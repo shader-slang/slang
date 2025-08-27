@@ -365,17 +365,22 @@ jobs:
           
           echo "Installing python packages..."
           
-          # Download and install requirements from slangpy repository
-          echo "Fetching requirements-dev.txt from slangpy repository..."
-          curl -fsSL https://raw.githubusercontent.com/shader-slang/slangpy/main/requirements-dev.txt -o requirements-dev.txt
-          
-          echo "Installing development requirements..."
-          python -m pip install -r requirements-dev.txt
-          python -m pip install pytest-github-actions-annotate-failures
+          # Only install additional packages on GitHub-hosted runners, not self-hosted
+          if [[ "${{ runner.environment }}" != "self-hosted" ]]; then
+            # Download and install requirements from slangpy repository
+            echo "Fetching requirements-dev.txt from slangpy repository..."
+            curl -fsSL https://raw.githubusercontent.com/shader-slang/slangpy/main/requirements-dev.txt -o requirements-dev.txt
+            
+            echo "Installing development requirements..."
+            python -m pip install -r requirements-dev.txt
+            python -m pip install pytest-github-actions-annotate-failures
+          else
+            echo "Skipping additional package installation on self-hosted runner"
+          fi
 
           echo "Running pytest on slangpy tests..."
           export PYTHONPATH="$SITE_PACKAGES"
-          python -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n auto
+          python -m pytest "$SITE_PACKAGES/slangpy/tests" -ra
       - uses: actions/upload-artifact@v4
         if: steps.filter.outputs.should-run == 'true' && ! matrix.full-gpu-tests
         with:
