@@ -8717,16 +8717,10 @@ static Expr* parsePrefixExpr(Parser* parser)
                 }
 
                 newLiteral->value = value;
-                // Mark this literal as having been negated if it was a unary minus operation
-                if (tokenType == TokenType::OpSub)
+                // Mark this literal as having been negated (unary minus or bitwise NOT)
+                if (tokenType == TokenType::OpSub || tokenType == TokenType::OpBitNot)
                 {
-                    newLiteral->wasNegated = true;
-                }
-                // Mark this literal as having been bitwise NOT if it was a unary bitwise NOT
-                // operation
-                if (tokenType == TokenType::OpBitNot)
-                {
-                    newLiteral->wasBitwiseNot = true;
+                    newLiteral->isLegitimateNegative = true;
                 }
                 return newLiteral;
             }

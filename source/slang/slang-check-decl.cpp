@@ -32,7 +32,8 @@ static void checkIntegerLiteralOverflow(
 {
     // Only apply overflow detection to integer types, not float types
     bool isIntegerType = false;
-    if (auto basicType = as<BasicExpressionType>(varDecl->type.type))
+    auto basicType = as<BasicExpressionType>(varDecl->type.type);
+    if (basicType)
     {
         const auto& info = BaseTypeInfo::getInfo(basicType->getBaseType());
         isIntegerType = (info.flags & BaseTypeInfo::Flag::Integer) != 0;
@@ -45,57 +46,60 @@ static void checkIntegerLiteralOverflow(
     }
 
     // Check if this literal was created by legitimate operations
-    bool isLegitimateNegative = intLit->wasNegated || intLit->wasBitwiseNot;
+    bool isLegitimateNegative = intLit->isLegitimateNegative;
 
     // Check if the value is valid for the declared type
     bool isValidForDeclaredType = false;
-    if (auto basicType = as<BasicExpressionType>(varDecl->type.type))
-    {
-        const auto& info = BaseTypeInfo::getInfo(basicType->getBaseType());
+    const auto& info = BaseTypeInfo::getInfo(basicType->getBaseType());
 
-        if (info.flags & BaseTypeInfo::Flag::Integer)
+    if (info.flags & BaseTypeInfo::Flag::Integer)
+    {
+        if (info.flags & BaseTypeInfo::Flag::Signed)
         {
-            if (info.flags & BaseTypeInfo::Flag::Signed)
+            // For signed types, check if the value fits within the type's range
+            int64_t minValue = 0, maxValue = 0;
+            switch (info.sizeInBytes)
             {
-                // For signed types, check if the value fits within the type's range
-                int64_t minValue = 0, maxValue = 0;
-                if (info.sizeInBytes == 1)
-                {
-                    minValue = INT8_MIN;
-                    maxValue = INT8_MAX;
-                }
-                else if (info.sizeInBytes == 2)
-                {
-                    minValue = INT16_MIN;
-                    maxValue = INT16_MAX;
-                }
-                else if (info.sizeInBytes == 4)
-                {
-                    minValue = INT32_MIN;
-                    maxValue = INT32_MAX;
-                }
-                else
-                {
-                    minValue = INT64_MIN;
-                    maxValue = INT64_MAX;
-                }
-                isValidForDeclaredType = (intLit->value >= minValue && intLit->value <= maxValue);
+            case 1:
+                minValue = INT8_MIN;
+                maxValue = INT8_MAX;
+                break;
+            case 2:
+                minValue = INT16_MIN;
+                maxValue = INT16_MAX;
+                break;
+            case 4:
+                minValue = INT32_MIN;
+                maxValue = INT32_MAX;
+                break;
+            default:
+                minValue = INT64_MIN;
+                maxValue = INT64_MAX;
+                break;
             }
-            else
+            isValidForDeclaredType = (intLit->value >= minValue && intLit->value <= maxValue);
+        }
+        else
+        {
+            // For unsigned types, check if the value is valid when interpreted as unsigned
+            uint64_t unsignedValue = (uint64_t)intLit->value;
+            uint64_t maxValue = 0;
+            switch (info.sizeInBytes)
             {
-                // For unsigned types, check if the value is valid when interpreted as unsigned
-                uint64_t unsignedValue = (uint64_t)intLit->value;
-                uint64_t maxValue = 0;
-                if (info.sizeInBytes == 1)
-                    maxValue = UINT8_MAX;
-                else if (info.sizeInBytes == 2)
-                    maxValue = UINT16_MAX;
-                else if (info.sizeInBytes == 4)
-                    maxValue = UINT32_MAX;
-                else
-                    maxValue = UINT64_MAX;
-                isValidForDeclaredType = (unsignedValue <= maxValue);
+            case 1:
+                maxValue = UINT8_MAX;
+                break;
+            case 2:
+                maxValue = UINT16_MAX;
+                break;
+            case 4:
+                maxValue = UINT32_MAX;
+                break;
+            default:
+                maxValue = UINT64_MAX;
+                break;
             }
+            isValidForDeclaredType = (unsignedValue <= maxValue);
         }
     }
 
