@@ -747,12 +747,7 @@ Result linkAndOptimizeIR(
     requiredLoweringPassSet = {};
     calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
 
-    ShortStringsOptions shortStrOptions = {};
-    shortStrOptions.targetSupportsStringLiterals =
-        (target == CodeGenTarget::CUDASource || target == CodeGenTarget::CPPSource ||
-         target == CodeGenTarget::CSource);
-    shortStrOptions.targetSupports8BitsIntegrals =
-        (target != CodeGenTarget::WGSL && target != CodeGenTarget::HLSL);
+    ShortStringsOptions shortStrOptions(target);
 
     // Debug info is added by the front-end, and therefore needs to be stripped out by targets that
     // opt out of debug info.

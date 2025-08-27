@@ -234,6 +234,44 @@ struct ShortStringLoweringPass : InstPassBase
     }
 };
 
+ShortStringsOptions::ShortStringsOptions(CodeGenTarget target)
+{
+    switch (target)
+    {
+    case CodeGenTarget::CSource:
+    case CodeGenTarget::CPPSource:
+    case CodeGenTarget::PyTorchCppBinding:
+    case CodeGenTarget::HostCPPSource:
+    case CodeGenTarget::HostExecutable:
+    case CodeGenTarget::HostSharedLibrary:
+    case CodeGenTarget::ShaderSharedLibrary:
+    case CodeGenTarget::ShaderHostCallable:
+    case CodeGenTarget::CUDASource:
+    case CodeGenTarget::PTX:
+    case CodeGenTarget::ObjectCode:
+    case CodeGenTarget::HostHostCallable:
+        targetSupportsStringLiterals = true;
+        break;
+    default:
+        targetSupportsStringLiterals = false;
+        break;
+    }
+    switch (target)
+    {
+    case CodeGenTarget::HLSL:
+    case CodeGenTarget::DXBytecode:
+    case CodeGenTarget::DXBytecodeAssembly:
+    case CodeGenTarget::DXIL:
+    case CodeGenTarget::DXILAssembly:
+    case CodeGenTarget::WGSL:
+        targetSupports8BitsIntegrals = false;
+        break;
+    default:
+        targetSupports8BitsIntegrals = true;
+        break;
+    }
+}
+
 bool lowerShortStringReturnChanged(
     TargetProgram* target,
     IRModule* module,

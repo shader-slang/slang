@@ -31,6 +31,8 @@ struct ShortStringsOptions
 {
     bool targetSupportsStringLiterals = false;
     bool targetSupports8BitsIntegrals = false;
+
+    ShortStringsOptions(CodeGenTarget target);
 };
 
 bool lowerShortStringReturnChanged(
