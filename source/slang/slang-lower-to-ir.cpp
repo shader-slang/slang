@@ -11672,7 +11672,7 @@ IRInst* getThisTypeFromInterfaceGeneric(IRInst* interfaceType)
     {
         auto genericReturn = findGenericReturnVal(generic);
         auto thisTypeInst = genericReturn;
-        while(!thisTypeInst)
+        while (!thisTypeInst)
         {
             if (as<IRThisType>(thisTypeInst))
                 return thisTypeInst;
