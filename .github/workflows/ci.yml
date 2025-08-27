@@ -363,9 +363,19 @@ jobs:
           echo "Listing files in slangpy directory..."
           ls -la "$SITE_PACKAGES/slangpy/"
           
+          echo "Installing python packages..."
+          
+          # Download and install requirements from slangpy repository
+          echo "Fetching requirements-dev.txt from slangpy repository..."
+          curl -fsSL https://raw.githubusercontent.com/shader-slang/slangpy/main/requirements-dev.txt -o requirements-dev.txt
+          
+          echo "Installing development requirements..."
+          python -m pip install -r requirements-dev.txt
+          python -m pip install pytest-github-actions-annotate-failures
+
           echo "Running pytest on slangpy tests..."
           export PYTHONPATH="$SITE_PACKAGES"
-          python -m pytest "$SITE_PACKAGES/slangpy/tests" -v
+          python -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n auto
       - uses: actions/upload-artifact@v4
         if: steps.filter.outputs.should-run == 'true' && ! matrix.full-gpu-tests
         with:
