@@ -4166,8 +4166,14 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitAddressOfExpr(AddressOfExpr* expr)
     {
+        auto loweredType = lowerType(context, expr->type);
         auto baseVal = lowerSubExpr(expr->arg);
-        return LoweredValInfo::ptr(baseVal.val);
+        auto ptr = LoweredValInfo::ptr(baseVal.val);
+
+        auto tempVar = context->irBuilder->emitVar(loweredType);
+        context->irBuilder->emitStore(tempVar, ptr.val);
+
+        return LoweredValInfo::ptr(tempVar);
     }
 
     LoweredValInfo visitIncompleteExpr(IncompleteExpr*)

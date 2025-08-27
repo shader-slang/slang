@@ -740,9 +740,12 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
             if (block == func->getFirstBlock())
             {
-                // A pointer typed function parameter should always be in the storage buffer address
-                // space.
-                addressSpace = AddressSpace::UserPointer;
+                // A pointer typed function parameter is in the storage buffer address
+                // space or groupshared.
+                if (as<IRGroupSharedRate>(inst->getRate()))
+                    addressSpace = AddressSpace::GroupShared;
+                else
+                    addressSpace = AddressSpace::UserPointer;
             }
             else
             {

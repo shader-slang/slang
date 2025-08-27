@@ -1840,7 +1840,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             (IRPtrTypeBase*)inst))
                         emitOpTypeForwardPointer(resultSpvType, storageClass);
                 }
-                if (storageClass == SpvStorageClassPhysicalStorageBuffer)
+                if (storageClass == SpvStorageClassPhysicalStorageBuffer ||
+                    storageClass == SpvStorageClassStorageBuffer)
                 {
                     if (m_decoratedSpvInsts.add(getID(resultSpvType)))
                     {
@@ -3863,20 +3864,22 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return spvDebugLocalVar;
     }
 
-    bool isLegalType(IRInst* type)
+    // returns true if the given type is legal for a `DebugVar`.
+    bool isLegalDebugVarType(IRInst* type)
     {
         switch (type->getOp())
         {
         case kIROp_UnsizedArrayType:
             return false;
         case kIROp_ArrayType:
-            return isLegalType(as<IRArrayType>(type)->getElementType());
+            return isLegalDebugVarType(as<IRArrayType>(type)->getElementType());
         case kIROp_VectorType:
         case kIROp_StructType:
         case kIROp_MatrixType:
             return true;
         case kIROp_PtrType:
-            return as<IRPtrTypeBase>(type)->getAddressSpace() == AddressSpace::UserPointer;
+            return as<IRPtrTypeBase>(type)->getAddressSpace() == AddressSpace::UserPointer ||
+                   as<IRPtrTypeBase>(type)->getAddressSpace() == AddressSpace::GroupShared;
         default:
             if (as<IRBasicType>(type))
                 return true;
@@ -3894,7 +3897,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         builder.setInsertBefore(debugVar);
         auto varType = tryGetPointedToType(&builder, debugVar->getDataType());
 
-        if (!isLegalType(varType))
+        if (!isLegalDebugVarType(varType))
             return nullptr;
 
         IRSizeAndAlignment sizeAlignment;
@@ -7356,7 +7359,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return emitOpAccessChain(
             parent,
             inst,
-            builder.getPtrType(arrayType, AccessQualifier::ReadWrite, addressSpace),
+            builder.getPtrType(arrayType, addressSpace),
             inst->getOperand(0),
             makeArray(emitIntConstant(0, builder.getIntType())));
     }
@@ -9283,10 +9286,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         if (auto ptrType = as<IRPtrTypeBase>(type))
         {
-            if (ptrType->getAddressSpace() == AddressSpace::StorageBuffer)
+            switch (ptrType->getAddressSpace())
             {
+            case AddressSpace::StorageBuffer:
+                ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_variable_pointers"));
+                requireSPIRVCapability(SpvCapabilityVariablePointersStorageBuffer);
+                break;
+            case AddressSpace::GroupShared:
                 ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_variable_pointers"));
                 requireSPIRVCapability(SpvCapabilityVariablePointers);
+                break;
             }
         }
     }
