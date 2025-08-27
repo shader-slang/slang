@@ -4167,11 +4167,19 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitAddressOfExpr(AddressOfExpr* expr)
     {
         auto loweredType = lowerType(context, expr->type);
-        auto baseVal = lowerSubExpr(expr->arg);
-        auto ptr = LoweredValInfo::ptr(baseVal.val);
-
+        auto baseVal = lowerLValueExpr(context, expr->arg);
+        auto ptr = tryGetAddress(context, baseVal, TryGetAddressMode::Aggressive);
         auto tempVar = context->irBuilder->emitVar(loweredType);
-        context->irBuilder->emitStore(tempVar, ptr.val);
+
+        switch (baseVal.flavor)
+        {
+        case LoweredValInfo::Flavor::Ptr:
+            context->irBuilder->emitStore(tempVar, ptr.val);
+
+        default:
+            SLANG_UNIMPLEMENTED_X("cannot get address of __getAddress(...) argument");
+            UNREACHABLE_RETURN(LoweredValInfo());
+        }
 
         return LoweredValInfo::ptr(tempVar);
     }
