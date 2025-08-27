@@ -4164,6 +4164,12 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     ASTBuilder* getASTBuilder() { return context->astBuilder; }
     LoweredValInfo lowerSubExpr(Expr* expr) { return sharedLoweringContext.lowerSubExpr(expr); }
 
+    LoweredValInfo visitAddressOfExpr(AddressOfExpr* expr)
+    {
+        auto baseVal = lowerSubExpr(expr->arg);
+        return LoweredValInfo::ptr(baseVal.val);
+    }
+
     LoweredValInfo visitIncompleteExpr(IncompleteExpr*)
     {
         SLANG_UNEXPECTED("a valid ast should not contain an IncompleteExpr.");

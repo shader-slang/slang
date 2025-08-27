@@ -1441,7 +1441,11 @@ DIAGNOSTIC(
     "If this is intended, consider using [NoDiffThis] on the function '$1' to suppress this "
     "warning. Alternatively, users can mark the parent struct as [Differentiable] to propagate "
     "derivatives.")
-
+DIAGNOSTIC(
+    31160,
+    Error,
+    invalidAddressOf,
+    "'__getAddress' only supports groupshared variables and groupshared variable indexing")
 DIAGNOSTIC(31200, Warning, deprecatedUsage, "$0 has been deprecated: $1")
 DIAGNOSTIC(31201, Error, modifierNotAllowed, "modifier '$0' is not allowed here.")
 DIAGNOSTIC(

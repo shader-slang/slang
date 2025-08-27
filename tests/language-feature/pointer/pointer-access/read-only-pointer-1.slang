@@ -22,7 +22,7 @@ void writeToReadOnlyPointerOut(out int ptrVal)
 void computeMain(int id : SV_DispatchThreadID)
 {
     // CHECK-NOT: ([[# @LINE+1]]): error
-    ReadPtr ptr1 = ReadPtr(&processMemory[id.x]);
+    ReadPtr ptr1 = ReadPtr(processMemory + id.x);
 
     // CHECK: ([[# @LINE+1]]): error 30011
     ptr1[id + 1] = 1;

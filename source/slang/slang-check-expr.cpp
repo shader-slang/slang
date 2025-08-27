@@ -3005,26 +3005,6 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                                 auto funcDeclRef = funcDeclRefExpr
                                                        ? getDeclRef(m_astBuilder, funcDeclRefExpr)
                                                        : DeclRef<Decl>();
-                                if (funcDeclRef)
-                                {
-                                    auto knownBuiltinAttr =
-                                        funcDeclRef.getDecl()
-                                            ->findModifier<KnownBuiltinAttribute>();
-                                    if (knownBuiltinAttr)
-                                    {
-                                        if (auto constantIntVal =
-                                                as<ConstantIntVal>(knownBuiltinAttr->name))
-                                        {
-                                            if (constantIntVal->getValue() ==
-                                                (int)KnownBuiltinDeclName::OperatorAddressOf)
-                                            {
-                                                getSink()->diagnose(
-                                                    argExpr,
-                                                    Diagnostics::cannotTakeConstantPointers);
-                                            }
-                                        }
-                                    }
-                                }
 
                                 getSink()->diagnose(
                                     argExpr,
@@ -4110,6 +4090,62 @@ Expr* SemanticsExprVisitor::visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
     sizeOfLikeExpr->sizedType = type;
 
     return sizeOfLikeExpr;
+}
+
+Expr* SemanticsExprVisitor::visitAddressOfExpr(AddressOfExpr* expr)
+{
+    expr->arg = CheckTerm(expr->arg);
+
+    // This address-of feature is purely experimental and for prototyping.
+    // Only allow known expressions.
+    // Note: Since we still expose `T*` as a `Ptr<T, AddressSpace::UserPointer>` we 
+    // still need to only create pointers of UserPointer/Generic address-space
+    auto tryToSetTypeWithBaseExpr = [&](Expr* addressSpaceSource, Expr* targetTypeSrc) -> bool
+    {
+        if (auto varExpr = as<VarExpr>(addressSpaceSource))
+        {
+            ensureDecl(varExpr->declRef, DeclCheckState::DefinitionChecked);
+            auto targetType = varExpr->declRef.substitute(m_astBuilder, targetTypeSrc->type.type);
+            if (auto varDecl = as<VarDeclBase>(varExpr->declRef.getDecl()))
+            {
+                // Handle variables tagged as [__vulkanHitObjectAttributes].
+                // This is an internal "hack" Slang uses.
+                if (varDecl->hasModifier<VulkanHitObjectAttributesAttribute>())
+                {
+                    expr->type = m_astBuilder->getPtrType(
+                        targetType,
+                        AccessQualifier::ReadWrite,
+                        AddressSpace::Generic);
+                    return true;
+                }
+                // Handle 'groupshared' variables.
+                else if (varDecl->hasModifier<HLSLGroupSharedModifier>())
+                {
+                    expr->type = m_astBuilder->getPtrType(
+                        targetType,
+                        AccessQualifier::ReadWrite,
+                        AddressSpace::GroupShared);
+                    return true;
+                }
+            }
+        }
+        return false;
+    };
+
+    if(tryToSetTypeWithBaseExpr(expr->arg, expr->arg))
+    {}
+    else if (auto indexExpr = as<IndexExpr>(expr->arg))
+    {
+        tryToSetTypeWithBaseExpr(
+            indexExpr->baseExpression, indexExpr);
+    }
+    
+    if (expr->type == nullptr)
+    {
+        getSink()->diagnose(expr, Diagnostics::invalidAddressOf);
+        expr->type = m_astBuilder->getErrorType();
+    }
+    return expr;
 }
 
 Expr* SemanticsExprVisitor::visitBuiltinCastExpr(BuiltinCastExpr* expr)

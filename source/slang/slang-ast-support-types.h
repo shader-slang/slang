@@ -233,7 +233,6 @@ FIDDLE() namespace Slang
         IDifferentiable,
         IDifferentiablePtr,
         NullDifferential,
-        OperatorAddressOf,
         COUNT
     };
 

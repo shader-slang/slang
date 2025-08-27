@@ -1282,6 +1282,7 @@ __builtin_type($((int)BaseType::AddressSpace))
 enum AddressSpace : uint64_t
 {
     Device = $((uint64_t)AddressSpace::UserPointer),
+    GroupShared = $((uint64_t)AddressSpace::GroupShared),
 };
 
 __builtin_type($((int)BaseType::MemoryScope))
@@ -2676,20 +2677,6 @@ __generic<$(ptrTypeParameterList)>
 __intrinsic_op(0)
 [require(cpp_cuda_spirv)]
 __prefix ConstRef<T> operator*($(fullPtrType) value);
-
-// Cannot infer generic from use-site, therefore only T can be 
-// used in the generic parameter list.
-__generic<T>
-__intrinsic_op(0)
-[require(cpp_cuda_spirv)]
-[KnownBuiltin($((int)KnownBuiltinDeclName::OperatorAddressOf))]
-__prefix Ptr<T> operator&(__ref T value);
-
-__generic<T>
-__intrinsic_op(0)
-[KnownBuiltin($( (int)KnownBuiltinDeclName::OperatorAddressOf))]
-[require(cpp_cuda_spirv)]
-__Addr<T> __get_addr(__ref T value);
 
 __generic<$(ptrTypeParameterList), TInt : __BuiltinIntegerType>
 __intrinsic_op($(kIROp_GetOffsetPtr))

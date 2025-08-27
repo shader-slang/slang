@@ -260,7 +260,8 @@
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::AndTypeExpr">(Slang::AndTypeExpr*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ModifiedTypeExpr">(Slang::ModifiedTypeExpr*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::PointerTypeExpr">(Slang::PointerTypeExpr*)&amp;astNodeType</ExpandedItem>
-            <Item Name="[type]">type</Item>
+			<ExpandedItem Condition="astNodeType == Slang::ASTNodeType::AddressOfExpr">(Slang::AddressOfExpr*)&amp;astNodeType</ExpandedItem>
+			<Item Name="[type]">type</Item>
             <Item Name="[Expr]">(Slang::Expr*)this,!</Item>
         </Expand>
     </Type>
