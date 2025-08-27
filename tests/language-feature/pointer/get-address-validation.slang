@@ -13,7 +13,7 @@ struct StructPtrInStruct
     DeviceStruct* ptr;
 }
 
-int* bufferUserPointer;
+uniform int* bufferUserPointer;
 RWStructuredBuffer<int> bufferStorage;
 groupshared int bufferGroupShared[100];
 uniform DeviceStruct* bufferUserPointerStruct;
@@ -37,18 +37,17 @@ GroupSharedPtr<T> paramGroupShared<T : __BuiltinIntegerType>(out groupshared T[1
 [numthreads(1, 1, 1)]
 void computeMain(int id : SV_DispatchThreadID)
 {
-
-    // CHECK-NOT: ([[# @LINE+1]]): error
-    int* ptr1 = __getAddress(bufferUserPointer[id.x]);
-
     // CHECK: ([[# @LINE+1]]): error 31160
-    int* ptr2 = __getAddress(bufferStorage[id.x]);
+    int* ptr1 = __getAddress(bufferStorage[id.x]);
 
-    // CHECK: ([[# @LINE+1]]): error 30019
-    int[100]* ptr3 = __getAddress(bufferGroupShared);
+    // CHECK ([[# @LINE+1]]): error
+    int[100]* ptr2 = __getAddress(bufferGroupShared);
+
+    // CHECK: ([[# @LINE+1]]): error
+    int* ptr3 = __getAddress(bufferGroupShared[id.x]);
 
     // CHECK-NOT: ([[# @LINE+1]]): error
-    int* ptr4 = __getAddress(bufferGroupShared[id.x]);
+    int* ptr4 = __getAddress(bufferUserPointer[id.x]);
 
     // CHECK-NOT: ([[# @LINE+1]]): error
     GroupSharedPtr<int[100]> ptr5 = __getAddress(bufferGroupShared);
@@ -71,10 +70,10 @@ void computeMain(int id : SV_DispatchThreadID)
     int* ptr10 = __getAddress(bufferUserPointerVector[0].x);
 
     output[id] = ptr1[id];
-    output[id] = ptr2[id];
-    output[id] = ptr3[id][0];
+    output[id] = ptr2[id][0];
+    output[id] = ptr3[id];
     output[id] = ptr4[id];
-    output[id] = ptr5[id][0];
+    output[id] = ptr5[id];
     output[id] = ptr6[id];
     output[id] = ptr7[id];
     output[id] = ptr8[id];

@@ -4155,7 +4155,6 @@ static PtrType* getValidTypeForAddressOf(
                     variableType,
                     AccessQualifier::ReadWrite,
                     AddressSpace::Generic);
-                
             }
             // Handle 'groupshared' variables.
             else if (hasHLSLGroupSharedModifier)
@@ -4165,13 +4164,13 @@ static PtrType* getValidTypeForAddressOf(
                     AccessQualifier::ReadWrite,
                     AddressSpace::GroupShared);
             }
-            // Handle global `uniform T*`
-            else if (hasUniformModifier && as<PtrType>(getType(m_astBuilder, varDeclRef)))
+            // Handle operation into pointer: `T* ptr2 = ptr1[1];`
+            else if (auto ptrType = as<PtrType>(getType(m_astBuilder, varDeclRef)))
             {
                 return m_astBuilder->getPtrType(
                     variableType,
-                    AccessQualifier::ReadWrite,
-                    AddressSpace::UserPointer);
+                    ptrType->getAccessQualifier(),
+                    ptrType->getAddressSpace());
             }
         }
     }

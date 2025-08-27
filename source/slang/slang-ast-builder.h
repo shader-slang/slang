@@ -531,6 +531,7 @@ public:
     // Construct the type `Ptr<valueType>`, where `Ptr`
     // is looked up as a builtin type.
     PtrType* getPtrType(Type* valueType, AccessQualifier accessQualifier, AddressSpace addrSpace);
+    PtrType* getPtrType(Type* valueType, Val* accessQualifier, Val* addrSpace);
 
     // Construct the type `Out<valueType>`
     OutType* getOutType(Type* valueType);
@@ -550,6 +551,11 @@ public:
     // Construct a pointer type like `Ptr<valueType>`, but where
     // the actual type name for the pointer type is given by `ptrTypeName`
     PtrTypeBase* getPtrType(Type* valueType, char const* ptrTypeName);
+    PtrTypeBase* getPtrType(
+        Type* valueType,
+        Val* accessQualifier,
+        Val* addrSpace,
+        char const* ptrTypeName);
     PtrTypeBase* getPtrType(
         Type* valueType,
         AccessQualifier accessQualifier,
