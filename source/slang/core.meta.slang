@@ -2671,6 +2671,12 @@ __intrinsic_op(0)
 [require(cpp_cuda_spirv)]
 __prefix Ref<T> operator*(Ptr<T, Access::ReadWrite, addrSpace> value);
 
+__generic<T>
+__intrinsic_op(0)
+[KnownBuiltin( $((int)KnownBuiltinDeclName::OperatorAddressOf))]
+[require(cpp_cuda)]
+__prefix Ptr<T, $((uint64_t)AddressSpace::UserPointer)ULL> operator&(__ref T value);
+
 // Unknown access qualifier or Access::Read access qualifier is a promise
 // that the pointer is not going to be used as an L-value.
 __generic<$(ptrTypeParameterList)>

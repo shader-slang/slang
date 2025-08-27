@@ -3005,6 +3005,26 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                                 auto funcDeclRef = funcDeclRefExpr
                                                        ? getDeclRef(m_astBuilder, funcDeclRefExpr)
                                                        : DeclRef<Decl>();
+                                if (funcDeclRef)
+                                {
+                                    auto knownBuiltinAttr =
+                                        funcDeclRef.getDecl()
+                                            ->findModifier<KnownBuiltinAttribute>();
+                                    if (knownBuiltinAttr)
+                                    {
+                                        if (auto constantIntVal =
+                                                as<ConstantIntVal>(knownBuiltinAttr->name))
+                                        {
+                                            if (constantIntVal->getValue() ==
+                                                (int)KnownBuiltinDeclName::OperatorAddressOf)
+                                            {
+                                                getSink()->diagnose(
+                                                    argExpr,
+                                                    Diagnostics::cannotTakeConstantPointers);
+                                            }
+                                        }
+                                    }
+                                }
 
                                 getSink()->diagnose(
                                     argExpr,
