@@ -1445,7 +1445,7 @@ DIAGNOSTIC(
     31160,
     Error,
     invalidAddressOf,
-    "'__getAddress' only supports groupshared variables and groupshared variable indexing")
+    "'__getAddress' only supports groupshared variables and members of groupshared/device memory.")
 DIAGNOSTIC(31200, Warning, deprecatedUsage, "$0 has been deprecated: $1")
 DIAGNOSTIC(31201, Error, modifierNotAllowed, "modifier '$0' is not allowed here.")
 DIAGNOSTIC(
