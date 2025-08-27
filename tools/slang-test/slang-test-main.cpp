@@ -1531,6 +1531,89 @@ ToolReturnCode spawnAndWait(
     return getReturnCode(outExeRes);
 }
 
+// Remove embedded source code from SPIR-V assembly output to prevent filecheck from matching
+// against embedded source instead of actual SPIR-V instructions
+String removeEmbeddedSourceFromSPIRV(const String& spirvOutput)
+{
+    StringBuilder filteredOutput;
+    List<UnownedStringSlice> lines;
+    StringUtil::calcLines(spirvOutput.getUnownedSlice(), lines);
+
+    // First pass: Find OpString IDs that are referenced by DebugSource (these contain embedded
+    // source)
+    List<String> sourceStringIds;
+
+    for (const auto& line : lines)
+    {
+        UnownedStringSlice trimmedLine = line.trim();
+
+        // Look for DebugSource instructions: %N = OpExtInst %void %M DebugSource %fileId %sourceId
+        if (trimmedLine.indexOf(UnownedStringSlice(" DebugSource ")) == Index(-1))
+            continue;
+
+        // Extract the last parameter which is the source string ID
+        // Pattern: %4 = OpExtInst %void %2 DebugSource %5 %1
+        List<UnownedStringSlice> tokens;
+        StringUtil::split(trimmedLine, ' ', tokens);
+
+        // The last token should be the source string ID
+        UnownedStringSlice lastToken = tokens.getLast();
+        if (lastToken.startsWith(UnownedStringSlice("%")))
+        {
+            sourceStringIds.add(String(lastToken));
+        }
+    }
+
+    // Second pass: Process embedded source strings to remove comment lines
+    bool insideSourceString = false;
+
+    for (const auto& line : lines)
+    {
+        UnownedStringSlice trimmedLine = line.trim();
+
+        if (!insideSourceString)
+        {
+            Index equalPos = trimmedLine.indexOf(UnownedStringSlice(" = OpString"));
+            if (equalPos != Index(-1) && trimmedLine.startsWith(UnownedStringSlice("%")))
+            {
+                String currentStringId = String(trimmedLine.head(equalPos));
+                if (sourceStringIds.contains(currentStringId))
+                {
+                    // Start processing this embedded source string
+                    insideSourceString = true;
+                }
+            }
+        }
+
+        if (insideSourceString)
+        {
+            Index commentPos = trimmedLine.indexOf(UnownedStringSlice("//"));
+            if (commentPos != -1)
+            {
+                // Keep everything before the comment, but add placeholder for the comment
+                UnownedStringSlice beforeComment = trimmedLine.head(commentPos);
+                filteredOutput.append(beforeComment);
+                filteredOutput.append("// [slang-test removed comment]\n");
+                continue;
+            }
+
+            if (trimmedLine.endsWith("\""))
+            {
+                insideSourceString = false;
+            }
+        }
+
+        // Add this line to the filtered output
+        filteredOutput.append(line);
+        filteredOutput.append("\n");
+    }
+
+    // The last empty line should be removed,
+    // because `StringUtil::calcLines()` turns "A\nB\n" into three lines
+    filteredOutput.reduceLength(filteredOutput.getLength() - 1);
+    return filteredOutput.produceString();
+}
+
 String getOutput(const ExecuteResult& exeRes)
 {
     ExecuteResult::ResultCode resultCode = exeRes.resultCode;
@@ -2367,6 +2450,13 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
     }
 
     String actualOutput = getOutput(exeRes);
+
+    // Check if we need to preprocess SPIR-V output to remove embedded source code
+    // This prevents filecheck from matching against embedded source instead of actual SPIR-V
+    if (target == SLANG_SPIRV || target == SLANG_SPIRV_ASM)
+    {
+        actualOutput = removeEmbeddedSourceFromSPIRV(actualOutput);
+    }
 
     return _validateOutput(
         context,

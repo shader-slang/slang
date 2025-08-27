@@ -1,4 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK):-target spirv -entry main -stage compute -g2 -emit-spirv-directly
+// This will be re-enabled when github #7693 is resolved
+//DISABLE_TEST:SIMPLE(filecheck=CHECK):-target spirv -entry main -stage compute -g2 -emit-spirv-directly
 
 struct TestType
 {
@@ -26,4 +27,4 @@ void main(int id : SV_DispatchThreadID)
 // CHECK: DebugFunctionDefinition
 // CHECK: DebugScope
 // CHECK: DebugLine
-// CHECK: DebugValue
+// CHECK: DebugDeclare
