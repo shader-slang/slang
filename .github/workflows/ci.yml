@@ -227,7 +227,7 @@ jobs:
         if: steps.filter.outputs.should-run == 'true'
         run: bash extras/verify-documented-compiler-version.sh
 
-      - name: Test Slang
+      - name: Check runtime environment
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && (matrix.platform != 'aarch64' || matrix.os == 'macos')
         run: |
           smokeResult=$("$bin_dir/slang-test" tests/render/check-backend-support-on-ci.slang)
@@ -242,13 +242,15 @@ jobs:
             do
               echo "Checking $backend ..." && echo "$supportedBackends" | grep -q "$backend"
             done
+
             for api in 'vk,vulkan' 'dx12,d3d12' 'dx11,d3d11' 'cuda' 'wgpu,webgpu'
             do
               echo "Checking $api ..." && echo "$smokeResult" | grep -q "Check $api: Supported"
             done
-            echo "Printing CUDA version: ..." && nvcc --version
-            echo "Printing Vulkan SDK version: ..." && vulkaninfo | grep -i version
 
+            echo "Printing CUDA compiler version: ..." && nvcc --version
+            echo "Printing GPU driver version: ..." && nvidia-smi -q | grep Version
+            echo "Printing Vulkan SDK version: ..." && vulkaninfo | grep -i version
           fi
 
           if [[ "${{matrix.os}}" == "macos" ]]
@@ -257,14 +259,21 @@ jobs:
             do
               echo "Checking $backend ..." && echo "$supportedBackends" | grep -q "$backend"
             done
+
             for api in 'mtl,metal'
             do
               echo "Checking $api ..." && echo "$smokeResult" | grep -q "Check $api: Supported"
             done
           fi
 
+      - name: Test Slang
+        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && (matrix.platform != 'aarch64' || matrix.os == 'macos')
+        run: |
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
+          if [ "${{ matrix.enable-debug-layers }}" == "true" ]; then
+            export VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation
+          fi
           if [[ "${{matrix.full-gpu-tests}}" == "true" ]]; then
             "$bin_dir/slang-test" \
               -use-test-server \
