@@ -4217,7 +4217,7 @@ static PtrType* getValidTypeForAddressOf(
             auto intrinsicOp = refAccessor->findModifier<IntrinsicOpModifier>();
             if (!intrinsicOp)
                 continue;
-            if (!intrinsicOp->op == kIROp_GetOffsetPtr)
+            if (intrinsicOp->op != kIROp_GetOffsetPtr)
                 continue;
             isOffsetIntrinsicOp = true;
         }
