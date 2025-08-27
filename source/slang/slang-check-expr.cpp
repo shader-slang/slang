@@ -4112,55 +4112,144 @@ Expr* SemanticsExprVisitor::visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
     return sizeOfLikeExpr;
 }
 
+// Determines if we have a valid `AddressOf` target.
+// Target to validate is `baseExpr`.
+// Original type is `targetType`.
+static PtrType* getValidTypeForAddressOf(
+    SemanticsVisitor* visitor,
+    ASTBuilder* m_astBuilder,
+    Expr* baseExpr,
+    Type* targetType)
+{
+    if (auto declRefExpr = as<DeclRefExpr>(baseExpr))
+    {
+        visitor->ensureDecl(declRefExpr->declRef, DeclCheckState::DefinitionChecked);
+        if (auto varDeclRef = as<VarDeclBase>(declRefExpr->declRef))
+        {
+            auto variableType = varDeclRef.substitute(m_astBuilder, targetType);
+            auto varDecl = varDeclRef.getDecl();
+            bool hasVulkanHitObjectAttributesAttribute = false;
+            bool hasHLSLGroupSharedModifier = false;
+            bool hasUniformModifier = false;
+            for(auto modifier : varDecl->modifiers)
+            {
+                if(as<VulkanHitObjectAttributesAttribute>(modifier))
+                    hasVulkanHitObjectAttributesAttribute = true;
+                else if(as<HLSLGroupSharedModifier>(modifier))
+                    hasHLSLGroupSharedModifier = true;
+                else if(as<HLSLUniformModifier>(modifier))
+                    hasUniformModifier = true;
+                    
+                if(hasVulkanHitObjectAttributesAttribute ||
+                    hasHLSLGroupSharedModifier ||
+                    hasUniformModifier)
+                    break;
+            }
+            
+            // Handle variables tagged as [__vulkanHitObjectAttributes].
+            // This support is needed for an internal "hack" Slang uses
+            // for raytracing.
+            if (hasVulkanHitObjectAttributesAttribute)
+            {
+                return m_astBuilder->getPtrType(
+                    variableType,
+                    AccessQualifier::ReadWrite,
+                    AddressSpace::Generic);
+                
+            }
+            // Handle 'groupshared' variables.
+            else if (hasHLSLGroupSharedModifier)
+            {
+                return m_astBuilder->getPtrType(
+                    variableType,
+                    AccessQualifier::ReadWrite,
+                    AddressSpace::GroupShared);
+            }
+            // Handle global `uniform T*`
+            else if (hasUniformModifier && as<PtrType>(getType(m_astBuilder, varDeclRef)))
+            {
+                return m_astBuilder->getPtrType(
+                    variableType,
+                    AccessQualifier::ReadWrite,
+                    AddressSpace::UserPointer);
+            }
+        }
+    }
+    
+    if (auto indexExpr = as<IndexExpr>(baseExpr))
+    {
+        return getValidTypeForAddressOf(
+            visitor,
+            m_astBuilder,
+            indexExpr->baseExpression,
+            targetType);
+    }
+    else if (auto memberExpr = as<MemberExpr>(baseExpr))
+    {
+        // Only allow `__getAddress` if we are refering to a member-variable
+        if (as<VarDeclBase>(memberExpr->declRef))
+            return getValidTypeForAddressOf(
+                visitor,
+                m_astBuilder,
+                memberExpr->baseExpression,
+                targetType);
+    }
+    else if (auto derefExpr = as<DerefExpr>(baseExpr))
+    {
+        return getValidTypeForAddressOf(
+            visitor,
+            m_astBuilder,
+            derefExpr->base,
+            targetType);
+    }
+    else if (auto invokeExpr = as<InvokeExpr>(baseExpr))
+    {
+        // Only allow the `kIROp_GetOffsetPtr` subscript operator
+        auto functionMemberExpr = as<MemberExpr>(invokeExpr->functionExpr);
+        if (!functionMemberExpr)
+            return nullptr;
+        auto subscriptDecl = as<SubscriptDecl>(functionMemberExpr->declRef.getDecl());
+        if (!subscriptDecl)
+            return nullptr;
+        bool isOffsetIntrinsicOp = false;
+        for (auto refAccessor : subscriptDecl->getMembersOfType<RefAccessorDecl>())
+        {
+            auto intrinsicOp = refAccessor->findModifier<IntrinsicOpModifier>();
+            if (!intrinsicOp)
+                continue;
+            if (!intrinsicOp->op == kIROp_GetOffsetPtr)
+                continue;
+            isOffsetIntrinsicOp = true;
+        }
+        if (!isOffsetIntrinsicOp)
+            return nullptr;
+        
+        // Since we have an offset, lets continue to check if we have a valid base
+        return getValidTypeForAddressOf(visitor, m_astBuilder, functionMemberExpr->baseExpression, targetType);
+    }
+    else if (auto swizzleExpr = as<SwizzleExpr>(baseExpr))
+    {
+        return getValidTypeForAddressOf(
+            visitor,
+            m_astBuilder,
+            swizzleExpr->base,
+            targetType);
+    }
+    return nullptr;
+}
+
 Expr* SemanticsExprVisitor::visitAddressOfExpr(AddressOfExpr* expr)
 {
     expr->arg = CheckTerm(expr->arg);
 
     // This address-of feature is purely experimental and for prototyping.
     // Only allow known expressions.
-    // Note: Since we still expose `T*` as a `Ptr<T, AddressSpace::UserPointer>` we 
-    // still need to only create pointers of UserPointer/Generic address-space
-    auto tryToSetTypeWithBaseExpr = [&](Expr* addressSpaceSource, Expr* targetTypeSrc) -> bool
-    {
-        if (auto varExpr = as<VarExpr>(addressSpaceSource))
-        {
-            ensureDecl(varExpr->declRef, DeclCheckState::DefinitionChecked);
-            auto targetType = varExpr->declRef.substitute(m_astBuilder, targetTypeSrc->type.type);
-            if (auto varDecl = as<VarDeclBase>(varExpr->declRef.getDecl()))
-            {
-                // Handle variables tagged as [__vulkanHitObjectAttributes].
-                // This is an internal "hack" Slang uses.
-                if (varDecl->hasModifier<VulkanHitObjectAttributesAttribute>())
-                {
-                    expr->type = m_astBuilder->getPtrType(
-                        targetType,
-                        AccessQualifier::ReadWrite,
-                        AddressSpace::Generic);
-                    return true;
-                }
-                // Handle 'groupshared' variables.
-                else if (varDecl->hasModifier<HLSLGroupSharedModifier>())
-                {
-                    expr->type = m_astBuilder->getPtrType(
-                        targetType,
-                        AccessQualifier::ReadWrite,
-                        AddressSpace::GroupShared);
-                    return true;
-                }
-            }
-        }
-        return false;
-    };
-
-    if(tryToSetTypeWithBaseExpr(expr->arg, expr->arg))
-    {}
-    else if (auto indexExpr = as<IndexExpr>(expr->arg))
-    {
-        tryToSetTypeWithBaseExpr(
-            indexExpr->baseExpression, indexExpr);
-    }
-    
-    if (expr->type == nullptr)
+    expr->type = getValidTypeForAddressOf(
+        this,
+        m_astBuilder,
+        expr->arg,
+        getType(m_astBuilder, expr->arg));
+    if (!expr->type)
     {
         getSink()->diagnose(expr, Diagnostics::invalidAddressOf);
         expr->type = m_astBuilder->getErrorType();

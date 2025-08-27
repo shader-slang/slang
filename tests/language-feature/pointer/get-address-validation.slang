@@ -2,9 +2,23 @@
 
 // Tests for invalid/valid use of `__getAddress`
 
+struct DeviceStruct
+{
+    int data1;
+    int data2;
+}
+
+struct StructPtrInStruct
+{
+    DeviceStruct* ptr;
+}
+
 int* bufferUserPointer;
 RWStructuredBuffer<int> bufferStorage;
 groupshared int bufferGroupShared[100];
+uniform DeviceStruct* bufferUserPointerStruct;
+uniform int2* bufferUserPointerVector;
+
 int* output;
 
 typealias GroupSharedPtr<T> = Ptr<T, Access::ReadWrite, AddressSpace::GroupShared>;
@@ -24,7 +38,7 @@ GroupSharedPtr<T> paramGroupShared<T : __BuiltinIntegerType>(out groupshared T[1
 void computeMain(int id : SV_DispatchThreadID)
 {
 
-    // CHECK: ([[# @LINE+1]]): error 31160
+    // CHECK-NOT: ([[# @LINE+1]]): error
     int* ptr1 = __getAddress(bufferUserPointer[id.x]);
 
     // CHECK: ([[# @LINE+1]]): error 31160
@@ -33,7 +47,7 @@ void computeMain(int id : SV_DispatchThreadID)
     // CHECK: ([[# @LINE+1]]): error 30019
     int[100]* ptr3 = __getAddress(bufferGroupShared);
 
-    // CHECK: ([[# @LINE+1]]): error 30019
+    // CHECK-NOT: ([[# @LINE+1]]): error
     int* ptr4 = __getAddress(bufferGroupShared[id.x]);
 
     // CHECK-NOT: ([[# @LINE+1]]): error
@@ -45,6 +59,17 @@ void computeMain(int id : SV_DispatchThreadID)
     // CHECK-NOT: ([[# @LINE+1]]): error
     GroupSharedPtr<int> ptr7 = paramGroupShared(bufferGroupShared);
 
+    // CHECK-NOT: ([[# @LINE+1]]): error
+    int* ptr8 = __getAddress(bufferUserPointerStruct.data1);
+
+    StructPtrInStruct structPtrInStruct;
+    structPtrInStruct.ptr = bufferUserPointerStruct;
+    // CHECK-NOT: ([[# @LINE+1]]): error
+    int* ptr9 = __getAddress(structPtrInStruct.ptr[id.x].data1);
+
+    // CHECK-NOT: ([[# @LINE+1]]): error
+    int* ptr10 = __getAddress(bufferUserPointerVector[0].x);
+
     output[id] = ptr1[id];
     output[id] = ptr2[id];
     output[id] = ptr3[id][0];
@@ -52,4 +77,7 @@ void computeMain(int id : SV_DispatchThreadID)
     output[id] = ptr5[id][0];
     output[id] = ptr6[id];
     output[id] = ptr7[id];
+    output[id] = ptr8[id];
+    output[id] = ptr9[id];
+    output[id] = ptr10[id];
 }
