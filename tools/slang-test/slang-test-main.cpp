@@ -1603,7 +1603,7 @@ String removeEmbeddedSourceFromSPIRV(const String& spirvOutput)
 
         if (insideSourceString)
         {
-            if (trimmedLine.endsWith("\"") && 
+            if (trimmedLine.endsWith("\"") &&
                 (trimmedLine.getLength() < 2 || trimmedLine[trimmedLine.getLength() - 2] != '\\'))
             {
                 insideSourceString = false;
