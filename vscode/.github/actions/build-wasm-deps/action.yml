@@ -1,0 +1,102 @@
+# Composite action to build and cache WASM dependencies (slang, spirv-tools)
+name: 'Build WASM Deps'
+description: 'Build and cache WASM dependencies (slang, spirv-tools) for the project.'
+inputs:
+  build-artifacts-dir:
+    description: 'Directory to move built artifacts into.'
+    required: true
+    default: ./src
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup emsdk
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ninja-build
+        source ./build_scripts/setup-emsdk.sh
+
+    - name: get slang head commit
+      shell: bash
+      run: |
+        if [ ! -d "slang-repo" ]; then
+          git clone https://github.com/shader-slang/slang.git slang-repo
+        fi
+        git -C slang-repo rev-parse HEAD > key.txt
+
+    - name: get spirv-tool head commit
+      shell: bash
+      run: |
+        source ./build_scripts/setup-spirv-tools.sh
+        git -C spirv-tools rev-parse HEAD > key-spirv-tool.txt
+
+    - name: restore slang-wasm
+      id: cache_slang
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          ./slang-wasm.js
+          ./slang-wasm.d.ts
+          ./slang-wasm.worker.js
+          ./slang-wasm.worker.d.ts
+          ./slang-wasm.node.js
+          ./slang-wasm.node.d.ts
+        key: ${{ hashFiles('key.txt') }}
+
+    - name: restore spirv-tools
+      id: cache_spirv_tools
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          ./spirv-tools.js
+          ./spirv-tools.d.ts
+          ./spirv-tools.worker.js
+          ./spirv-tools.worker.d.ts
+          ./spirv-tools.node.js
+          ./spirv-tools.node.d.ts
+        key: ${{ hashFiles('key-spirv-tool.txt') }}
+
+    - name: slang-wasm build
+      if: steps.cache_slang.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        /bin/bash -x ./build_scripts/slang-wasm-build.sh
+
+    - name: save slang-wasm
+      if: steps.cache_slang.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          ./slang-wasm.js
+          ./slang-wasm.d.ts
+          ./slang-wasm.worker.js
+          ./slang-wasm.worker.d.ts
+          ./slang-wasm.node.js
+          ./slang-wasm.node.d.ts
+        key: ${{ hashFiles('key.txt') }}
+
+    - name: spirv-tools-wasm build
+      if: steps.cache_spirv_tools.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        /bin/bash -x ./build_scripts/spirv-tool-wasm-build.sh
+
+    - name: save spirv-tools-wasm
+      if: steps.cache_spirv_tools.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          ./spirv-tools.js
+          ./spirv-tools.d.ts
+          ./spirv-tools.worker.js
+          ./spirv-tools.worker.d.ts
+          ./spirv-tools.node.js
+          ./spirv-tools.node.d.ts
+        key: ${{ hashFiles('key-spirv-tool.txt') }}
+
+    - name: Move artifacts
+      shell: bash
+      run: |
+        mkdir -p ${{ inputs.build-artifacts-dir }}
+        mv ./slang-wasm.js ./slang-wasm.d.ts ./slang-wasm.worker.js ./slang-wasm.worker.d.ts ./slang-wasm.node.js ./slang-wasm.node.d.ts ${{ inputs.build-artifacts-dir }}/
+        mv ./spirv-tools.js ./spirv-tools.d.ts ./spirv-tools.worker.js ./spirv-tools.worker.d.ts ./spirv-tools.node.js ./spirv-tools.node.d.ts ${{ inputs.build-artifacts-dir }}/
