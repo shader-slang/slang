@@ -15,8 +15,8 @@
 // runtime error VUID-RuntimeSpirv-shaderDenormFlushToZeroFloat32-06300 during CI testing
 //DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=FTZ):-vk -compute -Xslang -denorm-mode-fp32 -Xslang ftz
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=PRESERVE):-slang -compute -dx12 -use-dxil -profile cs_6_2 -shaderobj -Xslang -denorm-mode-fp32 -Xslang preserve
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=FTZ):-slang -compute -dx12 -use-dxil -profile cs_6_2 -Xslang -denorm-mode-fp32 -Xslang ftz
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=PRESERVE):-slang -compute -dx12 -profile cs_6_2 -shaderobj -Xslang -denorm-mode-fp32 -Xslang preserve
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=FTZ):-slang -compute -dx12 -profile cs_6_2 -Xslang -denorm-mode-fp32 -Xslang ftz
 
 // CHECK_ANY-NOT: DenormPreserve
 // CHECK_ANY-NOT: DenormFlushToZero
