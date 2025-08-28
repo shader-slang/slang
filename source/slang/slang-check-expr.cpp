@@ -4134,7 +4134,7 @@ static PtrType* getValidTypeForAddressOf(
 
         auto variableType = varDeclRef.substitute(m_astBuilder, targetType);
 
-        auto ptrType = as<PtrType>(getType(m_astBuilder, varDeclRef)); 
+        auto ptrType = as<PtrType>(getType(m_astBuilder, varDeclRef));
         if (!ptrType)
             return nullptr;
 
