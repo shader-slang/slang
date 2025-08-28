@@ -1364,17 +1364,10 @@ static SlangResult _innerMain(
         break;
 
     case DeviceType::D3D12:
-        input.target = SLANG_DXBC;
-        input.profile = "sm_5_0";
+        input.target = SLANG_DXIL;
+        input.profile = "sm_6_5";
         nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
-        slangPassThrough = SLANG_PASS_THROUGH_FXC;
-
-        if (options.useDXIL)
-        {
-            input.target = SLANG_DXIL;
-            input.profile = "sm_6_5";
-            slangPassThrough = SLANG_PASS_THROUGH_DXC;
-        }
+        slangPassThrough = SLANG_PASS_THROUGH_DXC;
         break;
 
     case DeviceType::Vulkan:

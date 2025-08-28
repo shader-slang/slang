@@ -64,7 +64,6 @@ struct Options
 
     bool outputUsingType = false;
 
-    bool useDXIL = false;
     bool onlyStartup = false;
 
     bool performanceProfile = false;

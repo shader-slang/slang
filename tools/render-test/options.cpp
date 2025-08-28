@@ -154,10 +154,6 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
         {
             outOptions.shaderType = ShaderProgramType::GraphicsTaskMeshCompute;
         }
-        else if (argValue == "-use-dxil")
-        {
-            outOptions.useDXIL = true;
-        }
         else if (argValue == "-skip-spirv-validation")
         {
             outOptions.skipSPIRVValidation = true;
