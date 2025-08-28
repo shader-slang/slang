@@ -1,5 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-dx12 -use-dxil -compute -shaderobj -output-using-type -xslang -matrix-layout-column-major
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-dx12 -use-dxil -compute -shaderobj -output-using-type -xslang -matrix-layout-row-major
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-dx12 -compute -shaderobj -output-using-type -xslang -matrix-layout-column-major
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-dx12 -compute -shaderobj -output-using-type -xslang -matrix-layout-row-major
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-vk -compute -shaderobj -output-using-type -xslang -matrix-layout-column-major
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-vk -compute -shaderobj -output-using-type -xslang -matrix-layout-row-major
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-mtl -compute -output-using-type -xslang -matrix-layout-column-major

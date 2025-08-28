@@ -1,6 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
 //TEST(compute):COMPARE_COMPUTE:-dx12  -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-dx12 -use-dxil -shaderobj
+//TEST(compute):COMPARE_COMPUTE:-dx12 -shaderobj
 //TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
 //TEST(compute):COMPARE_COMPUTE:-cuda -shaderobj
 // Note VK output is not loop unrolled

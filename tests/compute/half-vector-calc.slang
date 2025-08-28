@@ -1,4 +1,4 @@
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-dx12 -compute -output-using-type -use-dxil -profile cs_6_2 -render-features half -shaderobj
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-dx12 -compute -output-using-type -profile cs_6_2 -render-features half -shaderobj
 //TEST(compute):COMPARE_COMPUTE:-vk -compute -output-using-type -profile cs_6_2 -render-features half -shaderobj
 //TEST(compute):COMPARE_COMPUTE:-cuda -compute -output-using-type -render-features half -shaderobj
 

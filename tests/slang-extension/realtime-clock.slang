@@ -7,7 +7,7 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-dx11 -slang -compute  -output-using-type -nvapi-slot u0 -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -render-feature realtime-clock -output-using-type -shaderobj
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -output-using-type -nvapi-slot u0 -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -use-dxil  -output-using-type -nvapi-slot u0 -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute  -output-using-type -nvapi-slot u0 -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj
 
 // The test doesn't directly use this, but having this defined makes the 0 slot available if NVAPI is going to be used

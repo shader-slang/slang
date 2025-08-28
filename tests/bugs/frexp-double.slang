@@ -1,5 +1,5 @@
 //TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-output-using-type -render-feature double
-//TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-dx12 -use-dxil -output-using-type
+//TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-dx12 -output-using-type
 //TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -output-using-type
 //TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type  -render-feature double
 //TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -emit-spirv-directly -output-using-type  -render-feature double

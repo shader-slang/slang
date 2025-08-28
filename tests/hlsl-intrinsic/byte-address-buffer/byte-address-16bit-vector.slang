@@ -9,7 +9,7 @@
 // Note: disabled on D3D12 because some of the CI services don't have
 // a recent enough build of dxc to support generic load/store.
 //
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -profile cs_6_2 -render-features half -shaderobj
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_2 -render-features half -shaderobj
 
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-slang -vk -compute -profile cs_6_2 -render-features half -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -cuda -compute -shaderobj

@@ -3,7 +3,7 @@
 // Doesn't work on FXC
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -profile sm_6_2 -render-feature half -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_2 -render-feature half -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -render-feature int16,half -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -render-features half -output-using-type
 

@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=MTL):-target metal -entry computeMain -stage compute -DMETAL
 //TEST:SIMPLE(filecheck=LIB):-target metallib -entry computeMain -stage compute -DMETAL
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -dx12 -profile cs_6_0 -use-dxil -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -dx12 -profile cs_6_0 -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-vk -compute -shaderobj -output-using-type
 
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj -output-using-type

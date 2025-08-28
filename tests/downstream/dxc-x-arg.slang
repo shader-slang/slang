@@ -5,7 +5,7 @@
 
 // We are going to pass -Gis to DXC.
 // Test can only work on DXC.
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -Xslang... -Xdxc -Gis -X. -shaderobj 
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -Xslang... -Xdxc -Gis -X. -shaderobj 
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 

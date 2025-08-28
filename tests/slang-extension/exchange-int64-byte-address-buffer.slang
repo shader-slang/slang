@@ -2,7 +2,7 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
 // No support for int64_t on DX11
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -use-dxil -render-features atomic-int64 -compile-arg -O2 -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -render-features atomic-int64 -compile-arg -O2 -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -render-features atomic-int64 -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
 

@@ -1,6 +1,6 @@
 // bit-cast-16-bit.slang
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -profile sm_6_2 -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_2 -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -render-feature int16,half
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
 

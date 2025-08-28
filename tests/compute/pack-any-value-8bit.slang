@@ -2,7 +2,7 @@
 
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -render-feature int16
-//TEST_DISABLED(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_2 -use-dxil -output-using-type
+//TEST_DISABLED(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_2 -output-using-type
 
 [anyValueSize(20)]
 interface IInterface

@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -shaderobj -output-using-type -use-dxil -profile cs_6_7 -dx12 -xslang -Wno-41024
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -shaderobj -output-using-type -profile cs_6_7 -dx12 -xslang -Wno-41024
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-vk -compute -shaderobj -output-using-type -emit-spirv-directly -render-feature hardware-device -xslang -DVK -xslang -Wno-41024
 
 //TEST_INPUT: ubuffer(data=[2], stride=4):out,name outputBuffer

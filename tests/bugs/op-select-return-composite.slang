@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-d3d12 -output-using-type -use-dxil
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-d3d12 -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type -profile sm_6_0
 

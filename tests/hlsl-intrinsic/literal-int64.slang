@@ -3,7 +3,7 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX(filecheck=CHK):-slang -compute -shaderobj
 // No support with Dx12 with dxbc. Needs SM6.0 + dxil
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX(filecheck=CHK):-slang -compute -dx12 -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck=CHK):-slang -compute -profile cs_6_0 -dx12 -use-dxil -shaderobj -render-feature hardware-device
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck=CHK):-slang -compute -profile cs_6_0 -dx12 -shaderobj -render-feature hardware-device
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck=CHK):-vk -compute -shaderobj -render-feature int64
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck=CHK):-cuda -compute -shaderobj
 

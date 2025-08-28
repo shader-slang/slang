@@ -1,5 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -compute -Xslang -DSKIP_HALF_PRECISION
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12 -profile cs_6_2 -use-dxil -compute
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12 -profile cs_6_2 -compute
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -emit-spirv-directly -compute
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cuda -compute -Xslang -DSKIP_HALF_PRECISION
 //TEST_DISABLED(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -wgpu -compute

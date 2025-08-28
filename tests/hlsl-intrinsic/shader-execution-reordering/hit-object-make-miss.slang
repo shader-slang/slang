@@ -5,7 +5,7 @@
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry rayGenerationMain -stage raygeneration -emit-spirv-directly
 
 //DISABLE_TEST:COMPARE_COMPUTE_EX:-slang -compute -dx12 -output-using-type -profile sm_6_5 -nvapi-slot u0 
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-d3d12 -output-using-type -use-dxil -profile sm_6_5 -render-feature ray-query
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-d3d12 -output-using-type -profile sm_6_5 -render-feature ray-query
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-vk -output-using-type -render-feature ray-query
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer

@@ -3,7 +3,7 @@
 #language 2026
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -use-dxil -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -shaderobj
 
