@@ -4131,21 +4131,20 @@ static PtrType* getValidTypeForAddressOf(
             bool hasVulkanHitObjectAttributesAttribute = false;
             bool hasHLSLGroupSharedModifier = false;
             bool hasUniformModifier = false;
-            for(auto modifier : varDecl->modifiers)
+            for (auto modifier : varDecl->modifiers)
             {
-                if(as<VulkanHitObjectAttributesAttribute>(modifier))
+                if (as<VulkanHitObjectAttributesAttribute>(modifier))
                     hasVulkanHitObjectAttributesAttribute = true;
-                else if(as<HLSLGroupSharedModifier>(modifier))
+                else if (as<HLSLGroupSharedModifier>(modifier))
                     hasHLSLGroupSharedModifier = true;
-                else if(as<HLSLUniformModifier>(modifier))
+                else if (as<HLSLUniformModifier>(modifier))
                     hasUniformModifier = true;
-                    
-                if(hasVulkanHitObjectAttributesAttribute ||
-                    hasHLSLGroupSharedModifier ||
+
+                if (hasVulkanHitObjectAttributesAttribute || hasHLSLGroupSharedModifier ||
                     hasUniformModifier)
                     break;
             }
-            
+
             // Handle variables tagged as [__vulkanHitObjectAttributes].
             // This support is needed for an internal "hack" Slang uses
             // for raytracing.
@@ -4174,7 +4173,7 @@ static PtrType* getValidTypeForAddressOf(
             }
         }
     }
-    
+
     if (auto indexExpr = as<IndexExpr>(baseExpr))
     {
         return getValidTypeForAddressOf(
@@ -4195,11 +4194,7 @@ static PtrType* getValidTypeForAddressOf(
     }
     else if (auto derefExpr = as<DerefExpr>(baseExpr))
     {
-        return getValidTypeForAddressOf(
-            visitor,
-            m_astBuilder,
-            derefExpr->base,
-            targetType);
+        return getValidTypeForAddressOf(visitor, m_astBuilder, derefExpr->base, targetType);
     }
     else if (auto invokeExpr = as<InvokeExpr>(baseExpr))
     {
@@ -4222,17 +4217,17 @@ static PtrType* getValidTypeForAddressOf(
         }
         if (!isOffsetIntrinsicOp)
             return nullptr;
-        
+
         // Since we have an offset, lets continue to check if we have a valid base
-        return getValidTypeForAddressOf(visitor, m_astBuilder, functionMemberExpr->baseExpression, targetType);
-    }
-    else if (auto swizzleExpr = as<SwizzleExpr>(baseExpr))
-    {
         return getValidTypeForAddressOf(
             visitor,
             m_astBuilder,
-            swizzleExpr->base,
+            functionMemberExpr->baseExpression,
             targetType);
+    }
+    else if (auto swizzleExpr = as<SwizzleExpr>(baseExpr))
+    {
+        return getValidTypeForAddressOf(visitor, m_astBuilder, swizzleExpr->base, targetType);
     }
     return nullptr;
 }
@@ -4243,11 +4238,8 @@ Expr* SemanticsExprVisitor::visitAddressOfExpr(AddressOfExpr* expr)
 
     // This address-of feature is purely experimental and for prototyping.
     // Only allow known expressions.
-    expr->type = getValidTypeForAddressOf(
-        this,
-        m_astBuilder,
-        expr->arg,
-        getType(m_astBuilder, expr->arg));
+    expr->type =
+        getValidTypeForAddressOf(this, m_astBuilder, expr->arg, getType(m_astBuilder, expr->arg));
     if (!expr->type)
     {
         getSink()->diagnose(expr, Diagnostics::invalidAddressOf);
