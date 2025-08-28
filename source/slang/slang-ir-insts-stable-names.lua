@@ -670,4 +670,6 @@ return {
 	["SPIRVAsmOperand.__imageType"] = 666,
 	["SPIRVAsmOperand.__sampledImageType"] = 667,
 	["Type.CLayout"] = 668,
+	["Type.StringTypeBase.ShortString"] = 669,
+	["getCharFromString"] = 670,
 }
