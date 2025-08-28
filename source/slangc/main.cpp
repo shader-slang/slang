@@ -1,6 +1,5 @@
 // main.cpp
 
-#include "slang-tag-version.h"
 #include "slang.h"
 
 SLANG_API void spSetCommandLineCompilerMode(SlangCompileRequest* request);
@@ -8,6 +7,7 @@ SLANG_API void spSetCommandLineCompilerMode(SlangCompileRequest* request);
 #include "../core/slang-io.h"
 #include "../core/slang-test-tool-util.h"
 #include "../slang/slang-internal.h"
+#include "slang-tag-version.h"
 
 using namespace Slang;
 
@@ -20,8 +20,8 @@ static const char* getSlangcVersionString()
     return SLANG_TAG_VERSION;
 }
 
-// Check if version option is present and handle version check
-static bool handleVersionOption(
+// Check if slangc and slang library version match
+static void checkSlangcAndSlanglibVersion(
     SlangCompileRequest* compileRequest,
     int argc,
     const char* const* argv)
@@ -38,50 +38,13 @@ static bool handleVersionOption(
             const char* slangLibVersion = spGetBuildTagString();
 
             // Apply the same logic as getBuildTagString() for slangc version
-            String slangcVersion;
-            if (UnownedStringSlice(slangcVersionRaw) == "0.0.0-unknown")
+            if(strcmp(slangcVersionRaw, slangLibVersion) != 0)
             {
-                // For slangc, we can't easily get the executable timestamp like shared libraries,
-                // so we'll use a different approach - we'll consider "0.0.0-unknown" to match
-                // any library version that also resolves to a timestamp.
-                slangcVersion = slangcVersionRaw;
+                auto stdOut = StdWriters::getOut();
+                stdOut.print("[Warning] slangc version (%s) does not match slang library version (%s)\n", slangcVersionRaw, slangLibVersion);
             }
-            else
-            {
-                slangcVersion = slangcVersionRaw;
-            }
-
-            // Compare versions
-            bool versionsMatch = false;
-            if (slangcVersion == slangLibVersion)
-            {
-                versionsMatch = true;
-            }
-            else if (
-                UnownedStringSlice(slangcVersionRaw) == "0.0.0-unknown" &&
-                UnownedStringSlice(slangLibVersion).getLength() > 0 && isdigit(slangLibVersion[0]))
-            {
-                // Both are using fallback logic (timestamp for library, unknown for slangc)
-                // Consider this a match since they're built from the same source
-                versionsMatch = true;
-            }
-
-            auto stdOut = StdWriters::getOut();
-            stdOut.print("%s\n", slangLibVersion);
-
-            if (!versionsMatch)
-            {
-                // Versions don't match, print warning
-                auto stdError = StdWriters::getError();
-                stdError.print(
-                    "warning: slangc version (%s) does not match slang library version (%s)\n",
-                    slangcVersion.getBuffer(),
-                    slangLibVersion);
-            }
-            return true; // Handled version option
         }
     }
-    return false; // No version option found
 }
 
 #ifdef _WIN32
@@ -107,11 +70,7 @@ static SlangResult _compile(SlangCompileRequest* compileRequest, int argc, const
         appName = argv[0];
 
     // Check for version option first and handle version checking
-    if (handleVersionOption(compileRequest, argc, argv))
-    {
-        return SLANG_OK; // Version option handled, exit successfully
-    }
-
+    checkSlangcAndSlanglibVersion(compileRequest, argc, argv);
     {
         const SlangResult res = spProcessCommandLineArguments(compileRequest, &argv[1], argc - 1);
         if (SLANG_FAILED(res))
