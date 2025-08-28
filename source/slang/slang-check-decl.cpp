@@ -678,8 +678,15 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
             return;
         return DeclVisitor<VisitorType>::dispatch(val);
     }
+
     // Expr Visitor
     void visitExpr(Expr*) {}
+    
+    void visitOpenRefExpr(OpenRefExpr* expr)
+    { 
+        dispatchIfNotNull(expr->innerExpr);
+    }
+
     void visitIndexExpr(IndexExpr* subscriptExpr)
     {
         for (auto arg : subscriptExpr->indexExprs)
@@ -695,6 +702,10 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
             dispatchIfNotNull(element);
     }
 
+    void visitAddressOfExpr(AddressOfExpr* expr)
+    { 
+        dispatchIfNotNull(expr->arg);
+    }
 
     void visitAssignExpr(AssignExpr* expr)
     {
@@ -14388,9 +14399,9 @@ struct CapabilityDeclReferenceVisitor
     }
     void visitAddressOfExpr(AddressOfExpr* expr)
     {
-        // Address-of requires cpp_cuda_spirv
-        handleProcessFunc(stmt, CapabilitySet(CapabilityName::cpp_cuda_spirv), expr->loc);
-        dispatchIfNotNull(expr);
+        // __getAddress only works on cpp_cuda_spirv
+        handleProcessFunc(expr, CapabilitySet(CapabilityName::cpp_cuda_spirv), expr->loc);
+        this->dispatchIfNotNull(expr->arg);
     }
     void visitTargetSwitchStmt(TargetSwitchStmt* stmt)
     {
