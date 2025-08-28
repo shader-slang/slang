@@ -341,13 +341,13 @@ jobs:
         run: |
           python --version
           echo "Cleaning up existing installations and installing slangpy..."
-          
+
           # Try to uninstall existing slangpy
           python -m pip uninstall -y slangpy || echo "slangpy not found or already removed"
-          
+
           # Install slangpy
           python -m pip install --verbose slangpy --user
-          
+
           # Get site packages directory
           SITE_PACKAGES=$(python -c "import slangpy; import os; print(os.path.dirname(os.path.dirname(slangpy.__file__)))")
           echo "Site packages directory: $SITE_PACKAGES"
@@ -359,12 +359,12 @@ jobs:
           else
             cp "$lib_dir"/libslang*.* "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy library files"; exit 1; }
           fi
-          
+
           echo "Listing files in slangpy directory..."
           ls -la "$SITE_PACKAGES/slangpy/"
-          
+
           echo "Installing python packages..."
-          
+
           # Only install additional packages on GitHub-hosted runners, not self-hosted
           if [[ "${{ runner.environment }}" != "self-hosted" ]]; then
             # Download and install requirements from slangpy repository
