@@ -14386,6 +14386,12 @@ struct CapabilityDeclReferenceVisitor
     {
         handleProcessFunc(stmt, CapabilitySet(CapabilityName::fragment), stmt->loc);
     }
+    void visitAddressOfExpr(AddressOfExpr* expr)
+    {
+        // Address-of requires cpp_cuda_spirv
+        handleProcessFunc(stmt, CapabilitySet(CapabilityName::cpp_cuda_spirv), expr->loc);
+        dispatchIfNotNull(expr);
+    }
     void visitTargetSwitchStmt(TargetSwitchStmt* stmt)
     {
         CapabilitySet set;
