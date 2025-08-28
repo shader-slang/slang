@@ -682,10 +682,7 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
     // Expr Visitor
     void visitExpr(Expr*) {}
     
-    void visitOpenRefExpr(OpenRefExpr* expr)
-    { 
-        dispatchIfNotNull(expr->innerExpr);
-    }
+    void visitOpenRefExpr(OpenRefExpr* expr) { dispatchIfNotNull(expr->innerExpr); }
 
     void visitIndexExpr(IndexExpr* subscriptExpr)
     {
@@ -702,10 +699,7 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
             dispatchIfNotNull(element);
     }
 
-    void visitAddressOfExpr(AddressOfExpr* expr)
-    { 
-        dispatchIfNotNull(expr->arg);
-    }
+    void visitAddressOfExpr(AddressOfExpr* expr) { dispatchIfNotNull(expr->arg); }
 
     void visitAssignExpr(AssignExpr* expr)
     {
