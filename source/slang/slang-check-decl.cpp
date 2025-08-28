@@ -14399,8 +14399,8 @@ struct CapabilityDeclReferenceVisitor
     }
     void visitAddressOfExpr(AddressOfExpr* expr)
     {
-        // __getAddress only works on cpp_cuda_spirv
-        handleProcessFunc(expr, CapabilitySet(CapabilityName::cpp_cuda_spirv), expr->loc);
+        // __getAddress only works with certain targets
+        handleProcessFunc(expr, CapabilitySet(CapabilityName::cpp_cuda_metal_spirv), expr->loc);
         this->dispatchIfNotNull(expr->arg);
     }
     void visitTargetSwitchStmt(TargetSwitchStmt* stmt)

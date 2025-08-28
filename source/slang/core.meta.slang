@@ -2668,14 +2668,12 @@ for (auto op : intrinsicUnaryOps)
 // Only ReadWrite is an L-value.
 __generic<T, AddressSpace addrSpace>
 __intrinsic_op(0)
-[require(cpp_cuda_spirv)]
 __prefix Ref<T> operator*(Ptr<T, Access::ReadWrite, addrSpace> value);
 
 // Unknown access qualifier or Access::Read access qualifier is a promise
 // that the pointer is not going to be used as an L-value.
 __generic<$(ptrTypeParameterList)>
 __intrinsic_op(0)
-[require(cpp_cuda_spirv)]
 __prefix ConstRef<T> operator*($(fullPtrType) value);
 
 // TODO: [require(cpu)]. This cannot be done yet since this change breaks slangpy
