@@ -2671,18 +2671,19 @@ __intrinsic_op(0)
 [require(cpp_cuda_spirv)]
 __prefix Ref<T> operator*(Ptr<T, Access::ReadWrite, addrSpace> value);
 
-__generic<T>
-__intrinsic_op(0)
-[KnownBuiltin( $((int)KnownBuiltinDeclName::OperatorAddressOf))]
-[require(cpp)]
-__prefix Ptr<T, Access::ReadWrite, AddressSpace::Device> operator&(__ref T value);
-
 // Unknown access qualifier or Access::Read access qualifier is a promise
 // that the pointer is not going to be used as an L-value.
 __generic<$(ptrTypeParameterList)>
 __intrinsic_op(0)
 [require(cpp_cuda_spirv)]
 __prefix ConstRef<T> operator*($(fullPtrType) value);
+
+// TODO: [require(cpu)]. This cannot be done yet since this change breaks slangpy
+__generic<T>
+__intrinsic_op(0)
+[KnownBuiltin( $((int)KnownBuiltinDeclName::OperatorAddressOf))]
+[require(cpp_cuda_spirv)]
+__prefix Ptr<T, Access::ReadWrite, AddressSpace::Device> operator&(__ref T value);
 
 __generic<$(ptrTypeParameterList), TInt : __BuiltinIntegerType>
 __intrinsic_op($(kIROp_GetOffsetPtr))

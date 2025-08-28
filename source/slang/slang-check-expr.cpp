@@ -4121,6 +4121,30 @@ static PtrType* getValidTypeForAddressOf(
     Expr* baseExpr,
     Type* targetType)
 {
+
+    auto getDeclRefExprPtrType = [&](Expr* baseExpr) -> PtrType*
+    {
+        auto declRefExpr = as<DeclRefExpr>(baseExpr);
+        if (!declRefExpr)
+            return nullptr;
+        visitor->ensureDecl(declRefExpr->declRef, DeclCheckState::DefinitionChecked);
+        auto varDeclRef = as<VarDeclBase>(declRefExpr->declRef);
+        if (!varDeclRef)
+            return nullptr;
+
+        auto variableType = varDeclRef.substitute(m_astBuilder, targetType);
+
+        auto ptrType = as<PtrType>(getType(m_astBuilder, varDeclRef)); 
+        if (!ptrType)
+            return nullptr;
+
+        // Handle operation into pointer: `T* ptr2 = ptr1[1];`
+        return m_astBuilder->getPtrType(
+            variableType,
+            ptrType->getAccessQualifier(),
+            ptrType->getAddressSpace());
+    };
+
     if (auto declRefExpr = as<DeclRefExpr>(baseExpr))
     {
         visitor->ensureDecl(declRefExpr->declRef, DeclCheckState::DefinitionChecked);
@@ -4130,18 +4154,14 @@ static PtrType* getValidTypeForAddressOf(
             auto varDecl = varDeclRef.getDecl();
             bool hasVulkanHitObjectAttributesAttribute = false;
             bool hasHLSLGroupSharedModifier = false;
-            bool hasUniformModifier = false;
             for (auto modifier : varDecl->modifiers)
             {
                 if (as<VulkanHitObjectAttributesAttribute>(modifier))
                     hasVulkanHitObjectAttributesAttribute = true;
                 else if (as<HLSLGroupSharedModifier>(modifier))
                     hasHLSLGroupSharedModifier = true;
-                else if (as<HLSLUniformModifier>(modifier))
-                    hasUniformModifier = true;
 
-                if (hasVulkanHitObjectAttributesAttribute || hasHLSLGroupSharedModifier ||
-                    hasUniformModifier)
+                if (hasVulkanHitObjectAttributesAttribute || hasHLSLGroupSharedModifier)
                     break;
             }
 
@@ -4162,14 +4182,6 @@ static PtrType* getValidTypeForAddressOf(
                     variableType,
                     AccessQualifier::ReadWrite,
                     AddressSpace::GroupShared);
-            }
-            // Handle operation into pointer: `T* ptr2 = ptr1[1];`
-            else if (auto ptrType = as<PtrType>(getType(m_astBuilder, varDeclRef)))
-            {
-                return m_astBuilder->getPtrType(
-                    variableType,
-                    ptrType->getAccessQualifier(),
-                    ptrType->getAddressSpace());
             }
         }
     }
@@ -4194,11 +4206,11 @@ static PtrType* getValidTypeForAddressOf(
     }
     else if (auto derefExpr = as<DerefExpr>(baseExpr))
     {
-        return getValidTypeForAddressOf(visitor, m_astBuilder, derefExpr->base, targetType);
+        return getDeclRefExprPtrType(derefExpr->base);
     }
     else if (auto invokeExpr = as<InvokeExpr>(baseExpr))
     {
-        // Only allow the `kIROp_GetOffsetPtr` subscript operator
+        // Allow the `kIROp_GetOffsetPtr` subscript operator of a pointer-variable
         auto functionMemberExpr = as<MemberExpr>(invokeExpr->functionExpr);
         if (!functionMemberExpr)
             return nullptr;
@@ -4218,12 +4230,7 @@ static PtrType* getValidTypeForAddressOf(
         if (!isOffsetIntrinsicOp)
             return nullptr;
 
-        // Since we have an offset, lets continue to check if we have a valid base
-        return getValidTypeForAddressOf(
-            visitor,
-            m_astBuilder,
-            functionMemberExpr->baseExpression,
-            targetType);
+        return getDeclRefExprPtrType(functionMemberExpr->baseExpression);
     }
     else if (auto swizzleExpr = as<SwizzleExpr>(baseExpr))
     {
