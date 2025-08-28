@@ -30,77 +30,69 @@ static void checkIntegerLiteralOverflow(
     VarDeclBase* varDecl,
     DiagnosticSink* sink)
 {
-    // Only apply overflow detection to integer types, not float types
-    bool isIntegerType = false;
+    // Only apply overflow detection to integer types
     auto basicType = as<BasicExpressionType>(varDecl->type.type);
-    if (basicType)
-    {
-        const auto& info = BaseTypeInfo::getInfo(basicType->getBaseType());
-        isIntegerType = (info.flags & BaseTypeInfo::Flag::Integer) != 0;
-    }
-
-    if (!isIntegerType)
-    {
-        // Skip overflow detection for non-integer types
+    if (!basicType)
         return;
-    }
+
+    const auto& info = BaseTypeInfo::getInfo(basicType->getBaseType());
+
+    // Skip overflow detection for non-integer types
+    if ((info.flags & BaseTypeInfo::Flag::Integer) == 0)
+        return;
 
     // Check if this literal was created by legitimate operations
     bool isLegitimateNegative = intLit->isLegitimateNegative;
 
     // Check if the value is valid for the declared type
     bool isValidForDeclaredType = false;
-    const auto& info = BaseTypeInfo::getInfo(basicType->getBaseType());
 
-    if (info.flags & BaseTypeInfo::Flag::Integer)
+    if (info.flags & BaseTypeInfo::Flag::Signed)
     {
-        if (info.flags & BaseTypeInfo::Flag::Signed)
+        // For signed types, check if the value fits within the type's range
+        int64_t minValue = 0, maxValue = 0;
+        switch (info.sizeInBytes)
         {
-            // For signed types, check if the value fits within the type's range
-            int64_t minValue = 0, maxValue = 0;
-            switch (info.sizeInBytes)
-            {
-            case 1:
-                minValue = INT8_MIN;
-                maxValue = INT8_MAX;
-                break;
-            case 2:
-                minValue = INT16_MIN;
-                maxValue = INT16_MAX;
-                break;
-            case 4:
-                minValue = INT32_MIN;
-                maxValue = INT32_MAX;
-                break;
-            default:
-                minValue = INT64_MIN;
-                maxValue = INT64_MAX;
-                break;
-            }
-            isValidForDeclaredType = (intLit->value >= minValue && intLit->value <= maxValue);
+        case 1:
+            minValue = INT8_MIN;
+            maxValue = INT8_MAX;
+            break;
+        case 2:
+            minValue = INT16_MIN;
+            maxValue = INT16_MAX;
+            break;
+        case 4:
+            minValue = INT32_MIN;
+            maxValue = INT32_MAX;
+            break;
+        default:
+            minValue = INT64_MIN;
+            maxValue = INT64_MAX;
+            break;
         }
-        else
+        isValidForDeclaredType = (intLit->value >= minValue && intLit->value <= maxValue);
+    }
+    else
+    {
+        // For unsigned types, check if the value is valid when interpreted as unsigned
+        uint64_t unsignedValue = (uint64_t)intLit->value;
+        uint64_t maxValue = 0;
+        switch (info.sizeInBytes)
         {
-            // For unsigned types, check if the value is valid when interpreted as unsigned
-            uint64_t unsignedValue = (uint64_t)intLit->value;
-            uint64_t maxValue = 0;
-            switch (info.sizeInBytes)
-            {
-            case 1:
-                maxValue = UINT8_MAX;
-                break;
-            case 2:
-                maxValue = UINT16_MAX;
-                break;
-            case 4:
-                maxValue = UINT32_MAX;
-                break;
-            default:
-                maxValue = UINT64_MAX;
-                break;
-            }
-            isValidForDeclaredType = (unsignedValue <= maxValue);
+        case 1:
+            maxValue = UINT8_MAX;
+            break;
+        case 2:
+            maxValue = UINT16_MAX;
+            break;
+        case 4:
+            maxValue = UINT32_MAX;
+            break;
+        default:
+            maxValue = UINT64_MAX;
+            break;
         }
+        isValidForDeclaredType = (unsignedValue <= maxValue);
     }
 
     // Check if this is a negative value that was created by overflow rather than legitimate
