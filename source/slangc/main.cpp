@@ -45,6 +45,8 @@ static void checkSlangcAndSlanglibVersion(
                     "[Warning] slangc version (%s) does not match slang library version (%s)\n",
                     slangcVersionRaw,
                     slangLibVersion);
+                stdOut.print(
+                    "Use `-slang-dynamic-library-path` to show the path to the loaded slang library.\n");
             }
         }
     }
