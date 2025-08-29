@@ -1443,6 +1443,50 @@ bool SemanticsVisitor::_coerce(
         return true;
     }
 
+    // Optional<T> can be cast into Optional<U> where T is a subtype of U
+    if (auto fromOptionalType = as<OptionalType>(fromType))
+    {
+        if (auto toOptionalType = as<OptionalType>(toType))
+        {
+            Type* fromValueType = fromOptionalType->getValueType();
+            Type* toValueType = toOptionalType->getValueType();
+            
+            // Try to get a witness for the subtype relationship
+            auto witness = tryGetSubtypeWitness(fromValueType, toValueType);
+            if (witness)
+            {
+                if (outCost)
+                {
+                    // Cost is slightly higher than direct interface casting
+                    *outCost = kConversionCost_CastToInterface + 10;
+                }
+                if (outToExpr)
+                {
+                    // Step 1: Create unchecked MemberExpr for .value access
+                    auto memberExpr = getASTBuilder()->create<MemberExpr>();
+                    memberExpr->baseExpression = fromExpr;
+                    memberExpr->name = getSession()->getNamePool()->getName("value");
+                    memberExpr->loc = fromExpr->loc;
+                    // Don't set type, declRef, or checked - let semantic checker handle it
+                    
+                    // Apply semantic checking to resolve the member access
+                    auto unwrapExpr = CheckExpr(memberExpr);
+                    
+                    // Step 2: Convert T to U using createCastToSuperTypeExpr
+                    auto castExpr = createCastToSuperTypeExpr(toValueType, unwrapExpr, witness);
+                    
+                    // Step 3: Wrap it with Optional<U> using MakeOptionalExpr
+                    auto resultExpr = getASTBuilder()->create<MakeOptionalExpr>();
+                    resultExpr->value = castExpr;
+                    resultExpr->type = toType;
+                    resultExpr->loc = fromExpr->loc;
+                    *outToExpr = resultExpr;
+                }
+                return true;
+            }
+        }
+    }
+
     // A enum type can be converted into its underlying tag type.
     if (auto enumDecl = isEnumType(fromType))
     {
