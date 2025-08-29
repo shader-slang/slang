@@ -555,7 +555,7 @@ struct MyType
 int test(MyType* pObj)
 {
     MyType* pNext = pObj + 1;
-    // Note: `__getAddress` is a place-holder since pointers are experimental. Do not use `&`
+    // Note: `__getAddress` is a place-holder since pointers are experimental. Do not use `&`.
     MyType* pNext2 = __getAddress(pNext[1]);
     return pNext.a + pNext->a + (*pNext2).a + pNext2[0].a;
 }
