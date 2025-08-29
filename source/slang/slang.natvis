@@ -260,7 +260,8 @@
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::AndTypeExpr">(Slang::AndTypeExpr*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ModifiedTypeExpr">(Slang::ModifiedTypeExpr*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::PointerTypeExpr">(Slang::PointerTypeExpr*)&amp;astNodeType</ExpandedItem>
-            <Item Name="[type]">type</Item>
+			<ExpandedItem Condition="astNodeType == Slang::ASTNodeType::AddressOfExpr">(Slang::AddressOfExpr*)&amp;astNodeType</ExpandedItem>
+			<Item Name="[type]">type</Item>
             <Item Name="[Expr]">(Slang::Expr*)this,!</Item>
         </Expand>
     </Type>
@@ -484,11 +485,12 @@
         </Expand>
     </Type>
     <Type Name="Slang::ValNodeOperand">
-        <DisplayString Optional="true" Condition="kind==Slang::ValNodeOperandKind::ConstantValue">Const({values.intOperand})#{_debugUID}</DisplayString>
+        <DisplayString Condition="kind==Slang::ValNodeOperandKind::ConstantValue">ConstantValue ({this->values.intOperand}) #{((Val*)this)->_debugUID}</DisplayString>
         <DisplayString Condition="kind==Slang::ValNodeOperandKind::ValNode">{*(Val*)values.nodeOperand}</DisplayString>
         <DisplayString>{values.nodeOperand}</DisplayString>
         <Expand>
-            <ExpandedItem Condition="kind==Slang::ValNodeOperandKind::ValNode">*(Val*)values.nodeOperand</ExpandedItem>
+			<ExpandedItem Condition="kind==Slang::ValNodeOperandKind::ConstantValue">values</ExpandedItem>
+			<ExpandedItem Condition="kind==Slang::ValNodeOperandKind::ValNode">*(Val*)values.nodeOperand</ExpandedItem>
             <ExpandedItem Condition="kind==Slang::ValNodeOperandKind::ASTNode">*(Decl*)values.nodeOperand</ExpandedItem>
         </Expand>
     </Type>

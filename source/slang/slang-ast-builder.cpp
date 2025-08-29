@@ -461,9 +461,17 @@ Type* ASTBuilder::getSpecializedBuiltinType(ArrayView<Val*> genericArgs, const c
     return rsType;
 }
 
-PtrType* ASTBuilder::getPtrType(Type* valueType, AddressSpace addrSpace)
+PtrType* ASTBuilder::getPtrType(Type* valueType, Val* accessQualifier, Val* addrSpace)
 {
-    return dynamicCast<PtrType>(getPtrType(valueType, addrSpace, "PtrType"));
+    return dynamicCast<PtrType>(getPtrType(valueType, accessQualifier, addrSpace, "PtrType"));
+}
+
+PtrType* ASTBuilder::getPtrType(
+    Type* valueType,
+    AccessQualifier accessQualifier,
+    AddressSpace addrSpace)
+{
+    return dynamicCast<PtrType>(getPtrType(valueType, accessQualifier, addrSpace, "PtrType"));
 }
 
 Type* ASTBuilder::getDefaultLayoutType()
@@ -489,11 +497,6 @@ Type* ASTBuilder::getScalarLayoutType()
     return getSpecializedBuiltinType({}, "ScalarDataLayoutType");
 }
 
-Type* ASTBuilder::getCLayoutType()
-{
-    return getSpecializedBuiltinType({}, "CDataLayoutType");
-}
-
 // Construct the type `Out<valueType>`
 OutType* ASTBuilder::getOutType(Type* valueType)
 {
@@ -505,9 +508,9 @@ InOutType* ASTBuilder::getInOutType(Type* valueType)
     return dynamicCast<InOutType>(getPtrType(valueType, "InOutType"));
 }
 
-RefType* ASTBuilder::getRefType(Type* valueType, AddressSpace addrSpace)
+RefType* ASTBuilder::getRefType(Type* valueType)
 {
-    return dynamicCast<RefType>(getPtrType(valueType, addrSpace, "RefType"));
+    return dynamicCast<RefType>(getPtrType(valueType, "RefType"));
 }
 
 ConstRefType* ASTBuilder::getConstRefType(Type* valueType)
@@ -528,11 +531,25 @@ PtrTypeBase* ASTBuilder::getPtrType(Type* valueType, char const* ptrTypeName)
 
 PtrTypeBase* ASTBuilder::getPtrType(
     Type* valueType,
+    Val* accessQualifier,
+    Val* addrSpace,
+    char const* ptrTypeName)
+{
+    Val* args[] = {valueType, accessQualifier, addrSpace};
+    return as<PtrTypeBase>(getSpecializedBuiltinType(makeArrayView(args), ptrTypeName));
+}
+
+PtrTypeBase* ASTBuilder::getPtrType(
+    Type* valueType,
+    AccessQualifier accessQualifier,
     AddressSpace addrSpace,
     char const* ptrTypeName)
 {
-    Val* args[] = {valueType, getIntVal(getUInt64Type(), (IntegerLiteralValue)addrSpace)};
-    return as<PtrTypeBase>(getSpecializedBuiltinType(makeArrayView(args), ptrTypeName));
+    return as<PtrTypeBase>(getPtrType(
+        valueType,
+        getIntVal(getBuiltinType(BaseType::AccessQualifier), (IntegerLiteralValue)accessQualifier),
+        getIntVal(getBuiltinType(BaseType::AddressSpace), (IntegerLiteralValue)addrSpace),
+        ptrTypeName));
 }
 
 ArrayExpressionType* ASTBuilder::getArrayType(Type* elementType, IntVal* elementCount)

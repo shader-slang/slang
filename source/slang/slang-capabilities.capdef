@@ -271,6 +271,10 @@ alias cpp_cuda = cpp | cuda;
 /// [Compound]
 alias cpp_cuda_spirv = cpp | cuda | spirv;
 
+/// CPP, CUDA, Metal, and SPIRV code-gen targets
+/// [Compound]
+alias cpp_cuda_metal_spirv = cpp | cuda | metal | spirv;
+
 /// CUDA and SPIRV code-gen targets
 /// [Compound]
 alias cuda_spirv = cuda | spirv;

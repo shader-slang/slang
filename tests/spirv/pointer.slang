@@ -28,12 +28,12 @@ void funcWithInOutParam(inout PP p)
 
 // CHECK: OpEntryPoint
 
-StructuredBuffer<Data> buffer;
+uniform Data* buffer;
 RWStructuredBuffer<int> output;
 void main(int id : SV_DispatchThreadID)
 {
     output[0] = buffer[0].pNext.data;
-    let pData = &(buffer[0].pNext->data); // operator -> is also allowed on pointer types.
+    let pData = __getAddress(buffer[0].pNext->data); // operator -> is also allowed on pointer types.
     // CHECK: OpPtrAccessChain
     int* pData1 = pData + 1;
     *pData1 = 3;

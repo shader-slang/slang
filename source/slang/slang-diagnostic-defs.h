@@ -524,6 +524,14 @@ DIAGNOSTIC(
     Error,
     missingLayoutBindingModifier,
     "Expecting 'binding' modifier in the layout qualifier here")
+DIAGNOSTIC(
+    20017,
+    Error,
+    constNotAllowedOnCStylePtrDecl,
+    "'const' not allowed on pointer typed declarations using the C style '*' operator. "
+    "If the intent is to restrict the pointed-to value to read-only, use 'Ptr<T, Access.Read>'; "
+    "if the intent is to make the pointer itself immutable, use 'let' or 'const Ptr<...>'.")
+DIAGNOSTIC(20018, Error, constNotAllowedOnType, "cannot use 'const' as a type modifier")
 
 DIAGNOSTIC(
     20101,
@@ -702,11 +710,6 @@ DIAGNOSTIC(
     argumentExpectedLValue,
     "argument passed to parameter '$0' must be l-value.")
 DIAGNOSTIC(
-    30078,
-    Error,
-    cannotTakeConstantPointers,
-    "Not allowed to take pointer of an immutable object")
-DIAGNOSTIC(
     30048,
     Error,
     argumentHasMoreMemoryQualifiersThanParam,
@@ -823,7 +826,17 @@ DIAGNOSTIC(
     "function, you can replace '$2 $0' with a generic 'T $0' and a 'where T : $2' constraint.")
 DIAGNOSTIC(-1, Note, doYouMeanStaticConst, "do you intend to define a `static const` instead?")
 DIAGNOSTIC(-1, Note, doYouMeanUniform, "do you intend to define a `uniform` parameter instead?")
-
+DIAGNOSTIC(
+    30078,
+    Error,
+    coherentKeywordOnAPointer,
+    "cannot have a `globallycoherent T*` or a `coherent T*`, use explicit methods for coherent "
+    "operations instead")
+DIAGNOSTIC(
+    30079,
+    Error,
+    cannotTakeConstantPointers,
+    "Not allowed to take the address of an immutable object")
 DIAGNOSTIC(
     30100,
     Error,
@@ -927,11 +940,7 @@ DIAGNOSTIC(
     Note,
     noteExplicitConversionPossible,
     "explicit conversion from '$0' to '$1' is possible")
-DIAGNOSTIC(
-    30080,
-    Error,
-    ambiguousConversion,
-    "more than one implicit conversion exists from '$0' to '$1'")
+DIAGNOSTIC(30080, Error, ambiguousConversion, "more than one conversion exists from '$0' to '$1'")
 DIAGNOSTIC(
     30081,
     Warning,
@@ -1432,7 +1441,11 @@ DIAGNOSTIC(
     "If this is intended, consider using [NoDiffThis] on the function '$1' to suppress this "
     "warning. Alternatively, users can mark the parent struct as [Differentiable] to propagate "
     "derivatives.")
-
+DIAGNOSTIC(
+    31160,
+    Error,
+    invalidAddressOf,
+    "'__getAddress' only supports groupshared variables and members of groupshared/device memory.")
 DIAGNOSTIC(31200, Warning, deprecatedUsage, "$0 has been deprecated: $1")
 DIAGNOSTIC(31201, Error, modifierNotAllowed, "modifier '$0' is not allowed here.")
 DIAGNOSTIC(
@@ -2681,6 +2694,8 @@ DIAGNOSTIC(
     invalidAtomicDestinationPointer,
     "cannot perform atomic operation because destination is neither groupshared nor from a device "
     "buffer.")
+
+DIAGNOSTIC(41404, Error, cannotWriteToReadOnlyPointer, "cannot write to a read-only pointer")
 
 //
 // 5xxxx - Target code generation.

@@ -249,7 +249,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             {
                 builder.setInsertBefore(use->getUser());
                 auto addr = builder.emitFieldAddress(
-                    builder.getPtrType(kIROp_PtrType, innerType, AddressSpace::Uniform),
+                    builder.getPtrType(innerType, AccessQualifier::Read, AddressSpace::Uniform),
                     cbParamInst,
                     key);
                 use->set(addr);
@@ -291,12 +291,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 auto basePtrType = as<IRPtrTypeBase>(addr->getDataType());
                 IRType* ptrType = nullptr;
                 if (basePtrType->hasAddressSpace())
-                    ptrType = builder.getPtrType(
-                        kIROp_PtrType,
-                        user->getDataType(),
-                        basePtrType->getAddressSpace());
+                    ptrType = builder.getPtrType(user->getDataType(), basePtrType);
                 else
-                    ptrType = builder.getPtrType(kIROp_PtrType, user->getDataType());
+                    ptrType = builder.getPtrType(user->getDataType());
                 IRInst* subAddr = nullptr;
                 if (user->getOp() == kIROp_GetElement)
                     subAddr = builder.emitElementAddress(
@@ -443,6 +440,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 return;
             }
 
+            AccessQualifier access = AccessQualifier::ReadWrite;
             // Opaque resource handles can't be in Uniform for Vulkan, if they are
             // placed here then put them in UniformConstant instead
             if (isSpirvUniformConstantType(inst->getDataType()))
@@ -518,7 +516,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
                 // structured buffers in GLSL should be annotated as ReadOnly
                 if (as<IRHLSLStructuredBufferType>(structuredBufferType))
+                {
+                    access = AccessQualifier::Read;
                     memoryFlags = MemoryQualifierSetModifier::Flags::kReadOnly;
+                }
                 if (as<IRHLSLRasterizerOrderedStructuredBufferType>(structuredBufferType))
                     memoryFlags = MemoryQualifierSetModifier::Flags::kRasterizerOrdered;
 
@@ -555,7 +556,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
             // Make a pointer type of storageClass.
             builder.setInsertBefore(inst);
-            ptrType = builder.getPtrType(kIROp_PtrType, innerType, addressSpace);
+            ptrType = builder.getPtrType(innerType, access, addressSpace);
             inst->setFullType(ptrType);
             if (needLoad)
             {
@@ -578,7 +579,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                             IRBuilder builder(getElement);
                             builder.setInsertBefore(user);
                             auto newAddr = builder.emitElementAddress(
-                                builder.getPtrType(kIROp_PtrType, innerElementType, addressSpace),
+                                builder.getPtrType(
+                                    innerElementType,
+                                    ptrType->getAccessQualifier(),
+                                    addressSpace),
                                 inst,
                                 getElement->getIndex());
                             user->replaceUsesWith(newAddr);
@@ -714,6 +718,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             auto newPtrType = builder.getPtrType(
                 oldPtrType->getOp(),
                 oldPtrType->getValueType(),
+                oldPtrType->getAccessQualifier(),
                 AddressSpace::Function);
             inst->setFullType(newPtrType);
             addUsersToWorkList(inst);
@@ -735,9 +740,12 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
             if (block == func->getFirstBlock())
             {
-                // A pointer typed function parameter should always be in the storage buffer address
-                // space.
-                addressSpace = AddressSpace::UserPointer;
+                // A pointer typed function parameter is in the storage buffer address
+                // space or groupshared.
+                if (as<IRGroupSharedRate>(inst->getRate()))
+                    addressSpace = AddressSpace::GroupShared;
+                else
+                    addressSpace = AddressSpace::UserPointer;
             }
             else
             {
@@ -765,6 +773,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 auto newPtrType = builder.getPtrType(
                     oldPtrType->getOp(),
                     oldPtrType->getValueType(),
+                    oldPtrType->getAccessQualifier(),
                     AddressSpace::UserPointer);
                 inst->setFullType(newPtrType);
                 addUsersToWorkList(inst);
@@ -785,10 +794,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             IRBuilder builder(inst);
             builder.setInsertBefore(inst);
             IRType* newPtrType = oldPtrType->hasAddressSpace()
-                                     ? builder.getPtrType(
-                                           oldPtrType->getOp(),
-                                           newPtrValueType,
-                                           oldPtrType->getAddressSpace())
+                                     ? builder.getPtrType(newPtrValueType, oldPtrType)
                                      : builder.getPtrType(oldPtrType->getOp(), newPtrValueType);
             inst->setFullType(newPtrType);
         }
@@ -839,8 +845,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
         IRBuilder builder(m_sharedContext->m_irModule);
         builder.setInsertBefore(inst);
-        auto newPtrType =
-            builder.getPtrType(oldPtrType->getOp(), oldPtrType->getValueType(), addressSpace);
+        auto newPtrType = builder.getPtrType(
+            oldPtrType->getOp(),
+            oldPtrType->getValueType(),
+            oldPtrType->getAccessQualifier(),
+            addressSpace);
         inst->setFullType(newPtrType);
         addUsersToWorkList(inst);
         return;
@@ -1022,6 +1031,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 auto newPtrType = builder.getPtrType(
                     oldResultType->getOp(),
                     oldResultType->getValueType(),
+                    ptrType->getAccessQualifier(),
                     ptrType->getAddressSpace());
                 IRInst* args[2] = {base, index};
                 auto newInst = builder.emitIntrinsicInst(newPtrType, gepInst->getOp(), 2, args);
@@ -1075,6 +1085,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             auto newResultType = builder.getPtrType(
                 resultPtrType->getOp(),
                 resultPtrType->getValueType(),
+                ptrOperandType->getAccessQualifier(),
                 ptrOperandType->getAddressSpace());
             auto newInst = builder.replaceOperand(&offsetPtrInst->typeUse, newResultType);
             addUsersToWorkList(newInst);
@@ -1095,8 +1106,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         builder.setInsertBefore(loadInst);
         IRInst* args[] = {sb, index};
         auto addrInst = builder.emitIntrinsicInst(
-            builder
-                .getPtrType(kIROp_PtrType, loadInst->getFullType(), getStorageBufferAddressSpace()),
+            builder.getPtrType(loadInst->getFullType(), getStorageBufferAddressSpace()),
             kIROp_RWStructuredBufferGetElementPtr,
             2,
             args);
@@ -1115,7 +1125,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         builder.setInsertBefore(storeInst);
         IRInst* args[] = {sb, index};
         auto addrInst = builder.emitIntrinsicInst(
-            builder.getPtrType(kIROp_PtrType, value->getFullType(), getStorageBufferAddressSpace()),
+            builder.getPtrType(value->getFullType(), getStorageBufferAddressSpace()),
             kIROp_RWStructuredBufferGetElementPtr,
             2,
             args);
@@ -1168,6 +1178,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 auto newPtrType = builder.getPtrType(
                     oldResultType->getOp(),
                     newValueType,
+                    ptrType->getAccessQualifier(),
                     ptrType->getAddressSpace());
                 auto newInst =
                     builder.emitFieldAddress(newPtrType, inst->getBase(), inst->getField());
@@ -2172,8 +2183,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             }
 
             // Update the global param's type to use the wrapper struct
-            auto newPtrType =
-                builder.getPtrType(ptrType->getOp(), wrapperStruct, ptrType->getAddressSpace());
+            auto newPtrType = builder.getPtrType(wrapperStruct, ptrType);
             globalParam->setFullType(newPtrType);
 
             // Traverse all uses of the global param and insert a FieldAddress to access the
@@ -2184,7 +2194,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 {
                     builder.setInsertBefore(use->getUser());
                     auto addr = builder.emitFieldAddress(
-                        builder.getPtrType(kIROp_PtrType, structType, ptrType->getAddressSpace()),
+                        builder.getPtrType(structType, ptrType),
                         globalParam,
                         key);
                     use->set(addr);
@@ -2246,11 +2256,16 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         for (auto t : instsToProcess)
         {
             auto lowered = lowerStructuredBufferType(t);
+
+            AccessQualifier accessQualifier = AccessQualifier::ReadWrite;
+            if (as<IRHLSLStructuredBufferType>(t))
+                accessQualifier = AccessQualifier::Read;
+
             IRBuilder builder(t);
             builder.setInsertBefore(t);
             t->replaceUsesWith(builder.getPtrType(
-                kIROp_PtrType,
                 lowered.structType,
+                accessQualifier,
                 getStorageBufferAddressSpace()));
         }
         for (auto t : textureFootprintTypes)

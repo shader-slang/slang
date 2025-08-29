@@ -44,7 +44,7 @@ struct BaseTypeInfo
     static bool check();
 
 private:
-    static const BaseTypeInfo s_info[Index(BaseType::CountOf)];
+    static const BaseTypeInfo s_info[Index(BaseType::CountOfPrimitives)];
 };
 
 } // namespace Slang

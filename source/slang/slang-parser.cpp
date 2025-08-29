@@ -7026,7 +7026,6 @@ static NodeBase* parseSizeOfExpr(Parser* parser, void* /*userData*/)
 
 static NodeBase* parseAlignOfExpr(Parser* parser, void* /*userData*/)
 {
-    // We could have a type or a variable or an expression
     AlignOfExpr* alignOfExpr = parser->astBuilder->create<AlignOfExpr>();
 
     parser->ReadMatchingToken(TokenType::LParent);
@@ -7056,6 +7055,17 @@ static NodeBase* parseCountOfExpr(Parser* parser, void* /*userData*/)
     parser->ReadMatchingToken(TokenType::RParent);
 
     return countOfExpr;
+}
+
+static NodeBase* parseAddressOfExpr(Parser* parser, void* /*userData*/)
+{
+    // We could have a type or a variable or an expression
+    AddressOfExpr* addressOfExpr = parser->astBuilder->create<AddressOfExpr>();
+
+    parser->ReadMatchingToken(TokenType::LParent);
+    addressOfExpr->arg = parser->ParseExpression();
+    parser->ReadMatchingToken(TokenType::RParent);
+    return addressOfExpr;
 }
 
 static NodeBase* parseTryExpr(Parser* parser, void* /*userData*/)
@@ -9648,6 +9658,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseExpr("sizeof", parseSizeOfExpr),
     _makeParseExpr("alignof", parseAlignOfExpr),
     _makeParseExpr("countof", parseCountOfExpr),
+    _makeParseExpr("__getAddress", parseAddressOfExpr),
 };
 
 ConstArrayView<SyntaxParseInfo> getSyntaxParseInfos()

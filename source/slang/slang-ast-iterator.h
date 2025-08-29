@@ -251,6 +251,7 @@ struct ASTIterator
             iterator->maybeDispatchCallback(expr);
         }
         void visitReturnValExpr(ReturnValExpr* expr) { iterator->maybeDispatchCallback(expr); }
+        void visitAddressOfExpr(AddressOfExpr* expr) { iterator->maybeDispatchCallback(expr); }
 
         void visitAndTypeExpr(AndTypeExpr* expr)
         {

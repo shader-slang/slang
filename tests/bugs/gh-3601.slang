@@ -4,7 +4,7 @@ struct TestStruct
     uint index;
 };
 
-[[vk::binding(2, 0)]] StructuredBuffer<uint64_t> test;
+[[vk::binding(2, 0)]] uniform uint64_t* test;
 
 struct PP
 {
@@ -28,15 +28,15 @@ int* funcThatReturnsPointer(PP* p)
 
 // CHECK: OpEntryPoint
 
-[[vk::binding(0, 0)]] StructuredBuffer<Data> buffer;
+[[vk::binding(0, 0)]] uniform Data* buffer;
 [[vk::binding(1, 0)]] RWStructuredBuffer<int> output;
 [shader("compute")]
 [numthreads(8, 8, 1)]
 void main(int id : SV_DispatchThreadID)
 {
-    TestStruct * ptr = (TestStruct *)(test[0]);
+    TestStruct* ptr = (TestStruct*)(test[0]);
     output[0] = buffer[ptr.index].pNext.data;
-    let pData = &(buffer[0].pNext.data);
+    let pData = __getAddress(buffer[0].pNext.data);
     // CHECK: OpPtrAccessChain
     int* pData1 = pData + 1;
     *pData1 = 3;

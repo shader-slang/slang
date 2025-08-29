@@ -678,8 +678,12 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
             return;
         return DeclVisitor<VisitorType>::dispatch(val);
     }
+
     // Expr Visitor
     void visitExpr(Expr*) {}
+
+    void visitOpenRefExpr(OpenRefExpr* expr) { dispatchIfNotNull(expr->innerExpr); }
+
     void visitIndexExpr(IndexExpr* subscriptExpr)
     {
         for (auto arg : subscriptExpr->indexExprs)
@@ -695,6 +699,7 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
             dispatchIfNotNull(element);
     }
 
+    void visitAddressOfExpr(AddressOfExpr* expr) { dispatchIfNotNull(expr->arg); }
 
     void visitAssignExpr(AssignExpr* expr)
     {
@@ -2359,6 +2364,13 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         // global variables and struct fields to prevent mangling.
         addModifier(varDecl, m_astBuilder->create<ExternCppModifier>());
     }
+
+    // Not allowed a `globallycoherent T*` or related
+    if (as<PtrType>(varDecl->type))
+        if (auto memoryQualifierSet = varDecl->findModifier<MemoryQualifierSetModifier>())
+            if (memoryQualifierSet->getMemoryQualifierBit() &
+                MemoryQualifierSetModifier::Flags::kCoherent)
+                getSink()->diagnose(varDecl, Diagnostics::coherentKeywordOnAPointer);
 
     // Check for static const variables without initializers
     if (!varDecl->initExpr)
@@ -14378,6 +14390,12 @@ struct CapabilityDeclReferenceVisitor
     void visitDiscardStmt(DiscardStmt* stmt)
     {
         handleProcessFunc(stmt, CapabilitySet(CapabilityName::fragment), stmt->loc);
+    }
+    void visitAddressOfExpr(AddressOfExpr* expr)
+    {
+        // __getAddress only works with certain targets
+        handleProcessFunc(expr, CapabilitySet(CapabilityName::cpp_cuda_metal_spirv), expr->loc);
+        this->dispatchIfNotNull(expr->arg);
     }
     void visitTargetSwitchStmt(TargetSwitchStmt* stmt)
     {

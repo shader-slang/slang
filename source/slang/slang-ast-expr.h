@@ -503,6 +503,13 @@ class CountOfExpr : public SizeOfLikeExpr
 };
 
 FIDDLE()
+class AddressOfExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() Expr* arg = nullptr;
+};
+
+FIDDLE()
 class MakeOptionalExpr : public Expr
 {
     FIDDLE(...)

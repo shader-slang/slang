@@ -610,6 +610,15 @@ void ASTPrinter::addExpr(Expr* expr)
         }
         sb << ")";
     }
+    else if (const auto addressOfExpr = as<AddressOfExpr>(expr))
+    {
+        sb << "__getAddress(";
+        if (addressOfExpr->arg)
+        {
+            addExpr(addressOfExpr->arg);
+        }
+        sb << ")";
+    }
     else if (const auto makeOptionalExpr = as<MakeOptionalExpr>(expr))
     {
         if (makeOptionalExpr->value)

@@ -530,7 +530,8 @@ public:
     Type* getDiffInterfaceType() { return m_sharedASTBuilder->getDiffInterfaceType(); }
     // Construct the type `Ptr<valueType>`, where `Ptr`
     // is looked up as a builtin type.
-    PtrType* getPtrType(Type* valueType, AddressSpace addrSpace);
+    PtrType* getPtrType(Type* valueType, AccessQualifier accessQualifier, AddressSpace addrSpace);
+    PtrType* getPtrType(Type* valueType, Val* accessQualifier, Val* addrSpace);
 
     // Construct the type `Out<valueType>`
     OutType* getOutType(Type* valueType);
@@ -539,7 +540,7 @@ public:
     InOutType* getInOutType(Type* valueType);
 
     // Construct the type `Ref<valueType>`
-    RefType* getRefType(Type* valueType, AddressSpace addrSpace);
+    RefType* getRefType(Type* valueType);
 
     // Construct the type `ConstRef<valueType>`
     ConstRefType* getConstRefType(Type* valueType);
@@ -550,7 +551,16 @@ public:
     // Construct a pointer type like `Ptr<valueType>`, but where
     // the actual type name for the pointer type is given by `ptrTypeName`
     PtrTypeBase* getPtrType(Type* valueType, char const* ptrTypeName);
-    PtrTypeBase* getPtrType(Type* valueType, AddressSpace addrSpace, char const* ptrTypeName);
+    PtrTypeBase* getPtrType(
+        Type* valueType,
+        Val* accessQualifier,
+        Val* addrSpace,
+        char const* ptrTypeName);
+    PtrTypeBase* getPtrType(
+        Type* valueType,
+        AccessQualifier accessQualifier,
+        AddressSpace addrSpace,
+        char const* ptrTypeName);
 
     ArrayExpressionType* getArrayType(Type* elementType, IntVal* elementCount);
 

@@ -2200,6 +2200,29 @@ struct IRLoad : IRInst
 };
 
 FIDDLE()
+struct IRCoherentOperation : IRInst
+{
+    FIDDLE(baseInst())
+    IRInst* getPtr() { return getOperand(0); }
+    IRIntLit* getMemoryScope() { return cast<IRIntLit>(getOperand(getOperandCount() - 1)); }
+};
+
+FIDDLE()
+struct IRCoherentLoad : IRCoherentOperation
+{
+    FIDDLE(leafInst())
+    IRInst* getAlignment() { return getOperand(1); }
+};
+
+FIDDLE()
+struct IRCoherentStore : IRCoherentOperation
+{
+    FIDDLE(leafInst())
+    IRInst* getSrc() { return getOperand(1); }
+    IRInst* getAlignment() { return getOperand(2); }
+};
+
+FIDDLE()
 struct IRAtomicOperation : IRInst
 {
     FIDDLE(baseInst())
@@ -3721,6 +3744,7 @@ public:
     IRGenericKind* getGenericKind();
 
     IRPtrType* getPtrType(IRType* valueType);
+    IRPtrTypeBase* getPtrType(IROp op, IRType* valueType);
 
     // Form a ptr type to `valueType` using the same opcode and address space as `ptrWithAddrSpace`.
     IRPtrTypeBase* getPtrTypeWithAddressSpace(IRType* valueType, IRPtrTypeBase* ptrWithAddrSpace);
@@ -3728,14 +3752,41 @@ public:
     IROutType* getOutType(IRType* valueType);
     IRInOutType* getInOutType(IRType* valueType);
     IRRefType* getRefType(IRType* valueType, AddressSpace addrSpace);
-    IRConstRefType* getConstRefType(IRType* valueType);
     IRConstRefType* getConstRefType(IRType* valueType, AddressSpace addrSpace);
-    IRPtrTypeBase* getPtrType(IROp op, IRType* valueType);
-    IRPtrType* getPtrType(IROp op, IRType* valueType, AddressSpace addressSpace);
-    IRPtrType* getPtrType(IROp op, IRType* valueType, IRInst* addressSpace);
+    IRPtrType* getPtrType(
+        IROp op,
+        IRType* valueType,
+        AccessQualifier accessQualifier,
+        AddressSpace addressSpace);
+    IRPtrType* getPtrType(
+        IROp op,
+        IRType* valueType,
+        IRInst* accessQualifier,
+        IRInst* addressSpace);
+    IRPtrType* getPtrType(IROp op, IRType* valueType, AddressSpace addressSpace)
+    {
+        return getPtrType(op, valueType, AccessQualifier::ReadWrite, addressSpace);
+    }
+    IRPtrType* getPtrType(
+        IRType* valueType,
+        AccessQualifier accessQualifier,
+        AddressSpace addressSpace)
+    {
+        return getPtrType(kIROp_PtrType, valueType, accessQualifier, addressSpace);
+    }
     IRPtrType* getPtrType(IRType* valueType, AddressSpace addressSpace)
     {
-        return getPtrType(kIROp_PtrType, valueType, addressSpace);
+        return getPtrType(valueType, AccessQualifier::ReadWrite, addressSpace);
+    }
+    // Copies the op-type of the oldPtrType, access-qualifier and address-space.
+    // Does not reuse the same `inst` for access-qualifier and address-space.
+    IRPtrTypeBase* getPtrType(IRType* valueType, IRPtrTypeBase* oldPtrType)
+    {
+        return getPtrType(
+            oldPtrType->getOp(),
+            valueType,
+            oldPtrType->getAccessQualifier(),
+            oldPtrType->getAddressSpace());
     }
 
     IRTextureTypeBase* getTextureType(
