@@ -1450,31 +1450,30 @@ bool SemanticsVisitor::_coerce(
         {
             Type* fromValueType = fromOptionalType->getValueType();
             Type* toValueType = toOptionalType->getValueType();
-            
+
             // Try to get a witness for the subtype relationship
             auto witness = tryGetSubtypeWitness(fromValueType, toValueType);
             if (witness)
             {
                 if (outCost)
                 {
-                    // Cost is slightly higher than direct interface casting
-                    *outCost = kConversionCost_CastToInterface + 10;
+                    *outCost = kConversionCost_CastToOptionalInterface;
                 }
+
                 if (outToExpr)
                 {
                     // Step 1: Create unchecked MemberExpr for .value access
                     auto memberExpr = getASTBuilder()->create<MemberExpr>();
                     memberExpr->baseExpression = fromExpr;
-                    memberExpr->name = getSession()->getNamePool()->getName("value");
+                    memberExpr->name = getName("value");
                     memberExpr->loc = fromExpr->loc;
-                    // Don't set type, declRef, or checked - let semantic checker handle it
-                    
+
                     // Apply semantic checking to resolve the member access
                     auto unwrapExpr = CheckExpr(memberExpr);
-                    
+
                     // Step 2: Convert T to U using createCastToSuperTypeExpr
                     auto castExpr = createCastToSuperTypeExpr(toValueType, unwrapExpr, witness);
-                    
+
                     // Step 3: Wrap it with Optional<U> using MakeOptionalExpr
                     auto resultExpr = getASTBuilder()->create<MakeOptionalExpr>();
                     resultExpr->value = castExpr;
