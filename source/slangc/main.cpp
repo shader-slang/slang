@@ -38,10 +38,13 @@ static void checkSlangcAndSlanglibVersion(
             const char* slangLibVersion = spGetBuildTagString();
 
             // Apply the same logic as getBuildTagString() for slangc version
-            if(strcmp(slangcVersionRaw, slangLibVersion) != 0)
+            if (strcmp(slangcVersionRaw, slangLibVersion) != 0)
             {
                 auto stdOut = StdWriters::getOut();
-                stdOut.print("[Warning] slangc version (%s) does not match slang library version (%s)\n", slangcVersionRaw, slangLibVersion);
+                stdOut.print(
+                    "[Warning] slangc version (%s) does not match slang library version (%s)\n",
+                    slangcVersionRaw,
+                    slangLibVersion);
             }
         }
     }
