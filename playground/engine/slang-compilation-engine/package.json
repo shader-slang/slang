@@ -1,0 +1,26 @@
+{
+    "name": "slang-compilation-engine",
+	"version": "0.0.1",
+    "description": "Slang compilation engine",
+    "main": "dist/index.umd.js",
+    "module": "dist/index.es.js",
+    "types": "dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.es.js",
+            "require": "./dist/index.umd.js"
+        }
+    },
+    "scripts": {
+        "build": "vite build"
+    },
+    "dependencies": {
+        "slang-playground-shared": "0.0.1"
+    },
+    "devDependencies": {
+        "@types/emscripten": "^1.39.13",
+        "@webgpu/types": "^0.1.51"
+    },
+    "type": "module"
+}
