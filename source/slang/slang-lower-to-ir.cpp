@@ -4173,11 +4173,24 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         switch (ptr.flavor)
         {
         case LoweredValInfo::Flavor::Ptr:
-            // TODO: This is a hack, `ptr` may have the wrong address space since
-            // when lowering-to-ir we don't check what addres-space info we should
-            // be using for variables we create.
-            // example: `groupshared int ptr` ==> lower-to-ir lowers as default address-space
-            return LoweredValInfo::ptr(context->irBuilder->emitCast(loweredType, ptr.val));
+            {
+                // TODO: This is a hack. We should just be returning `ptr`. We do not do this since
+                // `ptr` may have the wrong address space. This happens since when lowering-to-ir we
+                // don't check what addres-space info we should be using for variables we create.
+                // example: `groupshared int ptr` ==> lower-to-ir lowers as default address-space
+                // with groupshared-rate.
+                //
+                // We need to emit a temporary variable (and cannot emit a cast) since `operator*`
+                // has its own hacks and is an incorrect implementation of its own. To elaborate,
+                // `operator*` is defined as `__intrinsic_op(0)`, which means "pass arguments
+                // through a function `in`, then set as result". This is an issue since this means
+                // that our function (which should be returning a `ref`) may in fact, not be returning
+                // a `ref` but instead be loading via the `in` parameter and generating a non-pointer
+                // result.
+                auto irVar = context->irBuilder->emitVar(loweredType);
+                context->irBuilder->emitStore(irVar, ptr.val);
+                return LoweredValInfo::ptr(irVar);
+            }
         default:
             SLANG_UNIMPLEMENTED_X("cannot get address of __getAddress(...) argument");
             UNREACHABLE_RETURN(LoweredValInfo());
