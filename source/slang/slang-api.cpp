@@ -982,3 +982,87 @@ SLANG_API void spSetDiagnosticFlags(slang::ICompileRequest* request, SlangDiagno
 
     request->setDiagnosticFlags(flags);
 }
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! Blob Creation !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+SLANG_EXTERN_C SLANG_API ISlangBlob* slang_createBlob(const void* data, size_t size)
+{
+    // Disallow empty blobs.
+    if (!data || size == 0)
+        return nullptr;
+
+    Slang::ComPtr<ISlangBlob> blob = Slang::RawBlob::create(data, size);
+    if (!blob)
+        return nullptr;
+
+    return blob.detach();
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! Module Loading !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+SLANG_EXTERN_C SLANG_API slang::IModule* slang_loadModuleFromSource(
+    slang::ISession* session,
+    const char* moduleName,
+    const char* path,
+    const char* source,
+    size_t sourceSize,
+    ISlangBlob** outDiagnostics)
+{
+    if (!session || !moduleName || !path || !source || sourceSize == 0)
+        return nullptr;
+
+    // Create a blob from the source data using the slang_createBlob function.
+    Slang::ComPtr<ISlangBlob> sourceBlob;
+    sourceBlob = slang_createBlob(source, sourceSize);
+    if (!sourceBlob)
+        return nullptr;
+
+    // Load the module using the existing blob-based API.
+    return session->loadModuleFromSource(moduleName, path, sourceBlob, outDiagnostics);
+}
+
+SLANG_EXTERN_C SLANG_API slang::IModule* slang_loadModuleFromIRBlob(
+    slang::ISession* session,
+    const char* moduleName,
+    const char* path,
+    const void* source,
+    size_t sourceSize,
+    ISlangBlob** outDiagnostics)
+{
+    if (!session || !moduleName || !path || !source || sourceSize == 0)
+        return nullptr;
+
+    // Create a blob from the source data using the slang_createBlob function.
+    Slang::ComPtr<ISlangBlob> sourceBlob;
+    sourceBlob = slang_createBlob(source, sourceSize);
+    if (!sourceBlob)
+        return nullptr;
+
+    // Load the module using the existing IR blob-based API.
+    return session->loadModuleFromIRBlob(moduleName, path, sourceBlob, outDiagnostics);
+}
+
+SLANG_EXTERN_C SLANG_API SlangResult slang_loadModuleInfoFromIRBlob(
+    slang::ISession* session,
+    const void* source,
+    size_t sourceSize,
+    SlangInt& outModuleVersion,
+    const char*& outModuleCompilerVersion,
+    const char*& outModuleName)
+{
+    if (!session || !source || sourceSize == 0)
+        return SLANG_E_INVALID_ARG;
+
+    // Create a blob from the source data using the slang_createBlob function.
+    Slang::ComPtr<ISlangBlob> sourceBlob;
+    sourceBlob = slang_createBlob(source, sourceSize);
+    if (!sourceBlob)
+        return SLANG_E_INVALID_ARG;
+
+    // Load module info using the existing IR blob-based API.
+    return session->loadModuleInfoFromIRBlob(
+        sourceBlob,
+        outModuleVersion,
+        outModuleCompilerVersion,
+        outModuleName);
+}

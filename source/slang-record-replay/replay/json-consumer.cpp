@@ -527,6 +527,127 @@ void CommonInterfaceWriter::linkWithOptions(
     m_fileStream.flush();
 }
 
+void CommonInterfaceWriter::getTargetCompileResult(
+    ObjectID objectId,
+    SlangInt targetIndex,
+    ObjectID outCompileResultId,
+    ObjectID outDiagnosticsId)
+{
+    Slang::StringBuilder builder;
+    int indent = 0;
+
+    Slang::String functionName = m_className;
+    functionName = functionName + "::getTargetCompileResult";
+    {
+        ScopeWritterForKey scopeWritter(&builder, &indent, functionName);
+        {
+            _writePair(
+                builder,
+                indent,
+                "this",
+                Slang::StringUtil::makeStringWithFormat("0x%llX", objectId));
+            _writePair(builder, indent, "targetIndex", targetIndex);
+            _writePair(
+                builder,
+                indent,
+                "outCompileResult",
+                Slang::StringUtil::makeStringWithFormat("0x%llX", outCompileResultId));
+            _writePairNoComma(
+                builder,
+                indent,
+                "outDiagnostics",
+                Slang::StringUtil::makeStringWithFormat("0x%llX", outDiagnosticsId));
+        }
+    }
+
+    m_fileStream.write(builder.begin(), builder.getLength());
+    m_fileStream.flush();
+}
+
+void CommonInterfaceWriter::getEntryPointCompileResult(
+    ObjectID objectId,
+    SlangInt entryPointIndex,
+    SlangInt targetIndex,
+    ObjectID outCompileResultId,
+    ObjectID outDiagnosticsId)
+{
+    Slang::StringBuilder builder;
+    int indent = 0;
+
+    Slang::String functionName = m_className;
+    functionName = functionName + "::getEntryPointCompileResult";
+    {
+        ScopeWritterForKey scopeWritter(&builder, &indent, functionName);
+        {
+            _writePair(
+                builder,
+                indent,
+                "this",
+                Slang::StringUtil::makeStringWithFormat("0x%llX", objectId));
+            _writePair(builder, indent, "entryPointIndex", entryPointIndex);
+            _writePair(builder, indent, "targetIndex", targetIndex);
+            _writePair(
+                builder,
+                indent,
+                "outCompileResult",
+                Slang::StringUtil::makeStringWithFormat("0x%llX", outCompileResultId));
+            _writePairNoComma(
+                builder,
+                indent,
+                "outDiagnostics",
+                Slang::StringUtil::makeStringWithFormat("0x%llX", outDiagnosticsId));
+        }
+    }
+
+    m_fileStream.write(builder.begin(), builder.getLength());
+    m_fileStream.flush();
+}
+
+void CommonInterfaceWriter::queryInterface(
+    ObjectID objectId,
+    const SlangUUID& guid,
+    ObjectID outInterfaceId)
+{
+    Slang::StringBuilder builder;
+    int indent = 0;
+
+    Slang::String functionName = m_className;
+    functionName = functionName + "::queryInterface";
+    {
+        ScopeWritterForKey scopeWritter(&builder, &indent, functionName);
+        {
+            _writePair(
+                builder,
+                indent,
+                "this",
+                Slang::StringUtil::makeStringWithFormat("0x%llX", objectId));
+
+            Slang::String guidString = Slang::StringUtil::makeStringWithFormat(
+                "%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+                guid.data1,
+                guid.data2,
+                guid.data3,
+                guid.data4[0],
+                guid.data4[1],
+                guid.data4[2],
+                guid.data4[3],
+                guid.data4[4],
+                guid.data4[5],
+                guid.data4[6],
+                guid.data4[7]);
+            _writePair(builder, indent, "guid", guidString);
+
+            _writePairNoComma(
+                builder,
+                indent,
+                "outInterface",
+                Slang::StringUtil::makeStringWithFormat("0x%llX", outInterfaceId));
+        }
+    }
+
+    m_fileStream.write(builder.begin(), builder.getLength());
+    m_fileStream.flush();
+}
 
 JsonConsumer::JsonConsumer(const Slang::String& filePath)
 {
@@ -2929,6 +3050,14 @@ void JsonConsumer::ICompositeComponentType_linkWithOptions(
         outDiagnosticsId);
 }
 
+void JsonConsumer::ICompositeComponentType_queryInterface(
+    ObjectID objectId,
+    const SlangUUID& guid,
+    ObjectID outInterfaceId)
+{
+    SANITY_CHECK();
+    m_compositeComponentTypeHelper.queryInterface(objectId, guid, outInterfaceId);
+}
 
 // ITypeConformance
 void JsonConsumer::ITypeConformance_getSession(ObjectID objectId, ObjectID outSessionId)
@@ -3063,6 +3192,33 @@ void JsonConsumer::ITypeConformance_linkWithOptions(
         outLinkedComponentTypeId,
         compilerOptionEntryCount,
         compilerOptionEntries,
+        outDiagnosticsId);
+}
+
+void JsonConsumer::IComponentType2_getTargetCompileResult(
+    ObjectID objectId,
+    SlangInt targetIndex,
+    ObjectID outCompileResultId,
+    ObjectID outDiagnosticsId)
+{
+    SANITY_CHECK();
+    m_componentType2Helper
+        .getTargetCompileResult(objectId, targetIndex, outCompileResultId, outDiagnosticsId);
+}
+
+void JsonConsumer::IComponentType2_getEntryPointCompileResult(
+    ObjectID objectId,
+    SlangInt entryPointIndex,
+    SlangInt targetIndex,
+    ObjectID outCompileResultId,
+    ObjectID outDiagnosticsId)
+{
+    SANITY_CHECK();
+    m_componentType2Helper.getEntryPointCompileResult(
+        objectId,
+        entryPointIndex,
+        targetIndex,
+        outCompileResultId,
         outDiagnosticsId);
 }
 }; // namespace SlangRecord

@@ -1,8 +1,0 @@
-result code = -1
-standard error = {
-tests/language-feature/higher-order-functions/overloaded.slang(17): error 39999: passing overloaded functions to higher order functions is not supported
-    return foo(bit<float>);
-              ^
-}
-standard output = {
-}

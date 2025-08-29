@@ -2065,6 +2065,94 @@ void SemanticsVisitor::AddCtorOverloadCandidate(
     AddOverloadCandidate(context, candidate, baseCost);
 }
 
+void SemanticsVisitor::maybeExpandArgList(List<Expr*>& args)
+{
+    bool needExpansion = false;
+    for (auto expr : args)
+    {
+        while (auto paren = as<ParenExpr>(expr))
+            expr = paren->base;
+
+        if (auto expand = as<ExpandExpr>(expr))
+        {
+            auto exprType = expand->type.type;
+            if (auto typeType = as<TypeType>(exprType))
+                exprType = typeType->getType();
+            if (as<ConcreteTypePack>(exprType))
+            {
+                needExpansion = true;
+            }
+        }
+    }
+    // Fast path without creating list copies.
+    if (!needExpansion)
+        return;
+    List<Expr*> result;
+    for (auto expr : args)
+    {
+        while (auto paren = as<ParenExpr>(expr))
+            expr = paren->base;
+        auto processExpr = [&]()
+        {
+            auto expand = as<ExpandExpr>(expr);
+            if (!expand)
+                return false;
+            auto type = expand->type.type;
+            if (auto typeType = as<TypeType>(type))
+            {
+                auto typePack = as<ConcreteTypePack>(typeType->getType());
+                if (!typePack)
+                    return false;
+                for (Index i = 0; i < typePack->getTypeCount(); i++)
+                {
+                    auto expandArg = m_astBuilder->create<SharedTypeExpr>();
+                    expandArg->loc = expr->loc;
+                    expandArg->type = m_astBuilder->getTypeType(typePack->getElementType(i));
+                    result.add(expandArg);
+                }
+                return true;
+            }
+            else if (auto typePack = as<ConcreteTypePack>(type))
+            {
+                auto localScope = getExprLocalScope();
+                SLANG_ASSERT(localScope);
+
+                VarDecl* varDecl = m_astBuilder->create<VarDecl>();
+                varDecl->parentDecl = nullptr;
+                if (m_outerScope && m_outerScope->containerDecl)
+                    m_outerScope->containerDecl->addMember(varDecl);
+                addModifier(varDecl, m_astBuilder->create<LocalTempVarModifier>());
+                varDecl->checkState = DeclCheckState::DefinitionChecked;
+                varDecl->nameAndLoc.loc = expr->loc;
+                varDecl->initExpr = expr;
+                varDecl->type.type = expr->type.type;
+                LetExpr* letExpr = m_astBuilder->create<LetExpr>();
+                letExpr->decl = varDecl;
+                localScope->addBinding(letExpr);
+                auto varExpr = m_astBuilder->create<VarExpr>();
+                varExpr->declRef = varDecl;
+                varExpr->type = expr->type.type;
+                varExpr->type.isLeftValue = false;
+                for (Index i = 0; i < typePack->getTypeCount(); i++)
+                {
+                    auto expandedArg = m_astBuilder->create<SwizzleExpr>();
+                    expandedArg->base = varExpr;
+                    expandedArg->type = typePack->getElementType(i);
+                    expandedArg->type.isLeftValue = false;
+                    expandedArg->elementIndices.add((uint32_t)i);
+                    result.add(expandedArg);
+                }
+                return true;
+            }
+            return false;
+        };
+
+        if (!processExpr())
+            result.add(expr);
+    }
+    args.swapWith(result);
+}
+
 bool SemanticsVisitor::OverloadResolveContext::matchArgumentsToParams(
     SemanticsVisitor* semantics,
     const List<QualType>& params,
@@ -2102,7 +2190,8 @@ bool SemanticsVisitor::OverloadResolveContext::matchArgumentsToParams(
     }
 
     // Try to match the variadic part.
-    // Is the corresponding argument a expand expr? If so it will map 1:1 to the type pack param.
+    // Is the corresponding argument a expand expr? If so it will map 1:1 to the type pack
+    // param.
     auto astBuilder = semantics->getASTBuilder();
 
     if (remainingArgCount <= 0)
@@ -2492,7 +2581,7 @@ void SemanticsVisitor::AddOverloadCandidates(Expr* funcExpr, OverloadResolveCont
     }
     else if (auto overloadedExpr2 = as<OverloadedExpr2>(funcExpr))
     {
-        for (auto item : overloadedExpr2->candidiateExprs)
+        for (auto item : overloadedExpr2->candidateExprs)
         {
             AddOverloadCandidates(item, context);
         }
@@ -2655,22 +2744,8 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
     {
         return CreateErrorExpr(expr);
     }
-    // If any of the arguments is an error, then we should bail out, to avoid
-    // cascading errors where we successfully pick an overload, but not the one
-    // the user meant.
-    for (auto arg : expr->arguments)
-    {
-        if (IsErrorExpr(arg))
-            return CreateErrorExpr(expr);
 
-        // If this argument is itself an overloaded value without a type
-        // then we can't sensibly continue
-        if (!arg->type && (as<OverloadedExpr>(arg) || as<OverloadedExpr2>(arg)))
-        {
-            getSink()->diagnose(expr->loc, Diagnostics::overloadedParameterToHigherOrderFunction);
-            return CreateErrorExpr(expr);
-        }
-    }
+    maybeExpandArgList(expr->arguments);
 
     for (auto& arg : expr->arguments)
     {
@@ -2700,7 +2775,8 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
             if (typeCheckingCache->resolvedOperatorOverloadCache.tryGetValue(key, candidate))
             {
                 // We should only use the cached candidate if it is persistent direct declref
-                // created from GlobalSession's ASTBuilder, or it is created in the current Linkage.
+                // created from GlobalSession's ASTBuilder, or it is created in the current
+                // Linkage.
                 if (candidate.cacheVersion == typeCheckingCache->version ||
                     findNextOuterGeneric(candidate.decl) == nullptr)
                 {
@@ -2910,8 +2986,8 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
             }
         }
 
-        // Now that we have resolved the overload candidate, we need to undo an `openExistential`
-        // operation that was applied to `out` arguments.
+        // Now that we have resolved the overload candidate, we need to undo an
+        // `openExistential` operation that was applied to `out` arguments.
         //
         auto funcType = context.bestCandidate->funcType;
         ShortList<ParameterDirection> paramDirections;
@@ -3087,6 +3163,7 @@ Expr* SemanticsVisitor::checkGenericAppWithCheckedArgs(GenericAppExpr* genericAp
 
     auto& baseExpr = genericAppExpr->functionExpr;
     auto& args = genericAppExpr->arguments;
+    maybeExpandArgList(args);
 
     // If there was an error in the base expression,  or in any of
     // the arguments, then just bail.
@@ -3138,11 +3215,12 @@ Expr* SemanticsVisitor::checkGenericAppWithCheckedArgs(GenericAppExpr* genericAp
             // to complete all of them and create an overloaded expression as a result.
 
             auto overloadedExpr = m_astBuilder->create<OverloadedExpr2>();
+            overloadedExpr->type = m_astBuilder->getOverloadedType();
             overloadedExpr->base = context.baseExpr;
             for (auto candidate : context.bestCandidates)
             {
                 auto candidateExpr = CompleteOverloadCandidate(context, candidate);
-                overloadedExpr->candidiateExprs.add(candidateExpr);
+                overloadedExpr->candidateExprs.add(candidateExpr);
             }
             return overloadedExpr;
         }

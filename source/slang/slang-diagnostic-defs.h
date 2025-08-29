@@ -650,6 +650,11 @@ DIAGNOSTIC(
     "Cannot convert array of size $0 to array of size $1 as this would truncate data")
 DIAGNOSTIC(30025, Error, invalidArraySize, "array size must be non-negative.")
 DIAGNOSTIC(
+    30027,
+    Error,
+    disallowedArrayOfParameterBlock,
+    "Arrays of ParameterBlock are not allowed")
+DIAGNOSTIC(
     30029,
     Error,
     arrayIndexOutOfBounds,
@@ -1152,24 +1157,30 @@ DIAGNOSTIC(
     missingCapabilityRequirementOnPublicDecl,
     "public symbol '$0' is missing capability requirement declaration, the symbol is assumed to "
     "require inferred capabilities '$1'.")
-DIAGNOSTIC(36104, Error, useOfUndeclaredCapability, "'$0' uses undeclared capability '$1'.")
+DIAGNOSTIC(36104, Error, useOfUndeclaredCapability, "'$0' uses undeclared capability '$1'")
 DIAGNOSTIC(
     36104,
     Error,
     useOfUndeclaredCapabilityOfInterfaceRequirement,
-    "'$0' uses capability '$1' that is missing from the interface requirement.")
+    "'$0' uses capability '$1' that is incompatable with the interface requirement")
+DIAGNOSTIC(
+    36104,
+    Error,
+    useOfUndeclaredCapabilityOfInheritanceDecl,
+    "'$0' uses capability '$1' that is incompatable with the supertype")
 DIAGNOSTIC(36105, Error, unknownCapability, "unknown capability name '$0'.")
 DIAGNOSTIC(36106, Error, expectCapability, "expect a capability name.")
 DIAGNOSTIC(
     36107,
     Error,
     entryPointUsesUnavailableCapability,
-    "entrypoint '$0' uses features that are not available in '$2' stage for '$1' target.")
+    "entrypoint '$0' uses features that are not available in '$2' stage for '$1' compilation "
+    "target.")
 DIAGNOSTIC(
     36108,
     Error,
     declHasDependenciesNotCompatibleOnTarget,
-    "'$0' has dependencies that are not compatible on the required target '$1'.")
+    "'$0' has dependencies that are not compatible on the required compilation target '$1'.")
 DIAGNOSTIC(36109, Error, invalidTargetSwitchCase, "'$0' cannot be used as a target_switch case.")
 DIAGNOSTIC(
     36110,
@@ -1206,7 +1217,18 @@ DIAGNOSTIC(
     36117,
     Error,
     declHasDependenciesNotCompatibleOnStage,
-    "'$0' uses features that are not available in '$1' stage.")
+    "'$0' requires support for stage '$1', but stage is unsupported.")
+DIAGNOSTIC(
+    36118,
+    Error,
+    subTypeHasSubsetOfAbstractAtomsToSuperType,
+    "subtype '$0' must have the same target/stage support as the supertype; '$0' is missing '$1'")
+DIAGNOSTIC(
+    36118,
+    Error,
+    requirmentHasSubsetOfAbstractAtomsToImplementation,
+    "requirement '$0' must have the same target/stage support as the implementation; '$0' is "
+    "missing '$1'")
 
 // Attributes
 DIAGNOSTIC(31000, Warning, unknownAttributeName, "unknown attribute '$0'")
@@ -1989,12 +2011,6 @@ DIAGNOSTIC(
 DIAGNOSTIC(
     39999,
     Error,
-    overloadedParameterToHigherOrderFunction,
-    "passing overloaded functions to higher order functions is not supported")
-
-DIAGNOSTIC(
-    39999,
-    Error,
     matrixColumnOrRowCountIsOne,
     "matrices with 1 column or row are not supported by the current code generation target")
 
@@ -2211,7 +2227,7 @@ DIAGNOSTIC(
     glslModuleNotAvailable,
     "'glsl' module is not available from the current global session. To enable GLSL compatibility "
     "mode, specify 'SlangGlobalSessionDesc::enableGLSL' when creating the global session.")
-DIAGNOSTIC(39999, Fatal, complationCeased, "compilation ceased")
+DIAGNOSTIC(39999, Fatal, compilationCeased, "compilation ceased")
 
 DIAGNOSTIC(
     38203,
@@ -2512,6 +2528,11 @@ DIAGNOSTIC(
     Warning,
     methodNeverMutates,
     "method marked `[mutable]` but never modifies `this`")
+DIAGNOSTIC(
+    41024,
+    Warning,
+    commaOperatorUsedInExpression,
+    "comma operator used in expression (may be unintended)")
 
 DIAGNOSTIC(
     41024,
@@ -2999,15 +3020,43 @@ DIAGNOSTIC(
 
 // 99999 - Internal compiler errors, and not-yet-classified diagnostics.
 
-DIAGNOSTIC(99999, Internal, unimplemented, "unimplemented feature in Slang compiler: $0")
-DIAGNOSTIC(99999, Internal, unexpected, "unexpected condition encountered in Slang compiler: $0")
-DIAGNOSTIC(99999, Internal, internalCompilerError, "Slang internal compiler error")
-DIAGNOSTIC(99999, Error, compilationAborted, "Slang compilation aborted due to internal error")
+DIAGNOSTIC(
+    99999,
+    Internal,
+    unimplemented,
+    "unimplemented feature in Slang compiler: $0\nFor assistance, file an issue on GitHub "
+    "(https://github.com/shader-slang/slang/issues) or join the Slang Discord "
+    "(https://khr.io/slangdiscord)")
+DIAGNOSTIC(
+    99999,
+    Internal,
+    unexpected,
+    "unexpected condition encountered in Slang compiler: $0\nFor assistance, file an issue on "
+    "GitHub "
+    "(https://github.com/shader-slang/slang/issues) or join the Slang Discord "
+    "(https://khr.io/slangdiscord)")
+DIAGNOSTIC(
+    99999,
+    Internal,
+    internalCompilerError,
+    "Slang internal compiler error\nFor assistance, file an issue on GitHub "
+    "(https://github.com/shader-slang/slang/issues) or join the Slang Discord "
+    "(https://khr.io/slangdiscord)")
+DIAGNOSTIC(
+    99999,
+    Error,
+    compilationAborted,
+    "Slang compilation aborted due to internal error\nFor assistance, file an issue on GitHub "
+    "(https://github.com/shader-slang/slang/issues) or join the Slang Discord "
+    "(https://khr.io/slangdiscord)")
 DIAGNOSTIC(
     99999,
     Error,
     compilationAbortedDueToException,
-    "Slang compilation aborted due to an exception of $0: $1")
+    "Slang compilation aborted due to an exception of $0: $1\nFor assistance, file an issue on "
+    "GitHub "
+    "(https://github.com/shader-slang/slang/issues) or join the Slang Discord "
+    "(https://khr.io/slangdiscord)")
 DIAGNOSTIC(
     99999,
     Internal,

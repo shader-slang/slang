@@ -400,12 +400,12 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         else
             m_writer->emit(");\n");
     };
-    auto diagnoseFloatAtommic = [&]()
+    auto diagnoseFloatAtomic = [&]()
     {
         getSink()->diagnose(
             inst,
             Diagnostics::unsupportedTargetIntrinsic,
-            "floating point atomic operation");
+            "Unsupported floating point atomic operation");
     };
     switch (inst->getOp())
     {
@@ -433,7 +433,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_AtomicLoad:
         {
             if (isFloatingType(inst->getDataType()))
-                diagnoseFloatAtommic();
+                diagnoseFloatAtomic();
 
             emitInstResultDecl(inst);
             bool isImageOp = false;
@@ -488,7 +488,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_AtomicExchange:
         {
             if (isFloatingType(inst->getDataType()))
-                diagnoseFloatAtommic();
+                diagnoseFloatAtomic();
 
             emitAtomicOp("atomic_exchange", "atomic_exchange_explicit");
             return true;
@@ -496,7 +496,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_AtomicCompareExchange:
         {
             if (isFloatingType(inst->getDataType()))
-                diagnoseFloatAtommic();
+                diagnoseFloatAtomic();
 
             bool isImageOp = false;
             auto imageSubscript = isTextureAccess(inst);
@@ -543,17 +543,11 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         }
     case kIROp_AtomicAdd:
         {
-            if (isFloatingType(inst->getDataType()))
-                diagnoseFloatAtommic();
-
             emitAtomicOp("atomic_fetch_add", "atomic_fetch_add_explicit");
             return true;
         }
     case kIROp_AtomicSub:
         {
-            if (isFloatingType(inst->getDataType()))
-                diagnoseFloatAtommic();
-
             emitAtomicOp("atomic_fetch_sub", "atomic_fetch_sub_explicit");
             return true;
         }
@@ -575,7 +569,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_AtomicMin:
         {
             if (isFloatingType(inst->getDataType()))
-                diagnoseFloatAtommic();
+                diagnoseFloatAtomic();
 
             emitAtomicOp("atomic_fetch_min", "atomic_fetch_min_explicit");
             return true;
@@ -583,7 +577,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_AtomicMax:
         {
             if (isFloatingType(inst->getDataType()))
-                diagnoseFloatAtommic();
+                diagnoseFloatAtomic();
 
             emitAtomicOp("atomic_fetch_max", "atomic_fetch_max_explicit");
             return true;
@@ -1077,9 +1071,7 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
     {
     case kIROp_VoidType:
     case kIROp_BoolType:
-    case kIROp_Int8Type:
     case kIROp_IntType:
-    case kIROp_UInt8Type:
     case kIROp_UIntType:
     case kIROp_FloatType:
     case kIROp_HalfType:
@@ -1087,6 +1079,12 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit(getDefaultBuiltinTypeName(type->getOp()));
             return;
         }
+    case kIROp_Int8Type:
+        m_writer->emit("char");
+        return;
+    case kIROp_UInt8Type:
+        m_writer->emit("uchar");
+        return;
     case kIROp_Int64Type:
         m_writer->emit("long");
         return;
@@ -1107,6 +1105,9 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
         return;
     case kIROp_StructType:
         m_writer->emit(getName(type));
+        return;
+    case kIROp_DescriptorHandleType:
+        emitType(type);
         return;
 
     case kIROp_DoubleType:

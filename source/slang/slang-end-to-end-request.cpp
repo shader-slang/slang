@@ -28,7 +28,7 @@ EndToEndCompileRequest::EndToEndCompileRequest(Session* session)
     : m_session(session), m_sink(nullptr, Lexer::sourceLocationLexer)
 {
     RefPtr<ASTBuilder> astBuilder(
-        new ASTBuilder(session->m_sharedASTBuilder, "EndToEnd::Linkage::astBuilder"));
+        new ASTBuilder(session->getASTBuilder(), "EndToEnd::Linkage::astBuilder"));
     m_linkage = new Linkage(session, astBuilder, session->getBuiltinLinkage());
     init();
 }
@@ -892,6 +892,11 @@ void EndToEndCompileRequest::setTargetForceGLSLScalarBufferLayout(int targetInde
 void EndToEndCompileRequest::setTargetForceDXLayout(int targetIndex, bool value)
 {
     getTargetOptionSet(targetIndex).set(CompilerOptionName::ForceDXLayout, value);
+}
+
+void EndToEndCompileRequest::setTargetForceCLayout(int targetIndex, bool value)
+{
+    getTargetOptionSet(targetIndex).set(CompilerOptionName::ForceCLayout, value);
 }
 
 void EndToEndCompileRequest::setTargetFloatingPointMode(

@@ -114,13 +114,21 @@ jobs:
           else
             BASE=HEAD^1
           fi
-          if git diff --name-only -z $BASE...HEAD | 
-            grep --null-data -qvE '^(docs/|LICENSES/|LICENSE$|CONTRIBUTING\.md$|README\.md$)'; then
-            echo "should-run=true" >> $GITHUB_OUTPUT
+
+          shouldRun=true
+          if files="$(git diff --name-only $BASE...HEAD)"; then
+            # Git diff succeeded, check if non-documentation files were changed
+            if echo "$files" | grep -qvE '^(docs/|LICENSES/|LICENSE$|CONTRIBUTING\.md$|README\.md$)'; then
+              shouldRun=true
+            else
+              echo "Only documentation files changed, skipping remaining steps"
+              shouldRun=false
+            fi
           else
-            echo "Only documentation files changed, skipping remaining steps"
-            echo "should-run=false" >> $GITHUB_OUTPUT
+            echo "Git diff failed, conservatively running tests"
+            shouldRun=true
           fi
+          echo "should-run=$shouldRun" >> $GITHUB_OUTPUT
       - name: Install dependencies
         run: |
           if [[ "${{ matrix.os }}" = "linux" ]]; then
@@ -216,9 +224,10 @@ jobs:
           fi
 
       - name: Check documented compiler versions
+        if: steps.filter.outputs.should-run == 'true'
         run: bash extras/verify-documented-compiler-version.sh
 
-      - name: Test Slang
+      - name: Check runtime environment
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && (matrix.platform != 'aarch64' || matrix.os == 'macos')
         run: |
           smokeResult=$("$bin_dir/slang-test" tests/render/check-backend-support-on-ci.slang)
@@ -233,13 +242,15 @@ jobs:
             do
               echo "Checking $backend ..." && echo "$supportedBackends" | grep -q "$backend"
             done
+
             for api in 'vk,vulkan' 'dx12,d3d12' 'dx11,d3d11' 'cuda' 'wgpu,webgpu'
             do
               echo "Checking $api ..." && echo "$smokeResult" | grep -q "Check $api: Supported"
             done
-            echo "Printing CUDA version: ..." && nvcc --version
-            echo "Printing Vulkan SDK version: ..." && vulkaninfo | grep -i version
 
+            echo "Printing CUDA compiler version: ..." && nvcc --version
+            echo "Printing GPU driver version: ..." && nvidia-smi -q | grep Version
+            echo "Printing Vulkan SDK version: ..." && vulkaninfo | grep -i version
           fi
 
           if [[ "${{matrix.os}}" == "macos" ]]
@@ -248,14 +259,21 @@ jobs:
             do
               echo "Checking $backend ..." && echo "$supportedBackends" | grep -q "$backend"
             done
+
             for api in 'mtl,metal'
             do
               echo "Checking $api ..." && echo "$smokeResult" | grep -q "Check $api: Supported"
             done
           fi
 
+      - name: Test Slang
+        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && (matrix.platform != 'aarch64' || matrix.os == 'macos')
+        run: |
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
+          if [ "${{ matrix.enable-debug-layers }}" == "true" ]; then
+            export VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation
+          fi
           if [[ "${{matrix.full-gpu-tests}}" == "true" ]]; then
             "$bin_dir/slang-test" \
               -use-test-server \
@@ -291,7 +309,7 @@ jobs:
           PATH=$bin_dir:$PATH tools/slangc-test/test.sh
       - name: Test Slang via glsl
         # Run GLSL backend tests on release for pull requests, and not on merge_group, to reduce CI load.
-        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests && matrix.config == 'release' && github.event_name == 'pull_request'
+        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests && matrix.config == 'release'
         run: |
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
@@ -342,8 +360,7 @@ jobs:
           Get-ChildItem -Path "$SITE_PACKAGES\slangpy" | ForEach-Object { Write-Host "$($_.Name) - Last Modified: $($_.LastWriteTime)" }
           Write-Host "Running pytest on slangpy tests..."
           $env:PYTHONPATH = "$SITE_PACKAGES"
-          # Disable some slangpy tests temporarily. This should be enabled back when https://github.com/shader-slang/slangpy/issues/274 is closed.
-          python -m pytest "$SITE_PACKAGES\slangpy\tests" -v -k "not (test_nested_structs and DeviceType.cuda) and not (test_cursor_read_write and DeviceType.cuda) and not (test_fill_from_kernel and DeviceType.cuda) and not (test_wrap_buffer and DeviceType.cuda) and not (test_apply_changes and DeviceType.cuda) and not (test_shader_cursor and DeviceType.cuda)"
+          python -m pytest "$SITE_PACKAGES\slangpy\tests" -v
       - uses: actions/upload-artifact@v4
         if: steps.filter.outputs.should-run == 'true' && ! matrix.full-gpu-tests
         with:

@@ -474,6 +474,11 @@ Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, Byt
 Pack members using FXCs member packing rules when targeting GLSL or SPIRV. 
 
 
+<a id="fvk-use-c-layout"></a>
+### -fvk-use-c-layout
+Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, ByteAddressBuffer and general pointers follow the C/C++ structure layout rules when targeting SPIRV. 
+
+
 <a id="fvk-b-shift"></a>
 ### -fvk-b-shift, -fvk-s-shift, -fvk-t-shift, -fvk-u-shift
 
@@ -1360,6 +1365,7 @@ A capability describes an optional feature that a target may or may not support.
 * `GL_NV_shader_subgroup_partitioned` : enables the GL_NV_shader_subgroup_partitioned extension 
 * `GL_NV_shader_texture_footprint` : enables the GL_NV_shader_texture_footprint extension 
 * `GL_NV_cluster_acceleration_structure` : enables the GL_NV_cluster_acceleration_structure extension 
+* `GL_NV_cooperative_vector` : enables the GL_NV_cooperative_vector extension 
 * `nvapi` 
 * `raytracing` 
 * `ser` 
