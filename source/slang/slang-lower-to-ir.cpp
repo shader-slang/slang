@@ -4184,9 +4184,9 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 // has its own hacks and is an incorrect implementation of its own. To elaborate,
                 // `operator*` is defined as `__intrinsic_op(0)`, which means "pass arguments
                 // through a function `in`, then set as result". This is an issue since this means
-                // that our function (which should be returning a `ref`) may in fact, not be returning
-                // a `ref` but instead be loading via the `in` parameter and generating a non-pointer
-                // result.
+                // that our function (which should be returning a `ref`) may in fact, not be
+                // returning a `ref` but instead be loading via the `in` parameter and generating a
+                // non-pointer result.
                 auto irVar = context->irBuilder->emitVar(loweredType);
                 context->irBuilder->emitStore(irVar, ptr.val);
                 return LoweredValInfo::ptr(irVar);
