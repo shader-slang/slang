@@ -3864,15 +3864,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return spvDebugLocalVar;
     }
 
-    // returns true if the given type is legal for a `DebugVar`.
-    bool isLegalDebugVarType(IRInst* type)
+    // Returns true if the given type is allowed to emit for a `DebugVar`.
+    // Other types may not be illegal, but Slang currently does not support
+    // emitting these other DebugVar types.
+    bool isAllowedDebugVarType(IRInst* type)
     {
         switch (type->getOp())
         {
         case kIROp_UnsizedArrayType:
             return false;
         case kIROp_ArrayType:
-            return isLegalDebugVarType(as<IRArrayType>(type)->getElementType());
+            return isAllowedDebugVarType(as<IRArrayType>(type)->getElementType());
         case kIROp_VectorType:
         case kIROp_StructType:
         case kIROp_MatrixType:
@@ -3897,7 +3899,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         builder.setInsertBefore(debugVar);
         auto varType = tryGetPointedToType(&builder, debugVar->getDataType());
 
-        if (!isLegalDebugVarType(varType))
+        if (!isAllowedDebugVarType(varType))
             return nullptr;
 
         IRSizeAndAlignment sizeAlignment;

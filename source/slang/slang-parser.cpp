@@ -7026,7 +7026,6 @@ static NodeBase* parseSizeOfExpr(Parser* parser, void* /*userData*/)
 
 static NodeBase* parseAlignOfExpr(Parser* parser, void* /*userData*/)
 {
-    // We could have a type or a variable or an expression
     AlignOfExpr* alignOfExpr = parser->astBuilder->create<AlignOfExpr>();
 
     parser->ReadMatchingToken(TokenType::LParent);

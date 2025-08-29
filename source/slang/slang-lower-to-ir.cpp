@@ -4169,19 +4169,19 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         auto loweredType = lowerType(context, expr->type);
         auto baseVal = lowerLValueExpr(context, expr->arg);
         auto ptr = tryGetAddress(context, baseVal, TryGetAddressMode::Aggressive);
-
-        auto tempVar = context->irBuilder->emitVar(loweredType);
+        
         switch (ptr.flavor)
         {
         case LoweredValInfo::Flavor::Ptr:
-            context->irBuilder->emitStore(tempVar, ptr.val);
-            break;
+            // TODO: This is a hack, `ptr` may have the wrong address space since
+            // when lowering-to-ir we don't check what addres-space info we should
+            // be using for variables we create.
+            // example: `groupshared int ptr` ==> lower-to-ir lowers as default address-space
+            return LoweredValInfo::ptr(context->irBuilder->emitCast(loweredType, ptr.val));
         default:
             SLANG_UNIMPLEMENTED_X("cannot get address of __getAddress(...) argument");
             UNREACHABLE_RETURN(LoweredValInfo());
         }
-
-        return LoweredValInfo::ptr(tempVar);
     }
 
     LoweredValInfo visitIncompleteExpr(IncompleteExpr*)

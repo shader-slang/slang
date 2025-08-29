@@ -529,8 +529,8 @@ DIAGNOSTIC(
     Error,
     constNotAllowedOnCStylePtrDecl,
     "'const' not allowed on pointer typed declarations using the C style '*' operator. "
-    "If the intent is to restrict the pointed-to value to read-only, use 'Ptr<T, Access.Read>' "
-    "instead; if the intent is to make the pointer itself immutable, use 'const Ptr<...>'.")
+    "If the intent is to restrict the pointed-to value to read-only, use 'Ptr<T, Access.Read>'; "
+    "if the intent is to make the pointer itself immutable, use 'let' or 'const Ptr<...>'.")
 DIAGNOSTIC(20018, Error, constNotAllowedOnType, "cannot use 'const' as a type modifier")
 
 DIAGNOSTIC(

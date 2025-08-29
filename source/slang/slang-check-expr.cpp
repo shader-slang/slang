@@ -4122,7 +4122,52 @@ static PtrType* getValidTypeForAddressOf(
     Type* targetType)
 {
 
-    auto getDeclRefExprPtrType = [&](Expr* baseExpr) -> PtrType*
+    // If our base is a variable like expression, we should check if this expr is a 
+    // block of memory we allow getting the address of.
+   if (auto declRefExpr = as<DeclRefExpr>(baseExpr))
+   {
+       visitor->ensureDecl(declRefExpr->declRef, DeclCheckState::DefinitionChecked);
+       if (auto varDeclRef = as<VarDeclBase>(declRefExpr->declRef))
+       {
+           auto variableType = varDeclRef.substitute(m_astBuilder, targetType);
+           auto varDecl = varDeclRef.getDecl();
+           bool hasVulkanHitObjectAttributesAttribute = false;
+           bool hasHLSLGroupSharedModifier = false;
+           for (auto modifier : varDecl->modifiers)
+           {
+               if (as<VulkanHitObjectAttributesAttribute>(modifier))
+                   hasVulkanHitObjectAttributesAttribute = true;
+               else if (as<HLSLGroupSharedModifier>(modifier))
+                   hasHLSLGroupSharedModifier = true;
+
+               if (hasVulkanHitObjectAttributesAttribute || hasHLSLGroupSharedModifier)
+                   break;
+           }
+
+           // Handle variables tagged as [__vulkanHitObjectAttributes].
+           // This support is needed for an internal "hack" Slang uses
+           // for raytracing with `__allocHitObjectAttributes`.
+           if (hasVulkanHitObjectAttributesAttribute)
+           {
+               return m_astBuilder->getPtrType(
+                   variableType,
+                   AccessQualifier::ReadWrite,
+                   AddressSpace::Generic);
+           }
+           // Handle 'groupshared' variables.
+           else if (hasHLSLGroupSharedModifier)
+           {
+               return m_astBuilder->getPtrType(
+                   variableType,
+                   AccessQualifier::ReadWrite,
+                   AddressSpace::GroupShared);
+           }
+       }
+   }
+   
+    // If our base is a variable like expression, which comes from a deref-like operation,
+    // we should check if we are able to return a pointer from that base.
+    auto getPtrTypeFromBaseOfDerefLikeOperation = [&](Expr* baseExpr) -> PtrType*
     {
         auto declRefExpr = as<DeclRefExpr>(baseExpr);
         if (!declRefExpr)
@@ -4138,56 +4183,18 @@ static PtrType* getValidTypeForAddressOf(
         if (!ptrType)
             return nullptr;
 
-        // Handle operation into pointer: `T* ptr2 = ptr1[1];`
-        return m_astBuilder->getPtrType(
+            return m_astBuilder->getPtrType(
             variableType,
             ptrType->getAccessQualifier(),
             ptrType->getAddressSpace());
     };
 
-    if (auto declRefExpr = as<DeclRefExpr>(baseExpr))
-    {
-        visitor->ensureDecl(declRefExpr->declRef, DeclCheckState::DefinitionChecked);
-        if (auto varDeclRef = as<VarDeclBase>(declRefExpr->declRef))
-        {
-            auto variableType = varDeclRef.substitute(m_astBuilder, targetType);
-            auto varDecl = varDeclRef.getDecl();
-            bool hasVulkanHitObjectAttributesAttribute = false;
-            bool hasHLSLGroupSharedModifier = false;
-            for (auto modifier : varDecl->modifiers)
-            {
-                if (as<VulkanHitObjectAttributesAttribute>(modifier))
-                    hasVulkanHitObjectAttributesAttribute = true;
-                else if (as<HLSLGroupSharedModifier>(modifier))
-                    hasHLSLGroupSharedModifier = true;
-
-                if (hasVulkanHitObjectAttributesAttribute || hasHLSLGroupSharedModifier)
-                    break;
-            }
-
-            // Handle variables tagged as [__vulkanHitObjectAttributes].
-            // This support is needed for an internal "hack" Slang uses
-            // for raytracing.
-            if (hasVulkanHitObjectAttributesAttribute)
-            {
-                return m_astBuilder->getPtrType(
-                    variableType,
-                    AccessQualifier::ReadWrite,
-                    AddressSpace::Generic);
-            }
-            // Handle 'groupshared' variables.
-            else if (hasHLSLGroupSharedModifier)
-            {
-                return m_astBuilder->getPtrType(
-                    variableType,
-                    AccessQualifier::ReadWrite,
-                    AddressSpace::GroupShared);
-            }
-        }
-    }
-
+    //This logic handles the recursive lookup of "does our operation lead up 
+    //to an addressessable (can take the address-of) section of memory".
     if (auto indexExpr = as<IndexExpr>(baseExpr))
     {
+        // If a user chooses to index into an array, we should check if the base
+        // expression is something we can get the address-of.
         return getValidTypeForAddressOf(
             visitor,
             m_astBuilder,
@@ -4196,7 +4203,8 @@ static PtrType* getValidTypeForAddressOf(
     }
     else if (auto memberExpr = as<MemberExpr>(baseExpr))
     {
-        // Only allow `__getAddress` if we are refering to a member-variable
+        // If a user chooses to get a member of a base, we should check if the base
+        // is something we can get the address-of.
         if (as<VarDeclBase>(memberExpr->declRef))
             return getValidTypeForAddressOf(
                 visitor,
@@ -4206,11 +4214,14 @@ static PtrType* getValidTypeForAddressOf(
     }
     else if (auto derefExpr = as<DerefExpr>(baseExpr))
     {
-        return getDeclRefExprPtrType(derefExpr->base);
+        // If a user deref's a variable-like-expression, we should
+        // check if this is a base expression we can get the address-of.
+        return getPtrTypeFromBaseOfDerefLikeOperation(derefExpr->base);
     }
     else if (auto invokeExpr = as<InvokeExpr>(baseExpr))
     {
-        // Allow the `kIROp_GetOffsetPtr` subscript operator of a pointer-variable
+        // We only want to allow function calls if we are getting the address
+        // of a `GetOffsetPtr` to a pointer-variable
         auto functionMemberExpr = as<MemberExpr>(invokeExpr->functionExpr);
         if (!functionMemberExpr)
             return nullptr;
@@ -4230,10 +4241,17 @@ static PtrType* getValidTypeForAddressOf(
         if (!isOffsetIntrinsicOp)
             return nullptr;
 
-        return getDeclRefExprPtrType(functionMemberExpr->baseExpression);
+        return getPtrTypeFromBaseOfDerefLikeOperation(functionMemberExpr->baseExpression);
     }
     else if (auto swizzleExpr = as<SwizzleExpr>(baseExpr))
     {
+        // Only allow swizzle of 1 element since otherwise
+        // we may have a non-contiguous swizzle
+        // (`val.xxy` is non contiguous).
+        if(swizzleExpr->elementIndices.getCount() > 1)
+            return nullptr;
+
+        // Check if the base expression is something we can get the address-of.
         return getValidTypeForAddressOf(visitor, m_astBuilder, swizzleExpr->base, targetType);
     }
     return nullptr;
