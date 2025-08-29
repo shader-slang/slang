@@ -1,0 +1,69 @@
+{
+  "os": ["linux", "macos", "windows"],
+  "config": ["debug", "release"],
+  "compiler": ["gcc", "clang", "cl"],
+  "platform": ["x86_64", "aarch64", "wasm"],
+  "exclude": [
+    { "os": "linux", "platform": "aarch64" },
+    { "os": "windows", "platform": "aarch64" },
+    { "os": "macos", "platform": "x86_64" },
+    { "os": "linux", "config": "debug", "platform": "wasm" },
+    { "os": "windows", "platform": "wasm" },
+    { "os": "macos", "platform": "wasm" },
+    { "os": "linux", "compiler": "clang" },
+    { "os": "linux", "compiler": "cl" },
+    { "os": "windows", "compiler": "gcc" },
+    { "os": "windows", "compiler": "clang" },
+    { "os": "macos", "compiler": "gcc" },
+    { "os": "macos", "compiler": "cl" }
+  ],
+  "include": [
+    { "os": "linux", "runs-on": "ubuntu-22.04" },
+    { "os": "macos", "runs-on": "macos-latest" },
+    { "os": "windows", "runs-on": "windows-latest" },
+    { "os": "linux", "warnings-as-errors": true },
+    { "os": "macos", "warnings-as-errors": true },
+    { "os": "windows", "warnings-as-errors": true },
+    { "test-category": "smoke" },
+    { "os": "windows", "test-category": "quick" },
+    { "config": "release", "test-category": "full" },
+    { "full-gpu-tests": false },
+    { "build-llvm": true },
+    { "platform": "wasm", "build-llvm": false },
+    { "has-gpu": false },
+    {
+      "os": "linux",
+      "config": "release",
+      "compiler": "gcc",
+      "platform": "aarch64",
+      "test-category": "smoke",
+      "full-gpu-tests": false,
+      "runs-on": "ubuntu-24.04-arm",
+      "has-gpu": false,
+      "build-llvm": false
+    },
+    {
+      "os": "windows",
+      "config": "release",
+      "compiler": "cl",
+      "platform": "x86_64",
+      "test-category": "full",
+      "full-gpu-tests": true,
+      "runs-on": ["Windows", "self-hosted", "GCP-T4"],
+      "has-gpu": true,
+      "server-count": 8
+    },
+    {
+      "os": "windows",
+      "config": "debug",
+      "compiler": "cl",
+      "platform": "x86_64",
+      "test-category": "full",
+      "full-gpu-tests": true,
+      "runs-on": ["Windows", "self-hosted", "GCP-T4"],
+      "has-gpu": true,
+      "server-count": 8
+    },
+    { "enable-debug-layers": true }
+  ]
+}
