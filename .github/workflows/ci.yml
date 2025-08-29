@@ -43,22 +43,35 @@ jobs:
           fi
           echo "should-run=$shouldRun" >> $GITHUB_OUTPUT
 
-  load-matrix:
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-    steps:
-      - uses: actions/checkout@v4
-      - id: set-matrix
-        run: |
-          matrix=$(cat .github/matrix-config-test.json | jq -c .)
-          echo "matrix=$matrix" >> $GITHUB_OUTPUT
-
   build-slang:
-    needs: [filter, load-matrix]
+    needs: [filter]
     if: needs.filter.outputs.should-run == 'true'
     strategy:
-      matrix: ${{ fromJson(needs.load-matrix.outputs.matrix) }}
+      matrix:
+        include:
+          - os: windows
+            config: release
+            compiler: cl
+            platform: x86_64
+            runs-on: windows-latest
+            warnings-as-errors: true
+            test-category: quick
+            full-gpu-tests: false
+            build-llvm: true
+            has-gpu: false
+            enable-debug-layers: true
+          - os: windows
+            config: release
+            compiler: cl
+            platform: x86_64
+            runs-on: ["Windows", "self-hosted", "test"]
+            test-category: full
+            full-gpu-tests: true
+            has-gpu: true
+            server-count: 8
+            warnings-as-errors: true
+            build-llvm: true
+            enable-debug-layers: true
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
 
@@ -183,10 +196,34 @@ jobs:
           retention-days: 1
 
   test-slang:
-    needs: [filter, load-matrix, build-slang]
+    needs: [filter, build-slang]
     if: needs.filter.outputs.should-run == 'true'
     strategy:
-      matrix: ${{ fromJson(needs.load-matrix.outputs.matrix) }}
+      matrix:
+        include:
+          - os: windows
+            config: release
+            compiler: cl
+            platform: x86_64
+            runs-on: windows-latest
+            warnings-as-errors: true
+            test-category: quick
+            full-gpu-tests: false
+            build-llvm: true
+            has-gpu: false
+            enable-debug-layers: true
+          - os: windows
+            config: release
+            compiler: cl
+            platform: x86_64
+            runs-on: ["Windows", "self-hosted", "test"]
+            test-category: full
+            full-gpu-tests: true
+            has-gpu: true
+            server-count: 8
+            warnings-as-errors: true
+            build-llvm: true
+            enable-debug-layers: true
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
 
