@@ -18,6 +18,7 @@
 #include "../core/slang-file-system.h"
 #include "../core/slang-hex-dump-util.h"
 #include "../core/slang-name-value.h"
+#include "../core/slang-shared-library.h"
 #include "../core/slang-string-slice-pool.h"
 #include "../core/slang-type-text-util.h"
 #include "slang-compiler-options.h"
@@ -485,6 +486,10 @@ void initCommandOptions(CommandOptions& options)
          "Display the build version. This is the contents of git describe --tags.\n"
          "It is typically only set from automated builds(such as distros available on github).A "
          "user build will by default be 'unknown'."},
+        {OptionKind::LibPath,
+         "-slang-dynamic-library-path",
+         nullptr,
+         "Display the absolute path to the slang library (DLL/SO)."},
         {OptionKind::LanguageVersion,
          "-std",
          "-std <language-version>",
@@ -2940,7 +2945,25 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             break;
         case OptionKind::Version:
             {
-                m_sink->diagnoseRaw(Severity::Note, m_session->getBuildTagString());
+                StringBuilder versionInfo;
+                versionInfo << m_session->getBuildTagString();
+                m_sink->diagnoseRaw(Severity::Note, versionInfo.toString().getUnownedSlice());
+                break;
+            }
+        case OptionKind::LibPath:
+            {
+                // Get the absolute path of the slang library
+                // Use slang_createGlobalSession as it's a function inside the slang library
+                auto libPath =
+                    SharedLibraryUtils::getSharedLibraryFileName((void*)slang_createGlobalSession);
+                if (libPath.getLength() > 0)
+                {
+                    m_sink->diagnoseRaw(Severity::Note, libPath.getUnownedSlice());
+                }
+                else
+                {
+                    m_sink->diagnoseRaw(Severity::Error, "Unable to determine library path");
+                }
                 break;
             }
         case OptionKind::HelpStyle:

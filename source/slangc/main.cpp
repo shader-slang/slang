@@ -7,10 +7,50 @@ SLANG_API void spSetCommandLineCompilerMode(SlangCompileRequest* request);
 #include "../core/slang-io.h"
 #include "../core/slang-test-tool-util.h"
 #include "../slang/slang-internal.h"
+#include "slang-tag-version.h"
 
 using namespace Slang;
 
 #include <assert.h>
+#include <cctype>
+
+// Get the slangc embedded version
+static const char* getSlangcVersionString()
+{
+    return SLANG_TAG_VERSION;
+}
+
+// Check if slangc and slang library version match
+static void checkSlangcAndSlanglibVersion(
+    SlangCompileRequest* compileRequest,
+    int argc,
+    const char* const* argv)
+{
+    // Look for version options in command line
+    for (int i = 1; i < argc; i++)
+    {
+        if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "-version") == 0)
+        {
+            // Get slangc version
+            const char* slangcVersionRaw = getSlangcVersionString();
+
+            // Get slang library version
+            const char* slangLibVersion = spGetBuildTagString();
+
+            // Apply the same logic as getBuildTagString() for slangc version
+            if (strcmp(slangcVersionRaw, slangLibVersion) != 0)
+            {
+                auto stdOut = StdWriters::getOut();
+                stdOut.print(
+                    "[Warning] slangc version (%s) does not match slang library version (%s)\n",
+                    slangcVersionRaw,
+                    slangLibVersion);
+                stdOut.print("Use `-slang-dynamic-library-path` to show the path to the loaded "
+                             "slang library.\n");
+            }
+        }
+    }
+}
 
 #ifdef _WIN32
 #define MAIN slangc_main
@@ -34,6 +74,8 @@ static SlangResult _compile(SlangCompileRequest* compileRequest, int argc, const
     if (argc > 0)
         appName = argv[0];
 
+    // Check for version option first and handle version checking
+    checkSlangcAndSlanglibVersion(compileRequest, argc, argv);
     {
         const SlangResult res = spProcessCommandLineArguments(compileRequest, &argv[1], argc - 1);
         if (SLANG_FAILED(res))

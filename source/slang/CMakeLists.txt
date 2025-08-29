@@ -228,7 +228,11 @@ set(slang_link_args
     slang-lookup-tables
     SPIRV-Headers::SPIRV-Headers
 )
-set(slang_interface_args INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/include)
+set(slang_interface_args 
+    INCLUDE_DIRECTORIES_PUBLIC 
+    ${slang_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_BINARY_DIR}/slang-version-header
+)
 set(slang_public_lib_args
     PUBLIC_HEADERS
     ${slang_SOURCE_DIR}/include/slang*.h
