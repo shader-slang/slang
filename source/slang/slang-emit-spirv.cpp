@@ -3989,7 +3989,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     void maybeRequireVMMDeviceScope(IRCoherentOperation* op)
     {
         if ((MemoryScope)op->getMemoryScope()->getValue() == MemoryScope::Device)
-            requireSPIRVCapability(SpvCapabilityVulkanMemoryModelDeviceScopeKHR);         
+            requireSPIRVCapability(SpvCapabilityVulkanMemoryModelDeviceScopeKHR);
     }
 
     enum class CoherentMemoryAccessMaskOperationType : int
@@ -3997,7 +3997,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         None = 0,
         Store = 1,
     };
-    
+
     template<CoherentMemoryAccessMaskOperationType operationType>
     void calcCoherentMemoryAccessMask(IRPtrTypeBase* type, IRInst* ptr, int& maskOut)
     {
@@ -4466,131 +4466,135 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             result = emitImageSubscript(parent, as<IRImageSubscript>(inst));
             break;
         case kIROp_CoherentLoad:
-        {
-            if (m_memoryModel != SpvMemoryModelVulkan)
-                SLANG_ASSERT_FAILURE("Explicit coherent operations require vulkan-memory-model, "
-                                     "specify the capability 'vk_mem_model'");
-            
-            auto op = as<IRCoherentLoad>(inst);
-            maybeRequireVMMDeviceScope(op);
-
-            int memoryAccessMask = 0;
-            IRPtrTypeBase* type = as<IRPtrTypeBase>(op->getPtr()->getDataType());
-            SLANG_ASSERT(type);
-            calcCoherentMemoryAccessMask<CoherentMemoryAccessMaskOperationType::None>(
-                type,
-                op->getPtr(),
-                memoryAccessMask);
-
-            switch (type->getAddressSpace())
             {
-            case AddressSpace::Image:
+                if (m_memoryModel != SpvMemoryModelVulkan)
+                    SLANG_ASSERT_FAILURE(
+                        "Explicit coherent operations require vulkan-memory-model, "
+                        "specify the capability 'vk_mem_model'");
+
+                auto op = as<IRCoherentLoad>(inst);
+                maybeRequireVMMDeviceScope(op);
+
+                int memoryAccessMask = 0;
+                IRPtrTypeBase* type = as<IRPtrTypeBase>(op->getPtr()->getDataType());
+                SLANG_ASSERT(type);
+                calcCoherentMemoryAccessMask<CoherentMemoryAccessMaskOperationType::None>(
+                    type,
+                    op->getPtr(),
+                    memoryAccessMask);
+
+                switch (type->getAddressSpace())
                 {
-                    SLANG_UNIMPLEMENTED_X(
-                        "Coherent operations with an image is currently unimplemented");
+                case AddressSpace::Image:
+                    {
+                        SLANG_UNIMPLEMENTED_X(
+                            "Coherent operations with an image is currently unimplemented");
 
-                    // TODO: 
-                    // Image-Pointers can only be used for Atomics, either: (1) we encode offsets+ptr logic ourselves;
-                    // (2) or we have a large legalization pass; (3) do atomic operations. Issue #7880
+                        // TODO:
+                        // Image-Pointers can only be used for Atomics, either: (1) we encode
+                        // offsets+ptr logic ourselves; (2) or we have a large legalization pass;
+                        // (3) do atomic operations. Issue #7880
 
-                    //auto imageSubscriptPtr = as<IRImageSubscript>(op->getPtr());
-                    //auto textureType =
-                    //    as<IRPtrTypeBase>(imageSubscriptPtr->getImage()->getDataType())->getValueType();
-                    //if (!imageSubscriptPtr)
+                        // auto imageSubscriptPtr = as<IRImageSubscript>(op->getPtr());
+                        // auto textureType =
+                        //     as<IRPtrTypeBase>(imageSubscriptPtr->getImage()->getDataType())->getValueType();
+                        // if (!imageSubscriptPtr)
 
-                    //auto image = emitOpLoad(
-                    //    parent,
-                    //    nullptr, textureType,
-                    //    imageSubscriptPtr->getImage());
+                        // auto image = emitOpLoad(
+                        //     parent,
+                        //     nullptr, textureType,
+                        //     imageSubscriptPtr->getImage());
 
-                    //result = emitInstCustomOperandFunc(
-                    //    image,
-                    //    inst,
-                    //    SpvOpImageRead,
-                    //    [&]()
-                    //    {
-                    //        emitOperand(inst->getFullType());
-                    //        emitOperand(kResultID);
-                    //        emitOperand(image);
-                    //        emitOperand(imageSubscriptPtr->getCoord());
-                    //        emitOperand(SpvLiteralInteger::from32(memoryAccessMask));
-                    //        if (imageSubscriptPtr->hasSampleCoord())
-                    //            emitOperand(imageSubscriptPtr->getSampleCoord());
-                    //        emitOperand(op->getMemoryScope());
-                    //    });
-                    break;
+                        // result = emitInstCustomOperandFunc(
+                        //     image,
+                        //     inst,
+                        //     SpvOpImageRead,
+                        //     [&]()
+                        //     {
+                        //         emitOperand(inst->getFullType());
+                        //         emitOperand(kResultID);
+                        //         emitOperand(image);
+                        //         emitOperand(imageSubscriptPtr->getCoord());
+                        //         emitOperand(SpvLiteralInteger::from32(memoryAccessMask));
+                        //         if (imageSubscriptPtr->hasSampleCoord())
+                        //             emitOperand(imageSubscriptPtr->getSampleCoord());
+                        //         emitOperand(op->getMemoryScope());
+                        //     });
+                        break;
+                    }
+                default:
+                    {
+                        result = emitInstCustomOperandFunc(
+                            parent,
+                            inst,
+                            SpvOpLoad,
+                            [&]()
+                            {
+                                emitOperand(inst->getFullType());
+                                emitOperand(kResultID);
+                                emitOperand(op->getPtr());
+                                emitOperand(SpvLiteralInteger::from32(memoryAccessMask));
+                                if (as<IRIntLit>(op->getAlignment()))
+                                    emitOperand(SpvLiteralInteger::from32(
+                                        (uint32_t)getIntVal(op->getAlignment())));
+                                else
+                                    emitOperand(op->getAlignment());
+                                emitOperand(op->getMemoryScope());
+                            });
+                        break;
+                    }
                 }
-            default:
-                {
-                    result = emitInstCustomOperandFunc(
-                        parent,
-                        inst,
-                        SpvOpLoad,
-                        [&]()
-                        {
-                            emitOperand(inst->getFullType());
-                            emitOperand(kResultID);
-                            emitOperand(op->getPtr());
-                            emitOperand(SpvLiteralInteger::from32(memoryAccessMask));
-                            if (as<IRIntLit>(op->getAlignment()))
-                                emitOperand(SpvLiteralInteger::from32(
-                                    (uint32_t)getIntVal(op->getAlignment())));
-                            else
-                                emitOperand(op->getAlignment());
-                            emitOperand(op->getMemoryScope());
-                        });
-                    break;
-                }
+                break;
             }
-            break;
-        }
         case kIROp_CoherentStore:
-        {
-            if (m_memoryModel != SpvMemoryModelVulkan)
-                SLANG_ASSERT_FAILURE("Explicit coherent operations require vulkan-memory-model, specify the capability 'vk_mem_model'");
-            
-            auto op = as<IRCoherentStore>(inst);
-            maybeRequireVMMDeviceScope(op);
-
-            int memoryAccessMask = 0;
-            IRPtrTypeBase* type = as<IRPtrTypeBase>(op->getPtr()->getDataType());
-            SLANG_ASSERT(type);
-            calcCoherentMemoryAccessMask<CoherentMemoryAccessMaskOperationType::Store>(
-                type,
-                op->getPtr(),
-                memoryAccessMask);
-
-            switch (type->getAddressSpace())
             {
-            case AddressSpace::Image:
+                if (m_memoryModel != SpvMemoryModelVulkan)
+                    SLANG_ASSERT_FAILURE(
+                        "Explicit coherent operations require vulkan-memory-model, specify the "
+                        "capability 'vk_mem_model'");
+
+                auto op = as<IRCoherentStore>(inst);
+                maybeRequireVMMDeviceScope(op);
+
+                int memoryAccessMask = 0;
+                IRPtrTypeBase* type = as<IRPtrTypeBase>(op->getPtr()->getDataType());
+                SLANG_ASSERT(type);
+                calcCoherentMemoryAccessMask<CoherentMemoryAccessMaskOperationType::Store>(
+                    type,
+                    op->getPtr(),
+                    memoryAccessMask);
+
+                switch (type->getAddressSpace())
                 {
-                    SLANG_UNIMPLEMENTED_X(
-                        "Coherent operations with an image is currently unimplemented");
-                    break;
+                case AddressSpace::Image:
+                    {
+                        SLANG_UNIMPLEMENTED_X(
+                            "Coherent operations with an image is currently unimplemented");
+                        break;
+                    }
+                default:
+                    {
+                        result = emitInstCustomOperandFunc(
+                            parent,
+                            inst,
+                            SpvOpStore,
+                            [&]()
+                            {
+                                emitOperand(op->getPtr());
+                                emitOperand(op->getSrc());
+                                emitOperand(SpvLiteralInteger::from32(memoryAccessMask));
+                                if (as<IRIntLit>(op->getAlignment()))
+                                    emitOperand(SpvLiteralInteger::from32(
+                                        (uint32_t)getIntVal(op->getAlignment())));
+                                else
+                                    emitOperand(op->getAlignment());
+                                emitOperand(op->getMemoryScope());
+                            });
+                        break;
+                    }
                 }
-            default:
-                {
-                    result = emitInstCustomOperandFunc(
-                        parent,
-                        inst,
-                        SpvOpStore,
-                        [&]()
-                        {
-                            emitOperand(op->getPtr());
-                            emitOperand(op->getSrc());
-                            emitOperand(SpvLiteralInteger::from32(memoryAccessMask));
-                            if (as<IRIntLit>(op->getAlignment()))
-                                emitOperand(SpvLiteralInteger::from32(
-                                    (uint32_t)getIntVal(op->getAlignment())));
-                            else
-                                emitOperand(op->getAlignment());
-                            emitOperand(op->getMemoryScope());
-                        });
-                    break;
-                }
+                break;
             }
-            break;
-        }
         case kIROp_AtomicInc:
             {
                 if (m_memoryModel == SpvMemoryModelVulkan)
