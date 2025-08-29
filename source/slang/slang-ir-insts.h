@@ -2204,7 +2204,7 @@ struct IRCoherentOperation : IRInst
 {
     FIDDLE(baseInst())
     IRInst* getPtr() { return getOperand(0); }
-    IRIntLit* getMemoryScope() { return cast<IRIntLit>(getOperand(getOperandCount()-1)); }
+    IRIntLit* getMemoryScope() { return cast<IRIntLit>(getOperand(getOperandCount() - 1)); }
 };
 
 FIDDLE()
