@@ -681,7 +681,7 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
 
     // Expr Visitor
     void visitExpr(Expr*) {}
-    
+
     void visitOpenRefExpr(OpenRefExpr* expr) { dispatchIfNotNull(expr->innerExpr); }
 
     void visitIndexExpr(IndexExpr* subscriptExpr)
