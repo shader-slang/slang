@@ -4169,7 +4169,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         auto loweredType = lowerType(context, expr->type);
         auto baseVal = lowerLValueExpr(context, expr->arg);
         auto ptr = tryGetAddress(context, baseVal, TryGetAddressMode::Aggressive);
-        
+
         switch (ptr.flavor)
         {
         case LoweredValInfo::Flavor::Ptr:
