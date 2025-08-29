@@ -23109,6 +23109,18 @@ extension<T, L : IBufferDataLayout> RasterizerOrderedStructuredBuffer<T, L> : IR
     int getCount() { uint count; uint stride; this.GetDimensions(count, stride); return count; }
 }
 
+[require(vk_mem_model)]
+internal void enableVMMDeviceScopeCapabilityIfNeeded(constexpr MemoryScope memoryScope)
+{
+    if (memoryScope == MemoryScope::Device)
+    {
+        spirv_asm
+        {
+            OpCapability VulkanMemoryModelDeviceScopeKHR;
+        };
+    }
+}
+
 namespace linalg
 {
 
@@ -23374,7 +23386,6 @@ extension<
 ${{{{
     } // iDim
 }}}}
-
 
 //
 // Cooperative Matrix type
@@ -23683,6 +23694,22 @@ struct CoopMat
         };
     }
 
+    // TODO: make this function an intrinsic and support all types via the single intrinsic
+    [require(cooperative_matrix, vk_mem_model)]
+    void CoherentStore<
+        let matrixLayout : CoopMatMatrixLayout
+    >(T* buffer, uint element, uint stride, constexpr MemoryScope memoryScope)
+    {
+        enableVMMDeviceScopeCapabilityIfNeeded(memoryScope);
+        let alignment = 16U;
+        const int32_t scope = (int32_t)memoryScope;
+        return spirv_asm
+        {
+            %pointer:$$T* = OpPtrAccessChain $buffer $element;
+            OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned|MakePointerAvailable|NonPrivatePointer !alignment $scope;
+        };
+    }
+
     [ForceInline]
     [require(cooperative_matrix)]
     void Store<
@@ -23791,6 +23818,24 @@ ${{{{
         {
             %pointer:$$T* = OpPtrAccessChain $buffer $element;
             result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
+        };
+    }
+
+    // TODO: make this function an intrinsic and support all types via the single intrinsic
+    [ForceInline]
+    [__NoSideEffect]
+    [require(cooperative_matrix, vk_mem_model)]
+    static This CoherentLoad<
+        let matrixLayout : CoopMatMatrixLayout
+    >(T* buffer, uint element, uint stride, constexpr MemoryScope memoryScope)
+    {
+        enableVMMDeviceScopeCapabilityIfNeeded(memoryScope);
+        let alignment = 16U;
+        const int32_t scope = (int32_t)memoryScope;
+        return spirv_asm
+        {
+            %pointer:$$T* = OpPtrAccessChain $buffer $element;
+            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned|MakePointerVisible|NonPrivatePointer !alignment $scope;
         };
     }
 
@@ -24350,6 +24395,24 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 }
 
 [ForceInline]
+[require(cooperative_matrix, vk_mem_model)]
+CoopMat<T, S, M, N, R> coopMatCoherentLoad<
+    T : __BuiltinArithmeticType,
+    let S : MemoryScope,
+    let M : int,
+    let N : int,
+    let R : CoopMatMatrixUse,
+    let matrixLayout : CoopMatMatrixLayout
+>(
+    T* buffer,
+    uint element,
+    uint stride,
+    constexpr MemoryScope memoryScope)
+{
+    return CoopMat<T, S, M, N, R>.CoherentLoad<matrixLayout>(buffer, element, stride, memoryScope);
+}
+
+[ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
     T : __BuiltinArithmeticType,
@@ -24715,6 +24778,20 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         };
     }
 
+    // TODO: make this function an intrinsic and support all types via the single intrinsic
+    [require(cooperative_vector, vk_mem_model)]
+    void coherentStore(T* buffer, int32_t byteOffset16ByteAligned = 0, constexpr MemoryScope memoryScope = MemoryScope::Device)
+    {
+        enableVMMDeviceScopeCapabilityIfNeeded(memoryScope);
+        let pointer = Ptr<T[]>(buffer);
+        let alignment = 16U;
+        const int32_t scope = (int32_t)memoryScope;
+        spirv_asm
+        {
+            OpCooperativeVectorStoreNV $pointer $byteOffset16ByteAligned $this Aligned|MakePointerAvailable|NonPrivatePointer !alignment $scope;
+        };
+    }
+
     [ForceInline]
     [require(cooperative_vector)]
     [require(hlsl_coopvec_poc)]
@@ -24884,6 +24961,20 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         return spirv_asm
         {
             result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV $pointer $byteOffset16ByteAligned Aligned !alignment;
+        };
+    }
+
+    // TODO: make this function an intrinsic and support all types via the single intrinsic
+    [require(cooperative_vector, vk_mem_model)]
+    static CoopVec<T, N> coherentLoad(T* buffer, int32_t byteOffset16ByteAligned = 0, constexpr MemoryScope memoryScope = MemoryScope::Device)
+    {
+        enableVMMDeviceScopeCapabilityIfNeeded(memoryScope);
+        let pointer = Ptr<T[]>(buffer);
+        let alignment = 16U;
+        const int32_t scope = (int32_t)memoryScope;
+        return spirv_asm
+        {
+            result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV $pointer $byteOffset16ByteAligned Aligned|MakePointerVisible|NonPrivatePointer !alignment $scope;
         };
     }
 
@@ -26325,6 +26416,13 @@ CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(RWStructured
 CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(T* buffer, int32_t byteOffset16ByteAligned = 0)
 {
     return CoopVec<T, N>.load(buffer, byteOffset16ByteAligned);
+}
+
+[ForceInline]
+[require(spirv, cooperative_vector, vk_mem_model)]
+CoopVec<T, N> coopVecCoherentLoad<let N : int, T : __BuiltinArithmeticType>(T* buffer, int32_t byteOffset16ByteAligned = 0, constexpr MemoryScope memoryScope = MemoryScope::Device)
+{
+    return CoopVec<T, N>.coherentLoad(buffer, byteOffset16ByteAligned, memoryScope);
 }
 
 // Groupshared

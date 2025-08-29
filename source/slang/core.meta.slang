@@ -1355,6 +1355,23 @@ extension<T, AddressSpace addrSpace> Ptr<T, Access::ReadWrite, addrSpace>
     }
 }
 
+// `ptr` is the value to be loaded.
+// `alignment` is the alignment to load with. Must be a power of two. Not always used.
+// `scope` controls the memory scope that an operation is coherent to.
+[require(SPV_KHR_vulkan_memory_model)]
+__intrinsic_op($(kIROp_CoherentLoad))
+__generic<T, Access access, AddressSpace addrSpace> 
+T coherentLoad(Ptr<T, access, addrSpace> ptr, int alignment, constexpr MemoryScope scope = MemoryScope::Device);
+
+// `ptr` is the dst for the store.
+// `val` is the value to store into `ptr`.
+// `alignment` is the alignment to load with. Must be a power of two. Not always used.
+// `scope` controls the memory scope that an operation is coherent to.
+[require(SPV_KHR_vulkan_memory_model)]
+__intrinsic_op($(kIROp_CoherentStore))
+__generic<T, AddressSpace addrSpace> 
+void coherentStore(Ptr<T, Access::ReadWrite, addrSpace> ptr, T val, int alignment, constexpr MemoryScope scope = MemoryScope::Device);
+
 //@hidden:
 __intrinsic_op($(kIROp_AlignedAttr))
 void __align_attr(int alignment);
