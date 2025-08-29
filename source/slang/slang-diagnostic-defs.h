@@ -317,6 +317,15 @@ DIAGNOSTIC(103, Note, performanceBenchmarkResult, "compiler performance benchmar
 DIAGNOSTIC(99999, Note, noteFailedToLoadDynamicLibrary, "failed to load dynamic library '$0'")
 
 //
+// 002xx - Reflection
+//
+DIAGNOSTIC(
+    00200,
+    Error,
+    noReflectionAvailableForModule,
+    "no reflection information available to output for module '$0'")
+
+//
 // 15xxx - Preprocessing
 //
 
