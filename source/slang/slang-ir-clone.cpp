@@ -5,6 +5,7 @@
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-mangle.h"
+#include "slang-ir-insert-debug-value-store.h"
 
 
 namespace Slang
@@ -72,6 +73,18 @@ IRInst* cloneInstAndOperands(IRCloneEnv* env, IRBuilder* builder, IRInst* oldIns
         return builder->getPtrValue(newType, oldPtr->value.ptrVal);
     }
 
+    // Check if DebugVar instructions remain debuggable after type substitution:
+    if (oldInst->getOp() == kIROp_DebugVar)
+    {
+        auto pointedToType = tryGetPointedToType(builder, newType);
+        DebugValueStoreContext debugContext;
+        if (!debugContext.isDebuggableType(pointedToType))
+        {
+            // Return a dummy instruction or nullptr - don't create invalid DebugVar
+            return builder->emitUndefined(newType); // or some other placeholder
+        }
+    }
+
     // This logic will not handle any instructions
     // with special-case data attached, but that only
     // applies to `IRConstant`s at this point, and those
@@ -106,6 +119,19 @@ IRInst* cloneInstAndOperands(IRCloneEnv* env, IRBuilder* builder, IRInst* oldIns
 
         if (canBeSpecConst)
             newType = maybeAddRateType(builder, newOperand->getFullType(), newType);
+    }
+
+    // Check if DebugValue instructions reference valid DebugVar after cloning:
+    if (oldInst->getOp() == kIROp_DebugValue && operandCount >= 2)
+    {
+        auto newDebugVar = newOperands[0]; // First operand is the DebugVar
+        
+        // If the referenced DebugVar became invalid (e.g., emitUndefined), skip this DebugValue
+        if (!newDebugVar || newDebugVar->getOp() == kIROp_Undefined)
+        {
+            // Return a no-op instruction instead of invalid DebugValue
+            return builder->emitUndefined(builder->getVoidType());
+        }
     }
 
     // Finally we create the inst with the updated operands.
