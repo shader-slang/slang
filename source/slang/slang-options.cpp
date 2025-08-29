@@ -2954,7 +2954,8 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             {
                 // Get the absolute path of the slang library
                 // Use slang_createGlobalSession as it's a function inside the slang library
-                auto libPath = SharedLibraryUtils::getSharedLibraryFileName((void*)slang_createGlobalSession);
+                auto libPath =
+                    SharedLibraryUtils::getSharedLibraryFileName((void*)slang_createGlobalSession);
                 if (libPath.getLength() > 0)
                 {
                     m_sink->diagnoseRaw(Severity::Note, libPath.getUnownedSlice());

@@ -901,7 +901,7 @@ typedef uint32_t SlangSizeT;
         Stage,   // intValue0: stage
         Target,  // intValue0: CodeGenTarget
         Version,
-        LibPath, // Print the absolute path of the slang library (DLL/SO)
+        LibPath,          // Print the absolute path of the slang library (DLL/SO)
         WarningsAsErrors, // stringValue0: "all" or comma separated list of warning codes or names.
         DisableWarnings,  // stringValue0: comma separated list of warning codes or names.
         EnableWarning,    // stringValue0: warning code or name.
