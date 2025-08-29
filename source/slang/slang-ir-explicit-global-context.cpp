@@ -316,8 +316,7 @@ struct IntroduceExplicitGlobalContextPass
         // The context will usually be passed around by pointer,
         // so we get and cache that pointer type up front.
         //
-        m_contextStructPtrType =
-            builder.getPtrType(kIROp_PtrType, m_contextStructType, getAddressSpaceOfLocal());
+        m_contextStructPtrType = builder.getPtrType(m_contextStructType, getAddressSpaceOfLocal());
 
 
         // The first step will be to create fields in the `KernelContext`
@@ -630,7 +629,7 @@ struct IntroduceExplicitGlobalContextPass
 
         auto ptrType = getGlobalVarPtrType(globalVar);
         if (fieldInfo.needDereference)
-            ptrType = builder.getPtrType(kIROp_PtrType, ptrType, getAddressSpaceOfLocal());
+            ptrType = builder.getPtrType(ptrType, getAddressSpaceOfLocal());
 
         // We then iterate over the uses of the variable,
         // being careful to defend against the use/def information
