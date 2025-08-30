@@ -152,6 +152,7 @@ void main(uint tid : SV_DispatchThreadID)
     for (int i = 0; i < sampler.getSampleCount(); i++)
         output[tid] += sampler.sample(i);
 }
+```
 
 Again, we can separately compile these modules into binary forms independently from how they will be specialized.
 To specialize the shader, we can author a third module that provides a definition for the `extern Sampler` type:
