@@ -8,7 +8,8 @@ RWStructuredBuffer<int4> outputBuffer;
 
 void computeMain()
 {
-    // CHECK: error 41400: {{.*}} HLSL supports only float and half type textures
+    // Integer texture sampling is now supported
+    // CHECK: Sample
     outputBuffer[0] = t2D.Sample(s, float2(0.0, 0.0));
 }
 
