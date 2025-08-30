@@ -103,8 +103,11 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
             if (ptrType)
             {
                 auto paramAddrSpace = key.getArgAddrSpaces()[paramIndex];
-                auto newParamType =
-                    builder.getPtrType(ptrType->getOp(), ptrType->getValueType(), paramAddrSpace);
+                auto newParamType = builder.getPtrType(
+                    ptrType->getOp(),
+                    ptrType->getValueType(),
+                    ptrType->getAccessQualifier(),
+                    paramAddrSpace);
                 param->setFullType(newParamType);
                 mapInstToAddrSpace[param] = paramAddrSpace;
             }
@@ -310,6 +313,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                                     auto newResultType = builder.getPtrType(
                                         ptrResultType->getOp(),
                                         ptrResultType->getValueType(),
+                                        ptrResultType->getAccessQualifier(),
                                         addrSpace);
                                     fixUpFuncType(func, newResultType);
                                     retValAddrSpaceChanged = true;
@@ -349,8 +353,11 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                 if (ptrType->getAddressSpace() != addrSpace)
                 {
                     IRBuilder builder(inst);
-                    auto newType =
-                        builder.getPtrType(ptrType->getOp(), ptrType->getValueType(), addrSpace);
+                    auto newType = builder.getPtrType(
+                        ptrType->getOp(),
+                        ptrType->getValueType(),
+                        ptrType->getAccessQualifier(),
+                        addrSpace);
                     setDataType(inst, newType);
                 }
             }
