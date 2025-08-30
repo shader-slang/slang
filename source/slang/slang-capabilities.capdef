@@ -2226,6 +2226,7 @@ alias subgroup_partitioned = _sm_6_5
 /// [Compound]
 alias subgroup_rotate = GL_KHR_shader_subgroup_rotate 
                        | metal
+		       | _cuda_sm_5_0
                        ;
 
 /// (All implemented targets) Capabilities required to use atomic operations of GLSL tier-1 float atomics
@@ -2260,6 +2261,7 @@ alias helper_lane = _sm_6_0 + fragment
 alias quad_control = _sm_6_7
                     | GL_EXT_shader_quad_control + GL_EXT_maximal_reconvergence + GL_KHR_shader_subgroup_vote
                     | metal
+                    | cuda
                     ;
 
 /// Capabilities required to enable shader breakpoints
