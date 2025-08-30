@@ -53,17 +53,6 @@ jobs:
             config: release
             compiler: cl
             platform: x86_64
-            runs-on: windows-latest
-            warnings-as-errors: true
-            test-category: quick
-            full-gpu-tests: false
-            build-llvm: true
-            has-gpu: false
-            enable-debug-layers: true
-          - os: windows
-            config: release
-            compiler: cl
-            platform: x86_64
             runs-on: ["Windows", "self-hosted", "test"]
             test-category: full
             full-gpu-tests: true
@@ -201,17 +190,6 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: windows
-            config: release
-            compiler: cl
-            platform: x86_64
-            runs-on: windows-latest
-            warnings-as-errors: true
-            test-category: quick
-            full-gpu-tests: false
-            build-llvm: true
-            has-gpu: false
-            enable-debug-layers: true
           - os: windows
             config: release
             compiler: cl
