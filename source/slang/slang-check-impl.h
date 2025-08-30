@@ -699,6 +699,8 @@ struct SharedSemanticsContext : public RefObject
 
     GLSLBindingOffsetTracker m_glslBindingOffsetTracker;
 
+    Dictionary<Type*, bool> m_typeContainsOpaqueHandleCache;
+
 public:
     SharedSemanticsContext(
         Linkage* linkage,
