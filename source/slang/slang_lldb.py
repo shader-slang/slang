@@ -106,17 +106,16 @@ class IRInst_synthetic(lldb.SBSyntheticValueProvider):
         # missing in that case. It is possible to fix that by using
         # `EvaluateExpression` instead, but that significantly degrades
         # performance, so we choose not to do it here.
-        match op.value:
-            case "kIROp_StringLit":
-                string_lit_t = target.FindFirstType("Slang::IRStringLit")
-                string_lit = self.valobj.Cast(string_lit_t)
-                val = string_lit.GetChildMemberWithName("value")
-                value = [("[value]", val.GetChildMemberWithName("stringVal"))]
-            case "kIROp_IntLit":
-                int_lit_t = target.FindFirstType("Slang::IRIntLit")
-                int_lit = self.valobj.Cast(int_lit_t)
-                val = int_lit.GetChildMemberWithName("value")
-                value = [("[value]", val.GetChildMemberWithName("intVal"))]
+        if op.value == "kIROp_StringLit":
+            string_lit_t = target.FindFirstType("Slang::IRStringLit")
+            string_lit = self.valobj.Cast(string_lit_t)
+            val = string_lit.GetChildMemberWithName("value")
+            value = [("[value]", val.GetChildMemberWithName("stringVal"))]
+        elif op.value == "kIROp_IntLit":
+            int_lit_t = target.FindFirstType("Slang::IRIntLit")
+            int_lit = self.valobj.Cast(int_lit_t)
+            val = int_lit.GetChildMemberWithName("value")
+            value = [("[value]", val.GetChildMemberWithName("intVal"))]
 
         # operands
         operands: list[tuple[str, lldb.SBValue]] = []
