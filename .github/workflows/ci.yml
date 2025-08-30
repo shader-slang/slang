@@ -186,6 +186,11 @@ jobs:
       - name: Build Slang
         run: |
           echo "cmake version: $(cmake --version)"
+          
+          # Setup ccache compiler launchers for MSVC
+          export CMAKE_C_COMPILER_LAUNCHER="${{ env.ccache_symlinks_path }}"
+          export CMAKE_CXX_COMPILER_LAUNCHER="${{ env.ccache_symlinks_path }}"
+          
           if [[ "${{ matrix.platform }}" = "wasm" ]]; then
               git clone https://github.com/emscripten-core/emsdk.git
               pushd emsdk
