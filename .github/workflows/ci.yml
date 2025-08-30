@@ -43,27 +43,87 @@ jobs:
           fi
           echo "should-run=$shouldRun" >> $GITHUB_OUTPUT
 
-  build-slang:
+  build:
     needs: [filter]
     if: needs.filter.outputs.should-run == 'true'
     strategy:
       matrix:
+        os: [linux, macos, windows]
+        config: [debug, release]
+        compiler: [gcc, clang, cl]
+        platform: [x86_64, aarch64, wasm]
+        exclude:
+          # Default to x64, but aarch64 on osx
+          - { os: linux, platform: aarch64 }
+          - { os: windows, platform: aarch64 }
+          - { os: macos, platform: x86_64 }
+          - { os: linux, config: debug, platform: wasm }
+          - { os: windows, platform: wasm }
+          - { os: macos, platform: wasm }
+          # Unused compiler configs
+          - { os: linux, compiler: clang }
+          - { os: linux, compiler: cl }
+          - { os: windows, compiler: gcc }
+          - { os: windows, compiler: clang }
+          - { os: macos, compiler: gcc }
+          - { os: macos, compiler: cl }
         include:
+          - { os: linux, runs-on: ubuntu-22.04 }
+          - { os: macos, runs-on: macos-latest }
+          - { os: windows, runs-on: windows-latest }
+          # Warnings are treated as errors by default.
+          # But we may want to disable it temporarily.
+          - { os: linux, warnings-as-errors: true }
+          - { os: macos, warnings-as-errors: true }
+          - { os: windows, warnings-as-errors: true }
+          # Set a test category depending on the config, smoke by default,
+          # quick or full conditionally otherwise
+          - test-category: smoke
+          - { os: windows, test-category: quick }
+          - { config: release, test-category: full }
+          # default not full gpu tests
+          - full-gpu-tests: false
+          - build-llvm: true
+          - { platform: wasm, build-llvm: false }
+          # The runners don't have a GPU by default except for the self-hosted ones
+          - has-gpu: false
+          # Self-hosted aarch64 build
+          - os: linux
+            config: release
+            compiler: gcc
+            platform: aarch64
+            test-category: smoke
+            full-gpu-tests: false
+            runs-on: ubuntu-24.04-arm
+            has-gpu: false
+            build-llvm: false
+          # Self-hosted full gpu build - release
           - os: windows
             config: release
             compiler: cl
             platform: x86_64
-            runs-on: ["Windows", "self-hosted", "test"]
             test-category: full
+            # Run full gpu tests on PR/Main branch, but not on merge_group.
             full-gpu-tests: true
+            # Run on self-hosted machine when using full-gpu-tests, otherwise on github runners.
+            runs-on: ["Windows", "self-hosted", "GCP-T4"]
             has-gpu: true
             server-count: 8
-            warnings-as-errors: true
-            build-llvm: true
-            enable-debug-layers: true
+          # Self-hosted full gpu build - debug
+          - os: windows
+            config: debug
+            compiler: cl
+            platform: x86_64
+            test-category: full
+            full-gpu-tests: true
+            runs-on: ["Windows", "self-hosted", "GCP-T4"]
+            has-gpu: true
+            server-count: 8
+          # Enable debug layers for all by default
+          - enable-debug-layers: true
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
-
+  
     defaults:
       run:
         shell: bash
@@ -179,32 +239,89 @@ jobs:
         with:
           name: slang-build-${{matrix.os}}-${{matrix.platform}}-${{matrix.compiler}}-${{matrix.config}}
           path: |
-            build/dist-${{matrix.config}}/**/ZIP/slang/*
-            build.em/Release
-            build/dist-${{matrix.config}}/bin/
-          retention-days: 1
+            build/dist-${{matrix.config}}/slang.zip
+          retention-days: 3
 
-  test-slang:
-    needs: [filter, build-slang]
+  test:
+    needs: [filter, build]
     if: needs.filter.outputs.should-run == 'true'
     strategy:
       matrix:
+        os: [linux, macos, windows]
+        config: [debug, release]
+        compiler: [gcc, clang, cl]
+        platform: [x86_64, aarch64, wasm]
+        exclude:
+          # Default to x64, but aarch64 on osx
+          - { os: linux, platform: aarch64 }
+          - { os: windows, platform: aarch64 }
+          - { os: macos, platform: x86_64 }
+          - { os: linux, config: debug, platform: wasm }
+          - { os: windows, platform: wasm }
+          - { os: macos, platform: wasm }
+          # Unused compiler configs
+          - { os: linux, compiler: clang }
+          - { os: linux, compiler: cl }
+          - { os: windows, compiler: gcc }
+          - { os: windows, compiler: clang }
+          - { os: macos, compiler: gcc }
+          - { os: macos, compiler: cl }
         include:
+          - { os: linux, runs-on: ubuntu-22.04 }
+          - { os: macos, runs-on: macos-latest }
+          - { os: windows, runs-on: windows-latest }
+          # Warnings are treated as errors by default.
+          # But we may want to disable it temporarily.
+          - { os: linux, warnings-as-errors: true }
+          - { os: macos, warnings-as-errors: true }
+          - { os: windows, warnings-as-errors: true }
+          # Set a test category depending on the config, smoke by default,
+          # quick or full conditionally otherwise
+          - test-category: smoke
+          - { os: windows, test-category: quick }
+          - { config: release, test-category: full }
+          # default not full gpu tests
+          - full-gpu-tests: false
+          - build-llvm: true
+          - { platform: wasm, build-llvm: false }
+          # The runners don't have a GPU by default except for the self-hosted ones
+          - has-gpu: false
+          # Self-hosted aarch64 build
+          - os: linux
+            config: release
+            compiler: gcc
+            platform: aarch64
+            test-category: smoke
+            full-gpu-tests: false
+            runs-on: ubuntu-24.04-arm
+            has-gpu: false
+            build-llvm: false
+          # Self-hosted full gpu build - release
           - os: windows
             config: release
             compiler: cl
             platform: x86_64
-            runs-on: ["Windows", "self-hosted", "test"]
             test-category: full
+            # Run full gpu tests on PR/Main branch, but not on merge_group.
             full-gpu-tests: true
+            # Run on self-hosted machine when using full-gpu-tests, otherwise on github runners.
+            runs-on: ["Windows", "self-hosted", "GCP-T4"]
             has-gpu: true
             server-count: 8
-            warnings-as-errors: true
-            build-llvm: true
-            enable-debug-layers: true
+          # Self-hosted full gpu build - debug
+          - os: windows
+            config: debug
+            compiler: cl
+            platform: x86_64
+            test-category: full
+            full-gpu-tests: true
+            runs-on: ["Windows", "self-hosted", "GCP-T4"]
+            has-gpu: true
+            server-count: 8
+          # Enable debug layers for all by default
+          - enable-debug-layers: true
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
-
     defaults:
       run:
         shell: bash
@@ -242,12 +359,38 @@ jobs:
 
       - name: Setup environment
         run: |
+          # Extract the slang.zip file to github_artifact directory
+          if [ -f "slang.zip" ]; then
+            echo "Extracting slang.zip to github_artifact directory..."
+            mkdir -p github_artifact
+            unzip -q slang.zip -d github_artifact/
+            # After extraction, the structure should be: github_artifact/bin/, github_artifact/cmake/, github_artifact/include/, github_artifact/lib/, github_artifact/share/
+          else
+            echo "slang.zip not found!"
+            ls -la
+            exit 1
+          fi
+          
           # Set up bin_dir based on platform and config
           if [[ "${{ matrix.platform }}" = "wasm" ]]; then
             echo "bin_dir=build.em/Release/bin" >> $GITHUB_ENV
           else
-            echo "bin_dir=build/dist-${{matrix.config}}/bin" >> $GITHUB_ENV
+            # The binaries are now in the extracted github_artifact/bin/ directory
+            echo "bin_dir=github_artifact/bin" >> $GITHUB_ENV
           fi
+          
+          # Also set lib_dir for slangpy tests
+          echo "lib_dir=github_artifact/lib" >> $GITHUB_ENV
+          
+          # Debug: show what we found
+          echo "Directory structure after extraction:"
+          ls -la
+          echo "github_artifact directory contents:"
+          ls -la github_artifact/ || echo "github_artifact directory not found"
+          echo "Binaries found:"
+          ls -la github_artifact/bin/ || echo "bin directory not found"
+          echo "Libraries found:"
+          ls -la github_artifact/lib/ || echo "lib directory not found"
 
       - name: Test Slang
         if: matrix.platform != 'wasm' && (matrix.platform != 'aarch64' || matrix.os == 'macos')
