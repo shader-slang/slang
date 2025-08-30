@@ -8727,6 +8727,11 @@ static Expr* parsePrefixExpr(Parser* parser)
                 }
 
                 newLiteral->value = value;
+                // Mark this literal as having been negated (unary minus or bitwise NOT)
+                if (tokenType == TokenType::OpSub || tokenType == TokenType::OpBitNot)
+                {
+                    newLiteral->isLegitimateNegative = true;
+                }
                 return newLiteral;
             }
             else if (auto floatLit = as<FloatingPointLiteralExpr>(arg))
