@@ -147,9 +147,67 @@ jobs:
       - name: Check documented compiler versions
         run: bash extras/verify-documented-compiler-version.sh
 
+      - name: List build output for debugging
+        run: |
+          echo "Build directory structure:"
+          find build -name "slang-test*" -o -name "slang-rhi-tests*" -o -name "*.exe" -o -name "*.dll" | head -20
+          echo "Bin directory contents:"
+          ls -la build/${cmake_config}/bin/ || echo "bin directory not found"
+          echo "Lib directory contents:"
+          ls -la build/${cmake_config}/lib/ || echo "lib directory not found"
+          
+          # Estimate artifact size
+          echo "Estimating artifact sizes:"
+          if [ -d "build/${cmake_config}/bin" ]; then
+            echo "Bin directory size:"
+            du -sh build/${cmake_config}/bin/ || echo "Could not calculate bin size"
+          fi
+          if [ -d "build/${cmake_config}/lib" ]; then
+            echo "Lib directory size:"
+            du -sh build/${cmake_config}/lib/ || echo "Could not calculate lib size"
+          fi
+
+      - name: Prepare artifacts for upload
+        run: |
+          # Create a staging directory for artifacts
+          mkdir -p artifacts-staging
+          
+          # Copy artifacts from the specific configuration directory
+          if [ -d "build/${cmake_config}" ]; then
+            echo "Copying artifacts from build/${cmake_config}..."
+            
+            # Copy only exe and dll files from bin directory
+            if [ -d "build/${cmake_config}/bin" ]; then
+              mkdir -p artifacts-staging/bin
+              find "build/${cmake_config}/bin" -type f \( -name "*.exe" -o -name "*.dll" \) -exec cp {} artifacts-staging/bin/ \; || echo "Failed to copy bin directory"
+            fi
+            
+            # Copy everything from lib directory
+            if [ -d "build/${cmake_config}/lib" ]; then
+              cp -r "build/${cmake_config}/lib" artifacts-staging/ || echo "Failed to copy lib directory"
+            fi
+            
+            # Copy share directory if it exists
+            if [ -d "build/${cmake_config}/share" ]; then
+              cp -r "build/${cmake_config}/share" artifacts-staging/ || echo "Failed to copy share directory"
+            fi
+            
+            # Copy include directory if it exists
+            if [ -d "build/${cmake_config}/include" ]; then
+              cp -r "build/${cmake_config}/include" artifacts-staging/ || echo "Failed to copy include directory"
+            fi
+            
+            echo "Artifacts staging directory contents:"
+            ls -la artifacts-staging/
+          else
+            echo "Configuration directory build/${cmake_config} not found!"
+            echo "Available build directories:"
+            ls -la build/ || echo "No build directory found"
+            exit 1
+          fi
+
       - uses: actions/upload-artifact@v4
         with:
           name: slang-build-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}
-          path: |
-            build/dist-${{ inputs.config }}/slang.zip
+          path: artifacts-staging/
           retention-days: 3

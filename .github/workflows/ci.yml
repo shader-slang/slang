@@ -160,8 +160,7 @@ jobs:
       config: debug
       runs-on: '["macos-latest"]'
       test-category: smoke
-      full-gpu-tests: true
-      has-gpu: true
+      server-count: 3
 
   test-macos-release-clang-aarch64:
     needs: [filter, build-macos-release-clang-aarch64]
@@ -176,6 +175,7 @@ jobs:
       test-category: full
       full-gpu-tests: true
       has-gpu: true
+      server-count: 3
 
   # Windows GPU tests (self-hosted)
   test-windows-debug-cl-x86_64-gpu:
