@@ -8,9 +8,9 @@ RWStructuredBuffer<int> outputBuffer;
 // CHECK_HLSL: [WaveSize(4)]
 
 // CUDA doesn't emit WaveSize attribute but generates valid compute kernel
-// CHECK_CUDA: RWStructuredBuffer<int> outputBuffer_0;
+// CHECK_CUDA: RWStructuredBuffer<int> [[OUTPUTBUFFER:outputBuffer[_0-9]*]];
 // CHECK_CUDA: extern "C" __global__ void computeMain()
-// CHECK_CUDA: *(&(globalParams_0->outputBuffer_0)[tid_0]) = tid_0;
+// CHECK_CUDA: *(&([[GLOBALPARAMS:globalParams[_0-9]*]]->[[OUTPUTBUFFER]])[[[TID:tid[_0-9]*]]]) = [[TID]];
 [WaveSize(4)]
 [numthreads(4, 1, 1)]
 void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
