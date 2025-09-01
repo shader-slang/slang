@@ -140,6 +140,7 @@ jobs:
       - name: Check runtime environment
         if: inputs.platform != 'wasm'
         run: |
+          echo "$bin_dir/slang-test"
           smokeResult=$("$bin_dir/slang-test" tests/render/check-backend-support-on-ci.slang)
           supportedBackends="$(echo "$smokeResult" | grep 'Supported backends: ')"
           echo "$supportedBackends"
@@ -147,8 +148,12 @@ jobs:
           echo "Printing GPU driver version: ..." && nvidia-smi -q | grep Version
           echo "Printing Vulkan SDK version: ..." && vulkaninfo | grep -i version        
           echo "PATH: $PATH"
-          echo "GITHUB_PATH: $GITHUB_PATH"
-          echo "GITHUB_ENV: $GITHUB_ENV"
+          echo "============== GITHUB_PATH =============="
+          cat $GITHUB_PATH"
+          echo "============== GITHUB_ENV ==============="
+          cat $GITHUB_ENV
+          echo "bin_dir: $bin_dir"
+          echo "lib_dir: $lib_dir"
 
       - name: List build output for debugging
         run: |
@@ -183,6 +188,8 @@ jobs:
             if [ -d "build/${cmake_config}/bin" ]; then
               mkdir -p artifacts-staging/bin
               find "build/${cmake_config}/bin" -type f ! -name "*.pdb" ! -name "*.ilk" ! -name "*.dwarf" ! -name "*.debug" ! -name "*.dSYM" -exec cp {} artifacts-staging/bin/ \; || echo "Failed to copy bin directory"
+
+              cp -r "build/${cmake_config}/bin/D3D12" artifacts-staging/bin/ || echo "Failed to copy bin/D3D12 directory"
             fi
             
             # Copy everything from lib directory
@@ -200,8 +207,8 @@ jobs:
               cp -r "build/${cmake_config}/include" artifacts-staging/ || echo "Failed to copy include directory"
             fi
             
-            echo "Artifacts staging directory contents:"
-            ls -la artifacts-staging/
+          echo "Artifacts staging directory contents (recursive):"
+          ls -laR artifacts-staging/
           else
             echo "Configuration directory build/${cmake_config} not found!"
             echo "Available build directories:"
@@ -213,4 +220,4 @@ jobs:
         with:
           name: slang-build-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}
           path: artifacts-staging/
-          retention-days: 3
+          retention-days: 1

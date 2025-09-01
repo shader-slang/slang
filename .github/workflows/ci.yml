@@ -112,16 +112,16 @@ jobs:
       config: debug
       runs-on: '["Windows", "self-hosted", "test"]'
 
-  build-windows-release-cl-x86_64-gpu:
-    needs: [filter]
-    if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-build.yml
-    with:
-      os: windows
-      compiler: cl
-      platform: x86_64
-      config: release
-      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+  # build-windows-release-cl-x86_64-gpu:
+  #   needs: [filter]
+  #   if: needs.filter.outputs.should-run == 'true'
+  #   uses: ./.github/workflows/ci-slang-build.yml
+  #   with:
+  #     os: windows
+  #     compiler: cl
+  #     platform: x86_64
+  #     config: release
+  #     runs-on: '["Windows", "self-hosted", "GCP-T4"]'
 
   # # Linux tests
   # test-linux-debug-gcc-x86_64:
