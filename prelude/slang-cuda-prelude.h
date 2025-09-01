@@ -2402,7 +2402,33 @@ struct ByteAddressBuffer
 };
 
 // https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-rwbyteaddressbuffer
-// Missing support for Atomic operations
+// Atomic operations support
+
+// Signed 64-bit atomic wrappers
+// CUDA only supports unsigned long long atomics, so we cast signed to unsigned
+__device__ __forceinline__ long long atomicExch(long long* address, long long val)
+{
+    return (long long)atomicExch((unsigned long long*)address, (unsigned long long)val);
+}
+
+__device__ __forceinline__ long long atomicCAS(long long* address, long long compare, long long val)
+{
+    return (long long)atomicCAS(
+        (unsigned long long*)address,
+        (unsigned long long)compare,
+        (unsigned long long)val);
+}
+
+// Float bitwise atomic compare-and-swap
+// Uses integer atomics to preserve exact float bit patterns
+__device__ __forceinline__ float atomicCAS(float* address, float compare, float val)
+{
+    int* addr_as_int = (int*)address;
+    int old = atomicCAS(addr_as_int, __float_as_int(compare), __float_as_int(val));
+    return __int_as_float(old);
+}
+
+// Missing support for Load with status
 // Missing support for Load with status
 struct RWByteAddressBuffer
 {
@@ -4691,30 +4717,6 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL int tex2DArrayfetch_int(
         : "=r"(result), "=r"(stub), "=r"(stub), "=r"(stub)
         : "l"(texObj), "r"(x), "r"(y), "r"(layer), "r"(layer));
     return result;
-}
-
-// Signed 64-bit atomic wrappers
-// CUDA only supports unsigned long long atomics, so we cast signed to unsigned
-__device__ __forceinline__ long long atomicExch(long long* address, long long val)
-{
-    return (long long)atomicExch((unsigned long long*)address, (unsigned long long)val);
-}
-
-__device__ __forceinline__ long long atomicCAS(long long* address, long long compare, long long val)
-{
-    return (long long)atomicCAS(
-        (unsigned long long*)address,
-        (unsigned long long)compare,
-        (unsigned long long)val);
-}
-
-// Float bitwise atomic compare-and-swap
-// Uses integer atomics to preserve exact float bit patterns
-__device__ __forceinline__ float atomicCAS(float* address, float compare, float val)
-{
-    int* addr_as_int = (int*)address;
-    int old = atomicCAS(addr_as_int, __float_as_int(compare), __float_as_int(val));
-    return __int_as_float(old);
 }
 
 template<>

@@ -337,12 +337,7 @@ void computeMain(uint groupIndex : SV_GroupIndex, int3 dispatchThreadID: SV_Disp
     outputBuffer[idx] = int(result);
 }
 
-// DX12: 1
-// DX12-NEXT: 1
-// DX12-NEXT: 1
-// DX12-NEXT: 1
-
-// CUDA: 1
-// CUDA-NEXT: 1
-// CUDA-NEXT: 1
-// CUDA-NEXT: 1
+// CHK: 1
+// CHK-NEXT: 1
+// CHK-NEXT: 1
+// CHK-NEXT: 1

@@ -3491,16 +3491,23 @@ ${{{{
 
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".Gather$(compareFunc)$(componentFunc)";
+        case hlsl: 
+            static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
+                "Gather is supported only for 2D and 3D textures");
+            __intrinsic_asm ".Gather$(compareFunc)$(componentFunc)";
         case cuda:
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D), "CUDA Gather is supported only for 2D textures");
             static_assert(isArray == 0, "CUDA Gather does not support texture arrays");
             __intrinsic_asm "tex2Dgather<$T0>($0, ($2).x, ($2).y$(componentArg))";
         case metal:
         case wgsl:
+            static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
+                "Gather is supported only for 2D and 3D textures");
             return __texture_gather$(compareFunc)($(getTexture) $(getSampler), location $(compareArg) $(componentArg));
         case glsl:
         case spirv:
+            static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
+                "Gather is supported only for 2D and 3D textures");
             return __texture_gather$(compareFunc)(this $(samplerArg), location $(compareArg) $(componentArg));
         }
     }
@@ -3530,12 +3537,12 @@ ${{{{
         $(compareParam),
         constexpr vector<int, Shape.planeDimensions> offset)
     {
-        static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
-            "Gather is supported only for 2D and 3D textures");
-
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".Gather$(compareFunc)$(componentFunc)";
+        case hlsl: 
+            static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
+                "Gather is supported only for 2D and 3D textures");
+            __intrinsic_asm ".Gather$(compareFunc)$(componentFunc)";
         case cuda:
             // CUDA tex2Dgather doesn't support offset - ignore offset parameter
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D), "CUDA Gather is supported only for 2D textures");
@@ -3543,9 +3550,13 @@ ${{{{
             __intrinsic_asm "tex2Dgather<$T0>($0, ($2).x, ($2).y$(componentArg))";
         case metal:
         case wgsl:
+            static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
+                "Gather is supported only for 2D and 3D textures");
             return __texture_gather$(compareFunc)_offset($(getTexture) $(getSampler), location $(compareArg), offset $(componentArg));
         case glsl:
         case spirv:
+            static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
+                "Gather is supported only for 2D and 3D textures");
             return __texture_gather$(compareFunc)_offset(this $(samplerArg), location $(compareArg), offset $(componentArg));
         }
     }

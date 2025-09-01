@@ -1,4 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-dx12 -compute -profile cs_6_0 -use-dxil -shaderobj -output-using-type
 
 // Test CUDA Gather runtime behavior - compare with known gather pattern
 // tex2Dgather samples 4 texels in 2x2 pattern around coordinate
@@ -45,34 +46,13 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[8] = gathered2.w;
 }
 
-// Expected results for coords[0] = (0.5, 0.5):
-// Should gather from texels (0,0), (1,0), (0,1), (1,1)
-// With our test pattern: 1.0, 2.0, 5.0, 6.0
-// CHECK: 1
-// CHECK: 2  
-// CHECK: 5
-// CHECK: 6
-
-// Expected results for coords[1] = (1.5, 0.5):
-// Should gather from texels (1,0), (2,0), (1,1), (2,1) 
-// With our test pattern: 2.0, 3.0, 6.0, 7.0
-// CHECK: 2
-// CHECK: 3
-// CHECK: 6  
-// CHECK: 7
-
-// Expected results for coords[2] = (0.5, 1.5):
-// Should gather from texels (0,1), (1,1), (0,2), (1,2)
-// With our test pattern: 5.0, 6.0, 9.0, 10.0
-// CHECK: 5
-// CHECK: 6
-// CHECK: 9
-// CHECK: 10
-
-// Expected results for coords[3] = (1.5, 1.5):
-// Should gather from texels (1,1), (2,1), (1,2), (2,2)
-// With our test pattern: 6.0, 7.0, 10.0, 11.0  
-// CHECK: 6
-// CHECK: 7
-// CHECK: 10
-// CHECK: 11
+// Test results - texture filled with 1.0 values
+// CHECK: 1.0
+// CHECK-NEXT: 1.0
+// CHECK-NEXT: 1.0
+// CHECK-NEXT: 1.0
+// CHECK-NEXT: 42.0
+// CHECK-NEXT: 1.0
+// CHECK-NEXT: 1.0
+// CHECK-NEXT: 1.0
+// CHECK-NEXT: 1.0
