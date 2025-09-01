@@ -53,7 +53,8 @@ jobs:
         run: |
           Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
           Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\usr\\bin"
-
+          echo "Running slang-test from build"
+          /c/actions-runner/_work/slang/slang/build/Debug/bin/slang-test tests/render/check-backend-support-on-ci.slang
       - uses: actions/checkout@v4
         with:
           submodules: "recursive"
@@ -81,14 +82,17 @@ jobs:
           
           # Set up bin_dir based on platform and config
           if [[ "${{ inputs.platform }}" == "wasm" ]]; then
-            echo "bin_dir=build.em/Release/bin" >> $GITHUB_ENV
+            bin_dir=build.em/Release/bin
+            echo "bin_dir=$bin_dir" >> $GITHUB_ENV
           else
             # The binaries are now in the github_artifact/bin/ directory
-            echo "bin_dir=$(pwd)/github_artifact/bin" >> $GITHUB_ENV
+            bin_dir=$(pwd)/github_artifact/bin
+            echo "bin_dir=$bin_dir" >> $GITHUB_ENV
           fi
           
           # Also set lib_dir for slangpy tests
-          echo "lib_dir=$(pwd)/github_artifact/lib" >> $GITHUB_ENV
+          lib_dir=$(pwd)/github_artifact/lib
+          echo "lib_dir=$lib_dir" >> $GITHUB_ENV
           
           # Set up library path for runtime linking
           if [[ "${{ inputs.os }}" == "linux" ]]; then
@@ -99,6 +103,7 @@ jobs:
             # On Windows, DLLs should be in the same directory as executables or in PATH
             echo "PATH=${bin_dir}:${lib_dir}:$PATH" >> $GITHUB_ENV
           fi
+          echo "PATH: $PATH"
 
       - name: Check runtime environment
         if: inputs.platform != 'wasm'
