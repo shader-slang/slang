@@ -59,18 +59,14 @@ jobs:
           submodules: "recursive"
           fetch-depth: "2"
 
-      - name: Install dependencies
-        run: |
-          if [[ "${{ inputs.os }}" = "linux" ]]; then
-              sudo apt-get update
-              sudo apt-get install -y libx11-dev 
-          fi
-
-      - name: Setup Node.js
-        if: inputs.os == 'linux'
-        uses: actions/setup-node@v4
+      - name: Setup
+        uses: ./.github/actions/common-setup
         with:
-          node-version: "20.x"
+          os: ${{ inputs.os }}
+          compiler: ${{ inputs.compiler }}
+          platform: ${{ inputs.platform }}
+          config: ${{ inputs.config }}
+          build-llvm: false
 
       - uses: actions/download-artifact@v4
         with:
