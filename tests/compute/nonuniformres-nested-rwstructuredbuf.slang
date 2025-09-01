@@ -27,9 +27,9 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
     // CHECK3: %[[VAR2:[a-zA-Z0-9_]+]] = OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer %buffer %{{.*}}NonUniform
     // CHECK3: %{{.*}} = OpAccessChain %_ptr_StorageBuffer_int %[[VAR2]]
     
-    // CHECK4: Array<RWStructuredBuffer<int>>  buffer_0;
-    // CHECK4: globalParams_0->buffer_0[_S{{[0-9]+}}]
-    // CHECK4: globalParams_0->buffer_0[int(_S{{[0-9]+}})]
+    // CHECK4: Array<RWStructuredBuffer<int>>  [[BUFFER:buffer[_0-9]*]];
+    // CHECK4: [[GLOBALPARAMS:globalParams[_0-9]*]]->[[BUFFER]][_S{{[0-9]+}}]
+    // CHECK4: [[GLOBALPARAMS]]->[[BUFFER]][int(_S{{[0-9]+}})]
     RWStructuredBuffer<int> buffer1 = buffer[NonUniformResourceIndex(NonUniformResourceIndex(NonUniformResourceIndex(dispatchThreadID.x)))];
     buffer1[0] = 1;
 

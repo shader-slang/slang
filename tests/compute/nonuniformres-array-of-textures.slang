@@ -34,10 +34,10 @@ void main(uint2 pixelIndex : SV_DispatchThreadID)
     // CHECK3: %[[VAR4:[a-zA-Z0-9_]+]] = OpLoad %{{.*}}[[VAR3]]{{.*}}NonUniform
     // CHECK3: %{{.*}} = OpImageFetch %v4float %[[VAR4]] %{{.*}}
     
-    // CHECK4: FixedArray<CUtexObject, 2>  textures_0;
-    // CHECK4: CUsurfObject outputTexture_0;
-    // CHECK4: tex2Dfetch_int<float>((globalParams_0->textures_0[_S{{[0-9]+}}])
-    // CHECK4: tex2Dfetch_int<float>((globalParams_0->textures_0[uint(float(_S{{[0-9]+}}))])
+    // CHECK4: FixedArray<CUtexObject, 2>  [[TEXTURES:textures[_0-9]*]];
+    // CHECK4: CUsurfObject [[OUTPUTTEXTURE:outputTexture[_0-9]*]];
+    // CHECK4: tex2Dfetch_int<float>(([[GLOBALPARAMS:globalParams[_0-9]*]]->[[TEXTURES]][_S{{[0-9]+}}])
+    // CHECK4: tex2Dfetch_int<float>(([[GLOBALPARAMS]]->[[TEXTURES]][uint(float(_S{{[0-9]+}}))])
     float2 tmp0 = textures[NonUniformResourceIndex(pixelIndex.x)].Load(int3(0, 0, 0));
     outputTexture[0] = tmp0;
 
