@@ -75,53 +75,12 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: slang-build-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}
-          path: ./
+          path: github_artifact
 
       - name: Setup environment
         run: |
-          # Create the main artifact directory structure
-          mkdir -p github_artifact/{bin,lib,include,share}
-          
-          # Copy all build artifacts to github_artifact
-          # Artifacts are now uploaded in a staging directory structure
-          if [ -d "bin" ]; then
-            echo "Found direct bin directory, copying artifacts..."
-            cp -r bin/* github_artifact/bin/ 2>/dev/null || echo "No binaries to copy"
-          fi
-          
-          if [ -d "lib" ]; then
-            echo "Found direct lib directory, copying artifacts..."
-            cp -r lib/* github_artifact/lib/ 2>/dev/null || echo "No libraries to copy"
-          fi
-          
-          if [ -d "include" ]; then
-            echo "Found direct include directory, copying artifacts..."
-            cp -r include github_artifact/ 2>/dev/null || echo "No include files to copy"
-          fi
-          
-          if [ -d "share" ]; then
-            echo "Found direct share directory, copying artifacts..."
-            cp -r share github_artifact/ 2>/dev/null || echo "No share files to copy"
-          fi
-          
-          # Fallback: check for build directory structure (shouldn't happen with new approach)
-          if [ -d "build" ]; then
-            echo "Found build directory, organizing all build artifacts..."
-            
-            # Copy all executables and DLLs from bin directory
-            find build -path "*/bin/*" \( -name "*.exe" -o -name "*.dll" -o -executable \) -type f -exec cp {} github_artifact/bin/ \; 2>/dev/null || echo "No binaries found"
-            
-            # Copy all libraries from lib directory  
-            find build -path "*/lib/*" \( -name "*.lib" -o -name "*.so" -o -name "*.dylib" -o -name "*.a" \) -type f -exec cp {} github_artifact/lib/ \; 2>/dev/null || echo "No libraries found"
-            
-            # Copy include files if they exist
-            find build -path "*/include/*" -type f -exec cp --parents {} github_artifact/ \; 2>/dev/null || echo "No include files found"
-            
-            # Copy share files if they exist  
-            find build -path "*/share/*" -type f -exec cp --parents {} github_artifact/ \; 2>/dev/null || echo "No share files found"
-          fi
-          
-          # Make sure all executables are executable
+          # Artifacts are now directly extracted to github_artifact directory
+          # Just ensure all executables are executable
           chmod +x github_artifact/bin/* 2>/dev/null || echo "No executables to make executable"
           
           # Set up bin_dir based on platform and config
@@ -144,6 +103,9 @@ jobs:
             # On Windows, DLLs should be in the same directory as executables or in PATH
             echo "PATH=github_artifact/bin;github_artifact/lib;$PATH" >> $GITHUB_ENV
           fi
+
+          echo "PATH: $PATH"
+          echo "GITHUB_PATH: $GITHUB_PATH"
           
           # Debug: show what we found
           echo "Directory structure after organizing artifacts:"
@@ -176,6 +138,14 @@ jobs:
             export VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation
           fi
           if [[ "${{ inputs.full-gpu-tests }}" == "true" ]]; then
+            echo "$bin_dir/slang-test" \
+              -use-test-server \
+              -server-count ${{ inputs.server-count }} \
+              -category ${{ inputs.test-category }} \
+              -expected-failure-list tests/expected-failure-github.txt \
+              -skip-reference-image-generation \
+              -show-adapter-info \
+              -enable-debug-layers ${{ inputs.enable-debug-layers }}
             "$bin_dir/slang-test" \
               -use-test-server \
               -server-count ${{ inputs.server-count }} \
