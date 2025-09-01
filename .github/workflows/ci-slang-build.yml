@@ -137,6 +137,19 @@ jobs:
       - name: Check documented compiler versions
         run: bash extras/verify-documented-compiler-version.sh
 
+      - name: Check runtime environment
+        if: inputs.platform != 'wasm'
+        run: |
+          smokeResult=$("$bin_dir/slang-test" tests/render/check-backend-support-on-ci.slang)
+          supportedBackends="$(echo "$smokeResult" | grep 'Supported backends: ')"
+          echo "$supportedBackends"
+          echo "Printing CUDA compiler version: ..." && nvcc --version
+          echo "Printing GPU driver version: ..." && nvidia-smi -q | grep Version
+          echo "Printing Vulkan SDK version: ..." && vulkaninfo | grep -i version        
+          echo "PATH: $PATH"
+          echo "GITHUB_PATH: $GITHUB_PATH"
+          echo "GITHUB_ENV: $GITHUB_ENV"
+
       - name: List build output for debugging
         run: |
           echo "Build directory structure:"
