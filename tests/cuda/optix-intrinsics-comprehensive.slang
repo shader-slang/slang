@@ -1,5 +1,8 @@
 //TEST:SIMPLE(filecheck=CHECK): -target cuda
-//TEST:SIMPLE(filecheck=CHECK-PTX): -target ptx
+//TEST:SIMPLE(filecheck=CHECK_PTX): -target ptx
+
+//TEST_INPUT: set scene = AccelerationStructure
+uniform RaytracingAccelerationStructure scene;
 
 // Ray query and geometry intrinsics - order independent
 //CHECK-DAG: optixGetHitKind()
@@ -27,21 +30,21 @@
 //CHECK-DAG: optixGetSbtDataPointer
 
 // PTX intrinsics validation - using actual PTX names (order independent)
-//CHECK-PTX-DAG: _optix_get_hit_kind
-//CHECK-PTX-DAG: _optix_read_instance_idx
-//CHECK-PTX-DAG: _optix_read_instance_id  
-//CHECK-PTX-DAG: _optix_get_object_ray_direction_x
-//CHECK-PTX-DAG: _optix_get_object_ray_origin_x
-//CHECK-PTX-DAG: _optix_read_primitive_idx
-//CHECK-PTX-DAG: _optix_get_ray_flags
-//CHECK-PTX-DAG: _optix_get_ray_tmin
-//CHECK-PTX-DAG: _optix_get_world_ray_direction_x
-//CHECK-PTX-DAG: _optix_get_world_ray_origin_x
-//CHECK-PTX-DAG: _optix_terminate_ray
-//CHECK-PTX-DAG: _optix_ignore_intersection
-//CHECK-PTX-DAG: _optix_hitobject_get_traverse_data
-//CHECK-PTX-DAG: _optix_hitobject_make_with_traverse_data
-//CHECK-PTX-DAG: _optix_get_sbt_data_ptr_64
+//CHECK_PTX-DAG: _optix_get_hit_kind
+//CHECK_PTX-DAG: _optix_read_instance_idx
+//CHECK_PTX-DAG: _optix_read_instance_id  
+//CHECK_PTX-DAG: _optix_get_object_ray_direction_x
+//CHECK_PTX-DAG: _optix_get_object_ray_origin_x
+//CHECK_PTX-DAG: _optix_read_primitive_idx
+//CHECK_PTX-DAG: _optix_get_ray_flags
+//CHECK_PTX-DAG: _optix_get_ray_tmin
+//CHECK_PTX-DAG: _optix_get_world_ray_direction_x
+//CHECK_PTX-DAG: _optix_get_world_ray_origin_x
+//CHECK_PTX-DAG: _optix_terminate_ray
+//CHECK_PTX-DAG: _optix_ignore_intersection
+//CHECK_PTX-DAG: _optix_hitobject_get_traverse_data
+//CHECK_PTX-DAG: _optix_hitobject_make_with_traverse_data
+//CHECK_PTX-DAG: _optix_get_sbt_data_ptr_64
 
 struct CustomAttributes
 {
@@ -196,8 +199,7 @@ void rayGenShader()
     ray.TMin = 0.001f;
     ray.TMax = 1000.0f;
     
-    // Test optixTrace through HitObject TraceRay  
-    RaytracingAccelerationStructure scene;
+    // Test optixTrace through HitObject TraceRay
     HitObject hit = HitObject::TraceRay(
         scene,
         RAY_FLAG_NONE,

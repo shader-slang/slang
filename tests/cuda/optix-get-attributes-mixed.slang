@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -entry closestHitShader -stage closesthit
-//TEST:SIMPLE(filecheck=CHECK-PTX): -target ptx -entry closestHitShader -stage closesthit
+//TEST:SIMPLE(filecheck=CHECK_PTX): -target ptx -entry closestHitShader -stage closesthit
 
 //CHECK: optixGetAttribute_0()
 //CHECK: __int_as_float(optixGetAttribute_1())
@@ -9,14 +9,14 @@
 //CHECK: __int_as_float(optixGetAttribute_5())
 //CHECK: optixGetAttribute_6()
 //CHECK: __int_as_float(optixGetAttribute_7())
-//CHECK-PTX: _optix_get_attribute_0
-//CHECK-PTX: _optix_get_attribute_1
-//CHECK-PTX: _optix_get_attribute_2
-//CHECK-PTX: _optix_get_attribute_3
-//CHECK-PTX: _optix_get_attribute_4
-//CHECK-PTX: _optix_get_attribute_5
-//CHECK-PTX: _optix_get_attribute_6
-//CHECK-PTX: _optix_get_attribute_7
+//CHECK_PTX: _optix_get_attribute_0
+//CHECK_PTX: _optix_get_attribute_1
+//CHECK_PTX: _optix_get_attribute_2
+//CHECK_PTX: _optix_get_attribute_3
+//CHECK_PTX: _optix_get_attribute_4
+//CHECK_PTX: _optix_get_attribute_5
+//CHECK_PTX: _optix_get_attribute_6
+//CHECK_PTX: _optix_get_attribute_7
 
 struct CustomIntersectionAttributes
 {
