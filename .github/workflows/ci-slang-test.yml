@@ -112,7 +112,7 @@ jobs:
           echo "Printing Vulkan SDK version: ..." && vulkaninfo | grep -i version        
           echo "PATH: $PATH"
           echo "============== GITHUB_PATH =============="
-          cat $GITHUB_PATH"
+          cat $GITHUB_PATH
           echo "============== GITHUB_ENV ==============="
           cat $GITHUB_ENV
           echo "bin_dir: $bin_dir"
