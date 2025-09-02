@@ -2471,7 +2471,13 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
 
             auto base = fieldExtract->getBase();
             emitOperand(base, leftSide(outerPrec, prec));
-            if (base->getDataType()->getOp() == kIROp_ClassType)
+
+            // Use -> if:
+            // 1. Base type is a class type, OR
+            // 2. Base type is a pointer to class type, OR
+            // 3. Base is a GetAddress operation (which produces a pointer)
+            if (base->getDataType()->getOp() == kIROp_ClassType ||
+                isPtrToClassType(base->getDataType()) || base->getOp() == kIROp_GetAddress)
                 m_writer->emit("->");
             else
                 m_writer->emit(".");

@@ -707,6 +707,36 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 {
     switch (inst->getOp())
     {
+    case kIROp_FieldExtract:
+        {
+            // Handle field extraction with proper -> syntax for CUDA kernel context
+            auto fieldExtract = as<IRFieldExtract>(inst);
+            auto base = fieldExtract->getBase();
+
+            auto prec = getInfo(EmitOp::Postfix);
+            EmitOpInfo outerPrec = inOuterPrec;
+            bool needClose = maybeEmitParens(outerPrec, prec);
+
+            emitOperand(base, leftSide(outerPrec, prec));
+
+            // Use -> for pointer types or address-of operations
+            auto baseType = base->getDataType();
+            if (baseType->getOp() == kIROp_ClassType || base->getOp() == kIROp_GetAddress ||
+                baseType->getOp() == kIROp_PtrType)
+            {
+                m_writer->emit("->");
+            }
+            else
+            {
+                m_writer->emit(".");
+            }
+
+            m_writer->emit(getName(fieldExtract->getField()));
+
+            if (needClose)
+                m_writer->emit(")");
+            return true;
+        }
     case kIROp_MakeVector:
     case kIROp_MakeVectorFromScalar:
         {
