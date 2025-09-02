@@ -240,6 +240,37 @@ struct WorkQueue
 
 struct TypeFlowSpecializationContext
 {
+    struct ParameterDirectionInfo
+    {
+        enum Kind
+        {
+            In,
+            Out,
+            InOut,
+            Ref,
+            ConstRef
+        } kind;
+
+        // For Ref and ConstRef
+        AddressSpace addressSpace;
+
+        ParameterDirectionInfo(Kind kind, AddressSpace addressSpace = (AddressSpace)0)
+            : kind(kind), addressSpace(addressSpace)
+        {
+        }
+
+        ParameterDirectionInfo()
+            : kind(Kind::In), addressSpace((AddressSpace)0)
+        {
+        }
+
+        bool operator==(const ParameterDirectionInfo& other) const
+        {
+            return kind == other.kind && addressSpace == other.addressSpace;
+        }
+    };
+
+
     IRCollectionTaggedUnionType* makeExistential(IRTableCollection* tableCollection)
     {
         HashSet<IRInst*> typeSet;
@@ -1494,9 +1525,9 @@ struct TypeFlowSpecializationContext
         return infos;
     }
 
-    List<ParameterDirection> getParamDirections(IRInst* context)
+    List<ParameterDirectionInfo> getParamDirections(IRInst* context)
     {
-        List<ParameterDirection> directions;
+        List<ParameterDirectionInfo> directions;
         if (as<IRFunc>(context))
         {
             for (auto param : as<IRFunc>(context)->getParams())
@@ -1566,11 +1597,11 @@ struct TypeFlowSpecializationContext
 
                         IRInst* argInfo = tryGetInfo(edge.callerContext, arg);
 
-                        switch (paramDirection)
+                        switch (paramDirection.kind)
                         {
-                        case kParameterDirection_Out:
-                        case kParameterDirection_InOut:
-                        case kParameterDirection_ConstRef:
+                        case ParameterDirectionInfo::Kind::Out:
+                        case ParameterDirectionInfo::Kind::InOut:
+                        case ParameterDirectionInfo::Kind::ConstRef:
                             {
                                 IRBuilder builder(module);
                                 if (!argInfo)
@@ -1591,7 +1622,7 @@ struct TypeFlowSpecializationContext
                                 updateInfo(edge.targetContext, param, newInfo, true, workQueue);
                                 break;
                             }
-                        case kParameterDirection_In:
+                        case ParameterDirectionInfo::Kind::In:
                             {
                                 // Use centralized update method
                                 if (!argInfo)
@@ -1630,8 +1661,8 @@ struct TypeFlowSpecializationContext
                 {
                     if (paramInfo)
                     {
-                        if (paramDirections[argIndex] == kParameterDirection_Out ||
-                            paramDirections[argIndex] == kParameterDirection_InOut)
+                        if (paramDirections[argIndex].kind == ParameterDirectionInfo::Kind::Out ||
+                            paramDirections[argIndex].kind == ParameterDirectionInfo::Kind::InOut)
                         {
                             auto arg = callInst->getArg(argIndex);
                             auto argPtrType = as<IRPtrTypeBase>(arg->getDataType());
@@ -2226,40 +2257,46 @@ struct TypeFlowSpecializationContext
     }
 
     // Split into direction and type
-    std::tuple<ParameterDirection, IRType*> getParameterDirectionAndType(IRType* paramType)
+    std::tuple<ParameterDirectionInfo, IRType*> getParameterDirectionAndType(IRType* paramType)
     {
         if (as<IROutType>(paramType))
             return {
-                ParameterDirection::kParameterDirection_Out,
+                ParameterDirectionInfo(ParameterDirectionInfo::Kind::Out),
                 as<IROutType>(paramType)->getValueType()};
         else if (as<IRInOutType>(paramType))
             return {
-                ParameterDirection::kParameterDirection_InOut,
+                ParameterDirectionInfo(ParameterDirectionInfo::Kind::InOut),
                 as<IRInOutType>(paramType)->getValueType()};
         else if (as<IRRefType>(paramType))
             return {
-                ParameterDirection::kParameterDirection_Ref,
+                ParameterDirectionInfo(
+                    ParameterDirectionInfo::Kind::Ref,
+                    as<IRRefType>(paramType)->getAddressSpace()),
                 as<IRRefType>(paramType)->getValueType()};
         else if (as<IRConstRefType>(paramType))
             return {
-                ParameterDirection::kParameterDirection_ConstRef,
+                ParameterDirectionInfo(
+                    ParameterDirectionInfo::Kind::ConstRef,
+                    as<IRConstRefType>(paramType)->getAddressSpace()),
                 as<IRConstRefType>(paramType)->getValueType()};
         else
-            return {ParameterDirection::kParameterDirection_In, paramType};
+            return {ParameterDirectionInfo(ParameterDirectionInfo::Kind::In), paramType};
     }
 
-    IRType* fromDirectionAndType(IRBuilder* builder, ParameterDirection direction, IRType* type)
+    IRType* fromDirectionAndType(IRBuilder* builder, ParameterDirectionInfo direction, IRType* type)
     {
-        switch (direction)
+        switch (direction.kind)
         {
-        case ParameterDirection::kParameterDirection_In:
+        case ParameterDirectionInfo::Kind::In:
             return type;
-        case ParameterDirection::kParameterDirection_Out:
+        case ParameterDirectionInfo::Kind::Out:
             return builder->getOutType(type);
-        case ParameterDirection::kParameterDirection_InOut:
+        case ParameterDirectionInfo::Kind::InOut:
             return builder->getInOutType(type);
-        case ParameterDirection::kParameterDirection_ConstRef:
-            return builder->getConstRefType(type);
+        case ParameterDirectionInfo::Kind::ConstRef:
+            return builder->getConstRefType(type, direction.addressSpace);
+        case ParameterDirectionInfo::Kind::Ref:
+            return builder->getRefType(type, direction.addressSpace);
         default:
             SLANG_UNEXPECTED("Unhandled parameter direction in fromDirectionAndType");
         }
@@ -2661,8 +2698,6 @@ struct TypeFlowSpecializationContext
         // First, we'll legalize all operands by upcasting if necessary.
         // This needs to be done even if the callee is not a collection.
         //
-        // List<IRTypeFlowData*> paramTypeFlows = getParamInfos(callee);
-        // List<ParameterDirection> paramDirections = getParamDirections(callee);
         UCount extraArgCount = newArgs.getCount();
         for (UInt i = 0; i < inst->getArgCount(); i++)
         {
@@ -2670,15 +2705,15 @@ struct TypeFlowSpecializationContext
             const auto [paramDirection, paramType] =
                 getParameterDirectionAndType(expectedFuncType->getParamType(i + extraArgCount));
 
-            switch (paramDirection)
+            switch (paramDirection.kind)
             {
-            case kParameterDirection_In:
+            case ParameterDirectionInfo::Kind::In:
                 newArgs.add(upcastCollection(context, arg, paramType));
                 break;
-            case kParameterDirection_Out:
-            case kParameterDirection_InOut:
-            case kParameterDirection_ConstRef:
-            case kParameterDirection_Ref:
+            case ParameterDirectionInfo::Kind::Out:
+            case ParameterDirectionInfo::Kind::InOut:
+            case ParameterDirectionInfo::Kind::ConstRef:
+            case ParameterDirectionInfo::Kind::Ref:
                 {
                     newArgs.add(arg);
                     break;
