@@ -91,7 +91,6 @@ IRCollectionBase* CollectionBuilder::createCollection(IROp op, const HashSet<IRI
     IRBuilder builder(module);
     builder.setInsertInto(module);
 
-    // Use makeTuple as a temporary implementation until IRCollection is available
     return as<IRCollectionBase>(builder.emitIntrinsicInst(
         nullptr,
         op,

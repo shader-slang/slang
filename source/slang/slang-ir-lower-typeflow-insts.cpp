@@ -233,15 +233,15 @@ struct TagOpsLoweringContext : public InstPassBase
         builder.setInsertAfter(inst);
 
         List<IRInst*> indices;
-        for (UInt i = 0; i < srcCollection->getOperandCount(); i++)
+        for (UInt i = 0; i < srcCollection->getCount(); i++)
         {
             // Find in destCollection
-            auto srcElement = srcCollection->getOperand(i);
+            auto srcElement = srcCollection->getElement(i);
 
             bool found = false;
-            for (UInt j = 0; j < destCollection->getOperandCount(); j++)
+            for (UInt j = 0; j < destCollection->getCount(); j++)
             {
-                auto destElement = destCollection->getOperand(j);
+                auto destElement = destCollection->getElement(j);
                 if (srcElement == destElement)
                 {
                     found = true;
@@ -281,15 +281,15 @@ struct TagOpsLoweringContext : public InstPassBase
         builder.setInsertAfter(inst);
 
         List<IRInst*> indices;
-        for (UInt i = 0; i < srcCollection->getOperandCount(); i++)
+        for (UInt i = 0; i < srcCollection->getCount(); i++)
         {
             // Find in destCollection
             bool found = false;
             auto srcElement =
-                findWitnessTableEntry(cast<IRWitnessTable>(srcCollection->getOperand(i)), key);
-            for (UInt j = 0; j < destCollection->getOperandCount(); j++)
+                findWitnessTableEntry(cast<IRWitnessTable>(srcCollection->getElement(i)), key);
+            for (UInt j = 0; j < destCollection->getCount(); j++)
             {
-                auto destElement = destCollection->getOperand(j);
+                auto destElement = destCollection->getElement(j);
                 if (srcElement == destElement)
                 {
                     found = true;
@@ -319,10 +319,9 @@ struct TagOpsLoweringContext : public InstPassBase
 
     void lowerGetTagForSpecializedCollection(IRGetTagForSpecializedCollection* inst)
     {
-        auto srcCollection = cast<IRCollectionBase>(
-            cast<IRCollectionTagType>(inst->getOperand(0)->getDataType())->getOperand(0));
-        auto destCollection =
-            cast<IRCollectionBase>(cast<IRCollectionTagType>(inst->getDataType())->getOperand(0));
+        auto srcCollection =
+            cast<IRCollectionTagType>(inst->getOperand(0)->getDataType())->getCollection();
+        auto destCollection = cast<IRCollectionTagType>(inst->getDataType())->getCollection();
         Dictionary<IRInst*, IRInst*> mapping;
 
         for (UInt i = 1; i < inst->getOperandCount(); i += 2)
@@ -336,14 +335,14 @@ struct TagOpsLoweringContext : public InstPassBase
         builder.setInsertAfter(inst);
 
         List<IRInst*> indices;
-        for (UInt i = 0; i < srcCollection->getOperandCount(); i++)
+        for (UInt i = 0; i < srcCollection->getCount(); i++)
         {
             // Find in destCollection
             bool found = false;
-            auto mappedElement = mapping[srcCollection->getOperand(i)];
-            for (UInt j = 0; j < destCollection->getOperandCount(); j++)
+            auto mappedElement = mapping[srcCollection->getElement(i)];
+            for (UInt j = 0; j < destCollection->getCount(); j++)
             {
-                auto destElement = destCollection->getOperand(j);
+                auto destElement = destCollection->getElement(j);
                 if (mappedElement == destElement)
                 {
                     found = true;
@@ -434,9 +433,9 @@ struct CollectionLoweringContext : public InstPassBase
     void lowerTypeCollection(IRTypeCollection* collection)
     {
         HashSet<IRType*> types;
-        for (UInt i = 0; i < collection->getOperandCount(); i++)
+        for (UInt i = 0; i < collection->getCount(); i++)
         {
-            if (auto type = as<IRType>(collection->getOperand(i)))
+            if (auto type = as<IRType>(collection->getElement(i)))
             {
                 types.add(type);
             }
@@ -477,8 +476,7 @@ struct SequentialIDTagLoweringContext : public InstPassBase
         Dictionary<UInt, UInt> mapping;
 
         // Map from sequential ID to unique ID
-        auto destCollection =
-            cast<IRCollectionBase>(cast<IRCollectionTagType>(inst->getDataType())->getOperand(0));
+        auto destCollection = cast<IRCollectionTagType>(inst->getDataType())->getCollection();
 
         UIndex dstSeqID = 0;
         forEachInCollection(
@@ -525,8 +523,7 @@ struct SequentialIDTagLoweringContext : public InstPassBase
         Dictionary<UInt, UInt> mapping;
 
         // Map from sequential ID to unique ID
-        auto destCollection = cast<IRCollectionBase>(
-            cast<IRCollectionTagType>(srcTagInst->getDataType())->getOperand(0));
+        auto destCollection = cast<IRCollectionTagType>(srcTagInst->getDataType())->getCollection();
 
         UIndex dstSeqID = 0;
         forEachInCollection(

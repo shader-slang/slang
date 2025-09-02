@@ -3505,6 +3505,54 @@ struct IREmbeddedDownstreamIR : IRInst
     IRBlobLit* getBlob() { return cast<IRBlobLit>(getOperand(1)); }
 };
 
+FIDDLE()
+struct IRTypeFlowData : IRInst
+{
+    FIDDLE(baseInst())
+};
+
+FIDDLE()
+struct IRCollectionBase : IRTypeFlowData
+{
+    FIDDLE(baseInst())
+    UInt getCount() { return getOperandCount(); }
+    IRInst* getElement(UInt idx) { return getOperand(idx); }
+    bool isSingleton() { return getOperandCount() == 1; }
+};
+
+FIDDLE()
+struct IRTableCollection : IRCollectionBase
+{
+    FIDDLE(leafInst())
+};
+
+
+FIDDLE()
+struct IRTypeCollection : IRCollectionBase
+{
+    FIDDLE(leafInst())
+};
+
+FIDDLE()
+struct IRCollectionTagType : IRTypeFlowData
+{
+    FIDDLE(leafInst())
+    IRCollectionBase* getCollection() { return as<IRCollectionBase>(getOperand(0)); }
+    bool isSingleton() { return getCollection()->isSingleton(); }
+};
+
+FIDDLE()
+struct IRCollectionTaggedUnionType : IRTypeFlowData
+{
+    FIDDLE(leafInst())
+    IRTypeCollection* getTypeCollection() { return as<IRTypeCollection>(getOperand(0)); }
+    IRTableCollection* getTableCollection() { return as<IRTableCollection>(getOperand(1)); }
+    bool isSingleton()
+    {
+        return getTypeCollection()->isSingleton() && getTableCollection()->isSingleton();
+    }
+};
+
 FIDDLE(allOtherInstStructs())
 
 struct IRBuilderSourceLocRAII;

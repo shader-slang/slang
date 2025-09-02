@@ -978,18 +978,16 @@ struct SpecializationContext
                 if (item->getOperand(i) == nullptr)
                 {
                     isInvalid = true;
-                    break;
                 }
-                if (item->getOperand(i)->getParent() == nullptr)
+                else if (item->getOperand(i)->getParent() == nullptr)
                 {
                     isInvalid = true;
-                    break;
                 }
-                if (item->getOperand(i)->getOp() == kIROp_Undefined)
+                else if (item->getOperand(i)->getOp() == kIROp_Undefined)
                 {
                     isInvalid = true;
-                    break;
                 }
+
                 if (i > 0)
                 {
                     key.vals.add(item->getOperand(i));
@@ -1014,8 +1012,6 @@ struct SpecializationContext
     }
     void readSpecializationDictionaries()
     {
-        auto moduleInst = module->getModuleInst();
-
         _readSpecializationDictionaryImpl(
             genericSpecializations,
             getOrCreateIRDictionary(kIROp_GenericSpecializationDictionary));

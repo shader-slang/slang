@@ -551,18 +551,18 @@ struct TypeFlowSpecializationContext
                 IRBuilder builder(arg->getModule());
                 setInsertAfterOrdinaryInst(&builder, arg);
                 auto argTableTag = builder.emitGetTupleElement(
-                    (IRType*)makeTagType(as<IRCollectionBase>(argTUType->getOperand(1))),
+                    (IRType*)makeTagType(argTUType->getTableCollection()),
                     arg,
                     0);
                 auto reinterpretedTag = upcastCollection(
                     context,
                     argTableTag,
-                    (IRType*)makeTagType(as<IRCollectionBase>(destTUType->getOperand(1))));
+                    (IRType*)makeTagType(destTUType->getTableCollection()));
 
                 auto argVal =
-                    builder.emitGetTupleElement((IRType*)argTUType->getOperand(0), arg, 1);
+                    builder.emitGetTupleElement((IRType*)argTUType->getTypeCollection(), arg, 1);
                 auto reinterpretedVal =
-                    upcastCollection(context, argVal, (IRType*)destTUType->getOperand(0));
+                    upcastCollection(context, argVal, (IRType*)destTUType->getTypeCollection());
                 return builder.emitMakeTuple(
                     (IRType*)destTUType,
                     {reinterpretedTag, reinterpretedVal});
@@ -746,7 +746,7 @@ struct TypeFlowSpecializationContext
             return makeExistential(as<IRTableCollection>(cBuilder.makeSingletonSet(witnessTable)));
 
         if (auto collectionTag = as<IRCollectionTagType>(witnessTableInfo))
-            return makeExistential(cast<IRTableCollection>(collectionTag->getOperand(0)));
+            return makeExistential(cast<IRTableCollection>(collectionTag->getCollection()));
 
         SLANG_UNEXPECTED("Unexpected witness table info type in analyzeMakeExistential");
     }
@@ -963,7 +963,7 @@ struct TypeFlowSpecializationContext
         {
             HashSet<IRInst*> results;
             forEachInCollection(
-                cast<IRTableCollection>(tagType->getOperand(0)),
+                cast<IRTableCollection>(tagType->getCollection()),
                 [&](IRInst* table)
                 { results.add(findWitnessTableEntry(cast<IRWitnessTable>(table), key)); });
             return makeTagType(cBuilder.makeSet(results));
@@ -986,7 +986,7 @@ struct TypeFlowSpecializationContext
             return makeUnbounded();
 
         if (auto taggedUnion = as<IRCollectionTaggedUnionType>(operandInfo))
-            return makeTagType(cast<IRTableCollection>(taggedUnion->getOperand(1)));
+            return makeTagType(taggedUnion->getTableCollection());
 
         SLANG_UNEXPECTED("Unhandled info type in analyzeExtractExistentialWitnessTable");
     }
@@ -1003,7 +1003,7 @@ struct TypeFlowSpecializationContext
             return makeUnbounded();
 
         if (auto taggedUnion = as<IRCollectionTaggedUnionType>(operandInfo))
-            return makeTagType(cast<IRTypeCollection>(taggedUnion->getOperand(0)));
+            return makeTagType(taggedUnion->getTypeCollection());
 
         SLANG_UNEXPECTED("Unhandled info type in analyzeExtractExistentialType");
     }
@@ -1020,14 +1020,14 @@ struct TypeFlowSpecializationContext
             return makeUnbounded();
 
         if (auto taggedUnion = as<IRCollectionTaggedUnionType>(operandInfo))
-            return cast<IRTypeCollection>(taggedUnion->getOperand(0));
+            return taggedUnion->getTypeCollection();
 
         return none();
     }
 
     IRInst* analyzeSpecialize(IRInst* context, IRSpecialize* inst)
     {
-        auto operand = inst->getOperand(0);
+        auto operand = inst->getBase();
         auto operandInfo = tryGetInfo(context, operand);
 
         if (!operandInfo)
@@ -1074,13 +1074,12 @@ struct TypeFlowSpecializationContext
 
                 if (auto argCollectionTag = as<IRCollectionTagType>(argInfo))
                 {
-                    if (getCollectionCount(argCollectionTag) == 1)
-                        specializationArgs.add(getCollectionElement(argCollectionTag, 0));
+                    if (argCollectionTag->isSingleton())
+                        specializationArgs.add(argCollectionTag->getCollection()->getElement(0));
                     else
                     {
                         needsTag = true;
-                        specializationArgs.add(
-                            cast<IRCollectionBase>(argCollectionTag->getOperand(0)));
+                        specializationArgs.add(argCollectionTag->getCollection());
                     }
                 }
                 else
@@ -1100,12 +1099,10 @@ struct TypeFlowSpecializationContext
                     {
                         if (auto infoCollectionTag = as<IRCollectionTagType>(info))
                         {
-                            if (getCollectionCount(infoCollectionTag) == 1)
-                                return getCollectionElement(infoCollectionTag, 0);
+                            if (infoCollectionTag->isSingleton())
+                                return infoCollectionTag->getCollection()->getElement(0);
                             else
-                            {
-                                return as<IRCollectionBase>(infoCollectionTag->getOperand(0));
-                            }
+                                return infoCollectionTag->getCollection();
                         }
                         else
                             return type;
@@ -1132,15 +1129,15 @@ struct TypeFlowSpecializationContext
                 //
                 if (auto tag = as<IRCollectionTagType>(typeInfo))
                 {
-                    SLANG_ASSERT(getCollectionCount(tag) == 1);
-                    auto specializeInst = cast<IRSpecialize>(getCollectionElement(tag, 0));
+                    SLANG_ASSERT(tag->isSingleton());
+                    auto specializeInst = cast<IRSpecialize>(tag->getCollection()->getElement(0));
                     auto specializedFuncType = cast<IRFuncType>(specializeGeneric(specializeInst));
                     typeOfSpecialization = specializedFuncType;
                 }
                 else if (auto collection = as<IRCollectionBase>(typeInfo))
                 {
-                    SLANG_ASSERT(getCollectionCount(collection) == 1);
-                    auto specializeInst = cast<IRSpecialize>(getCollectionElement(collection, 0));
+                    SLANG_ASSERT(collection->isSingleton());
+                    auto specializeInst = cast<IRSpecialize>(collection->getElement(0));
                     auto specializedFuncType = cast<IRFuncType>(specializeGeneric(specializeInst));
                     typeOfSpecialization = specializedFuncType;
                 }
@@ -1171,7 +1168,7 @@ struct TypeFlowSpecializationContext
             else if (auto collectionTagType = as<IRCollectionTagType>(operandInfo))
             {
                 needsTag = true;
-                collection = cast<IRCollectionBase>(collectionTagType->getOperand(0));
+                collection = collectionTagType->getCollection();
             }
 
             // Specialize each element in the set
@@ -2148,7 +2145,7 @@ struct TypeFlowSpecializationContext
             return true;
         }
 
-        if (auto typeCollection = as<IRTypeCollection>(collectionTagType->getOperand(0)))
+        if (auto typeCollection = as<IRTypeCollection>(collectionTagType->getCollection()))
         {
             // If this is a type collection, we can replace it with the collection type
             // We don't currently care about the tag of a type.
@@ -2241,17 +2238,17 @@ struct TypeFlowSpecializationContext
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
 
-        if (getCollectionCount(collectionTagType) == 1)
+        if (collectionTagType->isSingleton())
         {
             // Found a single possible type. Simple replacement.
-            auto singletonValue = getCollectionElement(collectionTagType, 0);
+            auto singletonValue = collectionTagType->getCollection()->getElement(0);
             inst->replaceUsesWith(singletonValue);
             inst->removeAndDeallocate();
             return true;
         }
 
         // Replace the instruction with the collection type.
-        inst->replaceUsesWith(collectionTagType->getOperand(0));
+        inst->replaceUsesWith(collectionTagType->getCollection());
         inst->removeAndDeallocate();
         return true;
     }
@@ -2351,8 +2348,9 @@ struct TypeFlowSpecializationContext
             as<IRCollectionTaggedUnionType>(newType))
         {
             // Merge the elements of both tagged unions into a new tuple type
-            return (IRType*)makeExistential((as<IRTableCollection>(
-                updateType((IRType*)currentType->getOperand(1), (IRType*)newType->getOperand(1)))));
+            return (IRType*)makeExistential((as<IRTableCollection>(updateType(
+                (IRType*)as<IRCollectionTaggedUnionType>(currentType)->getTableCollection(),
+                (IRType*)as<IRCollectionTaggedUnionType>(newType)->getTableCollection()))));
         }
         else if (isTaggedUnionType(currentType) && isTaggedUnionType(newType))
         {
@@ -2618,17 +2616,9 @@ struct TypeFlowSpecializationContext
         //
         if (auto collectionTag = as<IRCollectionTagType>(callee->getDataType()))
         {
-            if (getCollectionCount(collectionTag) > 1)
-            {
+            if (!collectionTag->isSingleton())
                 calleeTagInst = callee; // Only keep the tag if there are multiple elements.
-
-                // If we're placing a specialized call, use the base tag since the
-                // specialization arguments will also become arguments to the call.
-                //
-                // if (auto specializedTag = as<IRSpecialize>(calleeTagInst))
-                //    calleeTagInst = specializedTag->getBase();
-            }
-            callee = collectionTag->getOperand(0);
+            callee = collectionTag->getCollection();
         }
 
         // If by this point, we haven't resolved our callee into a global inst (
@@ -2806,8 +2796,8 @@ struct TypeFlowSpecializationContext
         builder.setInsertBefore(inst);
 
         // Collect types from the witness tables to determine the any-value type
-        auto tableCollection = as<IRTableCollection>(taggedUnion->getOperand(1));
-        auto typeCollection = as<IRTypeCollection>(taggedUnion->getOperand(0));
+        auto tableCollection = taggedUnion->getTableCollection();
+        auto typeCollection = taggedUnion->getTypeCollection();
 
         IRInst* witnessTableID = nullptr;
         if (auto witnessTable = as<IRWitnessTable>(inst->getWitnessTable()))
@@ -2827,9 +2817,8 @@ struct TypeFlowSpecializationContext
         }
 
         // Create the appropriate any-value type
-        auto collectionType = getCollectionCount(typeCollection) == 1
-                                  ? (IRType*)typeCollection->getOperand(0)
-                                  : (IRType*)typeCollection;
+        auto collectionType = typeCollection->isSingleton() ? (IRType*)typeCollection->getElement(0)
+                                                            : (IRType*)typeCollection;
 
         // Pack the value
         auto packedValue = as<IRTypeCollection>(collectionType)
@@ -2854,7 +2843,7 @@ struct TypeFlowSpecializationContext
         if (!taggedUnion)
             return false;
 
-        auto taggedUnionType = getLoweredType(taggedUnion);
+        auto taggedUnionType = as<IRCollectionTaggedUnionType>(getLoweredType(taggedUnion));
 
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
@@ -2863,25 +2852,27 @@ struct TypeFlowSpecializationContext
         args.add(inst->getDataType());
         args.add(inst->getTypeID());
         auto translatedTag = builder.emitIntrinsicInst(
-            (IRType*)makeTagType(as<IRTableCollection>(taggedUnionType->getOperand(1))),
+            (IRType*)makeTagType(taggedUnionType->getTableCollection()),
             kIROp_GetTagFromSequentialID,
             args.getCount(),
             args.getBuffer());
 
         IRInst* packedValue = nullptr;
-        auto collection = as<IRTypeCollection>(taggedUnionType->getOperand(0));
-        if (getCollectionCount(collection) > 1)
+        auto collection = taggedUnionType->getTypeCollection();
+        if (!collection->isSingleton())
         {
             packedValue = builder.emitPackAnyValue((IRType*)collection, inst->getValue());
         }
         else
         {
-            packedValue =
-                builder.emitReinterpret((IRType*)taggedUnionType->getOperand(0), inst->getValue());
+            packedValue = builder.emitReinterpret(
+                (IRType*)taggedUnionType->getTypeCollection(),
+                inst->getValue());
         }
 
-        auto newInst =
-            builder.emitMakeTuple(taggedUnionType, List<IRInst*>({translatedTag, packedValue}));
+        auto newInst = builder.emitMakeTuple(
+            (IRType*)taggedUnionType,
+            List<IRInst*>({translatedTag, packedValue}));
 
         inst->replaceUsesWith(newInst);
         inst->removeAndDeallocate();
@@ -2953,7 +2944,7 @@ struct TypeFlowSpecializationContext
             isFuncReturn = as<IRFunc>(getGenericReturnVal(concreteGeneric)) != nullptr;
         else if (auto tagType = as<IRCollectionTagType>(inst->getBase()->getDataType()))
         {
-            auto firstConcreteGeneric = as<IRGeneric>(getCollectionElement(tagType, 0));
+            auto firstConcreteGeneric = as<IRGeneric>(tagType->getCollection()->getElement(0));
             isFuncReturn = as<IRFunc>(getGenericReturnVal(firstConcreteGeneric)) != nullptr;
         }
 
@@ -3020,7 +3011,7 @@ struct TypeFlowSpecializationContext
             {
                 // If this is a tag type, replace with collection.
                 changed = true;
-                args.add(collectionTagType->getOperand(0));
+                args.add(collectionTagType->getCollection());
             }
             else
             {
@@ -3169,8 +3160,7 @@ struct TypeFlowSpecializationContext
         {
             IRBuilder builder(inst);
             setInsertAfterOrdinaryInst(&builder, inst);
-            auto firstElement =
-                getCollectionElement(as<IRCollectionBase>(tagType->getOperand(0)), 0);
+            auto firstElement = tagType->getCollection()->getElement(0);
             auto interfaceType =
                 as<IRInterfaceType>(as<IRWitnessTable>(firstElement)->getConformanceType());
             List<IRInst*> args = {interfaceType, arg};
@@ -3196,8 +3186,7 @@ struct TypeFlowSpecializationContext
         {
             IRBuilder builder(inst);
             setInsertAfterOrdinaryInst(&builder, inst);
-            auto firstElement =
-                getCollectionElement(as<IRCollectionBase>(tagType->getOperand(0)), 0);
+            auto firstElement = tagType->getCollection()->getElement(0);
             auto interfaceType =
                 as<IRInterfaceType>(as<IRWitnessTable>(firstElement)->getConformanceType());
 
