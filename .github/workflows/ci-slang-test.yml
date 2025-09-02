@@ -54,12 +54,6 @@ jobs:
           Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
           Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\usr\\bin"
 
-      - name: Test slang-test from build
-        if: ${{ inputs.os == 'windows' }}
-        shell: bash
-        run: |
-          echo "Running slang-test from build"
-          /c/actions-runner/_work/slang/slang/build/Debug/bin/slang-test tests/render/check-backend-support-on-ci.slang
       - uses: actions/checkout@v4
         with:
           submodules: "recursive"
@@ -106,7 +100,10 @@ jobs:
             echo "DYLD_LIBRARY_PATH=${lib_dir}:$DYLD_LIBRARY_PATH" >> $GITHUB_ENV
           elif [[ "${{ inputs.os }}" == "windows" ]]; then
             # On Windows, DLLs should be in the same directory as executables or in PATH
-            echo "PATH=${bin_dir}:${lib_dir}:$PATH" >> $GITHUB_ENV
+            # Use $GITHUB_PATH instead of $PATH for preservation across steps and
+            # avoid unix-like/windows-like path issues
+            echo "$bin_dir" >> $GITHUB_PATH
+            echo "$lib_dir" >> $GITHUB_PATH
           fi
           echo "PATH: $PATH"
 

@@ -144,9 +144,8 @@ jobs:
         if: inputs.platform != 'wasm'
         run: |
           echo "$bin_dir/slang-test"
-          smokeResult=$("$bin_dir/slang-test" tests/render/check-backend-support-on-ci.slang)
-          supportedBackends="$(echo "$smokeResult" | grep 'Supported backends: ')"
-          echo "$supportedBackends"
+          "$bin_dir/slang-test" tests/render/check-backend-support-on-ci.slang
+
           echo "Printing CUDA compiler version: ..." && nvcc --version
           echo "Printing GPU driver version: ..." && nvidia-smi -q | grep Version
           echo "Printing Vulkan SDK version: ..." && vulkaninfo | grep -i version        
