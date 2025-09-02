@@ -1368,6 +1368,13 @@ static SlangResult _innerMain(
         input.profile = "sm_6_5";
         nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
         slangPassThrough = SLANG_PASS_THROUGH_DXC;
+
+        if (options.useDXBC)
+        {
+            input.target = SLANG_DXBC;
+            input.profile = "sm_5_0";
+            slangPassThrough = SLANG_PASS_THROUGH_FXC;
+        }
         break;
 
     case DeviceType::Vulkan:
