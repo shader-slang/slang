@@ -143,39 +143,11 @@ jobs:
       - name: Check runtime environment
         if: inputs.platform != 'wasm'
         run: |
-          echo "$bin_dir/slang-test"
-          "$bin_dir/slang-test" tests/render/check-backend-support-on-ci.slang
-
           echo "Printing CUDA compiler version: ..." && nvcc --version
           echo "Printing GPU driver version: ..." && nvidia-smi -q | grep Version
           echo "Printing Vulkan SDK version: ..." && vulkaninfo | grep -i version        
-          echo "PATH: $PATH"
-          echo "============== GITHUB_PATH =============="
-          cat $GITHUB_PATH
-          echo "============== GITHUB_ENV ==============="
-          echo "GITHUB_ENV: $GITHUB_ENV"
           echo "All environment variables:"
           env | sort
-
-      - name: List build output for debugging
-        run: |
-          echo "Build directory structure:"
-          find build -name "slang-test*" -o -name "slang-rhi-tests*" -o -name "*.exe" -o -name "*.dll" | head -20
-          echo "Bin directory contents:"
-          ls -la build/${cmake_config}/bin/ || echo "bin directory not found"
-          echo "Lib directory contents:"
-          ls -la build/${cmake_config}/lib/ || echo "lib directory not found"
-          
-          # Estimate artifact size
-          echo "Estimating artifact sizes:"
-          if [ -d "build/${cmake_config}/bin" ]; then
-            echo "Bin directory size:"
-            du -sh build/${cmake_config}/bin/ || echo "Could not calculate bin size"
-          fi
-          if [ -d "build/${cmake_config}/lib" ]; then
-            echo "Lib directory size:"
-            du -sh build/${cmake_config}/lib/ || echo "Could not calculate lib size"
-          fi
 
       - name: Prepare artifacts for upload
         run: |
