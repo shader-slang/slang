@@ -1,5 +1,4 @@
-// This will be re-enabled when github #7693 is resolved
-//DISABLE_TEST:SIMPLE(filecheck=CHECK):-target spirv -entry main -stage compute -g2 -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK):-target spirv -entry main -stage compute -g2 -emit-spirv-directly
 
 struct TestType
 {
