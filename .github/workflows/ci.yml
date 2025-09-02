@@ -184,7 +184,7 @@ jobs:
         run: |
           echo "cmake version: $(cmake --version)"
 
-          
+
           if [[ "${{ matrix.platform }}" = "wasm" ]]; then
               git clone https://github.com/emscripten-core/emsdk.git
               pushd emsdk
