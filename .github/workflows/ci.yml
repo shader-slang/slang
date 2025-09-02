@@ -84,6 +84,12 @@ jobs:
             runs-on: ["Windows", "self-hosted", "GCP-T4"]
             has-gpu: true
             server-count: 8
+          # Enable GPU tests for macOS release
+          - os: macos
+            config: release
+            full-gpu-tests: true
+            has-gpu: true
+            server-count: 3
           # Enable debug layers for all by default
           - enable-debug-layers: true
       fail-fast: false
@@ -166,7 +172,7 @@ jobs:
         run: ./extras/check-inst-version-changes.sh
 
       - name: Upload IR version check results
-        if: ${{ steps.check-versions.outputs.artifact_created == 'true' }}
+        if: ${{ steps.check-ir-versions.outputs.artifact_created == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: ir-version-check-results
@@ -227,7 +233,7 @@ jobs:
         if: steps.filter.outputs.should-run == 'true'
         run: bash extras/verify-documented-compiler-version.sh
 
-      - name: Test Slang
+      - name: Check runtime environment
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && (matrix.platform != 'aarch64' || matrix.os == 'macos')
         run: |
           smokeResult=$("$bin_dir/slang-test" tests/render/check-backend-support-on-ci.slang)
@@ -236,35 +242,44 @@ jobs:
           # LLVM is required to run the filecheck
           echo "Checking llvm ..." && echo "$supportedBackends" | grep -q llvm
 
-          if [[ "${{matrix.full-gpu-tests}}" == "true" ]]
-          then
-            for backend in fxc dxc glslang visualstudio genericcpp nvrtc metal tint # clang gcc
-            do
-              echo "Checking $backend ..." && echo "$supportedBackends" | grep -q "$backend"
-            done
-            for api in 'vk,vulkan' 'dx12,d3d12' 'dx11,d3d11' 'cuda' 'wgpu,webgpu'
-            do
-              echo "Checking $api ..." && echo "$smokeResult" | grep -q "Check $api: Supported"
-            done
-            echo "Printing CUDA version: ..." && nvcc --version
-            echo "Printing Vulkan SDK version: ..." && vulkaninfo | grep -i version
-
-          fi
-
           if [[ "${{matrix.os}}" == "macos" ]]
           then
             for backend in metal
             do
               echo "Checking $backend ..." && echo "$supportedBackends" | grep -q "$backend"
             done
+
             for api in 'mtl,metal'
             do
               echo "Checking $api ..." && echo "$smokeResult" | grep -q "Check $api: Supported"
             done
+          else
+            if [[ "${{matrix.full-gpu-tests}}" == "true" ]]
+          then
+            for backend in fxc dxc glslang visualstudio genericcpp nvrtc metal tint # clang gcc
+            do
+              echo "Checking $backend ..." && echo "$supportedBackends" | grep -q "$backend"
+            done
+
+            for api in 'vk,vulkan' 'dx12,d3d12' 'dx11,d3d11' 'cuda' 'wgpu,webgpu'
+            do
+              echo "Checking $api ..." && echo "$smokeResult" | grep -q "Check $api: Supported"
+            done
+
+            echo "Printing CUDA compiler version: ..." && nvcc --version
+            echo "Printing GPU driver version: ..." && nvidia-smi -q | grep Version
+            echo "Printing Vulkan SDK version: ..." && vulkaninfo | grep -i version
+            fi
           fi
 
+      - name: Test Slang
+        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && (matrix.platform != 'aarch64' || matrix.os == 'macos')
+        run: |
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
+          if [ "${{ matrix.enable-debug-layers }}" == "true" ]; then
+            export VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation
+          fi
           if [[ "${{matrix.full-gpu-tests}}" == "true" ]]; then
             "$bin_dir/slang-test" \
               -use-test-server \
@@ -300,7 +315,7 @@ jobs:
           PATH=$bin_dir:$PATH tools/slangc-test/test.sh
       - name: Test Slang via glsl
         # Run GLSL backend tests on release for pull requests, and not on merge_group, to reduce CI load.
-        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests && matrix.config == 'release'
+        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.os != 'macos' && matrix.full-gpu-tests && matrix.config == 'release'
         run: |
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
@@ -318,40 +333,57 @@ jobs:
         # Some of the expensive tests that are not relevant for Slang (because they just test graphics API related things) are excluded using -tce.
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests && (github.event_name == 'pull_request' || matrix.config == 'release')
         run: |
-          "$bin_dir/slang-rhi-tests" -check-devices -tce=cmd-clear*,cmd-copy*,cmd-upload*,fence*,staging-heap*,texture-create*
+          export SLANG_RHI_EXCLUDE_TESTS="md-clear*,cmd-copy*,cmd-upload*,fence*,staging-heap*,texture-create*"
+          if [[ "${{matrix.os}}" == "macos" ]]; then
+            export SLANG_RHI_EXCLUDE_TESTS="sampler-array"
+          fi
+          "$bin_dir/slang-rhi-tests" -check-devices -tce="$SLANG_RHI_EXCLUDE_TESTS"
       - name: Run slangpy tests
         # Run slangpy tests on debug+release for pull requests, and only on release for merge_group, to reduce CI load.
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests && (github.event_name == 'pull_request' || matrix.config == 'release')
-        shell: pwsh
         run: |
           python --version
-          Write-Host "Cleaning up existing installations and installing slangpy..."
-          try {
-            $SLANGPY_LOCATION = python -c "import slangpy; print(slangpy.__file__.rsplit('\\', 2)[0])"
-            Start-Process -FilePath "python" -ArgumentList "-m pip uninstall -y slangpy" -Verb RunAs -Wait
-            if (Test-Path $SLANGPY_LOCATION) {
-              Write-Host "Removing existing slangpy directory at: $SLANGPY_LOCATION"
-              Remove-Item -Path $SLANGPY_LOCATION -Recurse -Force
-            }
-          } catch {
-            Write-Host "slangpy not found or already removed"
-          }
+          echo "Cleaning up existing installations and installing slangpy..."
+
+          # Try to uninstall existing slangpy
+          python -m pip uninstall -y slangpy || echo "slangpy not found or already removed"
+
+          # Install slangpy
           python -m pip install --verbose slangpy --user
-          $SITE_PACKAGES = python -c "import slangpy; print(slangpy.__file__.rsplit('\\', 2)[0])"
-          $bin_dir = $env:bin_dir -replace '^/c/', 'C:\' -replace '/', '\'
-          Write-Host "Site packages directory: $SITE_PACKAGES"
-          Write-Host "bin_dir location: $bin_dir"
-          try {
-            Copy-Item -Path "$bin_dir\slang*.dll" -Destination "$SITE_PACKAGES\slangpy\" -Force -ErrorAction Stop
-          } catch {
-            Write-Error "Failed to copy library files: $_"
-            exit 1
-          }
-          Write-Host "Listing files in slangpy directory..."
-          Get-ChildItem -Path "$SITE_PACKAGES\slangpy" | ForEach-Object { Write-Host "$($_.Name) - Last Modified: $($_.LastWriteTime)" }
-          Write-Host "Running pytest on slangpy tests..."
-          $env:PYTHONPATH = "$SITE_PACKAGES"
-          python -m pytest "$SITE_PACKAGES\slangpy\tests" -v
+
+          # Get site packages directory
+          SITE_PACKAGES=$(python -c "import slangpy; import os; print(os.path.dirname(os.path.dirname(slangpy.__file__)))")
+          echo "Site packages directory: $SITE_PACKAGES"
+          echo "bin_dir location: $bin_dir"
+          echo "lib_dir location: $lib_dir"
+          # Copy library files
+          if [[ "${{matrix.os}}" == "windows" ]]; then
+            cp "$bin_dir"/slang*.dll "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy library files"; exit 1; }
+          else
+            cp "$lib_dir"/libslang*.* "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy library files"; exit 1; }
+          fi
+
+          echo "Listing files in slangpy directory..."
+          ls -la "$SITE_PACKAGES/slangpy/"
+
+          echo "Installing python packages..."
+
+          # Only install additional packages on GitHub-hosted runners, not self-hosted
+          if [[ "${{ runner.environment }}" != "self-hosted" ]]; then
+            # Download and install requirements from slangpy repository
+            echo "Fetching requirements-dev.txt from slangpy repository..."
+            curl -fsSL https://raw.githubusercontent.com/shader-slang/slangpy/main/requirements-dev.txt -o requirements-dev.txt
+            
+            echo "Installing development requirements..."
+            python -m pip install -r requirements-dev.txt
+            python -m pip install pytest-github-actions-annotate-failures
+          else
+            echo "Skipping additional package installation on self-hosted runner"
+          fi
+
+          echo "Running pytest on slangpy tests..."
+          export PYTHONPATH="$SITE_PACKAGES"
+          python -m pytest "$SITE_PACKAGES/slangpy/tests" -ra
       - uses: actions/upload-artifact@v4
         if: steps.filter.outputs.should-run == 'true' && ! matrix.full-gpu-tests
         with:

@@ -1,4 +1,5 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type -cuda
 
 // Test IEEE 754 NaN comparison behavior with mixed int/float types
 // Tests the type promotion logic across integer and floating-point categories

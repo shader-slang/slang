@@ -6,7 +6,7 @@
 //DISABLE_TEST:COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -profile sm_6_5
 // Disabled because we don't have GLSL intrinsics for these it seems 
 //DISABLE_TEST(vulkan):COMPARE_COMPUTE_EX:-vk -compute
-//TEST:COMPARE_COMPUTE_EX:-cuda -compute -render-features cuda_sm_7_0
+//TEST:COMPARE_COMPUTE_EX:-cuda -compute -capability cuda_sm_7_0
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;

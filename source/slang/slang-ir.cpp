@@ -2935,17 +2935,13 @@ IRInOutType* IRBuilder::getInOutType(IRType* valueType)
 
 IRRefType* IRBuilder::getRefType(IRType* valueType, AddressSpace addrSpace)
 {
-    return (IRRefType*)getPtrType(kIROp_RefType, valueType, addrSpace);
-}
-
-IRConstRefType* IRBuilder::getConstRefType(IRType* valueType)
-{
-    return (IRConstRefType*)getPtrType(kIROp_ConstRefType, valueType);
+    return (IRRefType*)getPtrType(kIROp_RefType, valueType, AccessQualifier::ReadWrite, addrSpace);
 }
 
 IRConstRefType* IRBuilder::getConstRefType(IRType* valueType, AddressSpace addrSpace)
 {
-    return (IRConstRefType*)getPtrType(kIROp_ConstRefType, valueType, addrSpace);
+    return (
+        IRConstRefType*)getPtrType(kIROp_ConstRefType, valueType, AccessQualifier::Read, addrSpace);
 }
 
 IRSPIRVLiteralType* IRBuilder::getSPIRVLiteralType(IRType* type)
@@ -2965,23 +2961,35 @@ IRPtrTypeBase* IRBuilder::getPtrTypeWithAddressSpace(
     IRPtrTypeBase* ptrWithAddrSpace)
 {
     if (ptrWithAddrSpace->hasAddressSpace())
-        return (IRPtrTypeBase*)
-            getPtrType(ptrWithAddrSpace->getOp(), valueType, ptrWithAddrSpace->getAddressSpace());
+        return (IRPtrTypeBase*)getPtrType(
+            ptrWithAddrSpace->getOp(),
+            valueType,
+            ptrWithAddrSpace->getAccessQualifier(),
+            ptrWithAddrSpace->getAddressSpace());
     return (IRPtrTypeBase*)getPtrType(ptrWithAddrSpace->getOp(), valueType);
 }
 
-IRPtrType* IRBuilder::getPtrType(IROp op, IRType* valueType, AddressSpace addressSpace)
+IRPtrType* IRBuilder::getPtrType(
+    IROp op,
+    IRType* valueType,
+    AccessQualifier accessQualifier,
+    AddressSpace addressSpace)
 {
     return (IRPtrType*)getPtrType(
         op,
         valueType,
+        getIntValue(getUInt64Type(), static_cast<IRIntegerValue>(accessQualifier)),
         getIntValue(getUInt64Type(), static_cast<IRIntegerValue>(addressSpace)));
 }
 
-IRPtrType* IRBuilder::getPtrType(IROp op, IRType* valueType, IRInst* addressSpace)
+IRPtrType* IRBuilder::getPtrType(
+    IROp op,
+    IRType* valueType,
+    IRInst* accessQualifier,
+    IRInst* addressSpace)
 {
-    IRInst* operands[] = {valueType, addressSpace};
-    return (IRPtrType*)getType(op, addressSpace ? 2 : 1, operands);
+    IRInst* operands[] = {valueType, accessQualifier, addressSpace};
+    return (IRPtrType*)getType(op, addressSpace ? 3 : 1, operands);
 }
 
 IRTextureTypeBase* IRBuilder::getTextureType(
@@ -4822,7 +4830,7 @@ IRGlobalVar* IRBuilder::createGlobalVar(IRType* valueType)
 
 IRGlobalVar* IRBuilder::createGlobalVar(IRType* valueType, AddressSpace addressSpace)
 {
-    auto ptrType = getPtrType(kIROp_PtrType, valueType, addressSpace);
+    auto ptrType = getPtrType(valueType, addressSpace);
     IRGlobalVar* globalVar = createInst<IRGlobalVar>(this, kIROp_GlobalVar, ptrType);
     _maybeSetSourceLoc(globalVar);
     addGlobalValue(this, globalVar);
@@ -5079,7 +5087,7 @@ IRVar* IRBuilder::emitVar(IRType* type)
 
 IRVar* IRBuilder::emitVar(IRType* type, AddressSpace addressSpace)
 {
-    auto allocatedType = getPtrType(kIROp_PtrType, type, addressSpace);
+    auto allocatedType = getPtrType(type, addressSpace);
     auto inst = createInst<IRVar>(this, kIROp_Var, allocatedType);
     addInst(inst);
     return inst;
@@ -5308,6 +5316,7 @@ IRType* maybePropagateAddressSpace(IRBuilder* builder, IRInst* basePtr, IRType* 
                 type = builder->getPtrType(
                     resultPtrType->getOp(),
                     resultPtrType->getValueType(),
+                    basePtrType->getAccessQualifier(),
                     basePtrType->getAddressSpace());
             }
         }
@@ -5318,10 +5327,12 @@ IRType* maybePropagateAddressSpace(IRBuilder* builder, IRInst* basePtr, IRType* 
 IRInst* IRBuilder::emitFieldAddress(IRInst* basePtr, IRInst* fieldKey)
 {
     AddressSpace addrSpace = AddressSpace::Generic;
+    AccessQualifier accessQualifier = AccessQualifier::ReadWrite;
     IRInst* valueType = nullptr;
     auto basePtrType = unwrapAttributedType(basePtr->getDataType());
     if (auto ptrType = as<IRPtrTypeBase>(basePtrType))
     {
+        accessQualifier = ptrType->getAccessQualifier();
         addrSpace = ptrType->getAddressSpace();
         valueType = ptrType->getValueType();
     }
@@ -5344,7 +5355,7 @@ IRInst* IRBuilder::emitFieldAddress(IRInst* basePtr, IRInst* fieldKey)
         }
     }
     SLANG_RELEASE_ASSERT(resultType);
-    return emitFieldAddress(getPtrType(kIROp_PtrType, resultType, addrSpace), basePtr, fieldKey);
+    return emitFieldAddress(getPtrType(resultType, accessQualifier, addrSpace), basePtr, fieldKey);
 }
 
 IRInst* IRBuilder::emitFieldAddress(IRType* type, IRInst* base, IRInst* field)
@@ -5448,10 +5459,12 @@ IRInst* IRBuilder::emitElementAddress(IRInst* basePtr, IRIntegerValue index)
 IRInst* IRBuilder::emitElementAddress(IRInst* basePtr, IRInst* index)
 {
     AddressSpace addrSpace = AddressSpace::Generic;
+    AccessQualifier accessQualifier = AccessQualifier::ReadWrite;
     IRInst* valueType = nullptr;
     auto basePtrType = unwrapAttributedType(basePtr->getDataType());
     if (auto ptrType = as<IRPtrTypeBase>(basePtrType))
     {
+        accessQualifier = ptrType->getAccessQualifier();
         addrSpace = ptrType->getAddressSpace();
         valueType = ptrType->getValueType();
     }
@@ -5500,7 +5513,7 @@ IRInst* IRBuilder::emitElementAddress(IRInst* basePtr, IRInst* index)
     auto inst = createInst<IRGetElementPtr>(
         this,
         kIROp_GetElementPtr,
-        getPtrType(kIROp_PtrType, type, addrSpace),
+        getPtrType(type, accessQualifier, addrSpace),
         basePtr,
         index);
 
