@@ -191,6 +191,16 @@ void emitBaseType(ManglingContext* context, BaseType baseType)
     case BaseType::IntPtr:
         emitRaw(context, "ip");
         break;
+    case BaseType::AddressSpace:
+        emitRaw(context, "as");
+        break;
+    case BaseType::AccessQualifier:
+        emitRaw(context, "aq");
+        break;
+    case BaseType::MemoryScope:
+        emitRaw(context, "mem");
+        break;
+
     default:
         SLANG_UNEXPECTED("unimplemented case in base type mangling");
         break;
