@@ -13,12 +13,12 @@
 #include "../compiler-core/slang-name.h"
 #include "../core/slang-performance-profiler.h"
 #include "slang-ir-clone.h"
+#include "slang-ir-insert-debug-value-store.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-legalize-types.h"
 #include "slang-mangle.h"
-#include "slang-ir-insert-debug-value-store.h"
 
 namespace Slang
 {
@@ -844,14 +844,14 @@ static LegalVal legalizeDebugVar(
     case LegalType::Flavor::simple:
         {
             auto pointedToType = tryGetPointedToType(context->builder, type.getSimple());
-            
+
             // Check if the type is debuggable before creating DebugVar
             DebugValueStoreContext debugContext;
             if (!debugContext.isDebuggableType(pointedToType))
             {
                 return LegalVal();
             }
-            
+
             auto legalVal = context->builder->emitDebugVar(
                 pointedToType,
                 originalInst->getSource(),
@@ -2127,7 +2127,8 @@ static LegalVal legalizeInst(
         break;
     case kIROp_DebugVar:
         result = legalizeDebugVar(context, type, (IRDebugVar*)inst);
-        if (result.flavor == LegalVal::Flavor::none) {
+        if (result.flavor == LegalVal::Flavor::none)
+        {
             return result;
         }
         break;
