@@ -1681,15 +1681,22 @@ struct IRPtrTypeBase : IRType
     FIDDLE(baseInst())
     IRType* getValueType() { return (IRType*)getOperand(0); }
 
+    AccessQualifier getAccessQualifier()
+    {
+        return getOperandCount() > 1
+                   ? (AccessQualifier) static_cast<IRIntLit*>(getOperand(1))->getValue()
+                   : AccessQualifier::ReadWrite;
+    }
+
     bool hasAddressSpace()
     {
-        return getOperandCount() > 1 && getAddressSpace() != AddressSpace::Generic;
+        return getOperandCount() > 2 && getAddressSpace() != AddressSpace::Generic;
     }
 
     AddressSpace getAddressSpace()
     {
-        return getOperandCount() > 1
-                   ? (AddressSpace) static_cast<IRIntLit*>(getOperand(1))->getValue()
+        return getOperandCount() > 2
+                   ? (AddressSpace) static_cast<IRIntLit*>(getOperand(2))->getValue()
                    : AddressSpace::Generic;
     }
 };

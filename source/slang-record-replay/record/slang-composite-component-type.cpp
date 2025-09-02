@@ -15,10 +15,33 @@ CompositeComponentTypeRecorder::CompositeComponentTypeRecorder(
 
 ISlangUnknown* CompositeComponentTypeRecorder::getInterface(const Guid& guid)
 {
+    // Record the queryInterface call
+    ApiCallId callId =
+        static_cast<ApiCallId>(makeApiCallId(getClassId(), IComponentTypeMethodId::queryInterface));
+    ParameterRecorder* recorder{};
+    {
+        recorder = m_recordManager->beginMethodRecord(callId, m_componentHandle);
+        recorder->recordGuid(guid);
+        recorder = m_recordManager->endMethodRecord();
+    }
+
+    ISlangUnknown* result = nullptr;
     if (guid == CompositeComponentTypeRecorder::getTypeGuid())
     {
-        return static_cast<ISlangUnknown*>(this);
+        result = static_cast<ISlangUnknown*>(this);
     }
-    return nullptr;
+    else
+    {
+        // Delegate to the base class for IComponentType2 support.
+        result = IComponentTypeRecorder::getInterface(guid);
+    }
+
+    // Record the result
+    {
+        recorder->recordAddress(result);
+        m_recordManager->apendOutput();
+    }
+
+    return result;
 }
 } // namespace SlangRecord

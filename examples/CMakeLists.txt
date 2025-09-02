@@ -72,7 +72,7 @@ function(example dir)
     )
 endfunction()
 
-if(SLANG_ENABLE_EXAMPLES)
+if(SLANG_ENABLE_EXAMPLES AND SLANG_ENABLE_SLANG_RHI)
     #
     # Examples
     #

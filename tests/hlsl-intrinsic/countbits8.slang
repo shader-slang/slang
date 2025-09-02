@@ -1,8 +1,8 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -cpu
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -vk -compute
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -cuda -compute
-//TODO: metal is currently failing even with emulation, investigate.
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -mtl -compute -profile metallib_2_4
+//TODO: metal was previously failing but should work now after fixing vector type names
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -mtl -compute -profile metallib_2_4
 // Not testing the following:
 // -dx12/hlsl, No support for uint8_t with hlsl
 // -wgpu, only has 32-bit support

@@ -19859,7 +19859,7 @@ __Addr<T> __allocHitObjectAttributes<T>()
 {
     [__vulkanHitObjectAttributes]
     static T t;
-    return __get_addr(t);
+    return __getAddress(t);
 }
 
 // Next is the custom intrinsic that will compute the hitObjectAttributes location
@@ -21075,8 +21075,7 @@ struct HitObject
         /// Loads a root constant from the local root table referenced by the hit object. Valid if the hit object
         /// represents a hit or a miss. RootConstantOffsetInBytes must be a multiple of 4.
     [__requiresNVAPI]
-    [require(hlsl, ser)]
-    [require(cuda, ser)]
+    [require(cuda_hlsl, ser_raygen_closesthit_miss)]
     uint LoadLocalRootTableConstant(uint RootConstantOffsetInBytes)
     {
         __target_switch
