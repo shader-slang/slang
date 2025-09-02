@@ -116,7 +116,10 @@ jobs:
               cmake --preset default --fresh \
                 -DSLANG_SLANG_LLVM_FLAVOR=FETCH_BINARY \
                 "-DSLANG_SLANG_LLVM_BINARY_URL=$(pwd)/build/dist-release/slang-llvm.zip" \
-                "-DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }}"
+                "-DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }}" \
+                "-DCMAKE_C_COMPILER_LAUNCHER=${{ env.ccache_symlinks_path }}" \
+                "-DCMAKE_CXX_COMPILER_LAUNCHER=${{ env.ccache_symlinks_path }}" \
+                -DSLANG_ENABLE_TESTS=ON
               cmake --workflow --preset "${{ inputs.config }}"
             elif [[ "${{ inputs.build-llvm }}" = "false" ]]; then
               # linux aarch64 cannot build llvm.
@@ -152,9 +155,8 @@ jobs:
           cat $GITHUB_PATH
           echo "============== GITHUB_ENV ==============="
           echo "GITHUB_ENV: $GITHUB_ENV"
-          cat $GITHUB_ENV
-          echo "bin_dir: $bin_dir"
-          echo "lib_dir: $lib_dir"
+          echo "All environment variables:"
+          env | sort
 
       - name: List build output for debugging
         run: |
