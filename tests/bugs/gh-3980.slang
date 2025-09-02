@@ -1,5 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -compute -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -compute -output-using-type -dx12 -profile cs_6_6 -use-dxil
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -compute -output-using-type -dx12 -profile cs_6_6
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj -output-using-type -emit-spirv-directly
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cpu -compute -output-using-type
