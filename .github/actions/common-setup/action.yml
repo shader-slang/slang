@@ -120,7 +120,7 @@ runs:
 
       # Setup ccache for self-hosted runners (Windows only for now)
     - name: Setup ccache
-      if: ${{ inputs.os == 'windows' && env.RUNNER_ENVIRONMENT == 'self-hosted' }}
+      if: ${{ inputs.os == 'windows' && runner.environment == 'self-hosted' }}
       uses: Chocobo1/setup-ccache-action@v1
       with:
         update_packager_index: false
