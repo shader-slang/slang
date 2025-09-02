@@ -317,6 +317,60 @@ struct TagOpsLoweringContext : public InstPassBase
         inst->removeAndDeallocate();
     }
 
+    void lowerGetTagForSpecializedCollection(IRGetTagForSpecializedCollection* inst)
+    {
+        auto srcCollection = cast<IRCollectionBase>(
+            cast<IRCollectionTagType>(inst->getOperand(0)->getDataType())->getOperand(0));
+        auto destCollection =
+            cast<IRCollectionBase>(cast<IRCollectionTagType>(inst->getDataType())->getOperand(0));
+        Dictionary<IRInst*, IRInst*> mapping;
+
+        for (UInt i = 1; i < inst->getOperandCount(); i += 2)
+        {
+            auto srcElement = inst->getOperand(i);
+            auto destElement = inst->getOperand(i + 1);
+            mapping[srcElement] = destElement;
+        }
+
+        IRBuilder builder(inst->getModule());
+        builder.setInsertAfter(inst);
+
+        List<IRInst*> indices;
+        for (UInt i = 0; i < srcCollection->getOperandCount(); i++)
+        {
+            // Find in destCollection
+            bool found = false;
+            auto mappedElement = mapping[srcCollection->getOperand(i)];
+            for (UInt j = 0; j < destCollection->getOperandCount(); j++)
+            {
+                auto destElement = destCollection->getOperand(j);
+                if (mappedElement == destElement)
+                {
+                    found = true;
+                    indices.add(builder.getIntValue(builder.getUIntType(), j));
+                    break; // Found the index
+                }
+            }
+
+            if (!found)
+            {
+                SLANG_UNEXPECTED("Element not found in specialized collection");
+            }
+        }
+
+        // Create an array for the lookup
+        auto lookupArrayType = builder.getArrayType(
+            builder.getUIntType(),
+            builder.getIntValue(builder.getUIntType(), indices.getCount()));
+        auto lookupArray =
+            builder.emitMakeArray(lookupArrayType, indices.getCount(), indices.getBuffer());
+        auto resultID =
+            builder.emitElementExtract(inst->getDataType(), lookupArray, inst->getOperand(0));
+        inst->replaceUsesWith(resultID);
+        inst->removeAndDeallocate();
+    }
+
+
     void processInst(IRInst* inst)
     {
         switch (inst->getOp())
@@ -326,6 +380,9 @@ struct TagOpsLoweringContext : public InstPassBase
             break;
         case kIROp_GetTagForMappedCollection:
             lowerGetTagForMappedCollection(as<IRGetTagForMappedCollection>(inst));
+            break;
+        case kIROp_GetTagForSpecializedCollection:
+            lowerGetTagForSpecializedCollection(as<IRGetTagForSpecializedCollection>(inst));
             break;
         default:
             break;

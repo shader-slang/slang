@@ -681,6 +681,7 @@ return {
 	["CastTaggedUnionToInterfacePtr"] = 677,
 	["GetTagForSuperCollection"] = 678,
 	["GetTagForMappedCollection"] = 679,
-	["GetTagFromSequentialID"] = 680,
-	["GetSequentialIDFromTag"] = 681
+	["GetTagForSpecializedCollection"] = 680,
+	["GetTagFromSequentialID"] = 681,
+	["GetSequentialIDFromTag"] = 682
 }

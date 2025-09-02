@@ -2588,8 +2588,8 @@ struct TypeFlowSpecializationContext
                 // If we're placing a specialized call, use the base tag since the
                 // specialization arguments will also become arguments to the call.
                 //
-                if (auto specializedTag = as<IRSpecialize>(calleeTagInst))
-                    calleeTagInst = specializedTag->getBase();
+                // if (auto specializedTag = as<IRSpecialize>(calleeTagInst))
+                //    calleeTagInst = specializedTag->getBase();
             }
             callee = collectionTag->getOperand(0);
         }
@@ -2922,21 +2922,59 @@ struct TypeFlowSpecializationContext
             isFuncReturn = as<IRFunc>(getGenericReturnVal(firstConcreteGeneric)) != nullptr;
         }
 
-        // Functions/Collections of Functions should be handled at the call site (in specializeCall)
-        // since witness table specialization arguments must be inlined into the call.
-        //
+        // We'll emit a dynamic tag inst if the result is a func collection with multiple elements
         if (isFuncReturn)
         {
-            // TODO: Maybe make this the 'default' behavior if a specializeing call
-            // returns false.
-            //
-            if (tryGetInfo(context, inst))
-                return replaceType(context, inst);
+            if (auto info = tryGetInfo(context, inst))
+            {
+                // If our inst represents a collection directly (no run-time info),
+                // there's nothing to do except replace the type (if necessary)
+                //
+                if (as<IRCollectionBase>(info))
+                    return replaceType(context, inst);
+
+                auto specializedCollectionTag = as<IRCollectionTagType>(info);
+
+                // If the inst represents a singleton collection, there's nothing
+                // to do except replace the type (if necessary)
+                //
+                if (getCollectionCount(specializedCollectionTag) <= 1)
+                    return replaceType(context, inst);
+
+                List<IRInst*> mappingOperands;
+
+                // Add the base tag as the first operand. The mapping operands follow
+                mappingOperands.add(inst->getBase());
+
+                forEachInCollection(
+                    specializedCollectionTag,
+                    [&](IRInst* element)
+                    {
+                        // Emit the GetTagForSpecializedCollection for each element.
+                        auto specInst = cast<IRSpecialize>(element);
+                        auto baseGeneric = cast<IRGeneric>(specInst->getBase());
+
+                        mappingOperands.add(baseGeneric);
+                        mappingOperands.add(specInst);
+                    });
+
+                IRBuilder builder(inst);
+                setInsertBeforeOrdinaryInst(&builder, inst);
+                auto newInst = builder.emitIntrinsicInst(
+                    (IRType*)info,
+                    kIROp_GetTagForSpecializedCollection,
+                    mappingOperands.getCount(),
+                    mappingOperands.getBuffer());
+
+                inst->replaceUsesWith(newInst);
+                inst->removeAndDeallocate();
+                return true;
+            }
             else
                 return false;
         }
 
-        // For all other specializations, we'll 'drop' the dyanamic tag information.
+        // For all other specializations, we'll 'drop' the dynamic tag information.
         bool changed = false;
         List<IRInst*> args;
         for (UIndex i = 0; i < inst->getArgCount(); i++)

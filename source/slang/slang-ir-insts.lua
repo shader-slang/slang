@@ -2201,14 +2201,18 @@ local insts = {
 	{ GetTagForMappedCollection = {
 		-- Translate a tag from a set to its equivalent in a different set
 		-- based on a mapping induced by a lookup key
-	} },                                    
+	} },
+	{ GetTagForSpecializedCollection = { 
+		-- Translate a tag from a generic set to its equivalent in a specialized set
+		-- based on a mapping that is encoded in the operands of this tag instruction
+	} },
 	{ GetTagFromSequentialID = {
 		-- Translate an existing sequential ID (a 'global' ID) & and interface type into a tag
 	    -- the provided collection (a 'local' ID)
 	} }, 
 	{ GetSequentialIDFromTag = {
 		-- Translate a tag from the given collection (a 'local' ID) to a sequential ID (a 'global' ID)
-	} } 
+	} }
 }
 
 -- A function to calculate some useful properties and put it in the table,
