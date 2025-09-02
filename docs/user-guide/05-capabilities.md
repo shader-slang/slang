@@ -1,6 +1,7 @@
 ---
 layout: user-guide
 permalink: /user-guide/capabilities
+redirect_to: https://docs.shader-slang.org/en/latest/external/slang/docs/user-guide/05-capabilities.html
 ---
 
 # Capabilities
