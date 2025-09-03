@@ -56,32 +56,32 @@ void computeMain()
     // BUF-NEXT: 84
     // BUF-NEXT: F2
 
-    int32_t b = 0x12345678;
+    int32_t b = 0xF2845678;
     outputBuffer.b = unpack8(b);
     // BUF: 78
     // BUF-NEXT: 56
-    // BUF-NEXT: 34
-    // BUF-NEXT: 12
+    // BUF-NEXT: FFFFFF84
+    // BUF-NEXT: FFFFFFF2
 
     uint16_t c = 0xF256;
     outputBuffer.c = unpack8(c);
     // BUF-NEXT: 56
     // BUF-NEXT: F2
 
-    int16_t d = 0x1234;
+    int16_t d = 0xF256;
     outputBuffer.d = unpack8(d);
-    // BUF-NEXT: 34
-    // BUF-NEXT: 12
+    // BUF-NEXT: 56
+    // BUF-NEXT: FFFFFFF2
 
     uint32_t e = 0xF2845678;
     outputBuffer.e = unpack16(e);
     // BUF-NEXT: 5678
     // BUF-NEXT: F284
 
-    int32_t f = 0x12345678;
+    int32_t f = 0xF2845678;
     outputBuffer.f = unpack16(f);
     // BUF-NEXT: 5678
-    // BUF-NEXT: 1234
+    // BUF-NEXT: FFFFF284
 
     u16vec2 g = {0xF256, 0x1234};
     outputBuffer.g = pack32(g);
