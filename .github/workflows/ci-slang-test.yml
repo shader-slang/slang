@@ -47,6 +47,11 @@ jobs:
         shell: bash
 
     steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          fetch-depth: "2"
+      
       - name: Common Test Setup
         uses: ./.github/actions/common-test-setup
         with:
@@ -135,6 +140,11 @@ jobs:
         shell: bash
 
     steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          fetch-depth: "2"
+      
       - name: Common Test Setup
         uses: ./.github/actions/common-test-setup
         with:
@@ -161,6 +171,11 @@ jobs:
         shell: bash
 
     steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          fetch-depth: "2"
+      
       - name: Common Test Setup
         uses: ./.github/actions/common-test-setup
         with:

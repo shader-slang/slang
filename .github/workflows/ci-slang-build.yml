@@ -143,9 +143,12 @@ jobs:
       - name: Check runtime environment
         if: inputs.platform != 'wasm'
         run: |
-          echo "Printing CUDA compiler version: ..." && nvcc --version
-          echo "Printing GPU driver version: ..." && nvidia-smi -q | grep Version
-          echo "Printing Vulkan SDK version: ..." && vulkaninfo | grep -i version        
+          echo "Printing CUDA compiler version: ..."
+          nvcc --version 2>/dev/null || echo "CUDA compiler (nvcc) not available"
+          echo "Printing GPU driver version: ..."
+          nvidia-smi -q 2>/dev/null | grep Version || echo "NVIDIA driver (nvidia-smi) not available"
+          echo "Printing Vulkan SDK version: ..."
+          vulkaninfo 2>/dev/null | grep -i version || echo "Vulkan SDK (vulkaninfo) not available"
           echo "All environment variables:"
           env | sort
 
