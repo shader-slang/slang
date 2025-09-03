@@ -554,11 +554,11 @@ static SlangResult _findNVRTC(NVRTCPathVisitor& visitor)
         }
     }
 
-    // If we don't have a candidate try CUDA_PATH
+    // If we don't have a candidate, try CUDA_PATH
     if (!visitor.hasCandidates())
     {
         StringBuilder buf;
-        if (!SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
+        if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
                 UnownedStringSlice::fromLiteral("CUDA_PATH"),
                 buf)))
         {
