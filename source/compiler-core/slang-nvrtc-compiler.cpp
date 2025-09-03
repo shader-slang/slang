@@ -554,7 +554,7 @@ static SlangResult _findNVRTC(NVRTCPathVisitor& visitor)
         }
     }
 
-    // If we don't have a candidate try CUDA_PATH
+    // If we don't have a candidate, try CUDA_PATH
     if (!visitor.hasCandidates())
     {
         StringBuilder buf;
