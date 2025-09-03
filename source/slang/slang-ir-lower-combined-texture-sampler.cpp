@@ -115,13 +115,21 @@ void lowerCombinedTextureSamplers(
     // Lower combined texture sampler type into a struct type.
     for (auto globalInst : module->getGlobalInsts())
     {
+        IRType* dataType = nullptr;
+
         // Check if the global inst is a global param.
         auto globalParam = as<IRGlobalParam>(globalInst);
-        if (!globalParam)
-            continue;
+        bool instIsGlobalParam;
+        if (globalParam) {
+            // Check if the global param has a data type that is a texture type or an array type.
+            dataType = globalParam->getDataType();
+            instIsGlobalParam = true;
+        } else {
+            // Check if the global inst itself is a texture type or an array type.
+            dataType = as<IRType>(globalInst);
+            instIsGlobalParam = false;
+        }
 
-        // Check if the global param has a data type that is a texture type or an array type.
-        auto dataType = globalParam->getDataType();
         if (!dataType)
             continue;
 
@@ -176,6 +184,10 @@ void lowerCombinedTextureSamplers(
         {
             continue;
         }
+
+        // If the global inst is not a global param, we can exit now.
+        if (!instIsGlobalParam)
+            continue;
 
         auto layoutDecor = globalParam->findDecoration<IRLayoutDecoration>();
         if (!layoutDecor)
