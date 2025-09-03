@@ -107,6 +107,13 @@ jobs:
               [ -f "slang-wasm.js" ]
               node smoke/smoke-test.js smoke/rand_float.slang computeMain
           else
+            # Prepare ccache launcher arguments if ccache is available
+            cmake_launcher_defines=()
+            if [[ -n "${{ env.ccache_symlinks_path }}" ]]; then
+              cmake_launcher_defines+=("-DCMAKE_C_COMPILER_LAUNCHER=${{ env.ccache_symlinks_path }}")
+              cmake_launcher_defines+=("-DCMAKE_CXX_COMPILER_LAUNCHER=${{ env.ccache_symlinks_path }}")
+            fi
+
             if [[ "${{ inputs.os }}" =~ "windows" && "${{ inputs.config }}" == "debug" ]]; then
               # Doing a debug build will try to link against a release built llvm, this
               # is a problem on Windows, so make slang-llvm in release build and use
@@ -117,22 +124,22 @@ jobs:
                 -DSLANG_SLANG_LLVM_FLAVOR=FETCH_BINARY \
                 "-DSLANG_SLANG_LLVM_BINARY_URL=$(pwd)/build/dist-release/slang-llvm.zip" \
                 "-DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }}" \
-                "-DCMAKE_C_COMPILER_LAUNCHER=${{ env.ccache_symlinks_path }}" \
-                "-DCMAKE_CXX_COMPILER_LAUNCHER=${{ env.ccache_symlinks_path }}" \
-                -DSLANG_ENABLE_TESTS=ON
+                "${cmake_launcher_defines[@]}"
               cmake --workflow --preset "${{ inputs.config }}"
             elif [[ "${{ inputs.build-llvm }}" = "false" ]]; then
               # linux aarch64 cannot build llvm.
               cmake --preset default --fresh \
                 -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
-                -DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }}
+                -DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }} \
+                "${cmake_launcher_defines[@]}"
               cmake --workflow --preset "${{ inputs.config }}"
             else
               # Otherwise, use the "system" llvm we have just build or got from the
               # cache in the setup phase
               cmake --preset default --fresh \
                 -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
-                -DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }}
+                -DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }} \
+                "${cmake_launcher_defines[@]}"
               cmake --workflow --preset "${{ inputs.config }}"
             fi
           fi

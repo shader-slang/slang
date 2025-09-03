@@ -31,7 +31,7 @@ runs:
     - name: Install dependencies (Linux only)
       shell: bash
       run: |
-        if [[ "${{ inputs.os }}" = "linux" ]]; then
+        if [[ "${{ inputs.os }}" == "linux" ]]; then
             sudo apt-get update
             sudo apt-get install -y libx11-dev 
         fi
