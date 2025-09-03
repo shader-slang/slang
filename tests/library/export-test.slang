@@ -10,7 +10,7 @@
 
 // Test the produced kernel.
 
-//TEST:COMPARE_COMPUTE_EX:-slang -compute -profile cs_6_3 -dx12 -use-dxil -shaderobj -Xslang... -r tests/library/export-library.dxil -incomplete-library -X.
+//TEST:COMPARE_COMPUTE_EX:-slang -compute -profile cs_6_3 -dx12 -shaderobj -Xslang... -r tests/library/export-library.dxil -incomplete-library -X.
 
 extern int foo(int a);
 
