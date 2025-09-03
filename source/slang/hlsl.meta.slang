@@ -19859,7 +19859,7 @@ __Addr<T> __allocHitObjectAttributes<T>()
 {
     [__vulkanHitObjectAttributes]
     static T t;
-    return __get_addr(t);
+    return __getAddress(t);
 }
 
 // Next is the custom intrinsic that will compute the hitObjectAttributes location

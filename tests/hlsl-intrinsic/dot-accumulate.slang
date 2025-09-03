@@ -1,7 +1,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
 // Does not run on DX11 as SM 6.4 is required.
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx11
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_4 -use-dxil -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_4 -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-metal -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-wgsl -compute -shaderobj -render-feature half -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -g0 -output-using-type
