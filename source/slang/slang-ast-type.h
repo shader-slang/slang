@@ -651,10 +651,11 @@ class BwdCallableFuncType : public Type
 {
     FIDDLE(...)
     Type* getBase() { return as<Type>(getOperand(0)); }
+    Type* getCtxType() { return as<Type>(getOperand(1)); }
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    Type* _createCanonicalTypeOverride();
+    // Type* _createCanonicalTypeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
@@ -694,10 +695,11 @@ class FuncResultType : public Type
 {
     FIDDLE(...)
     Type* getBase() { return as<Type>(getOperand(0)); }
+    Type* getCtxType() { return as<Type>(getOperand(1)); }
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
-    Type* _createCanonicalTypeOverride();
+    // Type* _createCanonicalTypeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 

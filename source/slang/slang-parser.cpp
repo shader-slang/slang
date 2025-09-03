@@ -2787,6 +2787,8 @@ static Expr* parseBwdCallableFuncTypeExpr(Parser* parser)
     BwdCallableFuncTypeExpr* expr = parser->astBuilder->create<BwdCallableFuncTypeExpr>();
     parser->ReadToken(TokenType::LParent);
     expr->base = parser->ParseTypeExp();
+    parser->ReadToken(TokenType::Comma);
+    expr->ctxType = parser->ParseTypeExp();
     parser->ReadToken(TokenType::RParent);
     return expr;
 }
@@ -2809,6 +2811,8 @@ static Expr* parseResultTypeExpr(Parser* parser)
     FuncResultTypeExpr* expr = parser->astBuilder->create<FuncResultTypeExpr>();
     parser->ReadToken(TokenType::LParent);
     expr->base = parser->ParseTypeExp();
+    parser->ReadToken(TokenType::Comma);
+    expr->ctxType = parser->ParseTypeExp();
     parser->ReadToken(TokenType::RParent);
     return expr;
 }

@@ -367,6 +367,16 @@ INST(GetSequentialID, GetSequentialID, 1, HOISTABLE)
 INST(BindGlobalGenericParam, bind_global_generic_param, 2, 0)
 INST(AllocObj, allocObj, 0, 0)
 
+// Boxed meta-object construction operations (for types/witness-tables/funcs/etc..)
+INST(Box, Box, 1, HOISTABLE) // Starts a Boxed type
+INST(ForEachTableOf, ForEachTableOf, 1, HOISTABLE) // Enumerates the concrete witness tables that denote a conformance to the given interface
+INST(ForEachTypeOf, ForEachTypeOf, 1, HOISTABLE) // Enumerates all types that conform to a given interface
+
+INST(TypeEnumeratorType, TypeEnumerator, 1, HOISTABLE) // The type of the enumerator returned by ForEachTableOf and ForEachTypeOf
+INST(TableEnumeratorType, TableEnumerator, 2, HOISTABLE) // The type of the enumerator returned by ForEachTableOf
+INST(FuncEnumeratorType, FuncEnumerator, 2, HOISTABLE)
+INST_RANGE(EnumeratorTypeBase, TypeEnumeratorType, FuncEnumeratorType)
+
 INST(GlobalValueRef, globalValueRef, 1, 0)
 
 INST(MakeUInt64, makeUInt64, 2, 0)
@@ -1315,6 +1325,9 @@ INST(GetDynamicResourceHeap, GetDynamicResourceHeap, 0, HOISTABLE)
     INST(BackwardPrimalFromLegacyBwdDiffFunc, BackwardPrimalFromLegacyBwdDiffFunc, 2, HOISTABLE)
     INST(BackwardContextGetValFromLegacyBwdDiffFunc, BackwardContextGetValFromLegacyBwdDiffFunc, 2, HOISTABLE)
     INST(BackwardPropagateFromLegacyBwdDiffFunc, BackwardPropagateFromLegacyBwdDiffFunc, 2, HOISTABLE)
+
+    // Internal use inst.
+    INST(BackwardFromLegacyBwdDiffFunc, BackwardFromLegacyBwdDiffFunc, 2, HOISTABLE)
 
     //INST(ForwardEvalAndPropFromLegacyFwdDiffFunc, ForwardEvalAndPropFromLegacyFwdDiffFunc, 2, HOISTABLE)
     //INST(ForwardApplyFromLegacyFwdDiffFunc,       ForwardApplyFromLegacyFwdDiffFunc, 2, HOISTABLE)

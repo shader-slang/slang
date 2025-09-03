@@ -2,6 +2,7 @@
 
 #include "slang-ir-generics-lowering-context.h"
 
+#include "slang-ir-clone.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
 
@@ -147,6 +148,49 @@ IRType* SharedGenericsLoweringContext::lowerType(
     if (isTypeValue(paramType))
     {
         return builder->getRTTIHandleType();
+    }
+
+    if (as<IRSpecialize>(paramType))
+    {
+        auto genericInst = as<IRGeneric>(paramType->getOperand(0));
+
+        IRStructType* concreteType = nullptr;
+        this->loweredGenericStructs.tryGetValue(genericInst, concreteType);
+        if (concreteType)
+        {
+            // If we have a lowered generic struct, then we can just return it.
+            // The lowered generic struct is guaranteed to be an IRStructType.
+            return concreteType;
+        }
+
+        if (auto genericStructType = as<IRStructType>(getGenericReturnVal(genericInst)))
+        {
+            IRCloneEnv env;
+            // Create a specialized struct type for the generic.
+            builder->setInsertBefore(genericInst);
+            auto newStructType = builder->createStructType();
+
+            // Clone fields and lower the types recursively.
+            auto originalStruct = genericStructType;
+            for (auto field : originalStruct->getFields())
+            {
+                // Assume that the first operand of a struct field is its type.
+                auto fieldType = field->getFieldType();
+                auto loweredFieldType = lowerType(builder, fieldType, typeMapping, nullptr);
+                // auto clonedFieldKey = cloneInst(&env, builder, field->getKey());
+                auto newField = builder->createStructField(
+                    newStructType,
+                    field->getKey(),
+                    (IRType*)loweredFieldType);
+                cloneInstDecorationsAndChildren(&env, builder->getModule(), field, newField);
+            }
+
+            // Add the new struct type to the map of lowered generic structs.
+            loweredGenericStructs.add(genericInst, newStructType);
+            return newStructType;
+        }
+
+        // Default case is to fall through and lower the type operands.
     }
 
     switch (paramType->getOp())

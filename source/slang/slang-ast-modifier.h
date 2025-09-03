@@ -1595,6 +1595,21 @@ class DifferentiableAttribute : public Attribute
         return m_associatedValMapping[targetVal];
     }
 
+    void resolveDictionaryKeys()
+    {
+        // Go over m_associatedValMapping & call ->resolve() on all
+        // the dictionary keys (and re-insert them, if they are different)
+        //
+        OrderedDictionary<Val*, OrderedDictionary<SlangInt, Val*>> newMapping;
+        for (auto& pair : m_associatedValMapping)
+        {
+            auto& assocVals = pair.value;
+            auto newKey = pair.key->resolve();
+            newMapping[newKey] = assocVals;
+        }
+        m_associatedValMapping = newMapping;
+    }
+
     void addAssocVal(Val* targetVal, SlangInt id, Val* assocVal)
     {
         tryGetAssociatedVals(targetVal)[id] = assocVal;

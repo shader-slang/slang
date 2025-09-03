@@ -674,18 +674,18 @@ IRFunc* BackwardDiffTranscriberBase::generateNewForwardDerivativeForFunc(
     IRFunc* originalFunc,
     IRFunc* diffPropagateFunc)
 {
-    auto primalOuterParent = findOuterGeneric(originalFunc);
-    if (!primalOuterParent)
-        primalOuterParent = originalFunc;
+    // auto primalOuterParent = findOuterGeneric(originalFunc);
+    // if (!primalOuterParent)
+    //     primalOuterParent = originalFunc;
 
     // Make a clone of original func so we won't modify the original.
     IRCloneEnv originalCloneEnv;
-    primalOuterParent = cloneInst(&originalCloneEnv, builder, primalOuterParent);
-    auto primalFunc = as<IRFunc>(getGenericReturnVal(primalOuterParent));
+    auto clonedFunc = cloneInst(&originalCloneEnv, builder, originalFunc);
+    auto primalFunc = as<IRFunc>(clonedFunc);
 
     // Strip any existing derivative decorations off the clone.
     stripDerivativeDecorations(primalFunc);
-    eliminateDeadCode(primalOuterParent);
+    eliminateDeadCode(primalFunc);
 
     // Perform required transformations and simplifications on the original func to make it
     // reversible.
@@ -698,29 +698,21 @@ IRFunc* BackwardDiffTranscriberBase::generateNewForwardDerivativeForFunc(
 
     ForwardDiffTranscriber fwdTranscriber(autoDiffSharedContext, sink);
     fwdTranscriber.enableReverseModeCompatibility();
+    IRFunc* fwdDiffFunc = as<IRFunc>(fwdTranscriber.transcribe(builder, primalFunc));
+    SLANG_ASSERT(fwdDiffFunc);
 
-    auto oldCount = autoDiffSharedContext->followUpFunctionsToTranscribe.getCount();
-    IRFunc* fwdDiffFunc =
-        as<IRFunc>(getGenericReturnVal(fwdTranscriber.transcribe(builder, primalOuterParent)));
+    fwdTranscriber.transcribeFunc(builder, primalFunc, fwdDiffFunc);
     fwdDiffFunc->sourceLoc = primalFunc->sourceLoc;
 
-    SLANG_ASSERT(fwdDiffFunc);
-    auto newCount = autoDiffSharedContext->followUpFunctionsToTranscribe.getCount();
-    for (auto i = oldCount; i < newCount; i++)
-    {
-        auto pendingTask = autoDiffSharedContext->followUpFunctionsToTranscribe.getLast();
-        autoDiffSharedContext->followUpFunctionsToTranscribe.removeLast();
-        SLANG_RELEASE_ASSERT(pendingTask.type == FuncBodyTranscriptionTaskType::Forward);
-        fwdTranscriber.transcribeFunc(builder, pendingTask.originalFunc, pendingTask.resultFunc);
-    }
-
     // Remove the clone of original func.
-    primalOuterParent->removeAndDeallocate();
+    SLANG_ASSERT(primalFunc->hasUses() == false);
+    primalFunc->removeAndDeallocate();
 
     // Remove redundant loads since they interfere with transposition logic.
     eliminateRedundantLoadStore(fwdDiffFunc);
 
     // Migrate the new forward derivative function into the generic parent of `diffPropagateFunc`.
+    /*
     if (auto fwdParentGeneric = as<IRGeneric>(findOuterGeneric(fwdDiffFunc)))
     {
         // Clone forward derivative func from its own generic into current generic parent.
@@ -744,6 +736,7 @@ IRFunc* BackwardDiffTranscriberBase::generateNewForwardDerivativeForFunc(
         }
         fwdParentGeneric->removeAndDeallocate();
     }
+    */
 
     return fwdDiffFunc;
 }
@@ -795,6 +788,14 @@ static void generateName(IRBuilder* builder, IRInst* srcInst, IRInst* dstInst, c
     }
 }
 
+static IRInst* maybeHoist(IRBuilder& builder, IRInst* inst)
+{
+    IRInst* specializedVal = nullptr;
+    auto hoistResult = hoistValueFromGeneric(builder, inst, specializedVal, true);
+    return hoistResult; //(as<IRGeneric>(hoistResult)) ? getGenericReturnVal(hoistResult) :
+                        // hoistResult;
+}
+
 // Transcribe a function definition (AD 2.0)
 void BackwardDiffTranscriberBase::_transcribeFuncImpl(
     IRBuilder* builder,
@@ -812,58 +813,17 @@ void BackwardDiffTranscriberBase::_transcribeFuncImpl(
     //
     auto propagateFunc = builder->createFunc();
 
-    List<IRType*> propagateParamTypes;
-    IRType* propagateResultType;
-
-    propagateParamTypes.add(builder->getBackwardDiffIntermediateContextType(targetFunc));
-
-    for (UInt i = 0; i < targetFunc->getParamCount(); i++)
-    {
-        const auto& [direction, paramType] = splitDirectionAndType(targetFunc->getParamType(i));
-        auto diffParamType = (IRType*)differentiableTypeConformanceContext.getDifferentialForType(
-            builder,
-            paramType);
-
-        if (diffParamType)
-            propagateParamTypes.add(
-                fromDirectionAndType(builder, transposeDirection(direction), diffParamType));
-        else
-            propagateParamTypes.add(builder->getVoidType());
-    }
-
-    auto resultType = targetFunc->getResultType();
-    auto diffResultType =
-        (IRType*)differentiableTypeConformanceContext.getDifferentialForType(builder, resultType);
-    if (diffResultType)
-    {
-        propagateResultType =
-            fromDirectionAndType(builder, IRParameterDirection::In, diffResultType);
-    }
-    else
-    {
-        propagateResultType = builder->getVoidType();
-    }
-
-    if (propagateResultType->getOp() != kIROp_VoidType)
-    {
-        // If the result type is not void, we need to add it as the last parameter.
-        propagateParamTypes.add(propagateResultType);
-    }
-
-    auto propagateFuncType = builder->getFuncType(propagateParamTypes, builder->getVoidType());
-    propagateFunc->setFullType(propagateFuncType);
-
-    // --------------------------------------------------------------------------
 
     IRBuilder tempBuilder = *builder;
-    if (auto outerGeneric = findOuterGeneric(propagateFunc))
+    tempBuilder.setInsertBefore(propagateFunc);
+    /*if (auto outerGeneric = findOuterGeneric(propagateFunc))
     {
         tempBuilder.setInsertBefore(outerGeneric);
     }
     else
     {
         tempBuilder.setInsertBefore(propagateFunc);
-    }
+    }*/
 
     auto fwdDiffFunc = generateNewForwardDerivativeForFunc(&tempBuilder, targetFunc, propagateFunc);
     if (!fwdDiffFunc)
@@ -928,7 +888,7 @@ void BackwardDiffTranscriberBase::_transcribeFuncImpl(
     // into explicit intermediate data structure reads and writes.
     IRInst* intermediateType = nullptr;
     IRFunc* getValFunc = nullptr;
-    auto extractedPrimalFunc = diffUnzipPass->extractPrimalFunc(
+    auto applyFunc = diffUnzipPass->extractPrimalFunc(
         propagateFunc,
         targetFunc,
         primalsInfo,
@@ -968,30 +928,75 @@ void BackwardDiffTranscriberBase::_transcribeFuncImpl(
 
     // If primal function is nested in a generic, we want to create separate generics for all the
     // associated things we have just created.
-    auto primalOuterGeneric = findOuterGeneric(targetFunc);
-    IRInst* specializedFunc = nullptr;
-    auto intermediateTypeGeneric =
-        hoistValueFromGeneric(*builder, intermediateType, specializedFunc, true);
-    builder->setInsertBefore(targetFunc);
-    builder->addBackwardDerivativeIntermediateTypeDecoration(targetFunc, intermediateTypeGeneric);
+    // auto primalOuterGeneric = findOuterGeneric(targetFunc);
+    // IRInst* specializedFunc = nullptr;
+    // auto intermediateTypeGeneric =
+    //    hoistValueFromGeneric(*builder, intermediateType, specializedFunc, true);
+    // builder->setInsertBefore(targetFunc);
+    // builder->addBackwardDerivativeIntermediateTypeDecoration(targetFunc,
+    // intermediateTypeGeneric);
 
-    auto primalFuncGeneric =
-        hoistValueFromGeneric(*builder, extractedPrimalFunc, specializedFunc, true);
+    // auto primalFuncGeneric =
+    //     hoistValueFromGeneric(*builder, extractedPrimalFunc, specializedFunc, true);
 
-    builder->setInsertBefore(targetFunc);
-    IRInst* applyFunc = maybeSpecializeWithGeneric(*builder, primalFuncGeneric, primalOuterGeneric);
+    // builder->setInsertBefore(targetFunc);
+    // IRInst* applyFunc = maybeSpecializeWithGeneric(*builder, primalFuncGeneric,
+    // primalOuterGeneric);
 
     // Copy over checkpoint preference hints.
     {
-        auto diffPrimalFunc = getResolvedInstForDecorations(primalFuncGeneric, true);
+        auto diffPrimalFunc = getResolvedInstForDecorations(applyFunc, true);
         auto checkpointHint = targetFunc->findDecoration<IRCheckpointHintDecoration>();
         if (checkpointHint)
             builder->addDecoration(diffPrimalFunc, checkpointHint->getOp());
     }
 
-    initializeLocalVariables(
-        builder->getModule(),
-        as<IRGlobalValueWithCode>(getGenericReturnVal(primalFuncGeneric)));
+    // ------------------------------------------------------------
+    // Fill in the propagate function's type.
+    List<IRType*> propagateParamTypes;
+    IRType* propagateResultType;
+
+    propagateParamTypes.add((IRType*)intermediateType);
+
+    for (UInt i = 0; i < targetFunc->getParamCount(); i++)
+    {
+        const auto& [direction, paramType] = splitDirectionAndType(targetFunc->getParamType(i));
+        auto diffParamType = (IRType*)differentiableTypeConformanceContext.getDifferentialForType(
+            builder,
+            paramType);
+
+        if (diffParamType)
+            propagateParamTypes.add(
+                fromDirectionAndType(builder, transposeDirection(direction), diffParamType));
+        else
+            propagateParamTypes.add(builder->getVoidType());
+    }
+
+    auto resultType = targetFunc->getResultType();
+    auto diffResultType =
+        (IRType*)differentiableTypeConformanceContext.getDifferentialForType(builder, resultType);
+    if (diffResultType)
+    {
+        propagateResultType =
+            fromDirectionAndType(builder, IRParameterDirection::In, diffResultType);
+    }
+    else
+    {
+        propagateResultType = builder->getVoidType();
+    }
+
+    if (propagateResultType->getOp() != kIROp_VoidType)
+    {
+        // If the result type is not void, we need to add it as the last parameter.
+        propagateParamTypes.add(propagateResultType);
+    }
+
+    auto propagateFuncType = builder->getFuncType(propagateParamTypes, builder->getVoidType());
+    propagateFunc->setFullType(propagateFuncType);
+
+    // --------------------------------------------------------------------------
+
+    initializeLocalVariables(builder->getModule(), applyFunc);
     initializeLocalVariables(builder->getModule(), propagateFunc);
 
     // Clean up block labels & other temp decorations.
@@ -1008,11 +1013,20 @@ void BackwardDiffTranscriberBase::_transcribeFuncImpl(
     generateName(builder, targetFunc, getValFunc, "s_getVal_");
     generateName(builder, targetFunc, intermediateType, "s_bwdCallableCtx_");
 
-    // Output the 4-tuple result of the translation.
-    propagateFuncInst = propagateFunc;
-    applyFuncInst = applyFunc;
-    contextGetValFuncInst = getValFunc;
-    contextTypeInst = intermediateType;
+    IRBuilder subBuilder = *builder;
+
+    //
+    // Output the 4-tuple result of the translation (and hoist values out of any generic contexts).
+    //
+
+    // It's important to hoist the context type out *first* because the other funcs may depend on
+    // it.
+    //
+    contextTypeInst = maybeHoist(subBuilder, intermediateType);
+
+    propagateFuncInst = maybeHoist(subBuilder, propagateFunc);
+    applyFuncInst = maybeHoist(subBuilder, applyFunc);
+    contextGetValFuncInst = maybeHoist(subBuilder, getValFunc);
 }
 
 // Transcribe a function definition. (Old code)
@@ -1876,9 +1890,12 @@ LegacyBackwardDiffTranslationFuncContext::Result LegacyBackwardDiffTranslationFu
     UIndex bwdDiffParamIdx = 0;
     for (UIndex i = 0; i < applyBwdFuncType->getParamCount(); i++)
     {
-        auto applyParamType = this->applyBwdFunc->getParamType(i);
+        // auto applyParamType = this->applyBwdFunc->getParamType(i);
+        /*auto bwdPropParamType =
+            this->bwdPropFunc->getParamType(i + 1); // +1 to skip the context param*/
+        auto applyParamType = applyBwdFuncType->getParamType(i);
         auto bwdPropParamType =
-            this->bwdPropFunc->getParamType(i + 1); // +1 to skip the context param
+            bwdPropFuncType->getParamType(i + 1); // +1 to skip the context param
 
         if (as<IRVoidType>(bwdPropParamType))
         {
@@ -1987,14 +2004,18 @@ LegacyToNewBackwardDiffTranslationFuncContext::Result LegacyToNewBackwardDiffTra
     // then call the bwdPropFunc() with the differential parts of the parameters &
     // write back any output derivatives.
     //
+
+    // Create the context type first (since the rest depend on it).
+    auto contextType = builder->createStructType();
+
     auto applyFunc = builder->createFunc();
     auto bwdPropFunc = builder->createFunc();
     auto getValFunc = builder->createFunc();
-    auto contextType = builder->createStructType();
 
     auto legacyBwdDiffFuncType = as<IRFuncType>(this->legacyBwdDiffFunc->getDataType());
 
-    diffTypeContext.setFunc(this->primalFunc);
+    auto outerParent = as<IRGeneric>(findOuterGeneric(primalFunc));
+    diffTypeContext.setFunc(outerParent ? outerParent : primalFunc);
 
     IRInst* primalFuncType = this->primalFunc->getDataType();
 
@@ -2009,6 +2030,28 @@ LegacyToNewBackwardDiffTranslationFuncContext::Result LegacyToNewBackwardDiffTra
             builder->emitIntrinsicInst(nullptr, kIROp_BwdCallableFuncType, 2, &primalFuncType)));
     */
 
+    List<IRInst*> applyForBwdFuncTypeParams;
+    applyForBwdFuncTypeParams.add(primalFunc->getDataType());
+    applyForBwdFuncTypeParams.add(contextType);
+    auto applyForBwdFuncType = cast<IRFuncType>(diffTypeContext.resolveType(
+        builder,
+        builder->emitIntrinsicInst(
+            builder->getTypeKind(),
+            kIROp_ApplyForBwdFuncType,
+            applyForBwdFuncTypeParams.getCount(),
+            applyForBwdFuncTypeParams.getBuffer())));
+
+    List<IRInst*> bwdPropFuncTypeParams;
+    bwdPropFuncTypeParams.add(primalFunc->getDataType());
+    bwdPropFuncTypeParams.add(contextType);
+    auto bwdPropFuncType = cast<IRFuncType>(diffTypeContext.resolveType(
+        builder,
+        builder->emitIntrinsicInst(
+            builder->getTypeKind(),
+            kIROp_BwdCallableFuncType,
+            bwdPropFuncTypeParams.getCount(),
+            bwdPropFuncTypeParams.getBuffer())));
+
     applyFunc->setFullType(applyForBwdFuncType);
     bwdPropFunc->setFullType(bwdPropFuncType);
 
@@ -2020,7 +2063,7 @@ LegacyToNewBackwardDiffTranslationFuncContext::Result LegacyToNewBackwardDiffTra
     auto contextVar = applyFuncBuilder.emitVar(contextType);
 
     IRBuilder contextTypeBuilder(builder->getModule());
-    contextTypeBuilder.setInsertInto(contextType);
+    contextTypeBuilder.setInsertInto(builder->getModule());
 
     IRBuilder bwdPropFuncBuilder(builder->getModule());
     bwdPropFuncBuilder.setInsertInto(bwdPropFunc);
@@ -2043,7 +2086,8 @@ LegacyToNewBackwardDiffTranslationFuncContext::Result LegacyToNewBackwardDiffTra
     // location tagging.
     //
     ShortList<IRParam*, 8> primalFuncParams;
-    for (auto param : this->primalFunc->getParams())
+    auto funcForNames = as<IRFunc>(getResolvedInstForDecorations(primalFunc));
+    for (auto param : funcForNames->getParams())
     {
         primalFuncParams.add(param);
     }
@@ -2151,13 +2195,15 @@ LegacyToNewBackwardDiffTranslationFuncContext::Result LegacyToNewBackwardDiffTra
     // Build the getVal() function.
     //
 
-    auto getValFuncType = builder->getFuncType({contextType}, primalFunc->getResultType());
+    auto getValFuncType = builder->getFuncType(
+        {contextType},
+        as<IRFuncType>(primalFunc->getDataType())->getResultType());
 
     // Emit a call to the primal-func & store the result in a new key,
     // then load that key in the getValFunc and return it.
     //
     IRStructKey* resultKeyInst = contextTypeBuilder.createStructKey();
-    auto resultFieldType = primalFunc->getResultType();
+    auto resultFieldType = as<IRFuncType>(primalFunc->getDataType())->getResultType();
     contextTypeBuilder.createStructField(contextType, resultKeyInst, resultFieldType);
 
     getValFunc->setFullType(getValFuncType);
@@ -2188,7 +2234,7 @@ LegacyToNewBackwardDiffTranslationFuncContext::Result LegacyToNewBackwardDiffTra
 
     // Call the primal function and store the result in the context
     auto primalResult = applyFuncBuilder.emitCallInst(
-        primalFunc->getResultType(),
+        as<IRFuncType>(primalFunc->getDataType())->getResultType(),
         primalFunc,
         primalFuncArgs.getCount(),
         primalFuncArgs.getBuffer());
@@ -2235,7 +2281,13 @@ LegacyToNewBackwardDiffTranslationFuncContext::Result LegacyToNewBackwardDiffTra
     generateName(builder, primalFunc, getValFunc, "s_getVal_");
     generateName(builder, primalFunc, contextType, "s_bwdCallableCtx_");
 
-    return {applyFunc, contextType, getValFunc, bwdPropFunc};
+    // Hoist contextType first.
+    auto contextTypeGlobalVal = maybeHoist(*builder, contextType);
+
+    auto applyFuncGlobalVal = maybeHoist(*builder, applyFunc);
+    auto bwdPropFuncGlobalVal = maybeHoist(*builder, bwdPropFunc);
+    auto getValFuncGlobalVal = maybeHoist(*builder, getValFunc);
+    return {applyFuncGlobalVal, contextTypeGlobalVal, getValFuncGlobalVal, bwdPropFuncGlobalVal};
 }
 
 } // namespace Slang

@@ -82,12 +82,13 @@ struct ExtractPrimalFuncContext
         IRBuilder builder(module);
         builder.setInsertBefore(destFunc);
         IRFuncType* originalFuncType = nullptr;
-        outIntermediateType = createIntermediateType(destFunc);
-
+        // outIntermediateType = createIntermediateType(destFunc);
+        outIntermediateType = builder.createStructType();
+        builder.addDecoration(outIntermediateType, kIROp_OptimizableTypeDecoration);
         builder.addCheckpointIntermediateDecoration(outIntermediateType, originalFunc);
         outIntermediateType->sourceLoc = originalFunc->sourceLoc;
 
-        GenericChildrenMigrationContext migrationContext;
+        /*GenericChildrenMigrationContext migrationContext;
         migrationContext.init(
             as<IRGeneric>(findOuterGeneric(originalFunc)),
             as<IRGeneric>(findOuterGeneric(destFunc)),
@@ -107,15 +108,14 @@ struct ExtractPrimalFuncContext
                     !as<IRGlobalValueWithCode>(child))
                     migrationContext.cloneInst(&subBuilder, child);
             }
-        }
+        }*/
 
         originalFuncType = as<IRFuncType>(originalFunc->getDataType());
 
         SLANG_RELEASE_ASSERT(originalFuncType);
         List<IRType*> paramTypes;
         for (UInt i = 0; i < originalFuncType->getParamCount(); i++)
-            paramTypes.add(
-                (IRType*)migrationContext.cloneInst(&builder, originalFuncType->getParamType(i)));
+            paramTypes.add((IRType*)originalFuncType->getParamType(i));
 
         // paramTypes.add(builder.getOutType((IRType*)outIntermediateType));
         /*auto resultType =
@@ -209,7 +209,7 @@ struct ExtractPrimalFuncContext
     IRFunc* createGetValFunc(IRFunc*, IRInst* intermediateType, IRInst* returnValueKey)
     {
         IRBuilder builder(module);
-        builder.setInsertBefore(intermediateType);
+        builder.setInsertAfter(intermediateType);
 
         IRFunc* getValFunc = builder.createFunc();
         IRType* returnType = nullptr;
@@ -544,16 +544,16 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
     {
         nameHint->removeAndDeallocate();
     }
-    if (auto originalNameHint = originalFunc->findDecoration<IRNameHintDecoration>())
+    /*if (auto originalNameHint = originalFunc->findDecoration<IRNameHintDecoration>())
     {
         auto primalName = String("s_primal_ctx_") + UnownedStringSlice(originalNameHint->getName());
         builder.addNameHintDecoration(
             primalFunc,
             builder.getStringValue(primalName.getUnownedSlice()));
-        builder.addDecoration(primalFunc, kIROp_IgnoreSideEffectsDecoration);
 
-        markNonContextParamsAsSideEffectFree(&builder, primalFunc);
-    }
+    }*/
+    builder.addDecoration(primalFunc, kIROp_IgnoreSideEffectsDecoration);
+    markNonContextParamsAsSideEffectFree(&builder, primalFunc);
 
     // Copy PrimalValueStructKey decorations from primal func.
     copyPrimalValueStructKeyDecorations(func, subEnv);

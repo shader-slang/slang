@@ -401,7 +401,7 @@ void BwdCallableFuncType::_toTextOverride(StringBuilder& out)
     out << toSlice("BwdCallableFuncType<") << getBase() << toSlice(">");
 }
 
-Type* BwdCallableFuncType::_createCanonicalTypeOverride()
+/*Type* BwdCallableFuncType::_createCanonicalTypeOverride()
 {
     auto canonicalType = getBase()->getCanonicalType();
     if (canonicalType == this)
@@ -411,7 +411,7 @@ Type* BwdCallableFuncType::_createCanonicalTypeOverride()
     auto astBuilder = getCurrentASTBuilder();
     auto newType = astBuilder->getOrCreate<BwdCallableFuncType>(canonicalType);
     return newType;
-}
+}*/
 
 Val* BwdCallableFuncType::_substituteImplOverride(
     ASTBuilder* astBuilder,
@@ -419,7 +419,8 @@ Val* BwdCallableFuncType::_substituteImplOverride(
     int* ioDiff)
 {
     auto substBase = getBase()->substituteImpl(astBuilder, subst, ioDiff);
-    return astBuilder->getOrCreate<BwdCallableFuncType>(substBase)->getCanonicalType();
+    auto substCtx = getCtxType()->substituteImpl(astBuilder, subst, ioDiff);
+    return astBuilder->getOrCreate<BwdCallableFuncType>(substBase, substCtx)->getCanonicalType();
 }
 
 // --
@@ -428,6 +429,7 @@ void FuncResultType::_toTextOverride(StringBuilder& out)
     out << toSlice("FuncResultType<") << getBase() << toSlice(">");
 }
 
+/*
 Type* FuncResultType::_createCanonicalTypeOverride()
 {
     auto canonicalType = getBase()->getCanonicalType();
@@ -439,6 +441,7 @@ Type* FuncResultType::_createCanonicalTypeOverride()
     auto newType = astBuilder->getOrCreate<FuncResultType>(canonicalType);
     return newType;
 }
+*/
 
 Val* FuncResultType::_substituteImplOverride(
     ASTBuilder* astBuilder,
@@ -446,7 +449,8 @@ Val* FuncResultType::_substituteImplOverride(
     int* ioDiff)
 {
     auto substBase = getBase()->substituteImpl(astBuilder, subst, ioDiff);
-    return astBuilder->getOrCreate<FuncResultType>(substBase)->getCanonicalType();
+    auto substCtx = getCtxType()->substituteImpl(astBuilder, subst, ioDiff);
+    return astBuilder->getOrCreate<FuncResultType>(substBase, substCtx)->getCanonicalType();
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TupleType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

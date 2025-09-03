@@ -107,6 +107,7 @@ struct SwizzledMatrixLValueInfo;
 struct CopiedValInfo;
 struct ExtractedExistentialValInfo;
 struct ImplicitCastLValueInfo;
+struct MetaEnumeratorInfo;
 
 // This type is our core representation of lowered values.
 // In the simple case, it just wraps an `IRInst*`.
@@ -150,6 +151,9 @@ struct LoweredValInfo
 
         // The L-Value that is an implicit cast.
         ImplicitCastedLValue,
+
+        // Metadata for enumerating conformees of abstract types
+        MetaEnumerator,
     };
 
     union
@@ -230,6 +234,8 @@ struct LoweredValInfo
 
     static LoweredValInfo implicitCastedLValue(ImplicitCastLValueInfo* extInfo);
 
+    static LoweredValInfo metaEnumerator(MetaEnumeratorInfo* extInfo);
+
     SwizzledLValueInfo* getSwizzledLValueInfo()
     {
         SLANG_ASSERT(flavor == Flavor::SwizzledLValue);
@@ -254,6 +260,12 @@ struct LoweredValInfo
     {
         SLANG_ASSERT(flavor == Flavor::ImplicitCastedLValue);
         return (ImplicitCastLValueInfo*)ext;
+    }
+
+    MetaEnumeratorInfo* getMetaEnumeratorInfo()
+    {
+        SLANG_ASSERT(flavor == Flavor::MetaEnumerator);
+        return (MetaEnumeratorInfo*)ext;
     }
 };
 
@@ -389,6 +401,17 @@ struct ImplicitCastLValueInfo : ExtendedValueInfo
     ParameterDirection lValueType;
 };
 
+// Represents the result of a matrix swizzle operation in an l-value context.
+// The same non-contiguous and no-duplicate rules as above apply.
+struct MetaEnumeratorInfo : ExtendedValueInfo
+{
+    // The enumerator expression.
+    IRInst* val;
+
+    // The abstract type whose conformees are being iterated over.
+    IRType* enumeratorBase;
+};
+
 LoweredValInfo LoweredValInfo::boundMember(BoundMemberInfo* boundMemberInfo)
 {
     LoweredValInfo info;
@@ -445,6 +468,13 @@ LoweredValInfo LoweredValInfo::extractedExistential(ExtractedExistentialValInfo*
     return info;
 }
 
+LoweredValInfo LoweredValInfo::metaEnumerator(MetaEnumeratorInfo* extInfo)
+{
+    LoweredValInfo info;
+    info.flavor = Flavor::MetaEnumerator;
+    info.ext = extInfo;
+    return info;
+}
 
 // An "environment" for mapping AST declarations to IR values.
 //
@@ -1223,6 +1253,33 @@ top:
             auto result = builder->emitCast(info->type, getSimpleVal(context, baseVal));
             return LoweredValInfo::simple(result);
         }
+    case LoweredValInfo::Flavor::MetaEnumerator:
+        {
+            auto info = lowered.getMetaEnumeratorInfo();
+            auto enumeratorType = info->val->getDataType();
+
+            // Calculate effective type of the boxed value.
+            IRType* boxedValueType = nullptr;
+            switch (enumeratorType->getOp())
+            {
+            case kIROp_TypeEnumeratorType:
+                boxedValueType =
+                    context->irBuilder->getTypeKind(); // Type of a type is just a type kind,
+                break;
+            case kIROp_FuncEnumeratorType:
+                boxedValueType =
+                    (IRType*)enumeratorType->getOperand(1); // Extract the effective func type.
+                break;
+            case kIROp_TableEnumeratorType:
+                SLANG_ASSERT(as<IRWitnessTableType>(enumeratorType->getOperand(1)));
+                boxedValueType =
+                    (IRType*)enumeratorType->getOperand(1); // Extract the effective table type.
+                break;
+            }
+
+            return LoweredValInfo::simple(
+                builder->emitIntrinsicInst(boxedValueType, kIROp_Box, 1, &info->val));
+        }
     default:
         SLANG_UNEXPECTED("unhandled value flavor");
         UNREACHABLE_RETURN(LoweredValInfo());
@@ -1503,7 +1560,9 @@ IRStructKey* getInterfaceRequirementKey(IRGenContext* context, Decl* requirement
     // into the declaration.
     requirementKey = builder->createStructKey();
 
-    addLinkageDecoration(context, requirementKey, requirementDecl);
+    StringBuilder sb;
+    sb << "key_" << getMangledName(context->astBuilder, requirementDecl);
+    addLinkageDecoration(context, requirementKey, requirementDecl, sb.getUnownedSlice());
 
     context->shared->interfaceRequirementKeys.add(requirementDecl, requirementKey);
 
@@ -1742,6 +1801,29 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     {
         if (as<ThisTypeConstraintDecl>(val->getDeclRef()))
             return LoweredValInfo::simple(context->thisTypeWitness);
+        /*if (auto thisTypeConstraint = as<ThisTypeConstraintDecl>(val->getDeclRef()))
+        {
+            IRType* enumeratorBase = lowerType(context, val->getSup());
+            IRType* witnessTableType = context->irBuilder->getWitnessTableType(enumeratorBase);
+
+            List<IRInst*> operands;
+            operands.add(enumeratorBase);
+            operands.add(witnessTableType);
+
+            IRType* enumeratorType = (IRType*)context->irBuilder->emitIntrinsicInst(
+                context->irBuilder->getTypeKind(),
+                kIROp_TableEnumeratorType,
+                operands.getCount(),
+                operands.getBuffer());
+
+            List<IRInst*> enumeratorOperands;
+            enumeratorOperands.add(enumeratorBase);
+            return LoweredValInfo::simple(context->irBuilder->emitIntrinsicInst(
+                enumeratorType,
+                kIROp_ForEachTableOf,
+                enumeratorOperands.getCount(),
+                enumeratorOperands.getBuffer()));
+        }*/
 
         return emitDeclRef(
             context,
@@ -1875,8 +1957,10 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredValInfo visitBwdCallableFuncType(BwdCallableFuncType* bwdCallableFuncType)
     {
-        return LoweredValInfo::simple(
-            lowerFuncDependentType(bwdCallableFuncType->getBase(), kIROp_BwdCallableFuncType));
+        return LoweredValInfo::simple(lowerFuncDependentType(
+            bwdCallableFuncType->getBase(),
+            kIROp_BwdCallableFuncType,
+            bwdCallableFuncType->getCtxType()));
     }
 
     /*
@@ -1897,8 +1981,10 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredValInfo visitFuncResultType(FuncResultType* funcResultType)
     {
-        return LoweredValInfo::simple(
-            lowerFuncDependentType(funcResultType->getBase(), kIROp_FuncResultType));
+        return LoweredValInfo::simple(lowerFuncDependentType(
+            funcResultType->getBase(),
+            kIROp_FuncResultType,
+            funcResultType->getCtxType()));
     }
 
     LoweredValInfo visitBackwardDifferentiateVal(BackwardDifferentiateVal* val)
@@ -4105,7 +4191,8 @@ struct ExprLoweringContext
             // In this case we know exactly what declaration we
             // are going to call, and so we can resolve things
             // appropriately.
-            auto funcDeclRef = resolvedInfo.funcDeclRef;
+            auto funcDeclRef =
+                DeclRef<Decl>(as<DeclRefBase>(resolvedInfo.funcDeclRef.declRefBase->resolve()));
             auto baseExpr = resolvedInfo.baseExpr;
             if (baseExpr)
             {
@@ -8602,9 +8689,50 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                             astReqWitnessTable,
                             irSatisfyingWitnessTable))
                     {
+                        //
+                        // TODO: Need to lower conforming witness tables using the base type
+                        // that is consistent with the one in the requirement.
+                        //
+                        // Maybe we should lower the witness table twice?
+                        //
+
                         // Need to construct a sub-witness-table
                         auto irWitnessTableBaseType =
                             lowerType(subContext, astReqWitnessTable->baseType);
+                        /* This doesn't really work with transitive inheritance decls.. (atleast it
+                        gets complicated)
+                        if (auto declRefBaseType =
+                        as<DeclRefType>(astReqWitnessTable->baseType))
+                        {
+                            if (auto inheritanceDecl = as<InheritanceDecl>(entry.key))
+                            {
+                                // Slight hack to hijack the thisTypeWitness
+                                // to force this-type lookups to resolve to the abstract
+                                // versions.
+                                //
+                                if (!subContext->thisTypeWitness)
+                                {
+                                    // Set to ThisTypeWitness(null)
+                                    subContext->thisType = subContext->irBuilder->getThisType(
+                                        subContext->irBuilder->getVoidType());
+                                    subContext->thisTypeWitness =
+                                        subContext->irBuilder->createThisTypeWitness(
+                                            subContext->irBuilder->getVoidType());
+
+                                    // Lower the effective type for the witness table
+                                    irWitnessTableBaseType = lowerType(
+                                        subContext,
+                                        substituteType(
+                                            SubstitutionSet(declRefBaseType->getDeclRef()),
+                                            subContext->astBuilder,
+                                            inheritanceDecl->getSup().type));
+
+                                    // Reset
+                                    subContext->thisType = (IRInst*)nullptr;
+                                    subContext->thisTypeWitness = (IRInst*)nullptr;
+                                }
+                            }
+                        }*/
 
                         auto concreteType = irWitnessTable->getConcreteType();
 
@@ -8762,7 +8890,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 // a field that holds the base type...
                 //
                 auto irKey = getBuilder()->createStructKey();
-                addLinkageDecoration(context, irKey, inheritanceDecl);
+                StringBuilder sb;
+                sb << "key_" << getMangledName(context->astBuilder, inheritanceDecl);
+                addLinkageDecoration(context, irKey, inheritanceDecl, sb.getUnownedSlice());
                 getBuilder()->addNameHintDecoration(irKey, UnownedTerminatedStringSlice("base"));
                 auto keyVal = LoweredValInfo::simple(irKey);
                 context->setGlobalValue(inheritanceDecl, keyVal);
@@ -9942,22 +10072,39 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             List<IRInst*> irOperands;
             for (auto operand : synStructDecl->operands)
             {
-                if (auto funcDeclRef = DeclRef<Decl>(operand).as<FunctionDeclBase>())
+                if (auto declRefOperand = as<DeclRefBase>(operand->resolve()))
                 {
-                    FuncDeclBaseTypeInfo innerInfo;
-                    _lowerFuncDeclBaseTypeInfo(subContext, funcDeclRef, innerInfo);
+                    if (auto funcDeclRef = DeclRef<Decl>(declRefOperand).as<FunctionDeclBase>())
+                    {
+                        FuncDeclBaseTypeInfo innerInfo;
+                        _lowerFuncDeclBaseTypeInfo(subContext, funcDeclRef, innerInfo);
 
-                    auto targetDeclRefInfo = emitDeclRef(subContext, funcDeclRef, innerInfo.type);
+                        auto targetDeclRefInfo =
+                            emitDeclRef(subContext, funcDeclRef, innerInfo.type);
 
-                    SLANG_ASSERT(targetDeclRefInfo.flavor == LoweredValInfo::Flavor::Simple);
-                    auto _targetIRFunc = getSimpleVal(subContext, targetDeclRefInfo);
-                    irOperands.add(_targetIRFunc);
+                        SLANG_ASSERT(targetDeclRefInfo.flavor == LoweredValInfo::Flavor::Simple);
+                        auto _targetIRFunc = getSimpleVal(subContext, targetDeclRefInfo);
+                        irOperands.add(_targetIRFunc);
+                    }
+                    else
+                    {
+                        // Assume that we have a type here...
+                        LoweredValInfo info =
+                            emitDeclRef(subContext, declRefOperand, subBuilder->getTypeKind());
+                        if (info.flavor == LoweredValInfo::Flavor::Simple)
+                        {
+                            irOperands.add(getSimpleVal(subContext, info));
+                        }
+                        else
+                        {
+                            SLANG_UNEXPECTED("Unexpected operand type in synthesized function");
+                        }
+                    }
                 }
                 else
                 {
-                    // Assume that we have a type here...
-                    LoweredValInfo info =
-                        emitDeclRef(subContext, operand, subBuilder->getTypeKind());
+                    // Use lowerVal()
+                    auto info = lowerVal(subContext, operand);
                     if (info.flavor == LoweredValInfo::Flavor::Simple)
                     {
                         irOperands.add(getSimpleVal(subContext, info));
@@ -11038,6 +11185,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             auto diffAttr = decl->findModifier<DifferentiableAttribute>();
 
             auto diffTypeWitnessMap = diffAttr->getMapTypeToIDifferentiableWitness();
+            diffAttr->resolveDictionaryKeys();
             OrderedDictionary<Type*, SubtypeWitness*> resolveddiffTypeWitnessMap;
 
             // Go through each entry in the map and resolve the key.
@@ -11195,23 +11343,38 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             List<IRInst*> irOperands;
             for (auto operand : synFuncDecl->operands)
             {
-                operand = as<DeclRefBase>(operand->resolve());
-                if (auto funcDeclRef = DeclRef<Decl>(operand).as<FunctionDeclBase>())
+                if (auto declRefOperand = as<DeclRefBase>(operand->resolve()))
                 {
-                    FuncDeclBaseTypeInfo innerInfo;
-                    _lowerFuncDeclBaseTypeInfo(subContext, funcDeclRef, innerInfo);
+                    if (auto funcDeclRef = DeclRef<Decl>(declRefOperand).as<FunctionDeclBase>())
+                    {
+                        FuncDeclBaseTypeInfo innerInfo;
+                        _lowerFuncDeclBaseTypeInfo(subContext, funcDeclRef, innerInfo);
 
-                    auto targetDeclRefInfo = emitDeclRef(subContext, funcDeclRef, innerInfo.type);
+                        auto targetDeclRefInfo =
+                            emitDeclRef(subContext, funcDeclRef, innerInfo.type);
 
-                    SLANG_ASSERT(targetDeclRefInfo.flavor == LoweredValInfo::Flavor::Simple);
-                    auto _targetIRFunc = getSimpleVal(subContext, targetDeclRefInfo);
-                    irOperands.add(_targetIRFunc);
+                        SLANG_ASSERT(targetDeclRefInfo.flavor == LoweredValInfo::Flavor::Simple);
+                        auto _targetIRFunc = getSimpleVal(subContext, targetDeclRefInfo);
+                        irOperands.add(_targetIRFunc);
+                    }
+                    else
+                    {
+                        // Assume that we have a type here...
+                        LoweredValInfo info =
+                            emitDeclRef(subContext, declRefOperand, subBuilder->getTypeKind());
+                        if (info.flavor == LoweredValInfo::Flavor::Simple)
+                        {
+                            irOperands.add(getSimpleVal(subContext, info));
+                        }
+                        else
+                        {
+                            SLANG_UNEXPECTED("Unexpected operand type in synthesized function");
+                        }
+                    }
                 }
                 else
                 {
-                    // Assume that we have a type here...
-                    LoweredValInfo info =
-                        emitDeclRef(subContext, operand, subBuilder->getTypeKind());
+                    LoweredValInfo info = lowerVal(subContext, operand);
                     if (info.flavor == LoweredValInfo::Flavor::Simple)
                     {
                         irOperands.add(getSimpleVal(subContext, info));

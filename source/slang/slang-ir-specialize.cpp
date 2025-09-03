@@ -480,7 +480,7 @@ struct SpecializationContext
             // For now, we will overwrite the specialization args for the differential
             // using the args for the base.
             //
-            auto genericReturnVal = findInnerMostGenericReturnVal(genericVal);
+            /*auto genericReturnVal = findInnerMostGenericReturnVal(genericVal);
             if (genericReturnVal->findDecoration<IRTargetIntrinsicDecoration>())
             {
                 for (auto decor : genericReturnVal->getDecorations())
@@ -543,7 +543,7 @@ struct SpecializationContext
                     if (specialized)
                         return true;
                 }
-            }
+            }*/
             return false;
         }
 
@@ -1240,7 +1240,7 @@ struct SpecializationContext
             //
             if (options.lowerWitnessLookups)
             {
-                iterChanged = lowerWitnessLookupChains(module, sink);
+                // iterChanged = lowerWitnessLookupChains(module, sink);
                 iterChanged |= lowerWitnessLookup(module, sink);
             }
 
@@ -3180,7 +3180,12 @@ IRInst* specializeGenericImpl(
     //
     IRBuilder builderStorage(module);
     IRBuilder* builder = &builderStorage;
-    builder->setInsertBefore(genericVal);
+    // builder->setInsertBefore(genericVal);
+    //
+    // We can just insert before the specialize inst, which is hoistable
+    // and de-duplicated, and so will be in the appropriate scope.
+    //
+    builder->setInsertBefore(specializeInst);
 
     List<IRInst*> pendingWorkList;
     SLANG_DEFER(

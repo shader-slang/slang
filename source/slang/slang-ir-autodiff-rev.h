@@ -9,6 +9,7 @@
 #include "slang-ir-autodiff-unzip.h"
 #include "slang-ir-autodiff.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-specialize.h"
 #include "slang-ir.h"
 
 namespace Slang
@@ -399,18 +400,117 @@ struct BackwardDiffTranslator
     // Keep track of global insts that have already been translated.
     Dictionary<IRGlobalValueWithCode*, BackwardDiffTranslationFuncContext::Result> translationCache;
 
-    IRInst* getBaseForTranslateInst(IRInst* inst)
+    struct TranslationBaseInfo
     {
+        IRFunc* funcToTranslate = nullptr;
+
+        enum Flavor
+        {
+            Unknown,
+            Simple,    // Direct reference to func
+            Specialize // Indirect reference that requires specialization.
+        } flavor = Flavor::Unknown;
+
+        List<IRInst*> specializeOperands;
+    };
+
+    IRInst* materialize(IRBuilder* builder, TranslationBaseInfo& request, IRInst* resultInst)
+    {
+        if (request.flavor == TranslationBaseInfo::Flavor::Simple)
+        {
+            // Simple case, just return the function.
+            return resultInst;
+        }
+        else if (request.flavor == TranslationBaseInfo::Flavor::Specialize)
+        {
+            // Specialization case, we need to create a new specialized function.
+            // IRBuilder builder(resultInst->getModule());
+            // builder.setInsertAfter(request.funcToTranslate);
+
+            // auto outerGeneric = findOuterGeneric(resultInst);
+            SLANG_ASSERT(as<IRGeneric>(resultInst));
+            auto innerVal = getGenericReturnVal(resultInst);
+            if (as<IRFunc>(innerVal) || innerVal->getDataType()->getOp() == kIROp_FuncType)
+            {
+                return specializeGeneric(
+                    as<IRSpecialize>(builder->emitSpecializeInst(
+                        (IRType*)specializeGeneric(
+                            as<IRSpecialize>(builder->emitSpecializeInst(
+                                builder->getTypeKind(),
+                                resultInst->getDataType(),
+                                request.specializeOperands))),
+                        resultInst,
+                        request.specializeOperands)));
+            }
+            else if (as<IRStructType>(innerVal))
+            {
+                return (IRType*)specializeGeneric(
+                    as<IRSpecialize>(builder->emitSpecializeInst(
+                        builder->getTypeKind(),
+                        resultInst,
+                        request.specializeOperands)));
+            }
+            else
+            {
+                SLANG_UNEXPECTED("Unexpected result inst type for specialization.");
+            }
+        }
+        else
+        {
+            SLANG_UNEXPECTED("Unknown translation request flavor.");
+        }
+    }
+
+    IRInst* getBase(IRInst* inst)
+    {
+        IRInst* baseInst = nullptr;
         switch (inst->getOp())
         {
         case kIROp_BackwardDifferentiatePrimal:
         case kIROp_BackwardDifferentiatePropagate:
         case kIROp_BackwardContextGetPrimalVal:
         case kIROp_BackwardDiffIntermediateContextType:
-            return inst->getOperand(0);
+            baseInst = inst->getOperand(0);
+            break;
         default:
-            return nullptr;
+            baseInst = nullptr;
         }
+        return baseInst;
+    }
+
+    TranslationBaseInfo getTranslationBaseInfo(IRInst* inst)
+    {
+        auto baseInst = getBase(inst);
+        if (baseInst)
+        {
+            if (auto funcInst = as<IRFunc>(baseInst))
+            {
+                // If the base is a function, we can directly reference it.
+                TranslationBaseInfo requestInfo;
+                requestInfo.funcToTranslate = funcInst;
+                requestInfo.flavor = TranslationBaseInfo::Flavor::Simple;
+                return requestInfo;
+            }
+            else if (auto specializeInst = as<IRSpecialize>(baseInst))
+            {
+                // If the base is a specialization, we need to collect the operands.
+                TranslationBaseInfo requestInfo;
+                IRGeneric* genericInst = cast<IRGeneric>(specializeInst->getBase());
+                requestInfo.funcToTranslate = cast<IRFunc>(getGenericReturnVal(genericInst));
+                for (UInt i = 0; i < specializeInst->getArgCount(); i++)
+                    requestInfo.specializeOperands.add(specializeInst->getArg(i));
+                requestInfo.flavor = TranslationBaseInfo::Flavor::Specialize;
+                return requestInfo;
+            }
+            else
+            {
+                // Not sure what to do here..
+                SLANG_UNEXPECTED(
+                    "Expected a function or a specialization for backward differentiation.");
+            }
+        }
+
+        return TranslationBaseInfo();
     }
 
     IRInst* processTranslationRequest(
@@ -418,48 +518,64 @@ struct BackwardDiffTranslator
         AutoDiffSharedContext* sharedContext,
         DiagnosticSink* sink)
     {
-        auto baseInst = getBaseForTranslateInst(translateInst);
+        auto baseInfo = getTranslationBaseInfo(translateInst);
+        SLANG_ASSERT(baseInfo.flavor != TranslationBaseInfo::Flavor::Unknown);
 
-        auto globalValToTranslate = as<IRFunc>(getResolvedInstForDecorations(baseInst));
-        if (!globalValToTranslate)
+        auto translationKey = baseInfo.funcToTranslate;
+        // as<IRFunc>(getResolvedInstForDecorations(baseInfo.getBase()));
+        if (!translationKey)
         {
             // TODO: diagnose
             SLANG_UNEXPECTED("Expected a global value with code for backward differentiation.");
         }
 
-        auto extractRelevantGlobalVal = [&](BackwardDiffTranslationFuncContext::Result) -> IRInst*
+        auto extractRelevantGlobalVal =
+            [&](BackwardDiffTranslationFuncContext::Result result) -> IRInst*
         {
-            auto translationResult = translationCache[globalValToTranslate];
             switch (translateInst->getOp())
             {
             case kIROp_BackwardDifferentiatePrimal:
-                return translationResult.bwdApplyFunc;
+                return result.bwdApplyFunc;
             case kIROp_BackwardDifferentiatePropagate:
-                return translationResult.bwdPropFunc;
+                return result.bwdPropFunc;
             case kIROp_BackwardContextGetPrimalVal:
-                return translationResult.bwdValFunc;
+                return result.bwdValFunc;
             case kIROp_BackwardDiffIntermediateContextType:
-                return translationResult.bwdContextType;
+                return result.bwdContextType;
             default:
                 SLANG_UNEXPECTED("Unexpected backward differentiation operation.");
             }
         };
 
-        if (translationCache.containsKey(globalValToTranslate))
+        if (translationCache.containsKey(translationKey))
         {
-            // If we already have a translation for this function, return the requested value.
-            return extractRelevantGlobalVal(translationCache[globalValToTranslate]);
+            // If we already have a translation for this function, return the requested value
+            // and materialize any specializations if necessary.
+            //
+            IRBuilder builder(sharedContext->moduleInst);
+            builder.setInsertAfter(translateInst);
+            return materialize(
+                &builder,
+                baseInfo,
+                extractRelevantGlobalVal(translationCache[translationKey]));
         }
 
         // Create a new context for the translation.
-        BackwardDiffTranslationFuncContext context(globalValToTranslate, sharedContext, sink);
+        BackwardDiffTranslationFuncContext context(
+            as<IRGeneric>(translationKey) ? cast<IRFunc>(getGenericReturnVal(translationKey))
+                                          : translationKey,
+            sharedContext,
+            sink);
         IRBuilder builder(sharedContext->moduleInst);
-        builder.setInsertAfter(globalValToTranslate);
+        builder.setInsertAfter(translationKey);
 
         BackwardDiffTranslationFuncContext::Result translationResult = context.translate(&builder);
-        translationCache.add(globalValToTranslate, translationResult);
-
-        return extractRelevantGlobalVal(translationResult);
+        translationCache.add(translationKey, translationResult);
+        builder.setInsertAfter(translateInst);
+        return materialize(
+            &builder,
+            baseInfo,
+            extractRelevantGlobalVal(translationCache[translationKey]));
     }
 };
 
@@ -478,9 +594,9 @@ struct LegacyBackwardDiffTranslationFuncContext
     DifferentiableTypeConformanceContext diffTypeContext;
 
     // The operands to use to construct the backward derivative function.
-    IRFunc* applyBwdFunc;
-    IRType* contextType;
-    IRFunc* bwdPropFunc;
+    IRInst* applyBwdFunc;
+    IRInst* contextType;
+    IRInst* bwdPropFunc;
 
     // The expected type of the backward derivative function.
     IRFuncType* bwdDiffFuncType;
@@ -489,9 +605,9 @@ struct LegacyBackwardDiffTranslationFuncContext
     DiagnosticSink* sink;
 
     LegacyBackwardDiffTranslationFuncContext(
-        IRFunc* applyBwdFunc,
-        IRType* contextType,
-        IRFunc* bwdPropFunc,
+        IRInst* applyBwdFunc,
+        IRInst* contextType,
+        IRInst* bwdPropFunc,
         IRFuncType* bwdDiffFuncType,
         AutoDiffSharedContext* shared,
         DiagnosticSink* sink)
@@ -516,16 +632,16 @@ struct LegacyBackwardDiffTranslator
     void getOperandsForTranslateInst(
         IRInst* inst,
         IRInst*& applyBwdFunc,
-        IRType*& contextType,
-        IRFunc*& bwdPropFunc,
+        IRInst*& contextType,
+        IRInst*& bwdPropFunc,
         IRFuncType*& bwdDiffFuncType)
     {
         switch (inst->getOp())
         {
         case kIROp_BackwardDifferentiate:
             applyBwdFunc = inst->getOperand(0);
-            contextType = as<IRType>(inst->getOperand(1));
-            bwdPropFunc = as<IRFunc>(inst->getOperand(2));
+            contextType = inst->getOperand(1);
+            bwdPropFunc = inst->getOperand(2);
             bwdDiffFuncType = cast<IRFuncType>(inst->getDataType());
             break;
         default:
@@ -539,8 +655,8 @@ struct LegacyBackwardDiffTranslator
         DiagnosticSink* sink)
     {
         IRInst* applyBwdFunc;
-        IRType* contextType;
-        IRFunc* bwdPropFunc;
+        IRInst* contextType;
+        IRInst* bwdPropFunc;
         IRFuncType* bwdDiffFuncType;
         getOperandsForTranslateInst(
             translateInst,
@@ -549,16 +665,14 @@ struct LegacyBackwardDiffTranslator
             bwdPropFunc,
             bwdDiffFuncType);
 
-        LegacyBackwardDiffTranslationFuncContext context(
-            as<IRFunc>(applyBwdFunc),
-            contextType,
-            bwdPropFunc,
-            bwdDiffFuncType,
-            sharedContext,
-            sink);
+        LegacyBackwardDiffTranslationFuncContext
+            context(applyBwdFunc, contextType, bwdPropFunc, bwdDiffFuncType, sharedContext, sink);
 
         IRBuilder builder(sharedContext->moduleInst);
-        builder.setInsertAfter(as<IRGlobalValueWithCode>(applyBwdFunc));
+        // builder.setInsertAfter(as<IRGlobalValueWithCode>(applyBwdFunc));
+
+        // This will nest the func at the right place (inside any generic contexts).
+        builder.setInsertAfter(translateInst);
 
         LegacyBackwardDiffTranslationFuncContext::Result translationResult =
             context.translate(&builder);
@@ -584,29 +698,29 @@ struct LegacyToNewBackwardDiffTranslationFuncContext
     DifferentiableTypeConformanceContext diffTypeContext;
 
     // The operands to use to construct the backward derivative function.
-    IRFunc* primalFunc;
-    IRFunc* legacyBwdDiffFunc;
+    IRInst* primalFunc;
+    IRInst* legacyBwdDiffFunc;
 
     // The expected types of the apply and propagate functions.
-    IRFuncType* applyForBwdFuncType;
-    IRFuncType* bwdPropFuncType;
+    // IRFuncType* applyForBwdFuncType;
+    // IRFuncType* bwdPropFuncType;
 
     // The diagnostic sink to report errors.
     DiagnosticSink* sink;
 
     LegacyToNewBackwardDiffTranslationFuncContext(
-        IRFunc* primalFunc,
-        IRFunc* legacyBwdDiffFunc,
-        IRFuncType* applyForBwdFuncType,
-        IRFuncType* bwdPropFuncType,
+        IRInst* primalFunc,
+        IRInst* legacyBwdDiffFunc,
+        // IRFuncType* applyForBwdFuncType,
+        // IRFuncType* bwdPropFuncType,
         AutoDiffSharedContext* shared,
         DiagnosticSink* sink)
         : sharedContext(shared)
         , diffTypeContext(shared)
         , primalFunc(primalFunc)
         , legacyBwdDiffFunc(legacyBwdDiffFunc)
-        , applyForBwdFuncType(applyForBwdFuncType)
-        , bwdPropFuncType(bwdPropFuncType)
+        //, applyForBwdFuncType(applyForBwdFuncType)
+        //, bwdPropFuncType(bwdPropFuncType)
         , sink(sink)
     {
     }
@@ -620,12 +734,7 @@ struct LegacyToNewBackwardDiffTranslator
     // Keep track of global insts that have already been translated.
     Dictionary<IRInst*, LegacyToNewBackwardDiffTranslationFuncContext::Result> translationCache;
 
-    void getOperandsForTranslateInst(
-        IRInst* inst,
-        IRInst*& primalFunc,
-        IRInst*& bwdDiffFunc,
-        IRFuncType*& applyForBwdFuncType,
-        IRFuncType*& bwdPropFuncType)
+    void getOperandsForTranslateInst(IRInst* inst, IRInst*& primalFunc, IRInst*& bwdDiffFunc)
     {
         switch (inst->getOp())
         {
@@ -639,37 +748,137 @@ struct LegacyToNewBackwardDiffTranslator
         default:
             SLANG_UNEXPECTED("Unexpected backward differentiation operation.");
         }
+    }
 
-        // Find the use of "inst" in IRBackwardPrimalFromLegacyBwdDiffFunc
-        // and IRBackwardPropagateFromLegacyBwdDiffFunc, and copy the func types from there.
-        // If they don't exist, error out.
-        //
-        applyForBwdFuncType = nullptr;
-        bwdPropFuncType = nullptr;
+    struct TranslationBaseInfo
+    {
+        List<IRInst*> operands;
 
-        // Scan all uses of the primalFunc to find where it's used with the expected operations
-        for (auto use = primalFunc->firstUse; use; use = use->nextUse)
+        enum Flavor
         {
-            auto user = use->getUser();
-            if (user->getOp() == kIROp_BackwardPrimalFromLegacyBwdDiffFunc)
+            Unknown,
+            Simple,    // Direct reference to func
+            Specialize // Indirect reference that requires specialization.
+        } flavor = Flavor::Unknown;
+
+        List<IRInst*> specializeOperands;
+    };
+
+    // TODO: Merge the
+    IRInst* materialize(IRBuilder* builder, TranslationBaseInfo& info, IRInst* resultInst)
+    {
+        if (info.flavor == TranslationBaseInfo::Flavor::Simple)
+        {
+            // Simple case, just return the function.
+            return resultInst;
+        }
+        else if (info.flavor == TranslationBaseInfo::Flavor::Specialize)
+        {
+            auto outerGeneric = resultInst;
+            SLANG_ASSERT(as<IRGeneric>(resultInst));
+            auto innerVal = getGenericReturnVal(resultInst);
+            if (as<IRFunc>(innerVal) || innerVal->getDataType()->getOp() == kIROp_FuncType)
             {
-                applyForBwdFuncType = as<IRFuncType>(user->getDataType());
+                return specializeGeneric(
+                    as<IRSpecialize>(builder->emitSpecializeInst(
+                        (IRType*)specializeGeneric(
+                            as<IRSpecialize>(builder->emitSpecializeInst(
+                                builder->getTypeKind(),
+                                resultInst->getDataType(),
+                                info.specializeOperands))),
+                        resultInst,
+                        info.specializeOperands)));
             }
-            else if (user->getOp() == kIROp_BackwardPropagateFromLegacyBwdDiffFunc)
+            else if (as<IRStructType>(innerVal))
             {
-                bwdPropFuncType = as<IRFuncType>(user->getDataType());
+                return (IRType*)specializeGeneric(
+                    as<IRSpecialize>(builder->emitSpecializeInst(
+                        builder->getTypeKind(),
+                        resultInst,
+                        info.specializeOperands)));
+            }
+            else
+            {
+                SLANG_UNEXPECTED("Unexpected result inst type for specialization.");
             }
         }
-
-        // If we still don't have both function types, this is an error
-        if (!applyForBwdFuncType || !bwdPropFuncType)
+        else
         {
-            SLANG_UNEXPECTED(
-                "Could not determine function types for backward differentiation translation");
+            SLANG_UNEXPECTED("Unknown translation request flavor.");
         }
     }
 
-    IRInst* getCacheKeyForTranslateInst(IRInst* translateInst)
+    bool addOperand(TranslationBaseInfo& baseInfo, IRInst* operand)
+    {
+        if (operand)
+        {
+            if (auto funcInst = as<IRFunc>(operand))
+            {
+                baseInfo.operands.add(funcInst);
+                if (baseInfo.operands.getCount() == 1)
+                {
+                    baseInfo.flavor = TranslationBaseInfo::Flavor::Simple;
+                }
+                else if (baseInfo.flavor != TranslationBaseInfo::Flavor::Simple)
+                    return false; // Can't unify with existing operand.
+                else
+                    return true;
+            }
+            else if (auto specializeInst = as<IRSpecialize>(operand))
+            {
+                // If the base is a specialization, we need to collect the operands.
+                IRGeneric* genericInst = cast<IRGeneric>(specializeInst->getBase());
+                baseInfo.operands.add(genericInst);
+
+                if (baseInfo.operands.getCount() == 1)
+                {
+                    for (UInt i = 0; i < specializeInst->getArgCount(); i++)
+                        baseInfo.specializeOperands.add(specializeInst->getArg(i));
+                    baseInfo.flavor = TranslationBaseInfo::Flavor::Specialize;
+                }
+                else if (baseInfo.flavor != TranslationBaseInfo::Flavor::Specialize)
+                    return false; // Can't unify with existing operand.
+                else
+                {
+                    // check that the operands match
+                    if (baseInfo.specializeOperands.getCount() != specializeInst->getArgCount())
+                        return false; // Can't unify with existing operands.
+                    for (UInt i = 0; i < baseInfo.specializeOperands.getCount(); i++)
+                    {
+                        if (baseInfo.specializeOperands[i] != specializeInst->getArg(i))
+                            return false; // Can't unify with existing operands.
+                    }
+                }
+
+                return true;
+            }
+            else
+            {
+                // Not sure what to do here..
+                SLANG_UNEXPECTED(
+                    "Expected a function or a specialization for backward differentiation.");
+            }
+        }
+    }
+
+    TranslationBaseInfo getTranslationBaseInfo(IRInst* inst)
+    {
+        IRInst* primalFunc = nullptr;
+        IRInst* bwdDiffFunc = nullptr;
+        getOperandsForTranslateInst(inst, primalFunc, bwdDiffFunc);
+
+        TranslationBaseInfo info;
+        bool valid = true;
+        valid &= addOperand(info, primalFunc);
+        valid &= addOperand(info, bwdDiffFunc);
+
+        if (!valid)
+            return TranslationBaseInfo();
+
+        return info;
+    }
+
+    /*IRInst* getCacheKeyForTranslateInst(IRInst* translateInst)
     {
         switch (translateInst->getOp())
         {
@@ -682,14 +891,22 @@ struct LegacyToNewBackwardDiffTranslator
             SLANG_UNEXPECTED("Unexpected backward differentiation operation.");
             return nullptr;
         }
-    }
+    }*/
 
     IRInst* processTranslationRequest(
         IRInst* translateInst,
         AutoDiffSharedContext* sharedContext,
         DiagnosticSink* sink)
     {
-        IRInst* key = getCacheKeyForTranslateInst(translateInst);
+        // IRInst* key = getCacheKeyForTranslateInst(translateInst);
+        auto baseInfo = getTranslationBaseInfo(translateInst);
+
+        IRBuilder builder(sharedContext->moduleInst);
+        auto instKey = builder.emitIntrinsicInst(
+            builder.getTypeKind(),
+            kIROp_BackwardFromLegacyBwdDiffFunc,
+            baseInfo.operands.getCount(),
+            baseInfo.operands.getBuffer());
 
         auto extractRelevantGlobalVal =
             [&](LegacyToNewBackwardDiffTranslationFuncContext::Result translationResult) -> IRInst*
@@ -709,39 +926,37 @@ struct LegacyToNewBackwardDiffTranslator
             }
         };
 
-        if (translationCache.containsKey(key))
+        if (translationCache.containsKey(instKey))
         {
             // If we already have a translation for this function, return the requested value.
-            return extractRelevantGlobalVal(translationCache[key]);
+            return materialize(
+                &builder,
+                baseInfo,
+                extractRelevantGlobalVal(translationCache[instKey]));
         }
 
         IRInst* primalFunc;
         IRInst* legacyBwdDiffFunc;
-        IRFuncType* applyForBwdFuncType;
-        IRFuncType* bwdPropFuncType;
-        getOperandsForTranslateInst(
-            translateInst,
-            primalFunc,
-            legacyBwdDiffFunc,
-            applyForBwdFuncType,
-            bwdPropFuncType);
+        getOperandsForTranslateInst(translateInst, primalFunc, legacyBwdDiffFunc);
+
+        // TODO: Lower the required function types from the front-end as operands.
 
         // Create a new context for the translation.
         LegacyToNewBackwardDiffTranslationFuncContext context(
-            as<IRFunc>(primalFunc),
-            as<IRFunc>(legacyBwdDiffFunc),
-            applyForBwdFuncType,
-            bwdPropFuncType,
+            primalFunc,
+            legacyBwdDiffFunc,
+            /*applyForBwdFuncType,
+            bwdPropFuncType,*/
             sharedContext,
             sink);
-        IRBuilder builder(sharedContext->moduleInst);
-        builder.setInsertAfter(primalFunc);
+
+        builder.setInsertBefore(translateInst);
 
         LegacyToNewBackwardDiffTranslationFuncContext::Result translationResult =
             context.translate(&builder);
-        translationCache.add(key, translationResult);
+        translationCache.add(instKey, translationResult);
 
-        return extractRelevantGlobalVal(translationResult);
+        return materialize(&builder, baseInfo, extractRelevantGlobalVal(translationResult));
     }
 };
 

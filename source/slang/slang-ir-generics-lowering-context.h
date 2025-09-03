@@ -29,6 +29,7 @@ struct SharedGenericsLoweringContext
     OrderedDictionary<IRInst*, IRInst*> mapTypeToRTTIObject;
 
     Dictionary<IRInst*, IRInst*> loweredGenericFunctions;
+    Dictionary<IRGeneric*, IRStructType*> loweredGenericStructs;
     Dictionary<IRInterfaceType*, IRInterfaceType*> loweredInterfaceTypes;
     Dictionary<IRInterfaceType*, IRInterfaceType*> mapLoweredInterfaceToOriginal;
 

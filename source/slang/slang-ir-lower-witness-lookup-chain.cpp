@@ -27,6 +27,154 @@ static List<IRWitnessTable*> getWitnessTablesFromInterfaceType(
     return witnessTables;
 }
 
+struct Node;
+
+struct LookupChain
+{
+    IRInterfaceType* baseType;
+    ShortList<RefPtr<Node>, 2> nodes;
+
+    bool operator==(const LookupChain& other) const
+    {
+        if (baseType != other.baseType)
+            return false;
+        if (nodes.getCount() != other.nodes.getCount())
+            return false;
+        for (Index i = 0; i < nodes.getCount(); i++)
+        {
+            if (nodes[i] != other.nodes[i])
+                return false;
+        }
+        return true;
+    }
+
+    LookupChain()
+        : baseType(nullptr), nodes()
+    {
+    }
+
+    LookupChain(IRInterfaceType* baseType)
+        : baseType(baseType), nodes()
+    {
+    }
+
+    // getHashCode
+    HashCode64 getHashCode() const
+    {
+        HashCode64 hash = ::Slang::getHashCode(baseType);
+        for (auto node : nodes)
+            hash = combineHash(hash, ::Slang::getHashCode(node));
+        return combineHash(hash, ::Slang::getHashCode(baseType));
+    }
+
+    // Trivial chains have fewer than two nodes, one to extract
+    // type or table, and one lookup node.
+    //
+    bool isTrivial() const
+    {
+        /*bool containsSpecNodes = false;
+        // bool containsLookupNodes = false;
+        for (auto node : nodes)
+        {
+            if (node->flavor == Node::Specialize)
+                containsSpecNodes = true;
+        }*/
+
+        return nodes.getCount() <= 2; // && !(containsSpecNodes);
+    }
+};
+
+struct Node : RefObject
+{
+    enum Flavor
+    {
+        Lookup,
+        ExtractType,
+        ExtractTable,
+        Specialize
+    } flavor;
+
+    IRStructKey* lookupKey;
+    ShortList<LookupChain, 2> specOperands;
+
+    Node(IRStructKey* lookupKey)
+        : flavor(Lookup), lookupKey(lookupKey)
+    {
+    }
+
+    Node(ShortList<LookupChain, 2> specOperands)
+        : flavor(Specialize), lookupKey(nullptr), specOperands(specOperands)
+    {
+    }
+
+    Node(IRExtractExistentialType* extractTypeInst)
+        : flavor(ExtractType), lookupKey(nullptr), specOperands()
+    {
+    }
+
+    Node(IRExtractExistentialWitnessTable* extractTableInst)
+        : flavor(ExtractTable), lookupKey(nullptr), specOperands()
+    {
+    }
+
+    IRStructKey* getLookupKey()
+    {
+        SLANG_ASSERT(flavor == Lookup);
+        return lookupKey;
+    }
+
+    ShortList<LookupChain, 2>& getSpecOperands()
+    {
+        SLANG_ASSERT(flavor == Specialize);
+        return specOperands;
+    }
+
+    bool operator==(const Node& other) const
+    {
+        if (flavor != other.flavor)
+            return false;
+        if (flavor == Lookup)
+        {
+            return lookupKey == other.lookupKey;
+        }
+        else if (flavor == ExtractType || flavor == ExtractTable)
+        {
+            // For extract type/table, we don't care about the key.
+            return true;
+        }
+        else // Specialize
+        {
+            if (specOperands.getCount() != other.specOperands.getCount())
+                return false;
+            for (Index i = 0; i < specOperands.getCount(); i++)
+            {
+                if (!(specOperands[i] == other.specOperands[i]))
+                    return false;
+            }
+            return true;
+        }
+    }
+
+    // getHashCode
+    HashCode64 getHashCode() const
+    {
+        HashCode64 hash = ::Slang::getHashCode(flavor);
+        if (flavor == Lookup)
+        {
+            hash = combineHash(hash, ::Slang::getHashCode(lookupKey));
+        }
+        else if (flavor == Specialize)
+        {
+            for (auto& chain : specOperands)
+            {
+                hash = combineHash(hash, ::Slang::getHashCode(chain));
+            }
+        }
+        return hash;
+    }
+};
+
+
 struct WitnessChainLookupLoweringContext
 {
     IRModule* module;
@@ -231,47 +379,6 @@ struct WitnessChainLookupLoweringContext
         }
     }
 
-    struct LookupChain
-    {
-        IRInterfaceType* baseType;
-        ShortList<IRStructKey*> keys;
-
-        bool operator==(const LookupChain& other) const
-        {
-            if (baseType != other.baseType)
-                return false;
-            if (keys.getCount() != other.keys.getCount())
-                return false;
-            for (Index i = 0; i < keys.getCount(); i++)
-            {
-                if (keys[i] != other.keys[i])
-                    return false;
-            }
-            return true;
-        }
-
-        LookupChain()
-            : baseType(nullptr), keys(ShortList<IRStructKey*>())
-        {
-        }
-
-        LookupChain(IRInterfaceType* baseType)
-            : baseType(baseType), keys(ShortList<IRStructKey*>())
-        {
-        }
-
-        // getHashCode
-        HashCode64 getHashCode() const
-        {
-            HashCode64 hash = ::Slang::getHashCode(baseType);
-            for (auto key : keys)
-                hash = combineHash(hash, ::Slang::getHashCode(key));
-            return combineHash(hash, ::Slang::getHashCode(baseType));
-        }
-
-        bool isTrivial() const { return keys.getCount() == 1; }
-    };
-
     struct InterfaceDef
     {
         // Keep track of the requirements that are being folded into the
@@ -279,6 +386,8 @@ struct WitnessChainLookupLoweringContext
         //
         // (We'll turn it into an IRInterfaceType later, since we need to know
         // how many requirements we have before we can create the new type.)
+        // TODO: This can be simplified greatly once interface requirements
+        // are children instead of operands.
         //
         Dictionary<IRStructKey*, IRInst*> newRequirements;
         IRInterfaceType* base;
@@ -331,7 +440,85 @@ struct WitnessChainLookupLoweringContext
         return key;
     }
 
-    LookupChain getLookupChain(IRLookupWitnessMethod* lookupInst)
+    LookupChain reverseNodes(LookupChain& chain)
+    {
+        // Reverse the nodes in the chain.
+        LookupChain reversedChain(chain.baseType);
+        for (Index i = chain.nodes.getCount() - 1; i >= 0; i--)
+        {
+            reversedChain.nodes.add(chain.nodes[i]);
+        }
+        return reversedChain;
+    }
+
+    // New version of the getLookupChain that also handles
+    // ExtractExistentialWitnessTable, ExtractExistentialType
+    // and Specialize operations.
+    //
+    LookupChain getLookupChain(IRInst* inst)
+    {
+        LookupChain chain;
+        ShortList<Node*, 2> nodes;
+        for (;;)
+        {
+            switch (inst->getOp())
+            {
+            case kIROp_LookupWitness:
+                {
+                    auto lookupInst = as<IRLookupWitnessMethod>(inst);
+                    // Insert a lookup node with the requirement key.
+                    chain.nodes.add(new Node(cast<IRStructKey>(lookupInst->getRequirementKey())));
+                    inst = lookupInst->getWitnessTable();
+                    break;
+                }
+            case kIROp_ExtractExistentialType:
+                {
+                    auto extractInst = as<IRExtractExistentialType>(inst);
+                    // Insert an extract type node.
+                    chain.nodes.add(new Node(extractInst));
+                    // Determine the base interface type from the operand.
+                    auto interfaceType = as<IRInterfaceType>(
+                        unwrapAttributedType(extractInst->getOperand(0)->getDataType()));
+                    chain.baseType = interfaceType;
+                    return reverseNodes(chain);
+                }
+            case kIROp_ExtractExistentialWitnessTable:
+                {
+                    auto extractInst = as<IRExtractExistentialWitnessTable>(inst);
+                    // Insert an extract table node.
+                    chain.nodes.add(new Node(extractInst));
+                    // Get the interface type from the witness table's data type.
+                    auto wtType = as<IRWitnessTableTypeBase>(extractInst->getDataType());
+                    auto interfaceType =
+                        as<IRInterfaceType>(unwrapAttributedType(wtType->getConformanceType()));
+                    chain.baseType = interfaceType;
+                    return reverseNodes(chain);
+                }
+            case kIROp_Specialize:
+                {
+                    // Collect specialization operands by recursively processing them.
+                    ShortList<LookupChain, 2> specOperands;
+                    for (UInt i = 0; i < inst->getOperandCount(); i++)
+                    {
+                        specOperands.add(getLookupChain(inst->getOperand(i)));
+                    }
+                    chain.nodes.add(new Node(specOperands));
+                    return reverseNodes(chain);
+                }
+            default:
+                {
+                    // Expect a base inst with simple InterfaceType, otherwise
+                    // something is wrong.
+                    //
+                    SLANG_ASSERT(as<IRInterfaceType>(unwrapAttributedType(inst->getDataType())));
+                    chain.baseType = as<IRInterfaceType>(unwrapAttributedType(inst->getDataType()));
+                    return reverseNodes(chain);
+                }
+            }
+        }
+    }
+
+    /*LookupChain getLookupChain(IRLookupWitnessMethod* lookupInst)
     {
         LookupChain chain;
         // Track the lookup back to the base type
@@ -356,8 +543,55 @@ struct WitnessChainLookupLoweringContext
         chain.baseType = baseType;
 
         return chain;
+    }*/
+
+    IRInst* getLookupBaseInst(IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_LookupWitness:
+            {
+                auto lookupInst = as<IRLookupWitnessMethod>(inst);
+                IRInst* witnessTable = lookupInst->getWitnessTable();
+                while (witnessTable && witnessTable->getOp() == kIROp_LookupWitness)
+                {
+                    auto nestedLookup = as<IRLookupWitnessMethod>(witnessTable);
+                    witnessTable = nestedLookup->getWitnessTable();
+                }
+                auto extractInst = as<IRExtractExistentialWitnessTable>(witnessTable);
+                SLANG_ASSERT(extractInst);
+                return extractInst->getOperand(0);
+            }
+        case kIROp_Specialize:
+            {
+                // For a specialize instruction, get the lookup base from all operands
+                // and ensure they agree.
+                IRInst* baseInst = nullptr;
+                for (UInt i = 0; i < inst->getOperandCount(); i++)
+                {
+                    IRInst* currBase = getLookupBaseInst(inst->getOperand(i));
+                    if (!baseInst)
+                    {
+                        baseInst = currBase;
+                    }
+                    else
+                    {
+                        SLANG_ASSERT(areEquivalent(baseInst, currBase));
+                    }
+                }
+                return baseInst;
+            }
+        case kIROp_ExtractExistentialWitnessTable:
+            {
+                return as<IRExtractExistentialWitnessTable>(inst)->getOperand(0);
+            }
+        default:
+            SLANG_UNEXPECTED("Unhandled inst type in getLookupBaseInst");
+            return nullptr;
+        }
     }
 
+    /*
     IRInst* getLookupBaseInst(IRLookupWitnessMethod* lookupInst)
     {
         // Track the lookup back to the base type
@@ -374,6 +608,7 @@ struct WitnessChainLookupLoweringContext
 
         return extractInst->getOperand(0);
     }
+    */
 
     // Process an associated type lookup
     IRInst* translateTypeLookup(IRBuilder* builder, IRLookupWitnessMethod* lookupInst)
@@ -496,6 +731,10 @@ struct WitnessChainLookupLoweringContext
                     compressedParamTypes.add((
                         IRType*)translateTypeLookup(builder, as<IRLookupWitnessMethod>(paramType)));
                     break;
+                }
+            case kIROp_ExtractExistentialType:
+                {
+                    SLANG_UNEXPECTED("unhandled");
                 }
             default:
                 {
@@ -646,6 +885,54 @@ struct WitnessChainLookupLoweringContext
         return changed;
     }
 
+    IRInst* materialize(LookupChain chain, IRType* concreteType, IRWitnessTable* concreteTable)
+    {
+        IRBuilder builder(module);
+        builder.setInsertBefore(concreteTable);
+        IRInst* current = concreteTable;
+
+        for (auto node : chain.nodes)
+        {
+            switch (node->flavor)
+            {
+            case Node::Lookup:
+                // Re-insert a lookup using the stored requirement key.
+                current = builder.emitLookupInterfaceMethodInst(
+                    concreteType->getFullType(),
+                    current,
+                    node->lookupKey);
+                break;
+            case Node::ExtractType:
+                // Replace an extract type with the provided concrete type.
+                current = concreteType;
+                break;
+            case Node::ExtractTable:
+                // Replace an extract witness table with the provided concrete table.
+                current = concreteTable;
+                break;
+            case Node::Specialize:
+                {
+                    // Re-materialize each operand chain and then emit a specialize.
+                    List<IRInst*> specializedOperands;
+                    for (Index i = 0; i < node->getSpecOperands().getCount(); i++)
+                    {
+                        IRInst* specialized =
+                            materialize(node->getSpecOperands()[i], concreteType, concreteTable);
+                        specializedOperands.add(specialized);
+                    }
+                    SLANG_UNEXPECTED("todo: implement");
+                    /*current = builder.emitSpecializeInst(
+                        current,
+                        (UInt)specializedOperands.getCount(),
+                        specializedOperands.getBuffer());*/
+                    break;
+                }
+            }
+        }
+
+        return current;
+    }
+
     bool lowerNewRequirements()
     {
         // Go through all interface extension definitions,
@@ -695,20 +982,16 @@ struct WitnessChainLookupLoweringContext
 
             for (auto witnessTable : witnessTables)
             {
+                auto concreteType = witnessTable->getConcreteType();
                 for (auto reqItem : def.newRequirements)
                 {
                     auto key = reqItem.first;
                     auto chain = chains[key];
 
                     // Follow the chain to find the implementation in the witness table
-                    IRInst* impl = witnessTable;
-                    // Process the chain in reverse order
-                    for (Int i = chain.keys.getCount() - 1; i >= 0; i--)
-                    {
-                        auto _key = chain.keys[i];
-                        SLANG_ASSERT(as<IRWitnessTable>(impl));
-                        impl = findWitnessTableEntry(as<IRWitnessTable>(impl), _key);
-                    }
+                    // IRInst* impl = witnessTable;
+                    // Process the chain
+                    IRInst* impl = materialize(chain, concreteType, witnessTable);
 
                     if (assocTypeInterfaces.containsKey(chain))
                     {
@@ -732,6 +1015,8 @@ struct WitnessChainLookupLoweringContext
 bool lowerWitnessLookupChains(IRModule* module, DiagnosticSink* sink)
 {
     bool changed = false;
+
+    // TODO: Need to make sure we hold on to a single context always.
     WitnessChainLookupLoweringContext context;
     context.module = module;
     context.sink = sink;

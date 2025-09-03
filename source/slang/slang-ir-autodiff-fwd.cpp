@@ -1756,7 +1756,7 @@ InstPair ForwardDiffTranscriber::transcribeWrapExistential(IRBuilder* builder, I
 // Create an empty func to represent the transcribed func of `origFunc`.
 InstPair ForwardDiffTranscriber::transcribeFuncHeader(IRBuilder* inBuilder, IRFunc* origFunc)
 {
-    if (auto fwdDecor = origFunc->findDecoration<IRForwardDerivativeDecoration>())
+    /*if (auto fwdDecor = origFunc->findDecoration<IRForwardDerivativeDecoration>())
     {
         // If we reach here, the function must have been used directly in a `call` inst, and
         // therefore can't be a generic. Generic function are always referenced with `specialize`
@@ -1764,15 +1764,16 @@ InstPair ForwardDiffTranscriber::transcribeFuncHeader(IRBuilder* inBuilder, IRFu
         // `transcribeSpecialize`.
         SLANG_RELEASE_ASSERT(fwdDecor->getForwardDerivativeFunc()->getOp() == kIROp_Func);
         return InstPair(origFunc, fwdDecor->getForwardDerivativeFunc());
-    }
+    }*/
 
     IRFunc* diffFunc = nullptr;
+    diffFunc = transcribeFuncHeaderImpl(inBuilder, origFunc);
 
     // If we're transcribing a function as a 'value' (i.e. maybe embedded in a generic, keep the
     // insert location unchanged). If we're transcribing it as a declaration, we should
     // insert into the module.
     //
-    auto origOuterGen = as<IRGeneric>(findOuterGeneric(origFunc));
+    /*auto origOuterGen = as<IRGeneric>(findOuterGeneric(origFunc));
     if (!origOuterGen || findInnerMostGenericReturnVal(origOuterGen) != origFunc)
     {
         // Dealing with a declaration.. insert into module scope.
@@ -1796,17 +1797,17 @@ InstPair ForwardDiffTranscriber::transcribeFuncHeader(IRBuilder* inBuilder, IRFu
     else
     {
         inBuilder->addForwardDerivativeDecoration(origFunc, diffFunc);
-    }
+    }*/
 
     inBuilder->addFloatingModeOverrideDecoration(diffFunc, FloatingPointMode::Fast);
 
     copyOriginalDecorations(origFunc, diffFunc);
 
-    FuncBodyTranscriptionTask task;
+    /*FuncBodyTranscriptionTask task;
     task.type = FuncBodyTranscriptionTaskType::Forward;
     task.originalFunc = origFunc;
     task.resultFunc = diffFunc;
-    autoDiffSharedContext->followUpFunctionsToTranscribe.add(task);
+    autoDiffSharedContext->followUpFunctionsToTranscribe.add(task);*/
 
     return InstPair(origFunc, diffFunc);
 }

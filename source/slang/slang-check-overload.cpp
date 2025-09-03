@@ -1329,7 +1329,8 @@ bool isEffectivelySynthesized(Decl* decl)
     if (auto synFuncDecl = as<SynthesizedFuncDecl>(decl))
     {
         if (synFuncDecl->irOp == kIROp_FunctionCopy)
-            return isEffectivelySynthesized(DeclRef<Decl>(synFuncDecl->operands[0]).getDecl());
+            return isEffectivelySynthesized(
+                DeclRef<Decl>(as<DeclRefBase>(synFuncDecl->operands[0])).getDecl());
 
         switch (synFuncDecl->irOp)
         {

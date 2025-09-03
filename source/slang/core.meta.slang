@@ -706,10 +706,10 @@ __magic_type(BwdCallableBaseType)
 interface IBwdCallable<FType>
 {
     __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallablePropFunc))
-    __associatedfunc __bwd_callable_type(FType) operator(); // -> bwd_prop
+    __associatedfunc __bwd_callable_type(FType, This) operator(); // -> bwd_prop
 
     __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallableGetValFunc)) 
-    __associatedfunc __result_type(FType) val;
+    __associatedfunc __result_type(FType, This) val;
 };
 
 __magic_type(BwdDiffFuncInterfaceType)

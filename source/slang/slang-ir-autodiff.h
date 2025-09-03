@@ -323,7 +323,112 @@ struct DifferentiableTypeConformanceContext
         {
         case kIROp_ForwardDiffFuncType:
             {
-                SLANG_UNEXPECTED("not supported here..");
+                auto innerFnType = cast<IRFuncType>(resolveType(builder, typeInst->getOperand(0)));
+                List<IRType*> paramTypes;
+                for (UIndex i = 0; i < innerFnType->getParamCount(); ++i)
+                {
+                    const auto& [paramDirection, paramType] =
+                        splitDirectionAndType(innerFnType->getParamType(i));
+                    if (auto witness = tryGetDifferentiableWitness(
+                            builder,
+                            paramType,
+                            DiffConformanceKind::Any))
+                    {
+                        paramTypes.add(fromDirectionAndType(
+                            builder,
+                            paramDirection,
+                            getOrCreateDiffPairType(builder, paramType, witness)));
+                    }
+                    else
+                        paramTypes.add(innerFnType->getParamType(i));
+                }
+
+                // Do the same for the result type.
+                IRType* resultType = innerFnType->getResultType();
+                if (auto witness =
+                        tryGetDifferentiableWitness(builder, resultType, DiffConformanceKind::Any))
+                    resultType = getOrCreateDiffPairType(builder, resultType, witness);
+
+                return builder->getFuncType(paramTypes, resultType);
+            }
+        case kIROp_BackwardDiffFuncType:
+            {
+                auto innerFnType = cast<IRFuncType>(resolveType(builder, typeInst->getOperand(0)));
+
+                List<IRType*> origParamTypes;
+                for (UIndex i = 0; i < innerFnType->getParamCount(); ++i)
+                {
+                    origParamTypes.add(innerFnType->getParamType(i));
+                }
+
+                origParamTypes.add(fromDirectionAndType(
+                    builder,
+                    IRParameterDirection::Out,
+                    innerFnType->getResultType()));
+
+                List<IRType*> paramTypes;
+                for (auto origParamType : origParamTypes)
+                {
+                    const auto& [paramDirection, paramType] = splitDirectionAndType(origParamType);
+
+                    if (auto witness = tryGetDifferentiableWitness(
+                            builder,
+                            paramType,
+                            DiffConformanceKind::Any))
+                    {
+                        // Differentiable
+                        switch (paramDirection)
+                        {
+                        case IRParameterDirection::In:
+                            paramTypes.add(fromDirectionAndType(
+                                builder,
+                                IRParameterDirection::InOut,
+                                getOrCreateDiffPairType(builder, paramType, witness)));
+                            break;
+                        case IRParameterDirection::Out:
+                            paramTypes.add(fromDirectionAndType(
+                                builder,
+                                IRParameterDirection::In,
+                                (IRType*)getDifferentialForType(builder, paramType)));
+                            break;
+                        case IRParameterDirection::InOut:
+                            paramTypes.add(fromDirectionAndType(
+                                builder,
+                                IRParameterDirection::InOut,
+                                getOrCreateDiffPairType(builder, paramType, witness)));
+                            break;
+                        default:
+                            SLANG_UNEXPECTED(
+                                "Unhandled parameter direction in backward diff func type");
+                        }
+                    }
+                    else
+                    {
+                        // Non-differentiable
+                        switch (paramDirection)
+                        {
+                        case IRParameterDirection::In:
+                        case IRParameterDirection::Ref:
+                        case IRParameterDirection::ConstRef:
+                            paramTypes.add(
+                                fromDirectionAndType(builder, paramDirection, paramType));
+                            break;
+                        case IRParameterDirection::Out:
+                            // skip.
+                            break;
+                        case IRParameterDirection::InOut:
+                            paramTypes.add(
+                                fromDirectionAndType(builder, IRParameterDirection::In, paramType));
+                            break;
+                        default:
+                            SLANG_UNEXPECTED(
+                                false,
+                                "Unhandled parameter direction in backward diff func type");
+                        }
+                    }
+                }
+
+                return builder->getFuncType(paramTypes, builder->getVoidType());
             }
         case kIROp_ApplyForBwdFuncType:
             {
@@ -346,22 +451,24 @@ struct DifferentiableTypeConformanceContext
             }
         case kIROp_FuncResultType:
             {
-                auto bwdContextType = lookupContextType(builder, typeInst->getOperand(0));
+                // auto bwdContextType = lookupContextType(builder, typeInst->getOperand(0));
+                auto bwdContextType = typeInst->getOperand(1);
                 auto innerFnType = cast<IRFuncType>(resolveType(builder, typeInst->getOperand(0)));
 
                 return builder->getFuncType(
-                    List<IRType*>(bwdContextType),
+                    List<IRType*>((IRType*)bwdContextType),
                     innerFnType->getResultType());
                 break;
             }
         case kIROp_BwdCallableFuncType:
             {
-                auto bwdContextType = lookupContextType(builder, typeInst->getOperand(0));
+                // auto bwdContextType = lookupContextType(builder, typeInst->getOperand(0));
+                auto bwdContextType = typeInst->getOperand(1);
 
                 auto innerFnType = cast<IRFuncType>(resolveType(builder, typeInst->getOperand(0)));
                 List<IRType*> paramTypes;
 
-                paramTypes.add(bwdContextType);
+                paramTypes.add((IRType*)bwdContextType);
                 for (UIndex i = 0; i < innerFnType->getParamCount(); ++i)
                 {
                     const auto& [paramDirection, paramType] =
@@ -417,7 +524,7 @@ struct DifferentiableTypeConformanceContext
         return FunctionConformanceKind::Unknown;
     }*/
 
-    void setFunc(IRGlobalValueWithCode* func);
+    void setFunc(IRInst* inst);
 
     template<typename T>
     List<T*> getAnnotations(IRGlobalValueWithCode* inst);

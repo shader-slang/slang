@@ -3228,7 +3228,7 @@ bool SemanticsVisitor::trySynthesizeDiffContextTypeRequirementWitness(
     // if (requirementKind == BuiltinRequirementKind::BwdCallableContextType)
     //{
     ctxTypeInheritanceDecl->base.type = getCurrentASTBuilder()->getBwdCallableBaseType(
-        DeclRefType::create(getCurrentASTBuilder(), synStructDecl->operands[0]));
+        DeclRefType::create(getCurrentASTBuilder(), as<DeclRefBase>(synStructDecl->operands[0])));
     //}
     /*else if (requirementKind == BuiltinRequirementKind::FwdCallableContextType)
     {
@@ -14628,16 +14628,17 @@ static void translateBwdDerivativeAttributeToAD2(
         {substFuncAsTypeFromExtension->getDeclRefBase(), synBwdDiffFunc},
         {getCurrentASTBuilder()->getBwdCallableBaseType(funcAsTypeFromExtension)});
 
+    FuncType* applyBwdFuncType = as<FuncType>(visitor->resolveType(
+        getCurrentASTBuilder()->getOrCreate<ApplyForBwdFuncType>(
+            funcAsTypeFromExtension,
+            DeclRefType::create(getCurrentASTBuilder(), synContextStruct))));
     addSynthesizedFunc(
         visitor,
         bwdDiffExtension.getDecl(),
         visitor->getName("apply_bwd"),
         kIROp_BackwardPrimalFromLegacyBwdDiffFunc,
         {substFuncAsTypeFromExtension->getDeclRefBase(), synBwdDiffFunc},
-        as<FuncType>(visitor->resolveType(
-            getCurrentASTBuilder()->getOrCreate<ApplyForBwdFuncType>(
-                funcAsTypeFromExtension,
-                DeclRefType::create(getCurrentASTBuilder(), synContextStruct)))),
+        applyBwdFuncType,
         false);
 }
 

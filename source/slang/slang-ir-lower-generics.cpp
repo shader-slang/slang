@@ -291,6 +291,8 @@ void removeUnusedKeys(IRBuilder* builder, IRInterfaceType* interfaceType)
     interfaceType->replaceUsesWith(newInterfaceType);
 }
 
+void lowerWitnessTableTypes(SharedGenericsLoweringContext* sharedContext) {}
+
 void lowerGenerics(TargetProgram* targetProgram, IRModule* module, DiagnosticSink* sink)
 {
     SLANG_PROFILE;
@@ -308,6 +310,8 @@ void lowerGenerics(TargetProgram* targetProgram, IRModule* module, DiagnosticSin
             removeUnusedKeys(&builder, interfaceType);
         }
     }
+
+    lowerWitnessTableTypes(&sharedContext);
 
     // TODO: make this more specific..
     simplifyIR(targetProgram, module, IRSimplificationOptions::getFast(targetProgram));

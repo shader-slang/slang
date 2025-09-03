@@ -1234,14 +1234,20 @@ IRInst* DifferentiableTypeConformanceContext::tryGetAssociationOfKind(
     return nullptr;
 }
 
-void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
+void DifferentiableTypeConformanceContext::setFunc(IRInst* func)
 {
-    parentFunc = func;
+    // parentFunc = func;
 
-    List<IRDifferentiableTypeAnnotation*> diffTypeAnnotations =
-        getAnnotations<IRDifferentiableTypeAnnotation>(func);
-    List<IRWitnessTableAnnotation*> witnessTableAnnotations =
-        getAnnotations<IRWitnessTableAnnotation>(func);
+    List<IRDifferentiableTypeAnnotation*> diffTypeAnnotations;
+    if (auto valWithCode = as<IRGlobalValueWithCode>(func))
+    {
+        parentFunc = valWithCode;
+        diffTypeAnnotations.addRange(getAnnotations<IRDifferentiableTypeAnnotation>(valWithCode));
+    }
+
+    List<IRWitnessTableAnnotation*> witnessTableAnnotations;
+    if (auto valWithCode = as<IRGlobalValueWithCode>(func))
+        witnessTableAnnotations.addRange(getAnnotations<IRWitnessTableAnnotation>(valWithCode));
 
     // Go up the parents of func & add the annotations of any IRGeneric or IRModule parent:
     IRInst* parent = func;
@@ -3397,9 +3403,25 @@ struct AutoDiffPass : public InstPassBase
         return true;
     }*/
 
+    bool isTranslatedFuncTypeOp(IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_ApplyForBwdFuncType:
+        case kIROp_ForwardDiffFuncType:
+        case kIROp_FuncResultType:
+        case kIROp_BwdCallableFuncType:
+        case kIROp_BackwardDiffFuncType:
+            return true;
+        default:
+            return false;
+        }
+    }
+
     bool isTranslationOp(IRInst* inst)
     {
-        if (as<IRTranslateBase>(inst) || as<IRTranslatedTypeBase>(inst))
+        if (as<IRTranslateBase>(inst) || as<IRTranslatedTypeBase>(inst) ||
+            isTranslatedFuncTypeOp(inst))
             return true;
         return false;
 
@@ -3465,7 +3487,16 @@ struct AutoDiffPass : public InstPassBase
         for (UInt i = 0; i < inst->getOperandCount(); i++)
         {
             auto operand = inst->getOperand(i);
-            if (as<IRSpecialize>(operand) || isTranslationOp(operand))
+            // TODO: When merging with the specialization pass, we'll
+            // need to think about how to handle the case
+            // where the inner operand is a specialization.
+            //
+            // Do we specialize the operand first? What if we _can't_?
+            //
+            if (isTranslationOp(operand))
+                return false;
+
+            if (operand->getOp() == kIROp_FuncTypeOf)
                 return false;
         }
         return true;
@@ -3487,15 +3518,6 @@ struct AutoDiffPass : public InstPassBase
             processAllReachableInsts(
                 [&](IRInst* inst)
                 {
-                    /*switch (inst->getOp())
-                    {
-                    case kIROp_ForwardDifferentiate:
-                    case kIROp_BackwardDifferentiate:
-                    case kIROp_BackwardDifferentiatePrimal:
-                    case kIROp_BackwardDifferentiatePropagate:
-                    case kIROp_BackwardContextGetPrimalVal:
-                    case kIROp_BackwardDiffIntermediateContextType:
-                    case kIROp_FunctionCopy:*/
                     if (isTranslationOp(inst) && isInstReadyForTranslation(inst))
                     {
                         if (hasRelevantUses(inst))
@@ -3509,17 +3531,6 @@ struct AutoDiffPass : public InstPassBase
                             // that isn't being used yet.
                             return;
                         }
-                        /*if (auto innerFunc =
-                                as<IRFunc>(getResolvedInstForDecorations(inst->getOperand(0))))
-                        {
-                            // Skip functions whose body still has a differentiate inst
-                            // (higher order func).
-                            // if (!isFullyDifferentiated(innerFunc)) // no needed for AD 2.0
-                            //{
-                            addToWorkList(inst->getOperand(0));
-                            return;
-                            //}
-                        }*/
                     }
 
                     if (inst->getDataType())
@@ -3572,6 +3583,9 @@ struct AutoDiffPass : public InstPassBase
                     {
                         auto funcOperand = translateInst->getOperand(0);
                         translationResult = funcOperand;
+
+                        if (auto specInst = as<IRSpecialize>(translationResult))
+                            translationResult = specializeGeneric(specInst);
                     }
                     break;
                 case kIROp_BackwardDifferentiate:
@@ -3597,6 +3611,17 @@ struct AutoDiffPass : public InstPassBase
                             translateInst,
                             autodiffContext,
                             getSink());
+                    }
+                    break;
+                case kIROp_ApplyForBwdFuncType:
+                case kIROp_ForwardDiffFuncType:
+                case kIROp_FuncResultType:
+                case kIROp_BwdCallableFuncType:
+                case kIROp_BackwardDiffFuncType:
+                    {
+                        DifferentiableTypeConformanceContext ctx(autodiffContext);
+                        ctx.setFunc(translateInst->getParent());
+                        translationResult = ctx.resolveType(&subBuilder, translateInst);
                     }
                     break;
                 default:

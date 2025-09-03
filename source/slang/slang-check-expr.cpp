@@ -5240,10 +5240,13 @@ Expr* SemanticsExprVisitor::visitBwdCallableFuncTypeExpr(BwdCallableFuncTypeExpr
 {
     // Translate type node.
     expr->base = CheckProperType(expr->base);
+    expr->ctxType = CheckProperType(expr->ctxType);
 
-    if (expr->base.type && !as<ErrorType>(expr->base.type))
+    if (expr->base.type && !as<ErrorType>(expr->base.type) && expr->ctxType.type &&
+        !as<ErrorType>(expr->ctxType.type))
     {
-        auto bwdCallableFuncType = m_astBuilder->getOrCreate<BwdCallableFuncType>(expr->base.type);
+        auto bwdCallableFuncType =
+            m_astBuilder->getOrCreate<BwdCallableFuncType>(expr->base.type, expr->ctxType.type);
         expr->type = m_astBuilder->getOrCreate<TypeType>(bwdCallableFuncType);
         return expr;
     }
@@ -5271,10 +5274,13 @@ Expr* SemanticsExprVisitor::visitFuncResultTypeExpr(FuncResultTypeExpr* expr)
 {
     // Translate type node.
     expr->base = CheckProperType(expr->base);
+    expr->ctxType = CheckProperType(expr->ctxType);
 
-    if (expr->base.type && !as<ErrorType>(expr->base.type))
+    if (expr->base.type && !as<ErrorType>(expr->base.type) && expr->ctxType.type &&
+        !as<ErrorType>(expr->ctxType.type))
     {
-        auto funcResultType = m_astBuilder->getOrCreate<FuncResultType>(expr->base.type);
+        auto funcResultType =
+            m_astBuilder->getOrCreate<FuncResultType>(expr->base.type, expr->ctxType.type);
         expr->type = m_astBuilder->getOrCreate<TypeType>(funcResultType);
         return expr;
     }

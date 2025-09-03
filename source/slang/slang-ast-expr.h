@@ -750,6 +750,7 @@ class BwdCallableFuncTypeExpr : public Expr
 {
     FIDDLE(...)
     FIDDLE() TypeExp base;
+    FIDDLE() TypeExp ctxType;
 };
 
 /*
@@ -767,6 +768,7 @@ class FuncResultTypeExpr : public Expr
 {
     FIDDLE(...)
     FIDDLE() TypeExp base;
+    FIDDLE() TypeExp ctxType;
 };
 
 /// A type expression of the form `This`

@@ -169,6 +169,20 @@ struct GenerateWitnessTableWrapperContext
         return wrapperFunc;
     }
 
+    bool doesTypeHaveStorage(IRType* type)
+    {
+        // If we're using a function itself as a type,
+        // then it's just a logical type with no data.
+        //
+        // This is a bit of a hack.. we probably want to handle
+        // this before it gets to this point.
+        //
+        if (as<IRFunc>(type))
+            return false;
+        else
+            return true;
+    }
+
     void lowerWitnessTable(IRWitnessTable* witnessTable)
     {
         auto interfaceType = cast<IRInterfaceType>(witnessTable->getConformanceType());
@@ -191,12 +205,12 @@ struct GenerateWitnessTableWrapperContext
         auto concreteType = witnessTable->getConcreteType();
         IRIntegerValue typeSize, sizeLimit;
         bool isTypeOpaque = false;
-        if (!sharedContext->doesTypeFitInAnyValue(
-                concreteType,
-                interfaceType,
-                &typeSize,
-                &sizeLimit,
-                &isTypeOpaque))
+        if (doesTypeHaveStorage(concreteType) && !sharedContext->doesTypeFitInAnyValue(
+                                                     concreteType,
+                                                     interfaceType,
+                                                     &typeSize,
+                                                     &sizeLimit,
+                                                     &isTypeOpaque))
         {
             HashSet<IRType*> visited;
             if (isTypeOpaque)

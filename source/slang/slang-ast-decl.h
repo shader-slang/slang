@@ -190,7 +190,7 @@ FIDDLE()
 class SynthesizedStructDecl : public AggTypeDecl
 {
     FIDDLE(...)
-    FIDDLE() List<DeclRefBase*> operands;
+    FIDDLE() List<Val*> operands;
     FIDDLE() uint32_t irOp;
 };
 
@@ -491,7 +491,7 @@ FIDDLE()
 class SynthesizedFuncDecl : public FunctionDeclBase
 {
     FIDDLE(...)
-    FIDDLE() List<DeclRefBase*> operands;
+    FIDDLE() List<Val*> operands;
     FIDDLE() uint32_t irOp;
 };
 
