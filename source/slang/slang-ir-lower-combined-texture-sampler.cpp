@@ -124,12 +124,9 @@ void lowerCombinedTextureSamplers(
         auto dataType = globalParam->getDataType();
         if (!dataType)
             continue;
-        auto textureType = as<IRTextureTypeBase>(dataType);
-        auto arrayType = as<IRArrayTypeBase>(dataType);
 
         LoweredCombinedSamplerStructInfo typeInfo;
-
-        if (textureType)
+        if (auto textureType = as<IRTextureTypeBase>(dataType))
         {
             // Handle individual combined texture sampler
             if (getIntVal(textureType->getIsCombinedInst()) == 0)
@@ -138,7 +135,7 @@ void lowerCombinedTextureSamplers(
             // Lower the combined texture sampler type
             typeInfo = context.lowerCombinedTextureSamplerType(textureType);
         }
-        else if (arrayType)
+        else if (auto arrayType = as<IRArrayTypeBase>(dataType))
         {
             // Handle array of combined texture samplers
             auto elementType = as<IRTextureTypeBase>(arrayType->getElementType());
