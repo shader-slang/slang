@@ -2429,7 +2429,6 @@ __device__ __forceinline__ float atomicCAS(float* address, float compare, float 
 }
 
 // Missing support for Load with status
-// Missing support for Load with status
 struct RWByteAddressBuffer
 {
     SLANG_CUDA_CALL void GetDimensions(uint32_t* outDim) const { *outDim = uint32_t(sizeInBytes); }

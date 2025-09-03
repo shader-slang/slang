@@ -3486,9 +3486,6 @@ ${{{{
         vector<float, Shape.dimensions+isArray> location
         $(compareParam))
     {
-        static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
-            "Gather is supported only for 2D and 3D textures");
-
         __target_switch
         {
         case hlsl: 

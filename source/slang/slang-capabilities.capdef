@@ -2261,7 +2261,7 @@ alias helper_lane = _sm_6_0 + fragment
 alias quad_control = _sm_6_7
                     | GL_EXT_shader_quad_control + GL_EXT_maximal_reconvergence + GL_KHR_shader_subgroup_vote
                     | metal
-                    | cuda
+                    | _cuda_sm_5_0
                     ;
 
 /// Capabilities required to enable shader breakpoints
