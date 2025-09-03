@@ -1,5 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-dx12 -compute -profile cs_6_0 -use-dxil -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-dx12 -compute -profile cs_6_0 -shaderobj -output-using-type
 
 // Test CUDA Gather runtime behavior - compare with known gather pattern
 // tex2Dgather samples 4 texels in 2x2 pattern around coordinate
