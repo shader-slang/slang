@@ -161,7 +161,9 @@ runs:
         ccache --set-config=sloppiness=pch_defines,time_macros
 
         # Enable ccache for CMake (set environment variables)
-        echo "ccache_symlinks_path=ccache" >> $GITHUB_ENV
+        # Get the full path to ccache executable
+        ccache_path=$(which ccache)
+        echo "ccache_symlinks_path=$ccache_path" >> $GITHUB_ENV
 
         # Show initial stats
         echo "ccache configuration:"
