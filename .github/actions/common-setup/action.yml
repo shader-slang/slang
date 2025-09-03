@@ -118,17 +118,38 @@ runs:
           linux*) echo "${{github.workspace}}/external/slang-binaries/spirv-tools/$(uname -m)-linux/bin" >> "$GITHUB_PATH";;
         esac
 
-      # Setup ccache for self-hosted runners (Windows only for now)
-    - name: Setup ccache
+      # Setup ccache for compilation caching (Windows self-hosted only)
+    - name: Install ccache
       if: ${{ inputs.os == 'windows' && runner.environment == 'self-hosted' }}
-      uses: Chocobo1/setup-ccache-action@v1
+      shell: bash
+      run: |
+        # ccache should already be available on self-hosted runners
+        if ! command -v ccache; then
+          choco install ccache
+        fi
+        
+    - name: Restore ccache
+      if: ${{ inputs.os == 'windows' && runner.environment == 'self-hosted' }}
+      uses: actions/cache/restore@v4
       with:
-        update_packager_index: false
-        install_ccache: true
-        prepend_symlinks_to_path: true
-        windows_compile_environment: msvc
-        ccache_options: |
-          max_size=2G
-          compression=true
-          compression_level=6
-          sloppiness=pch_defines,time_macros
+        path: ${{ github.workspace }}/.ccache
+        key: ccache-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ github.ref }}
+        restore-keys: |
+          ccache-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-refs/heads/master
+          ccache-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-
+          
+    - name: Configure ccache
+      if: ${{ inputs.os == 'windows' && runner.environment == 'self-hosted' }}
+      shell: bash
+      run: |
+        # Set ccache directory
+        echo "CCACHE_DIR=${{ github.workspace }}/.ccache" >> $GITHUB_ENV
+        # Set up ccache symlinks path for CMake launcher
+        echo "ccache_symlinks_path=ccache" >> $GITHUB_ENV
+        # Configure ccache settings
+        ccache --set-config=max_size=2G
+        ccache --set-config=compression=true
+        ccache --set-config=compression_level=6
+        ccache --set-config=sloppiness=pch_defines,time_macros
+        # Show stats
+        ccache --show-stats

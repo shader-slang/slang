@@ -245,6 +245,13 @@ jobs:
         if: steps.filter.outputs.should-run == 'true'
         run: bash extras/verify-documented-compiler-version.sh
 
+      - name: Save ccache (master branch only)
+        if: ${{ matrix.os == 'windows' && runner.environment == 'self-hosted' && github.ref == 'refs/heads/master' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: ccache-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}-${{ github.ref }}
+
       - name: Check runtime environment
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && (matrix.platform != 'aarch64' || matrix.os == 'macos')
         run: |
