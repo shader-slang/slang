@@ -305,6 +305,45 @@ struct LinkingAndOptimizationOptions
     CLikeSourceEmitter* sourceEmitter = nullptr;
 };
 
+// Check if a BitCast instruction requires lowering for the current target.
+// For SPIRV targets, many bitcasts can be handled natively by OpBitcast.
+static bool shouldLowerBitCastForTarget(CodeGenContext* codeGenContext, IRInst* inst)
+{
+    if (!codeGenContext || !inst)
+        return true;
+
+    auto targetRequest = codeGenContext->getTargetReq();
+    if (!targetRequest)
+        return true;
+    
+    // For non-SPIRV targets, always lower bitcasts as before
+    auto target = targetRequest->getTarget();
+    if (target != CodeGenTarget::SPIRV && target != CodeGenTarget::SPIRVAssembly)
+        return true;
+
+    // Only optimize for direct SPIRV emission, not SPIRV-via-GLSL
+    auto targetProgram = codeGenContext->getTargetProgram();
+    if (!targetProgram->shouldEmitSPIRVDirectly())
+        return true;
+
+    // For SPIRV targets, check if this bitcast can be handled natively
+    auto fromType = inst->getOperand(0)->getDataType();
+    auto toType = inst->getDataType();
+
+    // SPIRV OpBitcast requires operand and result to have same bit width
+    IRSizeAndAlignment fromSize, toSize;
+    if (SLANG_SUCCEEDED(getNaturalSizeAndAlignment(targetProgram->getOptionSet(), fromType, &fromSize)) &&
+        SLANG_SUCCEEDED(getNaturalSizeAndAlignment(targetProgram->getOptionSet(), toType, &toSize)) &&
+        fromSize.size == toSize.size)
+    {
+        // SPIRV cannot bitcast between 8-bit types,
+        // but can natively bitcast between other types
+        return fromSize.size <= 8;
+    }
+
+    return true;
+}
+
 // Scan the IR module and determine which lowering/legalization passes are needed based
 // on the instructions we see.
 //
@@ -396,7 +435,7 @@ void calcRequiredLoweringPassSet(
         result.reinterpret = true;
         break;
     case kIROp_BitCast:
-        result.bitcast = true;
+        result.bitcast = shouldLowerBitCastForTarget(codeGenContext, inst);
         break;
     case kIROp_AutoPyBindCudaDecoration:
         result.derivativePyBindWrapper = true;
