@@ -2369,6 +2369,29 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
     {
         return tryFoldIndexExpr(indexExpr.getExpr(), kind, circularityInfo);
     }
+    else if (auto swizzleExpr = expr.as<SwizzleExpr>())
+    {
+        // For swizzle expressions on constants, we need to fold the base
+        // and then handle the swizzled component. For now, we only support
+        // single-component swizzles in constant contexts.
+        if (swizzleExpr.getExpr()->elementIndices.getCount() != 1)
+            return nullptr;
+
+        auto baseVal = tryConstantFoldExpr(
+            SubstExpr<Expr>(swizzleExpr.getExpr()->base, expr.getSubsts()),
+            kind,
+            circularityInfo);
+
+        if (baseVal)
+        {
+            // For constants that are swizzled, we just return the base value.
+            // The actual swizzle extraction will be handled during IR lowering or linking.
+            // This allows the swizzle expression to be considered a valid constant.
+            return baseVal;
+        }
+
+        return nullptr;
+    }
     return nullptr;
 }
 
