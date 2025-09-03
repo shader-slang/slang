@@ -601,6 +601,124 @@ class DefaultInitializableType : public BuiltinType
     FIDDLE(...)
 };
 
+FIDDLE()
+class FunctionBaseType : public BuiltinType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class DifferentiableFuncBaseType : public BuiltinType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class ForwardDiffFuncInterfaceType : public BuiltinType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class BwdCallableBaseType : public BuiltinType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class BwdDiffFuncInterfaceType : public BuiltinType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class LegacyBwdDiffFuncInterfaceType : public BuiltinType
+{
+    FIDDLE(...)
+};
+
+// Built-in type to translate the type.
+FIDDLE()
+class FwdDiffFuncType : public Type
+{
+    FIDDLE(...)
+    Type* getBase() { return as<Type>(getOperand(0)); }
+
+    // Overrides should be public so base classes can access
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
+class BwdDiffFuncType : public Type
+{
+    FIDDLE(...)
+    Type* getBase() { return as<Type>(getOperand(0)); }
+
+    // Overrides should be public so base classes can access
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
+class BwdCallableFuncType : public Type
+{
+    FIDDLE(...)
+    Type* getBase() { return as<Type>(getOperand(0)); }
+    Type* getCtxType() { return as<Type>(getOperand(1)); }
+
+    // Overrides should be public so base classes can access
+    void _toTextOverride(StringBuilder& out);
+    // Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
+class ApplyForBwdFuncType : public Type
+{
+    FIDDLE(...)
+    Type* getBase() { return as<Type>(getOperand(0)); }
+    Type* getCtxType() { return as<Type>(getOperand(1)); }
+
+    // Overrides should be public so base classes can access
+    void _toTextOverride(StringBuilder& out);
+    // Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+/*
+FIDDLE()
+class FwdCallableFuncType : public Type
+{
+    FIDDLE(...)
+    Type* getBase() { return as<Type>(getOperand(0)); }
+};
+
+FIDDLE()
+class ApplyForFwdFuncType : public Type
+{
+    FIDDLE(...)
+    Type* getBase() { return as<Type>(getOperand(0)); }
+    Type* getCtxType() { return as<Type>(getOperand(1)); }
+};
+*/
+
+
+FIDDLE()
+class FuncResultType : public Type
+{
+    FIDDLE(...)
+    Type* getBase() { return as<Type>(getOperand(0)); }
+    Type* getCtxType() { return as<Type>(getOperand(1)); }
+
+    // Overrides should be public so base classes can access
+    void _toTextOverride(StringBuilder& out);
+    // Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
 // A vector type, e.g., `vector<T,N>`
 FIDDLE()
 class VectorExpressionType : public ArithmeticExpressionType

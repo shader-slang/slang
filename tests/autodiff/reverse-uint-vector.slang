@@ -33,7 +33,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         dpfloat3 dpx = dpfloat3(float3(2.0, 3.0, 4.0), float3(0.0, 0.0, 0.0));
         dpfloat3 dpy = dpfloat3(float3(1.5, 2.5, 3.5), float3(0.0, 0.0, 0.0));
 
-        __bwd_diff(test_uint_offset)(dpx, dpy, dfloat3(1.0, 2.0, 3.0));
+        bwd_diff(test_uint_offset)(dpx, dpy, dfloat3(1.0, 2.0, 3.0));
         outputBuffer[0] = dpx.d.y; // Expect: 2
         outputBuffer[1] = dpy.d.y; // Expect: 2
     }

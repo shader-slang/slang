@@ -54,6 +54,7 @@ SubtypeWitness* SemanticsVisitor::isSubtype(
     IsSubTypeOptions isSubTypeOptions)
 {
     SubtypeWitness* result = nullptr;
+    // TODO: (make sure unknown witnesses don't have problems here: )
     if (getShared()->tryGetSubtypeWitnessFromCache(subType, superType, result))
         return result;
     result = checkAndConstructSubtypeWitness(subType, superType, isSubTypeOptions);
@@ -138,7 +139,10 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
         // the facets that represent supertypes, and those
         // will be the ones that store a type on the facet.
         //
-        auto facetType = facet->getType();
+        // TODO: resolve() is a workaround for cases where unknown-witness shows up even after
+        // resolution
+        //
+        auto facetType = facet->getType()->resolve();
         if (!facetType)
             continue;
 
@@ -163,7 +167,7 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
 
         // Conveniently, the `facet` stores a pre-computed witness for the
         // subtype relationship, which we can use here.
-        return facet->subtypeWitness;
+        return as<SubtypeWitness>(facet->subtypeWitness->resolve());
     }
     //
     // TODO: We could expand upon the test using the facet list above

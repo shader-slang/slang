@@ -27,7 +27,7 @@ struct Impl : IFoo
     }
     
     [Differentiable]
-    static This create(Differential d)
+    static This create(Differential d) // IForwardDifferentiable<create> & IBackwardDifferentiable<create>
     {
         This v;
         v.x = d.x * d.x;

@@ -335,8 +335,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         dpfloat3 dpf3 = dpfloat3(myfloat3(float3(1.0, 3.0, 5.0)), mydfloat3(float3(0.5, 1.5, 2.5)));
 
         outputBuffer[0] = f(dpa.p);                               // Expect: 22.0
-        outputBuffer[1] = __fwd_diff(f)(dpfloat(2.0, 0.5)).d;          // Expect: 9.5
-        outputBuffer[2] = __fwd_diff(f)(dpf4).d.val.values[3];         // Expect: 27.5
-        outputBuffer[3] = __fwd_diff(f)(dpf3).d.val.values[1];         // Expect: 40.5
+        outputBuffer[1] = fwd_diff(f)(dpfloat(2.0, 0.5)).d;          // Expect: 9.5
+        outputBuffer[2] = fwd_diff(f)(dpf4).d.val.values[3];         // Expect: 27.5
+        outputBuffer[3] = fwd_diff(f)(dpf3).d.val.values[1];         // Expect: 40.5
     }
 }

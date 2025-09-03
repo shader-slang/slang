@@ -1593,6 +1593,8 @@ class DifferentiableAttribute : public Attribute
     FIDDLE(...)
     // TODO(tfoley): Why is there this duplication here?
     List<KeyValuePair<Type*, SubtypeWitness*>> m_typeToIDifferentiableWitnessMappings;
+    OrderedDictionary<Val*, ShortList<SubtypeWitness*, 4>> m_witnessMapping;
+    OrderedDictionary<Val*, OrderedDictionary<SlangInt, Val*>> m_associatedValMapping;
 
     void addType(Type* declRef, SubtypeWitness* witness)
     {
@@ -1602,6 +1604,54 @@ class DifferentiableAttribute : public Attribute
             m_typeToIDifferentiableWitnessMappings.add(
                 KeyValuePair<Type*, SubtypeWitness*>(declRef, witness));
         }
+    }
+
+    bool hasWitnessForVal(Val* targetVal) const { return m_witnessMapping.containsKey(targetVal); }
+
+    ShortList<SubtypeWitness*, 4> tryGetWitnessList(Val* targetVal) const
+    {
+        if (auto resultPtr = m_witnessMapping.tryGetValue(targetVal))
+            return *resultPtr;
+        return ShortList<SubtypeWitness*, 4>();
+    }
+
+    void addWitness(Val* targetVal, SubtypeWitness* witness)
+    {
+        auto list = tryGetWitnessList(targetVal);
+        list.add(witness);
+        m_witnessMapping[targetVal] = list;
+    }
+
+    bool hasAssociatedVals(Val* targetVal) const
+    {
+        return m_associatedValMapping.containsKey(targetVal);
+    }
+
+    OrderedDictionary<SlangInt, Val*>& tryGetAssociatedVals(Val* targetVal) const
+    {
+        if (!hasAssociatedVals(targetVal))
+            m_associatedValMapping[targetVal] = OrderedDictionary<SlangInt, Val*>();
+        return m_associatedValMapping[targetVal];
+    }
+
+    void resolveDictionaryKeys()
+    {
+        // Go over m_associatedValMapping & call ->resolve() on all
+        // the dictionary keys (and re-insert them, if they are different)
+        //
+        OrderedDictionary<Val*, OrderedDictionary<SlangInt, Val*>> newMapping;
+        for (auto& pair : m_associatedValMapping)
+        {
+            auto& assocVals = pair.value;
+            auto newKey = pair.key->resolve();
+            newMapping[newKey] = assocVals;
+        }
+        m_associatedValMapping = newMapping;
+    }
+
+    void addAssocVal(Val* targetVal, SlangInt id, Val* assocVal)
+    {
+        tryGetAssociatedVals(targetVal)[id] = assocVal;
     }
 
     /// Mapping from types to subtype witnesses for conformance to IDifferentiable.

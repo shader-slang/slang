@@ -690,6 +690,20 @@ class BackwardDifferentiateExpr : public DifferentiateExpr
     FIDDLE(...)
 };
 
+FIDDLE()
+class FuncAsTypeExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() Expr* base = nullptr;
+};
+
+FIDDLE()
+class FuncTypeOfExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() Expr* base = nullptr;
+};
+
 /// An expression of the form `__dispatch_kernel(fn, threadGroupSize, dispatchSize)` to
 /// dispatch a compute kernel from host.
 ///
@@ -733,6 +747,64 @@ class TreatAsDifferentiableExpr : public Expr
     };
 
     FIDDLE() Flavor flavor;
+};
+
+FIDDLE()
+class FwdDiffFuncTypeExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() TypeExp base;
+};
+
+FIDDLE()
+class BwdDiffFuncTypeExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() TypeExp base;
+};
+
+FIDDLE()
+class ApplyForBwdFuncTypeExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() TypeExp base;
+    FIDDLE() TypeExp ctxType;
+};
+
+/*
+FIDDLE()
+class ApplyForFwdFuncTypeExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() TypeExp base;
+    FIDDLE() TypeExp ctxType;
+};
+*/
+
+FIDDLE()
+class BwdCallableFuncTypeExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() TypeExp base;
+    FIDDLE() TypeExp ctxType;
+};
+
+/*
+FIDDLE()
+class FwdCallableFuncTypeExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() TypeExp base;
+};
+*/
+
+
+FIDDLE()
+class FuncResultTypeExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() TypeExp base;
+    FIDDLE() TypeExp ctxType;
 };
 
 /// A type expression of the form `This`

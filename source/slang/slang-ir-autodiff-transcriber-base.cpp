@@ -125,6 +125,23 @@ IRInst* AutoDiffTranscriberBase::findOrTranscribeDiffInst(IRBuilder* builder, IR
     return lookupDiffInst(origInst);
 }
 
+// TODO: (AD2 overhaul) Ensure that the primal
+
+// orig -> primal
+// orig -> diff
+
+// origFunc
+// {
+//    inst-annotation(orig, diff-in-orig-context)
+// }
+//
+// fwdDifffunc
+// {
+//    inst-annotation(primal, diff-in-primal-context)
+// }
+// cloned()
+
+// to differentiate type (origType -> primalType -> Lookup on primalType)
 IRInst* AutoDiffTranscriberBase::findOrTranscribePrimalInst(IRBuilder* builder, IRInst* origInst)
 {
     if (!origInst)

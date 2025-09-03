@@ -461,7 +461,58 @@ Type* ASTBuilder::getSpecializedBuiltinType(ArrayView<Val*> genericArgs, const c
     return rsType;
 }
 
-PtrType* ASTBuilder::getPtrType(Type* valueType, Val* accessQualifier, Val* addrSpace)
+Type* ASTBuilder::getForwardDiffFuncInterfaceType(Type* baseType)
+{
+    auto decl = getSharedASTBuilder()->findMagicDecl("ForwardDiffFuncInterfaceType");
+    return DeclRefType::create(
+        this,
+        this->getGenericAppDeclRef(
+            DeclRef<GenericDecl>(decl->getDefaultDeclRef()),
+            makeConstArrayViewSingle(as<Val>(baseType))));
+}
+
+Type* ASTBuilder::getBackwardDiffFuncInterfaceType(Type* baseType)
+{
+    auto decl = getSharedASTBuilder()->findMagicDecl("BwdDiffFuncInterfaceType");
+    return DeclRefType::create(
+        this,
+        this->getGenericAppDeclRef(
+            DeclRef<GenericDecl>(decl->getDefaultDeclRef()),
+            makeConstArrayViewSingle(as<Val>(baseType))));
+}
+
+/*
+Type* ASTBuilder::getLegacyBackwardDiffFuncInterfaceType(Type* baseType)
+{
+    auto decl = getSharedASTBuilder()->findMagicDecl("LegacyBwdDiffFuncInterfaceType");
+    return DeclRefType::create(
+        this,
+        this->getGenericAppDeclRef(
+            DeclRef<GenericDecl>(decl->getDefaultDeclRef()),
+            makeConstArrayViewSingle(as<Val>(baseType))));
+}*/
+
+Type* ASTBuilder::getBwdCallableBaseType(Type* baseType)
+{
+    auto decl = getSharedASTBuilder()->findMagicDecl("BwdCallableBaseType");
+    return DeclRefType::create(
+        this,
+        this->getGenericAppDeclRef(
+            DeclRef<GenericDecl>(decl->getDefaultDeclRef()),
+            makeConstArrayViewSingle(as<Val>(baseType))));
+}
+
+Type* ASTBuilder::getFwdCallableBaseType(Type* baseType)
+{
+    auto decl = getSharedASTBuilder()->findMagicDecl("FwdCallableBaseType");
+    return DeclRefType::create(
+        this,
+        this->getGenericAppDeclRef(
+            DeclRef<GenericDecl>(decl->getDefaultDeclRef()),
+            makeConstArrayViewSingle(as<Val>(baseType))));
+}
+
+PtrType* ASTBuilder::getPtrType(Type* valueType, AddressSpace addrSpace)
 {
     return dynamicCast<PtrType>(getPtrType(valueType, accessQualifier, addrSpace, "PtrType"));
 }
@@ -662,6 +713,13 @@ DeclRef<InterfaceDecl> ASTBuilder::getDifferentiableInterfaceDecl()
     return declRef;
 }
 
+DeclRef<InterfaceDecl> ASTBuilder::getFunctionBaseInterfaceDecl()
+{
+    DeclRef<InterfaceDecl> declRef =
+        DeclRef<InterfaceDecl>(getBuiltinDeclRef("FunctionBaseType", nullptr));
+    return declRef;
+}
+
 DeclRef<InterfaceDecl> ASTBuilder::getDifferentiableRefInterfaceDecl()
 {
     DeclRef<InterfaceDecl> declRef =
@@ -709,6 +767,11 @@ MeshOutputType* ASTBuilder::getMeshOutputTypeFromModifier(
 Type* ASTBuilder::getDifferentiableInterfaceType()
 {
     return DeclRefType::create(this, getDifferentiableInterfaceDecl());
+}
+
+Type* ASTBuilder::getFunctionBaseType()
+{
+    return DeclRefType::create(this, getFunctionBaseInterfaceDecl());
 }
 
 Type* ASTBuilder::getDifferentiableRefInterfaceType()
@@ -867,6 +930,11 @@ TypePackSubtypeWitness* ASTBuilder::getSubtypeWitnessPack(
     ArrayView<SubtypeWitness*> witnesses)
 {
     return getOrCreate<TypePackSubtypeWitness>(subType, superType, witnesses);
+}
+
+UnknownSubtypeWitness* ASTBuilder::getUnknownSubtypeWitness(Type* subType, Type* superType)
+{
+    return getOrCreate<UnknownSubtypeWitness>(subType, superType);
 }
 
 SubtypeWitness* ASTBuilder::getExpandSubtypeWitness(

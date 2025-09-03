@@ -115,6 +115,25 @@ void ForwardDiffTranscriber::generateTrivialFwdDiffFunc(IRFunc* primalFunc, IRFu
     }
 }
 
+IRFuncType* ForwardDiffTranscriber::resolveFuncType(IRBuilder* builder, IRInst* funcTypeInst)
+{
+    if (auto funcType = as<IRFuncType>(funcTypeInst))
+    {
+        // Already a function type, so just return it.
+        return as<IRFuncType>(funcTypeInst);
+    }
+
+    switch (funcTypeInst->getOp())
+    {
+    case kIROp_ForwardDiffFuncType:
+        {
+            auto baseFuncType = cast<IRFuncType>(funcTypeInst->getOperand(0));
+            return differentiateFunctionType(builder, nullptr, baseFuncType);
+        }
+    }
+    SLANG_UNEXPECTED("Unexpected function type kind for differentiation.");
+}
+
 // Returns "d<var-name>" to use as a name hint for variables and parameters.
 // If no primal name is available, returns a blank string.
 //
@@ -192,6 +211,40 @@ InstPair ForwardDiffTranscriber::transcribeDifferentiableTypeAnnotation(
     builder->markInstAsPrimal(primalAnnotation);
 
     return InstPair(primalAnnotation, diffAnnotation);
+}
+
+
+InstPair ForwardDiffTranscriber::transcribeAssociatedInstAnnotation(
+    IRBuilder* builder,
+    IRInst* origInst)
+{
+    auto primalAnnotation =
+        as<IRAssociatedInstAnnotation>(maybeCloneForPrimalInst(builder, origInst));
+
+    IRAssociatedInstAnnotation* annotation = as<IRAssociatedInstAnnotation>(origInst);
+
+    /*auto diffType = differentiateType(builder, (IRType*)annotation->getBaseType());
+    if (!diffType)
+        return InstPair(primalAnnotation, nullptr);
+
+    auto diffTypeDiffWitness =
+        tryGetDifferentiableWitness(builder, diffType, DiffConformanceKind::Any);
+
+    IRInst* args[] = {diffType, diffTypeDiffWitness};
+
+    auto diffAnnotation = builder->emitIntrinsicInst(
+        builder->getVoidType(),
+        kIROp_DifferentiableTypeAnnotation,
+        2,
+        args);
+
+    builder->markInstAsPrimal(primalAnnotation);
+    builder->markInstAsPrimal(diffAnnotation);
+    */
+
+    builder->markInstAsPrimal(primalAnnotation);
+
+    return InstPair(primalAnnotation, nullptr);
 }
 
 InstPair ForwardDiffTranscriber::transcribeVar(IRBuilder* builder, IRVar* origVar)
@@ -681,7 +734,6 @@ IRInst* tryFindPrimalSubstitute(IRBuilder* builder, IRInst* callee)
 //
 InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* origCall)
 {
-
     IRInst* origCallee = origCall->getCallee();
 
     if (!origCallee)
@@ -700,10 +752,53 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
     }
 
     auto primalCallee = findOrTranscribePrimalInst(builder, origCallee);
-    auto substPrimalCallee = tryFindPrimalSubstitute(builder, primalCallee);
-
     IRInst* diffCallee = nullptr;
-    if (substPrimalCallee == primalCallee)
+
+    if (auto assocFwdDiffCallee =
+            (this->differentiableTypeConformanceContext.tryGetAssociationOfKind(
+                primalCallee,
+                FunctionAssociationKind::ForwardDerivative)))
+    {
+        diffCallee = assocFwdDiffCallee;
+    }
+    else
+    {
+        // TODO: It may be better to lower this as a SynthesizedFuncDecl from the front-end
+        // if a function is backward-differentiable, but not forward-differentiable.
+        //
+        if (this->useTrivialFwdsForBwdDifferentiableFuncs)
+        {
+            // See if the callee is backward differentiable.
+            if (this->differentiableTypeConformanceContext.tryGetAssociationOfKind(
+                    primalCallee,
+                    FunctionAssociationKind::BackwardDerivativeApply))
+            {
+                // If yes, then we want to generate a trivial forward function.
+                IRInst* args[] = {primalCallee->getDataType()};
+                auto fwdDiffFuncTypeInst = builder->emitIntrinsicInst(
+                    builder->getTypeKind(),
+                    kIROp_ForwardDiffFuncType,
+                    1,
+                    args);
+                auto resolvedFuncType = resolveFuncType(builder, fwdDiffFuncTypeInst);
+                // Generate a trivial forward differentiation function
+                auto trivialFwdCallee = builder->emitIntrinsicInst(
+                    resolvedFuncType,
+                    kIROp_ForwardDifferentiateTrivial,
+                    1,
+                    &primalCallee);
+
+                diffCallee = trivialFwdCallee;
+            }
+        }
+    }
+
+    // auto substPrimalCallee = tryFindPrimalSubstitute(builder, primalCallee);
+
+    /*if (diffCallee)
+    {
+    }
+    else if (substPrimalCallee == primalCallee)
     {
         instMapD.tryGetValue(origCallee, diffCallee);
     }
@@ -734,7 +829,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
                 primalCallee,
                 as<IRFuncType>(primalCallee->getFullType())),
             primalCallee);
-    }
+    }*/
 
     if (!diffCallee)
     {
@@ -751,8 +846,8 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
     SLANG_ASSERT(diffCalleeType);
     SLANG_RELEASE_ASSERT(diffCalleeType->getParamCount() == origCall->getArgCount());
 
-    auto placeholderCall =
-        builder->emitCallInst(nullptr, builder->emitUndefined(builder->getTypeKind()), 0, nullptr);
+    auto undefinedInst = builder->emitUndefined(builder->getTypeKind());
+    auto placeholderCall = builder->emitCallInst(nullptr, undefinedInst, 0, nullptr);
     builder->setInsertBefore(placeholderCall);
     IRBuilder argBuilder = *builder;
     IRBuilder afterBuilder = argBuilder;
@@ -929,8 +1024,14 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
 
     auto callInst = argBuilder.emitCallInst(diffReturnType, diffCallee, args);
     placeholderCall->removeAndDeallocate();
+    undefinedInst->removeAndDeallocate();
 
     argBuilder.markInstAsMixedDifferential(callInst, diffReturnType);
+
+    // Stick a link back the primal callee so that any future passes can
+    // use this info (e.g. backward AD pass would want to retreive the primalCallee
+    // so that it can look up the associated backward derivative).
+    //
     argBuilder.addAutoDiffOriginalValueDecoration(callInst, primalCallee);
 
     *builder = afterBuilder;
@@ -1689,7 +1790,7 @@ InstPair ForwardDiffTranscriber::transcribeWrapExistential(IRBuilder* builder, I
 // Create an empty func to represent the transcribed func of `origFunc`.
 InstPair ForwardDiffTranscriber::transcribeFuncHeader(IRBuilder* inBuilder, IRFunc* origFunc)
 {
-    if (auto fwdDecor = origFunc->findDecoration<IRForwardDerivativeDecoration>())
+    /*if (auto fwdDecor = origFunc->findDecoration<IRForwardDerivativeDecoration>())
     {
         // If we reach here, the function must have been used directly in a `call` inst, and
         // therefore can't be a generic. Generic function are always referenced with `specialize`
@@ -1697,15 +1798,16 @@ InstPair ForwardDiffTranscriber::transcribeFuncHeader(IRBuilder* inBuilder, IRFu
         // `transcribeSpecialize`.
         SLANG_RELEASE_ASSERT(fwdDecor->getForwardDerivativeFunc()->getOp() == kIROp_Func);
         return InstPair(origFunc, fwdDecor->getForwardDerivativeFunc());
-    }
+    }*/
 
     IRFunc* diffFunc = nullptr;
+    diffFunc = transcribeFuncHeaderImpl(inBuilder, origFunc);
 
     // If we're transcribing a function as a 'value' (i.e. maybe embedded in a generic, keep the
     // insert location unchanged). If we're transcribing it as a declaration, we should
     // insert into the module.
     //
-    auto origOuterGen = as<IRGeneric>(findOuterGeneric(origFunc));
+    /*auto origOuterGen = as<IRGeneric>(findOuterGeneric(origFunc));
     if (!origOuterGen || findInnerMostGenericReturnVal(origOuterGen) != origFunc)
     {
         // Dealing with a declaration.. insert into module scope.
@@ -1729,17 +1831,17 @@ InstPair ForwardDiffTranscriber::transcribeFuncHeader(IRBuilder* inBuilder, IRFu
     else
     {
         inBuilder->addForwardDerivativeDecoration(origFunc, diffFunc);
-    }
+    }*/
 
     inBuilder->addFloatingModeOverrideDecoration(diffFunc, FloatingPointMode::Fast);
 
     copyOriginalDecorations(origFunc, diffFunc);
 
-    FuncBodyTranscriptionTask task;
+    /*FuncBodyTranscriptionTask task;
     task.type = FuncBodyTranscriptionTaskType::Forward;
     task.originalFunc = origFunc;
     task.resultFunc = diffFunc;
-    autoDiffSharedContext->followUpFunctionsToTranscribe.add(task);
+    autoDiffSharedContext->followUpFunctionsToTranscribe.add(task);*/
 
     return InstPair(origFunc, diffFunc);
 }
@@ -1918,6 +2020,20 @@ SlangResult ForwardDiffTranscriber::prepareFuncForForwardDiff(IRFunc* func)
         simplifyFunc(autoDiffSharedContext->targetProgram, func, simplifyOptions);
     }
     return result;
+}
+
+
+void ForwardDiffTranscriber::_transcribeFuncImpl(
+    IRBuilder* inBuilder,
+    IRInst* origInst,
+    IRInst*& fwdDiffFunc)
+{
+    auto origFunc = as<IRFunc>(origInst);
+    SLANG_ASSERT(origFunc);
+    InstPair pair = this->transcribeFuncHeader(inBuilder, origFunc);
+    fwdDiffFunc = pair.differential;
+
+    this->transcribeFunc(inBuilder, origFunc, cast<IRFunc>(fwdDiffFunc));
 }
 
 // Transcribe a function definition.
@@ -2160,6 +2276,9 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_DifferentiableTypeAnnotation:
         return transcribeDifferentiableTypeAnnotation(builder, origInst);
 
+    case kIROp_AssociatedInstAnnotation:
+        return transcribeAssociatedInstAnnotation(builder, origInst);
+
         // Differentiable insts that should have been lowered in a previous pass.
     case kIROp_SwizzledStore:
         {
@@ -2295,6 +2414,7 @@ InstPair ForwardDiffTranscriber::transcribeFuncParam(
     if (auto diffPairType = tryGetDiffPairType(builder, (IRType*)origParam->getFullType()))
     {
         IRInst* diffPairParam = builder->emitParam(diffPairType);
+        builder->markInstAsMixedDifferential(diffPairParam);
 
         auto diffPairVarName = makeDiffPairName(origParam);
         if (diffPairVarName.getLength() > 0)

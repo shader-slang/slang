@@ -138,6 +138,16 @@ enum class AccessQualifier : uint64_t
     Read = 1,
 };
 
+enum class FunctionAssociationKind
+{
+    Unknown = 0,
+    ForwardDerivative = 1,
+    BackwardDerivativeApply = 2,
+    BackwardDerivativeContext = 3,
+    BackwardDerivativeContextGetVal = 4,
+    BackwardDerivativePropagate = 5
+};
+
 } // namespace Slang
 
 #endif

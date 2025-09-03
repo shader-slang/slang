@@ -69,6 +69,20 @@ enum class DiffConformanceKind
     Value = 2 // Perform actions for IDifferentiable
 };
 
+enum class FunctionConformanceKind
+{
+    Unknown = 0,
+    // ForwardDifferentiable = 1,
+    // BackwardDifferentiable = 2,
+    // BackwardPropCallable = 3,
+
+    ForwardDerivative = 1,
+    BackwardApply = 2,
+    BackwardContext = 3,
+    BackwardContextGetVal = 4,
+    BackwardProp = 5,
+};
+
 struct AutoDiffSharedContext
 {
     TargetProgram* targetProgram = nullptr;
@@ -213,6 +227,20 @@ private:
     IRInterfaceRequirementEntry* getInterfaceEntryAtIndex(IRInterfaceType* interface, UInt index);
 };
 
+enum IRParameterDirection
+{
+    In,
+    Out,
+    InOut,
+    Ref,
+    ConstRef
+};
+
+std::tuple<IRParameterDirection, IRType*> splitDirectionAndType(IRType* type);
+
+IRParameterDirection transposeDirection(IRParameterDirection direction);
+
+IRType* fromDirectionAndType(IRBuilder* builder, IRParameterDirection direction, IRType* type);
 
 struct DifferentiableTypeConformanceContext
 {
@@ -221,7 +249,26 @@ struct DifferentiableTypeConformanceContext
     IRGlobalValueWithCode* parentFunc = nullptr;
     OrderedDictionary<IRType*, IRInst*> differentiableTypeWitnessDictionary;
 
-    Dictionary<IRInst*, List<IRDifferentiableTypeAnnotation*>> annotationCache;
+    struct WitnessTableCacheKey
+    {
+        IRInst* inst;
+        FunctionConformanceKind conformanceType;
+        bool operator==(const WitnessTableCacheKey& other) const
+        {
+            return inst == other.inst && conformanceType == other.conformanceType;
+        }
+
+        HashCode getHashCode() const
+        {
+            Hasher hasher;
+            hasher.hashValue(inst);
+            hasher.hashValue(static_cast<int>(conformanceType));
+            return hasher.getResult();
+        }
+    };
+
+    // (inst, conformance-type) -> witness-table
+    Dictionary<WitnessTableCacheKey, IRInst*> witnessTableCache;
 
     IRFunc* existentialDAddFunc = nullptr;
 
@@ -235,11 +282,259 @@ struct DifferentiableTypeConformanceContext
                 sharedContext->nullDifferentialWitness);
     }
 
-    void setFunc(IRGlobalValueWithCode* func);
+    IRType* lookupContextType(IRBuilder* builder, IRInst* fnInst)
+    {
+        /*auto bwdDiffWitness =
+            tryGetWitnessOfKind(fnInst, FunctionConformanceKind::BackwardDifferentiable);
+        SLANG_ASSERT(bwdDiffWitness);
+        auto bwdDiffWitnessType = as<IRWitnessTableType>(bwdDiffWitness->getDataType());
+        auto bwdDiffWitnessInterface =
+            as<IRInterfaceType>(bwdDiffWitnessType->getConformanceType());
+        // TODO: remove hardcoded index (use key)
+        IRInterfaceRequirementEntry* contextTypeEntry =
+            as<IRInterfaceRequirementEntry>(bwdDiffWitnessInterface->getOperand(0));
+        auto bwdContextType = builder->emitLookupInterfaceMethodInst(
+            builder->getTypeKind(),
+            bwdDiffWitness,
+            contextTypeEntry->getRequirementKey());*/
 
-    List<IRDifferentiableTypeAnnotation*> getAnnotations(IRGlobalValueWithCode* inst);
+        return (IRType*)tryGetAssociationOfKind(
+            fnInst,
+            FunctionAssociationKind::BackwardDerivativeContext);
+        // return (IRType*)bwdContextType;
+    }
 
-    List<IRDifferentiableTypeAnnotation*> getAnnotations(IRModuleInst* inst);
+    IRType* resolveType(IRBuilder* builder, IRInst* typeInst)
+    {
+        if (auto funcType = as<IRFuncType>(typeInst))
+        {
+            // resolve the parameter and result types.
+            List<IRType*> paramTypes;
+            for (UIndex i = 0; i < funcType->getParamCount(); ++i)
+            {
+                paramTypes.add(resolveType(builder, funcType->getParamType(i)));
+            }
+
+            auto resultType = resolveType(builder, funcType->getResultType());
+            return builder->getFuncType(paramTypes, resultType);
+        }
+
+        switch (typeInst->getOp())
+        {
+        case kIROp_ForwardDiffFuncType:
+            {
+                auto innerFnType = cast<IRFuncType>(resolveType(builder, typeInst->getOperand(0)));
+                List<IRType*> paramTypes;
+                for (UIndex i = 0; i < innerFnType->getParamCount(); ++i)
+                {
+                    const auto& [paramDirection, paramType] =
+                        splitDirectionAndType(innerFnType->getParamType(i));
+                    if (auto witness = tryGetDifferentiableWitness(
+                            builder,
+                            paramType,
+                            DiffConformanceKind::Any))
+                    {
+                        paramTypes.add(fromDirectionAndType(
+                            builder,
+                            paramDirection,
+                            getOrCreateDiffPairType(builder, paramType, witness)));
+                    }
+                    else
+                        paramTypes.add(innerFnType->getParamType(i));
+                }
+
+                // Do the same for the result type.
+                IRType* resultType = innerFnType->getResultType();
+                if (auto witness =
+                        tryGetDifferentiableWitness(builder, resultType, DiffConformanceKind::Any))
+                    resultType = getOrCreateDiffPairType(builder, resultType, witness);
+
+                return builder->getFuncType(paramTypes, resultType);
+            }
+        case kIROp_BackwardDiffFuncType:
+            {
+                auto innerFnType = cast<IRFuncType>(resolveType(builder, typeInst->getOperand(0)));
+
+                List<IRType*> origParamTypes;
+                for (UIndex i = 0; i < innerFnType->getParamCount(); ++i)
+                {
+                    origParamTypes.add(innerFnType->getParamType(i));
+                }
+
+                origParamTypes.add(fromDirectionAndType(
+                    builder,
+                    IRParameterDirection::Out,
+                    innerFnType->getResultType()));
+
+                List<IRType*> paramTypes;
+                for (auto origParamType : origParamTypes)
+                {
+                    const auto& [paramDirection, paramType] = splitDirectionAndType(origParamType);
+
+                    if (auto witness = tryGetDifferentiableWitness(
+                            builder,
+                            paramType,
+                            DiffConformanceKind::Any))
+                    {
+                        // Differentiable
+                        switch (paramDirection)
+                        {
+                        case IRParameterDirection::In:
+                            paramTypes.add(fromDirectionAndType(
+                                builder,
+                                IRParameterDirection::InOut,
+                                getOrCreateDiffPairType(builder, paramType, witness)));
+                            break;
+                        case IRParameterDirection::Out:
+                            paramTypes.add(fromDirectionAndType(
+                                builder,
+                                IRParameterDirection::In,
+                                (IRType*)getDifferentialForType(builder, paramType)));
+                            break;
+                        case IRParameterDirection::InOut:
+                            paramTypes.add(fromDirectionAndType(
+                                builder,
+                                IRParameterDirection::InOut,
+                                getOrCreateDiffPairType(builder, paramType, witness)));
+                            break;
+                        default:
+                            SLANG_UNEXPECTED(
+                                "Unhandled parameter direction in backward diff func type");
+                        }
+                    }
+                    else
+                    {
+                        // Non-differentiable
+                        switch (paramDirection)
+                        {
+                        case IRParameterDirection::In:
+                        case IRParameterDirection::Ref:
+                        case IRParameterDirection::ConstRef:
+                            paramTypes.add(
+                                fromDirectionAndType(builder, paramDirection, paramType));
+                            break;
+                        case IRParameterDirection::Out:
+                            // skip.
+                            break;
+                        case IRParameterDirection::InOut:
+                            paramTypes.add(
+                                fromDirectionAndType(builder, IRParameterDirection::In, paramType));
+                            break;
+                        default:
+                            SLANG_UNEXPECTED(
+                                false,
+                                "Unhandled parameter direction in backward diff func type");
+                        }
+                    }
+                }
+
+                return builder->getFuncType(paramTypes, builder->getVoidType());
+            }
+        case kIROp_ApplyForBwdFuncType:
+            {
+                // auto bwdContextType = lookupContextType(builder, typeInst->getOperand(0));
+                auto bwdContextType = typeInst->getOperand(1);
+
+                // Copy the func's parameter types as-is and replace the result type with
+                // the bwd context type.
+                //
+                auto innerFnType = cast<IRFuncType>(resolveType(builder, typeInst->getOperand(0)));
+
+                List<IRType*> paramTypes;
+                for (UIndex i = 0; i < innerFnType->getParamCount(); ++i)
+                {
+                    paramTypes.add(innerFnType->getParamType(i));
+                }
+
+                return builder->getFuncType(paramTypes, (IRType*)bwdContextType);
+                break;
+            }
+        case kIROp_FuncResultType:
+            {
+                // auto bwdContextType = lookupContextType(builder, typeInst->getOperand(0));
+                auto bwdContextType = typeInst->getOperand(1);
+                auto innerFnType = cast<IRFuncType>(resolveType(builder, typeInst->getOperand(0)));
+
+                return builder->getFuncType(
+                    List<IRType*>((IRType*)bwdContextType),
+                    innerFnType->getResultType());
+                break;
+            }
+        case kIROp_BwdCallableFuncType:
+            {
+                // auto bwdContextType = lookupContextType(builder, typeInst->getOperand(0));
+                auto bwdContextType = typeInst->getOperand(1);
+
+                auto innerFnType = cast<IRFuncType>(resolveType(builder, typeInst->getOperand(0)));
+                List<IRType*> paramTypes;
+
+                paramTypes.add((IRType*)bwdContextType);
+                for (UIndex i = 0; i < innerFnType->getParamCount(); ++i)
+                {
+                    const auto& [paramDirection, paramType] =
+                        splitDirectionAndType(innerFnType->getParamType(i));
+                    if (auto diffType = getDifferentialForType(builder, paramType))
+                    {
+                        // If the parameter type is a differentiable type, we replace it with
+                        // the differential type.
+
+                        paramTypes.add(fromDirectionAndType(
+                            builder,
+                            transposeDirection(paramDirection),
+                            (IRType*)diffType));
+                    }
+                    else
+                        paramTypes.add(builder->getVoidType());
+                }
+
+                // Add the differential of the result type.
+                if (auto resultDiffType =
+                        getDifferentialForType(builder, innerFnType->getResultType()))
+                    paramTypes.add((IRType*)resultDiffType);
+
+                return builder->getFuncType(paramTypes, builder->getVoidType());
+                break;
+            }
+        }
+
+        return (IRType*)typeInst;
+    }
+
+    /*FunctionConformanceKind getFunctionConformanceKind(IRInst* conformanceType)
+    {
+        if (auto knownBuiltinDecoration =
+                conformanceType->findDecoration<IRKnownBuiltinDecoration>())
+        {
+            auto name = knownBuiltinDecoration->getName();
+            // TODO: We really need something better than doing a string comparison..
+            if (name == toSlice("IForwardDifferentiable"))
+            {
+                return FunctionConformanceKind::ForwardDifferentiable;
+            }
+            else if (name == toSlice("IBackwardDifferentiable"))
+            {
+                return FunctionConformanceKind::BackwardDifferentiable;
+            }
+            else if (name == toSlice("IBwdCallable"))
+            {
+                return FunctionConformanceKind::BackwardPropCallable;
+            }
+        }
+
+        return FunctionConformanceKind::Unknown;
+    }*/
+
+    void setFunc(IRInst* inst);
+
+    template<typename T>
+    List<T*> getAnnotations(IRGlobalValueWithCode* inst);
+
+    template<typename T>
+    List<T*> getAnnotations(IRModuleInst* inst);
+
+    IRInst* tryGetWitnessOfKind(IRInst* target, FunctionConformanceKind kind);
+
+    IRInst* tryGetAssociationOfKind(IRInst* target, FunctionAssociationKind kind);
 
     void buildGlobalWitnessDictionary();
 
@@ -567,6 +862,12 @@ bool isNoDiffType(IRType* paramType);
 bool isNeverDiffFuncType(IRFuncType* funcType);
 
 IRInst* lookupForwardDerivativeReference(IRInst* primalFunction);
+
+IRInst* _lookupWitness(
+    IRBuilder* builder,
+    IRInst* witness,
+    IRInst* requirementKey,
+    IRType* resultType = nullptr);
 
 struct IRAutodiffPassOptions
 {

@@ -231,9 +231,13 @@ static InstructionUsageType getCallUsageType(IRCall* call, IRInst* inst)
         ftn = as<IRFunc>(getResolvedInstForDecorations(spec));
 
     // Differentiable functions are mostly ignored, treated as having inout parameters
-    else if (as<IRForwardDifferentiate>(callee))
+    /*else if (as<IRForwardDifferentiate>(callee))
         return Store;
     else if (as<IRBackwardDifferentiate>(callee))
+        return Store;*/
+    // TODO: Maybe FunctionCopy should just default to it's operand's
+    // result?
+    else if (as<IRTranslateBase>(callee))
         return Store;
 
     else if (auto wit = as<IRLookupWitnessMethod>(callee))

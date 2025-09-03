@@ -3121,6 +3121,12 @@ IRDifferentialPairType* IRBuilder::getDifferentialPairType(IRType* valueType, IR
         getType(kIROp_DifferentialPairType, sizeof(operands) / sizeof(operands[0]), operands);
 }
 
+/*IRForwardDiffFuncType* IRBuilder::getForwardDiffFuncType(IRType* baseFuncType)
+{
+    return (
+        IRForwardDiffFuncType*)getType(kIROp_ForwardDiffFuncType, 1, (IRInst* const*)&baseFuncType);
+}*/
+
 IRDifferentialPtrPairType* IRBuilder::getDifferentialPtrPairType(
     IRType* valueType,
     IRInst* witnessTable)
@@ -3627,6 +3633,17 @@ IRInst* IRBuilder::emitBackwardDifferentiatePropagateInst(IRType* type, IRInst* 
     auto inst = createInst<IRBackwardDifferentiatePropagate>(
         this,
         kIROp_BackwardDifferentiatePropagate,
+        type,
+        baseFn);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitForwardDifferentiatePropagateInst(IRType* type, IRInst* baseFn)
+{
+    auto inst = createInst<IRForwardDifferentiatePropagate>(
+        this,
+        kIROp_ForwardDifferentiatePropagate,
         type,
         baseFn);
     addInst(inst);
@@ -8547,6 +8564,9 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     if (as<IRTypeFlowData>(this))
         return false;
 
+    if (as<IRTranslateBase>(this))
+        return false;
+
     switch (getOp())
     {
     // By default, assume that we might have side effects,
@@ -8729,14 +8749,22 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_GetPerVertexInputArray:
     case kIROp_MetalCastToDepthTexture:
     case kIROp_GetCurrentStage:
+    case kIROp_DetachDerivative:
+    case kIROp_FuncTypeOf:
         return false;
 
-    case kIROp_ForwardDifferentiate:
-    case kIROp_BackwardDifferentiate:
-    case kIROp_BackwardDifferentiatePrimal:
-    case kIROp_BackwardDifferentiatePropagate:
-    case kIROp_DetachDerivative:
+    case kIROp_FunctionCopy:
         return false;
+
+        /* TODO: Remove..
+        case kIROp_ForwardDifferentiate:
+        case kIROp_BackwardDifferentiate:
+        case kIROp_BackwardDifferentiatePrimal:
+        case kIROp_BackwardDifferentiatePropagate:
+        case kIROp_BackwardContextGetPrimalVal:
+        case kIROp_ForwardDifferentiatePropagate:
+        case kIROp_FunctionCopy:
+            return false;*/
 
     case kIROp_Div:
     case kIROp_IRem:

@@ -48,7 +48,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     {
         dpfloat dpa = dpfloat(1.0, 0.0);
 
-        __bwd_diff(test_simple_while)(dpa, 1.0f);
+        bwd_diff(test_simple_while)(dpa, 1.0f);
         outputBuffer[0] = dpa.d; // Expect: 8.0
     }
 }

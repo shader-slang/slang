@@ -620,6 +620,7 @@ void BackwardDiffTranscriberBase::makeParameterBlock(IRBuilder* inBuilder, IRFun
     // builder position, so we're going to manually move the new block
     // to before the existing block.
     auto paramBlock = builder.emitBlock();
+    builder.markInstAsMixedDifferential(paramBlock);
     paramBlock->insertBefore(firstBlock);
     builder.setInsertInto(paramBlock);
 
@@ -678,18 +679,18 @@ IRFunc* BackwardDiffTranscriberBase::generateNewForwardDerivativeForFunc(
     IRFunc* originalFunc,
     IRFunc* diffPropagateFunc)
 {
-    auto primalOuterParent = findOuterGeneric(originalFunc);
-    if (!primalOuterParent)
-        primalOuterParent = originalFunc;
+    // auto primalOuterParent = findOuterGeneric(originalFunc);
+    // if (!primalOuterParent)
+    //     primalOuterParent = originalFunc;
 
     // Make a clone of original func so we won't modify the original.
     IRCloneEnv originalCloneEnv;
-    primalOuterParent = cloneInst(&originalCloneEnv, builder, primalOuterParent);
-    auto primalFunc = as<IRFunc>(getGenericReturnVal(primalOuterParent));
+    auto clonedFunc = cloneInst(&originalCloneEnv, builder, originalFunc);
+    auto primalFunc = as<IRFunc>(clonedFunc);
 
     // Strip any existing derivative decorations off the clone.
     stripDerivativeDecorations(primalFunc);
-    eliminateDeadCode(primalOuterParent);
+    eliminateDeadCode(primalFunc);
 
     // Perform required transformations and simplifications on the original func to make it
     // reversible.
@@ -697,30 +698,26 @@ IRFunc* BackwardDiffTranscriberBase::generateNewForwardDerivativeForFunc(
         return diffPropagateFunc;
 
     // Forward transcribe the clone of the original func.
-    ForwardDiffTranscriber& fwdTranscriber = *static_cast<ForwardDiffTranscriber*>(
-        autoDiffSharedContext->transcriberSet.forwardTranscriber);
-    auto oldCount = autoDiffSharedContext->followUpFunctionsToTranscribe.getCount();
-    IRFunc* fwdDiffFunc =
-        as<IRFunc>(getGenericReturnVal(fwdTranscriber.transcribe(builder, primalOuterParent)));
+    /*ForwardDiffTranscriber& fwdTranscriber = *static_cast<ForwardDiffTranscriber*>(
+        autoDiffSharedContext->transcriberSet.forwardTranscriber);*/
+
+    ForwardDiffTranscriber fwdTranscriber(autoDiffSharedContext, sink);
+    fwdTranscriber.enableReverseModeCompatibility();
+    IRFunc* fwdDiffFunc = as<IRFunc>(fwdTranscriber.transcribe(builder, primalFunc));
+    SLANG_ASSERT(fwdDiffFunc);
+
+    fwdTranscriber.transcribeFunc(builder, primalFunc, fwdDiffFunc);
     fwdDiffFunc->sourceLoc = primalFunc->sourceLoc;
 
-    SLANG_ASSERT(fwdDiffFunc);
-    auto newCount = autoDiffSharedContext->followUpFunctionsToTranscribe.getCount();
-    for (auto i = oldCount; i < newCount; i++)
-    {
-        auto pendingTask = autoDiffSharedContext->followUpFunctionsToTranscribe.getLast();
-        autoDiffSharedContext->followUpFunctionsToTranscribe.removeLast();
-        SLANG_RELEASE_ASSERT(pendingTask.type == FuncBodyTranscriptionTaskType::Forward);
-        fwdTranscriber.transcribeFunc(builder, pendingTask.originalFunc, pendingTask.resultFunc);
-    }
-
     // Remove the clone of original func.
-    primalOuterParent->removeAndDeallocate();
+    SLANG_ASSERT(primalFunc->hasUses() == false);
+    primalFunc->removeAndDeallocate();
 
     // Remove redundant loads since they interfere with transposition logic.
     eliminateRedundantLoadStore(fwdDiffFunc);
 
     // Migrate the new forward derivative function into the generic parent of `diffPropagateFunc`.
+    /*
     if (auto fwdParentGeneric = as<IRGeneric>(findOuterGeneric(fwdDiffFunc)))
     {
         // Clone forward derivative func from its own generic into current generic parent.
@@ -744,6 +741,7 @@ IRFunc* BackwardDiffTranscriberBase::generateNewForwardDerivativeForFunc(
         }
         fwdParentGeneric->removeAndDeallocate();
     }
+    */
 
     return fwdDiffFunc;
 }
@@ -785,7 +783,258 @@ static void _unlockPrimalParamReplacementInsts(ParameterBlockTransposeInfo& para
         value->findDecoration<IRKeepAliveDecoration>()->removeAndDeallocate();
 }
 
-// Transcribe a function definition.
+static void generateName(IRBuilder* builder, IRInst* srcInst, IRInst* dstInst, const char* prefix)
+{
+    if (auto nameHint = srcInst->findDecoration<IRNameHintDecoration>())
+    {
+        String name = nameHint->getName();
+        name = prefix + name;
+        builder->addNameHintDecoration(dstInst, name.getUnownedSlice());
+    }
+}
+
+static IRInst* maybeHoist(IRBuilder& builder, IRInst* inst)
+{
+    IRInst* specializedVal = nullptr;
+    auto hoistResult = hoistValueFromGeneric(builder, inst, specializedVal, true);
+    return hoistResult; //(as<IRGeneric>(hoistResult)) ? getGenericReturnVal(hoistResult) :
+                        // hoistResult;
+}
+
+// Transcribe a function definition (AD 2.0)
+void BackwardDiffTranscriberBase::_transcribeFuncImpl(
+    IRBuilder* builder,
+    IRFunc* targetFunc,
+    IRInst*& applyFuncInst,
+    IRInst*& propagateFuncInst,
+    IRInst*& contextGetValFuncInst,
+    IRInst*& contextTypeInst)
+{
+    differentiableTypeConformanceContext.setFunc(targetFunc);
+
+    // --------------------------------------------------------------------------
+    // Create IRFunc* for propagate function &
+    // create the IRFuncType for it.
+    //
+    auto propagateFunc = builder->createFunc();
+
+
+    IRBuilder tempBuilder = *builder;
+    tempBuilder.setInsertBefore(propagateFunc);
+    /*if (auto outerGeneric = findOuterGeneric(propagateFunc))
+    {
+        tempBuilder.setInsertBefore(outerGeneric);
+    }
+    else
+    {
+        tempBuilder.setInsertBefore(propagateFunc);
+    }*/
+
+    auto fwdDiffFunc = generateNewForwardDerivativeForFunc(&tempBuilder, targetFunc, propagateFunc);
+    if (!fwdDiffFunc)
+        return;
+
+    bool isResultDifferentiable = as<IRDifferentialPairType>(fwdDiffFunc->getResultType());
+
+    // Split first block into a paramter block.
+    this->makeParameterBlock(&tempBuilder, as<IRFunc>(fwdDiffFunc));
+
+    // This steps adds a decoration to instructions that are computing the differential.
+    // TODO: This is disabled for now because fwd-mode already adds differential decorations
+    // wherever need. We need to run this pass only for user-writted forward derivativecode.
+    //
+    // diffPropagationPass->propagateDiffInstDecoration(builder, fwdDiffFunc);
+
+    diffUnzipPass->unzipDiffInsts(fwdDiffFunc);
+    IRFunc* unzippedFwdDiffFunc = fwdDiffFunc;
+
+    // Move blocks from `unzippedFwdDiffFunc` to the `diffPropagateFunc` shell.
+    builder->setInsertInto(propagateFunc->getParent());
+    {
+        List<IRBlock*> workList;
+        for (auto block = unzippedFwdDiffFunc->getFirstBlock(); block;
+             block = block->getNextBlock())
+            workList.add(block);
+
+        for (auto block : workList)
+            block->insertAtEnd(propagateFunc);
+    }
+
+    // Transpose the first block (parameter block)
+    /*
+    auto paramTransposeInfo = splitAndTransposeParameterBlock(
+        builder,
+        propagateFunc,
+        targetFunc->sourceLoc,
+        isResultDifferentiable);
+    */
+
+    // The insts we inserted in paramTransposeInfo.mapPrimalSpecificParamToReplacementInPropFunc
+    // may be used by write back logic that we are going to insert later.
+    // Before then we want to keep them alive.
+    //_lockPrimalParamReplacementInsts(builder, paramTransposeInfo);
+
+    builder->setInsertInto(propagateFunc);
+
+    // Transpose differential blocks from unzippedFwdDiffFunc into diffFunc (with dOutParameter)
+    // representing the derivative of the return value.
+    /*DiffTransposePass::FuncTranspositionInfo transposeInfo = {
+        paramTransposeInfo.dOutParam,
+        paramTransposeInfo.transposedInstMap};*/
+    diffTransposePass->transposeDiffBlocksInFunc(propagateFunc, {});
+
+    // Apply checkpointing policy to legalize cross-scope uses of primal values
+    // using either recompute or store strategies.
+    auto primalsInfo = applyCheckpointPolicy(propagateFunc);
+
+    // eliminateDeadCode(propagateFunc);
+
+    // Extracts the primal computations into its own func, turn all accesses to stored primal insts
+    // into explicit intermediate data structure reads and writes.
+    IRInst* intermediateType = nullptr;
+    IRFunc* getValFunc = nullptr;
+    auto applyFunc = diffUnzipPass->extractPrimalFunc(
+        propagateFunc,
+        targetFunc,
+        primalsInfo,
+        intermediateType,
+        getValFunc);
+
+    // At this point the unzipped func is just an empty shell
+    // and we can simply remove it.
+    unzippedFwdDiffFunc->removeAndDeallocate();
+
+    // Write back derivatives to inout parameters.
+    // writeBackDerivativeToInOutParams(paramTransposeInfo, propagateFunc);
+
+    // Remove primalFunc specific params.
+    /*List<IRInst*> paramsToRemove;
+    for (auto param : propagateFunc->getParams())
+    {
+        if (!paramTransposeInfo.propagateFuncParams.contains(param))
+            paramsToRemove.add(param);
+    }
+    for (auto param : paramsToRemove)
+    {
+        if (param->hasUses())
+        {
+            IRInst* replacement = nullptr;
+            paramTransposeInfo.mapPrimalSpecificParamToReplacementInPropFunc.tryGetValue(
+                param,
+                replacement);
+
+            if (replacement)
+                param->replaceUsesWith(replacement);
+        }
+        param->removeAndDeallocate();
+    }*/
+
+    //_unlockPrimalParamReplacementInsts(paramTransposeInfo);
+
+    // If primal function is nested in a generic, we want to create separate generics for all the
+    // associated things we have just created.
+    // auto primalOuterGeneric = findOuterGeneric(targetFunc);
+    // IRInst* specializedFunc = nullptr;
+    // auto intermediateTypeGeneric =
+    //    hoistValueFromGeneric(*builder, intermediateType, specializedFunc, true);
+    // builder->setInsertBefore(targetFunc);
+    // builder->addBackwardDerivativeIntermediateTypeDecoration(targetFunc,
+    // intermediateTypeGeneric);
+
+    // auto primalFuncGeneric =
+    //     hoistValueFromGeneric(*builder, extractedPrimalFunc, specializedFunc, true);
+
+    // builder->setInsertBefore(targetFunc);
+    // IRInst* applyFunc = maybeSpecializeWithGeneric(*builder, primalFuncGeneric,
+    // primalOuterGeneric);
+
+    // Copy over checkpoint preference hints.
+    {
+        auto diffPrimalFunc = getResolvedInstForDecorations(applyFunc, true);
+        auto checkpointHint = targetFunc->findDecoration<IRCheckpointHintDecoration>();
+        if (checkpointHint)
+            builder->addDecoration(diffPrimalFunc, checkpointHint->getOp());
+    }
+
+    // ------------------------------------------------------------
+    // Fill in the propagate function's type.
+    List<IRType*> propagateParamTypes;
+    IRType* propagateResultType;
+
+    propagateParamTypes.add((IRType*)intermediateType);
+
+    for (UInt i = 0; i < targetFunc->getParamCount(); i++)
+    {
+        const auto& [direction, paramType] = splitDirectionAndType(targetFunc->getParamType(i));
+        auto diffParamType = (IRType*)differentiableTypeConformanceContext.getDifferentialForType(
+            builder,
+            paramType);
+
+        if (diffParamType)
+            propagateParamTypes.add(
+                fromDirectionAndType(builder, transposeDirection(direction), diffParamType));
+        else
+            propagateParamTypes.add(builder->getVoidType());
+    }
+
+    auto resultType = targetFunc->getResultType();
+    auto diffResultType =
+        (IRType*)differentiableTypeConformanceContext.getDifferentialForType(builder, resultType);
+    if (diffResultType)
+    {
+        propagateResultType =
+            fromDirectionAndType(builder, IRParameterDirection::In, diffResultType);
+    }
+    else
+    {
+        propagateResultType = builder->getVoidType();
+    }
+
+    if (propagateResultType->getOp() != kIROp_VoidType)
+    {
+        // If the result type is not void, we need to add it as the last parameter.
+        propagateParamTypes.add(propagateResultType);
+    }
+
+    auto propagateFuncType = builder->getFuncType(propagateParamTypes, builder->getVoidType());
+    propagateFunc->setFullType(propagateFuncType);
+
+    // --------------------------------------------------------------------------
+
+    initializeLocalVariables(builder->getModule(), applyFunc);
+    initializeLocalVariables(builder->getModule(), propagateFunc);
+
+    // Clean up block labels & other temp decorations.
+    stripTempDecorations(propagateFunc);
+    stripTempDecorations(applyFunc);
+    stripTempDecorations(getValFunc);
+
+    // Make sure blocks are in control-flow order.
+    sortBlocksInFunc(propagateFunc);
+    sortBlocksInFunc(targetFunc);
+
+    generateName(builder, targetFunc, applyFunc, "s_apply_");
+    generateName(builder, targetFunc, propagateFunc, "s_bwdProp_");
+    generateName(builder, targetFunc, getValFunc, "s_getVal_");
+    generateName(builder, targetFunc, intermediateType, "s_bwdCallableCtx_");
+
+    IRBuilder subBuilder = *builder;
+
+    //
+    // Output the 4-tuple result of the translation (and hoist values out of any generic contexts).
+    //
+
+    // It's important to hoist the context type out *first* because the other funcs may depend on
+    // it.
+    //
+    contextTypeInst = maybeHoist(subBuilder, intermediateType);
+
+    propagateFuncInst = maybeHoist(subBuilder, propagateFunc);
+    applyFuncInst = maybeHoist(subBuilder, applyFunc);
+    contextGetValFuncInst = maybeHoist(subBuilder, getValFunc);
+}
+
+// Transcribe a function definition. (Old code)
 void BackwardDiffTranscriberBase::transcribeFuncImpl(
     IRBuilder* builder,
     IRFunc* primalFunc,
@@ -854,8 +1103,8 @@ void BackwardDiffTranscriberBase::transcribeFuncImpl(
 
     // Transpose differential blocks from unzippedFwdDiffFunc into diffFunc (with dOutParameter)
     // representing the derivative of the return value.
-    DiffTransposePass::FuncTranspositionInfo transposeInfo = {paramTransposeInfo.dOutParam};
-    diffTransposePass->transposeDiffBlocksInFunc(diffPropagateFunc, transposeInfo);
+    DiffTransposePass::FuncTranspositionInfo transposeInfo = {};
+    diffTransposePass->transposeDiffBlocksInFunc(diffPropagateFunc, {});
 
     // Apply checkpointing policy to legalize cross-scope uses of primal values
     // using either recompute or store strategies.
@@ -866,12 +1115,13 @@ void BackwardDiffTranscriberBase::transcribeFuncImpl(
     // Extracts the primal computations into its own func, turn all accesses to stored primal insts
     // into explicit intermediate data structure reads and writes.
     IRInst* intermediateType = nullptr;
+    IRFunc* getValFunc = nullptr;
     auto extractedPrimalFunc = diffUnzipPass->extractPrimalFunc(
         diffPropagateFunc,
         primalFunc,
         primalsInfo,
-        paramTransposeInfo,
-        intermediateType);
+        intermediateType,
+        getValFunc);
 
     // At this point the unzipped func is just an empty shell
     // and we can simply remove it.
@@ -960,6 +1210,7 @@ ParameterBlockTransposeInfo BackwardDiffTranscriberBase::splitAndTransposeParame
     SourceLoc primalLoc,
     bool isResultDifferentiable)
 {
+    differentiableTypeConformanceContext.setFunc(diffFunc);
     // This method splits transposes the all the parameters for both the primal and propagate
     // computation. At the end of this method, the parameter block will contain a combination of
     // parameters for both the to-be-primal function and to-be-propagate function. We use
@@ -1055,6 +1306,15 @@ ParameterBlockTransposeInfo BackwardDiffTranscriberBase::splitAndTransposeParame
     // - mapPrimalSpecificParamToReplacementInPropFunc[param]. What should all references to this
     // parameter
     //      from the primal compuation logic in the future propagate function be replaced to.
+
+    auto ctxParam = builder->emitParam(as<IRFuncType>(diffFunc->getDataType())->getParamType(0));
+    builder->addNameHintDecoration(ctxParam, UnownedStringSlice("_s_diff_ctx"));
+    builder->addDecoration(ctxParam, kIROp_PrimalContextDecoration);
+    result.propagateFuncParams.add(ctxParam);
+
+    diffFunc->sourceLoc = primalLoc;
+    ctxParam->sourceLoc = primalLoc;
+
     for (auto fwdParam : fwdParams)
     {
         IRBuilderSourceLocRAII sourceLocationScope(builder, fwdParam->sourceLoc);
@@ -1081,200 +1341,301 @@ ParameterBlockTransposeInfo BackwardDiffTranscriberBase::splitAndTransposeParame
                 builder,
                 diffPairType);
         }
-
-        // Now we handle each combination of parameter direction x differentiability.
-        if (outType)
+        else
         {
-            // Case 1: out parameters.
-            // Out parameters need to be handled differently whether or not it is differentiable,
-            // since the propagate function will not have a corresponding output.
-            if (diffPairType)
+            primalType = fwdParam->getDataType();
+
+            if (auto outType = as<IROutType>(primalType))
+                primalType = outType->getValueType();
+            else if (auto inoutType = as<IRInOutType>(primalType))
+                primalType = inoutType->getValueType();
+        }
+
+        // AD 2.0 logic (significantly simplified)
+        // If the parameter is a relevant differential pair, we
+        // put the primal component in the primal function and the diff component
+        // in the propagate function.
+        // If it's not relevant, then we replace it with a none-type parameter.
+        //
+        switch (fwdParam->getDataType()->getOp())
+        {
+        case kIROp_OutType:
+            // Out.
+            if (diffType)
             {
-                // Create dOut param.
-                auto diffParam = builder->emitParam(diffType);
-                copyNameHintAndDebugDecorations(diffParam, fwdParam);
-                result.propagateFuncParams.add(diffParam);
-                primalRefReplacement = builder->emitParam(builder->getOutType(primalType));
-                copyNameHintAndDebugDecorations(primalRefReplacement, fwdParam);
+                diffWriteRefReplacement = builder->emitParam(diffType); // In diff.
+                markDiffTypeInst(builder, diffWriteRefReplacement, primalType);
 
-                // Create a local var for read access in pre-transpose code.
-                // This will the var from which we will fetch the final resulting derivative
-                // after transposition.
-                auto tempVar = nextBlockBuilder.emitVar(diffType);
-                copyNameHintAndDebugDecorations(tempVar, fwdParam);
-                result.propagateFuncSpecificPrimalInsts.add(tempVar);
-
-                // Initialize the var with input diff param at start.
-                // Note that we insert the store in the primal block so it won't get transposed.
-                auto storeInst = nextBlockBuilder.emitStore(tempVar, diffParam);
-                nextBlockBuilder.markInstAsDifferential(storeInst, primalType);
-                // Since this store inst is specific to propagate function, we track it in a
-                // set so we can remove it when we generate the primal func.
-                result.propagateFuncSpecificPrimalInsts.add(storeInst);
-
-                diffWriteRefReplacement = tempVar;
-                diffRefReplacement = tempVar;
+                result.propagateFuncParams.add(diffWriteRefReplacement);
+                copyNameHintAndDebugDecorations(diffWriteRefReplacement, fwdParam);
+                diffRefReplacement = nullptr;
             }
             else
             {
-                primalRefReplacement = builder->emitParam(outType);
-                copyNameHintAndDebugDecorations(primalRefReplacement, fwdParam);
+                // NoneType parameter.
+                result.propagateFuncParams.add(builder->emitParam(builder->getVoidType()));
             }
+
+            primalRefReplacement = builder->emitParam( // Out primal.
+                builder->getOutType(primalType));
             result.primalFuncParams.add(primalRefReplacement);
+            copyNameHintAndDebugDecorations(primalRefReplacement, fwdParam);
 
-            // Create a local var for the out param for the primal part of the prop func.
-            auto tempPrimalVar = nextBlockBuilder.emitVar(outType->getValueType());
-            copyNameHintAndDebugDecorations(tempPrimalVar, fwdParam);
-            result.mapPrimalSpecificParamToReplacementInPropFunc[primalRefReplacement] =
-                tempPrimalVar;
+            break;
 
-            instsToRemove.add(fwdParam);
-        }
-        else if (!isRelevantDifferentialPair(fwdParam->getDataType()))
-        {
-            if (inoutType)
+        case kIROp_InOutType:
+            // In Out.
+            if (diffType)
             {
-                // Case 2: non differentiable inout parameter.
-                // They should become an inout parameter in primal func, but an in parameter in
-                // bwd func.
-                fwdParam->removeFromParent();
-                fwdDiffParameterBlock->addParam(fwdParam);
-                result.primalFuncParams.add(fwdParam);
+                auto diffParam = builder->emitParam(builder->getInOutType(diffType)); // InOut diff.
+                markDiffTypeInst(builder, diffParam, primalType);
 
-                primalRefReplacement = fwdParam;
+                result.propagateFuncParams.add(diffParam);
+                copyNameHintAndDebugDecorations(diffParam, fwdParam);
 
-                // Create an in param for the prop func.
-                auto propParam = builder->emitParam(inoutType->getValueType());
+                diffRefReplacement = diffParam;
+                diffWriteRefReplacement = diffParam;
+            }
+            else
+            {
+                // NoneType parameter.
+                result.propagateFuncParams.add(builder->emitParam(builder->getVoidType()));
+            }
+
+            primalRefReplacement =
+                builder->emitParam(builder->getInOutType(primalType)); // InOut primal.
+            result.primalFuncParams.add(primalRefReplacement);
+            break;
+
+        case kIROp_RefType:
+        case kIROp_ConstRefType:
+            SLANG_UNEXPECTED("Unexpected ref/constref type in backward diff transcriber");
+            break;
+
+        default:
+            // In.
+            if (diffPairType)
+            {
+                auto diffParam = builder->emitParam(builder->getOutType(diffType)); // Out diff.
+                markDiffTypeInst(builder, diffParam, primalType);
+
+                result.propagateFuncParams.add(diffParam);
+
+                diffWriteRefReplacement = nullptr;
+                diffRefReplacement = diffParam;
+            }
+            else
+            {
+                // NoneType parameter.
+                result.propagateFuncParams.add(builder->emitParam(builder->getVoidType()));
+            }
+
+            primalRefReplacement = builder->emitParam(primalType); // Out primal.
+            result.primalFuncParams.add(primalRefReplacement);
+            break;
+        }
+
+        // Now we handle each combination of parameter direction x differentiability.
+        // TODO: Temporarily disabled.
+        // Remove after AD 2.0 (above) is working
+        if (false)
+        {
+            if (outType)
+            {
+                // Case 1: out parameters.
+                // Out parameters need to be handled differently whether or not it is
+                // differentiable, since the propagate function will not have a corresponding
+                // output.
+                if (diffPairType)
+                {
+                    // Create dOut param.
+                    auto diffParam = builder->emitParam(diffType);
+                    copyNameHintAndDebugDecorations(diffParam, fwdParam);
+                    result.propagateFuncParams.add(diffParam);
+                    primalRefReplacement = builder->emitParam(builder->getOutType(primalType));
+                    copyNameHintAndDebugDecorations(primalRefReplacement, fwdParam);
+
+                    // Create a local var for read access in pre-transpose code.
+                    // This will the var from which we will fetch the final resulting derivative
+                    // after transposition.
+                    auto tempVar = nextBlockBuilder.emitVar(diffType);
+                    copyNameHintAndDebugDecorations(tempVar, fwdParam);
+                    result.propagateFuncSpecificPrimalInsts.add(tempVar);
+
+                    // Initialize the var with input diff param at start.
+                    // Note that we insert the store in the primal block so it won't get transposed.
+                    auto storeInst = nextBlockBuilder.emitStore(tempVar, diffParam);
+                    nextBlockBuilder.markInstAsDifferential(storeInst, primalType);
+                    // Since this store inst is specific to propagate function, we track it in a
+                    // set so we can remove it when we generate the primal func.
+                    result.propagateFuncSpecificPrimalInsts.add(storeInst);
+
+                    diffWriteRefReplacement = tempVar;
+                    diffRefReplacement = tempVar;
+                }
+                else
+                {
+                    primalRefReplacement = builder->emitParam(outType);
+                    copyNameHintAndDebugDecorations(primalRefReplacement, fwdParam);
+                }
+                result.primalFuncParams.add(primalRefReplacement);
+
+                // Create a local var for the out param for the primal part of the prop func.
+                auto tempPrimalVar = nextBlockBuilder.emitVar(outType->getValueType());
+                copyNameHintAndDebugDecorations(tempPrimalVar, fwdParam);
+                result.mapPrimalSpecificParamToReplacementInPropFunc[primalRefReplacement] =
+                    tempPrimalVar;
+
+                instsToRemove.add(fwdParam);
+            }
+            else if (!isRelevantDifferentialPair(fwdParam->getDataType()))
+            {
+                if (inoutType)
+                {
+                    // Case 2: non differentiable inout parameter.
+                    // They should become an inout parameter in primal func, but an in parameter in
+                    // bwd func.
+                    fwdParam->removeFromParent();
+                    fwdDiffParameterBlock->addParam(fwdParam);
+                    result.primalFuncParams.add(fwdParam);
+
+                    primalRefReplacement = fwdParam;
+
+                    // Create an in param for the prop func.
+                    auto propParam = builder->emitParam(inoutType->getValueType());
+                    copyNameHintAndDebugDecorations(propParam, fwdParam);
+                    result.propagateFuncParams.add(propParam);
+
+                    // Create a local var for the out param for the primal part of the prop func.
+                    auto tempPrimalVar = nextBlockBuilder.emitVar(inoutType->getValueType());
+                    copyNameHintAndDebugDecorations(tempPrimalVar, fwdParam);
+
+                    result.propagateFuncSpecificPrimalInsts.add(tempPrimalVar);
+                    auto storeInst = nextBlockBuilder.emitStore(tempPrimalVar, propParam);
+                    result.propagateFuncSpecificPrimalInsts.add(storeInst);
+                    result.mapPrimalSpecificParamToReplacementInPropFunc[primalRefReplacement] =
+                        tempPrimalVar;
+                }
+                else
+                {
+                    // Case 3: non differentiable, non output parameters.
+                    // If parameter is not an out param and has nothing to do with differentiation,
+                    // simply move the parameter to the end.
+                    //
+                    fwdParam->removeFromParent();
+                    fwdDiffParameterBlock->addParam(fwdParam);
+                    result.primalFuncParams.add(fwdParam);
+                    result.propagateFuncParams.add(fwdParam);
+                    continue;
+                }
+            }
+            else if (!inoutType)
+            {
+                // Case 4: `in` differentiable parameters.
+
+                SLANG_RELEASE_ASSERT(diffPairType);
+
+                // Create inout version.
+                auto inoutDiffPairType = builder->getInOutType(diffPairType);
+                primalRefReplacement = builder->emitParam(primalType);
+                copyNameHintAndDebugDecorations(primalRefReplacement, fwdParam);
+
+                result.primalFuncParams.add(primalRefReplacement);
+                auto propParam = builder->emitParam(inoutDiffPairType);
                 copyNameHintAndDebugDecorations(propParam, fwdParam);
                 result.propagateFuncParams.add(propParam);
 
-                // Create a local var for the out param for the primal part of the prop func.
-                auto tempPrimalVar = nextBlockBuilder.emitVar(inoutType->getValueType());
-                copyNameHintAndDebugDecorations(tempPrimalVar, fwdParam);
+                // A reference to this parameter from the diff blocks should be replaced with a load
+                // of the differential component of the pair.
+                auto newParamLoad = diffBuilder.emitLoad(propParam);
+                diffBuilder.markInstAsDifferential(newParamLoad, primalType);
+                result.propagateFuncSpecificPrimalInsts.add(newParamLoad);
 
-                result.propagateFuncSpecificPrimalInsts.add(tempPrimalVar);
-                auto storeInst = nextBlockBuilder.emitStore(tempPrimalVar, propParam);
-                result.propagateFuncSpecificPrimalInsts.add(storeInst);
+                diffRefReplacement =
+                    diffBuilder.emitDifferentialPairGetDifferential(diffType, newParamLoad);
+                diffBuilder.markInstAsDifferential(diffRefReplacement, primalType);
+                result.propagateFuncSpecificPrimalInsts.add(diffRefReplacement);
+
+                // Load the primal component from the prop param and use it as replacement for the
+                // primal param in the primal part of the prop func.
+                // Since these are logic specific to propagate function, we will add them to the
+                // `propagateFuncSpecificPrimalInsts` set so we can remove them when we generate the
+                // primal func.
+                auto primalReplacementLoad = nextBlockBuilder.emitLoad(propParam);
+                result.propagateFuncSpecificPrimalInsts.add(primalReplacementLoad);
+                auto primalVal =
+                    nextBlockBuilder.emitDifferentialPairGetPrimal(primalReplacementLoad);
+                result.propagateFuncSpecificPrimalInsts.add(primalVal);
                 result.mapPrimalSpecificParamToReplacementInPropFunc[primalRefReplacement] =
-                    tempPrimalVar;
+                    primalVal;
+
+                instsToRemove.add(fwdParam);
             }
             else
             {
-                // Case 3: non differentiable, non output parameters.
-                // If parameter is not an out param and has nothing to do with differentiation,
-                // simply move the parameter to the end.
-                //
-                fwdParam->removeFromParent();
-                fwdDiffParameterBlock->addParam(fwdParam);
-                result.primalFuncParams.add(fwdParam);
-                result.propagateFuncParams.add(fwdParam);
-                continue;
+                // Case 5: `inout` differentiable parameters.
+                SLANG_ASSERT(inoutType && diffPairType);
+
+                // Process differentiable inout parameters.
+                auto primalParam = builder->emitParam(builder->getInOutType(primalType));
+                copyNameHintAndDebugDecorations(primalParam, fwdParam);
+                result.primalFuncParams.add(primalParam);
+
+                auto diffParam = builder->emitParam(inoutType);
+                copyNameHintAndDebugDecorations(diffParam, fwdParam);
+                result.propagateFuncParams.add(diffParam);
+
+                // Primal references to this param is the new primal param.
+                primalRefReplacement = primalParam;
+
+                // Diff references to this param should be replaced with one local temp var
+                // for read and one separate temp var for write.
+
+                // Load the inital diff value.
+                auto loadedParam = nextBlockBuilder.emitLoad(diffParam);
+                result.propagateFuncSpecificPrimalInsts.add(loadedParam);
+
+                auto initDiff =
+                    nextBlockBuilder.emitDifferentialPairGetDifferential(diffType, loadedParam);
+                result.propagateFuncSpecificPrimalInsts.add(initDiff);
+
+                // Create a local var for diff read access.
+                auto diffVar = nextBlockBuilder.emitVar(diffType);
+                copyNameHintAndDebugDecorations(diffVar, fwdParam);
+                result.propagateFuncSpecificPrimalInsts.add(diffVar);
+                diffRefReplacement = diffVar;
+
+                // Clear the diff read var to zero at start of the function.
+                auto dzero = getDifferentialZeroOfType(&nextBlockBuilder, primalType);
+                result.propagateFuncSpecificPrimalInsts.add(dzero);
+                auto initDiffStore = nextBlockBuilder.emitStore(diffVar, dzero);
+                result.propagateFuncSpecificPrimalInsts.add(initDiffStore);
+
+                // Create a local var for diff write access.
+                auto diffWriteVar = nextBlockBuilder.emitVar(diffType);
+                result.propagateFuncSpecificPrimalInsts.add(diffWriteVar);
+                copyNameHintAndDebugDecorations(diffWriteVar, fwdParam);
+
+                // Initialize write var to 0.
+                auto writeStore = nextBlockBuilder.emitStore(diffWriteVar, initDiff);
+                result.propagateFuncSpecificPrimalInsts.add(writeStore);
+
+                diffWriteRefReplacement = diffWriteVar;
+
+                // Create a local var for the primal logic in the propagate func.
+                auto primalVar = nextBlockBuilder.emitVar(primalType);
+                copyNameHintAndDebugDecorations(primalVar, fwdParam);
+
+                result.propagateFuncSpecificPrimalInsts.add(primalVar);
+                auto initPrimalVal = nextBlockBuilder.emitDifferentialPairGetPrimal(loadedParam);
+                result.propagateFuncSpecificPrimalInsts.add(initPrimalVal);
+                auto storeInst = nextBlockBuilder.emitStore(primalVar, initPrimalVal);
+                result.propagateFuncSpecificPrimalInsts.add(storeInst);
+                result.mapPrimalSpecificParamToReplacementInPropFunc[primalParam] = primalVar;
+                result.outDiffWritebacks[diffParam] = InstPair(initPrimalVal, diffVar);
+
+                instsToRemove.add(fwdParam);
             }
-        }
-        else if (!inoutType)
-        {
-            // Case 4: `in` differentiable parameters.
-
-            SLANG_RELEASE_ASSERT(diffPairType);
-
-            // Create inout version.
-            auto inoutDiffPairType = builder->getInOutType(diffPairType);
-            primalRefReplacement = builder->emitParam(primalType);
-            copyNameHintAndDebugDecorations(primalRefReplacement, fwdParam);
-
-            result.primalFuncParams.add(primalRefReplacement);
-            auto propParam = builder->emitParam(inoutDiffPairType);
-            copyNameHintAndDebugDecorations(propParam, fwdParam);
-            result.propagateFuncParams.add(propParam);
-
-            // A reference to this parameter from the diff blocks should be replaced with a load
-            // of the differential component of the pair.
-            auto newParamLoad = diffBuilder.emitLoad(propParam);
-            diffBuilder.markInstAsDifferential(newParamLoad, primalType);
-            result.propagateFuncSpecificPrimalInsts.add(newParamLoad);
-
-            diffRefReplacement =
-                diffBuilder.emitDifferentialPairGetDifferential(diffType, newParamLoad);
-            diffBuilder.markInstAsDifferential(diffRefReplacement, primalType);
-            result.propagateFuncSpecificPrimalInsts.add(diffRefReplacement);
-
-            // Load the primal component from the prop param and use it as replacement for the
-            // primal param in the primal part of the prop func.
-            // Since these are logic specific to propagate function, we will add them to the
-            // `propagateFuncSpecificPrimalInsts` set so we can remove them when we generate the
-            // primal func.
-            auto primalReplacementLoad = nextBlockBuilder.emitLoad(propParam);
-            result.propagateFuncSpecificPrimalInsts.add(primalReplacementLoad);
-            auto primalVal = nextBlockBuilder.emitDifferentialPairGetPrimal(primalReplacementLoad);
-            result.propagateFuncSpecificPrimalInsts.add(primalVal);
-            result.mapPrimalSpecificParamToReplacementInPropFunc[primalRefReplacement] = primalVal;
-
-            instsToRemove.add(fwdParam);
-        }
-        else
-        {
-            // Case 5: `inout` differentiable parameters.
-            SLANG_ASSERT(inoutType && diffPairType);
-
-            // Process differentiable inout parameters.
-            auto primalParam = builder->emitParam(builder->getInOutType(primalType));
-            copyNameHintAndDebugDecorations(primalParam, fwdParam);
-            result.primalFuncParams.add(primalParam);
-
-            auto diffParam = builder->emitParam(inoutType);
-            copyNameHintAndDebugDecorations(diffParam, fwdParam);
-            result.propagateFuncParams.add(diffParam);
-
-            // Primal references to this param is the new primal param.
-            primalRefReplacement = primalParam;
-
-            // Diff references to this param should be replaced with one local temp var
-            // for read and one separate temp var for write.
-
-            // Load the inital diff value.
-            auto loadedParam = nextBlockBuilder.emitLoad(diffParam);
-            result.propagateFuncSpecificPrimalInsts.add(loadedParam);
-
-            auto initDiff =
-                nextBlockBuilder.emitDifferentialPairGetDifferential(diffType, loadedParam);
-            result.propagateFuncSpecificPrimalInsts.add(initDiff);
-
-            // Create a local var for diff read access.
-            auto diffVar = nextBlockBuilder.emitVar(diffType);
-            copyNameHintAndDebugDecorations(diffVar, fwdParam);
-            result.propagateFuncSpecificPrimalInsts.add(diffVar);
-            diffRefReplacement = diffVar;
-
-            // Clear the diff read var to zero at start of the function.
-            auto dzero = getDifferentialZeroOfType(&nextBlockBuilder, primalType);
-            result.propagateFuncSpecificPrimalInsts.add(dzero);
-            auto initDiffStore = nextBlockBuilder.emitStore(diffVar, dzero);
-            result.propagateFuncSpecificPrimalInsts.add(initDiffStore);
-
-            // Create a local var for diff write access.
-            auto diffWriteVar = nextBlockBuilder.emitVar(diffType);
-            result.propagateFuncSpecificPrimalInsts.add(diffWriteVar);
-            copyNameHintAndDebugDecorations(diffWriteVar, fwdParam);
-
-            // Initialize write var to 0.
-            auto writeStore = nextBlockBuilder.emitStore(diffWriteVar, initDiff);
-            result.propagateFuncSpecificPrimalInsts.add(writeStore);
-
-            diffWriteRefReplacement = diffWriteVar;
-
-            // Create a local var for the primal logic in the propagate func.
-            auto primalVar = nextBlockBuilder.emitVar(primalType);
-            copyNameHintAndDebugDecorations(primalVar, fwdParam);
-
-            result.propagateFuncSpecificPrimalInsts.add(primalVar);
-            auto initPrimalVal = nextBlockBuilder.emitDifferentialPairGetPrimal(loadedParam);
-            result.propagateFuncSpecificPrimalInsts.add(initPrimalVal);
-            auto storeInst = nextBlockBuilder.emitStore(primalVar, initPrimalVal);
-            result.propagateFuncSpecificPrimalInsts.add(storeInst);
-            result.mapPrimalSpecificParamToReplacementInPropFunc[primalParam] = primalVar;
-            result.outDiffWritebacks[diffParam] = InstPair(initPrimalVal, diffVar);
-
-            instsToRemove.add(fwdParam);
         }
 
         // We have emitted all the new parameters and computed the replacements for the original
@@ -1282,6 +1643,7 @@ ParameterBlockTransposeInfo BackwardDiffTranscriberBase::splitAndTransposeParame
         List<IRUse*> uses;
         for (auto use = fwdParam->firstUse; use; use = use->nextUse)
             uses.add(use);
+
         for (auto use : uses)
         {
             if (auto primalRef = as<IRPrimalParamRef>(use->getUser()))
@@ -1298,7 +1660,8 @@ ParameterBlockTransposeInfo BackwardDiffTranscriberBase::splitAndTransposeParame
             }
             else if (auto propagateRef = as<IRDiffParamRef>(use->getUser()))
             {
-                SLANG_RELEASE_ASSERT(diffRefReplacement);
+                /*
+                // old code...
                 auto refUse = propagateRef->firstUse;
                 while (refUse)
                 {
@@ -1313,17 +1676,22 @@ ParameterBlockTransposeInfo BackwardDiffTranscriberBase::splitAndTransposeParame
                     }
                     else
                     {
+                        SLANG_RELEASE_ASSERT(diffRefReplacement);
                         refUse->set(diffRefReplacement);
                     }
                     refUse = nextUse;
                 }
                 instsToRemove.add(propagateRef);
+                */
+                result.transposedInstMap[propagateRef] = diffRefReplacement;
             }
             else if (auto getDiff = as<IRDifferentialPairGetDifferential>(use->getUser()))
             {
                 SLANG_RELEASE_ASSERT(diffRefReplacement);
-                getDiff->replaceUsesWith(diffRefReplacement);
-                instsToRemove.add(getDiff);
+                // getDiff->replaceUsesWith(diffRefReplacement);
+                // instsToRemove.add(getDiff);
+
+                result.transposedInstMap[getDiff] = diffRefReplacement;
             }
             else
             {
@@ -1352,7 +1720,7 @@ ParameterBlockTransposeInfo BackwardDiffTranscriberBase::splitAndTransposeParame
     IRParam* dOutParam = nullptr;
     if (isResultDifferentiable)
     {
-        auto dOutParamType = as<IRFuncType>(diffFunc->getDataType())->getParamType(paramCount - 2);
+        auto dOutParamType = as<IRFuncType>(diffFunc->getDataType())->getParamType(paramCount - 1);
 
         SLANG_ASSERT(dOutParamType);
 
@@ -1362,17 +1730,13 @@ ParameterBlockTransposeInfo BackwardDiffTranscriberBase::splitAndTransposeParame
         result.propagateFuncParams.add(dOutParam);
     }
 
-    // Add a parameter for intermediate val.
-    auto ctxParam =
-        builder->emitParam(as<IRFuncType>(diffFunc->getDataType())->getParamType(paramCount - 1));
-    builder->addNameHintDecoration(ctxParam, UnownedStringSlice("_s_diff_ctx"));
-    builder->addDecoration(ctxParam, kIROp_PrimalContextDecoration);
-    result.primalFuncParams.add(ctxParam);
-    result.propagateFuncParams.add(ctxParam);
     result.dOutParam = dOutParam;
 
-    diffFunc->sourceLoc = primalLoc;
-    ctxParam->sourceLoc = primalLoc;
+    // Add a parameter for intermediate val.
+    /*
+    auto ctxParam =
+        builder->emitParam(as<IRFuncType>(diffFunc->getDataType())->getParamType(paramCount - 1));
+    */
 
     return result;
 }
@@ -1527,4 +1891,436 @@ InstPair BackwardDiffTranscriberBase::transcribeSpecialize(
         return InstPair(primalSpecialize, nullptr);
     }
 }
+
+LegacyBackwardDiffTranslationFuncContext::Result LegacyBackwardDiffTranslationFuncContext::
+    translate(IRBuilder* builder)
+{
+    // We just need to call the applyBwdFunc() with all the primal parts of the parameters
+    // then call the bwdPropFunc() with the differential parts of the parameters &
+    // write back any output derivatives.
+    //
+    auto bwdDiffFunc = builder->createFunc();
+    bwdDiffFunc->setFullType(this->bwdDiffFuncType);
+
+    // TODO: do all the decorator and naming stuff here.
+
+    builder->setInsertInto(bwdDiffFunc);
+    builder->emitBlock();
+    List<IRInst*> bwdDiffFuncParams;
+    // Emit parameters for the backward derivative function.
+    for (auto paramType : this->bwdDiffFuncType->getParamTypes())
+    {
+        // TODO: figure out how to put the right names for the parameters.
+        auto param = builder->emitParam(paramType);
+        bwdDiffFuncParams.add(param);
+    }
+
+    auto applyBwdFuncType = cast<IRFuncType>(this->applyBwdFunc->getDataType());
+    auto bwdPropFuncType = cast<IRFuncType>(this->bwdPropFunc->getDataType());
+    List<IRInst*> applyBwdFuncArgs;
+    List<IRInst*> bwdPropFuncParams;
+
+    UIndex bwdDiffParamIdx = 0;
+    for (UIndex i = 0; i < applyBwdFuncType->getParamCount(); i++)
+    {
+        // auto applyParamType = this->applyBwdFunc->getParamType(i);
+        /*auto bwdPropParamType =
+            this->bwdPropFunc->getParamType(i + 1); // +1 to skip the context param*/
+        auto applyParamType = applyBwdFuncType->getParamType(i);
+        auto bwdPropParamType =
+            bwdPropFuncType->getParamType(i + 1); // +1 to skip the context param
+
+        if (as<IRVoidType>(bwdPropParamType))
+        {
+            bwdPropFuncParams.add(builder->getVoidValue());
+        }
+
+        if (as<IROutType>(applyParamType))
+        {
+            // There won't be any parameter in the legacy bwd_diff function for this parameter.
+            applyBwdFuncArgs.add(builder->emitVar(as<IROutType>(applyParamType)->getValueType()));
+
+            if (!as<IRVoidType>(bwdPropParamType))
+            {
+                bwdPropFuncParams.add(
+                    bwdDiffFuncParams[bwdDiffParamIdx]); // Use the original parameter as-is.
+                bwdDiffParamIdx++;
+            }
+            continue;
+        }
+        else if (!as<IRVoidType>(bwdPropParamType))
+        {
+            // inout diff-pair or in diff-ptr-pair
+            if (auto bwdDiffParamPtrType =
+                    as<IRPtrTypeBase>(this->bwdDiffFuncType->getParamType(bwdDiffParamIdx)))
+            {
+                // as<IRDifferentialPairType>(bwdParamPtrType);
+                if (auto applyParamPtrType = as<IRPtrTypeBase>(applyParamType))
+                {
+                    applyBwdFuncArgs.add(builder->emitIntrinsicInst(
+                        builder->getPtrType(applyParamPtrType->getValueType()),
+                        kIROp_DifferentialPairGetPrimalUserCode,
+                        1,
+                        &bwdDiffFuncParams[bwdDiffParamIdx]));
+                }
+                else
+                {
+                    applyBwdFuncArgs.add(builder->emitLoad(builder->emitIntrinsicInst(
+                        builder->getPtrType(applyParamType),
+                        kIROp_DifferentialPairGetPrimalUserCode,
+                        1,
+                        &bwdDiffFuncParams[bwdDiffParamIdx])));
+                }
+                // applyBwdFuncArgs.add(builder->emitLoad(builder->emitDifferentialPairGetPrimal(
+                //     bwdDiffFuncParams[bwdDiffParamIdx++]))); // get the primal part
+
+                if (auto bwdPropParamPtrType = as<IRPtrTypeBase>(bwdPropParamType))
+                {
+                    bwdPropFuncParams.add(builder->emitIntrinsicInst(
+                        builder->getPtrType(bwdPropParamPtrType->getValueType()),
+                        kIROp_DifferentialPairGetDifferentialUserCode,
+                        1,
+                        &bwdDiffFuncParams[bwdDiffParamIdx]));
+                }
+                else
+                {
+                    bwdPropFuncParams.add(builder->emitLoad(builder->emitIntrinsicInst(
+                        bwdPropParamType,
+                        kIROp_DifferentialPairGetDifferentialUserCode,
+                        1,
+                        &bwdDiffFuncParams[bwdDiffParamIdx])));
+                }
+                bwdDiffParamIdx++;
+            }
+            else
+            {
+                SLANG_UNEXPECTED("Unexpected parameter type in backward diff transcriber");
+            }
+        }
+        else
+        {
+            applyBwdFuncArgs.add(bwdDiffFuncParams[bwdDiffParamIdx]);
+            bwdDiffParamIdx++;
+        }
+    }
+
+    // Do we have a left over parameter? This should be the
+    // d_Out parameter.
+    //
+    if (bwdDiffFuncParams.getCount() > bwdDiffParamIdx)
+    {
+        bwdPropFuncParams.add(bwdDiffFuncParams[bwdDiffParamIdx]);
+    }
+
+    auto contextVal = builder->emitCallInst(
+        applyBwdFuncType->getResultType(),
+        this->applyBwdFunc,
+        applyBwdFuncArgs.getCount(),
+        applyBwdFuncArgs.getBuffer());
+    bwdPropFuncParams.insert(0, contextVal);
+
+    builder->emitCallInst(
+        bwdPropFuncType->getResultType(),
+        this->bwdPropFunc,
+        bwdPropFuncParams.getCount(),
+        bwdPropFuncParams.getBuffer());
+
+    builder->emitReturn();
+
+    return {bwdDiffFunc};
+}
+
+LegacyToNewBackwardDiffTranslationFuncContext::Result LegacyToNewBackwardDiffTranslationFuncContext::
+    translate(IRBuilder* builder)
+{
+    // We just need to call the applyBwdFunc() with all the primal parts of the parameters
+    // then call the bwdPropFunc() with the differential parts of the parameters &
+    // write back any output derivatives.
+    //
+
+    // Create the context type first (since the rest depend on it).
+    auto contextType = builder->createStructType();
+
+    auto applyFunc = builder->createFunc();
+    auto bwdPropFunc = builder->createFunc();
+    auto getValFunc = builder->createFunc();
+
+    auto legacyBwdDiffFuncType = as<IRFuncType>(this->legacyBwdDiffFunc->getDataType());
+
+    auto outerParent = as<IRGeneric>(findOuterGeneric(primalFunc));
+    diffTypeContext.setFunc(outerParent ? outerParent : primalFunc);
+
+    IRInst* primalFuncType = this->primalFunc->getDataType();
+
+    /*
+    auto applyForBwdFuncType = as<IRFuncType>(diffTypeContext.resolveType(
+        builder,
+        (IRType*)
+            builder->emitIntrinsicInst(nullptr, kIROp_ApplyForBwdFuncType, 1, &primalFuncType)));
+    auto bwdPropFuncType = as<IRFuncType>(diffTypeContext.resolveType(
+        builder,
+        (IRType*)
+            builder->emitIntrinsicInst(nullptr, kIROp_BwdCallableFuncType, 2, &primalFuncType)));
+    */
+
+    List<IRInst*> applyForBwdFuncTypeParams;
+    applyForBwdFuncTypeParams.add(primalFunc->getDataType());
+    applyForBwdFuncTypeParams.add(contextType);
+    auto applyForBwdFuncType = cast<IRFuncType>(diffTypeContext.resolveType(
+        builder,
+        builder->emitIntrinsicInst(
+            builder->getTypeKind(),
+            kIROp_ApplyForBwdFuncType,
+            applyForBwdFuncTypeParams.getCount(),
+            applyForBwdFuncTypeParams.getBuffer())));
+
+    List<IRInst*> bwdPropFuncTypeParams;
+    bwdPropFuncTypeParams.add(primalFunc->getDataType());
+    bwdPropFuncTypeParams.add(contextType);
+    auto bwdPropFuncType = cast<IRFuncType>(diffTypeContext.resolveType(
+        builder,
+        builder->emitIntrinsicInst(
+            builder->getTypeKind(),
+            kIROp_BwdCallableFuncType,
+            bwdPropFuncTypeParams.getCount(),
+            bwdPropFuncTypeParams.getBuffer())));
+
+    applyFunc->setFullType(applyForBwdFuncType);
+    bwdPropFunc->setFullType(bwdPropFuncType);
+
+    // TODO: do all the decorator and naming stuff here.
+
+    IRBuilder applyFuncBuilder(builder->getModule());
+    applyFuncBuilder.setInsertInto(applyFunc);
+    applyFuncBuilder.emitBlock();
+    auto contextVar = applyFuncBuilder.emitVar(contextType);
+
+    IRBuilder contextTypeBuilder(builder->getModule());
+    contextTypeBuilder.setInsertInto(builder->getModule());
+
+    IRBuilder bwdPropFuncBuilder(builder->getModule());
+    bwdPropFuncBuilder.setInsertInto(bwdPropFunc);
+    bwdPropFuncBuilder.emitBlock();
+    auto contextInParam =
+        bwdPropFuncBuilder.emitParam(contextType); // Context parameter for the bwd prop func.
+    bwdPropFuncBuilder.addNameHintDecoration(contextInParam, UnownedStringSlice("ctx"));
+
+    IRBuilder bwdPropPostCallBuilder(builder->getModule());
+    bwdPropPostCallBuilder.setInsertAfter(contextInParam);
+    auto placeholderCall = bwdPropPostCallBuilder.emitCallInst(
+        legacyBwdDiffFuncType->getResultType(),
+        legacyBwdDiffFunc,
+        0,
+        nullptr);
+
+    bwdPropFuncBuilder.setInsertBefore(placeholderCall);
+
+    // Pull up a list of primal params, so we can use them for naming &
+    // location tagging.
+    //
+    ShortList<IRParam*, 8> primalFuncParams;
+    auto funcForNames = as<IRFunc>(getResolvedInstForDecorations(primalFunc));
+    for (auto param : funcForNames->getParams())
+    {
+        primalFuncParams.add(param);
+    }
+
+    // Jointly emit parameters for the apply and bwd prop functions, while
+    // also building the context type.
+    //
+    List<IRInst*> bwdDiffFuncArgs;
+    for (UIndex idx = 0; idx < applyForBwdFuncType->getParamCount(); idx++)
+    {
+        auto applyForBwdParam = applyFuncBuilder.emitParam(applyForBwdFuncType->getParamType(idx));
+        generateName(builder, primalFuncParams[idx], applyForBwdParam, "");
+        applyForBwdParam->sourceLoc = primalFuncParams[idx]->sourceLoc;
+
+        auto bwdPropParam = bwdPropFuncBuilder.emitParam(
+            bwdPropFuncType->getParamType(idx + 1)); // +1 to skip the context param
+        generateName(builder, primalFuncParams[idx], bwdPropParam, "d_");
+        bwdPropParam->sourceLoc = primalFuncParams[idx]->sourceLoc;
+
+        if (!as<IROutType>(applyForBwdParam->getDataType()))
+        {
+            auto key = contextTypeBuilder.createStructKey();
+            auto structFieldType = applyForBwdParam->getDataType();
+
+            if (auto inoutParamType = as<IRInOutType>(applyForBwdParam->getDataType()))
+            {
+                structFieldType = inoutParamType->getValueType();
+                contextTypeBuilder.createStructField(contextType, key, structFieldType);
+            }
+            else
+            {
+                // Has to be "in" type.
+                contextTypeBuilder.createStructField(contextType, key, structFieldType);
+            }
+
+            applyFuncBuilder.emitStore(
+                applyFuncBuilder
+                    .emitFieldAddress(builder->getPtrType(structFieldType), contextVar, key),
+                applyForBwdParam);
+
+            if (as<IRVoidType>(bwdPropParam->getDataType()))
+            {
+                // Add just the primal part (there's no differential part since its void).
+                bwdDiffFuncArgs.add(
+                    bwdPropFuncBuilder.emitFieldExtract(structFieldType, contextInParam, key));
+            }
+            else
+            {
+                // If this is not a void type, we need to construct a differential pair
+                // var.
+                //
+                auto inOutPairType = cast<IRInOutType>(
+                    legacyBwdDiffFuncType->getParamType(bwdDiffFuncArgs.getCount()));
+                IRInst* pairVar = bwdPropFuncBuilder.emitVar(inOutPairType->getValueType());
+
+                // Load the primal value from the context param and store it in here.
+                bwdPropFuncBuilder.emitStore(
+                    bwdPropFuncBuilder.emitIntrinsicInst(
+                        builder->getPtrType(structFieldType),
+                        kIROp_DifferentialPairGetPrimalUserCode,
+                        1,
+                        &pairVar),
+                    bwdPropFuncBuilder.emitFieldExtract(structFieldType, contextInParam, key));
+
+                auto diffPtr = bwdPropFuncBuilder.emitIntrinsicInst(
+                    bwdPropFuncBuilder.getPtrType(
+                        as<IROutTypeBase>(bwdPropParam->getDataType())->getValueType()),
+                    kIROp_DifferentialPairGetDifferentialUserCode,
+                    1,
+                    &pairVar);
+
+                if (as<IRInOutType>(bwdPropParam->getDataType()))
+                {
+                    bwdPropFuncBuilder.emitStore(
+                        diffPtr,
+                        bwdPropFuncBuilder.emitLoad(bwdPropParam));
+                }
+
+                // After the bwdDiff call, load the differential value and put it in bwdPropParam.
+                bwdPropPostCallBuilder.emitStore(
+                    bwdPropParam,
+                    bwdPropPostCallBuilder.emitLoad(diffPtr));
+
+                bwdDiffFuncArgs.add(pairVar);
+            }
+        }
+        else if (!as<IRVoidType>(bwdPropParam->getDataType()))
+        {
+            // Primal => Out param
+            // Diff => In diff param.
+            //
+            // SLANG_ASSERT(!as<IROutTypeBase>(bwdPropParam->getDataType()));
+            bwdDiffFuncArgs.add(bwdPropParam);
+        }
+        else
+        {
+            // Primal => Out param
+            // Diff => Void.
+
+            // Nothing to do.
+        }
+    }
+
+    //
+    // Build the getVal() function.
+    //
+
+    auto getValFuncType = builder->getFuncType(
+        {contextType},
+        as<IRFuncType>(primalFunc->getDataType())->getResultType());
+
+    // Emit a call to the primal-func & store the result in a new key,
+    // then load that key in the getValFunc and return it.
+    //
+    IRStructKey* resultKeyInst = contextTypeBuilder.createStructKey();
+    auto resultFieldType = as<IRFuncType>(primalFunc->getDataType())->getResultType();
+    contextTypeBuilder.createStructField(contextType, resultKeyInst, resultFieldType);
+
+    getValFunc->setFullType(getValFuncType);
+    IRBuilder getValFuncBuilder(builder->getModule());
+    getValFuncBuilder.setInsertInto(getValFunc);
+    getValFuncBuilder.emitBlock();
+    auto getValContextParam = getValFuncBuilder.emitParam(contextType);
+    getValFuncBuilder.addNameHintDecoration(getValContextParam, UnownedStringSlice("ctx"));
+
+    if (!as<IRVoidType>(resultFieldType))
+    {
+        // Load the result value from the context and return it
+        auto resultVal =
+            getValFuncBuilder.emitFieldExtract(resultFieldType, getValContextParam, resultKeyInst);
+        getValFuncBuilder.emitReturn(resultVal);
+    }
+    else
+    {
+        getValFuncBuilder.emitReturn();
+    }
+
+    // Now we need to emit the call to the primal function in the apply function
+    List<IRInst*> primalFuncArgs;
+    for (auto param : applyFunc->getParams())
+    {
+        primalFuncArgs.add(param);
+    }
+
+    // Call the primal function and store the result in the context
+    auto primalResult = applyFuncBuilder.emitCallInst(
+        as<IRFuncType>(primalFunc->getDataType())->getResultType(),
+        primalFunc,
+        primalFuncArgs.getCount(),
+        primalFuncArgs.getBuffer());
+
+    if (!as<IRVoidType>(resultFieldType))
+    {
+        applyFuncBuilder.emitStore(
+            applyFuncBuilder.emitFieldAddress(
+                applyFuncBuilder.getPtrType(resultFieldType),
+                contextVar,
+                resultKeyInst),
+            primalResult);
+    }
+
+    //
+    // Finish up applyFunc & bwdPropFunc.
+    //
+
+    applyFuncBuilder.emitReturn(applyFuncBuilder.emitLoad(contextVar));
+
+    if (legacyBwdDiffFuncType->getParamCount() > bwdDiffFuncArgs.getCount())
+    {
+        // We have a d_out parameter.
+        auto dOutParamType = legacyBwdDiffFuncType->getParamType(bwdDiffFuncArgs.getCount());
+        auto dOutParam = bwdPropFuncBuilder.emitParam(dOutParamType);
+        builder->addNameHintDecoration(dOutParam, UnownedStringSlice("d_out"));
+        bwdDiffFuncArgs.add(dOutParam);
+    }
+
+    // Replace the placeholder call with the actual bwd diff func call.
+    bwdPropFuncBuilder.setInsertBefore(placeholderCall);
+    bwdPropFuncBuilder.emitCallInst(
+        legacyBwdDiffFuncType->getResultType(),
+        this->legacyBwdDiffFunc,
+        bwdDiffFuncArgs.getCount(),
+        bwdDiffFuncArgs.getBuffer());
+
+    placeholderCall->removeAndDeallocate();
+
+    bwdPropPostCallBuilder.emitReturn();
+
+    generateName(builder, primalFunc, applyFunc, "s_apply_");
+    generateName(builder, primalFunc, bwdPropFunc, "s_bwdProp_");
+    generateName(builder, primalFunc, getValFunc, "s_getVal_");
+    generateName(builder, primalFunc, contextType, "s_bwdCallableCtx_");
+
+    // Hoist contextType first.
+    auto contextTypeGlobalVal = maybeHoist(*builder, contextType);
+
+    auto applyFuncGlobalVal = maybeHoist(*builder, applyFunc);
+    auto bwdPropFuncGlobalVal = maybeHoist(*builder, bwdPropFunc);
+    auto getValFuncGlobalVal = maybeHoist(*builder, getValFunc);
+    return {applyFuncGlobalVal, contextTypeGlobalVal, getValFuncGlobalVal, bwdPropFuncGlobalVal};
+}
+
 } // namespace Slang

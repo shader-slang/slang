@@ -1708,20 +1708,36 @@ FIDDLE() namespace Slang
         DAddFunc,            ///< The `IDifferentiable.dadd` function requirement
         DMulFunc,            ///< The `IDifferentiable.dmul` function requirement
 
-        InitLogicalFromInt, ///< The `ILogical.__init` mtehod.
-        Equals,             ///< The `ILogical.equals` mtehod.
-        LessThan,           ///< The `ILogical.lessThan` mtehod.
-        LessThanOrEquals,   ///< The `ILogical.lessThanOrEquals` mtehod.
-        Shl,                ///< The `ILogical.shl` mtehod.
-        Shr,                ///< The `ILogical.shr` mtehod.
-        BitAnd,             ///< The `ILogical.bitAnd` mtehod.
-        BitOr,              ///< The `ILogical.bitOr` mtehod.
-        BitXor,             ///< The `ILogical.bitXor` mtehod.
-        BitNot,             ///< The `ILogical.bitNot` mtehod.
-        And,                ///< The `ILogical.and` mtehod.
-        Or,                 ///< The `ILogical.or` mtehod.
-        Not,                ///< The `ILogical.not` mtehod.
+        InitLogicalFromInt,        ///< The `ILogical.__init` method.
+        Equals,                    ///< The `ILogical.equals` method.
+        LessThan,                  ///< The `ILogical.lessThan` method.
+        LessThanOrEquals,          ///< The `ILogical.lessThanOrEquals` method.
+        Shl,                       ///< The `ILogical.shl` method.
+        Shr,                       ///< The `ILogical.shr` method.
+        BitAnd,                    ///< The `ILogical.bitAnd` method.
+        BitOr,                     ///< The `ILogical.bitOr` method.
+        BitXor,                    ///< The `ILogical.bitXor` method.
+        BitNot,                    ///< The `ILogical.bitNot` method.
+        And,                       ///< The `ILogical.and` method.
+        Or,                        ///< The `ILogical.or` method.
+        Not,                       ///< The `ILogical.not` method.
+                                   // Requirement keys for new auto-diff system
+        ForwardDerivativeFuncType, ///< The "__fwd_diff_func_type" built-in associatedtype on
+                                   ///< functions
+        /*FwdCallableContextType,      ///< The "FwdCallable" built-in associatedtype on functions
+        FwdApplyFunc,                ///< The "applyFwd" built-in associated function on functions
+        EvalAndFwdPropFunc,          ///< The "FwdCallable::operator()" built-in function
+        LegacyForwardDerivativeFunc, ///< The "fwdDiff" built-in associated function on functions*/
+        ForwardDerivativeFunc,
+
+        BwdCallableContextType,       ///< The "BwdCallable" built-in associatedtype on functions
+        BwdApplyFunc,                 ///< The "apply" built-in associated function on functions
+        BwdCallablePropFunc,          ///< The "BwdCallable::operator()" built-in function
+        BwdCallableGetValFunc,        ///< The "BwdCallable::getVal()" built-in function
+        LegacyBackwardDerivativeFunc, ///< The "bwdDiff" built-in associated function on functions
     };
+
+    // How do we swap out applyFwd for applyBwd?
 
     enum class FunctionDifferentiableLevel
     {

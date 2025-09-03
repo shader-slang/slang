@@ -171,6 +171,8 @@ struct AutoDiffTranscriberBase
 
     virtual IROp getInterfaceRequirementDerivativeDecorationOp() = 0;
 
+    // virtual IRInst* processTranslationRequest(IRInst* inst) = 0;
+
     void markDiffTypeInst(IRBuilder* builder, IRInst* inst, IRType* primalType);
 
     void markDiffPairTypeInst(IRBuilder* builder, IRInst* inst, IRType* primalType);

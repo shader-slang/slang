@@ -704,7 +704,10 @@ bool shouldDeepCloneWitnessTable(IRSpecContextBase* context, IRWitnessTable* tab
             {
                 auto name = as<IRKnownBuiltinDecoration>(decor)->getName();
                 if (name == KnownBuiltinDeclName::IDifferentiable ||
-                    name == KnownBuiltinDeclName::IDifferentiablePtr)
+                    name == KnownBuiltinDeclName::IDifferentiablePtr ||
+                    name == KnownBuiltinDeclName::IForwardDifferentiable ||
+                    name == KnownBuiltinDeclName::IBackwardDifferentiable ||
+                    name == KnownBuiltinDeclName::IBwdCallable)
                     return context->getShared()->useAutodiff;
                 break;
             }
@@ -1942,6 +1945,9 @@ bool doesModuleUseAutodiff(IRInst* inst)
             case kIROp_BackwardDifferentiate:
             case kIROp_BackwardDifferentiatePrimal:
             case kIROp_BackwardDifferentiatePropagate:
+            case kIROp_BackwardPrimalFromLegacyBwdDiffFunc:
+            case kIROp_BackwardPropagateFromLegacyBwdDiffFunc:
+            case kIROp_BackwardContextGetValFromLegacyBwdDiffFunc:
                 return true;
             }
         }
@@ -2199,6 +2205,7 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
             if (_isHLSLExported(inst) || shouldCopyGlobalParams && as<IRGlobalParam>(inst) ||
                 sharedContext->useAutodiff &&
                     (as<IRDifferentiableTypeAnnotation>(inst) ||
+                     as<IRWitnessTableAnnotation>(inst) || as<IRAssociatedInstAnnotation>(inst) ||
                      inst->findDecorationImpl(kIROp_AutoDiffBuiltinDecoration) != nullptr))
             {
                 auto cloned = cloneValue(context, inst);

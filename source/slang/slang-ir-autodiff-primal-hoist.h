@@ -33,6 +33,24 @@ struct IROutOfOrderCloneContext : public RefObject
             pendingUses.add(&clonedInst->getOperands()[ii]);
         }
 
+        // Also add the data type use (if it exists and is not in a differential or recompute
+        // block).
+        //
+        bool addTypeUse = true;
+        if (clonedInst->getDataType())
+        {
+            if (auto operandParent = as<IRBlock>(clonedInst->getDataType()->getParent()))
+            {
+                if (isDifferentialOrRecomputeBlock(operandParent))
+                {
+                    addTypeUse = false;
+                }
+            }
+        }
+
+        if (addTypeUse)
+            pendingUses.add(&clonedInst->typeUse);
+
         for (auto use = inst->firstUse; use;)
         {
             auto nextUse = use->nextUse;

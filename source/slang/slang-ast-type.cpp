@@ -11,6 +11,8 @@
 namespace Slang
 {
 
+struct SemanticsContext;
+
 bool isAbstractTypePack(Type* type)
 {
     if (as<ExpandType>(type))
@@ -193,6 +195,16 @@ Val* DeclRefType::_substituteImplOverride(
     return DeclRefType::create(astBuilder, substDeclRef);
 }
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BuiltinTypeFunction !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+/*Type* BuiltinTypeFunction::calculateType(SemanticsContext* context){
+    SLANG_AST_NODE_VIRTUAL_CALL(BuiltinTypeFunction, calculateType, (context))}
+
+Type* BuiltinTypeFunction::_calculateTypeOverride(SemanticsContext* context)
+{
+    SLANG_UNEXPECTED("BuiltinTypeFunction::_calculateTypeOverride not overridden");
+    return nullptr;
+}*/
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArithmeticExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -231,7 +243,6 @@ Type* TensorViewType::getElementType()
 {
     return as<Type>(_getGenericTypeArg(this, 0));
 }
-
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! VectorExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -296,6 +307,150 @@ Type* MatrixExpressionType::getRowType()
         rowType = getCurrentASTBuilder()->getVectorType(getElementType(), getColumnCount());
     }
     return rowType;
+}
+
+// ----
+void FwdDiffFuncType::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("FwdDiffFuncType<") << getBase() << toSlice(">");
+}
+
+Type* FwdDiffFuncType::_createCanonicalTypeOverride()
+{
+    auto canonicalType = getBase()->getCanonicalType();
+    if (canonicalType == this)
+        return this;
+
+    // Otherwise, create a new FwdDiffFuncType.
+    auto astBuilder = getCurrentASTBuilder();
+    auto newType = astBuilder->getOrCreate<FwdDiffFuncType>(canonicalType);
+    return newType;
+}
+
+Val* FwdDiffFuncType::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    auto substBase = getBase()->substituteImpl(astBuilder, subst, ioDiff);
+    return astBuilder->getOrCreate<FwdDiffFuncType>(substBase)->getCanonicalType();
+}
+
+// ----
+void BwdDiffFuncType::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("BwdDiffFuncType<") << getBase() << toSlice(">");
+}
+
+Type* BwdDiffFuncType::_createCanonicalTypeOverride()
+{
+    auto canonicalType = getBase()->getCanonicalType();
+    if (canonicalType == this)
+        return this;
+
+    // Otherwise, create a new BwdDiffFuncType.
+    auto astBuilder = getCurrentASTBuilder();
+    auto newType = astBuilder->getOrCreate<BwdDiffFuncType>(canonicalType);
+    return newType;
+}
+
+Val* BwdDiffFuncType::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    auto substBase = getBase()->substituteImpl(astBuilder, subst, ioDiff);
+    return astBuilder->getOrCreate<BwdDiffFuncType>(substBase)->getCanonicalType();
+}
+
+// --
+void ApplyForBwdFuncType::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("ApplyForBwdFuncType<") << getBase() << toSlice(">");
+}
+
+/*Type* ApplyForBwdFuncType::_createCanonicalTypeOverride()
+{
+    auto canonicalType = getBase()->getCanonicalType();
+    auto canonicalCtxType = getCtxType()->getCanonicalType();
+    if (canonicalType != getBase() || canonicalCtxType != getCtxType())
+        return getCurrentASTBuilder()->getOrCreate<ApplyForBwdFuncType>(
+            canonicalType,
+            canonicalCtxType);
+
+    // Otherwise, create a new ApplyForBwdFuncType.
+   //auto astBuilder = getCurrentASTBuilder();
+    //auto newType = astBuilder->getOrCreate<ApplyForBwdFuncType>(canonicalType);
+    //return newType;
+    return this;
+}*/
+
+Val* ApplyForBwdFuncType::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    auto substBase = getBase()->substituteImpl(astBuilder, subst, ioDiff);
+    auto substCtx = getCtxType()->substituteImpl(astBuilder, subst, ioDiff);
+    return astBuilder->getOrCreate<ApplyForBwdFuncType>(substBase, substCtx)->getCanonicalType();
+}
+
+// --
+void BwdCallableFuncType::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("BwdCallableFuncType<") << getBase() << toSlice(">");
+}
+
+/*Type* BwdCallableFuncType::_createCanonicalTypeOverride()
+{
+    auto canonicalType = getBase()->getCanonicalType();
+    if (canonicalType == this)
+        return this;
+
+    // Otherwise, create a new BwdCallableFuncType.
+    auto astBuilder = getCurrentASTBuilder();
+    auto newType = astBuilder->getOrCreate<BwdCallableFuncType>(canonicalType);
+    return newType;
+}*/
+
+Val* BwdCallableFuncType::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    auto substBase = getBase()->substituteImpl(astBuilder, subst, ioDiff);
+    auto substCtx = getCtxType()->substituteImpl(astBuilder, subst, ioDiff);
+    return astBuilder->getOrCreate<BwdCallableFuncType>(substBase, substCtx)->getCanonicalType();
+}
+
+// --
+void FuncResultType::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("FuncResultType<") << getBase() << toSlice(">");
+}
+
+/*
+Type* FuncResultType::_createCanonicalTypeOverride()
+{
+    auto canonicalType = getBase()->getCanonicalType();
+    if (canonicalType == this)
+        return this;
+
+    // Otherwise, create a new FuncResultType.
+    auto astBuilder = getCurrentASTBuilder();
+    auto newType = astBuilder->getOrCreate<FuncResultType>(canonicalType);
+    return newType;
+}
+*/
+
+Val* FuncResultType::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    auto substBase = getBase()->substituteImpl(astBuilder, subst, ioDiff);
+    auto substCtx = getCtxType()->substituteImpl(astBuilder, subst, ioDiff);
+    return astBuilder->getOrCreate<FuncResultType>(substBase, substCtx)->getCanonicalType();
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TupleType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

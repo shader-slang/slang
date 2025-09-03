@@ -2,6 +2,13 @@
 
 // This test just ensures that we compile and run the code.
 // It does not check the correctness of the autodiff.
+//
+
+//CHECK: struct s_bwdCallableCtx_function_{{[_0-9]+}}
+//CHECK: {
+//CHECK:     MyDiffPtr{{[_0-9]+}} {{[_A-Za-z0-9]+}};
+//CHECK:     MyDiffPtr{{[_0-9]+}} {{[_A-Za-z0-9]+}};
+//CHECK: };
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out, name outputBuffer
 RWStructuredBuffer<float> outputBuffer;

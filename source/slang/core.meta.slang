@@ -85,6 +85,28 @@ syntax snorm : SNormModifier;
 ///
 syntax __extern_cpp : ExternCppModifier;
 
+/// Function interface o 
+/*interface IDifferentiableFuncBase
+{
+    __builtin_requirement($( (int)BuiltinRequirementKind::ForwardDerivativeFuncType) )
+    associatedtype __fwd_diff_func_type;
+}
+
+interface IForwardDifferentiable : IDifferentiableFuncBase
+{
+    associatedfunc __fwd_diff_func_type(This) __fwd_diff__;
+}*/
+
+/*interface IDifferentiableFuncBase
+{
+    __builtin_requirement($( (int)BuiltinRequirementKind::ForwardDerivativeFuncType) )
+    associatedtype __fwd_diff_func_type;
+};*/
+
+__magic_type(FunctionBaseType)
+interface IFunctionBase
+{ };
+
 /// Represents types that can be initialized with a default constructor.
 __magic_type(DefaultInitializableType)
 interface IDefaultInitializable
@@ -653,6 +675,64 @@ interface IDifferentiablePtrType
     associatedtype Differential : IDifferentiablePtrType;
 };
 
+__magic_type(DifferentiableFuncBaseType)
+[KnownBuiltin("IDifferentiableFuncBase")]
+interface IDifferentiableFuncBase
+{
+    // BuiltinRequirementKind::ForwardDiffFuncType
+    // Calculates the effective function type.
+    // 
+    __builtin_requirement($( (int)BuiltinRequirementKind::ForwardDerivativeFuncType))
+    associatedtype __fwd_diff_func_type;
+};
+
+__magic_type(ForwardDiffFuncInterfaceType)
+[KnownBuiltin("IForwardDifferentiable")]
+interface IForwardDifferentiable<FType>
+{
+
+    // BuiltinRequirementKind::ForwardDerivativeFunc
+    // inserts a synthesized-func-decl, which becomes a 
+    // IRForwardDifferentiate()
+    // 
+    __builtin_requirement($( (int)BuiltinRequirementKind::ForwardDerivativeFunc))
+    //static __associatedfunc FType.__fwd_diff_func_type fwd_diff;
+    static __associatedfunc __fwd_diff_func_type(FType) fwd_diff; // -> fwd_diff
+};
+
+// Core library interfaces:
+__magic_type(BwdCallableBaseType)
+[KnownBuiltin("IBwdCallable")]
+interface IBwdCallable<FType>
+{
+    __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallablePropFunc))
+    __associatedfunc __bwd_callable_type(FType, This) operator(); // -> bwd_prop
+
+    __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallableGetValFunc)) 
+    __associatedfunc __result_type(FType, This) val;
+};
+
+__magic_type(BwdDiffFuncInterfaceType)
+[KnownBuiltin("IBackwardDifferentiable")]
+interface IBackwardDifferentiable<FType>
+{
+    __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallableContextType)) 
+    associatedtype BwdCallable : IBwdCallable<FType>; // -> intermediate_context_type
+
+    __builtin_requirement($( (int)BuiltinRequirementKind::BwdApplyFunc))
+    __associatedfunc __apply_bwd_func_type(FType, This.BwdCallable) apply_bwd; // -> apply_bwd
+
+    __builtin_requirement($( (int)BuiltinRequirementKind::LegacyBackwardDerivativeFunc))
+    __associatedfunc __bwd_diff_func_type(FType) bwd_diff; // -> primal_ctx
+};
+
+/*__magic_type(LegacyBwdDiffFuncInterfaceType)
+[KnownBuiltin("ILegacyBackwardDifferentiable")]
+interface ILegacyBackwardDifferentiable<FType>
+{
+    __builtin_requirement($( (int)BuiltinRequirementKind::LegacyBackwardDerivativeFunc))
+    __associatedfunc __bwd_diff_func_type(FType) bwd_diff; // -> primal_ctx
+};*/
 
 /// `DifferentialPair<T>` is a built-in type that carries both the original and derivative value of a term. 
 /// It is defined as follows:

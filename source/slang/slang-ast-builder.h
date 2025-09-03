@@ -108,6 +108,7 @@ protected:
     Type* m_nullPtrType = nullptr;
     Type* m_noneType = nullptr;
     Type* m_diffInterfaceType = nullptr;
+    Type* m_forwardDiffFuncInterfaceType = nullptr;
     Type* m_builtinTypes[Index(BaseType::CountOf)];
 
     Dictionary<String, Decl*> m_magicDecls;
@@ -218,6 +219,14 @@ public:
     /// no need for additional state.
     ///
     Dictionary<ValKey, Val*, Hash<ValKey>, ValKeyEqual> m_cachedNodes;
+
+    Dictionary<GenericDecl*, List<Val*>> m_cachedGenericDefaultArgs;
+
+    HashSet<Val*> m_valsRequiringResolution;
+    Dictionary<Val*, Val*> m_resolvedVals;
+
+    // For [PrimalSubstitute] and [PrimalSubstituteOf] decorators
+    Dictionary<Decl*, ShortList<Decl*, 4>> m_substituteMap;
 
     /// Create AST types
     template<typename T>
@@ -528,6 +537,13 @@ public:
     Type* getNoneType() { return m_sharedASTBuilder->getNoneType(); }
     Type* getEnumTypeType() { return m_sharedASTBuilder->getEnumTypeType(); }
     Type* getDiffInterfaceType() { return m_sharedASTBuilder->getDiffInterfaceType(); }
+
+    Type* getForwardDiffFuncInterfaceType(Type* baseType);
+    Type* getBackwardDiffFuncInterfaceType(Type* baseType);
+    // Type* getLegacyBackwardDiffFuncInterfaceType(Type* baseType);
+    Type* getBwdCallableBaseType(Type* baseType);
+    Type* getFwdCallableBaseType(Type* baseType);
+
     // Construct the type `Ptr<valueType>`, where `Ptr`
     // is looked up as a builtin type.
     PtrType* getPtrType(Type* valueType, AccessQualifier accessQualifier, AddressSpace addrSpace);
@@ -594,8 +610,12 @@ public:
     DeclRef<InterfaceDecl> getDifferentiableInterfaceDecl();
     DeclRef<InterfaceDecl> getDifferentiableRefInterfaceDecl();
 
+    DeclRef<InterfaceDecl> getFunctionBaseInterfaceDecl();
+
     Type* getDifferentiableInterfaceType();
     Type* getDifferentiableRefInterfaceType();
+
+    Type* getFunctionBaseType();
 
     bool isDifferentiableInterfaceAvailable();
 
@@ -645,6 +665,8 @@ public:
         Type* subType,
         Type* superType,
         ArrayView<SubtypeWitness*> witnesses);
+
+    UnknownSubtypeWitness* getUnknownSubtypeWitness(Type* subType, Type* superType);
 
     SubtypeWitness* getExpandSubtypeWitness(
         Type* subType,

@@ -5,6 +5,7 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-lower-witness-lookup-chain.h"
 #include "slang-ir-lower-witness-lookup.h"
 #include "slang-ir-peephole.h"
 #include "slang-ir-sccp.h"
@@ -489,7 +490,7 @@ struct SpecializationContext
             // For now, we will overwrite the specialization args for the differential
             // using the args for the base.
             //
-            auto genericReturnVal = findInnerMostGenericReturnVal(genericVal);
+            /*auto genericReturnVal = findInnerMostGenericReturnVal(genericVal);
             if (genericReturnVal->findDecoration<IRTargetIntrinsicDecoration>())
             {
                 for (auto decor : genericReturnVal->getDecorations())
@@ -552,7 +553,7 @@ struct SpecializationContext
                     if (specialized)
                         return true;
                 }
-            }
+            }*/
             return false;
         }
 
@@ -662,6 +663,12 @@ struct SpecializationContext
 
         case kIROp_CountOf:
             return maybeSpecializeCountOf(inst);
+
+        case kIROp_FuncTypeOf:
+            return maybeSpecializeFuncTypeOf(inst);
+
+            // case kIROp_ContextTypeOf:
+            //     return maybeSpecializeContextTypeOf(inst);
 
         case kIROp_Func:
 
@@ -830,6 +837,88 @@ struct SpecializationContext
         inst->removeAndDeallocate();
         return true;
     }
+
+    bool maybeSpecializeFuncTypeOf(IRInst* inst)
+    {
+        // The `func_type_of` instruction is a special case
+        // where we want to specialize the type of a function
+        // based on the concrete types of its parameters.
+        //
+        // We will only do this if all of the operands are
+        // fully specialized, and then we will replace the
+        // `func_type_of` with a `specialize` instruction
+        // that specializes the function type.
+        //
+        auto operand = inst->getOperand(0);
+        if (auto func = as<IRFunc>(operand))
+        {
+            addUsersToWorkList(inst);
+            inst->replaceUsesWith(func->getDataType());
+            inst->removeAndDeallocate();
+            return true;
+        }
+
+        if (auto specialize = as<IRSpecialize>(operand))
+        {
+            if (auto generic = as<IRGeneric>(specialize->getBase()))
+            {
+                if (auto typeGeneric = as<IRGeneric>(generic->getDataType()))
+                {
+                    // If the generic is a type, we can specialize it directly.
+                    //
+                    IRBuilder builder(module);
+                    builder.setInsertBefore(inst);
+
+                    List<IRInst*> args;
+                    for (UInt i = 0; i < specialize->getArgCount(); i++)
+                    {
+                        args.add(specialize->getArg(i));
+                    }
+                    auto funcTypeInst =
+                        builder.emitSpecializeInst(builder.getTypeKind(), typeGeneric, args);
+                    addUsersToWorkList(inst);
+                    addUsersToWorkList(funcTypeInst);
+                    inst->replaceUsesWith(funcTypeInst);
+                    inst->removeAndDeallocate();
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /*bool maybeSpecializeContextTypeOf(IRInst* inst)
+    {
+        // TODO: This is a hack.. we need a nicer way to specialize a
+        // context type lookup.
+        //
+        auto operand = inst->getOperand(0);
+        for (auto use = operand->firstUse; use; use = use->nextUse)
+        {
+            auto user = use->getUser();
+            if (auto annotation = as<IRWitnessTableAnnotation>(user))
+            {
+                if (annotation->getTarget() == inst)
+                {
+                    if (auto wtType =
+    as<IRWitnessTableType>(annotation->getWitnessTable()->getDataType()))
+                    {
+                        if (auto nameHintDecor =
+    wtType->getConformanceType()->findDecoration<IRNameHintDecoration>())
+                        {
+                            if (nameHintDecor->getName() ==
+    UnownedStringSlice("IBackwardDifferentiable"))
+                            {
+                                contextTypeInst = annotation->getWitnessTable()->get
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }*/
 
     // Specializing lookup on witness tables is a general
     // transformation that helps with both generic and
@@ -3320,11 +3409,17 @@ IRInst* specializeGenericImpl(
     //
     IRBuilder builderStorage(module);
     IRBuilder* builder = &builderStorage;
-    builder->setInsertBefore(genericVal);
+    // builder->setInsertBefore(genericVal);
+    //
+    // We can just insert before the specialize inst, which is hoistable
+    // and de-duplicated, and so will be in the appropriate scope.
+    //
+    builder->setInsertBefore(specializeInst);
 
     List<IRInst*> pendingWorkList;
-    SLANG_DEFER(for (Index ii = pendingWorkList.getCount() - 1; ii >= 0; ii--) if (context)
-                    context->addToWorkList(pendingWorkList[ii]););
+    SLANG_DEFER(
+        for (Index ii = pendingWorkList.getCount() - 1; ii >= 0; ii--) if (context)
+            context->addToWorkList(pendingWorkList[ii]););
 
     // Now we will run through the body of the generic and
     // clone each of its instructions into the global scope,

@@ -1019,10 +1019,14 @@ struct IRDerivativeMemberDecoration : IRDecoration
     IRInst* getDerivativeMemberStructKey() { return getOperand(0); }
 };
 
+struct IRTranslateBase : public IRInst
+{
+    IR_PARENT_ISA(TranslateBase);
+};
+
 // An instruction that replaces the function symbol
 // with it's derivative function.
-FIDDLE()
-struct IRForwardDifferentiate : IRInst
+struct IRForwardDifferentiate : IRTranslateBase
 {
     FIDDLE(leafInst())
     // The base function for the call.
@@ -1036,8 +1040,7 @@ struct IRForwardDifferentiate : IRInst
 // of backward derivative computation. It performs the primal
 // computations and returns the intermediates that will be used
 // by the actual backward derivative function.
-FIDDLE()
-struct IRBackwardDifferentiatePrimal : IRInst
+struct IRBackwardDifferentiatePrimal : IRTranslateBase
 {
     FIDDLE(leafInst())
     // The base function for the call.
@@ -1049,29 +1052,72 @@ struct IRBackwardDifferentiatePrimal : IRInst
 // A backward derivative propagate function is the second pass of backward derivative computation.
 // It uses the intermediates computed in the bacward derivative primal function to perform the
 // actual backward derivative propagation.
-FIDDLE()
-struct IRBackwardDifferentiatePropagate : IRInst
+struct IRBackwardDifferentiatePropagate : IRTranslateBase
 {
     FIDDLE(leafInst())
     // The base function for the call.
     IRUse base;
     IRInst* getBaseFn() { return getOperand(0); }
+};
+
+// AD 2.0 Internal Use Inst.
+struct IRForwardDifferentiatePropagate : IRTranslateBase
+{
+    enum
+    {
+        kOp = kIROp_ForwardDifferentiatePropagate
+    };
+    // The base function for the call.
+    IRUse base;
+    IRInst* getBaseFn() { return getOperand(0); }
+
+    IR_LEAF_ISA(ForwardDifferentiatePropagate)
 };
 
 // An instruction that replaces the function symbol with its backward derivative function.
 // A backward derivative function is a concept that combines both passes of backward derivative
 // computation. This inst should only be produced by lower-to-ir, and will be replaced with calls to
 // the primal function followed by the propagate function in the auto-diff pass.
-FIDDLE()
-struct IRBackwardDifferentiate : IRInst
+struct IRBackwardDifferentiate : IRTranslateBase
 {
     FIDDLE(leafInst())
     // The base function for the call.
     IRUse base;
-    IRInst* getBaseFn() { return getOperand(0); }
+    IRInst* getApplyFunc() { return getOperand(0); }
+    IRInst* getContextType() { return getOperand(1); }
+    IRInst* getBwdPropFunc() { return getOperand(2); }
+
+    IR_LEAF_ISA(BackwardDifferentiate)
 };
 
-FIDDLE()
+struct IRBackwardPrimalFromLegacyBwdDiffFunc : IRTranslateBase
+{
+    enum
+    {
+        kOp = kIROp_BackwardPrimalFromLegacyBwdDiffFunc
+    };
+    // The base function for the call.
+    IRUse base;
+    IRInst* getBaseFn() { return getOperand(0); }
+    IRInst* getLegacyBwdDiffFunc() { return getOperand(1); }
+
+    IR_LEAF_ISA(BackwardPrimalFromLegacyBwdDiffFunc)
+};
+
+struct IRBackwardPropagateFromLegacyBwdDiffFunc : IRTranslateBase
+{
+    enum
+    {
+        kOp = kIROp_BackwardPropagateFromLegacyBwdDiffFunc
+    };
+    // The base function for the call.
+    IRUse base;
+    IRInst* getBaseFn() { return getOperand(0); }
+    IRInst* getLegacyBwdDiffFunc() { return getOperand(1); }
+
+    IR_LEAF_ISA(BackwardPropagateFromLegacyBwdDiffFunc)
+};
+
 struct IRIsDifferentialNull : IRInst
 {
     FIDDLE(leafInst())
@@ -1094,7 +1140,35 @@ struct IRDifferentiableTypeAnnotation : IRInst
     IRInst* getWitness() { return getOperand(1); }
 };
 
-FIDDLE()
+struct IRWitnessTableAnnotation : IRInst
+{
+    enum
+    {
+        kOp = kIROp_WitnessTableAnnotation
+    };
+    IRInst* getTarget() { return getOperand(0); }
+    IRInst* getWitnessTable() { return getOperand(1); }
+    IRInst* getConformanceType()
+    {
+        return as<IRWitnessTableType>(getWitnessTable()->getDataType())->getConformanceType();
+    }
+
+    IR_LEAF_ISA(WitnessTableAnnotation)
+};
+
+struct IRAssociatedInstAnnotation : IRInst
+{
+    enum
+    {
+        kOp = kIROp_AssociatedInstAnnotation
+    };
+    IRInst* getTarget() { return getOperand(0); }
+    IRIntegerValue getConformanceID() { return as<IRIntLit>(getOperand(1))->getValue(); }
+    IRInst* getInst() { return getOperand(2); }
+
+    IR_LEAF_ISA(AssociatedInstAnnotation)
+};
+
 struct IRDispatchKernel : IRInst
 {
     FIDDLE(leafInst())
@@ -4008,6 +4082,7 @@ public:
     IRInst* emitBackwardDifferentiateInst(IRType* type, IRInst* baseFn);
     IRInst* emitBackwardDifferentiatePrimalInst(IRType* type, IRInst* baseFn);
     IRInst* emitBackwardDifferentiatePropagateInst(IRType* type, IRInst* baseFn);
+    IRInst* emitForwardDifferentiatePropagateInst(IRType* type, IRInst* baseFn);
     IRInst* emitPrimalSubstituteInst(IRType* type, IRInst* baseFn);
     IRInst* emitDetachDerivative(IRType* type, IRInst* value);
     IRInst* emitIsDifferentialNull(IRInst* value);

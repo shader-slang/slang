@@ -50,7 +50,7 @@ inline int getVectorSize(VectorExpressionType* vecType)
 struct SemanticsVisitor;
 
 List<ExtensionDecl*> const& getCandidateExtensions(
-    DeclRef<AggTypeDecl> const& declRef,
+    DeclRef<Decl> const& declRef,
     SemanticsVisitor* semantics);
 
 // Returns the members of `genericInnerDecl`'s enclosing generic decl.
