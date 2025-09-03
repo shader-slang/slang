@@ -25,11 +25,6 @@ runs:
         Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
         Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\usr\\bin"
 
-    - uses: actions/checkout@v4
-      with:
-        submodules: "recursive"
-        fetch-depth: "2"
-
     - name: Setup
       uses: ./.github/actions/common-setup
       with:
