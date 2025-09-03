@@ -32,7 +32,7 @@ runs:
         compiler: ${{ inputs.compiler }}
         platform: ${{ inputs.platform }}
         config: ${{ inputs.config }}
-        build-llvm: true
+        build-llvm: false
 
     - uses: actions/download-artifact@v4
       with:

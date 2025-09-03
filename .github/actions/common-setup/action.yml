@@ -98,7 +98,7 @@ runs:
       id: cache-llvm
       if: inputs.build-llvm == 'true'
       with:
-        path: ${{ github.workspace }}/build/llvm-project-install
+        path: build/llvm-project-install
         # Use os*compiler*platform in lieu of an ABI key here, which is what we really want
         key: llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ hashFiles('external/build-llvm.sh') }}
     - name: Build LLVM
@@ -111,7 +111,7 @@ runs:
     - uses: actions/cache/save@v4
       if: inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true'
       with:
-        path: ${{ github.workspace }}/build/llvm-project-install
+        path: build/llvm-project-install
         key: ${{ steps.cache-llvm.outputs.cache-primary-key }}
 
     - name: Set environment variable for CMake
