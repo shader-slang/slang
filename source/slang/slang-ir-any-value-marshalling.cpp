@@ -1018,6 +1018,10 @@ SlangInt _getAnyValueSizeRaw(IRType* type, SlangInt offset)
         {
             return alignUp(offset, 4) + kRTTIHandleSize;
         }
+    case kIROp_CollectionTagType:
+        {
+            return alignUp(offset, 4) + 4;
+        }
     case kIROp_InterfaceType:
         {
             auto interfaceType = cast<IRInterfaceType>(type);
