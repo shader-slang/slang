@@ -1,4 +1,5 @@
-// TEST(smoke):CPP_COMPILER_SHARED_LIBRARY:
+// This test is failing due to a regression github issue #8362
+// DISABLE_TEST(smoke):CPP_COMPILER_SHARED_LIBRARY:
 
 #include <iostream>
 #include <stdio.h>

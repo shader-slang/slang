@@ -575,6 +575,13 @@ static SlangResult _gatherTestsForFile(
             continue;
         }
 
+        // Skip any extra slashes and spaces to handle malformed directives like ///TEST or // TEST
+        while (*cursor == '/')
+        {
+            cursor++;
+        }
+        skipHorizontalSpace(&cursor);
+
         UnownedStringSlice command;
 
         if (SLANG_FAILED(_extractCommand(&cursor, command)))
