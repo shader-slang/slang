@@ -52,12 +52,12 @@ runs:
           echo "bin_dir=$bin_dir" >> $GITHUB_ENV
         else
           # The binaries are now in the github_artifact/bin/ directory
-          bin_dir=$(pwd)/github_artifact/bin
+          bin_dir=$(pwd)/github_artifact/${cmake_config}/bin
           echo "bin_dir=$bin_dir" >> $GITHUB_ENV
         fi
         
         # Also set lib_dir for slangpy tests
-        lib_dir=$(pwd)/github_artifact/lib
+        lib_dir=$(pwd)/github_artifact/${cmake_config}/lib
         echo "lib_dir=$lib_dir" >> $GITHUB_ENV
         
         # Set up library path for runtime linking

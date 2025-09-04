@@ -171,34 +171,34 @@ jobs:
 
       - name: Prepare artifacts for upload
         run: |
-          # Create a staging directory for artifacts
-          mkdir -p artifacts-staging
+          # Create a staging directory for artifacts with config-specific subdirectory
+          mkdir -p "artifacts-staging/${cmake_config}"
           
           # Copy artifacts from the specific configuration directory
           if [ -d "build/${cmake_config}" ]; then
-            echo "Copying artifacts from build/${cmake_config}..."
+            echo "Copying artifacts from build/${cmake_config} to github_artifact/${cmake_config}..."
             
             # Copy bin directory excluding debug files
             if [ -d "build/${cmake_config}/bin" ]; then
-              mkdir -p artifacts-staging/bin
-              find "build/${cmake_config}/bin" -type f ! -name "*.pdb" ! -name "*.ilk" ! -name "*.dwarf" ! -name "*.debug" ! -name "*.dSYM" -exec cp {} artifacts-staging/bin/ \; || echo "Failed to copy bin directory"
+              mkdir -p "artifacts-staging/${cmake_config}/bin"
+              find "build/${cmake_config}/bin" -type f ! -name "*.pdb" ! -name "*.ilk" ! -name "*.dwarf" ! -name "*.debug" ! -name "*.dSYM" -exec cp {} "artifacts-staging/${cmake_config}/bin/" \; || echo "Failed to copy bin directory"
 
-              cp -r "build/${cmake_config}/bin/D3D12" artifacts-staging/bin/ || echo "Failed to copy bin/D3D12 directory"
+              cp -r "build/${cmake_config}/bin/D3D12" "artifacts-staging/${cmake_config}/bin/" || echo "Failed to copy bin/D3D12 directory"
             fi
             
             # Copy everything from lib directory
             if [ -d "build/${cmake_config}/lib" ]; then
-              cp -r "build/${cmake_config}/lib" artifacts-staging/ || echo "Failed to copy lib directory"
+              cp -r "build/${cmake_config}/lib" "artifacts-staging/${cmake_config}/" || echo "Failed to copy lib directory"
             fi
             
             # Copy share directory if it exists
             if [ -d "build/${cmake_config}/share" ]; then
-              cp -r "build/${cmake_config}/share" artifacts-staging/ || echo "Failed to copy share directory"
+              cp -r "build/${cmake_config}/share" "artifacts-staging/${cmake_config}/" || echo "Failed to copy share directory"
             fi
             
             # Copy include directory if it exists
             if [ -d "build/${cmake_config}/include" ]; then
-              cp -r "build/${cmake_config}/include" artifacts-staging/ || echo "Failed to copy include directory"
+              cp -r "build/${cmake_config}/include" "artifacts-staging/${cmake_config}/" || echo "Failed to copy include directory"
             fi
             
           echo "Artifacts staging directory contents (recursive):"
