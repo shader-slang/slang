@@ -74,12 +74,12 @@ jobs:
             "-show-adapter-info"
             "-enable-debug-layers" "${{ inputs.enable-debug-layers }}"
           )
-          
+
           # Add no-GPU failure list for non-GPU tests
           if [[ "${{ inputs.full-gpu-tests }}" != "true" ]]; then
             slang_test_args+=("-expected-failure-list" "tests/expected-failure-no-gpu.txt")
           fi
-          
+
           # Execute slang-test with all arguments
           "$bin_dir/slang-test" "${slang_test_args[@]}"
       - name: Run Slang examples

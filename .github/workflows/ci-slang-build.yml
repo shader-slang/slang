@@ -34,7 +34,7 @@ on:
 jobs:
   build:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
-    
+
     defaults:
       run:
         shell: bash
@@ -80,7 +80,7 @@ jobs:
       - name: Build Slang
         run: |
           echo "cmake version: $(cmake --version)"
-          
+
           # Show ccache status if available
           if command -v ccache &> /dev/null; then
             echo "🔧 ccache configuration:"
@@ -150,7 +150,7 @@ jobs:
               cmake --workflow --preset "${{ inputs.config }}"
             fi
           fi
-          
+
           # Show ccache statistics after build
           if command -v ccache &> /dev/null; then
             echo "📊 ccache statistics (post-build):"
@@ -166,7 +166,7 @@ jobs:
         run: |
           # Create a staging directory for artifacts with config-specific subdirectory
           mkdir -p "artifacts-staging/${cmake_config}"
-          
+
           # Copy artifacts from the specific configuration directory
           if [ -d "build/${cmake_config}" ]; then
             echo "Copying artifacts from build/${cmake_config} to github_artifact/${cmake_config}..."
