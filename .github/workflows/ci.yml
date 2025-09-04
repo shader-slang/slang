@@ -174,7 +174,6 @@ jobs:
       runs-on: '["macos-latest"]'
       test-category: full
       full-gpu-tests: true
-      has-gpu: true
       server-count: 3
 
   # Windows GPU tests (self-hosted)
@@ -190,7 +189,6 @@ jobs:
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
       test-category: full
       full-gpu-tests: true
-      has-gpu: true
 
   test-windows-release-cl-x86_64-gpu:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
@@ -204,4 +202,3 @@ jobs:
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
       test-category: full
       full-gpu-tests: true
-      has-gpu: true

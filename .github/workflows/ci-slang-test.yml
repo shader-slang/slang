@@ -26,10 +26,6 @@ on:
         required: false
         type: boolean
         default: false
-      has-gpu:
-        required: false
-        type: boolean
-        default: false
       server-count:
         required: false
         type: number
