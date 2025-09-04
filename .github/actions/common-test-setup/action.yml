@@ -1,22 +1,22 @@
 name: Common Test Setup
-description: 'Common setup steps for Slang test jobs'
+description: "Common setup steps for Slang test jobs"
 
 inputs:
   os:
     required: true
-    description: 'Operating system'
+    description: "Operating system"
   compiler:
     required: true
-    description: 'Compiler to use'
+    description: "Compiler to use"
   platform:
     required: true
-    description: 'Platform to build for'
+    description: "Platform to build for"
   config:
     required: true
-    description: 'Build configuration'
+    description: "Build configuration"
 
 runs:
-  using: 'composite'
+  using: "composite"
   steps:
     - name: Setup
       uses: ./.github/actions/common-setup
@@ -38,7 +38,7 @@ runs:
         # Artifacts are now directly extracted to github_artifact directory
         # Just ensure all executables are executable
         chmod +x github_artifact/${cmake_config}/bin/* 2>/dev/null || echo "No executables to make executable"
-        
+
         # Set up bin_dir based on platform and config
         if [[ "${{ inputs.platform }}" == "wasm" ]]; then
           bin_dir=build.em/Release/bin
@@ -47,11 +47,11 @@ runs:
           bin_dir=$(pwd)/github_artifact/${cmake_config}/bin
           echo "bin_dir=$bin_dir" >> $GITHUB_ENV
         fi
-        
+
         # Also set lib_dir for slangpy tests
         lib_dir=$(pwd)/github_artifact/${cmake_config}/lib
         echo "lib_dir=$lib_dir" >> $GITHUB_ENV
-        
+
         # Set up library path for runtime linking
         if [[ "${{ inputs.os }}" == "linux" ]]; then
           echo "LD_LIBRARY_PATH=${lib_dir}:$LD_LIBRARY_PATH" >> $GITHUB_ENV
