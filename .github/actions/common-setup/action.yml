@@ -162,7 +162,7 @@ runs:
         echo "🔧 Using persistent ccache directory: $ccache_dir"
 
         # Configure ccache settings for local use only
-        ccache --set-config=max_size=2G
+        ccache --set-config=max_size=20G
         ccache --set-config=compression=true
         ccache --set-config=compression_level=6
         ccache --set-config=sloppiness=pch_defines,time_macros
