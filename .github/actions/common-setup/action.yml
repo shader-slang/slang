@@ -150,8 +150,12 @@ runs:
         echo "✅ ccache found on self-hosted runner - setting up persistent caching"
 
         # Set ccache directory to a persistent location outside workspace
-        # Use runner temp directory with a unique path per repo/compiler/platform
-        ccache_base_dir="${RUNNER_TEMP:-/tmp}/ccache-slang"
+        if [[ "${{ inputs.os }}" == "windows" ]]; then
+          ccache_base_dir="C:/ccache-slang"
+        else
+          # Linux/macOS: Use home directory for persistence
+          ccache_base_dir="$HOME/.ccache-slang"
+        fi
         ccache_dir="$ccache_base_dir/${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}"
         mkdir -p "$ccache_dir"
         echo "CCACHE_DIR=$ccache_dir" >> $GITHUB_ENV
@@ -162,6 +166,7 @@ runs:
         ccache --set-config=compression=true
         ccache --set-config=compression_level=6
         ccache --set-config=sloppiness=pch_defines,time_macros
+        ccache --set-config=cache_dir="$ccache_dir"
 
         # Enable ccache for CMake (set environment variables)
         # Get the full path to ccache executable

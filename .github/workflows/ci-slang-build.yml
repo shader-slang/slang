@@ -114,6 +114,7 @@ jobs:
             cmake_launcher_defines=()
             if [[ -n "${ccache_symlinks_path:-}" ]]; then
               echo "🔧 Using ccache with launcher: ${ccache_symlinks_path}"
+              echo "🔧 CCACHE_DIR is set to: ${CCACHE_DIR:-'not set'}"
               cmake_launcher_defines+=("-DCMAKE_C_COMPILER_LAUNCHER=${ccache_symlinks_path}")
               cmake_launcher_defines+=("-DCMAKE_CXX_COMPILER_LAUNCHER=${ccache_symlinks_path}")
             else
