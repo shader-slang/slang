@@ -172,9 +172,3 @@ runs:
         # Get the full path to ccache executable
         ccache_path=$(which ccache)
         echo "ccache_symlinks_path=$ccache_path" >> $GITHUB_ENV
-
-        # Show initial stats
-        echo "ccache configuration:"
-        ccache --show-config || echo "Could not show ccache config"
-        ccache --zero-stats || echo "Could not zero ccache stats"
-        ccache --show-stats || echo "Could not show ccache stats"

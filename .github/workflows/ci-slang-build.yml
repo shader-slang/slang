@@ -156,8 +156,6 @@ jobs:
           if command -v ccache &> /dev/null; then
             echo "📊 ccache statistics (post-build):"
             ccache --show-stats || true
-            echo "🎯 ccache hit ratio summary:"
-            ccache --show-stats | grep -E "(cache hit|cache miss|files compiled)" || true
           fi
 
       - name: Check documented compiler versions
