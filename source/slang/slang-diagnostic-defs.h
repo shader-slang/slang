@@ -321,9 +321,9 @@ DIAGNOSTIC(99999, Note, noteFailedToLoadDynamicLibrary, "failed to load dynamic 
 //
 DIAGNOSTIC(
     00200,
-    Error,
+    Warning,
     noReflectionAvailableForModule,
-    "no reflection information available to output for module '$0'")
+    "no reflection information available to output for module '$0', no data will be written.")
 
 //
 // 15xxx - Preprocessing
