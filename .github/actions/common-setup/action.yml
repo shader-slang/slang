@@ -147,12 +147,15 @@ runs:
           exit 0
         fi
 
-        echo "✅ ccache found on self-hosted runner - setting up local caching"
+        echo "✅ ccache found on self-hosted runner - setting up persistent caching"
 
-        # Set ccache directory (local temp directory)
-        ccache_dir="${{ github.workspace }}/.ccache-local"
+        # Set ccache directory to a persistent location outside workspace
+        # Use runner temp directory with a unique path per repo/compiler/platform
+        ccache_base_dir="${RUNNER_TEMP:-/tmp}/ccache-slang"
+        ccache_dir="$ccache_base_dir/${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}"
         mkdir -p "$ccache_dir"
         echo "CCACHE_DIR=$ccache_dir" >> $GITHUB_ENV
+        echo "🔧 Using persistent ccache directory: $ccache_dir"
 
         # Configure ccache settings for local use only
         ccache --set-config=max_size=2G
