@@ -201,6 +201,11 @@ jobs:
               cp -r "build/${cmake_config}/include" "artifacts-staging/${cmake_config}/" || echo "Failed to copy include directory"
             fi
             
+            # Copy examples directory if it exists (contains shader files for examples)
+            if [ -d "build/examples" ]; then
+              cp -r "build/examples" "artifacts-staging/" || echo "Failed to copy examples directory"
+            fi
+            
           echo "Artifacts staging directory contents (recursive):"
           ls -laR artifacts-staging/
           else
