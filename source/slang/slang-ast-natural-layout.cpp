@@ -181,6 +181,11 @@ NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
         size.append(calcSize(optionalType->getValueType()));
         return size;
     }
+    else if (auto shortStringType = as<ShortStringType>(type))
+    {
+        // Target dependant layout
+        return NaturalSize::makeInvalid();
+    }
     else if (auto declRefType = as<DeclRefType>(type))
     {
         if (const auto enumDeclRef = declRefType->getDeclRef().as<EnumDecl>())

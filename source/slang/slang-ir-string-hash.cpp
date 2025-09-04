@@ -61,7 +61,7 @@ void addGlobalHashedStringLiterals(const StringSlicePool& pool, IRModule* module
     ShortList<IRInst*> operandInsts;
     for (Index i = 0; i < slicesCount; ++i)
     {
-        IRStringLit* stringLit = builder.getStringValue(slices[i]);
+        IRStringLit* stringLit = builder.getStringValue(slices[i], kIROp_StringType);
         operandInsts.add(stringLit);
     }
 
