@@ -2970,6 +2970,11 @@ DIAGNOSTIC(
     Error,
     divisionByMatrixNotSupported,
     "division by matrix is not supported for Metal and WGSL targets.")
+DIAGNOSTIC(
+    56103,
+    Error,
+    assignToRefNotSupported,
+    "assignment to mesh output member via reference not supported for Metal target.")
 
 DIAGNOSTIC(
     56103,
