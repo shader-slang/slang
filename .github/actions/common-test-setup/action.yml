@@ -36,7 +36,7 @@ runs:
 
     - uses: actions/download-artifact@v4
       with:
-        name: slang-build-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}
+        name: slang-tests-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}
         path: github_artifact
 
     - name: Setup environment
@@ -44,14 +44,13 @@ runs:
       run: |
         # Artifacts are now directly extracted to github_artifact directory
         # Just ensure all executables are executable
-        chmod +x github_artifact/bin/* 2>/dev/null || echo "No executables to make executable"
+        chmod +x github_artifact/${cmake_config}/bin/* 2>/dev/null || echo "No executables to make executable"
         
         # Set up bin_dir based on platform and config
         if [[ "${{ inputs.platform }}" == "wasm" ]]; then
           bin_dir=build.em/Release/bin
           echo "bin_dir=$bin_dir" >> $GITHUB_ENV
         else
-          # The binaries are now in the github_artifact/bin/ directory
           bin_dir=$(pwd)/github_artifact/${cmake_config}/bin
           echo "bin_dir=$bin_dir" >> $GITHUB_ENV
         fi
