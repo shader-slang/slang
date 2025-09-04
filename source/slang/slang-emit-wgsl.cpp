@@ -288,6 +288,40 @@ void WGSLSourceEmitter::emitSemanticsPrefixImpl(IRInst* inst)
     }
 }
 
+/// Calculate minimum WGSL alignment for function address space based on field type
+static uint32_t getWGSLMinimumFunctionAlignment(IRType* fieldType)
+{
+    // For WGSL function address space, certain types require minimum alignments
+    if (auto vectorType = as<IRVectorType>(fieldType))
+    {
+        IRIntegerValue elementCount = getIntVal(vectorType->getElementCount());
+        if (elementCount == 2)
+            return 8;  // vec2<T> requires 8-byte alignment
+        else if (elementCount >= 3)
+            return 16; // vec3<T> and vec4<T> require 16-byte alignment
+    }
+    
+    if (auto matrixType = as<IRMatrixType>(fieldType))
+    {
+        return 16; // Matrices typically require 16-byte alignment
+    }
+    
+    if (auto structType = as<IRStructType>(fieldType))
+    {
+        // For structs, find the maximum alignment requirement of all fields
+        uint32_t maxAlignment = 4; // Minimum 4-byte for basic types
+        for (auto structField : structType->getFields())
+        {
+            uint32_t fieldMinAlignment = getWGSLMinimumFunctionAlignment(structField->getFieldType());
+            maxAlignment = Math::Max(maxAlignment, fieldMinAlignment);
+        }
+        return maxAlignment;
+    }
+    
+    // For basic types (i32, u32, f32), 4-byte alignment is sufficient
+    return 4;
+}
+
 void WGSLSourceEmitter::emitStructFieldAttributes(
     IRStructType* structType,
     IRStructField* field,
@@ -311,11 +345,16 @@ void WGSLSourceEmitter::emitStructFieldAttributes(
     SLANG_ASSERT(fieldOffsetDecoration->getOffset() <= IRIntegerValue{UINT32_MAX});
     SLANG_ASSERT(isPowerOf2(structAlignment));
     const uint32_t fieldOffset = static_cast<uint32_t>(fieldOffsetDecoration->getOffset());
-    // Alignment is GCD(fieldOffset, structAlignment)
-    // TODO: Use builtin/intrinsic (e.g. __builtin_ffs)
+    
+    // Calculate alignment using GCD(fieldOffset, structAlignment)
     uint32_t fieldAlignment = 1U;
     while (((fieldAlignment & (structAlignment | fieldOffset)) == 0U))
         fieldAlignment = fieldAlignment << 1U;
+    
+    // Apply WGSL minimum alignment requirements for function address space
+    // WGSL requires higher alignment for certain types when used in function address space
+    uint32_t wgslMinAlignment = getWGSLMinimumFunctionAlignment(field->getFieldType());
+    fieldAlignment = Math::Max(fieldAlignment, wgslMinAlignment);
 
     m_writer->emit("@align(");
     m_writer->emit(fieldAlignment);
