@@ -1,0 +1,109 @@
+// unit-test-translation-unit-import.cpp
+
+#include "../../source/core/slang-io.h"
+#include "../../source/core/slang-process.h"
+#include "slang-com-ptr.h"
+#include "slang.h"
+#include "unit-test/slang-unit-test.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+
+using namespace Slang;
+
+static String getTypeFullName(slang::TypeReflection* type)
+{
+    ComPtr<ISlangBlob> blob;
+    type->getFullName(blob.writeRef());
+    return String((const char*)blob->getBufferPointer());
+}
+
+// Test that the reflection API provides correct info about modules with link-time types.
+
+SLANG_UNIT_TEST(linkTimeTypeReflection)
+{
+    // Source for a module that contains an undecorated entrypoint.
+    const char* userSourceBody = R"(
+        interface IMaterial { float4 load(); }
+        extern struct Material : IMaterial;
+        ConstantBuffer<Material> gMaterial;
+        RWTexture2D tex;
+
+        [numthreads(1,1,1)]
+        [shader("compute")]
+        void computeMain() {
+            tex[uint2(0, 0)] = gMaterial.load();
+        }
+        )";
+
+    String moduleName = "linkTimeTypeReflection_Compute";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV_ASM;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnosticBlob;
+    auto module = session->loadModuleFromSourceString(
+        moduleName.getBuffer(),
+        (moduleName + ".slang").getBuffer(),
+        userSourceBody,
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    String configModuleSource = "import " + moduleName + ";\n" + R"(
+        export struct Material : IMaterial = MyMaterial;
+
+        struct MyMaterial : IMaterial {
+           int data;
+           Texture2D diffuse;
+           float4 load() { return diffuse.Load(uint3(0,0,0)); }
+        }
+    )";
+    auto configModule = session->loadModuleFromSourceString(
+        "config",
+        "config.slang",
+        configModuleSource.getBuffer(),
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(configModule != nullptr);
+
+    slang::IComponentType* components[] = {module, configModule};
+
+    ComPtr<slang::IComponentType> compositeProgram;
+    session->createCompositeComponentType(
+        components,
+        2,
+        compositeProgram.writeRef(),
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(compositeProgram != nullptr);
+
+    ComPtr<slang::IComponentType> linkedProgram;
+    compositeProgram->link(linkedProgram.writeRef(), diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(linkedProgram != nullptr);
+
+    auto programLayout = linkedProgram->getLayout();
+    auto var0 = programLayout->getParameterByIndex(0);
+    SLANG_CHECK(var0->getTypeLayout()->getSize(slang::ParameterCategory::DescriptorTableSlot) == 2);
+
+    auto elementLayout = var0->getTypeLayout()->getElementTypeLayout();
+    SLANG_CHECK_ABORT(elementLayout != nullptr);
+    SLANG_CHECK(elementLayout->getSize() == 16);
+
+    auto var1 = programLayout->getParameterByIndex(1);
+    SLANG_CHECK(var1->getOffset(slang::ParameterCategory::DescriptorTableSlot) == 2);
+
+    ComPtr<slang::IBlob> codeBlob;
+    linkedProgram->getTargetCode(0, codeBlob.writeRef(), diagnosticBlob.writeRef());
+
+    SLANG_CHECK_ABORT(codeBlob.get());
+
+    auto spirvStr = UnownedStringSlice((const char*)codeBlob->getBufferPointer());
+
+    SLANG_CHECK(spirvStr.indexOf(toSlice("OpDecorate %tex Binding 2")) != -1);
+}

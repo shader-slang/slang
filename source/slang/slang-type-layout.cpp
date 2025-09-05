@@ -5181,7 +5181,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             StructTypeLayoutBuilder typeLayoutBuilder;
             StructTypeLayoutBuilder pendingDataTypeLayoutBuilder;
 
-            typeLayoutBuilder.beginLayout(type, rules);
+            typeLayoutBuilder.beginLayout(declRefType, rules);
             auto typeLayout = typeLayoutBuilder.getTypeLayout();
 
             _addLayout(context, type, typeLayout);
