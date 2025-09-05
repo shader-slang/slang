@@ -101,6 +101,8 @@ runs:
         path: build/llvm-project-install
         # Use os*compiler*platform in lieu of an ABI key here, which is what we really want
         key: llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ hashFiles('external/build-llvm.sh') }}
+        restore-keys: |
+             llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-
     - name: Build LLVM
       if: inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true'
       shell: bash
