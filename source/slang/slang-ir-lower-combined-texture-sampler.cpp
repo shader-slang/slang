@@ -100,6 +100,47 @@ struct LowerCombinedSamplerContext
         mapLoweredTypeToLoweredInfo.add(info.type, info);
         return info;
     }
+
+    LoweredCombinedSamplerStructInfo lowerCombinedTextureSamplerTypeArray(IRArrayTypeBase* arrayType)
+    {
+        if (auto loweredInfo = mapTypeToLoweredInfo.tryGetValue(arrayType))
+            return *loweredInfo;
+        
+        LoweredCombinedSamplerStructInfo info;
+        auto elementType = as<IRTextureTypeBase>(arrayType->getElementType());
+        if (elementType && getIntVal(elementType->getIsCombinedInst()) != 0) {
+            // Lower the element type to get struct layout
+            auto elementInfo = lowerCombinedTextureSamplerType(elementType);
+
+            // Create array type of the lowered struct
+            IRBuilder builder(arrayType);
+            auto arrayOfStructsType = builder.getArrayType(elementInfo.type, arrayType->getElementCount());
+
+            // Create array type layout with struct as element layout
+            IRArrayTypeLayout::Builder arrayLayoutBuilder(&builder, elementInfo.typeLayout);
+            // Copy resource usage from element to array (multiplied by array size)
+            IRIntegerValue arraySize = getIntVal(arrayType->getElementCount());
+            for (auto sizeAttr : elementInfo.typeLayout->getSizeAttrs())
+            {
+                arrayLayoutBuilder.addResourceUsage(sizeAttr->getResourceKind(),
+                    LayoutSize(sizeAttr->getSize().getFiniteValue() * arraySize));
+            }
+            auto arrayTypeLayout = arrayLayoutBuilder.build();
+
+            // Populate typeInfo with array layout info
+            info.type = arrayOfStructsType;
+            info.typeLayout = arrayTypeLayout;
+            info.texture = elementInfo.texture;
+            info.sampler = elementInfo.sampler;
+            info.textureType = elementInfo.textureType;
+            info.samplerType = elementInfo.samplerType;
+
+            // Store this info so it can be found later by the replacement logic
+            mapTypeToLoweredInfo.add(arrayType, info);
+            mapLoweredTypeToLoweredInfo.add(arrayOfStructsType, info);
+        }
+        return info;
+    }
 };
 
 void lowerCombinedTextureSamplers(
@@ -116,87 +157,61 @@ void lowerCombinedTextureSamplers(
     for (auto globalInst : module->getGlobalInsts())
     {
         IRType* dataType = nullptr;
-
-        // Check if the global inst is a global param.
         auto globalParam = as<IRGlobalParam>(globalInst);
-        bool instIsGlobalParam;
-        if (globalParam) {
-            // Check if the global param has a data type that is a texture type or an array type.
+        auto globalVar = as<IRGlobalVar>(globalInst);
+
+        // Handle global parameters
+        if (globalParam)
+        {
             dataType = globalParam->getDataType();
-            instIsGlobalParam = true;
-        } else {
-            // Check if the global inst itself is a texture type or an array type.
+        }
+        // Handle global variables  
+        else if (globalVar)
+        {
+            dataType = globalVar->getDataType();
+            if (auto ptrType = as<IRPtrType>(dataType))
+                dataType = ptrType->getValueType();
+        }
+        // Handle other global instructions
+        else
+        {
             dataType = as<IRType>(globalInst);
-            instIsGlobalParam = false;
         }
 
-        if (!dataType)
-            continue;
-
+        // Lower the data type
         LoweredCombinedSamplerStructInfo typeInfo;
+        // Lower individual combined texture sampler type
         if (auto textureType = as<IRTextureTypeBase>(dataType))
         {
-            // Handle individual combined texture sampler
             if (getIntVal(textureType->getIsCombinedInst()) == 0)
                 continue;
 
             // Lower the combined texture sampler type
             typeInfo = context.lowerCombinedTextureSamplerType(textureType);
         }
+        // Lower array and its element type if that is a combined texture sampler type
         else if (auto arrayType = as<IRArrayTypeBase>(dataType))
         {
-            // Handle array of combined texture samplers
             auto elementType = as<IRTextureTypeBase>(arrayType->getElementType());
             if (!elementType || getIntVal(elementType->getIsCombinedInst()) == 0)
                 continue;
 
-            // Lower the element type to get struct layout
-            auto elementInfo = context.lowerCombinedTextureSamplerType(elementType);
-
-            // Create array type of the lowered struct
-            IRBuilder builder(globalParam);
-            auto arrayOfStructsType = builder.getArrayType(elementInfo.type, arrayType->getElementCount());
-
-            // Create array type layout with struct as element layout
-            IRArrayTypeLayout::Builder arrayLayoutBuilder(&builder, elementInfo.typeLayout);
-            // Copy resource usage from element to array (multiplied by array size)
-            IRIntegerValue arraySize = getIntVal(arrayType->getElementCount());
-            for (auto sizeAttr : elementInfo.typeLayout->getSizeAttrs())
-            {
-                arrayLayoutBuilder.addResourceUsage(sizeAttr->getResourceKind(),
-                    LayoutSize(sizeAttr->getSize().getFiniteValue() * arraySize));
-            }
-            auto arrayTypeLayout = arrayLayoutBuilder.build();
-
-            // Populate typeInfo with array layout info
-            typeInfo.type = arrayOfStructsType;
-            typeInfo.typeLayout = arrayTypeLayout;
-            typeInfo.texture = elementInfo.texture;
-            typeInfo.sampler = elementInfo.sampler;
-            typeInfo.textureType = elementInfo.textureType;
-            typeInfo.samplerType = elementInfo.samplerType;
-
-            // Store this info so it can be found later by the replacement logic
-            context.mapTypeToLoweredInfo.add(arrayType, typeInfo);
-            context.mapLoweredTypeToLoweredInfo.add(arrayOfStructsType, typeInfo);
+            // Lower the array of combined texture sampler type and its element type
+            typeInfo = context.lowerCombinedTextureSamplerTypeArray(arrayType);
         }
         else
         {
             continue;
         }
 
-        // If the global inst is not a global param, we can exit now.
-        if (!instIsGlobalParam)
-            continue;
-
-        auto layoutDecor = globalParam->findDecoration<IRLayoutDecoration>();
+        auto layoutDecor = globalInst->findDecoration<IRLayoutDecoration>();
         if (!layoutDecor)
             continue;
         // Replace the original VarLayout with the new StructTypeVarLayout.
         auto varLayout = as<IRVarLayout>(layoutDecor->getLayout());
         if (!varLayout)
             continue;
-        IRBuilder subBuilder(globalParam);
+        IRBuilder subBuilder(globalInst);
         IRVarLayout::Builder newVarLayoutBuilder(&subBuilder, typeInfo.typeLayout);
         newVarLayoutBuilder.cloneEverythingButOffsetsFrom(varLayout);
         IRVarOffsetAttr* resOffsetAttr = nullptr;
@@ -226,7 +241,7 @@ void lowerCombinedTextureSamplers(
             info->kind = LayoutResourceKind::DescriptorTableSlot;
         }
         auto newVarLayout = newVarLayoutBuilder.build();
-        subBuilder.addLayoutDecoration(globalParam, newVarLayout);
+        subBuilder.addLayoutDecoration(globalInst, newVarLayout);
         varLayout->removeAndDeallocate();
     }
 
