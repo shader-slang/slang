@@ -110,8 +110,12 @@ jobs:
             -skip-reference-image-generation \
             -show-adapter-info
 
+  # Run slang-rhi tests when:
+  # 1. full-gpu-tests is enabled AND
+  # 2. Either it's a pull request OR config is release
   test-slang-rhi:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
+    if: inputs.full-gpu-tests && (github.event_name == 'pull_request' || inputs.config == 'release')
     defaults:
       run:
         shell: bash
@@ -131,9 +135,6 @@ jobs:
           config: ${{ inputs.config }}
 
       - name: Run slang-rhi tests
-        # Run slang-rhi tests on debug+release for pull requests, and only on release for merge_group, to reduce CI load.
-        # Some of the expensive tests that are not relevant for Slang (because they just test graphics API related things) are excluded using -tce.
-        if: inputs.full-gpu-tests && (github.event_name == 'pull_request' || inputs.config == 'release')
         run: |
           export SLANG_RHI_EXCLUDE_TESTS="md-clear*,cmd-copy*,cmd-upload*,fence*,staging-heap*,texture-create*"
           if [[ "${{ inputs.os }}" == "macos" ]]; then
@@ -141,8 +142,12 @@ jobs:
           fi
           "$bin_dir/slang-rhi-tests" -check-devices -tce="$SLANG_RHI_EXCLUDE_TESTS"
 
+  # Run slangpy tests when:
+  # 1. full-gpu-tests is enabled AND
+  # 2. Either it's a pull request OR config is release
   test-slangpy:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
+    if: inputs.full-gpu-tests && (github.event_name == 'pull_request' || inputs.config == 'release')
     defaults:
       run:
         shell: bash
@@ -162,8 +167,6 @@ jobs:
           config: ${{ inputs.config }}
 
       - name: Run slangpy tests
-        # Run slangpy tests on debug+release for pull requests, and only on release for merge_group, to reduce CI load.
-        if: inputs.full-gpu-tests && (github.event_name == 'pull_request' || inputs.config == 'release')
         run: |
           python --version
           echo "Cleaning up existing installations and installing slangpy..."
@@ -192,7 +195,7 @@ jobs:
           echo "Installing python packages..."
 
           # Only install additional packages on GitHub-hosted runners, not self-hosted
-          if [[ "${{ inputs.runs-on }}" != *"self-hosted"* ]]; then
+          if [[ ! "${{ inputs.runs-on }}" =~ self-hosted ]]; then
             # Download and install requirements from slangpy repository
             echo "Fetching requirements-dev.txt from slangpy repository..."
             curl -fsSL https://raw.githubusercontent.com/shader-slang/slangpy/main/requirements-dev.txt -o requirements-dev.txt
@@ -207,4 +210,4 @@ jobs:
 
           echo "Running pytest on slangpy tests..."
           export PYTHONPATH="$SITE_PACKAGES"
-          python -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n auto
+          python -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n auto --maxprocesses=4

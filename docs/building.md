@@ -353,7 +353,7 @@ encouraged but it isn't a continuously maintained setup.
 
 _MSVC_ 19 is tested in CI and is the recommended minimum version.
 
-_Clang_ 15.0 is tested in CI and is the recommended minimum version.
+_Clang_ 17.0 is tested in CI and is the recommended minimum version.
 
 ## Static linking against libslang
 
