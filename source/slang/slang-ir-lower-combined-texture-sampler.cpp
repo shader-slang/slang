@@ -101,44 +101,42 @@ struct LowerCombinedSamplerContext
         return info;
     }
 
-    LoweredCombinedSamplerStructInfo lowerCombinedTextureSamplerTypeArray(IRArrayTypeBase* arrayType)
+    LoweredCombinedSamplerStructInfo lowerCombinedTextureSamplerTypeArray(
+        IRArrayTypeBase* arrayType)
     {
         if (auto loweredInfo = mapTypeToLoweredInfo.tryGetValue(arrayType))
             return *loweredInfo;
         
-        LoweredCombinedSamplerStructInfo info;
-        auto elementType = as<IRTextureTypeBase>(arrayType->getElementType());
-        if (elementType && getIntVal(elementType->getIsCombinedInst()) != 0) {
-            // Lower the element type to get struct layout
-            auto elementInfo = lowerCombinedTextureSamplerType(elementType);
+        // Lower the element type to get struct layout
+        auto elementInfo = lowerCombinedTextureSamplerType(as<IRTextureTypeBase>(arrayType->getElementType()));
 
-            // Create array type of the lowered struct
-            IRBuilder builder(arrayType);
-            auto arrayOfStructsType = builder.getArrayType(elementInfo.type, arrayType->getElementCount());
+        // Create array type of the lowered struct
+        IRBuilder builder(arrayType);
+        auto arrayOfStructsType = builder.getArrayType(elementInfo.type, arrayType->getElementCount());
 
-            // Create array type layout with struct as element layout
-            IRArrayTypeLayout::Builder arrayLayoutBuilder(&builder, elementInfo.typeLayout);
-            // Copy resource usage from element to array (multiplied by array size)
-            IRIntegerValue arraySize = getIntVal(arrayType->getElementCount());
-            for (auto sizeAttr : elementInfo.typeLayout->getSizeAttrs())
-            {
-                arrayLayoutBuilder.addResourceUsage(sizeAttr->getResourceKind(),
-                    LayoutSize(sizeAttr->getSize().getFiniteValue() * arraySize));
-            }
-            auto arrayTypeLayout = arrayLayoutBuilder.build();
-
-            // Populate typeInfo with array layout info
-            info.type = arrayOfStructsType;
-            info.typeLayout = arrayTypeLayout;
-            info.texture = elementInfo.texture;
-            info.sampler = elementInfo.sampler;
-            info.textureType = elementInfo.textureType;
-            info.samplerType = elementInfo.samplerType;
-
-            // Store this info so it can be found later by the replacement logic
-            mapTypeToLoweredInfo.add(arrayType, info);
-            mapLoweredTypeToLoweredInfo.add(arrayOfStructsType, info);
+        // Create array type layout with struct as element layout
+        IRArrayTypeLayout::Builder arrayLayoutBuilder(&builder, elementInfo.typeLayout);
+        // Copy resource usage from element to array (multiplied by array size)
+        IRIntegerValue arraySize = getIntVal(arrayType->getElementCount());
+        for (auto sizeAttr : elementInfo.typeLayout->getSizeAttrs())
+        {
+            arrayLayoutBuilder.addResourceUsage(sizeAttr->getResourceKind(),
+                LayoutSize(sizeAttr->getSize().getFiniteValue() * arraySize));
         }
+        auto arrayTypeLayout = arrayLayoutBuilder.build();
+
+        // Populate typeInfo with array layout info
+        LoweredCombinedSamplerStructInfo info;
+        info.type = arrayOfStructsType;
+        info.typeLayout = arrayTypeLayout;
+        info.texture = elementInfo.texture;
+        info.sampler = elementInfo.sampler;
+        info.textureType = elementInfo.textureType;
+        info.samplerType = elementInfo.samplerType;
+
+        // Store this info so it can be found later by the replacement logic
+        mapTypeToLoweredInfo.add(arrayType, info);
+        mapLoweredTypeToLoweredInfo.add(arrayOfStructsType, info);
         return info;
     }
 };
