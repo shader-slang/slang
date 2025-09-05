@@ -27,7 +27,11 @@ SLANG_UNIT_TEST(linkTimeTypeReflection)
         interface IMaterial { float4 load(); }
         extern struct Material : IMaterial;
         ConstantBuffer<Material> gMaterial;
+
         RWTexture2D tex;
+
+        extern static const int count;
+        uniform uint4 buffers[count];
 
         [numthreads(1,1,1)]
         [shader("compute")]
@@ -59,6 +63,7 @@ SLANG_UNIT_TEST(linkTimeTypeReflection)
 
     String configModuleSource = "import " + moduleName + ";\n" + R"(
         export struct Material : IMaterial = MyMaterial;
+        export static const int count = 11;
 
         struct MyMaterial : IMaterial {
            int data;
@@ -89,6 +94,9 @@ SLANG_UNIT_TEST(linkTimeTypeReflection)
 
     auto programLayout = linkedProgram->getLayout();
     auto var0 = programLayout->getParameterByIndex(0);
+
+    // `gMaterial`'s binding starts at 1, because there is an implicit global uniform buffer.
+    SLANG_CHECK(var0->getOffset(slang::ParameterCategory::DescriptorTableSlot) == 1);
     SLANG_CHECK(var0->getTypeLayout()->getSize(slang::ParameterCategory::DescriptorTableSlot) == 2);
 
     auto elementLayout = var0->getTypeLayout()->getElementTypeLayout();
@@ -96,7 +104,10 @@ SLANG_UNIT_TEST(linkTimeTypeReflection)
     SLANG_CHECK(elementLayout->getSize() == 16);
 
     auto var1 = programLayout->getParameterByIndex(1);
-    SLANG_CHECK(var1->getOffset(slang::ParameterCategory::DescriptorTableSlot) == 2);
+    SLANG_CHECK(var1->getOffset(slang::ParameterCategory::DescriptorTableSlot) == 3);
+
+    auto var2 = programLayout->getParameterByIndex(2);
+    SLANG_CHECK(var2->getTypeLayout()->getSize() == 11 * 16);
 
     ComPtr<slang::IBlob> codeBlob;
     linkedProgram->getTargetCode(0, codeBlob.writeRef(), diagnosticBlob.writeRef());
@@ -105,5 +116,5 @@ SLANG_UNIT_TEST(linkTimeTypeReflection)
 
     auto spirvStr = UnownedStringSlice((const char*)codeBlob->getBufferPointer());
 
-    SLANG_CHECK(spirvStr.indexOf(toSlice("OpDecorate %tex Binding 2")) != -1);
+    SLANG_CHECK(spirvStr.indexOf(toSlice("OpDecorate %tex Binding 3")) != -1);
 }

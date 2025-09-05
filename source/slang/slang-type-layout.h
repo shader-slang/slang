@@ -1231,6 +1231,14 @@ struct TypeLayoutContext
         }
         return result;
     }
+
+    IntVal* tryResolveLinkTimeVal(IntVal* inVal) const
+    {
+        auto constIntVal = programLayout->getProgram()->tryFoldIntVal(inVal);
+        if (constIntVal)
+            return constIntVal;
+        return inVal;
+    }
 };
 
 //
