@@ -10,7 +10,7 @@ struct LoweredCombinedSamplerStructInfo
 {
     IRStructKey* texture;
     IRStructKey* sampler;
-    IRType* type;  // Can be IRStructType* or IRArrayType* (array of IRStructType elements)
+    IRType* type; // Can be IRStructType* or IRArrayType* (array of IRStructType elements)
     IRType* samplerType;
     IRType* textureType;
     IRTypeLayout* typeLayout;
@@ -106,13 +106,15 @@ struct LowerCombinedSamplerContext
     {
         if (auto loweredInfo = mapTypeToLoweredInfo.tryGetValue(arrayType))
             return *loweredInfo;
-        
+
         // Lower the element type to get struct layout
-        auto elementInfo = lowerCombinedTextureSamplerType(as<IRTextureTypeBase>(arrayType->getElementType()));
+        auto elementInfo =
+            lowerCombinedTextureSamplerType(as<IRTextureTypeBase>(arrayType->getElementType()));
 
         // Create array type of the lowered struct
         IRBuilder builder(arrayType);
-        auto arrayOfStructsType = builder.getArrayType(elementInfo.type, arrayType->getElementCount());
+        auto arrayOfStructsType =
+            builder.getArrayType(elementInfo.type, arrayType->getElementCount());
 
         // Create array type layout with struct as element layout
         IRArrayTypeLayout::Builder arrayLayoutBuilder(&builder, elementInfo.typeLayout);
@@ -120,7 +122,8 @@ struct LowerCombinedSamplerContext
         IRIntegerValue arraySize = getIntVal(arrayType->getElementCount());
         for (auto sizeAttr : elementInfo.typeLayout->getSizeAttrs())
         {
-            arrayLayoutBuilder.addResourceUsage(sizeAttr->getResourceKind(),
+            arrayLayoutBuilder.addResourceUsage(
+                sizeAttr->getResourceKind(),
                 LayoutSize(sizeAttr->getSize().getFiniteValue() * arraySize));
         }
         auto arrayTypeLayout = arrayLayoutBuilder.build();
@@ -163,7 +166,7 @@ void lowerCombinedTextureSamplers(
         {
             dataType = globalParam->getDataType();
         }
-        // Handle global variables  
+        // Handle global variables
         else if (globalVar)
         {
             dataType = globalVar->getDataType();
@@ -232,8 +235,8 @@ void lowerCombinedTextureSamplers(
         // slot, then we use the texture offset for the descriptor table slot offset.
         if (resOffsetAttr && !descriptorTableSlotOffsetAttr)
         {
-            auto info = newVarLayoutBuilder.findOrAddResourceInfo(
-                LayoutResourceKind::DescriptorTableSlot);
+            auto info =
+                newVarLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::DescriptorTableSlot);
             info->offset = resOffsetAttr->getOffset();
             info->space = resOffsetAttr->getSpace();
             info->kind = LayoutResourceKind::DescriptorTableSlot;
