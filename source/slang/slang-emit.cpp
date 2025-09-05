@@ -315,7 +315,7 @@ static bool shouldLowerBitCastForTarget(CodeGenContext* codeGenContext, IRInst* 
     auto targetRequest = codeGenContext->getTargetReq();
     if (!targetRequest)
         return true;
-    
+
     // For non-SPIRV targets, always lower bitcasts as before
     auto target = targetRequest->getTarget();
     if (target != CodeGenTarget::SPIRV && target != CodeGenTarget::SPIRVAssembly)
@@ -332,8 +332,10 @@ static bool shouldLowerBitCastForTarget(CodeGenContext* codeGenContext, IRInst* 
 
     // SPIRV OpBitcast requires operand and result to have same bit width
     IRSizeAndAlignment fromSize, toSize;
-    if (SLANG_SUCCEEDED(getNaturalSizeAndAlignment(targetProgram->getOptionSet(), fromType, &fromSize)) &&
-        SLANG_SUCCEEDED(getNaturalSizeAndAlignment(targetProgram->getOptionSet(), toType, &toSize)) &&
+    if (SLANG_SUCCEEDED(
+            getNaturalSizeAndAlignment(targetProgram->getOptionSet(), fromType, &fromSize)) &&
+        SLANG_SUCCEEDED(
+            getNaturalSizeAndAlignment(targetProgram->getOptionSet(), toType, &toSize)) &&
         fromSize.size == toSize.size)
     {
         // SPIRV cannot bitcast between 8-bit types,
