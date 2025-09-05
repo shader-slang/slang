@@ -203,7 +203,8 @@ jobs:
           else
             echo "Skipping additional package installation on self-hosted runner"
           fi
+          python -m pip install pytest-xdist
 
           echo "Running pytest on slangpy tests..."
           export PYTHONPATH="$SITE_PACKAGES"
-          python -m pytest "$SITE_PACKAGES/slangpy/tests" -ra
+          python -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n auto
