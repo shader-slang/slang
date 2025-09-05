@@ -195,11 +195,18 @@ jobs:
           echo "Listing files in slangpy directory..."
           ls -la "$SITE_PACKAGES/slangpy/"
 
-          echo "Installing python packages..."
-          curl -fsSL https://raw.githubusercontent.com/shader-slang/slangpy/main/requirements-dev.txt -o requirements-dev.txt
-          python -m pip install -r requirements-dev.txt
-          python -m pip install pytest-github-actions-annotate-failures
-          python -m pip install pytest-xdist
+          # Skip package installation on self-hosted runners to avoid permission issues
+          if [[ ! "${{ inputs.runs-on }}" =~ self-hosted ]]; then
+            echo "Installing python packages..."
+            curl -fsSL https://raw.githubusercontent.com/shader-slang/slangpy/main/requirements-dev.txt -o requirements-dev.txt
+            python -m pip install -r requirements-dev.txt --user
+            python -m pip install pytest-github-actions-annotate-failures --user
+            python -m pip install pytest-xdist --user
+          else
+            echo "Skipping Python package installation on self-hosted runner"
+            # TODO: remove this once we have pytest-xdist installed on all self-hosted runners
+            python -m pip install pytest-xdist --user
+          fi
 
           echo "Running pytest on slangpy tests..."
           export PYTHONPATH="$SITE_PACKAGES"
