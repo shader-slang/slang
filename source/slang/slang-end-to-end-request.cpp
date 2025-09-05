@@ -1577,15 +1577,23 @@ SlangResult EndToEndCompileRequest::compile()
     if (reflectionPath.getLength() != 0)
     {
         auto bufferWriter = PrettyWriter();
-        emitReflectionJSON(this, this->getReflection(), bufferWriter);
-        if (reflectionPath == "-")
+        auto* reflection = this->getReflection();
+        if (reflection)
         {
-            auto builder = bufferWriter.getBuilder();
-            StdWriters::getOut().write(builder.getBuffer(), builder.getLength());
+            emitReflectionJSON(this, this->getReflection(), bufferWriter);
+            if (reflectionPath == "-")
+            {
+                auto builder = bufferWriter.getBuilder();
+                StdWriters::getOut().write(builder.getBuffer(), builder.getLength());
+            }
+            else if (SLANG_FAILED(File::writeAllText(reflectionPath, bufferWriter.getBuilder())))
+            {
+                getSink()->diagnose(SourceLoc(), Diagnostics::unableToWriteFile, reflectionPath);
+            }
         }
-        else if (SLANG_FAILED(File::writeAllText(reflectionPath, bufferWriter.getBuilder())))
+        else
         {
-            getSink()->diagnose(SourceLoc(), Diagnostics::unableToWriteFile, reflectionPath);
+            getSink()->diagnose(SourceLoc(), Diagnostics::noReflectionAvailableForModule, reflectionPath);
         }
     }
 
