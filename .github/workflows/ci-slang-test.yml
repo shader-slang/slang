@@ -113,6 +113,8 @@ jobs:
   # Run slang-rhi tests when:
   # 1. full-gpu-tests is enabled AND
   # 2. Either it's a pull request OR config is release
+  # This is to reduce the CI load but do some check on pull requests.
+  # expensive slang-rhi tests are excluded with -tce option, because they are not relevant for Slang.
   test-slang-rhi:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
     if: inputs.full-gpu-tests && (github.event_name == 'pull_request' || inputs.config == 'release')
@@ -145,6 +147,7 @@ jobs:
   # Run slangpy tests when:
   # 1. full-gpu-tests is enabled AND
   # 2. Either it's a pull request OR config is release
+  # This is to reduce the CI load but do some check on pull requests.
   test-slangpy:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
     if: inputs.full-gpu-tests && (github.event_name == 'pull_request' || inputs.config == 'release')
@@ -193,19 +196,9 @@ jobs:
           ls -la "$SITE_PACKAGES/slangpy/"
 
           echo "Installing python packages..."
-
-          # Only install additional packages on GitHub-hosted runners, not self-hosted
-          if [[ ! "${{ inputs.runs-on }}" =~ self-hosted ]]; then
-            # Download and install requirements from slangpy repository
-            echo "Fetching requirements-dev.txt from slangpy repository..."
-            curl -fsSL https://raw.githubusercontent.com/shader-slang/slangpy/main/requirements-dev.txt -o requirements-dev.txt
-            
-            echo "Installing development requirements..."
-            python -m pip install -r requirements-dev.txt
-            python -m pip install pytest-github-actions-annotate-failures
-          else
-            echo "Skipping additional package installation on self-hosted runner"
-          fi
+          curl -fsSL https://raw.githubusercontent.com/shader-slang/slangpy/main/requirements-dev.txt -o requirements-dev.txt
+          python -m pip install -r requirements-dev.txt
+          python -m pip install pytest-github-actions-annotate-failures
           python -m pip install pytest-xdist
 
           echo "Running pytest on slangpy tests..."
