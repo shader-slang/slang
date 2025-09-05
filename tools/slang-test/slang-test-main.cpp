@@ -575,6 +575,13 @@ static SlangResult _gatherTestsForFile(
             continue;
         }
 
+        // Skip any extra slashes and spaces to handle malformed directives like ///TEST or // TEST
+        while (*cursor == '/')
+        {
+            cursor++;
+        }
+        skipHorizontalSpace(&cursor);
+
         UnownedStringSlice command;
 
         if (SLANG_FAILED(_extractCommand(&cursor, command)))
@@ -1159,7 +1166,7 @@ static SlangResult _extractRenderTestRequirements(
     // That a similar logic has to be kept inside the implementation of render-test and both this
     // and render-test will have to be kept in sync.
 
-    bool useDxil = cmdLine.findArgIndex(UnownedStringSlice::fromLiteral("-use-dxil")) >= 0;
+    bool useDxbc = cmdLine.findArgIndex(UnownedStringSlice::fromLiteral("-use-dxbc")) >= 0;
 
     bool usePassthru = false;
 
@@ -1226,13 +1233,13 @@ static SlangResult _extractRenderTestRequirements(
         passThru = SLANG_PASS_THROUGH_FXC;
         break;
     case RenderApiType::D3D12:
-        target = SLANG_DXBC;
+        target = SLANG_DXIL;
         nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
-        passThru = SLANG_PASS_THROUGH_FXC;
-        if (useDxil)
+        passThru = SLANG_PASS_THROUGH_DXC;
+        if (useDxbc)
         {
-            target = SLANG_DXIL;
-            passThru = SLANG_PASS_THROUGH_DXC;
+            target = SLANG_DXBC;
+            passThru = SLANG_PASS_THROUGH_FXC;
         }
         break;
     case RenderApiType::Vulkan:

@@ -8781,6 +8781,15 @@ IRType* unwrapArray(IRType* type)
     return t;
 }
 
+IRType* unwrapArrayAndPointers(IRType* type)
+{
+    if (const auto a = as<IRArrayTypeBase>(type))
+        return unwrapArrayAndPointers(a->getElementType());
+    if (const auto p = as<IRPtrTypeBase>(type))
+        return unwrapArrayAndPointers(p->getValueType());
+    return type;
+}
+
 //
 // IRTargetIntrinsicDecoration
 //

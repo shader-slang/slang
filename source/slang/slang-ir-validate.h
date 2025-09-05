@@ -85,4 +85,9 @@ void validateVectorsAndMatrices(
     DiagnosticSink* sink,
     TargetRequest* targetRequest);
 
+bool validateStructuredBufferResourceTypes(
+    IRModule* module,
+    DiagnosticSink* sink,
+    TargetRequest* targetRequest);
+
 } // namespace Slang
