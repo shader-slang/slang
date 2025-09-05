@@ -87,6 +87,7 @@ local insts = {
 					struct_name = "BackwardDiffIntermediateContextType",
 					operands = { { "func" } },
 					hoistable = true,
+					skipIRBuilderMethodGeneration = true,
 				},
 			},
 			{ TensorView = { struct_name = "TensorViewType", operands = { { "elementType", "IRType" } }, hoistable = true } },
