@@ -143,7 +143,7 @@ Val* Val::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst,
 void Val::_toTextOverride(StringBuilder& out)
 {
     SLANG_UNUSED(out);
-    SLANG_UNEXPECTED("Val::_toStringOverride not overridden");
+    SLANG_UNEXPECTED("Val::_toTextOverride not overridden");
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ConstantIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1434,6 +1434,10 @@ Val* TypeCastIntVal::tryFoldImpl(
             return true;
         case BaseType::UInt8:
             resultValue = (uint8_t)resultValue;
+            return true;
+        case BaseType::AddressSpace:
+        case BaseType::AccessQualifier:
+        case BaseType::MemoryScope:
             return true;
         default:
             return false;

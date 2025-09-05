@@ -181,7 +181,7 @@ struct ASTIterator
         {
             iterator->maybeDispatchCallback(expr);
             dispatchIfNotNull(expr->base);
-            for (auto candidate : expr->candidiateExprs)
+            for (auto candidate : expr->candidateExprs)
             {
                 dispatchIfNotNull(candidate);
             }
@@ -251,6 +251,7 @@ struct ASTIterator
             iterator->maybeDispatchCallback(expr);
         }
         void visitReturnValExpr(ReturnValExpr* expr) { iterator->maybeDispatchCallback(expr); }
+        void visitAddressOfExpr(AddressOfExpr* expr) { iterator->maybeDispatchCallback(expr); }
 
         void visitAndTypeExpr(AndTypeExpr* expr)
         {

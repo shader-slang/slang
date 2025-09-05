@@ -73,6 +73,21 @@ public:
         slang::CompilerOptionEntry* compilerOptionEntries,
         ObjectID outDiagnosticsId);
 
+    SlangResult queryInterface(ObjectID objectId, const SlangUUID& guid, ObjectID outInterfaceId);
+
+    // IComponentType2 methods.
+    SlangResult getTargetCompileResult(
+        ObjectID objectId,
+        SlangInt targetIndex,
+        ObjectID outCompileResultId,
+        ObjectID outDiagnosticsId);
+    SlangResult getEntryPointCompileResult(
+        ObjectID objectId,
+        SlangInt entryPointIndex,
+        SlangInt targetIndex,
+        ObjectID outCompileResultId,
+        ObjectID outDiagnosticsId);
+
 private:
     inline slang::IComponentType* getObjectPointer(ObjectID objectId)
     {
@@ -87,6 +102,21 @@ private:
         }
 
         return static_cast<slang::IComponentType*>(objPtr);
+    }
+
+    inline slang::IComponentType2* getObjectPointer2(ObjectID objectId)
+    {
+        void* objPtr = nullptr;
+
+        // If the object is not found, there must be something wrong with the record/replay
+        // logic, so report an error.
+        if (!m_objectMap.tryGetValue(objectId, objPtr))
+        {
+            slangRecordLog(LogLevel::Error, "Object not found in the object map: %d\n", objectId);
+            std::abort();
+        }
+
+        return static_cast<slang::IComponentType2*>(objPtr);
     }
 
     Slang::Dictionary<ObjectID, void*>& m_objectMap;
@@ -492,6 +522,11 @@ public:
         slang::CompilerOptionEntry* compilerOptionEntries,
         ObjectID outDiagnosticsId) override;
 
+    virtual void ICompositeComponentType_queryInterface(
+        ObjectID objectId,
+        const SlangUUID& guid,
+        ObjectID outInterfaceId) override;
+
     // ITypeConformance
     virtual void ITypeConformance_getSession(ObjectID objectId, ObjectID outSessionId) override;
     virtual void ITypeConformance_getLayout(
@@ -551,6 +586,19 @@ public:
         ObjectID outLinkedComponentTypeId,
         uint32_t compilerOptionEntryCount,
         slang::CompilerOptionEntry* compilerOptionEntries,
+        ObjectID outDiagnosticsId) override;
+
+    // IComponentType2 methods.
+    virtual void IComponentType2_getTargetCompileResult(
+        ObjectID objectId,
+        SlangInt targetIndex,
+        ObjectID outCompileResultId,
+        ObjectID outDiagnosticsId) override;
+    virtual void IComponentType2_getEntryPointCompileResult(
+        ObjectID objectId,
+        SlangInt entryPointIndex,
+        SlangInt targetIndex,
+        ObjectID outCompileResultId,
         ObjectID outDiagnosticsId) override;
 
     static void printDiagnosticMessage(slang::IBlob* diagnosticsBlob);

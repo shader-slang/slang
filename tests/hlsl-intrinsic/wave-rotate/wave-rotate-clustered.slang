@@ -1,8 +1,9 @@
 //TEST_CATEGORY(wave, compute)
 //TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -emit-spirv-directly
-//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -emit-spirv-via-glsl -Xslang... -capability GL_KHR_shader_subgroup_rotate -X.
+//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -profile sm_6_0
+//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -emit-spirv-via-glsl -profile sm_6_0 -Xslang... -capability GL_KHR_shader_subgroup_rotate -X.
 //TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -emit-spirv-directly -xslang -DUSE_GLSL_SYNTAX -allow-glsl
-//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -emit-spirv-via-glsl -allow-glsl -Xslang... -DUSE_GLSL_SYNTAX -capability GL_KHR_shader_subgroup_rotate -X.
+//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -emit-spirv-via-glsl -profile sm_6_0 -allow-glsl -Xslang... -DUSE_GLSL_SYNTAX -capability GL_KHR_shader_subgroup_rotate -X.
 
 #if defined(USE_GLSL_SYNTAX)
 #define __clusteredRotate subgroupClusteredRotate

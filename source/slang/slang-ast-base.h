@@ -29,8 +29,8 @@ class NodeBase
     // Note that the astBuilder is not stored in the NodeBase derived types by default.
     SLANG_FORCE_INLINE void init(ASTNodeType inAstNodeType, ASTBuilder* inAstBuilder)
     {
-        SLANG_UNUSED(inAstBuilder);
         astNodeType = inAstNodeType;
+        _astBuilder = inAstBuilder;
 #ifdef _DEBUG
         _initDebug(inAstNodeType, inAstBuilder);
 #endif
@@ -48,6 +48,15 @@ class NodeBase
 #ifdef _DEBUG
     int32_t _debugUID = 0;
 #endif
+
+    /// Get the AST builder that was used to allocate this node.
+    ASTBuilder* getASTBuilder() { return _astBuilder; }
+
+private:
+    friend class ASTBuilder;
+
+    /// The AST builder that was used to allocate this node.
+    ASTBuilder* _astBuilder = nullptr;
 };
 
 // Casting of NodeBase
@@ -587,6 +596,20 @@ protected:
     // stick with one ASTBuilder.
     // Call getCurrentASTBuilder() to obtain the right ASTBuilder for semantic checking.
     ASTBuilder* m_astBuilderForReflection;
+};
+
+struct TypePair
+{
+    Type* type0;
+    Type* type1;
+    HashCode getHashCode() const
+    {
+        return combineHash(Slang::getHashCode(type0), Slang::getHashCode(type1));
+    }
+    bool operator==(const TypePair& other) const
+    {
+        return type0 == other.type0 && type1 == other.type1;
+    }
 };
 
 template<typename T>

@@ -24,6 +24,7 @@
 #include "../../source/compiler-core/slang-downstream-compiler.h"
 #include "../../source/compiler-core/slang-language-server-protocol.h"
 #include "../../source/compiler-core/slang-nvrtc-compiler.h"
+#include "../render-test/slang-support.h"
 #include "directory-util.h"
 #include "options.h"
 #include "parse-diagnostic-util.h"
@@ -52,6 +53,9 @@ SLANG_RHI_EXPORT_AGILITY_SDK
 #endif
 
 using namespace Slang;
+
+// Constants for slang-test specific options
+static const char* kPreserveEmbeddedSourceOption = "-preserve-embedded-source";
 
 // Options for a particular test
 struct TestOptions
@@ -571,6 +575,13 @@ static SlangResult _gatherTestsForFile(
             continue;
         }
 
+        // Skip any extra slashes and spaces to handle malformed directives like ///TEST or // TEST
+        while (*cursor == '/')
+        {
+            cursor++;
+        }
+        skipHorizontalSpace(&cursor);
+
         UnownedStringSlice command;
 
         if (SLANG_FAILED(_extractCommand(&cursor, command)))
@@ -844,6 +855,9 @@ Result spawnAndWaitSharedLibrary(
     {
         StringBuilder stdErrorString;
         StringBuilder stdOutString;
+        renderer_test::CoreDebugCallback coreDebugCallback;
+        renderer_test::CoreToRHIDebugBridge rhiDebugBridge;
+        rhiDebugBridge.setCoreCallback(&coreDebugCallback);
 
         // Say static so not released
         StringWriter stdError(&stdErrorString, WriterFlag::IsConsole | WriterFlag::IsStatic);
@@ -854,6 +868,7 @@ Result spawnAndWaitSharedLibrary(
         StdWriters stdWriters;
         stdWriters.setWriter(SLANG_WRITER_CHANNEL_STD_ERROR, &stdError);
         stdWriters.setWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT, &stdOut);
+        stdWriters.setDebugCallback(&coreDebugCallback);
 
         if (exeName == "slangc" || exeName == "slangi")
         {
@@ -876,6 +891,7 @@ Result spawnAndWaitSharedLibrary(
 
         outRes.standardError = stdErrorString;
         outRes.standardOutput = stdOutString;
+        outRes.debugLayer = coreDebugCallback.getString();
 
         outRes.resultCode = (int)TestToolUtil::getReturnCode(res);
 
@@ -1013,6 +1029,7 @@ static Result _executeRPC(
     outRes.resultCode = exeRes.returnCode;
     outRes.standardError = exeRes.stdError;
     outRes.standardOutput = exeRes.stdOut;
+    outRes.debugLayer = exeRes.debugLayer;
 
     return SLANG_OK;
 }
@@ -1149,7 +1166,7 @@ static SlangResult _extractRenderTestRequirements(
     // That a similar logic has to be kept inside the implementation of render-test and both this
     // and render-test will have to be kept in sync.
 
-    bool useDxil = cmdLine.findArgIndex(UnownedStringSlice::fromLiteral("-use-dxil")) >= 0;
+    bool useDxbc = cmdLine.findArgIndex(UnownedStringSlice::fromLiteral("-use-dxbc")) >= 0;
 
     bool usePassthru = false;
 
@@ -1216,13 +1233,13 @@ static SlangResult _extractRenderTestRequirements(
         passThru = SLANG_PASS_THROUGH_FXC;
         break;
     case RenderApiType::D3D12:
-        target = SLANG_DXBC;
+        target = SLANG_DXIL;
         nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
-        passThru = SLANG_PASS_THROUGH_FXC;
-        if (useDxil)
+        passThru = SLANG_PASS_THROUGH_DXC;
+        if (useDxbc)
         {
-            target = SLANG_DXIL;
-            passThru = SLANG_PASS_THROUGH_DXC;
+            target = SLANG_DXBC;
+            passThru = SLANG_PASS_THROUGH_FXC;
         }
         break;
     case RenderApiType::Vulkan:
@@ -1524,12 +1541,106 @@ ToolReturnCode spawnAndWait(
     return getReturnCode(outExeRes);
 }
 
-String getOutput(const ExecuteResult& exeRes)
+// Remove embedded source code from SPIR-V assembly output to prevent filecheck from matching
+// against embedded source instead of actual SPIR-V instructions
+String removeEmbeddedSourceFromSPIRV(const String& spirvOutput)
+{
+    StringBuilder filteredOutput;
+    List<UnownedStringSlice> lines;
+    StringUtil::calcLines(spirvOutput.getUnownedSlice(), lines);
+
+    if (spirvOutput.endsWith("\n"))
+    {
+        // The last empty line should be removed,
+        // because `StringUtil::calcLines()` turns "A\nB\n" into three lines; not two.
+        SLANG_ASSERT(lines[lines.getCount() - 1] == "");
+        lines.setCount(lines.getCount() - 1);
+    }
+
+    // First pass: Find OpString IDs that are referenced by DebugSource
+    List<String> sourceStringIds;
+    for (const auto& line : lines)
+    {
+        UnownedStringSlice trimmedLine = line.trim();
+
+        if (trimmedLine.indexOf(UnownedStringSlice(" DebugSource ")) == Index(-1))
+            continue;
+
+        // Extract the last parameter which is the source string ID
+        // Pattern: %4 = OpExtInst %void %2 DebugSource %5 %1
+        List<UnownedStringSlice> tokens;
+        StringUtil::split(trimmedLine, ' ', tokens);
+
+        // The last token should be the source string ID
+        UnownedStringSlice lastToken = tokens.getLast();
+        if (lastToken.startsWith(UnownedStringSlice("%")))
+        {
+            sourceStringIds.add(String(lastToken));
+        }
+    }
+
+    // Second pass: Process embedded source strings to replace content with informative message
+    bool insideSourceString = false;
+    for (const auto& line : lines)
+    {
+        UnownedStringSlice trimmedLine = line.trim();
+
+        if (!insideSourceString)
+        {
+            Index equalPos = trimmedLine.indexOf(UnownedStringSlice(" = OpString"));
+            if (equalPos != Index(-1) && trimmedLine.startsWith(UnownedStringSlice("%")))
+            {
+                String currentStringId = String(trimmedLine.head(equalPos));
+                if (sourceStringIds.contains(currentStringId))
+                {
+                    insideSourceString = true;
+                    Index quotePos = line.indexOf('\"');
+                    if (quotePos != Index(-1))
+                    {
+                        filteredOutput.append(String(line.head(quotePos + 1)));
+                        filteredOutput.append("// slang-test removed the embedded source\n");
+                        filteredOutput.append("// Use `");
+                        filteredOutput.append(kPreserveEmbeddedSourceOption);
+                        filteredOutput.append("` to keep it explicitly\n\"\n");
+                    }
+                    continue;
+                }
+            }
+        }
+
+        if (insideSourceString)
+        {
+            if (trimmedLine.endsWith("\"") &&
+                (trimmedLine.getLength() < 2 || trimmedLine[trimmedLine.getLength() - 2] != '\\'))
+            {
+                insideSourceString = false;
+            }
+
+            // skip the embedded source lines
+            continue;
+        }
+
+        // Add this line to the filtered output
+        filteredOutput.append(line);
+        filteredOutput.append("\n");
+    }
+
+    return filteredOutput.produceString();
+}
+
+String getOutput(const ExecuteResult& exeRes, bool removeEmbeddedSource = false)
 {
     ExecuteResult::ResultCode resultCode = exeRes.resultCode;
 
     String standardOuptut = exeRes.standardOutput;
     String standardError = exeRes.standardError;
+    String debugLayer = exeRes.debugLayer;
+
+    // Apply embedded source removal to standard output if requested
+    if (removeEmbeddedSource)
+    {
+        standardOuptut = removeEmbeddedSourceFromSPIRV(standardOuptut);
+    }
 
     // We construct a single output string that captures the results
     StringBuilder actualOutputBuilder;
@@ -1540,6 +1651,12 @@ String getOutput(const ExecuteResult& exeRes)
     actualOutputBuilder.append("}\nstandard output = {\n");
     actualOutputBuilder.append(standardOuptut);
     actualOutputBuilder.append("}\n");
+    if (debugLayer.getLength() > 0)
+    {
+        actualOutputBuilder.append("debug layer = {\n");
+        actualOutputBuilder.append(debugLayer);
+        actualOutputBuilder.append("}\n");
+    }
 
     return actualOutputBuilder.produceString();
 }
@@ -2311,6 +2428,9 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
 
     for (auto arg : input.testOptions->args)
     {
+        // Filter out slang-test specific options that shouldn't be passed to slangc
+        if (arg == kPreserveEmbeddedSourceOption)
+            continue;
         cmdLine.addArg(arg);
     }
 
@@ -2352,7 +2472,11 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
         exeRes = runExeRes;
     }
 
-    String actualOutput = getOutput(exeRes);
+    bool needToRemoveEmbeddedSource =
+        ((target == SLANG_SPIRV || target == SLANG_SPIRV_ASM) &&
+         input.testOptions->args.indexOf(kPreserveEmbeddedSourceOption) == Index(-1));
+
+    String actualOutput = getOutput(exeRes, needToRemoveEmbeddedSource);
 
     return _validateOutput(
         context,
@@ -3262,6 +3386,7 @@ static TestResult _runHLSLComparisonTest(
 
     String standardOutput = exeRes.standardOutput;
     String standardError = exeRes.standardError;
+    String debugLayer = exeRes.debugLayer;
 
     // We construct a single output string that captures the results
     StringBuilder actualOutputBuilder;
@@ -3272,6 +3397,12 @@ static TestResult _runHLSLComparisonTest(
     actualOutputBuilder.append("}\nstandard output = {\n");
     actualOutputBuilder.append(standardOutput);
     actualOutputBuilder.append("}\n");
+    if (debugLayer.getLength() > 0)
+    {
+        actualOutputBuilder.append("debug layer = {\n");
+        actualOutputBuilder.append(debugLayer);
+        actualOutputBuilder.append("}\n");
+    }
 
     String actualOutput = actualOutputBuilder.produceString();
 
@@ -3339,6 +3470,7 @@ TestResult doGLSLComparisonTestRun(
 
     String standardOuptut = exeRes.standardOutput;
     String standardError = exeRes.standardError;
+    String debugLayer = exeRes.debugLayer;
 
     // We construct a single output string that captures the results
     StringBuilder outputBuilder;
@@ -3349,6 +3481,12 @@ TestResult doGLSLComparisonTestRun(
     outputBuilder.append("}\nstandard output = {\n");
     outputBuilder.append(standardOuptut);
     outputBuilder.append("}\n");
+    if (debugLayer.getLength() > 0)
+    {
+        outputBuilder.append("debug layer = {\n");
+        outputBuilder.append(debugLayer);
+        outputBuilder.append("}\n");
+    }
 
     String outputPath = outputStem + outputKind;
     String output = outputBuilder.produceString();
@@ -3748,6 +3886,7 @@ TestResult doRenderComparisonTestRun(
 
     String standardOutput = exeRes.standardOutput;
     String standardError = exeRes.standardError;
+    String debugLayer = exeRes.debugLayer;
 
     // We construct a single output string that captures the results
     StringBuilder outputBuilder;
@@ -3758,6 +3897,12 @@ TestResult doRenderComparisonTestRun(
     outputBuilder.append("}\nstandard output = {\n");
     outputBuilder.append(standardOutput);
     outputBuilder.append("}\n");
+    if (debugLayer.getLength() > 0)
+    {
+        outputBuilder.append("debug layer = {\n");
+        outputBuilder.append(debugLayer);
+        outputBuilder.append("}\n");
+    }
 
     String outputPath = outputStem + outputKind;
     String output = outputBuilder.produceString();
@@ -4733,12 +4878,17 @@ static SlangResult runUnitTestModule(
     if (!testModule)
         return SLANG_FAIL;
 
+    renderer_test::CoreDebugCallback coreDebugCallback;
+    renderer_test::CoreToRHIDebugBridge rhiDebugBridge;
+    rhiDebugBridge.setCoreCallback(&coreDebugCallback);
+
     UnitTestContext unitTestContext;
     unitTestContext.slangGlobalSession = context->getSession();
     unitTestContext.workDirectory = "";
     unitTestContext.enabledApis = context->options.enabledApis;
     unitTestContext.enableDebugLayers = context->options.enableDebugLayers;
     unitTestContext.executableDirectory = context->exeDirectoryPath.getBuffer();
+    unitTestContext.debugCallback = &rhiDebugBridge;
 
     auto testCount = testModule->getTestCount();
 
@@ -4808,6 +4958,13 @@ static SlangResult runUnitTestModule(
                     reporter->message(TestMessageType::RunError, "rpc failed");
                 }
 
+                // Check for VVL errors in unit tests
+                if (exeRes.debugLayer.getLength() > 0)
+                {
+                    testResult = TestResult::Fail;
+                    reporter->message(TestMessageType::TestFailure, exeRes.debugLayer);
+                }
+
                 // If the test fails, output any output - which might give information about
                 // individual tests that have failed.
                 if (testResult == TestResult::Fail)
@@ -4837,9 +4994,21 @@ static SlangResult runUnitTestModule(
             // TODO(JS): Problem here could be exception not handled properly across
             // shared library boundary.
             testModule->setTestReporter(reporter);
+
+            // Clear any previous debug messages
+            coreDebugCallback.clear();
+
             try
             {
                 test.testFunc(&unitTestContext);
+
+                // Check for VVL errors after test completion
+                String debugMessages = coreDebugCallback.getString();
+                if (debugMessages.getLength() > 0)
+                {
+                    reporter->message(TestMessageType::TestFailure, debugMessages);
+                    reporter->addResult(TestResult::Fail);
+                }
             }
             catch (...)
             {

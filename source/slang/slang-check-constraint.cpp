@@ -121,7 +121,7 @@ Type* SemanticsVisitor::_tryJoinTypeWithInterface(
     ConversionCost bestCost = kConversionCost_Explicit;
     if (auto basicType = dynamicCast<BasicExpressionType>(type))
     {
-        for (Int baseTypeFlavorIndex = 0; baseTypeFlavorIndex < Int(BaseType::CountOf);
+        for (Int baseTypeFlavorIndex = 0; baseTypeFlavorIndex < Int(BaseType::CountOfPrimitives);
              baseTypeFlavorIndex++)
         {
             // Don't consider `type`, since we already know it doesn't work.

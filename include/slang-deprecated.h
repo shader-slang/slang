@@ -904,6 +904,10 @@ extern "C"
         SlangReflection* reflection,
         SlangReflectionType* reflType,
         char const* name);
+    SLANG_API SlangReflectionFunction* spReflection_TryResolveOverloadedFunction(
+        SlangReflection* reflection,
+        uint32_t candidateCount,
+        SlangReflectionFunction** candidates);
 
     SLANG_API SlangUInt spReflection_getEntryPointCount(SlangReflection* reflection);
     SLANG_API SlangReflectionEntryPoint* spReflection_getEntryPointByIndex(
@@ -1604,6 +1608,8 @@ struct ICompileRequest : public ISlangUnknown
 
     virtual SLANG_NO_THROW void SLANG_MCALL
     setTargetEmbedDownstreamIR(int targetIndex, bool value) = 0;
+
+    virtual SLANG_NO_THROW void SLANG_MCALL setTargetForceCLayout(int targetIndex, bool value) = 0;
 };
 
     #define SLANG_UUID_ICompileRequest ICompileRequest::getTypeGuid()

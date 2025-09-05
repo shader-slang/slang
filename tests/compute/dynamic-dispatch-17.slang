@@ -1,8 +1,9 @@
 // Test using generic interface methods with dynamic dispatch.
 
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -vk -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -use-dxil -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx11 -profile sm_5_0 -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
 
 interface IReturnsZero
 {
