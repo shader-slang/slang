@@ -22,7 +22,7 @@ static String getTypeFullName(slang::TypeReflection* type)
 
 SLANG_UNIT_TEST(linkTimeTypeReflection)
 {
-    // Source for a module that contains an undecorated entrypoint.
+    // Source for a module that contains can be specialized with a link-time type.
     const char* userSourceBody = R"(
         interface IMaterial { float4 load(); }
         extern struct Material : IMaterial;
@@ -61,6 +61,7 @@ SLANG_UNIT_TEST(linkTimeTypeReflection)
         diagnosticBlob.writeRef());
     SLANG_CHECK_ABORT(module != nullptr);
 
+    // Source for a module that defines the link-time type.
     String configModuleSource = "import " + moduleName + ";\n" + R"(
         export struct Material : IMaterial = MyMaterial;
         export static const int count = 11;
@@ -117,4 +118,111 @@ SLANG_UNIT_TEST(linkTimeTypeReflection)
     auto spirvStr = UnownedStringSlice((const char*)codeBlob->getBufferPointer());
 
     SLANG_CHECK(spirvStr.indexOf(toSlice("OpDecorate %tex Binding 3")) != -1);
+}
+
+
+// Test that the reflection API provides correct info about modules using link-time constants in a
+// `Conditional` field.
+
+SLANG_UNIT_TEST(linkTimeConditionalReflection)
+{
+    // Source for a module that contains can be specialized with a link-time constant.
+    const char* userSourceBody = R"(
+        module LinkTimeConditional;
+
+        extern static const bool hasNormal;
+        extern static const bool hasColor;
+
+        struct VertexOut
+        {
+            float4 pos : SV_Position;
+            float someData;
+            Conditional<float3, hasNormal> normal;
+            Conditional<float3, hasColor> color;
+        }
+
+        [shader("vertex")]
+        VertexOut vertexMain()
+        {
+            VertexOut v;
+            v.pos = float4(0,0,0,1);
+            v.someData = 2.0f;
+            v.normal.set(float3(1,0,0));
+            v.color.set(float3(1,1,1));
+            return v;
+        }
+        )";
+
+    String moduleName = "LinkTimeConditional";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV_ASM;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnosticBlob;
+    auto module = session->loadModuleFromSourceString(
+        moduleName.getBuffer(),
+        (moduleName + ".slang").getBuffer(),
+        userSourceBody,
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    // Source for a module that defines the link-time constants.
+    String configModuleSource = R"(
+        export static const bool hasNormal = false;
+        export static const bool hasColor = true;
+    )";
+    auto configModule = session->loadModuleFromSourceString(
+        "config",
+        "config.slang",
+        configModuleSource.getBuffer(),
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(configModule != nullptr);
+
+    ComPtr<slang::IEntryPoint> entryPoint;
+    module->getDefinedEntryPoint(0, entryPoint.writeRef());
+
+    slang::IComponentType* components[] = {module, configModule, entryPoint};
+
+    ComPtr<slang::IComponentType> compositeProgram;
+    session->createCompositeComponentType(
+        components,
+        3,
+        compositeProgram.writeRef(),
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(compositeProgram != nullptr);
+
+    ComPtr<slang::IComponentType> linkedProgram;
+    compositeProgram->link(linkedProgram.writeRef(), diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(linkedProgram != nullptr);
+
+    auto programLayout = linkedProgram->getLayout();
+
+    auto entryPointLayout = programLayout->getEntryPointByIndex(0);
+
+    auto resultLayout = entryPointLayout->getResultVarLayout();
+    SLANG_CHECK_ABORT(resultLayout != nullptr);
+
+    // Number of varying output is 2, because `pos` is a system value that doesn't count towards
+    // varying output.
+    SLANG_CHECK(
+        resultLayout->getTypeLayout()->getSize(slang::ParameterCategory::VaryingOutput) == 2);
+
+    ComPtr<slang::IBlob> codeBlob;
+    linkedProgram->getTargetCode(0, codeBlob.writeRef(), diagnosticBlob.writeRef());
+
+    SLANG_CHECK_ABORT(codeBlob.get());
+
+    auto spirvStr = UnownedStringSlice((const char*)codeBlob->getBufferPointer());
+
+    // Test that the resulting spirv defines output at location 1, but not at location 2.
+    SLANG_CHECK(spirvStr.indexOf(toSlice("Location 1")) != -1);
+    SLANG_CHECK(spirvStr.indexOf(toSlice("Location 2")) == -1);
 }
