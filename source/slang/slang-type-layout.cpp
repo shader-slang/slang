@@ -5789,7 +5789,7 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
         auto uint2Type = astBuilder->getVectorType(
             astBuilder->getUIntType(),
             astBuilder->getIntVal(astBuilder->getIntType(), 2));
-        
+
         return getSimpleVaryingParameterTypeLayout(context, uint2Type, directionMask);
     }
 
