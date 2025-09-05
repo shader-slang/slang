@@ -2472,12 +2472,11 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             auto base = fieldExtract->getBase();
             emitOperand(base, leftSide(outerPrec, prec));
 
-            // Use -> if:
-            // 1. Base type is a class type, OR
-            // 2. Base type is a pointer to class type, OR
-            // 3. Base is a GetAddress operation (which produces a pointer)
-            if (base->getDataType()->getOp() == kIROp_ClassType ||
-                isPtrToClassType(base->getDataType()) || base->getOp() == kIROp_GetAddress)
+            // Enhanced pointer detection for all C-like targets
+            auto baseType = base->getDataType();
+            if (baseType->getOp() == kIROp_ClassType || isPtrToClassType(baseType) ||
+                base->getOp() == kIROp_GetAddress ||
+                baseType->getOp() == kIROp_PtrType) // Add general pointer check
                 m_writer->emit("->");
             else
                 m_writer->emit(".");
