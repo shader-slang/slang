@@ -1345,6 +1345,9 @@ Result linkAndOptimizeIR(
 #endif
         validateIRModuleIfEnabled(codeGenContext, irModule);
 
+        if (!validateStructuredBufferResourceTypes(irModule, sink, targetRequest))
+            return SLANG_FAIL;
+
         // Many of our target languages and/or downstream compilers
         // don't support `struct` types that have resource-type fields.
         // In order to work around this limitation, we will rewrite the

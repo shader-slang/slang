@@ -2,7 +2,7 @@
 // Disabled because main tests is wave-shuffle.slang, this just tests VK 
 //DISABLE_TEST:COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
 //DISABLE_TEST:COMPARE_COMPUTE_EX:-slang -compute -shaderobj
-//DISABLE_TEST:COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -profile cs_6_0 -shaderobj
+//DISABLE_TEST:COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -shaderobj
 //TEST(vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 //TEST:COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
 

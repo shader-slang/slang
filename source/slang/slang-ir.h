@@ -961,6 +961,7 @@ struct IRType : IRInst
 };
 
 IRType* unwrapArray(IRType* type);
+IRType* unwrapArrayAndPointers(IRType* type);
 
 FIDDLE()
 struct IRBasicType : IRType
