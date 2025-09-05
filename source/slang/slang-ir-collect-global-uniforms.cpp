@@ -49,6 +49,7 @@ struct CollectGlobalUniformParametersContext
     //
     IRModule* module;
     IRVarLayout* globalScopeVarLayout;
+    CodeGenTarget target = CodeGenTarget::Unknown;
 
     IRGlobalParam* _getGlobalParamFromLayoutFieldKey(IRInst* key)
     {
@@ -174,7 +175,47 @@ struct CollectGlobalUniformParametersContext
         // parameters that were present in the layout information (they are
         // represented as the fields of the global-scope `struct` layout).
         //
-        for (auto fieldLayoutAttr : globalParamsStructTypeLayout->getFieldLayoutAttrs())
+        // For CUDA targets, we need to ensure unsized arrays come last to satisfy
+        // the layout constraint in slang-ir-layout.cpp
+        auto fieldAttrs = globalParamsStructTypeLayout->getFieldLayoutAttrs();
+
+        // Create ordered field list - for CUDA, put unsized arrays last
+        List<IRStructFieldLayoutAttr*> orderedFields;
+
+        if (target == CodeGenTarget::CUDASource)
+        {
+            // For CUDA: separate regular and unsized array fields
+            List<IRStructFieldLayoutAttr*> regularFields;
+            List<IRStructFieldLayoutAttr*> unsizedArrayFields;
+
+            for (auto fieldLayoutAttr : fieldAttrs)
+            {
+                auto globalParam =
+                    _getGlobalParamFromLayoutFieldKey(fieldLayoutAttr->getFieldKey());
+                if (globalParam && as<IRUnsizedArrayType>(globalParam->getDataType()))
+                {
+                    unsizedArrayFields.add(fieldLayoutAttr);
+                }
+                else
+                {
+                    regularFields.add(fieldLayoutAttr);
+                }
+            }
+
+            // Add regular fields first, then unsized arrays
+            for (auto field : regularFields)
+                orderedFields.add(field);
+            for (auto field : unsizedArrayFields)
+                orderedFields.add(field);
+        }
+        else
+        {
+            // For other targets: preserve original order
+            for (auto field : fieldAttrs)
+                orderedFields.add(field);
+        }
+
+        for (auto fieldLayoutAttr : orderedFields)
         {
             // We expect the IR layout pass to have encoded field per-field
             // layout so that the "key" for the field is the corresponding
@@ -339,11 +380,15 @@ struct CollectGlobalUniformParametersContext
     }
 };
 
-void collectGlobalUniformParameters(IRModule* module, IRVarLayout* globalScopeVarLayout)
+void collectGlobalUniformParameters(
+    IRModule* module,
+    IRVarLayout* globalScopeVarLayout,
+    CodeGenTarget target)
 {
     CollectGlobalUniformParametersContext context;
     context.module = module;
     context.globalScopeVarLayout = globalScopeVarLayout;
+    context.target = target;
 
     context.processModule();
 }
