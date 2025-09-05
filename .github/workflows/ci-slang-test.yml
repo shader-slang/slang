@@ -57,7 +57,6 @@ jobs:
           config: ${{ inputs.config }}
 
       - name: Test Slang
-        if: inputs.platform != 'wasm'
         run: |
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
@@ -84,7 +83,7 @@ jobs:
           "$bin_dir/slang-test" "${slang_test_args[@]}"
       - name: Run Slang examples
         # Run GLSL backend tests on release for pull requests, and not on merge_group, to reduce CI load.
-        if: inputs.platform != 'wasm' && inputs.full-gpu-tests && inputs.config == 'release' && github.event_name == 'pull_request'
+        if: inputs.full-gpu-tests && inputs.config == 'release' && github.event_name == 'pull_request'
         run: |
           .github/workflows/ci-examples.sh \
            --bin-dir "$bin_dir" \
@@ -93,12 +92,11 @@ jobs:
            --config "${{ inputs.config }}" \
            --skip-file tests/expected-example-failure-github.txt
       - name: Run slangc tests
-        if: inputs.platform != 'wasm'
         run: |
           PATH=$bin_dir:$PATH tools/slangc-test/test.sh
       - name: Test Slang via glsl
         # Run GLSL backend tests on release for pull requests, and not on merge_group, to reduce CI load.
-        if: inputs.platform != 'wasm' && inputs.os != 'macos' && inputs.full-gpu-tests && inputs.config == 'release' && github.event_name == 'pull_request'
+        if: inputs.os != 'macos' && inputs.full-gpu-tests && inputs.config == 'release' && github.event_name == 'pull_request'
         run: |
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
@@ -135,7 +133,7 @@ jobs:
       - name: Run slang-rhi tests
         # Run slang-rhi tests on debug+release for pull requests, and only on release for merge_group, to reduce CI load.
         # Some of the expensive tests that are not relevant for Slang (because they just test graphics API related things) are excluded using -tce.
-        if: inputs.platform != 'wasm' && inputs.full-gpu-tests && (github.event_name == 'pull_request' || inputs.config == 'release')
+        if: inputs.full-gpu-tests && (github.event_name == 'pull_request' || inputs.config == 'release')
         run: |
           export SLANG_RHI_EXCLUDE_TESTS="md-clear*,cmd-copy*,cmd-upload*,fence*,staging-heap*,texture-create*"
           if [[ "${{ inputs.os }}" == "macos" ]]; then
@@ -165,7 +163,7 @@ jobs:
 
       - name: Run slangpy tests
         # Run slangpy tests on debug+release for pull requests, and only on release for merge_group, to reduce CI load.
-        if: inputs.platform != 'wasm' && inputs.full-gpu-tests && (github.event_name == 'pull_request' || inputs.config == 'release')
+        if: inputs.full-gpu-tests && (github.event_name == 'pull_request' || inputs.config == 'release')
         run: |
           python --version
           echo "Cleaning up existing installations and installing slangpy..."

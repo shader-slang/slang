@@ -40,13 +40,8 @@ runs:
         chmod +x github_artifact/${cmake_config}/bin/* 2>/dev/null || echo "No executables to make executable"
 
         # Set up bin_dir based on platform and config
-        if [[ "${{ inputs.platform }}" == "wasm" ]]; then
-          bin_dir=build.em/Release/bin
-          echo "bin_dir=$bin_dir" >> $GITHUB_ENV
-        else
-          bin_dir=$(pwd)/github_artifact/${cmake_config}/bin
-          echo "bin_dir=$bin_dir" >> $GITHUB_ENV
-        fi
+        bin_dir=$(pwd)/github_artifact/${cmake_config}/bin
+        echo "bin_dir=$bin_dir" >> $GITHUB_ENV
 
         # Also set lib_dir for slangpy tests
         lib_dir=$(pwd)/github_artifact/${cmake_config}/lib
@@ -66,14 +61,10 @@ runs:
         fi
 
     - name: Check runtime environment
-      if: inputs.platform != 'wasm'
       shell: bash
       run: |
-        echo "$bin_dir/slang-test"
+        echo "Checking supported backends"
         "$bin_dir/slang-test" tests/render/check-backend-support-on-ci.slang
-        smokeResult=$("$bin_dir/slang-test" tests/render/check-backend-support-on-ci.slang)
-        supportedBackends="$(echo "$smokeResult" | grep 'Supported backends: ')"
-        echo "$supportedBackends"
         # Windows-specific version checks - fail if tools are not available
         if [[ "${{ inputs.os }}" == "windows" ]]; then
           echo "Printing CUDA compiler version: ..."
