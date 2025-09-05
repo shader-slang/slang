@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target metallib -entry meshMain
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target metal -entry meshMain
 
 struct VsOutput {
   float4 pos : SV_Position;
