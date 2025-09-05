@@ -5781,6 +5781,17 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
 
         return typeLayout;
     }
+    else if (as<DescriptorHandleType>(type))
+    {
+        // DescriptorHandle<T> should be treated as uint2 for varying parameter layout
+        // to ensure correct location assignment in SPIR-V generation.
+        auto astBuilder = context.astBuilder;
+        auto uint2Type = astBuilder->getVectorType(
+            astBuilder->getUIntType(),
+            astBuilder->getIntVal(astBuilder->getIntType(), 2));
+        
+        return getSimpleVaryingParameterTypeLayout(context, uint2Type, directionMask);
+    }
 
     // catch-all case in case nothing matched
     SLANG_ASSERT(!"unimplemented case for varying parameter layout");
