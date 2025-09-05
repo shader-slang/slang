@@ -13,6 +13,7 @@
 #include "../compiler-core/slang-name.h"
 #include "../core/slang-performance-profiler.h"
 #include "slang-ir-clone.h"
+#include "slang-ir-insert-debug-value-store.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
@@ -842,8 +843,17 @@ static LegalVal legalizeDebugVar(
     {
     case LegalType::Flavor::simple:
         {
+            auto pointedToType = tryGetPointedToType(context->builder, type.getSimple());
+
+            // Check if the type is debuggable before creating DebugVar
+            DebugValueStoreContext debugContext;
+            if (!debugContext.isDebuggableType(pointedToType))
+            {
+                return LegalVal();
+            }
+
             auto legalVal = context->builder->emitDebugVar(
-                tryGetPointedToType(context->builder, type.getSimple()),
+                pointedToType,
                 originalInst->getSource(),
                 originalInst->getLine(),
                 originalInst->getCol(),
@@ -881,6 +891,9 @@ static LegalVal legalizeDebugValue(
     LegalVal debugValue,
     IRDebugValue* originalInst)
 {
+    if (debugVar.flavor == LegalVal::Flavor::none)
+        return LegalVal();
+
     // For now we just discard any special part and keep the ordinary part.
     switch (debugValue.flavor)
     {
@@ -2114,6 +2127,10 @@ static LegalVal legalizeInst(
         break;
     case kIROp_DebugVar:
         result = legalizeDebugVar(context, type, (IRDebugVar*)inst);
+        if (result.flavor == LegalVal::Flavor::none)
+        {
+            return result;
+        }
         break;
     case kIROp_DebugValue:
         result = legalizeDebugValue(context, args[0], args[1], (IRDebugValue*)inst);
