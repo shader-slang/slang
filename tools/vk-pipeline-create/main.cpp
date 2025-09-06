@@ -278,8 +278,8 @@ void PipelineCreationReplay::initVulkanAPI(IDevice* device)
     vkAPI.device = (VkDevice)(handle.handles[2].value);
     vkAPI.instance = (VkInstance)(handle.handles[0].value);
 #if SLANG_WINDOWS_FAMILY
-    auto dynamicLibraryName = "vulkan-1.dll";
-    HMODULE module = ::LoadLibraryA(dynamicLibraryName);
+    auto dynamicLibraryName = L"vulkan-1.dll";
+    HMODULE module = ::LoadLibraryW(dynamicLibraryName);
     vkAPI.vulkanLibraryHandle = (void*)module;
 #define VK_API_GET_GLOBAL_PROC(x) vkAPI.x = (PFN_##x)GetProcAddress(module, #x);
 #else

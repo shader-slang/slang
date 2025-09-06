@@ -16,7 +16,7 @@ extern "C"
     {
         fprintf(stderr, "%s", errorMessage.getBuffer());
 #if SLANG_WINDOWS_FAMILY
-        MessageBoxA(0, errorMessage.getBuffer(), "Slang Runtime Error", MB_ICONERROR);
+        MessageBoxW(0, errorMessage.toWString(), L"Slang Runtime Error", MB_ICONERROR);
 #endif
         abort();
     }
