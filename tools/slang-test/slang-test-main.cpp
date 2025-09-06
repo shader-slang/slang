@@ -1637,7 +1637,7 @@ String getOutput(const ExecuteResult& exeRes, bool removeEmbeddedSource = false)
     String debugLayer = exeRes.debugLayer;
 
     // Apply embedded source removal to standard output if requested
-    if (removeEmbeddedSource)
+    if (removeEmbeddedSource && standardOuptut.getLength() > 0)
     {
         standardOuptut = removeEmbeddedSourceFromSPIRV(standardOuptut);
     }
