@@ -48,17 +48,9 @@ namespace Slang
 /* static */ SlangResult File::remove(const String& fileName)
 {
 #ifdef _WIN32
-    // Convert to wide string for Unicode support
-    int wideLen = MultiByteToWideChar(CP_UTF8, 0, fileName.getBuffer(), -1, nullptr, 0);
-    if (wideLen == 0)
-        return SLANG_FAIL;
-    
-    wchar_t* wideFileName = (wchar_t*)_alloca(wideLen * sizeof(wchar_t));
-    if (MultiByteToWideChar(CP_UTF8, 0, fileName.getBuffer(), -1, wideFileName, wideLen) == 0)
-        return SLANG_FAIL;
 
     // https://docs.microsoft.com/en-us/windows/desktop/api/fileapi/nf-fileapi-deletefilew
-    if (DeleteFileW(wideFileName))
+    if (DeleteFileW(fileName.toWString()))
     {
         return SLANG_OK;
     }
@@ -86,10 +78,10 @@ namespace Slang
         int count = MAX_PATH + 1;
         while (true)
         {
-            char* chars = tempPath.prepareForAppend(count);
+            wchar_t* wideChars = (wchar_t*)_alloca(count * sizeof(wchar_t));
             //  Gets the temp path env string (no guarantee it's a valid path).
-            // https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-gettemppatha
-            DWORD ret = ::GetTempPathA(count - 1, chars);
+            // https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-gettemppathw
+            DWORD ret = ::GetTempPathW(count - 1, wideChars);
             if (ret == 0)
             {
                 return SLANG_FAIL;
@@ -99,7 +91,7 @@ namespace Slang
                 count = ret + 1;
                 continue;
             }
-            tempPath.appendInPlace(chars, count);
+            tempPath = String::fromWString(wideChars);
             break;
         }
     }
@@ -113,19 +105,18 @@ namespace Slang
     String tempFileName;
 
     {
-        int count = MAX_PATH + 1;
-        char* chars = tempFileName.prepareForAppend(count);
+        wchar_t wideChars[MAX_PATH + 1];
 
-        // https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-gettempfilenamea
+        // https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-gettempfilenamew
         // Generates a temporary file name.
         // Will create a file with this name.
-        DWORD ret = ::GetTempFileNameA(tempPath.getBuffer(), prefix.getBuffer(), 0, chars);
+        DWORD ret = ::GetTempFileNameW(tempPath.toWString(), prefix.toWString(), 0, wideChars);
 
         if (ret == 0)
         {
             return SLANG_FAIL;
         }
-        tempFileName.appendInPlace(chars, ::strlen(chars));
+        tempFileName = String::fromWString(wideChars);
     }
 
     SLANG_ASSERT(File::exists(tempFileName));
@@ -777,17 +768,8 @@ SlangResult Path::remove(const String& path)
     {
     case SLANG_PATH_TYPE_FILE:
         {
-            // Convert to wide string for Unicode support
-            int wideLen = MultiByteToWideChar(CP_UTF8, 0, path.getBuffer(), -1, nullptr, 0);
-            if (wideLen == 0)
-                break;
-            
-            wchar_t* widePath = (wchar_t*)_alloca(wideLen * sizeof(wchar_t));
-            if (MultiByteToWideChar(CP_UTF8, 0, path.getBuffer(), -1, widePath, wideLen) == 0)
-                break;
-
             // https://docs.microsoft.com/en-us/windows/desktop/api/fileapi/nf-fileapi-deletefilew
-            if (DeleteFileW(widePath))
+            if (DeleteFileW(path.toWString()))
             {
                 return SLANG_OK;
             }
@@ -795,17 +777,8 @@ SlangResult Path::remove(const String& path)
         }
     case SLANG_PATH_TYPE_DIRECTORY:
         {
-            // Convert to wide string for Unicode support
-            int wideLen = MultiByteToWideChar(CP_UTF8, 0, path.getBuffer(), -1, nullptr, 0);
-            if (wideLen == 0)
-                break;
-            
-            wchar_t* widePath = (wchar_t*)_alloca(wideLen * sizeof(wchar_t));
-            if (MultiByteToWideChar(CP_UTF8, 0, path.getBuffer(), -1, widePath, wideLen) == 0)
-                break;
-
             // https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-removedirectoryw
-            if (RemoveDirectoryW(widePath))
+            if (RemoveDirectoryW(path.toWString()))
             {
                 return SLANG_OK;
             }
@@ -837,20 +810,20 @@ SlangResult Path::remove(const String& path)
     // Path::remove() doesn't support remove a non-empty directory, so we need to implement
     // a simple function to remove the directory recursively.
 #ifdef _WIN32
-    // https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shfileoperationa
+    // https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shfileoperationw
     // Note: the fromPath requires a double-null-terminated string.
     String newPath = path;
     newPath.append('\0');
-    SHFILEOPSTRUCTA file_op = {
+    SHFILEOPSTRUCTW file_op = {
         NULL,
         FO_DELETE,
-        newPath.begin(),
+        newPath.toWString(),
         nullptr,
         FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_SILENT,
         false,
         0,
         nullptr};
-    int ret = SHFileOperationA(&file_op);
+    int ret = SHFileOperationW(&file_op);
     if (ret)
     {
         return SLANG_FAIL;

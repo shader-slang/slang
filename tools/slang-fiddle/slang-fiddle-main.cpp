@@ -428,13 +428,9 @@ int main(int argc, char const* const* argv)
     wchar_t wideBuffer[1024];
     GetCurrentDirectoryW(sizeof(wideBuffer)/sizeof(wideBuffer[0]), wideBuffer);
     
-    // Convert to UTF-8 for output
-    char buffer[1024];
-    int utf8Len = WideCharToMultiByte(CP_UTF8, 0, wideBuffer, -1, buffer, sizeof(buffer), nullptr, nullptr);
-    if (utf8Len > 0)
-    {
-        fprintf(stderr, "cwd: %s\n", buffer);
-    }
+    // Convert to UTF-8 using String::fromWString
+    String currentDir = String::fromWString(wideBuffer);
+    fprintf(stderr, "cwd: %s\n", currentDir.getBuffer());
     return 1;
 #endif
 
