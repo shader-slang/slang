@@ -80,7 +80,7 @@ runs:
         supportedBackends="$(echo "$smokeResult" | grep 'Supported backends: ')"
         echo "$smokeResult"
         echo "$supportedBackends"
-        
+
         # Check if the output contains "llvm" (case-insensitive)
         if echo "$supportedBackends" | grep -qi "llvm"; then
           echo "✅ LLVM backend support detected"
