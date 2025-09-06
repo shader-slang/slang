@@ -4772,10 +4772,6 @@ void runTestsInDirectory(TestContext* context)
     {
         if (shouldRunTest(context, file))
         {
-            if (context->options.verbosity >= VerbosityLevel::Info)
-            {
-                printf("found test: '%s'\n", file.getBuffer());
-            }
             if (SLANG_FAILED(_runTestsOnFile(context, file)))
             {
                 {
