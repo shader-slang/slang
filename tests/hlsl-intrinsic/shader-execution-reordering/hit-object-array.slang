@@ -7,7 +7,7 @@ But that is not valid for hitObjectNV int he extension */
 
 //DISABLE_TEST:SIMPLE: -target glsl -entry rayGenerationMain -stage raygeneration -profile sm_6_5 -line-directive-mode none 
 
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-d3d12 -output-using-type -use-dxil -profile sm_6_5 -render-feature ray-query
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-d3d12 -output-using-type -profile sm_6_5 -render-feature ray-query
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-vk -output-using-type -render-feature ray-query
 
 //TEST_INPUT: set scene = AccelerationStructure

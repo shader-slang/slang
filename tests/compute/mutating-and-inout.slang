@@ -2,7 +2,8 @@
 
 // Test that calling a `[mutating]` method on an `inout` function parameter works.
 
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
+//TEST(compute):COMPARE_COMPUTE: -cuda
+//TEST(compute):COMPARE_COMPUTE: -vk
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;

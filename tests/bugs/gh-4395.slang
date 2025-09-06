@@ -1,4 +1,4 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-dx12 -compute -output-using-type -use-dxil
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-dx12 -compute -output-using-type
 
 // Vulkan/GLSL doesn't support 1-dimensional matrix.
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-vk -compute -output-using-type -emit-spirv-via-glsl

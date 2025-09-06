@@ -125,8 +125,17 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
         return SLANG_OK;
     }
 
+    // We try to search the DLL in two different attempts.
+    // First attempt tries on the directories explicitly specified with AddDllDirectory(),
+    // If it failed to find one, we will search over all PATH.
+    // Windows API made two approaches mutually exclusive and we need to try two times.
     // https://learn.microsoft.com/en-us/windows/win32/api/libloaderapi/nf-libloaderapi-loadlibraryexa
-    const HMODULE h = LoadLibraryExA(platformFileName, nullptr, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
+    HMODULE h = LoadLibraryExA(platformFileName, nullptr, LOAD_LIBRARY_SEARCH_USER_DIRS);
+    // If LoadLibraryExA failed, try again with LoadLibraryA.
+    // https://docs.microsoft.com/en-us/windows/desktop/api/libloaderapi/nf-libloaderapi-loadlibrarya
+    if (!h)
+        h = LoadLibraryA(platformFileName);
+    // If still not found, return an error.
     if (!h)
     {
         const DWORD lastError = GetLastError();
