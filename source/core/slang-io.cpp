@@ -812,12 +812,18 @@ SlangResult Path::remove(const String& path)
 #ifdef _WIN32
     // https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shfileoperationw
     // Note: the fromPath requires a double-null-terminated string.
-    String newPath = path;
-    newPath.append('\0');
+    // Convert to wide string first, then manually create double-null-terminated buffer
+    auto widePath = path.toWString();
+    Index widePathLen = wcslen(widePath);
+    wchar_t* doubleNullPath = (wchar_t*)_alloca((widePathLen + 2) * sizeof(wchar_t));
+    wcscpy(doubleNullPath, widePath);
+    doubleNullPath[widePathLen] = L'\0';     // First null terminator
+    doubleNullPath[widePathLen + 1] = L'\0'; // Second null terminator for SHFileOperationW
+
     SHFILEOPSTRUCTW file_op = {
         NULL,
         FO_DELETE,
-        newPath.toWString(),
+        doubleNullPath,
         nullptr,
         FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_SILENT,
         false,
@@ -974,7 +980,7 @@ static SlangResult _calcExectuablePath(char* outPath, size_t* ioSize)
 
 #if SLANG_WINDOWS_FAMILY
     // https://docs.microsoft.com/en-us/windows/desktop/api/libloaderapi/nf-libloaderapi-getmodulefilenamew
-    
+
     // Use wide character version and convert back to UTF-8
     wchar_t* widePath = (wchar_t*)_alloca(bufferSize * sizeof(wchar_t));
     DWORD res = ::GetModuleFileNameW(::GetModuleHandle(nullptr), widePath, DWORD(bufferSize));
@@ -982,7 +988,15 @@ static SlangResult _calcExectuablePath(char* outPath, size_t* ioSize)
     if (res < bufferSize)
     {
         // Convert back to UTF-8
-        int utf8Len = WideCharToMultiByte(CP_UTF8, 0, widePath, -1, outPath, (int)bufferSize, nullptr, nullptr);
+        int utf8Len = WideCharToMultiByte(
+            CP_UTF8,
+            0,
+            widePath,
+            -1,
+            outPath,
+            (int)bufferSize,
+            nullptr,
+            nullptr);
         if (utf8Len > 0)
         {
             return SLANG_OK;
