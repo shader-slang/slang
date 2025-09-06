@@ -425,9 +425,16 @@ int main(int argc, char const* const* argv)
     }
     fprintf(stderr, "\n");
 
+    wchar_t wideBuffer[1024];
+    GetCurrentDirectoryW(sizeof(wideBuffer)/sizeof(wideBuffer[0]), wideBuffer);
+    
+    // Convert to UTF-8 for output
     char buffer[1024];
-    GetCurrentDirectoryA(sizeof(buffer), buffer);
-    fprintf(stderr, "cwd: %s\n", buffer);
+    int utf8Len = WideCharToMultiByte(CP_UTF8, 0, wideBuffer, -1, buffer, sizeof(buffer), nullptr, nullptr);
+    if (utf8Len > 0)
+    {
+        fprintf(stderr, "cwd: %s\n", buffer);
+    }
     return 1;
 #endif
 

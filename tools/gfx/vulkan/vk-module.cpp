@@ -31,7 +31,8 @@ Slang::Result VulkanModule::init(bool useSoftwareImpl)
 
 #if SLANG_WINDOWS_FAMILY
     dynamicLibraryName = useSoftwareImpl ? "vk_swiftshader.dll" : "vulkan-1.dll";
-    HMODULE module = ::LoadLibraryA(dynamicLibraryName);
+    const wchar_t* wideDynamicLibraryName = useSoftwareImpl ? L"vk_swiftshader.dll" : L"vulkan-1.dll";
+    HMODULE module = ::LoadLibraryW(wideDynamicLibraryName);
     m_module = (void*)module;
 #elif SLANG_APPLE_FAMILY
     dynamicLibraryName = useSoftwareImpl ? "libvk_swiftshader.dylib" : "libvulkan.1.dylib";

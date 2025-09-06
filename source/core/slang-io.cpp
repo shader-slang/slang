@@ -48,8 +48,17 @@ namespace Slang
 /* static */ SlangResult File::remove(const String& fileName)
 {
 #ifdef _WIN32
-    // https://docs.microsoft.com/en-us/windows/desktop/api/fileapi/nf-fileapi-deletefilea
-    if (DeleteFileA(fileName.getBuffer()))
+    // Convert to wide string for Unicode support
+    int wideLen = MultiByteToWideChar(CP_UTF8, 0, fileName.getBuffer(), -1, nullptr, 0);
+    if (wideLen == 0)
+        return SLANG_FAIL;
+    
+    wchar_t* wideFileName = (wchar_t*)_alloca(wideLen * sizeof(wchar_t));
+    if (MultiByteToWideChar(CP_UTF8, 0, fileName.getBuffer(), -1, wideFileName, wideLen) == 0)
+        return SLANG_FAIL;
+
+    // https://docs.microsoft.com/en-us/windows/desktop/api/fileapi/nf-fileapi-deletefilew
+    if (DeleteFileW(wideFileName))
     {
         return SLANG_OK;
     }
@@ -768,8 +777,17 @@ SlangResult Path::remove(const String& path)
     {
     case SLANG_PATH_TYPE_FILE:
         {
-            // https://docs.microsoft.com/en-us/windows/desktop/api/fileapi/nf-fileapi-deletefilea
-            if (DeleteFileA(path.getBuffer()))
+            // Convert to wide string for Unicode support
+            int wideLen = MultiByteToWideChar(CP_UTF8, 0, path.getBuffer(), -1, nullptr, 0);
+            if (wideLen == 0)
+                break;
+            
+            wchar_t* widePath = (wchar_t*)_alloca(wideLen * sizeof(wchar_t));
+            if (MultiByteToWideChar(CP_UTF8, 0, path.getBuffer(), -1, widePath, wideLen) == 0)
+                break;
+
+            // https://docs.microsoft.com/en-us/windows/desktop/api/fileapi/nf-fileapi-deletefilew
+            if (DeleteFileW(widePath))
             {
                 return SLANG_OK;
             }
@@ -777,8 +795,17 @@ SlangResult Path::remove(const String& path)
         }
     case SLANG_PATH_TYPE_DIRECTORY:
         {
-            // https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-removedirectorya
-            if (RemoveDirectoryA(path.getBuffer()))
+            // Convert to wide string for Unicode support
+            int wideLen = MultiByteToWideChar(CP_UTF8, 0, path.getBuffer(), -1, nullptr, 0);
+            if (wideLen == 0)
+                break;
+            
+            wchar_t* widePath = (wchar_t*)_alloca(wideLen * sizeof(wchar_t));
+            if (MultiByteToWideChar(CP_UTF8, 0, path.getBuffer(), -1, widePath, wideLen) == 0)
+                break;
+
+            // https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-removedirectoryw
+            if (RemoveDirectoryW(widePath))
             {
                 return SLANG_OK;
             }
@@ -973,13 +1000,20 @@ static SlangResult _calcExectuablePath(char* outPath, size_t* ioSize)
     SLANG_ASSERT(bufferSize > 0);
 
 #if SLANG_WINDOWS_FAMILY
-    // https://docs.microsoft.com/en-us/windows/desktop/api/libloaderapi/nf-libloaderapi-getmodulefilenamea
-
-    DWORD res = ::GetModuleFileNameA(::GetModuleHandle(nullptr), outPath, DWORD(bufferSize));
+    // https://docs.microsoft.com/en-us/windows/desktop/api/libloaderapi/nf-libloaderapi-getmodulefilenamew
+    
+    // Use wide character version and convert back to UTF-8
+    wchar_t* widePath = (wchar_t*)_alloca(bufferSize * sizeof(wchar_t));
+    DWORD res = ::GetModuleFileNameW(::GetModuleHandle(nullptr), widePath, DWORD(bufferSize));
     // If it fits it's the size not including terminator. So must be less than bufferSize
     if (res < bufferSize)
     {
-        return SLANG_OK;
+        // Convert back to UTF-8
+        int utf8Len = WideCharToMultiByte(CP_UTF8, 0, widePath, -1, outPath, (int)bufferSize, nullptr, nullptr);
+        if (utf8Len > 0)
+        {
+            return SLANG_OK;
+        }
     }
     return SLANG_E_BUFFER_TOO_SMALL;
 #elif SLANG_LINUX_FAMILY

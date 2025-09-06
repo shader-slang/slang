@@ -120,7 +120,7 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
     handleOut = nullptr;
     if (!platformFileName || strlen(platformFileName) == 0)
     {
-        if (!GetModuleHandleExA(0, nullptr, (HMODULE*)&handleOut))
+        if (!GetModuleHandleExW(0, nullptr, (HMODULE*)&handleOut))
             return SLANG_FAIL;
         return SLANG_OK;
     }
