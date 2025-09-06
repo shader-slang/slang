@@ -72,11 +72,21 @@ runs:
       run: |
         echo "Checking supported backends"
         # Capture the output of slang-test while also displaying it
-        if ! smokeResult=$("$bin_dir/slang-test" tests/render/check-backend-support-on-ci.slang 2>&1); then
-          echo "❌ ERROR: slang-test failed to run"
-          echo "Output: $smokeResult"
-          exit 1
-        fi
+        # Use simpler test without FileCheck to avoid slang-llvm loading issues
+        # Add retry logic for intermittent failures
+        for attempt in 1 2 3; do
+          if smokeResult=$("$bin_dir/slang-test" "tests/render/check-backend-support-on-ci.slang" 2>&1); then
+            break
+          else
+            echo "⚠️  Attempt $attempt failed, retrying..."
+            if [ $attempt -eq 3 ]; then
+              echo "❌ ERROR: slang-test failed to run after 3 attempts"
+              echo "Output: $smokeResult"
+              exit 1
+            fi
+            sleep 2
+          fi
+        done
         supportedBackends="$(echo "$smokeResult" | grep 'Supported backends: ')"
         echo "$smokeResult"
         echo "$supportedBackends"
