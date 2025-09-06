@@ -8896,6 +8896,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         IRGeneric* outerGeneric = nullptr;
 
+        bool needLinkage = true;
+
         // If we are static, then we need to insert the declaration before the parent.
         // This tries to match the behavior of previous `lowerFunctionStaticConstVarDecl`
         // functionality
@@ -8906,6 +8908,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // be the global scope, but it might be an outer
             // generic if we are lowering a generic function.
             subBuilder->setInsertBefore(subBuilder->getFunc());
+
+            // static values inside a function does not need a linkage.
+            // trying to insert a linkage decoration to a static constant defined
+            // inside a generic function can lead to errorneous IR.
+            needLinkage = false;
         }
         else if (!isFunctionVarDecl(decl))
         {
@@ -8960,8 +8967,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // All of the attributes/decorations we can attach
         // belong on the IR constant node.
         //
-
-        addLinkageDecoration(context, irConstant, decl);
+        if (needLinkage)
+            addLinkageDecoration(context, irConstant, decl);
 
         addNameHint(context, irConstant, decl);
         addVarDecorations(context, irConstant, decl);
@@ -12034,6 +12041,8 @@ static void lowerProgramEntryPointToIR(
             existentialSlotArgs.getCount(),
             existentialSlotArgs.getBuffer());
     }
+
+    stripFrontEndOnlyInstructions(builder->getModule(), IRStripOptions());
 }
 
 /// Ensure that `decl` and all relevant declarations under it get emitted.
