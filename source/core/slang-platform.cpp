@@ -15,9 +15,11 @@
 #include <dlfcn.h>
 #endif
 
+#if SLANG_HAS_BACKTRACE
+#include <execinfo.h>
+#endif
 
 #if SLANG_LINUX_FAMILY
-#include <execinfo.h>
 #include <unistd.h>
 #endif
 
@@ -365,7 +367,7 @@ static const PlatformFlags s_familyFlags[int(PlatformFamily::CountOf)] = {
 
 /* static */ void PlatformUtil::backtrace()
 {
-#if SLANG_LINUX_FAMILY
+#if SLANG_HAS_BACKTRACE
     // Print stack trace for debugging assistance
     void* stackTrace[64];
     int stackDepth = ::backtrace(stackTrace, 64);

@@ -489,6 +489,18 @@ convention for interface methods.
     #define SLANG_UNALIGNED_ACCESS 0
 #endif
 
+// Backtrace
+#if SLANG_LINUX_FAMILY
+    #include <features.h> // for __GLIBC__ define, if using GNU libc
+    #if defined(__GLIBC__) || (__ANDROID_API__ >= 33)
+        #define SLANG_HAS_BACKTRACE 1
+    #else
+        #define SLANG_HAS_BACKTRACE 0
+    #endif
+#else
+    #define SLANG_HAS_BACKTRACE 0
+#endif
+
 // One endianness must be set
 #if ((SLANG_BIG_ENDIAN | SLANG_LITTLE_ENDIAN) == 0)
     #error "Couldn't determine endianness"
