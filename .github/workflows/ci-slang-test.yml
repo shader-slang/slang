@@ -166,6 +166,11 @@ jobs:
           platform: ${{ inputs.platform }}
           config: ${{ inputs.config }}
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
       - name: Run slangpy tests
         run: |
           python --version
