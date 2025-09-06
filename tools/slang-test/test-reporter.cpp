@@ -610,9 +610,9 @@ void TestReporter::message(TestMessageType type, const String& message)
 
     if (canWriteStdError())
     {
+        fprintf(stderr, "[%s] ", m_currentInfo.name.getBuffer());
         if (type == TestMessageType::RunError || type == TestMessageType::TestFailure)
         {
-            fprintf(stderr, "error: ");
             fputs(message.getBuffer(), stderr);
             fprintf(stderr, "\n");
         }
@@ -627,6 +627,9 @@ void TestReporter::message(TestMessageType type, const String& message)
     {
         m_currentMessage << "\n";
     }
+
+    if (m_currentInfo.name.getLength())
+        m_currentMessage << "[" << m_currentInfo.name << "] ";
     m_currentMessage.append(message);
 }
 
