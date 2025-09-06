@@ -22807,12 +22807,12 @@ struct DynamicResourceTypeInfo
 };
 
 const DynamicResourceTypeInfo kDynamicResourceCastableTypes[] = {
-    { "StructuredBuffer<T, L>", "Buffer", "General", "Read", "StorageBuffer", "true" },
+    { "StructuredBuffer<T, L>", "Buffer", "General", "ReadWrite", "StorageBuffer", "true" },
     { "RWStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite", "StorageBuffer", "false" },
     { "AppendStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite", "StorageBuffer", "false" },
     { "ConsumeStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite", "StorageBuffer", "false" },
     { "RasterizerOrderedStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite", "StorageBuffer", "false" },
-    { "ByteAddressBuffer", "Buffer", "General", "Read", "StorageBuffer", "true" },
+    { "ByteAddressBuffer", "Buffer", "General", "ReadWrite", "StorageBuffer", "true" },
     { "RWByteAddressBuffer", "Buffer", "General", "ReadWrite", "StorageBuffer", "false" },
     { "RasterizerOrderedByteAddressBuffer", "Buffer", "General", "ReadWrite", "StorageBuffer", "false" },
     { "SamplerState", "Sampler", "Sampler", "Unknown", "Sampler", "false" },
@@ -23026,14 +23026,10 @@ ${{{{
     }
     case DescriptorKind.Buffer:
     {
-        // Use explicit binding values from type definition instead of concatenating kind+access
-${{{{
-        if (strcmp(bindlessOption.option, "None") == 0) {
-            sb << "        return __getDynamicResourceHeap<T>(T.defaultVkBinding)[((uint2)handleValue).x];";
-        } else {
-            sb << "        return __getDynamicResourceHeap<T>(T.vkMutableBinding)[((uint2)handleValue).x];";
-        }
-}}}}
+        if(DescriptorAccess.Read == T.descriptorAccess)
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).UniformBuffer)[((uint2)handleValue).x];
+        else
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).StorageBuffer)[((uint2)handleValue).x];
     }
     case DescriptorKind.AccelerationStructure:
         return __slang_noop_cast<T>(RaytracingAccelerationStructure(__asuint64((uint2)handleValue)));

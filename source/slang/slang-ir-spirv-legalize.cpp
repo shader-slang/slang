@@ -461,13 +461,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             IRBuilder builder(m_sharedContext->m_irModule);
             auto cbufferType = as<IRConstantBufferType>(innerType);
             auto paramBlockType = as<IRParameterBlockType>(innerType);
-            
+
             // Skip constant buffer processing for descriptor handles entirely
             if (as<IRDescriptorHandleType>(innerType))
             {
                 return;
             }
-            
+
             if (cbufferType || paramBlockType)
             {
                 innerType = as<IRUniformParameterGroupType>(innerType)->getElementType();
