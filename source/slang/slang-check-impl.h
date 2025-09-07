@@ -70,13 +70,13 @@ int getTypeBitSize(Type* t);
 // that can be used as lookup key in caches
 struct BasicTypeKey
 {
-    uint32_t baseType : 8;
-    uint32_t dim1 : 4;
-    uint32_t dim2 : 4;
-    uint32_t knownConstantBitCount : 8;
+    uint32_t baseType : 5;
+    uint32_t dim1 : 8;
+    uint32_t dim2 : 8;
+    uint32_t knownConstantBitCount : 6;
     uint32_t knownNegative : 1;
     uint32_t isLValue : 1;
-    uint32_t reserved : 6;
+    uint32_t reserved : 3;
     uint32_t getRaw() const
     {
         uint32_t val;
@@ -84,7 +84,7 @@ struct BasicTypeKey
         return val;
     }
     bool operator==(BasicTypeKey other) const { return getRaw() == other.getRaw(); }
-    static BasicTypeKey invalid() { return BasicTypeKey{0xff, 0, 0, 0, 0, 0, 0}; }
+    static BasicTypeKey invalid() { return BasicTypeKey{0x1f, 0, 0, 0, 0, 0, 0}; }
 };
 
 SLANG_FORCE_INLINE BasicTypeKey makeBasicTypeKey(
@@ -699,6 +699,8 @@ struct SharedSemanticsContext : public RefObject
 
     GLSLBindingOffsetTracker m_glslBindingOffsetTracker;
 
+    Dictionary<Decl*, bool> m_typeContainsRecursionCache;
+
 public:
     SharedSemanticsContext(
         Linkage* linkage,
@@ -919,19 +921,6 @@ private:
         FacetList baseFacets,
         FacetList::Builder& ioMergedFacets);
 
-    struct TypePair
-    {
-        Type* type0;
-        Type* type1;
-        HashCode getHashCode() const
-        {
-            return combineHash(Slang::getHashCode(type0), Slang::getHashCode(type1));
-        }
-        bool operator==(const TypePair& other) const
-        {
-            return type0 == other.type0 && type1 == other.type1;
-        }
-    };
     Dictionary<Type*, InheritanceInfo> m_mapTypeToInheritanceInfo;
     Dictionary<DeclRef<Decl>, InheritanceInfo> m_mapDeclRefToInheritanceInfo;
     Dictionary<TypePair, SubtypeWitness*> m_mapTypePairToSubtypeWitness;
@@ -3037,7 +3026,7 @@ public:
     }
 
     Expr* visitSizeOfLikeExpr(SizeOfLikeExpr* expr);
-
+    Expr* visitAddressOfExpr(AddressOfExpr* expr);
     Expr* visitIncompleteExpr(IncompleteExpr* expr);
     Expr* visitBoolLiteralExpr(BoolLiteralExpr* expr);
     Expr* visitNullPtrLiteralExpr(NullPtrLiteralExpr* expr);

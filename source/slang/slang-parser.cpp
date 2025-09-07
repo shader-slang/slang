@@ -7026,7 +7026,6 @@ static NodeBase* parseSizeOfExpr(Parser* parser, void* /*userData*/)
 
 static NodeBase* parseAlignOfExpr(Parser* parser, void* /*userData*/)
 {
-    // We could have a type or a variable or an expression
     AlignOfExpr* alignOfExpr = parser->astBuilder->create<AlignOfExpr>();
 
     parser->ReadMatchingToken(TokenType::LParent);
@@ -7056,6 +7055,17 @@ static NodeBase* parseCountOfExpr(Parser* parser, void* /*userData*/)
     parser->ReadMatchingToken(TokenType::RParent);
 
     return countOfExpr;
+}
+
+static NodeBase* parseAddressOfExpr(Parser* parser, void* /*userData*/)
+{
+    // We could have a type or a variable or an expression
+    AddressOfExpr* addressOfExpr = parser->astBuilder->create<AddressOfExpr>();
+
+    parser->ReadMatchingToken(TokenType::LParent);
+    addressOfExpr->arg = parser->ParseExpression();
+    parser->ReadMatchingToken(TokenType::RParent);
+    return addressOfExpr;
 }
 
 static NodeBase* parseTryExpr(Parser* parser, void* /*userData*/)
@@ -7239,7 +7249,7 @@ static IntegerLiteralValue _fixIntegerLiteral(
         // If the masked value is 0 or equal to the mask, we 'assume' no information is
         // lost
         // This allows for example -1u, to give 0xffffffff
-        // It also means 0xfffffffffffffffffu will give 0xffffffff, without a warning.
+        // It also means 0xffffffffffffffffu will give 0xffffffff, without a warning.
         if ((!(maskedValue == 0 || maskedValue == mask)) && sink && token)
         {
             // Output a warning that number has been altered
@@ -7296,20 +7306,19 @@ static BaseType _determineNonSuffixedIntegerLiteralType(
     {
         baseType = BaseType::UInt64;
 
-        if (isDecimalBase)
-        {
-            // There is an edge case here where 9223372036854775808 or INT64_MAX + 1
-            // brings us here, but the complete literal is -9223372036854775808 or INT64_MIN and is
-            // valid. Unfortunately because the lexer handles the negative(-) part of the literal
-            // separately it is impossible to know whether the literal has a negative sign or not.
-            // We emit the warning and initially process it as a uint64 anyways, and the negative
-            // sign will be properly parsed and the value will still be properly stored as a
-            // negative INT64_MIN.
+        // Emit warning if the value is too large for signed 64-bit, regardless of base
 
-            // Decimal integer is too large to be represented as signed.
-            // Output warning that it is represented as unsigned instead.
-            sink->diagnose(*token, Diagnostics::integerLiteralTooLarge);
-        }
+        // There is an edge case here where 9223372036854775808 or INT64_MAX + 1
+        // brings us here, but the complete literal is -9223372036854775808 or INT64_MIN and is
+        // valid. Unfortunately because the lexer handles the negative(-) part of the literal
+        // separately it is impossible to know whether the literal has a negative sign or not.
+        // We emit the warning and initially process it as a uint64 anyways, and the negative
+        // sign will be properly parsed and the value will still be properly stored as a
+        // negative INT64_MIN.
+
+        // Decimal integer is too large to be represented as signed.
+        // Output warning that it is represented as unsigned instead.
+        sink->diagnose(*token, Diagnostics::integerLiteralTooLarge);
     }
 
     return baseType;
@@ -9648,6 +9657,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseExpr("sizeof", parseSizeOfExpr),
     _makeParseExpr("alignof", parseAlignOfExpr),
     _makeParseExpr("countof", parseCountOfExpr),
+    _makeParseExpr("__getAddress", parseAddressOfExpr),
 };
 
 ConstArrayView<SyntaxParseInfo> getSyntaxParseInfos()

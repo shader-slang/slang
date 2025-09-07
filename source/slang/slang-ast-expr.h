@@ -2,6 +2,8 @@
 #pragma once
 
 #include "slang-ast-base.h"
+
+//
 #include "slang-ast-expr.h.fiddle"
 
 FIDDLE()
@@ -498,6 +500,13 @@ FIDDLE()
 class CountOfExpr : public SizeOfLikeExpr
 {
     FIDDLE(...)
+};
+
+FIDDLE()
+class AddressOfExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() Expr* arg = nullptr;
 };
 
 FIDDLE()

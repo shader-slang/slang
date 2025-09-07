@@ -2604,7 +2604,32 @@ struct ByteAddressBuffer
 };
 
 // https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-rwbyteaddressbuffer
-// Missing support for Atomic operations
+// Atomic operations support
+
+// Signed 64-bit atomic wrappers
+// CUDA only supports unsigned long long atomics, so we cast signed to unsigned
+__device__ __forceinline__ long long atomicExch(long long* address, long long val)
+{
+    return (long long)atomicExch((unsigned long long*)address, (unsigned long long)val);
+}
+
+__device__ __forceinline__ long long atomicCAS(long long* address, long long compare, long long val)
+{
+    return (long long)atomicCAS(
+        (unsigned long long*)address,
+        (unsigned long long)compare,
+        (unsigned long long)val);
+}
+
+// Float bitwise atomic compare-and-swap
+// Uses integer atomics to preserve exact float bit patterns
+__device__ __forceinline__ float atomicCAS(float* address, float compare, float val)
+{
+    int* addr_as_int = (int*)address;
+    int old = atomicCAS(addr_as_int, __float_as_int(compare), __float_as_int(val));
+    return __int_as_float(old);
+}
+
 // Missing support for Load with status
 struct RWByteAddressBuffer
 {
@@ -2863,16 +2888,66 @@ struct WaveOpMul
 template<typename T>
 struct WaveOpMax
 {
-    __inline__ __device__ static T getInitial(T a) { return a; }
+    __inline__ __device__ static T getInitial(T a, bool exclusive = false);
     __inline__ __device__ static T doOp(T a, T b) { return a > b ? a : b; }
 };
 
 template<typename T>
 struct WaveOpMin
 {
-    __inline__ __device__ static T getInitial(T a) { return a; }
+    __inline__ __device__ static T getInitial(T a, bool exclusive = false);
     __inline__ __device__ static T doOp(T a, T b) { return a < b ? a : b; }
 };
+
+// Compact specializations using macro for getInitial
+#define SLANG_WAVE_MIN_SPEC(T, EXCL_VAL)                                  \
+    template<>                                                            \
+    __inline__ __device__ T WaveOpMin<T>::getInitial(T a, bool exclusive) \
+    {                                                                     \
+        return exclusive ? (EXCL_VAL) : a;                                \
+    }
+
+#define SLANG_WAVE_MAX_SPEC(T, EXCL_VAL)                                  \
+    template<>                                                            \
+    __inline__ __device__ T WaveOpMax<T>::getInitial(T a, bool exclusive) \
+    {                                                                     \
+        return exclusive ? (EXCL_VAL) : a;                                \
+    }
+
+// Min specializations (exclusive identity = max value)
+SLANG_WAVE_MIN_SPEC(float, SLANG_INFINITY)
+SLANG_WAVE_MIN_SPEC(double, SLANG_INFINITY)
+SLANG_WAVE_MIN_SPEC(int, 0x7FFFFFFF)
+SLANG_WAVE_MIN_SPEC(uint, 0xFFFFFFFF)
+SLANG_WAVE_MIN_SPEC(char, (char)0x7F)
+SLANG_WAVE_MIN_SPEC(int8_t, (int8_t)0x7F)
+SLANG_WAVE_MIN_SPEC(uint8_t, (uint8_t)0xFF)
+SLANG_WAVE_MIN_SPEC(int16_t, (int16_t)0x7FFF)
+SLANG_WAVE_MIN_SPEC(uint16_t, (uint16_t)0xFFFF)
+SLANG_WAVE_MIN_SPEC(int64_t, 0x7FFFFFFFFFFFFFFFLL)
+SLANG_WAVE_MIN_SPEC(uint64_t, 0xFFFFFFFFFFFFFFFFULL)
+#if SLANG_CUDA_ENABLE_HALF
+SLANG_WAVE_MIN_SPEC(__half, __ushort_as_half(0x7BFF))
+#endif
+
+// Max specializations (exclusive identity = min value)
+SLANG_WAVE_MAX_SPEC(float, -SLANG_INFINITY)
+SLANG_WAVE_MAX_SPEC(double, -SLANG_INFINITY)
+SLANG_WAVE_MAX_SPEC(int, (int)0x80000000)
+SLANG_WAVE_MAX_SPEC(uint, 0)
+SLANG_WAVE_MAX_SPEC(char, (char)0x80)
+SLANG_WAVE_MAX_SPEC(int8_t, (int8_t)0x80)
+SLANG_WAVE_MAX_SPEC(uint8_t, 0)
+SLANG_WAVE_MAX_SPEC(int16_t, (int16_t)0x8000)
+SLANG_WAVE_MAX_SPEC(uint16_t, 0)
+SLANG_WAVE_MAX_SPEC(int64_t, (int64_t)0x8000000000000000LL)
+SLANG_WAVE_MAX_SPEC(uint64_t, 0)
+#if SLANG_CUDA_ENABLE_HALF
+SLANG_WAVE_MAX_SPEC(__half, __ushort_as_half(0xFBFF))
+#endif
+
+#undef SLANG_WAVE_MIN_SPEC
+#undef SLANG_WAVE_MAX_SPEC
 
 template<typename T>
 struct ElementTypeTrait;
@@ -2908,6 +2983,33 @@ struct ElementTypeTrait<int64_t>
 {
     typedef int64_t Type;
 };
+template<>
+struct ElementTypeTrait<char>
+{
+    typedef char Type;
+};
+template<>
+struct ElementTypeTrait<uchar>
+{
+    typedef uchar Type;
+};
+template<>
+struct ElementTypeTrait<short>
+{
+    typedef short Type;
+};
+template<>
+struct ElementTypeTrait<ushort>
+{
+    typedef ushort Type;
+};
+#if SLANG_CUDA_ENABLE_HALF
+template<>
+struct ElementTypeTrait<__half>
+{
+    typedef __half Type;
+};
+#endif
 
 // Vector
 template<>
@@ -2993,6 +3095,115 @@ struct ElementTypeTrait<double4>
 {
     typedef double Type;
 };
+
+// Additional vector types
+template<>
+struct ElementTypeTrait<char2>
+{
+    typedef char Type;
+};
+template<>
+struct ElementTypeTrait<char3>
+{
+    typedef char Type;
+};
+template<>
+struct ElementTypeTrait<char4>
+{
+    typedef char Type;
+};
+template<>
+struct ElementTypeTrait<uchar2>
+{
+    typedef uchar Type;
+};
+template<>
+struct ElementTypeTrait<uchar3>
+{
+    typedef uchar Type;
+};
+template<>
+struct ElementTypeTrait<uchar4>
+{
+    typedef uchar Type;
+};
+template<>
+struct ElementTypeTrait<short2>
+{
+    typedef short Type;
+};
+template<>
+struct ElementTypeTrait<short3>
+{
+    typedef short Type;
+};
+template<>
+struct ElementTypeTrait<short4>
+{
+    typedef short Type;
+};
+template<>
+struct ElementTypeTrait<ushort2>
+{
+    typedef ushort Type;
+};
+template<>
+struct ElementTypeTrait<ushort3>
+{
+    typedef ushort Type;
+};
+template<>
+struct ElementTypeTrait<ushort4>
+{
+    typedef ushort Type;
+};
+template<>
+struct ElementTypeTrait<longlong2>
+{
+    typedef int64_t Type;
+};
+template<>
+struct ElementTypeTrait<longlong3>
+{
+    typedef int64_t Type;
+};
+template<>
+struct ElementTypeTrait<longlong4>
+{
+    typedef int64_t Type;
+};
+template<>
+struct ElementTypeTrait<ulonglong2>
+{
+    typedef uint64_t Type;
+};
+template<>
+struct ElementTypeTrait<ulonglong3>
+{
+    typedef uint64_t Type;
+};
+template<>
+struct ElementTypeTrait<ulonglong4>
+{
+    typedef uint64_t Type;
+};
+#if SLANG_CUDA_ENABLE_HALF
+template<>
+struct ElementTypeTrait<__half2>
+{
+    typedef __half Type;
+};
+template<>
+struct ElementTypeTrait<__half3>
+{
+    typedef __half Type;
+};
+template<>
+struct ElementTypeTrait<__half4>
+{
+    typedef __half Type;
+};
+#endif
 
 // Matrix
 template<typename T, int ROWS, int COLS>
@@ -3627,6 +3838,111 @@ __inline__ __device__ T _wavePrefixAndMultiple(WarpMask mask, T val)
 {
     typedef typename ElementTypeTrait<T>::Type ElemType;
     _wavePrefixMultiple<WaveOpAnd<ElemType>, ElemType, sizeof(T) / sizeof(ElemType)>(
+        mask,
+        (ElemType*)&val);
+    return val;
+}
+
+template<typename T>
+__inline__ __device__ T _wavePrefixMin(WarpMask mask, T val)
+{
+    return _wavePrefixScalar<WaveOpMin<T>, T>(mask, val);
+}
+
+template<typename T>
+__inline__ __device__ T _wavePrefixMax(WarpMask mask, T val)
+{
+    return _wavePrefixScalar<WaveOpMax<T>, T>(mask, val);
+}
+
+template<typename T>
+__inline__ __device__ T _wavePrefixMinMultiple(WarpMask mask, T val)
+{
+    typedef typename ElementTypeTrait<T>::Type ElemType;
+    _wavePrefixMultiple<WaveOpMin<ElemType>, ElemType, sizeof(T) / sizeof(ElemType)>(
+        mask,
+        (ElemType*)&val);
+    return val;
+}
+
+template<typename T>
+__inline__ __device__ T _wavePrefixMaxMultiple(WarpMask mask, T val)
+{
+    typedef typename ElementTypeTrait<T>::Type ElemType;
+    _wavePrefixMultiple<WaveOpMax<ElemType>, ElemType, sizeof(T) / sizeof(ElemType)>(
+        mask,
+        (ElemType*)&val);
+    return val;
+}
+
+// Wrapper structures for exclusive operations that use the overloaded getInitial method
+template<typename T>
+struct WaveOpExclusiveMin
+{
+    __inline__ __device__ static T getInitial(T a) { return WaveOpMin<T>::getInitial(a, true); }
+    __inline__ __device__ static T doOp(T a, T b) { return WaveOpMin<T>::doOp(a, b); }
+};
+
+template<typename T>
+struct WaveOpExclusiveMax
+{
+    __inline__ __device__ static T getInitial(T a) { return WaveOpMax<T>::getInitial(a, true); }
+    __inline__ __device__ static T doOp(T a, T b) { return WaveOpMax<T>::doOp(a, b); }
+};
+
+// Inclusive prefix min/max functions (for WaveMultiPrefixInclusive*)
+template<typename T>
+__inline__ __device__ T _wavePrefixInclusiveMin(WarpMask mask, T val)
+{
+    return _wavePrefixMin(mask, val);
+}
+
+template<typename T>
+__inline__ __device__ T _wavePrefixInclusiveMax(WarpMask mask, T val)
+{
+    return _wavePrefixMax(mask, val);
+}
+
+template<typename T>
+__inline__ __device__ T _wavePrefixInclusiveMinMultiple(WarpMask mask, T val)
+{
+    return _wavePrefixMinMultiple(mask, val);
+}
+
+template<typename T>
+__inline__ __device__ T _wavePrefixInclusiveMaxMultiple(WarpMask mask, T val)
+{
+    return _wavePrefixMaxMultiple(mask, val);
+}
+
+// Explicit exclusive prefix min/max functions (for WaveMultiPrefixExclusive*)
+template<typename T>
+__inline__ __device__ T _wavePrefixExclusiveMin(WarpMask mask, T val)
+{
+    return _wavePrefixScalar<WaveOpExclusiveMin<T>, T>(mask, val);
+}
+
+template<typename T>
+__inline__ __device__ T _wavePrefixExclusiveMax(WarpMask mask, T val)
+{
+    return _wavePrefixScalar<WaveOpExclusiveMax<T>, T>(mask, val);
+}
+
+template<typename T>
+__inline__ __device__ T _wavePrefixExclusiveMinMultiple(WarpMask mask, T val)
+{
+    typedef typename ElementTypeTrait<T>::Type ElemType;
+    _wavePrefixMultiple<WaveOpExclusiveMin<ElemType>, ElemType, sizeof(T) / sizeof(ElemType)>(
+        mask,
+        (ElemType*)&val);
+    return val;
+}
+
+template<typename T>
+__inline__ __device__ T _wavePrefixExclusiveMaxMultiple(WarpMask mask, T val)
+{
+    typedef typename ElementTypeTrait<T>::Type ElemType;
+    _wavePrefixMultiple<WaveOpExclusiveMax<ElemType>, ElemType, sizeof(T) / sizeof(ElemType)>(
         mask,
         (ElemType*)&val);
     return val;
@@ -4626,3 +4942,214 @@ tex2DArrayfetch_int(CUtexObject texObj, int x, int y, int layer)
         : "l"(texObj), "r"(x), "r"(y), "r"(layer), "r"(layer));
     return make_int4(result_x, result_y, result_z, result_w);
 }
+
+// Wave rotate helper functions - templated approach
+#define SLANG_WARP_FULL_MASK 0xFFFFFFFF
+
+// Macro-based wave rotate implementation following codebase patterns
+#define SLANG_WAVE_ROTATE_IMPL(T)                                                     \
+    __device__ __forceinline__ T##2 _slang_waveRotate(T##2 value, unsigned int delta) \
+    {                                                                                 \
+        return make_##T##2(                                                           \
+            (T)__shfl_sync(                                                           \
+                SLANG_WARP_FULL_MASK,                                                 \
+                value.x,                                                              \
+                (_getLaneId() + delta) % SLANG_CUDA_WARP_SIZE),                       \
+            (T)__shfl_sync(                                                           \
+                SLANG_WARP_FULL_MASK,                                                 \
+                value.y,                                                              \
+                (_getLaneId() + delta) % SLANG_CUDA_WARP_SIZE));                      \
+    }                                                                                 \
+    __device__ __forceinline__ T##3 _slang_waveRotate(T##3 value, unsigned int delta) \
+    {                                                                                 \
+        return make_##T##3(                                                           \
+            (T)__shfl_sync(                                                           \
+                SLANG_WARP_FULL_MASK,                                                 \
+                value.x,                                                              \
+                (_getLaneId() + delta) % SLANG_CUDA_WARP_SIZE),                       \
+            (T)__shfl_sync(                                                           \
+                SLANG_WARP_FULL_MASK,                                                 \
+                value.y,                                                              \
+                (_getLaneId() + delta) % SLANG_CUDA_WARP_SIZE),                       \
+            (T)__shfl_sync(                                                           \
+                SLANG_WARP_FULL_MASK,                                                 \
+                value.z,                                                              \
+                (_getLaneId() + delta) % SLANG_CUDA_WARP_SIZE));                      \
+    }                                                                                 \
+    __device__ __forceinline__ T##4 _slang_waveRotate(T##4 value, unsigned int delta) \
+    {                                                                                 \
+        return make_##T##4(                                                           \
+            (T)__shfl_sync(                                                           \
+                SLANG_WARP_FULL_MASK,                                                 \
+                value.x,                                                              \
+                (_getLaneId() + delta) % SLANG_CUDA_WARP_SIZE),                       \
+            (T)__shfl_sync(                                                           \
+                SLANG_WARP_FULL_MASK,                                                 \
+                value.y,                                                              \
+                (_getLaneId() + delta) % SLANG_CUDA_WARP_SIZE),                       \
+            (T)__shfl_sync(                                                           \
+                SLANG_WARP_FULL_MASK,                                                 \
+                value.z,                                                              \
+                (_getLaneId() + delta) % SLANG_CUDA_WARP_SIZE),                       \
+            (T)__shfl_sync(                                                           \
+                SLANG_WARP_FULL_MASK,                                                 \
+                value.w,                                                              \
+                (_getLaneId() + delta) % SLANG_CUDA_WARP_SIZE));                      \
+    }
+
+// Generate wave rotate functions for all standard vector types
+SLANG_WAVE_ROTATE_IMPL(uint)
+SLANG_WAVE_ROTATE_IMPL(int)
+SLANG_WAVE_ROTATE_IMPL(float)
+SLANG_WAVE_ROTATE_IMPL(short)
+SLANG_WAVE_ROTATE_IMPL(ushort)
+SLANG_WAVE_ROTATE_IMPL(char)
+SLANG_WAVE_ROTATE_IMPL(uchar)
+SLANG_WAVE_ROTATE_IMPL(longlong)
+SLANG_WAVE_ROTATE_IMPL(ulonglong)
+
+#ifdef SLANG_CUDA_ENABLE_HALF
+SLANG_WAVE_ROTATE_IMPL(__half)
+#endif
+
+// Special handling for boolean vectors (requires int conversion)
+__device__ __forceinline__ bool2 _slang_waveRotate(bool2 value, unsigned int delta)
+{
+    int2 intValue = make_int2((int)value.x, (int)value.y);
+    int2 result = _slang_waveRotate(intValue, delta);
+    return make_bool2((bool)result.x, (bool)result.y);
+}
+
+__device__ __forceinline__ bool3 _slang_waveRotate(bool3 value, unsigned int delta)
+{
+    int3 intValue = make_int3((int)value.x, (int)value.y, (int)value.z);
+    int3 result = _slang_waveRotate(intValue, delta);
+    return make_bool3((bool)result.x, (bool)result.y, (bool)result.z);
+}
+
+__device__ __forceinline__ bool4 _slang_waveRotate(bool4 value, unsigned int delta)
+{
+    int4 intValue = make_int4((int)value.x, (int)value.y, (int)value.z, (int)value.w);
+    int4 result = _slang_waveRotate(intValue, delta);
+    return make_bool4((bool)result.x, (bool)result.y, (bool)result.z, (bool)result.w);
+}
+
+#undef SLANG_WAVE_ROTATE_IMPL
+
+// Quad control operations for CUDA
+__device__ __forceinline__ bool _slang_quadAny(bool expr)
+{
+    // Get values from all 4 lanes in the quad
+    bool v0 = __shfl_sync(0xFFFFFFFF, expr, (_getLaneId() & 0xFFFFFFFC) | 0);
+    bool v1 = __shfl_sync(0xFFFFFFFF, expr, (_getLaneId() & 0xFFFFFFFC) | 1);
+    bool v2 = __shfl_sync(0xFFFFFFFF, expr, (_getLaneId() & 0xFFFFFFFC) | 2);
+    bool v3 = __shfl_sync(0xFFFFFFFF, expr, (_getLaneId() & 0xFFFFFFFC) | 3);
+    return v0 || v1 || v2 || v3;
+}
+
+__device__ __forceinline__ bool _slang_quadAll(bool expr)
+{
+    // Get values from all 4 lanes in the quad
+    bool v0 = __shfl_sync(0xFFFFFFFF, expr, (_getLaneId() & 0xFFFFFFFC) | 0);
+    bool v1 = __shfl_sync(0xFFFFFFFF, expr, (_getLaneId() & 0xFFFFFFFC) | 1);
+    bool v2 = __shfl_sync(0xFFFFFFFF, expr, (_getLaneId() & 0xFFFFFFFC) | 2);
+    bool v3 = __shfl_sync(0xFFFFFFFF, expr, (_getLaneId() & 0xFFFFFFFC) | 3);
+    return v0 && v1 && v2 && v3;
+}
+
+// Clustered wave rotate operations for CUDA
+// Clustered rotate rotates values within clusters of specified size
+#define SLANG_WAVE_CLUSTERED_ROTATE_IMPL(T)                                                       \
+    __device__ __forceinline__ T                                                                  \
+    _slang_waveClusteredRotate(T value, unsigned int delta, unsigned int clusterSize)             \
+    {                                                                                             \
+        unsigned int laneId = _getLaneId();                                                       \
+        unsigned int clusterStart = (laneId / clusterSize) * clusterSize;                         \
+        unsigned int targetLane = clusterStart + ((laneId - clusterStart + delta) % clusterSize); \
+        return __shfl_sync(SLANG_WARP_FULL_MASK, value, targetLane);                              \
+    }                                                                                             \
+    __device__ __forceinline__                                                                    \
+        T##2 _slang_waveClusteredRotate(T##2 value, unsigned int delta, unsigned int clusterSize) \
+    {                                                                                             \
+        unsigned int laneId = _getLaneId();                                                       \
+        unsigned int clusterStart = (laneId / clusterSize) * clusterSize;                         \
+        unsigned int targetLane = clusterStart + ((laneId - clusterStart + delta) % clusterSize); \
+        return make_##T##2(                                                                       \
+            (T)__shfl_sync(SLANG_WARP_FULL_MASK, value.x, targetLane),                            \
+            (T)__shfl_sync(SLANG_WARP_FULL_MASK, value.y, targetLane));                           \
+    }                                                                                             \
+    __device__ __forceinline__                                                                    \
+        T##3 _slang_waveClusteredRotate(T##3 value, unsigned int delta, unsigned int clusterSize) \
+    {                                                                                             \
+        unsigned int laneId = _getLaneId();                                                       \
+        unsigned int clusterStart = (laneId / clusterSize) * clusterSize;                         \
+        unsigned int targetLane = clusterStart + ((laneId - clusterStart + delta) % clusterSize); \
+        return make_##T##3(                                                                       \
+            (T)__shfl_sync(SLANG_WARP_FULL_MASK, value.x, targetLane),                            \
+            (T)__shfl_sync(SLANG_WARP_FULL_MASK, value.y, targetLane),                            \
+            (T)__shfl_sync(SLANG_WARP_FULL_MASK, value.z, targetLane));                           \
+    }                                                                                             \
+    __device__ __forceinline__                                                                    \
+        T##4 _slang_waveClusteredRotate(T##4 value, unsigned int delta, unsigned int clusterSize) \
+    {                                                                                             \
+        unsigned int laneId = _getLaneId();                                                       \
+        unsigned int clusterStart = (laneId / clusterSize) * clusterSize;                         \
+        unsigned int targetLane = clusterStart + ((laneId - clusterStart + delta) % clusterSize); \
+        return make_##T##4(                                                                       \
+            (T)__shfl_sync(SLANG_WARP_FULL_MASK, value.x, targetLane),                            \
+            (T)__shfl_sync(SLANG_WARP_FULL_MASK, value.y, targetLane),                            \
+            (T)__shfl_sync(SLANG_WARP_FULL_MASK, value.z, targetLane),                            \
+            (T)__shfl_sync(SLANG_WARP_FULL_MASK, value.w, targetLane));                           \
+    }
+
+// Generate clustered wave rotate functions for all standard types
+SLANG_WAVE_CLUSTERED_ROTATE_IMPL(uint)
+SLANG_WAVE_CLUSTERED_ROTATE_IMPL(int)
+SLANG_WAVE_CLUSTERED_ROTATE_IMPL(float)
+SLANG_WAVE_CLUSTERED_ROTATE_IMPL(short)
+SLANG_WAVE_CLUSTERED_ROTATE_IMPL(ushort)
+SLANG_WAVE_CLUSTERED_ROTATE_IMPL(char)
+SLANG_WAVE_CLUSTERED_ROTATE_IMPL(uchar)
+SLANG_WAVE_CLUSTERED_ROTATE_IMPL(longlong)
+SLANG_WAVE_CLUSTERED_ROTATE_IMPL(ulonglong)
+
+#ifdef SLANG_CUDA_ENABLE_HALF
+SLANG_WAVE_CLUSTERED_ROTATE_IMPL(__half)
+#endif
+
+// Special handling for boolean clustered rotate
+__device__ __forceinline__ bool _slang_waveClusteredRotate(
+    bool value,
+    unsigned int delta,
+    unsigned int clusterSize)
+{
+    int intValue = (int)value;
+    int result = _slang_waveClusteredRotate(intValue, delta, clusterSize);
+    return (bool)result;
+}
+
+__device__ __forceinline__ bool2
+_slang_waveClusteredRotate(bool2 value, unsigned int delta, unsigned int clusterSize)
+{
+    int2 intValue = make_int2((int)value.x, (int)value.y);
+    int2 result = _slang_waveClusteredRotate(intValue, delta, clusterSize);
+    return make_bool2((bool)result.x, (bool)result.y);
+}
+
+__device__ __forceinline__ bool3
+_slang_waveClusteredRotate(bool3 value, unsigned int delta, unsigned int clusterSize)
+{
+    int3 intValue = make_int3((int)value.x, (int)value.y, (int)value.z);
+    int3 result = _slang_waveClusteredRotate(intValue, delta, clusterSize);
+    return make_bool3((bool)result.x, (bool)result.y, (bool)result.z);
+}
+
+__device__ __forceinline__ bool4
+_slang_waveClusteredRotate(bool4 value, unsigned int delta, unsigned int clusterSize)
+{
+    int4 intValue = make_int4((int)value.x, (int)value.y, (int)value.z, (int)value.w);
+    int4 result = _slang_waveClusteredRotate(intValue, delta, clusterSize);
+    return make_bool4((bool)result.x, (bool)result.y, (bool)result.z, (bool)result.w);
+}
+
+#undef SLANG_WAVE_CLUSTERED_ROTATE_IMPL

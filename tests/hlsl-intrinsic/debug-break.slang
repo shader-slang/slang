@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK_GLSL):-stage compute -entry computeMain -target glsl -line-directive-mode none
 // We can't enable because output source includes path to prelude.
 //DISABLE_TEST:SIMPLE:-stage compute -entry computeMain -target cpp -line-directive-mode none
-//DISABLE_TEST:SIMPLE:-stage compute -entry computeMain -target cuda -line-directive-mode none
+//TEST:SIMPLE(filecheck=CHECK_CUDA):-stage compute -entry computeMain -target cuda -line-directive-mode none
 // Not currently supported on HLSL
 //DISABLE_TEST:SIMPLE:-stage compute -entry computeMain -target hlsl -line-directive-mode none
 // With `slang-llvm` this will crash, but the call stack isn't really usable.
@@ -15,6 +15,7 @@
 // CHECK_GLSL: void main
 // CHECK_GLSL: glslDebugBreak{{.*}}();
 
+// CHECK_CUDA:__brkpt()
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]

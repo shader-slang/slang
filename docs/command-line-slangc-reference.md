@@ -474,6 +474,11 @@ Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, Byt
 Pack members using FXCs member packing rules when targeting GLSL or SPIRV. 
 
 
+<a id="fvk-use-c-layout"></a>
+### -fvk-use-c-layout
+Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, ByteAddressBuffer and general pointers follow the C/C++ structure layout rules when targeting SPIRV. 
+
+
 <a id="fvk-b-shift"></a>
 ### -fvk-b-shift, -fvk-s-shift, -fvk-t-shift, -fvk-u-shift
 
@@ -1262,6 +1267,7 @@ A capability describes an optional feature that a target may or may not support.
 * `any_cpp_target` 
 * `cpp_cuda` 
 * `cpp_cuda_spirv` 
+* `cpp_cuda_metal_spirv` 
 * `cuda_spirv` 
 * `cpp_cuda_glsl_spirv` 
 * `cpp_cuda_glsl_hlsl` 

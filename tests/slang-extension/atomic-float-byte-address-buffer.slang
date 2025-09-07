@@ -4,7 +4,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-dx11 -slang -compute -render-features atomic-float -output-using-type -nvapi-slot u0 -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -render-features atomic-float -output-using-type -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -render-features atomic-float -output-using-type -compile-arg -O2 -nvapi-slot u0 -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -use-dxil -render-features atomic-float -output-using-type -compile-arg -O2 -nvapi-slot u0 -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -render-features atomic-float -output-using-type -compile-arg -O2 -nvapi-slot u0 -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-mtl -compute -output-using-type -shaderobj
 
