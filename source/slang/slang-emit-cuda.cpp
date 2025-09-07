@@ -1007,66 +1007,6 @@ void CUDASourceEmitter::emitSimpleFuncImpl(IRFunc* func)
     CLikeSourceEmitter::emitSimpleFuncImpl(func);
 }
 
-void CUDASourceEmitter::emitSimpleValueImpl(IRInst* inst)
-{
-    if (inst->getOp() == kIROp_FloatLit)
-    {
-        IRConstant* constantInst = static_cast<IRConstant*>(inst);
-
-        IRType* type = constantInst->getDataType();
-        // Make sure we convert float to half when emitting a half literal to
-        // avoid overload ambiguity errors from CUDA.
-        if (type && type->getOp() == kIROp_HalfType)
-        {
-            m_writer->emit("__half(");
-        }
-
-        switch (constantInst->getFloatKind())
-        {
-        case IRConstant::FloatKind::Nan:
-            {
-                // TODO(JS):
-                // It's not clear this will work on all targets.
-                // In particular Visual Studio reports an error with this expression.
-                m_writer->emit("(0.0 / 0.0)");
-                break;
-            }
-        case IRConstant::FloatKind::PositiveInfinity:
-            {
-                m_writer->emit("SLANG_INFINITY");
-                break;
-            }
-        case IRConstant::FloatKind::NegativeInfinity:
-            {
-                m_writer->emit("(-SLANG_INFINITY)");
-                break;
-            }
-        default:
-            {
-                m_writer->emit(constantInst->value.floatVal);
-
-                // If the literal is a float, then we need to add 'f' at end, as
-                // without literal suffix the value defaults to double.
-                if (type && type->getOp() == kIROp_FloatType)
-                {
-                    m_writer->emitChar('f');
-                }
-                break;
-            }
-        }
-
-        if (type && type->getOp() == kIROp_HalfType)
-        {
-            m_writer->emit(")");
-        }
-    }
-    else
-    {
-        Super::emitSimpleValueImpl(inst);
-    }
-}
-
-
 void CUDASourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsetLayout)
 {
     Super::emitSemanticsImpl(inst, allowOffsetLayout);

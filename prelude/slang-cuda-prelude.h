@@ -274,6 +274,7 @@ typedef unsigned short ushort;
 typedef unsigned int uint;
 
 #if SLANG_CUDA_ENABLE_HALF
+typedef __half half;
 union Union16
 {
     uint16_t u;
