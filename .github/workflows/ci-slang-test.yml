@@ -62,14 +62,18 @@ jobs:
           fi
           # Build common slang-test arguments
           slang_test_args=(
-            "-use-test-server"
-            "-server-count" "${{ inputs.server-count }}"
             "-category" "${{ inputs.test-category }}"
             "-expected-failure-list" "tests/expected-failure-github.txt"
             "-skip-reference-image-generation"
             "-show-adapter-info"
             "-enable-debug-layers" "${{ inputs.enable-debug-layers }}"
           )
+
+          # Add test server arguments only if server count > 1
+          if [ "${{ inputs.server-count }}" -gt 1 ]; then
+            slang_test_args+=("-use-test-server")
+            slang_test_args+=("-server-count" "${{ inputs.server-count }}")
+          fi
 
           # Add no-GPU failure list for non-GPU tests
           if [[ "${{ inputs.full-gpu-tests }}" != "true" ]]; then
@@ -154,9 +158,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: "recursive"
-          fetch-depth: "1"
 
       - name: Common Test Setup
         uses: ./.github/actions/common-test-setup
@@ -165,6 +166,12 @@ jobs:
           compiler: ${{ inputs.compiler }}
           platform: ${{ inputs.platform }}
           config: ${{ inputs.config }}
+
+      - name: Setup Python
+        if: ${{ runner.environment != 'self-hosted' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
 
       - name: Run slangpy tests
         run: |
