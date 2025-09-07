@@ -2,7 +2,7 @@
 //DISABLE_TEST:COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
 //DISABLE_TEST:COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 //Disabled on D3D, because in general WaveShuffle requires hardware that doesn't have the 'uniform laneId across Wave' restriction. 
-//DISABLE_TEST:COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -profile cs_6_0 -shaderobj
+//DISABLE_TEST:COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -shaderobj
 // Disabled because vk doesn't currently support matrix types. See wave-shuffle-vk.slang
 //DISABLE_TEST(vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 //TEST:COMPARE_COMPUTE_EX:-cuda -compute -shaderobj

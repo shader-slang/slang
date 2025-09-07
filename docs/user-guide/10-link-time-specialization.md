@@ -149,7 +149,6 @@ RWStructuredBuffer<float> output;
 void main(uint tid : SV_DispatchThreadID)
 {
     Sampler sampler;
-    [ForceUnroll]
     for (int i = 0; i < sampler.getSampleCount(); i++)
         output[tid] += sampler.sample(i);
 }
