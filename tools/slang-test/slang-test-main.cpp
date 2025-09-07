@@ -565,13 +565,17 @@ static SlangResult _gatherTestsForFile(
             context->getTestReporter()->messageFormat(
                 TestMessageType::RunError,
                 "Failed to read test file '%s' (error: 0x%08X)",
-                filePath.getBuffer(), (unsigned int)readResult);
+                filePath.getBuffer(),
+                (unsigned int)readResult);
         }
         else
         {
             // Fallback to stderr if no context available
-            fprintf(stderr, "Failed to read test file '%s' (error: 0x%08X)\n", 
-                    filePath.getBuffer(), (unsigned int)readResult);
+            fprintf(
+                stderr,
+                "Failed to read test file '%s' (error: 0x%08X)\n",
+                filePath.getBuffer(),
+                (unsigned int)readResult);
         }
         return readResult;
     }
@@ -641,12 +645,16 @@ static SlangResult _gatherTestsForFile(
                     context->getTestReporter()->messageFormat(
                         TestMessageType::RunError,
                         "Failed to parse TEST_CATEGORY in file '%s' (error: 0x%08X)",
-                        filePath.getBuffer(), (unsigned int)res);
+                        filePath.getBuffer(),
+                        (unsigned int)res);
                 }
                 else
                 {
-                    fprintf(stderr, "Failed to parse TEST_CATEGORY in file '%s' (error: 0x%08X)\n", 
-                            filePath.getBuffer(), (unsigned int)res);
+                    fprintf(
+                        stderr,
+                        "Failed to parse TEST_CATEGORY in file '%s' (error: 0x%08X)\n",
+                        filePath.getBuffer(),
+                        (unsigned int)res);
                 }
                 return res;
             }
@@ -665,12 +673,16 @@ static SlangResult _gatherTestsForFile(
                     context->getTestReporter()->messageFormat(
                         TestMessageType::RunError,
                         "Failed to parse TEST directive in file '%s' (error: 0x%08X)",
-                        filePath.getBuffer(), (unsigned int)testRes);
+                        filePath.getBuffer(),
+                        (unsigned int)testRes);
                 }
                 else
                 {
-                    fprintf(stderr, "Failed to parse TEST directive in file '%s' (error: 0x%08X)\n", 
-                            filePath.getBuffer(), (unsigned int)testRes);
+                    fprintf(
+                        stderr,
+                        "Failed to parse TEST directive in file '%s' (error: 0x%08X)\n",
+                        filePath.getBuffer(),
+                        (unsigned int)testRes);
                 }
                 return testRes;
             }
@@ -696,12 +708,16 @@ static SlangResult _gatherTestsForFile(
                     context->getTestReporter()->messageFormat(
                         TestMessageType::RunError,
                         "Failed to parse DIAGNOSTIC_TEST directive in file '%s' (error: 0x%08X)",
-                        filePath.getBuffer(), (unsigned int)diagRes);
+                        filePath.getBuffer(),
+                        (unsigned int)diagRes);
                 }
                 else
                 {
-                    fprintf(stderr, "Failed to parse DIAGNOSTIC_TEST directive in file '%s' (error: 0x%08X)\n", 
-                            filePath.getBuffer(), (unsigned int)diagRes);
+                    fprintf(
+                        stderr,
+                        "Failed to parse DIAGNOSTIC_TEST directive in file '%s' (error: 0x%08X)\n",
+                        filePath.getBuffer(),
+                        (unsigned int)diagRes);
                 }
                 return diagRes;
             }

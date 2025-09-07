@@ -68,7 +68,7 @@ jobs:
             "-show-adapter-info"
             "-enable-debug-layers" "${{ inputs.enable-debug-layers }}"
           )
-          
+
           # Add test server arguments only if server count > 1
           if [ "${{ inputs.server-count }}" -gt 1 ]; then
             slang_test_args+=("-use-test-server")
@@ -171,7 +171,7 @@ jobs:
         if: ${{ runner.environment != 'self-hosted' }}
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: "3.10"
 
       - name: Run slangpy tests
         run: |
