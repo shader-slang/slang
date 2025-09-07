@@ -60,7 +60,7 @@ jobs:
           fetch-depth: "0"
       - name: Install dependencies
         run: |
-          if [[ "${{ matrix.os }}" = "linux" ]]; then
+          if [[ "${{ matrix.os }}" == "linux" ]]; then
               sudo apt-get update
               sudo apt-get install -y libx11-dev
           fi

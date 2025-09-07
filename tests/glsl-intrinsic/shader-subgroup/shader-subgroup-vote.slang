@@ -3,7 +3,7 @@
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
 
 // not testing cuda due to missing impl
-//DISABLE_TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda -DTARGET_CUDA 
+//DISABLE_TEST:SIMPLE(filecheck=CHECK_CUDA): -allow-glsl -stage compute -entry computeMain -target cuda -DTARGET_CUDA
 // not testing cpp due to missing impl
 //DISABLE_TEST:SIMPLE(filecheck=CHECK_CPP):  -allow-glsl -stage compute -entry computeMain -target cpp -DTARGET_CPP
 
@@ -23,7 +23,7 @@ buffer MyBlockName
 } inputBuffer;
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
-buffer MyBlockName2 
+buffer MyBlockName2
 {
     uint data[];
 } outputBuffer;
@@ -73,7 +73,7 @@ bool testAllEqual() {
         & testVAllEqual<double, 2>()
         & testVAllEqual<double, 3>()
         & testVAllEqual<double, 4>()
-        & test1AllEqual<half>() 
+        & test1AllEqual<half>()
         & testVAllEqual<half, 2>()
         & testVAllEqual<half, 3>()
         & testVAllEqual<half, 4>()
@@ -81,15 +81,15 @@ bool testAllEqual() {
         & testVAllEqual<int, 2>()
         & testVAllEqual<int, 3>()
         & testVAllEqual<int, 4>()
-        & test1AllEqual<int8_t>() 
+        & test1AllEqual<int8_t>()
         & testVAllEqual<int8_t, 2>()
         & testVAllEqual<int8_t, 3>()
         & testVAllEqual<int8_t, 4>()
-        & test1AllEqual<int16_t>() 
+        & test1AllEqual<int16_t>()
         & testVAllEqual<int16_t, 2>()
         & testVAllEqual<int16_t, 3>()
         & testVAllEqual<int16_t, 4>()
-        & test1AllEqual<int64_t>() 
+        & test1AllEqual<int64_t>()
         & testVAllEqual<int64_t, 2>()
         & testVAllEqual<int64_t, 3>()
         & testVAllEqual<int64_t, 4>()
@@ -97,15 +97,15 @@ bool testAllEqual() {
         & testVAllEqual<uint, 2>()
         & testVAllEqual<uint, 3>()
         & testVAllEqual<uint, 4>()
-        & test1AllEqual<uint8_t>() 
+        & test1AllEqual<uint8_t>()
         & testVAllEqual<uint8_t, 2>()
         & testVAllEqual<uint8_t, 3>()
         & testVAllEqual<uint8_t, 4>()
-        & test1AllEqual<uint16_t>() 
+        & test1AllEqual<uint16_t>()
         & testVAllEqual<uint16_t, 2>()
         & testVAllEqual<uint16_t, 3>()
         & testVAllEqual<uint16_t, 4>()
-        & test1AllEqual<uint64_t>() 
+        & test1AllEqual<uint64_t>()
         & testVAllEqual<uint64_t, 2>()
         & testVAllEqual<uint64_t, 3>()
         & testVAllEqual<uint64_t, 4>()
@@ -117,12 +117,12 @@ bool testAllEqual() {
 }
 
 [[ForceInline]]
-void _barrier()
+void MyBarrier()
 {
-#if !defined(WGPU)
-    subgroupBarrier();
-#else
+#if defined(WGPU)
     GroupMemoryBarrier();
+#else
+    subgroupBarrier();
 #endif
 }
 
@@ -133,53 +133,57 @@ void computeMain()
 
     // one is true, rest false, positive
     outputBuffer.data[0] = 1;
-    
-#if !defined(WGPU)
-    bool t1 = inputBuffer.data[0] == gl_GlobalInvocationID.x;
-#else
-    // There is no subgroup barrier for WGSL and workgroup barrier requries non uniform control flow.
+
+#if defined(WGPU)
+    // There is no subgroup barrier for WGSL.
+    // And workgroup barrier requries non uniform control flow.
     bool t1 = true;
+#else
+    bool t1 = inputBuffer.data[0] == gl_GlobalInvocationID.x;
 #endif
-    if (subgroupAny(t1)) {
-        _barrier();
+
+    if (subgroupAny(t1))
+    {
         outputBuffer.data[0] = 2;
     }
+    MyBarrier();
 
     // all false, negative
     outputBuffer.data[1] = 1;
     t1 = false;
-    if (!subgroupAny(t1)) {
-        _barrier();
+    if (!subgroupAny(t1))
+    {
         outputBuffer.data[1] = 2;
     }
+    MyBarrier();
 
     // all true, positive
     outputBuffer.data[2] = 1;
     t1 = true;
-    if (subgroupAll(t1)) {
-        _barrier();
+    if (subgroupAll(t1))
+    {
         outputBuffer.data[2] = 2;
     }
+    MyBarrier();
 
     // all false, negative
     outputBuffer.data[3] = 1;
     t1 = false;
-    if (!subgroupAll(t1)) {
-        _barrier();
+    if (!subgroupAll(t1))
+    {
         outputBuffer.data[3] = 2;
     }
+    MyBarrier();
 
     outputBuffer.data[4] = 1;
-
     // All equal intrinsic is not supported on WGSL as of time of writing.
 #if !defined(WGPU) && !defined(METAL)
-    if (testAllEqual()) {
-        subgroupBarrier();
+    if (testAllEqual())
+#endif
+    {
         outputBuffer.data[4] = 2;
     }
-#else
-    outputBuffer.data[4] = 2;
-#endif
+    MyBarrier();
 
     // CHECK_GLSL: void main(
     // CHECK_SPV: OpEntryPoint
