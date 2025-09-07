@@ -1876,11 +1876,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         stride = (valueSize >= (uint64_t)sizeAndAlignment.kIndeterminateSize)
                                      ? 0xFFFF
                                      : (uint32_t)sizeAndAlignment.getStride();
-                        emitOpDecorateArrayStride(
-                            getSection(SpvLogicalSectionID::Annotations),
-                            nullptr,
-                            resultSpvType,
-                            SpvLiteralInteger::from32(stride));
+                        if (stride != 0)
+                        {
+                            emitOpDecorateArrayStride(
+                                getSection(SpvLogicalSectionID::Annotations),
+                                nullptr,
+                                resultSpvType,
+                                SpvLiteralInteger::from32(stride));
+                        }
                     }
                 }
                 return resultSpvType;
