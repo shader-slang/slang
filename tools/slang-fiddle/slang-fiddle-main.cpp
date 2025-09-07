@@ -426,8 +426,8 @@ int main(int argc, char const* const* argv)
     fprintf(stderr, "\n");
 
     wchar_t wideBuffer[1024];
-    GetCurrentDirectoryW(sizeof(wideBuffer)/sizeof(wideBuffer[0]), wideBuffer);
-    
+    GetCurrentDirectoryW(sizeof(wideBuffer) / sizeof(wideBuffer[0]), wideBuffer);
+
     // Convert to UTF-8 using String::fromWString
     String currentDir = String::fromWString(wideBuffer);
     fprintf(stderr, "cwd: %s\n", currentDir.getBuffer());
