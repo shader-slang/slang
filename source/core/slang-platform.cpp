@@ -133,7 +133,8 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
     // Windows API made two approaches mutually exclusive and we need to try two times.
     // https://learn.microsoft.com/en-us/windows/win32/api/libloaderapi/nf-libloaderapi-loadlibraryexw
     String platformFileNameStr(platformFileName);
-    HMODULE h = LoadLibraryExW(platformFileNameStr.toWString(), nullptr, LOAD_LIBRARY_SEARCH_USER_DIRS);
+    HMODULE h =
+        LoadLibraryExW(platformFileNameStr.toWString(), nullptr, LOAD_LIBRARY_SEARCH_USER_DIRS);
     // If LoadLibraryExW failed, try again with LoadLibraryW.
     // https://docs.microsoft.com/en-us/windows/desktop/api/libloaderapi/nf-libloaderapi-loadlibraryw
     if (!h)
