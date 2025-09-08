@@ -261,7 +261,9 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
 
     bool DoStructuredBuffersNeedSeparateCounterBuffer() override { return true; }
 
-    SimpleLayoutInfo GetDescriptorHandleLayout(TypeLayoutContext const& context, DescriptorHandleType* descriptorHandleType) override
+    SimpleLayoutInfo GetDescriptorHandleLayout(
+        TypeLayoutContext const& context,
+        DescriptorHandleType* descriptorHandleType) override
     {
         // If bindless resources are supported, use element type layout
         if (areResourceTypesBindlessOnTarget(context.targetReq))
@@ -656,7 +658,9 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
         ioStructInfo->size = _roundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
     }
 
-    SimpleLayoutInfo GetDescriptorHandleLayout(TypeLayoutContext const& context, DescriptorHandleType* descriptorHandleType) override
+    SimpleLayoutInfo GetDescriptorHandleLayout(
+        TypeLayoutContext const& context,
+        DescriptorHandleType* descriptorHandleType) override
     {
         // If bindless resources are supported, use element type layout
         if (areResourceTypesBindlessOnTarget(context.targetReq))
@@ -700,7 +704,9 @@ struct MetalLayoutRulesImpl : public CPULayoutRulesImpl
         return vectorInfo;
     }
 
-    SimpleLayoutInfo GetDescriptorHandleLayout(TypeLayoutContext const& context, DescriptorHandleType* descriptorHandleType) override
+    SimpleLayoutInfo GetDescriptorHandleLayout(
+        TypeLayoutContext const& context,
+        DescriptorHandleType* descriptorHandleType) override
     {
         // If bindless resources are supported, use element type layout
         if (areResourceTypesBindlessOnTarget(context.targetReq))
