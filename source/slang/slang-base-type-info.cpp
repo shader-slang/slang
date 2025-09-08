@@ -4,7 +4,7 @@
 namespace Slang
 {
 
-/* static */ const BaseTypeInfo BaseTypeInfo::s_info[Index(BaseType::CountOf)] = {
+/* static */ const BaseTypeInfo BaseTypeInfo::s_info[Index(BaseType::CountOfPrimitives)] = {
     {0, 0, uint8_t(BaseType::Void)},
     {uint8_t(sizeof(bool)), 0, uint8_t(BaseType::Bool)},
     {uint8_t(sizeof(int8_t)),
@@ -84,6 +84,12 @@ namespace Slang
         return UnownedStringSlice::fromLiteral("intptr_t");
     case BaseType::UIntPtr:
         return UnownedStringSlice::fromLiteral("uintptr_t");
+    case BaseType::AddressSpace:
+        return UnownedStringSlice::fromLiteral("AddressSpace");
+    case BaseType::MemoryScope:
+        return UnownedStringSlice::fromLiteral("MemoryScope");
+    case BaseType::AccessQualifier:
+        return UnownedStringSlice::fromLiteral("Access");
     default:
         {
             SLANG_ASSERT(!"Unknown basic type");
