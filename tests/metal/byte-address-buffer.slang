@@ -1,9 +1,12 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal
 //TEST:SIMPLE(filecheck=CHECK-ASM): -target metallib
+// NOTE: Test not designed for compute, executing for pipecleaning only
+//TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-metal -compute -output-using-type
 
+//TEST_INPUT:ubuffer(data=[0xfffefdfc 0xfbfaf9f8 0xf7f6f5f4 0xf3f2f1f0 0xefeeedec 0xebeae9e8 0xe7e6e5e4 0xe3e2e1e0 0xdfdedddc 0xdbdad9d8 0xd7d6d5d4 0xd3d2d1d0 0xcfcecdcc 0xcbcac9c8 0xc7c6c5c4 0xc3c2c1c0 0xbfbebdbc 0xbbbab9b8 0xb7b6b5b4 0xb3b2b1b0 0xafaeadac 0xabaaa9a8 0xa7a6a5a4 0xa3a2a1a0 0x9f9e9d9c 0x9b9a9998 0x97969594 0x93929190 0x8f8e8d8c 0x8b8a8988 0x87868584 0x83828180 0x7f7e7d7c 0x7b7a7978 0x77767574 0x73727170 0x6f6e6d6c 0x6b6a6968 0x67666564 0x63626160 0x5f5e5d5c 0x5b5a5958 0x57565554 0x53525150 0x4f4e4d4c 0x4b4a4948 0x47464544 0x43424140 0x3f3e3d3c 0x3b3a3938 0x37363534 0x33323130 0x2f2e2d2c 0x2b2a2928 0x27262524 0x23222120 0x1f1e1d1c 0x1b1a1918 0x17161514 0x13121110 0x0f0e0d0c 0x0b0a0908 0x07060504 0x03020100 0xfffefdfc 0xfbfaf9f8 0xf7f6f5f4 0xf3f2f1f0 0xefeeedec 0xebeae9e8 0xe7e6e5e4 0xe3e2e1e0 0xdfdedddc 0xdbdad9d8 0xd7d6d5d4]):out,name=buffer
 RWByteAddressBuffer buffer;
 
-// CHECK-ASM: define void @main_kernel
+// CHECK-ASM: define void @computeMain
 
 struct TestStruct
 {
@@ -15,7 +18,8 @@ struct TestStruct
 }
 
 [numthreads(1,1,1)]
-void main_kernel(uint3 tid: SV_DispatchThreadID)
+[shader("compute")]
+void computeMain(uint3 tid: SV_DispatchThreadID)
 {
     // CHECK: uint [[WORD0:[a-zA-Z0-9_]+]] = as_type<uint>({{.*}}[(0U)>>2]);
     // CHECK: uchar [[A:[a-zA-Z0-9_]+]] = uchar(([[WORD0]] >> 0U) & 255U);
@@ -46,3 +50,80 @@ void main_kernel(uint3 tid: SV_DispatchThreadID)
     uintptr_t uintptr_val = (uintptr_t)-1;
     buffer.Store(280, uintptr_val);
 }
+
+// BUF: FFFEFDFC
+// BUF: FBFAF9F8
+// BUF: F7F6F5F4
+// BUF: F3F2F1F0
+// BUF: EFEEEDEC
+// BUF: EBEAE9E8
+// BUF: E7E6E5E4
+// BUF: E3E2E1E0
+// BUF: DFDEDDDC
+// BUF: DBDAD9D8
+// BUF: D7D6D5D4
+// BUF: D3D2D1D0
+// BUF: CFCECDCC
+// BUF: CBCAC9C8
+// BUF: C7C6C5C4
+// BUF: C3C2C1C0
+// BUF: BFBEBDBC
+// BUF: BBBAB9B8
+// BUF: B7B6B5B4
+// BUF: B3B2B1B0
+// BUF: AFAEADAC
+// BUF: ABAAA9A8
+// BUF: A7A6A5A4
+// BUF: A3A2A1A0
+// BUF: 9F9E9D9C
+// BUF: 9B9A9998
+// BUF: 97969594
+// BUF: 93929190
+// BUF: 8F8E8D8C
+// BUF: 8B8A8988
+// BUF: 87868584
+// BUF: 83828180
+// BUF: FFFE7DFC
+// BUF: FBFAF9F8
+// BUF: F7F6F5F4
+// BUF: F3F2F1F0
+// BUF: EFEEEDEC
+// BUF: EBEAE9E8
+// BUF: E7E6E5E4
+// BUF: E3E2E1E0
+// BUF: DFDEDDDC
+// BUF: DBDAD9D8
+// BUF: D7D6D5D4
+// BUF: D3D2D1D0
+// BUF: CFCECDCC
+// BUF: CBCAC9C8
+// BUF: C7C6C5C4
+// BUF: C3C2C1C0
+// BUF: BFBEBDBC
+// BUF: BBBAB9B8
+// BUF: 37363534
+// BUF: 33323130
+// BUF: 2F2E2D2C
+// BUF: 2B2A2928
+// BUF: 27262524
+// BUF: 23222120
+// BUF: 1F1E1D1C
+// BUF: 1B1A1918
+// BUF: 17161514
+// BUF: 13121110
+// BUF: F0E0D0C
+// BUF: B0A0908
+// BUF: 7060504
+// BUF: 3020100
+// BUF: FFFFFFFF
+// BUF: FFFFFFFF
+// BUF: 7B
+// BUF: 0
+// BUF: FF
+// BUF: 0
+// BUF: FFFFFFFF
+// BUF: FFFFFFFF
+// BUF: DFDEDDDC
+// BUF: DBDAD9D8
+// BUF: D7D6D5D4
+
