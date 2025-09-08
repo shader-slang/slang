@@ -2424,7 +2424,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         if (auto structDeclRef = declRef.as<StructDecl>())
         {
             RefPtr<StructTypeLayout> structLayout = new StructTypeLayout();
-            structLayout->type = type;
+            structLayout->type = declRefType;
 
             // We will recursively walk the fields of a `struct` type
             // to compute layouts for those fields.
