@@ -3490,7 +3490,7 @@ struct DeclReflection
 
     Modifier* findModifier(Modifier::ID id)
     {
-        return (Modifier*)spReflectionDecl_FindModifier(
+        return (Modifier*)spReflectionDecl_findModifier(
             (SlangReflectionDecl*)this,
             (SlangModifierID)id);
     }
