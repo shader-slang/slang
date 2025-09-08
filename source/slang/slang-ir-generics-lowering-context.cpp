@@ -16,7 +16,7 @@ bool isPolymorphicType(IRInst* typeInst)
     case kIROp_ThisType:
     case kIROp_AssociatedType:
     case kIROp_InterfaceType:
-    case kIROp_LookupWitness:
+    case kIROp_LookupWitnessMethod:
         return true;
     case kIROp_Specialize:
         {
@@ -299,7 +299,7 @@ IRType* SharedGenericsLoweringContext::lowerType(
 
             return tupleType;
         }
-    case kIROp_LookupWitness:
+    case kIROp_LookupWitnessMethod:
         {
             auto lookupInterface = static_cast<IRLookupWitnessMethod*>(paramType);
             auto witnessTableType =

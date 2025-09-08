@@ -14,6 +14,7 @@ using slang::CompilerOptionValueKind;
 enum MatrixLayoutMode : SlangMatrixLayoutModeIntegral;
 enum class LineDirectiveMode : SlangLineDirectiveModeIntegral;
 enum class FloatingPointMode : SlangFloatingPointModeIntegral;
+enum class FloatingPointDenormalMode : SlangFpDenormalModeIntegral;
 enum class OptimizationLevel : SlangOptimizationLevelIntegral;
 enum class DebugInfoLevel : SlangDebugInfoLevelIntegral;
 enum class CodeGenTarget : SlangCompileTargetIntegral;
@@ -347,6 +348,8 @@ struct CompilerOptionSet
 
     bool shouldUseDXLayout() { return getBoolOption(CompilerOptionName::ForceDXLayout); }
 
+    bool shouldUseCLayout() { return getBoolOption(CompilerOptionName::ForceCLayout); }
+
     bool shouldDumpIntermediates() { return getBoolOption(CompilerOptionName::DumpIntermediates); }
 
     bool shouldDumpIR() { return getBoolOption(CompilerOptionName::DumpIr); }
@@ -373,6 +376,33 @@ struct CompilerOptionSet
     FloatingPointMode getFloatingPointMode()
     {
         return getEnumOption<FloatingPointMode>(CompilerOptionName::FloatingPointMode);
+    }
+
+    FloatingPointDenormalMode getDenormalModeFp16()
+    {
+        if (!hasOption(CompilerOptionName::DenormalModeFp16))
+        {
+            return (FloatingPointDenormalMode)SLANG_FP_DENORM_MODE_ANY;
+        }
+        return getEnumOption<FloatingPointDenormalMode>(CompilerOptionName::DenormalModeFp16);
+    }
+
+    FloatingPointDenormalMode getDenormalModeFp32()
+    {
+        if (!hasOption(CompilerOptionName::DenormalModeFp32))
+        {
+            return (FloatingPointDenormalMode)SLANG_FP_DENORM_MODE_ANY;
+        }
+        return getEnumOption<FloatingPointDenormalMode>(CompilerOptionName::DenormalModeFp32);
+    }
+
+    FloatingPointDenormalMode getDenormalModeFp64()
+    {
+        if (!hasOption(CompilerOptionName::DenormalModeFp64))
+        {
+            return (FloatingPointDenormalMode)SLANG_FP_DENORM_MODE_ANY;
+        }
+        return getEnumOption<FloatingPointDenormalMode>(CompilerOptionName::DenormalModeFp64);
     }
 
     LineDirectiveMode getLineDirectiveMode()

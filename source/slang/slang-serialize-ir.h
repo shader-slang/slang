@@ -1,122 +1,102 @@
-// slang-serialize-ir.h
-#ifndef SLANG_SERIALIZE_IR_H_INCLUDED
-#define SLANG_SERIALIZE_IR_H_INCLUDED
+#pragma once
 
-#include "../core/slang-riff.h"
+#include "core/slang-smart-pointer.h"
+#include "slang-com-helper.h"
 #include "slang-ir.h"
-#include "slang-serialize-ir-types.h"
-#include "slang-serialize-source-loc.h"
-
-// For TranslationUnitRequest
-// and FrontEndCompileRequest::ExtraEntryPointInfo
-#include "slang-compiler.h"
 
 namespace Slang
 {
-struct IRModuleChunk : RIFF::ListChunk
+
+struct IRModule;
+class Session;
+class SerialSourceLocReader;
+class SerialSourceLocWriter;
+class String;
+namespace RIFF
 {
-};
+struct BuildCursor;
+struct Chunk;
+} // namespace RIFF
 
-struct IRSerialWriter
+void writeSerializedModuleIR(
+    RIFF::BuildCursor& cursor,
+    IRModule* moduleDecl,
+    SerialSourceLocWriter* sourceLocWriter);
+
+[[nodiscard]] Result readSerializedModuleIR(
+    RIFF::Chunk const* chunk,
+    Session* session,
+    SerialSourceLocReader* sourceLocReader,
+    RefPtr<IRModule>& outIRModule);
+
+[[nodiscard]] Result readSerializedModuleInfo(
+    RIFF::Chunk const* chunk,
+    String& compilerVersion,
+    UInt& version,
+    String& name);
+
+// Enable a mild optimization by putting instructions with payloads at the end
+// of the stream to make deserialization slightly faster
+const bool kReorderInstructionsForSerialization = true;
+
+// We expose this function here as it's used by the verifyIRSerialize function in
+// slang-serialize-container.cpp
+template<typename Func>
+static void traverseInstsInSerializationOrder(IRInst* moduleInst, Func&& processInst)
 {
-    typedef IRSerialData Ser;
-    typedef IRSerialBinary Bin;
-
-    Result write(
-        IRModule* module,
-        SerialSourceLocWriter* sourceLocWriter,
-        SerialOptionFlags flags,
-        IRSerialData* serialData);
-
-    /// Write to a container
-    static Result writeTo(const IRSerialData& data, RIFF::BuildCursor& cursor);
-
-    /// Get an instruction index from an instruction
-    Ser::InstIndex getInstIndex(IRInst* inst) const
+    const auto go = [&](auto& go, IRInst* inst) -> void
     {
-        return inst ? Ser::InstIndex(m_instMap.getValue(inst)) : Ser::InstIndex(0);
-    }
+        // Process the current instruction
+        processInst(inst);
 
-    /// Get a slice from an index
-    UnownedStringSlice getStringSlice(Ser::StringIndex index) const
-    {
-        return m_stringSlicePool.getSlice(StringSlicePool::Handle(index));
-    }
-    /// Get index from string representations
-    Ser::StringIndex getStringIndex(StringRepresentation* string)
-    {
-        return Ser::StringIndex(m_stringSlicePool.add(string));
-    }
-    Ser::StringIndex getStringIndex(const UnownedStringSlice& slice)
-    {
-        return Ser::StringIndex(m_stringSlicePool.add(slice));
-    }
-    Ser::StringIndex getStringIndex(Name* name)
-    {
-        return name ? getStringIndex(name->text) : SerialStringData::kNullStringIndex;
-    }
-    Ser::StringIndex getStringIndex(const char* chars)
-    {
-        return Ser::StringIndex(m_stringSlicePool.add(chars));
-    }
-    Ser::StringIndex getStringIndex(const String& string)
-    {
-        return Ser::StringIndex(m_stringSlicePool.add(string.getUnownedSlice()));
-    }
-
-    StringSlicePool& getStringPool() { return m_stringSlicePool; }
-
-    IRSerialWriter()
-        : m_serialData(nullptr), m_stringSlicePool(StringSlicePool::Style::Default)
-    {
-    }
-
-    /// Produces an instruction list which is in same order as written through IRSerialWriter
-    static void calcInstructionList(IRModule* module, List<IRInst*>& instsOut);
-
-protected:
-    void _addInstruction(IRInst* inst);
-    Result _calcDebugInfo(SerialSourceLocWriter* sourceLocWriter);
-
-    List<IRInst*> m_insts; ///< Instructions in same order as stored in the
-
-    List<IRDecoration*>
-        m_decorations; ///< Holds all decorations in order of the instructions as found
-    List<IRInst*> m_instWithFirstDecoration; ///< All decorations are held in this order after all
-                                             ///< the regular instructions
-
-    Dictionary<IRInst*, Ser::InstIndex> m_instMap; ///< Map an instruction to an instruction index
-
-    StringSlicePool m_stringSlicePool;
-    IRSerialData* m_serialData; ///< Where the data is stored
-};
-
-struct IRSerialReader
-{
-    typedef IRSerialData Ser;
-
-    /// Read a stream to fill in dataOut IRSerialData
-    static Result readFrom(IRModuleChunk const* irModuleChunk, IRSerialData* outData);
-
-    /// Read a module from serial data
-    Result read(
-        const IRSerialData& data,
-        Session* session,
-        SerialSourceLocReader* sourceLocReader,
-        RefPtr<IRModule>& outModule);
-
-    IRSerialReader()
-        : m_serialData(nullptr), m_module(nullptr), m_stringTable(StringSlicePool::Style::Default)
-    {
-    }
-
-protected:
-    StringSlicePool m_stringTable;
-
-    const IRSerialData* m_serialData;
-    IRModule* m_module;
-};
+        //
+        // Process the children
+        //
+        // To make things slightly easier for the branch predictor, if this
+        // is a module instruction move all the special case
+        // instructions (bool/int/float literals and string literals)
+        // to the end. It is semantically the same, but it means that
+        // the control flow when reading will be easier to predict.
+        //
+        if (kReorderInstructionsForSerialization && inst->m_op == kIROp_ModuleInst) [[unlikely]]
+        {
+            List<IRInst*> lits;
+            List<IRInst*> strings;
+            for (const auto c : inst->m_decorationsAndChildren)
+            {
+                if (c->m_op == kIROp_BoolLit || c->m_op == kIROp_IntLit ||
+                    c->m_op == kIROp_FloatLit || c->m_op == kIROp_PtrLit ||
+                    c->m_op == kIROp_VoidLit)
+                {
+                    lits.add(c);
+                }
+                else if (c->m_op == kIROp_StringLit || c->m_op == kIROp_BlobLit)
+                {
+                    strings.add(c);
+                }
+                else
+                {
+                    go(go, c);
+                }
+            }
+            for (const auto c : lits)
+            {
+                go(go, c);
+            }
+            for (const auto c : strings)
+            {
+                go(go, c);
+            }
+        }
+        else
+        {
+            for (const auto c : inst->m_decorationsAndChildren)
+            {
+                go(go, c);
+            }
+        }
+    };
+    go(go, moduleInst);
+}
 
 } // namespace Slang
-
-#endif

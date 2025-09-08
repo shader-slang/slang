@@ -502,8 +502,32 @@ void TextCommandOptionsWriter::appendDescriptionImpl()
     const auto& categories = m_commandOptions->getCategories();
     for (Index categoryIndex = 0; categoryIndex < categories.getCount(); ++categoryIndex)
     {
-        _appendDescriptionForCategory(categoryIndex);
+        const auto& category = categories[categoryIndex];
+
+        // Omit the value categories as well as the "Internal" and "Repro" categories from the text
+        // output
+        if (category.kind != CategoryKind::Value && category.name != toSlice("Internal") &&
+            category.name != toSlice("Repro"))
+        {
+            _appendDescriptionForCategory(categoryIndex);
+        }
     }
+
+    // Add instructions for getting help for specific categories
+    m_builder << "Getting Help for Specific Categories\n";
+    m_builder << "=====================================\n\n";
+    m_builder << "To get help for a specific category of options or values, use: slangc -h "
+                 "<help-category>\n";
+    m_builder << m_options.indent << "<help-category> can be: ";
+
+    List<UnownedStringSlice> categoryNames;
+    for (const auto& category : categories)
+    {
+        categoryNames.add(category.name);
+    }
+
+    _appendWrappedIndented(1, categoryNames, toSlice(", "));
+    m_builder << "\n\n";
 }
 
 void TextCommandOptionsWriter::_appendDescriptionForCategory(Index categoryIndex)
@@ -577,14 +601,9 @@ void TextCommandOptionsWriter::_appendDescriptionForCategory(Index categoryIndex
 
                 m_builder << m_options.indent << m_options.indent;
 
-                m_builder << "<" << usageCat.name << "> can be: ";
-
-                List<UnownedStringSlice> optionNames;
-                options.getCategoryOptionNames(usageCategoryIndex, optionNames);
-
-                _appendWrappedIndented(2, optionNames, toSlice(", "));
-
-                m_builder << "\n";
+                m_builder << "To get a list of values that can be used for <" << usageCat.name
+                          << ">, ";
+                m_builder << "use \"slangc -h " << usageCat.name << "\"\n";
             }
         }
     }

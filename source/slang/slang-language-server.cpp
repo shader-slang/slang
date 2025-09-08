@@ -160,6 +160,7 @@ SlangResult LanguageServer::parseNextMessage()
                     caps.semanticTokensProvider.full = true;
                     caps.semanticTokensProvider.range = false;
                     caps.signatureHelpProvider.triggerCharacters.add("(");
+                    caps.signatureHelpProvider.triggerCharacters.add("<");
                     caps.signatureHelpProvider.triggerCharacters.add(",");
                     caps.signatureHelpProvider.retriggerCharacters.add(",");
                     for (auto tokenType : kSemanticTokenTypes)
@@ -210,15 +211,15 @@ SlangResult LanguageServer::parseNextMessage()
                 if (response.result.getKind() == JSONValue::Kind::Array)
                 {
                     auto arr = m_connection->getContainer()->getArray(response.result);
-                    if (arr.getCount() == 12)
+                    if (arr.getCount() == 13)
                     {
                         updatePredefinedMacros(arr[0]);
                         updateSearchPaths(arr[1]);
                         updateSearchInWorkspace(arr[2]);
                         updateCommitCharacters(arr[3]);
-                        updateFormattingOptions(arr[4], arr[5], arr[6], arr[7], arr[8]);
-                        updateInlayHintOptions(arr[9], arr[10]);
-                        updateTraceOptions(arr[11]);
+                        updateFormattingOptions(arr[4], arr[5], arr[6], arr[7], arr[8], arr[9]);
+                        updateInlayHintOptions(arr[10], arr[11]);
+                        updateTraceOptions(arr[12]);
                     }
                 }
                 break;
@@ -252,7 +253,19 @@ SlangResult LanguageServerCore::didOpenTextDocument(const DidOpenTextDocumentPar
 
 SlangResult LanguageServer::didOpenTextDocument(const DidOpenTextDocumentParams& args)
 {
-    return m_core.didOpenTextDocument(args);
+    // When periodic diagnostic updates are disabled (e.g., for testing),
+    // the main server loop will not automatically publish diagnostics.
+    // In this case, we must manually trigger a diagnostic publication
+    // after any action that could affect the results, such as opening a document.
+    // The same logic applies to didChange and didClose handlers.
+    resetDiagnosticUpdateTime();
+    auto result = m_core.didOpenTextDocument(args);
+    if (!m_core.m_options.periodicDiagnosticUpdate)
+    {
+        publishDiagnostics();
+    }
+    m_pendingModulesToUpdateDiagnostics.add(uriToCanonicalPath(args.textDocument.uri));
+    return result;
 }
 
 static bool isBoolType(Type* t)
@@ -546,11 +559,50 @@ HumaneSourceLoc getModuleLoc(SourceManager* manager, ContainerDecl* moduleDecl)
     return location;
 }
 
+void LanguageServer::removePendingModuleToUpdateDiagnostics(const String& uri)
+{
+    String canonicalPath = uriToCanonicalPath(uri);
+    m_pendingModulesToUpdateDiagnostics.remove(canonicalPath);
+}
+
+// When user code has `Foo(123)` where `Foo` is a `struct`, goto-definition on
+// `Foo` should redirect to the constructor of `Foo` instead of the type declaration of `Foo`.
+// This function will check if the `declRefExpr` is a reference to a type declaration,
+// but the declRefExpr is referenced from an `InvokeExpr::originalFunctionExpr` that is now
+// resolved to a constructor. If so we will return the declRef of the constructor.
+//
+DeclRef<Decl> maybeRedirectToConstructor(DeclRefExpr* declRefExpr, const List<SyntaxNode*>& path)
+{
+    if (path.getCount() < 2)
+        return declRefExpr->declRef;
+    if (!as<AggTypeDecl>(declRefExpr->declRef))
+        return declRefExpr->declRef;
+    auto invokeExpr = as<InvokeExpr>(path[path.getCount() - 2]);
+    if (!invokeExpr)
+        return declRefExpr->declRef;
+    if (!invokeExpr->originalFunctionExpr)
+        return declRefExpr->declRef;
+    auto originalFuncExpr = invokeExpr->originalFunctionExpr;
+    if (originalFuncExpr != declRefExpr)
+        return declRefExpr->declRef;
+    // If the invoke expression is the same as the decl ref expression,
+    // it means we are looking at a constructor call.
+    auto resolvedFuncExpr = as<DeclRefExpr>(invokeExpr->functionExpr);
+    if (!resolvedFuncExpr)
+        return declRefExpr->declRef;
+    auto ctorDecl = as<ConstructorDecl>(resolvedFuncExpr->declRef);
+    if (ctorDecl)
+        return ctorDecl;
+    return declRefExpr->declRef;
+}
+
 SlangResult LanguageServer::hover(
     const LanguageServerProtocol::HoverParams& args,
     const JSONValue& responseId)
 {
     auto result = m_core.hover(args);
+    removePendingModuleToUpdateDiagnostics(args.textDocument.uri);
+
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
         m_connection->sendResult(NullResponse::get(), responseId);
@@ -564,6 +616,7 @@ LanguageServerResult<LanguageServerProtocol::Hover> LanguageServerCore::hover(
     const LanguageServerProtocol::HoverParams& args)
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
+
     RefPtr<DocumentVersion> doc;
     if (!m_workspace->openedDocuments.tryGetValue(canonicalPath, doc))
     {
@@ -610,7 +663,7 @@ LanguageServerResult<LanguageServerProtocol::Hover> LanguageServerCore::hover(
             }
             else if (auto overloadedExpr2 = as<OverloadedExpr2>(node))
             {
-                numOverloads = overloadedExpr2->candidiateExprs.getCount();
+                numOverloads = overloadedExpr2->candidateExprs.getCount();
             }
         }
         if (numOverloads > 1)
@@ -809,7 +862,8 @@ LanguageServerResult<LanguageServerProtocol::Hover> LanguageServerCore::hover(
     };
     if (auto declRefExpr = as<DeclRefExpr>(leafNode))
     {
-        fillDeclRefHoverInfo(declRefExpr->declRef, declRefExpr->name);
+        auto resolvedDeclRef = maybeRedirectToConstructor(declRefExpr, findResult[0].path);
+        fillDeclRefHoverInfo(resolvedDeclRef, declRefExpr->name);
     }
     else if (auto overloadedExpr = as<OverloadedExpr>(leafNode))
     {
@@ -818,9 +872,9 @@ LanguageServerResult<LanguageServerProtocol::Hover> LanguageServerCore::hover(
     }
     else if (auto overloadedExpr2 = as<OverloadedExpr2>(leafNode))
     {
-        if (overloadedExpr2->candidiateExprs.getCount() > 0)
+        if (overloadedExpr2->candidateExprs.getCount() > 0)
         {
-            auto candidateExpr = overloadedExpr2->candidiateExprs[0];
+            auto candidateExpr = overloadedExpr2->candidateExprs[0];
             fillExprHoverInfo(candidateExpr);
         }
     }
@@ -931,6 +985,8 @@ SlangResult LanguageServer::gotoDefinition(
     const JSONValue& responseId)
 {
     auto result = m_core.gotoDefinition(args);
+    removePendingModuleToUpdateDiagnostics(args.textDocument.uri);
+
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
         m_connection->sendResult(NullResponse::get(), responseId);
@@ -985,11 +1041,12 @@ LanguageServerResult<List<LanguageServerProtocol::Location>> LanguageServerCore:
     {
         if (declRefExpr->declRef.getDecl())
         {
+            auto declRef = declRefExpr->declRef;
+            declRef = maybeRedirectToConstructor(declRefExpr, findResult[0].path);
             auto location = version->linkage->getSourceManager()->getHumaneLoc(
-                declRefExpr->declRef.getNameLoc().isValid() ? declRefExpr->declRef.getNameLoc()
-                                                            : declRefExpr->declRef.getLoc(),
+                declRef.getNameLoc().isValid() ? declRef.getNameLoc() : declRef.getLoc(),
                 SourceLocType::Actual);
-            auto name = declRefExpr->declRef.getName();
+            auto name = declRef.getName();
             locations.add(LocationResult{
                 location,
                 name ? (int)UTF8Util::calcUTF16CharCount(name->text.getUnownedSlice()) : 0});
@@ -1057,6 +1114,14 @@ LanguageServerResult<List<LanguageServerProtocol::Location>> LanguageServerCore:
             {
                 result.uri =
                     URI::fromLocalFilePath(loc.loc.pathInfo.foundPath.getUnownedSlice()).uri;
+            }
+            else if (loc.loc.pathInfo.getName() == "core" || loc.loc.pathInfo.getName() == "glsl")
+            {
+                result.uri = StringBuilder() << "slang-synth://" << loc.loc.pathInfo.getName()
+                                             << "/" << loc.loc.pathInfo.getName() << ".builtin";
+            }
+            if (result.uri.getLength() != 0)
+            {
                 doc->oneBasedUTF8LocToZeroBasedUTF16Loc(
                     loc.loc.line,
                     loc.loc.column,
@@ -1146,15 +1211,17 @@ LanguageServerResult<CompletionResult> LanguageServerCore::completion(
     }
 
     // Ajust cursor position to the beginning of the current/last identifier.
+    Index firstTokenCharOffset = cursorOffset;
     cursorOffset--;
     while (cursorOffset > 0 && _isIdentifierChar(doc->getText()[cursorOffset]))
     {
+        firstTokenCharOffset = cursorOffset;
         cursorOffset--;
     }
 
     // Never show suggestions when the user is typing a number.
-    if (cursorOffset + 1 >= 0 && cursorOffset + 1 < doc->getText().getLength() &&
-        CharUtil::isDigit(doc->getText()[cursorOffset + 1]))
+    if (firstTokenCharOffset >= 0 && firstTokenCharOffset < doc->getText().getLength() &&
+        CharUtil::isDigit(doc->getText()[firstTokenCharOffset]))
     {
         return std::nullopt;
     }
@@ -1169,12 +1236,32 @@ LanguageServerResult<CompletionResult> LanguageServerCore::completion(
     version->linkage->contentAssistInfo.cursorCol = utf8Col;
     Slang::CompletionContext context;
     context.server = this;
-    context.cursorOffset = cursorOffset;
+    context.cursorOffset = firstTokenCharOffset;
     context.version = version;
     context.doc = doc.Ptr();
     context.canonicalPath = canonicalPath.getUnownedSlice();
     context.line = utf8Line;
     context.col = utf8Col;
+    Int firstNonWhiteSpace = 0;
+    auto lineContent = doc->getLine(utf8Line);
+    while (firstNonWhiteSpace < lineContent.getLength() &&
+           CharUtil::isWhitespace(lineContent[firstNonWhiteSpace]))
+        firstNonWhiteSpace++;
+    context.indent = doc->getLine(utf8Line).head(firstNonWhiteSpace);
+    doc->offsetToLineCol(firstTokenCharOffset, utf8Line, utf8Col);
+    doc->oneBasedUTF8LocToZeroBasedUTF16Loc(
+        utf8Line,
+        utf8Col,
+        context.requestRange.start.line,
+        context.requestRange.start.character);
+
+    auto utf8TokenLen = doc->getTokenLength(firstTokenCharOffset);
+    doc->oneBasedUTF8LocToZeroBasedUTF16Loc(
+        utf8Line,
+        utf8Col + utf8TokenLen,
+        context.requestRange.end.line,
+        context.requestRange.end.character);
+
     context.commitCharacterBehavior = m_commitCharacterBehavior;
     if (args.context.triggerKind == kCompletionTriggerKindTriggerCharacter &&
         (args.context.triggerCharacter == " " || args.context.triggerCharacter == "[" ||
@@ -1281,6 +1368,8 @@ SlangResult LanguageServer::semanticTokens(
     const JSONValue& responseId)
 {
     auto result = m_core.semanticTokens(args);
+    removePendingModuleToUpdateDiagnostics(args.textDocument.uri);
+
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
         m_connection->sendResult(NullResponse::get(), responseId);
@@ -1454,6 +1543,8 @@ SlangResult LanguageServer::signatureHelp(
     const JSONValue& responseId)
 {
     auto result = m_core.signatureHelp(args);
+    removePendingModuleToUpdateDiagnostics(args.textDocument.uri);
+
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
         m_connection->sendResult(NullResponse::get(), responseId);
@@ -1461,6 +1552,75 @@ SlangResult LanguageServer::signatureHelp(
     }
     m_connection->sendResult(&result.result, responseId);
     return SLANG_OK;
+}
+
+// Heuristical cost for determining the best candidate to use as the active signature.
+// We will always use the candidate that has the most matched parameters to the current argument
+// list. If there are multiple candidates with the same number of matched parameters, we will
+// use the one with the least number of unmatched parameters. If there are still multiple
+// candidates with the same number of unmatched parameters, we will use the one with the least
+// maximum argument conversion cost.
+//
+struct CallCandidateMatchCost
+{
+    Index matchedArgCount = 0;
+    Index excessArgCount = 0;
+    Index unmatchedParamCount = 0;
+    ConversionCost maxArgConversionCost = 0;
+
+    bool isBetterThan(const CallCandidateMatchCost& other) const
+    {
+        if (excessArgCount < other.excessArgCount)
+            return true;
+        else if (excessArgCount > other.excessArgCount)
+            return false;
+        if (matchedArgCount > other.matchedArgCount)
+            return true;
+        else if (matchedArgCount < other.matchedArgCount)
+            return false;
+
+        if (unmatchedParamCount < other.unmatchedParamCount)
+            return true;
+        else if (unmatchedParamCount > other.unmatchedParamCount)
+            return false;
+        return maxArgConversionCost < other.maxArgConversionCost;
+    }
+};
+
+// Given a callable decl and an AppExprBase containing the arguments used to call it,
+// return the match cost for the candidate.
+static CallCandidateMatchCost getCallCandidateMatchCost(
+    DeclRef<CallableDecl> callableDeclRef,
+    AppExprBase* appExpr,
+    SemanticsVisitor& semanticsVisitor,
+    WorkspaceVersion* version)
+{
+    CallCandidateMatchCost result;
+    auto astBuilder = version->linkage->getASTBuilder();
+    auto paramList = getMembersOfType<ParamDecl>(astBuilder, callableDeclRef).toArray();
+
+    for (Index argId = 0; argId < appExpr->arguments.getCount(); argId++)
+    {
+        auto arg = appExpr->arguments[argId];
+        if (!arg)
+            continue;
+        if (!arg->type.type)
+            continue;
+        if (argId < paramList.getCount())
+        {
+            auto paramType = getType(version->linkage->getASTBuilder(), paramList[argId]);
+            ConversionCost argCost = 0;
+            if (paramType && semanticsVisitor.canCoerce(paramType, arg->type.type, arg, &argCost))
+            {
+                result.matchedArgCount++;
+                result.maxArgConversionCost = Math::Max(result.maxArgConversionCost, argCost);
+            }
+        }
+    }
+    result.excessArgCount =
+        Math::Max((Index)0, (appExpr->argumentDelimeterLocs.getCount() - 1) - paramList.getCount());
+    result.unmatchedParamCount = paramList.getCount() - result.matchedArgCount;
+    return result;
 }
 
 LanguageServerResult<LanguageServerProtocol::SignatureHelp> LanguageServerCore::signatureHelp(
@@ -1539,13 +1699,32 @@ LanguageServerResult<LanguageServerProtocol::SignatureHelp> LanguageServerCore::
         bool useOriginalExpr = true;
         if (auto originalDeclRefExpr = as<DeclRefExpr>(appExpr->originalFunctionExpr))
         {
+            // If the original expr doesn't map to a valid declref, we will use the checked
+            // func expr instead.
             if (!originalDeclRefExpr->declRef)
             {
                 useOriginalExpr = false;
             }
         }
+        if (as<GenericAppExpr>(appExpr->originalFunctionExpr))
+        {
+            if (as<DeclRefExpr>(funcExpr))
+            {
+                // If the original function is a fully specialized generic app, use the checked func
+                // expr for signature help.
+                useOriginalExpr = false;
+            }
+        }
         if (useOriginalExpr)
             funcExpr = appExpr->originalFunctionExpr;
+    }
+    if (auto partialGenAppExpr = as<PartiallyAppliedGenericExpr>(funcExpr))
+    {
+        funcExpr = partialGenAppExpr->originalExpr;
+    }
+    if (auto genAppExpr = as<GenericAppExpr>(funcExpr))
+    {
+        funcExpr = genAppExpr->functionExpr;
     }
     if (!funcExpr)
     {
@@ -1553,10 +1732,56 @@ LanguageServerResult<LanguageServerProtocol::SignatureHelp> LanguageServerCore::
     }
 
     SignatureHelp response;
+    response.activeSignature = 0;
+
+    CallCandidateMatchCost bestCandidateMatchCost;
+
+    // We will use an ad-hoc semantics visitor to check for argument-to-parameter conversions
+    // and to determine the best candidate signature.
+    // In the ideal design, this info should be gathered during the normal type checking
+    // process, but that require a lot of refactoring in the current code base, and may
+    // risk slowing down type checking for non-language-server use cases since we won't be
+    // able to do as many early returns.
+    // So instead we will do a separate ad-hoc checking here to do a best-effort guess
+    // on the best candidate.
+    //
+    DiagnosticSink sink;
+    SharedSemanticsContext semanticsContext(version->linkage, nullptr, &sink);
+    SemanticsVisitor semanticsVisitor(&semanticsContext);
+
     auto addDeclRef = [&](DeclRef<Decl> declRef)
     {
         if (!declRef.getDecl())
             return;
+
+        // If funcExpr is a direct reference to a generic, we should either
+        // show the generic signature if we are inside `<>`, or show the function
+        // parameter signature if we are inside `()`. If we are inside `()`, we will
+        // need to form a decl ref to the inner decl and show its signature.
+        if (!as<GenericAppExpr>(appExpr))
+        {
+            if (auto genDeclRef = as<GenericDecl>(declRef))
+            {
+                declRef = createDefaultSubstitutionsIfNeeded(
+                    version->linkage->getASTBuilder(),
+                    &semanticsVisitor,
+                    version->linkage->getASTBuilder()->getMemberDeclRef(
+                        declRef,
+                        genDeclRef.getDecl()->inner));
+            }
+        }
+        // If we have a better match than the current best, we will update response.activeSignature
+        // to this signature.
+        if (auto callableDeclRef = declRef.as<CallableDecl>())
+        {
+            auto matchCost =
+                getCallCandidateMatchCost(callableDeclRef, appExpr, semanticsVisitor, version);
+            if (matchCost.isBetterThan(bestCandidateMatchCost))
+            {
+                bestCandidateMatchCost = matchCost;
+                response.activeSignature = (uint32_t)response.signatures.getCount();
+            }
+        }
 
         SignatureInformation sigInfo;
 
@@ -1634,13 +1859,22 @@ LanguageServerResult<LanguageServerProtocol::SignatureHelp> LanguageServerCore::
 
     if (auto declRefExpr = as<DeclRefExpr>(funcExpr))
     {
-        if (auto aggDeclRef = as<AggTypeDecl>(declRefExpr->declRef))
+        if (auto typeType = as<TypeType>(declRefExpr->type.type))
         {
-            // Look for initializers
-            for (auto member :
-                 getMembersOfType<ConstructorDecl>(version->linkage->getASTBuilder(), aggDeclRef))
+            if (as<GenericDeclRefType>(typeType->getType()))
             {
-                addDeclRef(member);
+                addDeclRef(declRefExpr->declRef);
+            }
+            else
+            {
+                // Look for initializers
+                auto ctors = semanticsVisitor.lookupConstructorsInType(
+                    typeType->getType(),
+                    declRefExpr->scope);
+                for (auto ctor : ctors)
+                {
+                    addDeclRef(ctor.declRef);
+                }
             }
         }
         else
@@ -1650,14 +1884,19 @@ LanguageServerResult<LanguageServerProtocol::SignatureHelp> LanguageServerCore::
     }
     else if (auto overloadedExpr = as<OverloadedExpr>(funcExpr))
     {
+        bool isGenApp = as<GenericAppExpr>(appExpr) != nullptr;
         for (auto item : overloadedExpr->lookupResult2)
         {
+            // Skip non-generic candidates if we are inside a generic app expr (e.g.
+            // `f<WE_ARE_HERE>`).
+            if (isGenApp && !as<GenericDecl>(item.declRef))
+                continue;
             addDeclRef(item.declRef);
         }
     }
     else if (auto overloadedExpr2 = as<OverloadedExpr2>(funcExpr))
     {
-        for (auto item : overloadedExpr2->candidiateExprs)
+        for (auto item : overloadedExpr2->candidateExprs)
         {
             addExpr(item);
         }
@@ -1670,7 +1909,6 @@ LanguageServerResult<LanguageServerProtocol::SignatureHelp> LanguageServerCore::
     {
         addFuncType(funcType);
     }
-    response.activeSignature = 0;
     response.activeParameter = 0;
     for (int i = 1; i < appExpr->argumentDelimeterLocs.getCount(); i++)
     {
@@ -1733,6 +1971,8 @@ SlangResult LanguageServer::inlayHint(
     const JSONValue& responseId)
 {
     auto result = m_core.inlayHint(args);
+    removePendingModuleToUpdateDiagnostics(args.textDocument.uri);
+
     if (SLANG_FAILED(result.returnCode) || result.isNull)
     {
         m_connection->sendResult(NullResponse::get(), responseId);
@@ -1843,6 +2083,9 @@ SlangResult LanguageServer::rangeFormatting(
 LanguageServerResult<List<LanguageServerProtocol::TextEdit>> LanguageServerCore::rangeFormatting(
     const LanguageServerProtocol::DocumentRangeFormattingParams& args)
 {
+    if (!m_formatOptions.enableFormatOnType)
+        return std::nullopt;
+
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     RefPtr<DocumentVersion> doc;
     if (!m_workspace->openedDocuments.tryGetValue(canonicalPath, doc))
@@ -1891,6 +2134,9 @@ SlangResult LanguageServer::onTypeFormatting(
 LanguageServerResult<List<LanguageServerProtocol::TextEdit>> LanguageServerCore::onTypeFormatting(
     const LanguageServerProtocol::DocumentOnTypeFormattingParams& args)
 {
+    if (!m_formatOptions.enableFormatOnType)
+        return std::nullopt;
+
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     RefPtr<DocumentVersion> doc;
     if (!m_workspace->openedDocuments.tryGetValue(canonicalPath, doc))
@@ -1933,6 +2179,13 @@ void LanguageServer::publishDiagnostics()
 
     auto version = m_core.m_workspace->getCurrentVersion();
     SLANG_AST_BUILDER_RAII(version->linkage->getASTBuilder());
+
+    // Make sure modules in pendingSet are being compiled.
+    for (auto canonicalPath : m_pendingModulesToUpdateDiagnostics)
+    {
+        version->getOrLoadModule(canonicalPath);
+    }
+    m_pendingModulesToUpdateDiagnostics.clear();
 
     // Send updates to clear diagnostics for files that no longer have any messages.
     List<String> filesToRemove;
@@ -2051,6 +2304,7 @@ void LanguageServer::updateCommitCharacters(const JSONValue& jsonValue)
 }
 
 void LanguageServer::updateFormattingOptions(
+    const JSONValue& enableFormatOnType,
     const JSONValue& clangFormatLoc,
     const JSONValue& clangFormatStyle,
     const JSONValue& clangFormatFallbackStyle,
@@ -2059,6 +2313,8 @@ void LanguageServer::updateFormattingOptions(
 {
     auto container = m_connection->getContainer();
     JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
+    if (enableFormatOnType.isValid())
+        converter.convert(enableFormatOnType, &m_core.m_formatOptions.enableFormatOnType);
     if (clangFormatLoc.isValid())
         converter.convert(clangFormatLoc, &m_core.m_formatOptions.clangFormatLocation);
     if (clangFormatStyle.isValid())
@@ -2128,6 +2384,8 @@ void LanguageServer::sendConfigRequest()
     item.section = "slang.searchInAllWorkspaceDirectories";
     args.items.add(item);
     item.section = "slang.enableCommitCharactersInAutoCompletion";
+    args.items.add(item);
+    item.section = "slang.format.enableFormatOnType";
     args.items.add(item);
     item.section = "slang.format.clangFormatLocation";
     args.items.add(item);
@@ -2541,7 +2799,12 @@ void LanguageServer::processCommands()
 SlangResult LanguageServer::didCloseTextDocument(const DidCloseTextDocumentParams& args)
 {
     resetDiagnosticUpdateTime();
-    return m_core.didCloseTextDocument(args);
+    auto result = m_core.didCloseTextDocument(args);
+    if (!m_core.m_options.periodicDiagnosticUpdate)
+    {
+        publishDiagnostics();
+    }
+    return result;
 }
 
 SlangResult LanguageServerCore::didCloseTextDocument(const DidCloseTextDocumentParams& args)
@@ -2554,7 +2817,24 @@ SlangResult LanguageServerCore::didCloseTextDocument(const DidCloseTextDocumentP
 SlangResult LanguageServer::didChangeTextDocument(const DidChangeTextDocumentParams& args)
 {
     resetDiagnosticUpdateTime();
-    return m_core.didChangeTextDocument(args);
+    auto result = m_core.didChangeTextDocument(args);
+
+    // Register the module path for a diagnostics update.
+    // Note: we don't want to trigger a compile and generate the diagnostics immediately on
+    // every text change. Instead, we want to defer it to when it is the right time for an
+    // update. This is needed to reduce the latency of other requests, such as completion.
+    // For example, when user types `.`, there will be a text change event followed by a
+    // completion request. We don't want to run compile once to get the diagnostics, and then
+    // process the completion request, as this will double the latency to popup the completion
+    // list.
+    String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
+    m_pendingModulesToUpdateDiagnostics.add(canonicalPath);
+
+    if (!m_core.m_options.periodicDiagnosticUpdate)
+    {
+        publishDiagnostics();
+    }
+    return result;
 }
 
 SlangResult LanguageServerCore::didChangeTextDocument(const DidChangeTextDocumentParams& args)
@@ -2562,13 +2842,14 @@ SlangResult LanguageServerCore::didChangeTextDocument(const DidChangeTextDocumen
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     for (auto change : args.contentChanges)
         m_workspace->changeDoc(canonicalPath, change.range, change.text);
+
     return SLANG_OK;
 }
 
 SlangResult LanguageServer::didChangeConfiguration(
     const LanguageServerProtocol::DidChangeConfigurationParams& args)
 {
-    if (args.settings.isValid())
+    if (args.settings.isValid() && args.settings.type != JSONValue::Type::Null)
     {
         updateConfigFromJSON(args.settings);
     }
@@ -2583,7 +2864,8 @@ void LanguageServer::update()
 {
     if (!m_core.m_workspace)
         return;
-    publishDiagnostics();
+    if (m_core.m_options.periodicDiagnosticUpdate)
+        publishDiagnostics();
 }
 
 void LanguageServer::updateConfigFromJSON(const JSONValue& jsonVal)
@@ -2613,25 +2895,65 @@ void LanguageServer::updateConfigFromJSON(const JSONValue& jsonVal)
         {
             updateCommitCharacters(kv.value);
         }
+        else if (key == "slang.format.enableFormatOnType")
+        {
+            updateFormattingOptions(
+                kv.value,
+                JSONValue(),
+                JSONValue(),
+                JSONValue(),
+                JSONValue(),
+                JSONValue());
+        }
         else if (key == "slang.format.clangFormatLocation")
         {
-            updateFormattingOptions(kv.value, JSONValue(), JSONValue(), JSONValue(), JSONValue());
+            updateFormattingOptions(
+                JSONValue(),
+                kv.value,
+                JSONValue(),
+                JSONValue(),
+                JSONValue(),
+                JSONValue());
         }
         else if (key == "slang.format.clangFormatStyle")
         {
-            updateFormattingOptions(JSONValue(), kv.value, JSONValue(), JSONValue(), JSONValue());
+            updateFormattingOptions(
+                JSONValue(),
+                JSONValue(),
+                kv.value,
+                JSONValue(),
+                JSONValue(),
+                JSONValue());
         }
         else if (key == "slang.format.clangFormatFallbackStyle")
         {
-            updateFormattingOptions(JSONValue(), JSONValue(), kv.value, JSONValue(), JSONValue());
+            updateFormattingOptions(
+                JSONValue(),
+                JSONValue(),
+                JSONValue(),
+                kv.value,
+                JSONValue(),
+                JSONValue());
         }
         else if (key == "slang.format.allowLineBreakChangesInOnTypeFormatting")
         {
-            updateFormattingOptions(JSONValue(), JSONValue(), JSONValue(), kv.value, JSONValue());
+            updateFormattingOptions(
+                JSONValue(),
+                JSONValue(),
+                JSONValue(),
+                JSONValue(),
+                kv.value,
+                JSONValue());
         }
         else if (key == "slang.format.allowLineBreakChangesInRangeFormatting")
         {
-            updateFormattingOptions(JSONValue(), JSONValue(), JSONValue(), JSONValue(), kv.value);
+            updateFormattingOptions(
+                JSONValue(),
+                JSONValue(),
+                JSONValue(),
+                JSONValue(),
+                JSONValue(),
+                kv.value);
         }
         else if (key == "slang.inlayHints.deducedTypes")
         {
@@ -2689,7 +3011,24 @@ SLANG_API void LanguageServerStartupOptions::parse(int argc, const char* const* 
     for (int i = 1; i < argc; i++)
     {
         if (strcmp(argv[i], "-vs") == 0)
+        {
             isVisualStudio = true;
+        }
+        else if (strcmp(argv[i], "-periodic-diagnostic-update") == 0)
+        {
+            periodicDiagnosticUpdate = true;
+            if (i + 1 < argc)
+            {
+                const char* value = argv[i + 1];
+                if (value[0] == 'f' || value[0] == 'F' || value[0] == 'n' || value[0] == 'N' ||
+                    value[0] == '0' ||
+                    ((value[0] == 'o' || value[0] == 'O') && (value[1] == 'f' || value[1] == 'F')))
+                {
+                    periodicDiagnosticUpdate = false;
+                }
+                i++;
+            }
+        }
     }
 }
 
@@ -2697,6 +3036,25 @@ SLANG_API SlangResult runLanguageServer(Slang::LanguageServerStartupOptions opti
 {
     Slang::LanguageServer server(options);
     SLANG_RETURN_ON_FAIL(server.execute());
+    return SLANG_OK;
+}
+
+SLANG_API SlangResult
+getBuiltinModuleSource(const UnownedStringSlice& moduleName, slang::IBlob** blob)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef());
+    Slang::Session* session = static_cast<Slang::Session*>(globalSession.get());
+    StringBuilder sb;
+    if (moduleName.startsWith("core"))
+    {
+        session->getBuiltinModuleSource(sb, slang::BuiltinModuleName::Core);
+    }
+    else if (moduleName.startsWith("glsl"))
+    {
+        session->getBuiltinModuleSource(sb, slang::BuiltinModuleName::GLSL);
+    }
+    *blob = StringBlob::moveCreate(sb.produceString()).detach();
     return SLANG_OK;
 }
 

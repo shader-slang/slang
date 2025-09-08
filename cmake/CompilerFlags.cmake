@@ -112,10 +112,13 @@ function(set_default_compile_options target)
             -Wno-invalid-offsetof
             -Wno-newline-eof
             -Wno-return-std-move
-            # Enabled warnings:
+            # Allowed warnings:
             # If a function returns an address/reference to a local, we want it to
             # produce an error, because it probably means something very bad.
             -Werror=return-local-addr
+            # Allow unused variables with a pattern of `if (auto v = as<...>(...))`.
+            # This pattern is very common in Slang code base.
+            -Wno-error=unused-but-set-variable
             # Some warnings which are on by default in MSVC
             -Wnarrowing
         )

@@ -2,6 +2,9 @@
 #pragma once
 
 #include "slang-ast-base.h"
+#include "slang-ir-insts-enum.h"
+
+//
 #include "slang-ast-modifier.h.fiddle"
 
 FIDDLE()
@@ -64,6 +67,21 @@ FIDDLE()
 class InternalModifier : public VisibilityModifier
 {
     FIDDLE(...)
+};
+
+FIDDLE()
+class OverrideModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
+// Marks that a decl is verified to be overriding another decl defined in a base type.
+FIDDLE()
+class IsOverridingModifier : public Modifier
+{
+    FIDDLE(...)
+
+    FIDDLE() Decl* overridedDecl = nullptr;
 };
 
 FIDDLE()
@@ -172,6 +190,13 @@ class SynthesizedStaticLambdaFuncModifier : public Modifier
     FIDDLE(...)
 };
 
+FIDDLE()
+class ExplicitlyDeclaredCapabilityModifier : public Modifier
+{
+    FIDDLE(...)
+    FIDDLE() CapabilitySet declaredCapabilityRequirements;
+};
+
 // Marks a synthesized variable as local temporary variable.
 FIDDLE()
 class LocalTempVarModifier : public Modifier
@@ -200,6 +225,13 @@ class ActualGlobalModifier : public Modifier
 /// checks).
 FIDDLE()
 class IgnoreForLookupModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
+/// A modifier that indicates an `TypeConstraintDecl` is optional.
+FIDDLE()
+class OptionalConstraintModifier : public Modifier
 {
     FIDDLE(...)
 };
@@ -551,7 +583,6 @@ class BuiltinRequirementModifier : public Modifier
     FIDDLE() BuiltinRequirementKind kind;
 };
 
-
 // A modifier applied to declarations of builtin types to indicate how they
 // should be lowered to the IR.
 //
@@ -731,6 +762,14 @@ class HLSLVolatileModifier : public Modifier
     FIDDLE(...)
 };
 
+// Indicate that an interface method requirement has a default impl.
+FIDDLE()
+class HasInterfaceDefaultImplModifier : public Modifier
+{
+    FIDDLE(...)
+public:
+    FIDDLE() Decl* defaultImplDecl = nullptr;
+};
 
 FIDDLE()
 class AttributeTargetModifier : public Modifier
@@ -1879,16 +1918,6 @@ class RequireFullQuadsAttribute : public Attribute
     FIDDLE(...)
 };
 
-/// A `[payload]` attribute indicates that a `struct` type will be used as
-/// a ray payload for `TraceRay()` calls, and thus also as input/output
-/// for shaders in the ray tracing pipeline that might be invoked for
-/// such a ray.
-///
-FIDDLE()
-class PayloadAttribute : public Attribute
-{
-    FIDDLE(...)
-};
 
 /// A `[raypayload]` attribute indicates that a `struct` type will be used as
 /// a ray payload for `TraceRay()` calls, and thus also as input/output
@@ -1925,7 +1954,7 @@ class NoSideEffectAttribute : public Attribute
     FIDDLE(...)
 };
 
-/// A `[KnownBuiltin("name")]` attribute allows the compiler to
+/// A `[KnownBuiltin(name)]` attribute allows the compiler to
 /// identify this declaration during compilation, despite obfuscation or
 /// linkage removing optimizations
 ///
@@ -1933,7 +1962,7 @@ FIDDLE()
 class KnownBuiltinAttribute : public Attribute
 {
     FIDDLE(...)
-    FIDDLE() String name;
+    FIDDLE() IntVal* name;
 };
 
 /// A modifier that applies to types rather than declarations.

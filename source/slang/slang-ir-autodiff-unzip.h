@@ -436,9 +436,8 @@ struct DiffUnzipPass
 
         if (intermediateVar)
         {
-            disableIRValidationAtInsert();
+            auto validationScope = disableIRValidationScope();
             diffBuilder->addBackwardDerivativePrimalContextDecoration(callInst, intermediateVar);
-            enableIRValidationAtInsert();
         }
 
         IRInst* diffVal = nullptr;
@@ -589,7 +588,7 @@ struct DiffUnzipPass
     {
         switch (branchInst->getOp())
         {
-        case kIROp_unconditionalBranch:
+        case kIROp_UnconditionalBranch:
             {
                 auto uncondBranchInst = as<IRUnconditionalBranch>(branchInst);
                 auto targetBlock = uncondBranchInst->getTargetBlock();
@@ -616,7 +615,7 @@ struct DiffUnzipPass
                         diffArgs.getBuffer()));
             }
 
-        case kIROp_conditionalBranch:
+        case kIROp_ConditionalBranch:
             {
                 auto trueBlock = as<IRConditionalBranch>(branchInst)->getTrueBlock();
                 auto falseBlock = as<IRConditionalBranch>(branchInst)->getFalseBlock();
@@ -633,7 +632,7 @@ struct DiffUnzipPass
                         as<IRBlock>(diffMap[falseBlock])));
             }
 
-        case kIROp_ifElse:
+        case kIROp_IfElse:
             {
                 auto trueBlock = as<IRIfElse>(branchInst)->getTrueBlock();
                 auto falseBlock = as<IRIfElse>(branchInst)->getFalseBlock();
@@ -687,7 +686,7 @@ struct DiffUnzipPass
                         diffCaseArgs.getBuffer()));
             }
 
-        case kIROp_loop:
+        case kIROp_Loop:
             return splitLoop(primalBuilder, diffBuilder, as<IRLoop>(branchInst));
 
         default:
@@ -717,11 +716,11 @@ struct DiffUnzipPass
         case kIROp_Return:
             return splitReturn(primalBuilder, diffBuilder, as<IRReturn>(inst));
 
-        case kIROp_unconditionalBranch:
-        case kIROp_conditionalBranch:
-        case kIROp_ifElse:
+        case kIROp_UnconditionalBranch:
+        case kIROp_ConditionalBranch:
+        case kIROp_IfElse:
         case kIROp_Switch:
-        case kIROp_loop:
+        case kIROp_Loop:
             return splitControlFlow(primalBuilder, diffBuilder, inst);
 
         case kIROp_Unreachable:

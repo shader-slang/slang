@@ -103,8 +103,11 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
             if (ptrType)
             {
                 auto paramAddrSpace = key.getArgAddrSpaces()[paramIndex];
-                auto newParamType =
-                    builder.getPtrType(ptrType->getOp(), ptrType->getValueType(), paramAddrSpace);
+                auto newParamType = builder.getPtrType(
+                    ptrType->getOp(),
+                    ptrType->getValueType(),
+                    ptrType->getAccessQualifier(),
+                    paramAddrSpace);
                 param->setFullType(newParamType);
                 mapInstToAddrSpace[param] = paramAddrSpace;
             }
@@ -310,6 +313,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                                     auto newResultType = builder.getPtrType(
                                         ptrResultType->getOp(),
                                         ptrResultType->getValueType(),
+                                        ptrResultType->getAccessQualifier(),
                                         addrSpace);
                                     fixUpFuncType(func, newResultType);
                                     retValAddrSpaceChanged = true;
@@ -349,8 +353,11 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                 if (ptrType->getAddressSpace() != addrSpace)
                 {
                     IRBuilder builder(inst);
-                    auto newType =
-                        builder.getPtrType(ptrType->getOp(), ptrType->getValueType(), addrSpace);
+                    auto newType = builder.getPtrType(
+                        ptrType->getOp(),
+                        ptrType->getValueType(),
+                        ptrType->getAccessQualifier(),
+                        addrSpace);
                     setDataType(inst, newType);
                 }
             }
@@ -412,4 +419,69 @@ void specializeAddressSpace(IRModule* module, InitialAddressSpaceAssigner* addrS
     AddressSpaceContext context(module, addrSpaceAssigner);
     context.processModule();
 }
+
+void propagateAddressSpaceFromInsts(List<IRInst*>&& workList)
+{
+    HashSet<IRInst*> visited;
+    auto addUserToWorkList = [&](IRInst* inst)
+    {
+        for (auto use = inst->firstUse; use; use = use->nextUse)
+        {
+            auto user = use->getUser();
+            if (visited.add(user))
+                workList.add(user);
+        }
+    };
+    for (auto item : workList)
+    {
+        visited.add(item);
+    }
+    for (Index i = 0; i < workList.getCount(); i++)
+    {
+        auto inst = workList[i];
+        IRBuilder builder(inst);
+        auto instPtrType = as<IRPtrTypeBase>(inst->getDataType());
+        if (!instPtrType)
+            continue;
+        for (auto use = inst->firstUse; use; use = use->nextUse)
+        {
+            auto user = use->getUser();
+            builder.setInsertBefore(user);
+            switch (user->getOp())
+            {
+            case kIROp_Loop:
+            case kIROp_UnconditionalBranch:
+                {
+                    auto branch = as<IRUnconditionalBranch>(user);
+                    UIndex phiIndex = (UIndex)(use - branch->getArgs());
+                    auto param = getParamAt(branch->getTargetBlock(), phiIndex);
+                    if (!param)
+                        continue;
+                    user = param;
+                    break;
+                }
+            }
+            switch (user->getOp())
+            {
+            case kIROp_FieldAddress:
+            case kIROp_GetElementPtr:
+            case kIROp_GetOffsetPtr:
+            case kIROp_Param:
+                {
+                    auto valueType = tryGetPointedToType(&builder, user->getDataType());
+                    if (!valueType)
+                        continue;
+                    auto newType = builder.getPtrTypeWithAddressSpace(valueType, instPtrType);
+                    if (newType != user->getDataType())
+                    {
+                        user->setFullType(newType);
+                        addUserToWorkList(user);
+                    }
+                    break;
+                }
+            }
+        }
+    }
+}
+
 } // namespace Slang

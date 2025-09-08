@@ -133,6 +133,7 @@ struct ASTIterator
             iterator->maybeDispatchCallback(expr);
 
             dispatchIfNotNull(expr->functionExpr);
+            dispatchIfNotNull(expr->originalFunctionExpr);
             for (auto arg : expr->arguments)
                 dispatchIfNotNull(arg);
         }
@@ -180,7 +181,7 @@ struct ASTIterator
         {
             iterator->maybeDispatchCallback(expr);
             dispatchIfNotNull(expr->base);
-            for (auto candidate : expr->candidiateExprs)
+            for (auto candidate : expr->candidateExprs)
             {
                 dispatchIfNotNull(candidate);
             }
@@ -245,7 +246,12 @@ struct ASTIterator
 
         void visitThisExpr(ThisExpr* expr) { iterator->maybeDispatchCallback(expr); }
         void visitThisTypeExpr(ThisTypeExpr* expr) { iterator->maybeDispatchCallback(expr); }
+        void visitThisInterfaceExpr(ThisInterfaceExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+        }
         void visitReturnValExpr(ReturnValExpr* expr) { iterator->maybeDispatchCallback(expr); }
+        void visitAddressOfExpr(AddressOfExpr* expr) { iterator->maybeDispatchCallback(expr); }
 
         void visitAndTypeExpr(AndTypeExpr* expr)
         {

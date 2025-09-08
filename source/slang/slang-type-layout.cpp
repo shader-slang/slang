@@ -463,7 +463,7 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
         // the compilation.
         // If we are emitting C++, then there is no way in general to know how that C++ will be
         // compiled it could be 32 or 64 (or other) sizes. For now we just assume they are the same.
-        return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), SLANG_ALIGN_OF(void*));
+        return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), alignof(void*));
     }
 
     SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount)
@@ -476,7 +476,7 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
 
             // So it is actually a Array<T> on CPU which is a pointer and a size
             info.size = sizeof(void*) * 2;
-            info.alignment = SLANG_ALIGN_OF(void*);
+            info.alignment = alignof(void*);
 
             return info;
         }
@@ -539,7 +539,7 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
                 return SimpleLayoutInfo(
                     LayoutResourceKind::Uniform,
                     sizeof(uint8_t),
-                    SLANG_ALIGN_OF(uint8_t));
+                    alignof(uint8_t));
             }
 
         default:
@@ -582,14 +582,6 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
         SimpleLayoutInfo elementInfo,
         size_t elementCount) override
     {
-        // Special case bool
-        if (elementType == BaseType::Bool)
-        {
-            SimpleLayoutInfo fixInfo(elementInfo);
-            fixInfo.size = sizeof(int32_t);
-            fixInfo.alignment = sizeof(int32_t);
-            return GetVectorLayout(BaseType::Int, fixInfo, elementCount);
-        }
 
         const auto elementSize = elementInfo.size.getFiniteValue();
 
@@ -1098,6 +1090,29 @@ struct CPULayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     LayoutRulesImpl* getStructuredBufferRules(CompilerOptionSet& compilerOptions) override;
 };
 
+struct CLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
+{
+    virtual LayoutRulesImpl* getAnyValueRules() override;
+    virtual LayoutRulesImpl* getConstantBufferRules(
+        CompilerOptionSet& compilerOptions,
+        Type* containerType) override;
+    virtual LayoutRulesImpl* getPushConstantBufferRules() override;
+    virtual LayoutRulesImpl* getTextureBufferRules(CompilerOptionSet& compilerOptions) override;
+    virtual LayoutRulesImpl* getVaryingInputRules() override;
+    virtual LayoutRulesImpl* getVaryingOutputRules() override;
+    virtual LayoutRulesImpl* getSpecializationConstantRules() override;
+    virtual LayoutRulesImpl* getShaderStorageBufferRules(
+        CompilerOptionSet& compilerOptions) override;
+    virtual LayoutRulesImpl* getParameterBlockRules(CompilerOptionSet& compilerOptions) override;
+
+    LayoutRulesImpl* getRayPayloadParameterRules() override;
+    LayoutRulesImpl* getCallablePayloadParameterRules() override;
+    LayoutRulesImpl* getHitAttributesParameterRules() override;
+
+    LayoutRulesImpl* getShaderRecordConstantBufferRules() override;
+    LayoutRulesImpl* getStructuredBufferRules(CompilerOptionSet& compilerOptions) override;
+};
+
 struct CUDALayoutRulesFamilyImpl : LayoutRulesFamilyImpl
 {
     virtual LayoutRulesImpl* getAnyValueRules() override;
@@ -1178,6 +1193,7 @@ struct WGSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
 GLSLLayoutRulesFamilyImpl kGLSLLayoutRulesFamilyImpl;
 HLSLLayoutRulesFamilyImpl kHLSLLayoutRulesFamilyImpl;
 CPULayoutRulesFamilyImpl kCPULayoutRulesFamilyImpl;
+CLayoutRulesFamilyImpl kCLayoutRulesFamilyImpl;
 CUDALayoutRulesFamilyImpl kCUDALayoutRulesFamilyImpl;
 MetalLayoutRulesFamilyImpl kMetalLayoutRulesFamilyImpl;
 MetalArgumentBufferTier2LayoutRulesFamilyImpl kMetalArgumentBufferTier2LayoutRulesFamilyImpl;
@@ -1195,60 +1211,41 @@ struct CPUObjectLayoutRulesImpl : ObjectLayoutRulesImpl
         case ShaderParameterKind::ConstantBuffer:
         case ShaderParameterKind::ParameterBlock:
             // It's a pointer to the actual uniform data
-            return SimpleLayoutInfo(
-                LayoutResourceKind::Uniform,
-                sizeof(void*),
-                SLANG_ALIGN_OF(void*));
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), alignof(void*));
 
         case ShaderParameterKind::MutableTexture:
         case ShaderParameterKind::TextureUniformBuffer:
         case ShaderParameterKind::Texture:
             // It's a pointer to a texture interface
-            return SimpleLayoutInfo(
-                LayoutResourceKind::Uniform,
-                sizeof(void*),
-                SLANG_ALIGN_OF(void*));
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), alignof(void*));
 
         case ShaderParameterKind::StructuredBuffer:
         case ShaderParameterKind::MutableStructuredBuffer:
         case ShaderParameterKind::AppendConsumeStructuredBuffer:
             // It's a ptr and a size of the amount of elements
-            return SimpleLayoutInfo(
-                LayoutResourceKind::Uniform,
-                sizeof(void*) * 2,
-                SLANG_ALIGN_OF(void*));
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*) * 2, alignof(void*));
 
         case ShaderParameterKind::RawBuffer:
         case ShaderParameterKind::Buffer:
         case ShaderParameterKind::MutableRawBuffer:
         case ShaderParameterKind::MutableBuffer:
             // It's a pointer and a size in bytes
-            return SimpleLayoutInfo(
-                LayoutResourceKind::Uniform,
-                sizeof(void*) * 2,
-                SLANG_ALIGN_OF(void*));
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*) * 2, alignof(void*));
 
         case ShaderParameterKind::ShaderStorageBuffer:
         case ShaderParameterKind::AccelerationStructure:
         case ShaderParameterKind::SamplerState:
             // It's a pointer
-            return SimpleLayoutInfo(
-                LayoutResourceKind::Uniform,
-                sizeof(void*),
-                SLANG_ALIGN_OF(void*));
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), alignof(void*));
 
         case ShaderParameterKind::TextureSampler:
         case ShaderParameterKind::MutableTextureSampler:
             {
                 ObjectLayoutInfo info;
-                info.layoutInfos.add(SimpleLayoutInfo(
-                    LayoutResourceKind::Uniform,
-                    sizeof(void*),
-                    SLANG_ALIGN_OF(void*)));
-                info.layoutInfos.add(SimpleLayoutInfo(
-                    LayoutResourceKind::Uniform,
-                    sizeof(void*),
-                    SLANG_ALIGN_OF(void*)));
+                info.layoutInfos.add(
+                    SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), alignof(void*)));
+                info.layoutInfos.add(
+                    SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), alignof(void*)));
                 return info;
             }
         case ShaderParameterKind::InputRenderTarget:
@@ -1367,6 +1364,69 @@ LayoutRulesImpl kCPUAnyValueLayoutRulesImpl_ = {
     &kDefaultLayoutRulesImpl,
     &kCPUObjectLayoutRulesImpl,
 };
+
+// C layout
+
+LayoutRulesImpl kCLayoutRulesImpl_ = {
+    &kCLayoutRulesFamilyImpl,
+    &kCPULayoutRulesImpl,
+    &kGLSLObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kCAnyValueLayoutRulesImpl_ = {
+    &kCLayoutRulesFamilyImpl,
+    &kDefaultLayoutRulesImpl,
+    &kCPUObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kCPushConstantRulesImpl_ = {
+    &kCLayoutRulesFamilyImpl,
+    &kCPULayoutRulesImpl,
+    &kGLSLPushConstantBufferObjectLayoutRulesImpl_,
+};
+
+LayoutRulesImpl kCVaryingInputLayoutRulesImpl_ = {
+    &kCLayoutRulesFamilyImpl,
+    &kGLSLVaryingOutputLayoutRulesImpl,
+    &kGLSLObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kCVaryingOutputLayoutRulesImpl_ = {
+    &kCLayoutRulesFamilyImpl,
+    &kGLSLVaryingOutputLayoutRulesImpl,
+    &kGLSLObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kCSpecializationConstantLayoutRulesImpl_ = {
+    &kCLayoutRulesFamilyImpl,
+    &kGLSLSpecializationConstantLayoutRulesImpl,
+    &kGLSLObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kCShaderRecordLayoutRulesImpl_ = {
+    &kCLayoutRulesFamilyImpl,
+    &kCPULayoutRulesImpl,
+    &kGLSLShaderRecordConstantBufferObjectLayoutRulesImpl_,
+};
+
+LayoutRulesImpl kCRayPayloadParameterLayoutRulesImpl_ = {
+    &kCLayoutRulesFamilyImpl,
+    &kGLSLRayPayloadParameterLayoutRulesImpl,
+    &kGLSLObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kCCallablePayloadParameterLayoutRulesImpl_ = {
+    &kCLayoutRulesFamilyImpl,
+    &kGLSLCallablePayloadParameterLayoutRulesImpl,
+    &kGLSLObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kCHitAttributesParameterLayoutRulesImpl_ = {
+    &kCLayoutRulesFamilyImpl,
+    &kGLSLHitAttributesParameterLayoutRulesImpl,
+    &kGLSLObjectLayoutRulesImpl,
+};
+
 
 // CUDA
 
@@ -1561,6 +1621,8 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getConstantBufferRules(
 {
     if (compilerOptions.shouldUseScalarLayout())
         return &kScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseCLayout())
+        return &kCLayoutRulesImpl_;
     else if (compilerOptions.shouldUseDXLayout())
         return &kFXCConstantBufferLayoutRulesFamilyImpl;
     if (auto cbufferType = as<ConstantBufferType>(containerType))
@@ -1575,6 +1637,8 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getConstantBufferRules(
             return &kStd430LayoutRulesImpl_;
         case ASTNodeType::ScalarDataLayoutType:
             return &kScalarLayoutRulesImpl_;
+        case ASTNodeType::CDataLayoutType:
+            return &kCLayoutRulesImpl_;
         default:
             break;
         }
@@ -1587,6 +1651,8 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getParameterBlockRules(
 {
     if (compilerOptions.shouldUseScalarLayout())
         return &kScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseCLayout())
+        return &kCLayoutRulesImpl_;
     else if (compilerOptions.shouldUseDXLayout())
         return &kFXCConstantBufferLayoutRulesFamilyImpl;
 
@@ -1608,6 +1674,8 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getTextureBufferRules(
 {
     if (compilerOptions.shouldUseScalarLayout())
         return &kScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseCLayout())
+        return &kCLayoutRulesImpl_;
     else if (compilerOptions.shouldUseDXLayout())
         return &kFXCConstantBufferLayoutRulesFamilyImpl;
 
@@ -1634,6 +1702,8 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getShaderStorageBufferRules(
 {
     if (compilerOptions.shouldUseScalarLayout())
         return &kScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseCLayout())
+        return &kCLayoutRulesImpl_;
     else if (compilerOptions.shouldUseDXLayout())
         return &kFXCShaderResourceLayoutRulesFamilyImpl;
 
@@ -1660,6 +1730,8 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getStructuredBufferRules(
 {
     if (compilerOptions.shouldUseScalarLayout())
         return &kScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseCLayout())
+        return &kCLayoutRulesImpl_;
     else if (compilerOptions.shouldUseDXLayout())
         return &kFXCShaderResourceLayoutRulesFamilyImpl;
 
@@ -1804,6 +1876,70 @@ LayoutRulesImpl* CPULayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getStructuredBufferRules(CompilerOptionSet&)
 {
     return &kCPULayoutRulesImpl_;
+}
+
+// C compatible layout family
+
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getAnyValueRules()
+{
+    return &kCAnyValueLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getConstantBufferRules(CompilerOptionSet&, Type*)
+{
+    return &kCLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getPushConstantBufferRules()
+{
+    return &kCPushConstantRulesImpl_;
+}
+
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getTextureBufferRules(CompilerOptionSet&)
+{
+    return &kCLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getVaryingInputRules()
+{
+    return &kCVaryingInputLayoutRulesImpl_;
+}
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getVaryingOutputRules()
+{
+    return &kCVaryingOutputLayoutRulesImpl_;
+}
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getSpecializationConstantRules()
+{
+    return &kCSpecializationConstantLayoutRulesImpl_;
+}
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getShaderStorageBufferRules(CompilerOptionSet&)
+{
+    return &kCLayoutRulesImpl_;
+}
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getParameterBlockRules(CompilerOptionSet&)
+{
+    return &kCLayoutRulesImpl_;
+}
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getRayPayloadParameterRules()
+{
+    return &kCRayPayloadParameterLayoutRulesImpl_;
+}
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getCallablePayloadParameterRules()
+{
+    return &kCCallablePayloadParameterLayoutRulesImpl_;
+}
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getHitAttributesParameterRules()
+{
+    return &kCHitAttributesParameterLayoutRulesImpl_;
+}
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
+{
+    return &kCShaderRecordLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getStructuredBufferRules(CompilerOptionSet&)
+{
+    return &kCLayoutRulesImpl_;
 }
 
 // CUDA Family
@@ -2531,6 +2667,11 @@ bool isKhronosTarget(CodeGenTarget target)
 bool isKhronosTarget(TargetRequest* targetReq)
 {
     return isKhronosTarget(targetReq->getTarget());
+}
+
+bool isSPIRV(CodeGenTarget codeGenTarget)
+{
+    return codeGenTarget == CodeGenTarget::SPIRV || codeGenTarget == CodeGenTarget::SPIRVAssembly;
 }
 
 bool isCPUTarget(TargetRequest* targetReq)
@@ -4777,7 +4918,8 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     else if (auto vecType = as<VectorExpressionType>(type))
     {
         auto elementType = vecType->getElementType();
-        size_t elementCount = (size_t)getIntVal(vecType->getElementCount());
+        size_t elementCount =
+            (size_t)getIntVal(context.tryResolveLinkTimeVal(vecType->getElementCount()));
 
         auto element = _createTypeLayout(context, elementType);
 
@@ -4803,8 +4945,9 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     }
     else if (auto matType = as<MatrixExpressionType>(type))
     {
-        size_t rowCount = (size_t)getIntVal(matType->getRowCount());
-        size_t colCount = (size_t)getIntVal(matType->getColumnCount());
+        size_t rowCount = (size_t)getIntVal(context.tryResolveLinkTimeVal(matType->getRowCount()));
+        size_t colCount =
+            (size_t)getIntVal(context.tryResolveLinkTimeVal(matType->getColumnCount()));
 
         auto elementType = matType->getElementType();
         auto elementResult = _createTypeLayout(context, elementType);
@@ -4890,7 +5033,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             context,
             arrayType,
             arrayType->getElementType(),
-            arrayType->getElementCount());
+            context.tryResolveLinkTimeVal(arrayType->getElementCount()));
     }
     else if (auto atomicType = as<AtomicType>(type))
     {
@@ -5040,7 +5183,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             StructTypeLayoutBuilder typeLayoutBuilder;
             StructTypeLayoutBuilder pendingDataTypeLayoutBuilder;
 
-            typeLayoutBuilder.beginLayout(type, rules);
+            typeLayoutBuilder.beginLayout(declRefType, rules);
             auto typeLayout = typeLayoutBuilder.getTypeLayout();
 
             _addLayout(context, type, typeLayout);

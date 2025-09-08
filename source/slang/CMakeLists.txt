@@ -5,30 +5,36 @@
 set(SLANG_FIDDLE_INPUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 set(SLANG_FIDDLE_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/fiddle")
 
-file(GLOB SLANG_FIDDLE_INPUT_FILE_NAMES
+file(
+    GLOB SLANG_FIDDLE_INPUT_FILE_NAMES
     CONFIGURE_DEPENDS
     RELATIVE "${SLANG_FIDDLE_INPUT_DIR}"
     "*.h"
-    "*.cpp")
+    "*.cpp"
+)
 
-list(TRANSFORM SLANG_FIDDLE_INPUT_FILE_NAMES
+list(
+    TRANSFORM SLANG_FIDDLE_INPUT_FILE_NAMES
     PREPEND "${SLANG_FIDDLE_INPUT_DIR}/"
-    OUTPUT_VARIABLE SLANG_FIDDLE_INPUTS)
+    OUTPUT_VARIABLE SLANG_FIDDLE_INPUTS
+)
+glob_append(SLANG_FIDDLE_LUA_INPUTS "*.lua")
 
-list(TRANSFORM SLANG_FIDDLE_INPUT_FILE_NAMES
+list(
+    TRANSFORM SLANG_FIDDLE_INPUT_FILE_NAMES
     APPEND ".fiddle"
-    OUTPUT_VARIABLE SLANG_FIDDLE_OUTPUTS)
-list(TRANSFORM SLANG_FIDDLE_OUTPUTS
-    PREPEND "${SLANG_FIDDLE_OUTPUT_DIR}/")
+    OUTPUT_VARIABLE SLANG_FIDDLE_OUTPUTS
+)
+list(TRANSFORM SLANG_FIDDLE_OUTPUTS PREPEND "${SLANG_FIDDLE_OUTPUT_DIR}/")
 
 add_custom_command(
     OUTPUT ${SLANG_FIDDLE_OUTPUTS}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${SLANG_FIDDLE_OUTPUT_DIR}
-    COMMAND slang-fiddle
-        -i "${SLANG_FIDDLE_INPUT_DIR}/"
-        -o "${SLANG_FIDDLE_OUTPUT_DIR}/"
-        ${SLANG_FIDDLE_INPUT_FILE_NAMES}
-    DEPENDS ${SLANG_FIDDLE_INPUTS} slang-fiddle
+    COMMAND
+        slang-fiddle -i "${SLANG_FIDDLE_INPUT_DIR}/" -o
+        "${SLANG_FIDDLE_OUTPUT_DIR}/" ${SLANG_FIDDLE_INPUT_FILE_NAMES}
+    DEPENDS ${SLANG_FIDDLE_INPUTS} ${SLANG_FIDDLE_LUA_INPUTS} slang-fiddle
+    WORKING_DIRECTORY ${slang_SOURCE_DIR}
     VERBATIM
 )
 add_library(
@@ -100,17 +106,11 @@ slang_add_target(
 # generated lookup tables
 #
 
-if(NOT SLANG_USE_SYSTEM_SPIRV_HEADERS)
-    if(NOT SLANG_OVERRIDE_SPIRV_HEADERS_PATH)
-        set(SLANG_SPIRV_HEADERS_INCLUDE_DIR
-            "${slang_SOURCE_DIR}/external/spirv-headers/include"
-        )
-    else()
-        set(SLANG_SPIRV_HEADERS_INCLUDE_DIR
-            "${SLANG_OVERRIDE_SPIRV_HEADERS_PATH}/spirv-headers/include"
-        )
-    endif()
-endif()
+get_target_property(
+    SLANG_SPIRV_HEADERS_INCLUDE_DIR
+    SPIRV-Headers::SPIRV-Headers
+    INTERFACE_INCLUDE_DIRECTORIES
+)
 
 set(SLANG_LOOKUP_GENERATOR_INPUT_JSON
     "${SLANG_SPIRV_HEADERS_INCLUDE_DIR}/spirv/unified1/extinst.glsl.std.450.grammar.json"
@@ -164,7 +164,7 @@ slang_add_target(
         ${SLANG_LOOKUP_GENERATED_SOURCE}
         ${SLANG_SPIRV_CORE_GRAMMAR_SOURCE}
     EXPORT_TYPE_AS ${SLANG_LIB_TYPE}
-    LINK_WITH_PRIVATE core SPIRV-Headers
+    LINK_WITH_PRIVATE core SPIRV-Headers::SPIRV-Headers
     EXCLUDE_FROM_ALL
     FOLDER generated
 )
@@ -226,7 +226,7 @@ set(slang_link_args
     slang-capability-lookup
     slang-fiddle-output
     slang-lookup-tables
-    SPIRV-Headers
+    SPIRV-Headers::SPIRV-Headers
 )
 set(slang_interface_args INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/include)
 set(slang_public_lib_args

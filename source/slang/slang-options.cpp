@@ -53,6 +53,7 @@ enum class ValueCategory
     Target,
     Language,
     FloatingPointMode,
+    FloatingPointDenormalMode,
     ArchiveType,
     Stage,
     LineDirectiveMode,
@@ -85,6 +86,7 @@ SLANG_GET_VALUE_CATEGORY(Compiler, SlangPassThrough)
 SLANG_GET_VALUE_CATEGORY(ArchiveType, SlangArchiveType)
 SLANG_GET_VALUE_CATEGORY(LineDirectiveMode, SlangLineDirectiveMode)
 SLANG_GET_VALUE_CATEGORY(FloatingPointMode, FloatingPointMode)
+SLANG_GET_VALUE_CATEGORY(FloatingPointDenormalMode, FloatingPointDenormalMode)
 SLANG_GET_VALUE_CATEGORY(FileSystemType, TypeTextUtil::FileSystemType)
 SLANG_GET_VALUE_CATEGORY(HelpStyle, CommandOptionsWriter::Style)
 SLANG_GET_VALUE_CATEGORY(OptimizationLevel, SlangOptimizationLevel)
@@ -186,6 +188,13 @@ void initCommandOptions(CommandOptions& options)
 
         options.addCategory(
             CategoryKind::Value,
+            "fp-denormal-mode",
+            "Floating Point Denormal Handling Mode",
+            UserValue(ValueCategory::FloatingPointDenormalMode));
+        options.addValues(TypeTextUtil::getFpDenormalModeInfos());
+
+        options.addCategory(
+            CategoryKind::Value,
             "help-style",
             "Help Style",
             UserValue(ValueCategory::HelpStyle));
@@ -273,7 +282,8 @@ void initCommandOptions(CommandOptions& options)
 
         for (auto name : names)
         {
-            if (name.startsWith("__") || name.startsWith("spirv_1_") || name.startsWith("_"))
+            if (name.startsWith("__") || name.startsWith("spirv_1_") || name.startsWith("_") ||
+                name == "Invalid")
             {
                 continue;
             }
@@ -316,6 +326,8 @@ void initCommandOptions(CommandOptions& options)
             {"tesc", "glsl (hull)"},
             {"tese", "glsl (domain)"},
             {"comp", "glsl (compute)"},
+            {"mesh", "glsl (mesh)"},
+            {"task", "glsl (amplification)"},
             {"slang", nullptr},
             {"spv", "SPIR-V"},
             {"spv-asm", "SPIR-V assembly"},
@@ -332,6 +344,24 @@ void initCommandOptions(CommandOptions& options)
         };
         options.addValues(pairs, SLANG_COUNT_OF(pairs));
     }
+
+    /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! help-category !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+    {
+        options.addCategory(
+            CategoryKind::Value,
+            "help-category",
+            "Available help categories for the -h option");
+
+        // Add all existing categories as valid help category values
+        const auto& categories = options.getCategories();
+        for (Index categoryIndex = 0; categoryIndex < categories.getCount(); ++categoryIndex)
+        {
+            const auto& category = categories[categoryIndex];
+            options.addValue(category.name, category.description);
+        }
+    }
+
 
     /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! General !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -536,8 +566,13 @@ void initCommandOptions(CommandOptions& options)
          "Include additional type conformance during linking for dynamic dispatch."},
         {OptionKind::EmitReflectionJSON,
          "-reflection-json",
-         "reflection-json <path>",
-         "Emit reflection data in JSON format to a file."}};
+         "-reflection-json <path>",
+         "Emit reflection data in JSON format to a file."},
+        {OptionKind::UseMSVCStyleBitfieldPacking,
+         "-msvc-style-bitfield-packing",
+         nullptr,
+         "Pack bitfields according to MSVC rules (msb first, new field when underlying type size "
+         "changes) rather than gcc-style (lsb first)"}};
 
     _addOptions(makeConstArrayView(generalOpts), options);
 
@@ -580,6 +615,21 @@ void initCommandOptions(CommandOptions& options)
          "-fp-mode,-floating-point-mode",
          "-fp-mode <fp-mode>, -floating-point-mode <fp-mode>",
          "Control floating point optimizations"},
+        {OptionKind::DenormalModeFp16,
+         "-denorm-mode-fp16",
+         "-denorm-mode-fp16 <fp-denormal-mode>",
+         "Control handling of 16-bit denormal floating point values in SPIR-V (any, preserve, "
+         "ftz)"},
+        {OptionKind::DenormalModeFp32,
+         "-denorm-mode-fp32",
+         "-denorm-mode-fp32 <fp-denormal-mode>",
+         "Control handling of 32-bit denormal floating point values in SPIR-V and DXIL (any, "
+         "preserve, ftz)"},
+        {OptionKind::DenormalModeFp64,
+         "-denorm-mode-fp64",
+         "-denorm-mode-fp64 <fp-denormal-mode>",
+         "Control handling of 64-bit denormal floating point values in SPIR-V (any, preserve, "
+         "ftz)"},
         {OptionKind::DebugInformation,
          "-g...",
          "-g, -g<debug-info-format>, -g<debug-level>",
@@ -613,6 +663,12 @@ void initCommandOptions(CommandOptions& options)
          "-fvk-use-dx-layout",
          nullptr,
          "Pack members using FXCs member packing rules when targeting GLSL or SPIRV."},
+        {OptionKind::ForceCLayout,
+         "-fvk-use-c-layout",
+         nullptr,
+         "Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, "
+         "ByteAddressBuffer and general pointers follow the C/C++ structure layout rules "
+         "when targeting SPIRV."},
         {OptionKind::VulkanBindShift,
          vkShiftNames.getBuffer(),
          "-fvk-<vulkan-shift>-shift <N> <space>",
@@ -683,7 +739,11 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::BindlessSpaceIndex,
          "-bindless-space-index",
          "-bindless-space-index <index>",
-         "Specify the space index for the system defined global bindless resource array."}};
+         "Specify the space index for the system defined global bindless resource array."},
+        {OptionKind::EmitSeparateDebug,
+         "-separate-debug-info",
+         nullptr,
+         "Emit debug data to a separate file, and strip it from the main output file."}};
 
     _addOptions(makeConstArrayView(targetOpts), options);
 
@@ -783,7 +843,7 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::DumpIntermediatePrefix,
          "-dump-intermediate-prefix",
          "-dump-intermediate-prefix <prefix>",
-         "File name prefix for -dump-intermediates outputs, default is 'slang-dump-'"},
+         "File name prefix for -dump-intermediates outputs, default is no prefix"},
         {OptionKind::DumpIntermediates,
          "-dump-intermediates",
          nullptr,
@@ -805,10 +865,10 @@ void initCommandOptions(CommandOptions& options)
          "-output-includes",
          nullptr,
          "Print the hierarchy of the processed source files."},
-        {OptionKind::SerialIr,
+        {OptionKind::REMOVED_SerialIR,
          "-serial-ir",
          nullptr,
-         "Serialize the IR between front-end and back-end."},
+         "[REMOVED] Serialize the IR between front-end and back-end."},
         {OptionKind::SkipCodeGen, "-skip-codegen", nullptr, "Skip the code generation phase."},
         {OptionKind::ValidateIr, "-validate-ir", nullptr, "Validate the IR between the phases."},
         {OptionKind::VerbosePaths,
@@ -821,10 +881,14 @@ void initCommandOptions(CommandOptions& options)
          nullptr,
          "Verify IR in the front-end."},
         {OptionKind::DumpModule, "-dump-module", nullptr, "Disassemble and print the module IR."},
-        {OptionKind::EmitSeparateDebug,
-         "-separate-debug-info",
+        {OptionKind::GetModuleInfo,
+         "-get-module-info",
          nullptr,
-         "Emit debug data to a separate file, and strip it from the main output file."}};
+         "Print the name and version of a serialized IR Module"},
+        {OptionKind::GetSupportedModuleVersions,
+         "-get-supported-module-versions",
+         nullptr,
+         "Print the minimum and maximum module versions this compiler supports"}};
     _addOptions(makeConstArrayView(debuggingOpts), options);
 
     /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Experimental !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -1281,11 +1345,14 @@ void OptionsParser::addInputForeignShaderPath(
     };
 
     static const Entry entries[] = {
+        {".vert", Profile::GLSL_Vertex},
         {".frag", Profile::GLSL_Fragment},
         {".geom", Profile::GLSL_Geometry},
         {".tesc", Profile::GLSL_TessControl},
         {".tese", Profile::GLSL_TessEval},
-        {".comp", Profile::GLSL_Compute}};
+        {".comp", Profile::GLSL_Compute},
+        {".mesh", Profile::GLSL_Mesh},
+        {".task", Profile::GLSL_Task}};
 
     for (Index i = 0; i < SLANG_COUNT_OF(entries); ++i)
     {
@@ -1948,8 +2015,14 @@ SlangResult OptionsParser::_parseHelp(const CommandLineArg& arg)
     {
         auto catArg = m_reader.getArgAndAdvance();
 
-        categoryIndex =
-            m_cmdOptions->findCategoryByCaseInsensitiveName(catArg.value.getUnownedSlice());
+        categoryIndex = m_cmdOptions->findCategoryByName(catArg.value.getUnownedSlice());
+
+        if (categoryIndex < 0)
+        {
+            categoryIndex =
+                m_cmdOptions->findCategoryByCaseInsensitiveName(catArg.value.getUnownedSlice());
+        }
+
         if (categoryIndex < 0)
         {
             m_sink->diagnose(catArg.loc, Diagnostics::unknownHelpCategory);
@@ -1994,7 +2067,9 @@ SlangResult OptionsParser::_parseHelp(const CommandLineArg& arg)
         writer->appendDescriptionForCategory(m_cmdOptions, categoryIndex);
     }
 
-    m_sink->diagnoseRaw(Severity::Note, buf.getBuffer());
+    // Write help text to stdout
+    FileWriter stdoutWriter(stdout, WriterFlag::IsUnowned);
+    stdoutWriter.write(buf.getBuffer(), buf.getLength());
 
     return SLANG_OK;
 }
@@ -2207,6 +2282,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::LoopInversion:
         case OptionKind::UnscopedEnum:
         case OptionKind::PreserveParameters:
+        case OptionKind::UseMSVCStyleBitfieldPacking:
             linkage->m_optionSet.set(optionKind, true);
             break;
         case OptionKind::MatrixLayoutRow:
@@ -2230,11 +2306,6 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 SLANG_RETURN_ON_FAIL(File::readAllBytes(fileName.value, contents));
                 SLANG_RETURN_ON_FAIL(
                     m_session->loadCoreModule(contents.getData(), contents.getSizeInBytes()));
-
-                // Ensure that the linkage's AST builder is up-to-date.
-                linkage->getASTBuilder()->m_cachedNodes =
-                    asInternal(m_session)->getGlobalASTBuilder()->m_cachedNodes;
-
                 break;
             }
         case OptionKind::CompileCoreModule:
@@ -2393,9 +2464,6 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             }
         case OptionKind::ReproFileSystem:
             SLANG_RETURN_ON_FAIL(_parseReproFileSystem(arg));
-            break;
-        case OptionKind::SerialIr:
-            m_frontEndReq->useSerialIRBottleneck = true;
             break;
         case OptionKind::VerbosePaths:
             m_requestImpl->getSink()->setFlag(DiagnosticSink::Flag::VerbosePath);
@@ -2608,6 +2676,11 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 getCurrentTarget()->optionSet.add(CompilerOptionName::ForceDXLayout, true);
                 break;
             }
+        case OptionKind::ForceCLayout:
+            {
+                getCurrentTarget()->optionSet.add(CompilerOptionName::ForceCLayout, true);
+                break;
+            }
         case OptionKind::EnableEffectAnnotations:
             {
                 m_compileRequest->setEnableEffectAnnotations(true);
@@ -2803,6 +2876,27 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 FloatingPointMode value;
                 SLANG_RETURN_ON_FAIL(_expectValue(value));
                 setFloatingPointMode(getCurrentTarget(), value);
+                break;
+            }
+        case OptionKind::DenormalModeFp16:
+            {
+                FloatingPointDenormalMode value;
+                SLANG_RETURN_ON_FAIL(_expectValue(value));
+                linkage->m_optionSet.set(CompilerOptionName::DenormalModeFp16, value);
+                break;
+            }
+        case OptionKind::DenormalModeFp32:
+            {
+                FloatingPointDenormalMode value;
+                SLANG_RETURN_ON_FAIL(_expectValue(value));
+                linkage->m_optionSet.set(CompilerOptionName::DenormalModeFp32, value);
+                break;
+            }
+        case OptionKind::DenormalModeFp64:
+            {
+                FloatingPointDenormalMode value;
+                SLANG_RETURN_ON_FAIL(_expectValue(value));
+                linkage->m_optionSet.set(CompilerOptionName::DenormalModeFp64, value);
                 break;
             }
         case OptionKind::Optimization:
@@ -3080,6 +3174,79 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     return SLANG_FAIL;
                 }
 
+
+                break;
+            }
+        case OptionKind::GetModuleInfo:
+            {
+                CommandLineArg fileName;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(fileName));
+                auto desc = slang::SessionDesc();
+                ComPtr<slang::ISession> session;
+                m_session->createSession(desc, session.writeRef());
+                ComPtr<slang::IBlob> diagnostics;
+
+                FileStream file;
+                if (SLANG_FAILED(file.init(
+                        fileName.value,
+                        FileMode::Open,
+                        FileAccess::Read,
+                        FileShare::None)))
+                {
+                    m_sink->diagnose(arg.loc, Diagnostics::cannotOpenFile, fileName.value);
+                    return SLANG_FAIL;
+                }
+
+                List<uint8_t> buffer;
+                file.seek(SeekOrigin::End, 0);
+                const Int64 size = file.getPosition();
+                buffer.setCount(size + 1);
+                file.seek(SeekOrigin::Start, 0);
+                SLANG_RETURN_ON_FAIL(file.readExactly(buffer.getBuffer(), (size_t)size));
+                buffer[size] = 0;
+                file.close();
+
+                ComPtr<slang::IModule> module;
+                // Load buffer as an IR blob
+                ComPtr<slang::IBlob> blob;
+                blob = RawBlob::create(buffer.getBuffer(), size);
+
+                const char* moduleName = nullptr;
+                const char* moduleCompilerVersion = nullptr;
+                SlangInt moduleVersion = ~0;
+                SLANG_RETURN_ON_FAIL(session->loadModuleInfoFromIRBlob(
+                    blob,
+                    moduleVersion,
+                    moduleCompilerVersion,
+                    moduleName));
+
+                char infoBuffer[512];
+                snprintf(
+                    infoBuffer,
+                    sizeof(infoBuffer),
+                    "Module Name: %s\n"
+                    "Module Version: %lld\n"
+                    "Compiler Version: %s\n",
+                    moduleName ? moduleName : "null",
+                    static_cast<long long>(moduleVersion),
+                    moduleCompilerVersion ? moduleCompilerVersion : "null");
+
+                m_sink->diagnoseRaw(Severity::Note, infoBuffer);
+
+                break;
+            }
+        case OptionKind::GetSupportedModuleVersions:
+            {
+                char infoBuffer[512];
+                snprintf(
+                    infoBuffer,
+                    sizeof(infoBuffer),
+                    "Minimum supported version: %lu\n"
+                    "Maximum supported version: %lu\n",
+                    (unsigned long)IRModule::k_minSupportedModuleVersion,
+                    (unsigned long)IRModule::k_maxSupportedModuleVersion);
+
+                m_sink->diagnoseRaw(Severity::Note, infoBuffer);
 
                 break;
             }
@@ -3551,6 +3718,11 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 m_compileRequest->setTargetForceDXLayout(targetID, true);
             }
 
+            if (rawTarget.optionSet.shouldUseCLayout())
+            {
+                m_compileRequest->setTargetForceCLayout(targetID, true);
+            }
+
             if (rawTarget.optionSet.getBoolOption(CompilerOptionName::GenerateWholeProgram))
             {
                 m_compileRequest->setTargetGenerateWholeProgram(targetID, true);
@@ -3799,6 +3971,40 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
     }
 
     applySettingsToDiagnosticSink(m_requestImpl->getSink(), m_sink, linkage->m_optionSet);
+
+    // Warn about separate debug info being used with unsupported targets
+    if (linkage->m_optionSet.getBoolOption(CompilerOptionName::EmitSeparateDebug))
+    {
+        // Check all targets to see if any use separate debug info with an unsupported target
+        for (const auto& rawTarget : m_rawTargets)
+        {
+            if (rawTarget.format != CodeGenTarget::SPIRV)
+            {
+                // Get the target name for the warning message
+                UnownedStringSlice targetName =
+                    TypeTextUtil::getCompileTargetName(asExternal(rawTarget.format));
+                m_sink->diagnose(
+                    SourceLoc(),
+                    Diagnostics::separateDebugInfoUnsupportedForTarget,
+                    targetName);
+            }
+        }
+
+        // Also check the default target if no explicit targets were specified
+        if (m_rawTargets.getCount() == 0)
+        {
+            if (m_defaultTarget.format != CodeGenTarget::SPIRV)
+            {
+                // Get the target name for the warning message
+                UnownedStringSlice targetName =
+                    TypeTextUtil::getCompileTargetName(asExternal(m_defaultTarget.format));
+                m_sink->diagnose(
+                    SourceLoc(),
+                    Diagnostics::separateDebugInfoUnsupportedForTarget,
+                    targetName);
+            }
+        }
+    }
 
     return (m_sink->getErrorCount() == 0) ? SLANG_OK : SLANG_FAIL;
 }

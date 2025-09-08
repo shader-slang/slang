@@ -393,6 +393,19 @@ protected:
     MemoryArena m_arena;
 };
 
+
+void outputExceptionDiagnostic(
+    const AbortCompilationException& exception,
+    DiagnosticSink& sink,
+    slang::IBlob** outDiagnostics);
+
+void outputExceptionDiagnostic(
+    const Exception& exception,
+    DiagnosticSink& sink,
+    slang::IBlob** outDiagnostics);
+
+void outputExceptionDiagnostic(DiagnosticSink& sink, slang::IBlob** outDiagnostics);
+
 } // namespace Slang
 
 #endif

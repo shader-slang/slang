@@ -15,6 +15,14 @@
 #include <dlfcn.h>
 #endif
 
+#if SLANG_HAS_BACKTRACE
+#include <execinfo.h>
+#endif
+
+#if SLANG_LINUX_FAMILY
+#include <unistd.h>
+#endif
+
 namespace Slang
 {
 // SharedLibrary
@@ -119,8 +127,17 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
         return SLANG_OK;
     }
 
+    // We try to search the DLL in two different attempts.
+    // First attempt tries on the directories explicitly specified with AddDllDirectory(),
+    // If it failed to find one, we will search over all PATH.
+    // Windows API made two approaches mutually exclusive and we need to try two times.
+    // https://learn.microsoft.com/en-us/windows/win32/api/libloaderapi/nf-libloaderapi-loadlibraryexa
+    HMODULE h = LoadLibraryExA(platformFileName, nullptr, LOAD_LIBRARY_SEARCH_USER_DIRS);
+    // If LoadLibraryExA failed, try again with LoadLibraryA.
     // https://docs.microsoft.com/en-us/windows/desktop/api/libloaderapi/nf-libloaderapi-loadlibrarya
-    const HMODULE h = LoadLibraryA(platformFileName);
+    if (!h)
+        h = LoadLibraryA(platformFileName);
+    // If still not found, return an error.
     if (!h)
     {
         const DWORD lastError = GetLastError();
@@ -169,12 +186,27 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
 }
 
 #else // _WIN32
-
 /* static */ SlangResult PlatformUtil::getInstancePath([[maybe_unused]] StringBuilder& out)
 {
-    // On non Windows it's typically hard to get the instance path, so we'll say not implemented.
-    // The meaning is also somewhat more ambiguous - is it the exe or the shared library path?
+#if defined(__linux__) || defined(__CYGWIN__)
+    char path[PATH_MAX];
+    ssize_t len = readlink("/proc/self/exe", path, sizeof(path) - 1);
+    if (len == -1)
+    {
+        return SLANG_FAIL;
+    }
+
+    path[len] = '\0';
+    String pathString(path);
+
+    // We don't want the instance name, just the path to it
+    out.clear();
+    out.append(Path::getParentDirectory(pathString));
+
+    return out.getLength() > 0 ? SLANG_OK : SLANG_FAIL;
+#else
     return SLANG_E_NOT_IMPLEMENTED;
+#endif
 }
 
 /* static */ SlangResult PlatformUtil::appendResult(
@@ -328,6 +360,27 @@ static const PlatformFlags s_familyFlags[int(PlatformFamily::CountOf)] = {
     return SLANG_OK;
 #else
     return SLANG_E_NOT_AVAILABLE;
+#endif
+}
+
+/* static */ void PlatformUtil::backtrace()
+{
+#if SLANG_HAS_BACKTRACE
+    // Print stack trace for debugging assistance
+    void* stackTrace[64];
+    int stackDepth = ::backtrace(stackTrace, 64);
+    char** symbols = ::backtrace_symbols(stackTrace, stackDepth);
+    if (symbols)
+    {
+        for (int i = 0; i < stackDepth; ++i)
+        {
+            fprintf(stdout, "%s\n", symbols[i]);
+        }
+        free(symbols);
+    }
+    fprintf(stdout, "\n");
+#else
+    fprintf(stdout, "Stack trace not available on this platform.\n");
 #endif
 }
 

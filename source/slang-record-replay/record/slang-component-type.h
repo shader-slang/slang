@@ -21,6 +21,8 @@ public:
         slang::IComponentType* componentType,
         RecordManager* recordManager);
 
+    ISlangUnknown* getInterface(const Guid& guid);
+
     virtual SLANG_NO_THROW slang::ISession* SLANG_MCALL getSession() override;
     virtual SLANG_NO_THROW slang::ProgramLayout* SLANG_MCALL
     getLayout(SlangInt targetIndex = 0, slang::IBlob** outDiagnostics = nullptr) override;
@@ -70,15 +72,6 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetMetadata(
         SlangInt targetIndex,
         slang::IMetadata** outMetadata,
-        slang::IBlob** outDiagnostics = nullptr) override;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCompileResult(
-        SlangInt entryPointIndex,
-        SlangInt targetIndex,
-        slang::ICompileResult** outCompileResult,
-        slang::IBlob** outDiagnostics) override;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCompileResult(
-        SlangInt targetIndex,
-        slang::ICompileResult** outCompileResult,
         slang::IBlob** outDiagnostics = nullptr) override;
 
 protected:

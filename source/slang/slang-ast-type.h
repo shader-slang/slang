@@ -2,6 +2,9 @@
 #pragma once
 
 #include "slang-ast-base.h"
+#include "slang-ast-decl.h"
+
+//
 #include "slang-ast-type.h.fiddle"
 
 FIDDLE()
@@ -154,6 +157,12 @@ class Std140DataLayoutType : public DataLayoutType
 
 FIDDLE()
 class ScalarDataLayoutType : public DataLayoutType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class CDataLayoutType : public DataLayoutType
 {
     FIDDLE(...)
 };
@@ -676,7 +685,7 @@ class PtrTypeBase : public BuiltinType
     FIDDLE(...)
     // Get the type of the pointed-to value.
     Type* getValueType();
-
+    Val* getAccessQualifier();
     Val* getAddressSpace();
 };
 

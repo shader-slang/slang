@@ -73,6 +73,7 @@ PROFILE_STAGE(Callable, callable, SLANG_STAGE_CALLABLE)
 
 PROFILE_STAGE(Mesh, mesh, SLANG_STAGE_MESH)
 PROFILE_STAGE(Amplification, amplification, SLANG_STAGE_AMPLIFICATION)
+PROFILE_STAGE_ALIAS(Task, task, Amplification)
 PROFILE_STAGE(Dispatch, dispatch, SLANG_STAGE_DISPATCH)
 
 // Note: HLSL and Direct3D convention erroneously uses the term "Pixel Shader"
@@ -322,6 +323,8 @@ P(Compute, compute, 430)
 P(Compute, compute, 440)
 P(Compute, compute, 450)
 
+P(Mesh, mesh, 450)
+
 #undef P
 #define P(UPPER, LOWER, STAGE, VERSION) \
     PROFILE(GLSL_##UPPER##_##VERSION, glsl_##LOWER##_##VERSION, STAGE, GLSL_##VERSION)
@@ -340,6 +343,8 @@ P(TessEval, tess_eval, Domain, 430)
 P(TessEval, tess_eval, Domain, 440)
 P(TessEval, tess_eval, Domain, 450)
 
+P(Task, task, Amplification, 450)
+
 #undef P
 
 // Define a default profile for each GLSL stage that just
@@ -351,6 +356,8 @@ PROFILE_ALIAS(GLSL_Geometry, GLSL_Geometry_450, glsl_geometry)
 PROFILE_ALIAS(GLSL_TessControl, GLSL_TessControl_450, glsl_tess_control)
 PROFILE_ALIAS(GLSL_TessEval, GLSL_TessEval_450, glsl_tess_eval)
 PROFILE_ALIAS(GLSL_Compute, GLSL_Compute_450, glsl_compute)
+PROFILE_ALIAS(GLSL_Mesh, GLSL_Mesh_450, glsl_mesh)
+PROFILE_ALIAS(GLSL_Task, GLSL_Task_450, glsl_task)
 
 // TODO: define a profile for each GLSL *version* that we can
 // use as a catch-all when the stage can be inferred from

@@ -2134,14 +2134,14 @@ static LegalVal legalizeInst(
     case kIROp_DefaultConstruct:
         result = legalizeDefaultConstruct(context, type);
         break;
-    case kIROp_unconditionalBranch:
-    case kIROp_loop:
+    case kIROp_UnconditionalBranch:
+    case kIROp_Loop:
         result = legalizeUnconditionalBranch(context, args, (IRUnconditionalBranch*)inst);
         break;
     case kIROp_Printf:
         result = legalizePrintf(context, args);
         break;
-    case kIROp_undefined:
+    case kIROp_Undefined:
         return legalizeUndefined(context, inst);
     case kIROp_GpuForeach:
         // This case should only happen when compiling for a target that does not support
@@ -3699,6 +3699,7 @@ static LegalVal legalizeGlobalVar(IRTypeLegalizationContext* context, IRGlobalVa
             irGlobalVar,
             context->builder->getPtrType(
                 legalValueType.getSimple(),
+                varPtrType ? varPtrType->getAccessQualifier() : AccessQualifier::ReadWrite,
                 varPtrType ? varPtrType->getAddressSpace() : AddressSpace::Global));
         return LegalVal::simple(irGlobalVar);
 
@@ -3965,7 +3966,7 @@ struct IRTypeLegalizationPass
         // would not be a valid location at which to
         // store their replacements.
         //
-        if (!inst->getParent() && inst->getOp() != kIROp_Module)
+        if (!inst->getParent() && inst->getOp() != kIROp_ModuleInst)
             return;
 
         // The main logic for legalizing an instruction is defined

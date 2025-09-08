@@ -2,6 +2,8 @@
 #pragma once
 
 #include "slang-ast-base.h"
+
+//
 #include "slang-ast-expr.h.fiddle"
 
 FIDDLE()
@@ -79,7 +81,7 @@ class OverloadedExpr2 : public Expr
     Expr* base = nullptr;
 
     // The lookup result that was ambiguous
-    List<Expr*> candidiateExprs;
+    List<Expr*> candidateExprs;
 };
 
 FIDDLE(abstract)
@@ -309,13 +311,17 @@ class StaticMemberExpr : public DeclRefExpr
     SourceLoc memberOperatorLoc;
 };
 
+FIDDLE()
 struct MatrixCoord
 {
+    FIDDLE(...)
+
     bool operator==(const MatrixCoord& rhs) const { return row == rhs.row && col == rhs.col; };
     bool operator!=(const MatrixCoord& rhs) const { return !(*this == rhs); };
+
     // Rows and columns are zero indexed
-    int row;
-    int col;
+    FIDDLE() Int32 row;
+    FIDDLE() Int32 col;
 };
 
 FIDDLE()
@@ -494,6 +500,13 @@ FIDDLE()
 class CountOfExpr : public SizeOfLikeExpr
 {
     FIDDLE(...)
+};
+
+FIDDLE()
+class AddressOfExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() Expr* arg = nullptr;
 };
 
 FIDDLE()
@@ -734,6 +747,17 @@ class ThisTypeExpr : public Expr
     Scope* scope = nullptr;
 };
 
+
+/// A type expression of the form `ThisInterface`
+///
+/// Refers to the interface type itself, not the conforming type from an interface decl.
+///
+FIDDLE()
+class ThisInterfaceExpr : public VarExpr
+{
+    FIDDLE(...)
+};
+
 /// A type expression of the form `Left & Right`.
 FIDDLE()
 class AndTypeExpr : public Expr
@@ -785,6 +809,7 @@ class PartiallyAppliedGenericExpr : public Expr
     FIDDLE(...)
 public:
     Expr* originalExpr = nullptr;
+    Expr* baseExpr = nullptr;
 
     /// The generic being applied
     DeclRef<GenericDecl> baseGenericDeclRef;
@@ -840,40 +865,41 @@ public:
     };
 
     // The flavour and token describes how this was parsed
-    Flavor flavor;
+    FIDDLE() Flavor flavor;
     // The single token this came from
     Token token;
 
     // If this was a SlangValue or SlangValueAddr or SlangType, then we also
     // store the expression, which should be a single VarExpr because we only
     // parse single idents at the moment
-    Expr* expr = nullptr;
+    FIDDLE() Expr* expr = nullptr;
 
     // If this is part of a bitwise or expression, this will point to the
     // remaining operands values in such an expression must be of flavour
     // Literal or NamedValue
-    List<SPIRVAsmOperand> bitwiseOrWith = List<SPIRVAsmOperand>();
+    FIDDLE() List<SPIRVAsmOperand> bitwiseOrWith = List<SPIRVAsmOperand>();
 
     // If this is a named value then we calculate the value here during
     // checking. If this is an opcode, then the parser will populate this too
     // (or set it to 0xffffffff);
-    SpvWord knownValue = 0xffffffff;
+    FIDDLE() SpvWord knownValue = 0xffffffff;
     // Although this might be a constant in the source we should actually pass
     // it as an id created with OpConstant
-    bool wrapInId = false;
+    FIDDLE() bool wrapInId = false;
 
     // Once we've checked things, the SlangType and BuiltinVar flavour operands
     // will have this type populated.
-    TypeExp type = TypeExp();
+    FIDDLE() TypeExp type = TypeExp();
 };
 
 FIDDLE()
 struct SPIRVAsmInst
 {
     FIDDLE(...)
+
 public:
-    SPIRVAsmOperand opcode;
-    List<SPIRVAsmOperand> operands;
+    FIDDLE() SPIRVAsmOperand opcode;
+    FIDDLE() List<SPIRVAsmOperand> operands;
 };
 
 FIDDLE()

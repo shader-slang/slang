@@ -19,7 +19,7 @@ standard output = {
                                 "kind": "scalar",
                                 "scalarType": "float32"
                             },
-                            "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                            "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
                         },
                         {
                             "name": "y",
@@ -35,15 +35,7 @@ standard output = {
                                     ]
                                 }
                             ],
-                            "binding": {"kind": "uniform", "offset": 4, "size": 4},
-                            "userAttribs": [
-                                {
-                                    "name": "DefaultValue",
-                                    "arguments": [
-                                        1
-                                    ]
-                                }
-                            ]
+                            "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0}
                         }
                     ],
                     "userAttribs": [
@@ -71,7 +63,7 @@ standard output = {
                                     "kind": "scalar",
                                     "scalarType": "float32"
                                 },
-                                "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                                "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
                             },
                             {
                                 "name": "y",
@@ -87,15 +79,7 @@ standard output = {
                                         ]
                                     }
                                 ],
-                                "binding": {"kind": "uniform", "offset": 4, "size": 4},
-                                "userAttribs": [
-                                    {
-                                        "name": "DefaultValue",
-                                        "arguments": [
-                                            1
-                                        ]
-                                    }
-                                ]
+                                "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0}
                             }
                         ],
                         "userAttribs": [
@@ -109,7 +93,7 @@ standard output = {
                             }
                         ]
                     },
-                    "binding": {"kind": "uniform", "offset": 0, "size": 8}
+                    "binding": {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 0}
                 }
             }
         },
@@ -128,7 +112,7 @@ standard output = {
                                 "kind": "scalar",
                                 "scalarType": "float32"
                             },
-                            "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                            "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
                         },
                         {
                             "name": "z",
@@ -144,15 +128,7 @@ standard output = {
                                     ]
                                 }
                             ],
-                            "binding": {"kind": "uniform", "offset": 4, "size": 4},
-                            "userAttribs": [
-                                {
-                                    "name": "DefaultValue",
-                                    "arguments": [
-                                        2
-                                    ]
-                                }
-                            ]
+                            "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0}
                         }
                     ],
                     "userAttribs": [
@@ -180,7 +156,7 @@ standard output = {
                                     "kind": "scalar",
                                     "scalarType": "float32"
                                 },
-                                "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                                "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
                             },
                             {
                                 "name": "z",
@@ -196,15 +172,7 @@ standard output = {
                                         ]
                                     }
                                 ],
-                                "binding": {"kind": "uniform", "offset": 4, "size": 4},
-                                "userAttribs": [
-                                    {
-                                        "name": "DefaultValue",
-                                        "arguments": [
-                                            2
-                                        ]
-                                    }
-                                ]
+                                "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0}
                             }
                         ],
                         "userAttribs": [
@@ -218,7 +186,7 @@ standard output = {
                             }
                         ]
                     },
-                    "binding": {"kind": "uniform", "offset": 0, "size": 8}
+                    "binding": {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 0}
                 }
             }
         },
@@ -232,7 +200,7 @@ standard output = {
                     ]
                 }
             ],
-            "binding": {"kind": "uniform", "offset": 0, "size": 4},
+            "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0},
             "type": {
                 "kind": "scalar",
                 "scalarType": "int32"
@@ -240,7 +208,7 @@ standard output = {
         },
         {
             "name": "param3",
-            "binding": {"kind": "uniform", "offset": 16, "size": 4},
+            "binding": {"kind": "uniform", "offset": 16, "size": 4, "elementStride": 0},
             "type": {
                 "kind": "struct",
                 "name": "D",
@@ -251,7 +219,7 @@ standard output = {
                             "kind": "scalar",
                             "scalarType": "int32"
                         },
-                        "binding": {"kind": "uniform", "offset": 0, "size": 4}
+                        "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
                     }
                 ],
                 "userAttribs": [
@@ -274,7 +242,7 @@ standard output = {
                     ]
                 }
             ],
-            "binding": {"kind": "uniform", "offset": 20, "size": 4},
+            "binding": {"kind": "uniform", "offset": 20, "size": 4, "elementStride": 0},
             "type": {
                 "kind": "scalar",
                 "scalarType": "int32"
@@ -308,7 +276,7 @@ standard output = {
                             ]
                         }
                     ],
-                    "binding": {"kind": "uniform", "offset": 0, "size": 4},
+                    "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0},
                     "type": {
                         "kind": "scalar",
                         "scalarType": "float32"
@@ -324,7 +292,7 @@ standard output = {
                             ]
                         }
                     ],
-                    "binding": {"kind": "uniform", "offset": 4, "size": 4},
+                    "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0},
                     "type": {
                         "kind": "scalar",
                         "scalarType": "float32"

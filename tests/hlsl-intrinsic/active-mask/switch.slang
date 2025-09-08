@@ -4,14 +4,9 @@
 
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -profile cs_6_0 -xslang -DHACK -shaderobj
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -xslang -DHACK -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -xslang -DHACK -shaderobj
-
-// Note: this test is currently disabled on the CUDA
-// target because we do not synthesize the active
-// mask value we want/expect to see.
-//
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -render-features cuda_sm_7_0
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -render-features cuda_sm_7_0
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name buffer
 RWStructuredBuffer<int> buffer;

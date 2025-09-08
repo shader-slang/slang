@@ -3,6 +3,7 @@
 
 #include "../../source/core/slang-process-util.h"
 #include "../../source/core/slang-string-util.h"
+#include "options.h"
 
 #include <mutex>
 #include <stdio.h>
@@ -91,7 +92,7 @@ TestReporter::TestReporter()
 
     m_inTest = false;
     m_dumpOutputOnFailure = false;
-    m_isVerbose = false;
+    m_verbosity = VerbosityLevel::Info;
 }
 
 Result TestReporter::init(
@@ -371,8 +372,17 @@ void TestReporter::_addResult(TestInfo info)
 
     m_testInfos.add(info);
 
-    auto defaultOutputFunc = [](const TestInfo& info)
+    auto defaultOutputFunc = [this](const TestInfo& info)
     {
+        // Skip output for passed/ignored tests if verbosity < Info
+        if (m_verbosity < VerbosityLevel::Info)
+        {
+            if (info.testResult == TestResult::Pass || info.testResult == TestResult::Ignored)
+            {
+                return;
+            }
+        }
+
         char const* resultString = "UNEXPECTED";
         switch (info.testResult)
         {
@@ -589,7 +599,7 @@ void TestReporter::message(TestMessageType type, const String& message)
 
     if (type == TestMessageType::Info)
     {
-        if (m_isVerbose && canWriteStdError())
+        if (m_verbosity == VerbosityLevel::Verbose && canWriteStdError())
         {
             fputs(message.getBuffer(), stderr);
         }
@@ -600,9 +610,9 @@ void TestReporter::message(TestMessageType type, const String& message)
 
     if (canWriteStdError())
     {
+        fprintf(stderr, "[%s] ", m_currentInfo.name.getBuffer());
         if (type == TestMessageType::RunError || type == TestMessageType::TestFailure)
         {
-            fprintf(stderr, "error: ");
             fputs(message.getBuffer(), stderr);
             fprintf(stderr, "\n");
         }
@@ -617,6 +627,9 @@ void TestReporter::message(TestMessageType type, const String& message)
     {
         m_currentMessage << "\n";
     }
+
+    if (m_currentInfo.name.getLength())
+        m_currentMessage << "[" << m_currentInfo.name << "] ";
     m_currentMessage.append(message);
 }
 

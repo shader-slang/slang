@@ -2,6 +2,7 @@
 #pragma once
 
 #include "compiler-core/slang-lexer.h"
+#include "lua/lauxlib.h"
 #include "slang-fiddle-diagnostics.h"
 
 namespace fiddle
@@ -109,6 +110,16 @@ class AbstractModifier : public ModifierNode
 class HiddenModifier : public ModifierNode
 {
 };
+class TableModifier : public ModifierNode
+{
+public:
+    TableModifier(String s)
+        : tableSource(s)
+    {
+    }
+    String tableSource;
+    int tableRef = LUA_NOREF;
+};
 
 enum class Mode
 {
@@ -205,6 +216,14 @@ public:
     TokenWithTrivia fiddleToken; // the actual `FIDDLE` identifier
 
     RefPtr<Node> node; // the node whose generated content should get emitted...
+};
+
+class FiddleLuaCallInvocation : public Decl
+{
+public:
+    TokenWithTrivia fiddleToken; // the actual `FIDDLE` identifier
+    String callString;
+    RefPtr<Node> parentDecl;
 };
 
 class UncheckedExpr : public Expr
@@ -331,7 +350,7 @@ T* findDecl(ContainerDecl* outerDecl, UnownedStringSlice const& name)
 RefPtr<SourceUnit> parseSourceUnit(
     SourceView* inputSourceView,
     LogicalModule* logicalModule,
-    RootNamePool* rootNamePool,
+    NamePool* namePool,
     DiagnosticSink* sink,
     SourceManager* sourceManager,
     String outputFileName);

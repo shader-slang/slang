@@ -912,14 +912,22 @@ FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declR
 {
     List<Type*> paramTypes;
     auto resultType = getResultType(astBuilder, declRef);
+
+    if (!resultType)
+        resultType = astBuilder->getErrorType();
+
     auto errorType = getErrorCodeType(astBuilder, declRef);
     auto visitParamDecl = [&](DeclRef<ParamDecl> paramDeclRef)
     {
         auto paramDecl = paramDeclRef.getDecl();
         auto paramType = getParamType(astBuilder, paramDeclRef);
+        if (!paramType)
+        {
+            paramType = astBuilder->getErrorType();
+        }
         if (paramDecl->findModifier<RefModifier>())
         {
-            paramType = astBuilder->getRefType(paramType, AddressSpace::Generic);
+            paramType = astBuilder->getRefType(paramType);
         }
         else if (paramDecl->findModifier<ConstRefModifier>())
         {
@@ -1185,8 +1193,15 @@ bool findVkImageFormatByName(const UnownedStringSlice& name, ImageFormat* outFor
     if (name.endsWith(kSNorm))
     {
         StringBuilder buf;
-        //  format names end with snormal after a '_', so replace with that
-        buf << name.head(name.getLength() - kSNorm.getLength()) << "_" << kSNorm;
+        auto prefix = name.head(name.getLength() - kSNorm.getLength());
+        buf << prefix;
+        // format names end with snormal after a '_', so add an underscore
+        // if the prefix doesn't already end with one
+        if (prefix.getLength() == 0 || prefix[prefix.getLength() - 1] != '_')
+        {
+            buf << "_";
+        }
+        buf << kSNorm;
         return findImageFormatByName(buf.getUnownedSlice(), outFormat);
     }
 

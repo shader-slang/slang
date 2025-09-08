@@ -1908,6 +1908,9 @@ private:
                     field->getKey(),
                     fieldParam);
 
+                // Remove the sementic info from the original struct
+                semanticInfoToRemove.add(field);
+
                 IRVarLayout* fieldLayout =
                     structTypeLayout ? structTypeLayout->getFieldLayout(fieldIndex) : nullptr;
                 if (varLayout)
@@ -3325,6 +3328,14 @@ protected:
                 result.permittedTypes.add(builder.getUIntType());
                 break;
             }
+        case SystemValueSemanticName::Barycentrics:
+            {
+                result.systemValueName = toSlice("barycentric_coord");
+                result.permittedTypes.add(builder.getVectorType(
+                    builder.getBasicType(BaseType::Float),
+                    builder.getIntValue(builder.getIntType(), 3)));
+                break;
+            }
         default:
             m_sink->diagnose(
                 parentVar,
@@ -3511,7 +3522,7 @@ protected:
             {
                 if (const auto dec = func->findDecoration<IRKnownBuiltinDecoration>())
                 {
-                    if (dec->getName() == "DispatchMesh")
+                    if (dec->getName() == KnownBuiltinDeclName::DispatchMesh)
                     {
                         SLANG_ASSERT(!dispatchMeshFunc && "Multiple DispatchMesh functions found");
                         dispatchMeshFunc = func;
@@ -3586,10 +3597,8 @@ protected:
 
                 IRPtrTypeBase* type = as<IRPtrTypeBase>(param->getDataType());
 
-                const auto annotatedPayloadType = builder.getPtrType(
-                    kIROp_ConstRefType,
-                    type->getValueType(),
-                    AddressSpace::MetalObjectData);
+                const auto annotatedPayloadType =
+                    builder.getConstRefType(type->getValueType(), AddressSpace::MetalObjectData);
 
                 param->setFullType(annotatedPayloadType);
             }

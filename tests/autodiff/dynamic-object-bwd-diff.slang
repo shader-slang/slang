@@ -2,6 +2,7 @@
 
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -26,7 +27,9 @@ struct C : IInterface2
 struct A : IInterface
 {
     float a;
+
     [BackwardDifferentiable]
+    [NoDiffThis]
     float calc(IInterface2 i2, float x)
     {
         float b = no_diff(i2.innerCalc(x));
@@ -37,7 +40,9 @@ struct A : IInterface
 struct B : IInterface
 {
     float a;
+
     [BackwardDifferentiable]
+    [NoDiffThis]
     float calc(IInterface2 i2, float x)
     {
         float b = no_diff(i2.innerCalc(x));

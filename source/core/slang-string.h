@@ -201,7 +201,7 @@ public:
     /// Trims any 'c' from the start or the end, and returns as a substring
     UnownedStringSlice trim(char c) const;
 
-    /// Trims any horizonatl whitespace from start and returns as a substring
+    /// Trims any horizontal whitespace from start and returns as a substring
     UnownedStringSlice trimStart() const;
 
     static constexpr bool kHasUniformHash = true;
@@ -217,6 +217,14 @@ protected:
     char const* m_begin;
     char const* m_end;
 };
+
+/// Three-way comparison of string slices.
+///
+/// * Returns 0 if `lhs == rhs`
+/// * Returns a value < 0 if `lhs < rhs`
+/// * Returns a value > 0 if `lhs > rhs`
+///
+int compare(UnownedStringSlice const& lhs, UnownedStringSlice const& rhs);
 
 // A more convenient way to make slices from *string literals*
 template<size_t SIZE>
@@ -451,9 +459,8 @@ private:
 };
 
 /*!
-@brief Represents a UTF-8 encoded string.
+@brief Represents an owned, zero-terminated UTF-8 encoded string.
 */
-
 class SLANG_RT_API String
 {
     friend struct StringSlice;

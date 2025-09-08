@@ -1,0 +1,117 @@
+name: ClaudeCode - Slang Assistant
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: read
+  id-token: write
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  issues:
+    types: [opened, assigned]
+  pull_request_review:
+    types: [submitted]
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  AWS_ACCESS_KEY_ID: ${{ vars.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ vars.AWS_SECRET_ACCESS_KEY }}
+
+jobs:
+  claude:
+    name: Claude Code Assistant
+    if: |
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude')))
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    # Cancel previous runs on new pushes
+    concurrency:
+      group: claude-${{ github.event.issue.number || github.event.pull_request.number || github.run_id }}
+      cancel-in-progress: true
+
+    steps:
+      # Format setup and environment preparation
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: false
+
+      - name: Checkout of submodules
+        run: git submodule update --init --recursive --depth=1
+
+      - name: Format Setup and Environment Preparation
+        uses: ./.github/actions/format-setup
+
+      # Complete Claude execution with authentication, setup, and execution
+      - name: Run Claude Code
+        id: claude
+        uses: ./.github/actions/claude-code-runner
+        with:
+          # Authentication (these secrets must be configured in your repository)
+          llmgw-id: ${{ secrets.LLMGW_ID }}
+          llmgw-secret: ${{ secrets.LLMGW_SECRET }}
+          llmgw-token-url: ${{ secrets.LLMGW_TOKEN_URL }}
+          github-token-fallback: ${{ secrets.GITHUB_TOKEN }}
+
+          # Repository-specific setup
+          setup-commands: |
+            set -euo pipefail
+            echo "🏗️ Setting up environment dependencies..."
+
+            sudo apt-get update
+            sudo apt-get install -y libx11-dev
+
+            # Configure and build the project
+            cmake --preset default --fresh
+            cmake --workflow --preset debug
+
+            echo "✅ Environment setup completed"
+
+          # Custom instructions for Slang
+          custom-instructions: |
+            ### **Build System Information:**
+            - OS: Ubuntu Linux
+            - Build commands: Configure `cmake --preset default`, Build `cmake --build --preset debug`, Test `./build/Debug/bin/slang-test tests/path/to/test.slang`
+            - Project is pre-built and ready for development tasks
+
+            ### **IMPORTANT: Deep Repository Knowledge & Debugging**
+            **Repository Knowledge Tool**: Use `mcp__deepwiki__ask_question` with repoName "shader-slang/slang" for architectural insights and implementation patterns.
+
+            **Implementation Guidelines:**
+            - Use git history (`git log -S "keyword"`) to find related features but don't spend excessive time
+            - Use deepwiki for expert insights and architectural patterns
+            - Think carefully about the user's request before implementing
+
+            ### **Test-Driven Development - Strongly Encouraged**
+            Write failing tests in `tests/` directory, implement fixes and verify both tests and builds succeed before submitting.
+
+          # MCP configuration for deepwiki
+          mcp-config: |
+            {
+              "mcpServers": {
+                "deepwiki": {
+                  "type": "sse",
+                  "url": "https://mcp.deepwiki.com/sse"
+                }
+              }
+            }
+
+          # Advanced configuration (using repository variables)
+          model: ${{ vars.ANTHROPIC_MODEL }}
+          aws-region: ${{ vars.AWS_REGION }}
+          bedrock-base-url: ${{ vars.ANTHROPIC_BEDROCK_BASE_URL }}
+          small-fast-model: ${{ vars.ANTHROPIC_SMALL_FAST_MODEL }}
+
+          # Additional tools for deepwiki
+          allowed-tools: "Bash,View,GlobTool,GrepTool,BatchTool,Write,mcp__deepwiki__ask_question"

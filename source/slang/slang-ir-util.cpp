@@ -453,6 +453,9 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
 
     switch (type->getOp())
     {
+    case kIROp_BoolType:
+        sb << "bool";
+        break;
     case kIROp_FloatType:
         sb << "float";
         break;
@@ -716,6 +719,30 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
     case kIROp_IntLit:
         sb << as<IRIntLit>(type)->getValue();
         break;
+    case kIROp_BoolLit:
+        sb << (as<IRBoolLit>(type)->getValue() ? "true" : "false");
+        break;
+    case kIROp_FloatLit:
+        sb << as<IRFloatLit>(type)->getValue();
+        break;
+    case kIROp_StringLit:
+        {
+            auto stringLit = as<IRStringLit>(type);
+            sb << "\"";
+            sb << stringLit->getStringSlice();
+            sb << "\"";
+        }
+        break;
+    case kIROp_VoidLit:
+        sb << "void";
+        break;
+    case kIROp_PtrLit:
+        {
+            auto ptrLit = as<IRPtrLit>(type);
+            sb << "ptr_";
+            sb << (UInt64)ptrLit->getValue();
+        }
+        break;
     default:
         if (auto decor = type->findDecoration<IRNameHintDecoration>())
             sb << decor->getName();
@@ -871,8 +898,8 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
             }
         }
         break;
-    case kIROp_unconditionalBranch:
-    case kIROp_loop:
+    case kIROp_UnconditionalBranch:
+    case kIROp_Loop:
         {
             auto branch = as<IRUnconditionalBranch>(inst);
             // If any pointer typed argument of the branch inst may overlap addr, return true.
@@ -922,7 +949,7 @@ IRInst* getUndefInst(IRBuilder builder, IRModule* module)
 
     for (auto inst : module->getModuleInst()->getChildren())
     {
-        if (inst->getOp() == kIROp_undefined && inst->getDataType() &&
+        if (inst->getOp() == kIROp_Undefined && inst->getDataType() &&
             inst->getDataType()->getOp() == kIROp_VoidType)
         {
             undefInst = inst;
@@ -997,12 +1024,15 @@ void sortBlocksInFunc(IRGlobalValueWithCode* func)
         block->insertAtEnd(func);
 }
 
-void removeLinkageDecorations(IRGlobalValueWithCode* func)
+void removeLinkageDecorations(IRInst* inst)
 {
+    if (!inst)
+        return;
+
     List<IRInst*> toRemove;
-    for (auto inst : func->getDecorations())
+    for (auto decoration : inst->getDecorations())
     {
-        switch (inst->getOp())
+        switch (decoration->getOp())
         {
         case kIROp_ImportDecoration:
         case kIROp_ExportDecoration:
@@ -1013,14 +1043,14 @@ void removeLinkageDecorations(IRGlobalValueWithCode* func)
         case kIROp_CudaDeviceExportDecoration:
         case kIROp_DllExportDecoration:
         case kIROp_HLSLExportDecoration:
-            toRemove.add(inst);
+            toRemove.add(decoration);
             break;
         default:
             break;
         }
     }
-    for (auto inst : toRemove)
-        inst->removeAndDeallocate();
+    for (auto decoration : toRemove)
+        decoration->removeAndDeallocate();
 }
 
 void setInsertBeforeOrdinaryInst(IRBuilder* builder, IRInst* inst)
@@ -1775,6 +1805,38 @@ UnownedStringSlice getBuiltinFuncName(IRInst* callee)
     auto decor = getResolvedInstForDecorations(callee)->findDecoration<IRKnownBuiltinDecoration>();
     if (!decor)
         return UnownedStringSlice();
+
+    // For backward compatibility, convert enum back to string
+    switch (decor->getName())
+    {
+    case KnownBuiltinDeclName::GeometryStreamAppend:
+        return UnownedStringSlice::fromLiteral("GeometryStreamAppend");
+    case KnownBuiltinDeclName::GeometryStreamRestart:
+        return UnownedStringSlice::fromLiteral("GeometryStreamRestart");
+    case KnownBuiltinDeclName::GetAttributeAtVertex:
+        return UnownedStringSlice::fromLiteral("GetAttributeAtVertex");
+    case KnownBuiltinDeclName::DispatchMesh:
+        return UnownedStringSlice::fromLiteral("DispatchMesh");
+    case KnownBuiltinDeclName::saturated_cooperation:
+        return UnownedStringSlice::fromLiteral("saturated_cooperation");
+    case KnownBuiltinDeclName::saturated_cooperation_using:
+        return UnownedStringSlice::fromLiteral("saturated_cooperation_using");
+    case KnownBuiltinDeclName::IDifferentiable:
+        return UnownedStringSlice::fromLiteral("IDifferentiable");
+    case KnownBuiltinDeclName::IDifferentiablePtr:
+        return UnownedStringSlice::fromLiteral("IDifferentiablePtr");
+    case KnownBuiltinDeclName::NullDifferential:
+        return UnownedStringSlice::fromLiteral("NullDifferential");
+    default:
+        return UnownedStringSlice();
+    }
+}
+
+KnownBuiltinDeclName getBuiltinFuncEnum(IRInst* callee)
+{
+    auto decor = getResolvedInstForDecorations(callee)->findDecoration<IRKnownBuiltinDecoration>();
+    if (!decor)
+        return KnownBuiltinDeclName::COUNT; // Use COUNT as invalid value
     return decor->getName();
 }
 
@@ -2346,6 +2408,79 @@ bool isInstHoistable(IROp op, IRType* type, IRInst* const* fixedArgs)
 {
     return (getIROpInfo(op).flags & kIROpFlag_Hoistable) ||
            isSpecConstOpHoistable(op, type, fixedArgs);
+}
+
+IRType* getUnsignedTypeFromSignedType(IRBuilder* builder, IRType* type)
+{
+    SLANG_RELEASE_ASSERT(isSignedType(type));
+
+    auto elementType = getVectorOrCoopMatrixElementType(type);
+
+    IROp op = type->getOp();
+    switch (op)
+    {
+    case kIROp_MatrixType:
+        {
+            auto unsignedTypeOp = getOppositeSignIntTypeOp(elementType->getOp());
+            auto matType = as<IRMatrixType>(type);
+            SLANG_RELEASE_ASSERT(matType);
+            return builder->getMatrixType(
+                builder->getType(unsignedTypeOp),
+                matType->getRowCount(),
+                matType->getColumnCount(),
+                matType->getLayout());
+        }
+    case kIROp_VectorType:
+        {
+            auto unsignedTypeOp = getOppositeSignIntTypeOp(elementType->getOp());
+            auto vecType = as<IRVectorType>(type);
+            SLANG_RELEASE_ASSERT(vecType);
+            return builder->getVectorType(
+                builder->getType(unsignedTypeOp),
+                vecType->getElementCount());
+        }
+    case kIROp_IntType:
+    case kIROp_Int16Type:
+    case kIROp_Int64Type:
+    case kIROp_Int8Type:
+        return builder->getType(getOppositeSignIntTypeOp(elementType->getOp()));
+    default:
+        return type;
+    }
+}
+
+bool isSignedType(IRType* type)
+{
+    switch (type->getOp())
+    {
+    case kIROp_FloatType:
+    case kIROp_DoubleType:
+        return true;
+    case kIROp_IntType:
+    case kIROp_Int16Type:
+    case kIROp_Int64Type:
+    case kIROp_Int8Type:
+        return true;
+    case kIROp_VectorType:
+        return isSignedType(as<IRVectorType>(type)->getElementType());
+    case kIROp_MatrixType:
+        return isSignedType(as<IRMatrixType>(type)->getElementType());
+    default:
+        return false;
+    }
+}
+
+bool isIROpaqueType(IRType* type)
+{
+    switch (type->getOp())
+    {
+    case kIROp_TextureType:
+    case kIROp_SamplerStateType:
+    case kIROp_SamplerComparisonStateType:
+        return true;
+    default:
+        return false;
+    }
 }
 
 } // namespace Slang

@@ -3,7 +3,7 @@
 
 #include "platform-api.h"
 #include "slang-com-ptr.h"
-#include "slang-gfx.h"
+#include "slang-rhi.h"
 #include "vector-math.h"
 
 #include <string>
@@ -20,7 +20,7 @@ struct ModelLoader
         glm::vec3 specularColor;
         float specularity;
 
-        Slang::ComPtr<gfx::ITextureResource> diffuseMap;
+        Slang::ComPtr<rhi::ITexture> diffuseMap;
     };
 
     struct Vertex
@@ -42,9 +42,9 @@ struct ModelLoader
 
     struct ModelData
     {
-        Slang::ComPtr<gfx::IBufferResource> vertexBuffer;
-        Slang::ComPtr<gfx::IBufferResource> indexBuffer;
-        gfx::PrimitiveTopology primitiveTopology;
+        Slang::ComPtr<rhi::IBuffer> vertexBuffer;
+        Slang::ComPtr<rhi::IBuffer> indexBuffer;
+        rhi::PrimitiveTopology primitiveTopology;
         int vertexCount;
         int indexCount;
         int meshCount;
@@ -69,7 +69,7 @@ struct ModelLoader
     };
 
     ICallbacks* callbacks = nullptr;
-    gfx::IDevice* device;
+    rhi::IDevice* device;
     LoadFlags loadFlags = 0;
     float scale = 1.0f;
 

@@ -338,7 +338,9 @@ struct FunctionParameterSpecializationContext
         // correctly check the preconditions.
         //
         auto oldFunc = as<IRFunc>(oldCall->getCallee());
-        SLANG_ASSERT(oldFunc);
+        if (!oldFunc)
+            return;
+
         SLANG_ASSERT(oldFunc->isDefinition());
 
         // Our first information-gathering pass will
@@ -390,6 +392,14 @@ struct FunctionParameterSpecializationContext
         newCall->insertBefore(oldCall);
         oldCall->replaceUsesWith(newCall);
         oldCall->removeAndDeallocate();
+
+        // If old func is no longer used after the specialization,
+        // remove it.
+        if (!oldFunc->hasUses())
+        {
+            if (!shouldInstBeLiveIfParentIsLive(oldFunc, IRDeadCodeEliminationOptions{}))
+                oldFunc->removeAndDeallocate();
+        }
     }
 
     // Before diving into the details on how we gather information
@@ -652,12 +662,12 @@ struct FunctionParameterSpecializationContext
         case kIROp_OutType:
         case kIROp_RefType:
         case kIROp_ConstRefType:
-            argType = as<IRPtrTypeBase>(argType)->getValueType();
-            resultType = getBuilder()->getPtrType(
-                paramType->getOp(),
-                argType,
-                as<IRPtrTypeBase>(paramType)->getAddressSpace());
-            break;
+            {
+                auto ptrParamType = as<IRPtrTypeBase>(paramType);
+                argType = as<IRPtrTypeBase>(argType)->getValueType();
+                resultType = getBuilder()->getPtrType(argType, ptrParamType);
+                break;
+            }
         }
         if (auto rate = paramType->getRate())
         {

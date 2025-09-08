@@ -1,0 +1,31 @@
+name: "Copilot Setup Steps"
+
+on:
+  workflow_dispatch:
+  # Automatically run the setup steps when they are changed to allow for easy validation, and
+  # allow manual testing through the repository's "Actions" tab
+  pull_request:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+
+jobs:
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          fetch-depth: "2"
+      - uses: ./.github/actions/format-setup
+      - name: setup environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libx11-dev
+          cmake --preset default --fresh
+          cmake --workflow --preset debug

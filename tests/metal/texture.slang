@@ -3,7 +3,7 @@
 //TEST:SIMPLE(filecheck=HLSL): -stage compute -entry computeMain -target hlsl -DEXCLUDE_INTEGER_TYPE
 //TEST:SIMPLE(filecheck=SPIR): -stage compute -entry computeMain -target spirv -emit-spirv-directly -DEXCLUDE_HALF_TYPE -DEXCLUDE_SHORT_TYPE
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=FUNCTIONAL):-slang -compute -dx12 -profile cs_6_6 -use-dxil -shaderobj -output-using-type -xslang -DEXCLUDE_INTEGER_TYPE -xslang -DEXCLUDE_SM_6_7
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=FUNCTIONAL):-slang -compute -dx12 -profile cs_6_6 -shaderobj -output-using-type -xslang -DEXCLUDE_INTEGER_TYPE -xslang -DEXCLUDE_SM_6_7
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=FUNCTIONAL):-vk -emit-spirv-directly -compute -shaderobj -output-using-type -render-feature hardware-device -xslang -DEXCLUDE_HALF_TYPE -xslang -DEXCLUDE_SHORT_TYPE
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
@@ -56,36 +56,36 @@ Texture2DArray<half4> t2DArray_f16;
 //TEST_INPUT: TextureCube(size=4, content = zero, arrayLength=2):name tCubeArray_f16
 TextureCubeArray<half4> tCubeArray_f16;
 
-//TEST_INPUT: Texture1D(size=4, content = zero):name t1D_i32
+//TEST_INPUT: Texture1D(size=4, format=RGBA8Sint, content = zero):name t1D_i32
 Texture1D<int4> t1D_i32;
-//TEST_INPUT: Texture2D(size=4, content = zero):name t2D_i32
+//TEST_INPUT: Texture2D(size=4, format=RGBA8Sint, content = zero):name t2D_i32
 Texture2D<int4> t2D_i32;
-//TEST_INPUT: Texture3D(size=4, content = zero):name t3D_i32
+//TEST_INPUT: Texture3D(size=4, format=RGBA8Sint, content = zero):name t3D_i32
 Texture3D<int4> t3D_i32;
-//TEST_INPUT: TextureCube(size=4, content = zero):name tCube_i32
+//TEST_INPUT: TextureCube(size=4, format=RGBA8Sint, content = zero):name tCube_i32
 TextureCube<int4> tCube_i32;
 
-//TEST_INPUT: Texture1D(size=4, content = zero, arrayLength=2):name t1DArray_i32
+//TEST_INPUT: Texture1D(size=4, format=RGBA8Sint, content = zero, arrayLength=2):name t1DArray_i32
 Texture1DArray<int4> t1DArray_i32;
-//TEST_INPUT: Texture2D(size=4, content = zero, arrayLength=2):name t2DArray_i32
+//TEST_INPUT: Texture2D(size=4, format=RGBA8Sint, content = zero, arrayLength=2):name t2DArray_i32
 Texture2DArray<int4> t2DArray_i32;
-//TEST_INPUT: TextureCube(size=4, content = zero, arrayLength=2):name tCubeArray_i32
+//TEST_INPUT: TextureCube(size=4, format=RGBA8Sint, content = zero, arrayLength=2):name tCubeArray_i32
 TextureCubeArray<int4> tCubeArray_i32;
 
-//TEST_INPUT: Texture1D(size=4, content = zero):name t1D_u32
+//TEST_INPUT: Texture1D(size=4, format=RGBA8Uint, content = zero):name t1D_u32
 Texture1D<uint4> t1D_u32;
-//TEST_INPUT: Texture2D(size=4, content = zero):name t2D_u32
+//TEST_INPUT: Texture2D(size=4, format=RGBA8Uint, content = zero):name t2D_u32
 Texture2D<uint4> t2D_u32;
-//TEST_INPUT: Texture3D(size=4, content = zero):name t3D_u32
+//TEST_INPUT: Texture3D(size=4, format=RGBA8Uint, content = zero):name t3D_u32
 Texture3D<uint4> t3D_u32;
-//TEST_INPUT: TextureCube(size=4, content = zero):name tCube_u32
+//TEST_INPUT: TextureCube(size=4, format=RGBA8Uint, content = zero):name tCube_u32
 TextureCube<uint4> tCube_u32;
 
-//TEST_INPUT: Texture1D(size=4, content = zero, arrayLength=2):name t1DArray_u32
+//TEST_INPUT: Texture1D(size=4, format=RGBA8Uint, content = zero, arrayLength=2):name t1DArray_u32
 Texture1DArray<uint4> t1DArray_u32;
-//TEST_INPUT: Texture2D(size=4, content = zero, arrayLength=2):name t2DArray_u32
+//TEST_INPUT: Texture2D(size=4, format=RGBA8Uint, content = zero, arrayLength=2):name t2DArray_u32
 Texture2DArray<uint4> t2DArray_u32;
-//TEST_INPUT: TextureCube(size=4, content = zero, arrayLength=2):name tCubeArray_u32
+//TEST_INPUT: TextureCube(size=4, format=RGBA8Uint, content = zero, arrayLength=2):name tCubeArray_u32
 TextureCubeArray<uint4> tCubeArray_u32;
 
 //TEST_INPUT: Texture1D(size=4, content = zero):name t1D_i16
@@ -173,18 +173,18 @@ typealias depthcube_array = _Texture<
     format
 >;
 
-//TEST_INPUT: Texture2D(size=4, content = zero):name d2D
+//TEST_INPUT: Texture2D(size=4, format=D32Float, content = zero):name d2D
 depth2d<float> d2D;
-//TEST_INPUT: TextureCube(size=4, content = zero):name dCube
+//TEST_INPUT: TextureCube(size=4, format=D32Float, content = zero):name dCube
 depthcube<float> dCube;
-//TEST_INPUT: Texture2D(size=4, content = zero, arrayLength=2):name d2DArray
+//TEST_INPUT: Texture2D(size=4, format=D32Float, content = zero, arrayLength=2):name d2DArray
 depth2d_array<float> d2DArray;
-//TEST_INPUT: TextureCube(size=4, content = zero, arrayLength=2):name dCubeArray
+//TEST_INPUT: TextureCube(size=4, format=D32Float, content = zero, arrayLength=2):name dCubeArray
 depthcube_array<float> dCubeArray;
 
-//TEST_INPUT: Sampler:name samplerState
+//TEST_INPUT: Sampler(filteringMode=point):name samplerState
 SamplerState samplerState;
-//TEST_INPUT: Sampler:name shadowSampler
+//TEST_INPUT: Sampler(depthCompare):name shadowSampler
 SamplerComparisonState shadowSampler;
 
 

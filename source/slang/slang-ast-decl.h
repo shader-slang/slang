@@ -3,6 +3,9 @@
 #pragma once
 
 #include "slang-ast-base.h"
+#include "slang-fossil.h"
+
+//
 #include "slang-ast-decl.h.fiddle"
 
 FIDDLE()
@@ -34,23 +37,54 @@ class UnresolvedDecl : public Decl
 struct ContainerDeclDirectMemberDecls
 {
 public:
-    List<Decl*> const& getDecls() const { return decls; }
+    List<Decl*> const& getDecls() const;
 
-    List<Decl*>& _refDecls() { return decls; }
+    Count getDeclCount() const;
+    Decl* getDecl(Index index) const;
+
+    Decl* findLastDeclOfName(Name* name) const;
+
+    Dictionary<Name*, Decl*> getMapFromNameToLastDeclOfThatName() const;
+
+    List<Decl*> const& getTransparentDecls() const;
+
+    bool isUsingOnDemandDeserialization() const;
+
+    void _initForOnDemandDeserialization(
+        RefObject* deserializationContext,
+        void const* deserializationData,
+        Count declCount);
 
 private:
     friend class ContainerDecl;
+    friend class ModuleDecl;
     friend struct ASTDumpContext;
 
-    List<Decl*> decls;
+    bool _areLookupAcceleratorsValid() const;
+    void _invalidateLookupAccelerators() const;
+    void _ensureLookupAcceleratorsAreValid() const;
 
-    struct
+    void _readSerializedTransparentDecls() const;
+    Decl* _readSerializedDeclAtIndex(Index index) const;
+    Decl* _readSerializedDeclsOfName(Name* name) const;
+
+    void _readAllSerializedDecls() const;
+
+    mutable List<Decl*> decls;
+
+    mutable struct
     {
         Count declCountWhenLastUpdated = 0;
 
         Dictionary<Name*, Decl*> mapNameToLastDeclOfThatName;
         List<Decl*> filteredListOfTransparentDecls;
     } accelerators;
+
+    mutable struct
+    {
+        RefPtr<RefObject> context;
+        void const* data = nullptr;
+    } onDemandDeserialization;
 };
 
 /// A conceptual list of declarations of the same name, in the same container.
@@ -199,6 +233,10 @@ class ContainerDecl : public Decl
     //
     void addMember(Decl* member) { addDirectMemberDecl(member); }
 
+    /// Is this declaration using on-demand deserialization for its direct members?
+    ///
+    bool isUsingOnDemandDeserializationForDirectMembers();
+
     //
     // NOTE: The operations after this point are *not* considered part of
     // the public API of `ContainerDecl`, and new code should not be
@@ -209,29 +247,6 @@ class ContainerDecl : public Decl
     // API, but such parts of the codebase should *not* be considered as
     // examples of how to interact with the Slang AST.
     //
-
-    /// Invalidate the acceleration structures used for declaration lookup,
-    /// because the code is about to replace `unscopedEnumAttr` with `transparentModifier`
-    /// as part of semantic checking of an `EnumDecl` nested under this `ContainerDecl`.
-    ///
-    /// Cannot be expressed in terms of the rest of the public API because the
-    /// existing assumption has been that any needed `TransparentModifier`s would
-    /// be manifestly obvious just from the syntax being parsed, so that they would
-    /// already be in place on parsed ASTs. the `UnscopedEnumAttribute` is a `TransparentModifier`
-    /// in all but name, but the two don't share a common base class such that code
-    /// could check for them together.
-    ///
-    /// TODO: In the long run, the obvious fix is to eliminate `UnscopedEnumAttribute`,
-    /// becuase it only exists to enable legacy code to be expressed in Slang, rather than
-    /// representing anything we want/intend to support long-term.
-    ///
-    /// TODO: In the even *longer* run, we should eliminate `TransparentModifier` as well,
-    /// because it only exists to support legacy `cbuffer` declarations and similar syntax,
-    /// and those should be deprecated over time.
-    ///
-    void _invalidateLookupAcceleratorsBecauseUnscopedEnumAttributeWillBeTurnedIntoTransparentModifier(
-        UnscopedEnumAttribute* unscopedEnumAttr,
-        TransparentModifier* transparentModifier);
 
     /// Remove a constructor declaration from the direct member declarations of this container.
     ///
@@ -601,7 +616,7 @@ FIDDLE(abstract)
 class FunctionDeclBase : public CallableDecl
 {
     FIDDLE(...)
-    FIDDLE() Stmt* body = nullptr;
+    Stmt* body = nullptr;
 };
 
 // A constructor/initializer to create instances of a type
@@ -737,6 +752,14 @@ class ModuleDecl : public NamespaceDeclBase
     /// This mapping is filled in during semantic checking, as `ExtensionDecl`s get checked.
     ///
     FIDDLE() Dictionary<AggTypeDecl*, RefPtr<CandidateExtensionList>> mapTypeToCandidateExtensions;
+
+    /// Is this module using on-demand deserialization for its exports?
+    ///
+    bool isUsingOnDemandDeserializationForExports();
+
+    /// Find a declaration exported from this module by its `mangledName`.
+    ///
+    Decl* _findSerializedDeclByMangledExportName(UnownedStringSlice const& mangledName);
 };
 
 // Represents a transparent scope of declarations that are defined in a single source file.
@@ -821,6 +844,21 @@ class GenericDecl : public ContainerDecl
     FIDDLE(...)
     // The decl that is genericized...
     FIDDLE() Decl* inner = nullptr;
+
+    /// A cached list of arguments that can be used when forming
+    /// a reference to the inner declaration with "default
+    /// substitutions" (for each generic parameter, the coresponding
+    /// argument will be a reference to the parameter itself).
+    ///
+    List<Val*> _cachedArgsForDefaultSubstitution;
+};
+
+FIDDLE()
+class InterfaceDefaultImplDecl : public GenericDecl
+{
+    FIDDLE(...)
+    FIDDLE() GenericTypeParamDecl* thisTypeDecl;
+    FIDDLE() GenericTypeConstraintDecl* thisTypeConstraintDecl;
 };
 
 FIDDLE(abstract)
@@ -910,7 +948,8 @@ class SyntaxDecl : public Decl
 {
     FIDDLE(...)
     // What type of syntax node will be produced when parsing with this keyword?
-    FIDDLE() SyntaxClass<NodeBase> syntaxClass;
+    FIDDLE()
+    SyntaxClass<NodeBase> syntaxClass;
 
     // Callback to invoke in order to parse syntax with this keyword.
     SyntaxParseCallback parseCallback = nullptr;

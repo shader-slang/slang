@@ -82,16 +82,18 @@ if(NOT ${SLANG_USE_SYSTEM_LZ4})
 endif()
 
 # Vulkan headers
-if(NOT ${SLANG_USE_SYSTEM_VULKAN_HEADERS})
-    if(NOT SLANG_OVERRIDE_VULKAN_HEADERS_PATH)
-        add_subdirectory(vulkan EXCLUDE_FROM_ALL ${system})
-    else()
-        add_subdirectory(
-            ${SLANG_OVERRIDE_VULKAN_HEADERS_PATH}/vulkan
-            vulkan
-            EXCLUDE_FROM_ALL
-            ${system}
-        )
+if(NOT TARGET Vulkan::Headers)
+    if(NOT ${SLANG_USE_SYSTEM_VULKAN_HEADERS})
+        if(NOT SLANG_OVERRIDE_VULKAN_HEADERS_PATH)
+            add_subdirectory(vulkan EXCLUDE_FROM_ALL ${system})
+        else()
+            add_subdirectory(
+                ${SLANG_OVERRIDE_VULKAN_HEADERS_PATH}/vulkan
+                vulkan
+                EXCLUDE_FROM_ALL
+                ${system}
+            )
+        endif()
     endif()
 endif()
 
@@ -103,55 +105,77 @@ target_include_directories(
 )
 
 # SPIRV-Headers
-if(NOT ${SLANG_USE_SYSTEM_SPIRV_HEADERS})
-    if(NOT SLANG_OVERRIDE_SPIRV_HEADERS_PATH)
-        add_subdirectory(spirv-headers EXCLUDE_FROM_ALL ${system})
-    else()
+if(NOT TARGET SPIRV-Headers)
+    if(SLANG_USE_SYSTEM_SPIRV_HEADERS)
+        if(SLANG_OVERRIDE_SPIRV_HEADERS_PATH)
+            message(
+                WARNING
+                "SLANG_OVERRIDE_SPIRV_HEADERS_PATH does nothing when SLANG_USE_SPIRV_HEADERS is set"
+            )
+        endif()
+    elseif(SLANG_OVERRIDE_SPIRV_HEADERS_PATH)
         add_subdirectory(
             ${SLANG_OVERRIDE_SPIRV_HEADERS_PATH}/spirv-headers
             spirv-headers
             EXCLUDE_FROM_ALL
             ${system}
         )
+    else()
+        add_subdirectory(spirv-headers EXCLUDE_FROM_ALL ${system})
     endif()
 endif()
 
 if(SLANG_ENABLE_SLANG_GLSLANG)
-    # SPIRV-Tools
-    set(SPIRV_TOOLS_BUILD_STATIC ON)
-    set(SPIRV_WERROR OFF)
-    # Headers
-    if(NOT SLANG_OVERRIDE_SPIRV_HEADERS_PATH)
-        set(SPIRV_HEADER_DIR "${CMAKE_CURRENT_LIST_DIR}/spirv-headers/")
-    else()
-        set(SPIRV_HEADER_DIR ${SLANG_OVERRIDE_SPIRV_HEADERS_PATH}/spirv-headers)
-    endif()
-    set(SPIRV_SKIP_TESTS ON)
-    # Tools
-    if(NOT SLANG_OVERRIDE_SPIRV_TOOLS_PATH)
-        add_subdirectory(spirv-tools EXCLUDE_FROM_ALL ${system})
-    else()
-        add_subdirectory(
-            ${SLANG_OVERRIDE_SPIRV_TOOLS_PATH}/spirv-tools
-            spirv-tools
-            EXCLUDE_FROM_ALL
-            ${system}
+    # When using spirv headers via find_package, SPIRV-Headers_SOURCE_DIR is not set
+    # SPIRV-Tools requires that variable, as it uses it to detect if SPIRV-Headers is provided by the consumer.
+    # Fake a source build by setting it here. Ideally SPIRV-Tools should not depend on _SOURCE_DIR
+    if(${SLANG_USE_SYSTEM_SPIRV_HEADERS})
+        get_target_property(
+            SPIRV-Headers_SOURCE_DIR
+            SPIRV-Headers::SPIRV-Headers
+            INTERFACE_INCLUDE_DIRECTORIES
+        )
+        cmake_path(
+            GET
+            SPIRV-Headers_SOURCE_DIR
+            PARENT_PATH SPIRV-Headers_SOURCE_DIR
         )
     endif()
 
-    # glslang
-    set(SKIP_GLSLANG_INSTALL ON)
-    set(ENABLE_OPT ON)
-    set(ENABLE_PCH OFF)
-    if(NOT SLANG_OVERRIDE_GLSLANG_PATH)
-        add_subdirectory(glslang EXCLUDE_FROM_ALL ${system})
-    else()
-        add_subdirectory(
-            ${SLANG_OVERRIDE_GLSLANG_PATH}/glslang
-            glslang
-            EXCLUDE_FROM_ALL
-            ${system}
-        )
+    if(NOT ${SLANG_USE_SYSTEM_SPIRV_TOOLS})
+        # SPIRV-Tools
+        set(SPIRV_TOOLS_BUILD_STATIC ON)
+        set(SPIRV_WERROR OFF)
+        set(SPIRV_SKIP_TESTS ON)
+        # Tools
+        if(NOT SLANG_OVERRIDE_SPIRV_TOOLS_PATH)
+            add_subdirectory(spirv-tools EXCLUDE_FROM_ALL ${system})
+        else()
+            add_subdirectory(
+                ${SLANG_OVERRIDE_SPIRV_TOOLS_PATH}/spirv-tools
+                spirv-tools
+                EXCLUDE_FROM_ALL
+                ${system}
+            )
+        endif()
+    endif()
+
+    if(NOT ${SLANG_USE_SYSTEM_GLSLANG})
+        # glslang
+        set(SKIP_GLSLANG_INSTALL ON)
+        set(ENABLE_OPT ON)
+        set(ENABLE_PCH OFF)
+        set(ALLOW_EXTERNAL_SPIRV_TOOLS ${SLANG_USE_SYSTEM_SPIRV_TOOLS})
+        if(NOT SLANG_OVERRIDE_GLSLANG_PATH)
+            add_subdirectory(glslang EXCLUDE_FROM_ALL ${system})
+        else()
+            add_subdirectory(
+                ${SLANG_OVERRIDE_GLSLANG_PATH}/glslang
+                glslang
+                EXCLUDE_FROM_ALL
+                ${system}
+            )
+        endif()
     endif()
 endif()
 
@@ -182,6 +206,8 @@ target_include_directories(
 # slang-rhi
 if(SLANG_ENABLE_SLANG_RHI)
     set(SLANG_RHI_BUILD_FROM_SLANG_REPO ON)
+    set(SLANG_RHI_BUILD_TESTS ON)
+    set(SLANG_RHI_BUILD_TESTS_WITH_GLFW OFF)
     set(SLANG_RHI_INSTALL OFF)
     set(SLANG_RHI_BINARY_DIR ${CMAKE_BINARY_DIR}/$<CONFIG>/bin)
     set(SLANG_RHI_FETCH_SLANG OFF)
@@ -219,6 +245,12 @@ if(SLANG_ENABLE_SLANG_RHI)
             ${system}
         )
     endif()
+
+    # Output slang-rhi-tests to the bin directory so we can run it easily.
+    set_target_properties(
+        slang-rhi-tests
+        PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIG>/bin
+    )
 endif()
 
 # Tidy things up:

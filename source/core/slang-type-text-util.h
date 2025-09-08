@@ -1,6 +1,14 @@
 #ifndef SLANG_CORE_TYPE_TEXT_UTIL_H
 #define SLANG_CORE_TYPE_TEXT_UTIL_H
 
+// TODO: This file's name is not obvious for what it contains.
+// Either the file should be renamed to be more obviously related
+// to what it does, or (better yet) the functionality should be
+// moved to reside in places that are more logically related
+// to each of the given types.
+//
+// Also: this doesn't belong in `core` for a bunch of reasons.
+
 #include "slang-array-view.h"
 #include "slang-name-value.h"
 #include "slang-string.h"
@@ -45,6 +53,8 @@ struct TypeTextUtil
     static ConstArrayView<NamesDescriptionValue> getDebugLevelInfos();
     /// Get the floating point modes
     static ConstArrayView<NamesDescriptionValue> getFloatingPointModeInfos();
+    /// Get the floating point denormal handling modes
+    static ConstArrayView<NamesDescriptionValue> getFpDenormalModeInfos();
     // Get the line directive infos
     static ConstArrayView<NamesDescriptionValue> getLineDirectiveInfos();
     /// Get the optimization level info

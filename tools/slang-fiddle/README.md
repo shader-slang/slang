@@ -9,7 +9,7 @@ Invoking Fiddle
 
 Fiddle gets invoked from the command line with a command line like:
 
-```
+```sh
 slang-fiddle -i source/ -o generated/ a.cpp b.h c.h d.cpp ...
 ```
 
@@ -51,7 +51,7 @@ During the scraping step, Fiddle will run the Slang lexer on each of the input f
 
 Putting `FIDDLE()` in front of an ordinary C++ `class`, `struct`, or `namespace` declaration tells Fiddle that it should include that C++ construct in the model of the program that it scrapes. For example, given this input:
 
-```
+```cpp
 FIDDLE()
 namespace MyProgram
 {
@@ -68,7 +68,7 @@ Fiddle will include the `MyProgram` namespace and the `MyProgram::A` type in its
 
 A programmer can place Fiddle-specific modifiers inside the `FIDDLE()` invocation before a type, to apply those modifiers to the model of that type:
 
-```
+```cpp
 FIDDLE(abstract)
 class Thing { /* ... */ };
 
@@ -78,7 +78,7 @@ class ConcreteThing : public Thing { /* ... */ }
 
 One important constraint is that any `struct` or `class` type marked with `FIDDLE()` *must* have an invocation of the form `FIDDLE(...)` (that is, `FIDDLE` applied to an actual ellipsis `...`) as the first item after the opening curly brace for its body:
 
-```
+```cpp
 FIDDLE()
 struct A
 {
@@ -98,6 +98,14 @@ Note again that Fiddle will *ignore* any fields not marked with `FIDDLE()`, so b
 In order for Fiddle to provide the macros that each `FIDDLE()` invocation expands into, any input file that includes invocations of `FIDDLE()` *must* also `#include` the corresponding generated file.
 For example, the input file `a.cpp` should `#include "a.cpp.fiddle"`.
 The `#include` of the generated output file should come *after* any other `#include`s, to make sure that any `.h` files that also use `FIDDLE()` don't cause confusion.
+Because `clang-format` automatically reorders `#include`s, you must separate this one from the others by preceding it with a blank line followed by an empty comment line:
+
+```cpp
+#include "something-else.h"
+
+//
+#include "a.cpp.fiddle"
+```
 
 Text Templates
 --------------
@@ -131,7 +139,8 @@ An idiomatic approach would be something like:
     class $T;
 %end
 #else // FIDDLE OUTPUT:
-#endif
+// Fiddle output goes here.
+#endif // FIDDLE END
 ```
 
 For the template part of things, you can write lines of more-or-less ordinary C++ code, interspersed with two kinds of script code:
@@ -151,5 +160,19 @@ For example, given the input above, the generated output for the template might 
 #else // FIDDLE OUTPUT:
 #define FIDDLE_TEMPLATE_OUTPUT_ID 0
 #include "my-class-forward-decls.h.fiddle"
-#endif
+#endif // FIDDLE END
 ```
+
+Inside templates there is a global defined `THIS_FILE` which is the file path
+of the C++ source containing the splice. This can be used to load adjacent lua
+files for example.
+
+Lua Function Calls
+------------------
+
+A more lightweight alternative to templates is to call
+`FIDDLE(myLuaFunction(my, parameters))`. This will load a lua file at
+`current_cpp_source_path.cpp.lua` and call the `myLuaFunction` function in the
+table returned by that lua file. Inside such splices a `fiddle` global table is
+available, containing a `current_decl` member if available, pointing to the
+namespace or class/struct containing this splice.

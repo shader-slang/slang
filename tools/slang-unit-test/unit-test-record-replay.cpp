@@ -256,6 +256,16 @@ static SlangResult runExample(
         hashLines.add(line);
     }
 
+    if (hashLines.getCount() == 0)
+    {
+        msgBuilder << "Hash value is not found for '" << exampleName << "'\n";
+        msgBuilder << "Process ret code: " << exeRes.resultCode << "\n";
+        msgBuilder << "Standard output:\n" << exeRes.standardOutput << "\n";
+        msgBuilder << "Standard error:\n" << exeRes.standardError << "\n";
+        getTestReporter()->message(TestMessageType::TestFailure, msgBuilder.toString().getBuffer());
+        return SLANG_FAIL;
+    }
+
     res = parseHashes(hashLines, outHashes);
     if (SLANG_FAILED(res))
     {
@@ -445,10 +455,14 @@ SLANG_UNIT_TEST(RecordReplay_ray_tracing)
     SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "ray-tracing")));
 }
 
+// This causes a Windows Graphics driver crash.
+// Temporarily disabled; issue #8022
+#if 0
 SLANG_UNIT_TEST(RecordReplay_ray_tracing_pipeline)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "ray-tracing-pipeline")));
 }
+#endif
 
 SLANG_UNIT_TEST(RecordReplay_autodiff_texture)
 {

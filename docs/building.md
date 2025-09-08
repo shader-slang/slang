@@ -9,7 +9,7 @@ version of Slang.
 
 Please install:
 
-- CMake (3.25 preferred, but 3.22 works[^1])
+- CMake (3.26 preferred, but 3.22 works[^1])
 - A C++ compiler with support for C++17. GCC, Clang and MSVC are supported
 - A CMake compatible backend, for example Visual Studio or Ninja
 - Python3 (a dependency for building spirv-tools)
@@ -143,6 +143,10 @@ build/Debug/bin/slang-test
 
 See the [documentation on testing](../tools/slang-test/README.md) for more information.
 
+## Debugging
+
+See the [documentation on debugging](/docs/debugging.md).
+
 ## More niche topics
 
 ### CMake options
@@ -215,7 +219,7 @@ There are several options for getting llvm-support:
       the case that a prebuilt binary can't be found then the build will proceed
       as though `DISABLE` was chosen
 - Use a system supplied LLVM: `-DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM`, you
-  must have llvm-13.0 and a matching libclang installed. It's important that
+  must have llvm-14.0 and a matching libclang installed. It's important that
   either:
     - You don't end up linking to a dynamic libllvm.so, this will almost
       certainly cause multiple versions of LLVM to be loaded at runtime,
@@ -322,7 +326,7 @@ have the Nix environment automatically activate when you enter your clone of
 this repository:
 
 ```bash
-echo 'use flake' >> .envrc
+echo 'use flake' > .envrc
 direnv allow
 ```
 
@@ -335,6 +339,21 @@ CMakePresets, you'll have to do without the presets. Something like the followin
 cmake -B build -G Ninja
 cmake --build build -j
 ```
+
+## Specific supported compiler versions
+
+<!---
+Please keep the exact formatting '_Foo_ xx.yy is tested in CI' as there is a
+script which checks that this is still up to date.
+-->
+
+_GCC_ 11.4 and 13.3 are tested in CI and is the recommended minimum version. GCC 10 is
+supported on a best-effort basis, i.e. PRs supporting this version are
+encouraged but it isn't a continuously maintained setup.
+
+_MSVC_ 19 is tested in CI and is the recommended minimum version.
+
+_Clang_ 17.0 is tested in CI and is the recommended minimum version.
 
 ## Static linking against libslang
 

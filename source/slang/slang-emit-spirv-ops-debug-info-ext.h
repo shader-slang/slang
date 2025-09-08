@@ -513,6 +513,13 @@ SpvInst* emitOpDebugLocalVariable(
 {
     static_assert(isSingular<T>);
     if (argIndex)
+    {
+        // Note +1 logic for argIndex is to follow the convention that
+        // 1-based index of the argument is used by GLSLANG/DXC NSDI.
+        IRBuilder builder(argIndex);
+        IRInst* newArgIndex =
+            builder.getIntValue(builder.getUIntType(), as<IRIntLit>(argIndex)->getValue() + 1);
+
         return emitInst(
             parent,
             inst,
@@ -528,7 +535,8 @@ SpvInst* emitOpDebugLocalVariable(
             col,
             scope,
             flags,
-            argIndex);
+            newArgIndex);
+    }
     return emitInst(
         parent,
         inst,
@@ -543,6 +551,42 @@ SpvInst* emitOpDebugLocalVariable(
         line,
         col,
         scope,
+        flags);
+}
+
+template<typename T>
+SpvInst* emitOpDebugGlobalVariable(
+    SpvInstParent* parent,
+    IRInst* inst,
+    const T& idResultType,
+    SpvInst* set,
+    IRInst* name,
+    SpvInst* type,
+    IRInst* source,
+    IRInst* line,
+    IRInst* col,
+    SpvInst* scope,
+    IRInst* linkageName,
+    SpvInst* variable,
+    IRInst* flags)
+{
+    static_assert(isSingular<T>);
+    return emitInst(
+        parent,
+        inst,
+        SpvOpExtInst,
+        idResultType,
+        kResultID,
+        set,
+        SpvWord(18), // DebugGlobalVariable opcode in NonSemantic.Shader.DebugInfo.100
+        name,
+        type,
+        source,
+        line,
+        col,
+        scope,
+        linkageName,
+        variable,
         flags);
 }
 

@@ -246,7 +246,7 @@ static RefPtr<Region> generateRegionsForIRBlocks(
         switch (terminator->getOp())
         {
         default:
-        case kIROp_conditionalBranch:
+        case kIROp_ConditionalBranch:
             // Note: we don't currently generate ordinary `conditionalBranch` instructions,
             // and instead only generate `ifElse` instructions, which include additional
             // information that can inform our control-flow restructuring pass.
@@ -265,7 +265,7 @@ static RefPtr<Region> generateRegionsForIRBlocks(
             *resultLink = nullptr;
             return resultRegion;
 
-        case kIROp_ifElse:
+        case kIROp_IfElse:
             {
                 // Here we have a two-way branch, so that we will construct a
                 // region representing an `if` statement.
@@ -305,7 +305,7 @@ static RefPtr<Region> generateRegionsForIRBlocks(
             }
             break;
 
-        case kIROp_loop:
+        case kIROp_Loop:
             {
                 // The terminator in this case is the header for a structured loop.
                 //
@@ -424,7 +424,7 @@ static RefPtr<Region> generateRegionsForIRBlocks(
             }
             break;
 
-        case kIROp_unconditionalBranch:
+        case kIROp_UnconditionalBranch:
             {
                 // Here we have an unconditional branch that was
                 // not covered by one of our labels for non-local

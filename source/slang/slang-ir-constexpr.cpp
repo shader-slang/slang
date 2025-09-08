@@ -133,7 +133,7 @@ bool opCanBeConstExpr(IROp op)
     case kIROp_MakeUInt64:
     case kIROp_MakeArray:
     case kIROp_MakeArrayFromElement:
-    case kIROp_swizzle:
+    case kIROp_Swizzle:
     case kIROp_GetElement:
     case kIROp_FieldExtract:
     case kIROp_UpdateElement:
@@ -146,7 +146,7 @@ bool opCanBeConstExpr(IROp op)
     case kIROp_GetOptionalValue:
     case kIROp_DifferentialPairGetDifferential:
     case kIROp_DifferentialPairGetPrimal:
-    case kIROp_LookupWitness:
+    case kIROp_LookupWitnessMethod:
     case kIROp_Specialize:
         // TODO: more cases
         return true;

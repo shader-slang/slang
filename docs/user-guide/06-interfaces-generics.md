@@ -43,7 +43,31 @@ struct MyType : IFoo, IBar
     uint myMethod2(uint2 x) {...}
 }
 ```
+
 In this case, the definition of `MyType` must satisfy the requirements from both the `IFoo` and `IBar` interfaces by providing both the `myMethod` and `myMethod2` methods.
+
+Interface methods can have a default implementation, which will be used if a conforming type doesn't provide an overriding implementation. For example:
+
+```slang
+interface IFoo
+{
+    int getVal() { return 0; }
+}
+
+// OK, MyType.getVal() will use the default implementation provided in `IFoo`.
+struct MyType : IFoo {}
+```
+
+A concrete type that provides its overriding implementation to an interface method requirement that has a default implementation must be explicitly marked as 'override'. For example:
+
+```slang
+struct MyType2 : IFoo
+{
+    // Explicitly mark `getVal` as `override` is needed
+    // because `IFoo.getVal` has a body.
+    override int getVal() { return 1; }
+}
+```
 
 Generics
 ---------------------
@@ -117,6 +141,28 @@ struct MyType<T, U>
     where T : IBar
     where U : IBaz<T>
 {
+}
+```
+
+Optional conformances can be expressed compactly using the `where optional` syntax:
+```csharp
+// Together, these two overloads...
+int myGenericMethod<T>(T arg)
+{
+}
+
+int myGenericMethod<T>(T arg) where T: IFoo
+{
+    arg.myMethod(1.0);
+}
+
+// ... are equivalent to:
+int myGenericMethod<T>(T arg) where optional T: IFoo
+{
+    if (T is IFoo)
+    {
+        arg.myMethod(1.0); // OK in a block that checks for T: IFoo conformance.
+    }
 }
 ```
 
@@ -806,7 +852,7 @@ void main()
 }
 
 ```
-See  [if-let syntax](03-convenience-features.html#if_let-syntax) for more details.
+See  [if-let syntax](03-convenience-features.md#if_let-syntax) for more details.
 
 
 Generic Interfaces

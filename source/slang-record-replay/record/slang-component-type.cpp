@@ -1,6 +1,7 @@
 #include "slang-component-type.h"
 
 #include "../util/record-utility.h"
+#include "slang-component-type2.h"
 #include "slang-composite-component-type.h"
 #include "slang-session.h"
 
@@ -16,6 +17,31 @@ IComponentTypeRecorder::IComponentTypeRecorder(
 
     m_componentHandle = reinterpret_cast<uint64_t>(m_actualComponentType.get());
     slangRecordLog(LogLevel::Verbose, "%s: %p\n", __PRETTY_FUNCTION__, componentType);
+}
+
+ISlangUnknown* IComponentTypeRecorder::getInterface(const Guid& guid)
+{
+    if (guid == IComponentTypeRecorder::getTypeGuid())
+    {
+        return static_cast<ISlangUnknown*>(this);
+    }
+
+    // Check if the underlying component type supports IComponentType2.
+    if (guid == slang::IComponentType2::getTypeGuid())
+    {
+        ComPtr<slang::IComponentType2> componentType2;
+        if (SLANG_SUCCEEDED(m_actualComponentType->queryInterface(
+                SLANG_IID_PPV_ARGS(componentType2.writeRef()))))
+        {
+            // Return a new IComponentType2Recorder that wraps the IComponentType2.
+            IComponentType2Recorder* recorder =
+                new IComponentType2Recorder(componentType2, m_recordManager);
+            auto res = static_cast<ISlangUnknown*>(recorder);
+            res->AddRef();
+            return res;
+        }
+    }
+    return nullptr;
 }
 
 SLANG_NO_THROW slang::ISession* IComponentTypeRecorder::getSession()
@@ -155,32 +181,6 @@ SLANG_NO_THROW SlangResult SLANG_MCALL IComponentTypeRecorder::getTargetMetadata
 {
     // No need to record this call.
     return m_actualComponentType->getTargetMetadata(targetIndex, outMetadata, outDiagnostics);
-}
-
-SLANG_NO_THROW SlangResult SLANG_MCALL IComponentTypeRecorder::getEntryPointCompileResult(
-    SlangInt entryPointIndex,
-    SlangInt targetIndex,
-    slang::ICompileResult** outCompileResult,
-    slang::IBlob** outDiagnostics)
-{
-    // No need to record this call.
-    return m_actualComponentType->getEntryPointCompileResult(
-        entryPointIndex,
-        targetIndex,
-        outCompileResult,
-        outDiagnostics);
-}
-
-SLANG_NO_THROW SlangResult SLANG_MCALL IComponentTypeRecorder::getTargetCompileResult(
-    SlangInt targetIndex,
-    slang::ICompileResult** outCompileResult,
-    slang::IBlob** outDiagnostics)
-{
-    // No need to record this call.
-    return m_actualComponentType->getTargetCompileResult(
-        targetIndex,
-        outCompileResult,
-        outDiagnostics);
 }
 
 SLANG_NO_THROW SlangResult IComponentTypeRecorder::getResultAsFileSystem(

@@ -118,7 +118,7 @@ static const FourCC::RawValue kObjectDefinitionListFourCC = SLANG_FOUR_CC('o', '
 } // namespace RIFFSerial
 
 /// Serializer implementation for writing to a tree of RIFF chunks.
-struct RIFFSerialWriter : ISerializerImpl
+struct RIFFSerialWriter
 {
 public:
     /// Construct a writer to append to the given RIFF `chunk`.
@@ -160,10 +160,10 @@ private:
         void* ptr;
 
         /// Callback that can be invoked to serialize the object's data.
-        Callback callback;
+        SerializerCallback callback;
 
-        /// User-data pointer for `callback`
-        void* userData;
+        /// Context pointer for `callback`
+        void* context;
     };
 
     /// The chunk where object definitions are listed.
@@ -196,56 +196,62 @@ private:
     // of the `ISerializerImpl` interface:
     //
 
-    virtual SerializationMode getMode() override;
+    SerializationMode getMode();
 
-    virtual void handleBool(bool& value) override;
+    void handleBool(bool& value);
 
-    virtual void handleInt8(int8_t& value) override;
-    virtual void handleInt16(int16_t& value) override;
-    virtual void handleInt32(Int32& value) override;
-    virtual void handleInt64(Int64& value) override;
+    void handleInt8(int8_t& value);
+    void handleInt16(int16_t& value);
+    void handleInt32(Int32& value);
+    void handleInt64(Int64& value);
 
-    virtual void handleUInt8(uint8_t& value) override;
-    virtual void handleUInt16(uint16_t& value) override;
-    virtual void handleUInt32(UInt32& value) override;
-    virtual void handleUInt64(UInt64& value) override;
+    void handleUInt8(uint8_t& value);
+    void handleUInt16(uint16_t& value);
+    void handleUInt32(UInt32& value);
+    void handleUInt64(UInt64& value);
 
-    virtual void handleFloat32(float& value) override;
-    virtual void handleFloat64(double& value) override;
+    void handleFloat32(float& value);
+    void handleFloat64(double& value);
 
-    virtual void handleString(String& value) override;
+    void handleString(String& value);
 
-    virtual void beginArray() override;
-    virtual void endArray() override;
+    struct Scope
+    {
+        // The RIFF serialization back-end is currently
+        // not taking advantage of the `Scope` facility
+        // in the serialization framework.
+    };
 
-    virtual void beginDictionary() override;
-    virtual void endDictionary() override;
+    void beginArray(Scope&);
+    void endArray(Scope&);
 
-    virtual bool hasElements() override;
+    void beginDictionary(Scope&);
+    void endDictionary(Scope&);
 
-    virtual void beginStruct() override;
-    virtual void endStruct() override;
+    bool hasElements();
 
-    virtual void beginVariant() override;
-    virtual void endVariant() override;
+    void beginStruct(Scope&);
+    void endStruct(Scope&);
 
-    virtual void handleFieldKey(char const* name, Int index) override;
+    void beginVariant(Scope&);
+    void endVariant(Scope&);
 
-    virtual void beginTuple() override;
-    virtual void endTuple() override;
+    void handleFieldKey(char const* name, Int index);
 
-    virtual void beginOptional() override;
-    virtual void endOptional() override;
+    void beginTuple(Scope&);
+    void endTuple(Scope&);
 
-    virtual void handleSharedPtr(void*& value, Callback callback, void* userData) override;
-    virtual void handleUniquePtr(void*& value, Callback callback, void* userData) override;
+    void beginOptional(Scope&);
+    void endOptional(Scope&);
 
-    virtual void handleDeferredObjectContents(void* valuePtr, Callback callback, void* userData)
-        override;
+    void handleSharedPtr(void*& value, SerializerCallback callback, void* context);
+    void handleUniquePtr(void*& value, SerializerCallback callback, void* context);
+
+    void handleDeferredObjectContents(void* valuePtr, SerializerCallback callback, void* context);
 };
 
 /// Serializer implementation for reading from a tree of RIFF chunks.
-struct RIFFSerialReader : ISerializerImpl
+struct RIFFSerialReader
 {
 public:
     /// Construct a reader to read data from the given `chunk`.
@@ -261,6 +267,19 @@ public:
     /// might be pending.
     ///
     ~RIFFSerialReader();
+
+    /// Read a chunk from the current cursor position.
+    ///
+    /// This operation can be used to skip over an entire value
+    /// that might otherwise need to be read with a sequence of
+    /// operations of the `ISerializerImpl` interface.
+    ///
+    /// The saved pointer can then be used to construct another
+    /// `RIFFSerialReader` to read the contents of the chunk
+    /// at some later time, or code can simply navigate the
+    /// chunk in memory using their own logic.
+    ///
+    RIFF::Chunk const* readChunk();
 
 private:
     /// Representation of a read cursor in the serialized RIFF data.
@@ -342,10 +361,10 @@ private:
         Cursor savedCursor;
 
         /// The callback to apply to read data into the `valuePtr`
-        Callback callback;
+        SerializerCallback callback;
 
-        /// The user-data pointer for the `callback`.
-        void* userData;
+        /// The context pointer for the `callback`.
+        void* context;
     };
 
     /// Deferred actions that are still pending.
@@ -386,52 +405,58 @@ private:
     // of the `ISerializerImpl` interface:
     //
 
-    virtual SerializationMode getMode() override;
+    SerializationMode getMode();
 
-    virtual void handleBool(bool& value) override;
+    void handleBool(bool& value);
 
-    virtual void handleInt8(int8_t& value) override;
-    virtual void handleInt16(int16_t& value) override;
-    virtual void handleInt32(Int32& value) override;
-    virtual void handleInt64(Int64& value) override;
+    void handleInt8(int8_t& value);
+    void handleInt16(int16_t& value);
+    void handleInt32(Int32& value);
+    void handleInt64(Int64& value);
 
-    virtual void handleUInt8(uint8_t& value) override;
-    virtual void handleUInt16(uint16_t& value) override;
-    virtual void handleUInt32(UInt32& value) override;
-    virtual void handleUInt64(UInt64& value) override;
+    void handleUInt8(uint8_t& value);
+    void handleUInt16(uint16_t& value);
+    void handleUInt32(UInt32& value);
+    void handleUInt64(UInt64& value);
 
-    virtual void handleFloat32(float& value) override;
-    virtual void handleFloat64(double& value) override;
+    void handleFloat32(float& value);
+    void handleFloat64(double& value);
 
-    virtual void handleString(String& value) override;
+    void handleString(String& value);
 
-    virtual void beginArray() override;
-    virtual void endArray() override;
+    struct Scope
+    {
+        // The RIFF serialization back-end is currently
+        // not taking advantage of the `Scope` facility
+        // in the serialization framework.
+    };
 
-    virtual void beginDictionary() override;
-    virtual void endDictionary() override;
+    void beginArray(Scope&);
+    void endArray(Scope&);
 
-    virtual bool hasElements() override;
+    void beginDictionary(Scope&);
+    void endDictionary(Scope&);
 
-    virtual void beginStruct() override;
-    virtual void endStruct() override;
+    bool hasElements();
 
-    virtual void beginVariant() override;
-    virtual void endVariant() override;
+    void beginStruct(Scope&);
+    void endStruct(Scope&);
 
-    virtual void handleFieldKey(char const* name, Int index) override;
+    void beginVariant(Scope&);
+    void endVariant(Scope&);
 
-    virtual void beginTuple() override;
-    virtual void endTuple() override;
+    void handleFieldKey(char const* name, Int index);
 
-    virtual void beginOptional() override;
-    virtual void endOptional() override;
+    void beginTuple(Scope&);
+    void endTuple(Scope&);
 
-    virtual void handleSharedPtr(void*& value, Callback callback, void* userData) override;
-    virtual void handleUniquePtr(void*& value, Callback callback, void* userData) override;
+    void beginOptional(Scope&);
+    void endOptional(Scope&);
 
-    virtual void handleDeferredObjectContents(void* valuePtr, Callback callback, void* userData)
-        override;
+    void handleSharedPtr(void*& value, SerializerCallback callback, void* context);
+    void handleUniquePtr(void*& value, SerializerCallback callback, void* context);
+
+    void handleDeferredObjectContents(void* valuePtr, SerializerCallback callback, void* context);
 };
 
 } // namespace Slang

@@ -1,5 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -32,6 +33,7 @@ struct Foo<T : IDifferentiable>
 extension<T : IDifferentiable> Foo<T>
 {
     [ForwardDerivativeOf(doThing)]
+    [NoDiffThis]
     DifferentialPair<T> diff_doThing()
     {
         return diffPair(value, T.dzero());

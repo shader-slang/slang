@@ -1,6 +1,7 @@
 // slang-fiddle-scrape.cpp
 #include "slang-fiddle-scrape.h"
 
+#include "core/slang-string-util.h"
 #include "slang-fiddle-script.h"
 
 namespace fiddle
@@ -144,6 +145,7 @@ public:
             break;
 
         case TokenType::IntegerLiteral:
+        case TokenType::StringLiteral:
             {
                 auto token = read();
                 return new LiteralExpr(token);
@@ -237,6 +239,8 @@ public:
 
     RefPtr<Expr> parseCppSimpleTypeSpecififer()
     {
+        while (advanceIf("const") || advanceIf("static"))
+            ;
 
         switch (peekType())
         {
@@ -396,14 +400,14 @@ public:
         addDecl(decl);
         WithParentDecl withParent(this, decl);
 
-        // We expect any `FIDDLE()`-marked aggregate type
-        // declaration to start with a `FIDDLE(...)` invocation,
-        // so that there is a suitable insertion point for
-        // the expansion step.
+        // We expect any `FIDDLE()`-marked aggregate type declaration to start
+        // with a `FIDDLE(...)` or `FIDDLE(myFunc(a,b,c))` invocation, so that
+        // there is a suitable insertion point for the expansion step or the
+        // user has specific a custom step
         //
         {
             auto saved = _cursor;
-            bool found = peekFiddleEllipsisInvocation();
+            bool found = peekFiddleEllipsisInvocation() || peekFiddleLuaCall();
             _cursor = saved;
             if (!found)
             {
@@ -430,6 +434,15 @@ public:
             return false;
 
         return true;
+    }
+
+    bool peekFiddleLuaCall()
+    {
+        auto saved = _cursor;
+        const bool found = advanceIf(TokenType::Identifier) &&
+                           (peekType() == TokenType::LParent || peekType() == TokenType::LBrace);
+        _cursor = saved;
+        return found;
     }
 
     RefPtr<Declarator> parseCppSimpleDeclarator()
@@ -467,7 +480,8 @@ public:
 
     RefPtr<Declarator> parseCppDeclarator()
     {
-        advanceIf("const");
+        while (advanceIf("const") || advanceIf("static"))
+            ;
 
         if (advanceIf(TokenType::OpMul))
         {
@@ -558,20 +572,30 @@ public:
                 return modifiers;
 
             case TokenType::Identifier:
+                if (advanceIf("abstract"))
+                {
+                    modifiers.add(new AbstractModifier());
+                }
+                else if (advanceIf("hidden"))
+                {
+                    modifiers.add(new HiddenModifier());
+                }
+                else
+                {
+                    return modifiers;
+                }
                 break;
-            }
 
-            if (advanceIf("abstract"))
-            {
-                modifiers.add(new AbstractModifier());
-            }
-            else if (advanceIf("hidden"))
-            {
-                modifiers.add(new HiddenModifier());
-            }
-            else
-            {
-                return modifiers;
+            case TokenType::LBrace:
+                {
+                    const auto b = read();
+                    StringBuilder sb;
+                    sb << b.getContent();
+                    for (int i = 0; i < b.getSkipCount(); ++i)
+                        sb << read().getContent() << " ";
+                    modifiers.add(new TableModifier(std::move(sb)));
+                }
+                break;
             }
         }
 
@@ -771,20 +795,41 @@ public:
 
             if (peekType() != TokenType::RParent)
             {
-                // In this case we are expecting a fiddle-mode declaration
-                // to appear, in which case we will allow any number of full
-                // fiddle-mode declarations, but won't expect a C++-mode
-                // declaration to follow.
+                if (peekFiddleLuaCall())
+                {
+                    StringBuilder sb;
+                    const auto f = expect(TokenType::Identifier);
+                    const auto b = read();
+                    sb << f.getContent() << b.getContent();
+                    for (int i = 0; i < b.getSkipCount(); ++i)
+                        sb << read().getContent() << " ";
+                    auto fiddleLuaCall = RefPtr(new FiddleLuaCallInvocation());
+                    fiddleLuaCall->fiddleToken = fiddleToken;
+                    fiddleLuaCall->parentDecl = _currentParentDecl;
+                    fiddleLuaCall->callString = std::move(sb);
+                    addDecl(fiddleLuaCall);
 
-                // TODO: We should associate these declarations
-                // as children of the `FiddleMacroInvocation`,
-                // so that they can be emitted as part of its
-                // expansion (if we decide to make more use
-                // of the `FIDDLE()` approach...).
+                    expect(TokenType::RParent);
+                    return;
+                }
+                else
+                {
 
-                parseFiddleModeDecls(fiddleModifiers);
-                expect(TokenType::RParent);
-                return;
+                    // In this case we are expecting a fiddle-mode declaration
+                    // to appear, in which case we will allow any number of full
+                    // fiddle-mode declarations, but won't expect a C++-mode
+                    // declaration to follow.
+
+                    // TODO: We should associate these declarations
+                    // as children of the `FiddleMacroInvocation`,
+                    // so that they can be emitted as part of its
+                    // expansion (if we decide to make more use
+                    // of the `FIDDLE()` approach...).
+
+                    parseFiddleModeDecls(fiddleModifiers);
+                    expect(TokenType::RParent);
+                    return;
+                }
             }
             expect(TokenType::RParent);
         }
@@ -1036,6 +1081,9 @@ private:
         else if (as<FiddleMacroInvocation>(decl))
         {
         }
+        else if (as<FiddleLuaCallInvocation>(decl))
+        {
+        }
         else
         {
             sink.diagnose(SourceLoc(), Diagnostics::unexpected, "case in checkDecl", "known type");
@@ -1092,6 +1140,7 @@ private:
     }
 };
 
+void push(lua_State* L, Val* val);
 
 // Emit
 
@@ -1101,6 +1150,7 @@ private:
     SourceManager& _sourceManager;
     RefPtr<LogicalModule> _module;
     StringBuilder& _builder;
+    DiagnosticSink& _sink;
 
 public:
     EmitContext(
@@ -1108,9 +1158,8 @@ public:
         DiagnosticSink& sink,
         SourceManager& sourceManager,
         LogicalModule* module)
-        : _builder(builder), _sourceManager(sourceManager), _module(module)
+        : _builder(builder), _sourceManager(sourceManager), _module(module), _sink(sink)
     {
-        SLANG_UNUSED(sink);
     }
 
     void emitMacrosRec(Decl* decl)
@@ -1130,20 +1179,23 @@ private:
         {
             emitMacroForFiddleInvocation(fiddleMacroInvocation);
         }
+        else if (const auto fiddleLuaCallInvocation = as<FiddleLuaCallInvocation>(decl))
+        {
+            emitMacroForFiddleLuaCallInvocation(fiddleLuaCallInvocation);
+        }
         else
         {
             // do nothing with most decls
         }
     }
 
-    void emitMacroForFiddleInvocation(FiddleMacroInvocation* fiddleInvocation)
-    {
-        SourceLoc loc = fiddleInvocation->fiddleToken.getLoc();
-        auto humaneLoc = _sourceManager.getHumaneLoc(loc);
-        auto lineNumber = humaneLoc.line;
-
 #define MACRO_LINE_ENDING " \\\n"
 
+    void emitMacroForFiddleInvocationPreamble(const TokenWithTrivia& fiddleToken)
+    {
+        const auto loc = fiddleToken.getLoc();
+        const auto humaneLoc = _sourceManager.getHumaneLoc(loc);
+        const auto lineNumber = humaneLoc.line;
         // Un-define the old `FIDDLE_#` macro for the
         // given line number, since this file might
         // be pulling in another generated header
@@ -1159,6 +1211,52 @@ private:
         _builder.append(lineNumber);
         _builder.append("(...)");
         _builder.append(MACRO_LINE_ENDING);
+    }
+
+    void emitMacroForFiddleInvocationPostamble() { _builder.append("/* end */\n\n"); }
+
+    void emitMacroForFiddleLuaCallInvocation(FiddleLuaCallInvocation* fiddleInvocation)
+    {
+        _builder.append("/*\n");
+        _builder.append(fiddleInvocation->callString);
+        _builder.append("\n*/\n");
+
+        emitMacroForFiddleInvocationPreamble(fiddleInvocation->fiddleToken);
+
+        const auto file =
+            _sourceManager.getHumaneLoc(fiddleInvocation->fiddleToken.getLoc()).pathInfo.getName();
+        StringBuilder sb;
+        sb << "require(\"" << file << ".lua\")." << fiddleInvocation->callString;
+
+        // Create the fiddle table
+        const auto L = getLuaState();
+        lua_newtable(L);
+        push(L, fiddleInvocation->parentDecl);
+        lua_setfield(L, -2, "current_decl");
+        lua_setglobal(L, "fiddle");
+
+        const auto output = evaluateLuaExpression(
+            fiddleInvocation->fiddleToken.getLoc(),
+            file,
+            sb.produceString(),
+            &_sink);
+
+        // Deregister the fiddle table
+        lua_pushnil(L);
+        lua_setglobal(L, "fiddle");
+
+        _builder.append(StringUtil::replaceAll(
+            output.getUnownedSlice(),
+            UnownedStringSlice("\n"),
+            UnownedStringSlice(MACRO_LINE_ENDING)));
+
+        _builder.append(MACRO_LINE_ENDING);
+        emitMacroForFiddleInvocationPostamble();
+    }
+
+    void emitMacroForFiddleInvocation(FiddleMacroInvocation* fiddleInvocation)
+    {
+        emitMacroForFiddleInvocationPreamble(fiddleInvocation->fiddleToken);
 
         auto decl = as<AggTypeDecl>(fiddleInvocation->node);
         if (decl)
@@ -1195,7 +1293,7 @@ private:
             }
             _builder.append("public:" MACRO_LINE_ENDING);
         }
-        _builder.append("/* end */\n\n");
+        emitMacroForFiddleInvocationPostamble();
     }
 
     void emitTypedDecl(Expr* expr, const char* name)
@@ -1504,20 +1602,18 @@ bool findOutputFileIncludeDirective(List<TokenWithTrivia> tokens, String outputF
 RefPtr<SourceUnit> parseSourceUnit(
     SourceView* inputSourceView,
     LogicalModule* logicalModule,
-    RootNamePool* rootNamePool,
+    NamePool* namePool,
     DiagnosticSink* sink,
     SourceManager* sourceManager,
     String outputFileName)
 {
     Lexer lexer;
-    NamePool namePool;
-    namePool.setRootNamePool(rootNamePool);
 
     // We suppress any diagnostics that might get emitted during lexing,
     // so that we can ignore any files we don't understand.
     //
     DiagnosticSink lexerSink;
-    lexer.initialize(inputSourceView, &lexerSink, &namePool, sourceManager->getMemoryArena());
+    lexer.initialize(inputSourceView, &lexerSink, namePool, sourceManager->getMemoryArena());
 
     auto inputTokens = lexer.lexAllTokens();
     auto tokensWithTrivia = collectTokensWithTrivia(inputTokens);
@@ -1566,6 +1662,14 @@ void push(lua_State* L, List<T> const& values)
     }
 }
 
+List<RefPtr<AggTypeDecl>> getDirectSubclasses(AggTypeDecl* decl)
+{
+    List<RefPtr<AggTypeDecl>> result;
+    for (auto subclass : decl->directSubTypeDecls)
+        result.add(subclass);
+    return result;
+}
+
 void getAllSubclasses(AggTypeDecl* decl, List<RefPtr<AggTypeDecl>>& ioSubclasses)
 {
     ioSubclasses.add(decl);
@@ -1604,6 +1708,57 @@ int _indexVal(lua_State* L)
     Val* val = (Val*)lua_touserdata(L, 1);
     char const* name = lua_tostring(L, 2);
 
+    // If we have some user data attached to this declaration, index that
+    if (auto decl = as<Decl>(val))
+    {
+        if (auto tableModifier = decl->findModifier<TableModifier>())
+        {
+            // Check if we have a cached table
+            if (tableModifier->tableRef == LUA_NOREF)
+            {
+                // Evaluate the table string and cache it
+                std::string tableCode =
+                    "return " + std::string(tableModifier->tableSource.getBuffer());
+
+                if (luaL_dostring(L, tableCode.c_str()) == LUA_OK)
+                {
+                    // Store the table in the registry
+                    tableModifier->tableRef = luaL_ref(L, LUA_REGISTRYINDEX);
+                }
+                else
+                {
+                    // Handle error - pop error message and continue
+                    lua_pop(L, 1);
+                }
+            }
+
+            // If we have a cached table, try to index it
+            if (tableModifier->tableRef != LUA_NOREF)
+            {
+                // Get the cached table from registry
+                lua_rawgeti(L, LUA_REGISTRYINDEX, tableModifier->tableRef);
+
+                // Index the table with the requested name
+                lua_pushstring(L, name);
+                lua_gettable(L, -2);
+
+                // Remove the table from stack, leaving just the result
+                lua_remove(L, -2);
+
+                // Check if we found something
+                if (!lua_isnil(L, -1))
+                {
+                    return 1;
+                }
+                else
+                {
+                    lua_pop(L, 1); // Pop the nil
+                    // Fall through to check other properties
+                }
+            }
+        }
+    }
+
     if (auto containerDecl = as<ContainerDecl>(val))
     {
         for (auto m : containerDecl->members)
@@ -1616,25 +1771,35 @@ int _indexVal(lua_State* L)
         }
     }
 
-    if (auto classDecl = as<ClassDecl>(val))
+    if (auto aggTypeDecl = as<AggTypeDecl>(val))
     {
+        if (strcmp(name, "directSubclasses") == 0)
+        {
+            auto value = getDirectSubclasses(aggTypeDecl);
+            push(L, value);
+            return 1;
+        }
+
         if (strcmp(name, "subclasses") == 0)
         {
-            auto value = getAllSubclasses(classDecl);
+            auto value = getAllSubclasses(aggTypeDecl);
             push(L, value);
             return 1;
         }
 
         if (strcmp(name, "directSuperClass") == 0)
         {
-            push(L, classDecl->directBaseType);
+            push(L, aggTypeDecl->directBaseType);
             return 1;
         }
+    }
 
+    if (auto aggTypeDecl = as<AggTypeDecl>(val))
+    {
         if (strcmp(name, "directFields") == 0)
         {
             List<RefPtr<Decl>> fields;
-            for (auto m : classDecl->members)
+            for (auto m : aggTypeDecl->members)
             {
                 if (auto f = as<VarDecl>(m))
                     fields.add(f);
@@ -1650,6 +1815,47 @@ int _indexVal(lua_State* L)
         {
             lua_pushboolean(L, decl->findModifier<AbstractModifier>() != nullptr);
             return 1;
+        }
+        if (strcmp(name, "getDebugVisType") == 0)
+        {
+            auto aggTypeDecl = as<AggTypeDecl>(decl);
+            if (aggTypeDecl)
+            {
+                if (aggTypeDecl->isSubTypeOf("Decl"))
+                    lua_pushstring(L, "SyntaxClassInfoDebugVisType::Decl");
+                else if (aggTypeDecl->isSubTypeOf("Expr"))
+                    lua_pushstring(L, "SyntaxClassInfoDebugVisType::Expr");
+                else if (aggTypeDecl->isSubTypeOf("Modifier"))
+                    lua_pushstring(L, "SyntaxClassInfoDebugVisType::Modifier");
+                else if (aggTypeDecl->isSubTypeOf("Stmt"))
+                    lua_pushstring(L, "SyntaxClassInfoDebugVisType::Stmt");
+                else if (aggTypeDecl->isSubTypeOf("Val"))
+                    lua_pushstring(L, "SyntaxClassInfoDebugVisType::Val");
+                else if (aggTypeDecl->isSubTypeOf("Scope"))
+                    lua_pushstring(L, "SyntaxClassInfoDebugVisType::Scope");
+                else
+                    lua_pushstring(L, "SyntaxClassInfoDebugVisType::Unknown");
+            }
+            else
+                lua_pushstring(L, "SyntaxClassInfoDebugVisType::Unknown");
+            return 1;
+        }
+    }
+
+    if (auto varDecl = as<VarDecl>(val))
+    {
+        if (strcmp(name, "initExpr") == 0)
+        {
+            // TODO: do any expression here
+            if (const auto literalExpr = as<LiteralExpr>(varDecl->initExpr))
+            {
+                lua_pushlstring(
+                    L,
+                    literalExpr->token.getContent().begin(),
+                    literalExpr->token.getContent().getLength());
+                return 1;
+            }
+            return 0;
         }
     }
 

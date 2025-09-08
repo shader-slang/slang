@@ -1,5 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -35,6 +36,7 @@ struct A
     float o;
 
     [ForwardDifferentiable]
+    [NoDiffThis]
     float doSomethingDifferentiable(float b)
     {
         return o + b;

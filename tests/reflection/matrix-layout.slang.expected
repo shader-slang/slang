@@ -23,7 +23,7 @@ standard output = {
                                     "scalarType": "float32"
                                 }
                             },
-                            "binding": {"kind": "uniform", "offset": 0, "size": 60}
+                            "binding": {"kind": "uniform", "offset": 0, "size": 60, "elementStride": 0}
                         },
                         {
                             "name": "ab",
@@ -36,7 +36,7 @@ standard output = {
                                     "scalarType": "float32"
                                 }
                             },
-                            "binding": {"kind": "uniform", "offset": 64, "size": 48}
+                            "binding": {"kind": "uniform", "offset": 64, "size": 48, "elementStride": 0}
                         },
                         {
                             "name": "ac",
@@ -49,7 +49,7 @@ standard output = {
                                     "scalarType": "float32"
                                 }
                             },
-                            "binding": {"kind": "uniform", "offset": 112, "size": 60}
+                            "binding": {"kind": "uniform", "offset": 112, "size": 60, "elementStride": 0}
                         }
                     ]
                 },
@@ -71,7 +71,7 @@ standard output = {
                                         "scalarType": "float32"
                                     }
                                 },
-                                "binding": {"kind": "uniform", "offset": 0, "size": 60}
+                                "binding": {"kind": "uniform", "offset": 0, "size": 60, "elementStride": 0}
                             },
                             {
                                 "name": "ab",
@@ -84,7 +84,7 @@ standard output = {
                                         "scalarType": "float32"
                                     }
                                 },
-                                "binding": {"kind": "uniform", "offset": 64, "size": 48}
+                                "binding": {"kind": "uniform", "offset": 64, "size": 48, "elementStride": 0}
                             },
                             {
                                 "name": "ac",
@@ -97,11 +97,11 @@ standard output = {
                                         "scalarType": "float32"
                                     }
                                 },
-                                "binding": {"kind": "uniform", "offset": 112, "size": 60}
+                                "binding": {"kind": "uniform", "offset": 112, "size": 60, "elementStride": 0}
                             }
                         ]
                     },
-                    "binding": {"kind": "uniform", "offset": 0, "size": 172}
+                    "binding": {"kind": "uniform", "offset": 0, "size": 172, "elementStride": 0}
                 }
             }
         },
@@ -130,7 +130,7 @@ standard output = {
                                                 "scalarType": "float32"
                                             }
                                         },
-                                        "binding": {"kind": "uniform", "offset": 0, "size": 60}
+                                        "binding": {"kind": "uniform", "offset": 0, "size": 60, "elementStride": 0}
                                     },
                                     {
                                         "name": "bb",
@@ -143,7 +143,7 @@ standard output = {
                                                 "scalarType": "float32"
                                             }
                                         },
-                                        "binding": {"kind": "uniform", "offset": 64, "size": 48}
+                                        "binding": {"kind": "uniform", "offset": 64, "size": 48, "elementStride": 0}
                                     },
                                     {
                                         "name": "bc",
@@ -156,11 +156,11 @@ standard output = {
                                                 "scalarType": "float32"
                                             }
                                         },
-                                        "binding": {"kind": "uniform", "offset": 112, "size": 60}
+                                        "binding": {"kind": "uniform", "offset": 112, "size": 60, "elementStride": 0}
                                     }
                                 ]
                             },
-                            "binding": {"kind": "uniform", "offset": 0, "size": 172}
+                            "binding": {"kind": "uniform", "offset": 0, "size": 172, "elementStride": 0}
                         }
                     ]
                 },
@@ -188,7 +188,7 @@ standard output = {
                                                     "scalarType": "float32"
                                                 }
                                             },
-                                            "binding": {"kind": "uniform", "offset": 0, "size": 60}
+                                            "binding": {"kind": "uniform", "offset": 0, "size": 60, "elementStride": 0}
                                         },
                                         {
                                             "name": "bb",
@@ -201,7 +201,7 @@ standard output = {
                                                     "scalarType": "float32"
                                                 }
                                             },
-                                            "binding": {"kind": "uniform", "offset": 64, "size": 48}
+                                            "binding": {"kind": "uniform", "offset": 64, "size": 48, "elementStride": 0}
                                         },
                                         {
                                             "name": "bc",
@@ -214,15 +214,15 @@ standard output = {
                                                     "scalarType": "float32"
                                                 }
                                             },
-                                            "binding": {"kind": "uniform", "offset": 112, "size": 60}
+                                            "binding": {"kind": "uniform", "offset": 112, "size": 60, "elementStride": 0}
                                         }
                                     ]
                                 },
-                                "binding": {"kind": "uniform", "offset": 0, "size": 172}
+                                "binding": {"kind": "uniform", "offset": 0, "size": 172, "elementStride": 0}
                             }
                         ]
                     },
-                    "binding": {"kind": "uniform", "offset": 0, "size": 172}
+                    "binding": {"kind": "uniform", "offset": 0, "size": 172, "elementStride": 0}
                 }
             }
         }

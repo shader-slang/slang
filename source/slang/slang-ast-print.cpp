@@ -610,6 +610,15 @@ void ASTPrinter::addExpr(Expr* expr)
         }
         sb << ")";
     }
+    else if (const auto addressOfExpr = as<AddressOfExpr>(expr))
+    {
+        sb << "__getAddress(";
+        if (addressOfExpr->arg)
+        {
+            addExpr(addressOfExpr->arg);
+        }
+        sb << ")";
+    }
     else if (const auto makeOptionalExpr = as<MakeOptionalExpr>(expr))
     {
         if (makeOptionalExpr->value)
@@ -1129,6 +1138,7 @@ void ASTPrinter::addVal(Val* val)
 
 /* static */ void ASTPrinter::appendDeclName(Decl* decl, StringBuilder& out)
 {
+    decl = maybeGetInner(decl);
     if (as<ConstructorDecl>(decl))
     {
         out << "init";
@@ -1168,8 +1178,34 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
 {
     auto& sb = m_builder;
 
-    // Find the parent declaration
-    auto parentDeclRef = declRef.getParent();
+    // Find the parent declaration.
+    DeclRef<Decl> parentDeclRef;
+
+    // If this is a lookup decl ref, prefix with the lookup source type instead of the parent.
+    if (auto lookupDeclRef = as<LookupDeclRef>(declRef.declRefBase))
+    {
+        if (auto extractExistentialType =
+                as<ExtractExistentialType>(lookupDeclRef->getLookupSource()))
+        {
+            parentDeclRef = extractExistentialType->getOriginalInterfaceDeclRef();
+        }
+        else
+        {
+            parentDeclRef = isDeclRefTypeOf<Decl>(lookupDeclRef->getLookupSource());
+        }
+        if (as<ThisTypeDecl>(parentDeclRef.getDecl()))
+        {
+            if (auto baseLookupDeclRef = as<LookupDeclRef>(parentDeclRef.declRefBase))
+            {
+                // If the base type is a lookup, we want to use its source type
+                parentDeclRef = isDeclRefTypeOf<Decl>(baseLookupDeclRef->getLookupSource());
+            }
+        }
+    }
+    else
+    {
+        parentDeclRef = declRef.getParent();
+    }
 
     // If the immediate parent is a generic, then we probably
     // want the declaration above that...
@@ -1180,9 +1216,13 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
     }
 
     // Depending on what the parent is, we may want to format things specially
-    if (auto aggTypeDeclRef = parentDeclRef.as<AggTypeDecl>())
+    if (parentDeclRef.as<ThisTypeDecl>())
     {
-        _addDeclPathRec(aggTypeDeclRef, depth + 1);
+        sb << "This.";
+    }
+    else if (parentDeclRef.as<AggTypeDecl>() || parentDeclRef.as<SimpleTypeDecl>())
+    {
+        _addDeclPathRec(parentDeclRef, depth + 1);
         sb << toSlice(".");
     }
     else if (auto namespaceDeclRef = parentDeclRef.as<NamespaceDecl>())
@@ -1201,8 +1241,7 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
     }
     else if (auto extensionDeclRef = parentDeclRef.as<ExtensionDecl>())
     {
-        ExtensionDecl* extensionDecl = as<ExtensionDecl>(parentDeclRef.getDecl());
-        Type* type = extensionDecl->targetType.type;
+        Type* type = getTargetType(m_astBuilder, extensionDeclRef);
         if (m_optionFlags & OptionFlag::NoSpecializedExtensionTypeName)
         {
             if (auto unspecializedDeclRef = isDeclRefTypeOf<Decl>(type))
@@ -1283,12 +1322,34 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
         else if (depth > 0)
         {
             // Write out the generic parameters (only if the depth allows it)
-            addGenericParams(parentGenericDeclRef);
+            addGenericParams(parentGenericDeclRef, nullptr);
         }
     }
 }
 
-void ASTPrinter::addGenericParams(const DeclRef<GenericDecl>& genericDeclRef)
+struct ParamScope
+{
+    StringBuilder* sb;
+    List<Range<Index>>* paramRanges;
+    Index rangeStart;
+    ParamScope(StringBuilder* inSb, List<Range<Index>>* outParamRanges)
+        : sb(inSb), paramRanges(outParamRanges)
+    {
+        rangeStart = sb->getLength();
+    }
+    ~ParamScope()
+    {
+        if (paramRanges)
+        {
+            Index rangeEnd = sb->getLength();
+            paramRanges->add(makeRange<Index>(rangeStart, rangeEnd));
+        }
+    }
+};
+
+void ASTPrinter::addGenericParams(
+    const DeclRef<GenericDecl>& genericDeclRef,
+    List<Range<Index>>* outParamRanges)
 {
     auto& sb = m_builder;
 
@@ -1301,7 +1362,7 @@ void ASTPrinter::addGenericParams(const DeclRef<GenericDecl>& genericDeclRef)
             if (!first)
                 sb << ", ";
             first = false;
-
+            ParamScope paramScope(&sb, outParamRanges);
             {
                 ScopePart scopePart(this, Part::Type::GenericParamType);
                 sb << getText(genericTypeParam.getName());
@@ -1312,17 +1373,15 @@ void ASTPrinter::addGenericParams(const DeclRef<GenericDecl>& genericDeclRef)
             if (!first)
                 sb << ", ";
             first = false;
-
-            {
-                ScopePart scopePart(this, Part::Type::GenericParamValue);
-                sb << getText(genericValParam.getName());
-            }
-
-            sb << ":";
-
+            ParamScope paramScope(&sb, outParamRanges);
             {
                 ScopePart scopePart(this, Part::Type::GenericParamValueType);
                 addType(getType(m_astBuilder, genericValParam));
+            }
+            sb << " ";
+            {
+                ScopePart scopePart(this, Part::Type::GenericParamValue);
+                sb << getText(genericValParam.getName());
             }
         }
         else if (auto genericTypePackParam = paramDeclRef.as<GenericTypePackParamDecl>())
@@ -1330,6 +1389,7 @@ void ASTPrinter::addGenericParams(const DeclRef<GenericDecl>& genericDeclRef)
             if (!first)
                 sb << ", ";
             first = false;
+            ParamScope paramScope(&sb, outParamRanges);
             {
                 ScopePart scopePart(this, Part::Type::GenericParamType);
                 sb << "each ";
@@ -1355,8 +1415,6 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef, List<Range<Index>>*
         bool first = true;
         for (auto paramDeclRef : getParameters(m_astBuilder, funcDeclRef))
         {
-            auto rangeStart = sb.getLength();
-
             ParamDecl* paramDecl = paramDeclRef.getDecl();
             auto paramType = getType(m_astBuilder, paramDeclRef);
 
@@ -1365,8 +1423,9 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef, List<Range<Index>>*
                 if (!first)
                 {
                     sb << ", ";
-                    rangeStart += 2;
                 }
+
+                ParamScope paramScope(&sb, outParamRange);
 
                 // Type part.
                 {
@@ -1414,11 +1473,6 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef, List<Range<Index>>*
                     sb << " = ";
                     addExpr(paramDecl->initExpr);
                 }
-
-                auto rangeEnd = sb.getLength();
-
-                if (outParamRange)
-                    outParamRange->add(makeRange<Index>(rangeStart, rangeEnd));
                 first = false;
             };
             if (auto typePack = as<ConcreteTypePack>(paramType))
@@ -1439,11 +1493,7 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef, List<Range<Index>>*
     }
     else if (auto genericDeclRef = declRef.as<GenericDecl>())
     {
-        addGenericParams(genericDeclRef);
-
-        addDeclParams(
-            m_astBuilder->getMemberDeclRef(genericDeclRef, genericDeclRef.getDecl()->inner),
-            outParamRange);
+        addGenericParams(genericDeclRef, outParamRange);
     }
     else
     {
@@ -1493,6 +1543,8 @@ void ASTPrinter::addDeclKindPrefix(Decl* decl)
                 if (as<GLSLLayoutModifierGroupMarker>(modifier))
                     continue;
                 if (as<HLSLLayoutSemantic>(modifier))
+                    continue;
+                if (as<ImplicitConversionModifier>(modifier))
                     continue;
             }
             // Don't print out attributes.

@@ -1,10 +1,10 @@
 name: Check Formatting (comment /format to auto-fix)
 
 on:
-  push:
-    branches: [master]
   pull_request:
     branches: [master]
+  merge_group:
+    types: [checks_requested]
 jobs:
   check-formatting:
     runs-on: ubuntu-latest

@@ -41,7 +41,7 @@ function(slang_add_target dir type)
         # building respectively
         EXPORT_MACRO_PREFIX
         # Ignore target type and use a particular style of export macro
-        # _DYNAMIC or _STATIC, this is useful when the target type is OBJECT 
+        # _DYNAMIC or _STATIC, this is useful when the target type is OBJECT
         # pass in STATIC or SHARED
         EXPORT_TYPE_AS
         # The folder in which to place this target for IDE-based generators (VS
@@ -414,7 +414,18 @@ function(slang_add_target dir type)
     #
     # Link and include from dependencies
     #
-    target_link_libraries(${target} PRIVATE ${ARG_LINK_WITH_PRIVATE})
+    if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.26")
+        target_link_libraries(
+            ${target}
+            PRIVATE $<BUILD_LOCAL_INTERFACE:${ARG_LINK_WITH_PRIVATE}>
+        )
+    else()
+        target_link_libraries(
+            ${target}
+            PRIVATE $<BUILD_INTERFACE:${ARG_LINK_WITH_PRIVATE}>
+        )
+    endif()
+
     target_link_libraries(${target} PUBLIC ${ARG_LINK_WITH_PUBLIC})
 
     if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
@@ -448,15 +459,24 @@ function(slang_add_target dir type)
         get_filename_component(inc_abs ${inc} ABSOLUTE)
         target_include_directories(
             ${target}
-            PUBLIC "$<BUILD_INTERFACE:${inc_abs}>"
+            PUBLIC
+                "$<BUILD_INTERFACE:${inc_abs}>"
+                "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
         )
     endforeach()
     foreach(inc ${ARG_INCLUDE_DIRECTORIES_PRIVATE})
         get_filename_component(inc_abs ${inc} ABSOLUTE)
-        target_include_directories(
-            ${target}
-            PRIVATE "$<BUILD_INTERFACE:${inc_abs}>"
-        )
+        if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.26")
+            target_include_directories(
+                ${target}
+                PRIVATE "$<BUILD_LOCAL_INTERFACE:${inc_abs}>"
+            )
+        else()
+            target_include_directories(
+                ${target}
+                PRIVATE "$<BUILD_INTERFACE:${inc_abs}>"
+            )
+        endif()
     endforeach()
 
     #

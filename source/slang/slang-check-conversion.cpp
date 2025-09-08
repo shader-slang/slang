@@ -346,6 +346,8 @@ Expr* SemanticsVisitor::_createCtorInvokeExpr(
     auto* varExpr = getASTBuilder()->create<VarExpr>();
     varExpr->type = (QualType)getASTBuilder()->getTypeType(toType);
     varExpr->declRef = isDeclRefTypeOf<Decl>(toType);
+    varExpr->loc = loc;
+    varExpr->checked = true;
 
     auto* constructorExpr = getASTBuilder()->create<ExplicitCtorInvokeExpr>();
     constructorExpr->functionExpr = varExpr;
@@ -382,6 +384,8 @@ bool SemanticsVisitor::createInvokeExprForExplicitCtor(
                 fromInitializerListExpr->args);
 
             DiagnosticSink tempSink(getSourceManager(), nullptr);
+            tempSink.setFlags(getSink()->getFlags());
+
             SemanticsVisitor subVisitor(withSink(&tempSink));
             ctorInvokeExpr = subVisitor.CheckTerm(ctorInvokeExpr);
 
@@ -395,6 +399,12 @@ bool SemanticsVisitor::createInvokeExprForExplicitCtor(
                     getSink()->diagnoseRaw(
                         Severity::Error,
                         static_cast<char const*>(blob->getBufferPointer()));
+                    // For non-c-style types, we will always return true when there
+                    // is a ctor, so that we do not fallback to legacy initializer list logic
+                    // in `_coerceInitializerList()` and produce unrelated errors.
+                    if (outExpr)
+                        *outExpr = CreateErrorExpr(ctorInvokeExpr);
+                    return true;
                 }
                 return false;
             }
@@ -418,6 +428,9 @@ bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
 
     if (!structDecl)
         return false;
+
+    if (!structDecl->checkState.isBeingChecked())
+        ensureDecl(structDecl, DeclCheckState::AttributesChecked);
 
     HashSet<Type*> isVisit;
     bool isCStyle = false;
@@ -656,8 +669,8 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
                 auto toMakeArrayFromElementExpr = m_astBuilder->create<MakeArrayFromElementExpr>();
                 toMakeArrayFromElementExpr->loc = fromInitializerListExpr->loc;
                 toMakeArrayFromElementExpr->type = QualType(toType);
-
-                *outToExpr = toMakeArrayFromElementExpr;
+                if (outToExpr)
+                    *outToExpr = toMakeArrayFromElementExpr;
                 return true;
             }
             for (UInt ee = 0; ee < elementCount; ++ee)
@@ -748,8 +761,8 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
                 auto defaultConstructExpr = m_astBuilder->create<DefaultConstructExpr>();
                 defaultConstructExpr->loc = fromInitializerListExpr->loc;
                 defaultConstructExpr->type = QualType(toType);
-
-                *outToExpr = defaultConstructExpr;
+                if (outToExpr)
+                    *outToExpr = defaultConstructExpr;
                 return true;
             }
 
@@ -953,13 +966,13 @@ bool SemanticsVisitor::_coerceInitializerList(
     }
 
     // We will fall back to the legacy logic of initialize list.
+    Expr* outInitListExpr = nullptr;
     if (!_readAggregateValueFromInitializerList(
             toType,
-            outToExpr,
+            &outInitListExpr,
             fromInitializerListExpr,
             argIndex))
         return false;
-
     if (argIndex != argCount)
     {
         if (outToExpr)
@@ -971,6 +984,8 @@ bool SemanticsVisitor::_coerceInitializerList(
                 argCount);
         }
     }
+    if (outToExpr)
+        *outToExpr = outInitListExpr;
 
     return true;
 }
@@ -1176,10 +1191,10 @@ bool SemanticsVisitor::_coerce(
     // then we should start by trying to resolve the ambiguous reference
     // based on prioritization of the different candidates.
     //
-    // TODO: A more powerful model would be to try to coerce each
+    // If `fromExpr` is overloaded, we will try to coerce each
     // of the constituent overload candidates, filtering down to
     // those that are coercible, and then disambiguating the result.
-    // Such an approach would let us disambiguate between overloaded
+    // Such an approach lets us disambiguate between overloaded
     // symbols based on their type (e.g., by casting the name of
     // an overloaded function to the type of the overload we mean
     // to reference).
@@ -1187,10 +1202,48 @@ bool SemanticsVisitor::_coerce(
     if (auto fromOverloadedExpr = as<OverloadedExpr>(fromExpr))
     {
         auto resolvedExpr =
-            maybeResolveOverloadedExpr(fromOverloadedExpr, LookupMask::Default, nullptr);
+            maybeResolveOverloadedExpr(fromOverloadedExpr, LookupMask::Default, toType, nullptr);
 
         fromExpr = resolvedExpr;
         fromType = resolvedExpr->type;
+    }
+    else if (auto overloadedExpr2 = as<OverloadedExpr2>(fromExpr))
+    {
+        ShortList<Expr*> coercibleCandidates;
+        for (auto candidate : overloadedExpr2->candidateExprs)
+        {
+            if (canCoerce(toType, candidate->type, candidate))
+                coercibleCandidates.add(candidate);
+        }
+        if (coercibleCandidates.getCount() == 1)
+        {
+            return _coerce(
+                site,
+                toType,
+                outToExpr,
+                coercibleCandidates[0]->type,
+                coercibleCandidates[0],
+                sink,
+                outCost);
+        }
+        if (sink)
+        {
+            auto firstCandidate = overloadedExpr2->candidateExprs.getCount() > 0
+                                      ? overloadedExpr2->candidateExprs[0]
+                                      : nullptr;
+            if (auto declCandidate = as<DeclRefExpr>(firstCandidate))
+            {
+                sink->diagnose(
+                    fromExpr->loc,
+                    Diagnostics::ambiguousReference,
+                    declCandidate->declRef);
+            }
+            else
+            {
+                sink->diagnose(fromExpr->loc, Diagnostics::ambiguousExpression);
+            }
+        }
+        return false;
     }
 
     // An important and easy case is when the "to" and "from" types are equal.
@@ -1427,7 +1480,11 @@ bool SemanticsVisitor::_coerce(
                 }
                 if (outToExpr)
                 {
-                    *outToExpr = fromExpr;
+                    auto castExpr = getASTBuilder()->create<BuiltinCastExpr>();
+                    castExpr->type = toType;
+                    castExpr->loc = fromExpr->loc;
+                    castExpr->base = fromExpr;
+                    *outToExpr = castExpr;
                 }
                 return true;
             }
@@ -1692,6 +1749,8 @@ bool SemanticsVisitor::_coerce(
             }
         }
 
+        bool result = true;
+
         // Conceptually, we want to treat the conversion as
         // possible, but report it as ambiguous if we actually
         // need to reify the result as an expression.
@@ -1701,9 +1760,17 @@ bool SemanticsVisitor::_coerce(
             if (sink)
             {
                 sink->diagnose(fromExpr, Diagnostics::ambiguousConversion, fromType, toType);
+                for (auto candidate : overloadContext.bestCandidates)
+                {
+                    sink->diagnose(
+                        candidate.item.declRef,
+                        Diagnostics::seeDeclarationOf,
+                        candidate.item.declRef);
+                }
             }
 
             *outToExpr = CreateErrorExpr(fromExpr);
+            result = false;
         }
 
         if (!cachedMethod)
@@ -1715,7 +1782,7 @@ bool SemanticsVisitor::_coerce(
 
         if (outCost)
             *outCost = bestCost;
-        return true;
+        return result;
     }
     else if (overloadContext.bestCandidate)
     {
@@ -1861,9 +1928,18 @@ bool SemanticsVisitor::_coerce(
             castExpr->arguments.add(args[0]);
         }
         if (!cachedMethod)
-            getShared()->cacheImplicitCastMethod(
-                implicitCastKey,
-                ImplicitCastMethod{*overloadContext.bestCandidate, cost});
+        {
+            // We can only cache the method if it is a public, otherwise we may not be able to
+            // use this method depending on where we are performing the coercion.
+            if (overloadContext.bestCandidate->item.declRef &&
+                getDeclVisibility(overloadContext.bestCandidate->item.declRef.getDecl()) ==
+                    DeclVisibility::Public)
+            {
+                getShared()->cacheImplicitCastMethod(
+                    implicitCastKey,
+                    ImplicitCastMethod{*overloadContext.bestCandidate, cost});
+            }
+        }
         return true;
     }
     if (!cachedMethod)

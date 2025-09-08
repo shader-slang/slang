@@ -144,22 +144,22 @@ void RIFFSerialWriter::_writeFloat(double value)
     }
 }
 
-void RIFFSerialWriter::beginArray()
+void RIFFSerialWriter::beginArray(Scope&)
 {
     _cursor.beginListChunk(RIFFSerial::kArrayFourCC);
 }
 
-void RIFFSerialWriter::endArray()
+void RIFFSerialWriter::endArray(Scope&)
 {
     _cursor.endChunk();
 }
 
-void RIFFSerialWriter::beginDictionary()
+void RIFFSerialWriter::beginDictionary(Scope&)
 {
     _cursor.beginListChunk(RIFFSerial::kDictionaryFourCC);
 }
 
-void RIFFSerialWriter::endDictionary()
+void RIFFSerialWriter::endDictionary(Scope&)
 {
     _cursor.endChunk();
 }
@@ -169,24 +169,24 @@ bool RIFFSerialWriter::hasElements()
     return false;
 }
 
-void RIFFSerialWriter::beginStruct()
+void RIFFSerialWriter::beginStruct(Scope&)
 {
     _cursor.beginListChunk(RIFFSerial::kStructFourCC);
 }
 
-void RIFFSerialWriter::endStruct()
+void RIFFSerialWriter::endStruct(Scope&)
 {
     _cursor.endChunk();
 }
 
-void RIFFSerialWriter::beginVariant()
+void RIFFSerialWriter::beginVariant(Scope& scope)
 {
-    beginStruct();
+    beginStruct(scope);
 }
 
-void RIFFSerialWriter::endVariant()
+void RIFFSerialWriter::endVariant(Scope& scope)
 {
-    endStruct();
+    endStruct(scope);
 }
 
 void RIFFSerialWriter::handleFieldKey(char const* name, Int index)
@@ -197,27 +197,27 @@ void RIFFSerialWriter::handleFieldKey(char const* name, Int index)
     SLANG_UNUSED(index);
 }
 
-void RIFFSerialWriter::beginTuple()
+void RIFFSerialWriter::beginTuple(Scope&)
 {
     _cursor.beginListChunk(RIFFSerial::kTupleFourCC);
 }
 
-void RIFFSerialWriter::endTuple()
+void RIFFSerialWriter::endTuple(Scope&)
 {
     _cursor.endChunk();
 }
 
-void RIFFSerialWriter::beginOptional()
+void RIFFSerialWriter::beginOptional(Scope&)
 {
     _cursor.beginListChunk(RIFFSerial::kOptionalFourCC);
 }
 
-void RIFFSerialWriter::endOptional()
+void RIFFSerialWriter::endOptional(Scope&)
 {
     _cursor.endChunk();
 }
 
-void RIFFSerialWriter::handleSharedPtr(void*& value, Callback callback, void* userData)
+void RIFFSerialWriter::handleSharedPtr(void*& value, SerializerCallback callback, void* context)
 {
     // Because we are writing, we only care about the
     // pointer that is already present in `value`.
@@ -279,22 +279,22 @@ void RIFFSerialWriter::handleSharedPtr(void*& value, Callback callback, void* us
     ObjectInfo objectInfo;
     objectInfo.ptr = ptr;
     objectInfo.callback = callback;
-    objectInfo.userData = userData;
+    objectInfo.context = context;
     _objects.add(objectInfo);
 }
 
-void RIFFSerialWriter::handleUniquePtr(void*& value, Callback callback, void* userData)
+void RIFFSerialWriter::handleUniquePtr(void*& value, SerializerCallback callback, void* context)
 {
     // We treat all pointers as shared pointers, because there isn't really
     // an optimized representation we would want to use for the unique case.
     //
-    handleSharedPtr(value, callback, userData);
+    handleSharedPtr(value, callback, context);
 }
 
 void RIFFSerialWriter::handleDeferredObjectContents(
     void* valuePtr,
-    Callback callback,
-    void* userData)
+    SerializerCallback callback,
+    void* context)
 {
     // Because we are already deferring writing of the *entirety* of
     // an object's members as part of how `handleSharedPtr()` works,
@@ -303,7 +303,7 @@ void RIFFSerialWriter::handleDeferredObjectContents(
     // (In practice the `handleDeferredObjectContents()` operation is
     // more for the benefit of reading than writing).
     //
-    callback(valuePtr, userData);
+    callback(valuePtr, this, context);
 }
 
 void RIFFSerialWriter::_writeObjectReference(ObjectIndex index)
@@ -363,7 +363,7 @@ void RIFFSerialWriter::_flush()
         // can set the pointed-to pointer to whatever object it
         // allocates or finds.
         //
-        objectInfo.callback(&objectInfo.ptr, objectInfo.userData);
+        objectInfo.callback(&objectInfo.ptr, this, objectInfo.context);
 
         // TODO(tfoley): There is an important invariant here that
         // the callback had better only write *one* value, but
@@ -485,23 +485,22 @@ void RIFFSerialReader::handleString(String& value)
     _advanceCursor();
 }
 
-void RIFFSerialReader::beginArray()
+void RIFFSerialReader::beginArray(Scope&)
 {
     _beginListChunk(RIFFSerial::kArrayFourCC);
 }
 
-void RIFFSerialReader::endArray()
+void RIFFSerialReader::endArray(Scope&)
 {
     _endListChunk();
 }
 
-
-void RIFFSerialReader::beginDictionary()
+void RIFFSerialReader::beginDictionary(Scope&)
 {
     _beginListChunk(RIFFSerial::kDictionaryFourCC);
 }
 
-void RIFFSerialReader::endDictionary()
+void RIFFSerialReader::endDictionary(Scope&)
 {
     _endListChunk();
 }
@@ -511,24 +510,24 @@ bool RIFFSerialReader::hasElements()
     return _cursor.get() != nullptr;
 }
 
-void RIFFSerialReader::beginStruct()
+void RIFFSerialReader::beginStruct(Scope&)
 {
     _beginListChunk(RIFFSerial::kStructFourCC);
 }
 
-void RIFFSerialReader::endStruct()
+void RIFFSerialReader::endStruct(Scope&)
 {
     _endListChunk();
 }
 
-void RIFFSerialReader::beginVariant()
+void RIFFSerialReader::beginVariant(Scope& scope)
 {
-    beginStruct();
+    beginStruct(scope);
 }
 
-void RIFFSerialReader::endVariant()
+void RIFFSerialReader::endVariant(Scope& scope)
 {
-    endStruct();
+    endStruct(scope);
 }
 
 void RIFFSerialReader::handleFieldKey(char const* name, Int index)
@@ -539,22 +538,22 @@ void RIFFSerialReader::handleFieldKey(char const* name, Int index)
     SLANG_UNUSED(index);
 }
 
-void RIFFSerialReader::beginTuple()
+void RIFFSerialReader::beginTuple(Scope&)
 {
     _beginListChunk(RIFFSerial::kTupleFourCC);
 }
 
-void RIFFSerialReader::endTuple()
+void RIFFSerialReader::endTuple(Scope&)
 {
     _endListChunk();
 }
 
-void RIFFSerialReader::beginOptional()
+void RIFFSerialReader::beginOptional(Scope&)
 {
     _beginListChunk(RIFFSerial::kOptionalFourCC);
 }
 
-void RIFFSerialReader::endOptional()
+void RIFFSerialReader::endOptional(Scope&)
 {
     _endListChunk();
 }
@@ -572,7 +571,7 @@ RIFFSerialReader::ObjectIndex RIFFSerialReader::_readObjectReference()
     return objectIndex;
 }
 
-void RIFFSerialReader::handleSharedPtr(void*& value, Callback callback, void* userData)
+void RIFFSerialReader::handleSharedPtr(void*& value, SerializerCallback callback, void* context)
 {
     // The logic here largely mirrors what appears in
     // `RIFFSerialWriter::handleSharedPtr`.
@@ -686,7 +685,7 @@ void RIFFSerialReader::handleSharedPtr(void*& value, Callback callback, void* us
     // that objects and stores a pointer to it into the output
     // parameter.
     //
-    callback(&objectInfo.ptr, userData);
+    callback(&objectInfo.ptr, this, context);
 
     _popCursor();
 
@@ -695,7 +694,7 @@ void RIFFSerialReader::handleSharedPtr(void*& value, Callback callback, void* us
     value = objectInfo.ptr;
 }
 
-void RIFFSerialReader::handleUniquePtr(void*& value, Callback callback, void* userData)
+void RIFFSerialReader::handleUniquePtr(void*& value, SerializerCallback callback, void* userData)
 {
     // We treat all pointers as shared pointers, because there isn't really
     // an optimized representation we would want to use for the unique case.
@@ -705,8 +704,8 @@ void RIFFSerialReader::handleUniquePtr(void*& value, Callback callback, void* us
 
 void RIFFSerialReader::handleDeferredObjectContents(
     void* valuePtr,
-    Callback callback,
-    void* userData)
+    SerializerCallback callback,
+    void* context)
 {
     // Unlike the case in `RIFFSerialWriter::handleDeferredObjectContents()`,
     // we very much *do* want to delay invoking the callback until later.
@@ -726,7 +725,7 @@ void RIFFSerialReader::handleDeferredObjectContents(
     deferredAction.savedCursor = _cursor;
     deferredAction.valuePtr = valuePtr;
     deferredAction.callback = callback;
-    deferredAction.userData = userData;
+    deferredAction.context = context;
 
     _deferredActions.add(deferredAction);
 }
@@ -777,7 +776,7 @@ void RIFFSerialReader::_flush()
         _deferredActions.removeLast();
 
         _cursor = deferredAction.savedCursor;
-        deferredAction.callback(deferredAction.valuePtr, deferredAction.userData);
+        deferredAction.callback(deferredAction.valuePtr, this, deferredAction.context);
     }
 }
 

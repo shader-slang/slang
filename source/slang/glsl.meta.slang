@@ -127,28 +127,32 @@ public in uvec3 gl_WorkGroupID : SV_GroupID;
 public in uint gl_LocalInvocationIndex : SV_GroupIndex;
 public in uvec3 gl_LocalInvocationID : SV_GroupThreadID;
 
-public property uint3 gl_NumWorkGroups {
-
-    [require(glsl_spirv, GLSL_430_SPIRV_1_0_compute)]
-    get 
+internal in int _gl_DeviceIndex : SV_DeviceIndex;
+public property int gl_DeviceIndex
+{
+    [__unsafeForceInlineEarly]
+    [require(glsl_spirv, GL_EXT_device_group)]
+    get
     {
-        __target_switch
-        {
-        case glsl:
-            __intrinsic_asm "(gl_NumWorkGroups)";
-        case spirv:
-            return spirv_asm {
-                    result:$$uint3 = OpLoad builtin(NumWorkgroups:uint3);
-                };
-        }
+        return _gl_DeviceIndex;
     }
 }
 
-[require(compute)]
+public property uint3 gl_NumWorkGroups
+{
+    [require(glsl_spirv, GLSL_430_SPIRV_1_0_compute)]
+    [require(glsl_spirv, meshshading)]
+    get 
+    {
+        return WorkgroupCount();
+    }
+}
+
 public property uint3 gl_WorkGroupSize
 {
     [__unsafeForceInlineEarly]
     [require(compute)]
+    [require(meshshading)]
     get
     {
         return WorkgroupSize();
@@ -211,6 +215,11 @@ public in int gl_ViewIndex : SV_ViewID;
 public in int gl_ViewportIndex : SV_ViewportArrayIndex;
 public in int gl_BaseVertex : SV_StartVertexLocation;
 public in int gl_BaseInstance : SV_StartInstanceLocation;
+
+public in int gl_FragInvocationCountEXT : SV_FragInvocationCount;
+public in int2 gl_FragSizeEXT : SV_FragSize;
+
+public in float2 gl_SamplePosition : SV_VulkanSamplePosition;
 
 
 // Override operator* behavior to compute algebric product of matrices and vectors.
@@ -294,7 +303,7 @@ public extension vector<T, 3>
 
 [ForceInline]
 [OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_spirv)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
 public bool operator==<T:__BuiltinArithmeticType, let N:int>(vector<T, N> left, vector<T, N> right)
 {
     return all(equal(left, right));
@@ -302,7 +311,7 @@ public bool operator==<T:__BuiltinArithmeticType, let N:int>(vector<T, N> left, 
 
 [ForceInline]
 [OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_spirv)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
 public bool operator!=<T:__BuiltinArithmeticType, let N:int>(vector<T, N> left, vector<T, N> right)
 {
     return any(notEqual(left, right));
@@ -310,7 +319,7 @@ public bool operator!=<T:__BuiltinArithmeticType, let N:int>(vector<T, N> left, 
 
 [ForceInline]
 [OverloadRank(14)]
-[require(cpp_cuda_glsl_hlsl_spirv)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
 public bool operator==<T:__BuiltinFloatingPointType, let N:int>(vector<T, N> left, vector<T, N> right)
 {
     return all(equal(left, right));
@@ -318,7 +327,7 @@ public bool operator==<T:__BuiltinFloatingPointType, let N:int>(vector<T, N> lef
 
 [ForceInline]
 [OverloadRank(14)]
-[require(cpp_cuda_glsl_hlsl_spirv)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
 public bool operator!=<T:__BuiltinFloatingPointType, let N:int>(vector<T, N> left, vector<T, N> right)
 {
     return any(notEqual(left, right));
@@ -326,7 +335,7 @@ public bool operator!=<T:__BuiltinFloatingPointType, let N:int>(vector<T, N> lef
 
 [ForceInline]
 [OverloadRank(14)]
-[require(cpp_cuda_glsl_hlsl_spirv)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
 public bool operator==<T:__BuiltinLogicalType, let N:int>(vector<T, N> left, vector<T, N> right)
 {
     return all(equal(left, right));
@@ -334,7 +343,7 @@ public bool operator==<T:__BuiltinLogicalType, let N:int>(vector<T, N> left, vec
 
 [ForceInline]
 [OverloadRank(14)]
-[require(cpp_cuda_glsl_hlsl_spirv)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
 public bool operator!=<T:__BuiltinLogicalType, let N:int>(vector<T, N> left, vector<T, N> right)
 {
     return any(notEqual(left, right));
@@ -347,7 +356,7 @@ for (auto type : kBaseTypes) {
 }}}}
 [ForceInline]
 [OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_spirv)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
 public bool operator==<let N:int>(vector<$(typeName), N> left, vector<$(typeName), N> right)
 {
     return all(equal(left, right));
@@ -355,7 +364,7 @@ public bool operator==<let N:int>(vector<$(typeName), N> left, vector<$(typeName
 
 [ForceInline]
 [OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_spirv)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
 public bool operator!=<let N:int>(vector<$(typeName), N> left, vector<$(typeName), N> right)
 {
     return any(notEqual(left, right));
@@ -4771,9 +4780,9 @@ public property uint3 gl_LaunchSizeEXT
 // casting conflict due to the spirv implementation of PrimitiveIndex().
 internal in uint __gl_PrimitiveID : SV_PrimitiveID;
 
-public property int gl_PrimitiveID 
+public property int gl_PrimitiveID
 {
-    [require(cuda_glsl_hlsl_spirv)]
+    [require(cuda_glsl_hlsl_spirv, raytracing_allstages)]
     get 
     {
         __stage_switch
@@ -4789,9 +4798,9 @@ public property int gl_PrimitiveID
     }
 }
 
-public property int gl_InstanceID 
+public property int gl_InstanceID
 {
-    [require(cuda_glsl_hlsl_spirv)]
+    [require(cuda_glsl_hlsl_spirv, raytracing_allstages)]
     get 
     {
         __stage_switch
@@ -6257,7 +6266,7 @@ public void traceRayMotionNV(
 
 // GL_KHR_shader_subgroup_basic Built-in Variables
 
-[require(cpp_cuda_glsl_hlsl_spirv_wgsl, subgroup_basic)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_basic)]
 void requireGLSLExtForSubgroupBasicBuiltin() {
     __target_switch
     {
@@ -6281,7 +6290,7 @@ void setupExtForSubgroupBasicBuiltIn() {
 }
 
 __spirv_version(1.3)
-[require(cpp_cuda_glsl_hlsl_spirv_wgsl, subgroup_ballot)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
 void requireGLSLExtForSubgroupBallotBuiltin() {
     __target_switch
     {
@@ -6294,7 +6303,7 @@ void requireGLSLExtForSubgroupBallotBuiltin() {
 }
 
 __spirv_version(1.3)
-[require(cpp_cuda_glsl_hlsl_spirv_wgsl, subgroup_ballot)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
 void setupExtForSubgroupBallotBuiltIn() {
     __target_switch
     {
@@ -8197,7 +8206,7 @@ __generic<T : __BuiltinType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 [ForceInline]
-[require(glsl_hlsl_spirv, subgroup_quad)]
+[require(glsl_hlsl_metal_spirv, subgroup_quad)]
 public T subgroupQuadBroadcast(T value, uint id)
 {
     shader_subgroup_preamble<T>();
@@ -8240,9 +8249,9 @@ public T subgroupQuadSwapDiagonal(T value)
 
 __generic<T : __BuiltinType, let N : int>
 __spirv_version(1.3)
-__glsl_extension(GL_KHR_shader_subgroup_quad)
+    __glsl_extension(GL_KHR_shader_subgroup_quad)
 [ForceInline]
-[require(glsl_hlsl_spirv, subgroup_quad)]
+    [require(glsl_hlsl_metal_spirv, subgroup_quad)]
 public vector<T,N> subgroupQuadBroadcast(vector<T,N> value, uint id)
 {
     shader_subgroup_preamble<T>();
@@ -8466,7 +8475,7 @@ public vector<T, N> subgroupPartitionedInclusiveMulNV(vector<T, N> value, uvec4 
 
 __generic<T : __BuiltinArithmeticType>
 [ForceInline]
-[require(cuda_glsl_spirv, subgroup_partitioned)]
+[require(glsl_spirv, subgroup_partitioned)]
 public T subgroupPartitionedInclusiveMinNV(T value, uvec4 ballot)
 {
     return WaveMultiPrefixInclusiveMin(value, ballot);
@@ -8474,7 +8483,7 @@ public T subgroupPartitionedInclusiveMinNV(T value, uvec4 ballot)
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 [ForceInline]
-[require(cuda_glsl_spirv, subgroup_partitioned)]
+[require(glsl_spirv, subgroup_partitioned)]
 public vector<T, N> subgroupPartitionedInclusiveMinNV(vector<T, N> value, uvec4 ballot)
 {
     return WaveMultiPrefixInclusiveMin(value, ballot);
@@ -8482,7 +8491,7 @@ public vector<T, N> subgroupPartitionedInclusiveMinNV(vector<T, N> value, uvec4 
 
 __generic<T : __BuiltinArithmeticType>
 [ForceInline]
-[require(cuda_glsl_spirv, subgroup_partitioned)]
+[require(glsl_spirv, subgroup_partitioned)]
 public T subgroupPartitionedInclusiveMaxNV(T value, uvec4 ballot)
 {
     return WaveMultiPrefixInclusiveMax(value, ballot);
@@ -8490,7 +8499,7 @@ public T subgroupPartitionedInclusiveMaxNV(T value, uvec4 ballot)
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 [ForceInline]
-[require(cuda_glsl_spirv, subgroup_partitioned)]
+[require(glsl_spirv, subgroup_partitioned)]
 public vector<T, N> subgroupPartitionedInclusiveMaxNV(vector<T, N> value, uvec4 ballot)
 {
     return WaveMultiPrefixInclusiveMax(value, ballot);
@@ -8578,7 +8587,7 @@ public vector<T, N> subgroupPartitionedExclusiveMulNV(vector<T, N> value, uvec4 
 
 __generic<T : __BuiltinArithmeticType>
 [ForceInline]
-[require(cuda_glsl_spirv, subgroup_partitioned)]
+[require(glsl_spirv, subgroup_partitioned)]
 public T subgroupPartitionedExclusiveMinNV(T value, uvec4 ballot)
 {
     return WaveMultiPrefixExclusiveMin(value, ballot);
@@ -8586,7 +8595,7 @@ public T subgroupPartitionedExclusiveMinNV(T value, uvec4 ballot)
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 [ForceInline]
-[require(cuda_glsl_spirv, subgroup_partitioned)]
+[require(glsl_spirv, subgroup_partitioned)]
 public vector<T, N> subgroupPartitionedExclusiveMinNV(vector<T, N> value, uvec4 ballot)
 {
     return WaveMultiPrefixExclusiveMin(value, ballot);
@@ -8594,7 +8603,7 @@ public vector<T, N> subgroupPartitionedExclusiveMinNV(vector<T, N> value, uvec4 
 
 __generic<T : __BuiltinArithmeticType>
 [ForceInline]
-[require(cuda_glsl_spirv, subgroup_partitioned)]
+[require(glsl_spirv, subgroup_partitioned)]
 public T subgroupPartitionedExclusiveMaxNV(T value, uvec4 ballot)
 {
     return WaveMultiPrefixExclusiveMax(value, ballot);
@@ -8602,7 +8611,7 @@ public T subgroupPartitionedExclusiveMaxNV(T value, uvec4 ballot)
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 [ForceInline]
-[require(cuda_glsl_spirv, subgroup_partitioned)]
+[require(glsl_spirv, subgroup_partitioned)]
 public vector<T, N> subgroupPartitionedExclusiveMaxNV(vector<T, N> value, uvec4 ballot)
 {
     return WaveMultiPrefixExclusiveMax(value, ballot);

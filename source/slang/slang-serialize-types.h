@@ -5,6 +5,7 @@
 #include "../core/slang-array-view.h"
 #include "../core/slang-riff.h"
 #include "../core/slang-string-slice-pool.h"
+#include "slang-ir.h"
 
 // #include "slang-name.h"
 // #include "slang-source-loc.h"
@@ -12,25 +13,6 @@
 namespace Slang
 {
 class Module;
-
-// Options for IR/AST/Debug serialization
-
-struct SerialOptionFlag
-{
-    typedef uint32_t Type;
-    enum Enum : Type
-    {
-        RawSourceLocation =
-            0x01, ///< If set will store directly SourceLoc - only useful if current source locs
-                  ///< will be identical when read in (typically this is *NOT* the case)
-        SourceLocation = 0x02, ///< If set will output SourceLoc information, that can be
-                               ///< reconstructed when read after being stored.
-        ASTModule = 0x04, ///< If set will output AST modules - typically required, but potentially
-                          ///< not desired (for example with obsfucation)
-        IRModule = 0x08,  ///< If set will output IR modules - typically required
-    };
-};
-typedef SerialOptionFlag::Type SerialOptionFlags;
 
 struct SerialStringData
 {
@@ -126,6 +108,12 @@ struct PropertyKeys<Module>
     static const FourCC::RawValue Digest = SLANG_FOUR_CC('S', 'H', 'A', '1');
     static const FourCC::RawValue ASTModule = SLANG_FOUR_CC('a', 's', 't', ' ');
     static const FourCC::RawValue FileDependencies = SLANG_FOUR_CC('f', 'd', 'e', 'p');
+};
+
+template<>
+struct PropertyKeys<IRModule>
+{
+    static const FourCC::RawValue IRModule = SLANG_FOUR_CC('i', 'r', ' ', ' ');
 };
 
 // For types/FourCC that work for serializing in general (not just IR).

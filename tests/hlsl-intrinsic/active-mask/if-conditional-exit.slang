@@ -7,9 +7,9 @@
 
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute 
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -profile cs_6_0
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -render-features cuda_sm_7_0
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -capability cuda_sm_7_0
 
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name buffer
@@ -21,10 +21,10 @@ RWStructuredBuffer<int> buffer;
 void test(int tid)
 {
 	WRITE(0);
-	if(tid & 1)
+	if((tid & 1) != 0)
 	{
 		WRITE(1);
-		if(tid & 2)
+		if((tid & 2) != 0)
 		{
 			WRITE(2);
 			return;

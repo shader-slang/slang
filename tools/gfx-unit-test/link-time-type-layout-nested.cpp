@@ -1,9 +1,9 @@
 #include "core/slang-blob.h"
 #include "gfx-test-util.h"
-#include "slang-gfx.h"
+#include "slang-rhi.h"
 #include "unit-test/slang-unit-test.h"
 
-using namespace gfx;
+using namespace rhi;
 
 namespace gfx_test
 {
@@ -17,8 +17,8 @@ static void diagnoseIfNeeded(Slang::ComPtr<slang::IBlob>& diagnosticsBlob)
 }
 
 static Slang::Result loadProgram(
-    gfx::IDevice* device,
-    Slang::ComPtr<gfx::IShaderProgram>& outShaderProgram,
+    rhi::IDevice* device,
+    Slang::ComPtr<rhi::IShaderProgram>& outShaderProgram,
     slang::ProgramLayout*& slangReflection)
 {
     // main.slang: declares the interface, extern struct Inner, and Outer struct with Inner field
@@ -35,9 +35,9 @@ static Slang::Result loadProgram(
         // Define a regular struct that contains an Inner field
         public struct Outer
         {
-            float2 position;
+            float2 position : POSITION;
             Inner innerData;
-            float2 texCoord;
+            float2 texCoord : TEXCOORD;
         };
 
         // Vertex shader entry point that takes an Outer parameter
@@ -56,7 +56,7 @@ static Slang::Result loadProgram(
         export public struct Inner : IFoo
         {
             public float4 getFoo() { return this.data; }
-            float4 data;
+            float4 data : COLOR;
         }
     )";
 
@@ -102,9 +102,9 @@ static Slang::Result loadProgram(
     slangReflection = composedProgram->getLayout();
 
     // Create a shader program
-    gfx::IShaderProgram::Desc programDesc = {};
+    ShaderProgramDesc programDesc = {};
     programDesc.slangGlobalScope = composedProgram.get();
-    auto shaderProgram = device->createProgram(programDesc);
+    auto shaderProgram = device->createShaderProgram(programDesc);
     outShaderProgram = shaderProgram;
 
     return SLANG_OK;
@@ -200,9 +200,9 @@ static void validateNestedExternStructLayout(
     SLANG_CHECK_MSG(foundDataField, "Could not find field 'data' in Inner struct");
 }
 
-void linkTimeTypeLayoutNestedImpl(gfx::IDevice* device, UnitTestContext* context)
+void linkTimeTypeLayoutNestedImpl(rhi::IDevice* device, UnitTestContext* context)
 {
-    Slang::ComPtr<gfx::IShaderProgram> shaderProgram;
+    Slang::ComPtr<rhi::IShaderProgram> shaderProgram;
     slang::ProgramLayout* slangReflection = nullptr;
 
     auto result = loadProgram(device, shaderProgram, slangReflection);
@@ -212,13 +212,29 @@ void linkTimeTypeLayoutNestedImpl(gfx::IDevice* device, UnitTestContext* context
     validateNestedExternStructLayout(context, slangReflection);
 
     // Create a graphics pipeline to verify everything works
-    GraphicsPipelineStateDesc pipelineDesc = {};
-    pipelineDesc.program = shaderProgram.get();
-    pipelineDesc.primitiveType = PrimitiveType::Triangle;
+    InputElementDesc inputElements[] = {
+        {"POSITION", 0, Format::RG32Float, 0, 0},  // Outer.position (float2)
+        {"COLOR", 0, Format::RGBA32Float, 8, 0},   // Outer.innerData.data (float4)
+        {"TEXCOORD", 0, Format::RG32Float, 24, 0}, // Outer.texCoord (float2)
+    };
+    VertexStreamDesc vertexStreams[] = {
+        {32, InputSlotClass::PerVertex, 0}, // sizeof(Outer) = 2*float2 + float4 = 32 bytes
+    };
+    InputLayoutDesc inputLayoutDesc = {};
+    inputLayoutDesc.inputElementCount = SLANG_COUNT_OF(inputElements);
+    inputLayoutDesc.inputElements = inputElements;
+    inputLayoutDesc.vertexStreamCount = SLANG_COUNT_OF(vertexStreams);
+    inputLayoutDesc.vertexStreams = vertexStreams;
+    auto inputLayout = device->createInputLayout(inputLayoutDesc);
+    SLANG_CHECK(inputLayout != nullptr);
 
-    ComPtr<gfx::IPipelineState> pipelineState;
-    auto pipelineResult =
-        device->createGraphicsPipelineState(pipelineDesc, pipelineState.writeRef());
+    RenderPipelineDesc pipelineDesc = {};
+    pipelineDesc.program = shaderProgram.get();
+    pipelineDesc.inputLayout = inputLayout;
+    pipelineDesc.primitiveTopology = PrimitiveTopology::TriangleList;
+
+    ComPtr<IRenderPipeline> pipelineState;
+    auto pipelineResult = device->createRenderPipeline(pipelineDesc, pipelineState.writeRef());
     SLANG_CHECK(SLANG_SUCCEEDED(pipelineResult));
 }
 
@@ -235,7 +251,7 @@ void linkTimeTypeLayoutNestedImpl(gfx::IDevice* device, UnitTestContext* context
 
 SLANG_UNIT_TEST(linkTimeTypeLayoutNested)
 {
-    runTestImpl(linkTimeTypeLayoutNestedImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
+    runTestImpl(linkTimeTypeLayoutNestedImpl, unitTestContext, DeviceType::Vulkan);
 }
 
 } // namespace gfx_test
