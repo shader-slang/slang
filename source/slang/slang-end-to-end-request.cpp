@@ -1588,7 +1588,10 @@ SlangResult EndToEndCompileRequest::compile()
         }
         else
         {
-            getSink()->diagnose(SourceLoc(), Diagnostics::noReflectionAvailableForModule, reflectionPath);
+            getSink()->diagnose(
+                SourceLoc(),
+                Diagnostics::noReflectionAvailableForModule,
+                reflectionPath);
         }
     }
 
