@@ -1022,7 +1022,6 @@ struct SimpleLayoutRulesImpl
 
     // Get layout for a descriptor handle type
     virtual SimpleLayoutInfo GetDescriptorHandleLayout(
-        TypeLayoutContext const& context,
         DescriptorHandleType* descriptorHandleType) = 0;
 };
 
@@ -1098,10 +1097,9 @@ struct LayoutRulesImpl
     }
 
     SimpleLayoutInfo GetDescriptorHandleLayout(
-        TypeLayoutContext const& context,
         DescriptorHandleType* descriptorHandleType)
     {
-        return simpleRules->GetDescriptorHandleLayout(context, descriptorHandleType);
+        return simpleRules->GetDescriptorHandleLayout(descriptorHandleType);
     }
 
     // Forward `ObjectLayoutRulesImpl` interface
