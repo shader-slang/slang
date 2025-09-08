@@ -183,6 +183,7 @@ NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
     }
     else if (auto shortStringType = as<ShortStringType>(type))
     {
+        SLANG_UNUSED(shortStringType);
         // Target dependant layout
         return NaturalSize::makeInvalid();
     }
