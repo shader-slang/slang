@@ -260,6 +260,26 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
     }
 
     bool DoStructuredBuffersNeedSeparateCounterBuffer() override { return true; }
+
+    SimpleLayoutInfo GetDescriptorHandleLayout(TypeLayoutContext const& context, DescriptorHandleType* descriptorHandleType) override
+    {
+        // If bindless resources are supported, use element type layout
+        if (areResourceTypesBindlessOnTarget(context.targetReq))
+        {
+            // For bindless targets, the descriptor handle has the same layout as its element type
+            auto elementType = descriptorHandleType->getElementType();
+            if (auto basicType = as<BasicExpressionType>(elementType))
+            {
+                return GetScalarLayout(basicType->getBaseType());
+            }
+            // For complex types, fall back to pointer size
+            return GetPointerLayout();
+        }
+
+        // For non-bindless targets, DescriptorHandle<T> is treated as uint2
+        auto uintInfo = GetScalarLayout(BaseType::UInt);
+        return GetVectorLayout(BaseType::UInt, uintInfo, 2);
+    }
 };
 
 /// Common behavior for GLSL-family layout.
@@ -635,6 +655,25 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
         // Conform to CUDA/C/C++ size is adjusted to the largest alignment
         ioStructInfo->size = _roundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
     }
+
+    SimpleLayoutInfo GetDescriptorHandleLayout(TypeLayoutContext const& context, DescriptorHandleType* descriptorHandleType) override
+    {
+        // If bindless resources are supported, use element type layout
+        if (areResourceTypesBindlessOnTarget(context.targetReq))
+        {
+            // For bindless targets, the descriptor handle has the same layout as its element type
+            auto elementType = descriptorHandleType->getElementType();
+            if (auto basicType = as<BasicExpressionType>(elementType))
+            {
+                return GetScalarLayout(basicType->getBaseType());
+            }
+            // For complex types, fall back to pointer size (uint64_t for CUDA)
+            return GetPointerLayout();
+        }
+
+        // For non-bindless CUDA targets, DescriptorHandle<T> is treated as uint64_t
+        return GetScalarLayout(BaseType::UInt64);
+    }
 };
 
 struct MetalLayoutRulesImpl : public CPULayoutRulesImpl
@@ -659,6 +698,25 @@ struct MetalLayoutRulesImpl : public CPULayoutRulesImpl
         vectorInfo.alignment = alignment;
 
         return vectorInfo;
+    }
+
+    SimpleLayoutInfo GetDescriptorHandleLayout(TypeLayoutContext const& context, DescriptorHandleType* descriptorHandleType) override
+    {
+        // If bindless resources are supported, use element type layout
+        if (areResourceTypesBindlessOnTarget(context.targetReq))
+        {
+            // For bindless targets, the descriptor handle has the same layout as its element type
+            auto elementType = descriptorHandleType->getElementType();
+            if (auto basicType = as<BasicExpressionType>(elementType))
+            {
+                return GetScalarLayout(basicType->getBaseType());
+            }
+            // For complex types, fall back to pointer size (uint64_t for Metal)
+            return GetPointerLayout();
+        }
+
+        // For non-bindless Metal targets, DescriptorHandle<T> is treated as uint64_t
+        return GetScalarLayout(BaseType::UInt64);
     }
 };
 
@@ -5079,10 +5137,8 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     {
         if (areResourceTypesBindlessOnTarget(context.targetReq))
             return _createTypeLayout(context, resPtrType->getElementType());
-        auto uint2Type = context.astBuilder->getVectorType(
-            context.astBuilder->getUIntType(),
-            context.astBuilder->getIntVal(context.astBuilder->getIntType(), 2));
-        return _createTypeLayout(context, uint2Type);
+        auto info = rules->GetDescriptorHandleLayout(context, resPtrType);
+        return createSimpleTypeLayout(info, type, rules);
     }
     else if (auto optionalType = as<OptionalType>(type))
     {
@@ -5781,16 +5837,23 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
 
         return typeLayout;
     }
-    else if (as<DescriptorHandleType>(type))
+    else if (auto descriptorHandleType = as<DescriptorHandleType>(type))
     {
-        // DescriptorHandle<T> should be treated as uint2 for varying parameter layout
-        // to ensure correct location assignment in SPIR-V generation.
-        auto astBuilder = context.astBuilder;
-        auto uint2Type = astBuilder->getVectorType(
-            astBuilder->getUIntType(),
-            astBuilder->getIntVal(astBuilder->getIntType(), 2));
+        // DescriptorHandle<T> layout depends on target:
+        // - SPIR-V: treated as uint2
+        // - CUDA/Metal: treated as uint64_t
+        RefPtr<TypeLayout> typeLayout = new TypeLayout();
+        typeLayout->type = type;
+        typeLayout->rules = rules;
 
-        return getSimpleVaryingParameterTypeLayout(context, uint2Type, directionMask);
+        for (int rr = 0; rr < varyingRulesCount; ++rr)
+        {
+            auto varyingRuleSet = varyingRules[rr];
+            auto info = varyingRuleSet->GetDescriptorHandleLayout(context, descriptorHandleType);
+            typeLayout->addResourceUsage(info.kind, info.size);
+        }
+
+        return typeLayout;
     }
 
     // catch-all case in case nothing matched
