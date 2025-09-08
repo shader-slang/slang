@@ -1096,8 +1096,7 @@ struct LayoutRulesImpl
         return simpleRules->DoStructuredBuffersNeedSeparateCounterBuffer();
     }
 
-    SimpleLayoutInfo GetDescriptorHandleLayout(
-        DescriptorHandleType* descriptorHandleType)
+    SimpleLayoutInfo GetDescriptorHandleLayout(DescriptorHandleType* descriptorHandleType)
     {
         return simpleRules->GetDescriptorHandleLayout(descriptorHandleType);
     }

@@ -261,8 +261,7 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
 
     bool DoStructuredBuffersNeedSeparateCounterBuffer() override { return true; }
 
-    SimpleLayoutInfo GetDescriptorHandleLayout(
-        DescriptorHandleType* descriptorHandleType) override
+    SimpleLayoutInfo GetDescriptorHandleLayout(DescriptorHandleType* descriptorHandleType) override
     {
         SLANG_UNUSED(descriptorHandleType);
         // For SPIR-V targets, DescriptorHandle<T> is treated as uint2
@@ -645,8 +644,7 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
         ioStructInfo->size = _roundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
     }
 
-    SimpleLayoutInfo GetDescriptorHandleLayout(
-        DescriptorHandleType* descriptorHandleType) override
+    SimpleLayoutInfo GetDescriptorHandleLayout(DescriptorHandleType* descriptorHandleType) override
     {
         SLANG_UNUSED(descriptorHandleType);
         // For CUDA targets, DescriptorHandle<T> is treated as uint64_t
@@ -678,8 +676,7 @@ struct MetalLayoutRulesImpl : public CPULayoutRulesImpl
         return vectorInfo;
     }
 
-    SimpleLayoutInfo GetDescriptorHandleLayout(
-        DescriptorHandleType* descriptorHandleType) override
+    SimpleLayoutInfo GetDescriptorHandleLayout(DescriptorHandleType* descriptorHandleType) override
     {
         SLANG_UNUSED(descriptorHandleType);
         // For Metal targets, DescriptorHandle<T> is treated as uint64_t
