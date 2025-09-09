@@ -439,9 +439,26 @@ Type* NativeRefType::getValueType()
     return as<Type>(_getGenericTypeArg(this, 0));
 }
 
-Val* PtrTypeBase::getAddressSpace()
+
+Val* PtrTypeBase::getAccessQualifier()
 {
     return _getGenericTypeArg(this, 1);
+}
+
+Val* PtrTypeBase::getAddressSpace()
+{
+    return _getGenericTypeArg(this, 2);
+}
+
+AccessQualifier tryGetAccessQualifierValue(Val* val)
+{
+    AccessQualifier accessQualifier = AccessQualifier::ReadWrite;
+
+    if (auto cintVal = as<ConstantIntVal>(val))
+    {
+        accessQualifier = (AccessQualifier)(cintVal->getValue());
+    }
+    return accessQualifier;
 }
 
 AddressSpace tryGetAddressSpaceValue(Val* addrSpaceVal)
@@ -460,19 +477,38 @@ void maybePrintAddrSpaceOperand(StringBuilder& out, AddressSpace addrSpace)
     switch (addrSpace)
     {
     case AddressSpace::Generic:
+        out << toSlice(", AddressSpace::Generic");
+        break;
     case AddressSpace::UserPointer:
+        // We expose UserPointer as Device to users
+        out << toSlice(", AddressSpace::Device");
         break;
     case AddressSpace::GroupShared:
-        out << toSlice(", groupshared");
+        out << toSlice(", AddressSpace::GroupShared");
         break;
     case AddressSpace::Global:
-        out << toSlice(", global");
+        out << toSlice(", AddressSpace::Global");
         break;
     case AddressSpace::ThreadLocal:
-        out << toSlice(", threadlocal");
+        out << toSlice(", AddressSpace::ThreadLocal");
         break;
     case AddressSpace::Uniform:
-        out << toSlice(", uniform");
+        out << toSlice(", AddressSpace::Uniform");
+        break;
+    default:
+        break;
+    }
+}
+
+void maybePrintAccessQualifierOperand(StringBuilder& out, AccessQualifier accessQualifier)
+{
+    switch (accessQualifier)
+    {
+    case AccessQualifier::ReadWrite:
+        out << toSlice(", Access::ReadWrite");
+        break;
+    case AccessQualifier::Read:
+        out << toSlice(", Access::Read");
         break;
     default:
         break;
@@ -481,20 +517,21 @@ void maybePrintAddrSpaceOperand(StringBuilder& out, AddressSpace addrSpace)
 
 void PtrType::_toTextOverride(StringBuilder& out)
 {
+    auto accessQualifier = tryGetAccessQualifierValue(getAccessQualifier());
     auto addrSpace = tryGetAddressSpaceValue(getAddressSpace());
-    if (addrSpace == AddressSpace::Generic)
-        out << toSlice("Addr<") << getValueType();
-    else
-        out << toSlice("Ptr<") << getValueType();
+    out << toSlice("Ptr<") << getValueType();
+    maybePrintAccessQualifierOperand(out, accessQualifier);
     maybePrintAddrSpaceOperand(out, addrSpace);
     out << toSlice(">");
 }
 
 void RefType::_toTextOverride(StringBuilder& out)
 {
+    auto accessQualifier = tryGetAccessQualifierValue(getAccessQualifier());
+    auto addrSpace = tryGetAddressSpaceValue(getAddressSpace());
     out << toSlice("Ref<") << getValueType();
-    auto addressSpaceVal = getAddressSpace();
-    maybePrintAddrSpaceOperand(out, tryGetAddressSpaceValue(addressSpaceVal));
+    maybePrintAccessQualifierOperand(out, accessQualifier);
+    maybePrintAddrSpaceOperand(out, addrSpace);
     out << toSlice(">");
 }
 

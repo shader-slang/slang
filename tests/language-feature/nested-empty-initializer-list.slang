@@ -1,5 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-dx12 -use-dxil -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-dx12 -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -shaderobj
 

@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=DX12):-slang -compute -dx12 -output-using-type -use-dxil -profile cs_6_5 -render-feature ray-query
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=DX12):-slang -compute -dx12 -output-using-type -profile cs_6_5 -render-feature ray-query
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=VK):-vk -emit-spirv-directly -compute -shaderobj -output-using-type -render-feature ray-query
 
 //TEST_INPUT: set accelStruct = AccelerationStructure

@@ -15,7 +15,7 @@ float test(MyType* pObj)
 {
     //SPV: OpTypePointer
     MyType* pNext = pObj + 1;
-    MyType* pNext2 = &pNext[1];
+    MyType* pNext2 = __getAddress(pNext[1]);
     return pNext.a + pNext->a + (*pNext2).a + pNext2[0].a;
 }
 

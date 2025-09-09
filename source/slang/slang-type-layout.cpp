@@ -2669,6 +2669,11 @@ bool isKhronosTarget(TargetRequest* targetReq)
     return isKhronosTarget(targetReq->getTarget());
 }
 
+bool isSPIRV(CodeGenTarget codeGenTarget)
+{
+    return codeGenTarget == CodeGenTarget::SPIRV || codeGenTarget == CodeGenTarget::SPIRVAssembly;
+}
+
 bool isCPUTarget(TargetRequest* targetReq)
 {
     return ArtifactDescUtil::isCpuLikeTarget(
@@ -4913,7 +4918,8 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     else if (auto vecType = as<VectorExpressionType>(type))
     {
         auto elementType = vecType->getElementType();
-        size_t elementCount = (size_t)getIntVal(vecType->getElementCount());
+        size_t elementCount =
+            (size_t)getIntVal(context.tryResolveLinkTimeVal(vecType->getElementCount()));
 
         auto element = _createTypeLayout(context, elementType);
 
@@ -4939,8 +4945,9 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     }
     else if (auto matType = as<MatrixExpressionType>(type))
     {
-        size_t rowCount = (size_t)getIntVal(matType->getRowCount());
-        size_t colCount = (size_t)getIntVal(matType->getColumnCount());
+        size_t rowCount = (size_t)getIntVal(context.tryResolveLinkTimeVal(matType->getRowCount()));
+        size_t colCount =
+            (size_t)getIntVal(context.tryResolveLinkTimeVal(matType->getColumnCount()));
 
         auto elementType = matType->getElementType();
         auto elementResult = _createTypeLayout(context, elementType);
@@ -5026,7 +5033,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             context,
             arrayType,
             arrayType->getElementType(),
-            arrayType->getElementCount());
+            context.tryResolveLinkTimeVal(arrayType->getElementCount()));
     }
     else if (auto atomicType = as<AtomicType>(type))
     {
@@ -5176,7 +5183,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             StructTypeLayoutBuilder typeLayoutBuilder;
             StructTypeLayoutBuilder pendingDataTypeLayoutBuilder;
 
-            typeLayoutBuilder.beginLayout(type, rules);
+            typeLayoutBuilder.beginLayout(declRefType, rules);
             auto typeLayout = typeLayoutBuilder.getTypeLayout();
 
             _addLayout(context, type, typeLayout);

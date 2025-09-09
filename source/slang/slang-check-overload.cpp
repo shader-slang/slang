@@ -1196,8 +1196,25 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                         {
                             // If the subscript decl has a setter,
                             // then the call is an l-value if base is l-value.
+                            //
+                            // If Ptr<T, Access> we only need to check for ReadWrite
+                            // Access (if ReadWrite result is an LValue. By default a
+                            // Ptr<...> is Read-only (unresolved generic argument & Access::Read).
                             if (auto base = GetBaseExpr(baseExpr))
                             {
+                                if (auto ptrTypeBase = as<PtrTypeBase>(base->type))
+                                {
+                                    auto accessQualifier =
+                                        as<ConstantIntVal>(ptrTypeBase->getAccessQualifier());
+                                    if (!accessQualifier ||
+                                        AccessQualifier(accessQualifier->getValue()) ==
+                                            AccessQualifier::ReadWrite)
+                                    {
+                                        callExpr->type.isLeftValue = true;
+                                    }
+                                    break;
+                                }
+
                                 if (base->type.isLeftValue)
                                 {
                                     callExpr->type.isLeftValue = true;

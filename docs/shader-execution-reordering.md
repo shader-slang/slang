@@ -47,11 +47,24 @@ and its related functions are available in raytracing shader types only.
 * [IsNop](#is-nop)
 * [GetRayDesc](#get-ray-desc)
 * [GetShaderTableIndex](#get-shader-table-index)
+* [SetShaderTableIndex](#set-shader-table-index)
 * [GetInstanceIndex](#get-instance-index)
 * [GetInstanceID](#get-instance-id)
 * [GetGeometryIndex](#get-geometry-index)
 * [GetPrimitiveIndex](#get-primitive-index)
 * [GetHitKind](#get-hit-kind)
+* [GetAttributes](#get-attributes)
+* [GetWorldToObject](#get-world-to-object)
+* [GetObjectToWorld](#get-object-to-world)
+* [GetCurrentTime](#get-current-time)
+* [GetObjectRayOrigin](#get-object-ray-origin)
+* [GetObjectRayDirection](#get-object-ray-direction)
+* [GetShaderRecordBufferHandle](#get-shader-record-buffer-handle)
+* [GetClusterID](#get-cluster-id)
+* [GetSpherePositionAndRadius](#get-sphere-position-and-radius)
+* [GetLssPositionsAndRadii](#get-lss-positions-and-radii)
+* [IsSphereHit](#is-sphere-hit)
+* [IsLssHit](#is-lss-hit)
 * [LoadLocalRootTableConstant](#load-local-root-table-constant)
 
 --------------------------------------------------------------------------------
@@ -413,6 +426,174 @@ represents a hit or a miss. RootConstantOffsetInBytes must be a multiple of 4.
 
 ```
 uint HitObject.LoadLocalRootTableConstant(uint RootConstantOffsetInBytes);
+```
+
+--------------------------------------------------------------------------------
+<a id="set-shader-table-index"></a>
+# `HitObject.SetShaderTableIndex`
+
+## Description
+
+Sets the shader table index of the hit object. Used to modify which shader gets invoked during HitObject.Invoke.
+
+## Signature 
+
+```
+uint HitObject.SetShaderTableIndex(uint RecordIndex);
+```
+
+--------------------------------------------------------------------------------
+<a id="get-world-to-object"></a>
+# `HitObject.GetWorldToObject`
+
+## Description
+
+Returns the world-to-object transformation matrix. Valid if the hit object represents a hit.
+
+## Signature 
+
+```
+float4x3 HitObject.GetWorldToObject();
+```
+
+--------------------------------------------------------------------------------
+<a id="get-object-to-world"></a>
+# `HitObject.GetObjectToWorld`
+
+## Description
+
+Returns the object-to-world transformation matrix. Valid if the hit object represents a hit.
+
+## Signature 
+
+```
+float4x3 HitObject.GetObjectToWorld();
+```
+
+--------------------------------------------------------------------------------
+<a id="get-current-time"></a>
+# `HitObject.GetCurrentTime`
+
+## Description
+
+Returns the current time for motion blur. Valid if the hit object represents a motion hit or miss.
+
+## Signature 
+
+```
+float HitObject.GetCurrentTime();
+```
+
+--------------------------------------------------------------------------------
+<a id="get-object-ray-origin"></a>
+# `HitObject.GetObjectRayOrigin`
+
+## Description
+
+Returns the ray origin in object space. Valid if the hit object represents a hit.
+
+## Signature 
+
+```
+float3 HitObject.GetObjectRayOrigin();
+```
+
+--------------------------------------------------------------------------------
+<a id="get-object-ray-direction"></a>
+# `HitObject.GetObjectRayDirection`
+
+## Description
+
+Returns the ray direction in object space. Valid if the hit object represents a hit.
+
+## Signature 
+
+```
+float3 HitObject.GetObjectRayDirection();
+```
+
+--------------------------------------------------------------------------------
+<a id="get-shader-record-buffer-handle"></a>
+# `HitObject.GetShaderRecordBufferHandle`
+
+## Description
+
+Returns the shader record buffer handle. Valid if the hit object represents a hit or a miss.
+
+## Signature 
+
+```
+uint2 HitObject.GetShaderRecordBufferHandle();
+```
+
+--------------------------------------------------------------------------------
+<a id="get-cluster-id"></a>
+# `HitObject.GetClusterID`
+
+## Description
+
+Returns the cluster ID for cluster acceleration structures. Valid if the hit object represents a hit.
+
+## Signature 
+
+```
+int HitObject.GetClusterID();
+```
+
+--------------------------------------------------------------------------------
+<a id="get-sphere-position-and-radius"></a>
+# `HitObject.GetSpherePositionAndRadius`
+
+## Description
+
+Returns the position and radius of a sphere primitive. Valid if the hit object represents a sphere hit.
+
+## Signature 
+
+```
+float4 HitObject.GetSpherePositionAndRadius();
+```
+
+--------------------------------------------------------------------------------
+<a id="get-lss-positions-and-radii"></a>
+# `HitObject.GetLssPositionsAndRadii`
+
+## Description
+
+Returns the positions and radii of a linear swept sphere primitive. Valid if the hit object represents an LSS hit.
+
+## Signature 
+
+```
+float2x4 HitObject.GetLssPositionsAndRadii();
+```
+
+--------------------------------------------------------------------------------
+<a id="is-sphere-hit"></a>
+# `HitObject.IsSphereHit`
+
+## Description
+
+Returns true if the HitObject represents a hit on a sphere primitive, otherwise returns false.
+
+## Signature 
+
+```
+bool HitObject.IsSphereHit();
+```
+
+--------------------------------------------------------------------------------
+<a id="is-lss-hit"></a>
+# `HitObject.IsLssHit`
+
+## Description
+
+Returns true if the HitObject represents a hit on a linear swept sphere primitive, otherwise returns false.
+
+## Signature 
+
+```
+bool HitObject.IsLssHit();
 ```
 
 --------------------------------------------------------------------------------
