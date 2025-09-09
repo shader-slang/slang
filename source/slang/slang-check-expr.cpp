@@ -223,12 +223,26 @@ Expr* SemanticsVisitor::maybeOpenRef(Expr* expr)
 {
     auto exprType = expr->type.type;
 
-    if (auto refType = as<RefTypeBase>(exprType))
+    if (auto refType = as<ExplicitRefType>(exprType))
     {
         auto openRef = m_astBuilder->create<OpenRefExpr>();
         openRef->innerExpr = expr;
-        openRef->type.isLeftValue = (as<RefType>(exprType) != nullptr);
+
+        // TODO(tfoley): The `QualType` constructor has its own
+        // logic to determine the value category (e.g., whether
+        // or not something is an l-value) when it is passed
+        // a `Ref` type. It is unclear whether both this code
+        // *and* that code are required, or if we can consolidate
+        // the two.
+        //
+        // Note that here we change the actual `Type*` stored in
+        // the `QualType` to be the underlying value type of the
+        // reference, whereas the `QualType` constructor does not
+        // perform such unwrapping.
+        //
+        openRef->type = QualType(refType);
         openRef->type.type = refType->getValueType();
+
         openRef->checked = true;
         openRef->loc = expr->loc;
         return openRef;
@@ -538,9 +552,25 @@ Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, Sou
     derefExpr->type = QualType(elementType);
     derefExpr->checked = true;
 
-    if (as<PtrType>(base->type) || as<RefType>(base->type))
+    if (as<PtrType>(base->type))
     {
+        // TODO(tfoley): It is not clear why this is being unconditionally
+        // set to `true` when the `Ptr` types in the core module has an
+        // `AccessQualifier` parameter that can be used to form a read-only pointer.
+        //
         derefExpr->type.isLeftValue = true;
+    }
+    else if (as<ExplicitRefType>(base->type))
+    {
+        // TODO(tfoley): The code here is exploiting the ability of the
+        // `QualType` constructor to compute the correct value category
+        // for a reference type, so that we don't have to repeat that logic
+        // here. That might not be the right place for that logic to live,
+        // however, and so the code here might need updating sooner or
+        // later.
+        //
+        bool baseIsLVal = QualType(base->type.type).isLeftValue;
+        derefExpr->type.isLeftValue = baseIsLVal;
     }
     else if (isImmutableBufferType(base->type))
     {
@@ -2926,7 +2956,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 }
                 compareMemoryQualifierOfParamToArgument(paramDecl, argExpr);
 
-                if (as<OutTypeBase>(paramType) || as<RefType>(paramType))
+                if (as<OutTypeBase>(paramType) || as<RefParamType>(paramType))
                 {
                     // `out`, `inout`, and `ref` parameters currently require
                     // an *exact* match on the type of the argument.
@@ -3037,7 +3067,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                                     const DiagnosticInfo* diagnostic = nullptr;
 
                                     // Try and determine reason for failure
-                                    if (as<RefType>(paramType))
+                                    if (as<RefParamType>(paramType))
                                     {
                                         // Ref types are not allowed to use this mechanism because
                                         // it breaks atomics

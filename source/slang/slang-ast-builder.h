@@ -533,17 +533,23 @@ public:
     PtrType* getPtrType(Type* valueType, AccessQualifier accessQualifier, AddressSpace addrSpace);
     PtrType* getPtrType(Type* valueType, Val* accessQualifier, Val* addrSpace);
 
-    // Construct the type `Out<valueType>`
-    OutType* getOutType(Type* valueType);
+    // Construct the type `OutParam<valueType>`
+    OutParamType* getOutType(Type* valueType);
 
-    // Construct the type `InOut<valueType>`
-    InOutType* getInOutType(Type* valueType);
+    // Construct the type `InOutParam<valueType>`
+    InOutParamType* getInOutType(Type* valueType);
+
+    // Construct the type `RefParam<valueType>`
+    RefParamType* getRefParamType(Type* valueType);
+
+    // Construct the type `ConstRefParam<valueType>`
+    ConstRefParamType* getConstRefParamType(Type* valueType);
 
     // Construct the type `Ref<valueType>`
-    RefType* getRefType(Type* valueType);
+    ExplicitRefType* getExplicitRefType(Type* valueType);
 
-    // Construct the type `ConstRef<valueType>`
-    ConstRefType* getConstRefType(Type* valueType);
+    // Construct the type `Ref<valueType, .Read>`
+    ExplicitRefType* getExplicitConstRefType(Type* valueType);
 
     // Construct the type `Optional<valueType>`
     OptionalType* getOptionalType(Type* valueType);

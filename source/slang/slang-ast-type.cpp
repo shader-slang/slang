@@ -450,15 +450,19 @@ Val* PtrTypeBase::getAddressSpace()
     return _getGenericTypeArg(this, 2);
 }
 
-AccessQualifier tryGetAccessQualifierValue(Val* val)
+std::optional<AccessQualifier> tryGetAccessQualifierValue(Val* val)
 {
-    AccessQualifier accessQualifier = AccessQualifier::ReadWrite;
-
     if (auto cintVal = as<ConstantIntVal>(val))
     {
-        accessQualifier = (AccessQualifier)(cintVal->getValue());
+        return AccessQualifier(cintVal->getValue());
     }
-    return accessQualifier;
+    return std::optional<AccessQualifier>();
+}
+
+std::optional<AccessQualifier> PtrTypeBase::tryGetAccessQualifierValue()
+{
+    auto accessQualifierArg = this->getAccessQualifier();
+    return Slang::tryGetAccessQualifierValue(accessQualifierArg);
 }
 
 AddressSpace tryGetAddressSpaceValue(Val* addrSpaceVal)
@@ -517,20 +521,20 @@ void maybePrintAccessQualifierOperand(StringBuilder& out, AccessQualifier access
 
 void PtrType::_toTextOverride(StringBuilder& out)
 {
-    auto accessQualifier = tryGetAccessQualifierValue(getAccessQualifier());
     auto addrSpace = tryGetAddressSpaceValue(getAddressSpace());
     out << toSlice("Ptr<") << getValueType();
-    maybePrintAccessQualifierOperand(out, accessQualifier);
+    if(auto optionalAccessQualifier = tryGetAccessQualifierValue())
+        maybePrintAccessQualifierOperand(out, *optionalAccessQualifier);
     maybePrintAddrSpaceOperand(out, addrSpace);
     out << toSlice(">");
 }
 
-void RefType::_toTextOverride(StringBuilder& out)
+void ExplicitRefType::_toTextOverride(StringBuilder& out)
 {
-    auto accessQualifier = tryGetAccessQualifierValue(getAccessQualifier());
     auto addrSpace = tryGetAddressSpaceValue(getAddressSpace());
     out << toSlice("Ref<") << getValueType();
-    maybePrintAccessQualifierOperand(out, accessQualifier);
+    if (auto optionalAccessQualifier = tryGetAccessQualifierValue())
+        maybePrintAccessQualifierOperand(out, *optionalAccessQualifier);
     maybePrintAddrSpaceOperand(out, addrSpace);
     out << toSlice(">");
 }
@@ -559,11 +563,11 @@ Type* NamedExpressionType::_createCanonicalTypeOverride()
 ParameterDirection FuncType::getParamDirection(Index index)
 {
     auto paramType = getParamType(index);
-    if (as<RefType>(paramType))
+    if (as<RefParamType>(paramType))
     {
         return kParameterDirection_Ref;
     }
-    else if (as<ConstRefType>(paramType))
+    else if (as<ConstRefParamType>(paramType))
     {
         return kParameterDirection_ConstRef;
     }

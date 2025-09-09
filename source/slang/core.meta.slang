@@ -1332,6 +1332,10 @@ struct Ptr<
     __init(int64_t val);
 
     // By default, getter is not an L value
+    //
+    // TODO(tfoley): Yes... yes it *is* an l-value,
+    // because that's a `ref` accessor down there...
+    //
     __generic<TInt : __BuiltinIntegerType>
     __subscript(TInt index) -> T
     {
@@ -1341,12 +1345,13 @@ struct Ptr<
     }
 };
 
+/*
 extension<T, AddressSpace addrSpace> Ptr<T, Access::ReadWrite, addrSpace>
 {
     // We have a `ref` accessor if we are ReadWrite. This means only `ReadWrite`
     // can be used as an L-value.
     __generic<TInt : __BuiltinIntegerType>
-    __subscript(TInt index) -> Ref<T>
+    __subscript(TInt index) -> ExplicitRef<T, Access::ReadWrite, addrSpace>
     {
         // If a 'Ptr[index]' is referred to by a '__ref', call 'kIROp_GetOffsetPtr(index)'
         __intrinsic_op($(kIROp_GetOffsetPtr))
@@ -1354,6 +1359,7 @@ extension<T, AddressSpace addrSpace> Ptr<T, Access::ReadWrite, addrSpace>
         ref;
     }
 }
+*/
 
 //@hidden:
 __intrinsic_op($(kIROp_AlignedAttr))
@@ -1508,28 +1514,33 @@ extension uintptr_t : IRangedValue
 }
 
 //@hidden:
-__generic<T>
-__magic_type(OutType)
-__intrinsic_type($(kIROp_OutType))
-struct Out
-{};
 
-__generic<T>
-__magic_type(InOutType)
-__intrinsic_type($(kIROp_InOutType))
-struct InOut
-{};
-
-__generic<T>
-__magic_type(RefType)
+__magic_type(ExplicitRefType)
 __intrinsic_type($(kIROp_RefType))
-struct Ref
+struct ExplicitRef<
+    T, 
+    Access access = Access::ReadWrite, 
+    AddressSpace addrSpace = AddressSpace::Device>
 {};
 
-__generic<T>
-__magic_type(ConstRefType)
+__magic_type(OutParamType)
+__intrinsic_type($(kIROp_OutType))
+struct OutParam<T>
+{};
+
+__magic_type(InOutParamType)
+__intrinsic_type($(kIROp_InOutType))
+struct InOutParam<T>
+{};
+
+__magic_type(RefParamType)
+__intrinsic_type($(kIROp_RefType))
+struct RefParam<T>
+{};
+
+__magic_type(ConstRefParamType)
 __intrinsic_type($(kIROp_ConstRefType))
-struct ConstRef
+struct ConstRefParam<T>
 {};
 
 // __Addr<T> is AddressSpace::Generic since Slang will specalize & validate the address-space
@@ -2672,15 +2683,9 @@ for (auto op : intrinsicUnaryOps)
 }}}}
 
 // Only ReadWrite is an L-value.
-__generic<T, AddressSpace addrSpace>
+__generic<T, Access access, AddressSpace addrSpace>
 __intrinsic_op(0)
-__prefix Ref<T> operator*(Ptr<T, Access::ReadWrite, addrSpace> value);
-
-// Unknown access qualifier or Access::Read access qualifier is a promise
-// that the pointer is not going to be used as an L-value.
-__generic<$(ptrTypeParameterList)>
-__intrinsic_op(0)
-__prefix ConstRef<T> operator*($(fullPtrType) value);
+__prefix ExplicitRef<T, access, addrSpace> operator*(Ptr<T, access, addrSpace> value);
 
 // TODO: [require(cpu)]. This cannot be done yet since this change breaks slangpy
 __generic<T>

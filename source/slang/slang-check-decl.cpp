@@ -1649,7 +1649,7 @@ EnumDecl* isEnumType(Type* type)
     return nullptr;
 }
 
-bool isNullableType(Type* type)
+bool doesTypeHaveAnUnusedBitPatternThatCanBeUsedForOptionalRepresentation(Type* type)
 {
     if (as<PtrTypeBase>(type))
         return true;
@@ -1659,7 +1659,9 @@ bool isNullableType(Type* type)
         return true;
     if (as<OptionalType>(type))
         return true;
-    if (as<RefTypeBase>(type))
+    // TODO(tfoley): Somebody put the explicit `Ref<T>` types
+    // here as a list of a nullable type, and it is 
+    if (as<ExplicitRefType>(type))
         return true;
     if (as<NativeStringType>(type))
         return true;

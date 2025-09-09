@@ -687,6 +687,8 @@ class PtrTypeBase : public BuiltinType
     Type* getValueType();
     Val* getAccessQualifier();
     Val* getAddressSpace();
+
+    std::optional<AccessQualifier> tryGetAccessQualifierValue();
 };
 
 FIDDLE()
@@ -709,7 +711,14 @@ class PtrType : public PtrTypeBase
     void _toTextOverride(StringBuilder& out);
 };
 
-/// A pointer-like type used to represent a parameter "direction"
+/// A pointer-like type used to represent a parameter-passing mode.
+///
+/// Historically the codebase has referredd to different parameter-passing
+/// modes as parameter "directions," because they initially included
+/// only `in`, `out`, and `inout`. The name is confusing when applied
+/// to things like `ref` parameters, but we haven't had time to rename
+/// everything yet.
+///
 FIDDLE()
 class ParamDirectionType : public PtrTypeBase
 {
@@ -720,44 +729,64 @@ class ParamDirectionType : public PtrTypeBase
 // logical pointer that is passed for an `out`
 // or `in out` parameter
 FIDDLE(abstract)
-class OutTypeBase : public ParamDirectionType
+class OutParamTypeBase : public ParamDirectionType
 {
     FIDDLE(...)
 };
+using OutTypeBase = OutParamTypeBase;
 
 // The type for an `out` parameter, e.g., `out T`
 FIDDLE()
-class OutType : public OutTypeBase
+class OutParamType : public OutParamTypeBase
 {
     FIDDLE(...)
 };
+using OutType = OutParamType;
 
 // The type for an `in out` parameter, e.g., `in out T`
 FIDDLE()
-class InOutType : public OutTypeBase
+class InOutParamType : public OutParamTypeBase
 {
     FIDDLE(...)
 };
-
-FIDDLE(abstract)
-class RefTypeBase : public ParamDirectionType
-{
-    FIDDLE(...)
-};
+using InOutType = InOutParamType;
 
 // The type for an `ref` parameter, e.g., `ref T`
 FIDDLE()
-class RefType : public RefTypeBase
+class RefParamType : public ParamDirectionType
+{
+    FIDDLE(...)
+};
+
+/// The type for an `constref` parameter, e.g., `constref T`
+///
+/// Note that, despite the modifier currently used to represent
+/// this case in code, this is *not* comparable to the `ref`
+/// parameter-passing mode, and is instead an input-only
+/// equivalent of `inout`.
+///
+FIDDLE()
+class ConstRefParamType : public ParamDirectionType
+{
+    FIDDLE(...)
+};
+
+/// A reference type that is explicitly named somewhere in code (`Ref<T>`).
+///
+/// The explicit reference types are distinct from the
+/// parameter-passing mode wrapper types like `RefParamType`.
+/// An explicit reference type is a type that code written in
+/// Slang is allowed to name (e.g., by having a function that
+/// returns a `Ref<T>`), even if those uses may only occur
+/// in the core module. In constrast, the parameter-passing
+/// mode wrapper types should only ever be used as part of
+/// the encoding of a `FuncType`.
+///
+FIDDLE()
+class ExplicitRefType : public PtrTypeBase
 {
     FIDDLE(...)
     void _toTextOverride(StringBuilder& out);
-};
-
-// The type for an `constref` parameter, e.g., `constref T`
-FIDDLE()
-class ConstRefType : public RefTypeBase
-{
-    FIDDLE(...)
 };
 
 FIDDLE()

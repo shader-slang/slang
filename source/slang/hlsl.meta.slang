@@ -10352,10 +10352,10 @@ matrix<T, N, M> fwidth_fine(matrix<T, N, M> x)
 }
 
 __intrinsic_op($(kIROp_ResolveVaryingInputRef))
-Ref<T> __ResolveVaryingInputRef<T>(__constref T attribute);
+ExplicitRef<T, Access.Read> __ResolveVaryingInputRef<T>(__constref T attribute);
 
 __intrinsic_op($(kIROp_GetPerVertexInputArray))
-Ref<Array<T, 3>> __GetPerVertexInputArray<T>(__constref T attribute);
+ExplicitRef<Array<T, 3>, Access.Read> __GetPerVertexInputArray<T>(__constref T attribute);
 
 T __GetAttributeAtVertex<T>(__constref T attribute, uint vertexIndex)
 {
@@ -17399,14 +17399,14 @@ void CallShader(uint shaderIndex, inout Payload payload)
 // side effect typed use locations (`inout`,`out`, etc.) are managed.
 __generic<T>
 __intrinsic_op($(kIROp_ForceVarIntoStructTemporarily))
-Ref<T> __forceVarIntoStructTemporarily(inout T maybeStruct);
+ExplicitRef<T> __forceVarIntoStructTemporarily(inout T maybeStruct);
 
 // Some functions require a struct type which is decorated with a [raypayload]
 // attribute. This will do the same as __forceVarIntoStructTemporarily and also
 // ensure that the struct type in question is decorated appropriately.
 __generic<T>
 __intrinsic_op($(kIROp_ForceVarIntoRayPayloadStructTemporarily))
-Ref<T> __forceVarIntoRayPayloadStructTemporarily(inout T maybeStruct);
+ExplicitRef<T> __forceVarIntoRayPayloadStructTemporarily(inout T maybeStruct);
 
 __generic<payload_t>
 [require(hlsl, raytracing)]
@@ -19891,7 +19891,7 @@ extension __SubpassImpl<T, 1>
 // We access the HitObjectAttributes via this function for the desired type, and it acts *as if* it's just an access
 // to the global t.
 [ForceInline]
-Ref<T> __hitObjectAttributes<T>()
+ExplicitRef<T> __hitObjectAttributes<T>()
 {
     [__vulkanHitObjectAttributes]   
     static T t;
@@ -22683,7 +22683,7 @@ namespace vk
         T *_ptr;
         [ForceInline] __init(T *ptr) { _ptr = ptr; }
         [ForceInline] __init(uint64_t val) { _ptr = (T *)val; }
-        [ForceInline] Ref<T> Get() { return *_ptr; }
+        [ForceInline] ExplicitRef<T> Get() { return *_ptr; }
         [ForceInline] T *getPtr() { return _ptr;}
     }
     [ForceInline]
@@ -23526,7 +23526,7 @@ struct CoopMat
     __intrinsic_op($(kIROp_GetElementPtr))
     [__ref]
     [__NoSideEffect]
-    Ref<T> __indexRef(int index);
+    ExplicitRef<T> __indexRef(int index);
 
     /// Returns the count as an integer value.
     [ForceInline]
@@ -25005,7 +25005,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     __intrinsic_op($(kIROp_GetElementPtr))
     [__ref]
     [__NoSideEffect]
-    Ref<T> __indexRef(int index);
+    ExplicitRef<T> __indexRef(int index);
 
     [ForceInline]
     [__NoSideEffect]

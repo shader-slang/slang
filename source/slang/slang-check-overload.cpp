@@ -643,12 +643,35 @@ static QualType getParamQualType(ASTBuilder* astBuilder, DeclRef<ParamDecl> para
 
 static QualType getParamQualType(Type* paramType)
 {
+    // TODO(tfoley): This function probably shouldn't exist, and instead
+    // the accessors for the parameters of a `FuncType` should
+    // directly return a `QualType` for each parameter rather than
+    // a plain `Type` that potentially includes a wrapping
+    // `ParamDirectionType`.
+    //
+    // In addition, the determination of what value category a reference
+    // to a parameter should be (and thus what the `QualType` sould be)
+    // should be driven by computing the `ParameterDirection` first,
+    // and then using the direction to determine the value category
+    // (so as to isolate the code that needs to care about the wrapper
+    // types to just the computation of the dirction).
+    //
+    // Note the large amount of duplication between this function and
+    // the other `getParamQualType()` above.
+    //
+    bool isLVal = false;
+    Type* valueType = paramType;
     if (auto paramDirType = as<ParamDirectionType>(paramType))
     {
-        if (as<OutTypeBase>(paramDirType) || as<RefType>(paramDirType))
-            return QualType(paramDirType->getValueType(), true);
+        valueType = paramDirType->getValueType();
+        if (as<InOutParamType>(paramDirType))
+            isLVal = true;
+        if (as<OutParamType>(paramDirType))
+            isLVal = true;
+        if(as<RefParamType>(paramDirType))
+            isLVal = true;
     }
-    return paramType;
+    return QualType(valueType, isLVal);
 }
 
 bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
