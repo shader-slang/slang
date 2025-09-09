@@ -4232,6 +4232,10 @@ slangOptixHitObjectSetSbtRecordIndex(OptixTraversableHandle* Obj, uint sbtRecord
     optixHitObjectSetSbtRecordIndex(sbtRecordIndex); // returns void
     return sbtRecordIndex;
 }
+#else
+// Define OptixTraversableHandle even if OptiX is not enabled.
+// This allows RaytracingAccelerationStructure to be properly reflected in non-OptiX code.
+typedef unsigned long long OptixTraversableHandle;
 #endif
 static const int kSlangTorchTensorMaxDim = 5;
 
