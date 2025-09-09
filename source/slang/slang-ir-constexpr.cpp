@@ -61,10 +61,10 @@ bool isConstExpr(IRInst* value)
     case kIROp_WitnessTable:
     case kIROp_Generic:
         return true;
-    case kIROp_Param:
-        if (isGenericParam(value))
-            return true;
-        break;
+    //case kIROp_Param:
+    //    if (isGenericParam(value))
+    //        return true;
+    //    break;
     default:
         break;
     }
@@ -445,7 +445,7 @@ bool propagateConstExprBackward(PropagateConstExprContext* context, IRGlobalValu
                                 // If arg is not constexpr after this, meaning it can't be
                                 // marked constexpr for some reason, but the param requires
                                 // that. This is not expected.
-                                if (!isConstExpr(arg))
+                                if (!isConstExpr(arg) && !isGenericParam(arg))
                                 {
                                     context->getSink()->diagnose(
                                         callInst->sourceLoc,
