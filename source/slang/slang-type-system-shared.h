@@ -23,6 +23,8 @@ namespace Slang
     X(IntPtr)                \
     X(UIntPtr)               \
     X(CountOfPrimitives)     \
+    /* end */
+#define FOREACH_BASE_ENUM(X) \
     X(AddressSpace)          \
     X(MemoryScope)           \
     X(AccessQualifier)       \
@@ -32,6 +34,7 @@ enum class BaseType
 {
 #define DEFINE_BASE_TYPE(NAME) NAME,
     FOREACH_BASE_TYPE(DEFINE_BASE_TYPE)
+    FOREACH_BASE_ENUM(DEFINE_BASE_TYPE)
 #undef DEFINE_BASE_TYPE
 
         CountOf,
@@ -138,6 +141,7 @@ enum class AccessQualifier : uint64_t
     Read = 1,
 };
 
+BaseType getBaseEnumUnderlyingType(BaseType enumBaseType);
 } // namespace Slang
 
 #endif
