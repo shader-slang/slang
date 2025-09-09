@@ -160,8 +160,11 @@ bool opCanBeConstExprByForwardPass(IRInst* value)
 {
     // TODO: handle call inst here.
 
-    if (value->getOp() == kIROp_Param)
+    if (value->getOp() == kIROp_Param ||
+        value->getOp() == kIROp_Specialize)
+    {
         return false;
+    }
     return opCanBeConstExpr(value->getOp());
 }
 
