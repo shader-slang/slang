@@ -501,6 +501,13 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
         // Conform to C/C++ size is adjusted to the largest alignment
         ioStructInfo->size = _roundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
     }
+
+    SimpleLayoutInfo GetDescriptorHandleLayout(DescriptorHandleType* descriptorHandleType) override
+    {
+        SLANG_UNUSED(descriptorHandleType);
+        // For CPU targets, DescriptorHandle<T> is treated as uint64_t
+        return GetScalarLayout(BaseType::UInt64);
+    }
 };
 
 // The CUDA compiler NVRTC only works on 64 bit operating systems.
@@ -674,13 +681,6 @@ struct MetalLayoutRulesImpl : public CPULayoutRulesImpl
         vectorInfo.alignment = alignment;
 
         return vectorInfo;
-    }
-
-    SimpleLayoutInfo GetDescriptorHandleLayout(DescriptorHandleType* descriptorHandleType) override
-    {
-        SLANG_UNUSED(descriptorHandleType);
-        // For Metal targets, DescriptorHandle<T> is treated as uint64_t
-        return GetScalarLayout(BaseType::UInt64);
     }
 };
 
@@ -5807,9 +5807,6 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
     }
     else if (auto descriptorHandleType = as<DescriptorHandleType>(type))
     {
-        // DescriptorHandle<T> layout depends on target:
-        // - SPIR-V: treated as uint2
-        // - CUDA/Metal: treated as uint64_t
         RefPtr<TypeLayout> typeLayout = new TypeLayout();
         typeLayout->type = type;
         typeLayout->rules = rules;
