@@ -101,7 +101,7 @@ jobs:
             cmake --workflow --preset generators --fresh
             mkdir generators
             cmake --install build --config Release --component generators --prefix generators
-            emcmake cmake -DSLANG_GENERATORS_PATH=generators/bin --preset emscripten -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
+            emcmake cmake -DSLANG_GENERATORS_PATH=generators/bin --preset emscripten -DSLANG_SLANG_LLVM_FLAVOR=DISABLE -DSLANG_ENABLE_SPIRV_TOOLS_MIMALLOC=OFF
             cmake --build --preset emscripten --config "$cmake_config" --target slang-wasm
             mkdir "build.em/$cmake_config/bin/smoke"
             cp tests/wasm/smoke/* "build.em/$cmake_config/bin/smoke/"
