@@ -1,0 +1,2 @@
+glslang:  test_std430_cbuffer_issue.slang(11): error :  'std430 requires the buffer storage qualifier' : required extension not requested: GL_EXT_scalar_block_layout
+glslang: note : ERROR: 1 compilation errors.  No code generated.
