@@ -1387,7 +1387,7 @@ LayoutRulesImpl kCPushConstantRulesImpl_ = {
 
 LayoutRulesImpl kCVaryingInputLayoutRulesImpl_ = {
     &kCLayoutRulesFamilyImpl,
-    &kGLSLVaryingOutputLayoutRulesImpl,
+    &kGLSLVaryingInputLayoutRulesImpl,
     &kGLSLObjectLayoutRulesImpl,
 };
 
