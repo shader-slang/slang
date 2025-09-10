@@ -1660,7 +1660,7 @@ bool doesTypeHaveAnUnusedBitPatternThatCanBeUsedForOptionalRepresentation(Type* 
     if (as<OptionalType>(type))
         return true;
     // TODO(tfoley): Somebody put the explicit `Ref<T>` types
-    // here as a list of a nullable type, and it is 
+    // here as a list of a nullable type, and it is
     if (as<ExplicitRefType>(type))
         return true;
     if (as<NativeStringType>(type))

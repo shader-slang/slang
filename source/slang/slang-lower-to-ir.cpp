@@ -4759,8 +4759,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             // We start by asserting that the reference type we
             // are being asked to form is read-only.
             //
-            SLANG_ASSERT(as<ExplicitRefType>(expr->type)
-                && !QualType(expr->type).isLeftValue);
+            SLANG_ASSERT(as<ExplicitRefType>(expr->type) && !QualType(expr->type).isLeftValue);
 
             // Now we perpetrate our hackery, by forming a simple value
             // for the operand in an SSA register and copying it into
