@@ -4112,8 +4112,8 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
     {
         auto requiredParam = requiredParams[paramIndex];
         auto satisfyingParam = satisfyingParams[paramIndex];
-        if (getParameterDirection(requiredParam.getDecl()) !=
-            getParameterDirection(satisfyingParam.getDecl()))
+        if (getNominalParameterDirection(requiredParam.getDecl()) !=
+            getNominalParameterDirection(satisfyingParam.getDecl()))
             return false;
         auto requiredParamType = getType(m_astBuilder, requiredParam);
         auto satisfyingParamType = getType(m_astBuilder, satisfyingParam);
@@ -5647,16 +5647,16 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                     auto synParam = *synParamIter;
                     auto calleeParam = *calleeParamIter;
                     if (!matchParamDirection(
-                            getParameterDirection(calleeParam),
-                            getParameterDirection(synParam)))
+                        getNominalParameterDirection(calleeParam),
+                        getNominalParameterDirection(synParam)))
                     {
                         if (outFailureDetails)
                         {
                             outFailureDetails->reason =
                                 WitnessSynthesisFailureReason::ParameterDirMismatch;
                             outFailureDetails->candidateMethod = declRefExpr->declRef;
-                            outFailureDetails->actualDir = getParameterDirection(calleeParam);
-                            outFailureDetails->expectedDir = getParameterDirection(synParam);
+                            outFailureDetails->actualDir = getNominalParameterDirection(calleeParam);
+                            outFailureDetails->expectedDir = getNominalParameterDirection(synParam);
                             outFailureDetails->paramDecl = calleeParam;
                         }
                         return false;
@@ -9864,6 +9864,7 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
         checkMeshOutputDecl(paramDecl);
     }
 
+#if 0
     if (auto declRefType = as<DeclRefType>(paramDecl->type.type))
     {
         if (declRefType->getDeclRef().getDecl()->findModifier<NonCopyableTypeAttribute>())
@@ -9907,7 +9908,9 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
             }
         }
     }
-    else if (isTypePack(paramDecl->type.type))
+    else
+#endif
+    if (isTypePack(paramDecl->type.type))
     {
         // For now, we only allow parameter packs to be `const`.
         bool hasConstModifier = false;
@@ -10456,16 +10459,16 @@ void SemanticsDeclHeaderVisitor::setFuncTypeIntoRequirementDecl(
         auto paramDir = funcType->getParamDirection(i);
         switch (paramDir)
         {
-        case ParameterDirection::kParameterDirection_InOut:
+        case kParameterDirection_InOut:
             addModifier(param, m_astBuilder->create<InOutModifier>());
             break;
-        case ParameterDirection::kParameterDirection_Out:
+        case kParameterDirection_Out:
             addModifier(param, m_astBuilder->create<OutModifier>());
             break;
-        case ParameterDirection::kParameterDirection_Ref:
+        case kParameterDirection_Ref:
             addModifier(param, m_astBuilder->create<RefModifier>());
             break;
-        case ParameterDirection::kParameterDirection_ConstRef:
+        case kParameterDirection_ConstRef:
             addModifier(param, m_astBuilder->create<ConstRefModifier>());
             break;
         default:
@@ -13206,9 +13209,9 @@ ArgsWithDirectionInfo getImaginaryArgsToFunc(
         arg->type.type = param->getType();
         arg->loc = loc;
         imaginaryArguments.add(arg);
-        directions.add(getParameterDirection(param));
+        directions.add(getNominalParameterDirection(param));
     }
-    return {imaginaryArguments, directions, nullptr, ParameterDirection::kParameterDirection_In};
+    return {imaginaryArguments, directions, nullptr, kParameterDirection_In};
 }
 
 ArgsWithDirectionInfo getImaginaryArgsToForwardDerivative(
@@ -13237,8 +13240,8 @@ ArgsWithDirectionInfo getImaginaryArgsToForwardDerivative(
     }
 
     ParameterDirection thisTypeDirection = (thisArgExpr && !thisArgExpr->type.isLeftValue)
-                                               ? ParameterDirection::kParameterDirection_In
-                                               : ParameterDirection::kParameterDirection_InOut;
+                                               ? kParameterDirection_In
+                                               : kParameterDirection_InOut;
 
     List<Expr*> imaginaryArguments;
     for (auto param : originalFuncDecl->getParameters())
@@ -13262,7 +13265,7 @@ ArgsWithDirectionInfo getImaginaryArgsToForwardDerivative(
     List<ParameterDirection> expectedParamDirections;
     for (auto param : originalFuncDecl->getParameters())
     {
-        expectedParamDirections.add(getParameterDirection(param));
+        expectedParamDirections.add(getNominalParameterDirection(param));
     }
 
     return {imaginaryArguments, expectedParamDirections, thisArgExpr, thisTypeDirection};
@@ -13298,8 +13301,8 @@ ArgsWithDirectionInfo getImaginaryArgsToBackwardDerivative(
     }
 
     ParameterDirection thisTypeDirection = (thisArgExpr && !thisArgExpr->type.isLeftValue)
-                                               ? ParameterDirection::kParameterDirection_In
-                                               : ParameterDirection::kParameterDirection_InOut;
+                                               ? kParameterDirection_In
+                                               : kParameterDirection_InOut;
 
     List<Expr*> imaginaryArguments;
     List<ParameterDirection> expectedParamDirections;
@@ -13319,7 +13322,7 @@ ArgsWithDirectionInfo getImaginaryArgsToBackwardDerivative(
         arg->type.type = param->getType();
         arg->loc = loc;
 
-        ParameterDirection direction = getParameterDirection(param);
+        ParameterDirection direction = getNominalParameterDirection(param);
 
         bool isDiffParam = (!param->findModifier<NoDiffModifier>());
         if (isDiffParam)
@@ -13338,13 +13341,13 @@ ArgsWithDirectionInfo getImaginaryArgsToBackwardDerivative(
                         visitor->getASTBuilder(),
                         pairType->getPrimalType());
 
-                    direction = ParameterDirection::kParameterDirection_In;
+                    direction = kParameterDirection_In;
                 }
                 else
                 {
                     // in T : IDifferentiable -> inout DifferentialPair<T>
                     // inout T : IDifferentiable -> inout DifferentialPair<T>
-                    direction = ParameterDirection::kParameterDirection_InOut;
+                    direction = kParameterDirection_InOut;
                 }
             }
             else if (auto refPairType = as<DifferentialPtrPairType>(diffPair))
@@ -13368,7 +13371,7 @@ ArgsWithDirectionInfo getImaginaryArgsToBackwardDerivative(
             // no_diff inout T -> in T
             // no_diff in T -> in T
             //
-            direction = ParameterDirection::kParameterDirection_In;
+            direction = kParameterDirection_In;
         }
 
         imaginaryArguments.add(arg);
@@ -13383,7 +13386,7 @@ ArgsWithDirectionInfo getImaginaryArgsToBackwardDerivative(
         arg->type.type = diffReturnType;
         arg->loc = loc;
         imaginaryArguments.add(arg);
-        expectedParamDirections.add(ParameterDirection::kParameterDirection_In);
+        expectedParamDirections.add(kParameterDirection_In);
     }
 
     return {imaginaryArguments, expectedParamDirections, thisArgExpr, thisTypeDirection};
