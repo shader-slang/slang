@@ -2820,12 +2820,14 @@ void addArg(
                     // from the arg.
                     paramType = lowerType(context, argType);
                 }
+#if 0
                 if (auto refType = as<IRConstRefType>(paramType))
                 {
                     paramType = refType->getValueType();
                     argVal = LoweredValInfo::simple(
                         context->irBuilder->emitLoad(getSimpleVal(context, argPtr)));
                 }
+#endif
 
                 LoweredValInfo tempVar = createVar(context, paramType);
 
