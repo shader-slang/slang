@@ -27,6 +27,7 @@
 #include "slang-ir-obfuscate-loc.h"
 #include "slang-ir-operator-shift-overflow.h"
 #include "slang-ir-peephole.h"
+#include "slang-ir-potential-infinite-loop.h"
 #include "slang-ir-sccp.h"
 #include "slang-ir-simplify-cfg.h"
 #include "slang-ir-ssa.h"
@@ -12413,6 +12414,12 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // a module we depend on changes.
 
     validateIRModuleIfEnabled(compileRequest, module);
+
+    // Check for potential infinite loops using dedicated IR pass
+    if (compileRequest->getLinkage()->m_optionSet.shouldRunNonEssentialValidation())
+    {
+        checkForPotentialInfiniteLoops(module, compileRequest->getSink());
+    }
 
     // If we are being asked to dump IR during compilation,
     // then we can dump the initial IR for the module here.
