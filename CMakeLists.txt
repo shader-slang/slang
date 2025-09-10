@@ -185,6 +185,11 @@ advanced_option(
     "Build using system glslang library"
     OFF
 )
+advanced_option(
+    SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC
+    "Enable mimalloc for SPIRV-Tools to improve compilation performance"
+    ON
+)
 
 option(
     SLANG_SPIRV_HEADERS_INCLUDE_DIR
