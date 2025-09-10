@@ -1285,6 +1285,7 @@ enum AddressSpace : uint64_t
 {
     Device = $((uint64_t)AddressSpace::UserPointer),
     GroupShared = $((uint64_t)AddressSpace::GroupShared),
+    VaryingInput = $((uint64_t)AddressSpace::Input),
 };
 
 // @hidden: this type is a BaseType since we want it to work with
