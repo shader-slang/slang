@@ -2287,7 +2287,8 @@ public:
     {
         ComPtr<ISlangBlob> spirvBlob;
         SlangResult res = artifact->loadBlob(ArtifactKeep::Yes, spirvBlob.writeRef());
-        if (SLANG_FAILED(res) || !spirvBlob)
+        if (SLANG_FAILED(res) || !spirvBlob ||
+            spirvBlob->getBufferSize() < SPV_INDEX_INSTRUCTION_START * sizeof(SpvWord))
             return SLANG_FAIL;
 
         // Populate the full array of SPIR-V words.
