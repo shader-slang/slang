@@ -5093,7 +5093,8 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         // and for such types the size of an `Optional<T>` can be
         // the same as a `T`, by making use of that unused pattern.
         //
-        if (doesTypeHaveAnUnusedBitPatternThatCanBeUsedForOptionalRepresentation(optionalType->getValueType()))
+        if (doesTypeHaveAnUnusedBitPatternThatCanBeUsedForOptionalRepresentation(
+                optionalType->getValueType()))
             return _createTypeLayout(context, optionalType->getValueType());
 
         // For all other types, an `Optional<T>` is laid out more-or-less

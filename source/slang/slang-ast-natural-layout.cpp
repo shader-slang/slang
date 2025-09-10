@@ -179,7 +179,8 @@ NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
         // and for such types the size of an `Optional<T>` can be
         // the same as a `T`, by making use of that unused pattern.
         //
-        if (doesTypeHaveAnUnusedBitPatternThatCanBeUsedForOptionalRepresentation(optionalType->getValueType()))
+        if (doesTypeHaveAnUnusedBitPatternThatCanBeUsedForOptionalRepresentation(
+                optionalType->getValueType()))
             return calcSize(optionalType->getValueType());
 
         // For all other types, an `Optional<T>` is laid out more-or-less

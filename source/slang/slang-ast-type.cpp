@@ -523,7 +523,7 @@ void PtrType::_toTextOverride(StringBuilder& out)
 {
     auto addrSpace = tryGetAddressSpaceValue(getAddressSpace());
     out << toSlice("Ptr<") << getValueType();
-    if(auto optionalAccessQualifier = tryGetAccessQualifierValue())
+    if (auto optionalAccessQualifier = tryGetAccessQualifierValue())
         maybePrintAccessQualifierOperand(out, *optionalAccessQualifier);
     maybePrintAddrSpaceOperand(out, addrSpace);
     out << toSlice(">");

@@ -668,7 +668,7 @@ static QualType getParamQualType(Type* paramType)
             isLVal = true;
         if (as<OutParamType>(paramDirType))
             isLVal = true;
-        if(as<RefParamType>(paramDirType))
+        if (as<RefParamType>(paramDirType))
             isLVal = true;
     }
     return QualType(valueType, isLVal);
