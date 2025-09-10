@@ -305,6 +305,18 @@ struct LinkingAndOptimizationOptions
     CLikeSourceEmitter* sourceEmitter = nullptr;
 };
 
+// Check if a type is natively supported by SPIRV OpBitcast instruction
+static bool canSPIRVBitcastType(IRType* type)
+{
+    if (as<IRBasicType>(type))
+        return true;
+    if (auto vectorType = as<IRVectorType>(type))
+        return canSPIRVBitcastType(vectorType->getElementType());
+    if (as<IRPtrType>(type) || as<IRPointerLikeType>(type))
+        return true;
+    return false;
+}
+
 // Check if a BitCast instruction requires lowering for the current target.
 // For SPIRV targets, many bitcasts can be handled natively by OpBitcast.
 static bool shouldLowerBitCastForTarget(CodeGenContext* codeGenContext, IRInst* inst)
@@ -316,7 +328,6 @@ static bool shouldLowerBitCastForTarget(CodeGenContext* codeGenContext, IRInst* 
     if (!targetRequest)
         return true;
 
-    // For non-SPIRV targets, always lower bitcasts as before
     auto target = targetRequest->getTarget();
     if (target != CodeGenTarget::SPIRV && target != CodeGenTarget::SPIRVAssembly)
         return true;
@@ -326,9 +337,14 @@ static bool shouldLowerBitCastForTarget(CodeGenContext* codeGenContext, IRInst* 
     if (!targetProgram->shouldEmitSPIRVDirectly())
         return true;
 
-    // For SPIRV targets, check if this bitcast can be handled natively
-    auto fromType = inst->getOperand(0)->getDataType();
+    auto operand = inst->getOperand(0);
+    if (!operand)
+        return true;
+
+    auto fromType = operand->getDataType();
     auto toType = inst->getDataType();
+    if (!fromType || !toType)
+        return true;
 
     // SPIRV OpBitcast requires operand and result to have same bit width
     IRSizeAndAlignment fromSize, toSize;
@@ -338,9 +354,8 @@ static bool shouldLowerBitCastForTarget(CodeGenContext* codeGenContext, IRInst* 
             getNaturalSizeAndAlignment(targetProgram->getOptionSet(), toType, &toSize)) &&
         fromSize.size == toSize.size)
     {
-        // SPIRV cannot bitcast between 8-bit types,
-        // but can natively bitcast between other types
-        return fromSize.size <= 8;
+        // For SPIRV targets, check if this bitcast can be handled natively
+        return !canSPIRVBitcastType(fromType) || !canSPIRVBitcastType(toType);
     }
 
     return true;
