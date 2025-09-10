@@ -3030,7 +3030,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 layout->usesResourceKind(LayoutResourceKind::VaryingInput))
             {
                 const auto ptrType = as<IRPtrTypeBase>(var->getDataType());
-                if (ptrType && (isIntegralScalarOrCompositeType(ptrType->getValueType()) || as<IRPtrTypeBase>(ptrType->getValueType())))
+                if (ptrType && (isIntegralScalarOrCompositeType(ptrType->getValueType()) ||
+                                as<IRPtrTypeBase>(ptrType->getValueType())))
                     emitOpDecorate(
                         getSection(SpvLogicalSectionID::Annotations),
                         nullptr,
