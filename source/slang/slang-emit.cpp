@@ -308,8 +308,12 @@ struct LinkingAndOptimizationOptions
 // Check if a type is natively supported by SPIRV OpBitcast instruction
 static bool canSPIRVBitcastType(IRType* type)
 {
-    if (as<IRBasicType>(type))
-        return true;
+    if (auto basicType = as<IRBasicType>(type))
+    {
+        // SPIRV spec supports all numerical types, but SPIRV tools crash on 8-bit constants
+        auto op = basicType->getOp();
+        return op != kIROp_Int8Type && op != kIROp_UInt8Type;
+    }
     if (auto vectorType = as<IRVectorType>(type))
         return canSPIRVBitcastType(vectorType->getElementType());
     if (as<IRPtrType>(type) || as<IRPointerLikeType>(type))
