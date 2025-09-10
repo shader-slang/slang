@@ -5680,6 +5680,20 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
 
         return typeLayout;
     }
+    else if (as<PtrType>(type))
+    {
+        RefPtr<TypeLayout> typeLayout = new PointerTypeLayout();
+        typeLayout->type = type;
+        typeLayout->rules = rules;
+
+        for (int rr = 0; rr < varyingRulesCount; ++rr)
+        {
+            auto info = varyingRules[rr]->GetPointerLayout();
+            typeLayout->addResourceUsage(info.kind, info.size);
+        }
+
+        return typeLayout;
+    }
     else if (auto vecType = as<VectorExpressionType>(type))
     {
         auto elementType = vecType->getElementType();
