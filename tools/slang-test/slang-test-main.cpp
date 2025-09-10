@@ -549,13 +549,36 @@ static void applyMacroSubstitution(String filePath, TestDetails& details)
 static SlangResult _gatherTestsForFile(
     TestCategorySet* categorySet,
     String filePath,
-    FileTestList* outTestList)
+    FileTestList* outTestList,
+    TestContext* context = nullptr)
 {
     outTestList->tests.clear();
 
     String fileContents;
 
-    SLANG_RETURN_ON_FAIL(Slang::File::readAllText(filePath, fileContents));
+    SlangResult readResult = Slang::File::readAllText(filePath, fileContents);
+    if (SLANG_FAILED(readResult))
+    {
+        // Log file reading failure with details (thread-safe)
+        if (context && context->getTestReporter())
+        {
+            context->getTestReporter()->messageFormat(
+                TestMessageType::RunError,
+                "Failed to read test file '%s' (error: 0x%08X)",
+                filePath.getBuffer(),
+                (unsigned int)readResult);
+        }
+        else
+        {
+            // Fallback to stderr if no context available
+            fprintf(
+                stderr,
+                "Failed to read test file '%s' (error: 0x%08X)\n",
+                filePath.getBuffer(),
+                (unsigned int)readResult);
+        }
+        return readResult;
+    }
 
     // Walk through the lines of the file, looking for test commands
     char const* cursor = fileContents.begin();
@@ -614,9 +637,27 @@ static SlangResult _gatherTestsForFile(
         {
             SlangResult res = _parseCategories(categorySet, &cursor, fileOptions);
 
-            // If if failed we are done, unless it was just 'not available'
+            // If it failed we are done, unless it was just 'not available'
             if (SLANG_FAILED(res) && res != SLANG_E_NOT_AVAILABLE)
+            {
+                if (context && context->getTestReporter())
+                {
+                    context->getTestReporter()->messageFormat(
+                        TestMessageType::RunError,
+                        "Failed to parse TEST_CATEGORY in file '%s' (error: 0x%08X)",
+                        filePath.getBuffer(),
+                        (unsigned int)res);
+                }
+                else
+                {
+                    fprintf(
+                        stderr,
+                        "Failed to parse TEST_CATEGORY in file '%s' (error: 0x%08X)\n",
+                        filePath.getBuffer(),
+                        (unsigned int)res);
+                }
                 return res;
+            }
 
             skipToEndOfLine(&cursor);
             continue;
@@ -624,7 +665,27 @@ static SlangResult _gatherTestsForFile(
 
         if (command == "TEST")
         {
-            SLANG_RETURN_ON_FAIL(_gatherTestOptions(categorySet, &cursor, testDetails.options));
+            SlangResult testRes = _gatherTestOptions(categorySet, &cursor, testDetails.options);
+            if (SLANG_FAILED(testRes))
+            {
+                if (context && context->getTestReporter())
+                {
+                    context->getTestReporter()->messageFormat(
+                        TestMessageType::RunError,
+                        "Failed to parse TEST directive in file '%s' (error: 0x%08X)",
+                        filePath.getBuffer(),
+                        (unsigned int)testRes);
+                }
+                else
+                {
+                    fprintf(
+                        stderr,
+                        "Failed to parse TEST directive in file '%s' (error: 0x%08X)\n",
+                        filePath.getBuffer(),
+                        (unsigned int)testRes);
+                }
+                return testRes;
+            }
             applyMacroSubstitution(filePath, testDetails);
 
             // See if the type of test needs certain APIs available
@@ -639,7 +700,27 @@ static SlangResult _gatherTestsForFile(
         }
         else if (command == "DIAGNOSTIC_TEST")
         {
-            SLANG_RETURN_ON_FAIL(_gatherTestOptions(categorySet, &cursor, testDetails.options));
+            SlangResult diagRes = _gatherTestOptions(categorySet, &cursor, testDetails.options);
+            if (SLANG_FAILED(diagRes))
+            {
+                if (context && context->getTestReporter())
+                {
+                    context->getTestReporter()->messageFormat(
+                        TestMessageType::RunError,
+                        "Failed to parse DIAGNOSTIC_TEST directive in file '%s' (error: 0x%08X)",
+                        filePath.getBuffer(),
+                        (unsigned int)diagRes);
+                }
+                else
+                {
+                    fprintf(
+                        stderr,
+                        "Failed to parse DIAGNOSTIC_TEST directive in file '%s' (error: 0x%08X)\n",
+                        filePath.getBuffer(),
+                        (unsigned int)diagRes);
+                }
+                return diagRes;
+            }
             applyMacroSubstitution(filePath, testDetails);
 
             // Apply the file wide options
@@ -1637,7 +1718,7 @@ String getOutput(const ExecuteResult& exeRes, bool removeEmbeddedSource = false)
     String debugLayer = exeRes.debugLayer;
 
     // Apply embedded source removal to standard output if requested
-    if (removeEmbeddedSource)
+    if (removeEmbeddedSource && standardOuptut.getLength() > 0)
     {
         standardOuptut = removeEmbeddedSourceFromSPIRV(standardOuptut);
     }
@@ -4482,7 +4563,7 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
     // Gather a list of tests to run
     FileTestList testList;
 
-    SLANG_RETURN_ON_FAIL(_gatherTestsForFile(&context->categorySet, filePath, &testList));
+    SLANG_RETURN_ON_FAIL(_gatherTestsForFile(&context->categorySet, filePath, &testList, context));
 
     if (testList.tests.getCount() == 0)
     {
@@ -4772,17 +4853,15 @@ void runTestsInDirectory(TestContext* context)
     {
         if (shouldRunTest(context, file))
         {
-            if (context->options.verbosity >= VerbosityLevel::Info)
-            {
-                printf("found test: '%s'\n", file.getBuffer());
-            }
-            if (SLANG_FAILED(_runTestsOnFile(context, file)))
+            SlangResult result = _runTestsOnFile(context, file);
+            if (SLANG_FAILED(result))
             {
                 {
                     TestReporter::TestScope scope(context->getTestReporter(), file);
-                    context->getTestReporter()->message(
+                    context->getTestReporter()->messageFormat(
                         TestMessageType::RunError,
-                        "slang-test: unable to parse test");
+                        "slang-test: unable to parse test (error code: 0x%08X)",
+                        (unsigned int)result);
 
                     context->getTestReporter()->addResult(TestResult::Fail);
                 }
