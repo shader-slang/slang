@@ -22726,7 +22726,8 @@ enum DescriptorKind
     Unknown, /// Unknown descriptor kind.
     Texture, /// A texture descriptor.
     CombinedTextureSampler, /// A combined texture and sampler state descriptor.
-    Buffer, /// A buffer descriptor.
+    ConstantBuffer, /// A constant buffer descriptor.
+    StorageBuffer, /// A storage buffer descriptor.
     Sampler, /// A sampler state descriptor.
     AccelerationStructure, /// A ray tracing acceleration structure descriptor.
     TexelBuffer /// A texel buffer descriptor.
@@ -22802,24 +22803,22 @@ struct DynamicResourceTypeInfo
     const char* kind;
     const char* dynamicKind;
     const char* access;
-    const char* explicitBinding;
-    const char* forceStorageBuffer; // "true" if this type should use StorageBuffer binding regardless of access
 };
 
 const DynamicResourceTypeInfo kDynamicResourceCastableTypes[] = {
-    { "StructuredBuffer<T, L>", "Buffer", "General", "ReadWrite", "StorageBuffer", "true" },
-    { "RWStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite", "StorageBuffer", "false" },
-    { "AppendStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite", "StorageBuffer", "false" },
-    { "ConsumeStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite", "StorageBuffer", "false" },
-    { "RasterizerOrderedStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite", "StorageBuffer", "false" },
-    { "ByteAddressBuffer", "Buffer", "General", "ReadWrite", "StorageBuffer", "true" },
-    { "RWByteAddressBuffer", "Buffer", "General", "ReadWrite", "StorageBuffer", "false" },
-    { "RasterizerOrderedByteAddressBuffer", "Buffer", "General", "ReadWrite", "StorageBuffer", "false" },
-    { "SamplerState", "Sampler", "Sampler", "Unknown", "Sampler", "false" },
-    { "SamplerComparisonState", "Sampler", "Sampler", "Unknown", "Sampler", "false" },
-    { "ConstantBuffer<T, L>", "Buffer", "General", "Read", "UniformBuffer", "false" },
-    { "TextureBuffer<T>", "Buffer", "General", "Read", "UniformTexelBuffer", "false" },
-    { "RaytracingAccelerationStructure", "AccelerationStructure", "General", "Read", "Unknown", "false" },
+    { "StructuredBuffer<T, L>", "StorageBuffer", "General", "Read" },
+    { "RWStructuredBuffer<T, L>", "StorageBuffer", "General", "ReadWrite" },
+    { "AppendStructuredBuffer<T, L>", "StorageBuffer", "General", "ReadWrite" },
+    { "ConsumeStructuredBuffer<T, L>", "StorageBuffer", "General", "ReadWrite" },
+    { "RasterizerOrderedStructuredBuffer<T, L>", "StorageBuffer", "General", "ReadWrite" },
+    { "ByteAddressBuffer", "StorageBuffer", "General", "Read" },
+    { "RWByteAddressBuffer", "StorageBuffer", "General", "ReadWrite" },
+    { "RasterizerOrderedByteAddressBuffer", "StorageBuffer", "General", "ReadWrite" },
+    { "SamplerState", "Sampler", "Sampler", "Unknown" },
+    { "SamplerComparisonState", "Sampler", "Sampler", "Unknown" },
+    { "ConstantBuffer<T, L>", "ConstantBuffer", "General", "Read" },
+    { "TextureBuffer<T>", "TexelBuffer", "General", "Read" },
+    { "RaytracingAccelerationStructure", "AccelerationStructure", "General", "Read" },
 };
 
 for (auto type : kDynamicResourceCastableTypes) {
@@ -22827,8 +22826,6 @@ for (auto type : kDynamicResourceCastableTypes) {
     auto kind = type.kind;
     auto typeName = type.name;
     auto access = type.access;
-    auto explicitBinding = type.explicitBinding;
-    auto forceStorageBuffer = type.forceStorageBuffer;
     if (strstr(typeName, "<T, L>"))
         sb << "__generic<T, L : IBufferDataLayout>\n";
     else if (strstr(typeName, "<T>"))
@@ -22843,9 +22840,6 @@ extension $(typeName) : __IDynamicResourceCastable<__DynamicResourceKind.$(dynam
 
     static const DescriptorKind kind = DescriptorKind.$(kind);
     static const DescriptorAccess descriptorAccess = DescriptorAccess.$(access);
-    static const uint defaultVkBinding = DefaultVkBindlessBindings.$(explicitBinding);
-    static const uint vkMutableBinding = VkMutableBindlessBindings.$(explicitBinding);
-    static const bool forceStorageBuffer = $(forceStorageBuffer);
 
     typealias Handle = DescriptorHandle<$(typeName)>;
 
@@ -22919,8 +22913,9 @@ enum DefaultVkBindlessBindings : uint
     StorageImage = 3, /// STORAGE_IMAGE
     UniformTexelBuffer = 4, /// UNIFORM_TEXEL_BUFFER
     StorageTexelBuffer = 5, /// STORAGE_TEXEL_BUFFER
-    UniformBuffer = 6, /// UNIFORM_BUFFER
-    StorageBuffer = 7, /// STORAGE_BUFFER
+    ConstantBuffer_Read = 6, /// UNIFORM_BUFFER
+    StorageBuffer_Read = 7, /// STORAGE_BUFFER
+    StorageBuffer_ReadWrite = 7, /// STORAGE_BUFFER
     Unknown = 8, /// Other
 }
 
@@ -22933,8 +22928,9 @@ enum VkMutableBindlessBindings : uint
     StorageImage = 2, /// STORAGE_IMAGE
     UniformTexelBuffer = 2, /// UNIFORM_TEXEL_BUFFER
     StorageTexelBuffer = 2, /// STORAGE_TEXEL_BUFFER
-    UniformBuffer = 2, /// UNIFORM_BUFFER
-    StorageBuffer = 2, /// STORAGE_BUFFER,
+    ConstantBuffer_Read = 2, /// UNIFORM_BUFFER
+    StorageBuffer_Read = 2, /// STORAGE_BUFFER
+    StorageBuffer_ReadWrite = 2, /// STORAGE_BUFFER,
     Unknown = 3, /// Other
 }
 
@@ -23024,12 +23020,16 @@ ${{{{
         else
             return __getDynamicResourceHeap<T>($(bindlessOption.enumType).StorageTexelBuffer)[((uint2)handleValue).x];
     }
-    case DescriptorKind.Buffer:
+    case DescriptorKind.ConstantBuffer:
+    {
+        return __getDynamicResourceHeap<T>($(bindlessOption.enumType).ConstantBuffer_Read)[((uint2)handleValue).x];
+    }
+    case DescriptorKind.StorageBuffer:
     {
         if(DescriptorAccess.Read == T.descriptorAccess)
-            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).UniformBuffer)[((uint2)handleValue).x];
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).StorageBuffer_Read)[((uint2)handleValue).x];
         else
-            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).StorageBuffer)[((uint2)handleValue).x];
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).StorageBuffer_ReadWrite)[((uint2)handleValue).x];
     }
     case DescriptorKind.AccelerationStructure:
         return __slang_noop_cast<T>(RaytracingAccelerationStructure(__asuint64((uint2)handleValue)));
