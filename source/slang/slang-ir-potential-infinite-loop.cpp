@@ -47,7 +47,9 @@ static void checkLoopForInfinitePattern(IRLoop* loop, DiagnosticSink* sink)
                 if (leftIsConstant || rightIsConstant)
                 {
                     // Look for specific patterns that suggest problematic loops
-                    // If we find a constant 0 being compared, it's suspicious
+                    // Note: 0.0 comparisons can trigger false positives on legitimate convergence
+                    // loops (e.g., while(error > 0.0) { error = computeNewError(); }), but this
+                    // conservative approach catches common typos like missing assignment operators
                     if (leftIsConstant && leftOp->getOp() == kIROp_FloatLit)
                     {
                         auto floatLit = as<IRFloatLit>(leftOp);
@@ -72,26 +74,28 @@ static void checkLoopForInfinitePattern(IRLoop* loop, DiagnosticSink* sink)
     }
 }
 
+/// Recursively traverse all instructions to find loops, including nested functions in generics
+static void traverseInstsForLoops(IRInst* inst, DiagnosticSink* sink)
+{
+    // Check if this instruction is a loop
+    if (auto loop = as<IRLoop>(inst))
+    {
+        checkLoopForInfinitePattern(loop, sink);
+    }
+
+    // Recursively traverse all children to catch functions inside generics
+    for (auto child : inst->getChildren())
+    {
+        traverseInstsForLoops(child, sink);
+    }
+}
+
 /// Main entry point for infinite loop detection IR pass
 void checkForPotentialInfiniteLoops(IRModule* module, DiagnosticSink* sink)
 {
-    // Traverse all functions and check for infinite loop patterns
-    for (auto globalInst : module->getGlobalInsts())
-    {
-        if (auto func = as<IRFunc>(globalInst))
-        {
-            for (auto block : func->getBlocks())
-            {
-                for (auto inst : block->getChildren())
-                {
-                    if (auto loop = as<IRLoop>(inst))
-                    {
-                        checkLoopForInfinitePattern(loop, sink);
-                    }
-                }
-            }
-        }
-    }
+    // Use recursive traversal to catch all loops including those in nested contexts
+    // like functions inside generics, which the original top-level traversal missed
+    traverseInstsForLoops(module->getModuleInst(), sink);
 }
 
 } // namespace Slang
