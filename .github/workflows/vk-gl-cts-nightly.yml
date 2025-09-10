@@ -111,7 +111,7 @@ jobs:
 
       - name: success notification
         id: slack-notify-success
-        if: ${{ success() }}
+        if: ${{ github.event_name == 'schedule' && success() }}
         uses: slackapi/slack-github-action@v1.26.0
         with:
           payload: |
@@ -122,7 +122,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
       - name: failure notification
         id: slack-notify-failure
-        if: ${{ !success() }}
+        if: ${{ github.event_name == 'schedule' && !success() }}
         uses: slackapi/slack-github-action@v1.26.0
         with:
           payload: |
