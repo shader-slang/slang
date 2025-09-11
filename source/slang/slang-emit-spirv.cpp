@@ -4149,6 +4149,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_Lsh:
             result = emitArithmetic(parent, inst);
             break;
+        case kIROp_GetArrayLength:
+            result = emitGetArrayLength(parent, inst);
+            break;
         case kIROp_CastDescriptorHandleToUInt2:
         case kIROp_CastUInt2ToDescriptorHandle:
         case kIROp_GlobalValueRef:
@@ -7353,6 +7356,31 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto result =
             emitOpCompositeConstruct(parent, inst, inst->getDataType(), arrayLength, strideOperand);
         return result;
+    }
+
+    SpvInst* emitGetArrayLength(SpvInstParent* parent, IRInst* inst)
+    {
+        // GetArrayLength should be called on an unsized array
+        // The operand should be the array value (or pointer to array)
+        auto arrayOperand = inst->getOperand(0);
+        
+        IRBuilder builder(inst);
+        
+        // For SPIRV, we need to emit OpArrayLength
+        // OpArrayLength takes a pointer to a struct and the member index of the runtime array
+        // The array operand might be a direct reference or need to be traced back to a struct field
+        
+        // Generate OpArrayLength with struct pointer and member index 0 (assuming unsized array is first/only member)
+        auto arrayLength = emitInst(
+            parent,
+            inst,
+            SpvOpArrayLength,
+            builder.getUIntType(),
+            kResultID,
+            arrayOperand,
+            SpvLiteralInteger::from32(0));
+
+        return arrayLength;
     }
 
     SpvInst* emitGetBufferPtr(SpvInstParent* parent, IRInst* inst)

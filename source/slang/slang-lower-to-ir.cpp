@@ -4355,9 +4355,27 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitGetArrayLengthExpr(GetArrayLengthExpr* expr)
     {
         auto type = lowerType(context, expr->arrayExpr->type);
-        auto arrayType = as<IRArrayType>(type);
-        SLANG_ASSERT(arrayType);
-        return LoweredValInfo::simple(arrayType->getElementCount());
+        
+        // Check if this is an unsized array type
+        if (auto unsizedArrayType = as<IRUnsizedArrayType>(type))
+        {
+            // For unsized arrays, generate a GetArrayLength IR instruction
+            auto arrayValue = lowerRValueExpr(context, expr->arrayExpr);
+            auto builder = getBuilder();
+            auto result = builder->emitGetArrayLength(builder->getIntType(), arrayValue);
+            return LoweredValInfo::simple(result);
+        }
+        else if (auto arrayType = as<IRArrayType>(type))
+        {
+            // For sized arrays, return the element count directly
+            return LoweredValInfo::simple(arrayType->getElementCount());
+        }
+        else
+        {
+            // This should not happen if the semantic analysis was correct
+            SLANG_UNEXPECTED("visitGetArrayLengthExpr called on non-array type");
+            return LoweredValInfo();
+        }
     }
 
     LoweredValInfo visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)

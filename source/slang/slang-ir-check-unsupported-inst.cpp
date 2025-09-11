@@ -2,13 +2,13 @@
 
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-target.h"
 
 namespace Slang
 {
 
 void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* sink)
 {
-    SLANG_UNUSED(target);
     for (auto block : func->getBlocks())
     {
         for (auto inst : block->getChildren())
@@ -16,8 +16,26 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
             switch (inst->getOp())
             {
             case kIROp_GetArrayLength:
-                sink->diagnose(inst, Diagnostics::attemptToQuerySizeOfUnsizedArray);
-                break;
+                {
+                    // GetArrayLength is supported for SPIRV and GLSL targets
+                    bool isSupported = false;
+                    if (target)
+                    {
+                        auto codeGenTarget = target->getTarget();
+                        if (codeGenTarget == CodeGenTarget::SPIRV || 
+                            codeGenTarget == CodeGenTarget::SPIRVAssembly ||
+                            codeGenTarget == CodeGenTarget::GLSL)
+                        {
+                            isSupported = true;
+                        }
+                    }
+                    
+                    if (!isSupported)
+                    {
+                        sink->diagnose(inst, Diagnostics::attemptToQuerySizeOfUnsizedArray);
+                    }
+                    break;
+                }
             }
         }
     }

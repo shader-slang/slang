@@ -3990,6 +3990,39 @@ Expr* SemanticsExprVisitor::visitTreatAsDifferentiableExpr(TreatAsDifferentiable
     return expr;
 }
 
+// Helper function to check if an expression represents accessing an unsized array
+// that is a field of a structured buffer, which should be allowed for getCount()
+static bool isUnsizedArrayInStructuredBuffer(Expr* arrayExpr)
+{
+    // Check if this is a member access (field access)
+    if (auto memberExpr = as<MemberExpr>(arrayExpr))
+    {
+        // Get the base expression type 
+        if (auto baseType = memberExpr->baseExpression->type)
+        {
+            // Check if we're accessing a member through structured buffer indexing
+            if (auto indexExpr = as<IndexExpr>(memberExpr->baseExpression))
+            {
+                if (auto baseBufferType = indexExpr->baseExpression->type)
+                {
+                    // Check if the base type is any kind of structured buffer
+                    if (as<HLSLStructuredBufferTypeBase>(baseBufferType))
+                    {
+                        return true;
+                    }
+                }
+            }
+            // Also check if the base is directly a structured buffer element type
+            else if (as<HLSLStructuredBufferTypeBase>(baseType))
+            {
+                return true;
+            }
+        }
+    }
+    
+    return false;
+}
+
 Expr* SemanticsExprVisitor::visitGetArrayLengthExpr(GetArrayLengthExpr* expr)
 {
     expr->arrayExpr = CheckTerm(expr->arrayExpr);
@@ -3998,7 +4031,11 @@ Expr* SemanticsExprVisitor::visitGetArrayLengthExpr(GetArrayLengthExpr* expr)
         expr->type = m_astBuilder->getIntType();
         if (arrType->isUnsized())
         {
-            getSink()->diagnose(expr, Diagnostics::invalidArraySize);
+            // Allow unsized arrays if they're fields of structured buffers
+            if (!isUnsizedArrayInStructuredBuffer(expr->arrayExpr))
+            {
+                getSink()->diagnose(expr, Diagnostics::invalidArraySize);
+            }
         }
     }
     else
