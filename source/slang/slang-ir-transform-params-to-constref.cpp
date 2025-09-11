@@ -204,7 +204,7 @@ struct TransformParamsToConstRefContext
                                 break;
                             }
                         }
-                        
+
                         if (!isRelatedToUpdatedParam)
                             continue;
 
@@ -274,7 +274,7 @@ struct TransformParamsToConstRefContext
     void eliminateLoadStorePairsForEntryPoint(IRFunc* func)
     {
         List<IRInst*> toRemove;
-        
+
         // Look for patterns: load(ptr) followed by store(var, load_result)
         // This can be optimized to direct pointer usage
         for (auto block : func->getBlocks())
@@ -285,17 +285,17 @@ struct TransformParamsToConstRefContext
                 {
                     auto storedValue = storeInst->getVal();
                     auto destPtr = storeInst->getPtr();
-                    
+
                     // Check if we're storing a load result
                     if (auto loadInst = as<IRLoad>(storedValue))
                     {
                         auto loadedPtr = loadInst->getPtr();
-                        
+
                         // IMPORTANT: Only optimize if destPtr is a variable (kIROp_Var)
                         // Don't optimize stores to buffer elements or other meaningful destinations
                         if (!as<IRVar>(destPtr))
                             continue;
-                        
+
                         // Check if this load has only one use (this store)
                         bool loadHasOnlyOneUse = true;
                         UInt useCount = 0;
@@ -308,16 +308,16 @@ struct TransformParamsToConstRefContext
                                 break;
                             }
                         }
-                        
+
                         if (loadHasOnlyOneUse)
                         {
                             // Replace all uses of destPtr with loadedPtr
                             destPtr->replaceUsesWith(loadedPtr);
-                            
+
                             // Mark both instructions for removal
                             toRemove.add(storeInst);
                             toRemove.add(loadInst);
-                            
+
                             // Also remove the variable if it's only used by this store
                             if (auto varInst = as<IRVar>(destPtr))
                             {
@@ -335,14 +335,14 @@ struct TransformParamsToConstRefContext
                                     toRemove.add(varInst);
                                 }
                             }
-                            
+
                             changed = true;
                         }
                     }
                 }
             }
         }
-        
+
         // Remove marked instructions
         for (auto inst : toRemove)
         {
@@ -450,17 +450,19 @@ struct TransformParamsToConstRefContext
         }
 
         // Handle entry point functions separately - they don't get processed by processFunc
-        // but they still need load/store optimization for parameters that come from global parameters
+        // but they still need load/store optimization for parameters that come from global
+        // parameters
         for (auto inst = module->getModuleInst()->getFirstChild(); inst; inst = inst->getNextInst())
         {
             auto func = as<IRFunc>(inst);
             if (!func || !func->isDefinition())
                 continue;
-            
+
             // Only process entry point functions that weren't already processed
             if (!shouldProcessFunction(func))
             {
-                // For entry point functions, use a broader optimization since we don't have specific updatedParams
+                // For entry point functions, use a broader optimization since we don't have
+                // specific updatedParams
                 eliminateLoadStorePairsForEntryPoint(func);
             }
         }
