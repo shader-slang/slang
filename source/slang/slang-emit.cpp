@@ -318,7 +318,8 @@ static bool canSPIRVBitcastType(IRType* type)
         return canSPIRVBitcastType(vectorType->getElementType());
     if (as<IRPtrType>(type) || as<IRPointerLikeType>(type))
     {
-        // SPIRV spec allows pointer types in OpBitcast, but they interfere with atomic operations in SlangPy
+        // SPIRV spec allows pointer types in OpBitcast, but they interfere with atomic operations
+        // in SlangPy
         return false;
     }
     return false;
