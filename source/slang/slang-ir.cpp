@@ -2722,6 +2722,10 @@ IRType* IRBuilder::getType(IROp op, IRInst* operand0)
 
 IRBasicType* IRBuilder::getBasicType(BaseType baseType)
 {
+    if ((UInt)baseType > (UInt)BaseType::CountOfPrimitives)
+    {
+        baseType = getBaseEnumUnderlyingType(baseType);
+    }
     return (IRBasicType*)getType(IROp((UInt)kIROp_FirstBasicType + (UInt)baseType));
 }
 
