@@ -2062,16 +2062,22 @@ DIAGNOSTIC(
 DIAGNOSTIC(
     38008,
     Error,
+    entryPointCannotReturnResourceType,
+    "entry point '$0' cannot return a resource type '$1'; shader functions must return simple data types")
+
+DIAGNOSTIC(
+    38009,
+    Error,
     specializationParameterOfNameNotSpecialized,
     "no specialization argument was provided for specialization parameter '$0'")
 DIAGNOSTIC(
-    38008,
+    38009,
     Error,
     specializationParameterNotSpecialized,
     "no specialization argument was provided for specialization parameter")
 
 DIAGNOSTIC(
-    38009,
+    38010,
     Error,
     expectedValueOfTypeForSpecializationArg,
     "expected a constant value of type '$0' as argument for specialization parameter '$1'")

@@ -378,6 +378,13 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     auto module = getModule(entryPointFuncDecl);
     auto linkage = module->getLinkage();
 
+    // Check if the return type is valid for a shader entry point
+    auto returnType = entryPointFuncDecl->returnType.type;
+    if (returnType && as<ResourceType>(returnType))
+    {
+        sink->diagnose(entryPointFuncDecl, Diagnostics::entryPointCannotReturnResourceType, entryPointName, returnType);
+    }
+
     // Every entry point needs to have a stage specified either via
     // command-line/API options, or via an explicit `[shader("...")]` attribute.
     //
