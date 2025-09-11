@@ -9388,7 +9388,7 @@ static NodeBase* parseBuiltinRequirementModifier(Parser* parser, void* /*userDat
     return modifier;
 }
 
-static NodeBase* parseMagicTypeModifier(Parser* parser, void* /*userData*/)
+static NodeBase* parseMagicTypeModifier2(Parser* parser, void* /*userData*/, bool magicEnum)
 {
     MagicTypeModifier* modifier = parser->astBuilder->create<MagicTypeModifier>();
     parser->ReadToken(TokenType::LParent);
@@ -9398,8 +9398,14 @@ static NodeBase* parseMagicTypeModifier(Parser* parser, void* /*userData*/)
         modifier->tag =
             uint32_t(stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
     }
-    auto syntaxClass = parser->astBuilder->findSyntaxClass(getName(parser, modifier->magicName));
-    if (syntaxClass)
+
+    if (magicEnum)
+    {
+        modifier->magicNodeType = getSyntaxClass<EnumTypeType>();
+    }
+    else if (
+        auto syntaxClass =
+            parser->astBuilder->findSyntaxClass(getName(parser, modifier->magicName)))
     {
         modifier->magicNodeType = syntaxClass;
     }
@@ -9408,6 +9414,16 @@ static NodeBase* parseMagicTypeModifier(Parser* parser, void* /*userData*/)
     parser->ReadToken(TokenType::RParent);
 
     return modifier;
+}
+
+static NodeBase* parseMagicTypeModifier(Parser* parser, void* userData)
+{
+    return parseMagicTypeModifier2(parser, userData, false);
+}
+
+static NodeBase* parseMagicEnumModifier(Parser* parser, void* userData)
+{
+    return parseMagicTypeModifier2(parser, userData, true);
 }
 
 static NodeBase* parseIntrinsicTypeModifier(Parser* parser, void* /*userData*/)
@@ -9634,6 +9650,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseModifier("__builtin_requirement", parseBuiltinRequirementModifier),
 
     _makeParseModifier("__magic_type", parseMagicTypeModifier),
+    _makeParseModifier("__magic_enum", parseMagicEnumModifier),
     _makeParseModifier("__intrinsic_type", parseIntrinsicTypeModifier),
     _makeParseModifier("__implicit_conversion", parseImplicitConversionModifier),
 
