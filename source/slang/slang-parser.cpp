@@ -3578,8 +3578,8 @@ static Decl* ParseBufferBlockDecl(
 
 static NodeBase* parseHLSLCBufferDecl(Parser* parser, void* /*userData*/)
 {
-    // Check for GLSL layout qualifiers when GLSL input is allowed
-    if (parser->options.allowGLSLInput && parser->pendingModifiers)
+    // Check for GLSL layout qualifiers (layout modifiers can be used even without allowGLSLInput)
+    if (parser->pendingModifiers)
     {
         auto getLayoutArg = [&](const char* defaultLayout)
         {
