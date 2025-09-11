@@ -1387,7 +1387,7 @@ LayoutRulesImpl kCPushConstantRulesImpl_ = {
 
 LayoutRulesImpl kCVaryingInputLayoutRulesImpl_ = {
     &kCLayoutRulesFamilyImpl,
-    &kGLSLVaryingOutputLayoutRulesImpl,
+    &kGLSLVaryingInputLayoutRulesImpl,
     &kGLSLObjectLayoutRulesImpl,
 };
 
@@ -4918,7 +4918,8 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     else if (auto vecType = as<VectorExpressionType>(type))
     {
         auto elementType = vecType->getElementType();
-        size_t elementCount = (size_t)getIntVal(vecType->getElementCount());
+        size_t elementCount =
+            (size_t)getIntVal(context.tryResolveLinkTimeVal(vecType->getElementCount()));
 
         auto element = _createTypeLayout(context, elementType);
 
@@ -4944,8 +4945,9 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     }
     else if (auto matType = as<MatrixExpressionType>(type))
     {
-        size_t rowCount = (size_t)getIntVal(matType->getRowCount());
-        size_t colCount = (size_t)getIntVal(matType->getColumnCount());
+        size_t rowCount = (size_t)getIntVal(context.tryResolveLinkTimeVal(matType->getRowCount()));
+        size_t colCount =
+            (size_t)getIntVal(context.tryResolveLinkTimeVal(matType->getColumnCount()));
 
         auto elementType = matType->getElementType();
         auto elementResult = _createTypeLayout(context, elementType);
@@ -5031,7 +5033,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             context,
             arrayType,
             arrayType->getElementType(),
-            arrayType->getElementCount());
+            context.tryResolveLinkTimeVal(arrayType->getElementCount()));
     }
     else if (auto atomicType = as<AtomicType>(type))
     {
@@ -5181,7 +5183,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             StructTypeLayoutBuilder typeLayoutBuilder;
             StructTypeLayoutBuilder pendingDataTypeLayoutBuilder;
 
-            typeLayoutBuilder.beginLayout(type, rules);
+            typeLayoutBuilder.beginLayout(declRefType, rules);
             auto typeLayout = typeLayoutBuilder.getTypeLayout();
 
             _addLayout(context, type, typeLayout);
@@ -5673,6 +5675,20 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
         for (int rr = 0; rr < varyingRulesCount; ++rr)
         {
             auto info = varyingRules[rr]->GetScalarLayout(baseType);
+            typeLayout->addResourceUsage(info.kind, info.size);
+        }
+
+        return typeLayout;
+    }
+    else if (as<PtrType>(type))
+    {
+        RefPtr<TypeLayout> typeLayout = new PointerTypeLayout();
+        typeLayout->type = type;
+        typeLayout->rules = rules;
+
+        for (int rr = 0; rr < varyingRulesCount; ++rr)
+        {
+            auto info = varyingRules[rr]->GetPointerLayout();
             typeLayout->addResourceUsage(info.kind, info.size);
         }
 
