@@ -3990,6 +3990,30 @@ Expr* SemanticsExprVisitor::visitTreatAsDifferentiableExpr(TreatAsDifferentiable
     return expr;
 }
 
+// Helper function to check if an expression represents accessing an unsized array
+// that is a field of a structured buffer, which should be allowed for getCount()
+static bool isUnsizedArrayInStructuredBuffer(Expr* arrayExpr)
+{
+    // Check if this is a member access (field access)
+    if (auto memberExpr = as<MemberExpr>(arrayExpr))
+    {
+        // Get the base expression (should be indexing into a structured buffer)
+        if (auto indexExpr = as<IndexExpr>(memberExpr->baseExpression))
+        {
+            if (auto baseBufferType = indexExpr->baseExpression->type)
+            {
+                // Check if the base type is any kind of structured buffer
+                if (as<HLSLStructuredBufferTypeBase>(baseBufferType))
+                {
+                    return true;
+                }
+            }
+        }
+    }
+
+    return false;
+}
+
 Expr* SemanticsExprVisitor::visitGetArrayLengthExpr(GetArrayLengthExpr* expr)
 {
     expr->arrayExpr = CheckTerm(expr->arrayExpr);
@@ -3998,7 +4022,11 @@ Expr* SemanticsExprVisitor::visitGetArrayLengthExpr(GetArrayLengthExpr* expr)
         expr->type = m_astBuilder->getIntType();
         if (arrType->isUnsized())
         {
-            getSink()->diagnose(expr, Diagnostics::invalidArraySize);
+            // Allow unsized arrays if they're fields of structured buffers
+            if (!isUnsizedArrayInStructuredBuffer(expr->arrayExpr))
+            {
+                getSink()->diagnose(expr, Diagnostics::invalidArraySize);
+            }
         }
     }
     else
