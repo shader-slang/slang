@@ -70,8 +70,8 @@ void modify(inout int data[10])
 // CUDA: notDirectlyUsingParam{{.*}}Array{{.*}}*{{.*}}data
 int notDirectlyUsingParam(int data[10], int val)
 {
-// ensure we create a temporary for the array
-// CUDA: FixedArray{{.*}};
+// do not create a temporary for the array
+// CUDA-NOT: FixedArray{{.*}};
     modify(data);
     return data[1] + val;
 }
@@ -114,7 +114,7 @@ void computeMain()
     // not directly using param
     int notDirectlyUsingParamVal = notDirectlyUsingParam(val, input[1]);
 
-    output[0] = 
+    output[0] =
         structVal == 3 &&
         globalParamStructVal == 3 &&
         nestedStructVal == 3 &&

@@ -14,11 +14,12 @@ void modify(inout int v)
 void computeMain(int3 v : SV_DispatchThreadID)
 {
     int3 u = v;
-    // CHECK: int [[TEMP:[a-zA-Z0-9_]+]] = u{{.*}}.x;
-    // CHECK: modify{{.*}}(&[[TEMP]])
-    // CHECK: u{{.*}}.x = [[TEMP]];
+    // CHECK: thread int3 [[TEMP:[a-zA-Z0-9_]+]] = int3(v{{.*}};
+    // CHECK: modify{{.*}}(&[[TEMP]][int(0)])
 
     modify(u.x);
+
+    // CHECK: outputBuffer{{.*}} = [[TEMP]].x + [[TEMP]].y;
     // BUF: 2
     outputBuffer[0] = u.x + u.y;
 }

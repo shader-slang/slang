@@ -60,7 +60,7 @@ struct TransformParamsToConstRefContext
                     case kIROp_FieldExtract:
                         {
                             // Transform the IRFieldExtract into a IRFieldAddress
-                            auto fieldExtract = as<IRFieldExtract>(use->getUser());
+                            auto fieldExtract = as<IRFieldExtract>(user);
                             builder.setInsertBefore(fieldExtract);
                             auto fieldAddr = builder.emitFieldAddress(
                                 fieldExtract->getBase(),
@@ -73,8 +73,7 @@ struct TransformParamsToConstRefContext
                     case kIROp_GetElement:
                         {
                             // Transform the IRGetElement into a IRGetElementPtr
-                            auto getElement = as<IRGetElement>(use->getUser());
-
+                            auto getElement = as<IRGetElement>(user);
                             builder.setInsertBefore(getElement);
                             auto elemAddr = builder.emitElementAddress(
                                 getElement->getBase(),
@@ -111,14 +110,8 @@ struct TransformParamsToConstRefContext
             List<IRInst*> newArgs;
 
             // Transform arguments to match the updated-parameter
-            IRParam* param = func->getFirstParam();
             UInt i = 0;
-            auto iterate = [&]()
-            {
-                param = param->getNextParam();
-                i++;
-            };
-            for (; param; iterate())
+            for (IRParam* param = func->getFirstParam(); param; param = param->getNextParam(), i++)
             {
                 auto arg = call->getArg(i);
                 if (!updatedParams.contains(param))
@@ -179,11 +172,191 @@ struct TransformParamsToConstRefContext
         return true;
     }
 
+    // Eliminate unnecessary load+store pairs that can be optimized away
+    // Only optimize patterns related to the updated parameters
+    void eliminateLoadStorePairs(IRFunc* func, HashSet<IRParam*>& updatedParams)
+    {
+        List<IRInst*> toRemove;
+
+        // Look for patterns: load(ptr) followed by store(var, load_result)
+        // This can be optimized to direct pointer usage
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst : block->getChildren())
+            {
+                if (auto storeInst = as<IRStore>(inst))
+                {
+                    auto storedValue = storeInst->getVal();
+                    auto destPtr = storeInst->getPtr();
+
+                    // Check if we're storing a load result
+                    if (auto loadInst = as<IRLoad>(storedValue))
+                    {
+                        auto loadedPtr = loadInst->getPtr();
+
+                        // Only optimize if the loaded pointer is related to our updated parameters
+                        bool isRelatedToUpdatedParam = false;
+                        for (auto param : updatedParams)
+                        {
+                            if (loadedPtr == param)
+                            {
+                                isRelatedToUpdatedParam = true;
+                                break;
+                            }
+                        }
+
+                        if (!isRelatedToUpdatedParam)
+                            continue;
+
+                        // IMPORTANT: Only optimize if destPtr is a variable (kIROp_Var)
+                        // Don't optimize stores to buffer elements or other meaningful destinations
+                        if (!as<IRVar>(destPtr))
+                            continue;
+
+                        // Check if this load has only one use (this store)
+                        bool loadHasOnlyOneUse = true;
+                        UInt useCount = 0;
+                        for (auto use = loadInst->firstUse; use; use = use->nextUse)
+                        {
+                            useCount++;
+                            if (useCount > 1 || use->getUser() != storeInst)
+                            {
+                                loadHasOnlyOneUse = false;
+                                break;
+                            }
+                        }
+
+                        if (loadHasOnlyOneUse)
+                        {
+                            // Replace all uses of destPtr with loadedPtr
+                            destPtr->replaceUsesWith(loadedPtr);
+
+                            // Mark both instructions for removal
+                            toRemove.add(storeInst);
+                            toRemove.add(loadInst);
+
+                            // Also remove the variable if it's only used by this store
+                            if (auto varInst = as<IRVar>(destPtr))
+                            {
+                                bool varHasOnlyStoreUse = true;
+                                for (auto use = varInst->firstUse; use; use = use->nextUse)
+                                {
+                                    if (use->getUser() != storeInst)
+                                    {
+                                        varHasOnlyStoreUse = false;
+                                        break;
+                                    }
+                                }
+                                if (varHasOnlyStoreUse)
+                                {
+                                    toRemove.add(varInst);
+                                }
+                            }
+
+                            changed = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Remove marked instructions
+        for (auto inst : toRemove)
+        {
+            if (inst->getParent())
+            {
+                inst->removeAndDeallocate();
+            }
+        }
+    }
+
+    // Eliminate load+store pairs for entry point functions (without specific updatedParams)
+    void eliminateLoadStorePairsForEntryPoint(IRFunc* func)
+    {
+        List<IRInst*> toRemove;
+
+        // Look for patterns: load(ptr) followed by store(var, load_result)
+        // This can be optimized to direct pointer usage
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst : block->getChildren())
+            {
+                if (auto storeInst = as<IRStore>(inst))
+                {
+                    auto storedValue = storeInst->getVal();
+                    auto destPtr = storeInst->getPtr();
+
+                    // Check if we're storing a load result
+                    if (auto loadInst = as<IRLoad>(storedValue))
+                    {
+                        auto loadedPtr = loadInst->getPtr();
+
+                        // IMPORTANT: Only optimize if destPtr is a variable (kIROp_Var)
+                        // Don't optimize stores to buffer elements or other meaningful destinations
+                        if (!as<IRVar>(destPtr))
+                            continue;
+
+                        // Check if this load has only one use (this store)
+                        bool loadHasOnlyOneUse = true;
+                        UInt useCount = 0;
+                        for (auto use = loadInst->firstUse; use; use = use->nextUse)
+                        {
+                            useCount++;
+                            if (useCount > 1 || use->getUser() != storeInst)
+                            {
+                                loadHasOnlyOneUse = false;
+                                break;
+                            }
+                        }
+
+                        if (loadHasOnlyOneUse)
+                        {
+                            // Replace all uses of destPtr with loadedPtr
+                            destPtr->replaceUsesWith(loadedPtr);
+
+                            // Mark both instructions for removal
+                            toRemove.add(storeInst);
+                            toRemove.add(loadInst);
+
+                            // Also remove the variable if it's only used by this store
+                            if (auto varInst = as<IRVar>(destPtr))
+                            {
+                                bool varHasOnlyStoreUse = true;
+                                for (auto use = varInst->firstUse; use; use = use->nextUse)
+                                {
+                                    if (use->getUser() != storeInst)
+                                    {
+                                        varHasOnlyStoreUse = false;
+                                        break;
+                                    }
+                                }
+                                if (varHasOnlyStoreUse)
+                                {
+                                    toRemove.add(varInst);
+                                }
+                            }
+
+                            changed = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Remove marked instructions
+        for (auto inst : toRemove)
+        {
+            if (inst->getParent())
+            {
+                inst->removeAndDeallocate();
+            }
+        }
+    }
+
     // Process a single function
     void processFunc(IRFunc* func)
     {
         HashSet<IRParam*> updatedParams;
-        bool hasTransformedParams = false;
 
         // First pass: Transform parameter types
         for (auto param = func->getFirstParam(); param; param = param->getNextParam())
@@ -203,13 +376,12 @@ struct TransformParamsToConstRefContext
                 auto constRefType = builder.getConstRefType(paramType, AddressSpace::ThreadLocal);
                 param->setFullType(constRefType);
 
-                hasTransformedParams = true;
                 changed = true;
                 updatedParams.add(param);
             }
         }
 
-        if (!hasTransformedParams)
+        if (updatedParams.getCount() == 0)
         {
             return;
         }
@@ -219,6 +391,9 @@ struct TransformParamsToConstRefContext
 
         // Third pass: Update call sites
         updateCallSites(func, updatedParams);
+
+        // Optimization pass: Remove unnecessary load+store pairs created by updateCallSites
+        eliminateLoadStorePairs(func, updatedParams);
     }
 
     void addFuncsToCallListInTopologicalOrder(
@@ -272,6 +447,24 @@ struct TransformParamsToConstRefContext
         for (auto func : functionsToProcess)
         {
             processFunc(func);
+        }
+
+        // Handle entry point functions separately - they don't get processed by processFunc
+        // but they still need load/store optimization for parameters that come from global
+        // parameters
+        for (auto inst = module->getModuleInst()->getFirstChild(); inst; inst = inst->getNextInst())
+        {
+            auto func = as<IRFunc>(inst);
+            if (!func || !func->isDefinition())
+                continue;
+
+            // Only process entry point functions that weren't already processed
+            if (!shouldProcessFunction(func))
+            {
+                // For entry point functions, use a broader optimization since we don't have
+                // specific updatedParams
+                eliminateLoadStorePairsForEntryPoint(func);
+            }
         }
 
         return SLANG_OK;
