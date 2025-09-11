@@ -22,14 +22,14 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
                     if (target)
                     {
                         auto codeGenTarget = target->getTarget();
-                        if (codeGenTarget == CodeGenTarget::SPIRV || 
+                        if (codeGenTarget == CodeGenTarget::SPIRV ||
                             codeGenTarget == CodeGenTarget::SPIRVAssembly ||
                             codeGenTarget == CodeGenTarget::GLSL)
                         {
                             isSupported = true;
                         }
                     }
-                    
+
                     if (!isSupported)
                     {
                         sink->diagnose(inst, Diagnostics::attemptToQuerySizeOfUnsizedArray);

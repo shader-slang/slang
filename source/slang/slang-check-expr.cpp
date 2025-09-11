@@ -3994,40 +3994,24 @@ Expr* SemanticsExprVisitor::visitTreatAsDifferentiableExpr(TreatAsDifferentiable
 // that is a field of a structured buffer, which should be allowed for getCount()
 static bool isUnsizedArrayInStructuredBuffer(Expr* arrayExpr)
 {
-    // For now, let's be more permissive and allow any unsized array getCount for supported targets
-    // This will let us test the rest of the implementation
-    // TODO: Make this more specific to only structured buffer fields when needed
-    return true;
-    
-    /*
     // Check if this is a member access (field access)
     if (auto memberExpr = as<MemberExpr>(arrayExpr))
     {
-        // Get the base expression type 
-        if (auto baseType = memberExpr->baseExpression->type)
+        // Get the base expression (should be indexing into a structured buffer)
+        if (auto indexExpr = as<IndexExpr>(memberExpr->baseExpression))
         {
-            // Check if we're accessing a member through structured buffer indexing
-            if (auto indexExpr = as<IndexExpr>(memberExpr->baseExpression))
+            if (auto baseBufferType = indexExpr->baseExpression->type)
             {
-                if (auto baseBufferType = indexExpr->baseExpression->type)
+                // Check if the base type is any kind of structured buffer
+                if (as<HLSLStructuredBufferTypeBase>(baseBufferType))
                 {
-                    // Check if the base type is any kind of structured buffer
-                    if (as<HLSLStructuredBufferTypeBase>(baseBufferType))
-                    {
-                        return true;
-                    }
+                    return true;
                 }
-            }
-            // Also check if the base is directly a structured buffer element type
-            else if (as<HLSLStructuredBufferTypeBase>(baseType))
-            {
-                return true;
             }
         }
     }
-    
+
     return false;
-    */
 }
 
 Expr* SemanticsExprVisitor::visitGetArrayLengthExpr(GetArrayLengthExpr* expr)

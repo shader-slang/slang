@@ -3101,6 +3101,15 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             emitRequireExtension(as<IRRequireTargetExtension>(inst));
             break;
         }
+    case kIROp_GetArrayLength:
+        {
+            // For GLSL and similar languages, we emit .length() method call
+            emitOperand(
+                inst->getOperand(0),
+                leftSide(getInfo(EmitOp::General), getInfo(EmitOp::Postfix)));
+            m_writer->emit(".length()");
+            break;
+        }
     default:
         diagnoseUnhandledInst(inst);
         break;
