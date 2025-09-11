@@ -2063,7 +2063,8 @@ DIAGNOSTIC(
     38008,
     Error,
     entryPointCannotReturnResourceType,
-    "entry point '$0' cannot return a resource type '$1'; shader functions must return simple data types")
+    "entry point '$0' cannot return a resource type '$1'; shader functions must return simple data "
+    "types")
 
 DIAGNOSTIC(
     38009,
