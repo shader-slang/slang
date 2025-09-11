@@ -22768,7 +22768,8 @@ enum DescriptorKind
     Unknown, /// Unknown descriptor kind.
     Texture, /// A texture descriptor.
     CombinedTextureSampler, /// A combined texture and sampler state descriptor.
-    Buffer, /// A buffer descriptor.
+    ConstantBuffer, /// A constant buffer descriptor.
+    StorageBuffer, /// A storage buffer descriptor.
     Sampler, /// A sampler state descriptor.
     AccelerationStructure, /// A ray tracing acceleration structure descriptor.
     TexelBuffer /// A texel buffer descriptor.
@@ -22847,19 +22848,19 @@ struct DynamicResourceTypeInfo
 };
 
 const DynamicResourceTypeInfo kDynamicResourceCastableTypes[] = {
-    { "StructuredBuffer<T, L>", "Buffer", "General", "Read" },
-    { "RWStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite" },
-    { "AppendStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite" },
-    { "ConsumeStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite" },
-    { "RasterizerOrderedStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite" },
-    { "ByteAddressBuffer", "Buffer", "General", "Read" },
-    { "RWByteAddressBuffer", "Buffer", "General", "ReadWrite" },
-    { "RasterizerOrderedByteAddressBuffer", "Buffer", "General", "ReadWrite" },
+    { "StructuredBuffer<T, L>", "StorageBuffer", "General", "Read" },
+    { "RWStructuredBuffer<T, L>", "StorageBuffer", "General", "ReadWrite" },
+    { "AppendStructuredBuffer<T, L>", "StorageBuffer", "General", "ReadWrite" },
+    { "ConsumeStructuredBuffer<T, L>", "StorageBuffer", "General", "ReadWrite" },
+    { "RasterizerOrderedStructuredBuffer<T, L>", "StorageBuffer", "General", "ReadWrite" },
+    { "ByteAddressBuffer", "StorageBuffer", "General", "Read" },
+    { "RWByteAddressBuffer", "StorageBuffer", "General", "ReadWrite" },
+    { "RasterizerOrderedByteAddressBuffer", "StorageBuffer", "General", "ReadWrite" },
     { "SamplerState", "Sampler", "Sampler", "Unknown" },
     { "SamplerComparisonState", "Sampler", "Sampler", "Unknown" },
-    { "ConstantBuffer<T, L>", "Buffer", "General", "Read"},
-    { "TextureBuffer<T>", "Buffer", "General", "Read"},
-    { "RaytracingAccelerationStructure", "AccelerationStructure", "General", "Read"},
+    { "ConstantBuffer<T, L>", "ConstantBuffer", "General", "Read" },
+    { "TextureBuffer<T>", "TexelBuffer", "General", "Read" },
+    { "RaytracingAccelerationStructure", "AccelerationStructure", "General", "Read" },
 };
 
 for (auto type : kDynamicResourceCastableTypes) {
@@ -22950,12 +22951,13 @@ enum DefaultVkBindlessBindings : uint
 {
     Sampler = 0, /// SAMPLER
     CombinedTextureSampler = 1, /// COMBINED_IMAGE_SAMPLER
-    Texture_Read = 2, /// SAMPLED_IMAGE
-    Texture_ReadWrite = 3, /// STORAGE_IMAGE
-    TexelBuffer_Read = 4, /// UNIFORM_TEXEL_BUFFER
-    TexelBuffer_ReadWrite = 5, /// STORAGE_TEXEL_BUFFER
-    Buffer_Read = 6, /// UNIFORM_BUFFER
-    Buffer_ReadWrite = 7, /// STORAGE_BUFFER
+    SampledImage = 2, /// SAMPLED_IMAGE
+    StorageImage = 3, /// STORAGE_IMAGE
+    UniformTexelBuffer = 4, /// UNIFORM_TEXEL_BUFFER
+    StorageTexelBuffer = 5, /// STORAGE_TEXEL_BUFFER
+    ConstantBuffer_Read = 6, /// UNIFORM_BUFFER
+    StorageBuffer_Read = 7, /// STORAGE_BUFFER
+    StorageBuffer_ReadWrite = 7, /// STORAGE_BUFFER
     Unknown = 8, /// Other
 }
 
@@ -22964,12 +22966,13 @@ enum VkMutableBindlessBindings : uint
 {
     Sampler = 0, /// SAMPLER
     CombinedTextureSampler = 1, /// COMBINED_IMAGE_SAMPLER
-    Texture_Read = 2, /// SAMPLED_IMAGE
-    Texture_ReadWrite = 2, /// STORAGE_IMAGE
-    TexelBuffer_Read = 2, /// UNIFORM_TEXEL_BUFFER
-    TexelBuffer_ReadWrite = 2, /// STORAGE_TEXEL_BUFFER
-    Buffer_Read = 2, /// UNIFORM_BUFFER
-    Buffer_ReadWrite = 2, /// STORAGE_BUFFER,
+    SampledImage = 2, /// SAMPLED_IMAGE
+    StorageImage = 2, /// STORAGE_IMAGE
+    UniformTexelBuffer = 2, /// UNIFORM_TEXEL_BUFFER
+    StorageTexelBuffer = 2, /// STORAGE_TEXEL_BUFFER
+    ConstantBuffer_Read = 2, /// UNIFORM_BUFFER
+    StorageBuffer_Read = 2, /// STORAGE_BUFFER
+    StorageBuffer_ReadWrite = 2, /// STORAGE_BUFFER,
     Unknown = 3, /// Other
 }
 
@@ -23048,23 +23051,27 @@ ${{{{
     case DescriptorKind.Texture:
     {
         if(DescriptorAccess.Read == T.descriptorAccess)
-            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Texture_Read)[((uint2)handleValue).x];
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).SampledImage)[((uint2)handleValue).x];
         else
-            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Texture_ReadWrite)[((uint2)handleValue).x];
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).StorageImage)[((uint2)handleValue).x];
     }
     case DescriptorKind.TexelBuffer:
     {
         if(DescriptorAccess.Read == T.descriptorAccess)
-            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).TexelBuffer_Read)[((uint2)handleValue).x];
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).UniformTexelBuffer)[((uint2)handleValue).x];
         else
-            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).TexelBuffer_ReadWrite)[((uint2)handleValue).x];
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).StorageTexelBuffer)[((uint2)handleValue).x];
     }
-    case DescriptorKind.Buffer:
+    case DescriptorKind.ConstantBuffer:
+    {
+        return __getDynamicResourceHeap<T>($(bindlessOption.enumType).ConstantBuffer_Read)[((uint2)handleValue).x];
+    }
+    case DescriptorKind.StorageBuffer:
     {
         if(DescriptorAccess.Read == T.descriptorAccess)
-            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Buffer_Read)[((uint2)handleValue).x];
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).StorageBuffer_Read)[((uint2)handleValue).x];
         else
-            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Buffer_ReadWrite)[((uint2)handleValue).x];
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).StorageBuffer_ReadWrite)[((uint2)handleValue).x];
     }
     case DescriptorKind.AccelerationStructure:
         return __slang_noop_cast<T>(RaytracingAccelerationStructure(__asuint64((uint2)handleValue)));
