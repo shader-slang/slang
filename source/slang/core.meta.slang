@@ -1278,18 +1278,12 @@ struct __none_t
 {
 };
 
-// @hidden: this type is a BaseType since we want it to work with
-// `registerBuiltinDecl`
-__builtin_type($((int)BaseType::AddressSpace))
 enum AddressSpace : uint64_t
 {
     Device = $((uint64_t)AddressSpace::UserPointer),
     GroupShared = $((uint64_t)AddressSpace::GroupShared),
 };
 
-// @hidden: this type is a BaseType since we want it to work with
-// `registerBuiltinDecl`
-__builtin_type($((int)BaseType::MemoryScope))
 enum MemoryScope : int32_t
 {
     CrossDevice = $((int32_t)MemoryScope::CrossDevice),
@@ -1300,9 +1294,6 @@ enum MemoryScope : int32_t
     QueueFamily = $((int32_t)MemoryScope::QueueFamily),
 }
 
-// @hidden: this type is a BaseType since we want it to work with
-// `registerBuiltinDecl`
-__builtin_type($((int)BaseType::AccessQualifier))
 enum Access : uint64_t
 {
     ReadWrite = $((uint64_t)AccessQualifier::ReadWrite),

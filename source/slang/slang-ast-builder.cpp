@@ -545,10 +545,12 @@ PtrTypeBase* ASTBuilder::getPtrType(
     AddressSpace addrSpace,
     char const* ptrTypeName)
 {
+    Type* typeOfAccessQualifier = getUInt64Type();
+    Type* typeOfAddressSpace = getUInt64Type();
     return as<PtrTypeBase>(getPtrType(
         valueType,
-        getIntVal(getBuiltinType(BaseType::AccessQualifier), (IntegerLiteralValue)accessQualifier),
-        getIntVal(getBuiltinType(BaseType::AddressSpace), (IntegerLiteralValue)addrSpace),
+        getIntVal(typeOfAccessQualifier, (IntegerLiteralValue)accessQualifier),
+        getIntVal(typeOfAddressSpace, (IntegerLiteralValue)addrSpace),
         ptrTypeName));
 }
 
