@@ -613,6 +613,16 @@ void CLikeSourceEmitter::defaultEmitInstStmt(IRInst* inst)
             m_writer->emit(");\n");
         }
         break;
+    case kIROp_GetArrayLength:
+        {
+            // For GLSL and similar languages, we emit .length() method call
+            emitInstResultDecl(inst);
+            emitOperand(
+                inst->getOperand(0),
+                leftSide(getInfo(EmitOp::General), getInfo(EmitOp::Postfix)));
+            m_writer->emit(".length();\n");
+        }
+        break;
     case kIROp_Discard:
         m_writer->emit("discard;\n");
         break;

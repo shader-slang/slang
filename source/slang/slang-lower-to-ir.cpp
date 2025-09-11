@@ -4361,8 +4361,9 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         {
             // For unsized arrays, generate a GetArrayLength IR instruction
             auto arrayValue = lowerRValueExpr(context, expr->arrayExpr);
+            auto arrayInst = getSimpleVal(context, arrayValue);
             auto builder = getBuilder();
-            auto result = builder->emitGetArrayLength(builder->getIntType(), arrayValue);
+            auto result = builder->emitIntrinsicInst(builder->getIntType(), kIROp_GetArrayLength, 1, &arrayInst);
             return LoweredValInfo::simple(result);
         }
         else if (auto arrayType = as<IRArrayType>(type))

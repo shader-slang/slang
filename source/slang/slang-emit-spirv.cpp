@@ -7368,9 +7368,35 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         
         // For SPIRV, we need to emit OpArrayLength
         // OpArrayLength takes a pointer to a struct and the member index of the runtime array
-        // The array operand might be a direct reference or need to be traced back to a struct field
+        // However, we're likely getting a loaded array value, so we need to work with what we have
         
-        // Generate OpArrayLength with struct pointer and member index 0 (assuming unsized array is first/only member)
+        // If this is a load of a runtime array, we need to get the struct pointer instead
+        if (auto loadInst = as<IRLoad>(arrayOperand))
+        {
+            // Get the pointer being loaded from
+            auto ptrOperand = loadInst->getPtr();
+            
+            // This should be a pointer to a struct member, we need the parent struct pointer
+            if (auto getFieldAddr = as<IRFieldAddress>(ptrOperand))
+            {
+                // Get the struct pointer (base of the field address)
+                auto structPtr = getFieldAddr->getBase();
+                
+                // Generate OpArrayLength with struct pointer and member index 0
+                auto arrayLength = emitInst(
+                    parent,
+                    inst,
+                    SpvOpArrayLength,
+                    builder.getUIntType(),
+                    kResultID,
+                    structPtr,
+                    SpvLiteralInteger::from32(0));
+
+                return arrayLength;
+            }
+        }
+        
+        // Fallback: try to use the operand directly (may not work in all cases)
         auto arrayLength = emitInst(
             parent,
             inst,
