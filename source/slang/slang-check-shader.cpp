@@ -382,7 +382,11 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     auto returnType = entryPointFuncDecl->returnType.type;
     if (returnType && as<ResourceType>(returnType))
     {
-        sink->diagnose(entryPointFuncDecl, Diagnostics::entryPointCannotReturnResourceType, entryPointName, returnType);
+        sink->diagnose(
+            entryPointFuncDecl,
+            Diagnostics::entryPointCannotReturnResourceType,
+            entryPointName,
+            returnType);
     }
 
     // Every entry point needs to have a stage specified either via
