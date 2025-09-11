@@ -1278,12 +1278,16 @@ struct __none_t
 {
 };
 
+/// @category misc_types
+__magic_enum(AddressSpace)
 enum AddressSpace : uint64_t
 {
     Device = $((uint64_t)AddressSpace::UserPointer),
     GroupShared = $((uint64_t)AddressSpace::GroupShared),
 };
 
+/// @category misc_types
+__magic_enum(MemoryScope)
 enum MemoryScope : int32_t
 {
     CrossDevice = $((int32_t)MemoryScope::CrossDevice),
@@ -1294,6 +1298,8 @@ enum MemoryScope : int32_t
     QueueFamily = $((int32_t)MemoryScope::QueueFamily),
 }
 
+/// @category misc_types
+__magic_enum(AccessQualifier)
 enum Access : uint64_t
 {
     ReadWrite = $((uint64_t)AccessQualifier::ReadWrite),
