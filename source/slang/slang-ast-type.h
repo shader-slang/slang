@@ -740,6 +740,7 @@ FIDDLE()
 class OutParamType : public OutParamTypeBase
 {
     FIDDLE(...)
+    void _toTextOverride(StringBuilder& out);
 };
 using OutType = OutParamType;
 
@@ -748,6 +749,7 @@ FIDDLE()
 class InOutParamType : public OutParamTypeBase
 {
     FIDDLE(...)
+    void _toTextOverride(StringBuilder& out);
 };
 using InOutType = InOutParamType;
 
@@ -756,9 +758,10 @@ FIDDLE()
 class RefParamType : public ParamDirectionType
 {
     FIDDLE(...)
+    void _toTextOverride(StringBuilder& out);
 };
 
-/// The type for an `constref` parameter, e.g., `constref T`
+/// The type for a `constref` parameter, e.g., `constref T`
 ///
 /// Note that, despite the modifier currently used to represent
 /// this case in code, this is *not* comparable to the `ref`
@@ -769,6 +772,7 @@ FIDDLE()
 class ConstRefParamType : public ParamDirectionType
 {
     FIDDLE(...)
+    void _toTextOverride(StringBuilder& out);
 };
 
 /// A reference type that is explicitly named somewhere in code (`Ref<T>`).

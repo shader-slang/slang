@@ -539,6 +539,26 @@ void ExplicitRefType::_toTextOverride(StringBuilder& out)
     out << toSlice(">");
 }
 
+void OutParamType::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("out ") << getValueType();
+}
+
+void InOutParamType::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("inout ") << getValueType();
+}
+
+void RefParamType::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("ref ") << getValueType();
+}
+
+void ConstRefParamType::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("borrow ") << getValueType();
+}
+
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! NamedExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
