@@ -3612,7 +3612,7 @@ Type* SemanticsVisitor::_toDifferentialParamType(Type* primalParamType)
         else
         {
             SLANG_UNEXPECTED("unhandled parameter-passing mode");
-            return diffValueType;
+            UNREACHABLE_RETURN(diffValueType);
         }
     }
 
