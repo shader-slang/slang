@@ -1064,7 +1064,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [ForceInline]
     __glsl_extension(GL_ARB_sparse_texture_clamp)
     [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_clamp_fragment)]
-    T Sample(vector<float, Shape.dimensions+isArray> location, vector<int, Shape.planeDimensions> offset, float clamp)
+    T Sample(vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, float clamp)
     {
         __requireComputeDerivative();
         __target_switch
@@ -1091,7 +1091,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    T Sample(vector<float, Shape.dimensions+isArray> location, vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
+    T Sample(vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
         __requireComputeDerivative();
         __target_switch
@@ -3135,7 +3135,7 @@ vector<T.Element,4> __texture_gather_offset(
     _Texture<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
     SamplerState s,
     vector<float, Shape.dimensions+isArray> location,
-    constexpr vector<int, Shape.planeDimensions> offset,
+    vector<int, Shape.planeDimensions> offset,
     int component)
 {
     __target_switch
@@ -3196,7 +3196,7 @@ __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCo
 vector<T.Element,4> __texture_gather_offset(
     _Texture<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler,
     vector<float, Shape.dimensions+isArray> location,
-    constexpr vector<int, Shape.planeDimensions> offset,
+    vector<int, Shape.planeDimensions> offset,
     int component)
 {
     __target_switch
@@ -3340,7 +3340,7 @@ vector<T.Element,4> __texture_gatherCmp_offset(
     SamplerComparisonState s,
     vector<float, Shape.dimensions+isArray> location,
     T.Element compareValue,
-    constexpr vector<int, Shape.planeDimensions> offset)
+    vector<int, Shape.planeDimensions> offset)
 {
     __target_switch
     {
@@ -3386,7 +3386,7 @@ vector<T.Element,4> __texture_gatherCmp_offset(
     _Texture<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler,
     vector<float, Shape.dimensions+isArray> location,
     T.Element compareValue,
-    constexpr vector<int, Shape.planeDimensions> offset)
+    vector<int, Shape.planeDimensions> offset)
 {
     __target_switch
     {
@@ -3532,7 +3532,7 @@ ${{{{
         $(samplerParam)
         vector<float, Shape.dimensions+isArray> location
         $(compareParam),
-        constexpr vector<int, Shape.planeDimensions> offset)
+        vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
         {
@@ -3557,6 +3557,7 @@ ${{{{
             return __texture_gather$(compareFunc)_offset(this $(samplerArg), location $(compareArg), offset $(componentArg));
         }
     }
+
 
     [ForceInline]
     [require(hlsl, texture_gather)]
@@ -3628,6 +3629,7 @@ ${{{{
 ${{{{
 } // for (isScalarTexture)
 }}}}
+
 // End of all Texture Gather
 
 

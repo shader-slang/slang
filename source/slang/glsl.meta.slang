@@ -1914,7 +1914,7 @@ public vector<T.Element,4> texture(Sampler1D<T> sampler, float p)
 __generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> texture(Sampler1D<T> sampler, float p, constexpr float bias)
+public vector<T.Element,4> texture(Sampler1D<T> sampler, float p, float bias)
 {
     return __vectorReshape2<T.Element, 4>(sampler.SampleBias(p, bias));
 }
@@ -1950,7 +1950,7 @@ public vector<T.Element,4> texture(_Texture<
         0, // isShadow
         1, // isCombined
         format
-    > sampler, vector<float,Shape.dimensions+isArray> p, constexpr float bias)
+    > sampler, vector<float,Shape.dimensions+isArray> p, float bias)
 {
     return __vectorReshape2<T.Element,4>(sampler.SampleBias(p, bias));
 }
@@ -3891,7 +3891,7 @@ public vector<T.Element,4> textureGatherOffset(_Texture<
         0, // isShadow
         1, // isCombined
         format
-    > sampler, vector<float,2+isArray> p, constexpr vector<int,2> offset, int comp = 0)
+    > sampler, vector<float,2+isArray> p, vector<int,2> offset, int comp = 0)
 {
     switch (comp)
     {
@@ -3915,10 +3915,11 @@ public vec4 textureGatherOffset(_Texture<
         1, // isShadow
         1, // isCombined
         format
-    > sampler, vector<float,2+isArray> p, float refZ, constexpr vector<int,2> offset)
+    > sampler, vector<float,2+isArray> p, float refZ, vector<int,2> offset)
 {
     return sampler.GatherCmp(p, refZ, offset);
 }
+
 
 // -------------------
 // textureGatherOffsets
