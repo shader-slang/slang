@@ -3891,7 +3891,7 @@ public vector<T.Element,4> textureGatherOffset(_Texture<
         0, // isShadow
         1, // isCombined
         format
-    > sampler, vector<float,2+isArray> p, constexpr vector<int,2> offset, int comp = 0)
+    > sampler, vector<float,2+isArray> p, vector<int,2> offset, int comp = 0)
 {
     switch (comp)
     {
@@ -3915,10 +3915,11 @@ public vec4 textureGatherOffset(_Texture<
         1, // isShadow
         1, // isCombined
         format
-    > sampler, vector<float,2+isArray> p, float refZ, constexpr vector<int,2> offset)
+    > sampler, vector<float,2+isArray> p, float refZ, vector<int,2> offset)
 {
     return sampler.GatherCmp(p, refZ, offset);
 }
+
 
 // -------------------
 // textureGatherOffsets
