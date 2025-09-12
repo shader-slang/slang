@@ -63,9 +63,9 @@ bool isConstExpr(IRInst* value)
     case kIROp_GlobalConstant:
         return true;
     case kIROp_Param:
-       if (isGenericParam(value))
-           return true;
-       break;
+        if (isGenericParam(value))
+            return true;
+        break;
     default:
         break;
     }
@@ -161,8 +161,7 @@ bool opCanBeConstExprByForwardPass(IRInst* value)
 {
     // TODO: handle call inst here.
 
-    if (value->getOp() == kIROp_Param ||
-        value->getOp() == kIROp_Specialize)
+    if (value->getOp() == kIROp_Param || value->getOp() == kIROp_Specialize)
     {
         return false;
     }
