@@ -803,7 +803,7 @@ Result linkAndOptimizeIR(
     // can assume that all ordinary/uniform data is strictly
     // passed using constant buffers.
     //
-    collectGlobalUniformParameters(irModule, outLinkedIR.globalScopeVarLayout);
+    collectGlobalUniformParameters(irModule, outLinkedIR.globalScopeVarLayout, target);
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "GLOBAL UNIFORMS COLLECTED");
 #endif
@@ -1304,6 +1304,9 @@ Result linkAndOptimizeIR(
         dumpIRIfEnabled(codeGenContext, irModule, "EXISTENTIALS LEGALIZED");
 #endif
         validateIRModuleIfEnabled(codeGenContext, irModule);
+
+        if (!validateStructuredBufferResourceTypes(irModule, sink, targetRequest))
+            return SLANG_FAIL;
 
         // Many of our target languages and/or downstream compilers
         // don't support `struct` types that have resource-type fields.
@@ -2285,7 +2288,8 @@ public:
     {
         ComPtr<ISlangBlob> spirvBlob;
         SlangResult res = artifact->loadBlob(ArtifactKeep::Yes, spirvBlob.writeRef());
-        if (SLANG_FAILED(res) || !spirvBlob)
+        if (SLANG_FAILED(res) || !spirvBlob ||
+            spirvBlob->getBufferSize() < SPV_INDEX_INSTRUCTION_START * sizeof(SpvWord))
             return SLANG_FAIL;
 
         // Populate the full array of SPIR-V words.

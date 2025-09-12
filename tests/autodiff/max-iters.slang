@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type -d3d12 -use-dxil
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type -d3d12
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type -vk
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type -metal
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type -cuda

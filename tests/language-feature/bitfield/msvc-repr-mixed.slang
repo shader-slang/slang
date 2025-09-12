@@ -19,20 +19,23 @@ struct MixedSizes {
     uint16_t d : 8;  // Same backing field
 };
 
+groupshared MixedSizes m;
+
+typealias GroupSharedPtr<T> = Ptr<T, Access::ReadWrite, AddressSpace::GroupShared>;
+
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    MixedSizes m;
     m.a = 0xA;
     m.b = 0xB;
     m.c = 0xCD;
     m.d = 0xEF;
 
     // Read the two backing fields separately
-    uint8_t* p8 = (uint8_t*)&m;
-    uint16_t* p16 = (uint16_t*)((uint8_t*)&m + 2); // Skip uint8_t + padding
+    GroupSharedPtr<uint8_t> p8 = (GroupSharedPtr<uint8_t>)__getAddress(m);
+    GroupSharedPtr<uint16_t> p16 = (GroupSharedPtr<uint16_t>)( ((GroupSharedPtr<uint8_t>)__getAddress(m)) + 2); // Skip uint8_t + padding
 
-    outputBuffer[0] = uint(*p8);
-    outputBuffer[1] = uint(*p16);
+    outputBuffer[0] = (uint)*p8;
+    outputBuffer[1] = (uint)*p16;
 }
 

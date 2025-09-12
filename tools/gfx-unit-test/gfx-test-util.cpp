@@ -252,6 +252,7 @@ Slang::ComPtr<IDevice> createTestingDevice(
     {
         deviceDesc.enableValidation = context->enableDebugLayers;
         deviceDesc.debugCallback = context->debugCallback;
+        getRHI()->enableDebugLayers();
     }
 
     D3D12DeviceExtendedDesc extDesc = {};

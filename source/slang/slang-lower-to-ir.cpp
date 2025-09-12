@@ -2067,7 +2067,14 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto astValueType = type->getValueType();
 
         IRType* irValueType = lowerType(context, astValueType);
+        IRInst* accessQualifier = nullptr;
         IRInst* addrSpace = nullptr;
+
+        if (auto astAccessQualifier = type->getAccessQualifier())
+        {
+            accessQualifier = getSimpleVal(context, lowerVal(context, astAccessQualifier));
+        }
+
         if (auto astAddrSpace = type->getAddressSpace())
         {
             addrSpace = getSimpleVal(context, lowerVal(context, astAddrSpace));
@@ -2078,7 +2085,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                 getBuilder()->getUInt64Type(),
                 (IRIntegerValue)AddressSpace::Generic);
         }
-        return getBuilder()->getPtrType(kIROp_PtrType, irValueType, addrSpace);
+
+        return getBuilder()->getPtrType(kIROp_PtrType, irValueType, accessQualifier, addrSpace);
     }
 
     IRType* visitDeclRefType(DeclRefType* type)
@@ -3437,7 +3445,6 @@ void _lowerFuncDeclBaseTypeInfo(
     auto& parameterLists = outInfo.parameterLists;
     collectParameterLists(
         context,
-
         declRef,
         &parameterLists,
         kParameterListCollectMode_Default,
@@ -3469,7 +3476,7 @@ void _lowerFuncDeclBaseTypeInfo(
             irParamType = builder->getRefType(irParamType, AddressSpace::Generic);
             break;
         case kParameterDirection_ConstRef:
-            irParamType = builder->getConstRefType(irParamType);
+            irParamType = builder->getConstRefType(irParamType, AddressSpace::Generic);
             break;
         default:
             SLANG_UNEXPECTED("unknown parameter direction");
@@ -4156,6 +4163,39 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     IRBuilder* getBuilder() { return context->irBuilder; }
     ASTBuilder* getASTBuilder() { return context->astBuilder; }
     LoweredValInfo lowerSubExpr(Expr* expr) { return sharedLoweringContext.lowerSubExpr(expr); }
+
+    LoweredValInfo visitAddressOfExpr(AddressOfExpr* expr)
+    {
+        auto loweredType = lowerType(context, expr->type);
+        auto baseVal = lowerLValueExpr(context, expr->arg);
+        auto ptr = tryGetAddress(context, baseVal, TryGetAddressMode::Aggressive);
+
+        switch (ptr.flavor)
+        {
+        case LoweredValInfo::Flavor::Ptr:
+            {
+                // TODO: This is a hack. We should just be returning `ptr`. We do not do this since
+                // `ptr` may have the wrong address space. This happens since when lowering-to-ir we
+                // don't check what addres-space info we should be using for variables we create.
+                // example: `groupshared int ptr` ==> lower-to-ir lowers as default address-space
+                // with groupshared-rate.
+                //
+                // We need to emit a temporary variable (and cannot emit a cast) since `operator*`
+                // has its own hacks and is an incorrect implementation of its own. To elaborate,
+                // `operator*` is defined as `__intrinsic_op(0)`, which means "pass arguments
+                // through a function `in`, then set as result". This is an issue since this means
+                // that our function (which should be returning a `ref`) may in fact, not be
+                // returning a `ref` but instead be loading via the `in` parameter and generating a
+                // non-pointer result.
+                auto irVar = context->irBuilder->emitVar(loweredType);
+                context->irBuilder->emitStore(irVar, ptr.val);
+                return LoweredValInfo::ptr(irVar);
+            }
+        default:
+            SLANG_UNIMPLEMENTED_X("cannot get address of __getAddress(...) argument");
+            UNREACHABLE_RETURN(LoweredValInfo());
+        }
+    }
 
     LoweredValInfo visitIncompleteExpr(IncompleteExpr*)
     {
@@ -8856,6 +8896,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         IRGeneric* outerGeneric = nullptr;
 
+        bool needLinkage = true;
+
         // If we are static, then we need to insert the declaration before the parent.
         // This tries to match the behavior of previous `lowerFunctionStaticConstVarDecl`
         // functionality
@@ -8866,6 +8908,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // be the global scope, but it might be an outer
             // generic if we are lowering a generic function.
             subBuilder->setInsertBefore(subBuilder->getFunc());
+
+            // static values inside a function does not need a linkage.
+            // trying to insert a linkage decoration to a static constant defined
+            // inside a generic function can lead to errorneous IR.
+            needLinkage = false;
         }
         else if (!isFunctionVarDecl(decl))
         {
@@ -8920,8 +8967,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // All of the attributes/decorations we can attach
         // belong on the IR constant node.
         //
-
-        addLinkageDecoration(context, irConstant, decl);
+        if (needLinkage)
+            addLinkageDecoration(context, irConstant, decl);
 
         addNameHint(context, irConstant, decl);
         addVarDecorations(context, irConstant, decl);
@@ -11994,6 +12041,8 @@ static void lowerProgramEntryPointToIR(
             existentialSlotArgs.getCount(),
             existentialSlotArgs.getBuffer());
     }
+
+    stripFrontEndOnlyInstructions(builder->getModule(), IRStripOptions());
 }
 
 /// Ensure that `decl` and all relevant declarations under it get emitted.
