@@ -2042,7 +2042,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         List<IRType*> paramTypes;
         for (Index pp = 0; pp < paramCount; ++pp)
         {
-            paramTypes.add(lowerType(context, type->getParamType(pp)));
+            paramTypes.add(lowerType(context, type->getParamTypeWithDirectionWrapper(pp)));
         }
         if (type->getErrorType()->equals(context->astBuilder->getBottomType()))
         {
@@ -3816,13 +3816,13 @@ struct ExprLoweringContext
 
         for (Index i = 0; i < argCount; ++i)
         {
-            IRType* paramType = lowerType(context, funcType->getParamType(i));
-            ParameterDirection paramDirection = funcType->getParamDirection(i);
+            auto paramInfo = funcType->getParamInfo(i);
+            IRType* paramType = lowerType(context, paramInfo.type);
             addDirectCallArgs(
                 expr,
                 i,
                 paramType,
-                paramDirection,
+                paramInfo.direction,
                 DeclRef<ParamDecl>(),
                 ioArgs,
                 ioFixups);

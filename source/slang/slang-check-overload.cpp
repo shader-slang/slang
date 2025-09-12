@@ -696,7 +696,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
             Count paramCount = funcType->getParamCount();
             for (Index i = 0; i < paramCount; ++i)
             {
-                auto paramType = getParamQualType(funcType->getParamType(i));
+                auto paramType = getParamQualType(funcType->getParamTypeWithDirectionWrapper(i));
                 paramTypes.add(paramType);
             }
         }
@@ -2689,7 +2689,7 @@ void SemanticsVisitor::AddHigherOrderOverloadCandidates(
             List<QualType> paramTypes;
 
             for (Index ii = 0; ii < diffFuncType->getParamCount(); ii++)
-                paramTypes.add(getParamQualType(diffFuncType->getParamType(ii)));
+                paramTypes.add(getParamQualType(diffFuncType->getParamTypeWithDirectionWrapper(ii)));
 
             // Try to infer generic arguments, based on the updated context.
             OverloadResolveContext subContext = context;

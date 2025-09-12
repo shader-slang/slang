@@ -2945,7 +2945,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
             Index paramCount = funcType->getParamCount();
             for (Index pp = 0; pp < paramCount; ++pp)
             {
-                auto paramType = funcType->getParamType(pp);
+                auto paramType = funcType->getParamTypeWithDirectionWrapper(pp);
                 Expr* argExpr = nullptr;
                 ParamDecl* paramDecl = nullptr;
                 if (pp < expr->arguments.getCount())
@@ -3557,21 +3557,66 @@ Expr* SemanticsExprVisitor::maybeRegisterLambdaCapture(Expr* exprIn)
     return resultMemberExpr;
 }
 
-Type* SemanticsVisitor::_toDifferentialParamType(Type* primalType)
+Type* SemanticsVisitor::_toDifferentialParamType(Type* primalParamType)
 {
-    // Check for type modifiers like 'out' and 'inout'. We need to differentiate the
-    // nested type.
+    // This function is invoked on parameter types that could
+    // still be wrapped to represent a parameter-passing mode
+    // like `ref`, `out`, etc.
     //
-    if (auto primalOutType = as<OutType>(primalType))
+    // We need to intercept these cases here, and ensure that
+    // the wrapper is not exposed to other parts of the front-end
+    // code, because they only exist to encode the parameter-passing
+    // mode, and are not a proper part of the Slang type system
+    // (at least not at this time).
+    //
+    if (auto primalParamWrapperType = as<ParamDirectionType>(primalParamType))
     {
-        return m_astBuilder->getOutType(_toDifferentialParamType(primalOutType->getValueType()));
+        // Some parameter-passing modes do not naturally lend themselves
+        // to being differentiated - most notably, `ref` parameters.
+        // We will detect those cases here, and handle them as a parameter
+        // of a non-differentiable type would be handled.
+        //
+        // TODO(tfoley): With the introduction of `IDifferentiablePtrType`,
+        // it is possible that something like a `ref` parameter could also
+        // support autodiff, but it is not clear what a correct
+        // one-size-fits-all behavior should be in that case.
+        //
+        if (as<RefParamType>(primalParamType))
+            return primalParamWrapperType;
+
+        // Given a primal type that is a wrapper like `Out<T>`, we can
+        // extract the underlying primal value type `T`, and determine
+        // what the differential type value type corresponding to `T`
+        // should be.
+        //
+        auto primalValueType = primalParamWrapperType->getValueType();
+        auto diffValueType = _toDifferentialParamType(primalValueType);
+
+        // Once we have created the appropriate differential value type,
+        // we will form the differential parameter type by wrapping
+        // the differential value type in the same wrapper that had
+        // been used for the primal type.
+        //
+        if (as<OutType>(primalParamWrapperType))
+        {
+            return m_astBuilder->getOutType(diffValueType);
+        }
+        else if (as<InOutType>(primalParamWrapperType))
+        {
+            return m_astBuilder->getInOutType(diffValueType);
+        }
+        else if (as<ConstRefParamType>(primalParamWrapperType))
+        {
+            return m_astBuilder->getConstRefParamType(diffValueType);
+        }
+        else
+        {
+            SLANG_UNEXPECTED("unhandled parameter-passing mode");
+            return diffValueType;
+        }
     }
-    else if (auto primalInOutType = as<InOutType>(primalType))
-    {
-        return m_astBuilder->getInOutType(
-            _toDifferentialParamType(primalInOutType->getValueType()));
-    }
-    return getDifferentialPairType(primalType);
+
+    return getDifferentialPairType(primalParamType);
 }
 
 Type* SemanticsVisitor::getDifferentialPairType(Type* primalType)
@@ -3652,7 +3697,7 @@ Type* SemanticsVisitor::getForwardDiffFuncType(FuncType* originalType)
 
     for (Index i = 0; i < originalType->getParamCount(); i++)
     {
-        if (auto jvpParamType = _toDifferentialParamType(originalType->getParamType(i)))
+        if (auto jvpParamType = _toDifferentialParamType(originalType->getParamTypeWithDirectionWrapper(i)))
             paramTypes.add(jvpParamType);
     }
     FuncType* jvpType =
@@ -3678,7 +3723,9 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType)
 
     for (Index i = 0; i < originalType->getParamCount(); i++)
     {
-        if (auto outType = as<OutType>(originalType->getParamType(i)))
+        auto originalParamType = originalType->getParamTypeWithDirectionWrapper(i);
+
+        if (auto outType = as<OutType>(originalParamType))
         {
             auto diffElementType = tryGetDifferentialType(m_astBuilder, outType->getValueType());
             if (diffElementType)
@@ -3690,7 +3737,7 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType)
                 continue;
             }
         }
-        else if (auto derivType = _toDifferentialParamType(originalType->getParamType(i)))
+        else if (auto derivType = _toDifferentialParamType(originalParamType))
         {
             if (as<DifferentialPairType>(derivType))
             {

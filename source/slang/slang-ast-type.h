@@ -845,11 +845,94 @@ class FuncType : public Type
     OperandView<Type> getParamTypes() { return OperandView<Type>(this, 0, getOperandCount() - 2); }
 
     Index getParamCount() { return m_operands.getCount() - 2; }
-    Type* getParamType(Index index) { return as<Type>(getOperand(index)); }
-    Type* getResultType() { return as<Type>(getOperand(m_operands.getCount() - 2)); }
-    Type* getErrorType() { return as<Type>(getOperand(m_operands.getCount() - 1)); }
 
+    /// Get the type of one of the function's parameters, by index.
+    ///
+    /// The type returned by this function may include a wrapper
+    /// type around what the user-perceived type of the parameter
+    /// is. For example, if a parameter is declared as `out int a`
+    /// then this function would return a type coresponding to
+    /// `OutParam<int>`, using the hidden `OutParam<T>` type defined
+    /// in the core module.
+    ///
+    /// Any code that calls this function should be conscious of
+    /// the possibility of encountering these wrappers, and handle
+    /// them accordingly.
+    ///
+    Type* getParamTypeWithDirectionWrapper(Index index)
+    {
+        return as<Type>(getOperand(index));
+    }
+
+    /// Get the type of one of the function's parameters, by index.
+    ///
+    /// The type returned by this funciton is the user-perceived
+    /// type of the parameter, and does not include any wrappers
+    /// that are introduced to indicate the parameter-passing mode.
+    /// For example, a parameter declared as `out int a` will simply
+    /// return the `int` type, the same as would be returned for
+    /// a parameter simply declared as `int a`.
+    ///
+    /// Any code that calls this function should be conscious of
+    /// the possibility that the type returned may not fully
+    /// describe the contract for the given parameter, and should
+    /// make sure to consult `getParamDirection` as well, to get
+    /// a complete picture.
+    ///
+    Type* getParamValueType(Index index);
+
+    /// Get the parameter-passing mode of one of the function's parameters, by index.
+    ///
     ParameterDirection getParamDirection(Index index);
+
+    /// Combined information on the type and parameter-passing mode of a parameter.
+    ///
+    struct ParamInfo
+    {
+        /// The parameter-passing mode used for the parameter.
+        ParameterDirection direction = kParameterDirection_In;
+
+        /// The user-perceived type of the parameter.
+        Type* type = nullptr;
+    };
+
+    /// Get combined information on the type and parameter-passing mode of a parameter.
+    ///
+    ParamInfo getParamInfo(Index index)
+    {
+        ParamInfo info;
+        info.direction = getParamDirection(index);
+        info.type = getParamValueType(index);
+        return info;
+    }
+
+    /// Get the result type of this function.
+    ///
+    /// This is the type that a call to the function evaluates to if
+    /// the function returns successfully.
+    ///
+    /// A function that conceptually returns no value will have the `Unit`
+    /// type as its result type.
+    ///
+    /// A type that can never return will have the bottom type `Never`
+    /// as its result type.
+    ///
+    Type* getResultType() { return as<Type>(getOperand(m_operands.getCount() - 2)); }
+
+    /// Get the type of errors (if any) that this function can fail with.
+    ///
+    /// Evaluation of a call to a function with this `FuncType` may fail
+    /// with an error of the corresponding error type.
+    ///
+    /// A function that cannot fail with an error will have the bottom
+    /// type `Never` as its error type.
+    ///
+    /// Note that a function that "never fails" at the type system level
+    /// may still fail in various ways that are perceivable to the user.
+    /// The error type of a function only refers to failure modes that
+    /// are being explicitly modeled using the Slang type system.
+    ///
+    Type* getErrorType() { return as<Type>(getOperand(m_operands.getCount() - 1)); }
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
