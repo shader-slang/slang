@@ -51,6 +51,8 @@ enum class CodeGenTarget : SlangCompileTargetIntegral
     WGSLSPIRVAssembly = SLANG_WGSL_SPIRV_ASM,
     WGSLSPIRV = SLANG_WGSL_SPIRV,
     HostVM = SLANG_HOST_VM,
+    LLVMAssembly = SLANG_LLVM_ASSEMBLY,
+    LLVMObjectCode = SLANG_LLVM_OBJECT_CODE,
     CountOf = SLANG_TARGET_COUNT_OF,
 };
 

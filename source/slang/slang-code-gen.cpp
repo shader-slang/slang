@@ -1043,6 +1043,8 @@ SlangResult emitSPIRVForEntryPointsDirectly(
 
 SlangResult emitHostVMCode(CodeGenContext* codeGenContext, ComPtr<IArtifact>& outArtifact);
 
+SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtifact>& outArtifact);
+
 static CodeGenTarget _getIntermediateTarget(CodeGenTarget target)
 {
     switch (target)
@@ -1158,6 +1160,10 @@ SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     case CodeGenTarget::HostVM:
         SLANG_RETURN_ON_FAIL(emitHostVMCode(this, outArtifact));
         return SLANG_OK;
+    case CodeGenTarget::LLVMAssembly:
+    case CodeGenTarget::LLVMObjectCode:
+        SLANG_RETURN_ON_FAIL(emitLLVMForEntryPoints(this, outArtifact));
+        return SLANG_OK;
     default:
         break;
     }
@@ -1210,6 +1216,8 @@ SlangResult CodeGenContext::emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     case CodeGenTarget::HostSharedLibrary:
     case CodeGenTarget::WGSLSPIRVAssembly:
     case CodeGenTarget::HostVM:
+    case CodeGenTarget::LLVMAssembly:
+    case CodeGenTarget::LLVMObjectCode:
         {
             SLANG_RETURN_ON_FAIL(_emitEntryPoints(outArtifact));
 

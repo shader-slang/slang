@@ -85,6 +85,8 @@ static const TypeTextUtil::CompileTargetInfo s_compileTargetInfos[] = {
      "SPIR-V assembly via WebGPU shading language"},
     {SLANG_WGSL_SPIRV, "wgsl-spirv", "wgsl-spirv", "SPIR-V via WebGPU shading language"},
     {SLANG_HOST_VM, "slang-vm", "slangvm,slang-vm", "Slang VM byte code"},
+    {SLANG_LLVM_ASSEMBLY, "ll", "llvm,llvm-ir,llvm-asm", "LLVM IR assembly"},
+    {SLANG_LLVM_OBJECT_CODE, "o", "llvm-obj", "Object code compiled with LLVM"}
 };
 
 static const NamesDescriptionValue s_languageInfos[] = {
