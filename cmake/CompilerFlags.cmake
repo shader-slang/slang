@@ -212,6 +212,7 @@ function(set_default_compile_options target)
             $<$<BOOL:${SLANG_ENABLE_IR_BREAK_ALLOC}>:SLANG_ENABLE_IR_BREAK_ALLOC>
             $<$<BOOL:${SLANG_ENABLE_DX_ON_VK}>:SLANG_CONFIG_DX_ON_VK>
             $<$<STREQUAL:${SLANG_LIB_TYPE},STATIC>:STB_IMAGE_STATIC>
+            SLANG_ENABLE_LLVM_TARGET=$<BOOL:${SLANG_ENABLE_LLVM}>
     )
 
     if(SLANG_ENABLE_ASAN)

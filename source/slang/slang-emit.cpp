@@ -2867,6 +2867,7 @@ SlangResult emitHostVMCode(CodeGenContext* codeGenContext, ComPtr<IArtifact>& ou
     return SLANG_OK;
 }
 
+#if SLANG_ENABLE_LLVM_TARGET
 SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtifact>& outArtifact)
 {
     auto target = codeGenContext->getTargetFormat();
@@ -2904,5 +2905,6 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
 
     return SLANG_OK;
 }
+#endif
 
 } // namespace Slang
