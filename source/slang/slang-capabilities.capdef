@@ -119,6 +119,10 @@ def wgsl : target + textualTarget;
 /// [Target]
 def slangvm : target;
 
+/// Represents the LLVM IR target.
+/// [Target]
+def llvm : target;
+
 // Capabilities that stand for target SPIR-V versions for the GLSL backend.
 // These are not compilation targets. We will convert `_spirv_*` to `glsl_spirv_*` during compilation.
 
@@ -255,7 +259,7 @@ def optix_coopvec : _cuda_sm_9_0;
 
 /// All code-gen targets
 /// [Compound]
-alias any_target = hlsl | metal | glsl | c | cpp | cuda | spirv | wgsl;
+alias any_target = hlsl | metal | glsl | c | cpp | cuda | spirv | wgsl | llvm;
 
 /// All non-asm code-gen targets
 /// [Compound]

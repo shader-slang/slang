@@ -1,0 +1,25 @@
+// slang-emit-llvm.h
+#ifndef SLANG_EMIT_LLVM_H
+#define SLANG_EMIT_LLVM_H
+
+#include "../core/slang-basic.h"
+#include "slang-ir-link.h"
+
+namespace Slang
+{
+
+SlangResult emitLLVMAssemblyFromIR(
+    CodeGenContext* codeGenContext,
+    IRModule* irModule,
+    const List<IRFunc*>& irEntryPoints,
+    String& assemblyOut);
+
+SlangResult emitLLVMObjectFromIR(
+    CodeGenContext* codeGenContext,
+    IRModule* irModule,
+    const List<IRFunc*>& irEntryPoints,
+    List<uint8_t>& objectOut);
+
+} // namespace Slang
+
+#endif

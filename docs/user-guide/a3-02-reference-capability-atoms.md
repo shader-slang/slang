@@ -33,6 +33,9 @@ Targets
 `hlsl`
 > Represents the HLSL code generation target.
 
+`llvm`
+> Represents the LLVM IR target.
+
 `metal`
 > Represents the Metal programming language code generation target.
 

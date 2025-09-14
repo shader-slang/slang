@@ -15,6 +15,7 @@
 #include "slang-emit-cuda.h"
 #include "slang-emit-glsl.h"
 #include "slang-emit-hlsl.h"
+#include "slang-emit-llvm.h"
 #include "slang-emit-metal.h"
 #include "slang-emit-slang.h"
 #include "slang-emit-source-writer.h"
@@ -837,6 +838,8 @@ Result linkAndOptimizeIR(
         {
         case CodeGenTarget::HostCPPSource:
         case CodeGenTarget::HostVM:
+        case CodeGenTarget::LLVMAssembly:
+        case CodeGenTarget::LLVMObjectCode:
             break;
         case CodeGenTarget::CUDASource:
             collectOptiXEntryPointUniformParams(irModule);
@@ -872,6 +875,8 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CUDASource:
     case CodeGenTarget::HostVM:
+    case CodeGenTarget::LLVMAssembly:
+    case CodeGenTarget::LLVMObjectCode:
         break;
     }
 
@@ -2858,6 +2863,44 @@ SlangResult emitHostVMCode(CodeGenContext* codeGenContext, ComPtr<IArtifact>& ou
 
     outArtifact = ArtifactUtil::createArtifactForCompileTarget(SLANG_HOST_VM);
     outArtifact->addRepresentationUnknown(byteCodeBlob);
+
+    return SLANG_OK;
+}
+
+SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtifact>& outArtifact)
+{
+    auto target = codeGenContext->getTargetFormat();
+    bool objectCode = target == CodeGenTarget::LLVMObjectCode;
+
+    LinkedIR linkedIR;
+    LinkingAndOptimizationOptions linkingAndOptimizationOptions;
+    SLANG_RETURN_ON_FAIL(
+        linkAndOptimizeIR(codeGenContext, linkingAndOptimizationOptions, linkedIR));
+
+    auto irModule = linkedIR.module;
+    auto irEntryPoints = linkedIR.entryPoints;
+
+    dumpIRIfEnabled(codeGenContext, irModule, "POST LINK AND OPTIMIZE");
+
+    ComPtr<ISlangBlob> blob;
+
+    if (objectCode)
+    {
+        List<uint8_t> object;
+        emitLLVMObjectFromIR(codeGenContext, irModule, irEntryPoints, object);
+        blob = RawBlob::create(object.getBuffer(), object.getCount());
+    }
+    else
+    {
+        String irString;
+        emitLLVMAssemblyFromIR(codeGenContext, irModule, irEntryPoints, irString);
+        blob = StringBlob::create(irString);
+    }
+
+    auto artifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(codeGenContext->getTargetFormat()));
+    artifact->addRepresentationUnknown(blob);
+
+    outArtifact.swap(artifact);
 
     return SLANG_OK;
 }

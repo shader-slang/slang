@@ -2409,6 +2409,8 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CSource:
     case CodeGenTarget::HostVM:
+    case CodeGenTarget::LLVMAssembly:
+    case CodeGenTarget::LLVMObjectCode:
         {
             // For now lets use some fairly simple CPU binding rules
 
