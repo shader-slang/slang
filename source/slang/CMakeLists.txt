@@ -230,6 +230,7 @@ set(slang_link_args
     slang-lookup-tables
     SPIRV-Headers::SPIRV-Headers
 )
+
 set(slang_interface_args INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/include)
 set(slang_public_lib_args
     PUBLIC_HEADERS
@@ -242,6 +243,11 @@ set(slang_public_lib_args
     EXPORT_SET_NAME
     SlangTargets
 )
+
+if(SLANG_ENABLE_LLVM)
+    set(slang_link_args ${slang_link_args} ${LLVM_LIBS})
+    set(slang_build_args ${slang_build_args} INCLUDE_DIRECTORIES_PRIVATE ${LLVM_INCLUDE_DIRS})
+endif()
 
 #
 # Minimal static slang used in generating the embedded core module

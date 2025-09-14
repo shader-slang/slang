@@ -53,6 +53,10 @@ function(slang_glob_sources var dir)
         list(FILTER files EXCLUDE REGEX "(^|/)open-gl/.*")
     endif()
 
+    if(NOT SLANG_ENABLE_LLVM)
+        list(FILTER files EXCLUDE REGEX "(^|/).*emit-llvm.cpp")
+    endif()
+
     list(APPEND ${var} ${files})
     set(${var} ${${var}} PARENT_SCOPE)
 endfunction()

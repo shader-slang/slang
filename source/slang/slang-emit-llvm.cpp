@@ -12,6 +12,7 @@ SlangResult emitLLVMAssemblyFromIR(
     String& assemblyOut)
 {
     printf("TODO: LLVM IR ASSEMBLY\n");
+    assemblyOut = "placeholder";
     return SLANG_OK;
 }
 
