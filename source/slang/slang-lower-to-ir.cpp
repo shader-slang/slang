@@ -2094,7 +2094,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto declRef = type->getDeclRef();
         auto decl = declRef.getDecl();
 
-        // Check for types with teh `__intrinsic_type` modifier.
+        // Check for types with the `__intrinsic_type` modifier.
         if (decl->findModifier<IntrinsicTypeModifier>())
         {
             return lowerSimpleIntrinsicType(type);
@@ -9397,6 +9397,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // Allocate an IRInterfaceType with the `operandCount` operands.
         IRInterfaceType* irInterface = subBuilder->createInterfaceType(operandCount, nullptr);
         auto finalVal = finishOuterGenerics(subBuilder, irInterface, outerGeneric);
+        subBuilder->setInsertAfter(irInterface);
+        subBuilder->getThisType(irInterface);
 
         // Add `irInterface` to decl mapping now to prevent cyclic lowering.
         context->setGlobalValue(decl, LoweredValInfo::simple(finalVal));
@@ -11708,6 +11710,24 @@ bool isAbstractWitnessTable(IRInst* inst)
     return false;
 }
 
+// We change the way of encoding the interface generic, `This` type will
+// be an inst encoded inside the interface generic right before `return`
+// inst.
+IRInst* getThisTypeFromInterfaceGeneric(IRInst* interfaceType)
+{
+    if (auto generic = as<IRGeneric>(interfaceType))
+    {
+        auto genericReturn = findGenericReturnVal(generic);
+        auto thisTypeInst = genericReturn;
+        while (!thisTypeInst)
+        {
+            if (as<IRThisType>(thisTypeInst))
+                return thisTypeInst;
+        }
+    }
+    return nullptr;
+}
+
 LoweredValInfo emitDeclRef(IRGenContext* context, Decl* decl, DeclRefBase* subst, IRType* type)
 {
     const auto initialSubst = subst;
@@ -11730,7 +11750,8 @@ LoweredValInfo emitDeclRef(IRGenContext* context, Decl* decl, DeclRefBase* subst
             parentInterfaceType =
                 lowerType(context, DeclRefType::create(context->astBuilder, subst->getParent()));
         }
-        auto thisType = context->irBuilder->getThisType(parentInterfaceType);
+        SLANG_RELEASE_ASSERT(as<IRSpecialize>(parentInterfaceType));
+        auto thisType = getThisTypeFromInterfaceGeneric(parentInterfaceType->getOperand(0));
         return LoweredValInfo::simple(thisType);
     }
 
