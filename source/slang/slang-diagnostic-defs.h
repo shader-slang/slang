@@ -1691,6 +1691,11 @@ DIAGNOSTIC(
     Error,
     invalidEqualityConstraintSupType,
     "type '$0' is not a proper type to use in a generic equality constraint.")
+DIAGNOSTIC(
+    30405,
+    Note,
+    failedEqualityConstraintCanonicalOrder,
+    "failed to resolve canonical order of generic equality constraint.")
 
 // 305xx: initializer lists
 DIAGNOSTIC(30500, Error, tooManyInitializers, "too many initializers (expected $0, got $1)")

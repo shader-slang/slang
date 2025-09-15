@@ -365,9 +365,14 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
 
     void visitGenericTypeConstraintDecl(GenericTypeConstraintDecl* decl);
 
+    bool checkGenericTypeEqualityCanonicalOrder(GenericTypeConstraintDecl* decl);
+
     void visitTypeCoercionConstraintDecl(TypeCoercionConstraintDecl* decl);
 
-    void validateGenericConstraintSubType(GenericTypeConstraintDecl* decl, TypeExp type);
+    bool validateGenericConstraintSubType(
+        GenericTypeConstraintDecl* decl,
+        TypeExp type,
+        bool diagnose);
 
     void checkForwardReferencesInGenericConstraint(GenericTypeConstraintDecl* decl);
 
@@ -3250,9 +3255,10 @@ bool isProperConstraineeType(Type* type)
     return true;
 }
 
-void SemanticsDeclHeaderVisitor::validateGenericConstraintSubType(
+bool SemanticsDeclHeaderVisitor::validateGenericConstraintSubType(
     GenericTypeConstraintDecl* decl,
-    TypeExp type)
+    TypeExp type,
+    bool diagnose)
 {
     // Validate that the sub type of a constraint is in valid form.
     //
@@ -3261,7 +3267,7 @@ void SemanticsDeclHeaderVisitor::validateGenericConstraintSubType(
         if (subDeclRef.getDecl()->parentDecl == decl->parentDecl)
         {
             // OK, sub type is one of the generic parameter type.
-            return;
+            return true;
         }
         if (as<GenericDecl>(decl->parentDecl))
         {
@@ -3272,8 +3278,9 @@ void SemanticsDeclHeaderVisitor::validateGenericConstraintSubType(
             auto dependentGeneric = getShared()->getDependentGenericParent(subDeclRef);
             if (dependentGeneric.getDecl() != decl->parentDecl)
             {
-                getSink()->diagnose(type.exp, Diagnostics::invalidConstraintSubType, type);
-                return;
+                if (diagnose)
+                    getSink()->diagnose(type.exp, Diagnostics::invalidConstraintSubType, type);
+                return false;
             }
         }
         else if (as<AssocTypeDecl>(decl->parentDecl))
@@ -3291,8 +3298,9 @@ void SemanticsDeclHeaderVisitor::validateGenericConstraintSubType(
             auto lookupDeclRef = as<LookupDeclRef>(subDeclRef.declRefBase);
             if (!lookupDeclRef)
             {
-                getSink()->diagnose(type.exp, Diagnostics::invalidConstraintSubType, type);
-                return;
+                if (diagnose)
+                    getSink()->diagnose(type.exp, Diagnostics::invalidConstraintSubType, type);
+                return false;
             }
 
             // We allow `associatedtype T where This.T : ...`.
@@ -3301,24 +3309,27 @@ void SemanticsDeclHeaderVisitor::validateGenericConstraintSubType(
             //
             if (lookupDeclRef->getDecl()->parentDecl == decl->parentDecl ||
                 lookupDeclRef->getDecl() == decl->parentDecl)
-                return;
+                return true;
             auto baseType = as<Type>(lookupDeclRef->getLookupSource());
             if (!baseType)
             {
-                getSink()->diagnose(type.exp, Diagnostics::invalidConstraintSubType, type);
-                return;
+                if (diagnose)
+                    getSink()->diagnose(type.exp, Diagnostics::invalidConstraintSubType, type);
+                return false;
             }
             type.type = baseType;
-            validateGenericConstraintSubType(decl, type);
+            return validateGenericConstraintSubType(decl, type, diagnose);
         }
     }
     if (!isProperConstraineeType(type.type))
     {
         // It is meaningless for certain types to be used in type constraints.
         // For example, `IFoo<T>` should not appear as the left-hand-side of a generic constraint.
-        getSink()->diagnose(type.exp, Diagnostics::invalidConstraintSubType, type);
-        return;
+        if (diagnose)
+            getSink()->diagnose(type.exp, Diagnostics::invalidConstraintSubType, type);
+        return false;
     }
+    return true;
 }
 
 // General utility function to collect all referenced declarations from a value
@@ -3443,9 +3454,19 @@ void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConst
         // Check for forward references in generic constraints after type translation
         checkForwardReferencesInGenericConstraint(decl);
 
-        validateGenericConstraintSubType(decl, decl->sub);
+        bool equalityCannon = true;
         if (decl->isEqualityConstraint)
         {
+            equalityCannon = checkGenericTypeEqualityCanonicalOrder(decl);
+        }
+
+        bool validSub = validateGenericConstraintSubType(decl, decl->sub, true);
+        if (decl->isEqualityConstraint)
+        {
+            if (!validSub && !equalityCannon)
+            {
+                getSink()->diagnose(decl, Diagnostics::failedEqualityConstraintCanonicalOrder);
+            }
             if (!isProperConstraineeType(decl->sup) && !as<ErrorType>(decl->sup.type))
             {
                 getSink()->diagnose(
@@ -3465,6 +3486,59 @@ void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConst
             }
         }
     }
+}
+
+ContainerDecl* findDeclsLowestCommonAncestor(Decl*& a, Decl*& b);
+
+bool SemanticsDeclHeaderVisitor::checkGenericTypeEqualityCanonicalOrder(
+    GenericTypeConstraintDecl* decl)
+{
+    auto compare = [&]() -> int
+    {
+        bool subOk = validateGenericConstraintSubType(decl, decl->sub, false);
+        bool supOk = validateGenericConstraintSubType(decl, decl->sup, false);
+
+        if (subOk != supOk) // Only one is qualified
+        {
+            return int(supOk) - int(subOk);
+        }
+        else if (!(subOk || supOk))
+        {
+            // None is qualified, the generic constraint is not valid anyway.
+            // There is no point in comparing further.
+            return -1;
+        }
+        // Both sub and sup are qualified
+        // For example:
+        // __generic <A : IA, B : IB>
+        // where A::T == B::T
+        // Sort them by declaration order in the generic (A > B)
+
+        Decl* subAncestor = as<DeclRefType>(decl->sub.type)->getDeclRef().getDecl();
+        Decl* supAncestor = as<DeclRefType>(decl->sup.type)->getDeclRef().getDecl();
+        auto ancestor = findDeclsLowestCommonAncestor(subAncestor, supAncestor);
+        if (!ancestor)
+        {
+            return 0;
+        }
+
+        auto subIndex = ancestor->getMembers().binarySearch(subAncestor);
+        auto supIndex = ancestor->getMembers().binarySearch(supAncestor);
+
+        return int(supIndex - subIndex);
+    };
+
+    bool res = true;
+    int cmp = compare();
+    if (cmp > 0)
+    {
+        Swap(decl->sub, decl->sup);
+    }
+    if (cmp == 0 && decl->sub != decl->sup)
+    {
+        res = false;
+    }
+    return res;
 }
 
 void SemanticsDeclHeaderVisitor::visitGenericTypeParamDecl(GenericTypeParamDecl* decl)
