@@ -352,7 +352,7 @@ struct CompilerOptionSet
 
     bool shouldDumpIntermediates() { return getBoolOption(CompilerOptionName::DumpIntermediates); }
 
-    bool shouldDumpIR() { return true; }// getBoolOption(CompilerOptionName::DumpIr); }
+    bool shouldDumpIR() { return getBoolOption(CompilerOptionName::DumpIr); }
 
     bool shouldObfuscateCode() { return getBoolOption(CompilerOptionName::Obfuscate); }
 
