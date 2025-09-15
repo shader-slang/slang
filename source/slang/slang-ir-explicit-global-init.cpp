@@ -1,7 +1,6 @@
 // slang-ir-explicit-global-init.cpp
 #include "slang-ir-explicit-global-init.h"
 
-#include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
 
 namespace Slang
@@ -84,6 +83,7 @@ struct MoveGlobalVarInitializationToEntryPointsPass
             auto globalVar = as<IRGlobalVar>(inst);
             if (!globalVar)
                 continue;
+
             // If it's an `Actual Global` we don't want to move initialization
             if (as<IRActualGlobalRate>(globalVar->getRate()))
             {
@@ -95,28 +95,6 @@ struct MoveGlobalVarInitializationToEntryPointsPass
                 continue;
 
             processGlobalVarWithInit(globalVar, firstBlock);
-        }
-
-        // Also handle module-level instructions with constructor call operands
-        // These represent global constants like `static const Stuff gStuff = { ... }`
-        // that become `let %gStuff = call %Constructor(...)` in the IR
-        for (auto inst : m_module->getGlobalInsts())
-        {
-            // Skip if it's already a GlobalVar (handled above)
-            if (as<IRGlobalVar>(inst))
-                continue;
-
-            // Check if this instruction itself is a constructor call
-            if (auto call = as<IRCall>(inst))
-            {
-                auto func = call->getCallee();
-                if (func && func->findDecoration<IRConstructorDecoration>())
-                {
-                    // Found a module-level constructor call instruction
-                    // Transform it into a global variable with initialization in entry points
-                    processGlobalConstantWithConstructor(inst, call);
-                }
-            }
         }
 
         // Then we loop over all the entry points in the
@@ -204,49 +182,6 @@ struct MoveGlobalVarInitializationToEntryPointsPass
         info.globalVar = globalVar;
         info.initFunc = initFunc;
         m_globalVarsWithInit.add(info);
-    }
-
-    void processGlobalConstantWithConstructor(IRInst* globalConstInst, IRCall* constructorCall)
-    {
-        IRBuilder builder(m_module);
-        builder.setInsertBefore(globalConstInst);
-
-        // Create a new global variable to replace the constructor call
-        auto valueType = globalConstInst->getDataType();
-        auto globalVar = builder.createGlobalVar(valueType);
-
-        // Copy decorations from the original instruction
-        for (auto decoration : globalConstInst->getDecorations())
-        {
-            if (auto nameHint = as<IRNameHintDecoration>(decoration))
-            {
-                builder.addNameHintDecoration(globalVar, nameHint->getName());
-            }
-            else if (auto exportDecor = as<IRExportDecoration>(decoration))
-            {
-                builder.addExportDecoration(globalVar, exportDecor->getMangledName());
-            }
-        }
-
-        // Create a block within the global var that contains the initialization
-        builder.setInsertInto(globalVar);
-        auto initBlock = builder.emitBlock();
-        builder.setInsertInto(initBlock);
-
-        // Clone the constructor call into the init block
-        IRCloneEnv cloneEnv;
-        auto clonedCall = cloneInst(&cloneEnv, &builder, constructorCall);
-        builder.emitReturn(clonedCall);
-
-        // Replace all uses of the original instruction with the new global var
-        globalConstInst->replaceUsesWith(globalVar);
-
-        // Remove the original instruction
-        globalConstInst->removeAndDeallocate();
-
-        // The existing processGlobalVarWithInit logic will handle this
-        // since it's now a proper IRGlobalVar with a firstBlock
-        processGlobalVarWithInit(globalVar, initBlock);
     }
 
     void processEntryPoint(IRFunc* entryPointFunc)
