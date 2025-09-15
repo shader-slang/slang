@@ -26,11 +26,19 @@ if(NOT SLANG_ENABLE_EXTERNAL_COMPILER_WARNINGS)
 endif()
 
 # Option to enable mimalloc for SPIRV-Tools to improve compilation performance
-option(
-    SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC
-    "Enable mimalloc for SPIRV-Tools to improve compilation performance"
-    ON
-)
+if(WIN32)
+    option(
+        SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC
+        "Enable mimalloc for SPIRV-Tools to improve compilation performance"
+        ON
+    )
+else()
+    option(
+        SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC
+        "Enable mimalloc for SPIRV-Tools to improve compilation performance"
+        OFF
+    )
+endif()
 
 # Unordered dense
 if(NOT ${SLANG_USE_SYSTEM_UNORDERED_DENSE})

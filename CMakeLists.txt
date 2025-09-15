@@ -188,7 +188,7 @@ advanced_option(
 advanced_option(
     SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC
     "Enable mimalloc for SPIRV-Tools to improve compilation performance"
-    ON
+    OFF
 )
 
 option(
