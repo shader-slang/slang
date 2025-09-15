@@ -305,6 +305,64 @@ struct LinkingAndOptimizationOptions
     CLikeSourceEmitter* sourceEmitter = nullptr;
 };
 
+// Check if a type is natively supported by SPIRV OpBitcast instruction
+static bool canSPIRVBitcastType(IRType* type)
+{
+    if (auto basicType = as<IRBasicType>(type))
+    {
+        // SPIRV spec supports all numerical types, but SPIRV tools crash on 8-bit constants
+        auto op = basicType->getOp();
+        return op != kIROp_Int8Type && op != kIROp_UInt8Type;
+    }
+    if (auto vectorType = as<IRVectorType>(type))
+        return canSPIRVBitcastType(vectorType->getElementType());
+    return false;
+}
+
+// Check if a BitCast instruction requires lowering for the current target.
+// For SPIRV targets, many bitcasts can be handled natively by OpBitcast.
+static bool shouldLowerBitCastForTarget(CodeGenContext* codeGenContext, IRInst* inst)
+{
+    if (!codeGenContext || !inst)
+        return true;
+
+    auto targetRequest = codeGenContext->getTargetReq();
+    if (!targetRequest)
+        return true;
+
+    auto target = targetRequest->getTarget();
+    if (target != CodeGenTarget::SPIRV && target != CodeGenTarget::SPIRVAssembly)
+        return true;
+
+    // Only optimize for direct SPIRV emission, not SPIRV-via-GLSL
+    auto targetProgram = codeGenContext->getTargetProgram();
+    if (!targetProgram->shouldEmitSPIRVDirectly())
+        return true;
+
+    auto operand = inst->getOperand(0);
+    if (!operand)
+        return true;
+
+    auto fromType = operand->getDataType();
+    auto toType = inst->getDataType();
+    if (!fromType || !toType)
+        return true;
+
+    // SPIRV OpBitcast requires operand and result to have same bit width
+    IRSizeAndAlignment fromSize, toSize;
+    if (SLANG_SUCCEEDED(
+            getNaturalSizeAndAlignment(targetProgram->getOptionSet(), fromType, &fromSize)) &&
+        SLANG_SUCCEEDED(
+            getNaturalSizeAndAlignment(targetProgram->getOptionSet(), toType, &toSize)) &&
+        fromSize.size == toSize.size)
+    {
+        // For SPIRV targets, check if this bitcast can be handled natively
+        return !canSPIRVBitcastType(fromType) || !canSPIRVBitcastType(toType);
+    }
+
+    return true;
+}
+
 // Scan the IR module and determine which lowering/legalization passes are needed based
 // on the instructions we see.
 //
@@ -396,7 +454,7 @@ void calcRequiredLoweringPassSet(
         result.reinterpret = true;
         break;
     case kIROp_BitCast:
-        result.bitcast = true;
+        result.bitcast = shouldLowerBitCastForTarget(codeGenContext, inst);
         break;
     case kIROp_AutoPyBindCudaDecoration:
         result.derivativePyBindWrapper = true;
