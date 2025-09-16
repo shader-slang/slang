@@ -32,12 +32,6 @@ if(WIN32)
         "Enable mimalloc for SPIRV-Tools to improve compilation performance"
         ON
     )
-else()
-    option(
-        SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC
-        "Enable mimalloc for SPIRV-Tools to improve compilation performance"
-        OFF
-    )
 endif()
 
 # Unordered dense
