@@ -1,0 +1,104 @@
+#pragma once
+
+#include <slang-rhi.h>
+#include <chrono>
+#include <mutex>
+#include <unordered_map>
+#include <vector>
+#include <string>
+
+// Device Cache for preventing NVIDIA Tegra driver state corruption
+// This cache reuses Vulkan instances and devices to avoid the VK_ERROR_INCOMPATIBLE_DRIVER
+// issue that occurs after ~19 device creation/destruction cycles on Tegra platforms.
+class DeviceCache
+{
+public:
+    struct DeviceCacheKey
+    {
+        rhi::DeviceType deviceType;
+        bool enableValidation;
+        bool enableRayTracingValidation;
+        std::string profileName;
+        std::vector<std::string> requiredFeatures;
+        
+        bool operator==(const DeviceCacheKey& other) const;
+    };
+    
+    struct DeviceCacheKeyHash
+    {
+        std::size_t operator()(const DeviceCacheKey& key) const;
+    };
+    
+    struct CachedDevice
+    {
+        Slang::ComPtr<rhi::IDevice> device;
+        int refCount;
+        std::chrono::steady_clock::time_point lastUsed;
+        
+        CachedDevice();
+    };
+    
+private:
+    static std::mutex s_mutex;
+    static std::unordered_map<DeviceCacheKey, CachedDevice, DeviceCacheKeyHash> s_deviceCache;
+    static std::chrono::steady_clock::time_point s_lastCleanup;
+    static constexpr std::chrono::minutes CLEANUP_INTERVAL{5}; // Clean up unused devices every 5 minutes
+    static constexpr std::chrono::minutes DEVICE_TIMEOUT{10}; // Remove devices unused for 10 minutes
+    
+    static void cleanupUnusedDevices();
+    
+public:
+    static Slang::ComPtr<rhi::IDevice> acquireDevice(const rhi::DeviceDesc& desc);
+    static void releaseDevice(rhi::IDevice* device);
+    static void forceCleanup();
+};
+
+// RAII wrapper for cached devices to ensure proper cleanup
+class CachedDeviceWrapper
+{
+private:
+    Slang::ComPtr<rhi::IDevice> m_device;
+    
+public:
+    CachedDeviceWrapper() = default;
+    
+    CachedDeviceWrapper(Slang::ComPtr<rhi::IDevice> device) : m_device(device) {}
+    
+    ~CachedDeviceWrapper()
+    {
+        if (m_device)
+        {
+            DeviceCache::releaseDevice(m_device.get());
+        }
+    }
+    
+    // Move constructor
+    CachedDeviceWrapper(CachedDeviceWrapper&& other) noexcept
+        : m_device(std::move(other.m_device))
+    {
+    }
+    
+    // Move assignment
+    CachedDeviceWrapper& operator=(CachedDeviceWrapper&& other) noexcept
+    {
+        if (this != &other)
+        {
+            if (m_device)
+            {
+                DeviceCache::releaseDevice(m_device.get());
+            }
+            m_device = std::move(other.m_device);
+        }
+        return *this;
+    }
+    
+    // Delete copy constructor and assignment
+    CachedDeviceWrapper(const CachedDeviceWrapper&) = delete;
+    CachedDeviceWrapper& operator=(const CachedDeviceWrapper&) = delete;
+    
+    rhi::IDevice* get() const { return m_device.get(); }
+    rhi::IDevice* operator->() const { return m_device.get(); }
+    operator bool() const { return m_device != nullptr; }
+    
+    Slang::ComPtr<rhi::IDevice>& getComPtr() { return m_device; }
+};

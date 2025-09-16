@@ -12,6 +12,7 @@
 #include "shader-input-layout.h"
 #include "shader-renderer-util.h"
 #include "slang-support.h"
+#include "slang-test-device-cache.h"
 #include "window.h"
 
 #if defined(_WIN32)
@@ -1495,7 +1496,7 @@ static SlangResult _innerMain(
         return SLANG_E_NOT_AVAILABLE;
     }
 
-    Slang::ComPtr<IDevice> device;
+    CachedDeviceWrapper deviceWrapper;
     {
         DeviceDesc desc = {};
         desc.deviceType = options.deviceType;
@@ -1558,8 +1559,8 @@ static SlangResult _innerMain(
             {
                 getRHI()->enableDebugLayers();
             }
-            SlangResult res = getRHI()->createDevice(desc, device.writeRef());
-            if (SLANG_FAILED(res))
+            auto cachedDevice = DeviceCache::acquireDevice(desc);
+            if (!cachedDevice)
             {
                 // We need to be careful here about SLANG_E_NOT_AVAILABLE. This return value means
                 // that the renderer couldn't be created because it required *features* that were
@@ -1571,11 +1572,7 @@ static SlangResult _innerMain(
                 //
                 // We also don't want to output the 'Unable to create renderer' error, as this isn't
                 // an error.
-                if (res == SLANG_E_NOT_AVAILABLE)
-                {
-                    return res;
-                }
-
+                SlangResult res = SLANG_E_NOT_AVAILABLE; // Default to not available if device creation fails
                 if (!options.onlyStartup)
                 {
                     fprintf(stderr, "Unable to create renderer %s\n", rendererName.getBuffer());
@@ -1583,13 +1580,14 @@ static SlangResult _innerMain(
 
                 return res;
             }
-            SLANG_ASSERT(device);
+            deviceWrapper = CachedDeviceWrapper(cachedDevice);
+            SLANG_ASSERT(deviceWrapper);
         }
 
         for (const auto& feature : requiredFeatureList)
         {
             // If doesn't have required feature... we have to give up
-            if (!device->hasFeature(feature))
+            if (!deviceWrapper->hasFeature(feature))
             {
                 return SLANG_E_NOT_AVAILABLE;
             }
@@ -1599,7 +1597,7 @@ static SlangResult _innerMain(
     // Print adapter info after device creation but before any other operations
     if (options.showAdapterInfo)
     {
-        auto info = device->getInfo();
+        auto info = deviceWrapper->getInfo();
         auto out = stdWriters->getOut();
         out.print("Using graphics adapter: %s\n", info.adapterName);
     }
@@ -1613,11 +1611,16 @@ static SlangResult _innerMain(
     {
         RenderTestApp app;
         renderDocBeginFrame();
-        SLANG_RETURN_ON_FAIL(app.initialize(session, device, options, input));
+        SLANG_RETURN_ON_FAIL(app.initialize(session, deviceWrapper.get(), options, input));
         app.update();
         renderDocEndFrame();
         app.finalize();
     }
+
+    
+    // Force cleanup of cached devices before shutdown
+    DeviceCache::forceCleanup();
+
     return SLANG_OK;
 }
 
