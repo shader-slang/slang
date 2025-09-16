@@ -11866,13 +11866,28 @@ LoweredValInfo emitDeclRef(IRGenContext* context, Decl* decl, DeclRefBase* subst
                 // from the same interface directly, e.g. a reference to
                 // IBase.AssocType from IDerived:IBase will be lowered as
                 // IRAssocType(IBase).
-                // We may want to consider unifying our IR representation to
-                // represent associated types with lookupWitness inst even inside
-                // interface definitions.
-                return emitDeclRef(
+                auto lowerVal = emitDeclRef(
                     context,
                     decl->getDefaultDeclRef(),
                     context->irBuilder->getTypeKind());
+
+                // We want to unify our IR representation to any requirement entry
+                // (e.g. withness, associated types) lookupWitness.
+                if (auto requirementEntry = as<IRInterfaceRequirementEntry>(lowerVal.val))
+                {
+                    auto irRequirementKey = requirementEntry->getRequirementKey();
+                    // Because ThisTypeWitness is defined inside the interface, we need to have
+                    // a copy at the use site.
+                    IRCloneEnv env;
+                    auto localThisTypeWitness = cloneInst(&env, context->irBuilder, context->thisTypeWitness);
+                    auto irSatisfyingVal = context->irBuilder->emitLookupInterfaceMethodInst(
+                        type,
+                        localThisTypeWitness,
+                        irRequirementKey);
+
+                    return LoweredValInfo::simple(irSatisfyingVal);
+                }
+                return lowerVal;
             }
 
             SLANG_RELEASE_ASSERT(irWitnessTable);
