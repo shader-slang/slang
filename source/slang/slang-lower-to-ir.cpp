@@ -11879,7 +11879,8 @@ LoweredValInfo emitDeclRef(IRGenContext* context, Decl* decl, DeclRefBase* subst
                     // Because ThisTypeWitness is defined inside the interface, we need to have
                     // a copy at the use site.
                     IRCloneEnv env;
-                    auto localThisTypeWitness = cloneInst(&env, context->irBuilder, context->thisTypeWitness);
+                    auto localThisTypeWitness =
+                        cloneInst(&env, context->irBuilder, context->thisTypeWitness);
                     auto irSatisfyingVal = context->irBuilder->emitLookupInterfaceMethodInst(
                         type,
                         localThisTypeWitness,
