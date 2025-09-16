@@ -24657,7 +24657,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         case hlsl_coopvec_poc:
             __intrinsic_asm ".CopyFrom";
         case optix_coopvec:
-            __intrinsic_asm "optixCoopVecCvt<$T0>(*($0))";
+            __intrinsic_asm "optixCoopVecCvt<OptixCoopVec<$[0], $[1]>>(*($0))", T, N;
         default:
             if (__isFloat<T>() && __isInt<U>())
                 this = __int_to_float_cast<T>(other);
