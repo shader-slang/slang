@@ -24715,7 +24715,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         case hlsl_coopvec_poc:
             __intrinsic_asm ".CopyFrom";
         case optix_coopvec:
-            __intrinsic_asm "optixCoopVecCvt<$TR>(*($0));";
+            __intrinsic_asm "optixCoopVecCvt<OptixCoopVec<$[0], $[1]>>(*($0))", T, N;
         default:
             if (__isFloat<T>() && __isInt<U>())
                 this = __int_to_float_cast<T>(other);
@@ -24895,7 +24895,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             ret.__Load(buffer, byteOffset16ByteAligned);
             return ret;
         case optix_coopvec:
-            __intrinsic_asm "optixCoopVecLoad<$TR>((CUdeviceptr)(&($0)));";
+            __intrinsic_asm "optixCoopVecLoad<$TR>((CUdeviceptr)(&($0)))";
         default:
             var vec = CoopVec<T, N>();
             for(int i = 0; i < N; ++i)
@@ -24925,7 +24925,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             ret.__Load(buffer, byteOffset16ByteAligned);
             return ret;
         case optix_coopvec:
-            __intrinsic_asm "optixCoopVecLoad<$TR>((CUdeviceptr)(&($0)));";
+            __intrinsic_asm "optixCoopVecLoad<$TR>((CUdeviceptr)(&($0)))";
         default:
             var vec = CoopVec<T, N>();
             for(int i = 0; i < N; ++i)
@@ -25011,7 +25011,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             ret.__Load(data, __byteToElemOffset<T>(byteOffset16ByteAligned));
             return ret;
         case optix_coopvec:
-            __intrinsic_asm "optixCoopVecLoad<$TR>((CUdeviceptr)(&($0)));";
+            __intrinsic_asm "optixCoopVecLoad<$TR>((CUdeviceptr)(&($0)))";
         default:
             CoopVec<T,N> result;
             for(int i = 0; i < N; ++i)
