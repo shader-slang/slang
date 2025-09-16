@@ -86,9 +86,29 @@ void legalizeArrayReturnType(IRModule* module)
     {
         if (auto func = as<IRFunc>(inst))
         {
-            if (func->getResultType()->getOp() == kIROp_ArrayType)
+            auto resultType = func->getResultType();
+            auto opcode = resultType->getOp();
+
+            if (opcode == kIROp_ArrayType)
             {
-                makeFuncReturnViaOutParam(builder, func);
+                // Check if this ArrayType was originally a CoopVectorType
+                // The lowering pass adds a "CoopVec" name hint to such types
+                bool isOriginallyCoopVectorType = false;
+                if (auto nameDecoration = resultType->findDecoration<IRNameHintDecoration>())
+                {
+                    auto name = nameDecoration->getName();
+                    if (name == "CoopVec")
+                    {
+                        isOriginallyCoopVectorType = true;
+                    }
+                }
+
+                // Only apply the transformation to genuine ArrayType returns,
+                // not to those that were originally CoopVectorType
+                if (!isOriginallyCoopVectorType)
+                {
+                    makeFuncReturnViaOutParam(builder, func);
+                }
             }
         }
     }
