@@ -287,6 +287,31 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
         SimpleLayoutInfo vectorInfo(LayoutResourceKind::Uniform, size, _roundUpToPowerOfTwo(size));
         return vectorInfo;
     }
+};
+
+/// WGSL layout rules for any-value types (function parameters, local variables, etc.)
+/// Uses std430-style vector alignment while keeping other behavior as default.
+struct WGSLAnyValueLayoutRulesImpl : DefaultLayoutRulesImpl
+{
+    typedef DefaultLayoutRulesImpl Super;
+
+    SimpleLayoutInfo GetVectorLayout(
+        BaseType elementType,
+        SimpleLayoutInfo elementInfo,
+        size_t elementCount) override
+    {
+        SLANG_UNUSED(elementType);
+        // WGSL requires vectors to be aligned to the next power of two up from their size
+        // (same as std140/std430 rules) to meet Tint's alignment requirements.
+        // For example, vec2<f32> needs 8-byte alignment, not 4-byte.
+        //
+        SLANG_RELEASE_ASSERT(elementInfo.kind == LayoutResourceKind::Uniform);
+        SLANG_RELEASE_ASSERT(elementInfo.size.isFinite());
+
+        auto size = elementInfo.size.getFiniteValue() * elementCount;
+        SimpleLayoutInfo vectorInfo(LayoutResourceKind::Uniform, size, _roundUpToPowerOfTwo(size));
+        return vectorInfo;
+    }
 
     SimpleLayoutInfo GetPointerLayout() override
     {
@@ -984,6 +1009,7 @@ Std430LayoutRulesImpl kStd430LayoutRulesImpl;
 FXCShaderResourceLayoutRulesImpl kFXCShaderResourceLayoutRulesImpl;
 HLSLConstantBufferLayoutRulesImpl kHLSLConstantBufferLayoutRulesImpl;
 HLSLStructuredBufferLayoutRulesImpl kHLSLStructuredBufferLayoutRulesImpl;
+WGSLAnyValueLayoutRulesImpl kWGSLAnyValueLayoutRulesImpl;
 
 GLSLVaryingLayoutRulesImpl kGLSLVaryingInputLayoutRulesImpl(LayoutResourceKind::VertexInput);
 GLSLVaryingLayoutRulesImpl kGLSLVaryingOutputLayoutRulesImpl(LayoutResourceKind::FragmentOutput);
@@ -2286,6 +2312,12 @@ LayoutRulesImpl* MetalArgumentBufferTier2LayoutRulesFamilyImpl::getParameterBloc
 
 // WGSL Family
 
+LayoutRulesImpl kWGSLAnyValueLayoutRulesImpl_ = {
+    &kWGSLLayoutRulesFamilyImpl,
+    &kWGSLAnyValueLayoutRulesImpl,
+    &kWGSLObjectLayoutRulesImpl,
+};
+
 LayoutRulesImpl kWGSLConstantBufferLayoutRulesImpl_ = {
     &kWGSLLayoutRulesFamilyImpl,
     &kStd140LayoutRulesImpl,
@@ -2294,7 +2326,7 @@ LayoutRulesImpl kWGSLConstantBufferLayoutRulesImpl_ = {
 
 LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getAnyValueRules()
 {
-    return &kGLSLAnyValueLayoutRulesImpl_;
+    return &kWGSLAnyValueLayoutRulesImpl_;
 }
 
 LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getConstantBufferRules(CompilerOptionSet&, Type*)

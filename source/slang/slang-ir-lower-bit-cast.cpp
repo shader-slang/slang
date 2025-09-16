@@ -74,8 +74,7 @@ struct BitCastLoweringContext
                 {
                     IRIntegerValue fieldOffset = 0;
                     SLANG_RELEASE_ASSERT(
-                        getNaturalOffset(targetProgram->getOptionSet(), field, &fieldOffset) ==
-                        SLANG_OK);
+                        getTargetOffset(targetProgram, field, &fieldOffset) == SLANG_OK);
                     auto fieldType = field->getFieldType();
                     auto fieldValue =
                         readObject(builder, src, fieldType, (uint32_t)(fieldOffset + offset));
@@ -92,8 +91,8 @@ struct BitCastLoweringContext
                 List<IRInst*> elements;
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(
-                    getNaturalSizeAndAlignment(
-                        targetProgram->getOptionSet(),
+                    getTargetSizeAndAlignment(
+                        targetProgram,
                         arrayType->getElementType(),
                         &elementLayout) == SLANG_OK);
                 for (IRIntegerValue i = 0; i < arrayCount->value.intVal; i++)
@@ -118,8 +117,8 @@ struct BitCastLoweringContext
                 List<IRInst*> elements;
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(
-                    getNaturalSizeAndAlignment(
-                        targetProgram->getOptionSet(),
+                    getTargetSizeAndAlignment(
+                        targetProgram,
                         vectorType->getElementType(),
                         &elementLayout) == SLANG_OK);
                 for (IRIntegerValue i = 0; i < elementCount->value.intVal; i++)
@@ -148,10 +147,8 @@ struct BitCastLoweringContext
                     matrixType->getColumnCount());
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(
-                    getNaturalSizeAndAlignment(
-                        targetProgram->getOptionSet(),
-                        elementType,
-                        &elementLayout) == SLANG_OK);
+                    getTargetSizeAndAlignment(targetProgram, elementType, &elementLayout) ==
+                    SLANG_OK);
                 for (IRIntegerValue i = 0; i < elementCount->value.intVal; i++)
                 {
                     elements.add(readObject(
@@ -228,9 +225,9 @@ struct BitCastLoweringContext
         auto toType = inst->getDataType();
 
         IRSizeAndAlignment toTypeSize;
-        getNaturalSizeAndAlignment(targetProgram->getOptionSet(), toType, &toTypeSize);
+        getTargetSizeAndAlignment(targetProgram, toType, &toTypeSize);
         IRSizeAndAlignment fromTypeSize;
-        getNaturalSizeAndAlignment(targetProgram->getOptionSet(), fromType, &fromTypeSize);
+        getTargetSizeAndAlignment(targetProgram, fromType, &fromTypeSize);
 
         if (as<IRBasicType>(fromType) != nullptr && as<IRBasicType>(toType) != nullptr)
         {

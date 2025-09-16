@@ -1563,6 +1563,11 @@ IRTypeLayoutRules* getTypeLayoutRuleForBuffer(TargetProgram* target, IRType* buf
     case kIROp_PtrType:
         return IRTypeLayoutRules::getNatural();
     }
+    // For WGSL, use std430-like layout rules for better vector alignment compatibility with Tint
+    if (target->getTargetReq()->getTarget() == CodeGenTarget::WGSL)
+    {
+        return IRTypeLayoutRules::getStd430();
+    }
     return IRTypeLayoutRules::getNatural();
 }
 
