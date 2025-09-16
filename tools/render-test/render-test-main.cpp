@@ -1597,7 +1597,7 @@ static SlangResult _innerMain(
     }
 
     // Print adapter info after device creation but before any other operations
-    if (options.showAdapterInfo)
+    if (options.showAdapterInfo && device)
     {
         auto info = device->getInfo();
         auto out = stdWriters->getOut();
