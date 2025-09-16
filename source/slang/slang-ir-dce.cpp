@@ -512,6 +512,181 @@ bool trimOptimizableTypes(IRModule* module)
     return changed;
 }
 
+static bool eliminateLoadStorePairsInFunc(IRFunc* func, HashSet<IRFunc*>& processedFuncs)
+{
+    // Avoid infinite recursion by tracking processed functions
+    if (processedFuncs.contains(func))
+        return false;
+
+    processedFuncs.add(func);
+
+    bool changed = false;
+    List<IRInst*> toRemove;
+
+    for (auto block : func->getBlocks())
+    {
+        for (auto blockInst : block->getChildren())
+        {
+            // First, recursively process any function calls in this block
+            if (auto call = as<IRCall>(blockInst))
+            {
+                auto callee = call->getCallee();
+                if (auto calleeFunc = as<IRFunc>(callee))
+                {
+                    changed |= eliminateLoadStorePairsInFunc(calleeFunc, processedFuncs);
+                }
+            }
+
+            auto storeInst = as<IRStore>(blockInst);
+            if (!storeInst)
+                continue;
+
+            auto storedValue = storeInst->getVal();
+            auto destPtr = storeInst->getPtr();
+
+            // Only optimize if destPtr is a variable (kIROp_Var).
+            // Don't optimize stores to buffer elements or other meaningful destinations.
+            if (!as<IRVar>(destPtr))
+                continue;
+
+            // Check if we're storing a load result
+            auto loadInst = as<IRLoad>(storedValue);
+            if (!loadInst)
+                continue;
+
+            // Do not optimize the primitive types because the legalization step may assume the
+            // existance of Load instructions when the entry parameters are replaced with the
+            // builtin variables.
+            auto loadInstType = loadInst->getDataType();
+            switch (loadInstType->getOp())
+            {
+            case kIROp_Int8Type:
+            case kIROp_Int16Type:
+            case kIROp_IntType:
+            case kIROp_Int64Type:
+            case kIROp_UInt8Type:
+            case kIROp_UInt16Type:
+            case kIROp_UIntType:
+            case kIROp_UInt64Type:
+            case kIROp_IntPtrType:
+            case kIROp_UIntPtrType:
+            case kIROp_FloatType:
+            case kIROp_DoubleType:
+            case kIROp_HalfType:
+            case kIROp_BoolType:
+                continue;
+            }
+
+            auto loadedPtr = loadInst->getPtr();
+
+            // Optimize only when the type is immutable (ConstRef).
+            auto loadedPtrType = loadedPtr->getDataType();
+            if (!as<IRConstRefType>(loadedPtrType) && !as<IRParameterBlockType>(loadedPtrType) &&
+                !as<IRConstantBufferType>(loadedPtrType))
+                continue;
+
+            // We cannot optimize if the variable is passed to a function call that treats the
+            // parameter as mutable.
+            bool isSafeToOptimize = true;
+
+            // Check if variable is only used in function calls with ConstRef parameters
+            for (auto use = destPtr->firstUse; use; use = use->nextUse)
+            {
+                auto user = use->getUser();
+                if (user == storeInst)
+                    continue; // Skip the store itself
+
+                auto call = as<IRCall>(user);
+                if (!call)
+                {
+                    isSafeToOptimize = false;
+                    break;
+                }
+
+                auto callee = call->getCallee();
+                auto funcInst = as<IRFunc>(callee);
+                if (!funcInst)
+                {
+                    isSafeToOptimize = false;
+                    break;
+                }
+
+                // Find which argument position this variable is used in
+                UInt argIndex = 0;
+                bool foundArg = false;
+                for (UInt i = 0; i < call->getArgCount(); i++)
+                {
+                    if (call->getArg(i) == destPtr)
+                    {
+                        argIndex = i;
+                        foundArg = true;
+                        break;
+                    }
+                }
+
+                if (!foundArg)
+                {
+                    isSafeToOptimize = false;
+                    break;
+                }
+
+                // Check if the corresponding parameter is ConstRef
+                auto param = funcInst->getFirstParam();
+                for (UInt i = 0; i < argIndex && param; i++)
+                {
+                    param = param->getNextParam();
+                }
+                if (!param || !as<IRConstRefType>(param->getDataType()))
+                {
+                    // Unsafe, because the parameter might be used as mutable.
+                    isSafeToOptimize = false;
+                    break;
+                }
+            }
+
+            if (!isSafeToOptimize)
+                continue;
+
+            // Replace all uses of destPtr with loadedPtr
+            destPtr->replaceUsesWith(loadedPtr);
+
+            // Mark both instructions for removal
+            toRemove.add(storeInst);
+            toRemove.add(loadInst);
+            toRemove.add(destPtr);
+            changed = true;
+        }
+    }
+
+    // Remove marked instructions
+    for (auto instToRemove : toRemove)
+    {
+        instToRemove->removeAndDeallocate();
+    }
+
+    return changed;
+}
+
+bool eliminateLoadStorePairs(IRModule* module)
+{
+    bool changed = false;
+    HashSet<IRFunc*> processedFuncs;
+
+    // Look for patterns: load(ptr) followed by store(var, load_result)
+    // This can be optimized to direct pointer usage when safe
+    // Process recursively through function calls
+    for (auto inst : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(inst);
+        if (!func)
+            continue;
+
+        changed |= eliminateLoadStorePairsInFunc(func, processedFuncs);
+    }
+
+    return changed;
+}
+
 bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions options)
 {
     // The main source of confusion/complexity here is that
