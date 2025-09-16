@@ -1617,11 +1617,12 @@ static SlangResult _innerMain(
         app.finalize();
     }
 
-    
-    // Force cleanup of cached devices before shutdown
-    DeviceCache::forceCleanup();
-
     return SLANG_OK;
+}
+
+SLANG_TEST_TOOL_API void cleanDeviceCache()
+{
+    DeviceCache::cleanCache();
 }
 
 SLANG_TEST_TOOL_API SlangResult innerMain(

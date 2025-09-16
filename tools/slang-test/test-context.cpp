@@ -130,6 +130,7 @@ TestContext::InnerMainFunc TestContext::getInnerMainFunc(const String& dirPath, 
             loader->loadPlatformSharedLibrary(path.begin(), tool.m_sharedLibrary.writeRef())))
     {
         tool.m_func = (InnerMainFunc)tool.m_sharedLibrary->findFuncByName("innerMain");
+        tool.m_cleanDeviceCacheFunc = (CleanDeviceCacheFunc)tool.m_sharedLibrary->findFuncByName("cleanDeviceCache");
     }
 
     m_sharedLibTools.add(name, tool);
@@ -150,6 +151,30 @@ void TestContext::setInnerMainFunc(const String& name, InnerMainFunc func)
         tool.m_func = func;
         m_sharedLibTools.add(name, tool);
     }
+}
+
+TestContext::CleanDeviceCacheFunc TestContext::getCleanDeviceCacheFunc(const String& name)
+{
+    StringBuilder sharedLibToolBuilder;
+    sharedLibToolBuilder.append(name);
+    sharedLibToolBuilder.append("-tool");
+
+    StringBuilder path;
+    SharedLibrary::appendPlatformFileName(sharedLibToolBuilder.getUnownedSlice(), path);
+
+    DefaultSharedLibraryLoader* loader = DefaultSharedLibraryLoader::getSingleton();
+
+    SharedLibraryTool tool = {};
+
+    if (SLANG_SUCCEEDED(
+            loader->loadPlatformSharedLibrary(path.begin(), tool.m_sharedLibrary.writeRef())))
+    {
+        tool.m_func = (InnerMainFunc)tool.m_sharedLibrary->findFuncByName("innerMain");
+        tool.m_cleanDeviceCacheFunc = (CleanDeviceCacheFunc)tool.m_sharedLibrary->findFuncByName("cleanDeviceCache");
+    }
+
+    m_sharedLibTools.add(name, tool);
+    return tool.m_cleanDeviceCacheFunc;
 }
 
 DownstreamCompilerSet* TestContext::getCompilerSet()

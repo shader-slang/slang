@@ -34,23 +34,25 @@ public:
         Slang::ComPtr<rhi::IDevice> device;
         int refCount;
         std::chrono::steady_clock::time_point lastUsed;
+        uint64_t creationOrder;
         
         CachedDevice();
     };
     
 private:
-    static std::mutex s_mutex;
-    static std::unordered_map<DeviceCacheKey, CachedDevice, DeviceCacheKeyHash> s_deviceCache;
-    static std::chrono::steady_clock::time_point s_lastCleanup;
-    static constexpr std::chrono::minutes CLEANUP_INTERVAL{5}; // Clean up unused devices every 5 minutes
-    static constexpr std::chrono::minutes DEVICE_TIMEOUT{10}; // Remove devices unused for 10 minutes
+    static constexpr int MAX_CACHED_DEVICES = 10;
     
-    static void cleanupUnusedDevices();
+    // Use function-local statics to control destruction order (Meyer's singleton pattern)
+    static std::mutex& getMutex();
+    static std::unordered_map<DeviceCacheKey, CachedDevice, DeviceCacheKeyHash>& getDeviceCache();
+    static uint64_t& getNextCreationOrder();
+    
+    static void evictOldestDeviceIfNeeded();
     
 public:
     static Slang::ComPtr<rhi::IDevice> acquireDevice(const rhi::DeviceDesc& desc);
     static void releaseDevice(rhi::IDevice* device);
-    static void forceCleanup();
+    static void cleanCache();
 };
 
 // RAII wrapper for cached devices to ensure proper cleanup

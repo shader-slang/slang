@@ -1,10 +1,26 @@
 #include <algorithm>
 #include "slang-test-device-cache.h"
 
-// Static member definitions
-std::mutex DeviceCache::s_mutex;
-std::unordered_map<DeviceCache::DeviceCacheKey, DeviceCache::CachedDevice, DeviceCache::DeviceCacheKeyHash> DeviceCache::s_deviceCache;
-std::chrono::steady_clock::time_point DeviceCache::s_lastCleanup = std::chrono::steady_clock::now();
+// Static member accessor functions (Meyer's singleton pattern)
+// This ensures proper destruction order - function-local statics are destroyed
+// in reverse order of first access, avoiding the static destruction order fiasco
+std::mutex& DeviceCache::getMutex()
+{
+    static std::mutex instance;
+    return instance;
+}
+
+std::unordered_map<DeviceCache::DeviceCacheKey, DeviceCache::CachedDevice, DeviceCache::DeviceCacheKeyHash>& DeviceCache::getDeviceCache()
+{
+    static std::unordered_map<DeviceCacheKey, CachedDevice, DeviceCacheKeyHash> instance;
+    return instance;
+}
+
+uint64_t& DeviceCache::getNextCreationOrder()
+{
+    static uint64_t instance = 0;
+    return instance;
+}
 
 bool DeviceCache::DeviceCacheKey::operator==(const DeviceCacheKey& other) const
 {
@@ -32,29 +48,35 @@ std::size_t DeviceCache::DeviceCacheKeyHash::operator()(const DeviceCacheKey& ke
 }
 
 DeviceCache::CachedDevice::CachedDevice() 
-    : refCount(0), lastUsed(std::chrono::steady_clock::now()) 
+    : refCount(0), lastUsed(std::chrono::steady_clock::now()), creationOrder(0)
 {
 }
 
-void DeviceCache::cleanupUnusedDevices()
+void DeviceCache::evictOldestDeviceIfNeeded()
 {
-    auto now = std::chrono::steady_clock::now();
-    if (now - s_lastCleanup < CLEANUP_INTERVAL)
+    auto& deviceCache = getDeviceCache();
+    if (deviceCache.size() < MAX_CACHED_DEVICES)
         return;
         
-    s_lastCleanup = now;
+    // Find the oldest device that has only one reference (from our cache)
+    auto oldestIt = deviceCache.end();
+    uint64_t oldestCreationOrder = UINT64_MAX;
     
-    auto it = s_deviceCache.begin();
-    while (it != s_deviceCache.end())
+    for (auto it = deviceCache.begin(); it != deviceCache.end(); ++it)
     {
-        if (it->second.refCount == 0 && (now - it->second.lastUsed) > DEVICE_TIMEOUT)
+        // Check if device is not currently in use by any CachedDeviceWrapper
+        // If refCount is 0, it means no active users and is safe to evict
+        if (it->second.refCount == 0 && it->second.creationOrder < oldestCreationOrder)
         {
-            it = s_deviceCache.erase(it);
+            oldestCreationOrder = it->second.creationOrder;
+            oldestIt = it;
         }
-        else
-        {
-            ++it;
-        }
+    }
+    
+    // Remove the oldest truly unused device
+    if (oldestIt != deviceCache.end())
+    {
+        deviceCache.erase(oldestIt);
     }
 }
 
@@ -70,7 +92,9 @@ Slang::ComPtr<rhi::IDevice> DeviceCache::acquireDevice(const rhi::DeviceDesc& de
         return nullptr;
     }
     
-    std::lock_guard<std::mutex> lock(s_mutex);
+    std::lock_guard<std::mutex> lock(getMutex());
+    auto& deviceCache = getDeviceCache();
+    auto& nextCreationOrder = getNextCreationOrder();
     
     // Create cache key
     DeviceCacheKey key;
@@ -86,12 +110,12 @@ Slang::ComPtr<rhi::IDevice> DeviceCache::acquireDevice(const rhi::DeviceDesc& de
     }
     std::sort(key.requiredFeatures.begin(), key.requiredFeatures.end());
     
-    // Clean up old devices periodically
-    cleanupUnusedDevices();
+    // Evict oldest device if we've reached the limit
+    evictOldestDeviceIfNeeded();
     
     // Check if we have a cached device
-    auto it = s_deviceCache.find(key);
-    if (it != s_deviceCache.end())
+    auto it = deviceCache.find(key);
+    if (it != deviceCache.end())
     {
         it->second.refCount++;
         it->second.lastUsed = std::chrono::steady_clock::now();
@@ -107,10 +131,11 @@ Slang::ComPtr<rhi::IDevice> DeviceCache::acquireDevice(const rhi::DeviceDesc& de
     }
     
     // Cache the device
-    CachedDevice& cached = s_deviceCache[key];
+    CachedDevice& cached = deviceCache[key];
     cached.device = device;
     cached.refCount = 1;
     cached.lastUsed = std::chrono::steady_clock::now();
+    cached.creationOrder = nextCreationOrder++;
     
     return device;
 }
@@ -124,10 +149,11 @@ void DeviceCache::releaseDevice(rhi::IDevice* device)
     if (device->getDeviceType() != rhi::DeviceType::Vulkan)
         return;
         
-    std::lock_guard<std::mutex> lock(s_mutex);
+    std::lock_guard<std::mutex> lock(getMutex());
+    auto& deviceCache = getDeviceCache();
     
     // Find the device in cache and decrement ref count
-    for (auto& pair : s_deviceCache)
+    for (auto& pair : deviceCache)
     {
         if (pair.second.device.get() == device)
         {
@@ -138,8 +164,9 @@ void DeviceCache::releaseDevice(rhi::IDevice* device)
     }
 }
 
-void DeviceCache::forceCleanup()
+void DeviceCache::cleanCache()
 {
-    std::lock_guard<std::mutex> lock(s_mutex);
-    s_deviceCache.clear();
+    std::lock_guard<std::mutex> lock(getMutex());
+    auto& deviceCache = getDeviceCache();
+    deviceCache.clear();
 }
