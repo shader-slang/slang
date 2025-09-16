@@ -521,7 +521,7 @@ static bool eliminateLoadStorePairsInFunc(IRFunc* func, HashSet<IRFunc*>& proces
     processedFuncs.add(func);
 
     bool changed = false;
-    List<IRInst*> toRemove;
+    HashSet<IRInst*> toRemove;
 
     for (auto block : func->getBlocks())
     {
@@ -652,8 +652,11 @@ static bool eliminateLoadStorePairsInFunc(IRFunc* func, HashSet<IRFunc*>& proces
 
             // Mark both instructions for removal
             toRemove.add(storeInst);
-            toRemove.add(loadInst);
             toRemove.add(destPtr);
+
+            // Note: loadInst might be still in use.
+            // We need to rely on DCE to delete it if unused.
+
             changed = true;
         }
     }

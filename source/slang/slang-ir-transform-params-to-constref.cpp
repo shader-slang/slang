@@ -60,7 +60,7 @@ struct TransformParamsToConstRefContext
                     case kIROp_FieldExtract:
                         {
                             // Transform the IRFieldExtract into a IRFieldAddress
-                            auto fieldExtract = as<IRFieldExtract>(use->getUser());
+                            auto fieldExtract = as<IRFieldExtract>(user);
                             builder.setInsertBefore(fieldExtract);
                             auto fieldAddr = builder.emitFieldAddress(
                                 fieldExtract->getBase(),
@@ -73,8 +73,7 @@ struct TransformParamsToConstRefContext
                     case kIROp_GetElement:
                         {
                             // Transform the IRGetElement into a IRGetElementPtr
-                            auto getElement = as<IRGetElement>(use->getUser());
-
+                            auto getElement = as<IRGetElement>(user);
                             builder.setInsertBefore(getElement);
                             auto elemAddr = builder.emitElementAddress(
                                 getElement->getBase(),
@@ -111,14 +110,8 @@ struct TransformParamsToConstRefContext
             List<IRInst*> newArgs;
 
             // Transform arguments to match the updated-parameter
-            IRParam* param = func->getFirstParam();
             UInt i = 0;
-            auto iterate = [&]()
-            {
-                param = param->getNextParam();
-                i++;
-            };
-            for (; param; iterate())
+            for (IRParam* param = func->getFirstParam(); param; param = param->getNextParam(), i++)
             {
                 auto arg = call->getArg(i);
                 if (!updatedParams.contains(param))
@@ -183,7 +176,6 @@ struct TransformParamsToConstRefContext
     void processFunc(IRFunc* func)
     {
         HashSet<IRParam*> updatedParams;
-        bool hasTransformedParams = false;
 
         // First pass: Transform parameter types
         for (auto param = func->getFirstParam(); param; param = param->getNextParam())
@@ -203,13 +195,12 @@ struct TransformParamsToConstRefContext
                 auto constRefType = builder.getConstRefType(paramType, AddressSpace::ThreadLocal);
                 param->setFullType(constRefType);
 
-                hasTransformedParams = true;
                 changed = true;
                 updatedParams.add(param);
             }
         }
 
-        if (!hasTransformedParams)
+        if (updatedParams.getCount() == 0)
         {
             return;
         }
