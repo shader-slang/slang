@@ -3697,7 +3697,8 @@ Type* SemanticsVisitor::getForwardDiffFuncType(FuncType* originalType)
 
     for (Index i = 0; i < originalType->getParamCount(); i++)
     {
-        if (auto jvpParamType = _toDifferentialParamType(originalType->getParamTypeWithDirectionWrapper(i)))
+        if (auto jvpParamType =
+                _toDifferentialParamType(originalType->getParamTypeWithDirectionWrapper(i)))
             paramTypes.add(jvpParamType);
     }
     FuncType* jvpType =
