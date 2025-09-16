@@ -4149,6 +4149,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_Lsh:
             result = emitArithmetic(parent, inst);
             break;
+        case kIROp_GetArrayLength:
+            result = emitGetArrayLength(parent, inst);
+            break;
         case kIROp_CastDescriptorHandleToUInt2:
         case kIROp_CastUInt2ToDescriptorHandle:
         case kIROp_GlobalValueRef:
@@ -7353,6 +7356,57 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto result =
             emitOpCompositeConstruct(parent, inst, inst->getDataType(), arrayLength, strideOperand);
         return result;
+    }
+
+    SpvInst* emitGetArrayLength(SpvInstParent* parent, IRInst* inst)
+    {
+        // GetArrayLength should be called on an unsized array
+        // The operand should be the array value (or pointer to array)
+        auto arrayOperand = inst->getOperand(0);
+
+        IRBuilder builder(inst);
+
+        // For SPIRV, we need to emit OpArrayLength
+        // OpArrayLength takes a pointer to a struct and the member index of the runtime array
+        // However, we're likely getting a loaded array value, so we need to work with what we have
+
+        // If this is a load of a runtime array, we need to get the struct pointer instead
+        if (auto loadInst = as<IRLoad>(arrayOperand))
+        {
+            // Get the pointer being loaded from
+            auto ptrOperand = loadInst->getPtr();
+
+            // This should be a pointer to a struct member, we need the parent struct pointer
+            if (auto getFieldAddr = as<IRFieldAddress>(ptrOperand))
+            {
+                // Get the struct pointer (base of the field address)
+                auto structPtr = getFieldAddr->getBase();
+
+                // Generate OpArrayLength with struct pointer and member index 0
+                auto arrayLength = emitInst(
+                    parent,
+                    inst,
+                    SpvOpArrayLength,
+                    builder.getUIntType(),
+                    kResultID,
+                    structPtr,
+                    SpvLiteralInteger::from32(0));
+
+                return arrayLength;
+            }
+        }
+
+        // Fallback: try to use the operand directly (may not work in all cases)
+        auto arrayLength = emitInst(
+            parent,
+            inst,
+            SpvOpArrayLength,
+            builder.getUIntType(),
+            kResultID,
+            arrayOperand,
+            SpvLiteralInteger::from32(0));
+
+        return arrayLength;
     }
 
     SpvInst* emitGetBufferPtr(SpvInstParent* parent, IRInst* inst)
