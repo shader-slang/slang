@@ -16,8 +16,20 @@ struct GenType<T : __BuiltinIntegerType, A: IA, let N : int, let M : int>
 {
     static const int HalfN = N > 1? N / A.M : 1;
     static const int P = M + N;
+
+    // TODO(tfoley): What this test is testing seems to be outside
+    // the scope of what we ever intend to support in user code.
+    // Returning an `ExplicitRef<T>` is supposed to be a core-module-only
+    // thing, and even then is something that we would like to do less
+    // of over time.
+    //
+    // The only purpose of this test *seems* to be ensuring that this
+    // particular function (and the `groupshared` declaration inside
+    // it) "works," but the function itself is not something that we
+    // intend to be supported in Slang.
+    // 
     [ForceInline]
-    Ref<uint> weights(int index)
+    ExplicitRef<uint> weights(int index)
     {
         static groupshared uint w[P];
         return w[index];
