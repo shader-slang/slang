@@ -859,10 +859,7 @@ class FuncType : public Type
     /// the possibility of encountering these wrappers, and handle
     /// them accordingly.
     ///
-    Type* getParamTypeWithDirectionWrapper(Index index)
-    {
-        return as<Type>(getOperand(index));
-    }
+    Type* getParamTypeWithDirectionWrapper(Index index) { return as<Type>(getOperand(index)); }
 
     /// Get the type of one of the function's parameters, by index.
     ///
