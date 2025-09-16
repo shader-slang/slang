@@ -593,7 +593,8 @@ static bool eliminateLoadStorePairsInFunc(IRFunc* func, HashSet<IRFunc*>& proces
             for (auto use = destPtr->firstUse; use; use = use->nextUse)
             {
                 auto user = use->getUser();
-                if (user == storeInst) continue; // Skip the store itself
+                if (user == storeInst)
+                    continue; // Skip the store itself
 
                 auto call = as<IRCall>(user);
                 if (!call)
