@@ -1817,7 +1817,7 @@ Result linkAndOptimizeIR(
     // Rewrite functions that return arrays to return them via `out` parameter,
     // since our target languages doesn't allow returning arrays.
     if (!isMetalTarget(targetRequest) && !isSPIRV(target))
-        legalizeArrayReturnType(irModule);
+        legalizeArrayReturnType(irModule, targetRequest);
 
     if (isKhronosTarget(targetRequest) || target == CodeGenTarget::HLSL)
     {
