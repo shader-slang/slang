@@ -528,6 +528,12 @@ bool CUDASourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 {
     switch (inst->getOp())
     {
+    case kIROp_Load:
+        {
+            // This case is likely not triggered for variable initialization
+            // Fall back to default handling
+            return false;
+        }
     case kIROp_StructuredBufferGetDimensions:
         {
             auto count = _generateUniqueName(UnownedStringSlice("_elementCount"));
@@ -707,6 +713,29 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 {
     switch (inst->getOp())
     {
+    case kIROp_Load:
+        {
+            // Handle struct type mismatches that can occur with optimized types
+            auto base = inst->getOperand(0);
+            auto loadType = inst->getDataType();
+            
+            // Always emit a cast for struct loads to handle potential type mismatches
+            // between optimized and non-optimized struct versions
+            if (as<IRStructType>(loadType))
+            {
+                // Emit cast to ensure type compatibility
+                m_writer->emit("(");
+                emitType(loadType);
+                m_writer->emit(")(");
+                emitDereferenceOperand(base, getInfo(EmitOp::Postfix));
+                m_writer->emit(")");
+                return true;
+            }
+            
+            // Fall back to default load emission for non-struct types
+            emitDereferenceOperand(base, inOuterPrec);
+            return true;
+        }
     case kIROp_MakeVector:
     case kIROp_MakeVectorFromScalar:
         {
