@@ -564,6 +564,11 @@ static SlangResult _findNVRTC(NVRTCPathVisitor& visitor)
         {
             // Look for candidates in the directory
             visitor.findInDirectory(Path::combine(buf, "bin"));
+            // Also check bin/x64 subdirectory (common on Windows)
+            if (!visitor.hasCandidates())
+            {
+                visitor.findInDirectory(Path::combine(buf, "bin/x64"));
+            }  
         }
     }
 
@@ -749,30 +754,30 @@ SlangResult NVRTCDownstreamCompiler::_findOptixIncludePath(String& outPath)
 
     // First try to find OptiX headers in the local external/optix-dev/include
     // directory relative to the executable path
-    {
-        StringBuilder instancePathBuilder;
-        if (SLANG_SUCCEEDED(PlatformUtil::getInstancePath(instancePathBuilder)))
-        {
-            // Get executable path, then go up to project root
-            // instancePathBuilder already contains the bin directory path
-            // Executable is in build/Debug/bin or build/Release/bin
-            // Go up 3 levels: bin -> Debug/Release -> build -> project root
-            String binPath = instancePathBuilder;
-            String buildTypeDir = Path::getParentDirectory(binPath);
-            String buildDir = Path::getParentDirectory(buildTypeDir);
-            String projectRoot = Path::getParentDirectory(buildDir);
+    //{
+    //    StringBuilder instancePathBuilder;
+    //    if (SLANG_SUCCEEDED(PlatformUtil::getInstancePath(instancePathBuilder)))
+    //    {
+    //        // Get executable path, then go up to project root
+    //        // instancePathBuilder already contains the bin directory path
+    //        // Executable is in build/Debug/bin or build/Release/bin
+    //        // Go up 3 levels: bin -> Debug/Release -> build -> project root
+    //        String binPath = instancePathBuilder;
+    //        String buildTypeDir = Path::getParentDirectory(binPath);
+    //        String buildDir = Path::getParentDirectory(buildTypeDir);
+    //        String projectRoot = Path::getParentDirectory(buildDir);
 
-            String localOptixPath =
-                Path::combine(Path::combine(projectRoot, "external/optix-dev"), "include");
-            String optixHeader = Path::combine(localOptixPath, g_optixHeaderName);
+    //        String localOptixPath =
+    //            Path::combine(Path::combine(projectRoot, "external/optix-dev"), "include");
+    //        String optixHeader = Path::combine(localOptixPath, g_optixHeaderName);
 
-            if (File::exists(optixHeader))
-            {
-                outPath = localOptixPath;
-                return SLANG_OK;
-            }
-        }
-    }
+    //        if (File::exists(optixHeader))
+    //        {
+    //            outPath = localOptixPath;
+    //            return SLANG_OK;
+    //        }
+    //    }
+    //}
     List<String> rootPaths;
 
 #if SLANG_WINDOWS_FAMILY
@@ -882,10 +887,6 @@ SlangResult NVRTCDownstreamCompiler::_maybeAddHalfSupport(
     const DownstreamCompileOptions& options,
     CommandLine& ioCmdLine)
 {
-    if ((options.flags & DownstreamCompileOptions::Flag::EnableFloat16) == 0)
-    {
-        return SLANG_OK;
-    }
 
     // First check if we know if one of the include paths contains cuda_fp16.h
     for (const auto& includePath : options.includePaths)
