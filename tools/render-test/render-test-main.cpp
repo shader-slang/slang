@@ -1441,7 +1441,7 @@ static SlangResult _innerMain(
         }
     }
 
-    renderer_test::CoreToRHIDebugBridge debugCallback;
+    static renderer_test::CoreToRHIDebugBridge debugCallback;
     debugCallback.setCoreCallback(stdWriters->getDebugCallback());
 
     // Use the profile name set on options if set

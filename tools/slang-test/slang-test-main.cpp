@@ -5429,33 +5429,14 @@ SlangResult innerMain(int argc, char** argv)
         }
 
         reporter.outputSummary();
+
+        cleanupRenderTestDeviceCache(context);
         return reporter.didAllSucceed() ? SLANG_OK : SLANG_FAIL;
     }
 }
 
 int main(int argc, char** argv)
 {
-    // Create a context for cleanup purposes
-    TestContext cleanupContext;
-    if (SLANG_SUCCEEDED(cleanupContext.init(argv[0])))
-    {
-        // Run the main test logic
-        SlangResult res = innerMain(argc, argv);
-        
-        // Clean up any cached devices from render-test-main before shutdown 
-        // to prevent use-after-free during static destruction
-        cleanupRenderTestDeviceCache(cleanupContext);
-        
-        slang::shutdown();
-        Slang::RttiInfo::deallocateAll();
-
-#ifdef _MSC_VER
-        _CrtDumpMemoryLeaks();
-#endif
-        return SLANG_SUCCEEDED(res) ? 0 : 1;
-    }
-    else
-    {
         // Fallback: run without cleanup if context initialization fails
         SlangResult res = innerMain(argc, argv);
         slang::shutdown();
@@ -5465,5 +5446,5 @@ int main(int argc, char** argv)
         _CrtDumpMemoryLeaks();
 #endif
         return SLANG_SUCCEEDED(res) ? 0 : 1;
-    }
+    
 }
