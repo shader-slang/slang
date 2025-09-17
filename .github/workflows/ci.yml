@@ -110,7 +110,7 @@ jobs:
       compiler: cl
       platform: x86_64
       config: debug
-      runs-on: '["Windows", "self-hosted", "GCP-T4", "test"]'
+      runs-on: '["Windows", "self-hosted", "test"]'
 
   build-windows-release-cl-x86_64-gpu:
     needs: [filter]
@@ -121,7 +121,7 @@ jobs:
       compiler: cl
       platform: x86_64
       config: release
-      runs-on: '["Windows", "self-hosted", "GCP-T4", "test"]'
+      runs-on: '["Windows", "self-hosted", "test"]'
 
   # Linux tests
   test-linux-debug-gcc-x86_64:
@@ -186,7 +186,7 @@ jobs:
       compiler: cl
       platform: x86_64
       config: debug
-      runs-on: '["Windows", "self-hosted", "GCP-T4", "test"]'
+      runs-on: '["Windows", "self-hosted", "test"]'
       test-category: full
       full-gpu-tests: true
 
@@ -199,6 +199,6 @@ jobs:
       compiler: cl
       platform: x86_64
       config: release
-      runs-on: '["Windows", "self-hosted", "GCP-T4", "test"]'
+      runs-on: '["Windows", "self-hosted", "test"]'
       test-category: full
       full-gpu-tests: true
