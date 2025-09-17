@@ -2879,7 +2879,6 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
         linkAndOptimizeIR(codeGenContext, linkingAndOptimizationOptions, linkedIR));
 
     auto irModule = linkedIR.module;
-    auto irEntryPoints = linkedIR.entryPoints;
 
     dumpIRIfEnabled(codeGenContext, irModule, "POST LINK AND OPTIMIZE");
 
@@ -2888,13 +2887,13 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
     if (objectCode)
     {
         List<uint8_t> object;
-        emitLLVMObjectFromIR(codeGenContext, irModule, irEntryPoints, object);
+        emitLLVMObjectFromIR(codeGenContext, irModule, object);
         blob = RawBlob::create(object.getBuffer(), object.getCount());
     }
     else
     {
         String irString;
-        emitLLVMAssemblyFromIR(codeGenContext, irModule, irEntryPoints, irString);
+        emitLLVMAssemblyFromIR(codeGenContext, irModule, irString);
         blob = StringBlob::create(irString);
     }
 
