@@ -18,20 +18,18 @@ runs:
   steps:
     - name: Add bash to PATH
       shell: pwsh
-      if: ${{inputs.os == 'windows' && contains(runner.labels, 'test')}}
+      if: ${{inputs.os == 'windows'}}
       run: |
         Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
         Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\usr\\bin"
 
     - name: Set up MSVC dev tools on Windows
       uses: ilammy/msvc-dev-cmd@v1
-      if: ${{contains(runner.labels, 'test')}}
       with:
         sdk: "10.0.26100.4654"
 
     - name: Install dependencies (Linux only)
       shell: bash
-      if: ${{contains(runner.labels, 'test')}}
       run: |
         if [[ "${{ inputs.os }}" == "linux" ]]; then
             sudo apt-get update
@@ -39,13 +37,12 @@ runs:
         fi
 
     - name: Setup Node.js (Linux only)
-      if: ${{inputs.os == 'linux' && contains(runner.labels, 'test')}}
+      if: inputs.os == 'linux'
       uses: actions/setup-node@v4
       with:
         node-version: "20.x"
 
     - shell: bash
-      if: ${{contains(runner.labels, 'test')}}
       run: |
         # Set up system dependencies
 
@@ -99,27 +96,26 @@ runs:
     # Try to restore an LLVM install, and build it otherwise
     - uses: actions/cache/restore@v4
       id: cache-llvm
-      if: ${{inputs.build-llvm == 'true' && contains(runner.labels, 'test')}}
+      if: inputs.build-llvm == 'true'
       with:
         path: build/llvm-project-install
         # Use os*compiler*platform in lieu of an ABI key here, which is what we really want
         key: llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ hashFiles('external/build-llvm.sh') }}
     - name: Build LLVM
-      if: ${{inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true' && contains(runner.labels, 'test')}}
+      if: inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true'
       shell: bash
       run: |
         ./external/build-llvm.sh \
           --install-prefix "${{github.workspace}}/build/llvm-project-install" \
           --repo "https://${{github.token}}@github.com/llvm/llvm-project"
     - uses: actions/cache/save@v4
-      if: ${{inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true' && contains(runner.labels, 'test')}}
+      if: inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true'
       with:
         path: build/llvm-project-install
         key: ${{ steps.cache-llvm.outputs.cache-primary-key }}
 
     - name: Set environment variable for CMake
       shell: bash
-      if: ${{contains(runner.labels, 'test')}}
       run: |
         if [ "${{inputs.build-llvm}}" == "true" ]; then
           echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> "$GITHUB_ENV"
@@ -128,7 +124,6 @@ runs:
 
     # Put spirv-tools in path
     - shell: bash
-      if: ${{contains(runner.labels, 'test')}}
       run: |
         win_platform="${{ inputs.platform }}"
         win_platform="${win_platform//x86_64/x64}"
@@ -140,7 +135,7 @@ runs:
       # Setup ccache for local compilation speedup (Windows self-hosted only)
       # Only use ccache if already installed - don't attempt installation
     - name: Setup ccache (if available, local only, no GitHub uploads)
-      if: ${{inputs.os == 'windows' && runner.environment == 'self-hosted' && contains(runner.labels, 'test')}}
+      if: ${{ inputs.os == 'windows' && runner.environment == 'self-hosted' }}
       shell: bash
       run: |
         # Check if ccache is available
