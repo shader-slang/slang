@@ -44,6 +44,49 @@ struct TransformParamsToConstRefContext
         return true;
     }
 
+    // Check if an IR instruction represents an addressable value
+    // that can be passed directly to a constref parameter.
+    // Returns the address to use, or nullptr if not addressable.
+    IRInst* getAddressableValue(IRInst* inst)
+    {
+        if (!inst)
+            return nullptr;
+
+        switch (inst->getOp())
+        {
+        case kIROp_Var:             // Local variables
+        case kIROp_GlobalVar:       // Global variables  
+        case kIROp_FieldAddress:    // Address of struct field (e.g. &obj.field)
+        case kIROp_GetElementPtr:   // Address of array element (e.g. &arr[i])
+        case kIROp_GetOffsetPtr:    // Address with offset
+            return inst;
+        case kIROp_Param:
+            {
+                // Parameters are addressable if they are reference types
+                auto paramType = inst->getDataType();
+                if (auto ptrType = as<IRPtrTypeBase>(paramType))
+                    return inst;
+                return nullptr;
+            }
+        case kIROp_Load:
+            {
+                // If we're loading from an addressable location,
+                // we can use that address directly instead of creating a copy
+                auto loadInst = as<IRLoad>(inst);
+                auto ptr = loadInst->getPtr();
+                return getAddressableValue(ptr);
+            }
+        default:
+            return nullptr;
+        }
+    }
+
+    // Helper function for backward compatibility
+    bool isAddressableValue(IRInst* inst)
+    {
+        return getAddressableValue(inst) != nullptr;
+    }
+
     void rewriteParamUseSitesToSupportConstRefUsage(HashSet<IRParam*>& updatedParams)
     {
         // Traverse the uses of our updated params to rewrite them.
@@ -127,9 +170,20 @@ struct TransformParamsToConstRefContext
                     continue;
                 }
 
-                auto tempVar = builder.emitVar(arg->getFullType());
-                builder.emitStore(tempVar, arg);
-                newArgs.add(tempVar);
+                // Check if the argument is already addressable (produces a pointer)
+                IRInst* addressableArg = getAddressableValue(arg);
+                if (addressableArg)
+                {
+                    // Argument is already addressable, pass the address directly
+                    newArgs.add(addressableArg);
+                }
+                else
+                {
+                    // Argument is not addressable, create a temporary variable
+                    auto tempVar = builder.emitVar(arg->getFullType());
+                    builder.emitStore(tempVar, arg);
+                    newArgs.add(tempVar);
+                }
             }
 
             // Create new call with updated arguments
