@@ -73,7 +73,12 @@ void simplifyIR(
         changed |= removeUnusedGenericParam(module);
         changed |= applySparseConditionalConstantPropagationForGlobalScope(module, sink);
         changed |= peepholeOptimizeGlobalScope(target, module);
-        changed |= trimOptimizableTypes(module);
+        // Temporarily disable trimOptimizableTypes to prevent CUDA backend
+        // type mismatches between global parameters and specialized functions.
+        // This is a conservative fix that prevents struct field elimination
+        // that can cause type inconsistencies in function call specialization.
+        // TODO: Implement more targeted fix that preserves global parameter type consistency
+        // changed |= trimOptimizableTypes(module);
 
         for (auto inst : module->getGlobalInsts())
         {
