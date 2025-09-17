@@ -1,5 +1,6 @@
 #include "slang-emit-llvm.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-util.h"
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
@@ -128,6 +129,131 @@ struct LLVMEmitter
         return llvmValue;
     }
 
+    void getUnderlyingTypeInfo(IRInst* inst, bool& isFloat, bool& isSigned)
+    {
+        IRType* elementType = getVectorOrCoopMatrixElementType(inst->getOperand(0)->getDataType());
+        IRBasicType* basicType = as<IRBasicType>(elementType);
+        isFloat = isFloatingType(basicType);
+        isSigned = isSignedType(basicType);
+    }
+
+    llvm::Value* _emitCompare(IRInst* inst)
+    {
+        bool isFloat, isSigned;
+        getUnderlyingTypeInfo(inst, isFloat, isSigned);
+
+        llvm::CmpInst::Predicate pred;
+        switch (inst->getOp())
+        {
+        case kIROp_Less:
+            pred = isFloat ? llvm::CmpInst::Predicate::FCMP_OLT :
+                isSigned ? llvm::CmpInst::Predicate::ICMP_SLT : llvm::CmpInst::Predicate::ICMP_ULT;
+            break;
+        case kIROp_Leq:
+            pred = isFloat ? llvm::CmpInst::Predicate::FCMP_OLE :
+                isSigned ? llvm::CmpInst::Predicate::ICMP_SLE : llvm::CmpInst::Predicate::ICMP_ULE;
+            break;
+        case kIROp_Eql:
+            pred = isFloat ? llvm::CmpInst::Predicate::FCMP_OEQ : llvm::CmpInst::Predicate::ICMP_EQ;
+            break;
+        case kIROp_Neq:
+            pred = isFloat ? llvm::CmpInst::Predicate::FCMP_ONE : llvm::CmpInst::Predicate::ICMP_NE;
+            break;
+        case kIROp_Greater:
+            pred = isFloat ? llvm::CmpInst::Predicate::FCMP_OGT :
+                isSigned ? llvm::CmpInst::Predicate::ICMP_SGT : llvm::CmpInst::Predicate::ICMP_UGT;
+            break;
+        case kIROp_Geq:
+            pred = isFloat ? llvm::CmpInst::Predicate::FCMP_OGE :
+                isSigned ? llvm::CmpInst::Predicate::ICMP_SGE : llvm::CmpInst::Predicate::ICMP_UGE;
+            break;
+        default:
+            SLANG_UNEXPECTED("Unsupported compare op");
+            break;
+        }
+
+        SLANG_ASSERT(inst->getOperandCount() == 2);
+        return llvmBuilder.CreateCmp(pred, findLLVMValue(inst->getOperand(0)), findLLVMValue(inst->getOperand(1)));
+    }
+
+    llvm::Value* _emitArithmetic(IRInst* inst)
+    {
+        bool isFloat, isSigned;
+        getUnderlyingTypeInfo(inst, isFloat, isSigned);
+
+        if (inst->getOperandCount() == 1)
+        {
+            auto llvmValue = findLLVMValue(inst->getOperand(0));
+            switch (inst->getOp())
+            {
+            case kIROp_Neg:
+                return isFloat ? llvmBuilder.CreateFNeg(llvmValue) : llvmBuilder.CreateNeg(llvmValue);
+            case kIROp_Not:
+            case kIROp_BitNot:
+                return llvmBuilder.CreateNot(llvmValue);
+            default:
+                SLANG_UNEXPECTED("Unsupported unary arithmetic op");
+                break;
+            }
+        }
+        else if (inst->getOperandCount() == 2)
+        {
+            llvm::Instruction::BinaryOps op;
+            switch (inst->getOp())
+            {
+            case kIROp_Add:
+                op = isFloat ? llvm::Instruction::FAdd : llvm::Instruction::Add;
+                break;
+            case kIROp_Sub:
+                op = isFloat ? llvm::Instruction::FSub : llvm::Instruction::Sub;
+                break;
+            case kIROp_Mul:
+                op = isFloat ? llvm::Instruction::FMul : llvm::Instruction::Mul;
+                break;
+            case kIROp_Div:
+                op = isFloat ? llvm::Instruction::FDiv : isSigned ? llvm::Instruction::SDiv : llvm::Instruction::UDiv;
+                break;
+            case kIROp_IRem:
+                op = isSigned ? llvm::Instruction::SRem : llvm::Instruction::URem;
+                break;
+            case kIROp_FRem:
+                op = llvm::Instruction::FRem;
+                break;
+            case kIROp_And:
+                op = llvm::Instruction::And;
+                break;
+            case kIROp_Or:
+                op = llvm::Instruction::Or;
+                break;
+            case kIROp_BitAnd:
+                op = llvm::Instruction::And;
+                break;
+            case kIROp_BitOr:
+                op = llvm::Instruction::Or;
+                break;
+            case kIROp_BitXor:
+                op = llvm::Instruction::Xor;
+                break;
+            case kIROp_Rsh:
+                op = isSigned ? llvm::Instruction::AShr : llvm::Instruction::LShr;
+                break;
+            case kIROp_Lsh:
+                op = llvm::Instruction::Shl;
+                break;
+            default:
+                SLANG_UNEXPECTED("Unsupported binary arithmetic op");
+                break;
+            }
+            return llvmBuilder.CreateBinOp(op, findLLVMValue(inst->getOperand(0)), findLLVMValue(inst->getOperand(1)));
+        }
+        else
+        {
+            SLANG_UNEXPECTED("Unexpected number of operands for arithmetic op");
+        }
+
+        return nullptr;
+    }
+
     // Caution! This is only for emitting things which are considered
     // instructions in LLVM! It won't work for IRBlocks, IRFuncs & such.
     llvm::Value* emitLLVMInstruction(IRInst* inst)
@@ -139,6 +265,34 @@ struct LLVMEmitter
         case kIROp_BoolLit:
         case kIROp_FloatLit:
             llvmInst = maybeEnsureConstant(inst);
+            break;
+
+        case kIROp_Less:
+        case kIROp_Leq:
+        case kIROp_Eql:
+        case kIROp_Neq:
+        case kIROp_Greater:
+        case kIROp_Geq:
+            llvmInst = _emitCompare(inst);
+            break;
+
+        case kIROp_Add:
+        case kIROp_Sub:
+        case kIROp_Mul:
+        case kIROp_Div:
+        case kIROp_IRem:
+        case kIROp_FRem:
+        case kIROp_Neg:
+        case kIROp_Not:
+        case kIROp_And:
+        case kIROp_Or:
+        case kIROp_BitNot:
+        case kIROp_BitAnd:
+        case kIROp_BitOr:
+        case kIROp_BitXor:
+        case kIROp_Rsh:
+        case kIROp_Lsh:
+            llvmInst = _emitArithmetic(inst);
             break;
 
         case kIROp_Return:
@@ -155,6 +309,7 @@ struct LLVMEmitter
                 }
             }
             break;
+
         default:
             SLANG_UNEXPECTED("Unsupported instruction for LLVM target!");
             break;
@@ -374,6 +529,7 @@ struct LLVMEmitter
             llvm::StringRef name;
             if (maybeGetName(&name, pp))
                 llvmArg->setName(name);
+            mapInstToLLVM[pp] = llvmArg;
         }
 
         mapInstToLLVM[func] = llvmFunc;
@@ -474,6 +630,63 @@ struct LLVMEmitter
         }
     }
 
+    void emitPhi(IRParam* param)
+    {
+        IRBlock* parentBlock = as<IRBlock>(param->getParent());
+
+        int predecessorCount = 0;
+
+        for (auto use = parentBlock->firstUse; use; use = use->nextUse)
+        {
+            auto branchInst = as<IRUnconditionalBranch>(use->getUser());
+            if (!branchInst)
+                continue;
+            if (branchInst->getTargetBlock() != parentBlock)
+                continue;
+            if (branchInst->getOp() != kIROp_UnconditionalBranch && branchInst->getOp() != kIROp_Loop)
+                continue;
+            predecessorCount++;
+        }
+
+        auto llvmType = ensureType(param->getFullType());
+        auto llvmPhi = llvmBuilder.CreatePHI(llvmType, predecessorCount);
+
+        mapInstToLLVM[param] = llvmPhi;
+    }
+
+    void finishPhi(IRParam* param, int index)
+    {
+        IRBlock* parentBlock = as<IRBlock>(param->getParent());
+        llvm::PHINode* llvmPhi = llvm::cast<llvm::PHINode>(mapInstToLLVM.getValue(param));
+
+        for (auto use = parentBlock->firstUse; use; use = use->nextUse)
+        {
+            auto branchInst = as<IRUnconditionalBranch>(use->getUser());
+            if (!branchInst)
+                continue;
+            if (branchInst->getTargetBlock() != parentBlock)
+                continue;
+
+            UInt argStartIndex = 0;
+            switch (branchInst->getOp())
+            {
+            case kIROp_UnconditionalBranch:
+                argStartIndex = 1;
+                break;
+            case kIROp_Loop:
+                argStartIndex = 3;
+                break;
+            default:
+                // A phi argument can only come from an unconditional branch inst.
+                // Other uses are not relavent so we should skip.
+                continue;
+            }
+            auto sourceBlock = llvm::cast<llvm::BasicBlock>(mapInstToLLVM.getValue(branchInst->getParent()));
+            auto valueInst = branchInst->getOperand(argStartIndex + index);
+            llvmPhi->addIncoming(findLLVMValue(valueInst), sourceBlock);
+        }
+    }
+
     void emitFuncDefinition(IRFunc* func)
     {
         llvm::Function* llvmFunc = ensureFuncDecl(func);
@@ -494,10 +707,14 @@ struct LLVMEmitter
             llvmBuilder.SetInsertPoint(llvmBlock);
 
             // Insert block parameters as Phi nodes.
-            for (auto irParam : irBlock->getParams())
+            if (irBlock != func->getFirstBlock())
             {
-                // TODO Create phi nodes. Can't set them yet, since the
-                // instructions they refer to haven't been created yet.
+                for (auto irParam : irBlock->getParams())
+                {
+                    // Create phi nodes. Can't set them yet, since the instructions
+                    // they refer to may have not yet been created.
+                    emitPhi(irParam);
+                }
             }
 
             // Then, add the regular instructions.
@@ -510,9 +727,14 @@ struct LLVMEmitter
         // Finally, fill in the Phi nodes.
         for (auto irBlock : func->getBlocks())
         {
-            for (auto irParam : irBlock->getParams())
+            int index = 0;
+            if (irBlock != func->getFirstBlock())
             {
-                // TODO Set phi nodes
+                for (auto irParam : irBlock->getParams())
+                {
+                    finishPhi(irParam, index);
+                    index++;
+                }
             }
         }
     }
