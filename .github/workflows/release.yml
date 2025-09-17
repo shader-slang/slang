@@ -58,12 +58,7 @@ jobs:
         with:
           submodules: "recursive"
           fetch-depth: "0"
-      - name: Install dependencies
-        run: |
-          if [[ "${{ matrix.os }}" == "linux" ]]; then
-              sudo apt-get update
-              sudo apt-get install -y libx11-dev
-          fi
+
       - name: Setup
         uses: ./.github/actions/common-setup
         with:
@@ -78,24 +73,6 @@ jobs:
           cmake --workflow --preset generators --fresh
           mkdir build-platform-generators
           cmake --install build --config Release --component generators --prefix build-platform-generators
-
-      - name: Change dev tools to host arch (windows)
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: ${{matrix.platform == 'aarch64' && 'amd64_arm64' || 'amd64'}}
-
-      - name: Change dev tools to host arch (linux and macos)
-        run: |
-          if [[ "${{matrix.os}}" == linux* && "${{matrix.platform}}" == "aarch64" && "$(uname -m)" != "aarch64" ]]; then
-            export CC=aarch64-linux-gnu-gcc
-            export CXX=aarch64-linux-gnu-g++
-          fi
-          CMAKE_OSX_ARCHITECTURES="${{matrix.platform}}"
-          CMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES//aarch64/arm64}
-
-          echo "CC=$CC" >> "$GITHUB_ENV"
-          echo "CXX=$CXX" >> "$GITHUB_ENV"
-          echo "CMAKE_OSX_ARCHITECTURES=$CMAKE_OSX_ARCHITECTURES" >> "$GITHUB_ENV"
 
       - name: Build Slang
         run: |
