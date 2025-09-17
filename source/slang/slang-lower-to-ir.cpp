@@ -9410,8 +9410,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             context->astBuilder,
             createDefaultSpecializedDeclRef(subContext, nullptr, decl->getThisTypeDecl()));
         subContext->thisType = thisType;
-        // Create a stand-in witness that represents `ThisType` conforms to the interface.
-        subContext->thisTypeWitness = subBuilder->createThisTypeWitness((IRType*)finalVal);
+        {
+            IRBuilderInsertLocScope insertScope(subBuilder);
+            subBuilder->setInsertInto(subBuilder->getModule());
+            // Create a stand-in witness that represents `ThisType` conforms to the interface,
+            // and move it to global scope.
+            subContext->thisTypeWitness = subBuilder->createThisTypeWitness((IRType*)finalVal);
+        }
 
         // Lower associated types first, so they can be referred to when lowering functions.
         for (auto assocTypeDecl : decl->getMembersOfType<AssocTypeDecl>())
@@ -11699,15 +11704,6 @@ static void _addFlattenedTupleArgs(List<IRInst*>& ioArgs, IRInst* val)
     }
 }
 
-bool isAbstractWitnessTable(IRInst* inst)
-{
-    if (as<IRThisTypeWitness>(inst) || as<IRInterfaceRequirementEntry>(inst))
-        return true;
-    if (auto lookup = as<IRLookupWitnessMethod>(inst))
-        return isAbstractWitnessTable(lookup->getWitnessTable());
-    return false;
-}
-
 LoweredValInfo emitDeclRef(IRGenContext* context, Decl* decl, DeclRefBase* subst, IRType* type)
 {
     const auto initialSubst = subst;
@@ -11838,88 +11834,31 @@ LoweredValInfo emitDeclRef(IRGenContext* context, Decl* decl, DeclRefBase* subst
             return lowerType(context, thisTypeSubst->getWitness()->getSub());
         }
 
-        if (isInterfaceRequirement(decl))
-        {
-            // If we reach here, somebody is trying to look up an interface
-            // requirement "through" some concrete type. We need to lower this
-            // decl-ref as a lookup of the corresponding member in a witness
-            // table.
-            //
-            // The witness table itself is referenced by the this-type
-            // substitution, so we can just lower that.
-            //
-            // Note: unlike the case for generics above, in the interface-lookup
-            // case, we don't end up caring about any further outer substitutions.
-            // That is because even if we are naming `ISomething<Foo>.doIt()`,
-            // a method inside a generic interface, we don't actually care
-            // about the substitution of `Foo` for the parameter `T` of
-            // `ISomething<T>`. That is because we really care about the
-            // witness table for the concrete type that conforms to `ISomething<Foo>`.
-            //
-            auto irWitnessTable = lowerSimpleVal(context, thisTypeSubst->getWitness());
-            if (isAbstractWitnessTable(irWitnessTable))
-            {
-                // If `thisTypeSubst` doesn't lower into a concrete IRWitnessTable,
-                // this is a lookup of an interface requirement
-                // defined in some base interface from an interface type.
-                // For now we just lower that decl as if it is referenced
-                // from the same interface directly, e.g. a reference to
-                // IBase.AssocType from IDerived:IBase will be lowered as
-                // IRAssocType(IBase).
-                // We may want to consider unifying our IR representation to
-                // represent associated types with lookupWitness inst even inside
-                // interface definitions.
-                return emitDeclRef(
-                    context,
-                    decl->getDefaultDeclRef(),
-                    context->irBuilder->getTypeKind());
-            }
+        // If we reach here, somebody is trying to look up an interface
+        // requirement "through" some concrete type. We need to lower this
+        // decl-ref as a lookup of the corresponding member in a witness
+        // table.
+        //
+        // The witness table itself is referenced by the this-type
+        // substitution, so we can just lower that.
+        //
+        // Note: unlike the case for generics above, in the interface-lookup
+        // case, we don't end up caring about any further outer substitutions.
+        // That is because even if we are naming `ISomething<Foo>.doIt()`,
+        // a method inside a generic interface, we don't actually care
+        // about the substitution of `Foo` for the parameter `T` of
+        // `ISomething<T>`. That is because we really care about the
+        // witness table for the concrete type that conforms to `ISomething<Foo>`.
+        //
+        auto irWitnessTable = lowerSimpleVal(context, thisTypeSubst->getWitness());
+        SLANG_RELEASE_ASSERT(irWitnessTable);
 
-            SLANG_RELEASE_ASSERT(irWitnessTable);
-
-            //
-            // The key to use for looking up the interface member is
-            // derived from the declaration.
-            //
-            auto irRequirementKey = getInterfaceRequirementKey(context, decl);
-            //
-            // Those two pieces of information tell us what we need to
-            // do in order to look up the value that satisfied the requirement.
-            //
-            auto irSatisfyingVal = context->irBuilder->emitLookupInterfaceMethodInst(
-                type,
-                irWitnessTable,
-                irRequirementKey);
-            return LoweredValInfo::simple(irSatisfyingVal);
-        }
-        else
-        {
-            // This case is a reference to a member declaration of the interface
-            // (or added by an extension of the interface) that does *not*
-            // represent a requirement of the interface.
-            //
-            // Our policy is that concrete methods/members on an interface type
-            // are lowered as generics, where the generic parameter represents
-            // the `ThisType`.
-            //
-            auto genericVal = emitDeclRef(
-                context,
-                decl,
-                thisTypeSubst->getBase(),
-                context->irBuilder->getGenericKind());
-            auto irGenericVal = getSimpleVal(context, genericVal);
-
-            // In order to reference the member for a particular type, we
-            // specialize the generic for that type.
-            //
-            IRInst* irSubType = lowerType(context, thisTypeSubst->getWitness()->getSub());
-            IRInst* irSubTypeWitness = lowerSimpleVal(context, thisTypeSubst->getWitness());
-
-            IRInst* irSpecializeArgs[] = {irSubType, irSubTypeWitness};
-            auto irSpecializedVal =
-                context->irBuilder->emitSpecializeInst(type, irGenericVal, 2, irSpecializeArgs);
-            return LoweredValInfo::simple(irSpecializedVal);
-        }
+        auto irRequirementKey = getInterfaceRequirementKey(context, decl);
+        auto irLookupWitness = context->irBuilder->emitLookupInterfaceMethodInst(
+            type,
+            irWitnessTable,
+            irRequirementKey);
+        return LoweredValInfo::simple(irLookupWitness);
     }
     else
     {
