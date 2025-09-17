@@ -102,7 +102,7 @@ struct LLVMEmitter
 
     // Finds the value of an instruction that has already been emitted, OR
     // creates the value if it's a constant.
-    llvm::Value* findLLVMValue(IRInst* inst)
+    llvm::Value* findValue(IRInst* inst)
     {
         if (mapInstToLLVM.containsKey(inst))
             return mapInstToLLVM.getValue(inst);
@@ -173,7 +173,7 @@ struct LLVMEmitter
         }
 
         SLANG_ASSERT(inst->getOperandCount() == 2);
-        return llvmBuilder.CreateCmp(pred, findLLVMValue(inst->getOperand(0)), findLLVMValue(inst->getOperand(1)));
+        return llvmBuilder.CreateCmp(pred, findValue(inst->getOperand(0)), findValue(inst->getOperand(1)));
     }
 
     llvm::Value* _emitArithmetic(IRInst* inst)
@@ -183,7 +183,7 @@ struct LLVMEmitter
 
         if (inst->getOperandCount() == 1)
         {
-            auto llvmValue = findLLVMValue(inst->getOperand(0));
+            auto llvmValue = findValue(inst->getOperand(0));
             switch (inst->getOp())
             {
             case kIROp_Neg:
@@ -244,7 +244,7 @@ struct LLVMEmitter
                 SLANG_UNEXPECTED("Unsupported binary arithmetic op");
                 break;
             }
-            return llvmBuilder.CreateBinOp(op, findLLVMValue(inst->getOperand(0)), findLLVMValue(inst->getOperand(1)));
+            return llvmBuilder.CreateBinOp(op, findValue(inst->getOperand(0)), findValue(inst->getOperand(1)));
         }
         else
         {
@@ -305,8 +305,63 @@ struct LLVMEmitter
                 }
                 else
                 {
-                    llvmInst = llvmBuilder.CreateRet(findLLVMValue(retVal));
+                    llvmInst = llvmBuilder.CreateRet(findValue(retVal));
                 }
+            }
+            break;
+
+        case kIROp_Var:
+            {
+                auto var = static_cast<IRVar*>(inst);
+                auto ptrType = var->getDataType();
+                auto llvmType = ensureType(ptrType->getValueType());
+
+                llvm::AllocaInst* llvmVar = llvmBuilder.CreateAlloca(llvmType);
+
+                llvm::StringRef name;
+                if (maybeGetName(&name, inst))
+                    llvmVar->setName(name);
+
+                llvmInst = llvmVar;
+            }
+            break;
+
+        case kIROp_UnconditionalBranch:
+            {
+                auto branch = static_cast<IRUnconditionalBranch*>(inst);
+                auto llvmTarget = llvm::cast<llvm::BasicBlock>(findValue(branch->getTargetBlock()));
+                llvmInst = llvmBuilder.CreateBr(llvmTarget);
+            }
+            break;
+
+        case kIROp_IfElse:
+            {
+                auto ifelseInst = static_cast<IRIfElse*>(inst);
+                auto trueBlock = llvm::cast<llvm::BasicBlock>(findValue(ifelseInst->getTrueBlock()));
+                auto falseBlock = llvm::cast<llvm::BasicBlock>(findValue(ifelseInst->getFalseBlock()));
+                auto cond = findValue(ifelseInst->getCondition());
+                llvmInst = llvmBuilder.CreateCondBr(cond, trueBlock, falseBlock);
+            }
+            break;
+
+        case kIROp_Store:
+            {
+                auto storeInst = static_cast<IRStore*>(inst);
+                auto llvmPtr = findValue(storeInst->getPtr());
+                auto llvmVal = findValue(storeInst->getVal());
+                // TODO: isVolatile
+                llvmInst = llvmBuilder.CreateStore(llvmVal, llvmPtr);
+            }
+            break;
+
+        case kIROp_Load:
+            {
+                auto loadInst = static_cast<IRLoad*>(inst);
+                auto ptrType = as<IRPtrTypeBase>(loadInst->getPtr()->getDataType());
+                auto llvmType = ensureType(ptrType->getValueType());
+                auto llvmPtr = findValue(loadInst->getPtr());
+                // TODO: isVolatile
+                llvmInst = llvmBuilder.CreateLoad(llvmType, llvmPtr);
             }
             break;
 
@@ -683,7 +738,7 @@ struct LLVMEmitter
             }
             auto sourceBlock = llvm::cast<llvm::BasicBlock>(mapInstToLLVM.getValue(branchInst->getParent()));
             auto valueInst = branchInst->getOperand(argStartIndex + index);
-            llvmPhi->addIncoming(findLLVMValue(valueInst), sourceBlock);
+            llvmPhi->addIncoming(findValue(valueInst), sourceBlock);
         }
     }
 
