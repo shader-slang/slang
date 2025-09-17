@@ -27,12 +27,11 @@ runs:
       uses: ilammy/msvc-dev-cmd@v1
 
     - name: Install dependencies (Linux only)
+      if: inputs.os == 'linux'
       shell: bash
       run: |
-        if [[ "${{ inputs.os }}" == "linux" ]]; then
-            sudo apt-get update
-            sudo apt-get install -y libx11-dev 
-        fi
+        sudo apt-get update
+        sudo apt-get install -y libx11-dev
 
     - name: Setup Node.js (Linux only)
       if: inputs.os == 'linux'
