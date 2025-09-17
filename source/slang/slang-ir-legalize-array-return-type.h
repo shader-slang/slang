@@ -1,8 +1,8 @@
 // slang-ir-legalize-array-return-type.h
 #pragma once
 
-#include "slang-ir-insts.h"
 #include "slang-compiler.h"
+#include "slang-ir-insts.h"
 
 namespace Slang
 {
