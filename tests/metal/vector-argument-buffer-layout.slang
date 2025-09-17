@@ -1,18 +1,19 @@
-//TEST:REFLECTION(filecheck=CHECK): -target metal
+//TEST:REFLECTION(filecheck=METAL): -target metal
 //TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -compute -entry computeMain -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -output-using-type
 
 
-//CHECK: "name": "o",
-//CHECK: "binding": {"kind": "constantBuffer", "index": 0},
+//METAL: "name": "o",
+//METAL: "binding": {"kind": "constantBuffer", "index": 0},
 
-//CHECK: "name": "gParams",
-//CHECK: "binding": {"kind": "constantBuffer", "index": 1},
+//METAL: "name": "gParams",
+//METAL: "binding": {"kind": "constantBuffer", "index": 1},
 
 
-//CHECK: "dir"
-//CHECK: "binding": {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 4}
-//CHECK: "color"
-//CHECK: "binding": {"kind": "uniform", "offset": 16, "size": 16, "elementStride": 4}
+//METAL: "dir"
+//METAL: "binding": {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 4}
+//METAL: "color"
+//METAL: "binding": {"kind": "uniform", "offset": 16, "size": 16, "elementStride": 4}
 
 struct Params
 {

@@ -1,6 +1,7 @@
 //TEST:SIMPLE(filecheck=METAL): -target metal -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 //TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-metal -compute -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;

@@ -1,8 +1,8 @@
 //TEST:SIMPLE(filecheck=METAL): -entry meshMain -stage mesh -target metal
-//TEST:SIMPLE(filecheck=METAL-ASM): -entry meshMain -stage mesh -target metallib
+//TEST:SIMPLE(filecheck=METALLIB): -entry meshMain -stage mesh -target metallib
 
-// METAL-ASM-NOT: error :
-// METAL-ASM: @meshMain
+// METALLIB-NOT: error :
+// METALLIB: @meshMain
 
 //
 // Mesh shader

@@ -1,6 +1,7 @@
 //TEST:SIMPLE(filecheck=LIB):-target metallib -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
-//TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-metal -compute -output-using-type
+//TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-metal -compute -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -output-using-type
 
 // METAL-NOT: struct emptyStruct
 struct emptyStruct
@@ -30,6 +31,6 @@ void computeMain(
     uint tid: SV_DispatchThreadID,
 )
 {
-    // CHK: 5
+    // BUF: 5
     param.set();
 }

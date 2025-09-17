@@ -1,7 +1,6 @@
 //TEST:SIMPLE(filecheck=METAL): -stage compute -entry computeMain -target metal -DEMIT_SOURCE
 //TEST:SIMPLE(filecheck=METALLIB): -stage compute -entry computeMain -target metallib -DEMIT_SOURCE -DMETALLIB
 //TEST:SIMPLE(filecheck=HLSL): -stage compute -entry computeMain -target hlsl -DEMIT_SOURCE
-//DISABLE_TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -compute -entry computeMain -output-using-type
 
 // It appears that when kIROp_CombinedTextureSamplerGetSampler is used,
 // "$1" refers to a sampler not the first parameter of the function.

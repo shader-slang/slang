@@ -1,9 +1,10 @@
-//TEST:SIMPLE(filecheck=CHECK): -target metal
-//TEST:SIMPLE(filecheck=CHECK-ASM): -target metallib
+//TEST:SIMPLE(filecheck=METAL): -target metal
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib
 //TEST:REFLECTION(filecheck=REFLECT):-target metal -entry computeMain -stage compute
 //TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-metal -compute -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0], stride=1):out,name=outputBuffer
 uniform RWStructuredBuffer<float> outputBuffer;
 
 struct MyBlock
@@ -16,9 +17,9 @@ ParameterBlock<MyBlock> block;
 //TEST_INPUT: set block2 = new MyBlock{ ubuffer(data=[0.0]), ubuffer(data=[5.0]) }
 ParameterBlock<MyBlock> block2;
 
-// CHECK: {{\[\[}}kernel{{\]\]}} void computeMain(float device* {{.*}} {{\[\[}}buffer(0){{\]\]}}, MyBlock{{.*}} constant* block{{.*}} {{\[\[}}buffer(1){{\]\]}}, MyBlock{{.*}} constant* block2{{.*}} {{\[\[}}buffer(2){{\]\]}})
+// METAL: {{\[\[}}kernel{{\]\]}} void computeMain(float device* {{.*}} {{\[\[}}buffer(0){{\]\]}}, MyBlock{{.*}} constant* block{{.*}} {{\[\[}}buffer(1){{\]\]}}, MyBlock{{.*}} constant* block2{{.*}} {{\[\[}}buffer(2){{\]\]}})
 
-// CHECK-ASM: define void @computeMain
+// METALLIB: define void @computeMain
 
 // REFLECT: "elementVarLayout": {
 // REFLECT: "name": "b1",
