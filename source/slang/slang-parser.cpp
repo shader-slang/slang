@@ -9388,7 +9388,16 @@ static NodeBase* parseBuiltinRequirementModifier(Parser* parser, void* /*userDat
     return modifier;
 }
 
-static NodeBase* parseMagicTypeModifier2(Parser* parser, void* /*userData*/, bool magicEnum)
+enum class MagicTypeModifierKind
+{
+    Type,
+    Enum,
+};
+
+static NodeBase* parseMagicTypeModifierImpl(
+    Parser* parser,
+    void* /*userData*/,
+    MagicTypeModifierKind kind)
 {
     MagicTypeModifier* modifier = parser->astBuilder->create<MagicTypeModifier>();
     parser->ReadToken(TokenType::LParent);
@@ -9399,7 +9408,7 @@ static NodeBase* parseMagicTypeModifier2(Parser* parser, void* /*userData*/, boo
             uint32_t(stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
     }
 
-    if (magicEnum)
+    if (kind == MagicTypeModifierKind::Enum)
     {
         modifier->magicNodeType = getSyntaxClass<EnumTypeType>();
     }
@@ -9418,12 +9427,12 @@ static NodeBase* parseMagicTypeModifier2(Parser* parser, void* /*userData*/, boo
 
 static NodeBase* parseMagicTypeModifier(Parser* parser, void* userData)
 {
-    return parseMagicTypeModifier2(parser, userData, false);
+    return parseMagicTypeModifierImpl(parser, userData, MagicTypeModifierKind::Type);
 }
 
 static NodeBase* parseMagicEnumModifier(Parser* parser, void* userData)
 {
-    return parseMagicTypeModifier2(parser, userData, true);
+    return parseMagicTypeModifierImpl(parser, userData, MagicTypeModifierKind::Enum);
 }
 
 static NodeBase* parseIntrinsicTypeModifier(Parser* parser, void* /*userData*/)
