@@ -2,6 +2,7 @@
 #pragma once
 
 #include "slang-ir-insts.h"
+#include "slang-compiler.h"
 
 namespace Slang
 {
@@ -9,5 +10,5 @@ struct IRModule;
 
 // Turn array-typed return values into `out` parameters for backends that does not
 // support arrays in return values.
-void legalizeArrayReturnType(IRModule* module);
+void legalizeArrayReturnType(IRModule* module, CodeGenTarget target = CodeGenTarget::Unknown);
 } // namespace Slang
