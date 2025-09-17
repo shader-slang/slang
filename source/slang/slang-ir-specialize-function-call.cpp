@@ -714,11 +714,11 @@ struct FunctionParameterSpecializationContext
             // If the parameter requires specialization, then it
             // is time to look at the structure of the argument.
             //
-            return getSpecializedValueForArg(ioInfo, oldArg);
+            return getSpecializedValueForArg(ioInfo, oldParam, oldArg);
         }
     }
 
-    IRInst* getSpecializedValueForArg(FuncSpecializationInfo& ioInfo, IRInst* oldArg)
+    IRInst* getSpecializedValueForArg(FuncSpecializationInfo& ioInfo, IRParam* oldParam, IRInst* oldArg)
     {
         // The logic here parallels `gatherCallInfoForArg`,
         // and only differs in what information it is gathering.
@@ -733,6 +733,27 @@ struct FunctionParameterSpecializationContext
             // should be used to stand in for the original
             // parameter in the specialized function.
             //
+            // However, we need to ensure type compatibility if the global
+            // parameter type has been modified by optimization passes.
+            auto expectedType = oldParam->getDataType();
+            auto globalParamType = globalParam->getDataType();
+            
+            // Debug: Print type information
+            #if 0
+            printf("Expected param type: %s\n", expectedType->getOp() == kIROp_PtrType ? "Ptr" : "Other");
+            printf("Global param type: %s\n", globalParamType->getOp() == kIROp_PtrType ? "Ptr" : "Other");
+            #endif
+            
+            if (expectedType != globalParamType)
+            {
+                // If types don't match, we need to create a bitcast or equivalent
+                // to ensure type safety in the specialized function
+                auto builder = getBuilder();
+                auto castInst = builder->emitBitCast(expectedType, globalParam);
+                ioInfo.newBodyInsts.add(castInst);
+                return castInst;
+            }
+            
             return globalParam;
         }
         if (auto globalFunc = as<IRGlobalValueWithCode>(oldArg))
@@ -759,7 +780,7 @@ struct FunctionParameterSpecializationContext
             // to get a value that can stand in for it
             // in the specialized callee.
             //
-            auto newBase = getSpecializedValueForArg(ioInfo, oldBase);
+            auto newBase = getSpecializedValueForArg(ioInfo, oldParam, oldBase);
 
             // Next we'll process `oldIndex` as if it
             // was an ordinary argument (not a specialized one),
@@ -816,7 +837,7 @@ struct FunctionParameterSpecializationContext
         else if (auto oldArgLoad = as<IRLoad>(oldArg))
         {
             auto oldPtr = oldArgLoad->getPtr();
-            auto newPtr = getSpecializedValueForArg(ioInfo, oldPtr);
+            auto newPtr = getSpecializedValueForArg(ioInfo, oldParam, oldPtr);
 
             auto builder = getBuilder();
             builder->setInsertLoc(IRInsertLoc());
