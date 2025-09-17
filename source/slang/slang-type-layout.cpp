@@ -1387,7 +1387,7 @@ LayoutRulesImpl kCPushConstantRulesImpl_ = {
 
 LayoutRulesImpl kCVaryingInputLayoutRulesImpl_ = {
     &kCLayoutRulesFamilyImpl,
-    &kGLSLVaryingOutputLayoutRulesImpl,
+    &kGLSLVaryingInputLayoutRulesImpl,
     &kGLSLObjectLayoutRulesImpl,
 };
 
@@ -5675,6 +5675,20 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
         for (int rr = 0; rr < varyingRulesCount; ++rr)
         {
             auto info = varyingRules[rr]->GetScalarLayout(baseType);
+            typeLayout->addResourceUsage(info.kind, info.size);
+        }
+
+        return typeLayout;
+    }
+    else if (as<PtrType>(type))
+    {
+        RefPtr<TypeLayout> typeLayout = new PointerTypeLayout();
+        typeLayout->type = type;
+        typeLayout->rules = rules;
+
+        for (int rr = 0; rr < varyingRulesCount; ++rr)
+        {
+            auto info = varyingRules[rr]->GetPointerLayout();
             typeLayout->addResourceUsage(info.kind, info.size);
         }
 
