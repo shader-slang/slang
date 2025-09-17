@@ -42,7 +42,7 @@ struct BinaryLLVMOutputStream: public llvm::raw_pwrite_stream
     List<uint8_t>& output;
 
     BinaryLLVMOutputStream(List<uint8_t>& output)
-        : output(output)
+        : raw_pwrite_stream(true), output(output)
     {
         SetUnbuffered();
     }
@@ -54,7 +54,10 @@ struct BinaryLLVMOutputStream: public llvm::raw_pwrite_stream
 
     void pwrite_impl(const char *Ptr, size_t Size, uint64_t Offset) override
     {
-        output.insertRange(Offset, reinterpret_cast<const uint8_t*>(Ptr), Size);
+        memcpy(
+            output.getBuffer() + Offset,
+            reinterpret_cast<const uint8_t*>(Ptr),
+            Size);
     }
 
     uint64_t current_pos() const override
@@ -94,6 +97,74 @@ struct LLVMEmitter
 
     ~LLVMEmitter()
     {
+    }
+
+    // Finds the value of an instruction that has already been emitted, OR
+    // creates the value if it's a constant.
+    llvm::Value* findLLVMValue(IRInst* inst)
+    {
+        if (mapInstToLLVM.containsKey(inst))
+            return mapInstToLLVM.getValue(inst);
+
+        llvm::Value* llvmValue = nullptr;
+        switch (inst->getOp())
+        {
+        case kIROp_IntLit:
+        case kIROp_BoolLit:
+        case kIROp_FloatLit:
+            llvmValue = maybeEnsureConstant(inst);
+            break;
+        default:
+            SLANG_UNEXPECTED(
+                "Unsupported value type for LLVM target, or referring to an "
+                "instruction that hasn't been emitted yet!");
+            break;
+        }
+
+        SLANG_ASSERT(llvmValue);
+
+        if(llvmValue)
+            mapInstToLLVM[inst] = llvmValue;
+        return llvmValue;
+    }
+
+    // Caution! This is only for emitting things which are considered
+    // instructions in LLVM! It won't work for IRBlocks, IRFuncs & such.
+    llvm::Value* emitLLVMInstruction(IRInst* inst)
+    {
+        llvm::Value* llvmInst = nullptr;
+        switch (inst->getOp())
+        {
+        case kIROp_IntLit:
+        case kIROp_BoolLit:
+        case kIROp_FloatLit:
+            llvmInst = maybeEnsureConstant(inst);
+            break;
+
+        case kIROp_Return:
+            {
+                IRReturn* retInst = static_cast<IRReturn*>(inst);
+                auto retVal = retInst->getVal();
+                if (retVal->getOp() == kIROp_VoidLit)
+                {
+                    llvmInst = llvmBuilder.CreateRetVoid();
+                }
+                else
+                {
+                    llvmInst = llvmBuilder.CreateRet(findLLVMValue(retVal));
+                }
+            }
+            break;
+        default:
+            SLANG_UNEXPECTED("Unsupported instruction for LLVM target!");
+            break;
+        }
+
+        SLANG_ASSERT(llvmInst);
+
+        if(llvmInst)
+            mapInstToLLVM[inst] = llvmInst;
+        return llvmInst;
     }
 
     bool maybeGetName(llvm::StringRef* nameOut, IRInst* irInst)
@@ -246,15 +317,16 @@ struct LLVMEmitter
             break;
         default:
             SLANG_UNEXPECTED("Unsupported type for LLVM target!");
+            break;
         }
 
         mapTypeToLLVM[type] = llvmType;
         return llvmType;
     }
 
-    bool isExternallyVisible(IRFunc* func)
+    llvm::GlobalValue::LinkageTypes getLinkageType(IRInst* inst)
     {
-        for (auto decor : func->getDecorations())
+        for (auto decor : inst->getDecorations())
         {
             switch (decor->getOp())
             {
@@ -263,27 +335,26 @@ struct LLVMEmitter
             case kIROp_HLSLExportDecoration:
             case kIROp_DllExportDecoration:
                 {
-                    return true;
+                    return llvm::GlobalValue::ExternalLinkage;
                 }
             default:
                 break;
             }
         }
-        return false;
+        return llvm::GlobalValue::PrivateLinkage;
     }
 
-    llvm::Value* ensureFuncDecl(IRFunc* func)
+    llvm::Function* ensureFuncDecl(IRFunc* func)
     {
+        if (mapInstToLLVM.containsKey(func))
+            return llvm::cast<llvm::Function>(mapInstToLLVM.getValue(func));
+
         auto funcType = static_cast<IRFuncType*>(func->getDataType());
         llvm::FunctionType* llvmFuncType = llvm::cast<llvm::FunctionType>(ensureType(funcType));
 
-        auto linkageType = llvm::Function::PrivateLinkage;
-        if (isExternallyVisible(func))
-            linkageType = llvm::Function::ExternalLinkage;
-
         llvm::Function* llvmFunc = llvm::Function::Create(
             llvmFuncType,
-            linkageType,
+            getLinkageType(func),
             "", // Name is conditionally set below.
             llvmModule
         );
@@ -309,6 +380,85 @@ struct LLVMEmitter
         return llvmFunc;
     }
 
+    llvm::Constant* maybeEnsureConstant(IRInst* inst)
+    {
+        if (mapInstToLLVM.containsKey(inst))
+            return llvm::cast<llvm::Constant>(mapInstToLLVM.getValue(inst));
+
+        llvm::Constant* llvmConstant = nullptr;
+
+        switch (inst->getOp())
+        {
+        case kIROp_IntLit:
+        case kIROp_BoolLit:
+            {
+                auto litInst = static_cast<IRConstant*>(inst);
+                IRBasicType* type = as<IRBasicType>(inst->getDataType());
+                if (type)
+                {
+                    llvmConstant = llvm::ConstantInt::get(ensureType(type), litInst->value.intVal);
+                }
+                break;
+            }
+        case kIROp_FloatLit:
+            {
+                auto litInst = static_cast<IRConstant*>(inst);
+                IRBasicType* type = as<IRBasicType>(inst->getDataType());
+                if (type)
+                {
+                    llvmConstant = llvm::ConstantFP::get(ensureType(type), litInst->value.floatVal);
+                }
+            }
+            break;
+            // TODO: constant arrays, structs, vectors, matrices?
+        default:
+            break;
+        }
+
+        if (llvmConstant)
+            mapInstToLLVM[inst] = llvmConstant;
+        return llvmConstant;
+    }
+
+    llvm::Value* ensureGlobalVar(IRGlobalVar* var)
+    {
+        if (mapInstToLLVM.containsKey(var))
+            return mapInstToLLVM.getValue(var);
+
+        IRPtrType* ptrType = var->getDataType();
+        auto varType = ensureType(ptrType->getValueType());
+        // TODO: When is the global variable a constant?
+        llvm::GlobalVariable* llvmVar = new llvm::GlobalVariable(varType, false, getLinkageType(var));
+
+        if (auto firstBlock = var->getFirstBlock())
+        {
+            llvm::Constant* constantValue = nullptr;
+            if (auto returnInst = as<IRReturn>(firstBlock->getTerminator()))
+            {
+                // If the initializer is constant, we can emit that to the
+                // variable directly.
+                IRInst* val = returnInst->getVal();
+                constantValue = maybeEnsureConstant(val);
+            }
+
+            if (constantValue)
+                llvmVar->setInitializer(constantValue);
+            else
+            {
+                // TODO: Create a function that initializes the global variable,
+                // and append that to llvm.global_ctors.
+            }
+        }
+
+        llvm::StringRef name;
+        if (maybeGetName(&name, var))
+            llvmVar->setName(name);
+
+        llvmModule.insertGlobalVariable(llvmVar);
+        mapInstToLLVM[var] = llvmVar;
+        return llvmVar;
+    }
+
     void emitGlobalDeclarations(IRModule* irModule)
     {
         for (auto inst : irModule->getGlobalInsts())
@@ -316,6 +466,65 @@ struct LLVMEmitter
             if (auto func = as<IRFunc>(inst))
             {
                 ensureFuncDecl(func);
+            }
+            else if(auto globalVar = as<IRGlobalVar>(inst))
+            {
+                ensureGlobalVar(globalVar);
+            }
+        }
+    }
+
+    void emitFuncDefinition(IRFunc* func)
+    {
+        llvm::Function* llvmFunc = ensureFuncDecl(func);
+
+        // Create all blocks first
+        for (auto irBlock : func->getBlocks())
+        {
+            llvm::BasicBlock* llvmBlock = llvm::BasicBlock::Create(llvmContext, "", llvmFunc);
+            mapInstToLLVM[irBlock] = llvmBlock;
+        }
+
+        // Then, fill in the blocks. Lucky for us, there appears to basically be
+        // a 1:1 correspondence between Slang IR blocks and LLVM IR blocks, so
+        // this is straightforward.
+        for (auto irBlock : func->getBlocks())
+        {
+            llvm::BasicBlock* llvmBlock = llvm::cast<llvm::BasicBlock>(mapInstToLLVM.getValue(irBlock));
+            llvmBuilder.SetInsertPoint(llvmBlock);
+
+            // Insert block parameters as Phi nodes.
+            for (auto irParam : irBlock->getParams())
+            {
+                // TODO Create phi nodes. Can't set them yet, since the
+                // instructions they refer to haven't been created yet.
+            }
+
+            // Then, add the regular instructions.
+            for (auto irInst: irBlock->getOrdinaryInsts())
+            {
+                emitLLVMInstruction(irInst);
+            }
+        }
+
+        // Finally, fill in the Phi nodes.
+        for (auto irBlock : func->getBlocks())
+        {
+            for (auto irParam : irBlock->getParams())
+            {
+                // TODO Set phi nodes
+            }
+        }
+    }
+
+    void emitGlobalFunctions(IRModule* irModule)
+    {
+        for (auto inst : irModule->getGlobalInsts())
+        {
+            if (auto func = as<IRFunc>(inst))
+            {
+                if (isDefinition(func))
+                    emitFuncDefinition(func);
             }
         }
     }
@@ -325,6 +534,7 @@ struct LLVMEmitter
         // Start by emitting all function declarations, so that the functions
         // can freely refer to each other later on.
         emitGlobalDeclarations(irModule);
+        emitGlobalFunctions(irModule);
     }
 
     // Optimizes the LLVM IR and destroys mapInstToLLVM.
