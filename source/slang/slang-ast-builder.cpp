@@ -461,6 +461,18 @@ Type* ASTBuilder::getSpecializedBuiltinType(ArrayView<Val*> genericArgs, const c
     return rsType;
 }
 
+Type* ASTBuilder::getMagicEnumType(const char* magicEnumName)
+{
+    auto& cache = getSharedASTBuilder()->m_magicEnumTypes;
+    Type* res = nullptr;
+    if (!cache.tryGetValue(magicEnumName, res))
+    {
+        res = getSpecializedBuiltinType({}, magicEnumName);
+        cache.add(magicEnumName, res);
+    }
+    return res;
+}
+
 PtrType* ASTBuilder::getPtrType(Type* valueType, Val* accessQualifier, Val* addrSpace)
 {
     return dynamicCast<PtrType>(getPtrType(valueType, accessQualifier, addrSpace, "PtrType"));
@@ -545,8 +557,8 @@ PtrTypeBase* ASTBuilder::getPtrType(
     AddressSpace addrSpace,
     char const* ptrTypeName)
 {
-    Type* typeOfAccessQualifier = getSpecializedBuiltinType({}, "AccessQualifier");
-    Type* typeOfAddressSpace = getSpecializedBuiltinType({}, "AddressSpace");
+    Type* typeOfAccessQualifier = getMagicEnumType("AccessQualifier");
+    Type* typeOfAddressSpace = getMagicEnumType("AddressSpace");
     return as<PtrTypeBase>(getPtrType(
         valueType,
         getIntVal(typeOfAccessQualifier, (IntegerLiteralValue)accessQualifier),
