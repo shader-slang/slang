@@ -11,13 +11,11 @@ namespace Slang
 SlangResult emitLLVMAssemblyFromIR(
     CodeGenContext* codeGenContext,
     IRModule* irModule,
-    const List<IRFunc*>& irEntryPoints,
     String& assemblyOut);
 
 SlangResult emitLLVMObjectFromIR(
     CodeGenContext* codeGenContext,
     IRModule* irModule,
-    const List<IRFunc*>& irEntryPoints,
     List<uint8_t>& objectOut);
 
 } // namespace Slang
