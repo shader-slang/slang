@@ -38,7 +38,7 @@ jobs:
               compiler: gcc,
               build-slang-llvm: false,
             }
-          - { os: windows, runs-on: windows-latest, compiler: cl }
+          - { os: windows, runs-on: ["Windows", "self-hosted", "GCP-T4"], compiler: cl }
           - { os: macos, runs-on: macos-latest, compiler: clang }
 
           - { build-slang-llvm: false }
