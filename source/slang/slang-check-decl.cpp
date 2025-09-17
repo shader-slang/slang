@@ -372,7 +372,7 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
     bool validateGenericConstraintSubType(
         GenericTypeConstraintDecl* decl,
         TypeExp type,
-        bool diagnose);
+        DiagnosticSink* sink = nullptr);
 
     void checkForwardReferencesInGenericConstraint(GenericTypeConstraintDecl* decl);
 
@@ -3258,7 +3258,7 @@ bool isProperConstraineeType(Type* type)
 bool SemanticsDeclHeaderVisitor::validateGenericConstraintSubType(
     GenericTypeConstraintDecl* decl,
     TypeExp type,
-    bool diagnose)
+    DiagnosticSink* sink)
 {
     // Validate that the sub type of a constraint is in valid form.
     //
@@ -3278,8 +3278,8 @@ bool SemanticsDeclHeaderVisitor::validateGenericConstraintSubType(
             auto dependentGeneric = getShared()->getDependentGenericParent(subDeclRef);
             if (dependentGeneric.getDecl() != decl->parentDecl)
             {
-                if (diagnose)
-                    getSink()->diagnose(type.exp, Diagnostics::invalidConstraintSubType, type);
+                if (sink)
+                    sink->diagnose(type.exp, Diagnostics::invalidConstraintSubType, type);
                 return false;
             }
         }
@@ -3298,8 +3298,8 @@ bool SemanticsDeclHeaderVisitor::validateGenericConstraintSubType(
             auto lookupDeclRef = as<LookupDeclRef>(subDeclRef.declRefBase);
             if (!lookupDeclRef)
             {
-                if (diagnose)
-                    getSink()->diagnose(type.exp, Diagnostics::invalidConstraintSubType, type);
+                if (sink)
+                    sink->diagnose(type.exp, Diagnostics::invalidConstraintSubType, type);
                 return false;
             }
 
@@ -3313,20 +3313,20 @@ bool SemanticsDeclHeaderVisitor::validateGenericConstraintSubType(
             auto baseType = as<Type>(lookupDeclRef->getLookupSource());
             if (!baseType)
             {
-                if (diagnose)
-                    getSink()->diagnose(type.exp, Diagnostics::invalidConstraintSubType, type);
+                if (sink)
+                    sink->diagnose(type.exp, Diagnostics::invalidConstraintSubType, type);
                 return false;
             }
             type.type = baseType;
-            return validateGenericConstraintSubType(decl, type, diagnose);
+            return validateGenericConstraintSubType(decl, type, sink);
         }
     }
     if (!isProperConstraineeType(type.type))
     {
         // It is meaningless for certain types to be used in type constraints.
         // For example, `IFoo<T>` should not appear as the left-hand-side of a generic constraint.
-        if (diagnose)
-            getSink()->diagnose(type.exp, Diagnostics::invalidConstraintSubType, type);
+        if (sink)
+            sink->diagnose(type.exp, Diagnostics::invalidConstraintSubType, type);
         return false;
     }
     return true;
@@ -3460,7 +3460,7 @@ void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConst
             equalityCannon = checkGenericTypeEqualityCanonicalOrder(decl);
         }
 
-        bool validSub = validateGenericConstraintSubType(decl, decl->sub, true);
+        bool validSub = validateGenericConstraintSubType(decl, decl->sub, getSink());
         if (decl->isEqualityConstraint)
         {
             if (!validSub && !equalityCannon)
@@ -3495,8 +3495,8 @@ bool SemanticsDeclHeaderVisitor::checkGenericTypeEqualityCanonicalOrder(
 {
     auto compare = [&]() -> int
     {
-        bool subOk = validateGenericConstraintSubType(decl, decl->sub, false);
-        bool supOk = validateGenericConstraintSubType(decl, decl->sup, false);
+        bool subOk = validateGenericConstraintSubType(decl, decl->sub);
+        bool supOk = validateGenericConstraintSubType(decl, decl->sup);
 
         if (subOk != supOk) // Only one is qualified
         {
