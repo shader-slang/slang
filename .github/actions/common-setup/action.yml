@@ -26,7 +26,7 @@ runs:
     - name: Set up MSVC dev tools on Windows
       uses: ilammy/msvc-dev-cmd@v1
       with:
-        sdk: "10.0.26100.4654"
+        sdk: "10.0.26100.0"
 
     - name: Install dependencies (Linux only)
       shell: bash
