@@ -471,7 +471,7 @@ local insts = {
 	{ indexedFieldKey = { min_operands = 2, hoistable = true } },
 	-- A placeholder witness that ThisType implements the enclosing interface.
 	-- Used only in interface definitions.
-	{ thisTypeWitness = { min_operands = 1 } },
+	{ thisTypeWitness = { min_operands = 1, hoistable = true } },
 	-- A placeholder witness for the fact that two types are equal.
 	{ TypeEqualityWitness = { min_operands = 2, hoistable = true } },
 	{ global_hashed_string_literals = {} },

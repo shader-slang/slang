@@ -9410,13 +9410,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             context->astBuilder,
             createDefaultSpecializedDeclRef(subContext, nullptr, decl->getThisTypeDecl()));
         subContext->thisType = thisType;
-        {
-            IRBuilderInsertLocScope insertScope(subBuilder);
-            subBuilder->setInsertInto(subBuilder->getModule());
-            // Create a stand-in witness that represents `ThisType` conforms to the interface,
-            // and move it to global scope.
-            subContext->thisTypeWitness = subBuilder->createThisTypeWitness((IRType*)finalVal);
-        }
+        // Create a stand-in witness that represents `ThisType` conforms to the interface,
+        // and move it to global scope.
+        subContext->thisTypeWitness = subBuilder->createThisTypeWitness((IRType*)finalVal);
 
         // Lower associated types first, so they can be referred to when lowering functions.
         for (auto assocTypeDecl : decl->getMembersOfType<AssocTypeDecl>())
@@ -11834,31 +11830,62 @@ LoweredValInfo emitDeclRef(IRGenContext* context, Decl* decl, DeclRefBase* subst
             return lowerType(context, thisTypeSubst->getWitness()->getSub());
         }
 
-        // If we reach here, somebody is trying to look up an interface
-        // requirement "through" some concrete type. We need to lower this
-        // decl-ref as a lookup of the corresponding member in a witness
-        // table.
-        //
-        // The witness table itself is referenced by the this-type
-        // substitution, so we can just lower that.
-        //
-        // Note: unlike the case for generics above, in the interface-lookup
-        // case, we don't end up caring about any further outer substitutions.
-        // That is because even if we are naming `ISomething<Foo>.doIt()`,
-        // a method inside a generic interface, we don't actually care
-        // about the substitution of `Foo` for the parameter `T` of
-        // `ISomething<T>`. That is because we really care about the
-        // witness table for the concrete type that conforms to `ISomething<Foo>`.
-        //
-        auto irWitnessTable = lowerSimpleVal(context, thisTypeSubst->getWitness());
-        SLANG_RELEASE_ASSERT(irWitnessTable);
+        if (isInterfaceRequirement(decl))
+        {
+            // If we reach here, somebody is trying to look up an interface
+            // requirement "through" some concrete type. We need to lower this
+            // decl-ref as a lookup of the corresponding member in a witness
+            // table.
+            //
+            // The witness table itself is referenced by the this-type
+            // substitution, so we can just lower that.
+            //
+            // Note: unlike the case for generics above, in the interface-lookup
+            // case, we don't end up caring about any further outer substitutions.
+            // That is because even if we are naming `ISomething<Foo>.doIt()`,
+            // a method inside a generic interface, we don't actually care
+            // about the substitution of `Foo` for the parameter `T` of
+            // `ISomething<T>`. That is because we really care about the
+            // witness table for the concrete type that conforms to `ISomething<Foo>`.
+            //
+            auto irWitnessTable = lowerSimpleVal(context, thisTypeSubst->getWitness());
+            SLANG_RELEASE_ASSERT(irWitnessTable);
 
-        auto irRequirementKey = getInterfaceRequirementKey(context, decl);
-        auto irLookupWitness = context->irBuilder->emitLookupInterfaceMethodInst(
-            type,
-            irWitnessTable,
-            irRequirementKey);
-        return LoweredValInfo::simple(irLookupWitness);
+            auto irRequirementKey = getInterfaceRequirementKey(context, decl);
+            auto irLookupWitness = context->irBuilder->emitLookupInterfaceMethodInst(
+                type,
+                irWitnessTable,
+                irRequirementKey);
+            return LoweredValInfo::simple(irLookupWitness);
+        }
+        else
+        {
+            // This case is a reference to a member declaration of the interface
+            // (or added by an extension of the interface) that does *not*
+            // represent a requirement of the interface.
+            //
+            // Our policy is that concrete methods/members on an interface type
+            // are lowered as generics, where the generic parameter represents
+            // the `ThisType`.
+            //
+            auto genericVal = emitDeclRef(
+                context,
+                decl,
+                thisTypeSubst->getBase(),
+                context->irBuilder->getGenericKind());
+            auto irGenericVal = getSimpleVal(context, genericVal);
+
+            // In order to reference the member for a particular type, we
+            // specialize the generic for that type.
+            //
+            IRInst* irSubType = lowerType(context, thisTypeSubst->getWitness()->getSub());
+            IRInst* irSubTypeWitness = lowerSimpleVal(context, thisTypeSubst->getWitness());
+
+            IRInst* irSpecializeArgs[] = {irSubType, irSubTypeWitness};
+            auto irSpecializedVal =
+                context->irBuilder->emitSpecializeInst(type, irGenericVal, 2, irSpecializeArgs);
+            return LoweredValInfo::simple(irSpecializedVal);
+        }
     }
     else
     {
