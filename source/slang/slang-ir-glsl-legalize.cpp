@@ -4210,7 +4210,6 @@ void legalizeEntryPointForGLSL(
     }
 
     // Special handling for ray tracing shaders
-    bool isRayTracingShader = false;
     switch (stage)
     {
     case Stage::AnyHit:
@@ -4219,7 +4218,6 @@ void legalizeEntryPointForGLSL(
     case Stage::Intersection:
     case Stage::Miss:
     case Stage::RayGeneration:
-        isRayTracingShader = true;
         consolidateRayTracingParameters(&context, func);
         break;
     default:

@@ -1139,13 +1139,20 @@ LookupResult SemanticsVisitor::resolveOverloadedLookup(
     if (!inResult.isOverloaded())
         return inResult;
 
+    // If this is a lookup for a completion request token (to generate completion candidate list),
+    // don't apply expected-type filtering on the lookup result so we can report the entire
+    // candidate list in the language server.
+    bool shouldSkipCoercionFilter =
+        getLinkage()->contentAssistInfo.checkingMode == ContentAssistCheckingMode::Completion &&
+        inResult.getName() == getSession()->getCompletionRequestTokenName();
+
     // We are going to build up a list of items to return.
     List<LookupResultItem> items;
     for (auto item : inResult.items)
     {
         // First we check if the item is coercible to targetType.
         // And skip if it doesn't.
-        if (targetType)
+        if (targetType && !shouldSkipCoercionFilter)
         {
             auto declType = GetTypeForDeclRef(item.declRef, SourceLoc());
             if (!canCoerce(targetType, declType, nullptr, nullptr))
@@ -1186,9 +1193,12 @@ LookupResult SemanticsVisitor::resolveOverloadedLookup(
     // The resulting `items` list should be all those items
     // that were neither better nor worse than one another.
     //
-    // There should always be at least one such item.
+    // If no candidates are passing coercion check, return unresolved lookup result
+    // and leave downstream logic to diagnose and error.
     //
-    SLANG_ASSERT(items.getCount() != 0);
+
+    if (items.getCount() == 0)
+        return inResult;
 
     LookupResult result;
     for (auto item : items)

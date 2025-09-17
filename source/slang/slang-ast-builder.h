@@ -110,6 +110,7 @@ protected:
     Type* m_noneType = nullptr;
     Type* m_diffInterfaceType = nullptr;
     Type* m_builtinTypes[Index(BaseType::CountOf)];
+    Dictionary<String, Type*> m_magicEnumTypes;
 
     Dictionary<String, Decl*> m_magicDecls;
     Dictionary<BuiltinRequirementKind, Decl*> m_builtinRequirementDecls;
@@ -512,6 +513,8 @@ public:
 
     Type* getSpecializedBuiltinType(Type* typeParam, const char* magicTypeName);
     Type* getSpecializedBuiltinType(ArrayView<Val*> genericArgs, const char* magicTypeName);
+
+    Type* getMagicEnumType(const char* magicEnumName);
 
     Type* getDefaultLayoutType();
     Type* getDefaultPushConstantLayoutType();
