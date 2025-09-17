@@ -76,6 +76,7 @@ static bool _isSubCommand(const char* arg)
         "  -verbose-paths                 Use verbose paths in output\n"
         "  -category <name>               Only run tests in specified category\n"
         "  -exclude <name>                Exclude tests in specified category\n"
+        "  -exclude-prefix <prefix>       Exclude tests with specified path prefix\n"
         "  -api <expr>                    Enable specific APIs (e.g., 'vk+dx12' or '+dx11')\n"
         "  -synthesizedTestApi <expr>     Set APIs for synthesized tests\n"
         "  -skip-api-detection            Skip API availability detection\n"
@@ -356,6 +357,18 @@ static bool _isSubCommand(const char* arg)
             {
                 optionsOut->excludeCategories.add(category, category);
             }
+        }
+        else if (strcmp(arg, "-exclude-prefix") == 0)
+        {
+            if (argCursor == argEnd)
+            {
+                stdError.print("error: expected operand for '%s'\n", arg);
+                showHelp(stdError);
+                return SLANG_FAIL;
+            }
+            Slang::StringBuilder sb;
+            Slang::Path::simplify(*argCursor++, Slang::Path::SimplifyStyle::NoRoot, sb);
+            optionsOut->excludePrefixes.add(sb);
         }
         else if (strcmp(arg, "-api") == 0)
         {

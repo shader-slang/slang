@@ -4766,6 +4766,15 @@ static bool shouldRunTest(TestContext* context, String filePath)
     if (!endsWithAllowedExtension(context, filePath))
         return false;
 
+    // Check exclude prefixes first - if any match, skip the test
+    for (auto& excludePrefix : context->options.excludePrefixes)
+    {
+        if (filePath.startsWith(excludePrefix))
+        {
+            return false;
+        }
+    }
+
     if (!context->options.testPrefixes.getCount())
     {
         return true;
