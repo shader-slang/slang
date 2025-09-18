@@ -215,13 +215,12 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
 
         # Tools
         if(NOT SLANG_OVERRIDE_SPIRV_TOOLS_PATH)
-            add_subdirectory(spirv-tools EXCLUDE_FROM_ALL ${system})
+            add_subdirectory(spirv-tools EXCLUDE_FROM_ALL)
         else()
             add_subdirectory(
                 ${SLANG_OVERRIDE_SPIRV_TOOLS_PATH}/spirv-tools
                 spirv-tools
                 EXCLUDE_FROM_ALL
-                ${system}
             )
         endif()
     endif()
