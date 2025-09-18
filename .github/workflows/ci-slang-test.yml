@@ -44,9 +44,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: "recursive"
-          fetch-depth: "2"
 
       - name: Common Test Setup
         uses: ./.github/actions/common-test-setup
@@ -57,7 +54,6 @@ jobs:
           config: ${{ inputs.config }}
 
       - name: Test Slang
-        if: inputs.platform != 'wasm'
         run: |
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
@@ -66,14 +62,18 @@ jobs:
           fi
           # Build common slang-test arguments
           slang_test_args=(
-            "-use-test-server"
-            "-server-count" "${{ inputs.server-count }}"
             "-category" "${{ inputs.test-category }}"
             "-expected-failure-list" "tests/expected-failure-github.txt"
             "-skip-reference-image-generation"
             "-show-adapter-info"
             "-enable-debug-layers" "${{ inputs.enable-debug-layers }}"
           )
+
+          # Add test server arguments only if server count > 1
+          if [ "${{ inputs.server-count }}" -gt 1 ]; then
+            slang_test_args+=("-use-test-server")
+            slang_test_args+=("-server-count" "${{ inputs.server-count }}")
+          fi
 
           # Add no-GPU failure list for non-GPU tests
           if [[ "${{ inputs.full-gpu-tests }}" != "true" ]]; then
@@ -84,7 +84,7 @@ jobs:
           "$bin_dir/slang-test" "${slang_test_args[@]}"
       - name: Run Slang examples
         # Run GLSL backend tests on release for pull requests, and not on merge_group, to reduce CI load.
-        if: inputs.platform != 'wasm' && inputs.full-gpu-tests && inputs.config == 'release' && github.event_name == 'pull_request'
+        if: inputs.full-gpu-tests && inputs.config == 'release' && github.event_name == 'pull_request'
         run: |
           .github/workflows/ci-examples.sh \
            --bin-dir "$bin_dir" \
@@ -93,12 +93,11 @@ jobs:
            --config "${{ inputs.config }}" \
            --skip-file tests/expected-example-failure-github.txt
       - name: Run slangc tests
-        if: inputs.platform != 'wasm'
         run: |
           PATH=$bin_dir:$PATH tools/slangc-test/test.sh
       - name: Test Slang via glsl
         # Run GLSL backend tests on release for pull requests, and not on merge_group, to reduce CI load.
-        if: inputs.platform != 'wasm' && inputs.os != 'macos' && inputs.full-gpu-tests && inputs.config == 'release' && github.event_name == 'pull_request'
+        if: inputs.os != 'macos' && inputs.full-gpu-tests && inputs.config == 'release' && github.event_name == 'pull_request'
         run: |
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
@@ -112,8 +111,14 @@ jobs:
             -skip-reference-image-generation \
             -show-adapter-info
 
+  # Run slang-rhi tests when:
+  # 1. full-gpu-tests is enabled AND
+  # 2. Either it's a pull request OR config is release
+  # This is to reduce the CI load but do some check on pull requests.
+  # expensive slang-rhi tests are excluded with -tce option, because they are not relevant for Slang.
   test-slang-rhi:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
+    if: inputs.full-gpu-tests && (github.event_name == 'pull_request' || inputs.config == 'release')
     defaults:
       run:
         shell: bash
@@ -122,7 +127,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: "recursive"
-          fetch-depth: "2"
+          fetch-depth: "1"
 
       - name: Common Test Setup
         uses: ./.github/actions/common-test-setup
@@ -133,9 +138,6 @@ jobs:
           config: ${{ inputs.config }}
 
       - name: Run slang-rhi tests
-        # Run slang-rhi tests on debug+release for pull requests, and only on release for merge_group, to reduce CI load.
-        # Some of the expensive tests that are not relevant for Slang (because they just test graphics API related things) are excluded using -tce.
-        if: inputs.platform != 'wasm' && inputs.full-gpu-tests && (github.event_name == 'pull_request' || inputs.config == 'release')
         run: |
           export SLANG_RHI_EXCLUDE_TESTS="md-clear*,cmd-copy*,cmd-upload*,fence*,staging-heap*,texture-create*"
           if [[ "${{ inputs.os }}" == "macos" ]]; then
@@ -143,17 +145,19 @@ jobs:
           fi
           "$bin_dir/slang-rhi-tests" -check-devices -tce="$SLANG_RHI_EXCLUDE_TESTS"
 
+  # Run slangpy tests when:
+  # 1. full-gpu-tests is enabled AND
+  # 2. Either it's a pull request OR config is release
+  # This is to reduce the CI load but do some check on pull requests.
   test-slangpy:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
+    if: inputs.full-gpu-tests && (github.event_name == 'pull_request' || inputs.config == 'release')
     defaults:
       run:
         shell: bash
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: "recursive"
-          fetch-depth: "2"
 
       - name: Common Test Setup
         uses: ./.github/actions/common-test-setup
@@ -163,9 +167,13 @@ jobs:
           platform: ${{ inputs.platform }}
           config: ${{ inputs.config }}
 
+      - name: Setup Python
+        if: ${{ runner.environment != 'self-hosted' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
       - name: Run slangpy tests
-        # Run slangpy tests on debug+release for pull requests, and only on release for merge_group, to reduce CI load.
-        if: inputs.platform != 'wasm' && inputs.full-gpu-tests && (github.event_name == 'pull_request' || inputs.config == 'release')
         run: |
           python --version
           echo "Cleaning up existing installations and installing slangpy..."
@@ -191,21 +199,19 @@ jobs:
           echo "Listing files in slangpy directory..."
           ls -la "$SITE_PACKAGES/slangpy/"
 
-          echo "Installing python packages..."
-
-          # Only install additional packages on GitHub-hosted runners, not self-hosted
-          if [[ "${{ inputs.runs-on }}" != *"self-hosted"* ]]; then
-            # Download and install requirements from slangpy repository
-            echo "Fetching requirements-dev.txt from slangpy repository..."
+          # Skip package installation on self-hosted runners to avoid permission issues
+          if [[ ! "${{ inputs.runs-on }}" =~ self-hosted ]]; then
+            echo "Installing python packages..."
             curl -fsSL https://raw.githubusercontent.com/shader-slang/slangpy/main/requirements-dev.txt -o requirements-dev.txt
-            
-            echo "Installing development requirements..."
-            python -m pip install -r requirements-dev.txt
-            python -m pip install pytest-github-actions-annotate-failures
+            python -m pip install -r requirements-dev.txt --user
+            python -m pip install pytest-github-actions-annotate-failures --user
+            python -m pip install pytest-xdist --user
           else
-            echo "Skipping additional package installation on self-hosted runner"
+            echo "Skipping Python package installation on self-hosted runner"
+            # TODO: remove this once we have pytest-xdist installed on all self-hosted runners
+            python -m pip install pytest-xdist --user
           fi
 
           echo "Running pytest on slangpy tests..."
           export PYTHONPATH="$SITE_PACKAGES"
-          python -m pytest "$SITE_PACKAGES/slangpy/tests" -ra
+          python -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n auto --maxprocesses=4

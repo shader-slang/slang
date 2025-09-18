@@ -3516,6 +3516,21 @@ SLANG_API SlangReflectionModifier* spReflectionFunction_FindModifier(
     return spReflectionVariable_FindModifier(varRefl, modifierID);
 }
 
+SLANG_API SlangReflectionModifier* spReflectionDecl_findModifier(
+    SlangReflectionDecl* decl,
+    SlangModifierID modifierID)
+{
+    Decl* slangDecl = (Decl*)decl;
+    if (!slangDecl)
+        return nullptr;
+
+    auto varRefl = convert(DeclRef<Decl>(slangDecl));
+    if (!varRefl)
+        return nullptr;
+
+    return spReflectionVariable_FindModifier(varRefl, modifierID);
+}
+
 SLANG_API unsigned int spReflectionFunction_GetUserAttributeCount(SlangReflectionFunction* inFunc)
 {
     auto func = convertToFunc(inFunc);
