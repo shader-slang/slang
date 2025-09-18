@@ -274,6 +274,18 @@ struct LLVMEmitter
         return nullptr;
     }
 
+    std::size_t findStructKeyIndex(IRStructType* irStruct, IRStructKey* irKey)
+    {
+        std::size_t index = 0;
+        for (auto field : irStruct->getFields())
+        {
+            if(field->getKey() == irKey)
+                return index;
+            index++;
+        }
+        SLANG_UNEXPECTED("Requested key that doesn't exist in struct!");
+    }
+
     // Caution! This is only for emitting things which are considered
     // instructions in LLVM! It won't work for IRBlocks, IRFuncs & such.
     llvm::Value* emitLLVMInstruction(IRInst* inst)
@@ -397,6 +409,45 @@ struct LLVMEmitter
                 {
                     llvmInst = llvmBuilder.CreateInsertValue(llvmInst, findValue(inst->getOperand(aa)), aa);
                 }
+            }
+            break;
+
+        case kIROp_FieldExtract:
+            {
+                auto fieldExtractInst = static_cast<IRFieldExtract*>(inst);
+                auto structType = as<IRStructType>(fieldExtractInst->getBase()->getDataType());
+                auto llvmBase = findValue(fieldExtractInst->getBase());
+                unsigned idx = findStructKeyIndex(structType, as<IRStructKey>(fieldExtractInst->getField()));
+                llvmInst = llvmBuilder.CreateExtractValue(llvmBase, idx);
+            }
+            break;
+
+        case kIROp_FieldAddress:
+            {
+                auto fieldAddressInst = static_cast<IRFieldAddress*>(inst);
+                auto base = fieldAddressInst->getBase();
+                auto key = as<IRStructKey>(fieldAddressInst->getField());
+
+                IRStructType* baseStructType = nullptr;
+                if (auto ptrLikeType = as<IRPointerLikeType>(base->getDataType()))
+                {
+                    baseStructType = as<IRStructType>(ptrLikeType->getElementType());
+                }
+                else if (auto ptrType = as<IRPtrTypeBase>(base->getDataType()))
+                {
+                    baseStructType = as<IRStructType>(ptrType->getValueType());
+                }
+
+                std::size_t index = findStructKeyIndex(baseStructType, key);
+
+                auto llvmStructType = ensureType(baseStructType);
+                auto llvmBase = findValue(base);
+                llvm::Value* idx[2] = {
+                    llvmBuilder.getInt32(0),
+                    llvmBuilder.getInt32(index)
+                };
+
+                llvmInst = llvmBuilder.CreateGEP(llvmStructType, llvmBase, idx);
             }
             break;
 
