@@ -78,23 +78,9 @@ void makeFuncReturnViaOutParam(IRBuilder& builder, IRFunc* func)
     }
 }
 
-void legalizeArrayReturnType(IRModule* module, CodeGenTarget target)
+void legalizeArrayReturnType(IRModule* module)
 {
     IRBuilder builder(module);
-
-    // Check if the target supports CoopVec natively
-    bool targetSupportsCoopVec = false;
-    switch (target)
-    {
-    case CodeGenTarget::SPIRV:
-    case CodeGenTarget::CUDASource:
-    case CodeGenTarget::PTX:
-        targetSupportsCoopVec = true;
-        break;
-    default:
-        targetSupportsCoopVec = false;
-        break;
-    }
 
     for (auto inst : module->getGlobalInsts())
     {
@@ -117,11 +103,9 @@ void legalizeArrayReturnType(IRModule* module, CodeGenTarget target)
                     }
                 }
 
-                // Only apply the transformation to genuine ArrayType returns.
-                // For CoopVectorType arrays, skip transformation only if the target supports
-                // CoopVec natively
-                bool shouldSkip = isOriginallyCoopVectorType && targetSupportsCoopVec;
-                if (!shouldSkip)
+                // Only apply the transformation to genuine ArrayType returns,
+                // not to those that were originally CoopVectorType
+                if (!isOriginallyCoopVectorType)
                 {
                     makeFuncReturnViaOutParam(builder, func);
                 }
