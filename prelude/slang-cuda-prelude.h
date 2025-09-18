@@ -4955,3 +4955,112 @@ _slang_waveClusteredRotate(bool4 value, unsigned int delta, unsigned int cluster
 }
 
 #undef SLANG_WAVE_CLUSTERED_ROTATE_IMPL
+
+// ---------------------- OptiX Cooperative Vector Wrappers --------------------------------------
+#ifdef SLANG_CUDA_ENABLE_OPTIX
+
+// Template metaprogramming for Slang enum to OptiX constant conversion
+template<unsigned SlangEnum>
+struct SlangToOptixComponentType {
+    static constexpr OptixCoopVecElemType value = OPTIX_COOP_VEC_ELEM_TYPE_FLOAT32; // Default
+};
+
+template<> struct SlangToOptixComponentType<0> { static constexpr OptixCoopVecElemType value = OPTIX_COOP_VEC_ELEM_TYPE_FLOAT8_E4M3; }; // FloatE4M3
+template<> struct SlangToOptixComponentType<1> { static constexpr OptixCoopVecElemType value = OPTIX_COOP_VEC_ELEM_TYPE_FLOAT8_E5M2; }; // FloatE5M2
+template<> struct SlangToOptixComponentType<2> { static constexpr OptixCoopVecElemType value = OPTIX_COOP_VEC_ELEM_TYPE_FLOAT16; };    // Float16
+template<> struct SlangToOptixComponentType<3> { static constexpr OptixCoopVecElemType value = OPTIX_COOP_VEC_ELEM_TYPE_FLOAT32; };    // Float32
+template<> struct SlangToOptixComponentType<5> { static constexpr OptixCoopVecElemType value = OPTIX_COOP_VEC_ELEM_TYPE_INT8; };      // SignedInt8
+template<> struct SlangToOptixComponentType<7> { static constexpr OptixCoopVecElemType value = OPTIX_COOP_VEC_ELEM_TYPE_INT32; };     // SignedInt32
+template<> struct SlangToOptixComponentType<10> { static constexpr OptixCoopVecElemType value = OPTIX_COOP_VEC_ELEM_TYPE_UINT8; };   // UnsignedInt8
+template<> struct SlangToOptixComponentType<12> { static constexpr OptixCoopVecElemType value = OPTIX_COOP_VEC_ELEM_TYPE_UINT32; };  // UnsignedInt32
+
+template<unsigned SlangEnum>
+struct SlangToOptixMatrixLayout {
+    static constexpr OptixCoopVecMatrixLayout value = OPTIX_COOP_VEC_MATRIX_LAYOUT_ROW_MAJOR; // Default
+};
+
+template<> struct SlangToOptixMatrixLayout<0> { static constexpr OptixCoopVecMatrixLayout value = OPTIX_COOP_VEC_MATRIX_LAYOUT_ROW_MAJOR; };        // RowMajor
+template<> struct SlangToOptixMatrixLayout<1> { static constexpr OptixCoopVecMatrixLayout value = OPTIX_COOP_VEC_MATRIX_LAYOUT_COLUMN_MAJOR; };     // ColumnMajor
+template<> struct SlangToOptixMatrixLayout<2> { static constexpr OptixCoopVecMatrixLayout value = OPTIX_COOP_VEC_MATRIX_LAYOUT_INFERENCING_OPTIMAL; }; // InferencingOptimal
+template<> struct SlangToOptixMatrixLayout<3> { static constexpr OptixCoopVecMatrixLayout value = OPTIX_COOP_VEC_MATRIX_LAYOUT_TRAINING_OPTIMAL; };    // TrainingOptimal
+
+// Template trait to extract vector size from OptixCoopVec<T, N>
+template<typename T>
+struct OptixCoopVecTraits;
+
+template<typename T, unsigned N>
+struct OptixCoopVecTraits<OptixCoopVec<T, N>> {
+    static constexpr unsigned size = N;
+};
+
+// Fully generic templated OptiX cooperative vector matrix multiplication wrapper
+template<typename VecTOut, typename VecTIn,
+         unsigned inputInterpretation, unsigned matrixInterpretation, unsigned matrixLayout>
+__forceinline__ __device__ VecTOut slangOptixCoopVecMatMul(
+    const VecTIn& inputVector,
+    CUdeviceptr matrix,
+    unsigned matrixOffset,
+    bool transpose,
+    unsigned matrixStride)
+{
+    // Extract vector dimensions using template metaprogramming - no hardcoding!
+    constexpr unsigned N = OptixCoopVecTraits<VecTOut>::size;  // Output vector size
+    constexpr unsigned K = OptixCoopVecTraits<VecTIn>::size;   // Input vector size
+
+    // Use template metaprogramming to convert enum values to OptiX constants at compile time
+    return optixCoopVecMatMul<VecTOut, VecTIn,
+                             SlangToOptixComponentType<inputInterpretation>::value,
+                             SlangToOptixMatrixLayout<matrixLayout>::value,
+                             false, N, K,
+                             SlangToOptixComponentType<matrixInterpretation>::value>
+                             (inputVector, matrix, matrixOffset, matrixStride);
+}
+
+// OptiX cooperative vector matrix multiplication wrapper (WITH bias - 6 runtime params)
+template<typename VecTOut, typename VecTIn,
+         unsigned inputInterpretation, unsigned matrixInterpretation, unsigned matrixLayout, unsigned biasInterpretation>
+__forceinline__ __device__ VecTOut slangOptixCoopVecMatMul(
+    const VecTIn& inputVector,
+    CUdeviceptr matrix,
+    unsigned matrixOffset,
+    CUdeviceptr bias,
+    unsigned biasOffset,
+    unsigned matrixStride)
+{
+    // Extract vector dimensions using template metaprogramming - no hardcoding!
+    constexpr unsigned N = OptixCoopVecTraits<VecTOut>::size;  // Output vector size
+    constexpr unsigned K = OptixCoopVecTraits<VecTIn>::size;   // Input vector size
+
+    // Call OptiX SDK with bias (6 runtime parameters)
+    return optixCoopVecMatMul<VecTOut, VecTIn,
+                             SlangToOptixComponentType<inputInterpretation>::value,
+                             SlangToOptixMatrixLayout<matrixLayout>::value,
+                             false, N, K,
+                             SlangToOptixComponentType<matrixInterpretation>::value,
+                             SlangToOptixComponentType<biasInterpretation>::value>
+                             (inputVector, matrix, matrixOffset, bias, biasOffset, matrixStride);
+}
+
+// OptiX cooperative vector matrix multiplication wrapper (WITHOUT bias, 4 runtime params - StructuredBuffer variant)
+template<typename VecTOut, typename VecTIn,
+         unsigned inputInterpretation, unsigned matrixInterpretation, unsigned matrixLayout>
+__forceinline__ __device__ VecTOut slangOptixCoopVecMatMul(
+    const VecTIn& inputVector,
+    CUdeviceptr matrix,
+    unsigned matrixOffset,
+    unsigned matrixStride)
+{
+    // Extract vector dimensions using template metaprogramming - no hardcoding!
+    constexpr unsigned N = OptixCoopVecTraits<VecTOut>::size;  // Output vector size
+    constexpr unsigned K = OptixCoopVecTraits<VecTIn>::size;   // Input vector size
+
+    // Call OptiX SDK without bias and without transpose (4 runtime parameters)
+    return optixCoopVecMatMul<VecTOut, VecTIn,
+                             SlangToOptixComponentType<inputInterpretation>::value,
+                             SlangToOptixMatrixLayout<matrixLayout>::value,
+                             false, N, K,
+                             SlangToOptixComponentType<matrixInterpretation>::value>
+                             (inputVector, matrix, matrixOffset, matrixStride);
+}
+
+#endif // SLANG_CUDA_ENABLE_OPTIX

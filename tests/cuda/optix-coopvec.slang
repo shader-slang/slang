@@ -7,6 +7,7 @@
 // CHECK-PTX: _optix_vector_op1_16xi32
 // CHECK-PTX: _optix_vector_op2_16xi32
 // CHECK-PTX: _optix_vector_op3_16xi32
+// CHECK-PTX: _optix_matvecmul_16xi32
 // CHECK-PTX: _optix_outer_product_accumulate_16xi32
 // CHECK-PTX: _optix_reduce_sum_accumulate_16xi32
 // CHECK-PTX: add.f32
@@ -16,6 +17,7 @@
 // CHECK: optixCoopVecAdd
 // CHECK: optixCoopVecCvt
 // CHECK: optixCoopVecFFMA
+// CHECK: slangOptixCoopVecMatMul
 // CHECK: optixCoopVecMax
 // CHECK: optixCoopVecMin
 // CHECK: optixCoopVecMul
@@ -54,6 +56,24 @@ RWByteAddressBuffer outputMat2;
 
 //TEST_INPUT:ubuffer(data=[5 6 7 8], stride=4),name=bias
 ByteAddressBuffer bias;
+
+//TEST_INPUT:ubuffer(data=[67305985 134678021 202050057 269422093], stride=4),name=matrixSimple
+//[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16] - simple 4x4 matrix for coopVecMatMul test
+ByteAddressBuffer matrixSimple;
+
+//TEST_INPUT:ubuffer(data=[16909060 33752068 50595076 67438084], stride=4),name=biasSimple
+//[4 3 2 1 4 3 2 1 4 3 2 1 4 3 2 1] - simple bias vector for coopVecMatMul with bias test
+ByteAddressBuffer biasSimple;
+
+//TEST_INPUT:ubuffer(data=[67305985 134678021 202050057 269422093], stride=4),name=matrixStructured
+//[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16] - StructuredBuffer matrix to test MatMul_4 path
+StructuredBuffer<float> matrixStructured;
+
+//TEST_INPUT:ubuffer(data=[16909060 33752068 50595076 67438084], stride=4),name=biasStructured
+//[4 3 2 1 4 3 2 1 4 3 2 1 4 3 2 1] - StructuredBuffer bias to test MatMul_5 path
+StructuredBuffer<float> biasStructured;
+
+
 
 struct RayPayload
 {
@@ -95,7 +115,61 @@ void closestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
         false,
         4
     );
-    
+
+    // Test coopVecMatMul (without bias addition)
+    CoopVec<float, 4> resultMatMul = coopVecMatMul<float, 4, 4>(
+        vec,
+        CoopVecComponentType::Float32,
+        matrixSimple,
+        0,
+        CoopVecComponentType::Float32,
+        CoopVecMatrixLayout::RowMajor,
+        false,
+        4
+    );
+
+    // Test coopVecMatMul with different matrix interpretation (shows enum genericity)
+    CoopVec<float, 4> resultMatMulInt8 = coopVecMatMul<float, 4, 4>(
+        vec,
+        CoopVecComponentType::Float32,
+        matrixSimple,
+        0,
+        CoopVecComponentType::SignedInt8,
+        CoopVecMatrixLayout::RowMajor,
+        false,
+        4
+    );
+
+    // TEST CASES TO EXERCISE MatMul_4 and MatMul_5 paths
+    // These should trigger the StructuredBuffer function variants
+
+    // Test case for MatMul_4 path (StructuredBuffer without bias)
+    CoopVec<float, 4> resultMatMulStructured = coopVecMatMul<float, 4, 4>(
+        vec,
+        CoopVecComponentType::Float32,
+        matrixStructured,  // StructuredBuffer<float> instead of ByteAddressBuffer
+        0,
+        CoopVecComponentType::Float32,
+        CoopVecMatrixLayout::RowMajor,
+        false,
+        4
+    );
+
+    // Test case for MatMul_5 path (StructuredBuffer with bias)
+    CoopVec<float, 4> resultMatMulAddStructured = coopVecMatMulAdd<float, 4, 4>(
+        vec,
+        CoopVecComponentType::Float32,
+        matrixStructured,  // StructuredBuffer<float> matrix
+        0,
+        CoopVecComponentType::Float32,
+        biasStructured,    // StructuredBuffer<float> bias
+        0,
+        CoopVecComponentType::Float32,
+        CoopVecMatrixLayout::ColumnMajor,  // Different layout for variety
+        false,
+        4
+    );
+
     CoopVec<float, 4> resultMax = max(vec1, vec2);
     CoopVec<float, 4> resultMin = min(vec1, vec2);
     
@@ -134,6 +208,10 @@ void closestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
                           resultCopy[i] +
                           resultFMA[i]  +
                           resultMul[i]  +
+                          resultMatMul[i] +
+                          resultMatMulInt8[i] +
+                          resultMatMulStructured[i] +
+                          resultMatMulAddStructured[i] +
                           resultMax[i]  +
                           resultMin[i]  +
                           resultVecMul[i] +
