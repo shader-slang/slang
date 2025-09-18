@@ -4,6 +4,7 @@
 #
 
 glob_append(prelude_headers "*-prelude.h")
+glob_append(prelude_headers "*-prelude.ll")
 
 set(prelude_source)
 foreach(input ${prelude_headers})
@@ -32,7 +33,9 @@ slang_add_target(
         ${CMAKE_CURRENT_LIST_DIR}/../include
     EXPORT_TYPE_AS ${SLANG_LIB_TYPE}
     LINK_WITH_PRIVATE unordered_dense::unordered_dense
-    PUBLIC_HEADERS ${CMAKE_CURRENT_LIST_DIR}/slang*.h
+    PUBLIC_HEADERS
+        ${CMAKE_CURRENT_LIST_DIR}/slang*.h
+        ${CMAKE_CURRENT_LIST_DIR}/slang*.ll
     # It's an object library, so the install step only installs the headers
     INSTALL
     FOLDER generated

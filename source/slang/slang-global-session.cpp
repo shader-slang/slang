@@ -18,6 +18,7 @@
 extern Slang::String get_slang_cuda_prelude();
 extern Slang::String get_slang_cpp_prelude();
 extern Slang::String get_slang_hlsl_prelude();
+extern Slang::String get_slang_llvm_prelude();
 
 namespace Slang
 {
@@ -120,6 +121,7 @@ void Session::init()
     m_languagePreludes[Index(SourceLanguage::CUDA)] = get_slang_cuda_prelude();
     m_languagePreludes[Index(SourceLanguage::CPP)] = get_slang_cpp_prelude();
     m_languagePreludes[Index(SourceLanguage::HLSL)] = get_slang_hlsl_prelude();
+    m_languagePreludes[Index(SourceLanguage::LLVM)] = get_slang_llvm_prelude();
 
     if (!spirvCoreGrammarInfo)
         spirvCoreGrammarInfo = SPIRVCoreGrammarInfo::getEmbeddedVersion();

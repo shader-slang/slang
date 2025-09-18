@@ -1,6 +1,7 @@
 #include "slang-emit-llvm.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
+#include <llvm/AsmParser/Parser.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
@@ -9,6 +10,7 @@
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Module.h>
+#include <llvm/IR/ModuleSummaryIndex.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/MC/TargetRegistry.h>
 #include <llvm/Passes/PassBuilder.h>
@@ -77,6 +79,7 @@ struct LLVMEmitter
     llvm::LLVMContext llvmContext;
     llvm::IRBuilder<> llvmBuilder;
     llvm::Module llvmModule;
+    llvm::ModuleSummaryIndex llvmPreludeSummaryIndex;
 
     // The LLVM value class is closest to Slang's IRInst, as it can represent
     // constants, instructions and functions, whereas llvm::Instruction only
@@ -87,13 +90,29 @@ struct LLVMEmitter
     CodeGenContext* codeGenContext;
 
     LLVMEmitter(CodeGenContext* codeGenContext)
-        : llvmBuilder(llvmContext), llvmModule("module", llvmContext), codeGenContext(codeGenContext)
+        : llvmBuilder(llvmContext), llvmModule("module", llvmContext),
+          llvmPreludeSummaryIndex(true),
+          codeGenContext(codeGenContext)
     {
+        auto session = codeGenContext->getSession();
+        String prelude = session->getPreludeForLanguage(SourceLanguage::LLVM);
+
         llvm::InitializeAllTargetInfos();
         llvm::InitializeAllTargets();
         llvm::InitializeAllTargetMCs();
         llvm::InitializeAllAsmParsers();
         llvm::InitializeAllAsmPrinters();
+
+        llvm::SMDiagnostic diag;
+        // TODO: Override the datalayout?
+        llvm::MemoryBufferRef buf(
+            llvm::StringRef(prelude.begin(), prelude.getLength()),
+            llvm::StringRef("prelude")
+        );
+        if(llvm::parseAssemblyInto(buf, &llvmModule, &llvmPreludeSummaryIndex, diag))
+        {
+            SLANG_UNEXPECTED("Failed to parse LLVM prelude!");
+        }
     }
 
     ~LLVMEmitter()
@@ -113,6 +132,7 @@ struct LLVMEmitter
         case kIROp_IntLit:
         case kIROp_BoolLit:
         case kIROp_FloatLit:
+        case kIROp_StringLit:
             llvmValue = maybeEnsureConstant(inst);
             break;
         default:
@@ -264,6 +284,7 @@ struct LLVMEmitter
         case kIROp_IntLit:
         case kIROp_BoolLit:
         case kIROp_FloatLit:
+        case kIROp_StringLit:
             llvmInst = maybeEnsureConstant(inst);
             break;
 
@@ -326,9 +347,10 @@ struct LLVMEmitter
             }
             break;
 
+        case kIROp_Loop:
         case kIROp_UnconditionalBranch:
             {
-                auto branch = static_cast<IRUnconditionalBranch*>(inst);
+                auto branch = as<IRUnconditionalBranch>(inst);
                 auto llvmTarget = llvm::cast<llvm::BasicBlock>(findValue(branch->getTargetBlock()));
                 llvmInst = llvmBuilder.CreateBr(llvmTarget);
             }
@@ -362,6 +384,47 @@ struct LLVMEmitter
                 auto llvmPtr = findValue(loadInst->getPtr());
                 // TODO: isVolatile
                 llvmInst = llvmBuilder.CreateLoad(llvmType, llvmPtr);
+            }
+            break;
+
+        case kIROp_Call:
+            {
+                auto callInst = static_cast<IRCall*>(inst);
+                auto llvmFunc = llvm::cast<llvm::Function>(findValue(callInst->getCallee()));
+
+                List<llvm::Value*> args;
+
+                for(IRInst* arg : callInst->getArgsList())
+                {
+                    args.add(findValue(arg));
+                }
+
+                llvmInst = llvmBuilder.CreateCall(llvmFunc, llvm::ArrayRef(args.begin(), args.end()));
+            }
+            break;
+
+        case kIROp_Printf:
+            {
+                // This function comes from the prelude.
+                auto llvmFunc = cast<llvm::Function>(llvmModule.getNamedValue("printf"));
+                SLANG_ASSERT(llvmFunc);
+
+                List<llvm::Value*> args;
+                args.add(findValue(inst->getOperand(0)));
+                if (inst->getOperandCount() == 2)
+                {
+                    auto operand = inst->getOperand(1);
+                    if (auto makeStruct = as<IRMakeStruct>(operand))
+                    {
+                        // Flatten the tuple resulting from the variadic pack.
+                        for (UInt bb = 0; bb < makeStruct->getOperandCount(); ++bb)
+                        {
+                            args.add(findValue(makeStruct->getOperand(bb)));
+                        }
+                    }
+                }
+
+                llvmInst = llvmBuilder.CreateCall(llvmFunc, llvm::ArrayRef(args.begin(), args.end()));
             }
             break;
 
@@ -621,6 +684,17 @@ struct LLVMEmitter
                 }
             }
             break;
+        case kIROp_StringLit:
+            {
+                auto litInst = static_cast<IRConstant*>(inst);
+                llvmConstant = llvmBuilder.CreateGlobalString(
+                    llvm::StringRef(
+                        litInst->getStringSlice().begin(),
+                        litInst->getStringSlice().getLength()
+                    )
+                );
+            }
+            break;
             // TODO: constant arrays, structs, vectors, matrices?
         default:
             break;
@@ -878,16 +952,17 @@ struct LLVMEmitter
     {
         // TODO: Take the target triple as a parameter to allow
         // cross-compilation.
-        std::string target_triple = llvm::sys::getDefaultTargetTriple();
+        std::string target_triple_str = llvm::sys::getDefaultTargetTriple();
         std::string error;
-        const llvm::Target* target = llvm::TargetRegistry::lookupTarget(target_triple, error);
+        const llvm::Target* target = llvm::TargetRegistry::lookupTarget(target_triple_str, error);
         if (!target)
         {
-            codeGenContext->getSink()->diagnose(SourceLoc(), Diagnostics::unrecognizedTargetTriple, target_triple.c_str(), error.c_str());
+            codeGenContext->getSink()->diagnose(SourceLoc(), Diagnostics::unrecognizedTargetTriple, target_triple_str.c_str(), error.c_str());
             return;
         }
 
         llvm::TargetOptions opt;
+        llvm::Triple target_triple(target_triple_str);
         llvm::TargetMachine* target_machine = target->createTargetMachine(target_triple, "generic", "", opt, llvm::Reloc::PIC_);
         SLANG_DEFER(delete target_machine);
 
