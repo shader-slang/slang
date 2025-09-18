@@ -214,6 +214,9 @@ static void processInst(IRInst* inst, DiagnosticSink* sink)
     case kIROp_Leq:
         legalizeBinaryOp(inst, sink, CodeGenTarget::Metal);
         break;
+    case kIROp_MeshOutputRef:
+        sink->diagnose(getDiagnosticPos(inst), Diagnostics::assignToRefNotSupported);
+        break;
     case kIROp_MetalCastToDepthTexture:
         {
             // If the operand is already a depth texture, don't do anything.
