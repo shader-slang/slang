@@ -387,6 +387,19 @@ struct LLVMEmitter
             }
             break;
 
+        case kIROp_MakeArray:
+        case kIROp_MakeStruct:
+            {
+                auto llvmType = ensureType(inst->getDataType());
+
+                llvmInst = llvm::PoisonValue::get(llvmType);
+                for (UInt aa = 0; aa < inst->getOperandCount(); ++aa)
+                {
+                    llvmInst = llvmBuilder.CreateInsertValue(llvmInst, findValue(inst->getOperand(aa)), aa);
+                }
+            }
+            break;
+
         case kIROp_Call:
             {
                 auto callInst = static_cast<IRCall*>(inst);
