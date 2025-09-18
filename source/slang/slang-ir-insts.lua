@@ -659,6 +659,17 @@ local insts = {
 			{ atomicDec = { min_operands = 1 } },
 		},
 	},
+	-- CoherentOperations
+	{
+		CoherentOperation = {
+			{
+				CoherentLoad = { min_operands = 3 },
+			},
+			{
+				CoherentStore = { min_operands = 4 },
+			},
+		},
+	},
 	-- Produced and removed during backward auto-diff pass as a temporary placeholder representing the
 	-- currently accumulated derivative to pass to some dOut argument in a nested call.
 	{ LoadReverseGradient = { min_operands = 1 } },
