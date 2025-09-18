@@ -11700,7 +11700,10 @@ static void _addFlattenedTupleArgs(List<IRInst*>& ioArgs, IRInst* val)
     }
 }
 
-static IRInst* maybeCloneThisTypeWitness(IRGenContext* context, IRInst* thisTypeWitness)
+static IRInst* maybeCloneThisTypeWitness(
+    IRGenContext* context,
+    IRInst* thisTypeWitness,
+    Type* thisType)
 {
     auto currentInsertLoc = context->irBuilder->getInsertLoc().getParent();
     auto parentOfThisTypeWitness = thisTypeWitness->parent;
@@ -11716,10 +11719,11 @@ static IRInst* maybeCloneThisTypeWitness(IRGenContext* context, IRInst* thisType
         currentInsertLoc = currentInsertLoc->parent;
     }
 
-    // If the scope of insert location is not dominated by scope of ThisTypeWitness, we will
-    // need to copy the inst locally.
-    IRCloneEnv cloneEnv;
-    auto newThisTypeWitness = cloneInst(&cloneEnv, context->irBuilder, thisTypeWitness);
+    auto thisTypeIR = as<IRThisType>(lowerType(context, thisType));
+    SLANG_RELEASE_ASSERT(thisTypeIR);
+
+    auto newThisTypeWitness =
+        context->irBuilder->createThisTypeWitness((IRType*)thisTypeIR->getConstraintType());
     return newThisTypeWitness;
 }
 
@@ -11874,7 +11878,10 @@ LoweredValInfo emitDeclRef(IRGenContext* context, Decl* decl, DeclRefBase* subst
             auto irWitnessTable = lowerSimpleVal(context, thisTypeSubst->getWitness());
             SLANG_RELEASE_ASSERT(irWitnessTable);
 
-            irWitnessTable = maybeCloneThisTypeWitness(context, irWitnessTable);
+            irWitnessTable = maybeCloneThisTypeWitness(
+                context,
+                irWitnessTable,
+                thisTypeSubst->getLookupSource());
             // Copy ThisTypeWitness locally if necessary
             auto irRequirementKey = getInterfaceRequirementKey(context, decl);
             auto irLookupWitness = context->irBuilder->emitLookupInterfaceMethodInst(
