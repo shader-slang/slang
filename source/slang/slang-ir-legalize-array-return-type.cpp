@@ -80,8 +80,7 @@ void makeFuncReturnViaOutParam(IRBuilder& builder, IRFunc* func)
 
 static bool targetSupportsCoopVec(CodeGenTarget target)
 {
-    return target == CodeGenTarget::SPIRV ||
-           target == CodeGenTarget::CUDASource ||
+    return target == CodeGenTarget::SPIRV || target == CodeGenTarget::CUDASource ||
            target == CodeGenTarget::PTX;
 }
 
