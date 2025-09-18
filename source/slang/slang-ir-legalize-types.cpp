@@ -2386,7 +2386,25 @@ static LegalVal legalizeInst(IRTypeLegalizationContext* context, IRInst* inst)
     for (UInt aa = 0; aa < argCount; ++aa)
     {
         auto oldArg = inst->getOperand(aa);
-        auto legalArg = legalizeOperand(context, oldArg);
+        
+        LegalVal legalArg;
+        // Special handling for type operands
+        if (as<IRType>(oldArg))
+        {
+            // e.g. ParameterBlock<Struct>, the inst. ParameterBlockType holds the operand `StructType`,
+            // if we don't legalize it here and the same structType is legalized somewhere else, the operand of
+            // ParameterBlockType might not get updated, and it would result in a type mismatch.
+            auto legalType = legalizeType(context, as<IRType>(oldArg));
+            if (legalType.flavor == LegalType::Flavor::simple)
+                legalArg = LegalVal::simple(legalType.getSimple());
+            else
+                legalArg = LegalVal::simple(oldArg); // fallback for complex types
+        }
+        else
+        {
+            legalArg = legalizeOperand(context, oldArg);
+        }
+        
         legalArgs.add(legalArg);
 
         if (legalArg.flavor != LegalVal::Flavor::simple)
