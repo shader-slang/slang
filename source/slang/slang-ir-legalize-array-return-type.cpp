@@ -78,55 +78,35 @@ void makeFuncReturnViaOutParam(IRBuilder& builder, IRFunc* func)
     }
 }
 
+static bool targetSupportsCoopVec(CodeGenTarget target)
+{
+    return target == CodeGenTarget::SPIRV ||
+           target == CodeGenTarget::CUDASource ||
+           target == CodeGenTarget::PTX;
+}
+
+static bool isCoopVecArray(IRType* type)
+{
+    if (auto nameDecoration = type->findDecoration<IRNameHintDecoration>())
+        return nameDecoration->getName() == "CoopVec";
+    return false;
+}
+
 void legalizeArrayReturnType(IRModule* module, CodeGenTarget target)
 {
     IRBuilder builder(module);
 
-    // Check if the target supports CoopVec natively
-    bool targetSupportsCoopVec = false;
-    switch (target)
-    {
-    case CodeGenTarget::SPIRV:
-    case CodeGenTarget::CUDASource:
-    case CodeGenTarget::PTX:
-        targetSupportsCoopVec = true;
-        break;
-    default:
-        targetSupportsCoopVec = false;
-        break;
-    }
-
     for (auto inst : module->getGlobalInsts())
     {
-        if (auto func = as<IRFunc>(inst))
-        {
-            auto resultType = func->getResultType();
-            auto opcode = resultType->getOp();
+        auto func = as<IRFunc>(inst);
+        if (!func || func->getResultType()->getOp() != kIROp_ArrayType)
+            continue;
 
-            if (opcode == kIROp_ArrayType)
-            {
-                // Check if this ArrayType was originally a CoopVectorType
-                // The lowering pass adds a "CoopVec" name hint to such types
-                bool isOriginallyCoopVectorType = false;
-                if (auto nameDecoration = resultType->findDecoration<IRNameHintDecoration>())
-                {
-                    auto name = nameDecoration->getName();
-                    if (name == "CoopVec")
-                    {
-                        isOriginallyCoopVectorType = true;
-                    }
-                }
+        // Skip CoopVec arrays on targets that support them natively
+        if (isCoopVecArray(func->getResultType()) && targetSupportsCoopVec(target))
+            continue;
 
-                // Only apply the transformation to genuine ArrayType returns.
-                // For CoopVectorType arrays, skip transformation only if the target supports
-                // CoopVec natively
-                bool shouldSkip = isOriginallyCoopVectorType && targetSupportsCoopVec;
-                if (!shouldSkip)
-                {
-                    makeFuncReturnViaOutParam(builder, func);
-                }
-            }
-        }
+        makeFuncReturnViaOutParam(builder, func);
     }
 }
 } // namespace Slang
