@@ -657,57 +657,75 @@ IArtifact* ComponentType::getTargetArtifact(Int targetIndex, slang::IBlob** outD
     {
         return artifact.get();
     }
-
-    // If the user hasn't specified any entry points, then we should
-    // discover all entrypoints that are defined in linked modules, and
-    // include all of them in the compile.
-    //
-    if (getEntryPointCount() == 0)
+    try
     {
-        List<Module*> modules;
-        this->enumerateModules([&](Module* module) { modules.add(module); });
-        List<RefPtr<ComponentType>> components;
-        components.add(this);
-        bool entryPointsDiscovered = false;
-        for (auto module : modules)
+        // If the user hasn't specified any entry points, then we should
+        // discover all entrypoints that are defined in linked modules, and
+        // include all of them in the compile.
+        //
+        if (getEntryPointCount() == 0)
         {
-            for (auto entryPoint : module->getEntryPoints())
+            List<Module*> modules;
+            this->enumerateModules([&](Module* module) { modules.add(module); });
+            List<RefPtr<ComponentType>> components;
+            components.add(this);
+            bool entryPointsDiscovered = false;
+            for (auto module : modules)
             {
-                components.add(entryPoint);
-                entryPointsDiscovered = true;
+                for (auto entryPoint : module->getEntryPoints())
+                {
+                    components.add(entryPoint);
+                    entryPointsDiscovered = true;
+                }
+            }
+
+            // If any entry points were discovered, then we should emit the program with entrypoints
+            // linked.
+            if (entryPointsDiscovered)
+            {
+                RefPtr<CompositeComponentType> composite =
+                    new CompositeComponentType(linkage, components);
+                ComPtr<IComponentType> linkedComponentType;
+                SLANG_RETURN_NULL_ON_FAIL(
+                    composite->link(linkedComponentType.writeRef(), outDiagnostics));
+                auto targetArtifact = static_cast<ComponentType*>(linkedComponentType.get())
+                                          ->getTargetArtifact(targetIndex, outDiagnostics);
+                if (targetArtifact)
+                {
+                    m_targetArtifacts[targetIndex] = targetArtifact;
+                }
+                return targetArtifact;
             }
         }
 
-        // If any entry points were discovered, then we should emit the program with entrypoints
-        // linked.
-        if (entryPointsDiscovered)
-        {
-            RefPtr<CompositeComponentType> composite =
-                new CompositeComponentType(linkage, components);
-            ComPtr<IComponentType> linkedComponentType;
-            SLANG_RETURN_NULL_ON_FAIL(
-                composite->link(linkedComponentType.writeRef(), outDiagnostics));
-            auto targetArtifact = static_cast<ComponentType*>(linkedComponentType.get())
-                                      ->getTargetArtifact(targetIndex, outDiagnostics);
-            if (targetArtifact)
-            {
-                m_targetArtifacts[targetIndex] = targetArtifact;
-            }
-            return targetArtifact;
-        }
+        auto target = linkage->targets[targetIndex];
+        auto targetProgram = getTargetProgram(target);
+
+        DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
+        applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
+        applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
+
+        IArtifact* targetArtifact = targetProgram->getOrCreateWholeProgramResult(&sink);
+        sink.getBlobIfNeeded(outDiagnostics);
+        m_targetArtifacts[targetIndex] = ComPtr<IArtifact>(targetArtifact);
+        return targetArtifact;
     }
-
-    auto target = linkage->targets[targetIndex];
-    auto targetProgram = getTargetProgram(target);
-
-    DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
-    applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
-    applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
-
-    IArtifact* targetArtifact = targetProgram->getOrCreateWholeProgramResult(&sink);
-    sink.getBlobIfNeeded(outDiagnostics);
-    m_targetArtifacts[targetIndex] = ComPtr<IArtifact>(targetArtifact);
-    return targetArtifact;
+    catch (const Exception& e)
+    {
+        if (outDiagnostics && !*outDiagnostics)
+        {
+            DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
+            applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
+            applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
+            sink.diagnose(
+                SourceLoc(),
+                Diagnostics::compilationAbortedDueToException,
+                typeid(e).name(),
+                e.Message);
+            sink.getBlobIfNeeded(outDiagnostics);
+        }
+        return nullptr;
+    }
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL

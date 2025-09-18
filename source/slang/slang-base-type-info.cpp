@@ -84,12 +84,6 @@ namespace Slang
         return UnownedStringSlice::fromLiteral("intptr_t");
     case BaseType::UIntPtr:
         return UnownedStringSlice::fromLiteral("uintptr_t");
-    case BaseType::AddressSpace:
-        return UnownedStringSlice::fromLiteral("AddressSpace");
-    case BaseType::MemoryScope:
-        return UnownedStringSlice::fromLiteral("MemoryScope");
-    case BaseType::AccessQualifier:
-        return UnownedStringSlice::fromLiteral("Access");
     default:
         {
             SLANG_ASSERT(!"Unknown basic type");

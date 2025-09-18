@@ -2922,13 +2922,6 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 
     if (auto elementType = getConstantBufferElementType(varDecl->getType()))
     {
-        if (doesTypeHaveTag(elementType, TypeTag::Incomplete))
-        {
-            getSink()->diagnose(
-                varDecl->type.exp->loc,
-                Diagnostics::incompleteTypeCannotBeUsedInBuffer,
-                elementType);
-        }
         if (doesTypeHaveTag(elementType, TypeTag::Unsized))
         {
             // If the element type is unsized, it can only be an array of resource types that we can
@@ -2945,17 +2938,6 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
                     trailingArrayType);
                 getSink()->diagnose(varDecl->loc, Diagnostics::seeConstantBufferDefinition);
             }
-        }
-    }
-    else if (varDecl->findModifier<HLSLUniformModifier>())
-    {
-        auto varType = varDecl->getType();
-        if (doesTypeHaveTag(varType, TypeTag::Incomplete))
-        {
-            getSink()->diagnose(
-                varDecl->type.exp->loc,
-                Diagnostics::incompleteTypeCannotBeUsedInUniformParameter,
-                varType);
         }
     }
     maybeRegisterDifferentiableType(getASTBuilder(), varDecl->getType());

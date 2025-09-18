@@ -2402,7 +2402,32 @@ struct ByteAddressBuffer
 };
 
 // https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/sm5-object-rwbyteaddressbuffer
-// Missing support for Atomic operations
+// Atomic operations support
+
+// Signed 64-bit atomic wrappers
+// CUDA only supports unsigned long long atomics, so we cast signed to unsigned
+__device__ __forceinline__ long long atomicExch(long long* address, long long val)
+{
+    return (long long)atomicExch((unsigned long long*)address, (unsigned long long)val);
+}
+
+__device__ __forceinline__ long long atomicCAS(long long* address, long long compare, long long val)
+{
+    return (long long)atomicCAS(
+        (unsigned long long*)address,
+        (unsigned long long)compare,
+        (unsigned long long)val);
+}
+
+// Float bitwise atomic compare-and-swap
+// Uses integer atomics to preserve exact float bit patterns
+__device__ __forceinline__ float atomicCAS(float* address, float compare, float val)
+{
+    int* addr_as_int = (int*)address;
+    int old = atomicCAS(addr_as_int, __float_as_int(compare), __float_as_int(val));
+    return __int_as_float(old);
+}
+
 // Missing support for Load with status
 struct RWByteAddressBuffer
 {
@@ -4207,6 +4232,10 @@ slangOptixHitObjectSetSbtRecordIndex(OptixTraversableHandle* Obj, uint sbtRecord
     optixHitObjectSetSbtRecordIndex(sbtRecordIndex); // returns void
     return sbtRecordIndex;
 }
+#else
+// Define OptixTraversableHandle even if OptiX is not enabled.
+// This allows RaytracingAccelerationStructure to be properly reflected in non-OptiX code.
+typedef unsigned long long OptixTraversableHandle;
 #endif
 static const int kSlangTorchTensorMaxDim = 5;
 
@@ -4715,3 +4744,214 @@ tex2DArrayfetch_int(CUtexObject texObj, int x, int y, int layer)
         : "l"(texObj), "r"(x), "r"(y), "r"(layer), "r"(layer));
     return make_int4(result_x, result_y, result_z, result_w);
 }
+
+// Wave rotate helper functions - templated approach
+#define SLANG_WARP_FULL_MASK 0xFFFFFFFF
+
+// Macro-based wave rotate implementation following codebase patterns
+#define SLANG_WAVE_ROTATE_IMPL(T)                                                     \
+    __device__ __forceinline__ T##2 _slang_waveRotate(T##2 value, unsigned int delta) \
+    {                                                                                 \
+        return make_##T##2(                                                           \
+            (T)__shfl_sync(                                                           \
+                SLANG_WARP_FULL_MASK,                                                 \
+                value.x,                                                              \
+                (_getLaneId() + delta) % SLANG_CUDA_WARP_SIZE),                       \
+            (T)__shfl_sync(                                                           \
+                SLANG_WARP_FULL_MASK,                                                 \
+                value.y,                                                              \
+                (_getLaneId() + delta) % SLANG_CUDA_WARP_SIZE));                      \
+    }                                                                                 \
+    __device__ __forceinline__ T##3 _slang_waveRotate(T##3 value, unsigned int delta) \
+    {                                                                                 \
+        return make_##T##3(                                                           \
+            (T)__shfl_sync(                                                           \
+                SLANG_WARP_FULL_MASK,                                                 \
+                value.x,                                                              \
+                (_getLaneId() + delta) % SLANG_CUDA_WARP_SIZE),                       \
+            (T)__shfl_sync(                                                           \
+                SLANG_WARP_FULL_MASK,                                                 \
+                value.y,                                                              \
+                (_getLaneId() + delta) % SLANG_CUDA_WARP_SIZE),                       \
+            (T)__shfl_sync(                                                           \
+                SLANG_WARP_FULL_MASK,                                                 \
+                value.z,                                                              \
+                (_getLaneId() + delta) % SLANG_CUDA_WARP_SIZE));                      \
+    }                                                                                 \
+    __device__ __forceinline__ T##4 _slang_waveRotate(T##4 value, unsigned int delta) \
+    {                                                                                 \
+        return make_##T##4(                                                           \
+            (T)__shfl_sync(                                                           \
+                SLANG_WARP_FULL_MASK,                                                 \
+                value.x,                                                              \
+                (_getLaneId() + delta) % SLANG_CUDA_WARP_SIZE),                       \
+            (T)__shfl_sync(                                                           \
+                SLANG_WARP_FULL_MASK,                                                 \
+                value.y,                                                              \
+                (_getLaneId() + delta) % SLANG_CUDA_WARP_SIZE),                       \
+            (T)__shfl_sync(                                                           \
+                SLANG_WARP_FULL_MASK,                                                 \
+                value.z,                                                              \
+                (_getLaneId() + delta) % SLANG_CUDA_WARP_SIZE),                       \
+            (T)__shfl_sync(                                                           \
+                SLANG_WARP_FULL_MASK,                                                 \
+                value.w,                                                              \
+                (_getLaneId() + delta) % SLANG_CUDA_WARP_SIZE));                      \
+    }
+
+// Generate wave rotate functions for all standard vector types
+SLANG_WAVE_ROTATE_IMPL(uint)
+SLANG_WAVE_ROTATE_IMPL(int)
+SLANG_WAVE_ROTATE_IMPL(float)
+SLANG_WAVE_ROTATE_IMPL(short)
+SLANG_WAVE_ROTATE_IMPL(ushort)
+SLANG_WAVE_ROTATE_IMPL(char)
+SLANG_WAVE_ROTATE_IMPL(uchar)
+SLANG_WAVE_ROTATE_IMPL(longlong)
+SLANG_WAVE_ROTATE_IMPL(ulonglong)
+
+#ifdef SLANG_CUDA_ENABLE_HALF
+SLANG_WAVE_ROTATE_IMPL(__half)
+#endif
+
+// Special handling for boolean vectors (requires int conversion)
+__device__ __forceinline__ bool2 _slang_waveRotate(bool2 value, unsigned int delta)
+{
+    int2 intValue = make_int2((int)value.x, (int)value.y);
+    int2 result = _slang_waveRotate(intValue, delta);
+    return make_bool2((bool)result.x, (bool)result.y);
+}
+
+__device__ __forceinline__ bool3 _slang_waveRotate(bool3 value, unsigned int delta)
+{
+    int3 intValue = make_int3((int)value.x, (int)value.y, (int)value.z);
+    int3 result = _slang_waveRotate(intValue, delta);
+    return make_bool3((bool)result.x, (bool)result.y, (bool)result.z);
+}
+
+__device__ __forceinline__ bool4 _slang_waveRotate(bool4 value, unsigned int delta)
+{
+    int4 intValue = make_int4((int)value.x, (int)value.y, (int)value.z, (int)value.w);
+    int4 result = _slang_waveRotate(intValue, delta);
+    return make_bool4((bool)result.x, (bool)result.y, (bool)result.z, (bool)result.w);
+}
+
+#undef SLANG_WAVE_ROTATE_IMPL
+
+// Quad control operations for CUDA
+__device__ __forceinline__ bool _slang_quadAny(bool expr)
+{
+    // Get values from all 4 lanes in the quad
+    bool v0 = __shfl_sync(0xFFFFFFFF, expr, (_getLaneId() & 0xFFFFFFFC) | 0);
+    bool v1 = __shfl_sync(0xFFFFFFFF, expr, (_getLaneId() & 0xFFFFFFFC) | 1);
+    bool v2 = __shfl_sync(0xFFFFFFFF, expr, (_getLaneId() & 0xFFFFFFFC) | 2);
+    bool v3 = __shfl_sync(0xFFFFFFFF, expr, (_getLaneId() & 0xFFFFFFFC) | 3);
+    return v0 || v1 || v2 || v3;
+}
+
+__device__ __forceinline__ bool _slang_quadAll(bool expr)
+{
+    // Get values from all 4 lanes in the quad
+    bool v0 = __shfl_sync(0xFFFFFFFF, expr, (_getLaneId() & 0xFFFFFFFC) | 0);
+    bool v1 = __shfl_sync(0xFFFFFFFF, expr, (_getLaneId() & 0xFFFFFFFC) | 1);
+    bool v2 = __shfl_sync(0xFFFFFFFF, expr, (_getLaneId() & 0xFFFFFFFC) | 2);
+    bool v3 = __shfl_sync(0xFFFFFFFF, expr, (_getLaneId() & 0xFFFFFFFC) | 3);
+    return v0 && v1 && v2 && v3;
+}
+
+// Clustered wave rotate operations for CUDA
+// Clustered rotate rotates values within clusters of specified size
+#define SLANG_WAVE_CLUSTERED_ROTATE_IMPL(T)                                                       \
+    __device__ __forceinline__ T                                                                  \
+    _slang_waveClusteredRotate(T value, unsigned int delta, unsigned int clusterSize)             \
+    {                                                                                             \
+        unsigned int laneId = _getLaneId();                                                       \
+        unsigned int clusterStart = (laneId / clusterSize) * clusterSize;                         \
+        unsigned int targetLane = clusterStart + ((laneId - clusterStart + delta) % clusterSize); \
+        return __shfl_sync(SLANG_WARP_FULL_MASK, value, targetLane);                              \
+    }                                                                                             \
+    __device__ __forceinline__                                                                    \
+        T##2 _slang_waveClusteredRotate(T##2 value, unsigned int delta, unsigned int clusterSize) \
+    {                                                                                             \
+        unsigned int laneId = _getLaneId();                                                       \
+        unsigned int clusterStart = (laneId / clusterSize) * clusterSize;                         \
+        unsigned int targetLane = clusterStart + ((laneId - clusterStart + delta) % clusterSize); \
+        return make_##T##2(                                                                       \
+            (T)__shfl_sync(SLANG_WARP_FULL_MASK, value.x, targetLane),                            \
+            (T)__shfl_sync(SLANG_WARP_FULL_MASK, value.y, targetLane));                           \
+    }                                                                                             \
+    __device__ __forceinline__                                                                    \
+        T##3 _slang_waveClusteredRotate(T##3 value, unsigned int delta, unsigned int clusterSize) \
+    {                                                                                             \
+        unsigned int laneId = _getLaneId();                                                       \
+        unsigned int clusterStart = (laneId / clusterSize) * clusterSize;                         \
+        unsigned int targetLane = clusterStart + ((laneId - clusterStart + delta) % clusterSize); \
+        return make_##T##3(                                                                       \
+            (T)__shfl_sync(SLANG_WARP_FULL_MASK, value.x, targetLane),                            \
+            (T)__shfl_sync(SLANG_WARP_FULL_MASK, value.y, targetLane),                            \
+            (T)__shfl_sync(SLANG_WARP_FULL_MASK, value.z, targetLane));                           \
+    }                                                                                             \
+    __device__ __forceinline__                                                                    \
+        T##4 _slang_waveClusteredRotate(T##4 value, unsigned int delta, unsigned int clusterSize) \
+    {                                                                                             \
+        unsigned int laneId = _getLaneId();                                                       \
+        unsigned int clusterStart = (laneId / clusterSize) * clusterSize;                         \
+        unsigned int targetLane = clusterStart + ((laneId - clusterStart + delta) % clusterSize); \
+        return make_##T##4(                                                                       \
+            (T)__shfl_sync(SLANG_WARP_FULL_MASK, value.x, targetLane),                            \
+            (T)__shfl_sync(SLANG_WARP_FULL_MASK, value.y, targetLane),                            \
+            (T)__shfl_sync(SLANG_WARP_FULL_MASK, value.z, targetLane),                            \
+            (T)__shfl_sync(SLANG_WARP_FULL_MASK, value.w, targetLane));                           \
+    }
+
+// Generate clustered wave rotate functions for all standard types
+SLANG_WAVE_CLUSTERED_ROTATE_IMPL(uint)
+SLANG_WAVE_CLUSTERED_ROTATE_IMPL(int)
+SLANG_WAVE_CLUSTERED_ROTATE_IMPL(float)
+SLANG_WAVE_CLUSTERED_ROTATE_IMPL(short)
+SLANG_WAVE_CLUSTERED_ROTATE_IMPL(ushort)
+SLANG_WAVE_CLUSTERED_ROTATE_IMPL(char)
+SLANG_WAVE_CLUSTERED_ROTATE_IMPL(uchar)
+SLANG_WAVE_CLUSTERED_ROTATE_IMPL(longlong)
+SLANG_WAVE_CLUSTERED_ROTATE_IMPL(ulonglong)
+
+#ifdef SLANG_CUDA_ENABLE_HALF
+SLANG_WAVE_CLUSTERED_ROTATE_IMPL(__half)
+#endif
+
+// Special handling for boolean clustered rotate
+__device__ __forceinline__ bool _slang_waveClusteredRotate(
+    bool value,
+    unsigned int delta,
+    unsigned int clusterSize)
+{
+    int intValue = (int)value;
+    int result = _slang_waveClusteredRotate(intValue, delta, clusterSize);
+    return (bool)result;
+}
+
+__device__ __forceinline__ bool2
+_slang_waveClusteredRotate(bool2 value, unsigned int delta, unsigned int clusterSize)
+{
+    int2 intValue = make_int2((int)value.x, (int)value.y);
+    int2 result = _slang_waveClusteredRotate(intValue, delta, clusterSize);
+    return make_bool2((bool)result.x, (bool)result.y);
+}
+
+__device__ __forceinline__ bool3
+_slang_waveClusteredRotate(bool3 value, unsigned int delta, unsigned int clusterSize)
+{
+    int3 intValue = make_int3((int)value.x, (int)value.y, (int)value.z);
+    int3 result = _slang_waveClusteredRotate(intValue, delta, clusterSize);
+    return make_bool3((bool)result.x, (bool)result.y, (bool)result.z);
+}
+
+__device__ __forceinline__ bool4
+_slang_waveClusteredRotate(bool4 value, unsigned int delta, unsigned int clusterSize)
+{
+    int4 intValue = make_int4((int)value.x, (int)value.y, (int)value.z, (int)value.w);
+    int4 result = _slang_waveClusteredRotate(intValue, delta, clusterSize);
+    return make_bool4((bool)result.x, (bool)result.y, (bool)result.z, (bool)result.w);
+}
+
+#undef SLANG_WAVE_CLUSTERED_ROTATE_IMPL

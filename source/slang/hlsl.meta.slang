@@ -1064,7 +1064,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [ForceInline]
     __glsl_extension(GL_ARB_sparse_texture_clamp)
     [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_clamp_fragment)]
-    T Sample(vector<float, Shape.dimensions+isArray> location, vector<int, Shape.planeDimensions> offset, float clamp)
+    T Sample(vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, float clamp)
     {
         __requireComputeDerivative();
         __target_switch
@@ -1091,7 +1091,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    T Sample(vector<float, Shape.dimensions+isArray> location, vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
+    T Sample(vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
         __requireComputeDerivative();
         __target_switch
@@ -3135,7 +3135,7 @@ vector<T.Element,4> __texture_gather_offset(
     _Texture<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
     SamplerState s,
     vector<float, Shape.dimensions+isArray> location,
-    constexpr vector<int, Shape.planeDimensions> offset,
+    vector<int, Shape.planeDimensions> offset,
     int component)
 {
     __target_switch
@@ -3196,7 +3196,7 @@ __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCo
 vector<T.Element,4> __texture_gather_offset(
     _Texture<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler,
     vector<float, Shape.dimensions+isArray> location,
-    constexpr vector<int, Shape.planeDimensions> offset,
+    vector<int, Shape.planeDimensions> offset,
     int component)
 {
     __target_switch
@@ -3340,7 +3340,7 @@ vector<T.Element,4> __texture_gatherCmp_offset(
     SamplerComparisonState s,
     vector<float, Shape.dimensions+isArray> location,
     T.Element compareValue,
-    constexpr vector<int, Shape.planeDimensions> offset)
+    vector<int, Shape.planeDimensions> offset)
 {
     __target_switch
     {
@@ -3386,7 +3386,7 @@ vector<T.Element,4> __texture_gatherCmp_offset(
     _Texture<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler,
     vector<float, Shape.dimensions+isArray> location,
     T.Element compareValue,
-    constexpr vector<int, Shape.planeDimensions> offset)
+    vector<int, Shape.planeDimensions> offset)
 {
     __target_switch
     {
@@ -3480,23 +3480,31 @@ ${{{{
         const char* componentArg = (isShadow ? "" : componentArgString[componentId]);
 }}}}
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv_wgsl, texture_gather)]
+    [require(cuda_glsl_hlsl_metal_spirv_wgsl, texture_gather)]
     vector<T.Element,4> Gather$(compareFunc)$(componentFunc)(
         $(samplerParam)
         vector<float, Shape.dimensions+isArray> location
         $(compareParam))
     {
-        static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
-            "Gather is supported only for 2D and 3D textures");
-
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".Gather$(compareFunc)$(componentFunc)";
+        case hlsl: 
+            static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
+                "Gather is supported only for 2D and 3D textures");
+            __intrinsic_asm ".Gather$(compareFunc)$(componentFunc)";
+        case cuda:
+            static_assert(Shape.flavor == $(SLANG_TEXTURE_2D), "CUDA Gather is supported only for 2D textures");
+            static_assert(isArray == 0, "CUDA Gather does not support texture arrays");
+            __intrinsic_asm "tex2Dgather<$T0>($0, ($2).x, ($2).y$(componentArg))";
         case metal:
         case wgsl:
+            static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
+                "Gather is supported only for 2D and 3D textures");
             return __texture_gather$(compareFunc)($(getTexture) $(getSampler), location $(compareArg) $(componentArg));
         case glsl:
         case spirv:
+            static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
+                "Gather is supported only for 2D and 3D textures");
             return __texture_gather$(compareFunc)(this $(samplerArg), location $(compareArg) $(componentArg));
         }
     }
@@ -3519,27 +3527,37 @@ ${{{{
     }
 
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv_wgsl, texture_gather)]
+    [require(cuda_glsl_hlsl_metal_spirv_wgsl, texture_gather)]
     vector<T.Element,4> Gather$(compareFunc)$(componentFunc)(
         $(samplerParam)
         vector<float, Shape.dimensions+isArray> location
         $(compareParam),
-        constexpr vector<int, Shape.planeDimensions> offset)
+        vector<int, Shape.planeDimensions> offset)
     {
-        static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
-            "Gather is supported only for 2D and 3D textures");
-
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".Gather$(compareFunc)$(componentFunc)";
+        case hlsl: 
+            static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
+                "Gather is supported only for 2D and 3D textures");
+            __intrinsic_asm ".Gather$(compareFunc)$(componentFunc)";
+        case cuda:
+            // CUDA tex2Dgather doesn't support offset - ignore offset parameter
+            static_assert(Shape.flavor == $(SLANG_TEXTURE_2D), "CUDA Gather is supported only for 2D textures");
+            static_assert(isArray == 0, "CUDA Gather does not support texture arrays");
+            __intrinsic_asm "tex2Dgather<$T0>($0, ($2).x, ($2).y$(componentArg))";
         case metal:
         case wgsl:
+            static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
+                "Gather is supported only for 2D and 3D textures");
             return __texture_gather$(compareFunc)_offset($(getTexture) $(getSampler), location $(compareArg), offset $(componentArg));
         case glsl:
         case spirv:
+            static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
+                "Gather is supported only for 2D and 3D textures");
             return __texture_gather$(compareFunc)_offset(this $(samplerArg), location $(compareArg), offset $(componentArg));
         }
     }
+
 
     [ForceInline]
     [require(hlsl, texture_gather)]
@@ -3611,6 +3629,7 @@ ${{{{
 ${{{{
 } // for (isScalarTexture)
 }}}}
+
 // End of all Texture Gather
 
 
@@ -5704,7 +5723,7 @@ ${{{{
         case hlsl: __intrinsic_asm ".InterlockedCompareStore64";
         default:
             let buf = __getEquivalentStructuredBuffer<T>(this);
-            __atomic_compare_exchange(buf[byteAddress / 4], compareValue, value);
+            __atomic_compare_exchange(buf[byteAddress / 8], compareValue, value);
             return;
         }
     }
@@ -14917,7 +14936,7 @@ matrix<T,N,M> WaveMaskPrefixBitXor(WaveMask mask, matrix<T,N,M> expr)
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
-[require(glsl_hlsl_metal_spirv, subgroup_quad)]
+[require(cuda_glsl_hlsl_metal_spirv, subgroup_quad)]
 T QuadReadLaneAt(T sourceValue, uint quadLaneID)
 {
     __target_switch
@@ -14934,12 +14953,14 @@ T QuadReadLaneAt(T sourceValue, uint quadLaneID)
             OpCapability GroupNonUniformQuad;
             result:$$T = OpGroupNonUniformQuadBroadcast Subgroup $sourceValue $quadLaneID;
         };
+    case cuda:
+        __intrinsic_asm "_waveShuffleMultiple(0xFFFFFFFF, $0, (_getLaneId() & 0xFFFFFFFC) | ($1 & 3))";
     }
 }
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
-[require(glsl_hlsl_metal_spirv, subgroup_quad)]
+[require(cuda_glsl_hlsl_metal_spirv, subgroup_quad)]
 vector<T,N> QuadReadLaneAt(vector<T,N> sourceValue, uint quadLaneID)
 {
     __target_switch
@@ -14955,6 +14976,8 @@ vector<T,N> QuadReadLaneAt(vector<T,N> sourceValue, uint quadLaneID)
             OpCapability GroupNonUniformQuad;
             result:$$vector<T,N> = OpGroupNonUniformQuadBroadcast Subgroup $sourceValue $quadLaneID;
         };
+    case cuda:
+        __intrinsic_asm "_waveShuffleMultiple(0xFFFFFFFF, $0, (_getLaneId() & 0xFFFFFFFC) | ($1 & 3))";
     }
 }
 __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadLaneAt(matrix<T,N,M> sourceValue, uint quadLaneID);
@@ -14965,7 +14988,7 @@ __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
 [ForceInline]
-[require(glsl_hlsl_metal_spirv_wgsl, subgroup_quad)]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_quad)]
 T QuadReadAcrossX(T localValue)
 {
     __target_switch
@@ -14982,6 +15005,8 @@ T QuadReadAcrossX(T localValue)
             result:$$T = OpGroupNonUniformQuadSwap Subgroup $localValue $direction;
         };
     case wgsl: __intrinsic_asm "quadSwapX";
+    case cuda:
+        __intrinsic_asm "_waveShuffleMultiple(0xFFFFFFFF, $0, _getLaneId() ^ 1)";
     }
 }
 
@@ -14990,7 +15015,7 @@ __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
 [ForceInline]
-[require(glsl_hlsl_metal_spirv_wgsl, subgroup_quad)]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_quad)]
 vector<T,N> QuadReadAcrossX(vector<T,N> localValue)
 {
     __target_switch
@@ -15007,6 +15032,8 @@ vector<T,N> QuadReadAcrossX(vector<T,N> localValue)
             result:$$vector<T,N> = OpGroupNonUniformQuadSwap Subgroup $localValue $direction;
         };
     case wgsl: __intrinsic_asm "quadSwapX";
+    case cuda:
+        __intrinsic_asm "_waveShuffleMultiple(0xFFFFFFFF, $0, _getLaneId() ^ 1)";
     }
 }
 __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadAcrossX(matrix<T,N,M> localValue);
@@ -15017,7 +15044,7 @@ __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
 [ForceInline]
-[require(glsl_hlsl_metal_spirv_wgsl, subgroup_quad)]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_quad)]
 T QuadReadAcrossY(T localValue)
 {
     __target_switch
@@ -15034,6 +15061,8 @@ T QuadReadAcrossY(T localValue)
             result:$$T = OpGroupNonUniformQuadSwap Subgroup $localValue $direction;
         };
     case wgsl: __intrinsic_asm "quadSwapY";
+    case cuda:
+        __intrinsic_asm "_waveShuffleMultiple(0xFFFFFFFF, $0, _getLaneId() ^ 2)";
     }
 }
 __generic<T : __BuiltinType, let N : int>
@@ -15041,7 +15070,7 @@ __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
 [ForceInline]
-[require(glsl_hlsl_metal_spirv_wgsl, subgroup_quad)]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_quad)]
 vector<T,N> QuadReadAcrossY(vector<T,N> localValue)
 {
     __target_switch
@@ -15058,6 +15087,8 @@ vector<T,N> QuadReadAcrossY(vector<T,N> localValue)
             result:$$vector<T,N> = OpGroupNonUniformQuadSwap Subgroup $localValue $direction;
         };
     case wgsl: __intrinsic_asm "quadSwapY";
+    case cuda:
+        __intrinsic_asm "_waveShuffleMultiple(0xFFFFFFFF, $0, _getLaneId() ^ 2)";
     }
 }
 __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadAcrossY(matrix<T,N,M> localValue);
@@ -15068,7 +15099,7 @@ __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
 [ForceInline]
-[require(glsl_hlsl_metal_spirv_wgsl, subgroup_quad)]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_quad)]
 T QuadReadAcrossDiagonal(T localValue)
 {
     __target_switch
@@ -15085,6 +15116,8 @@ T QuadReadAcrossDiagonal(T localValue)
             result:$$T = OpGroupNonUniformQuadSwap Subgroup $localValue $direction;
         };
     case wgsl: __intrinsic_asm "quadSwapDiagonal";
+    case cuda:
+        __intrinsic_asm "_waveShuffleMultiple(0xFFFFFFFF, $0, _getLaneId() ^ 3)";
     }
 }
 __generic<T : __BuiltinType, let N : int>
@@ -15092,7 +15125,7 @@ __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
 [ForceInline]
-[require(glsl_hlsl_metal_spirv_wgsl, subgroup_quad)]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_quad)]
 vector<T,N> QuadReadAcrossDiagonal(vector<T,N> localValue)
 {
     __target_switch
@@ -15109,6 +15142,8 @@ vector<T,N> QuadReadAcrossDiagonal(vector<T,N> localValue)
             result:$$vector<T,N> = OpGroupNonUniformQuadSwap Subgroup $localValue $direction;
         };
     case wgsl: __intrinsic_asm "quadSwapDiagonal";
+    case cuda:
+        __intrinsic_asm "_waveShuffleMultiple(0xFFFFFFFF, $0, _getLaneId() ^ 3)";
     }
 }
 __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadAcrossDiagonal(matrix<T,N,M> localValue);
@@ -16300,7 +16335,7 @@ void shader_subgroup_preamble()
 
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_rotate)
-[require(glsl_metal_spirv, subgroup_rotate)]
+[require(cuda_glsl_metal_spirv, subgroup_rotate)]
 T WaveRotate(T value, uint delta)
 {
     shader_subgroup_preamble<T>();
@@ -16308,6 +16343,8 @@ T WaveRotate(T value, uint delta)
     {
     case glsl:
         __intrinsic_asm "subgroupRotate";
+    case cuda:
+        __intrinsic_asm "__shfl_sync(0xFFFFFFFF, $0, (_getLaneId() + $1) % 32)";
     case metal:
         __intrinsic_asm "simd_shuffle_rotate_down";
     case spirv:
@@ -16322,7 +16359,7 @@ T WaveRotate(T value, uint delta)
 
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_rotate)
-[require(glsl_metal_spirv, subgroup_rotate)]
+[require(cuda_glsl_metal_spirv, subgroup_rotate)]
 vector<T, N> WaveRotate(vector<T, N> value, uint delta)
 {
     shader_subgroup_preamble<T>();
@@ -16330,6 +16367,8 @@ vector<T, N> WaveRotate(vector<T, N> value, uint delta)
     {
     case glsl:
         __intrinsic_asm "subgroupRotate";
+    case cuda:
+        __intrinsic_asm "_slang_waveRotate($0, $1)";
     case metal:
         __intrinsic_asm "simd_shuffle_rotate_down";
     case spirv:
@@ -16344,7 +16383,7 @@ vector<T, N> WaveRotate(vector<T, N> value, uint delta)
 
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_rotate)
-[require(glsl_spirv, subgroup_rotate)]
+[require(cuda_glsl_spirv, subgroup_rotate)]
 T WaveClusteredRotate(T value, uint delta, constexpr uint clusterSize)
 {
     shader_subgroup_preamble<T>();
@@ -16352,6 +16391,8 @@ T WaveClusteredRotate(T value, uint delta, constexpr uint clusterSize)
     {
     case glsl:
         __intrinsic_asm "subgroupClusteredRotate";
+    case cuda:
+        __intrinsic_asm "_slang_waveClusteredRotate($0, $1, $2)";
     case spirv:
         return spirv_asm
         {
@@ -16364,7 +16405,7 @@ T WaveClusteredRotate(T value, uint delta, constexpr uint clusterSize)
 
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_rotate)
-[require(glsl_spirv, subgroup_rotate)]
+[require(cuda_glsl_spirv, subgroup_rotate)]
 vector<T, N> WaveClusteredRotate(vector<T, N> value, uint delta, constexpr uint clusterSize)
 {
     shader_subgroup_preamble<T>();
@@ -16372,6 +16413,8 @@ vector<T, N> WaveClusteredRotate(vector<T, N> value, uint delta, constexpr uint 
     {
     case glsl:
         __intrinsic_asm "subgroupClusteredRotate";
+    case cuda:
+        __intrinsic_asm "_slang_waveClusteredRotate($0, $1, $2)";
     case spirv:
         return spirv_asm
         {
@@ -16978,7 +17021,7 @@ __glsl_extension(GL_EXT_maximal_reconvergence)
 __glsl_extension(GL_EXT_shader_quad_control)
 __spirv_version(1.3)
 [ForceInline]
-[require(glsl_hlsl_metal_spirv, quad_control)]
+[require(cuda_glsl_hlsl_metal_spirv, quad_control)]
 bool QuadAny(bool expr)
 {
     __requireMaximallyReconverges();
@@ -16988,6 +17031,7 @@ bool QuadAny(bool expr)
     case hlsl: __intrinsic_asm "QuadAny";
     case glsl: __intrinsic_asm "subgroupQuadAny";
     case metal: __intrinsic_asm "quad_any";
+    case cuda: __intrinsic_asm "_slang_quadAny";
     case spirv:
         return spirv_asm
         {
@@ -17003,7 +17047,7 @@ __glsl_extension(GL_EXT_maximal_reconvergence)
 __glsl_extension(GL_EXT_shader_quad_control)
 __spirv_version(1.3)
 [ForceInline]
-[require(glsl_hlsl_metal_spirv, quad_control)]
+[require(cuda_glsl_hlsl_metal_spirv, quad_control)]
 bool QuadAll(bool expr)
 {
     __requireMaximallyReconverges();
@@ -17013,6 +17057,7 @@ bool QuadAll(bool expr)
     case hlsl: __intrinsic_asm "QuadAll";
     case glsl: __intrinsic_asm "subgroupQuadAll";
     case metal: __intrinsic_asm "quad_all";
+    case cuda: __intrinsic_asm "_slang_quadAll";
     case spirv:
         return spirv_asm
         {
@@ -20833,7 +20878,7 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "NvRtSphereObjectPositionAndRadius";
+        case hlsl: __intrinsic_asm ".GetSphereObjectPositionAndRadius";
         case cuda:
             {
                 __intrinsic_asm "optixHitObjectGetSpherePositionAndRadius";
@@ -20858,7 +20903,7 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "NvRtLssObjectPositionsAndRadii";
+        case hlsl: __intrinsic_asm ".GetLssObjectPositionsAndRadii";
         case cuda:
             {
                 __intrinsic_asm "optixHitObjectGetLssPositionsAndRadii";
@@ -20889,7 +20934,7 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "NvRtIsSphereHit";
+        case hlsl: __intrinsic_asm ".IsSphereHit";
         case cuda:
             {
                 __intrinsic_asm "optixHitObjectIsSphereHit";
@@ -20911,7 +20956,7 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "NvRtIsLssHit";
+        case hlsl: __intrinsic_asm ".IsLssHit";
         case cuda:
             {
                 __intrinsic_asm "optixHitObjectIsLSSHit";
