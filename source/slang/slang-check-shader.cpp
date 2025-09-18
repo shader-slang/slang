@@ -531,6 +531,20 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         }
     }
 
+    // Vulkan attribute diagnostics: check for [[vk::binding]] and [[vk::push_constants]] on entry point parameters
+    // Only check for these attributes on entry points (not on regular functions)
+    for (const auto& param : entryPointFuncDecl->getParameters())
+    {
+        if (param->findModifier<GLSLBindingAttribute>())
+        {
+            sink->diagnose(param, Diagnostics::ignoredVkAttributeOnEntryPointParameter, "[[vk::binding]]", param->getName());
+        }
+        if (param->findModifier<PushConstantAttribute>())
+        {
+            sink->diagnose(param, Diagnostics::ignoredVkAttributeOnEntryPointParameter, "[[vk::push_constant]]", param->getName());
+        }
+    }
+
     for (auto target : linkage->targets)
     {
         auto targetCaps = target->getTargetCaps();

@@ -2077,6 +2077,13 @@ DIAGNOSTIC(
     "expected a constant value of type '$0' as argument for specialization parameter '$1'")
 
 DIAGNOSTIC(
+    38010,
+    Warning,
+    ignoredVkAttributeOnEntryPointParameter,
+    "attribute '$0' on parameter '$1' is unsupported on entry point parameters and will be "
+    "ignored")
+
+DIAGNOSTIC(
     38100,
     Error,
     typeDoesntImplementInterfaceRequirement,
