@@ -5088,9 +5088,26 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     }
     else if (auto optionalType = as<OptionalType>(type))
     {
-        // OptionalType should be laid out the same way as Tuple<T, bool>.
-        if (isNullableType(optionalType->getValueType()))
+        // Sometimes a type `T` has an unused bit pattern that
+        // can be used to represent the null/absent optional value,
+        // and for such types the size of an `Optional<T>` can be
+        // the same as a `T`, by making use of that unused pattern.
+        //
+        if (doesTypeHaveAnUnusedBitPatternThatCanBeUsedForOptionalRepresentation(
+                optionalType->getValueType()))
             return _createTypeLayout(context, optionalType->getValueType());
+
+        // For all other types, an `Optional<T>` is laid out more-or-less
+        // as tuple of a `T` and a `bool`.
+        //
+        // TODO(tfoley): This code implements the `(T,bool)` ordering,
+        // which provides more easy opportunities to generate compact
+        // layouts by using "tail padding" than the `(bool, T)` ordering.
+        // However the "natural layout" implementation does not match
+        // what is being done here (it uses the `(bool, T)` ordering).
+        // The discrepancy should probably be fixed, but doing so would
+        // technically be a breaking change.
+        //
         Array<Type*, 2> types =
             makeArray(optionalType->getValueType(), context.astBuilder->getBoolType());
         auto tupleType = context.astBuilder->getTupleType(types.getView());

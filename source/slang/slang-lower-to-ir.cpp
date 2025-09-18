@@ -2042,7 +2042,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         List<IRType*> paramTypes;
         for (Index pp = 0; pp < paramCount; ++pp)
         {
-            paramTypes.add(lowerType(context, type->getParamType(pp)));
+            paramTypes.add(lowerType(context, type->getParamTypeWithDirectionWrapper(pp)));
         }
         if (type->getErrorType()->equals(context->astBuilder->getBottomType()))
         {
@@ -2820,12 +2820,14 @@ void addArg(
                     // from the arg.
                     paramType = lowerType(context, argType);
                 }
+#if 0
                 if (auto refType = as<IRConstRefType>(paramType))
                 {
                     paramType = refType->getValueType();
                     argVal = LoweredValInfo::simple(
                         context->irBuilder->emitLoad(getSimpleVal(context, argPtr)));
                 }
+#endif
 
                 LoweredValInfo tempVar = createVar(context, paramType);
 
@@ -3814,13 +3816,13 @@ struct ExprLoweringContext
 
         for (Index i = 0; i < argCount; ++i)
         {
-            IRType* paramType = lowerType(context, funcType->getParamType(i));
-            ParameterDirection paramDirection = funcType->getParamDirection(i);
+            auto paramInfo = funcType->getParamInfo(i);
+            IRType* paramType = lowerType(context, paramInfo.type);
             addDirectCallArgs(
                 expr,
                 i,
                 paramType,
-                paramDirection,
+                paramInfo.direction,
                 DeclRef<ParamDecl>(),
                 ioArgs,
                 ioFixups);
@@ -4736,16 +4738,55 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
         if (loweredBase.flavor != LoweredValInfo::Flavor::Ptr)
         {
-            SLANG_ASSERT(as<ConstRefType>(expr->type));
-            // If the base isn't a pointer, then we are trying to form
-            // a const ref to a temporary value.
-            // To do so we must copy it into a variable.
+            // If the base expression is not one that (trivially)
+            // lower to a pointer, then we have a bit of a problem,
+            // because the semantics of forming a reference are
+            // that we should refer to the memory location of
+            // the operand itself.
+            //
+            // For now, we are hacking this case by supporting
+            // formation of a *read-only* reference when the base
+            // expression is an r-value, by first copying the base
+            // expression into a temporary.
+            //
+            // Note that this approach is semantically incorrect,
+            // and a fix should be made further up the stack to
+            // rule out whatever is happening here.
+            //
+            // TODO(tfoley): Investigate why this case is arising
+            // at all, and/or eliminate the explicit `Ref` type
+            // entirely, so we don't have to deal with it.
+
+
+            // We start by asserting that the reference type we
+            // are being asked to form is read-only.
+            //
+            SLANG_ASSERT(as<ExplicitRefType>(expr->type) && !QualType(expr->type).isLeftValue);
+
+            // Now we perpetrate our hackery, by forming a simple value
+            // for the operand in an SSA register and copying it into
+            // a temporary.
+            //
+            // TODO(tfoley): This logic might be better expressed by
+            // forming a `LoweredValInfo` for the temporary and then
+            // using the `assign()` operation to write the base into it,
+            // since that operation might produce simpler code than
+            // we get by using `getSimpleVal` here.
+            //
             auto baseVal = getSimpleVal(context, loweredBase);
             auto tempVar = context->irBuilder->emitVar(baseVal->getFullType());
             context->irBuilder->emitStore(tempVar, baseVal);
             loweredBase.val = tempVar;
         }
 
+        // Note that the `flavor` of the lowered value that we return
+        // is always `Simple`, because at the level of the IR a value
+        // of type `Ref` is just a pointer.
+        //
+        // In the case where the hack above was used to introduce a
+        // temporary, the pointer value is the address of the temporary
+        // variable itself.
+        //
         loweredBase.flavor = LoweredValInfo::Flavor::Simple;
         return loweredBase;
     }
