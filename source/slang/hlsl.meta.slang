@@ -25564,6 +25564,7 @@ for(auto buffer : kByteAddressBufferCases) {
     [mutating]
     [require(cooperative_vector)]
     [require(hlsl_coopvec_poc)]
+    [require(optix_coopvec)]
     void matMulAccumPacked<U : __BuiltinArithmeticType, let PackedK : int>(
         CoopVec<U, PackedK> input,
         constexpr CoopVecComponentType inputInterpretation,
@@ -25629,6 +25630,7 @@ for(auto buffer : kByteAddressBufferCases) {
     [ForceInline]
     [require(cooperative_vector)]
     [require(hlsl_coopvec_poc)]
+    [require(optix_coopvec)]
     void matMulAccum<U : __BuiltinArithmeticType, let K : int>(
         CoopVec<U, K> input,
         constexpr CoopVecComponentType inputInterpretation,
@@ -25658,6 +25660,7 @@ for(auto buffer : kByteAddressBufferCases) {
     [mutating]
     [require(cooperative_vector)]
     [require(hlsl_coopvec_poc)]
+    [require(optix_coopvec)]
     void matMulAddAccumPacked<U : __BuiltinArithmeticType, let PackedK : int>(
         CoopVec<U, PackedK> input,
         constexpr CoopVecComponentType inputInterpretation,
@@ -25738,6 +25741,7 @@ for(auto buffer : kByteAddressBufferCases) {
     [ForceInline]
     [require(cooperative_vector)]
     [require(hlsl_coopvec_poc)]
+    [require(optix_coopvec)]
     void matMulAddAccum<U : __BuiltinArithmeticType, let K : int>(
         CoopVec<U, K> input,
         constexpr CoopVecComponentType inputInterpretation,
@@ -26661,6 +26665,7 @@ for(auto buffer : kByteAddressBufferCases_) {
 [ForceInline]
 [require(cooperative_vector)]
 [require(hlsl_coopvec_poc)]
+[require(optix_coopvec)]
 __generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>
 CoopVec<T, M> coopVecMatMulPacked(
     CoopVec<U, PackedK> input,
@@ -26674,15 +26679,14 @@ CoopVec<T, M> coopVecMatMulPacked(
     constexpr uint matrixStride
 )
 {
-    static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
-                 , "for non-packed inputInterpretation values k must be equal to the input vector length");
-    static_assert(!__isPackedInputInterpretation(inputInterpretation)
-                || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
-                 , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
-
     __target_switch
     {
     case spirv:
+        static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
+                     , "for non-packed inputInterpretation values k must be equal to the input vector length");
+        static_assert(!__isPackedInputInterpretation(inputInterpretation)
+                    || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
+                     , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
         let m : int32_t = M;
         let matrixInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(matrixInterpretation);
         let inputInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(inputInterpretation);
@@ -26705,6 +26709,11 @@ CoopVec<T, M> coopVecMatMulPacked(
         };
 
     case hlsl:
+        static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
+                     , "for non-packed inputInterpretation values k must be equal to the input vector length");
+        static_assert(!__isPackedInputInterpretation(inputInterpretation)
+                    || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
+                     , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
         var ret = CoopVec<T, M>(0);
         let inputInterpretationHLSL = __getHLSLCoopVecComponentType(inputInterpretation);
         let matrixInterpretationHLSL = __getHLSLCoopVecComponentType(matrixInterpretation);
@@ -26722,6 +26731,9 @@ CoopVec<T, M> coopVecMatMulPacked(
              matrixStride
         );
         return ret;
+
+    case optix_coopvec:
+        __intrinsic_asm "slangOptixCoopVecMatMul<OptixCoopVec<$[0], $[1]>, OptixCoopVec<$[2], $[3]>, $1, $5, $6>($0, (CUdeviceptr)(&($3)), $4, $7, $8)", T, M, U, PackedK;
 
     default:
         var result = CoopVec<T, M>(0);
@@ -26824,6 +26836,7 @@ CoopVec<T, M> coopVecMatMulPacked(
 [ForceInline]
 [require(cooperative_vector)]
 [require(hlsl_coopvec_poc)]
+[require(optix_coopvec)]
 __generic<T : __BuiltinArithmeticType, let M : int, let K : int, U : __BuiltinArithmeticType>
 CoopVec<T, M> coopVecMatMul(
     CoopVec<U, K> input,
@@ -26881,6 +26894,7 @@ CoopVec<T, M> coopVecMatMul(
 [ForceInline]
 [require(cooperative_vector)]
 [require(hlsl_coopvec_poc)]
+[require(optix_coopvec)]
 CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>(
     CoopVec<U, PackedK> input,
     constexpr CoopVecComponentType inputInterpretation,
@@ -26896,15 +26910,14 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
     constexpr uint matrixStride
 )
 {
-    static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
-                 , "for non-packed inputInterpretation values k must be equal to the input vector length");
-    static_assert(!__isPackedInputInterpretation(inputInterpretation)
-                || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
-                 , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
-
     __target_switch
     {
     case spirv:
+        static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
+                     , "for non-packed inputInterpretation values k must be equal to the input vector length");
+        static_assert(!__isPackedInputInterpretation(inputInterpretation)
+                    || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
+                     , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
         let m : int32_t = M;
         let matrixInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(matrixInterpretation);
         let biasInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(biasInterpretation);
@@ -26929,6 +26942,11 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
         };
 
     case hlsl:
+        static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
+                     , "for non-packed inputInterpretation values k must be equal to the input vector length");
+        static_assert(!__isPackedInputInterpretation(inputInterpretation)
+                    || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
+                     , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
         var ret = CoopVec<T, M>(0);
         let inputInterpretationHLSL = __getHLSLCoopVecComponentType(inputInterpretation);
         let matrixInterpretationHLSL = __getHLSLCoopVecComponentType(matrixInterpretation);
@@ -26951,7 +26969,15 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
         );
         return ret;
 
+    case optix_coopvec:
+        __intrinsic_asm "slangOptixCoopVecMatMul<OptixCoopVec<$[0], $[1]>, OptixCoopVec<$[2], $[3]>, $1, $5, $9, $8>($0, (CUdeviceptr)(&($3)), $4, (CUdeviceptr)(&($6)), $7, $11)", T, M, U, PackedK;
+
     default:
+        static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
+                     , "for non-packed inputInterpretation values k must be equal to the input vector length");
+        static_assert(!__isPackedInputInterpretation(inputInterpretation)
+                    || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
+                     , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
         var result = coopVecMatMulPacked<T, M, PackedK, U>(
             input,
             inputInterpretation,
@@ -27257,6 +27283,7 @@ for(auto buffer : kStructuredBufferCases_) {
 }}}}
 
 [require(spirv, cooperative_vector)]
+[require(optix_coopvec)]
 __generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType,IgnoredBufferElementType>
 CoopVec<T, M> coopVecMatMulPacked(
     CoopVec<U, PackedK> input,
@@ -27270,14 +27297,14 @@ CoopVec<T, M> coopVecMatMulPacked(
     constexpr uint matrixStride
 )
 {
-    static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
-                 , "for non-packed inputInterpretation values k must be equal to the input vector length");
-    static_assert(!__isPackedInputInterpretation(inputInterpretation)
-                || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
-                 , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
     __target_switch
     {
     case spirv:
+        static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
+                     , "for non-packed inputInterpretation values k must be equal to the input vector length");
+        static_assert(!__isPackedInputInterpretation(inputInterpretation)
+                    || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
+                     , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
         let m : int32_t = M;
         let matrixInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(matrixInterpretation);
         let inputInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(inputInterpretation);
@@ -27298,11 +27325,14 @@ CoopVec<T, M> coopVecMatMulPacked(
         {
             result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulNV $input $inputInterpretationSpirv $matrixPtr $matrixOffset $matrixInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
         };
+    case optix_coopvec:
+        __intrinsic_asm "slangOptixCoopVecMatMul<$T0, $T0, $1, $5, $6>($0, (CUdeviceptr)(&($3)), $4, $8)";
     }
 }
 
 // specialized coopVecMatMul for non-packed inputs
 [require(spirv, cooperative_vector)]
+[require(optix_coopvec)]
 __generic<T : __BuiltinArithmeticType, let M : int, let K : int, U : __BuiltinArithmeticType,IgnoredBufferElementType>
 CoopVec<T, M> coopVecMatMul(
     CoopVec<U, K> input,
@@ -27331,6 +27361,7 @@ CoopVec<T, M> coopVecMatMul(
 }
 
 [require(spirv, cooperative_vector)]
+[require(optix_coopvec)]
 CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType, IgnoredBufferElementType>(
     CoopVec<U, PackedK> input,
     constexpr CoopVecComponentType inputInterpretation,
@@ -27346,15 +27377,14 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
     constexpr uint matrixStride
 )
 {
-    static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
-                 , "for non-packed inputInterpretation values k must be equal to the input vector length");
-    static_assert(!__isPackedInputInterpretation(inputInterpretation)
-                || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
-                 , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
-
     __target_switch
     {
     case spirv:
+        static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
+                     , "for non-packed inputInterpretation values k must be equal to the input vector length");
+        static_assert(!__isPackedInputInterpretation(inputInterpretation)
+                    || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
+                     , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
         let m : int32_t = M;
         let matrixInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(matrixInterpretation);
         let biasInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(biasInterpretation);
@@ -27378,10 +27408,13 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
         {
             result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulAddNV $input $inputInterpretationSpirv $matrixPtr $matrixOffset $matrixInterpretationSpirv $biasPtr $biasOffset $biasInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
         };
+    case optix_coopvec:
+        __intrinsic_asm "slangOptixCoopVecMatMul<OptixCoopVec<$[0], $[1]>, OptixCoopVec<$[2], $[3]>, $1, $5, $9, $8>($0, (CUdeviceptr)(&($3)), $4, (CUdeviceptr)(&($6)), $7, $11)", T, M, U, PackedK;
     }
 }
 
 [require(spirv, cooperative_vector)]
+[require(optix_coopvec)]
 CoopVec<T, M> coopVecMatMulAdd<T : __BuiltinArithmeticType, let M : int, let K : int, U : __BuiltinArithmeticType, IgnoredBufferElementType>(
     CoopVec<U, K> input,
     constexpr CoopVecComponentType inputInterpretation,
@@ -27600,15 +27633,14 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
     constexpr uint matrixStride
 )
 {
-    static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
-                 , "for non-packed inputInterpretation values k must be equal to the input vector length");
-    static_assert(!__isPackedInputInterpretation(inputInterpretation)
-                || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
-                 , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
-
     __target_switch
     {
     case spirv:
+        static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
+                     , "for non-packed inputInterpretation values k must be equal to the input vector length");
+        static_assert(!__isPackedInputInterpretation(inputInterpretation)
+                    || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
+                     , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
         let m : int32_t = M;
         let matrixInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(matrixInterpretation);
         let biasInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(biasInterpretation);

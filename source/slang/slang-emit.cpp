@@ -819,6 +819,10 @@ Result linkAndOptimizeIR(
 #endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
+    // Process `static_assert` after the specialization is done.
+    // Some information for `static_assert` is available only after the specialization.
+    checkStaticAssert(irModule->getModuleInst(), sink);
+
     // Another transformation that needed to wait until we
     // had layout information on parameters is to take uniform
     // parameters of a shader entry point and move them into
@@ -1397,9 +1401,6 @@ Result linkAndOptimizeIR(
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    // Process `static_assert` after the specialization is done.
-    // Some information for `static_assert` is available only after the specialization.
-    checkStaticAssert(irModule->getModuleInst(), sink);
 
     // For HLSL (and fxc/dxc) only, we need to "wrap" any
     // structured buffers defined over matrix types so
