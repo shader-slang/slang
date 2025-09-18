@@ -114,6 +114,8 @@ target_include_directories(
 )
 
 # SPIRV-Headers
+# Avoid using ${system} intentionally in `add_subdirectory`, because if we do, it will end up using
+# spirv.h installed in the system directory on MacOS.
 if(NOT TARGET SPIRV-Headers)
     if(SLANG_USE_SYSTEM_SPIRV_HEADERS)
         if(SLANG_OVERRIDE_SPIRV_HEADERS_PATH)
@@ -127,10 +129,9 @@ if(NOT TARGET SPIRV-Headers)
             ${SLANG_OVERRIDE_SPIRV_HEADERS_PATH}/spirv-headers
             spirv-headers
             EXCLUDE_FROM_ALL
-            ${system}
         )
     else()
-        add_subdirectory(spirv-headers EXCLUDE_FROM_ALL ${system})
+        add_subdirectory(spirv-headers EXCLUDE_FROM_ALL)
     endif()
 endif()
 
