@@ -1267,7 +1267,7 @@ Result linkAndOptimizeIR(
     // For CUDA targets, always inline global constants to avoid dynamic initialization
     // of __device__ variables rejected by NVRTC. This runs independently of the broader
     // resource/existential type legalization, which remains disabled for CUDA.
-    if (target == CodeGenTarget::CUDASource)
+    if (target == CodeGenTarget::CUDASource || options.shouldLegalizeExistentialAndResourceTypes)
     {
         inlineGlobalConstantsForLegalization(irModule);
     }
@@ -1275,7 +1275,6 @@ Result linkAndOptimizeIR(
     // We don't need the legalize pass for C/C++ based types
     if (options.shouldLegalizeExistentialAndResourceTypes)
     {
-        inlineGlobalConstantsForLegalization(irModule);
 
         // The Slang language allows interfaces to be used like
         // ordinary types (including placing them in constant
