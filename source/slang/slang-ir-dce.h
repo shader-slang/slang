@@ -35,4 +35,13 @@ bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions o
 bool isWeakReferenceOperand(IRInst* inst, UInt operandIndex);
 
 bool trimOptimizableTypes(IRModule* module);
+
+/// Eliminate unnecessary load+store pairs when safe to do so.
+/// This optimization looks for patterns where a value is loaded from a ConstRef
+/// parameter and immediately stored to a temporary variable, then only passed
+/// to functions that accept ConstRef parameters. In such cases, the temporary
+/// variable can be eliminated and the original ConstRef parameter used directly.
+/// Returns true if any changes were made.
+bool eliminateLoadStorePairs(IRModule* module);
+
 } // namespace Slang
