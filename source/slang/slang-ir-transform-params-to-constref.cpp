@@ -44,17 +44,27 @@ struct TransformParamsToConstRefContext
         return true;
     }
 
-    void rewriteParamUseSitesToSupportConstRefUsage(HashSet<IRParam*>& updatedParams)
+    void rewriteValueUsesToAddrUses(IRInst* newAddrInst)
     {
-        // Traverse the uses of our updated params to rewrite them.
-        // Assume a `in` parameter has been converted to a `constref` parameter.
-        for (auto param : updatedParams)
+        HashSet<IRInst*> workListSet;
+        workListSet.add(newAddrInst);
+        List<IRInst*> workList;
+        workList.add(newAddrInst);
+        auto _addToWorkList = [&](IRInst* inst)
         {
+            if (workListSet.add(inst))
+                workList.add(inst);
+        };
+        for (Index i = 0; i < workList.getCount(); i++)
+        {
+            auto inst = workList[i];
             traverseUses(
-                param,
+                inst,
                 [&](IRUse* use)
                 {
                     auto user = use->getUser();
+                    if (workListSet.contains(user))
+                        return;
                     switch (user->getOp())
                     {
                     case kIROp_FieldExtract:
@@ -65,9 +75,8 @@ struct TransformParamsToConstRefContext
                             auto fieldAddr = builder.emitFieldAddress(
                                 fieldExtract->getBase(),
                                 fieldExtract->getField());
-                            auto loadInst = builder.emitLoad(fieldAddr);
-                            fieldExtract->replaceUsesWith(loadInst);
-                            fieldExtract->removeAndDeallocate();
+                            fieldExtract->replaceUsesWith(fieldAddr);
+                            _addToWorkList(fieldAddr);
                             break;
                         }
                     case kIROp_GetElement:
@@ -79,21 +88,30 @@ struct TransformParamsToConstRefContext
                             auto elemAddr = builder.emitElementAddress(
                                 getElement->getBase(),
                                 getElement->getIndex());
-                            auto loadInst = builder.emitLoad(elemAddr);
-                            getElement->replaceUsesWith(loadInst);
-                            getElement->removeAndDeallocate();
+                            getElement->replaceUsesWith(elemAddr);
+                            _addToWorkList(elemAddr);
                             break;
                         }
                     default:
                         {
                             // Insert a load before the user and replace the user with the load
                             builder.setInsertBefore(user);
-                            auto loadInst = builder.emitLoad(param);
+                            auto loadInst = builder.emitLoad(inst);
                             use->set(loadInst);
                             break;
                         }
                     }
                 });
+        }
+    }
+
+    void rewriteParamUseSitesToSupportConstRefUsage(HashSet<IRParam*>& updatedParams)
+    {
+        // Traverse the uses of our updated params to rewrite them.
+        // Assume a `in` parameter has been converted to a `constref` parameter.
+        for (auto param : updatedParams)
+        {
+            rewriteValueUsesToAddrUses(param);
         }
     }
 
@@ -200,7 +218,7 @@ struct TransformParamsToConstRefContext
                 // This allows us to pass the address of variables directly into a function,
                 // giving us the choice to remove copies into a parameter.
                 auto paramType = param->getDataType();
-                auto constRefType = builder.getConstRefType(paramType, AddressSpace::ThreadLocal);
+                auto constRefType = builder.getConstRefType(paramType, AddressSpace::Generic);
                 param->setFullType(constRefType);
 
                 hasTransformedParams = true;
