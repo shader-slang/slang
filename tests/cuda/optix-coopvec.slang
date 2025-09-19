@@ -1,6 +1,14 @@
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -capability optix_coopvec
-//TEST:SIMPLE(filecheck=CHECK-PTX): -target ptx -Xnvrtc -I"./external/optix-dev/include/"
 
+// Note - Validated locally.Enable with latest optix and cuda SDK
+//DISABLE_TEST:SIMPLE(filecheck=CHECK-PTX): -target ptx -capability optix_coopvec
+
+// CHECK-PTX: _optix_vector_load_16xi32
+// CHECK-PTX: _optix_vector_op1_16xi32
+// CHECK-PTX: _optix_vector_op2_16xi32
+// CHECK-PTX: _optix_vector_op3_16xi32
+// CHECK-PTX: _optix_outer_product_accumulate_16xi32
+// CHECK-PTX: _optix_reduce_sum_accumulate_16xi32
 // CHECK-PTX: add.f32
 // CHECK: optixCoopVecLoad
 // CHECK: OptixCoopVec
