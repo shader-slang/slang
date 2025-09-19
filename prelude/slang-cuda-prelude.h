@@ -4959,7 +4959,6 @@ _slang_waveClusteredRotate(bool4 value, unsigned int delta, unsigned int cluster
 // ---------------------- OptiX Cooperative Vector Wrappers --------------------------------------
 #ifdef SLANG_CUDA_ENABLE_OPTIX
 
-// Template metaprogramming for Slang enum to OptiX constant conversion
 template<unsigned SlangEnum>
 struct SlangToOptixComponentType {
     static constexpr OptixCoopVecElemType value = OPTIX_COOP_VEC_ELEM_TYPE_FLOAT32; // Default
@@ -4993,7 +4992,6 @@ struct OptixCoopVecTraits<OptixCoopVec<T, N>> {
     static constexpr unsigned size = N;
 };
 
-// Fully generic templated OptiX cooperative vector matrix multiplication wrapper
 template<typename VecTOut, typename VecTIn,
          unsigned inputInterpretation, unsigned matrixInterpretation, unsigned matrixLayout>
 __forceinline__ __device__ VecTOut slangOptixCoopVecMatMul(
@@ -5003,11 +5001,9 @@ __forceinline__ __device__ VecTOut slangOptixCoopVecMatMul(
     bool transpose,
     unsigned matrixStride)
 {
-    // Extract vector dimensions using template metaprogramming - no hardcoding!
     constexpr unsigned N = OptixCoopVecTraits<VecTOut>::size;  // Output vector size
     constexpr unsigned K = OptixCoopVecTraits<VecTIn>::size;   // Input vector size
 
-    // Use template metaprogramming to convert enum values to OptiX constants at compile time
     return optixCoopVecMatMul<VecTOut, VecTIn,
                              SlangToOptixComponentType<inputInterpretation>::value,
                              SlangToOptixMatrixLayout<matrixLayout>::value,
@@ -5027,7 +5023,6 @@ __forceinline__ __device__ VecTOut slangOptixCoopVecMatMul(
     unsigned biasOffset,
     unsigned matrixStride)
 {
-    // Extract vector dimensions using template metaprogramming - no hardcoding!
     constexpr unsigned N = OptixCoopVecTraits<VecTOut>::size;  // Output vector size
     constexpr unsigned K = OptixCoopVecTraits<VecTIn>::size;   // Input vector size
 
@@ -5050,7 +5045,6 @@ __forceinline__ __device__ VecTOut slangOptixCoopVecMatMul(
     unsigned matrixOffset,
     unsigned matrixStride)
 {
-    // Extract vector dimensions using template metaprogramming - no hardcoding!
     constexpr unsigned N = OptixCoopVecTraits<VecTOut>::size;  // Output vector size
     constexpr unsigned K = OptixCoopVecTraits<VecTIn>::size;   // Input vector size
 
