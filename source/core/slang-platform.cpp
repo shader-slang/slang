@@ -141,10 +141,7 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
     // https://docs.microsoft.com/en-us/windows/desktop/api/libloaderapi/nf-libloaderapi-loadlibraryw
     String platformFileNameStr(platformFileName);
     OSString wideFileName = platformFileNameStr.toWString();
-    HMODULE handle = LoadLibraryExW(
-        wideFileName, 
-        nullptr, 
-        LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
+    HMODULE handle = LoadLibraryExW(wideFileName, nullptr, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
 
     if (!handle)
         handle = LoadLibraryW(wideFileName);
