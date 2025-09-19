@@ -35,9 +35,9 @@ static Slang::Result loadProgram(
         // Define a regular struct that contains an Inner field
         public struct Outer
         {
-            float2 position;
+            float2 position : POSITION;
             Inner innerData;
-            float2 texCoord;
+            float2 texCoord : TEXCOORD;
         };
 
         // Vertex shader entry point that takes an Outer parameter
@@ -56,7 +56,7 @@ static Slang::Result loadProgram(
         export public struct Inner : IFoo
         {
             public float4 getFoo() { return this.data; }
-            float4 data;
+            float4 data : COLOR;
         }
     )";
 
@@ -212,8 +212,25 @@ void linkTimeTypeLayoutNestedImpl(rhi::IDevice* device, UnitTestContext* context
     validateNestedExternStructLayout(context, slangReflection);
 
     // Create a graphics pipeline to verify everything works
+    InputElementDesc inputElements[] = {
+        {"POSITION", 0, Format::RG32Float, 0, 0},  // Outer.position (float2)
+        {"COLOR", 0, Format::RGBA32Float, 8, 0},   // Outer.innerData.data (float4)
+        {"TEXCOORD", 0, Format::RG32Float, 24, 0}, // Outer.texCoord (float2)
+    };
+    VertexStreamDesc vertexStreams[] = {
+        {32, InputSlotClass::PerVertex, 0}, // sizeof(Outer) = 2*float2 + float4 = 32 bytes
+    };
+    InputLayoutDesc inputLayoutDesc = {};
+    inputLayoutDesc.inputElementCount = SLANG_COUNT_OF(inputElements);
+    inputLayoutDesc.inputElements = inputElements;
+    inputLayoutDesc.vertexStreamCount = SLANG_COUNT_OF(vertexStreams);
+    inputLayoutDesc.vertexStreams = vertexStreams;
+    auto inputLayout = device->createInputLayout(inputLayoutDesc);
+    SLANG_CHECK(inputLayout != nullptr);
+
     RenderPipelineDesc pipelineDesc = {};
     pipelineDesc.program = shaderProgram.get();
+    pipelineDesc.inputLayout = inputLayout;
     pipelineDesc.primitiveTopology = PrimitiveTopology::TriangleList;
 
     ComPtr<IRenderPipeline> pipelineState;

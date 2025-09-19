@@ -7,9 +7,9 @@
 
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute 
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -profile cs_6_0 -xslang -DHACK
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -xslang -DHACK
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -xslang -DHACK
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -render-features cuda_sm_7_0
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -capability cuda_sm_7_0
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name buffer
 RWStructuredBuffer<int> buffer;
@@ -32,9 +32,9 @@ void test(uint tid)
 	for(int ii = 0; ii < tid; ++ii)
 	{
 		WRITE(0, ii);
-		if(tid & 1)
+		if((tid & 1) != 0)
 		{
-			if(tid & 2)
+			if((tid & 2) != 0)
 			{
 				// Note: because of the two `if(alwaysFalse) break;` branches
 				// here, the `WRITE(3,ii)` at the end of the loop body no
@@ -47,7 +47,7 @@ void test(uint tid)
 				// the expected/desired result even in the presence of
 				// these additional control-flow edges.
 			#ifndef HACK
-				if(alwaysFalse) break;
+				if(alwaysFalse != 0) break;
 			#endif
 
 				WRITE(1, ii);
@@ -56,7 +56,7 @@ void test(uint tid)
 			else
 			{
 			#ifndef HACK
-				if(alwaysFalse) break;
+				if(alwaysFalse != 0) break;
 			#endif
 
 				WRITE(2, ii);

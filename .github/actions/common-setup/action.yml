@@ -25,8 +25,19 @@ runs:
 
     - name: Set up MSVC dev tools on Windows
       uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Install dependencies (Linux only)
+      if: inputs.os == 'linux'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libx11-dev
+
+    - name: Setup Node.js (Linux only)
+      if: inputs.os == 'linux'
+      uses: actions/setup-node@v4
       with:
-        sdk: "10.0.19041.0"
+        node-version: "20.x"
 
     - shell: bash
       run: |
@@ -84,7 +95,7 @@ runs:
       id: cache-llvm
       if: inputs.build-llvm == 'true'
       with:
-        path: ${{ github.workspace }}/build/llvm-project-install
+        path: build/llvm-project-install
         # Use os*compiler*platform in lieu of an ABI key here, which is what we really want
         key: llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ hashFiles('external/build-llvm.sh') }}
     - name: Build LLVM
@@ -97,7 +108,7 @@ runs:
     - uses: actions/cache/save@v4
       if: inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true'
       with:
-        path: ${{ github.workspace }}/build/llvm-project-install
+        path: build/llvm-project-install
         key: ${{ steps.cache-llvm.outputs.cache-primary-key }}
 
     - name: Set environment variable for CMake
@@ -117,3 +128,44 @@ runs:
           windows*) echo "${{github.workspace}}/external/slang-binaries/spirv-tools/windows-$win_platform/bin" >> "$GITHUB_PATH";;
           linux*) echo "${{github.workspace}}/external/slang-binaries/spirv-tools/$(uname -m)-linux/bin" >> "$GITHUB_PATH";;
         esac
+
+      # Setup ccache for local compilation speedup (Windows self-hosted only)
+      # Only use ccache if already installed - don't attempt installation
+    - name: Setup ccache (if available, local only, no GitHub uploads)
+      if: ${{ inputs.os == 'windows' && runner.environment == 'self-hosted' }}
+      shell: bash
+      run: |
+        # Check if ccache is available
+        if ! command -v ccache &> /dev/null; then
+          echo "⚠️  ccache not found on this self-hosted runner"
+          echo "   Skipping ccache setup to avoid permission issues"
+          echo "   Build will proceed without ccache acceleration"
+          echo "   To enable ccache: manually install it on the runner with admin rights"
+          exit 0
+        fi
+
+        echo "✅ ccache found on self-hosted runner - setting up persistent caching"
+
+        # Set ccache directory to a persistent location outside workspace
+        if [[ "${{ inputs.os }}" == "windows" ]]; then
+          ccache_base_dir="C:/ccache-slang"
+        else
+          # Linux/macOS: Use home directory for persistence
+          ccache_base_dir="$HOME/.ccache-slang"
+        fi
+        ccache_dir="$ccache_base_dir/${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}"
+        mkdir -p "$ccache_dir"
+        echo "CCACHE_DIR=$ccache_dir" >> $GITHUB_ENV
+        echo "🔧 Using persistent ccache directory: $ccache_dir"
+
+        # Configure ccache settings for local use only
+        ccache --set-config=max_size=20G
+        ccache --set-config=compression=true
+        ccache --set-config=compression_level=6
+        ccache --set-config=sloppiness=pch_defines,time_macros
+        ccache --set-config=cache_dir="$ccache_dir"
+
+        # Enable ccache for CMake (set environment variables)
+        # Get the full path to ccache executable
+        ccache_path=$(which ccache)
+        echo "ccache_symlinks_path=$ccache_path" >> $GITHUB_ENV

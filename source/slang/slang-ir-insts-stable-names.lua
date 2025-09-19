@@ -669,6 +669,7 @@ return {
 	["SPIRVAsmOperand.__sampledType"] = 665,
 	["SPIRVAsmOperand.__imageType"] = 666,
 	["SPIRVAsmOperand.__sampledImageType"] = 667,
-	["Decoration.spirvExport"] = 668,
-	["Decoration.spirvExtern"] = 669,
+	["Type.CLayout"] = 668,
+	["Decoration.spirvExport"] = 669,
+	["Decoration.spirvExtern"] = 670,
 }

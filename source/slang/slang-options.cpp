@@ -663,6 +663,12 @@ void initCommandOptions(CommandOptions& options)
          "-fvk-use-dx-layout",
          nullptr,
          "Pack members using FXCs member packing rules when targeting GLSL or SPIRV."},
+        {OptionKind::ForceCLayout,
+         "-fvk-use-c-layout",
+         nullptr,
+         "Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, "
+         "ByteAddressBuffer and general pointers follow the C/C++ structure layout rules "
+         "when targeting SPIRV."},
         {OptionKind::VulkanBindShift,
          vkShiftNames.getBuffer(),
          "-fvk-<vulkan-shift>-shift <N> <space>",
@@ -2009,8 +2015,14 @@ SlangResult OptionsParser::_parseHelp(const CommandLineArg& arg)
     {
         auto catArg = m_reader.getArgAndAdvance();
 
-        categoryIndex =
-            m_cmdOptions->findCategoryByCaseInsensitiveName(catArg.value.getUnownedSlice());
+        categoryIndex = m_cmdOptions->findCategoryByName(catArg.value.getUnownedSlice());
+
+        if (categoryIndex < 0)
+        {
+            categoryIndex =
+                m_cmdOptions->findCategoryByCaseInsensitiveName(catArg.value.getUnownedSlice());
+        }
+
         if (categoryIndex < 0)
         {
             m_sink->diagnose(catArg.loc, Diagnostics::unknownHelpCategory);
@@ -2662,6 +2674,11 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::ForceDXLayout:
             {
                 getCurrentTarget()->optionSet.add(CompilerOptionName::ForceDXLayout, true);
+                break;
+            }
+        case OptionKind::ForceCLayout:
+            {
+                getCurrentTarget()->optionSet.add(CompilerOptionName::ForceCLayout, true);
                 break;
             }
         case OptionKind::EnableEffectAnnotations:
@@ -3699,6 +3716,11 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             if (rawTarget.optionSet.shouldUseDXLayout())
             {
                 m_compileRequest->setTargetForceDXLayout(targetID, true);
+            }
+
+            if (rawTarget.optionSet.shouldUseCLayout())
+            {
+                m_compileRequest->setTargetForceCLayout(targetID, true);
             }
 
             if (rawTarget.optionSet.getBoolOption(CompilerOptionName::GenerateWholeProgram))

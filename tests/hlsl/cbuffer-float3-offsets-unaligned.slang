@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv -emit-spirv-directly -profile cs_6_2 -entry computeMain -line-directive-mode none -fvk-use-dx-layout
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-slang -compute -dx12 -use-dxil -Xslang... -Xdxc -fvk-use-dx-layout -Xdxc -enable-16bit-types -X. -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-slang -compute -dx12 -Xslang... -Xdxc -fvk-use-dx-layout -Xdxc -enable-16bit-types -X. -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-slang -compute -vk -emit-spirv-directly -Xslang... -fvk-use-dx-layout -X. -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -output-using-type
 //TEST:REFLECTION(filecheck=REFLECT):-stage compute -entry computeMain -target spirv -profile cs_6_2 -no-codegen -line-directive-mode none -fvk-use-dx-layout

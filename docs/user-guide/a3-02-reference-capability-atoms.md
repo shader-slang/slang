@@ -526,6 +526,9 @@ Extensions
 `GL_NV_compute_shader_derivatives`
 > Represents the GL_NV_compute_shader_derivatives extension.
 
+`GL_NV_cooperative_vector`
+> Represents the GL_NV_cooperative_vector extension.
+
 `GL_NV_fragment_shader_barycentric`
 > Represents the GL_NV_fragment_shader_barycentric extension.
 
@@ -810,9 +813,6 @@ Extensions
 `spvVulkanMemoryModelKHR`
 > Represents the SPIR-V capability for vulkan memory model.
 
-`GL_NV_cooperative_vector`
-> Represents the GL_NV_cooperative_vector extension.
-
 Compound Capabilities
 ----------------------
 *Capabilities to specify capabilities created by other capabilities (`raytracing`, `meshshading`...)*
@@ -983,6 +983,9 @@ Compound Capabilities
 
 `cpp_cuda_hlsl_spirv`
 > CPP, CUDA, HLSL, and SPIRV code-gen targets
+
+`cpp_cuda_metal_spirv`
+> CPP, CUDA, Metal, and SPIRV code-gen targets
 
 `cpp_cuda_spirv`
 > CPP, CUDA and SPIRV code-gen targets

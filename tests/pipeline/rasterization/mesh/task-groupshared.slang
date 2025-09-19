@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -task -output-using-type -dx12 -use-dxil -profile sm_6_6 -render-features mesh-shader
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -task -output-using-type -dx12 -profile sm_6_6 -render-features mesh-shader
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -task -output-using-type -vk -profile sm_6_5 -render-features mesh-shader
 
 // Similar to task-simple, except that the payload is declared as a groupshared

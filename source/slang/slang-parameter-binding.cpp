@@ -1821,11 +1821,12 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
             // We need to compute whether an entry point consumes
             // any sample-rate inputs, and along with explicitly
             // `sample`-qualified parameters, we also need to
-            // detect use of `SV_SampleIndex` as an input.
+            // detect use of `SV_SampleIndex` and
+            // `SV_VulkanSamplePosition` as an input.
             //
             if (state.directionMask & kEntryPointParameterDirection_Input)
             {
-                if (sn == "sv_sampleindex")
+                if (sn == "sv_sampleindex" || sn == "sv_vulkansampleposition")
                 {
                     state.isSampleRate = true;
                 }
@@ -2343,13 +2344,13 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     {
         SLANG_ASSERT(ptrType->astNodeType == ASTNodeType::PtrType);
 
+        auto typeLayout = processSimpleEntryPointParameter(context, ptrType, state, varLayout);
+        RefPtr<PointerTypeLayout> ptrTypeLayout = typeLayout.as<PointerTypeLayout>();
+
         // Work out the layout for the value/target type
         auto valueTypeLayout =
             processEntryPointVaryingParameter(context, ptrType->getValueType(), state, varLayout);
-
-        RefPtr<PointerTypeLayout> ptrTypeLayout = new PointerTypeLayout();
         ptrTypeLayout->valueTypeLayout = valueTypeLayout;
-
         return ptrTypeLayout;
     }
     else if (auto optionalType = as<OptionalType>(type))
@@ -2419,7 +2420,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         if (auto structDeclRef = declRef.as<StructDecl>())
         {
             RefPtr<StructTypeLayout> structLayout = new StructTypeLayout();
-            structLayout->type = type;
+            structLayout->type = declRefType;
 
             // We will recursively walk the fields of a `struct` type
             // to compute layouts for those fields.

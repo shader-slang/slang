@@ -756,6 +756,14 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         requiredType = builder->getBasicType(BaseType::Int);
         name = "gl_SampleID";
     }
+    else if (semanticName == "sv_vulkansampleposition")
+    {
+        context->requireGLSLVersion(ProfileVersion::GLSL_400);
+        requiredType = builder->getVectorType(
+            builder->getBasicType(BaseType::Float),
+            builder->getIntValue(builder->getIntType(), 2));
+        name = "gl_SamplePosition";
+    }
     else if (semanticName == "sv_stencilref")
     {
         // uint in hlsl, int in glsl
@@ -1458,7 +1466,11 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
             // Set the array size to 0, to mean it is unsized
             auto arrayType = builder->getArrayType(type, 0);
 
-            IRType* paramType = builder->getPtrType(ptrOpCode, arrayType, addrSpace);
+            auto accessQualifier = AccessQualifier::ReadWrite;
+            if (kind == LayoutResourceKind::VaryingInput)
+                accessQualifier = AccessQualifier::Read;
+            IRType* paramType =
+                builder->getPtrType(ptrOpCode, arrayType, accessQualifier, addrSpace);
 
             auto globalParam = addGlobalParam(builder->getModule(), paramType);
             moveValueBefore(globalParam, builder->getFunc());
@@ -2550,7 +2562,7 @@ static void consolidateParameters(GLSLLegalizationContext* context, List<IRParam
 
     // Create a global variable to hold the consolidated struct
     consolidatedVar = builder->createGlobalVar(structType);
-    auto ptrType = builder->getPtrType(kIROp_PtrType, structType, AddressSpace::IncomingRayPayload);
+    auto ptrType = builder->getPtrType(structType, AddressSpace::IncomingRayPayload);
     consolidatedVar->setFullType(ptrType);
     consolidatedVar->moveToEnd();
 
@@ -3080,7 +3092,8 @@ IRInst* getOrCreatePerVertexInputArray(GLSLLegalizationContext* context, IRInst*
     auto arrayType = builder.getArrayType(
         tryGetPointedToType(&builder, inputVertexAttr->getDataType()),
         builder.getIntValue(builder.getIntType(), 3));
-    arrayInst = builder.createGlobalParam(builder.getPtrType(arrayType, AddressSpace::Input));
+    arrayInst = builder.createGlobalParam(
+        builder.getPtrType(arrayType, AccessQualifier::Read, AddressSpace::Input));
     context->mapVertexInputToPerVertexArray[inputVertexAttr] = arrayInst;
     builder.addDecoration(arrayInst, kIROp_PerVertexDecoration);
 
@@ -4197,7 +4210,6 @@ void legalizeEntryPointForGLSL(
     }
 
     // Special handling for ray tracing shaders
-    bool isRayTracingShader = false;
     switch (stage)
     {
     case Stage::AnyHit:
@@ -4206,7 +4218,6 @@ void legalizeEntryPointForGLSL(
     case Stage::Intersection:
     case Stage::Miss:
     case Stage::RayGeneration:
-        isRayTracingShader = true;
         consolidateRayTracingParameters(&context, func);
         break;
     default:
@@ -4293,10 +4304,7 @@ void legalizeEntryPointForGLSL(
             // Re-add ptr if there was one on the input
             if (ptrType)
             {
-                sizedArrayType = builder.getPtrType(
-                    ptrType->getOp(),
-                    sizedArrayType,
-                    ptrType->getAddressSpace());
+                sizedArrayType = builder.getPtrType(sizedArrayType, ptrType);
             }
 
             // Change the globals type

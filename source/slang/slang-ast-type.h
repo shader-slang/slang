@@ -162,6 +162,12 @@ class ScalarDataLayoutType : public DataLayoutType
 };
 
 FIDDLE()
+class CDataLayoutType : public DataLayoutType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
 class FeedbackType : public BuiltinType
 {
     FIDDLE(...)
@@ -679,7 +685,7 @@ class PtrTypeBase : public BuiltinType
     FIDDLE(...)
     // Get the type of the pointed-to value.
     Type* getValueType();
-
+    Val* getAccessQualifier();
     Val* getAddressSpace();
 };
 

@@ -1071,9 +1071,7 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
     {
     case kIROp_VoidType:
     case kIROp_BoolType:
-    case kIROp_Int8Type:
     case kIROp_IntType:
-    case kIROp_UInt8Type:
     case kIROp_UIntType:
     case kIROp_FloatType:
     case kIROp_HalfType:
@@ -1081,6 +1079,12 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit(getDefaultBuiltinTypeName(type->getOp()));
             return;
         }
+    case kIROp_Int8Type:
+        m_writer->emit("char");
+        return;
+    case kIROp_UInt8Type:
+        m_writer->emit("uchar");
+        return;
     case kIROp_Int64Type:
         m_writer->emit("long");
         return;
@@ -1101,6 +1105,9 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
         return;
     case kIROp_StructType:
         m_writer->emit(getName(type));
+        return;
+    case kIROp_DescriptorHandleType:
+        emitType(type);
         return;
 
     case kIROp_DoubleType:

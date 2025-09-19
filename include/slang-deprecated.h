@@ -750,6 +750,9 @@ extern "C"
     SLANG_API SlangReflectionGeneric* spReflectionDecl_castToGeneric(SlangReflectionDecl* decl);
     SLANG_API SlangReflectionType* spReflection_getTypeFromDecl(SlangReflectionDecl* decl);
     SLANG_API SlangReflectionDecl* spReflectionDecl_getParent(SlangReflectionDecl* decl);
+    SLANG_API SlangReflectionModifier* spReflectionDecl_findModifier(
+        SlangReflectionDecl* decl,
+        SlangModifierID modifierID);
 
     // Generic Reflection
 
@@ -1608,6 +1611,8 @@ struct ICompileRequest : public ISlangUnknown
 
     virtual SLANG_NO_THROW void SLANG_MCALL
     setTargetEmbedDownstreamIR(int targetIndex, bool value) = 0;
+
+    virtual SLANG_NO_THROW void SLANG_MCALL setTargetForceCLayout(int targetIndex, bool value) = 0;
 };
 
     #define SLANG_UUID_ICompileRequest ICompileRequest::getTypeGuid()

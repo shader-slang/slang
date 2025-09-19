@@ -1,6 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -emit-spirv-via-glsl -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -d3d12 -profile cs_6_6 -use-dxil -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -d3d12 -profile cs_6_6 -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj -output-using-type
 
