@@ -1600,6 +1600,40 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
+    void legalizeSPIRVLinkageFunc(IRFunc* func)
+    {
+        // Check the `HLSLExport` decoration or `DownstreamExport` decoration. If any performs, we
+        // assume this function is exported, add SpirV export decoration and add linkage attribute
+        // later.
+        auto hlslExportDecor = func->findDecoration<IRHLSLExportDecoration>();
+        auto downstreamExportDecor = func->findDecoration<IRDownstreamModuleExportDecoration>();
+        if (hlslExportDecor || downstreamExportDecor)
+        {
+            IRBuilder builder(func);
+            builder.addDecoration(func, kIROp_SpirVExportDecoration);
+        }
+        // Check the `UserExtern` decoration or `DownstreamImport` decoration. If any performs, we
+        // assume this function is imported, add SpirV extern decoration and add linkage attribute
+        // later.
+        auto userExternDecor = func->findDecoration<IRUserExternDecoration>();
+        auto downstreamImportDecor = func->findDecoration<IRDownstreamModuleImportDecoration>();
+        // Also, we need to check `AvailableInDownstream` decoration for slang module link.
+        auto availableInDownstreamDecor =
+            func->findDecoration<IRAvailableInDownstreamIRDecoration>();
+        if (userExternDecor || downstreamImportDecor || availableInDownstreamDecor)
+        {
+            IRBuilder builder(func);
+            builder.addDecoration(func, kIROp_SpirVExternDecoration);
+            // If function comes from downstream IR, mangled name is stored in `ExportDecoration`
+            // instead of `ImportDecoration`, also need to fix this.
+            auto exportDecor = func->findDecoration<IRExportDecoration>();
+            if (exportDecor)
+            {
+                builder.addImportDecoration(func, exportDecor->getMangledName());
+            }
+        }
+    }
+
     void legalizeSPIRVEntryPoint(IRFunc* func, IREntryPointDecoration* entryPointDecor)
     {
         auto stage = entryPointDecor->getProfile().getStage();
@@ -2280,6 +2314,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         {
             if (auto func = as<IRFunc>(globalInst))
             {
+                legalizeSPIRVLinkageFunc(func);
                 if (auto entryPointDecor = func->findDecoration<IREntryPointDecoration>())
                 {
                     legalizeSPIRVEntryPoint(func, entryPointDecor);
