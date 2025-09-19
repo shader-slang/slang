@@ -128,18 +128,20 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
         return SLANG_OK;
     }
 
-    // We try to search the DLL in two different attempts.
-    // First attempt tries on the directories explicitly specified with AddDllDirectory(),
-    // If it failed to find one, we will search over all PATH.
-    // Windows API made two approaches mutually exclusive and we need to try two times.
+    // Search both user-specified directories (AddDllDirectory) and default search paths.
+    // Using LOAD_LIBRARY_SEARCH_USER_DIRS | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS combines
+    // the behavior of the previous two-step approach into a single call.
+    // Search order: 1) User directories (AddDllDirectory/SetDllDirectory)
+    //               2) Application directory
+    //               3) System32
+    // Note: PATH environment variable is NOT searched (unlike LoadLibraryW).
     // https://learn.microsoft.com/en-us/windows/win32/api/libloaderapi/nf-libloaderapi-loadlibraryexw
     String platformFileNameStr(platformFileName);
-    HMODULE h =
-        LoadLibraryExW(platformFileNameStr.toWString(), nullptr, LOAD_LIBRARY_SEARCH_USER_DIRS);
-    // If LoadLibraryExW failed, try again with LoadLibraryW.
-    // https://docs.microsoft.com/en-us/windows/desktop/api/libloaderapi/nf-libloaderapi-loadlibraryw
-    if (!h)
-        h = LoadLibraryW(platformFileNameStr.toWString());
+    OSString wideFileName = platformFileNameStr.toWString();
+    HMODULE h = LoadLibraryExW(
+        wideFileName, 
+        nullptr, 
+        LOAD_LIBRARY_SEARCH_USER_DIRS | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
     // If still not found, return an error.
     if (!h)
     {
