@@ -2743,6 +2743,7 @@ SlangResult emitHostVMCode(CodeGenContext* codeGenContext, ComPtr<IArtifact>& ou
     outArtifact = ArtifactUtil::createArtifactForCompileTarget(SLANG_HOST_VM);
     outArtifact->addRepresentationUnknown(byteCodeBlob);
 
+    // trivial change to trigger ci
     return SLANG_OK;
 }
 
