@@ -20,6 +20,7 @@
 #endif
 
 #if SLANG_LINUX_FAMILY
+#include <limits.h>
 #include <unistd.h>
 #endif
 
