@@ -128,22 +128,28 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
         return SLANG_OK;
     }
 
-    // Search both user-specified directories (AddDllDirectory) and default search paths.
-    // Using LOAD_LIBRARY_SEARCH_USER_DIRS | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS combines
-    // the behavior of the previous two-step approach into a single call.
-    // Search order: 1) User directories (AddDllDirectory/SetDllDirectory)
+    // We try to search the DLL in two different attempts.
+    // First attempt - LoadLibraryExW()
+    // If it failed to find one, we will use LoadLibraryW() to search over all PATH.
+    // Search order: 1) The directory that contains the DLL (LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR).
+    //                  This directory is searched only for dependencies of the DLL being loaded.
     //               2) Application directory
-    //               3) System32
-    // Note: PATH environment variable is NOT searched (unlike LoadLibraryW).
+    //               3) User directories (AddDllDirectory/SetDllDirectory)
+    //               4) System32
+    //               5) PATH environment variable (by the 2nd attempt with LoadLibraryW())
     // https://learn.microsoft.com/en-us/windows/win32/api/libloaderapi/nf-libloaderapi-loadlibraryexw
+    // https://docs.microsoft.com/en-us/windows/desktop/api/libloaderapi/nf-libloaderapi-loadlibraryw
     String platformFileNameStr(platformFileName);
     OSString wideFileName = platformFileNameStr.toWString();
-    HMODULE h = LoadLibraryExW(
+    HMODULE handle = LoadLibraryExW(
         wideFileName, 
         nullptr, 
-        LOAD_LIBRARY_SEARCH_USER_DIRS | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
+        LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
+
+    if (!handle)
+        handle = LoadLibraryW(wideFileName);
     // If still not found, return an error.
-    if (!h)
+    if (!handle)
     {
         const DWORD lastError = GetLastError();
         switch (lastError)
@@ -166,7 +172,7 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
         // Turn to Result, if not one of the well known errors
         return HRESULT_FROM_WIN32(lastError);
     }
-    handleOut = (Handle)h;
+    handleOut = (Handle)handle;
     return SLANG_OK;
 }
 
