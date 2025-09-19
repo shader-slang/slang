@@ -7486,7 +7486,7 @@ IRInst* getOrEmitDebugSource(IRGenContext* context, PathInfo path)
         content = UnownedStringSlice((char*)outBlob->getBufferPointer(), outBlob->getBufferSize());
     IRBuilder builder(*context->irBuilder);
     builder.setInsertInto(context->irBuilder->getModule());
-    auto debugSrcInst = builder.emitDebugSource(path.foundPath.getUnownedSlice(), content);
+    auto debugSrcInst = builder.emitDebugSource(path.foundPath.getUnownedSlice(), content, false);
     context->shared->mapSourcePathToDebugSourceInst[path.foundPath] = debugSrcInst;
     return debugSrcInst;
 }
@@ -12130,7 +12130,8 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         {
             auto debugSource = builder->emitDebugSource(
                 source->getPathInfo().getMostUniqueIdentity().getUnownedSlice(),
-                source->getContent());
+                source->getContent(),
+                source->isIncludedFile());
             context->shared->mapSourceFileToDebugSourceInst.add(source, debugSource);
         }
     }
