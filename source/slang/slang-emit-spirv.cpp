@@ -2297,7 +2297,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 auto moduleInst = inst->getModule()->getModuleInst();
                 if (!m_defaultDebugSource)
                     m_defaultDebugSource = debugSource;
-                if (!m_mapIRInstToSpvDebugInst.containsKey(moduleInst))
+                // Only create DebugCompilationUnit for non-included files
+                auto isIncludedFile = as<IRBoolLit>(debugSource->getIsIncludedFile())->getValue();
+                if (!m_mapIRInstToSpvDebugInst.containsKey(moduleInst) && !isIncludedFile)
                 {
                     IRBuilder builder(inst);
                     builder.setInsertBefore(inst);
