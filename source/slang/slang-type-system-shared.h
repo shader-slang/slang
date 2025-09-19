@@ -23,9 +23,6 @@ namespace Slang
     X(IntPtr)                \
     X(UIntPtr)               \
     X(CountOfPrimitives)     \
-    X(AddressSpace)          \
-    X(MemoryScope)           \
-    X(AccessQualifier)       \
     /* end */
 
 enum class BaseType

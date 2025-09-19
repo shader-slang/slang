@@ -24,6 +24,11 @@ if(EMSCRIPTEN)
     # To generate binding code
     target_link_options(
         slang-wasm
-        PUBLIC "--bind" "--emit-tsd" "interface.d.ts" "-s" "EXPORT_ES6=1"
+        PUBLIC
+        "--bind"
+        "--emit-tsd" "interface.d.ts"
+        "-sEXPORT_ES6=1"
+        "-sMODULARIZE=1"
+        "-sEXPORTED_RUNTIME_METHODS=['FS']"
     )
 endif()
