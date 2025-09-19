@@ -48,7 +48,7 @@ std::size_t DeviceCache::DeviceCacheKeyHash::operator()(const DeviceCacheKey& ke
 }
 
 DeviceCache::CachedDevice::CachedDevice() 
-    : refCount(0), lastUsed(std::chrono::steady_clock::now()), creationOrder(0)
+    : refCount(0), creationOrder(0)
 {
 }
 
@@ -83,14 +83,14 @@ void DeviceCache::evictOldestDeviceIfNeeded()
 Slang::ComPtr<rhi::IDevice> DeviceCache::acquireDevice(const rhi::DeviceDesc& desc)
 {
     // Only cache Vulkan devices to avoid the Tegra driver issue
-    if (desc.deviceType != rhi::DeviceType::Vulkan)
-    {
-        Slang::ComPtr<rhi::IDevice> device;
-        auto result = rhi::getRHI()->createDevice(desc, device.writeRef());
-        if (SLANG_SUCCEEDED(result))
-            return device;
-        return nullptr;
-    }
+    // if (desc.deviceType != rhi::DeviceType::Vulkan)
+    // {
+    //     Slang::ComPtr<rhi::IDevice> device;
+    //     auto result = rhi::getRHI()->createDevice(desc, device.writeRef());
+    //     if (SLANG_SUCCEEDED(result))
+    //         return device;
+    //     return nullptr;
+    // }
     
     std::lock_guard<std::mutex> lock(getMutex());
     auto& deviceCache = getDeviceCache();
@@ -118,7 +118,6 @@ Slang::ComPtr<rhi::IDevice> DeviceCache::acquireDevice(const rhi::DeviceDesc& de
     if (it != deviceCache.end())
     {
         it->second.refCount++;
-        it->second.lastUsed = std::chrono::steady_clock::now();
         return it->second.device;
     }
     
@@ -134,7 +133,6 @@ Slang::ComPtr<rhi::IDevice> DeviceCache::acquireDevice(const rhi::DeviceDesc& de
     CachedDevice& cached = deviceCache[key];
     cached.device = device;
     cached.refCount = 1;
-    cached.lastUsed = std::chrono::steady_clock::now();
     cached.creationOrder = nextCreationOrder++;
     
     return device;
@@ -145,9 +143,9 @@ void DeviceCache::releaseDevice(rhi::IDevice* device)
     if (!device)
         return;
         
-    // Only manage Vulkan devices
-    if (device->getDeviceType() != rhi::DeviceType::Vulkan)
-        return;
+    // // Only manage Vulkan devices
+    // if (device->getDeviceType() != rhi::DeviceType::Vulkan)
+    //     return;
         
     std::lock_guard<std::mutex> lock(getMutex());
     auto& deviceCache = getDeviceCache();
@@ -158,7 +156,6 @@ void DeviceCache::releaseDevice(rhi::IDevice* device)
         if (pair.second.device.get() == device)
         {
             pair.second.refCount--;
-            pair.second.lastUsed = std::chrono::steady_clock::now();
             break;
         }
     }

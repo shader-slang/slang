@@ -33,7 +33,6 @@ public:
     {
         Slang::ComPtr<rhi::IDevice> device;
         int refCount;
-        std::chrono::steady_clock::time_point lastUsed;
         uint64_t creationOrder;
         
         CachedDevice();
