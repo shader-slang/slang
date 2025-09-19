@@ -543,19 +543,35 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     {
         if (param->findModifier<GLSLBindingAttribute>())
         {
-            sink->diagnose(param, Diagnostics::unhandledModOnEntryPointParameter, "attribute '[[vk::binding(...)]]'", param->getName());
+            sink->diagnose(
+                param,
+                Diagnostics::unhandledModOnEntryPointParameter,
+                "attribute '[[vk::binding(...)]]'",
+                param->getName());
         }
         if (param->findModifier<PushConstantAttribute>())
         {
-            sink->diagnose(param, Diagnostics::unhandledModOnEntryPointParameter, "attribute '[[vk::push_constant]]'", param->getName());
+            sink->diagnose(
+                param,
+                Diagnostics::unhandledModOnEntryPointParameter,
+                "attribute '[[vk::push_constant]]'",
+                param->getName());
         }
         if (param->findModifier<HLSLRegisterSemantic>())
         {
-            sink->diagnose(param, Diagnostics::unhandledModOnEntryPointParameter, "keyword 'register'", param->getName());
+            sink->diagnose(
+                param,
+                Diagnostics::unhandledModOnEntryPointParameter,
+                "keyword 'register'",
+                param->getName());
         }
         if (param->findModifier<HLSLPackOffsetSemantic>())
         {
-            sink->diagnose(param, Diagnostics::unhandledModOnEntryPointParameter, "keyword 'packoffset'", param->getName());
+            sink->diagnose(
+                param,
+                Diagnostics::unhandledModOnEntryPointParameter,
+                "keyword 'packoffset'",
+                param->getName());
         }
     }
 
