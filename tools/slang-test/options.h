@@ -136,6 +136,9 @@ struct Options
 
     bool emitSPIRVDirectly = true;
 
+    // Whether to enable RHI device caching in render-test (default: true in slang-test)
+    bool cacheRhiDevice = true;
+
     Slang::HashSet<Slang::String> capabilities;
     Slang::HashSet<Slang::String> expectedFailureList;
 

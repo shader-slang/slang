@@ -1559,8 +1559,20 @@ static SlangResult _innerMain(
             {
                 getRHI()->enableDebugLayers();
             }
-            auto cachedDevice = DeviceCache::acquireDevice(desc);
-            if (!cachedDevice)
+            Slang::ComPtr<rhi::IDevice> rhiDevice;
+            if (options.cacheRhiDevice)
+            {
+                rhiDevice = DeviceCache::acquireDevice(desc);
+            }
+            else
+            {
+                auto result = rhi::getRHI()->createDevice(desc, rhiDevice.writeRef());
+                if (SLANG_FAILED(result))
+                {
+                    rhiDevice = nullptr;
+                }
+            }
+            if (!rhiDevice)
             {
                 // We need to be careful here about SLANG_E_NOT_AVAILABLE. This return value means
                 // that the renderer couldn't be created because it required *features* that were
@@ -1580,7 +1592,7 @@ static SlangResult _innerMain(
 
                 return res;
             }
-            deviceWrapper = CachedDeviceWrapper(cachedDevice);
+            deviceWrapper = CachedDeviceWrapper(rhiDevice);
             SLANG_ASSERT(deviceWrapper);
         }
 

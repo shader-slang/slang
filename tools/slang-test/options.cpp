@@ -92,6 +92,7 @@ static bool _isSubCommand(const char* arg)
         "  -capability <name>             Compile with the given capability\n"
         "  -enable-debug-layers [true|false] Enable or disable Validation Layer for Vulkan\n"
         "                                 and Debug Device for DX\n"
+        "  -cache-rhi-device [true|false] Enable or disable RHI device caching (default: true)\n"
 #if _DEBUG
         "  -disable-debug-layers          Disable the debug layers (default enabled in debug "
         "build)\n"
@@ -499,6 +500,26 @@ static bool _isSubCommand(const char* arg)
                 ((value[0] == 'o' || value[0] == 'O') && (value[1] == 'f' || value[1] == 'F')))
             {
                 optionsOut->enableDebugLayers = false;
+            }
+        }
+        else if (strcmp(arg, "-cache-rhi-device") == 0)
+        {
+            optionsOut->cacheRhiDevice = true;
+
+            if (argCursor == argEnd)
+            {
+                stdError.print("error: expected operand for '%s'\n", arg);
+                showHelp(stdError);
+                return SLANG_FAIL;
+            }
+
+            // Check for false variants
+            const char* value = *argCursor++;
+            if (value[0] == 'f' || value[0] == 'F' || value[0] == 'n' || value[0] == 'N' ||
+                value[0] == '0' ||
+                ((value[0] == 'o' || value[0] == 'O') && (value[1] == 'f' || value[1] == 'F')))
+            {
+                optionsOut->cacheRhiDevice = false;
             }
         }
 #if _DEBUG

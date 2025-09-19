@@ -3643,6 +3643,11 @@ static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine
     {
         ioCmdLine.addArg("-enable-debug-layers");
     }
+
+    if (options.cacheRhiDevice)
+    {
+        ioCmdLine.addArg("-cache-rhi-device");
+    }
 }
 
 static SlangResult _extractProfileTime(const UnownedStringSlice& text, double& timeOut)
