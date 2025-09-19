@@ -1,10 +1,10 @@
 //TEST:SIMPLE(filecheck=METAL): -target metal
-//TEST:SIMPLE(filecheck=METAL_ASM): -target metallib
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -stage fragment -entry fragmentMain
 //TEST:SIMPLE(filecheck=WGSLSPIRV): -target wgsl-spirv-asm
 
-// METAL_ASM: define {{.*}} @vertexMain
-// METAL_ASM: define {{.*}} @fragmentMain
+// METALLIB: define {{.*}} @vertexMain
+// METALLIB: define {{.*}} @fragmentMain
 
 // Check that we don't flatten stage-input parameters that have user semantics.
 

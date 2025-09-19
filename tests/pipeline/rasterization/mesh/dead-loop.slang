@@ -1,5 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -mesh -output-using-type -dx12 -profile sm_6_6 -render-features mesh-shader
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -mesh -output-using-type -vk -profile sm_6_5 -render-features mesh-shader
+//TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -mesh -output-using-type -metal -render-features mesh-shader
 
 // See https://github.com/shader-slang/slang/issues/3401
 

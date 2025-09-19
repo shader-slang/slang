@@ -6,9 +6,11 @@
 //TEST:SIMPLE(filecheck=CUDA): -stage compute -entry computeMain -target cuda
 //TEST:SIMPLE(filecheck=CPP):  -stage compute -entry computeMain -target cpp
 
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -output-using-type -emit-spirv-via-glsl
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -output-using-type -emit-spirv-directly
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -output-using-type -emit-spirv-via-glsl
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -output-using-type -emit-spirv-directly
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib
+
+//TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -compute -output-using-type -xslang -DMETAL_COMPUTE
 
 //TEST_INPUT:ubuffer(data=[0 1 -1], stride=4):name=inputBuffer
 RWStructuredBuffer<int> inputBuffer;
@@ -63,7 +65,7 @@ bool Test_Scalar()
 
         // METAL: atan2(
         // METALLIB: atan2.f32
-        && zero == atan2<T>(zero, zero)
+        && zero == atan2<T>(zero, one)
 
         // METAL: atanh(
         // METALLIB: atanh.f32
@@ -291,7 +293,7 @@ bool Test_Vector()
 
         // METAL: atan2(
         // METAL-NOT: atan2(
-        && zero == atan2<T>(zero, zero)
+        && zero == atan2<T>(zero, one)
 
         // METAL: atanh(
         // METAL-NOT: atanh(
