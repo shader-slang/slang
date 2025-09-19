@@ -65,7 +65,7 @@ void computeMain()
         output,
         0,
         32,
-        CoopVecMatrixLayout::RowMajor,
+        CoopVecMatrixLayout::TrainingOptimal,
         CoopVecComponentType::Float16,
     );
 
