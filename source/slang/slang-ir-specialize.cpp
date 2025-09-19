@@ -846,9 +846,35 @@ struct SpecializationContext
         // operation that will yield such a table.
         //
         auto witnessTable = as<IRWitnessTable>(lookupInst->getWitnessTable());
+        IRInterfaceType* interfaceType = nullptr;
         if (!witnessTable)
         {
-            return false;
+            IRInst* currentWitness = lookupInst->getWitnessTable();
+            if (auto nestedLookupInst = as<IRLookupWitnessMethod>(currentWitness))
+            {
+                addToWorkList(nestedLookupInst);
+                return false;
+            }
+
+            if (as<IRThisTypeWitness>(currentWitness))
+            {
+                auto witnessTableType = as<IRWitnessTableTypeBase>(currentWitness->getDataType());
+                if (!areAllOperandsFullySpecialized(witnessTableType))
+                    return false;
+
+                interfaceType = as<IRInterfaceType>(witnessTableType->getConformanceType());
+            }
+            else if (auto witnessTableType = as<IRWitnessTableType>(currentWitness))
+            {
+                interfaceType = as<IRInterfaceType>(witnessTableType->getConformanceType());
+            }
+            else
+            {
+                return false;
+            }
+
+            if (!interfaceType)
+                return false;
         }
 
         // Because we have a concrete witness table, we can
@@ -856,7 +882,12 @@ struct SpecializationContext
         // the given interface requirement.
         //
         auto requirementKey = lookupInst->getRequirementKey();
-        auto satisfyingVal = findWitnessVal(witnessTable, requirementKey);
+        IRInst* satisfyingVal = nullptr;
+
+        if (witnessTable)
+            satisfyingVal = findWitnessVal(witnessTable, requirementKey);
+        else
+            satisfyingVal = findInterfaceRequirement(interfaceType, requirementKey);
 
         // We expect to always find a satisfying value, but
         // we will go ahead and code defensively so that
@@ -915,6 +946,7 @@ struct SpecializationContext
         }
         return nullptr;
     }
+
     template<typename TDict>
     void _readSpecializationDictionaryImpl(TDict& dict, IRInst* dictInst)
     {
