@@ -10,6 +10,7 @@
 // Device Cache for preventing NVIDIA Tegra driver state corruption
 // This cache reuses Vulkan instances and devices to avoid the VK_ERROR_INCOMPATIBLE_DRIVER
 // issue that occurs after ~19 device creation/destruction cycles on Tegra platforms.
+// Uses ComPtr for automatic device lifecycle management - devices are released when removed from cache.
 class DeviceCache
 {
 public:
@@ -32,7 +33,6 @@ public:
     struct CachedDevice
     {
         Slang::ComPtr<rhi::IDevice> device;
-        int refCount;
         uint64_t creationOrder;
         
         CachedDevice();
@@ -50,7 +50,6 @@ private:
     
 public:
     static Slang::ComPtr<rhi::IDevice> acquireDevice(const rhi::DeviceDesc& desc);
-    static void releaseDevice(rhi::IDevice* device);
     static void cleanCache();
 };
 
@@ -67,10 +66,6 @@ public:
     
     ~CachedDeviceWrapper()
     {
-        if (m_device)
-        {
-            DeviceCache::releaseDevice(m_device.get());
-        }
     }
     
     // Move constructor
@@ -84,10 +79,6 @@ public:
     {
         if (this != &other)
         {
-            if (m_device)
-            {
-                DeviceCache::releaseDevice(m_device.get());
-            }
             m_device = std::move(other.m_device);
         }
         return *this;

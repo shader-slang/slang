@@ -48,7 +48,7 @@ std::size_t DeviceCache::DeviceCacheKeyHash::operator()(const DeviceCacheKey& ke
 }
 
 DeviceCache::CachedDevice::CachedDevice() 
-    : refCount(0), creationOrder(0)
+    : creationOrder(0)
 {
 }
 
@@ -58,22 +58,20 @@ void DeviceCache::evictOldestDeviceIfNeeded()
     if (deviceCache.size() < MAX_CACHED_DEVICES)
         return;
         
-    // Find the oldest device that has only one reference (from our cache)
+    // Find the oldest device to evict
     auto oldestIt = deviceCache.end();
     uint64_t oldestCreationOrder = UINT64_MAX;
     
     for (auto it = deviceCache.begin(); it != deviceCache.end(); ++it)
     {
-        // Check if device is not currently in use by any CachedDeviceWrapper
-        // If refCount is 0, it means no active users and is safe to evict
-        if (it->second.refCount == 0 && it->second.creationOrder < oldestCreationOrder)
+        if (it->second.creationOrder < oldestCreationOrder)
         {
             oldestCreationOrder = it->second.creationOrder;
             oldestIt = it;
         }
     }
     
-    // Remove the oldest truly unused device
+    // Remove the oldest device - ComPtr will handle the actual device release
     if (oldestIt != deviceCache.end())
     {
         deviceCache.erase(oldestIt);
@@ -82,15 +80,15 @@ void DeviceCache::evictOldestDeviceIfNeeded()
 
 Slang::ComPtr<rhi::IDevice> DeviceCache::acquireDevice(const rhi::DeviceDesc& desc)
 {
-    // Only cache Vulkan devices to avoid the Tegra driver issue
-    // if (desc.deviceType != rhi::DeviceType::Vulkan)
-    // {
-    //     Slang::ComPtr<rhi::IDevice> device;
-    //     auto result = rhi::getRHI()->createDevice(desc, device.writeRef());
-    //     if (SLANG_SUCCEEDED(result))
-    //         return device;
-    //     return nullptr;
-    // }
+    // Skip caching for CUDA devices due to crashes
+    if (desc.deviceType == rhi::DeviceType::CUDA)
+    {
+        Slang::ComPtr<rhi::IDevice> device;
+        auto result = rhi::getRHI()->createDevice(desc, device.writeRef());
+        if (SLANG_SUCCEEDED(result))
+            return device;
+        return nullptr;
+    }
     
     std::lock_guard<std::mutex> lock(getMutex());
     auto& deviceCache = getDeviceCache();
@@ -117,7 +115,7 @@ Slang::ComPtr<rhi::IDevice> DeviceCache::acquireDevice(const rhi::DeviceDesc& de
     auto it = deviceCache.find(key);
     if (it != deviceCache.end())
     {
-        it->second.refCount++;
+        // Return the cached device - COM reference counting handles the references
         return it->second.device;
     }
     
@@ -132,34 +130,11 @@ Slang::ComPtr<rhi::IDevice> DeviceCache::acquireDevice(const rhi::DeviceDesc& de
     // Cache the device
     CachedDevice& cached = deviceCache[key];
     cached.device = device;
-    cached.refCount = 1;
     cached.creationOrder = nextCreationOrder++;
     
     return device;
 }
 
-void DeviceCache::releaseDevice(rhi::IDevice* device)
-{
-    if (!device)
-        return;
-        
-    // // Only manage Vulkan devices
-    // if (device->getDeviceType() != rhi::DeviceType::Vulkan)
-    //     return;
-        
-    std::lock_guard<std::mutex> lock(getMutex());
-    auto& deviceCache = getDeviceCache();
-    
-    // Find the device in cache and decrement ref count
-    for (auto& pair : deviceCache)
-    {
-        if (pair.second.device.get() == device)
-        {
-            pair.second.refCount--;
-            break;
-        }
-    }
-}
 
 void DeviceCache::cleanCache()
 {
