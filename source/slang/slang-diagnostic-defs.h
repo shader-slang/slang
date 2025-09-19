@@ -2079,9 +2079,8 @@ DIAGNOSTIC(
 DIAGNOSTIC(
     38010,
     Warning,
-    ignoredVkAttributeOnEntryPointParameter,
-    "attribute '$0' on parameter '$1' is unsupported on entry point parameters and will be "
-    "ignored")
+    unhandledModOnEntryPointParameter,
+    "$0 on parameter '$1' is unsupported on entry point parameters and will be ignored")
 
 DIAGNOSTIC(
     38100,
