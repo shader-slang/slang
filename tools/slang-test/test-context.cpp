@@ -130,7 +130,8 @@ TestContext::InnerMainFunc TestContext::getInnerMainFunc(const String& dirPath, 
             loader->loadPlatformSharedLibrary(path.begin(), tool.m_sharedLibrary.writeRef())))
     {
         tool.m_func = (InnerMainFunc)tool.m_sharedLibrary->findFuncByName("innerMain");
-        tool.m_cleanDeviceCacheFunc = (CleanDeviceCacheFunc)tool.m_sharedLibrary->findFuncByName("cleanDeviceCache");
+        tool.m_cleanDeviceCacheFunc =
+            (CleanDeviceCacheFunc)tool.m_sharedLibrary->findFuncByName("cleanDeviceCache");
     }
 
     m_sharedLibTools.add(name, tool);
@@ -156,7 +157,8 @@ void TestContext::setInnerMainFunc(const String& name, InnerMainFunc func)
 TestContext::CleanDeviceCacheFunc TestContext::getCleanDeviceCacheFunc(const String& name)
 {
     SharedLibraryTool* tool = m_sharedLibTools.tryGetValue(name);
-    if (tool) {
+    if (tool)
+    {
         return tool->m_cleanDeviceCacheFunc;
     }
 

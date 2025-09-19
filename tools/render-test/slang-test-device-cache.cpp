@@ -1,5 +1,6 @@
-#include <algorithm>
 #include "slang-test-device-cache.h"
+
+#include <algorithm>
 
 // Static member accessor functions (Meyer's singleton pattern)
 // This ensures proper destruction order - function-local statics are destroyed
@@ -10,7 +11,11 @@ std::mutex& DeviceCache::getMutex()
     return instance;
 }
 
-std::unordered_map<DeviceCache::DeviceCacheKey, DeviceCache::CachedDevice, DeviceCache::DeviceCacheKeyHash>& DeviceCache::getDeviceCache()
+std::unordered_map<
+    DeviceCache::DeviceCacheKey,
+    DeviceCache::CachedDevice,
+    DeviceCache::DeviceCacheKeyHash>&
+DeviceCache::getDeviceCache()
 {
     static std::unordered_map<DeviceCacheKey, CachedDevice, DeviceCacheKeyHash> instance;
     return instance;
@@ -24,11 +29,9 @@ uint64_t& DeviceCache::getNextCreationOrder()
 
 bool DeviceCache::DeviceCacheKey::operator==(const DeviceCacheKey& other) const
 {
-    return deviceType == other.deviceType &&
-           enableValidation == other.enableValidation &&
+    return deviceType == other.deviceType && enableValidation == other.enableValidation &&
            enableRayTracingValidation == other.enableRayTracingValidation &&
-           profileName == other.profileName &&
-           requiredFeatures == other.requiredFeatures;
+           profileName == other.profileName && requiredFeatures == other.requiredFeatures;
 }
 
 std::size_t DeviceCache::DeviceCacheKeyHash::operator()(const DeviceCacheKey& key) const
@@ -37,17 +40,17 @@ std::size_t DeviceCache::DeviceCacheKeyHash::operator()(const DeviceCacheKey& ke
     std::size_t h2 = std::hash<bool>{}(key.enableValidation);
     std::size_t h3 = std::hash<bool>{}(key.enableRayTracingValidation);
     std::size_t h4 = std::hash<std::string>{}(key.profileName);
-    
+
     std::size_t h5 = 0;
     for (const auto& feature : key.requiredFeatures)
     {
         h5 ^= std::hash<std::string>{}(feature) + 0x9e3779b9 + (h5 << 6) + (h5 >> 2);
     }
-    
+
     return h1 ^ (h2 << 1) ^ (h3 << 2) ^ (h4 << 3) ^ (h5 << 4);
 }
 
-DeviceCache::CachedDevice::CachedDevice() 
+DeviceCache::CachedDevice::CachedDevice()
     : creationOrder(0)
 {
 }
@@ -57,11 +60,11 @@ void DeviceCache::evictOldestDeviceIfNeeded()
     auto& deviceCache = getDeviceCache();
     if (deviceCache.size() < MAX_CACHED_DEVICES)
         return;
-        
+
     // Find the oldest device to evict
     auto oldestIt = deviceCache.end();
     uint64_t oldestCreationOrder = UINT64_MAX;
-    
+
     for (auto it = deviceCache.begin(); it != deviceCache.end(); ++it)
     {
         if (it->second.creationOrder < oldestCreationOrder)
@@ -70,7 +73,7 @@ void DeviceCache::evictOldestDeviceIfNeeded()
             oldestIt = it;
         }
     }
-    
+
     // Remove the oldest device - ComPtr will handle the actual device release
     if (oldestIt != deviceCache.end())
     {
@@ -89,28 +92,28 @@ Slang::ComPtr<rhi::IDevice> DeviceCache::acquireDevice(const rhi::DeviceDesc& de
             return device;
         return nullptr;
     }
-    
+
     std::lock_guard<std::mutex> lock(getMutex());
     auto& deviceCache = getDeviceCache();
     auto& nextCreationOrder = getNextCreationOrder();
-    
+
     // Create cache key
     DeviceCacheKey key;
     key.deviceType = desc.deviceType;
     key.enableValidation = desc.enableValidation;
     key.enableRayTracingValidation = desc.enableRayTracingValidation;
     key.profileName = desc.slang.targetProfile ? desc.slang.targetProfile : "";
-    
+
     // Add required features to key
     for (int i = 0; i < desc.requiredFeatureCount; ++i)
     {
         key.requiredFeatures.push_back(desc.requiredFeatures[i]);
     }
     std::sort(key.requiredFeatures.begin(), key.requiredFeatures.end());
-    
+
     // Evict oldest device if we've reached the limit
     evictOldestDeviceIfNeeded();
-    
+
     // Check if we have a cached device
     auto it = deviceCache.find(key);
     if (it != deviceCache.end())
@@ -118,7 +121,7 @@ Slang::ComPtr<rhi::IDevice> DeviceCache::acquireDevice(const rhi::DeviceDesc& de
         // Return the cached device - COM reference counting handles the references
         return it->second.device;
     }
-    
+
     // Create new device
     Slang::ComPtr<rhi::IDevice> device;
     auto result = rhi::getRHI()->createDevice(desc, device.writeRef());
@@ -126,12 +129,12 @@ Slang::ComPtr<rhi::IDevice> DeviceCache::acquireDevice(const rhi::DeviceDesc& de
     {
         return nullptr;
     }
-    
+
     // Cache the device
     CachedDevice& cached = deviceCache[key];
     cached.device = device;
     cached.creationOrder = nextCreationOrder++;
-    
+
     return device;
 }
 

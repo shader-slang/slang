@@ -5451,14 +5451,13 @@ SlangResult innerMain(int argc, char** argv)
 
 int main(int argc, char** argv)
 {
-        // Fallback: run without cleanup if context initialization fails
-        SlangResult res = innerMain(argc, argv);
-        slang::shutdown();
-        Slang::RttiInfo::deallocateAll();
+    // Fallback: run without cleanup if context initialization fails
+    SlangResult res = innerMain(argc, argv);
+    slang::shutdown();
+    Slang::RttiInfo::deallocateAll();
 
 #ifdef _MSC_VER
-        _CrtDumpMemoryLeaks();
+    _CrtDumpMemoryLeaks();
 #endif
-        return SLANG_SUCCEEDED(res) ? 0 : 1;
-    
+    return SLANG_SUCCEEDED(res) ? 0 : 1;
 }
