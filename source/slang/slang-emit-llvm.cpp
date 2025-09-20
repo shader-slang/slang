@@ -450,6 +450,74 @@ struct LLVMEmitter
             }
             break;
 
+        case kIROp_IntCast:
+            {
+                auto llvmValue = findValue(inst->getOperand(0));
+
+                auto fromTypeV = inst->getOperand(0)->getDataType();
+                auto toTypeV = inst->getDataType();
+                auto fromType = getVectorOrCoopMatrixElementType(fromTypeV);
+                auto toType = getVectorOrCoopMatrixElementType(toTypeV);
+
+                auto fromInfo = getIntTypeInfo(fromType);
+                auto toInfo = getIntTypeInfo(toType);
+
+                if (fromInfo.width == toInfo.width)
+                {
+                    // LLVM integers are sign-ambiguous, so if the width is the
+                    // same, there's nothing to do.
+                    llvmInst = llvmValue;
+                }
+                else if(as<IRBoolType>(toType))
+                {
+                    llvmInst = llvmBuilder.CreateCmp(
+                        llvm::CmpInst::Predicate::ICMP_NE,
+                        llvmValue,
+                        llvm::ConstantInt::get(ensureType(fromType), 0)
+                    );
+                }
+                else
+                {
+                    llvm::Instruction::CastOps cast = llvm::Instruction::CastOps::Trunc;
+                    if (toInfo.width > fromInfo.width)
+                    {
+                        // Source is signed, so sign extend.
+                        cast = fromInfo.isSigned ?
+                            llvm::Instruction::CastOps::SExt :
+                            llvm::Instruction::CastOps::ZExt;
+                    }
+                    llvmInst = llvmBuilder.CreateCast(cast, llvmValue, ensureType(toTypeV));
+                }
+            }
+            break;
+
+        case kIROp_FloatCast:
+            {
+                auto llvmValue = findValue(inst->getOperand(0));
+
+                auto fromTypeV = inst->getOperand(0)->getDataType();
+                auto toTypeV = inst->getDataType();
+
+                auto llvmFromType = ensureType(getVectorOrCoopMatrixElementType(fromTypeV));
+                auto llvmToType = ensureType(getVectorOrCoopMatrixElementType(toTypeV));
+
+                auto fromSize = llvmFromType->getScalarSizeInBits();
+                auto toSize = llvmToType->getScalarSizeInBits();
+
+                if (fromSize == toSize)
+                {
+                    llvmInst = llvmValue;
+                }
+                else
+                {
+                    llvmInst = llvmBuilder.CreateCast(
+                        fromSize < toSize ? llvm::Instruction::CastOps::FPExt : llvm::Instruction::CastOps::FPTrunc,
+                        llvmValue, llvmToType
+                    );
+                }
+            }
+            break;
+
         case kIROp_CastIntToFloat:
             {
                 auto fromTypeV = inst->getOperand(0)->getDataType();
@@ -459,6 +527,79 @@ struct LLVMEmitter
                         llvm::Instruction::CastOps::SIToFP : 
                         llvm::Instruction::CastOps::UIToFP,
                     findValue(inst->getOperand(0)),
+                    ensureType(toTypeV)
+                );
+            }
+            break;
+
+        case kIROp_CastFloatToInt:
+            {
+                auto fromTypeV = inst->getOperand(0)->getDataType();
+                auto fromType = getVectorOrCoopMatrixElementType(fromTypeV);
+                auto toTypeV = inst->getDataType();
+                auto toType = getVectorOrCoopMatrixElementType(toTypeV);
+                auto llvmValue = findValue(inst->getOperand(0));
+
+                if(as<IRBoolType>(toType))
+                {
+                    llvmInst = llvmBuilder.CreateCmp(
+                        llvm::CmpInst::Predicate::FCMP_UNE,
+                        llvmValue,
+                        llvm::ConstantInt::get(ensureType(fromType), 0)
+                    );
+                }
+                else
+                {
+                    llvmInst = llvmBuilder.CreateCast(
+                        isSignedType(toTypeV) ?
+                            llvm::Instruction::CastOps::FPToSI :
+                            llvm::Instruction::CastOps::FPToUI,
+                        llvmValue,
+                        ensureType(toTypeV)
+                    );
+                }
+            }
+            break;
+
+        case kIROp_CastPtrToInt:
+            {
+                auto fromValue = inst->getOperand(0);
+                auto toTypeV = inst->getDataType();
+                llvmInst = llvmBuilder.CreateCast(
+                    llvm::Instruction::CastOps::PtrToInt,
+                    findValue(fromValue),
+                    ensureType(toTypeV)
+                );
+            }
+            break;
+
+        case kIROp_CastPtrToBool:
+            {
+                auto fromValue = inst->getOperand(0);
+                llvmInst = llvmBuilder.CreateIsNotNull(findValue(fromValue));
+            }
+            break;
+
+        case kIROp_CastIntToPtr:
+            {
+                auto fromValue = inst->getOperand(0);
+                auto toTypeV = inst->getDataType();
+                llvmInst = llvmBuilder.CreateCast(
+                    llvm::Instruction::CastOps::IntToPtr,
+                    findValue(fromValue),
+                    ensureType(toTypeV)
+                );
+            }
+            break;
+
+        case kIROp_PtrCast:
+        case kIROp_BitCast:
+            {
+                auto fromValue = inst->getOperand(0);
+                auto toTypeV = inst->getDataType();
+                llvmInst = llvmBuilder.CreateCast(
+                    llvm::Instruction::CastOps::BitCast,
+                    findValue(fromValue),
                     ensureType(toTypeV)
                 );
             }
@@ -535,7 +676,28 @@ struct LLVMEmitter
                         // Flatten the tuple resulting from the variadic pack.
                         for (UInt bb = 0; bb < makeStruct->getOperandCount(); ++bb)
                         {
-                            args.add(findValue(makeStruct->getOperand(bb)));
+                            auto llvmValue = findValue(makeStruct->getOperand(bb));
+                            auto valueType = llvmValue->getType();
+
+                            if (valueType->isFloatingPointTy() && valueType->getScalarSizeInBits() < 64)
+                            {
+                                // Floats need to get up-casted to at least f64
+                                llvmValue = llvmBuilder.CreateCast(
+                                    llvm::Instruction::CastOps::FPExt,
+                                    llvmValue,
+                                    llvm::Type::getDoubleTy(llvmContext)
+                                );
+                            }
+                            else if (valueType->isIntegerTy() && valueType->getScalarSizeInBits() < 32)
+                            {
+                                // Ints are upcasted to at least i32.
+                                llvmValue = llvmBuilder.CreateCast(
+                                    llvm::Instruction::CastOps::SExt,
+                                    llvmValue,
+                                    llvm::Type::getInt32Ty(llvmContext)
+                                );
+                            }
+                            args.add(llvmValue);
                         }
                     }
                 }
@@ -1062,6 +1224,9 @@ struct LLVMEmitter
             );
             if(llvm::parseAssemblyInto(buf, &llvmModule, &llvmSummaryIndex, diag))
             {
+                //auto msg = diag.getMessage();
+                //printf("%s\n", llvmTextIR.c_str());
+                //printf("%s\n", msg.str().c_str());
                 SLANG_UNEXPECTED("Failed to parse LLVM inline IR!");
             }
 
