@@ -278,6 +278,10 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
         {
             outOptions.showAdapterInfo = true;
         }
+        else if (argValue == "-cache-rhi-device")
+        {
+            outOptions.cacheRhiDevice = true;
+        }
         else
         {
             // Lookup

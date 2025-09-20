@@ -64,6 +64,9 @@ struct Options
     // only run test cases with names have one of these prefixes.
     Slang::List<Slang::String> testPrefixes;
 
+    // skip test cases with names that have one of these prefixes.
+    Slang::List<Slang::String> excludePrefixes;
+
     // verbosity level for output
     VerbosityLevel verbosity = VerbosityLevel::Info;
 
@@ -132,6 +135,9 @@ struct Options
     int serverCount = 1;
 
     bool emitSPIRVDirectly = true;
+
+    // Whether to enable RHI device caching in render-test (default: true in slang-test)
+    bool cacheRhiDevice = true;
 
     Slang::HashSet<Slang::String> capabilities;
     Slang::HashSet<Slang::String> expectedFailureList;
