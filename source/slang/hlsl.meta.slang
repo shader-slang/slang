@@ -5536,7 +5536,7 @@ ${{{{
     /// maps to `atomicAdd`.
     [__requiresNVAPI]
     [ForceInline]
-    [require(sm_5_0)]
+    [require(cuda_hlsl_spirv, sm_5_0)]
     void InterlockedAddF16(uint byteAddress, half value, out half originalValue)
     {
         __target_switch
@@ -5576,7 +5576,7 @@ ${{{{
     /// maps to `atomicAdd`.
     [__requiresNVAPI]
     [ForceInline]
-    [require(sm_5_0)]
+    [require(cuda_hlsl_spirv, sm_5_0)]
     void InterlockedAddF16Emulated(uint byteAddress, half value, out half originalValue)
     {
         __target_switch
@@ -13400,7 +13400,7 @@ matrix<int, N, M> sign(matrix<T, N, M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T sin(T x)
 {
     __target_switch
@@ -13414,12 +13414,13 @@ T sin(T x)
         OpExtInst $$T result glsl450 Sin $x
     };
     case wgsl: __intrinsic_asm "sin";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.sin($0)";
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> sin(vector<T, N> x)
 {
     __target_switch
@@ -13438,7 +13439,7 @@ vector<T, N> sin(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> sin(matrix<T, N, M> x)
 {
     __target_switch

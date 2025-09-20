@@ -1,6 +1,7 @@
 #include "slang-emit-llvm.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
+#include "../core/slang-char-util.h"
 #include <llvm/AsmParser/Parser.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constants.h>
@@ -74,12 +75,28 @@ struct BinaryLLVMOutputStream: public llvm::raw_pwrite_stream
     }
 };
 
+static UInt parseNumber(const char*& cursor, const char* end)
+{
+    char d = *cursor;
+    SLANG_RELEASE_ASSERT(CharUtil::isDigit(d));
+    UInt n = 0;
+    while (CharUtil::isDigit(d))
+    {
+        n = n * 10 + (d - '0');
+        cursor++;
+        if (cursor == end)
+            break;
+        d = *cursor;
+    }
+    return n;
+}
+
 struct LLVMEmitter
 {
     llvm::LLVMContext llvmContext;
     llvm::IRBuilder<> llvmBuilder;
     llvm::Module llvmModule;
-    llvm::ModuleSummaryIndex llvmPreludeSummaryIndex;
+    llvm::ModuleSummaryIndex llvmSummaryIndex;
 
     // The LLVM value class is closest to Slang's IRInst, as it can represent
     // constants, instructions and functions, whereas llvm::Instruction only
@@ -91,7 +108,7 @@ struct LLVMEmitter
 
     LLVMEmitter(CodeGenContext* codeGenContext)
         : llvmBuilder(llvmContext), llvmModule("module", llvmContext),
-          llvmPreludeSummaryIndex(true),
+          llvmSummaryIndex(true),
           codeGenContext(codeGenContext)
     {
         auto session = codeGenContext->getSession();
@@ -104,12 +121,11 @@ struct LLVMEmitter
         llvm::InitializeAllAsmPrinters();
 
         llvm::SMDiagnostic diag;
-        // TODO: Override the datalayout?
         llvm::MemoryBufferRef buf(
             llvm::StringRef(prelude.begin(), prelude.getLength()),
             llvm::StringRef("prelude")
         );
-        if(llvm::parseAssemblyInto(buf, &llvmModule, &llvmPreludeSummaryIndex, diag))
+        if(llvm::parseAssemblyInto(buf, &llvmModule, &llvmSummaryIndex, diag))
         {
             SLANG_UNEXPECTED("Failed to parse LLVM prelude!");
         }
@@ -378,6 +394,28 @@ struct LLVMEmitter
             }
             break;
 
+        case kIROp_Switch:
+            {
+                auto switchInst = static_cast<IRSwitch*>(inst);
+                auto llvmMergeBlock = llvm::cast<llvm::BasicBlock>(findValue(switchInst->getBreakLabel()));
+                auto llvmCondition = findValue(switchInst->getCondition());
+
+                auto llvmSwitch = llvmBuilder.CreateSwitch(llvmCondition, llvmMergeBlock, switchInst->getCaseCount());
+                for (UInt c = 0; c < switchInst->getCaseCount(); c++)
+                {
+                    auto value = switchInst->getCaseValue(c);
+                    auto intLit = as<IRIntLit>(value);
+                    SLANG_ASSERT(intLit);
+
+                    auto llvmCaseBlock = llvm::cast<llvm::BasicBlock>(findValue(switchInst->getCaseLabel(c)));
+                    auto llvmCaseValue = llvm::cast<llvm::ConstantInt>(maybeEnsureConstant(intLit));
+
+                    llvmSwitch->addCase(llvmCaseValue, llvmCaseBlock);
+                }
+                llvmInst = llvmSwitch;
+            }
+            break;
+
         case kIROp_Store:
             {
                 auto storeInst = static_cast<IRStore*>(inst);
@@ -409,6 +447,20 @@ struct LLVMEmitter
                 {
                     llvmInst = llvmBuilder.CreateInsertValue(llvmInst, findValue(inst->getOperand(aa)), aa);
                 }
+            }
+            break;
+
+        case kIROp_CastIntToFloat:
+            {
+                auto fromTypeV = inst->getOperand(0)->getDataType();
+                auto toTypeV = inst->getDataType();
+                llvmInst = llvmBuilder.CreateCast(
+                    isSignedType(fromTypeV) ?
+                        llvm::Instruction::CastOps::SIToFP : 
+                        llvm::Instruction::CastOps::UIToFP,
+                    findValue(inst->getOperand(0)),
+                    ensureType(toTypeV)
+                );
             }
             break;
 
@@ -880,53 +932,188 @@ struct LLVMEmitter
         }
     }
 
+    // Using std::string as the LLVM API works with that. It's not to be
+    // ingested by Slang.
+    std::string expandIntrinsic(llvm::Function* llvmFunc, IRFunc* parentFunc, UnownedStringSlice intrinsicText)
+    {
+        std::string out;
+        llvm::raw_string_ostream expanded(out);
+        
+        auto resultType = parentFunc->getResultType();
+
+        char const* cursor = intrinsicText.begin();
+        char const* end = intrinsicText.end();
+        llvmFunc->print(expanded);
+
+        while (out.size() > 0 && out.back() != '{')
+            out.pop_back();
+
+        expanded << "\n";
+
+        while (cursor < end)
+        {
+            // Indicates the start of a 'special' sequence
+            if (*cursor == '$')
+            {
+                cursor++;
+                SLANG_RELEASE_ASSERT(cursor < end);
+                char d = *cursor++;
+                switch (d)
+                {
+                case 'T':
+                    // Type of parameter
+                    {
+                        IRType* type = nullptr;
+                        if (*cursor == 'R')
+                        {
+                            // Get the return type of the call
+                            cursor++;
+                            type = resultType;
+                        }
+                        else
+                        {
+                            UInt argIndex = parseNumber(cursor, end);
+                            SLANG_RELEASE_ASSERT(argIndex < parentFunc->getParamCount());
+                            type = parentFunc->getParamType(argIndex);
+                        }
+
+                        auto llvmType = ensureType(type);
+                        llvmType->print(expanded);
+                    }
+                    break;
+                case '0':
+                case '1':
+                case '2':
+                case '3':
+                case '4':
+                case '5':
+                case '6':
+                case '7':
+                case '8':
+                case '9':
+                    // Function parameter.
+                    {
+                        --cursor;
+                        UInt argIndex = parseNumber(cursor, end);
+                        SLANG_RELEASE_ASSERT(argIndex < parentFunc->getParamCount());
+                        IRParam* param = nullptr;
+
+                        for (IRParam* p : parentFunc->getParams())
+                        {
+                            if (argIndex == 0)
+                            {
+                                param = p;
+                                break;
+                            }
+                            argIndex--;
+                        }
+
+                        auto llvmParam = findValue(param);
+                        llvmParam->print(expanded);
+                    }
+                    break;
+                default:
+                    SLANG_UNEXPECTED("bad format in intrinsic definition");
+                    break;
+                }
+            }
+            else
+            {
+                expanded << *cursor;
+                cursor++;
+            }
+        }
+
+        expanded << "\nret ";
+        auto llvmResultType = ensureType(resultType);
+        llvmResultType->print(expanded);
+
+        if (as<IRVoidType>(resultType) == nullptr)
+        {
+            expanded << " %result";
+        }
+
+        expanded << "\n}\n";
+
+        return out;
+    }
+
+
     void emitFuncDefinition(IRFunc* func)
     {
         llvm::Function* llvmFunc = ensureFuncDecl(func);
 
-        // Create all blocks first
-        for (auto irBlock : func->getBlocks())
+        UnownedStringSlice intrinsicDef;
+        IRInst* intrinsicInst;
+        if (Slang::findTargetIntrinsicDefinition(func, codeGenContext->getTargetReq()->getTargetCaps(), intrinsicDef, intrinsicInst))
         {
-            llvm::BasicBlock* llvmBlock = llvm::BasicBlock::Create(llvmContext, "", llvmFunc);
-            mapInstToLLVM[irBlock] = llvmBlock;
-        }
+            llvm::BasicBlock::Create(llvmContext, "", llvmFunc);
 
-        // Then, fill in the blocks. Lucky for us, there appears to basically be
-        // a 1:1 correspondence between Slang IR blocks and LLVM IR blocks, so
-        // this is straightforward.
-        for (auto irBlock : func->getBlocks())
-        {
-            llvm::BasicBlock* llvmBlock = llvm::cast<llvm::BasicBlock>(mapInstToLLVM.getValue(irBlock));
-            llvmBuilder.SetInsertPoint(llvmBlock);
+            std::string llvmTextIR = expandIntrinsic(llvmFunc, func, intrinsicDef);
+            std::string llvmFuncName = llvmFunc->getName().str();
+            llvmFunc->eraseFromParent();
 
-            // Insert block parameters as Phi nodes.
-            if (irBlock != func->getFirstBlock())
+
+            // This function is defined by an intrinsic.
+            llvm::SMDiagnostic diag;
+            llvm::MemoryBufferRef buf(
+                llvm::StringRef(llvmTextIR),
+                llvm::StringRef("inline-llvm-ir")
+            );
+            if(llvm::parseAssemblyInto(buf, &llvmModule, &llvmSummaryIndex, diag))
             {
-                for (auto irParam : irBlock->getParams())
+                SLANG_UNEXPECTED("Failed to parse LLVM inline IR!");
+            }
+
+            llvmFunc = cast<llvm::Function>(llvmModule.getNamedValue(llvmFuncName));
+            mapInstToLLVM[func] = llvmFunc;
+        }
+        else
+        {
+            // Create all blocks first
+            for (auto irBlock : func->getBlocks())
+            {
+                llvm::BasicBlock* llvmBlock = llvm::BasicBlock::Create(llvmContext, "", llvmFunc);
+                mapInstToLLVM[irBlock] = llvmBlock;
+            }
+
+            // Then, fill in the blocks. Lucky for us, there appears to basically be
+            // a 1:1 correspondence between Slang IR blocks and LLVM IR blocks, so
+            // this is straightforward.
+            for (auto irBlock : func->getBlocks())
+            {
+                llvm::BasicBlock* llvmBlock = llvm::cast<llvm::BasicBlock>(mapInstToLLVM.getValue(irBlock));
+                llvmBuilder.SetInsertPoint(llvmBlock);
+
+                // Insert block parameters as Phi nodes.
+                if (irBlock != func->getFirstBlock())
                 {
-                    // Create phi nodes. Can't set them yet, since the instructions
-                    // they refer to may have not yet been created.
-                    emitPhi(irParam);
+                    for (auto irParam : irBlock->getParams())
+                    {
+                        // Create phi nodes. Can't set them yet, since the instructions
+                        // they refer to may have not yet been created.
+                        emitPhi(irParam);
+                    }
+                }
+
+                // Then, add the regular instructions.
+                for (auto irInst: irBlock->getOrdinaryInsts())
+                {
+                    emitLLVMInstruction(irInst);
                 }
             }
 
-            // Then, add the regular instructions.
-            for (auto irInst: irBlock->getOrdinaryInsts())
+            // Finally, fill in the Phi nodes.
+            for (auto irBlock : func->getBlocks())
             {
-                emitLLVMInstruction(irInst);
-            }
-        }
-
-        // Finally, fill in the Phi nodes.
-        for (auto irBlock : func->getBlocks())
-        {
-            int index = 0;
-            if (irBlock != func->getFirstBlock())
-            {
-                for (auto irParam : irBlock->getParams())
+                int index = 0;
+                if (irBlock != func->getFirstBlock())
                 {
-                    finishPhi(irParam, index);
-                    index++;
+                    for (auto irParam : irBlock->getParams())
+                    {
+                        finishPhi(irParam, index);
+                        index++;
+                    }
                 }
             }
         }

@@ -182,6 +182,11 @@ CapabilitySet TargetRequest::getTargetCaps()
         atoms.add(CapabilityName::wgsl);
         break;
 
+    case CodeGenTarget::LLVMAssembly:
+    case CodeGenTarget::LLVMObjectCode:
+        atoms.add(CapabilityName::llvm);
+        break;
+
     default:
         break;
     }
