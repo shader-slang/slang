@@ -450,6 +450,39 @@ struct LLVMEmitter
             }
             break;
 
+        case kIROp_MakeVector:
+            {
+                auto llvmType = ensureType(inst->getDataType());
+                llvmInst = llvm::PoisonValue::get(llvmType);
+                for (UInt aa = 0; aa < inst->getOperandCount(); ++aa)
+                {
+                    llvmInst = llvmBuilder.CreateInsertElement(llvmInst, findValue(inst->getOperand(aa)), aa);
+                }
+            }
+            break;
+
+        case kIROp_Swizzle:
+            {
+                auto swizzleInst = static_cast<IRSwizzle*>(inst);
+                auto baseInst = swizzleInst->getBase();
+                if (swizzleInst->getElementCount() == 1)
+                {
+                    llvmInst = llvmBuilder.CreateExtractElement(findValue(baseInst), findValue(swizzleInst->getElementIndex(0)));
+                }
+                else
+                {
+                    List<int> mask;
+                    mask.reserve(swizzleInst->getElementCount());
+                    for (UInt i = 0; i < swizzleInst->getElementCount(); ++i)
+                    {
+                        int val = as<IRIntLit>(swizzleInst->getElementIndex(i))->getValue();
+                        mask.add(val);
+                    }
+                    llvmInst = llvmBuilder.CreateShuffleVector(findValue(baseInst), llvm::ArrayRef<int>(mask.begin(), mask.end()));
+                }
+            }
+            break;
+
         case kIROp_IntCast:
             {
                 auto llvmValue = findValue(inst->getOperand(0));
@@ -605,16 +638,6 @@ struct LLVMEmitter
             }
             break;
 
-        case kIROp_FieldExtract:
-            {
-                auto fieldExtractInst = static_cast<IRFieldExtract*>(inst);
-                auto structType = as<IRStructType>(fieldExtractInst->getBase()->getDataType());
-                auto llvmBase = findValue(fieldExtractInst->getBase());
-                unsigned idx = findStructKeyIndex(structType, as<IRStructKey>(fieldExtractInst->getField()));
-                llvmInst = llvmBuilder.CreateExtractValue(llvmBase, idx);
-            }
-            break;
-
         case kIROp_FieldAddress:
             {
                 auto fieldAddressInst = static_cast<IRFieldAddress*>(inst);
@@ -641,6 +664,66 @@ struct LLVMEmitter
                 };
 
                 llvmInst = llvmBuilder.CreateGEP(llvmStructType, llvmBase, idx);
+            }
+            break;
+
+        case kIROp_FieldExtract:
+            {
+                auto fieldExtractInst = static_cast<IRFieldExtract*>(inst);
+                auto structType = as<IRStructType>(fieldExtractInst->getBase()->getDataType());
+                auto llvmBase = findValue(fieldExtractInst->getBase());
+                unsigned idx = findStructKeyIndex(structType, as<IRStructKey>(fieldExtractInst->getField()));
+                llvmInst = llvmBuilder.CreateExtractValue(llvmBase, idx);
+            }
+            break;
+
+        case kIROp_GetElementPtr:
+            {
+                auto gepInst = static_cast<IRGetElementPtr*>(inst);
+                auto baseInst = gepInst->getBase();
+                auto indexInst = gepInst->getIndex();
+
+                IRType* baseType = nullptr;
+                if (auto ptrType = as<IRPtrTypeBase>(baseInst->getDataType()))
+                {
+                    baseType = ptrType->getValueType();
+                }
+
+                llvm::Value* indices[2] = {
+                    llvmBuilder.getInt32(0),
+                    findValue(indexInst)
+                };
+
+                llvmInst = llvmBuilder.CreateGEP(ensureType(baseType), findValue(baseInst), indices);
+            }
+            break;
+
+        case kIROp_GetElement:
+            {
+                auto geInst = static_cast<IRGetElement*>(inst);
+                auto baseInst = geInst->getBase();
+                auto indexInst = geInst->getIndex();
+
+                auto baseTy = baseInst->getDataType();
+                if (as<IRVectorType>(baseTy) || as<IRMatrixType>(baseTy))
+                {
+                    // For vectors, we can use extractelement
+                    llvmInst = llvmBuilder.CreateExtractElement(findValue(baseInst), findValue(indexInst));
+                }
+                else
+                {
+                    int64_t index = 0;
+                    if (auto intLit = as<IRIntLit>(indexInst))
+                    {
+                        index = intLit->getValue();
+                    }
+                    else
+                    {
+                        SLANG_ASSERT_FAILURE("GetElement on aggregates only supports constant indices on LLVM");
+                    }
+                    // Other aggregates need extractvalue.
+                    llvmInst = llvmBuilder.CreateExtractValue(findValue(baseInst), index);
+                }
             }
             break;
 
@@ -927,6 +1010,14 @@ struct LLVMEmitter
                 llvmArg->setName(name);
             mapInstToLLVM[pp] = llvmArg;
         }
+
+        // Attach attributes based on decorations!
+        if (func->findDecoration<IRReadNoneDecoration>())
+            llvmFunc->setOnlyAccessesArgMemory();
+        else if (func->findDecoration<IRForceInlineDecoration>())
+            llvmFunc->addFnAttr(llvm::Attribute::AttrKind::AlwaysInline);
+        else if (func->findDecoration<IRNoInlineDecoration>())
+            llvmFunc->addFnAttr(llvm::Attribute::AttrKind::NoInline);
 
         mapInstToLLVM[func] = llvmFunc;
         return llvmFunc;
@@ -1215,7 +1306,6 @@ struct LLVMEmitter
             std::string llvmFuncName = llvmFunc->getName().str();
             llvmFunc->eraseFromParent();
 
-
             // This function is defined by an intrinsic.
             llvm::SMDiagnostic diag;
             llvm::MemoryBufferRef buf(
@@ -1231,6 +1321,10 @@ struct LLVMEmitter
             }
 
             llvmFunc = cast<llvm::Function>(llvmModule.getNamedValue(llvmFuncName));
+
+            // Intrinsic functions usually do nothing other than call a single
+            // instruction; we can just inline them by default.
+            llvmFunc->addFnAttr(llvm::Attribute::AttrKind::AlwaysInline);
             mapInstToLLVM[func] = llvmFunc;
         }
         else
