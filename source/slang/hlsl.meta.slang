@@ -10144,6 +10144,7 @@ vector<T, N> fma(vector<T, N> a, vector<T, N> b, vector<T, N> c)
         OpExtInst $$vector<T, N> result glsl450 Fma $a $b $c
     };
     case wgsl: __intrinsic_asm "fma";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.fmuladd($0, $1, $2)";
     default:
         VECTOR_MAP_TRINARY(T, N, fma, a, b, c);
     }
@@ -10157,6 +10158,7 @@ matrix<T, N, M> fma(matrix<T, N, M> a, matrix<T, N, M> b, matrix<T, N, M> c)
     __target_switch
     {
     case hlsl: __intrinsic_asm "fma";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.fmuladd($0, $1, $2)";
     default:
         MATRIX_MAP_TRINARY(T, N, M, fma, a, b, c);
     }
