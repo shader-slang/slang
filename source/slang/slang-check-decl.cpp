@@ -2840,6 +2840,22 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         }
     }
 
+    // Part of VUID-StandaloneSpirv-OpTypeRuntimeArray-04680: OpTypeRuntimeArray must only be
+    // instantiated by a variable as the outermost dimension of an arrayed variable ...
+    if (auto arrayType = as<ArrayExpressionType>(varDecl->getType()))
+    {
+        bool isFirstDimension = true;
+        for (auto t = arrayType; t != nullptr; t = as<ArrayExpressionType>(t->getElementType()))
+        {
+            if (t->isUnsized() && !isFirstDimension)
+            {
+                getSink()->diagnose(varDecl, Diagnostics::unsizedArrayMustBeOutermostDimension);
+                break;
+            }
+            isFirstDimension = false;
+        }
+    }
+
     TypeTag varTypeTags = getTypeTags(varDecl->getType());
     auto parentDecl = as<AggTypeDecl>(getParentDecl(varDecl));
     if (parentDecl)

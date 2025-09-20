@@ -2214,6 +2214,23 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             }
             return false;
         }
+    case kIROp_GetArrayLength:
+        {
+            IRFieldAddress* fieldAddress = as<IRFieldAddress>(inst->getOperand(0));
+            if (IRLoad* load = as<IRLoad>(inst->getOperand(0)))
+                fieldAddress = as<IRFieldAddress>(load->getOperand(0));
+            if (!fieldAddress)
+                return false;
+            auto prec = getInfo(EmitOp::Postfix);
+            EmitOpInfo outerPrec = inOuterPrec;
+            bool needClose = maybeEmitParens(outerPrec, prec);
+            emitOperand(fieldAddress->getOperand(0), prec);
+            m_writer->emit(".");
+            m_writer->emit(getName(fieldAddress->getField()));
+            m_writer->emit(".length()");
+            maybeCloseParens(needClose);
+            return true;
+        }
     case kIROp_MakeVectorFromScalar:
     case kIROp_MatrixReshape:
         {

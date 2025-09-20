@@ -809,6 +809,11 @@ DIAGNOSTIC(
     "type.")
 DIAGNOSTIC(30071, Error, varCannotBeUnsized, "cannot instantiate a variable of unsized type.")
 DIAGNOSTIC(30072, Error, paramCannotBeUnsized, "function parameter cannot be unsized.")
+DIAGNOSTIC(
+    30073,
+    Error,
+    unsizedArrayMustBeOutermostDimension,
+    "unsized array is only allowed in the outermost dimension.")
 
 DIAGNOSTIC(
     30075,

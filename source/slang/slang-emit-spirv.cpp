@@ -4053,6 +4053,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_MeshOutputRef:
             result = emitMeshOutputRef(parent, inst);
             break;
+        case kIROp_GetArrayLength:
+            result = emitGetArrayLength(parent, inst);
+            break;
         case kIROp_GetElement:
             result = emitGetElement(parent, as<IRGetElement>(inst));
             break;
@@ -7036,6 +7039,47 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return emitOpAccessChain(parent, inst, inst->getFullType(), baseId, makeArray(index));
     }
 
+    SpvInst* emitGetArrayLength(SpvInstParent* parent, IRInst* inst)
+    {
+        IRBuilder builder(m_irModule);
+        builder.setInsertBefore(inst);
+        IRFieldAddress* fieldAddr = as<IRFieldAddress>(inst->getOperand(0));
+        if (IRLoad* load = as<IRLoad>(inst->getOperand(0)))
+            fieldAddr = as<IRFieldAddress>(load->getOperand(0));
+        if (!fieldAddr)
+        {
+            SLANG_UNEXPECTED("emitGetArrayLength expects an IRFieldAddress to a runtime array.");
+            UNREACHABLE_RETURN(nullptr);
+        }
+
+        auto base = fieldAddr->getBase();
+        auto basePtrTy = as<IRPtrTypeBase>(base->getDataType());
+        SLANG_ASSERT(basePtrTy);
+        auto baseStructTy = as<IRStructType>(basePtrTy->getValueType());
+        SLANG_ASSERT(baseStructTy);
+
+        auto memberIndex =
+            (int32_t)getStructFieldId(baseStructTy, as<IRStructKey>(fieldAddr->getField()));
+
+        auto arrayLength = emitInst(
+            parent,
+            nullptr,
+            SpvOpArrayLength,
+            builder.getUIntType(),
+            kResultID,
+            base,
+            SpvLiteralInteger::from32(memberIndex));
+
+        // Convert to the IR result type if needed (e.g., Slang 'int' vs SPIR-V 'uint').
+        auto wantTy = inst->getDataType();
+        if (wantTy == builder.getUIntType())
+        {
+            registerInst(inst, arrayLength);
+            return arrayLength;
+        }
+        return emitOpBitcast(parent, inst, wantTy, arrayLength);
+    }
+
     SpvInst* emitGetElement(SpvInstParent* parent, IRGetElement* inst)
     {
         requireVariableBufferCapabilityIfNeeded(inst->getDataType());
@@ -7077,6 +7121,24 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitLoad(SpvInstParent* parent, IRLoad* inst)
     {
+        bool onlyUsedForArrayLength = true;
+        for (auto use = inst->firstUse; use; use = use->nextUse)
+        {
+            if (use->getUser()->getOp() != kIROp_GetArrayLength)
+            {
+                onlyUsedForArrayLength = false;
+                break;
+            }
+        }
+        if (onlyUsedForArrayLength && as<IRFieldAddress>(inst->getOperand(0)))
+        {
+            // GetArrayLength should operate on field address directly,
+            // but IArray::getCount() doesn't use ref this so it's lowered to
+            // load(field_address(runtime array)). SpvOpLoad is illegal on SpvOpTypeRuntimeArray so
+            // remove it here
+            return emitInst(parent, inst, SpvOpNop);
+        }
+
         requireVariableBufferCapabilityIfNeeded(inst->getDataType());
 
         auto ptrType = as<IRPtrTypeBase>(inst->getPtr()->getDataType());
