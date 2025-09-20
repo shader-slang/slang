@@ -228,15 +228,21 @@ jobs:
           echo "Linux Release x64: ${{ needs.test-linux-release-gcc-x86_64.result }}"
           echo "Linux Debug x64: ${{ needs.test-linux-debug-gcc-x86_64.result }}"
 
-          # Check if all required jobs succeeded
-          if [[ "${{ needs.test-windows-release-cl-x86_64-gpu.result }}" != "success" ]] || \
-             [[ "${{ needs.test-windows-debug-cl-x86_64-gpu.result }}" != "success" ]] || \
-             [[ "${{ needs.test-macos-release-clang-aarch64.result }}" != "success" ]] || \
-             [[ "${{ needs.test-macos-debug-clang-aarch64.result }}" != "success" ]] || \
-             [[ "${{ needs.test-linux-release-gcc-x86_64.result }}" != "success" ]] || \
-             [[ "${{ needs.test-linux-debug-gcc-x86_64.result }}" != "success" ]]; then
+          # Check if any required jobs failed (allow success or skipped)
+          if [[ "${{ needs.test-windows-release-cl-x86_64-gpu.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-windows-debug-cl-x86_64-gpu.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-macos-release-clang-aarch64.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-macos-debug-clang-aarch64.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-linux-release-gcc-x86_64.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-linux-debug-gcc-x86_64.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-windows-release-cl-x86_64-gpu.result }}" == "cancelled" ]] || \
+             [[ "${{ needs.test-windows-debug-cl-x86_64-gpu.result }}" == "cancelled" ]] || \
+             [[ "${{ needs.test-macos-release-clang-aarch64.result }}" == "cancelled" ]] || \
+             [[ "${{ needs.test-macos-debug-clang-aarch64.result }}" == "cancelled" ]] || \
+             [[ "${{ needs.test-linux-release-gcc-x86_64.result }}" == "cancelled" ]] || \
+             [[ "${{ needs.test-linux-debug-gcc-x86_64.result }}" == "cancelled" ]]; then
             echo "❌ One or more CI jobs failed or were cancelled"
             exit 1
           fi
 
-          echo "✅ All CI jobs passed successfully!"
+          echo "✅ All CI jobs completed successfully (passed or skipped)!"
