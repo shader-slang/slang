@@ -1584,7 +1584,8 @@ static SlangResult _innerMain(
                 //
                 // We also don't want to output the 'Unable to create renderer' error, as this isn't
                 // an error.
-                SlangResult res = SLANG_E_NOT_AVAILABLE; // Default to not available if device creation fails
+                SlangResult res =
+                    SLANG_E_NOT_AVAILABLE; // Default to not available if device creation fails
                 if (!options.onlyStartup)
                 {
                     fprintf(stderr, "Unable to create renderer %s\n", rendererName.getBuffer());
