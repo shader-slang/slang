@@ -9410,7 +9410,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             context->astBuilder,
             createDefaultSpecializedDeclRef(subContext, nullptr, decl->getThisTypeDecl()));
         subContext->thisType = thisType;
-        // Create a stand-in witness that represents `ThisType` conforms to the interface.
+        // Create a stand-in witness that represents `ThisType` conforms to the interface,
+        // and move it to global scope.
         subContext->thisTypeWitness = subBuilder->createThisTypeWitness((IRType*)finalVal);
 
         // Lower associated types first, so they can be referred to when lowering functions.
@@ -11699,13 +11700,31 @@ static void _addFlattenedTupleArgs(List<IRInst*>& ioArgs, IRInst* val)
     }
 }
 
-bool isAbstractWitnessTable(IRInst* inst)
+static IRInst* maybeCloneThisTypeWitness(
+    IRGenContext* context,
+    IRInst* thisTypeWitness,
+    Type* thisType)
 {
-    if (as<IRThisTypeWitness>(inst) || as<IRInterfaceRequirementEntry>(inst))
-        return true;
-    if (auto lookup = as<IRLookupWitnessMethod>(inst))
-        return isAbstractWitnessTable(lookup->getWitnessTable());
-    return false;
+    auto currentInsertLoc = context->irBuilder->getInsertLoc().getParent();
+    auto parentOfThisTypeWitness = thisTypeWitness->parent;
+
+    while (currentInsertLoc != nullptr)
+    {
+        // If current insert location is same as scope of ThisTypeWitness, don't copy it.
+        if (parentOfThisTypeWitness == currentInsertLoc)
+        {
+            return thisTypeWitness;
+        }
+
+        currentInsertLoc = currentInsertLoc->parent;
+    }
+
+    auto thisTypeIR = as<IRThisType>(lowerType(context, thisType));
+    SLANG_RELEASE_ASSERT(thisTypeIR);
+
+    auto newThisTypeWitness =
+        context->irBuilder->createThisTypeWitness((IRType*)thisTypeIR->getConstraintType());
+    return newThisTypeWitness;
 }
 
 LoweredValInfo emitDeclRef(IRGenContext* context, Decl* decl, DeclRefBase* subst, IRType* type)
@@ -11857,40 +11876,19 @@ LoweredValInfo emitDeclRef(IRGenContext* context, Decl* decl, DeclRefBase* subst
             // witness table for the concrete type that conforms to `ISomething<Foo>`.
             //
             auto irWitnessTable = lowerSimpleVal(context, thisTypeSubst->getWitness());
-            if (isAbstractWitnessTable(irWitnessTable))
-            {
-                // If `thisTypeSubst` doesn't lower into a concrete IRWitnessTable,
-                // this is a lookup of an interface requirement
-                // defined in some base interface from an interface type.
-                // For now we just lower that decl as if it is referenced
-                // from the same interface directly, e.g. a reference to
-                // IBase.AssocType from IDerived:IBase will be lowered as
-                // IRAssocType(IBase).
-                // We may want to consider unifying our IR representation to
-                // represent associated types with lookupWitness inst even inside
-                // interface definitions.
-                return emitDeclRef(
-                    context,
-                    decl->getDefaultDeclRef(),
-                    context->irBuilder->getTypeKind());
-            }
-
             SLANG_RELEASE_ASSERT(irWitnessTable);
 
-            //
-            // The key to use for looking up the interface member is
-            // derived from the declaration.
-            //
+            irWitnessTable = maybeCloneThisTypeWitness(
+                context,
+                irWitnessTable,
+                thisTypeSubst->getLookupSource());
+            // Copy ThisTypeWitness locally if necessary
             auto irRequirementKey = getInterfaceRequirementKey(context, decl);
-            //
-            // Those two pieces of information tell us what we need to
-            // do in order to look up the value that satisfied the requirement.
-            //
-            auto irSatisfyingVal = context->irBuilder->emitLookupInterfaceMethodInst(
+            auto irLookupWitness = context->irBuilder->emitLookupInterfaceMethodInst(
                 type,
                 irWitnessTable,
                 irRequirementKey);
-            return LoweredValInfo::simple(irSatisfyingVal);
+            return LoweredValInfo::simple(irLookupWitness);
         }
         else
         {

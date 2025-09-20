@@ -98,6 +98,7 @@ struct WitnessLookupLoweringContext
         case kIROp_StructType:
         case kIROp_ClassType:
         case kIROp_InterfaceType:
+        case kIROp_LookupWitnessMethod:
             return (IRType*)type;
         default:
             {
