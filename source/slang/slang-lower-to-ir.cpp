@@ -9410,8 +9410,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             context->astBuilder,
             createDefaultSpecializedDeclRef(subContext, nullptr, decl->getThisTypeDecl()));
         subContext->thisType = thisType;
-        // Create a stand-in witness that represents `ThisType` conforms to the interface,
-        // and move it to global scope.
+        // Create a stand-in witness that represents `ThisType` conforms to the interface.
         subContext->thisTypeWitness = subBuilder->createThisTypeWitness((IRType*)finalVal);
 
         // Lower associated types first, so they can be referred to when lowering functions.

@@ -845,20 +845,27 @@ struct SpecializationContext
         // the result of a `specialize` instruction or other
         // operation that will yield such a table.
         //
+        // Since we unify the frontend such that all LookupDeclRef node
+        // on a interface requirement will always be lowered to lookup
+        // witness, it creats an exception that IRThisTypeWitness, a non-concrete
+        // witness table, also need to be specialized. Otherwise, there is
+        // no logic in the later passes can handle it. However, we know for
+        // sure that the IRThisTypeWitness is only used to wrap an interface
+        // type, therefore, it must be only used to exact the interface requirement.
         auto witnessTable = as<IRWitnessTable>(lookupInst->getWitnessTable());
         IRInterfaceType* interfaceType = nullptr;
         if (!witnessTable)
         {
-            IRInst* currentWitness = lookupInst->getWitnessTable();
-            IRWitnessTableTypeBase* witnessTableType = nullptr;
-            if (!witnessTableType)
+            if (auto thisTypeWitness = as<IRThisTypeWitness>(lookupInst->getWitnessTable()))
             {
-                if (auto thisTypeWitness = as<IRThisTypeWitness>(currentWitness))
-                    witnessTableType = as<IRWitnessTableTypeBase>(thisTypeWitness->getDataType());
-            }
+                if (auto witnessTableType = as<IRWitnessTableTypeBase>(thisTypeWitness->getDataType()))
+                {
+                    if (!areAllOperandsFullySpecialized(witnessTableType))
+                        return false;
 
-            if (witnessTableType && areAllOperandsFullySpecialized(witnessTableType))
-                interfaceType = as<IRInterfaceType>(witnessTableType->getConformanceType());
+                    interfaceType = as<IRInterfaceType>(witnessTableType->getConformanceType());
+                }
+            }
 
             if (!interfaceType)
                 return false;
@@ -877,7 +884,8 @@ struct SpecializationContext
         {
             // If we are specializing ThisTypeWitness, the result of the specialization
             // could be a WitnessTabelType, in such case, in order to not break the generality
-            // the specialziation, we will wrap it into another ThisTypeWitnes.
+            // the specialziation (we don't specialize WitnessTableType here), we will wrap it
+            // into another ThisTypeWitnes and handle it later.
             satisfyingVal = findInterfaceRequirement(interfaceType, requirementKey);
             if (auto witnessTableType = as<IRWitnessTableType>(satisfyingVal))
             {
@@ -885,7 +893,7 @@ struct SpecializationContext
                 IRBuilder builderStorage(module);
                 IRBuilder* builder = &builderStorage;
                 builder->setInsertBefore(lookupInst);
-                satisfyingVal = builder->createThisTypeWitness((IRType*)newInterfaceType);
+                satisfyingVal = builder->createThisTypeWitness(newInterfaceType);
             }
         }
 
