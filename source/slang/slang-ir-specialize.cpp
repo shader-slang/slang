@@ -850,28 +850,15 @@ struct SpecializationContext
         if (!witnessTable)
         {
             IRInst* currentWitness = lookupInst->getWitnessTable();
-            if (auto nestedLookupInst = as<IRLookupWitnessMethod>(currentWitness))
+            IRWitnessTableTypeBase* witnessTableType = nullptr;
+            if (!witnessTableType)
             {
-                addToWorkList(nestedLookupInst);
-                return false;
+                if (auto thisTypeWitness = as<IRThisTypeWitness>(currentWitness))
+                    witnessTableType = as<IRWitnessTableTypeBase>(thisTypeWitness->getDataType());
             }
 
-            if (as<IRThisTypeWitness>(currentWitness))
-            {
-                auto witnessTableType = as<IRWitnessTableTypeBase>(currentWitness->getDataType());
-                if (!areAllOperandsFullySpecialized(witnessTableType))
-                    return false;
-
+            if (witnessTableType && areAllOperandsFullySpecialized(witnessTableType))
                 interfaceType = as<IRInterfaceType>(witnessTableType->getConformanceType());
-            }
-            else if (auto witnessTableType = as<IRWitnessTableType>(currentWitness))
-            {
-                interfaceType = as<IRInterfaceType>(witnessTableType->getConformanceType());
-            }
-            else
-            {
-                return false;
-            }
 
             if (!interfaceType)
                 return false;
@@ -887,7 +874,20 @@ struct SpecializationContext
         if (witnessTable)
             satisfyingVal = findWitnessVal(witnessTable, requirementKey);
         else
+        {
+            // If we are specializing ThisTypeWitness, the result of the specialization
+            // could be a WitnessTabelType, in such case, in order to not break the generality
+            // the specialziation, we will wrap it into another ThisTypeWitnes.
             satisfyingVal = findInterfaceRequirement(interfaceType, requirementKey);
+            if (auto witnessTableType = as<IRWitnessTableType>(satisfyingVal))
+            {
+                auto newInterfaceType = as<IRInterfaceType>(witnessTableType->getConformanceType());
+                IRBuilder builderStorage(module);
+                IRBuilder* builder = &builderStorage;
+                builder->setInsertBefore(lookupInst);
+                satisfyingVal = builder->createThisTypeWitness((IRType*)newInterfaceType);
+            }
+        }
 
         // We expect to always find a satisfying value, but
         // we will go ahead and code defensively so that

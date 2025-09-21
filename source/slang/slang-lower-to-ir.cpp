@@ -11700,6 +11700,15 @@ static void _addFlattenedTupleArgs(List<IRInst*>& ioArgs, IRInst* val)
     }
 }
 
+bool isAbstractWitnessTable(IRInst* inst)
+{
+    if (as<IRThisTypeWitness>(inst) || as<IRInterfaceRequirementEntry>(inst))
+        return true;
+    if (auto lookup = as<IRLookupWitnessMethod>(inst))
+        return isAbstractWitnessTable(lookup->getWitnessTable());
+    return false;
+}
+
 static IRInst* maybeCloneThisTypeWitness(
     IRGenContext* context,
     IRInst* thisTypeWitness,
@@ -11878,11 +11887,15 @@ LoweredValInfo emitDeclRef(IRGenContext* context, Decl* decl, DeclRefBase* subst
             auto irWitnessTable = lowerSimpleVal(context, thisTypeSubst->getWitness());
             SLANG_RELEASE_ASSERT(irWitnessTable);
 
-            irWitnessTable = maybeCloneThisTypeWitness(
-                context,
-                irWitnessTable,
-                thisTypeSubst->getLookupSource());
-            // Copy ThisTypeWitness locally if necessary
+            if (isAbstractWitnessTable(irWitnessTable))
+            {
+                // Copy ThisTypeWitness locally if necessary
+                irWitnessTable = maybeCloneThisTypeWitness(
+                    context,
+                    irWitnessTable,
+                    thisTypeSubst->getLookupSource());
+            }
+
             auto irRequirementKey = getInterfaceRequirementKey(context, decl);
             auto irLookupWitness = context->irBuilder->emitLookupInterfaceMethodInst(
                 type,
