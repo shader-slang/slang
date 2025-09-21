@@ -858,7 +858,8 @@ struct SpecializationContext
         {
             if (auto thisTypeWitness = as<IRThisTypeWitness>(lookupInst->getWitnessTable()))
             {
-                if (auto witnessTableType = as<IRWitnessTableTypeBase>(thisTypeWitness->getDataType()))
+                if (auto witnessTableType =
+                        as<IRWitnessTableTypeBase>(thisTypeWitness->getDataType()))
                 {
                     if (!areAllOperandsFullySpecialized(witnessTableType))
                         return false;
