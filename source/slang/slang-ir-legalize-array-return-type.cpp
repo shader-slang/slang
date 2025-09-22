@@ -86,8 +86,8 @@ static bool targetSupportsCoopVec(CodeGenTarget target)
 
 static bool isCoopVecArray(IRType* type)
 {
-    if (auto nameDecoration = type->findDecoration<IRNameHintDecoration>())
-        return nameDecoration->getName() == "CoopVec";
+    if (auto intrinsicDecor = type->findDecoration<IRIntrinsicOpDecoration>())
+        return intrinsicDecor->getIntrinsicOp() == kIROp_CoopVectorType;
     return false;
 }
 

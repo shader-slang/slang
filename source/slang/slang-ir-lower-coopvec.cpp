@@ -49,7 +49,8 @@ struct CoopVecLoweringContext
         RefPtr<LoweredCoopVecInfo> info = new LoweredCoopVecInfo();
         info->coopvecType = (IRType*)type;
         info->arrayType = builder->getArrayType(type->getElementType(), type->getElementCount());
-        builder->addNameHintDecoration(info->arrayType, UnownedStringSlice("CoopVec"));
+        builder->addDecoration(info->arrayType, kIROp_IntrinsicOpDecoration,
+                               builder->getIntValue(builder->getIntType(), kIROp_CoopVectorType));
 
         mapLoweredArrayToCoopVecInfo[info->arrayType] = info;
         loweredCoopVecs[type] = info;
