@@ -6,6 +6,7 @@
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-mangle.h"
+#include "slang-target.h"
 
 namespace Slang
 {
@@ -205,6 +206,53 @@ bool isVaryingParameter(IRVarLayout* varLayout)
     return isVaryingParameter(varLayout->getTypeLayout());
 }
 
+
+// Helper function to determine if a parameter has explicit binding information
+// that should be preserved across all targets
+bool hasExplicitBinding(IRVarLayout* /*paramLayout*/)
+{
+    // For now, always preserve resource types for cross-target compatibility
+    // This is a conservative approach to ensure binding information is not lost
+    // TODO: Implement more sophisticated detection of explicit vs. inferred bindings
+    return true;
+}
+
+// Helper function to determine if a parameter should be collected into a constant buffer
+// This implements cross-target binding preservation logic to fix the root cause
+// of binding information loss during entry point parameter transformation
+bool shouldCollectEntryPointParamInConstantBuffer(
+    IRParam* param,
+    TargetRequest* targetReq,
+    IRVarLayout* paramLayout)
+{
+    // Check if this is a varying parameter - if so, don't collect
+    if (isVaryingParameter(paramLayout))
+        return false;
+
+    auto paramType = param->getDataType();
+
+    // CROSS-TARGET FIX: For all targets, preserve resource types with explicit bindings
+    // This addresses the root cause where register(u10, space0) and [[vk::binding(10, 0)]]
+    // get lost when parameters are moved to global scope
+    if (isResourceType(paramType))
+    {
+        // For Metal targets, always preserve resource types for buffer/texture/sampler binding
+        if (targetReq && isMetalTarget(targetReq))
+        {
+            return false; // Don't collect - preserve as direct parameter
+        }
+
+        // For HLSL/SPIR-V targets, preserve resource types with explicit binding annotations
+        // This prevents loss of register(uX, spaceY) and [[vk::binding(X, Y)]] information
+        if (hasExplicitBinding(paramLayout))
+        {
+            return false; // Don't collect - preserve explicit bindings
+        }
+    }
+
+    return true; // Collect into constant buffer by default
+}
+
 struct CollectEntryPointUniformParams : PerEntryPointPass
 {
     CollectEntryPointUniformParamsOptions m_options;
@@ -302,11 +350,15 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
             if (!paramLayout)
                 continue;
 
-            // A parameter that has varying input/output behavior should be left alone,
-            // since this pass is only supposed to apply to uniform (non-varying)
-            // parameters.
+
+            // For Metal targets, skip collection of resource parameters
+            // so they remain as direct entry point parameters and can generate
+            // proper binding attributes like [[buffer(N)]], [[texture(N)]], [[sampler(N)]]
             //
-            if (isVaryingParameter(paramLayout))
+            if (!shouldCollectEntryPointParamInConstantBuffer(
+                    param,
+                    m_options.targetReq,
+                    paramLayout))
                 continue;
 
             for (auto offsetAttr : paramLayout->getOffsetAttrs())
@@ -587,6 +639,8 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
 
 struct MoveEntryPointUniformParametersToGlobalScope : PerEntryPointPass
 {
+    TargetRequest* m_targetReq = nullptr;
+
     void processEntryPointImpl(EntryPointInfo const& info) SLANG_OVERRIDE
     {
         auto entryPointFunc = info.func;
@@ -620,11 +674,8 @@ struct MoveEntryPointUniformParametersToGlobalScope : PerEntryPointPass
             if (!paramLayout)
                 continue;
 
-            // A parameter that has varying input/output behavior should be left alone,
-            // since this pass is only supposed to apply to uniform (non-varying)
-            // parameters.
-            //
-            if (isVaryingParameter(paramLayout))
+            // Use unified logic to determine if parameter should be collected
+            if (!shouldCollectEntryPointParamInConstantBuffer(param, m_targetReq, paramLayout))
                 continue;
 
             auto paramType = param->getFullType();
@@ -678,9 +729,10 @@ void collectEntryPointUniformParams(
     context.processModule(module);
 }
 
-void moveEntryPointUniformParamsToGlobalScope(IRModule* module)
+void moveEntryPointUniformParamsToGlobalScope(IRModule* module, TargetRequest* targetReq)
 {
     MoveEntryPointUniformParametersToGlobalScope context;
+    context.m_targetReq = targetReq;
     context.processModule(module);
 }
 

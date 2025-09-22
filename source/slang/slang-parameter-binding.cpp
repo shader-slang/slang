@@ -2597,7 +2597,17 @@ static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
     auto paramType = getType(context->getASTBuilder(), paramDeclRef);
     SLANG_ASSERT(paramType);
 
-    if (paramDeclRef.getDecl()->hasModifier<HLSLUniformModifier>())
+    // CROSS-TARGET BINDING PRESERVATION FIX:
+    // Check if this is a resource type (StructuredBuffer, Texture, etc.) that should be handled
+    // as a resource parameter even if it has an HLSLUniformModifier (which can come from 'const')
+    bool isResourceType = as<HLSLStructuredBufferTypeBase>(paramType) ||
+                         as<TextureType>(paramType) ||
+                         as<SamplerStateType>(paramType) ||
+                         as<ConstantBufferType>(paramType);
+
+    bool hasHLSLUniformModifier = paramDeclRef.getDecl()->hasModifier<HLSLUniformModifier>();
+
+    if (hasHLSLUniformModifier && !isResourceType)
     {
         // An entry-point parameter that is explicitly marked `uniform` represents
         // a uniform shader parameter passed via the implicitly-defined
@@ -2618,6 +2628,69 @@ static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
                 paramType);
         }
         return createTypeLayoutWith(context->layoutContext, layoutRules, paramType);
+    }
+    else if (isResourceType)
+    {
+        // CROSS-TARGET BINDING PRESERVATION FIX:
+        // Handle resource parameters (StructuredBuffer, Texture2D, etc.) with explicit bindings
+        // Use the existing global parameter type layout computation
+        auto typeLayout = getTypeLayoutForGlobalShaderParameter(
+            context,
+            paramDeclRef.getDecl(),
+            paramType);
+
+        // Set up the type layout for the parameter
+        paramVarLayout->typeLayout = typeLayout;
+
+        // Manually process explicit binding annotations to ensure they're preserved
+        // Look for HLSL `register` semantics
+        for (auto semantic : paramDeclRef.getDecl()->getModifiersOfType<HLSLRegisterSemantic>())
+        {
+            auto semanticInfo = _extractLayoutSemanticInfo(context, semantic);
+            if (semanticInfo.kind != LayoutResourceKind::None)
+            {
+                // Find or create the resource info for this binding
+                if (auto resourceInfo = paramVarLayout->findOrAddResourceInfo(semanticInfo.kind))
+                {
+                    resourceInfo->index = semanticInfo.index;
+                    resourceInfo->space = semanticInfo.space;
+                }
+
+                // CROSS-TARGET BINDING PRESERVATION FIX:
+                // For Metal targets, also add MetalBuffer resource kind with the same binding index
+                // This ensures register(u10) and register(t5) map to [[buffer(10)]] and [[buffer(5)]]
+                if (context->layoutContext.targetReq &&
+                    isMetalTarget(context->layoutContext.targetReq))
+                {
+                    if (semanticInfo.kind == LayoutResourceKind::UnorderedAccess ||
+                        semanticInfo.kind == LayoutResourceKind::ShaderResource)
+                    {
+                        if (auto metalResourceInfo = paramVarLayout->findOrAddResourceInfo(LayoutResourceKind::MetalBuffer))
+                        {
+                            metalResourceInfo->index = semanticInfo.index;
+                            metalResourceInfo->space = semanticInfo.space;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Look for GLSL/Vulkan `[[vk::binding()]]` attributes
+        for (auto attr : paramDeclRef.getDecl()->getModifiersOfType<GLSLBindingAttribute>())
+        {
+            // Extract binding and set information
+            auto binding = attr->binding;
+            auto set = attr->set;
+
+            // Apply to descriptor table slot resource kind (used for Vulkan bindings)
+            if (auto resourceInfo = paramVarLayout->findOrAddResourceInfo(LayoutResourceKind::DescriptorTableSlot))
+            {
+                resourceInfo->index = binding;
+                resourceInfo->space = set;
+            }
+        }
+
+        return typeLayout;
     }
     else
     {
