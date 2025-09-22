@@ -191,9 +191,7 @@ void HLSLSourceEmitter::_emitHLSLRegisterSemantic(
                 m_writer->emit("s");
                 break;
             default:
-                {
-                    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled HLSL register type");
-                }
+                SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled HLSL register type");
                 break;
             }
             m_writer->emit(index);
