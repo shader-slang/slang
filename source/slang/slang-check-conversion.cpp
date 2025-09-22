@@ -559,7 +559,7 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
         {
             auto isLinkTimeVal =
                 as<TypeCastIntVal>(toElementCount) || as<DeclRefIntVal>(toElementCount) ||
-                as<PolynomialIntVal>(toElementCount) || as<FuncCallIntVal>(toElementType);
+                as<PolynomialIntVal>(toElementCount) || as<FuncCallIntVal>(toElementCount);
             if (isLinkTimeVal)
             {
                 auto defaultConstructExpr = m_astBuilder->create<DefaultConstructExpr>();
