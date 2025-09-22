@@ -185,7 +185,7 @@ jobs:
           python -m pip install --verbose slangpy --user
 
           # Get site packages directory
-          SITE_PACKAGES=$(python -c "import slangpy; import os; print(os.path.dirname(os.path.dirname(slangpy.__file__)))")
+          SITE_PACKAGES=$(python -c "import slangpy; import os; print(os.path.dirname(os.path.dirname(slangpy.__file__)))" | tail -n 1)
           echo "Site packages directory: $SITE_PACKAGES"
           echo "bin_dir location: $bin_dir"
           echo "lib_dir location: $lib_dir"
@@ -206,12 +206,8 @@ jobs:
             python -m pip install -r requirements-dev.txt --user
             python -m pip install pytest-github-actions-annotate-failures --user
             python -m pip install pytest-xdist --user
-          else
-            echo "Skipping Python package installation on self-hosted runner"
-            # TODO: remove this once we have pytest-xdist installed on all self-hosted runners
-            python -m pip install pytest-xdist --user
           fi
 
           echo "Running pytest on slangpy tests..."
           export PYTHONPATH="$SITE_PACKAGES"
-          python -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n auto --maxprocesses=4
+          python -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n auto --maxprocesses=3
