@@ -34,6 +34,3 @@ tests/compute/interface-shader-param.slang.5 syn (wgpu)
 tests/language-feature/shader-params/interface-shader-param-ordinary.slang.4 syn (wgpu)
 tests/glsl-intrinsic/shader-subgroup/shader-subgroup-builtin-variables.slang.8 (mtl)
 tests/glsl-intrinsic/shader-subgroup/shader-subgroup-builtin-variables-2.slang.3 (mtl)
-
-# GitHub issue #8289; VVL prints an error incorrectly; it will be resolved with a next VulkanSDK
-gfx-unit-test-tool/samplerArrayVulkan.internal
