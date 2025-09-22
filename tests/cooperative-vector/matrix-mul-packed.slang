@@ -30,7 +30,7 @@ void computeMain()
         matrix,
         0,
         CoopVecComponentType::SignedInt8,
-        CoopVecMatrixLayout::RowMajor,
+        CoopVecMatrixLayout::TrainingOptimal,
         false,
         4
     );

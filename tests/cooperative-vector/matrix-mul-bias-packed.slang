@@ -37,7 +37,7 @@ void computeMain()
         bias,
         0,
         CoopVecComponentType::SignedInt32,
-        CoopVecMatrixLayout::RowMajor,
+        CoopVecMatrixLayout::TrainingOptimal,
         false,
         4
     );
