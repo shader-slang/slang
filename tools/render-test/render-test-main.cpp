@@ -1577,7 +1577,7 @@ static SlangResult _innerMain(
                     rhiDevice = nullptr;
                 }
             }
-            
+
             // Check result for both cached and non-cached paths
             if (SLANG_FAILED(res) || !rhiDevice)
             {

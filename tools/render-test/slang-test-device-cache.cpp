@@ -85,7 +85,7 @@ SlangResult DeviceCache::acquireDevice(const rhi::DeviceDesc& desc, rhi::IDevice
 {
     if (!outDevice)
         return SLANG_E_INVALID_ARG;
-    
+
     *outDevice = nullptr;
 
     // Skip caching for CUDA devices due to crashes
