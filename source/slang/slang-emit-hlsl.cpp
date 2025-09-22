@@ -159,7 +159,7 @@ void HLSLSourceEmitter::_emitHLSLRegisterSemantic(
     case LayoutResourceKind::ExistentialObjectParam:
     case LayoutResourceKind::VaryingInput:
     case LayoutResourceKind::VaryingOutput:
-    case LayoutResourceKind::DescriptorTableSlot:  // Vulkan descriptor bindings, not HLSL registers
+    case LayoutResourceKind::DescriptorTableSlot: // Vulkan descriptor bindings, not HLSL registers
         // ignore
         break;
     default:

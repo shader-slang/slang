@@ -2601,9 +2601,8 @@ static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
     // Check if this is a resource type (StructuredBuffer, Texture, etc.) that should be handled
     // as a resource parameter even if it has an HLSLUniformModifier (which can come from 'const')
     bool isResourceType = as<HLSLStructuredBufferTypeBase>(paramType) ||
-                         as<TextureType>(paramType) ||
-                         as<SamplerStateType>(paramType) ||
-                         as<ConstantBufferType>(paramType);
+                          as<TextureType>(paramType) || as<SamplerStateType>(paramType) ||
+                          as<ConstantBufferType>(paramType);
 
     bool hasHLSLUniformModifier = paramDeclRef.getDecl()->hasModifier<HLSLUniformModifier>();
 
@@ -2634,10 +2633,8 @@ static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
         // CROSS-TARGET BINDING PRESERVATION FIX:
         // Handle resource parameters (StructuredBuffer, Texture2D, etc.) with explicit bindings
         // Use the existing global parameter type layout computation
-        auto typeLayout = getTypeLayoutForGlobalShaderParameter(
-            context,
-            paramDeclRef.getDecl(),
-            paramType);
+        auto typeLayout =
+            getTypeLayoutForGlobalShaderParameter(context, paramDeclRef.getDecl(), paramType);
 
         // Set up the type layout for the parameter
         paramVarLayout->typeLayout = typeLayout;
@@ -2658,14 +2655,16 @@ static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
 
                 // CROSS-TARGET BINDING PRESERVATION FIX:
                 // For Metal targets, also add MetalBuffer resource kind with the same binding index
-                // This ensures register(u10) and register(t5) map to [[buffer(10)]] and [[buffer(5)]]
+                // This ensures register(u10) and register(t5) map to [[buffer(10)]] and
+                // [[buffer(5)]]
                 if (context->layoutContext.targetReq &&
                     isMetalTarget(context->layoutContext.targetReq))
                 {
                     if (semanticInfo.kind == LayoutResourceKind::UnorderedAccess ||
                         semanticInfo.kind == LayoutResourceKind::ShaderResource)
                     {
-                        if (auto metalResourceInfo = paramVarLayout->findOrAddResourceInfo(LayoutResourceKind::MetalBuffer))
+                        if (auto metalResourceInfo = paramVarLayout->findOrAddResourceInfo(
+                                LayoutResourceKind::MetalBuffer))
                         {
                             metalResourceInfo->index = semanticInfo.index;
                             metalResourceInfo->space = semanticInfo.space;
@@ -2683,7 +2682,8 @@ static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
             auto set = attr->set;
 
             // Apply to descriptor table slot resource kind (used for Vulkan bindings)
-            if (auto resourceInfo = paramVarLayout->findOrAddResourceInfo(LayoutResourceKind::DescriptorTableSlot))
+            if (auto resourceInfo =
+                    paramVarLayout->findOrAddResourceInfo(LayoutResourceKind::DescriptorTableSlot))
             {
                 resourceInfo->index = binding;
                 resourceInfo->space = set;
