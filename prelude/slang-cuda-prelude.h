@@ -4965,15 +4965,24 @@ __host__ __device__ constexpr OptixCoopVecElemType slangToOptixComponentType(uns
 {
     switch (slangEnum)
     {
-        case 0:  return OPTIX_COOP_VEC_ELEM_TYPE_FLOAT8_E4M3;  // FloatE4M3
-        case 1:  return OPTIX_COOP_VEC_ELEM_TYPE_FLOAT8_E5M2;  // FloatE5M2
-        case 2:  return OPTIX_COOP_VEC_ELEM_TYPE_FLOAT16;      // Float16
-        case 3:  return OPTIX_COOP_VEC_ELEM_TYPE_FLOAT32;      // Float32
-        case 5:  return OPTIX_COOP_VEC_ELEM_TYPE_INT8;         // SignedInt8
-        case 7:  return OPTIX_COOP_VEC_ELEM_TYPE_INT32;        // SignedInt32
-        case 10: return OPTIX_COOP_VEC_ELEM_TYPE_UINT8;        // UnsignedInt8
-        case 12: return OPTIX_COOP_VEC_ELEM_TYPE_UINT32;       // UnsignedInt32
-        default: return OPTIX_COOP_VEC_ELEM_TYPE_FLOAT32;      // Default
+    case 0:
+        return OPTIX_COOP_VEC_ELEM_TYPE_FLOAT8_E4M3; // FloatE4M3
+    case 1:
+        return OPTIX_COOP_VEC_ELEM_TYPE_FLOAT8_E5M2; // FloatE5M2
+    case 2:
+        return OPTIX_COOP_VEC_ELEM_TYPE_FLOAT16; // Float16
+    case 3:
+        return OPTIX_COOP_VEC_ELEM_TYPE_FLOAT32; // Float32
+    case 5:
+        return OPTIX_COOP_VEC_ELEM_TYPE_INT8; // SignedInt8
+    case 7:
+        return OPTIX_COOP_VEC_ELEM_TYPE_INT32; // SignedInt32
+    case 10:
+        return OPTIX_COOP_VEC_ELEM_TYPE_UINT8; // UnsignedInt8
+    case 12:
+        return OPTIX_COOP_VEC_ELEM_TYPE_UINT32; // UnsignedInt32
+    default:
+        return OPTIX_COOP_VEC_ELEM_TYPE_FLOAT32; // Default
     }
 }
 
@@ -4982,11 +4991,16 @@ __host__ __device__ constexpr OptixCoopVecMatrixLayout slangToOptixMatrixLayout(
 {
     switch (slangEnum)
     {
-        case 0:  return OPTIX_COOP_VEC_MATRIX_LAYOUT_ROW_MAJOR;            // RowMajor
-        case 1:  return OPTIX_COOP_VEC_MATRIX_LAYOUT_COLUMN_MAJOR;         // ColumnMajor
-        case 2:  return OPTIX_COOP_VEC_MATRIX_LAYOUT_INFERENCING_OPTIMAL;  // InferencingOptimal
-        case 3:  return OPTIX_COOP_VEC_MATRIX_LAYOUT_TRAINING_OPTIMAL;     // TrainingOptimal
-        default: return OPTIX_COOP_VEC_MATRIX_LAYOUT_ROW_MAJOR;            // Default
+    case 0:
+        return OPTIX_COOP_VEC_MATRIX_LAYOUT_ROW_MAJOR; // RowMajor
+    case 1:
+        return OPTIX_COOP_VEC_MATRIX_LAYOUT_COLUMN_MAJOR; // ColumnMajor
+    case 2:
+        return OPTIX_COOP_VEC_MATRIX_LAYOUT_INFERENCING_OPTIMAL; // InferencingOptimal
+    case 3:
+        return OPTIX_COOP_VEC_MATRIX_LAYOUT_TRAINING_OPTIMAL; // TrainingOptimal
+    default:
+        return OPTIX_COOP_VEC_MATRIX_LAYOUT_ROW_MAJOR; // Default
     }
 }
 
@@ -5008,8 +5022,9 @@ struct SlangToOptixMatrixLayout
 template<typename T>
 struct OptixCoopVecTraits;
 
-// Template specialization for OptiX's OptixCoopVec - only enabled when cooperative vectors are available
-// NVRTC explicitly disables cooperative vectors by setting OPTIX_INCLUDE_COOPERATIVE_VECTOR to 0
+// Template specialization for OptiX's OptixCoopVec - only enabled when cooperative vectors are
+// available NVRTC explicitly disables cooperative vectors by setting
+// OPTIX_INCLUDE_COOPERATIVE_VECTOR to 0
 #if defined(OPTIX_VERSION) && OPTIX_VERSION > 90000
 template<typename T, unsigned int N>
 struct OptixCoopVecTraits<OptixCoopVec<T, N>>
