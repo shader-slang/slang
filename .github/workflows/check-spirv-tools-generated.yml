@@ -1,0 +1,157 @@
+name: Check SPIRV-Tools Generated Files
+
+on:
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-spirv-consistency:
+    name: Check SPIRV-Tools Generated Files Consistency
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          submodules: recursive
+
+      - name: Check if SPIRV-Tools or SPIRV-Headers were modified
+        id: check-spirv-changes
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git fetch origin ${{ github.base_ref }}
+            BASE=origin/${{ github.base_ref }}
+          else
+            BASE=HEAD^1
+          fi
+
+          # Check if spirv-tools or spirv-headers submodules were modified
+          if git diff --name-only $BASE...HEAD | grep -E '^external/(spirv-tools|spirv-headers)(/|$)'; then
+            echo "spirv-modified=true" >> $GITHUB_OUTPUT
+            echo "SPIRV-Tools or SPIRV-Headers submodules were modified"
+          else
+            echo "spirv-modified=false" >> $GITHUB_OUTPUT
+            echo "No SPIRV-Tools or SPIRV-Headers changes detected, skipping check"
+          fi
+
+      - name: Set up Python
+        if: steps.check-spirv-changes.outputs.spirv-modified == 'true'
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.x"
+
+      - name: Install build dependencies
+        if: steps.check-spirv-changes.outputs.spirv-modified == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build
+
+      - name: Check SPIRV-Headers consistency
+        if: steps.check-spirv-changes.outputs.spirv-modified == 'true'
+        run: |
+          # Get the commit hash that spirv-tools expects for spirv-headers from DEPS file
+          cd external/spirv-tools
+          EXPECTED_SPIRV_HEADERS_COMMIT=$(grep "'spirv_headers_revision':" DEPS | sed "s/.*'spirv_headers_revision'.*'\\([^']*\\)'.*/\\1/")
+          echo "Expected SPIRV-Headers commit (from DEPS): $EXPECTED_SPIRV_HEADERS_COMMIT"
+
+          # Get the current commit hash of our spirv-headers submodule
+          cd ../spirv-headers
+          ACTUAL_SPIRV_HEADERS_COMMIT=$(git log -1 --format="%H")
+          echo "Actual SPIRV-Headers commit: $ACTUAL_SPIRV_HEADERS_COMMIT"
+
+          # Compare the commits
+          if [ "$EXPECTED_SPIRV_HEADERS_COMMIT" != "$ACTUAL_SPIRV_HEADERS_COMMIT" ]; then
+            echo "❌ SPIRV-Headers commit mismatch!"
+            echo "   Expected: $EXPECTED_SPIRV_HEADERS_COMMIT"
+            echo "   Actual:   $ACTUAL_SPIRV_HEADERS_COMMIT"
+            echo ""
+            echo "Please update external/spirv-headers to match the commit used by external/spirv-tools:"
+            echo "  git -C external/spirv-headers fetch"
+            echo "  git -C external/spirv-headers checkout $EXPECTED_SPIRV_HEADERS_COMMIT"
+            exit 1
+          else
+            echo "✅ SPIRV-Headers commit is consistent"
+          fi
+
+      - name: Build SPIRV-Tools to generate files
+        if: steps.check-spirv-changes.outputs.spirv-modified == 'true'
+        run: |
+          cd external/spirv-tools
+
+          # Sync dependencies (this might require additional setup for private repos)
+          python3 utils/git-sync-deps || echo "Warning: git-sync-deps failed, continuing anyway"
+
+          # Configure and build
+          cmake . -B build -G Ninja
+          cmake --build build --config Release
+
+          echo "Generated files in build directory:"
+          ls -la build/*.h build/*.inc 2>/dev/null || echo "No generated header files found"
+
+      - name: Check generated files consistency
+        if: steps.check-spirv-changes.outputs.spirv-modified == 'true'
+        run: |
+          cd external/spirv-tools/build
+
+          echo "Comparing generated files with committed files in spirv-tools-generated/"
+
+          MISMATCH_FOUND=false
+
+          # Compare each generated file with the committed version
+          for f in *.h *.inc; do
+            if [ -f "$f" ]; then
+              committed_file="../../spirv-tools-generated/$f"
+              if [ ! -f "$committed_file" ]; then
+                echo "❌ Missing file in spirv-tools-generated/: $f"
+                MISMATCH_FOUND=true
+              elif ! diff -q "$f" "$committed_file" > /dev/null; then
+                echo "❌ File differs: $f"
+                MISMATCH_FOUND=true
+              else
+                echo "✅ File matches: $f"
+              fi
+            fi
+          done
+
+          if [ "$MISMATCH_FOUND" = true ]; then
+            echo ""
+            echo "❌ Generated files are not consistent with committed files!"
+            echo ""
+            echo "To fix this issue, please regenerate the files following these steps:"
+            echo "1. cd external/spirv-tools"
+            echo "2. python3 utils/git-sync-deps"
+            echo "3. cmake . -B build"
+            echo "4. cmake --build build --config Release"
+            echo "5. cd .."
+            echo "6. rm spirv-tools-generated/*.h spirv-tools-generated/*.inc"
+            echo "7. cp spirv-tools/build/*.h spirv-tools/build/*.inc spirv-tools-generated/"
+            echo "8. git add spirv-tools-generated/"
+            echo ""
+            echo "See docs/update_spirv.md for detailed instructions."
+            exit 1
+          else
+            echo ""
+            echo "✅ All generated files are consistent!"
+          fi
+
+      - name: Summary
+        if: always() && steps.check-spirv-changes.outputs.spirv-modified == 'true'
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ SPIRV-Tools generated files check passed"
+          else
+            echo "❌ SPIRV-Tools generated files check failed"
+            echo "Please ensure that external/spirv-tools-generated/ contains the correct generated files"
+            echo "that match the current version of external/spirv-tools/"
+          fi
+
+      - name: Skip message
+        if: steps.check-spirv-changes.outputs.spirv-modified == 'false'
+        run: |
+          echo "ℹ️  No SPIRV-Tools or SPIRV-Headers changes detected in this PR"
+          echo "Skipping SPIRV-Tools generated files consistency check"
