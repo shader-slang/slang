@@ -119,6 +119,10 @@ struct LLVMEmitter
 
     CodeGenContext* codeGenContext;
 
+    llvm::TargetMachine* targetMachine;
+
+    bool debug = false;
+
     LLVMEmitter(CodeGenContext* codeGenContext)
         : llvmModule("module", llvmContext),
           llvmDebugBuilder(llvmModule),
@@ -145,45 +149,64 @@ struct LLVMEmitter
             llvmBuilder = new llvm::IRBuilder<>(llvmContext);
         }
 
+        // TODO: Take the target triple as a parameter to allow
+        // cross-compilation.
+        std::string target_triple_str = llvm::sys::getDefaultTargetTriple();
+        std::string error;
+        const llvm::Target* target = llvm::TargetRegistry::lookupTarget(target_triple_str, error);
+        if (!target)
+        {
+            codeGenContext->getSink()->diagnose(SourceLoc(), Diagnostics::unrecognizedTargetTriple, target_triple_str.c_str(), error.c_str());
+            return;
+        }
 
-        llvmModule.addModuleFlag(
-            llvm::Module::Warning,
-            "Debug Info Version",
-             llvm::DEBUG_METADATA_VERSION
-        );
+        llvm::TargetOptions opt;
+        llvm::Triple target_triple(target_triple_str);
+        targetMachine = target->createTargetMachine(target_triple, "generic", "", opt, llvm::Reloc::PIC_);
 
-        StringBuilder sb;
-        getOptions().writeCommandLineArgs(codeGenContext->getSession(), sb);
+        debug = getOptions().getDebugInfoLevel() != DebugInfoLevel::None;
 
-        auto params = sb.toString();
+        if (debug)
+        {
+            llvmModule.addModuleFlag(
+                llvm::Module::Warning,
+                "Debug Info Version",
+                 llvm::DEBUG_METADATA_VERSION
+            );
 
-        // TODO: Separate debug info - that'll need to use the SplitName
-        // parameter!
-        compileUnit = llvmDebugBuilder.createCompileUnit(
-            // TODO: We should probably apply for a language ID in DWARF? Not
-            // sure how that process goes. Anyway, let's just use C as the ID
-            // until this target is properly usable.
-            llvm::dwarf::DW_LANG_C,
+            StringBuilder sb;
+            getOptions().writeCommandLineArgs(codeGenContext->getSession(), sb);
 
-            // The "compile unit" model doesn't work super well for Slang -
-            // we're supposed to only have one for the debug info per output
-            // file, as if we were building each .slang-module into a separate
-            // `.o`. Which we can't really do without losing large swathes of
-            // language features.
-            //
-            // Anyway, for now, we'll give no name to the "compile unit" and
-            // just operate with individual files separately. This doesn't
-            // prevent the debugger from seeing our source in any way.
-            llvmDebugBuilder.createFile("<slang-llvm>", "."),
+            auto params = sb.toString();
 
-            "Slang compiler",
+            // TODO: Separate debug info - that'll need to use the SplitName
+            // parameter!
+            compileUnit = llvmDebugBuilder.createCompileUnit(
+                // TODO: We should probably apply for a language ID in DWARF? Not
+                // sure how that process goes. Anyway, let's just use C as the ID
+                // until this target is properly usable.
+                llvm::dwarf::DW_LANG_C,
 
-            getOptions().getOptimizationLevel() != OptimizationLevel::None,
+                // The "compile unit" model doesn't work super well for Slang -
+                // we're supposed to only have one for the debug info per output
+                // file, as if we were building each .slang-module into a separate
+                // `.o`. Which we can't really do without losing large swathes of
+                // language features.
+                //
+                // Anyway, for now, we'll give no name to the "compile unit" and
+                // just operate with individual files separately. This doesn't
+                // prevent the debugger from seeing our source in any way.
+                llvmDebugBuilder.createFile("<slang-llvm>", "."),
 
-            llvm::StringRef(params.begin(), params.getLength()),
+                "Slang compiler",
 
-            0
-        );
+                getOptions().getOptimizationLevel() != OptimizationLevel::None,
+
+                llvm::StringRef(params.begin(), params.getLength()),
+
+                0
+            );
+        }
 
         debugScopeStack.add(compileUnit);
 
@@ -200,6 +223,7 @@ struct LLVMEmitter
 
     ~LLVMEmitter()
     {
+        delete targetMachine;
         delete llvmBuilder;
     }
 
@@ -863,6 +887,7 @@ struct LLVMEmitter
             break;
 
         case kIROp_DebugVar:
+            if (debug)
             {
                 auto debugVarInst = static_cast<IRDebugVar*>(inst);
 
@@ -894,6 +919,7 @@ struct LLVMEmitter
             return nullptr;
 
         case kIROp_DebugValue:
+            if (debug)
             {
                 auto debugValueInst = static_cast<IRDebugValue*>(inst);
                 llvm::DIVariable* debugVar = variableDebugInfo[debugValueInst->getDebugVar()];
@@ -913,6 +939,7 @@ struct LLVMEmitter
             return nullptr;
 
         case kIROp_DebugLine:
+            if (debug)
             {
                 auto debugLineInst = static_cast<IRDebugLine*>(inst);
 
@@ -1743,7 +1770,7 @@ struct LLVMEmitter
         }
 
         llvm::DISubprogram* sp = nullptr;
-        if (auto debugFuncDecoration = func->findDecoration<IRDebugFuncDecoration>())
+        if (auto debugFuncDecoration = func->findDecoration<IRDebugFuncDecoration>(); debugFuncDecoration && debug)
         {
             auto debugFunc = as<IRDebugFunction>(debugFuncDecoration->getDebugFunc());
             sp = ensureDebugFunc(func, debugFunc);
@@ -1835,43 +1862,40 @@ struct LLVMEmitter
     {
         mapInstToLLVM.clear();
 
-        llvm::ModuleAnalysisManager moduleAnalysisManager;
-        llvm::FunctionAnalysisManager functionAnalysisManager;
         llvm::LoopAnalysisManager loopAnalysisManager;
+        llvm::FunctionAnalysisManager functionAnalysisManager;
         llvm::CGSCCAnalysisManager CGSCCAnalysisManager;
+        llvm::ModuleAnalysisManager moduleAnalysisManager;
 
-        llvm::PassBuilder passBuilder;
+        llvm::PassBuilder passBuilder(targetMachine);
         passBuilder.registerModuleAnalyses(moduleAnalysisManager);
+        passBuilder.registerCGSCCAnalyses(CGSCCAnalysisManager);
         passBuilder.registerFunctionAnalyses(functionAnalysisManager);
+        passBuilder.registerLoopAnalyses(loopAnalysisManager);
         passBuilder.crossRegisterProxies(loopAnalysisManager, functionAnalysisManager, CGSCCAnalysisManager, moduleAnalysisManager);
 
-        llvm::PassInstrumentationCallbacks passInstrumentationCallbacks;
-        llvm::StandardInstrumentations standardInstrumentations(llvmContext, true);
-        standardInstrumentations.registerCallbacks(passInstrumentationCallbacks, &moduleAnalysisManager);
+        llvm::OptimizationLevel llvmLevel = llvm::OptimizationLevel::O0;
 
-        // TODO: Make the passes configurable
-        llvm::FunctionPassManager functionPassManager;
-        functionPassManager.addPass(llvm::ReassociatePass());
-        functionPassManager.addPass(llvm::GVNPass());
-        functionPassManager.addPass(llvm::SimplifyCFGPass());
-        functionPassManager.addPass(llvm::PromotePass());
-        functionPassManager.addPass(llvm::LoopSimplifyPass());
-        functionPassManager.addPass(llvm::LoopUnrollPass());
-        functionPassManager.addPass(llvm::DSEPass());
-        functionPassManager.addPass(llvm::DCEPass());
-        //functionPassManager.addPass(llvm::InstCombinePass());
-        functionPassManager.addPass(llvm::AggressiveInstCombinePass());
-
-        llvm::ModulePassManager modulePassManager;
-        modulePassManager.addPass(llvm::ModuleInlinerPass());
+        switch(getOptions().getOptimizationLevel())
+        {
+        case OptimizationLevel::None:
+            llvmLevel = llvm::OptimizationLevel::O0;
+            break;
+        default:
+        case OptimizationLevel::Default:
+            llvmLevel = llvm::OptimizationLevel::O1;
+            break;
+        case OptimizationLevel::High:
+            llvmLevel = llvm::OptimizationLevel::O2;
+            break;
+        case OptimizationLevel::Maximal:
+            llvmLevel = llvm::OptimizationLevel::O3;
+            break;
+        }
 
         // Run the actual optimizations.
+        llvm::ModulePassManager modulePassManager = passBuilder.buildPerModuleDefaultPipeline(llvmLevel);
         modulePassManager.run(llvmModule, moduleAnalysisManager);
-        for(llvm::Function& f: llvmModule)
-        {
-            if(!f.isDeclaration())
-                functionPassManager.run(f, functionAnalysisManager);
-        }
     }
 
     void finalize()
@@ -1883,7 +1907,10 @@ struct LLVMEmitter
             optimize();
         }
 
-        llvmDebugBuilder.finalize();
+        if (debug)
+        {
+            llvmDebugBuilder.finalize();
+        }
     }
 
     void dumpAssembly(String& assemblyOut)
@@ -1896,30 +1923,14 @@ struct LLVMEmitter
 
     void generateObjectCode(List<uint8_t>& objectOut)
     {
-        // TODO: Take the target triple as a parameter to allow
-        // cross-compilation.
-        std::string target_triple_str = llvm::sys::getDefaultTargetTriple();
-        std::string error;
-        const llvm::Target* target = llvm::TargetRegistry::lookupTarget(target_triple_str, error);
-        if (!target)
-        {
-            codeGenContext->getSink()->diagnose(SourceLoc(), Diagnostics::unrecognizedTargetTriple, target_triple_str.c_str(), error.c_str());
-            return;
-        }
-
-        llvm::TargetOptions opt;
-        llvm::Triple target_triple(target_triple_str);
-        llvm::TargetMachine* target_machine = target->createTargetMachine(target_triple, "generic", "", opt, llvm::Reloc::PIC_);
-        SLANG_DEFER(delete target_machine);
-
-        llvmModule.setDataLayout(target_machine->createDataLayout());
-        llvmModule.setTargetTriple(target_triple);
+        llvmModule.setDataLayout(targetMachine->createDataLayout());
+        llvmModule.setTargetTriple(targetMachine->getTargetTriple());
 
         BinaryLLVMOutputStream output(objectOut);
 
         llvm::legacy::PassManager pass;
         auto fileType = llvm::CodeGenFileType::ObjectFile;
-        if (target_machine->addPassesToEmitFile(pass, output, nullptr, fileType))
+        if (targetMachine->addPassesToEmitFile(pass, output, nullptr, fileType))
         {
             codeGenContext->getSink()->diagnose(SourceLoc(), Diagnostics::llvmCodegenFailed);
             return;
