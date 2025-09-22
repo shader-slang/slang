@@ -1532,7 +1532,7 @@ extension uintptr_t : IRangedValue
 
 __magic_type(ExplicitRefType)
 __intrinsic_type($(kIROp_RefType))
-struct ExplicitRef<
+struct Ref<
     T, 
     Access access = Access::ReadWrite, 
     AddressSpace addrSpace = AddressSpace::Device>
@@ -2700,7 +2700,7 @@ for (auto op : intrinsicUnaryOps)
 // Only ReadWrite is an L-value.
 __generic<T, Access access, AddressSpace addrSpace>
 __intrinsic_op(0)
-__prefix ExplicitRef<T, access, addrSpace> operator*(Ptr<T, access, addrSpace> value);
+__prefix Ref<T, access, addrSpace> operator*(Ptr<T, access, addrSpace> value);
 
 // TODO: [require(cpu)]. This cannot be done yet since this change breaks slangpy
 __generic<T>
