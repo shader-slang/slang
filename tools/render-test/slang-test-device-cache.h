@@ -1,6 +1,5 @@
 #pragma once
 
-#include <chrono>
 #include <mutex>
 #include <slang-rhi.h>
 #include <string>
@@ -50,7 +49,7 @@ private:
     static void evictOldestDeviceIfNeeded();
 
 public:
-    static Slang::ComPtr<rhi::IDevice> acquireDevice(const rhi::DeviceDesc& desc);
+    static SlangResult acquireDevice(const rhi::DeviceDesc& desc, rhi::IDevice** outDevice);
     static void cleanCache();
 };
 

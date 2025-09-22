@@ -4776,6 +4776,11 @@ static bool shouldRunTest(TestContext* context, String filePath)
     {
         if (filePath.startsWith(excludePrefix))
         {
+            if (context->options.verbosity == VerbosityLevel::Verbose)
+            {
+                context->getTestReporter()->messageFormat(
+                    TestMessageType::Info, "%s file is excluded from the test because it is found from the exclusion list\n", filePath.getBuffer());
+            }
             return false;
         }
     }

@@ -81,16 +81,17 @@ void DeviceCache::evictOldestDeviceIfNeeded()
     }
 }
 
-Slang::ComPtr<rhi::IDevice> DeviceCache::acquireDevice(const rhi::DeviceDesc& desc)
+SlangResult DeviceCache::acquireDevice(const rhi::DeviceDesc& desc, rhi::IDevice** outDevice)
 {
+    if (!outDevice)
+        return SLANG_E_INVALID_ARG;
+    
+    *outDevice = nullptr;
+
     // Skip caching for CUDA devices due to crashes
     if (desc.deviceType == rhi::DeviceType::CUDA)
     {
-        Slang::ComPtr<rhi::IDevice> device;
-        auto result = rhi::getRHI()->createDevice(desc, device.writeRef());
-        if (SLANG_SUCCEEDED(result))
-            return device;
-        return nullptr;
+        return rhi::getRHI()->createDevice(desc, outDevice);
     }
 
     std::lock_guard<std::mutex> lock(getMutex());
@@ -102,7 +103,7 @@ Slang::ComPtr<rhi::IDevice> DeviceCache::acquireDevice(const rhi::DeviceDesc& de
     key.deviceType = desc.deviceType;
     key.enableValidation = desc.enableValidation;
     key.enableRayTracingValidation = desc.enableRayTracingValidation;
-    key.profileName = desc.slang.targetProfile ? desc.slang.targetProfile : "";
+    key.profileName = desc.slang.targetProfile ? desc.slang.targetProfile : "Unknown";
 
     // Add required features to key
     for (int i = 0; i < desc.requiredFeatureCount; ++i)
@@ -119,7 +120,12 @@ Slang::ComPtr<rhi::IDevice> DeviceCache::acquireDevice(const rhi::DeviceDesc& de
     if (it != deviceCache.end())
     {
         // Return the cached device - COM reference counting handles the references
-        return it->second.device;
+        *outDevice = it->second.device.get();
+        if (*outDevice)
+        {
+            (*outDevice)->addRef();
+            return SLANG_OK;
+        }
     }
 
     // Create new device
@@ -127,7 +133,7 @@ Slang::ComPtr<rhi::IDevice> DeviceCache::acquireDevice(const rhi::DeviceDesc& de
     auto result = rhi::getRHI()->createDevice(desc, device.writeRef());
     if (SLANG_FAILED(result))
     {
-        return nullptr;
+        return result;
     }
 
     // Cache the device
@@ -135,7 +141,14 @@ Slang::ComPtr<rhi::IDevice> DeviceCache::acquireDevice(const rhi::DeviceDesc& de
     cached.device = device;
     cached.creationOrder = nextCreationOrder++;
 
-    return device;
+    // Return the device with proper reference counting
+    *outDevice = device.get();
+    if (*outDevice)
+    {
+        (*outDevice)->addRef();
+    }
+
+    return SLANG_OK;
 }
 
 

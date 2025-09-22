@@ -1560,19 +1560,26 @@ static SlangResult _innerMain(
                 getRHI()->enableDebugLayers();
             }
             Slang::ComPtr<rhi::IDevice> rhiDevice;
+            SlangResult res;
             if (options.cacheRhiDevice)
             {
-                rhiDevice = DeviceCache::acquireDevice(desc);
-            }
-            else
-            {
-                auto result = rhi::getRHI()->createDevice(desc, rhiDevice.writeRef());
-                if (SLANG_FAILED(result))
+                res = DeviceCache::acquireDevice(desc, rhiDevice.writeRef());
+                if (SLANG_FAILED(res))
                 {
                     rhiDevice = nullptr;
                 }
             }
-            if (!rhiDevice)
+            else
+            {
+                res = rhi::getRHI()->createDevice(desc, rhiDevice.writeRef());
+                if (SLANG_FAILED(res))
+                {
+                    rhiDevice = nullptr;
+                }
+            }
+            
+            // Check result for both cached and non-cached paths
+            if (SLANG_FAILED(res) || !rhiDevice)
             {
                 // We need to be careful here about SLANG_E_NOT_AVAILABLE. This return value means
                 // that the renderer couldn't be created because it required *features* that were
@@ -1584,17 +1591,18 @@ static SlangResult _innerMain(
                 //
                 // We also don't want to output the 'Unable to create renderer' error, as this isn't
                 // an error.
-                SlangResult res =
-                    SLANG_E_NOT_AVAILABLE; // Default to not available if device creation fails
+                if (res == SLANG_E_NOT_AVAILABLE)
+                {
+                    return res;
+                }
                 if (!options.onlyStartup)
                 {
                     fprintf(stderr, "Unable to create renderer %s\n", rendererName.getBuffer());
                 }
-
                 return res;
             }
+            SLANG_ASSERT(rhiDevice);
             deviceWrapper = CachedDeviceWrapper(rhiDevice);
-            SLANG_ASSERT(deviceWrapper);
         }
 
         for (const auto& feature : requiredFeatureList)
