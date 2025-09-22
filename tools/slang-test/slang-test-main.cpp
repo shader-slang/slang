@@ -4779,7 +4779,10 @@ static bool shouldRunTest(TestContext* context, String filePath)
             if (context->options.verbosity == VerbosityLevel::Verbose)
             {
                 context->getTestReporter()->messageFormat(
-                    TestMessageType::Info, "%s file is excluded from the test because it is found from the exclusion list\n", filePath.getBuffer());
+                    TestMessageType::Info,
+                    "%s file is excluded from the test because it is found from the exclusion "
+                    "list\n",
+                    filePath.getBuffer());
             }
             return false;
         }
