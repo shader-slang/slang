@@ -6,7 +6,7 @@ RWStructuredBuffer<int> outputBuffer;
 
 // TODO(tfoley): What this test is testing seems to be outside
 // the scope of what we ever intend to support in user code.
-// Returning an `ExplicitRef<T>` is supposed to be a core-module-only
+// Returning an `Ref<T>` is supposed to be a core-module-only
 // thing, and even then is something that we would like to do less
 // of over time.
 //
@@ -16,7 +16,7 @@ RWStructuredBuffer<int> outputBuffer;
 // intend to be supported in Slang.
 // 
 [ForceInline]
-ExplicitRef<uint> table<let n: int>(int index)
+Ref<uint> table<let n: int>(int index)
 {
     static groupshared uint array[n];
     return array[index];

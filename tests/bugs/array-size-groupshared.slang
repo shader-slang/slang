@@ -19,7 +19,7 @@ struct GenType<T : __BuiltinIntegerType, A: IA, let N : int, let M : int>
 
     // TODO(tfoley): What this test is testing seems to be outside
     // the scope of what we ever intend to support in user code.
-    // Returning an `ExplicitRef<T>` is supposed to be a core-module-only
+    // Returning an `Ref<T>` is supposed to be a core-module-only
     // thing, and even then is something that we would like to do less
     // of over time.
     //
@@ -29,7 +29,7 @@ struct GenType<T : __BuiltinIntegerType, A: IA, let N : int, let M : int>
     // intend to be supported in Slang.
     // 
     [ForceInline]
-    ExplicitRef<uint> weights(int index)
+    Ref<uint> weights(int index)
     {
         static groupshared uint w[P];
         return w[index];
