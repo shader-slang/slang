@@ -209,12 +209,16 @@ bool isVaryingParameter(IRVarLayout* varLayout)
 
 // Helper function to determine if a parameter has explicit binding information
 // that should be preserved across all targets
-bool hasExplicitBinding(IRVarLayout* /*paramLayout*/)
+bool hasExplicitBinding(IRParam* param, IRVarLayout* paramLayout)
 {
-    // For now, always preserve resource types for cross-target compatibility
-    // This is a conservative approach to ensure binding information is not lost
-    // TODO: Implement more sophisticated detection of explicit vs. inferred bindings
-    return true;
+    SLANG_UNUSED(paramLayout);
+
+    // Check for explicit HLSL binding decoration which is set when register() or [[vk::binding()]]
+    // annotations are present in the source code
+    if (param && param->findDecoration<IRHasExplicitHLSLBindingDecoration>())
+        return true;
+
+    return false;
 }
 
 // Helper function to determine if a parameter should be collected into a constant buffer
@@ -244,7 +248,7 @@ bool shouldCollectEntryPointParamInConstantBuffer(
 
         // For HLSL/SPIR-V targets, preserve resource types with explicit binding annotations
         // This prevents loss of register(uX, spaceY) and [[vk::binding(X, Y)]] information
-        if (hasExplicitBinding(paramLayout))
+        if (hasExplicitBinding(param, paramLayout))
         {
             return false; // Don't collect - preserve explicit bindings
         }

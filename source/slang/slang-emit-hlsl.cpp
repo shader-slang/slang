@@ -192,9 +192,7 @@ void HLSLSourceEmitter::_emitHLSLRegisterSemantic(
                 break;
             default:
                 {
-                    StringBuilder sb;
-                    sb << "unhandled HLSL register type: " << (int)kind;
-                    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), sb.toString().getBuffer());
+                    SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled HLSL register type");
                 }
                 break;
             }
