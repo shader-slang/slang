@@ -8,7 +8,7 @@ There are three directories under `external` that are related to SPIR-V:
 In order to use the latest or custom SPIR-V, they need to be updated.
 
 
-## Update SPIRV-Headers and SPIRV-Tools
+## Update SPIRV-Tools
 
 On the Slang repo, you need to update to use the latest commit of SPIRV-Tools and SPIRV-Headers.
 
@@ -31,14 +31,6 @@ On the Slang repo, you need to update to use the latest commit of SPIRV-Tools an
    git -C external/spirv-tools checkout origin/main
    ```
 
-1. Update the SPIRV-Headers submodule to what SPIRV-Tools uses
-   ```
-   git -C external/spirv-headers fetch
-   git -C external/spirv-tools/external/spirv-headers log -1 --oneline
-   git -C external/spirv-headers checkout [commit hash from the previous command]
-   ```
-
-
 ## Build spirv-tools
 
 A directory, `external/spirv-tools/generated`, holds a set of files generated from spirv-tools directory.
@@ -54,6 +46,17 @@ cmake.exe --build build --config Release
 # Go back to repository root
 cd ../..
 ```
+
+## Update SPIRV-Tools
+
+1. Update the SPIRV-Headers submodule to what SPIRV-Tools uses
+   ```
+   git -C external/spirv-headers fetch
+   git -C external/spirv-tools/external/spirv-headers log -1 --oneline
+   git -C external/spirv-headers checkout [commit hash from the previous command]
+   ```
+
+Note that the update of SPIRV-Headers should be done after running `python3.exe utils\git-sync-deps`, because the python script will update `external/spirv-tools/external/spirv-headers` to whichever commit the current SPIRV-Tools depends on.
 
 
 ## Copy the generated files from `spirv-tools/build/` to `spirv-tools-generated/`
