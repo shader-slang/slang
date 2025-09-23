@@ -551,19 +551,21 @@ static bool eliminateRedundantTemporaryCopyInFunc(IRFunc* func)
                 if (!loadInst)
                     continue; // skip because it is not the pattern we are looking for
 
-                auto loadedPtr = loadInst->getPtr();
+                auto loadPtr = loadInst->getPtr();
+
+                AddressSpace loadAddressSpace = AddressSpace::Generic;
+                if (auto loadPtrType = as<IRPtrTypeBase>(getRootAddr(loadPtr)->getDataType()))
+                {
+                    loadAddressSpace = loadPtrType->getAddressSpace();
+                }
 
                 // Check address space compatibility
                 if (auto destPtrType = as<IRPtrTypeBase>(getRootAddr(destPtr)->getDataType()))
                 {
-                    if (auto loadedPtrType =
-                            as<IRPtrTypeBase>(getRootAddr(loadedPtr)->getDataType()))
+                    if (destPtrType->getAddressSpace() != loadAddressSpace)
                     {
-                        if (destPtrType->getAddressSpace() != loadedPtrType->getAddressSpace())
-                        {
-                            // skip because the address space is not compatible.
-                            continue;
-                        }
+                        // skip because the address space is not compatible.
+                        continue;
                     }
                 }
 
@@ -574,7 +576,7 @@ static bool eliminateRedundantTemporaryCopyInFunc(IRFunc* func)
                 // to maintain this pretense, which breaks our load/store optimization assumptions.
                 // Skip optimization when loading from semantics to let legalization handle the load
                 // removal.
-                if (auto param = as<IRParam>(loadedPtr))
+                if (auto param = as<IRParam>(loadPtr))
                     if (param->findDecoration<IRSemanticDecoration>())
                         continue;
 
@@ -631,9 +633,15 @@ static bool eliminateRedundantTemporaryCopyInFunc(IRFunc* func)
                                     goto unsafeToOptimize;
 
                                 // Check if this parameter position is ConstRef
-                                auto param = params[i];
-                                if (!as<IRConstRefType>(param->getDataType()))
-                                    goto unsafeToOptimize;
+                                auto paramType = as<IRPtrTypeBase>(params[i]->getDataType());
+                                if (!paramType)
+                                    goto unsafeToOptimize; // must be a pointer
+
+                                if (!as<IRConstRefType>(paramType))
+                                    goto unsafeToOptimize; // must be const-ref
+
+                                if (paramType->getAddressSpace() != loadAddressSpace)
+                                    goto unsafeToOptimize; // incompatible address space
                             }
                         }
                         continue; // Safe so far and check the next use
@@ -648,7 +656,7 @@ static bool eliminateRedundantTemporaryCopyInFunc(IRFunc* func)
                 // If we get here, all uses are safe to optimize.
 
                 // Replace all uses of destPtr with loadedPtr
-                destPtr->replaceUsesWith(loadedPtr);
+                destPtr->replaceUsesWith(loadPtr);
 
                 // Mark instructions for removal
                 toRemove.add(storeInst);
