@@ -1409,10 +1409,10 @@ IRInst* mergeCandidateParentsForHoistableInst(IRInst* left, IRInst* right)
     // because otherwise we'd be violating the basic dominance
     // assumptions.
     //
-    SLANG_ASSERT(parentNonBlock);
-
-    // As a fallback, try to use the left parent as a default
-    // in case things go badly.
+    // However, in some cases (e.g., when dealing with generic interface
+    // methods that reference static constants), the operands may not
+    // have the expected parent-child relationship. In such cases,
+    // we fall back to using the left parent as a default.
     //
     if (!parentNonBlock)
     {
