@@ -541,15 +541,17 @@ static bool eliminateRedundantTemporaryCopyInFunc(IRFunc* func)
                 auto storedValue = storeInst->getVal();
                 auto destPtr = storeInst->getPtr();
 
-                // Only optimize temporary variable.
-                // Don't optimize stores to permanent memory locations.
                 if (destPtr->getOp() != kIROp_Var)
-                    continue; // skip because it is not the pattern we are looking for
+                {
+                    // Only optimize temporary variable.
+                    // Don't optimize stores to permanent memory locations.
+                    continue;
+                }
 
                 // Check if we're storing a load result
                 auto loadInst = as<IRLoad>(storedValue);
                 if (!loadInst)
-                    continue; // skip because it is not the pattern we are looking for
+                    continue;
 
                 auto loadPtr = loadInst->getPtr();
 
@@ -557,16 +559,6 @@ static bool eliminateRedundantTemporaryCopyInFunc(IRFunc* func)
                 if (auto loadPtrType = as<IRPtrTypeBase>(getRootAddr(loadPtr)->getDataType()))
                 {
                     loadAddressSpace = loadPtrType->getAddressSpace();
-                }
-
-                // Check address space compatibility
-                if (auto destPtrType = as<IRPtrTypeBase>(getRootAddr(destPtr)->getDataType()))
-                {
-                    if (destPtrType->getAddressSpace() != loadAddressSpace)
-                    {
-                        // skip because the address space is not compatible.
-                        continue;
-                    }
                 }
 
                 // Do not optimize loads from semantic parameters because some semantics have
@@ -579,9 +571,6 @@ static bool eliminateRedundantTemporaryCopyInFunc(IRFunc* func)
                 if (auto param = as<IRParam>(loadPtr))
                     if (param->findDecoration<IRSemanticDecoration>())
                         continue;
-
-                // We cannot optimize if the variable is passed to a function call that treats the
-                // parameter as mutable, or if there are multiple stores to the variable.
 
                 // If the pointer is re-used with IRStore more than once,
                 // handling the case will become more complex.
@@ -608,7 +597,7 @@ static bool eliminateRedundantTemporaryCopyInFunc(IRFunc* func)
                     if (as<IRLoad>(user))
                         continue; // Check the next use
 
-                    // For function calls, check if the parameter is ConstRef
+                    // For function calls, check if the pointer is treated as immutable.
                     if (auto call = as<IRCall>(user))
                     {
                         auto callee = call->getCallee();
@@ -633,10 +622,7 @@ static bool eliminateRedundantTemporaryCopyInFunc(IRFunc* func)
                                     goto unsafeToOptimize;
 
                                 // Check if this parameter position is ConstRef
-                                auto paramType = as<IRPtrTypeBase>(params[i]->getDataType());
-                                if (!paramType)
-                                    goto unsafeToOptimize; // must be a pointer
-
+                                auto paramType = cast<IRPtrTypeBase>(params[i]->getDataType());
                                 if (!as<IRConstRefType>(paramType))
                                     goto unsafeToOptimize; // must be const-ref
 
@@ -650,6 +636,7 @@ static bool eliminateRedundantTemporaryCopyInFunc(IRFunc* func)
                     // TODO: there might be more cases that is safe to optimize
                     // We need to add more cases here as needed.
 
+                    // If we get here, the pointer is used with an unexpected IR.
                     goto unsafeToOptimize;
                 }
 
