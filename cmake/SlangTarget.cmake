@@ -423,10 +423,7 @@ function(slang_add_target dir type)
         # Expand the list manually to work around a bug in cmake 3.22.1
         # See: https://github.com/shader-slang/slang/issues/8335
         foreach(lib IN LISTS ARG_LINK_WITH_PRIVATE)
-            target_link_libraries(
-                ${target}
-                PRIVATE $<BUILD_INTERFACE:${lib}>
-            )
+            target_link_libraries(${target} PRIVATE $<BUILD_INTERFACE:${lib}>)
         endforeach()
     endif()
 
