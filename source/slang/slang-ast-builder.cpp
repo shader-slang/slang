@@ -931,12 +931,22 @@ top:
     {
         return bIsSubtypeOfCWitness;
     }
+    else if (auto declAIsSubtypeOfBWitness = as<DeclaredSubtypeWitness>(aIsSubtypeOfBWitness))
+    {
+        if (declAIsSubtypeOfBWitness->isEquality())
+            return bIsSubtypeOfCWitness;
+    }
 
     // Similarly, if `b == c`, then the `a <: b` witness is a witness for `a <: c`
     //
     if (as<TypeEqualityWitness>(bIsSubtypeOfCWitness))
     {
         return aIsSubtypeOfBWitness;
+    }
+    else if (auto declBIsSubtypeOfCWitness = as<DeclaredSubtypeWitness>(bIsSubtypeOfCWitness))
+    {
+        if (declBIsSubtypeOfCWitness->isEquality())
+            return declBIsSubtypeOfCWitness;
     }
 
     // HACK: There is downstream code generation logic that assumes that
