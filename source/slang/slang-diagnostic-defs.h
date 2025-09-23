@@ -2080,7 +2080,7 @@ DIAGNOSTIC(
     38010,
     Error,
     entryPointCannotReturnResourceType,
-    "entry point '$0' cannot return a resource type '$1'")
+    "entry point '$0' cannot return type '$1' that contains resource types")
 
 DIAGNOSTIC(
     38100,

@@ -2,7 +2,7 @@
 
 // Test that entry points cannot return resource types
 
-//CHECK: error 38010: entry point 'test1' cannot return a resource type
+//CHECK: error 38010: entry point 'test1' cannot return type 'Texture2D<int>' that contains resource types
 [shader("compute")]
 Texture2D<int> test1(uint3 threadID : SV_DispatchThreadID)
 {
