@@ -19116,7 +19116,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
             {
                 OpExtension "SPV_NV_cluster_acceleration_structure";
                 OpCapability RayTracingClusterAccelerationStructureNV;
-                result:$$int = OpRayQueryGetClusterIdNV &this $iCandidateOrCommitted;
+                result:$$int = OpRayQueryGetIntersectionClusterIdNV &this $iCandidateOrCommitted;
             };
         }
     }
@@ -19161,7 +19161,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
             {
                 OpExtension "SPV_NV_cluster_acceleration_structure";
                 OpCapability RayTracingClusterAccelerationStructureNV;
-                result:$$int = OpRayQueryGetClusterIdNV &this $iCandidateOrCommitted;
+                result:$$int = OpRayQueryGetIntersectionClusterIdNV &this $iCandidateOrCommitted;
             };
         }
     }
