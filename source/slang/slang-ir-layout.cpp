@@ -368,9 +368,6 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
         return SLANG_OK;
     case kIROp_DescriptorHandleType:
         {
-            // On bindless targets (CUDA, CPU, Metal), DescriptorHandle<T> is just a pointer
-            // For non-bindless targets, use uint2
-
             // Check if this is a bindless target
             auto target = optionSet.getTarget();
             bool isBindless =
@@ -382,13 +379,7 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
             if (isBindless)
             {
                 // Calculate pointer size for the target
-                int pointerSize = 8; // Default to 64-bit pointers
-                if (target == CodeGenTarget::HostCPPSource ||
-                    target == CodeGenTarget::HostExecutable ||
-                    target == CodeGenTarget::HostSharedLibrary)
-                {
-                    pointerSize = (int)sizeof(void*);
-                }
+                int pointerSize = (int)sizeof(void*);
 
                 // Return pointer size/alignment for bindless targets
                 *outSizeAndAlignment = IRSizeAndAlignment(pointerSize, pointerSize);
