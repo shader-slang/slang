@@ -74,7 +74,7 @@ void simplifyIR(
         changed |= applySparseConditionalConstantPropagationForGlobalScope(module, sink);
         changed |= peepholeOptimizeGlobalScope(target, module);
         changed |= trimOptimizableTypes(module);
-        changed |= eliminateLoadStorePairs(module);
+        changed |= eliminateRedundantTemporaryCopy(module);
 
         for (auto inst : module->getGlobalInsts())
         {

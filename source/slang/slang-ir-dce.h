@@ -36,12 +36,13 @@ bool isWeakReferenceOperand(IRInst* inst, UInt operandIndex);
 
 bool trimOptimizableTypes(IRModule* module);
 
-/// Eliminate unnecessary load+store pairs when safe to do so.
-/// This optimization looks for patterns where a value is loaded from a ConstRef
-/// parameter and immediately stored to a temporary variable, then only passed
-/// to functions that accept ConstRef parameters. In such cases, the temporary
-/// variable can be eliminated and the original ConstRef parameter used directly.
+/// Eliminate redundant temporary variable copies in load-store patterns.
+/// This optimization looks for patterns where a value is loaded from memory
+/// and immediately stored to a temporary variable, which is then only used
+/// in read-only contexts. In such cases, the temporary variable and the
+/// load-store indirection can be eliminated by using the original memory
+/// location directly.
 /// Returns true if any changes were made.
-bool eliminateLoadStorePairs(IRModule* module);
+bool eliminateRedundantTemporaryCopy(IRModule* module);
 
 } // namespace Slang
