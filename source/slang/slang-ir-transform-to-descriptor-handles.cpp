@@ -17,19 +17,25 @@
 
 namespace Slang
 {
-struct ResourceToDescriptorHandleTransformContext : public InstPassBase
+
+struct ResourceToDescriptorHandleTransformContext
 {
     TargetProgram* targetProgram;
     DiagnosticSink* diagnosticSink;
     IRBuilder irBuilder;
 
-    /// Maps original types to their lowered equivalents
-    /// Key: Original type (e.g., struct with Texture2D field)
-    /// Value: Lowered type (e.g., struct with DescriptorHandle<Texture2D> field)
-    Dictionary<IRType*, IRType*> originalToLoweredTypeMap;
-    Dictionary<IRType*, IRType*> loweredToOriginalTypeMap;
+    /// Information about a type transformation
+    struct TransformedTypeInfo
+    {
+        IRType* originalType;
+        IRType* transformedType;
+    };
 
-    /// Tracks parameter block types that have been updated with lowered element types
+    /// Caching for type transformations (bidirectional)
+    Dictionary<IRType*, TransformedTypeInfo> transformedTypeInfo; // original type -> transformed type info
+    Dictionary<IRType*, TransformedTypeInfo> mapTransformedTypeToInfo; // transformed type -> transformed type info
+
+    /// Tracks parameter block types that have been updated with transformed element types
     List<IRParameterBlockType*> updatedParameterBlockTypes;
 
     /// Maps original buffer types to their wrapper struct types
@@ -39,111 +45,162 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
         TargetProgram* inTargetProgram,
         IRModule* module,
         DiagnosticSink* inSink)
-        : InstPassBase(module)
-        , targetProgram(inTargetProgram)
+        : targetProgram(inTargetProgram)
         , diagnosticSink(inSink)
         , irBuilder(module)
     {
     }
 
-    /// Recursively converts types to their descriptor handle equivalents
-    ///
-    /// This function performs the core type transformation:
-    /// - Resource types (Texture2D, Buffer, etc.) -> DescriptorHandle<ResourceType>
-    /// - Structs containing resources -> Structs with DescriptorHandle fields
-    /// - Arrays/pointers of resources -> Arrays/pointers of DescriptorHandle types
-    ///
-    /// @param originalType The type to potentially transform
-    /// @return The transformed type, or the original type if no transformation needed
-    IRType* convertTypeToDescriptorHandle(IRType* originalType)
+
+    /// Check if a type should be transformed
+    bool shouldTransformType(IRType* type)
     {
-        // Check if we've already processed this type to avoid infinite recursion
-        if (auto existingLoweredType = originalToLoweredTypeMap.tryGetValue(originalType))
-            return *existingLoweredType;
+        switch (type->getOp())
+        {
+        case kIROp_ParameterBlockType:
+        case kIROp_ArrayType:
+        case kIROp_StructType:
+            return true;
+        default:
+            return false;
+        }
+    }
 
-        IRType* transformedType = originalType;
+    /// Check if a type is a resource type that should be converted to descriptor handle
+    bool isResourceType(IRType* type)
+    {
+        switch (type->getOp())
+        {
+        case kIROp_TextureType:
+        case kIROp_HLSLStructuredBufferType:
+        case kIROp_HLSLRWStructuredBufferType:
+        case kIROp_HLSLAppendStructuredBufferType:
+        case kIROp_HLSLConsumeStructuredBufferType:
+        case kIROp_HLSLByteAddressBufferType:
+        case kIROp_HLSLRWByteAddressBufferType:
+        case kIROp_SamplerStateType:
+        case kIROp_SamplerComparisonStateType:
+            return true;
+        default:
+            return false;
+        }
+    }
 
-        if (isResourceType(originalType))
+    /// Copy name hints and debug decorations from source to target
+    void copyNameHintAndDebugDecorations(IRInst* target, IRInst* source)
+    {
+        // Copy name hint if present
+        if (auto nameHint = source->findDecoration<IRNameHintDecoration>())
+        {
+            irBuilder.addNameHintDecoration(target, nameHint->getName());
+        }
+        
+        // Copy other relevant decorations as needed
+        // This can be extended to copy more decoration types
+    }
+
+    /// Get transformed type info with proper caching and cycle detection
+    /// This is the main entry point for type transformation
+    TransformedTypeInfo getTransformedTypeInfo(IRType* type)
+    {
+        // Check cache first to avoid recomputation and infinite recursion
+        TransformedTypeInfo info;
+        if (transformedTypeInfo.tryGetValue(type, info))
+            return info;
+        
+        // Check if this is already a transformed type
+        if (mapTransformedTypeToInfo.tryGetValue(type))
+        {
+            info.originalType = type;
+            info.transformedType = type;
+            return info;
+        }
+        
+        // Delegate to implementation
+        info = getTransformedTypeInfoImpl(type);
+        
+        // Cache results with bidirectional mapping
+        transformedTypeInfo.set(type, info);
+        mapTransformedTypeToInfo.set(info.transformedType, info);
+        
+        return info;
+    }
+
+    /// Implementation of type transformation logic
+    TransformedTypeInfo getTransformedTypeInfoImpl(IRType* type)
+    {
+        IRBuilder builder(type);
+        builder.setInsertAfter(type);
+        
+        TransformedTypeInfo info;
+        info.originalType = type;
+        info.transformedType = type; // Default: no transformation
+        
+        if (isResourceType(type))
         {
             // Transform: Texture2D -> DescriptorHandle<Texture2D>
-            irBuilder.setInsertBefore(originalType);
-            transformedType = (IRDescriptorHandleType*)irBuilder.getType(
-                kIROp_DescriptorHandleType,
-                originalType);
+            info.transformedType = builder.getType(kIROp_DescriptorHandleType, type);
         }
-        else if (auto structType = as<IRStructType>(originalType))
+        else if (auto structType = as<IRStructType>(type))
         {
-            // Check if this struct contains any resource types that need transformation
-            bool structNeedsTransformation = false;
+            if (!shouldTransformType(type))
+                return info;
+                
+            // Check if any field needs transformation
+            bool needsTransformation = false;
             for (auto field : structType->getFields())
             {
-                auto fieldType = field->getFieldType();
-                if (convertTypeToDescriptorHandle(fieldType) != fieldType)
+                auto fieldInfo = getTransformedTypeInfo(field->getFieldType());
+                if (fieldInfo.transformedType != fieldInfo.originalType)
                 {
-                    structNeedsTransformation = true;
+                    needsTransformation = true;
                     break;
                 }
             }
-
-            if (structNeedsTransformation)
+            
+            if (needsTransformation)
             {
-                // Create a new struct type with transformed field types
-                irBuilder.setInsertBefore(structType);
-                auto transformedStructType = irBuilder.createStructType();
-
-                // Preserve decorations from the original struct
+                // Create new struct with transformed fields
+                auto transformedStructType = builder.createStructType();
                 copyNameHintAndDebugDecorations(transformedStructType, structType);
-
-                // Transform all fields, converting resource types to descriptor handles
+                
                 for (auto originalField : structType->getFields())
                 {
-                    auto originalFieldType = originalField->getFieldType();
-                    auto transformedFieldType = convertTypeToDescriptorHandle(originalFieldType);
-                    auto fieldKey = originalField->getKey();
-                    irBuilder.createStructField(
+                    auto fieldInfo = getTransformedTypeInfo(originalField->getFieldType());
+                    builder.createStructField(
                         transformedStructType,
-                        fieldKey,
-                        transformedFieldType);
+                        originalField->getKey(),
+                        fieldInfo.transformedType);
                 }
-
-                transformedType = transformedStructType;
+                
+                info.transformedType = transformedStructType;
             }
         }
-        else if (auto arrayType = as<IRArrayTypeBase>(originalType))
+        else if (auto arrayType = as<IRArrayTypeBase>(type))
         {
-            // Handle arrays: Array<Texture2D, N> -> Array<DescriptorHandle<Texture2D>, N>
-            auto elementType = arrayType->getElementType();
-            auto transformedElementType = convertTypeToDescriptorHandle(elementType);
-
-            if (transformedElementType != elementType)
+            if (!shouldTransformType(type))
+                return info;
+                
+            auto elementInfo = getTransformedTypeInfo(arrayType->getElementType());
+            if (elementInfo.transformedType != elementInfo.originalType)
             {
-                irBuilder.setInsertBefore(originalType);
-                transformedType =
-                    irBuilder.getArrayType(transformedElementType, arrayType->getElementCount());
+                info.transformedType = builder.getArrayType(
+                    elementInfo.transformedType, 
+                    arrayType->getElementCount());
             }
         }
-        else if (auto ptrType = as<IRPtrTypeBase>(originalType))
+        else if (auto ptrType = as<IRPtrTypeBase>(type))
         {
-            // Handle pointers: Ptr<Texture2D> -> Ptr<DescriptorHandle<Texture2D>>
-            auto valueType = ptrType->getValueType();
-            auto transformedValueType = convertTypeToDescriptorHandle(valueType);
-
-            if (transformedValueType != valueType)
+            auto valueInfo = getTransformedTypeInfo(ptrType->getValueType());
+            if (valueInfo.transformedType != valueInfo.originalType)
             {
-                irBuilder.setInsertBefore(originalType);
-                transformedType =
-                    irBuilder.getPtrTypeWithAddressSpace(transformedValueType, ptrType);
+                info.transformedType = builder.getPtrTypeWithAddressSpace(
+                    valueInfo.transformedType, 
+                    ptrType);
             }
         }
-
-        // Cache the transformation result to avoid recomputing
-        if (transformedType != originalType)
-        {
-            originalToLoweredTypeMap[originalType] = transformedType;
-            loweredToOriginalTypeMap[transformedType] = originalType;
-        }
-
-        return transformedType;
+        
+        return info;
     }
 
     /// Checks if a type is a buffer type that results in a pointer in Metal
@@ -177,19 +234,14 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
     }
 
     /// Transforms parameter block types to use descriptor handles
-    ///
-    /// This method finds all ParameterBlock<T> types where T contains resources,
-    /// and replaces them with ParameterBlock<T'> where T' uses descriptor handles.
-    ///
-    /// For example: ParameterBlock<MaterialData> where MaterialData contains Texture2D
-    /// becomes: ParameterBlock<MaterialData_DescHandleTransformed> with DescriptorHandle<Texture2D>
+    /// Uses systematic approach with proper validation and caching
     void transformParameterBlockTypes()
     {
         List<IRParameterBlockType*> parameterBlockTypesToTransform;
         List<IRParameterBlockType*> bufferParameterBlocks;
 
-        // First pass: identify all parameter block types that need transformation
-        for (auto globalInst : module->getGlobalInsts())
+        // Collect all parameter block types that need processing
+        for (auto globalInst : irBuilder.getModule()->getGlobalInsts())
         {
             if (auto paramBlockType = as<IRParameterBlockType>(globalInst))
             {
@@ -198,37 +250,35 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
                 // Check if this is ParameterBlock<BufferType> that needs wrapping
                 if (isBufferTypeThatNeedsWrapping(elementType))
                 {
-                    // We will handle buffer types separately to wrap them in structs
                     bufferParameterBlocks.add(paramBlockType);
                 }
-            }
-        }
-        // Handle ParameterBlock<BufferType> wrapping
-        handleBufferParameterBlockWrapping(bufferParameterBlocks);
-
-        for (auto globalInst : module->getGlobalInsts())
-        {
-            if (auto paramBlockType = as<IRParameterBlockType>(globalInst))
-            {
-                auto elementType = paramBlockType->getElementType();
-                auto transformedElementType = convertTypeToDescriptorHandle(elementType);
-
-                if (transformedElementType != elementType)
+                else
                 {
-                    parameterBlockTypesToTransform.add(paramBlockType);
+                    // Check if element type needs transformation
+                    auto elementInfo = getTransformedTypeInfo(elementType);
+                    if (elementInfo.transformedType != elementInfo.originalType)
+                    {
+                        parameterBlockTypesToTransform.add(paramBlockType);
+                    }
                 }
             }
         }
 
-        // Second pass: replace each parameter block type with its transformed version
+        // Handle buffer parameter blocks first (they have special wrapping logic)
+        handleBufferParameterBlockWrapping(bufferParameterBlocks);
+
+        // Transform regular parameter block types
         for (auto originalParamBlockType : parameterBlockTypesToTransform)
         {
-            auto originalElementType = originalParamBlockType->getElementType();
-            auto transformedElementType = convertTypeToDescriptorHandle(originalElementType);
+            auto elementInfo = getTransformedTypeInfo(originalParamBlockType->getElementType());
+            
+            // Validate transformation is still needed (may have been processed already)
+            if (elementInfo.transformedType == elementInfo.originalType)
+                continue;
 
             // Create new parameter block type: ParameterBlock<TransformedType>
             auto transformedParamBlockType =
-                irBuilder.getType(kIROp_ParameterBlockType, transformedElementType);
+                irBuilder.getType(kIROp_ParameterBlockType, elementInfo.transformedType);
 
             // Replace all uses of the original type with the new type
             originalParamBlockType->replaceUsesWith(transformedParamBlockType);
@@ -242,18 +292,6 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
         }
     }
 
-    /// Extracts the underlying resource type from a descriptor handle type
-    ///
-    /// @param descriptorHandleType A DescriptorHandle<ResourceType> type
-    /// @return The wrapped ResourceType, or nullptr if not a descriptor handle
-    IRType* extractResourceTypeFromDescriptorHandle(IRType* descriptorHandleType)
-    {
-        if (auto descHandleType = as<IRDescriptorHandleType>(descriptorHandleType))
-        {
-            return descHandleType->getResourceType();
-        }
-        return nullptr;
-    }
 
     /// Handles wrapping of ParameterBlock<BufferType> into ParameterBlock<WrapperStruct>
     ///
@@ -406,24 +444,18 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
     }
 
     /// Converts a value from transformed type back to its original type
-    ///
-    /// This method handles the reverse transformation, converting descriptor handles
-    /// and transformed structs back to their original resource types and struct types.
-    ///
-    /// @param transformedValue The value with transformed type (descriptor handle or transformed
-    /// struct)
-    /// @param targetOriginalType The original type to convert to
-    /// @return The converted value, or the original value if no conversion needed
+    /// Uses the new ConversionMethod pattern for cleaner and more systematic conversion
     IRInst* convertDescriptorHandleToOriginalType(
         IRInst* transformedValue,
         IRType* targetOriginalType)
     {
         auto transformedValueType = transformedValue->getFullType();
 
+
         // Case 1: Convert descriptor handle back to resource type
         if (auto descriptorHandleType = as<IRDescriptorHandleType>(transformedValueType))
         {
-            auto resourceType = extractResourceTypeFromDescriptorHandle(descriptorHandleType);
+            auto resourceType = descriptorHandleType->getResourceType();
             if (resourceType && resourceType == targetOriginalType)
             {
                 // Insert cast instruction: DescriptorHandle<Texture2D> -> Texture2D
@@ -440,12 +472,10 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
             auto targetStructType = as<IRStructType>(targetOriginalType);
             if (targetStructType)
             {
-                // Check if this transformed struct corresponds to the target original type
-                IRType* expectedTransformedType = nullptr;
-                if (originalToLoweredTypeMap.tryGetValue(
-                        targetOriginalType,
-                        expectedTransformedType) &&
-                    expectedTransformedType == transformedValueType)
+                // Check if we have transformation info for this type pair
+                TransformedTypeInfo info;
+                if (transformedTypeInfo.tryGetValue(targetOriginalType, info) &&
+                    info.transformedType == transformedValueType)
                 {
                     return convertTransformedStructToOriginal(transformedValue, targetOriginalType);
                 }
@@ -461,11 +491,9 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
                 auto targetPointeeType = targetPtrType->getValueType();
                 
                 // Check if the pointer's value type corresponds to a transformed type
-                IRType* expectedTransformedPointeeType = nullptr;
-                if (originalToLoweredTypeMap.tryGetValue(
-                        targetPointeeType,
-                        expectedTransformedPointeeType) &&
-                    expectedTransformedPointeeType == transformedPointeeType)
+                TransformedTypeInfo pointeeInfo;
+                if (transformedTypeInfo.tryGetValue(targetPointeeType, pointeeInfo) &&
+                    pointeeInfo.transformedType == transformedPointeeType)
                 {
                     // We need to convert the value that the pointer points to, not just the pointer type
                     // 1. Load the transformed struct from the pointer
@@ -494,11 +522,9 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
                 auto targetElementType = targetArrayType->getElementType();
                 
                 // Check if the array's element type corresponds to a transformed type
-                IRType* expectedTransformedElementType = nullptr;
-                if (originalToLoweredTypeMap.tryGetValue(
-                        targetElementType,
-                        expectedTransformedElementType) &&
-                    expectedTransformedElementType == transformedElementType)
+                TransformedTypeInfo elementInfo;
+                if (transformedTypeInfo.tryGetValue(targetElementType, elementInfo) &&
+                    elementInfo.transformedType == transformedElementType)
                 {
                     // We need to convert each element of the array from transformed type to original type
                     
@@ -586,10 +612,12 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
         }
 
         // Check if we have a mapping from transformed type to original type
-        if (!transformedType || !loweredToOriginalTypeMap.tryGetValue(transformedType, originalType))
+        TransformedTypeInfo typeInfo;
+        if (!transformedType || !mapTransformedTypeToInfo.tryGetValue(transformedType, typeInfo))
         {
             return false; // No conversion needed
         }
+        originalType = typeInfo.originalType;
 
         // Insert conversion instructions before the user instruction
         irBuilder.setInsertBefore(userInstruction);
@@ -617,18 +645,19 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
         return true; // Conversion was performed
     }
 
-        void updateTypesAndInsertCast(IRInst* startInst) {
+        /// Process value transformations using systematic work list approach
+        void processValueTransformations(IRInst* startInst) {
             
             List<IRInst*> worklist;
             HashSet<IRInst*> processed; // Track processed instructions to avoid infinite loops
             
             worklist.add(startInst);
-			// Process all users of the current instruction
 
             while (worklist.getCount() > 0) {
                 auto currentInst = worklist.getLast();
                 worklist.removeLast();
-                // Skip if already processed
+                
+                // Skip if already processed to avoid cycles
                 if (processed.contains(currentInst)) {
                     continue;
                 }
@@ -658,13 +687,13 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
                         if (!currentPtrType) break;
                         
                         auto originalValueType = currentPtrType->getValueType();
-                        IRType* transformedValueType = nullptr;
                         
-                        if (originalToLoweredTypeMap.tryGetValue(originalValueType, transformedValueType))
+                        TransformedTypeInfo valueTypeInfo;
+                        if (transformedTypeInfo.tryGetValue(originalValueType, valueTypeInfo))
                         {
                             // Create new pointer type pointing to the transformed type
                             auto transformedPtrType = irBuilder.getPtrTypeWithAddressSpace(
-                                transformedValueType, // new value type (with descriptor handles)
+                                valueTypeInfo.transformedType, // new value type (with descriptor handles)
                                 currentPtrType);      // preserves pointer op and address space
                             
                             // Update the instruction's type
@@ -752,9 +781,15 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
             }
         }
 
-        void updateTypesAndInsertCast() {
+        /// Main entry point for processing all transformed types and values
+        /// Uses systematic work list approach instead of recursive processing
+        void processAllTransformations() {
+            // Collect all values that need processing
+            List<IRInst*> valuesToProcess;
+            
             for (auto transformedParameterBlockType : updatedParameterBlockTypes)
             {
+                // Collect all uses of transformed parameter block types
                 for (auto use = transformedParameterBlockType->firstUse; use; use = use->nextUse)
                 {
                     auto userInstruction = use->getUser();
@@ -762,32 +797,45 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
                         userInstruction->getOp() == kIROp_Param ||
                         userInstruction->getOp() == kIROp_FieldExtract)
                     {
-                        // Begin top-down processing from this global parameter or function parameter
-                        updateTypesAndInsertCast(userInstruction);
+                        valuesToProcess.add(userInstruction);
                     }
                 }
+            }
+            
+            // Process each collected value using the systematic approach
+            for (auto value : valuesToProcess)
+            {
+                processValueTransformations(value);
             }
         }
 
         /// Main entry point for processing the entire module
-        ///
-        /// Orchestrates the complete descriptor handle transformation:
-        /// 1. Transforms parameter block types (including RWStructuredBuffer wrapping)
-        /// 2. Applies transformations using top-down approach
+        /// Uses systematic approach with proper error handling and validation
         void processModule()
         {
-            transformParameterBlockTypes();
-            updateTypesAndInsertCast();
+            try
+            {
+                // Phase 1: Transform parameter block types (including buffer wrapping)
+                transformParameterBlockTypes();
+                
+                // Phase 2: Process all value transformations systematically
+                processAllTransformations();
+            }
+            catch (...)
+            {
+                // Log error through diagnostic sink if available
+                if (diagnosticSink)
+                {
+                    diagnosticSink->diagnose(SourceLoc(), Diagnostics::internalCompilerError,
+                        "Error during descriptor handle transformation");
+                }
+                throw;
+            }
         }
     };
 
     /// Public API for transforming resource types to descriptor handles
-    ///
-    /// This function transforms an IR module to use explicit descriptor handles
-    ///
-    /// @param targetProgram The target program being compiled
-    /// @param module The IR module to transform
-    /// @param diagnosticSink For reporting any errors or warnings during transformation
+    /// Enhanced with configuration options and better error handling
     void transformResourceTypesToDescriptorHandles(
         TargetProgram* targetProgram,
         IRModule* module,
@@ -800,3 +848,4 @@ struct ResourceToDescriptorHandleTransformContext : public InstPassBase
         transformContext.processModule();
     }
 }
+
