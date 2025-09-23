@@ -5078,11 +5078,36 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     else if (auto resPtrType = as<DescriptorHandleType>(type))
     {
         if (areResourceTypesBindlessOnTarget(context.targetReq))
-            return _createTypeLayout(context, resPtrType->getElementType());
-        auto uint2Type = context.astBuilder->getVectorType(
-            context.astBuilder->getUIntType(),
-            context.astBuilder->getIntVal(context.astBuilder->getIntType(), 2));
-        return _createTypeLayout(context, uint2Type);
+        {
+            // On bindless targets, DescriptorHandle<T> is laid out as a pointer
+            RefPtr<PointerTypeLayout> ptrLayout = new PointerTypeLayout();
+            
+            const auto info = rules->GetPointerLayout();
+            
+            const TypeLayoutResult result(ptrLayout, info);
+            _addLayout(context, type, result);
+            
+            ptrLayout->type = type;
+            ptrLayout->rules = rules;
+            
+            ptrLayout->uniformAlignment = info.alignment;
+            
+            ptrLayout->addResourceUsage(info.kind, info.size);
+            
+            // Store the element type layout as the value type
+            TypeLayoutResult elementTypeLayout = _createTypeLayout(context, resPtrType->getElementType());
+            ptrLayout->valueTypeLayout = elementTypeLayout.layout;
+            
+            return result;
+        }
+        else
+        {
+            // On non-bindless targets, use uint2 layout
+            auto uint2Type = context.astBuilder->getVectorType(
+                context.astBuilder->getUIntType(),
+                context.astBuilder->getIntVal(context.astBuilder->getIntType(), 2));
+            return _createTypeLayout(context, uint2Type);
+        }
     }
     else if (auto optionalType = as<OptionalType>(type))
     {

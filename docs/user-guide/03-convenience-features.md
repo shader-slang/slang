@@ -600,8 +600,8 @@ Pointer types can also be specified using the generic syntax `Ptr<MyType>`. `Ptr
 Slang supports the `DescriptorHandle<T>` type that represents a bindless handle to a resource. This feature provides a portable way of implementing
 the bindless resource idiom. When targeting HLSL, GLSL and SPIRV where descriptor types (e.g. textures, samplers and buffers) are opaque handles,
 `DescriptorHandle<T>` will translate into a `uint2` so it can be defined in any memory location. The underlying `uint2` value is treated as an index
-to access the global descriptor heap or resource array in order to obtain the actual resource handle. On targets with where resource handles
-are not opaque handles, `DescriptorHandle<T>` maps to `T` and will have the same size and alignment defined by the target.
+to access the global descriptor heap or resource array in order to obtain the actual resource handle. On targets where resource handles
+are not opaque handles (e.g. CUDA, CPU, Metal), `DescriptorHandle<T>` is treated as a pointer-sized type (typically 8 bytes on 64-bit platforms) that stores a handle or address to the resource.
 
 `DescriptorHandle<T>` is declared as:
 ```slang

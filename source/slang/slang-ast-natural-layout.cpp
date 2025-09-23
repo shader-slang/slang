@@ -181,6 +181,15 @@ NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
         size.append(calcSize(optionalType->getValueType()));
         return size;
     }
+    else if (as<DescriptorHandleType>(type))
+    {
+        // Check for DescriptorHandleType BEFORE DeclRefType to ensure it gets handled correctly
+        // DescriptorHandleType is treated as pointer-sized in natural layout
+        // On bindless targets (CUDA, CPU, Metal) it's actually a pointer
+        // On non-bindless targets it's uint2 (8 bytes on 64-bit)
+        // We use pointer size (8 bytes) as the conservative default
+        return NaturalSize::makeFromBaseType(BaseType::UInt64);
+    }
     else if (auto declRefType = as<DeclRefType>(type))
     {
         if (const auto enumDeclRef = declRefType->getDeclRef().as<EnumDecl>())
