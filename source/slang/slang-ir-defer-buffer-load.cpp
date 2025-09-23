@@ -67,38 +67,6 @@ struct DeferBufferLoadContext
         return result;
     }
 
-    static bool isImmutableLocation(IRInst* loc)
-    {
-        switch (loc->getOp())
-        {
-        case kIROp_GetStructuredBufferPtr:
-        case kIROp_ImageSubscript:
-            return isImmutableLocation(loc->getOperand(0));
-        default:
-            break;
-        }
-
-        auto type = loc->getDataType();
-        if (!type)
-            return false;
-
-        switch (type->getOp())
-        {
-        case kIROp_HLSLStructuredBufferType:
-        case kIROp_HLSLByteAddressBufferType:
-        case kIROp_ConstantBufferType:
-        case kIROp_ParameterBlockType:
-            return true;
-        default:
-            break;
-        }
-
-        if (auto textureType = as<IRTextureType>(type))
-            return textureType->getAccess() == SLANG_RESOURCE_ACCESS_READ;
-
-        return false;
-    }
-
     static bool isImmutableBufferLoad(IRInst* inst)
     {
         // Note: we cannot defer loads from RWStructuredBuffer because there can be other

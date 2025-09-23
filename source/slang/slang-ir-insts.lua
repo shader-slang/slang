@@ -1473,7 +1473,7 @@ local insts = {
 					struct_name = "RequireFullQuadsDecoration",
 				},
 			},
-			{ TempCallArgVar = { struct_name = "TempCallArgVarDecoration" } },
+			{ TempCallArgVar = { struct_name = "TempCallArgImmutableVarDecoration" } },
 			{
 				nonCopyable = {
 					-- Marks a type to be non copyable, causing SSA pass to skip turning variables of the the type into SSA values.
@@ -1891,6 +1891,10 @@ local insts = {
 	{ EnumCast = { min_operands = 1 } },
 	{ CastUInt2ToDescriptorHandle = { min_operands = 1 } },
 	{ CastDescriptorHandleToUInt2 = { min_operands = 1 } },
+	-- Represents a psuedo cast to convert between a logical type (user declared) and a storage Type
+	-- (valid in buffer locations). The operand can either be a value or an address.
+	{ CastLogicalToStorage = { min_operands = 1 } },
+	{ CastStorageToLogical = { min_operands = 2, struct_name = "CastStorageToLogical" } },
 	-- Represents a no-op cast to convert a resource pointer to a resource on targets where the resource handles are
 	-- already concrete types.
 	{ CastDescriptorHandleToResource = { min_operands = 1 } },

@@ -893,6 +893,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
         auto funcType = as<IRFuncType>(funcValue->getFullType());
+        bool argsChanged = false;
         for (UInt i = 0; i < inst->getArgCount(); i++)
         {
             auto arg = inst->getArg(i);
@@ -956,10 +957,22 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             auto load = builder.emitLoad(arg);
             builder.emitStore(tempVar, load);
             newArgs.add(tempVar);
+            argsChanged = true;
+
+            // We may need to write the value back to the original pointer argument
+            // after the call.
+            //
+            // If callee doesn't modify the memory location, no need to write back.
+            if (funcType && funcType->getParamCount() > i &&
+                as<IRConstRefType>(funcType->getParamType(i)))
+                continue;
+            // If the buffer location is immutable, don't write back.
+            if (isImmutableLocation(root))
+                continue;
             writeBacks.add(WriteBackPair{arg, tempVar});
         }
         SLANG_ASSERT((UInt)newArgs.getCount() == inst->getArgCount());
-        if (writeBacks.getCount())
+        if (argsChanged)
         {
             auto newCall = builder.emitCallInst(inst->getFullType(), inst->getCallee(), newArgs);
             for (auto wb : writeBacks)

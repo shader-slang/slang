@@ -2483,4 +2483,35 @@ bool isIROpaqueType(IRType* type)
     }
 }
 
+bool isImmutableLocation(IRInst* loc)
+{
+    switch (loc->getOp())
+    {
+    case kIROp_GetStructuredBufferPtr:
+    case kIROp_ImageSubscript:
+        return isImmutableLocation(loc->getOperand(0));
+    default:
+        break;
+    }
+
+    auto type = loc->getDataType();
+    if (!type)
+        return false;
+
+    switch (type->getOp())
+    {
+    case kIROp_HLSLStructuredBufferType:
+    case kIROp_HLSLByteAddressBufferType:
+    case kIROp_ConstantBufferType:
+    case kIROp_ParameterBlockType:
+        return true;
+    default:
+        break;
+    }
+
+    if (auto textureType = as<IRTextureType>(type))
+        return textureType->getAccess() == SLANG_RESOURCE_ACCESS_READ;
+
+    return false;
+}
 } // namespace Slang

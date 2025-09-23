@@ -418,6 +418,8 @@ IRType* getUnsignedTypeFromSignedType(IRBuilder* builder, IRType* type);
 bool isSignedType(IRType* type);
 
 bool isIROpaqueType(IRType* type);
+
+bool isImmutableLocation(IRInst* loc);
 } // namespace Slang
 
 #endif

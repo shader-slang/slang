@@ -92,6 +92,24 @@ struct TransformParamsToConstRefContext
                             _addToWorkList(elemAddr);
                             break;
                         }
+                    case kIROp_Store:
+                        {
+                            // If the current value is being stored into a write-once temp var that
+                            // is immediately passed into a constref location in a call, we can get
+                            // rid of the temp var and replace it with `inst` directly.
+                            // (such temp var can be introduced during `updateCallSites` when we
+                            // were processing the callee.)
+                            //
+                            auto dest = as<IRStore>(user)->getPtr();
+                            if (dest->findDecorationImpl(kIROp_TempCallArgImmutableVarDecoration))
+                            {
+                                user->removeAndDeallocate();
+                                dest->replaceUsesWith(inst);
+                                dest->removeAndDeallocate();
+                                break;
+                            }
+                            [[fallthrough]];
+                        }
                     default:
                         {
                             // Insert a load before the user and replace the user with the load
@@ -113,6 +131,31 @@ struct TransformParamsToConstRefContext
         {
             rewriteValueUsesToAddrUses(param);
         }
+    }
+
+    // Check if `load` is an `IRLoad(addr)` where `addr` is a immutable location.
+    IRInst* isLoadFromImmutableAddress(IRInst* load)
+    {
+        auto addr = load->getOperand(0);
+        auto root = getRootAddr(addr);
+        if (!root)
+            return nullptr;
+        if (!root->getDataType())
+            return nullptr;
+        switch (root->getDataType()->getOp())
+        {
+        case kIROp_ConstantBufferType:
+        case kIROp_ConstRefType:
+        case kIROp_ParameterBlockType:
+            return addr;
+        default:
+            // Note that we should in general not assume a read-only StructuredBuffer or
+            // a pointer with read-only access as an immutable location due to potential aliasing.
+            // We could introduce a compiler flag to turn on optimizations on these buffer types
+            // assuming there is no aliasing.
+            break;
+        }
+        return nullptr;
     }
 
     // Update call sites to pass an address instead of value for each updated-param
@@ -144,10 +187,19 @@ struct TransformParamsToConstRefContext
                     newArgs.add(arg);
                     continue;
                 }
-
-                auto tempVar = builder.emitVar(arg->getFullType());
-                builder.emitStore(tempVar, arg);
-                newArgs.add(tempVar);
+                if (auto addr = isLoadFromImmutableAddress(arg))
+                {
+                    // If existing argument is a load from an immutable buffer address,
+                    // we can pass in the address as is, without making a temporary copy.
+                    newArgs.add(addr);
+                }
+                else
+                {
+                    auto tempVar = builder.emitVar(arg->getFullType());
+                    builder.addDecoration(tempVar, kIROp_TempCallArgImmutableVarDecoration);
+                    builder.emitStore(tempVar, arg);
+                    newArgs.add(tempVar);
+                }
             }
 
             // Create new call with updated arguments

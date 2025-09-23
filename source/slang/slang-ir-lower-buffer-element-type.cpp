@@ -145,6 +145,22 @@ struct LoweredElementTypeContext
     TargetProgram* target;
     BufferElementTypeLoweringOptions options;
 
+    struct SpecializationKey
+    {
+        IRFunc* callee;
+        IRFuncType* specializedFuncType;
+        bool operator==(const SpecializationKey& other) const
+        {
+            return (callee == other.callee && specializedFuncType == other.specializedFuncType);
+        }
+        HashCode64 getHashCode() const
+        {
+            return combineHash(Slang::getHashCode(callee), Slang::getHashCode(specializedFuncType));
+        }
+    };
+    // Specialized functions that takes storage-typed pointers instead of logical-typed pointers.
+    Dictionary<SpecializationKey, IRFunc*> specializedFuncs;
+
     LoweredElementTypeContext(
         TargetProgram* target,
         BufferElementTypeLoweringOptions inOptions,
@@ -881,20 +897,24 @@ struct LoweredElementTypeContext
 
     IRType* getLoweredPtrLikeType(IRType* originalPtrLikeType, IRType* newElementType)
     {
-        if (as<IRPointerLikeType>(originalPtrLikeType) || as<IRPtrTypeBase>(originalPtrLikeType) ||
+        IRBuilder builder(newElementType);
+        builder.setInsertAfter(newElementType);
+        if (auto ptrType = as<IRPtrTypeBase>(originalPtrLikeType))
+        {
+            // Intentionally drop address space info from the pointer type to keep
+            // the IR simple. There are passes after this that may alter the arguments
+            // to functions to have a different address-space, so we want to have new
+            // functions and instructs we introduce in this pass address-space generic.
+            // and let the follow-up address-space specialization pass to fill in the final
+            // address space.
+            return builder.getPtrType(ptrType->getOp(), newElementType);
+        }
+
+        if (as<IRPointerLikeType>(originalPtrLikeType) ||
             as<IRHLSLStructuredBufferTypeBase>(originalPtrLikeType) ||
             as<IRGLSLShaderStorageBufferType>(originalPtrLikeType))
         {
-            IRBuilder builder(newElementType);
-            builder.setInsertAfter(newElementType);
-            ShortList<IRInst*> operands;
-            for (UInt i = 0; i < originalPtrLikeType->getOperandCount(); i++)
-                operands.add(originalPtrLikeType->getOperand(i));
-            operands[0] = newElementType;
-            return builder.getType(
-                originalPtrLikeType->getOp(),
-                (UInt)operands.getCount(),
-                operands.getArrayView().getBuffer());
+            return builder.getPtrType(newElementType);
         }
         SLANG_UNREACHABLE("unhandled ptr like or buffer type");
     }
@@ -934,6 +954,332 @@ struct LoweredElementTypeContext
         }
     }
 
+    bool maybeTranslateTailingPointerGetElementAddress(
+        IRBuilder& builder,
+        IRFieldAddress* fieldAddr,
+        IRCastStorageToLogical* castInst,
+        TypeLoweringConfig& config,
+        List<IRCastStorageToLogical*>& castInstWorkList)
+    {
+        // If we are accessing an unsized array element from a pointer, we need to
+        // compute
+        // the trailing ptr that points to the first element of the array.
+        // And then replace all getElementPtr(arrayPtr, index) with
+        // getOffsetPtr(trailingPtr, index).
+
+        auto ptrType = as<IRPtrTypeBase>(fieldAddr->getDataType());
+        if (!ptrType)
+            return false;
+        if (ptrType->getAddressSpace() != AddressSpace::UserPointer)
+            return false;
+        if (auto unsizedArrayType = as<IRUnsizedArrayType>(ptrType->getValueType()))
+        {
+            builder.setInsertBefore(fieldAddr);
+            auto newArrayPtrVal = fieldAddr->getBase();
+            auto loweredInnerType = getLoweredTypeInfo(unsizedArrayType->getElementType(), config);
+
+            IRSizeAndAlignment arrayElementSizeAlignment;
+            getSizeAndAlignment(
+                target->getOptionSet(),
+                config.layoutRule,
+                loweredInnerType.loweredType,
+                &arrayElementSizeAlignment);
+            IRSizeAndAlignment baseSizeAlignment;
+            getSizeAndAlignment(
+                target->getOptionSet(),
+                config.layoutRule,
+                tryGetPointedToType(&builder, fieldAddr->getBase()->getDataType()),
+                &baseSizeAlignment);
+
+            // Convert pointer to uint64 and adjust offset.
+            IRIntegerValue offset = baseSizeAlignment.size;
+            offset = align(offset, arrayElementSizeAlignment.alignment);
+            if (offset != 0)
+            {
+                auto rawPtr = builder.emitBitCast(builder.getUInt64Type(), newArrayPtrVal);
+                newArrayPtrVal = builder.emitAdd(
+                    rawPtr->getFullType(),
+                    rawPtr,
+                    builder.getIntValue(builder.getUInt64Type(), offset));
+            }
+            newArrayPtrVal = builder.emitBitCast(
+                builder.getPtrType(loweredInnerType.loweredType),
+                newArrayPtrVal);
+            traverseUses(
+                fieldAddr,
+                [&](IRUse* fieldAddrUse)
+                {
+                    auto fieldAddrUser = fieldAddrUse->getUser();
+                    if (fieldAddrUser->getOp() == kIROp_GetElementPtr)
+                    {
+                        builder.setInsertBefore(fieldAddrUser);
+                        auto newElementPtr =
+                            builder.emitGetOffsetPtr(newArrayPtrVal, fieldAddrUser->getOperand(1));
+                        auto castedGEP = builder.emitCastStorageToLogical(
+                            fieldAddrUser->getFullType(),
+                            newElementPtr,
+                            castInst->getBufferType());
+                        fieldAddrUser->replaceUsesWith(castedGEP);
+                        fieldAddrUser->removeAndDeallocate();
+                        castInstWorkList.add(castedGEP);
+                    }
+                    else if (fieldAddrUser->getOp() == kIROp_GetOffsetPtr)
+                    {
+                    }
+                    else
+                    {
+                        SLANG_UNEXPECTED("unknown use of pointer to unsized array.");
+                    }
+                });
+            SLANG_ASSERT(!fieldAddr->hasUses());
+            fieldAddr->removeAndDeallocate();
+            return true;
+        }
+        return false;
+    }
+
+    void deferStorageToLogicalCasts(
+        IRModule* module,
+        List<IRCastStorageToLogical*> castInstWorkList)
+    {
+        IRBuilder builder(module);
+
+        while (castInstWorkList.getCount())
+        {
+            // We process call instructions after other instructions, so we
+            // can be sure that all castStorageToLogical insts have already
+            // been pushed to the call argument lists before we process it.
+            HashSet<IRCall*> callWorkList;
+            // Defer the storage-to-logical cast operation to latest possible time to avoid
+            // unnecessary packing/unpacking.
+            for (Index i = 0; i < castInstWorkList.getCount(); i++)
+            {
+                auto castInst = castInstWorkList[i];
+                auto ptrVal = castInst->getOperand(0);
+                auto config =
+                    getTypeLoweringConfigForBuffer(target, (IRType*)castInst->getBufferType());
+                traverseUses(
+                    castInst,
+                    [&](IRUse* use)
+                    {
+                        auto user = use->getUser();
+                        switch (user->getOp())
+                        {
+                        case kIROp_FieldAddress:
+                            // If our logical struct type ends with an unsized array field, the
+                            // storage struct type won't have this field defined.
+                            // Therefore, all fieldAddress(obj, lastField) inst retrieving the last
+                            // field of such struct should be translated into
+                            // `(ArrayElementType*)((StorageStruct*)(obj)+1) + idx`.
+                            // That is, we should first compute the tailing pointer of the
+                            // struct, and replace all getElementPtr(fieldAddr, idx) with
+                            // getOffsetPtr(tailingPtr, idx).
+                            if (maybeTranslateTailingPointerGetElementAddress(
+                                    builder,
+                                    (IRFieldAddress*)user,
+                                    castInst,
+                                    config,
+                                    castInstWorkList))
+                                return;
+                            [[fallthrough]];
+                        case kIROp_GetElementPtr:
+                        case kIROp_GetOffsetPtr:
+                        case kIROp_RWStructuredBufferGetElementPtr:
+                            {
+                                // gep(castStorageToLogical(x)) ==> castStorageToLogical(gep(x))
+                                if (user->getOperand(0) != castInst)
+                                    break;
+                                auto logicalBaseType = castInst->getDataType();
+                                auto logicalType = user->getDataType();
+                                IRInst* storageBaseAddr = ptrVal;
+                                auto originalBaseValueType =
+                                    tryGetPointedToType(&builder, logicalBaseType);
+                                if (user->getOp() == kIROp_GetElementPtr)
+                                {
+                                    // If original type is an array, the lowered type will be a
+                                    // struct. In that case, all existing address insts should be
+                                    // appended with a field extract.
+                                    if (as<IRArrayType>(originalBaseValueType))
+                                    {
+                                        builder.setInsertBefore(user);
+                                        List<IRInst*> args;
+                                        for (UInt i = 0; i < user->getOperandCount(); i++)
+                                            args.add(user->getOperand(i));
+                                        auto arrayLowerInfo =
+                                            getLoweredTypeInfo(originalBaseValueType, config);
+                                        storageBaseAddr = builder.emitFieldAddress(
+                                            builder.getPtrType(
+                                                arrayLowerInfo.loweredInnerArrayType),
+                                            ptrVal,
+                                            arrayLowerInfo.loweredInnerStructKey);
+                                    }
+                                    if (as<IRMatrixType>(originalBaseValueType))
+                                    {
+                                        // We are tring to get a pointer to a lowered matrix
+                                        // element. We process this insts at a later phase.
+                                        SLANG_ASSERT(user->getOp() == kIROp_GetElementPtr);
+                                        lowerMatrixAddresses(
+                                            module,
+                                            MatrixAddrWorkItem{user, config});
+                                        break;
+                                    }
+                                }
+
+                                ShortList<IRInst*> newArgs;
+                                newArgs.add(storageBaseAddr);
+                                for (UInt i = 1; i < user->getOperandCount(); i++)
+                                    newArgs.add(user->getOperand(i));
+                                builder.setInsertBefore(user);
+                                auto logicalValueType = tryGetPointedToType(&builder, logicalType);
+                                auto storageTypeInfo = getLoweredTypeInfo(logicalValueType, config);
+                                auto storageGEP = builder.emitIntrinsicInst(
+                                    builder.getPtrType(storageTypeInfo.loweredType),
+                                    user->getOp(),
+                                    newArgs.getCount(),
+                                    newArgs.getArrayView().getBuffer());
+                                auto castOfGEP = builder.emitCastStorageToLogical(
+                                    logicalType,
+                                    storageGEP,
+                                    castInst->getBufferType());
+                                user->replaceUsesWith(castOfGEP);
+                                user->removeAndDeallocate();
+                                castInstWorkList.add(castOfGEP);
+                                break;
+                            }
+                        case kIROp_Call:
+                            {
+                                // call(f, castStorageToLogical(x)) ==> call(f', x)
+                                //
+                                // If we see a call that takes a logical typed pointer, we will
+                                // specialize the callee to take a storage typed pointer instead,
+                                // and push the cast to inside the callee.
+                                // We will process calls after other gep insts, so for now just add
+                                // it into a separate worklist.
+                                callWorkList.add((IRCall*)user);
+                                break;
+                            }
+                        }
+                    });
+            }
+
+            // Now that we have processed all GEP instructions, we can now proceed to
+            // process all calls. This is done by making a clone of the callee, and change
+            // the parameter type from logical type to storage type, and insert a
+            // castStorageToLogical on the parameter. Then we go back to the beginning and make sure
+            // we process those newly created castStorageToLogical insts.
+            List<IRCastStorageToLogical*> newCasts;
+            for (auto call : callWorkList)
+            {
+                auto calleeFunc = as<IRGlobalValueWithParams>(call->getCallee());
+                List<IRInst*> oldParams;
+
+                for (auto param : calleeFunc->getParams())
+                    oldParams.add(param);
+                SLANG_ASSERT(oldParams.getCount() == (Index)call->getArgCount());
+
+                ShortList<IRType*> paramTypes;
+                ShortList<IRInst*> newArgs;
+                for (UInt i = 0; i < call->getArgCount(); i++)
+                {
+                    auto arg = call->getArg(i);
+                    if (auto castArg = as<IRCastStorageToLogical>(arg))
+                    {
+                        auto oldParamPtrType = oldParams[i]->getDataType();
+                        auto storageValueType =
+                            tryGetPointedToType(&builder, castArg->getOperand(0)->getDataType());
+                        auto storagePtrType =
+                            getLoweredPtrLikeType(oldParamPtrType, storageValueType);
+                        paramTypes.add(storagePtrType);
+                        newArgs.add(castArg->getOperand(0));
+                    }
+                    else
+                    {
+                        paramTypes.add(arg->getDataType());
+                        newArgs.add(arg);
+                    }
+                }
+                auto specializedFuncType = builder.getFuncType(
+                    (UInt)paramTypes.getCount(),
+                    paramTypes.getArrayView().getBuffer(),
+                    call->getDataType());
+                auto key = SpecializationKey{(IRFunc*)calleeFunc, specializedFuncType};
+                IRFunc* specializedFunc = nullptr;
+                if (!specializedFuncs.tryGetValue(key, specializedFunc))
+                {
+                    specializedFunc = createSpecializedFuncThatUseStorageType(
+                        call,
+                        specializedFuncType,
+                        newCasts);
+                }
+                builder.setInsertBefore(call);
+                auto newCall = builder.emitCallInst(
+                    call->getFullType(),
+                    specializedFunc,
+                    newArgs.getArrayView().arrayView);
+                call->replaceUsesWith(newCall);
+                call->removeAndDeallocate();
+            }
+
+            // Remove any casts that have no more uses.
+            for (auto cast : castInstWorkList)
+            {
+                if (!cast->hasUses())
+                    cast->removeAndDeallocate();
+            }
+
+            // Continue to process new casts added during function specialization.
+            castInstWorkList.swapWith(newCasts);
+        }
+    }
+
+    IRFunc* createSpecializedFuncThatUseStorageType(
+        IRCall* call,
+        IRFuncType* specializedFuncType,
+        List<IRCastStorageToLogical*>& outNewCasts)
+    {
+        IRBuilder builder(call);
+        builder.setInsertBefore(call->getCallee());
+
+        // Create a clone of the callee.
+        IRCloneEnv cloneEnv;
+        auto clonedFunc = as<IRFunc>(cloneInst(&cloneEnv, &builder, call->getCallee()));
+        List<IRUse*> uses;
+
+        // If a parameter is being translated to storage type,
+        // insert a cast to convert it to logical type.
+        List<IRParam*> params;
+        for (auto param : clonedFunc->getParams())
+            params.add(param);
+        for (UInt i = 0; i < (UInt)params.getCount(); i++)
+        {
+            auto param = params[i];
+            SLANG_RELEASE_ASSERT(i < call->getArgCount());
+            auto arg = call->getArg(i);
+            auto cast = as<IRCastStorageToLogical>(arg);
+            if (!cast)
+                continue;
+            auto logicalParamType = param->getFullType();
+            auto storageType = specializedFuncType->getParamType(i);
+            param->setFullType((IRType*)storageType);
+            setInsertBeforeOrdinaryInst(&builder, param);
+
+            // Store uses of param before creating a cast inst that uses it.
+            uses.clear();
+            for (auto use = param->firstUse; use; use = use->nextUse)
+                uses.add(use);
+            auto castedParam =
+                builder.emitCastStorageToLogical(logicalParamType, param, cast->getBufferType());
+            outNewCasts.add(castedParam);
+
+            // Replace all previous uses of param to use castedParam instead.
+            for (auto use : uses)
+                builder.replaceOperand(use, castedParam);
+        }
+        clonedFunc->setFullType(specializedFuncType);
+        removeLinkageDecorations(clonedFunc);
+        return clonedFunc;
+    }
+
     void processModule(IRModule* module)
     {
         IRBuilder builder(module);
@@ -941,6 +1287,7 @@ struct LoweredElementTypeContext
         {
             IRType* bufferType;
             IRType* elementType;
+            IRType* loweredBufferType = nullptr;
             bool shouldWrapArrayInStruct = false;
         };
         List<BufferTypeInfo> bufferTypeInsts;
@@ -990,12 +1337,10 @@ struct LoweredElementTypeContext
             bufferTypeInsts.add(BufferTypeInfo{(IRType*)globalInst, elementType});
         }
 
-        // Maintain a pending work list of all matrix addresses, and try to lower them out of
-        // existance after everything else has been lowered.
 
-        List<MatrixAddrWorkItem> matrixAddrInsts;
+        List<IRCastStorageToLogical*> castInstWorkList;
 
-        for (auto bufferTypeInfo : bufferTypeInsts)
+        for (auto& bufferTypeInfo : bufferTypeInsts)
         {
             auto bufferType = bufferTypeInfo.bufferType;
             auto elementType = bufferTypeInfo.elementType;
@@ -1022,10 +1367,10 @@ struct LoweredElementTypeContext
                 (UInt)typeOperands.getCount(),
                 typeOperands.getArrayView().getBuffer());
 
-            // We treat a value of a buffer type as a pointer, and use a work list to translate
-            // all loads and stores through the pointer values that needs lowering.
+            // Replace all global buffer declarations to use the storage type instead,
+            // and insert initial `castStorageToLogical` instructions to convert the
+            // storage-typed pointer to logical-typed pointer.
 
-            List<IRInst*> ptrValsWorkList;
             traverseUses(
                 bufferType,
                 [&](IRUse* use)
@@ -1033,433 +1378,340 @@ struct LoweredElementTypeContext
                     auto user = use->getUser();
                     if (use != &user->typeUse)
                         return;
-                    ptrValsWorkList.add(use->getUser());
+                    auto ptrVal = use->getUser();
+                    builder.setInsertAfter(ptrVal);
+                    builder.replaceOperand(use, loweredBufferType);
+                    auto logicalBufferType = getLoweredPtrLikeType(bufferType, elementType);
+                    auto castStorageToLogical =
+                        builder.emitCastStorageToLogical(logicalBufferType, ptrVal, bufferType);
+                    traverseUses(
+                        ptrVal,
+                        [&](IRUse* ptrUse)
+                        {
+                            if (ptrUse->getUser() != castStorageToLogical)
+                                builder.replaceOperand(ptrUse, castStorageToLogical);
+                        });
+                    castInstWorkList.add(castStorageToLogical);
                 });
-
-            // Translate the values to use new lowered buffer type instead.
-            for (Index i = 0; i < ptrValsWorkList.getCount(); i++)
-            {
-                auto ptrVal = ptrValsWorkList[i];
-                auto oldPtrType = ptrVal->getFullType();
-                auto originalElementType = oldPtrType->getOperand(0);
-
-                // If we are accessing an unsized array element from a pointer, we need to compute
-                // the trailing ptr that points to the first element of the array.
-                // And then replace all getElementPtr(arrayPtr, index) with
-                // getOffsetPtr(trailingPtr, index).
-                if (auto fieldAddr = as<IRFieldAddress>(ptrVal))
-                {
-                    auto handleUnsizedArrayAccess = [&]() -> bool
-                    {
-                        auto ptrType = as<IRPtrType>(ptrVal->getDataType());
-                        if (!ptrType)
-                            return false;
-                        if (ptrType->getAddressSpace() != AddressSpace::UserPointer)
-                            return false;
-                        if (auto unsizedArrayType = as<IRUnsizedArrayType>(ptrType->getValueType()))
-                        {
-                            builder.setInsertBefore(ptrVal);
-                            auto newArrayPtrVal = fieldAddr->getBase();
-                            auto loweredInnerType =
-                                getLoweredTypeInfo(unsizedArrayType->getElementType(), config);
-
-                            IRSizeAndAlignment arrayElementSizeAlignment;
-                            getSizeAndAlignment(
-                                target->getOptionSet(),
-                                config.layoutRule,
-                                loweredInnerType.loweredType,
-                                &arrayElementSizeAlignment);
-                            IRSizeAndAlignment baseSizeAlignment;
-                            getSizeAndAlignment(
-                                target->getOptionSet(),
-                                config.layoutRule,
-                                tryGetPointedToType(&builder, fieldAddr->getBase()->getDataType()),
-                                &baseSizeAlignment);
-
-                            // Convert pointer to uint64 and adjust offset.
-                            IRIntegerValue offset = baseSizeAlignment.size;
-                            offset = align(offset, arrayElementSizeAlignment.alignment);
-                            if (offset != 0)
-                            {
-                                auto rawPtr =
-                                    builder.emitBitCast(builder.getUInt64Type(), newArrayPtrVal);
-                                newArrayPtrVal = builder.emitAdd(
-                                    rawPtr->getFullType(),
-                                    rawPtr,
-                                    builder.getIntValue(builder.getUInt64Type(), offset));
-                            }
-                            newArrayPtrVal = builder.emitBitCast(
-                                builder.getPtrType(
-                                    loweredInnerType.loweredType,
-                                    ptrType->getAddressSpace()),
-                                newArrayPtrVal);
-                            traverseUses(
-                                ptrVal,
-                                [&](IRUse* use)
-                                {
-                                    auto user = use->getUser();
-                                    if (user->getOp() == kIROp_GetElementPtr)
-                                    {
-                                        builder.setInsertBefore(user);
-                                        auto newElementPtr = builder.emitGetOffsetPtr(
-                                            newArrayPtrVal,
-                                            user->getOperand(1));
-                                        user->replaceUsesWith(newElementPtr);
-                                        user->removeAndDeallocate();
-                                        ptrValsWorkList.add(newElementPtr);
-                                    }
-                                    else if (user->getOp() == kIROp_GetOffsetPtr)
-                                    {
-                                    }
-                                    else
-                                    {
-                                        SLANG_UNEXPECTED(
-                                            "unknown use of pointer to unsized array.");
-                                    }
-                                });
-                            SLANG_ASSERT(!ptrVal->hasUses());
-                            ptrVal->removeAndDeallocate();
-                            return true;
-                        }
-                        return false;
-                    };
-                    if (handleUnsizedArrayAccess())
-                        continue;
-                }
-
-                LoweredElementTypeInfo loweredElementTypeInfo = {};
-                if (auto getElementPtr = as<IRGetElementPtr>(ptrVal))
-                {
-                    if (auto arrayType = as<IRArrayTypeBase>(
-                            tryGetPointedToType(&builder, getElementPtr->getBase()->getDataType())))
-                    {
-                        // For WGSL, an array of scalar or vector type will always be converted to
-                        // an array of 16-byte aligned vector type. In this case, we will run into a
-                        // GetElementPtr where the result type is different from the element type of
-                        // the base array.
-                        // We should setup loweredElementTypeInfo so the remaining logic can handle
-                        // this case and insert proper packing/unpacking logic around it.
-                        if (arrayType->getElementType() != originalElementType &&
-                            isScalarOrVectorType(originalElementType))
-                        {
-                            loweredElementTypeInfo.loweredType = arrayType->getElementType();
-                            loweredElementTypeInfo.originalType = (IRType*)originalElementType;
-                            loweredElementTypeInfo.convertLoweredToOriginal = getConversionMethod(
-                                loweredElementTypeInfo.originalType,
-                                loweredElementTypeInfo.loweredType);
-                            loweredElementTypeInfo.convertOriginalToLowered = getConversionMethod(
-                                loweredElementTypeInfo.loweredType,
-                                loweredElementTypeInfo.originalType);
-                        }
-                    }
-                }
-
-                // For general cases we simply check if the element type needs lowering.
-                // If so we will insert packing/unpacking logic if necessary.
-                //
-                if (!loweredElementTypeInfo.loweredType)
-                {
-                    loweredElementTypeInfo =
-                        getLoweredTypeInfo((IRType*)originalElementType, config);
-                }
-
-                if (loweredElementTypeInfo.loweredType == loweredElementTypeInfo.originalType)
-                    continue;
-
-                ptrVal->setFullType(getLoweredPtrLikeType(
-                    ptrVal->getFullType(),
-                    loweredElementTypeInfo.loweredType));
-
-                traverseUses(
-                    ptrVal,
-                    [&](IRUse* use)
-                    {
-                        auto user = use->getUser();
-                        if (as<IRDecoration>(user))
-                            return;
-                        switch (user->getOp())
-                        {
-                        case kIROp_Load:
-                        case kIROp_StructuredBufferLoad:
-                        case kIROp_StructuredBufferLoadStatus:
-                        case kIROp_RWStructuredBufferLoad:
-                        case kIROp_RWStructuredBufferLoadStatus:
-                        case kIROp_StructuredBufferConsume:
-                            {
-                                builder.setInsertBefore(user);
-                                auto addr = getBufferAddr(builder, user);
-                                if (!addr)
-                                {
-                                    IRCloneEnv cloneEnv = {};
-                                    builder.setInsertBefore(user);
-                                    auto newLoad = cloneInst(&cloneEnv, &builder, user);
-                                    newLoad->setFullType(loweredElementTypeInfo.loweredType);
-                                    addr = builder.emitVar(loweredElementTypeInfo.loweredType);
-                                    builder.emitStore(addr, newLoad);
-                                }
-                                if (auto alignedAttr = user->findAttr<IRAlignedAttr>())
-                                {
-                                    builder.addAlignedAddressDecoration(
-                                        addr,
-                                        alignedAttr->getAlignment());
-                                }
-                                auto unpackedVal =
-                                    loweredElementTypeInfo.convertLoweredToOriginal.apply(
-                                        builder,
-                                        loweredElementTypeInfo.originalType,
-                                        addr);
-                                user->replaceUsesWith(unpackedVal);
-                                user->removeAndDeallocate();
-                                break;
-                            }
-                        case kIROp_Store:
-                        case kIROp_RWStructuredBufferStore:
-                        case kIROp_StructuredBufferAppend:
-                            {
-                                // Use must be the dest operand of the store inst.
-                                if (use != user->getOperands() + 0)
-                                    break;
-                                IRCloneEnv cloneEnv = {};
-                                builder.setInsertBefore(user);
-                                auto originalVal = getStoreVal(user);
-                                IRInst* addr = getBufferAddr(builder, user);
-                                if (addr)
-                                {
-                                    if (auto alignedAttr = user->findAttr<IRAlignedAttr>())
-                                    {
-                                        builder.addAlignedAddressDecoration(
-                                            addr,
-                                            alignedAttr->getAlignment());
-                                    }
-
-                                    loweredElementTypeInfo.convertOriginalToLowered
-                                        .applyDestinationDriven(builder, addr, originalVal);
-                                    user->removeAndDeallocate();
-                                }
-                                else if (auto sbAppend = as<IRStructuredBufferAppend>(user))
-                                {
-                                    builder.setInsertBefore(sbAppend);
-                                    addr = builder.emitVar(loweredElementTypeInfo.loweredType);
-                                    loweredElementTypeInfo.convertOriginalToLowered
-                                        .applyDestinationDriven(builder, addr, originalVal);
-                                    auto packedVal = builder.emitLoad(addr);
-                                    sbAppend->setOperand(1, packedVal);
-                                }
-                                else
-                                {
-                                    SLANG_UNREACHABLE("unhandled store type");
-                                }
-                                break;
-                            }
-                        case kIROp_GetElementPtr:
-                        case kIROp_FieldAddress:
-                            {
-                                // If original type is an array, the lowered type will be a struct.
-                                // In that case, all existing address insts should be appended with
-                                // a field extract.
-                                if (as<IRArrayType>(originalElementType))
-                                {
-                                    builder.setInsertBefore(user);
-                                    List<IRInst*> args;
-                                    for (UInt i = 0; i < user->getOperandCount(); i++)
-                                        args.add(user->getOperand(i));
-                                    auto newArrayPtrVal = builder.emitFieldAddress(
-                                        builder.getPtrType(
-                                            loweredElementTypeInfo.loweredInnerArrayType),
-                                        ptrVal,
-                                        loweredElementTypeInfo.loweredInnerStructKey);
-                                    builder.replaceOperand(use, newArrayPtrVal);
-                                    ptrValsWorkList.add(user);
-                                }
-                                else if (as<IRMatrixType>(originalElementType))
-                                {
-                                    // We are tring to get a pointer to a lowered matrix element.
-                                    // We process this insts at a later phase.
-                                    SLANG_ASSERT(user->getOp() == kIROp_GetElementPtr);
-                                    matrixAddrInsts.add(MatrixAddrWorkItem{user, config});
-                                }
-                                else
-                                {
-                                    // If we getting a derived address from the pointer, we need
-                                    // to recursively lower the new address. We do so by pushing
-                                    // the address inst into the work list.
-                                    ptrValsWorkList.add(user);
-                                }
-                            }
-                            break;
-                        case kIROp_RWStructuredBufferGetElementPtr:
-                        case kIROp_GetOffsetPtr:
-                            ptrValsWorkList.add(user);
-                            break;
-                        case kIROp_StructuredBufferGetDimensions:
-                            break;
-                        case kIROp_Call:
-                            {
-                                // If a structured buffer or pointer typed value is used directly as
-                                // an argument, we don't need to do any marshalling here.
-                                if (as<IRHLSLStructuredBufferTypeBase>(ptrVal->getDataType()))
-                                    break;
-                                if (options.lowerBufferPointer &&
-                                    as<IRPtrType>(ptrVal->getDataType()))
-                                    break;
-                                // If we are calling a function with an l-value pointer from buffer
-                                // access, we need to materialize the object as a local variable,
-                                // and pass the address of the local variable to the function.
-                                builder.setInsertBefore(user);
-                                auto unpackedVal =
-                                    loweredElementTypeInfo.convertLoweredToOriginal.apply(
-                                        builder,
-                                        (IRType*)originalElementType,
-                                        ptrVal);
-                                auto var = builder.emitVar((IRType*)originalElementType);
-                                builder.emitStore(var, unpackedVal);
-                                use->set(var);
-                                builder.setInsertAfter(user);
-                                auto newVal = builder.emitLoad(var);
-                                loweredElementTypeInfo.convertOriginalToLowered
-                                    .applyDestinationDriven(builder, ptrVal, newVal);
-                            }
-                            break;
-                        default:
-                            break;
-                        }
-                    });
-            }
-
-            // Replace all remaining uses of bufferType to loweredBufferType, these uses are
-            // non-operational and should be directly replaceable, such as uses in `IRFuncType`.
-            bufferType->replaceUsesWith(loweredBufferType);
-            bufferType->removeAndDeallocate();
+            bufferTypeInfo.loweredBufferType = loweredBufferType;
         }
 
-        // Process all matrix address uses.
-        lowerMatrixAddresses(module, matrixAddrInsts);
+        // Push down `CastStorageToLogical` insts we inserted above to latest possible locations,
+        // specializing all function calls along the way, until we truly need the the logical value.
+        // This means that `FieldAddr(CastStorageToLogical(buffer), field0))` is translated to
+        // `CastStorageToLogical(FieldAddr(buffer, field0))`. This way we can be sure that we are
+        // doing minimal packing/unpacking.
+        deferStorageToLogicalCasts(module, _Move(castInstWorkList));
+
+        // Now translate the `CastStorageToLogical` into actual packing/unpacking code.
+        materializeStorageToLogicalCasts(module->getModuleInst());
+
+        // Replace all remaining uses of bufferType to loweredBufferType, these uses are
+        // non-operational and should be directly replaceable, such as uses in `IRFuncType`.
+        for (auto bufferTypeInst : bufferTypeInsts)
+        {
+            if (!bufferTypeInst.loweredBufferType)
+                continue;
+            bufferTypeInst.bufferType->replaceUsesWith(bufferTypeInst.loweredBufferType);
+            bufferTypeInst.bufferType->removeAndDeallocate();
+        }
+    }
+
+    void materializeStorageToLogicalCastsImpl(IRCastStorageToLogical* castInst)
+    {
+        // Translate the values to use new lowered buffer type instead.
+
+        auto ptrVal = castInst->getOperand(0);
+        auto oldPtrType = castInst->getFullType();
+        auto originalElementType = oldPtrType->getOperand(0);
+        auto config = getTypeLoweringConfigForBuffer(target, (IRType*)castInst->getBufferType());
+
+        IRBuilder builder(ptrVal);
+
+
+        LoweredElementTypeInfo loweredElementTypeInfo = {};
+        if (auto getElementPtr = as<IRGetElementPtr>(ptrVal))
+        {
+            if (auto arrayType = as<IRArrayTypeBase>(
+                    tryGetPointedToType(&builder, getElementPtr->getBase()->getDataType())))
+            {
+                // For WGSL, an array of scalar or vector type will always be converted to
+                // an array of 16-byte aligned vector type. In this case, we will run into a
+                // GetElementPtr where the result type is different from the element type of
+                // the base array.
+                // We should setup loweredElementTypeInfo so the remaining logic can handle
+                // this case and insert proper packing/unpacking logic around it.
+                if (arrayType->getElementType() != originalElementType &&
+                    isScalarOrVectorType(originalElementType))
+                {
+                    loweredElementTypeInfo.loweredType = arrayType->getElementType();
+                    loweredElementTypeInfo.originalType = (IRType*)originalElementType;
+                    loweredElementTypeInfo.convertLoweredToOriginal = getConversionMethod(
+                        loweredElementTypeInfo.originalType,
+                        loweredElementTypeInfo.loweredType);
+                    loweredElementTypeInfo.convertOriginalToLowered = getConversionMethod(
+                        loweredElementTypeInfo.loweredType,
+                        loweredElementTypeInfo.originalType);
+                }
+            }
+        }
+
+        // For general cases we simply check if the element type needs lowering.
+        // If so we will insert packing/unpacking logic if necessary.
+        //
+        if (!loweredElementTypeInfo.loweredType)
+        {
+            loweredElementTypeInfo = getLoweredTypeInfo((IRType*)originalElementType, config);
+        }
+
+        if (loweredElementTypeInfo.loweredType == loweredElementTypeInfo.originalType)
+        {
+            castInst->replaceUsesWith(ptrVal);
+            castInst->removeAndDeallocate();
+            return;
+        }
+
+        traverseUses(
+            castInst,
+            [&](IRUse* use)
+            {
+                auto user = use->getUser();
+                if (as<IRDecoration>(user))
+                    return;
+                switch (user->getOp())
+                {
+                case kIROp_Load:
+                case kIROp_StructuredBufferLoad:
+                case kIROp_StructuredBufferLoadStatus:
+                case kIROp_RWStructuredBufferLoad:
+                case kIROp_RWStructuredBufferLoadStatus:
+                case kIROp_StructuredBufferConsume:
+                    {
+                        builder.setInsertBefore(user);
+                        auto addr = getBufferAddr(builder, user);
+                        if (addr == castInst)
+                            addr = ptrVal;
+                        if (!addr)
+                        {
+                            IRCloneEnv cloneEnv = {};
+                            builder.setInsertBefore(user);
+                            auto newLoad = cloneInst(&cloneEnv, &builder, user);
+                            newLoad->setFullType(loweredElementTypeInfo.loweredType);
+                            addr = builder.emitVar(loweredElementTypeInfo.loweredType);
+                            builder.emitStore(addr, newLoad);
+                        }
+                        if (auto alignedAttr = user->findAttr<IRAlignedAttr>())
+                        {
+                            builder.addAlignedAddressDecoration(addr, alignedAttr->getAlignment());
+                        }
+                        auto unpackedVal = loweredElementTypeInfo.convertLoweredToOriginal.apply(
+                            builder,
+                            loweredElementTypeInfo.originalType,
+                            addr);
+                        user->replaceUsesWith(unpackedVal);
+                        user->removeAndDeallocate();
+                        break;
+                    }
+                case kIROp_Store:
+                case kIROp_RWStructuredBufferStore:
+                case kIROp_StructuredBufferAppend:
+                    {
+                        // Use must be the dest operand of the store inst.
+                        if (use != user->getOperands() + 0)
+                            break;
+                        IRCloneEnv cloneEnv = {};
+                        builder.setInsertBefore(user);
+                        auto originalVal = getStoreVal(user);
+                        IRInst* addr = getBufferAddr(builder, user);
+                        if (addr)
+                        {
+                            addr = ptrVal;
+                            if (auto alignedAttr = user->findAttr<IRAlignedAttr>())
+                            {
+                                builder.addAlignedAddressDecoration(
+                                    addr,
+                                    alignedAttr->getAlignment());
+                            }
+
+                            loweredElementTypeInfo.convertOriginalToLowered.applyDestinationDriven(
+                                builder,
+                                addr,
+                                originalVal);
+                            user->removeAndDeallocate();
+                        }
+                        else if (auto sbAppend = as<IRStructuredBufferAppend>(user))
+                        {
+                            builder.setInsertBefore(sbAppend);
+                            addr = builder.emitVar(loweredElementTypeInfo.loweredType);
+                            loweredElementTypeInfo.convertOriginalToLowered.applyDestinationDriven(
+                                builder,
+                                addr,
+                                originalVal);
+                            auto packedVal = builder.emitLoad(addr);
+                            sbAppend->setOperand(1, packedVal);
+                        }
+                        else
+                        {
+                            SLANG_UNREACHABLE("unhandled store type");
+                        }
+                        break;
+                    }
+                default:
+                    SLANG_UNREACHABLE(
+                        "lowerBufferElementType: unknown user of CastStorageToLogical.");
+
+                    break;
+                }
+            });
+
+        if (!castInst->hasUses())
+            castInst->removeAndDeallocate();
+    }
+
+    void collectCastStorageToLogicalInsts(List<IRCastStorageToLogical*>& insts, IRInst* root)
+    {
+        if (root->getOp() == kIROp_CastStorageToLogical)
+        {
+            insts.add((IRCastStorageToLogical*)root);
+            return;
+        }
+        for (auto child : root->getChildren())
+        {
+            collectCastStorageToLogicalInsts(insts, child);
+        }
+    }
+
+    void materializeStorageToLogicalCasts(IRInst* root)
+    {
+        List<IRCastStorageToLogical*> castInsts;
+        collectCastStorageToLogicalInsts(castInsts, root);
+        for (auto inst : castInsts)
+        {
+            materializeStorageToLogicalCastsImpl(inst);
+        }
     }
 
     // Lower all getElementPtr insts of a lowered matrix out of existance.
-    void lowerMatrixAddresses(IRModule* module, List<MatrixAddrWorkItem>& matrixAddrInsts)
+    void lowerMatrixAddresses(IRModule* module, MatrixAddrWorkItem workItem)
     {
         IRBuilder builder(module);
-        for (auto workItem : matrixAddrInsts)
-        {
-            auto majorAddr = workItem.matrixAddrInst;
-            auto majorGEP = as<IRGetElementPtr>(majorAddr);
-            SLANG_ASSERT(majorGEP);
-            auto loweredMatrixType =
-                cast<IRPtrTypeBase>(majorGEP->getBase()->getFullType())->getValueType();
-            auto matrixTypeInfo = getTypeLoweringMap(workItem.config)
-                                      .mapLoweredTypeToInfo.tryGetValue(loweredMatrixType);
-            SLANG_ASSERT(matrixTypeInfo);
-            auto matrixType = as<IRMatrixType>(matrixTypeInfo->originalType);
-            auto rowCount = getIntVal(matrixType->getRowCount());
-            traverseUses(
-                majorAddr,
-                [&](IRUse* use)
+        auto majorAddr = workItem.matrixAddrInst;
+        auto majorGEP = as<IRGetElementPtr>(majorAddr);
+        SLANG_ASSERT(majorGEP);
+        auto baseCast = as<IRCastStorageToLogical>(majorGEP->getBase());
+        SLANG_ASSERT(baseCast);
+        auto storageBase = baseCast->getOperand(0);
+        auto loweredMatrixType = cast<IRPtrTypeBase>(storageBase->getFullType())->getValueType();
+        auto matrixTypeInfo =
+            getTypeLoweringMap(workItem.config).mapLoweredTypeToInfo.tryGetValue(loweredMatrixType);
+        SLANG_ASSERT(matrixTypeInfo);
+        auto matrixType = as<IRMatrixType>(matrixTypeInfo->originalType);
+        auto rowCount = getIntVal(matrixType->getRowCount());
+        traverseUses(
+            majorAddr,
+            [&](IRUse* use)
+            {
+                auto user = use->getUser();
+                builder.setInsertBefore(user);
+                switch (user->getOp())
                 {
-                    auto user = use->getUser();
-                    builder.setInsertBefore(user);
-                    switch (user->getOp())
+                case kIROp_Load:
                     {
-                    case kIROp_Load:
+                        IRInst* resultInst = nullptr;
+                        auto dataPtr = builder.emitFieldAddress(
+                            getLoweredPtrLikeType(
+                                majorAddr->getDataType(),
+                                matrixTypeInfo->loweredInnerArrayType),
+                            storageBase,
+                            matrixTypeInfo->loweredInnerStructKey);
+                        if (getIntVal(matrixType->getLayout()) == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR)
                         {
-                            IRInst* resultInst = nullptr;
-                            auto dataPtr = builder.emitFieldAddress(
-                                getLoweredPtrLikeType(
-                                    majorAddr->getDataType(),
-                                    matrixTypeInfo->loweredInnerArrayType),
-                                majorGEP->getBase(),
-                                matrixTypeInfo->loweredInnerStructKey);
-                            if (getIntVal(matrixType->getLayout()) ==
-                                SLANG_MATRIX_LAYOUT_COLUMN_MAJOR)
+                            List<IRInst*> args;
+                            for (IRIntegerValue i = 0; i < rowCount; i++)
                             {
-                                List<IRInst*> args;
-                                for (IRIntegerValue i = 0; i < rowCount; i++)
-                                {
-                                    auto vector =
-                                        builder.emitLoad(builder.emitElementAddress(dataPtr, i));
-                                    auto element =
-                                        builder.emitElementExtract(vector, majorGEP->getIndex());
-                                    args.add(element);
-                                }
-                                resultInst = builder.emitMakeVector(
-                                    builder.getVectorType(
-                                        matrixType->getElementType(),
-                                        (IRIntegerValue)args.getCount()),
-                                    args);
-                            }
-                            else
-                            {
+                                auto vector =
+                                    builder.emitLoad(builder.emitElementAddress(dataPtr, i));
                                 auto element =
-                                    builder.emitElementAddress(dataPtr, majorGEP->getIndex());
-                                resultInst = builder.emitLoad(element);
+                                    builder.emitElementExtract(vector, majorGEP->getIndex());
+                                args.add(element);
                             }
-                            user->replaceUsesWith(resultInst);
+                            resultInst = builder.emitMakeVector(
+                                builder.getVectorType(
+                                    matrixType->getElementType(),
+                                    (IRIntegerValue)args.getCount()),
+                                args);
+                        }
+                        else
+                        {
+                            auto element =
+                                builder.emitElementAddress(dataPtr, majorGEP->getIndex());
+                            resultInst = builder.emitLoad(element);
+                        }
+                        user->replaceUsesWith(resultInst);
+                        user->removeAndDeallocate();
+                    }
+                    break;
+                case kIROp_Store:
+                    {
+                        auto storeInst = cast<IRStore>(user);
+                        if (storeInst->getOperand(0) != majorAddr)
+                            break;
+                        auto dataPtr = builder.emitFieldAddress(
+                            getLoweredPtrLikeType(
+                                majorAddr->getDataType(),
+                                matrixTypeInfo->loweredInnerArrayType),
+                            storageBase,
+                            matrixTypeInfo->loweredInnerStructKey);
+                        if (getIntVal(matrixType->getLayout()) == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR)
+                        {
+                            for (IRIntegerValue i = 0; i < rowCount; i++)
+                            {
+                                auto vectorAddr = builder.emitElementAddress(dataPtr, i);
+                                auto elementAddr =
+                                    builder.emitElementAddress(vectorAddr, majorGEP->getIndex());
+                                builder.emitStore(
+                                    elementAddr,
+                                    builder.emitElementExtract(storeInst->getVal(), i));
+                            }
+                        }
+                        else
+                        {
+                            auto rowAddr =
+                                builder.emitElementAddress(dataPtr, majorGEP->getIndex());
+                            builder.emitStore(rowAddr, storeInst->getVal());
                             user->removeAndDeallocate();
                         }
                         break;
-                    case kIROp_Store:
+                    }
+                case kIROp_GetElementPtr:
+                    {
+                        auto gep2 = cast<IRGetElementPtr>(user);
+                        auto rowIndex = majorGEP->getIndex();
+                        auto colIndex = gep2->getIndex();
+                        if (getIntVal(matrixType->getLayout()) == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR)
                         {
-                            auto storeInst = cast<IRStore>(user);
-                            if (storeInst->getOperand(0) != majorAddr)
-                                break;
-                            auto dataPtr = builder.emitFieldAddress(
-                                getLoweredPtrLikeType(
-                                    majorAddr->getDataType(),
-                                    matrixTypeInfo->loweredInnerArrayType),
-                                majorGEP->getBase(),
-                                matrixTypeInfo->loweredInnerStructKey);
-                            if (getIntVal(matrixType->getLayout()) ==
-                                SLANG_MATRIX_LAYOUT_COLUMN_MAJOR)
-                            {
-                                for (IRIntegerValue i = 0; i < rowCount; i++)
-                                {
-                                    auto vectorAddr = builder.emitElementAddress(dataPtr, i);
-                                    auto elementAddr = builder.emitElementAddress(
-                                        vectorAddr,
-                                        majorGEP->getIndex());
-                                    builder.emitStore(
-                                        elementAddr,
-                                        builder.emitElementExtract(storeInst->getVal(), i));
-                                }
-                            }
-                            else
-                            {
-                                auto rowAddr =
-                                    builder.emitElementAddress(dataPtr, majorGEP->getIndex());
-                                builder.emitStore(rowAddr, storeInst->getVal());
-                                user->removeAndDeallocate();
-                            }
-                            break;
+                            Swap(rowIndex, colIndex);
                         }
-                    case kIROp_GetElementPtr:
-                        {
-                            auto gep2 = cast<IRGetElementPtr>(user);
-                            auto rowIndex = majorGEP->getIndex();
-                            auto colIndex = gep2->getIndex();
-                            if (getIntVal(matrixType->getLayout()) ==
-                                SLANG_MATRIX_LAYOUT_COLUMN_MAJOR)
-                            {
-                                Swap(rowIndex, colIndex);
-                            }
-                            auto dataPtr = builder.emitFieldAddress(
-                                getLoweredPtrLikeType(
-                                    majorAddr->getDataType(),
-                                    matrixTypeInfo->loweredInnerArrayType),
-                                majorGEP->getBase(),
-                                matrixTypeInfo->loweredInnerStructKey);
-                            auto vectorAddr = builder.emitElementAddress(dataPtr, rowIndex);
-                            auto elementAddr = builder.emitElementAddress(vectorAddr, colIndex);
-                            gep2->replaceUsesWith(elementAddr);
-                            gep2->removeAndDeallocate();
-                            break;
-                        }
-                    default:
-                        SLANG_UNREACHABLE("unhandled inst of a matrix address inst that needs "
-                                          "storage lowering.");
+                        auto dataPtr = builder.emitFieldAddress(
+                            getLoweredPtrLikeType(
+                                majorAddr->getDataType(),
+                                matrixTypeInfo->loweredInnerArrayType),
+                            storageBase,
+                            matrixTypeInfo->loweredInnerStructKey);
+                        auto vectorAddr = builder.emitElementAddress(dataPtr, rowIndex);
+                        auto elementAddr = builder.emitElementAddress(vectorAddr, colIndex);
+                        gep2->replaceUsesWith(elementAddr);
+                        gep2->removeAndDeallocate();
                         break;
                     }
-                });
-        }
+                default:
+                    SLANG_UNREACHABLE("unhandled inst of a matrix address inst that needs "
+                                      "storage lowering.");
+                    break;
+                }
+            });
+        if (!majorAddr->hasUses())
+            majorAddr->removeAndDeallocate();
     }
 };
 

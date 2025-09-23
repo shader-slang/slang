@@ -1,33 +1,46 @@
-//TEST:SIMPLE(filecheck=SPV): -target spirv
+//TEST:SIMPLE(filecheck=SPV): -target spirv -O0
 
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
 
+// todo: also need to test a single function being called with different buffer types.
+// todo: check swizzled store.
+
+struct DoubleNested
+{
+    int4x3 matrix;
+    int getMatVal(int i, int j) { return matrix[i][j]; }
+}
+
 struct Nested
 {
-    bool values[16];
-
-    bool getVal(int id) { return values[id]; }
+    bool values[4];
+    DoubleNested doubleNested;
+    int getVal(int id) { return (int)values[0] + doubleNested.getMatVal(0, 1); }
 }
 
 struct Params
 {
     Nested nested;
 
-    bool getVal(int id) { return nested.getVal(id); }
+    int getVal(int id) { return nested.getVal(id); }
 }
 
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0], stride=4)
-RWStructuredBuffer<int> outputBuffer;
+// TEST_INPUT: set outputBuffer = out ubuffer(data=[0], stride=4)
 
-//TEST_INPUT:set gParams = cbuffer(data=[1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1])
+RWStructuredBuffer<int4> outputBuffer;
+
+// TEST_INPUT:set gParams = cbuffer(data=[1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1])
 ConstantBuffer<Params> gParams;
 
-// CHECK: 1
+// TEST_INPUT: set gDoubleNested = ubuffer(data=[1 2 3 4 5 6 7 8 9 10 11 12])
+uniform DoubleNested *gDoubleNested;
+
+// CHECK: 7
 
 [numthreads(1,1,1)]
 void computeMain(int id: SV_DispatchThreadID)
 {
-    outputBuffer[0] = gParams.getVal(id);
+    outputBuffer[0].xyz = gDoubleNested.getMatVal(1, 1);
 }
 
 // SPV-NOT: OpCompositeConstruct
