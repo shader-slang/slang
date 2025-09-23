@@ -1,5 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
-// CHECK: OpEntryPoint
+//TEST:INTERPRET(filecheck=ICHECK):
 
 __generic <Scalar : __BuiltinFloatingPointType, int Mode>
 struct Spectrum
@@ -32,8 +31,10 @@ struct Spectrum
 static const int DefaultMode = 0x103;
 typealias Spec = Spectrum<float, DefaultMode>;
 
-[shader("vertex")]
-Spec main(float3 vertex_color : COLOR0) : COLOR0
+void main()
 {
-	return Spec::MakeFromRGB(vertex_color);
+	float3 color = {1, 2, 3};
+	let spec = Spec::MakeFromRGB(color);
+	// ICHECK: (1, 2, 3)
+	printf("(%.0f, %.0f, %.0f)", spec.data[0], spec.data[1], spec.data[2]);
 }
