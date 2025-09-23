@@ -27270,6 +27270,7 @@ for(auto buffer : kStructuredBufferCases_) {
 }}}}
 
 [require(spirv, cooperative_vector)]
+[require(optix_coopvec)]
 __generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType,IgnoredBufferElementType>
 CoopVec<T, M> coopVecMatMulPacked(
     CoopVec<U, PackedK> input,
@@ -27311,11 +27312,14 @@ CoopVec<T, M> coopVecMatMulPacked(
         {
             result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulNV $input $inputInterpretationSpirv $matrixPtr $matrixOffset $matrixInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
         };
+    case optix_coopvec:
+        __intrinsic_asm "slangOptixCoopVecMatMul<$T0, $T0, $1, $5, $6>($0, (CUdeviceptr)(&($3)), $4, $8)";
     }
 }
 
 // specialized coopVecMatMul for non-packed inputs
 [require(spirv, cooperative_vector)]
+[require(optix_coopvec)]
 __generic<T : __BuiltinArithmeticType, let M : int, let K : int, U : __BuiltinArithmeticType,IgnoredBufferElementType>
 CoopVec<T, M> coopVecMatMul(
     CoopVec<U, K> input,
@@ -27344,6 +27348,7 @@ CoopVec<T, M> coopVecMatMul(
 }
 
 [require(spirv, cooperative_vector)]
+[require(optix_coopvec)]
 CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType, IgnoredBufferElementType>(
     CoopVec<U, PackedK> input,
     constexpr CoopVecComponentType inputInterpretation,
@@ -27391,10 +27396,13 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
         {
             result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulAddNV $input $inputInterpretationSpirv $matrixPtr $matrixOffset $matrixInterpretationSpirv $biasPtr $biasOffset $biasInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
         };
+    case optix_coopvec:
+        __intrinsic_asm "slangOptixCoopVecMatMul<OptixCoopVec<$[0], $[1]>, OptixCoopVec<$[2], $[3]>, $1, $5, $9, $8>($0, (CUdeviceptr)(&($3)), $4, (CUdeviceptr)(&($6)), $7, $11)", T, M, U, PackedK;
     }
 }
 
 [require(spirv, cooperative_vector)]
+[require(optix_coopvec)]
 CoopVec<T, M> coopVecMatMulAdd<T : __BuiltinArithmeticType, let M : int, let K : int, U : __BuiltinArithmeticType, IgnoredBufferElementType>(
     CoopVec<U, K> input,
     constexpr CoopVecComponentType inputInterpretation,
