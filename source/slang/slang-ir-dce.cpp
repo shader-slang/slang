@@ -544,14 +544,28 @@ static bool eliminateRedundantTemporaryCopyInFunc(IRFunc* func)
                 // Only optimize temporary variable.
                 // Don't optimize stores to permanent memory locations.
                 if (destPtr->getOp() != kIROp_Var)
-                    continue;
+                    continue; // skip because it is not the pattern we are looking for
 
                 // Check if we're storing a load result
                 auto loadInst = as<IRLoad>(storedValue);
                 if (!loadInst)
-                    continue;
+                    continue; // skip because it is not the pattern we are looking for
 
                 auto loadedPtr = loadInst->getPtr();
+
+                // Check address space compatibility
+                if (auto destPtrType = as<IRPtrTypeBase>(getRootAddr(destPtr)->getDataType()))
+                {
+                    if (auto loadedPtrType =
+                            as<IRPtrTypeBase>(getRootAddr(loadedPtr)->getDataType()))
+                    {
+                        if (destPtrType->getAddressSpace() != loadedPtrType->getAddressSpace())
+                        {
+                            // skip because the address space is not compatible.
+                            continue;
+                        }
+                    }
+                }
 
                 // Do not optimize loads from semantic parameters because some semantics have
                 // builtin types that are vector types but pretend to be scalar types (e.g.,
@@ -631,8 +645,7 @@ static bool eliminateRedundantTemporaryCopyInFunc(IRFunc* func)
                     goto unsafeToOptimize;
                 }
 
-                // If we get here, all uses are safe to optimize
-                // safeToOptimize:
+                // If we get here, all uses are safe to optimize.
 
                 // Replace all uses of destPtr with loadedPtr
                 destPtr->replaceUsesWith(loadedPtr);
