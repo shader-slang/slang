@@ -1649,7 +1649,7 @@ EnumDecl* isEnumType(Type* type)
     return nullptr;
 }
 
-bool isNullableType(Type* type)
+bool doesTypeHaveAnUnusedBitPatternThatCanBeUsedForOptionalRepresentation(Type* type)
 {
     if (as<PtrTypeBase>(type))
         return true;
@@ -1659,7 +1659,9 @@ bool isNullableType(Type* type)
         return true;
     if (as<OptionalType>(type))
         return true;
-    if (as<RefTypeBase>(type))
+    // TODO(tfoley): Somebody put the explicit `Ref<T>` types
+    // here as a list of a nullable type, and it is
+    if (as<ExplicitRefType>(type))
         return true;
     if (as<NativeStringType>(type))
         return true;
@@ -10448,12 +10450,12 @@ void SemanticsDeclHeaderVisitor::setFuncTypeIntoRequirementDecl(
     decl->errorType.type = funcType->getErrorType();
     for (Index i = 0; i < funcType->getParamCount(); i++)
     {
-        auto paramType = funcType->getParamType(i);
-        if (auto dirType = as<ParamDirectionType>(paramType))
-            paramType = dirType->getValueType();
+        auto paramInfo = funcType->getParamInfo(i);
+        auto paramType = paramInfo.type;
+        auto paramDir = paramInfo.direction;
+
         auto param = m_astBuilder->create<ParamDecl>();
         param->type.type = paramType;
-        auto paramDir = funcType->getParamDirection(i);
         switch (paramDir)
         {
         case ParameterDirection::kParameterDirection_InOut:
@@ -13051,7 +13053,7 @@ void checkDerivativeAttributeImpl(
                         Diagnostics::customDerivativeSignatureMismatchAtPosition,
                         ii,
                         qualTypeToString(argList[ii]->type),
-                        funcType->getParamType(ii)->toString());
+                        funcType->getParamTypeWithDirectionWrapper(ii)->toString());
                 }
             }
             // The `imaginaryArguments` list does not include the `this` parameter.

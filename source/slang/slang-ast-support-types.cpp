@@ -11,13 +11,26 @@ namespace Slang
 QualType::QualType(Type* type)
     : type(type), isLeftValue(false)
 {
-    if (as<RefType>(type))
+    if (auto refType = as<ExplicitRefType>(type))
     {
-        isLeftValue = true;
-    }
-    else if (as<ConstRefType>(type))
-    {
-        isLeftValue = false;
+        if (auto optAccessQualifier = refType->tryGetAccessQualifierValue())
+        {
+            auto accessQualifier = *optAccessQualifier;
+            switch (accessQualifier)
+            {
+            case AccessQualifier::ReadWrite:
+                isLeftValue = true;
+                break;
+
+            case AccessQualifier::Read:
+                isLeftValue = false;
+                break;
+
+            default:
+                SLANG_UNEXPECTED("unhandled access qualifier");
+                break;
+            }
+        }
     }
 }
 
