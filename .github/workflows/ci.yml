@@ -208,12 +208,6 @@ jobs:
   # SPIRV-Tools consistency check
   check-spirv-tools-generated:
     uses: ./.github/workflows/check-spirv-tools-generated.yml
-    with:
-      os: windows
-      compiler: cl
-      platform: x86_64
-      config: release
-      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
 
   check-ci:
     needs:
