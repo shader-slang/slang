@@ -1284,6 +1284,7 @@ enum AddressSpace : uint64_t
 {
     Device = $((uint64_t)AddressSpace::UserPointer),
     GroupShared = $((uint64_t)AddressSpace::GroupShared),
+    VaryingInput = $((uint64_t)AddressSpace::Input),
 };
 
 /// @category misc_types
@@ -1328,29 +1329,49 @@ struct Ptr<
     __intrinsic_op($(kIROp_CastIntToPtr))
     __init(int64_t val);
 
-    // By default, getter is not an L value
+    /// Subscript a pointer to get a reference to a value.
+    ///
+    /// The pointer must reference a memory location where
+    /// N >= 0 values of type `T` are stored sequentially,
+    /// in a layout consistent with an array `T[N]`;
+    /// otherwise, this operation has undefined behavior.
+    ///
+    /// The `index` parameter must satisfy 0 <= `index` <= N;
+    /// otherwise, this operation has undefined behavior.
+    ///
     __generic<TInt : __BuiltinIntegerType>
     __subscript(TInt index) -> T
     {
+        //
+        // TODO(tfoley): The `Ptr` type's subscript operation
+        // currently provides a `ref` accessor (which returns a
+        // reference that can be used for reading or writing),
+        // independent of the `Access` that is specified by the
+        // generic arguments  of a particular pointer type. In
+        // practice, this means that subscripting a read-only
+        // pointer yields a readable *and* writable reference.
+        //
+        // Previous versions of the code module attempted to
+        // address the problem by providing a `get` accessor
+        // on all platforms, and then use an `extension` to
+        // introduce a `ref` accessor only to pointers that
+        // are known to be mutable. That approach does not work,
+        // however, because it is necessary that subscripting
+        // a pointer yields a reference (l-value), whether or not
+        // the reference is read-only.
+        //
+        // A different solution to the problem is needed, whether
+        // by splitting up read-only and read-write pointers as
+        // distinct types (as many languages do), or by allowing
+        // the subscript operation to explicitly return a reference
+        // with the same access as the pointer itself.
+        //
+
         __intrinsic_op($(kIROp_GetOffsetPtr))
         [nonmutating]
         ref;
     }
 };
-
-extension<T, AddressSpace addrSpace> Ptr<T, Access::ReadWrite, addrSpace>
-{
-    // We have a `ref` accessor if we are ReadWrite. This means only `ReadWrite`
-    // can be used as an L-value.
-    __generic<TInt : __BuiltinIntegerType>
-    __subscript(TInt index) -> Ref<T>
-    {
-        // If a 'Ptr[index]' is referred to by a '__ref', call 'kIROp_GetOffsetPtr(index)'
-        __intrinsic_op($(kIROp_GetOffsetPtr))
-        [nonmutating]
-        ref;
-    }
-}
 
 //@hidden:
 __intrinsic_op($(kIROp_AlignedAttr))
@@ -1505,28 +1526,33 @@ extension uintptr_t : IRangedValue
 }
 
 //@hidden:
-__generic<T>
-__magic_type(OutType)
-__intrinsic_type($(kIROp_OutType))
-struct Out
-{};
 
-__generic<T>
-__magic_type(InOutType)
-__intrinsic_type($(kIROp_InOutType))
-struct InOut
-{};
-
-__generic<T>
-__magic_type(RefType)
+__magic_type(ExplicitRefType)
 __intrinsic_type($(kIROp_RefType))
-struct Ref
+struct Ref<
+    T, 
+    Access access = Access::ReadWrite, 
+    AddressSpace addrSpace = AddressSpace::Device>
 {};
 
-__generic<T>
-__magic_type(ConstRefType)
+__magic_type(OutParamType)
+__intrinsic_type($(kIROp_OutType))
+struct OutParam<T>
+{};
+
+__magic_type(InOutParamType)
+__intrinsic_type($(kIROp_InOutType))
+struct InOutParam<T>
+{};
+
+__magic_type(RefParamType)
+__intrinsic_type($(kIROp_RefType))
+struct RefParam<T>
+{};
+
+__magic_type(ConstRefParamType)
 __intrinsic_type($(kIROp_ConstRefType))
-struct ConstRef
+struct ConstRefParam<T>
 {};
 
 // __Addr<T> is AddressSpace::Generic since Slang will specalize & validate the address-space
@@ -2669,15 +2695,9 @@ for (auto op : intrinsicUnaryOps)
 }}}}
 
 // Only ReadWrite is an L-value.
-__generic<T, AddressSpace addrSpace>
+__generic<T, Access access, AddressSpace addrSpace>
 __intrinsic_op(0)
-__prefix Ref<T> operator*(Ptr<T, Access::ReadWrite, addrSpace> value);
-
-// Unknown access qualifier or Access::Read access qualifier is a promise
-// that the pointer is not going to be used as an L-value.
-__generic<$(ptrTypeParameterList)>
-__intrinsic_op(0)
-__prefix ConstRef<T> operator*($(fullPtrType) value);
+__prefix Ref<T, access, addrSpace> operator*(Ptr<T, access, addrSpace> value);
 
 // TODO: [require(cpu)]. This cannot be done yet since this change breaks slangpy
 __generic<T>

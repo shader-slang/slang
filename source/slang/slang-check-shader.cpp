@@ -822,13 +822,13 @@ Type* getParamTypeWithDirectionWrapper(ASTBuilder* astBuilder, DeclRef<VarDeclBa
     case kParameterDirection_In:
         return result;
     case kParameterDirection_ConstRef:
-        return astBuilder->getConstRefType(result);
+        return astBuilder->getConstRefParamType(result);
     case kParameterDirection_Out:
         return astBuilder->getOutType(result);
     case kParameterDirection_InOut:
         return astBuilder->getInOutType(result);
     case kParameterDirection_Ref:
-        return astBuilder->getRefType(result);
+        return astBuilder->getRefParamType(result);
     default:
         return result;
     }
