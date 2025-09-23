@@ -5081,23 +5081,24 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         {
             // On bindless targets, DescriptorHandle<T> is laid out as a pointer
             RefPtr<PointerTypeLayout> ptrLayout = new PointerTypeLayout();
-            
+
             const auto info = rules->GetPointerLayout();
-            
+
             const TypeLayoutResult result(ptrLayout, info);
             _addLayout(context, type, result);
-            
+
             ptrLayout->type = type;
             ptrLayout->rules = rules;
-            
+
             ptrLayout->uniformAlignment = info.alignment;
-            
+
             ptrLayout->addResourceUsage(info.kind, info.size);
-            
+
             // Store the element type layout as the value type
-            TypeLayoutResult elementTypeLayout = _createTypeLayout(context, resPtrType->getElementType());
+            TypeLayoutResult elementTypeLayout =
+                _createTypeLayout(context, resPtrType->getElementType());
             ptrLayout->valueTypeLayout = elementTypeLayout.layout;
-            
+
             return result;
         }
         else

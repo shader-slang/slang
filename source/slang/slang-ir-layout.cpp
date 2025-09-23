@@ -370,17 +370,15 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
         {
             // On bindless targets (CUDA, CPU, Metal), DescriptorHandle<T> is just a pointer
             // For non-bindless targets, use uint2
-            
+
             // Check if this is a bindless target
             auto target = optionSet.getTarget();
-            bool isBindless = (target == CodeGenTarget::CUDASource ||
-                               target == CodeGenTarget::CPPSource ||
-                               target == CodeGenTarget::CSource ||
-                               target == CodeGenTarget::HostCPPSource ||
-                               target == CodeGenTarget::PyTorchCppBinding ||
-                               target == CodeGenTarget::Metal ||
-                               target == CodeGenTarget::MetalLib);
-            
+            bool isBindless =
+                (target == CodeGenTarget::CUDASource || target == CodeGenTarget::CPPSource ||
+                 target == CodeGenTarget::CSource || target == CodeGenTarget::HostCPPSource ||
+                 target == CodeGenTarget::PyTorchCppBinding || target == CodeGenTarget::Metal ||
+                 target == CodeGenTarget::MetalLib);
+
             if (isBindless)
             {
                 // Calculate pointer size for the target
@@ -391,7 +389,7 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
                 {
                     pointerSize = (int)sizeof(void*);
                 }
-                
+
                 // Return pointer size/alignment for bindless targets
                 *outSizeAndAlignment = IRSizeAndAlignment(pointerSize, pointerSize);
                 return SLANG_OK;
