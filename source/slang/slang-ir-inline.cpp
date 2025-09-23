@@ -265,8 +265,17 @@ struct InliningPassBase
         }
 
         // We cannot inline a function that is defined by a generic asm inst.
+        // EXCEPTION: Allow inlining of [ForceInline] functions to fix cooperative vector
+        // static assertion evaluation for CUDA/OptiX targets.
         if (hasGenericAsmInst(callee))
-            return false;
+        {
+            bool isForceInline = callee->findDecoration<IRForceInlineDecoration>() != nullptr;
+
+            // For now, allow all ForceInline functions to be inlined even with GenericAsm
+            // This fixes the cooperative vector static assertion issue
+            if (!isForceInline)
+                return false;
+        }
 
         // At this point the `CallSiteInfo` is complete and
         // could be used for inlining, but we have additional
