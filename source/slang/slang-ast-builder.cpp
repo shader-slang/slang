@@ -512,22 +512,27 @@ Type* ASTBuilder::getScalarLayoutType()
 // Construct the type `Out<valueType>`
 OutType* ASTBuilder::getOutType(Type* valueType)
 {
-    return dynamicCast<OutType>(getPtrType(valueType, "OutType"));
+    return dynamicCast<OutType>(getPtrType(valueType, "OutParamType"));
 }
 
 InOutType* ASTBuilder::getInOutType(Type* valueType)
 {
-    return dynamicCast<InOutType>(getPtrType(valueType, "InOutType"));
+    return dynamicCast<InOutType>(getPtrType(valueType, "InOutParamType"));
 }
 
-RefType* ASTBuilder::getRefType(Type* valueType)
+RefParamType* ASTBuilder::getRefParamType(Type* valueType)
 {
-    return dynamicCast<RefType>(getPtrType(valueType, "RefType"));
+    return dynamicCast<RefParamType>(getPtrType(valueType, "RefParamType"));
 }
 
-ConstRefType* ASTBuilder::getConstRefType(Type* valueType)
+ConstRefParamType* ASTBuilder::getConstRefParamType(Type* valueType)
 {
-    return dynamicCast<ConstRefType>(getPtrType(valueType, "ConstRefType"));
+    return dynamicCast<ConstRefParamType>(getPtrType(valueType, "ConstRefParamType"));
+}
+
+ExplicitRefType* ASTBuilder::getExplicitRefType(Type* valueType)
+{
+    return dynamicCast<ExplicitRefType>(getPtrType(valueType, "ExplicitRefType"));
 }
 
 OptionalType* ASTBuilder::getOptionalType(Type* valueType)
@@ -931,12 +936,22 @@ top:
     {
         return bIsSubtypeOfCWitness;
     }
+    else if (auto declAIsSubtypeOfBWitness = as<DeclaredSubtypeWitness>(aIsSubtypeOfBWitness))
+    {
+        if (declAIsSubtypeOfBWitness->isEquality())
+            return bIsSubtypeOfCWitness;
+    }
 
     // Similarly, if `b == c`, then the `a <: b` witness is a witness for `a <: c`
     //
     if (as<TypeEqualityWitness>(bIsSubtypeOfCWitness))
     {
         return aIsSubtypeOfBWitness;
+    }
+    else if (auto declBIsSubtypeOfCWitness = as<DeclaredSubtypeWitness>(bIsSubtypeOfCWitness))
+    {
+        if (declBIsSubtypeOfCWitness->isEquality())
+            return declBIsSubtypeOfCWitness;
     }
 
     // HACK: There is downstream code generation logic that assumes that

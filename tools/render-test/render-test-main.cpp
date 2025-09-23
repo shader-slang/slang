@@ -12,6 +12,7 @@
 #include "shader-input-layout.h"
 #include "shader-renderer-util.h"
 #include "slang-support.h"
+#include "slang-test-device-cache.h"
 #include "window.h"
 
 #if defined(_WIN32)
@@ -1440,7 +1441,7 @@ static SlangResult _innerMain(
         }
     }
 
-    renderer_test::CoreToRHIDebugBridge debugCallback;
+    static renderer_test::CoreToRHIDebugBridge debugCallback;
     debugCallback.setCoreCallback(stdWriters->getDebugCallback());
 
     // Use the profile name set on options if set
@@ -1495,7 +1496,7 @@ static SlangResult _innerMain(
         return SLANG_E_NOT_AVAILABLE;
     }
 
-    Slang::ComPtr<IDevice> device;
+    CachedDeviceWrapper deviceWrapper;
     {
         DeviceDesc desc = {};
         desc.deviceType = options.deviceType;
@@ -1558,8 +1559,27 @@ static SlangResult _innerMain(
             {
                 getRHI()->enableDebugLayers();
             }
-            SlangResult res = getRHI()->createDevice(desc, device.writeRef());
-            if (SLANG_FAILED(res))
+            Slang::ComPtr<rhi::IDevice> rhiDevice;
+            SlangResult res;
+            if (options.cacheRhiDevice)
+            {
+                res = DeviceCache::acquireDevice(desc, rhiDevice.writeRef());
+                if (SLANG_FAILED(res))
+                {
+                    rhiDevice = nullptr;
+                }
+            }
+            else
+            {
+                res = rhi::getRHI()->createDevice(desc, rhiDevice.writeRef());
+                if (SLANG_FAILED(res))
+                {
+                    rhiDevice = nullptr;
+                }
+            }
+
+            // Check result for both cached and non-cached paths
+            if (SLANG_FAILED(res) || !rhiDevice)
             {
                 // We need to be careful here about SLANG_E_NOT_AVAILABLE. This return value means
                 // that the renderer couldn't be created because it required *features* that were
@@ -1575,21 +1595,20 @@ static SlangResult _innerMain(
                 {
                     return res;
                 }
-
                 if (!options.onlyStartup)
                 {
                     fprintf(stderr, "Unable to create renderer %s\n", rendererName.getBuffer());
                 }
-
                 return res;
             }
-            SLANG_ASSERT(device);
+            SLANG_ASSERT(rhiDevice);
+            deviceWrapper = CachedDeviceWrapper(rhiDevice);
         }
 
         for (const auto& feature : requiredFeatureList)
         {
             // If doesn't have required feature... we have to give up
-            if (!device->hasFeature(feature))
+            if (!deviceWrapper->hasFeature(feature))
             {
                 return SLANG_E_NOT_AVAILABLE;
             }
@@ -1599,7 +1618,7 @@ static SlangResult _innerMain(
     // Print adapter info after device creation but before any other operations
     if (options.showAdapterInfo)
     {
-        auto info = device->getInfo();
+        auto info = deviceWrapper->getInfo();
         auto out = stdWriters->getOut();
         out.print("Using graphics adapter: %s\n", info.adapterName);
     }
@@ -1613,12 +1632,18 @@ static SlangResult _innerMain(
     {
         RenderTestApp app;
         renderDocBeginFrame();
-        SLANG_RETURN_ON_FAIL(app.initialize(session, device, options, input));
+        SLANG_RETURN_ON_FAIL(app.initialize(session, deviceWrapper.get(), options, input));
         app.update();
         renderDocEndFrame();
         app.finalize();
     }
+
     return SLANG_OK;
+}
+
+SLANG_TEST_TOOL_API void cleanDeviceCache()
+{
+    DeviceCache::cleanCache();
 }
 
 SLANG_TEST_TOOL_API SlangResult innerMain(

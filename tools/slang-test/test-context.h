@@ -90,6 +90,7 @@ class TestContext
 {
 public:
     typedef Slang::TestToolUtil::InnerMainFunc InnerMainFunc;
+    typedef void (*CleanDeviceCacheFunc)();
 
     /// Get the slang session
     SlangSession* getSession() const { return m_session; }
@@ -100,6 +101,9 @@ public:
     InnerMainFunc getInnerMainFunc(const Slang::String& dirPath, const Slang::String& name);
     /// Set the function for the shared library
     void setInnerMainFunc(const Slang::String& name, InnerMainFunc func);
+
+    /// Get the device cache cleanup function (from shared library)
+    CleanDeviceCacheFunc getCleanDeviceCacheFunc(const Slang::String& name);
 
     void setTestRequirements(TestRequirements* req);
 
@@ -196,6 +200,7 @@ protected:
     {
         Slang::ComPtr<ISlangSharedLibrary> m_sharedLibrary;
         InnerMainFunc m_func;
+        CleanDeviceCacheFunc m_cleanDeviceCacheFunc;
     };
 
     Slang::List<Slang::RefPtr<Slang::JSONRPCConnection>> m_jsonRpcConnections;
