@@ -412,6 +412,18 @@ struct LLVMEmitter
         SLANG_UNEXPECTED("Requested key that doesn't exist in struct!");
     }
 
+    bool isVolatile(IRInst* value)
+    {
+        if (auto memoryQualifier = value->findDecoration<IRMemoryQualifierSetDecoration>())
+        {
+            if (memoryQualifier->getMemoryQualifierBit() & MemoryQualifierSetModifier::Flags::kVolatile)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // Caution! This is only for emitting things which are considered
     // instructions in LLVM! It won't work for IRBlocks, IRFuncs & such.
     llvm::Value* emitLLVMInstruction(IRInst* inst, llvm::Value* storeOnReturn)
@@ -537,8 +549,7 @@ struct LLVMEmitter
                 auto storeInst = static_cast<IRStore*>(inst);
                 auto llvmPtr = findValue(storeInst->getPtr());
                 auto llvmVal = findValue(storeInst->getVal());
-                // TODO: isVolatile
-                llvmInst = llvmBuilder->CreateStore(llvmVal, llvmPtr);
+                llvmInst = llvmBuilder->CreateStore(llvmVal, llvmPtr, isVolatile(storeInst->getPtr()));
             }
             break;
 
@@ -548,8 +559,7 @@ struct LLVMEmitter
                 auto ptrType = as<IRPtrTypeBase>(loadInst->getPtr()->getDataType());
                 auto llvmType = ensureType(ptrType->getValueType());
                 auto llvmPtr = findValue(loadInst->getPtr());
-                // TODO: isVolatile
-                llvmInst = llvmBuilder->CreateLoad(llvmType, llvmPtr);
+                llvmInst = llvmBuilder->CreateLoad(llvmType, llvmPtr, isVolatile(loadInst->getPtr()));
             }
             break;
 
@@ -1180,7 +1190,6 @@ struct LLVMEmitter
         switch (type->getOp())
         {
         case kIROp_VoidType:
-            // TODO: Is there anything better for void?
             llvmType = llvmDebugBuilder.createUnspecifiedType("void");
             break;
         case kIROp_Int8Type:
@@ -1595,7 +1604,8 @@ struct LLVMEmitter
 
         IRPtrType* ptrType = var->getDataType();
         auto varType = ensureType(ptrType->getValueType());
-        // TODO: When is the global variable a constant?
+        // The global vars are never emitted as constant, constants are always
+        // inlined into where they're needed.
         llvm::GlobalVariable* llvmVar = new llvm::GlobalVariable(varType, false, getLinkageType(var));
 
         llvm::StringRef name;
