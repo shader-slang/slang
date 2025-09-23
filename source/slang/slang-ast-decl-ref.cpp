@@ -426,6 +426,14 @@ SourceLoc DeclRefBase::getLoc() const
     return getDecl()->loc;
 }
 
+// Keep this function here for better debuggin purpose
+String DeclRefBase::toString() const
+{
+    StringBuilder sb;
+    const_cast<DeclRefBase*>(this)->toText(sb);
+    return sb.produceString();
+}
+
 DeclRefBase* DeclRefBase::getParent()
 {
     auto astBuilder = getCurrentASTBuilder();

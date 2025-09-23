@@ -4,6 +4,17 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
+// TODO(tfoley): What this test is testing seems to be outside
+// the scope of what we ever intend to support in user code.
+// Returning an `Ref<T>` is supposed to be a core-module-only
+// thing, and even then is something that we would like to do less
+// of over time.
+//
+// The only purpose of this test *seems* to be ensuring that this
+// particular function (and the `groupshared` declaration inside
+// it) "works," but the function itself is not something that we
+// intend to be supported in Slang.
+// 
 [ForceInline]
 Ref<uint> table<let n: int>(int index)
 {

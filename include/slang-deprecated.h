@@ -750,6 +750,9 @@ extern "C"
     SLANG_API SlangReflectionGeneric* spReflectionDecl_castToGeneric(SlangReflectionDecl* decl);
     SLANG_API SlangReflectionType* spReflection_getTypeFromDecl(SlangReflectionDecl* decl);
     SLANG_API SlangReflectionDecl* spReflectionDecl_getParent(SlangReflectionDecl* decl);
+    SLANG_API SlangReflectionModifier* spReflectionDecl_findModifier(
+        SlangReflectionDecl* decl,
+        SlangModifierID modifierID);
 
     // Generic Reflection
 

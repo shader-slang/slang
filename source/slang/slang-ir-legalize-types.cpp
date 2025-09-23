@@ -13,6 +13,7 @@
 #include "../compiler-core/slang-name.h"
 #include "../core/slang-performance-profiler.h"
 #include "slang-ir-clone.h"
+#include "slang-ir-insert-debug-value-store.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
@@ -178,14 +179,27 @@ static LegalVal maybeMaterializeWrappedValue(IRTypeLegalizationContext* context,
 static LegalVal legalizeOperand(IRTypeLegalizationContext* context, IRInst* irValue)
 {
     LegalVal legalVal;
+
+    // Special handling for type operands
+    if (auto oldType = as<IRType>(irValue))
+    {
+        // e.g. ParameterBlock<Struct>, the inst. ParameterBlockType holds the operand `StructType`,
+        // if we don't legalize it here and the same structType is legalized somewhere else, the
+        // operand of ParameterBlockType might not get updated, and it would result in a type
+        // mismatch.
+        auto legalType = legalizeType(context, oldType);
+        if (legalType.flavor == LegalType::Flavor::simple)
+            return LegalVal::simple(legalType.getSimple());
+        // legalType is not simple, fallback to the original value
+    }
+
     if (context->mapValToLegalVal.tryGetValue(irValue, legalVal))
     {
         return maybeMaterializeWrappedValue(context, legalVal);
     }
 
     // For now, assume that anything not covered
-    // by the mapping is legal as-is.
-
+    // by the type legalization or val mapping is legal as-is.
     return LegalVal::simple(irValue);
 }
 
@@ -842,8 +856,17 @@ static LegalVal legalizeDebugVar(
     {
     case LegalType::Flavor::simple:
         {
+            auto pointedToType = tryGetPointedToType(context->builder, type.getSimple());
+
+            // Check if the type is debuggable before creating DebugVar
+            DebugValueStoreContext debugContext;
+            if (!debugContext.isDebuggableType(pointedToType))
+            {
+                return LegalVal();
+            }
+
             auto legalVal = context->builder->emitDebugVar(
-                tryGetPointedToType(context->builder, type.getSimple()),
+                pointedToType,
                 originalInst->getSource(),
                 originalInst->getLine(),
                 originalInst->getCol(),
@@ -881,6 +904,9 @@ static LegalVal legalizeDebugValue(
     LegalVal debugValue,
     IRDebugValue* originalInst)
 {
+    if (debugVar.flavor == LegalVal::Flavor::none)
+        return LegalVal();
+
     // For now we just discard any special part and keep the ordinary part.
     switch (debugValue.flavor)
     {
@@ -2114,6 +2140,10 @@ static LegalVal legalizeInst(
         break;
     case kIROp_DebugVar:
         result = legalizeDebugVar(context, type, (IRDebugVar*)inst);
+        if (result.flavor == LegalVal::Flavor::none)
+        {
+            return result;
+        }
         break;
     case kIROp_DebugValue:
         result = legalizeDebugValue(context, args[0], args[1], (IRDebugValue*)inst);
@@ -2369,7 +2399,8 @@ static LegalVal legalizeInst(IRTypeLegalizationContext* context, IRInst* inst)
     for (UInt aa = 0; aa < argCount; ++aa)
     {
         auto oldArg = inst->getOperand(aa);
-        auto legalArg = legalizeOperand(context, oldArg);
+
+        LegalVal legalArg = legalizeOperand(context, oldArg);
         legalArgs.add(legalArg);
 
         if (legalArg.flavor != LegalVal::Flavor::simple)
