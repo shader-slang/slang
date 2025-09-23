@@ -265,15 +265,57 @@ struct InliningPassBase
         }
 
         // We cannot inline a function that is defined by a generic asm inst.
-        // EXCEPTION: Allow inlining of [ForceInline] functions to fix cooperative vector
-        // static assertion evaluation for CUDA/OptiX targets.
+        // EXCEPTION: Allow inlining of [ForceInline] cooperative vector functions
+        // to fix static assertion evaluation for CUDA/OptiX targets.
         if (hasGenericAsmInst(callee))
         {
             bool isForceInline = callee->findDecoration<IRForceInlineDecoration>() != nullptr;
+            bool isCoopVecRelated = false;
 
-            // For now, allow all ForceInline functions to be inlined even with GenericAsm
-            // This fixes the cooperative vector static assertion issue
-            if (!isForceInline)
+            if (isForceInline)
+            {
+                if (auto func = as<IRFunc>(callee))
+                {
+                    // Check return type for cooperative vectors (direct or lowered)
+                    if (as<IRCoopVectorType>(func->getResultType()))
+                        isCoopVecRelated = true;
+                    else if (auto arrayType = as<IRArrayType>(func->getResultType()))
+                    {
+                        if (auto intrinsicDecor = arrayType->findDecoration<IRIntrinsicOpDecoration>())
+                        {
+                            if (getIntVal(intrinsicDecor->getOperand(0)) == kIROp_CoopVectorType)
+                                isCoopVecRelated = true;
+                        }
+                    }
+
+                    // Check parameter types for cooperative vectors
+                    if (!isCoopVecRelated)
+                    {
+                        for (auto param : func->getParams())
+                        {
+                            if (as<IRCoopVectorType>(param->getDataType()))
+                            {
+                                isCoopVecRelated = true;
+                                break;
+                            }
+                            else if (auto arrayType = as<IRArrayType>(param->getDataType()))
+                            {
+                                if (auto intrinsicDecor = arrayType->findDecoration<IRIntrinsicOpDecoration>())
+                                {
+                                    if (getIntVal(intrinsicDecor->getOperand(0)) == kIROp_CoopVectorType)
+                                    {
+                                        isCoopVecRelated = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Only allow inlining of ForceInline functions that are cooperative vector related
+            if (!isForceInline || !isCoopVecRelated)
                 return false;
         }
 
