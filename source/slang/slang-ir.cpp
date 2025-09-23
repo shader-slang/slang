@@ -3892,7 +3892,7 @@ IRInst* IRBuilder::emitPackAnyValue(IRType* type, IRInst* value)
 
 IRInst* IRBuilder::emitUnpackAnyValue(IRType* type, IRInst* value)
 {
-    auto inst = createInst<IRPackAnyValue>(this, kIROp_UnpackAnyValue, type, value);
+    auto inst = createInst<IRUnpackAnyValue>(this, kIROp_UnpackAnyValue, type, value);
 
     addInst(inst);
     return inst;
@@ -8548,6 +8548,9 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
         return false;
 
     if (as<IRSPIRVAsmOperand>(this))
+        return false;
+
+    if (as<IRTypeFlowData>(this))
         return false;
 
     switch (getOp())

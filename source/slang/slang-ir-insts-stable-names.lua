@@ -670,4 +670,18 @@ return {
 	["SPIRVAsmOperand.__imageType"] = 666,
 	["SPIRVAsmOperand.__sampledImageType"] = 667,
 	["Type.CLayout"] = 668,
+  	["TypeFlowData.CollectionBase.TypeCollection"] = 669,
+	["TypeFlowData.CollectionBase.FuncCollection"] = 670,
+	["TypeFlowData.CollectionBase.TableCollection"] = 671,
+	["TypeFlowData.CollectionBase.GenericCollection"] = 672,
+	["TypeFlowData.UnboundedCollection"] = 673,
+	["TypeFlowData.CollectionTagType"] = 674,
+	["TypeFlowData.CollectionTaggedUnionType"] = 675,
+	["CastInterfaceToTaggedUnionPtr"] = 676,
+	["CastTaggedUnionToInterfacePtr"] = 677,
+	["GetTagForSuperCollection"] = 678,
+	["GetTagForMappedCollection"] = 679,
+	["GetTagForSpecializedCollection"] = 680,
+	["GetTagFromSequentialID"] = 681,
+	["GetSequentialIDFromTag"] = 682
 }

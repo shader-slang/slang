@@ -1479,6 +1479,9 @@ static LegalVal legalizeGetElement(
     // the "index" argument.
     auto indexOperand = legalIndexOperand.getSimple();
 
+    if (type.flavor == LegalType::Flavor::none)
+        return LegalVal();
+
     return legalizeGetElement(context, type, legalPtrOperand, indexOperand);
 }
 
