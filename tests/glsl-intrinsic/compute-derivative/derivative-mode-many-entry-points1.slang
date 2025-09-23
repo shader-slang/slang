@@ -24,6 +24,7 @@ void main1(uint3 dispatchThreadID : SV_DispatchThreadID)
 
 [DerivativeGroupLinear]
 [shader("compute")]
+[numthreads(4,1,1)]
 void main2(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     outputBuffer.result = asint(ddx(1));
