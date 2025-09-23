@@ -83,12 +83,35 @@ local insts = {
 				},
 			},
 			{
-				BwdDiffIntermediateCtxType = {
-					struct_name = "BackwardDiffIntermediateContextType",
-					operands = { { "func" } },
+				TranslatedTypeBase = 
+				{
 					hoistable = true,
-				},
+					{
+						BwdDiffIntermediateCtxType = {
+							struct_name = "BackwardDiffIntermediateContextType",
+							operands = { { "func" } }
+						}
+					},
+					{
+						TrivialBackwardDiffIntermediateContextType = {
+							struct_name = "TrivialBackwardDiffIntermediateContextType",
+							operands = { { "func" } }
+						}
+					},
+					{
+						BackwardContextFromLegacyBwdDiffFunc = {
+							operands = { { "func" }, {"legacyBwdDiffFunc"} }
+						}
+					}
+				}
 			},
+
+			{ ForwardDiffFuncType = { hoistable = true } },
+			{ BackwardDiffFuncType = { hoistable = true } },
+			{ ApplyForBwdFuncType = { hoistable = true } },
+			{ FuncResultType = { hoistable = true } },
+			{ BwdCallableFuncType = { hoistable = true } },
+
 			{ TensorView = { struct_name = "TensorViewType", operands = { { "elementType", "IRType" } }, hoistable = true } },
 			{ TorchTensor = { struct_name = "TorchTensorType", hoistable = true } },
 			{ ArrayListVector = { struct_name = "ArrayListType", operands = { { "elementType", "IRType" } }, hoistable = true } },
@@ -811,6 +834,10 @@ local insts = {
 	--   for(ii : 0 ... M-1 )
 	--     dst[ii] = src[idx[ii]];
 	{ swizzledStore = { min_operands = 2 } },
+	-- Transposed operation of MakeVectorFromScalar
+	{ SumVectorElements = { min_operands = 1 } },
+	-- Transposed operation of MakeMatrixFromScalar
+	{ SumMatrixElements = { min_operands = 1 } },
 	{
 		TerminatorInst = {
 			{ return_val = { struct_name = "Return", min_operands = 1 } },
@@ -1898,6 +1925,7 @@ local insts = {
 	{ sizeOf = { min_operands = 1 } },
 	{ alignOf = { min_operands = 1 } },
 	{ countOf = { min_operands = 1 } },
+	{ FuncTypeOf = { min_operands = 1, hoistable = true } },
 	{ GetArrayLength = { min_operands = 1 } },
 	{ IsType = { min_operands = 3 } },
 	{ TypeEquals = { min_operands = 2 } },
@@ -1909,16 +1937,32 @@ local insts = {
 	{ IsSignedInt = { min_operands = 1 } },
 	{ IsVector = { min_operands = 1 } },
 	{ GetDynamicResourceHeap = { hoistable = true } },
-	{ ForwardDifferentiate = { min_operands = 1 } },
-	-- Produces the primal computation of backward derivatives, will return an intermediate context for
-	-- backward derivative func.
-	{ BackwardDifferentiatePrimal = { min_operands = 1 } },
-	-- Produces the actual backward derivative propagate function, using the intermediate context returned by the
-	-- primal func produced from `BackwardDifferentiatePrimal`.
-	{ BackwardDifferentiatePropagate = { min_operands = 1 } },
-	-- Represents the conceptual backward derivative function. Only produced by lower-to-ir and will be
-	-- replaced with `BackwardDifferentiatePrimal` and `BackwardDifferentiatePropagate`.
-	{ BackwardDifferentiate = { min_operands = 1 } },
+	{ TranslateBase = {
+		hoistable = true,
+
+		-- TODO: Document these.
+		{ TrivialForwardDifferentiate = { min_operands = 1 } },
+
+		{ BackwardDifferentiatePrimal = { min_operands = 1 } },
+		{ BackwardDifferentiatePropagate = { min_operands = 1 } },
+		{ BackwardContextGetPrimalVal = { min_operands = 1 } },
+
+		{ TrivialBackwardDifferentiatePrimal = { min_operands = 1 } },
+		{ TrivialBackwardDifferentiatePropagate = { min_operands = 1 } },
+		{ TrivialBackwardContextGetPrimalVal = { min_operands = 1 } },
+
+		{ FunctionCopy = { min_operands = 1 } },
+
+		{ BackwardDifferentiate = { min_operands = 3 } },
+		{ ForwardDifferentiate = { min_operands = 1 } },
+		
+		{ BackwardPrimalFromLegacyBwdDiffFunc = { min_operands = 2 } },
+		{ BackwardContextGetValFromLegacyBwdDiffFunc = { min_operands = 2 } },
+		{ BackwardPropagateFromLegacyBwdDiffFunc = { min_operands = 2 } },
+
+		{ BackwardFromLegacyBwdDiffFunc = { min_operands = 2 } },
+		{ ForwardDifferentiatePropagate = { min_operands = 1 } }
+	} },
 	{ PrimalSubstitute = { min_operands = 1 } },
 	{ DispatchKernel = { min_operands = 3 } },
 	{ CudaKernelLaunch = { min_operands = 6 } },
@@ -2022,6 +2066,8 @@ local insts = {
 	{ DifferentiableTypeDictionaryItem = {} },
 	-- Differentiable Type Annotation (for run-time types)
 	{ DifferentiableTypeAnnotation = { min_operands = 2, hoistable = true } },
+	{ WitnessTableAnnotation = { min_operands = 2, hoistable = true } },
+	{ AssociatedInstAnnotation = { min_operands = 2, hoistable = true } },
 	{ BeginFragmentShaderInterlock = {} },
 	{
 		EndFragmentShaderInterlock = { struct_name = "EndFragmentShaderInterlock" },
@@ -2212,6 +2258,9 @@ local insts = {
 	} }, 
 	{ GetSequentialIDFromTag = {
 		-- Translate a tag from the given collection (a 'local' ID) to a sequential ID (a 'global' ID)
+	} },
+	{ MakeIDifferentiableWitness = {
+		hoistable = true
 	} }
 }
 

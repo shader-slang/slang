@@ -240,37 +240,6 @@ struct WorkQueue
 
 struct TypeFlowSpecializationContext
 {
-    struct ParameterDirectionInfo
-    {
-        enum Kind
-        {
-            In,
-            Out,
-            InOut,
-            Ref,
-            ConstRef
-        } kind;
-
-        // For Ref and ConstRef
-        AddressSpace addressSpace;
-
-        ParameterDirectionInfo(Kind kind, AddressSpace addressSpace = (AddressSpace)0)
-            : kind(kind), addressSpace(addressSpace)
-        {
-        }
-
-        ParameterDirectionInfo()
-            : kind(Kind::In), addressSpace((AddressSpace)0)
-        {
-        }
-
-        bool operator==(const ParameterDirectionInfo& other) const
-        {
-            return kind == other.kind && addressSpace == other.addressSpace;
-        }
-    };
-
-
     IRCollectionTaggedUnionType* makeExistential(IRTableCollection* tableCollection)
     {
         HashSet<IRInst*> typeSet;
@@ -714,8 +683,9 @@ struct TypeFlowSpecializationContext
 
             auto tables = collectExistentialTables(interfaceType);
             if (tables.getCount() > 0)
-                return makeExistential(as<IRTableCollection>(
-                    cBuilder.createCollection(kIROp_TableCollection, tables)));
+                return makeExistential(
+                    as<IRTableCollection>(
+                        cBuilder.createCollection(kIROp_TableCollection, tables)));
             else
                 return none();
         }
@@ -817,8 +787,9 @@ struct TypeFlowSpecializationContext
                     {
                         auto tables = collectExistentialTables(interfaceType);
                         if (tables.getCount() > 0)
-                            return makeExistential(as<IRTableCollection>(
-                                cBuilder.createCollection(kIROp_TableCollection, tables)));
+                            return makeExistential(
+                                as<IRTableCollection>(
+                                    cBuilder.createCollection(kIROp_TableCollection, tables)));
                         else
                             return none();
                     }
@@ -844,8 +815,9 @@ struct TypeFlowSpecializationContext
                 {
                     auto tables = collectExistentialTables(interfaceType);
                     if (tables.getCount() > 0)
-                        return makeExistential(as<IRTableCollection>(
-                            cBuilder.createCollection(kIROp_TableCollection, tables)));
+                        return makeExistential(
+                            as<IRTableCollection>(
+                                cBuilder.createCollection(kIROp_TableCollection, tables)));
                     else
                         return none();
                 }
@@ -1529,7 +1501,7 @@ struct TypeFlowSpecializationContext
         {
             for (auto param : as<IRFunc>(context)->getParams())
             {
-                const auto [direction, type] = getParameterDirectionAndType(param->getDataType());
+                const auto [direction, type] = splitDirectionAndType(param->getDataType());
                 directions.add(direction);
             }
         }
@@ -1539,7 +1511,7 @@ struct TypeFlowSpecializationContext
             auto innerFunc = getGenericReturnVal(generic);
             for (auto param : as<IRFunc>(innerFunc)->getParams())
             {
-                const auto [direction, type] = getParameterDirectionAndType(param->getDataType());
+                const auto [direction, type] = splitDirectionAndType(param->getDataType());
                 directions.add(direction);
             }
         }
@@ -1580,7 +1552,7 @@ struct TypeFlowSpecializationContext
                     {
                         auto arg = callInst->getOperand(argIndex);
                         const auto [paramDirection, paramType] =
-                            getParameterDirectionAndType(param->getDataType());
+                            splitDirectionAndType(param->getDataType());
 
                         // Only update if
                         // 1. The paramType is a global inst and an interface type
@@ -1784,16 +1756,18 @@ struct TypeFlowSpecializationContext
 
         if (as<IRCollectionTaggedUnionType>(info1) && as<IRCollectionTaggedUnionType>(info2))
         {
-            return makeExistential(unionCollection<IRTableCollection>(
-                cast<IRTableCollection>(info1->getOperand(1)),
-                cast<IRTableCollection>(info2->getOperand(1))));
+            return makeExistential(
+                unionCollection<IRTableCollection>(
+                    cast<IRTableCollection>(info1->getOperand(1)),
+                    cast<IRTableCollection>(info2->getOperand(1))));
         }
 
         if (as<IRCollectionTagType>(info1) && as<IRCollectionTagType>(info2))
         {
-            return makeTagType(unionCollection<IRCollectionBase>(
-                cast<IRCollectionBase>(info1->getOperand(0)),
-                cast<IRCollectionBase>(info2->getOperand(0))));
+            return makeTagType(
+                unionCollection<IRCollectionBase>(
+                    cast<IRCollectionBase>(info1->getOperand(0)),
+                    cast<IRCollectionBase>(info2->getOperand(0))));
         }
 
         if (as<IRCollectionBase>(info1) && as<IRCollectionBase>(info2))
@@ -2253,52 +2227,6 @@ struct TypeFlowSpecializationContext
         return true;
     }
 
-    // Split into direction and type
-    std::tuple<ParameterDirectionInfo, IRType*> getParameterDirectionAndType(IRType* paramType)
-    {
-        if (as<IROutType>(paramType))
-            return {
-                ParameterDirectionInfo(ParameterDirectionInfo::Kind::Out),
-                as<IROutType>(paramType)->getValueType()};
-        else if (as<IRInOutType>(paramType))
-            return {
-                ParameterDirectionInfo(ParameterDirectionInfo::Kind::InOut),
-                as<IRInOutType>(paramType)->getValueType()};
-        else if (as<IRRefType>(paramType))
-            return {
-                ParameterDirectionInfo(
-                    ParameterDirectionInfo::Kind::Ref,
-                    as<IRRefType>(paramType)->getAddressSpace()),
-                as<IRRefType>(paramType)->getValueType()};
-        else if (as<IRConstRefType>(paramType))
-            return {
-                ParameterDirectionInfo(
-                    ParameterDirectionInfo::Kind::ConstRef,
-                    as<IRConstRefType>(paramType)->getAddressSpace()),
-                as<IRConstRefType>(paramType)->getValueType()};
-        else
-            return {ParameterDirectionInfo(ParameterDirectionInfo::Kind::In), paramType};
-    }
-
-    IRType* fromDirectionAndType(IRBuilder* builder, ParameterDirectionInfo direction, IRType* type)
-    {
-        switch (direction.kind)
-        {
-        case ParameterDirectionInfo::Kind::In:
-            return type;
-        case ParameterDirectionInfo::Kind::Out:
-            return builder->getOutType(type);
-        case ParameterDirectionInfo::Kind::InOut:
-            return builder->getInOutType(type);
-        case ParameterDirectionInfo::Kind::ConstRef:
-            return builder->getConstRefType(type, direction.addressSpace);
-        case ParameterDirectionInfo::Kind::Ref:
-            return builder->getRefType(type, direction.addressSpace);
-        default:
-            SLANG_UNEXPECTED("Unhandled parameter direction in fromDirectionAndType");
-        }
-    }
-
     bool isTaggedUnionType(IRInst* type)
     {
         if (auto tupleType = as<IRTupleType>(type))
@@ -2356,13 +2284,15 @@ struct TypeFlowSpecializationContext
         {
             IRBuilder builder(module);
             // Merge the elements of both tagged unions into a new tuple type
-            return builder.getTupleType(List<IRType*>(
-                {(IRType*)makeTagType(as<IRCollectionBase>(updateType(
-                     (IRType*)currentType->getOperand(0)->getOperand(0),
-                     (IRType*)newType->getOperand(0)->getOperand(0)))),
-                 (IRType*)updateType(
-                     (IRType*)currentType->getOperand(1),
-                     (IRType*)newType->getOperand(1))}));
+            return builder.getTupleType(
+                List<IRType*>(
+                    {(IRType*)makeTagType(
+                         as<IRCollectionBase>(updateType(
+                             (IRType*)currentType->getOperand(0)->getOperand(0),
+                             (IRType*)newType->getOperand(0)->getOperand(0)))),
+                     (IRType*)updateType(
+                         (IRType*)currentType->getOperand(1),
+                         (IRType*)newType->getOperand(1))}));
         }
         else // Need to create a new collection.
         {
@@ -2398,9 +2328,8 @@ struct TypeFlowSpecializationContext
             else
             {
                 // Otherwise, update the existing type
-                auto [currentDirection, currentType] =
-                    getParameterDirectionAndType(paramTypes[index]);
-                auto [newDirection, newType] = getParameterDirectionAndType(paramType);
+                auto [currentDirection, currentType] = splitDirectionAndType(paramTypes[index]);
+                auto [newDirection, newType] = splitDirectionAndType(paramType);
                 auto updatedType = updateType(currentType, newType);
                 SLANG_ASSERT(currentDirection == newDirection);
                 paramTypes[index] = fromDirectionAndType(&builder, currentDirection, updatedType);
@@ -2693,7 +2622,7 @@ struct TypeFlowSpecializationContext
         {
             auto arg = inst->getArg(i);
             const auto [paramDirection, paramType] =
-                getParameterDirectionAndType(expectedFuncType->getParamType(i + extraArgCount));
+                splitDirectionAndType(expectedFuncType->getParamType(i + extraArgCount));
 
             switch (paramDirection.kind)
             {

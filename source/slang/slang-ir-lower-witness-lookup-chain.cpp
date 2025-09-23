@@ -463,7 +463,7 @@ struct WitnessChainLookupLoweringContext
         {
             switch (inst->getOp())
             {
-            case kIROp_LookupWitness:
+            case kIROp_LookupWitnessMethod:
                 {
                     auto lookupInst = as<IRLookupWitnessMethod>(inst);
                     // Insert a lookup node with the requirement key.
@@ -549,11 +549,11 @@ struct WitnessChainLookupLoweringContext
     {
         switch (inst->getOp())
         {
-        case kIROp_LookupWitness:
+        case kIROp_LookupWitnessMethod:
             {
                 auto lookupInst = as<IRLookupWitnessMethod>(inst);
                 IRInst* witnessTable = lookupInst->getWitnessTable();
-                while (witnessTable && witnessTable->getOp() == kIROp_LookupWitness)
+                while (witnessTable && witnessTable->getOp() == kIROp_LookupWitnessMethod)
                 {
                     auto nestedLookup = as<IRLookupWitnessMethod>(witnessTable);
                     witnessTable = nestedLookup->getWitnessTable();
@@ -638,7 +638,7 @@ struct WitnessChainLookupLoweringContext
     {
         switch (type->getOp())
         {
-        case kIROp_LookupWitness:
+        case kIROp_LookupWitnessMethod:
             {
                 auto witnessTable = as<IRLookupWitnessMethod>(type)->getWitnessTable();
                 if (auto extractTable = as<IRExtractExistentialWitnessTable>(witnessTable))
@@ -726,7 +726,7 @@ struct WitnessChainLookupLoweringContext
         {
             switch (paramType->getOp())
             {
-            case kIROp_LookupWitness:
+            case kIROp_LookupWitnessMethod:
                 {
                     compressedParamTypes.add((
                         IRType*)translateTypeLookup(builder, as<IRLookupWitnessMethod>(paramType)));
@@ -745,7 +745,7 @@ struct WitnessChainLookupLoweringContext
         }
 
         auto resultType = funcType->getResultType();
-        if (resultType->getOp() == kIROp_LookupWitness)
+        if (resultType->getOp() == kIROp_LookupWitnessMethod)
         {
             resultType =
                 (IRType*)translateTypeLookup(builder, as<IRLookupWitnessMethod>(resultType));

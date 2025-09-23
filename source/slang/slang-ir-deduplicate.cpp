@@ -40,7 +40,7 @@ void IRDeduplicationContext::tryHoistInst(IRInst* inst)
     InstWorkList workList(inst->getModule());
     InstHashSet workListSet(inst->getModule());
     workList.add(inst);
-    workListSet.add(inst);
+    // workListSet.add(inst);
     IRBuilder builder(inst->getModule());
 
     for (Index i = 0; i < workList.getCount(); i++)
@@ -49,13 +49,21 @@ void IRDeduplicationContext::tryHoistInst(IRInst* inst)
 
         // Does inst no longer depend on anything defined locally?
         // If so we should hoist it.
-        bool shouldHoist = false;
+        bool shouldHoist = (item->getOperandCount() > 0);
+
+        if (item->getFullType())
+        {
+            auto typeParent = item->getFullType()->getParent();
+            if (typeParent == item->getParent())
+                shouldHoist = false;
+        }
+
         for (UInt a = 0; a < item->getOperandCount(); a++)
         {
             auto opParent = item->getOperand(a)->getParent();
-            if (opParent != item->getParent())
+            if (opParent == item->getParent())
             {
-                shouldHoist = true;
+                shouldHoist = false;
                 break;
             }
         }
@@ -71,8 +79,8 @@ void IRDeduplicationContext::tryHoistInst(IRInst* inst)
             {
                 if (getIROpInfo(use->getUser()->getOp()).isHoistable())
                 {
-                    if (workListSet.add(use->getUser()))
-                        workList.add(use->getUser());
+                    // if (workListSet.add(use->getUser()))
+                    workList.add(use->getUser());
                 }
             }
         }

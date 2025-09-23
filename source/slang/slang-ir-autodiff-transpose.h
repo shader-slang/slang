@@ -588,22 +588,22 @@ struct DiffTransposePass
                 continue;
             }
 
-            switch (direction)
+            switch (direction.kind)
             {
-            case IRParameterDirection::In:
+            case ParameterDirectionInfo::Kind::In:
                 {
                     builder.setInsertAfter(param);
                     auto transposedParam = builder.emitParam(
-                        fromDirectionAndType(&builder, IRParameterDirection::Out, type));
+                        fromDirectionAndType(&builder, {ParameterDirectionInfo::Kind::Out}, type));
                     transposedParams.add(param, transposedParam);
                     builder.markInstAsDifferential(transposedParam);
                     break;
                 }
-            case IRParameterDirection::Out:
+            case ParameterDirectionInfo::Kind::Out:
                 {
                     builder.setInsertAfter(param);
                     auto transposedParam = builder.emitParam(
-                        fromDirectionAndType(&builder, IRParameterDirection::In, type));
+                        fromDirectionAndType(&builder, {ParameterDirectionInfo::Kind::In}, type));
                     builder.markInstAsDifferential(transposedParam);
 
                     setInsertAfterOrdinaryInst(&builder, transposedParam);
@@ -617,7 +617,7 @@ struct DiffTransposePass
                     transposedParams.add(param, transposedParam);
                     break;
                 }
-            case IRParameterDirection::InOut:
+            case ParameterDirectionInfo::Kind::InOut:
                 {
                     // For inout parameters, the param is effectively a read-write
                     // address, so we can use it as-is.
@@ -829,9 +829,9 @@ struct DiffTransposePass
 
                 const auto& [direction, type] = splitDirectionAndType(fwdParam->getDataType());
 
-                switch (direction)
+                switch (direction.kind)
                 {
-                case IRParameterDirection::In:
+                case ParameterDirectionInfo::Kind::In:
                     {
                         // Ignore void parameters.
                         if (as<IRVoidType>(fwdParam->getDataType()))
@@ -844,12 +844,12 @@ struct DiffTransposePass
                         }
                         break;
                     }
-                case IRParameterDirection::Out:
+                case ParameterDirectionInfo::Kind::Out:
                     {
                         instsToRemove.add(fwdParam);
                         break;
                     }
-                case IRParameterDirection::InOut:
+                case ParameterDirectionInfo::Kind::InOut:
                     {
                         // Do nothing.. the in-out var is being used directly as
                         // an address.
@@ -1312,7 +1312,7 @@ struct DiffTransposePass
             FunctionAssociationKind::BackwardDerivativePropagate);
 
         List<IRInst*> bwdPropArgs;
-        OrderedDictionary<IRInst*, IRVar*> writebacks;
+        List<std::pair<IRInst*, IRVar*>> writebacks;
 
         // Add the context struct as-is.
         bwdPropArgs.add(fwdCall->getArg(0));
@@ -1328,9 +1328,9 @@ struct DiffTransposePass
                 continue;
             }
 
-            switch (argDirection)
+            switch (argDirection.kind)
             {
-            case IRParameterDirection::In:
+            case ParameterDirectionInfo::Kind::In:
                 {
                     // Need to flip the direction..
                     // Create a temp var for the out derivative.
@@ -1338,10 +1338,10 @@ struct DiffTransposePass
                     //
                     auto tempVar = builder->emitVar(argType);
                     bwdPropArgs.add(tempVar);
-                    writebacks.add(fwdCall->getArg(ii), as<IRVar>(tempVar));
+                    writebacks.add(std::make_pair(fwdCall->getArg(ii), as<IRVar>(tempVar)));
                     break;
                 }
-            case IRParameterDirection::Out:
+            case ParameterDirectionInfo::Kind::Out:
                 {
                     // This is an out parameter, so we need to load the value
                     // from the reverse value.
@@ -1350,7 +1350,7 @@ struct DiffTransposePass
                     bwdPropArgs.add(diffVal);
                     break;
                 }
-            case IRParameterDirection::InOut:
+            case ParameterDirectionInfo::Kind::InOut:
                 {
                     bwdPropArgs.add(fwdCall->getArg(ii));
                     break;
@@ -1852,6 +1852,9 @@ struct DiffTransposePass
         case kIROp_PackAnyValue:
             return transposePackAnyValue(builder, fwdInst, revValue);
 
+        case kIROp_BuiltinCast:
+            return transposeBuiltinCast(builder, fwdInst, revValue);
+
         case kIROp_LoadReverseGradient:
         case kIROp_ReverseGradientDiffPairRef:
         case kIROp_DefaultConstruct:
@@ -1986,11 +1989,12 @@ struct DiffTransposePass
     {
         // dP = GetOptionalValue(dVal) -> dVal = MakeOptionalValue(dP)
         auto optionalVal = fwdGetOptionalValue->getOperand(0);
-        return TranspositionResult(List<RevGradient>(RevGradient(
-            RevGradient::Flavor::Simple,
-            fwdGetOptionalValue->getOperand(0),
-            builder->emitMakeOptionalValue(optionalVal->getDataType(), revValue),
-            fwdGetOptionalValue)));
+        return TranspositionResult(
+            List<RevGradient>(RevGradient(
+                RevGradient::Flavor::Simple,
+                fwdGetOptionalValue->getOperand(0),
+                builder->emitMakeOptionalValue(optionalVal->getDataType(), revValue),
+                fwdGetOptionalValue)));
     }
 
     TranspositionResult transposeMakePair(
@@ -2079,6 +2083,7 @@ struct DiffTransposePass
         IRInst* fwdMakeVector,
         IRInst* revValue)
     {
+        /*
         auto vectorType = as<IRVectorType>(revValue->getDataType());
         SLANG_RELEASE_ASSERT(vectorType);
         auto vectorSize = as<IRIntLit>(vectorType->getElementCount());
@@ -2096,7 +2101,18 @@ struct DiffTransposePass
                 revComp,
                 fwdMakeVector));
         }
-        return TranspositionResult(gradients);
+        return TranspositionResult(gradients);*/
+
+        return TranspositionResult(
+            List<RevGradient>{RevGradient(
+                RevGradient::Flavor::Simple,
+                fwdMakeVector->getOperand(0),
+                builder->emitIntrinsicInst(
+                    fwdMakeVector->getOperand(0)->getDataType(),
+                    kIROp_SumVectorElements,
+                    1,
+                    &revValue),
+                fwdMakeVector)});
     }
 
     TranspositionResult transposeMakeMatrixFromScalar(
@@ -2104,7 +2120,7 @@ struct DiffTransposePass
         IRInst* fwdMakeMatrix,
         IRInst* revValue)
     {
-        auto matrixType = as<IRMatrixType>(revValue->getDataType());
+        /*auto matrixType = as<IRMatrixType>(revValue->getDataType());
         SLANG_RELEASE_ASSERT(matrixType);
         auto row = as<IRIntLit>(matrixType->getRowCount());
         auto col = as<IRIntLit>(matrixType->getColumnCount());
@@ -2128,7 +2144,17 @@ struct DiffTransposePass
                     fwdMakeMatrix));
             }
         }
-        return TranspositionResult(gradients);
+        return TranspositionResult(gradients);*/
+        return TranspositionResult(
+            List<RevGradient>{RevGradient(
+                RevGradient::Flavor::Simple,
+                fwdMakeMatrix->getOperand(0),
+                builder->emitIntrinsicInst(
+                    fwdMakeMatrix->getOperand(0)->getDataType(),
+                    kIROp_SumMatrixElements,
+                    1,
+                    &revValue),
+                fwdMakeMatrix)});
     }
 
     TranspositionResult transposeMakeMatrix(
@@ -2558,7 +2584,6 @@ struct DiffTransposePass
                 fwdInst)));
     }
 
-
     TranspositionResult transposePackAnyValue(IRBuilder* builder, IRInst* fwdInst, IRInst* revValue)
     {
         // (A = packAnyValue<T, U>(B)) -> (dB += unpackAnyValue<U, T>(dA))
@@ -2567,6 +2592,21 @@ struct DiffTransposePass
                 RevGradient::Flavor::Simple,
                 fwdInst->getOperand(0),
                 builder->emitUnpackAnyValue(fwdInst->getOperand(0)->getDataType(), revValue),
+                fwdInst)));
+    }
+
+    TranspositionResult transposeBuiltinCast(IRBuilder* builder, IRInst* fwdInst, IRInst* revValue)
+    {
+        // (A = builtinCast<T, U>(B)) -> (dB += builtinCast<U, T>(dA))
+        return TranspositionResult(
+            List<RevGradient>(RevGradient(
+                RevGradient::Flavor::Simple,
+                fwdInst->getOperand(0),
+                builder->emitIntrinsicInst(
+                    fwdInst->getOperand(0)->getDataType(),
+                    kIROp_BuiltinCast,
+                    1,
+                    &revValue),
                 fwdInst)));
     }
 
@@ -2638,27 +2678,55 @@ struct DiffTransposePass
         // setInsertAfterOrdinaryInst. The second block is the block that the first
         // block branches into unconditionaly.
         //
+        bool shouldGoIntoNextBlock = false;
         if (auto block = as<IRBlock>(inst->getParent()))
         {
+            // Primal parameters block.
             auto firstBlock = cast<IRFunc>(block->getParent())->getFirstBlock();
+            if (block == firstBlock)
+                shouldGoIntoNextBlock = true;
+
+            // Check if block is bwd-prop parameters block.
+            if (block->getPredecessors().getCount() == 1)
+            {
+                auto predBlock = getUniquePredecessor(block);
+                if (isDifferentialOrRecomputeBlock(block) &&
+                    !isDifferentialOrRecomputeBlock(predBlock))
+                    shouldGoIntoNextBlock = true;
+            }
+
+            if (shouldGoIntoNextBlock)
+            {
+                auto nextBlock =
+                    as<IRUnconditionalBranch>(block->getTerminator())->getTargetBlock();
+                if (auto ordInst = nextBlock->getFirstOrdinaryInst())
+                    builder->setInsertAfter(ordInst);
+                else
+                    builder->setInsertBefore(nextBlock->getTerminator());
+                return;
+            }
+
+            /*
             if (auto firstBranch = as<IRUnconditionalBranch>(firstBlock->getTerminator()))
             {
                 auto secondBlock = firstBranch->getTargetBlock();
 
                 if (block == firstBlock || block == secondBlock)
                 {
-                    if (auto branch = as<IRUnconditionalBranch>(secondBlock->getTerminator()))
+                    if (auto branch = as<IRUnconditionalBranch>(firstBlock->getTerminator()))
                     {
-                        if (auto ordInst = branch->getTargetBlock()->getFirstOrdinaryInst())
+                        if (auto ordInst = secondBlock->getFirstOrdinaryInst())
                             builder->setInsertAfter(ordInst);
                         else
-                            builder->setInsertInto(branch->getTargetBlock());
+                            builder->setInsertBefore(secondBlock->getTerminator());
 
                         return;
                     }
                 }
             }
+            */
         }
+
         setInsertAfterOrdinaryInst(builder, inst);
     }
 

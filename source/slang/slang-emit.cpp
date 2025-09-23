@@ -885,6 +885,83 @@ static void fixupLookupWitnessTypes(TargetProgram* targetProgram, IRModule* irMo
 }
 
 
+void lowerSumVectorMatrixInsts(IRModule* module)
+{
+    struct LowerSumVectorMatrixPass : InstPassBase
+    {
+        LowerSumVectorMatrixPass(IRModule* module)
+            : InstPassBase(module)
+        {
+        }
+        void processModule()
+        {
+            processInstsOfType<IRSumVectorElements>(
+                kIROp_SumVectorElements,
+                [&](IRSumVectorElements* sumInst)
+                {
+                    auto vectorOperand = sumInst->getOperand(0);
+                    IRBuilder builder(module);
+                    builder.setInsertBefore(sumInst);
+                    auto vectorType = as<IRVectorType>(vectorOperand->getDataType());
+                    auto vectorSize = as<IRIntLit>(vectorType->getElementCount())->getValue();
+                    auto vectorElemType = vectorType->getElementType();
+
+                    IRInst* result = nullptr;
+                    for (auto ii = 0; ii < vectorSize; ii++)
+                    {
+                        auto element =
+                            builder.emitElementExtract(vectorOperand, builder.getIntValue(ii));
+                        if (ii == 0)
+                            result = element;
+                        else
+                            result = builder.emitAdd(vectorElemType, result, element);
+                    }
+
+                    SLANG_ASSERT(result);
+
+                    sumInst->replaceUsesWith(result);
+                    sumInst->removeAndDeallocate();
+                });
+
+            processInstsOfType<IRSumMatrixElements>(
+                kIROp_SumMatrixElements,
+                [&](IRSumMatrixElements* sumInst)
+                {
+                    auto matrixOperand = sumInst->getOperand(0);
+                    IRBuilder builder(module);
+                    builder.setInsertBefore(sumInst);
+                    auto matrixType = as<IRMatrixType>(matrixOperand->getDataType());
+                    auto matrixColCount = as<IRIntLit>(matrixType->getColumnCount())->getValue();
+                    auto matrixRowCount = as<IRIntLit>(matrixType->getRowCount())->getValue();
+                    auto matrixElemType = matrixType->getElementType();
+
+                    IRInst* result = nullptr;
+                    for (auto ii = 0; ii < matrixRowCount; ii++)
+                    {
+                        for (auto jj = 0; jj < matrixColCount; jj++)
+                        {
+                            auto element = builder.emitElementExtract(
+                                builder.emitElementExtract(matrixOperand, builder.getIntValue(ii)),
+                                builder.getIntValue(jj));
+                            if (ii == 0 && jj == 0)
+                                result = element;
+                            else
+                                result = builder.emitAdd(matrixElemType, result, element);
+                        }
+                    }
+                    SLANG_ASSERT(result);
+
+                    sumInst->replaceUsesWith(result);
+                    sumInst->removeAndDeallocate();
+                });
+        }
+    };
+
+    LowerSumVectorMatrixPass pass(module);
+    pass.processModule();
+}
+
+
 Result linkAndOptimizeIR(
     CodeGenContext* codeGenContext,
     LinkingAndOptimizationOptions const& options,
@@ -1369,6 +1446,8 @@ Result linkAndOptimizeIR(
     // but are not used for dynamic dispatch, unpin them so we don't
     // do unnecessary work to lower them.
     unpinWitnessTables(irModule);
+
+    lowerSumVectorMatrixInsts(irModule);
 
     if (!fastIRSimplificationOptions.minimalOptimization)
     {
@@ -2058,6 +2137,12 @@ Result linkAndOptimizeIR(
         simplificationOptions.cfgOptions.removeTrivialSingleIterationLoops = true;
         simplifyIR(targetProgram, irModule, simplificationOptions, sink);
     }
+
+    // Required for AD 2.0 which can create empty types.
+    // TODO: Maybe make this conditional (only touch the optimizable types).
+    // to make it more narrowly scoped.
+    //
+    legalizeEmptyTypes(targetProgram, irModule, sink);
 
     // As a late step, we need to take the SSA-form IR and move things *out*
     // of SSA form, by eliminating all "phi nodes" (block parameters) and

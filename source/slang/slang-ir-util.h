@@ -60,6 +60,43 @@ struct DeduplicateContext
     }
 };
 
+struct ParameterDirectionInfo
+{
+    enum Kind
+    {
+        In,
+        Out,
+        InOut,
+        Ref,
+        ConstRef
+    } kind;
+
+    // For Ref and ConstRef
+    AddressSpace addressSpace;
+
+    ParameterDirectionInfo(Kind kind, AddressSpace addressSpace = (AddressSpace)0)
+        : kind(kind), addressSpace(addressSpace)
+    {
+    }
+
+    ParameterDirectionInfo()
+        : kind(Kind::In), addressSpace((AddressSpace)0)
+    {
+    }
+
+    bool operator==(const ParameterDirectionInfo& other) const
+    {
+        return kind == other.kind && addressSpace == other.addressSpace;
+    }
+};
+
+
+// Split into direction and type
+std::tuple<ParameterDirectionInfo, IRType*> splitDirectionAndType(IRType* paramType);
+
+IRType* fromDirectionAndType(IRBuilder* builder, ParameterDirectionInfo direction, IRType* type);
+
+
 bool isPtrToClassType(IRInst* type);
 
 bool isPtrToArrayType(IRInst* type);

@@ -215,10 +215,76 @@ private:
     DifferentialPairTypeBuilder pairBuilderStorage;
 };
 
+struct DiffWitnessTranslationPass : InstPassBase
+{
+public:
+    DiffWitnessTranslationPass(AutoDiffSharedContext* context)
+        : InstPassBase(context->moduleInst->getModule()), diffTypeConformanceContext(context)
+    {
+    }
+
+    bool processModule()
+    {
+        bool modified = false;
+        processAllInsts(
+            [&](IRInst* inst)
+            {
+                // TODO: Replace this logic with something lighter weight.
+                diffTypeConformanceContext.setFunc(inst);
+                switch (inst->getOp())
+                {
+                case kIROp_MakeIDifferentiableWitness:
+                    {
+                        IRBuilder builder(module);
+                        auto baseType = inst->getOperand(0);
+                        SLANG_ASSERT(as<IRDifferentialPairTypeBase>(baseType));
+                        auto confType =
+                            cast<IRWitnessTableType>(inst->getDataType())->getConformanceType();
+                        if (as<IRDifferentialPairType>(confType) ||
+                            as<IRDifferentialPairUserCodeType>(confType))
+                        {
+                            auto synWitness =
+                                diffTypeConformanceContext.buildDifferentiablePairWitness(
+                                    &builder,
+                                    cast<IRDifferentialPairTypeBase>(baseType),
+                                    DiffConformanceKind::Value);
+                            inst->replaceUsesWith(synWitness);
+                            inst->removeAndDeallocate();
+                            modified = true;
+                        }
+                        else if (as<IRDifferentialPtrPairType>(confType))
+                        {
+                            auto synWitness =
+                                diffTypeConformanceContext.buildDifferentiablePairWitness(
+                                    &builder,
+                                    cast<IRDifferentialPtrPairType>(baseType),
+                                    DiffConformanceKind::Ptr);
+                            inst->replaceUsesWith(synWitness);
+                            inst->removeAndDeallocate();
+                            modified = true;
+                        }
+                        break;
+                    }
+                }
+            });
+
+        return modified;
+    }
+
+private:
+    DifferentiableTypeConformanceContext diffTypeConformanceContext;
+};
+
 bool processPairTypes(AutoDiffSharedContext* context)
 {
     DiffPairLoweringPass pairLoweringPass(context);
     return pairLoweringPass.processModule();
+}
+
+bool processDiffTypeWitnessSynthesisInsts(AutoDiffSharedContext* context)
+{
+    DiffWitnessTranslationPass witnessSynthesisPass(context);
+    return witnessSynthesisPass.processModule();
 }
 
 struct DifferentialPairUserCodeTranscribePass : public InstPassBase

@@ -512,7 +512,7 @@ Type* ASTBuilder::getFwdCallableBaseType(Type* baseType)
             makeConstArrayViewSingle(as<Val>(baseType))));
 }
 
-PtrType* ASTBuilder::getPtrType(Type* valueType, AddressSpace addrSpace)
+PtrType* ASTBuilder::getPtrType(Type* valueType, Val* accessQualifier, Val* addrSpace)
 {
     return dynamicCast<PtrType>(getPtrType(valueType, accessQualifier, addrSpace, "PtrType"));
 }
@@ -932,9 +932,12 @@ TypePackSubtypeWitness* ASTBuilder::getSubtypeWitnessPack(
     return getOrCreate<TypePackSubtypeWitness>(subType, superType, witnesses);
 }
 
-UnknownSubtypeWitness* ASTBuilder::getUnknownSubtypeWitness(Type* subType, Type* superType)
+UnknownSubtypeWitness* ASTBuilder::getUnknownSubtypeWitness(
+    Type* subType,
+    Type* superType,
+    ModuleDecl* module)
 {
-    return getOrCreate<UnknownSubtypeWitness>(subType, superType);
+    return getOrCreate<UnknownSubtypeWitness>(subType, superType, module->getDefaultDeclRef());
 }
 
 SubtypeWitness* ASTBuilder::getExpandSubtypeWitness(

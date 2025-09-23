@@ -784,7 +784,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
                 // Generate a trivial forward differentiation function
                 auto trivialFwdCallee = builder->emitIntrinsicInst(
                     resolvedFuncType,
-                    kIROp_ForwardDifferentiateTrivial,
+                    kIROp_TrivialForwardDifferentiate,
                     1,
                     &primalCallee);
 
@@ -1039,7 +1039,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
     if (as<IRDifferentialPairType>(diffReturnType) || as<IRDifferentialPtrPairType>(diffReturnType))
     {
         IRInst* primalResultValue = afterBuilder.emitDifferentialPairGetPrimal(callInst);
-        auto diffType = differentiateType(&afterBuilder, origCall->getFullType());
+        auto diffType = differentiateType(&afterBuilder, primalReturnType);
         IRInst* diffResultValue =
             afterBuilder.emitDifferentialPairGetDifferential(diffType, callInst);
         return InstPair(primalResultValue, diffResultValue);
@@ -1672,7 +1672,7 @@ InstPair ForwardDiffTranscriber::transcribeSingleOperandInst(IRBuilder* builder,
 
     IRInst* diffResult = nullptr;
 
-    if (auto diffType = differentiateType(builder, origInst->getDataType()))
+    if (auto diffType = differentiateType(builder, primalType))
     {
         if (auto diffBase = findOrTranscribeDiffInst(builder, origBase))
         {
@@ -2022,6 +2022,13 @@ SlangResult ForwardDiffTranscriber::prepareFuncForForwardDiff(IRFunc* func)
     return result;
 }
 
+static IRInst* maybeHoist(IRBuilder& builder, IRInst* inst)
+{
+    IRInst* specializedVal = nullptr;
+    auto hoistResult = hoistValueFromGeneric(builder, inst, specializedVal, true);
+    return hoistResult; //(as<IRGeneric>(hoistResult)) ? getGenericReturnVal(hoistResult) :
+                        // hoistResult;
+}
 
 void ForwardDiffTranscriber::_transcribeFuncImpl(
     IRBuilder* inBuilder,
@@ -2034,6 +2041,9 @@ void ForwardDiffTranscriber::_transcribeFuncImpl(
     fwdDiffFunc = pair.differential;
 
     this->transcribeFunc(inBuilder, origFunc, cast<IRFunc>(fwdDiffFunc));
+
+    fwdDiffFunc = maybeHoist(*inBuilder, fwdDiffFunc);
+    copyDebugInfo(origFunc, fwdDiffFunc);
 }
 
 // Transcribe a function definition.

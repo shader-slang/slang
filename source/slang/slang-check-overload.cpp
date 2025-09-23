@@ -1011,8 +1011,9 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
         SubtypeWitness* subTypeWitness = nullptr;
         if (getAllowUnknownWitnesses())
         {
+            auto moduleDecl = this->getShared()->getModule()->getModuleDecl();
             subTypeWitness = m_astBuilder->getOrCreate<UnknownSubtypeWitness>(sub, sup);
-            m_astBuilder->m_valsRequiringResolution.add(subTypeWitness);
+            moduleDecl->m_valsRequiringResolution.add(subTypeWitness);
         }
         else
         {

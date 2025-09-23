@@ -83,6 +83,8 @@ enum class FunctionConformanceKind
     BackwardProp = 5,
 };
 
+ParameterDirectionInfo transposeDirection(ParameterDirectionInfo direction);
+
 struct AutoDiffSharedContext
 {
     TargetProgram* targetProgram = nullptr;
@@ -195,13 +197,7 @@ private:
     IRStructKey* findAddMethodStructKey()
     {
         return cast<IRStructKey>(
-            getInterfaceEntryAtIndex(differentiableInterfaceType, 3)->getRequirementKey());
-    }
-
-    IRStructKey* findMulMethodStructKey()
-    {
-        return cast<IRStructKey>(
-            getInterfaceEntryAtIndex(differentiableInterfaceType, 4)->getRequirementKey());
+            getInterfaceEntryAtIndex(differentiableInterfaceType, 5)->getRequirementKey());
     }
 
 
@@ -226,21 +222,6 @@ private:
     // IRStructKey* getIDifferentiableStructKeyAtIndex(UInt index);
     IRInterfaceRequirementEntry* getInterfaceEntryAtIndex(IRInterfaceType* interface, UInt index);
 };
-
-enum IRParameterDirection
-{
-    In,
-    Out,
-    InOut,
-    Ref,
-    ConstRef
-};
-
-std::tuple<IRParameterDirection, IRType*> splitDirectionAndType(IRType* type);
-
-IRParameterDirection transposeDirection(IRParameterDirection direction);
-
-IRType* fromDirectionAndType(IRBuilder* builder, IRParameterDirection direction, IRType* type);
 
 struct DifferentiableTypeConformanceContext
 {
@@ -363,7 +344,7 @@ struct DifferentiableTypeConformanceContext
 
                 origParamTypes.add(fromDirectionAndType(
                     builder,
-                    IRParameterDirection::Out,
+                    {ParameterDirectionInfo::Kind::Out},
                     innerFnType->getResultType()));
 
                 List<IRType*> paramTypes;
@@ -377,24 +358,24 @@ struct DifferentiableTypeConformanceContext
                             DiffConformanceKind::Any))
                     {
                         // Differentiable
-                        switch (paramDirection)
+                        switch (paramDirection.kind)
                         {
-                        case IRParameterDirection::In:
+                        case ParameterDirectionInfo::Kind::In:
                             paramTypes.add(fromDirectionAndType(
                                 builder,
-                                IRParameterDirection::InOut,
+                                {ParameterDirectionInfo::Kind::InOut},
                                 getOrCreateDiffPairType(builder, paramType, witness)));
                             break;
-                        case IRParameterDirection::Out:
+                        case ParameterDirectionInfo::Kind::Out:
                             paramTypes.add(fromDirectionAndType(
                                 builder,
-                                IRParameterDirection::In,
+                                {ParameterDirectionInfo::Kind::In},
                                 (IRType*)getDifferentialForType(builder, paramType)));
                             break;
-                        case IRParameterDirection::InOut:
+                        case ParameterDirectionInfo::Kind::InOut:
                             paramTypes.add(fromDirectionAndType(
                                 builder,
-                                IRParameterDirection::InOut,
+                                {ParameterDirectionInfo::Kind::InOut},
                                 getOrCreateDiffPairType(builder, paramType, witness)));
                             break;
                         default:
@@ -405,24 +386,25 @@ struct DifferentiableTypeConformanceContext
                     else
                     {
                         // Non-differentiable
-                        switch (paramDirection)
+                        switch (paramDirection.kind)
                         {
-                        case IRParameterDirection::In:
-                        case IRParameterDirection::Ref:
-                        case IRParameterDirection::ConstRef:
+                        case ParameterDirectionInfo::Kind::In:
+                        case ParameterDirectionInfo::Kind::Ref:
+                        case ParameterDirectionInfo::Kind::ConstRef:
                             paramTypes.add(
                                 fromDirectionAndType(builder, paramDirection, paramType));
                             break;
-                        case IRParameterDirection::Out:
+                        case ParameterDirectionInfo::Kind::Out:
                             // skip.
                             break;
-                        case IRParameterDirection::InOut:
-                            paramTypes.add(
-                                fromDirectionAndType(builder, IRParameterDirection::In, paramType));
+                        case ParameterDirectionInfo::Kind::InOut:
+                            paramTypes.add(fromDirectionAndType(
+                                builder,
+                                ParameterDirectionInfo::Kind::In,
+                                paramType));
                             break;
                         default:
                             SLANG_UNEXPECTED(
-                                false,
                                 "Unhandled parameter direction in backward diff func type");
                         }
                     }
@@ -939,5 +921,8 @@ bool isDerivativeContextVar(IRVar* var);
 bool isDiffInst(IRInst* inst);
 
 bool isDifferentialOrRecomputeBlock(IRBlock* block);
+
+void copyDebugInfo(IRInst* srcFunc, IRInst* destFunc);
+
 
 }; // namespace Slang

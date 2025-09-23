@@ -1645,6 +1645,7 @@ struct IRBackwardContextFromLegacyBwdDiffFunc : IRTranslatedTypeBase
     FIDDLE(leafInst())
 };
 
+FIDDLE()
 struct IRBackwardDiffIntermediateContextType : IRTranslatedTypeBase
 {
     FIDDLE(leafInst())

@@ -2,6 +2,7 @@
 #pragma once
 
 #include "slang-ir-autodiff-transcriber-base.h"
+#include "slang-ir-specialize.h"
 
 namespace Slang
 {
@@ -11,7 +12,7 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
     // Pending values to write back to inout params at the end of the current function.
     OrderedDictionary<IRInst*, InstPair> mapInOutParamToWriteBackValue;
 
-    // Signals the transcriber to use an IRForwardDifferentiateTrivial(func)
+    // Signals the transcriber to use an IRTrivialForwardDifferentiate(func)
     // instruction for functions that are non-forward-differentiable, but
     // have a reverse-mode derivative defined.
     //
@@ -167,14 +168,22 @@ struct ForwardDiffTranslationFuncContext
     // The function to transcribe.
     IRFunc* targetFunc;
 
+    // Whether the function is a trivial case (zero derivatives).
+    bool isTrivial = false;
+
     // The diagnostic sink to report errors.
     DiagnosticSink* sink;
 
     ForwardDiffTranslationFuncContext(
         IRFunc* targetFunc,
+        bool isTrivial,
         AutoDiffSharedContext* shared,
         DiagnosticSink* sink)
-        : sharedContext(shared), diffTypeContext(shared), targetFunc(targetFunc), sink(sink)
+        : sharedContext(shared)
+        , diffTypeContext(shared)
+        , targetFunc(targetFunc)
+        , isTrivial(isTrivial)
+        , sink(sink)
     {
         diffTypeContext.setFunc(as<IRFunc>(targetFunc));
     }
@@ -186,11 +195,27 @@ struct ForwardDiffTranslationFuncContext
 
         // Do the reverse-mode translation & return the 4-tuple result.
         ForwardDiffTranscriber transcriber(sharedContext, sink);
+        if (!isTrivial)
+        {
+            IRInst* fwdDiffFunc;
+            transcriber._transcribeFuncImpl(builder, targetFunc, fwdDiffFunc);
 
-        IRInst* fwdDiffFunc;
-        transcriber._transcribeFuncImpl(builder, targetFunc, fwdDiffFunc);
-
-        return {fwdDiffFunc};
+            return {fwdDiffFunc};
+        }
+        else
+        {
+            IRInst* fwdDiffFunc = builder->createFunc();
+            IRInst* typeOperand = targetFunc->getFullType();
+            fwdDiffFunc->setFullType(diffTypeContext.resolveType(
+                builder,
+                builder->emitIntrinsicInst(
+                    builder->getTypeKind(),
+                    kIROp_ForwardDiffFuncType,
+                    1,
+                    &typeOperand)));
+            transcriber.generateTrivialFwdDiffFunc(targetFunc, cast<IRFunc>(fwdDiffFunc));
+            return {fwdDiffFunc};
+        }
     }
 };
 
@@ -198,7 +223,7 @@ struct ForwardDiffTranslationFuncContext
 struct ForwardDiffTranslator
 {
     // Keep track of global insts that have already been translated.
-    Dictionary<IRGlobalValueWithCode*, ForwardDiffTranslationFuncContext::Result> translationCache;
+    Dictionary<IRInst*, ForwardDiffTranslationFuncContext::Result> translationCache;
 
     IRInst* getBaseForTranslateInst(IRInst* inst)
     {
@@ -211,35 +236,362 @@ struct ForwardDiffTranslator
         }
     }
 
+    // TODO: MERGE
+    struct TranslationBaseInfo
+    {
+        List<IRInst*> operands;
+
+        enum Flavor
+        {
+            Unknown,
+            Simple,    // Direct reference to func
+            Specialize // Indirect reference that requires specialization.
+        } flavor = Flavor::Unknown;
+
+        List<IRInst*> specializeOperands;
+    };
+    // TODO: MERGE
+    IRInst* materialize(IRBuilder* builder, TranslationBaseInfo& info, IRInst* resultInst)
+    {
+        if (info.flavor == TranslationBaseInfo::Flavor::Simple)
+        {
+            // Simple case, just return the function.
+            return resultInst;
+        }
+        else if (info.flavor == TranslationBaseInfo::Flavor::Specialize)
+        {
+            auto outerGeneric = resultInst;
+            SLANG_ASSERT(as<IRGeneric>(resultInst));
+            auto innerVal = getGenericReturnVal(resultInst);
+            if (as<IRFunc>(innerVal) || innerVal->getDataType()->getOp() == kIROp_FuncType)
+            {
+                return specializeGeneric(
+                    as<IRSpecialize>(builder->emitSpecializeInst(
+                        (IRType*)specializeGeneric(
+                            as<IRSpecialize>(builder->emitSpecializeInst(
+                                builder->getTypeKind(),
+                                resultInst->getDataType(),
+                                info.specializeOperands))),
+                        resultInst,
+                        info.specializeOperands)));
+            }
+            else if (as<IRStructType>(innerVal))
+            {
+                return (IRType*)specializeGeneric(
+                    as<IRSpecialize>(builder->emitSpecializeInst(
+                        builder->getTypeKind(),
+                        resultInst,
+                        info.specializeOperands)));
+            }
+            else
+            {
+                SLANG_UNEXPECTED("Unexpected result inst type for specialization.");
+            }
+        }
+        else
+        {
+            SLANG_UNEXPECTED("Unknown translation request flavor.");
+        }
+    }
+    // TODO: MERGE
+    bool addOperand(TranslationBaseInfo& baseInfo, IRInst* operand)
+    {
+        if (operand)
+        {
+            if (auto funcInst = as<IRFunc>(operand))
+            {
+                baseInfo.operands.add(funcInst);
+                if (baseInfo.operands.getCount() == 1)
+                {
+                    baseInfo.flavor = TranslationBaseInfo::Flavor::Simple;
+                }
+                else if (baseInfo.flavor != TranslationBaseInfo::Flavor::Simple)
+                    return false; // Can't unify with existing operand.
+
+                return true;
+            }
+            else if (auto specializeInst = as<IRSpecialize>(operand))
+            {
+                // If the base is a specialization, we need to collect the operands.
+                IRGeneric* genericInst = cast<IRGeneric>(specializeInst->getBase());
+                baseInfo.operands.add(genericInst);
+
+                if (baseInfo.operands.getCount() == 1)
+                {
+                    for (UInt i = 0; i < specializeInst->getArgCount(); i++)
+                        baseInfo.specializeOperands.add(specializeInst->getArg(i));
+                    baseInfo.flavor = TranslationBaseInfo::Flavor::Specialize;
+                }
+                else if (baseInfo.flavor != TranslationBaseInfo::Flavor::Specialize)
+                    return false; // Can't unify with existing operand.
+                else
+                {
+                    // check that the operands match
+                    if (baseInfo.specializeOperands.getCount() != specializeInst->getArgCount())
+                        return false; // Can't unify with existing operands.
+                    for (UInt i = 0; i < baseInfo.specializeOperands.getCount(); i++)
+                    {
+                        if (baseInfo.specializeOperands[i] != specializeInst->getArg(i))
+                            return false; // Can't unify with existing operands.
+                    }
+                }
+
+                return true;
+            }
+            else
+            {
+                // Not sure what to do here..
+                SLANG_UNEXPECTED(
+                    "Expected a function or a specialization for backward differentiation.");
+            }
+        }
+    }
+
+    TranslationBaseInfo getTranslationBaseInfo(IRInst* inst)
+    {
+        IRInst* primalFunc = inst->getOperand(0);
+
+        TranslationBaseInfo info;
+        bool valid = true;
+        valid &= addOperand(info, primalFunc);
+
+        if (!valid)
+            return TranslationBaseInfo();
+
+        return info;
+    }
+
     IRInst* processTranslationRequest(
         IRInst* translateInst,
         AutoDiffSharedContext* sharedContext,
         DiagnosticSink* sink)
     {
-        auto baseInst = getBaseForTranslateInst(translateInst);
+        // auto baseInst = getBaseForTranslateInst(translateInst);
+        auto baseInfo = getTranslationBaseInfo(translateInst);
 
-        auto globalValToTranslate = as<IRFunc>(getResolvedInstForDecorations(baseInst));
+        /*auto globalValToTranslate = as<IRFunc>(getResolvedInstForDecorations(baseInst));
         if (!globalValToTranslate)
         {
             // TODO: diagnose
             SLANG_UNEXPECTED("Expected a global value with code for forward differentiation.");
-        }
+        }*/
 
-        if (translationCache.containsKey(globalValToTranslate))
+        IRBuilder builder(sharedContext->moduleInst);
+        auto translationKey = baseInfo.operands[0];
+
+        if (translationCache.containsKey(translationKey))
         {
             // If we already have a translation for this function, return the requested value.
-            return translationCache[globalValToTranslate].fwdDiffFunc;
+            return materialize(&builder, baseInfo, translationCache[translationKey].fwdDiffFunc);
         }
 
+        IRFunc* funcToTranslate =
+            (as<IRGeneric>(translationKey) ? cast<IRFunc>(getGenericReturnVal(translationKey))
+                                           : cast<IRFunc>(translationKey));
+
+        // Intrinsics are not currently explicitly differentiated.
+        //
+        // TODO: What about intrinsics that are accessed via dynamic dispatch?
+        //
+        if (funcToTranslate->findDecoration<IRIntrinsicOpDecoration>())
+            return nullptr;
+
         // Create a new context for the translation.
-        ForwardDiffTranslationFuncContext context(globalValToTranslate, sharedContext, sink);
-        IRBuilder builder(sharedContext->moduleInst);
-        builder.setInsertAfter(globalValToTranslate);
+        ForwardDiffTranslationFuncContext context(funcToTranslate, false, sharedContext, sink);
+        builder.setInsertAfter(funcToTranslate);
 
         // Translate, cache and return the result.
         ForwardDiffTranslationFuncContext::Result translationResult = context.translate(&builder);
-        translationCache.add(globalValToTranslate, translationResult);
-        return translationResult.fwdDiffFunc;
+        translationCache.add(translationKey, translationResult);
+        return materialize(&builder, baseInfo, translationResult.fwdDiffFunc);
+    }
+};
+
+// TODO: De-duplicate
+struct TrivialForwardDiffTranslator
+{
+    // Keep track of global insts that have already been translated.
+    Dictionary<IRInst*, ForwardDiffTranslationFuncContext::Result> translationCache;
+
+    IRInst* getBaseForTranslateInst(IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_TrivialForwardDifferentiate:
+            return inst->getOperand(0);
+        default:
+            return nullptr;
+        }
+    }
+
+    // TODO: MERGE
+    struct TranslationBaseInfo
+    {
+        List<IRInst*> operands;
+
+        enum Flavor
+        {
+            Unknown,
+            Simple,    // Direct reference to func
+            Specialize // Indirect reference that requires specialization.
+        } flavor = Flavor::Unknown;
+
+        List<IRInst*> specializeOperands;
+    };
+    // TODO: MERGE
+    IRInst* materialize(IRBuilder* builder, TranslationBaseInfo& info, IRInst* resultInst)
+    {
+        if (info.flavor == TranslationBaseInfo::Flavor::Simple)
+        {
+            // Simple case, just return the function.
+            return resultInst;
+        }
+        else if (info.flavor == TranslationBaseInfo::Flavor::Specialize)
+        {
+            auto outerGeneric = resultInst;
+            SLANG_ASSERT(as<IRGeneric>(resultInst));
+            auto innerVal = getGenericReturnVal(resultInst);
+            if (as<IRFunc>(innerVal) || innerVal->getDataType()->getOp() == kIROp_FuncType)
+            {
+                return specializeGeneric(
+                    as<IRSpecialize>(builder->emitSpecializeInst(
+                        (IRType*)specializeGeneric(
+                            as<IRSpecialize>(builder->emitSpecializeInst(
+                                builder->getTypeKind(),
+                                resultInst->getDataType(),
+                                info.specializeOperands))),
+                        resultInst,
+                        info.specializeOperands)));
+            }
+            else if (as<IRStructType>(innerVal))
+            {
+                return (IRType*)specializeGeneric(
+                    as<IRSpecialize>(builder->emitSpecializeInst(
+                        builder->getTypeKind(),
+                        resultInst,
+                        info.specializeOperands)));
+            }
+            else
+            {
+                SLANG_UNEXPECTED("Unexpected result inst type for specialization.");
+            }
+        }
+        else
+        {
+            SLANG_UNEXPECTED("Unknown translation request flavor.");
+        }
+    }
+    // TODO: MERGE
+    bool addOperand(TranslationBaseInfo& baseInfo, IRInst* operand)
+    {
+        if (operand)
+        {
+            if (auto funcInst = as<IRFunc>(operand))
+            {
+                baseInfo.operands.add(funcInst);
+                if (baseInfo.operands.getCount() == 1)
+                {
+                    baseInfo.flavor = TranslationBaseInfo::Flavor::Simple;
+                }
+                else if (baseInfo.flavor != TranslationBaseInfo::Flavor::Simple)
+                    return false; // Can't unify with existing operand.
+
+                return true;
+            }
+            else if (auto specializeInst = as<IRSpecialize>(operand))
+            {
+                // If the base is a specialization, we need to collect the operands.
+                IRGeneric* genericInst = cast<IRGeneric>(specializeInst->getBase());
+                baseInfo.operands.add(genericInst);
+
+                if (baseInfo.operands.getCount() == 1)
+                {
+                    for (UInt i = 0; i < specializeInst->getArgCount(); i++)
+                        baseInfo.specializeOperands.add(specializeInst->getArg(i));
+                    baseInfo.flavor = TranslationBaseInfo::Flavor::Specialize;
+                }
+                else if (baseInfo.flavor != TranslationBaseInfo::Flavor::Specialize)
+                    return false; // Can't unify with existing operand.
+                else
+                {
+                    // check that the operands match
+                    if (baseInfo.specializeOperands.getCount() != specializeInst->getArgCount())
+                        return false; // Can't unify with existing operands.
+                    for (UInt i = 0; i < baseInfo.specializeOperands.getCount(); i++)
+                    {
+                        if (baseInfo.specializeOperands[i] != specializeInst->getArg(i))
+                            return false; // Can't unify with existing operands.
+                    }
+                }
+
+                return true;
+            }
+            else
+            {
+                // Not sure what to do here..
+                SLANG_UNEXPECTED(
+                    "Expected a function or a specialization for backward differentiation.");
+            }
+        }
+    }
+
+    TranslationBaseInfo getTranslationBaseInfo(IRInst* inst)
+    {
+        IRInst* primalFunc = inst->getOperand(0);
+
+        TranslationBaseInfo info;
+        bool valid = true;
+        valid &= addOperand(info, primalFunc);
+
+        if (!valid)
+            return TranslationBaseInfo();
+
+        return info;
+    }
+
+    IRInst* processTranslationRequest(
+        IRInst* translateInst,
+        AutoDiffSharedContext* sharedContext,
+        DiagnosticSink* sink)
+    {
+        // auto baseInst = getBaseForTranslateInst(translateInst);
+        auto baseInfo = getTranslationBaseInfo(translateInst);
+
+        /*auto globalValToTranslate = as<IRFunc>(getResolvedInstForDecorations(baseInst));
+        if (!globalValToTranslate)
+        {
+            // TODO: diagnose
+            SLANG_UNEXPECTED("Expected a global value with code for forward differentiation.");
+        }*/
+
+        IRBuilder builder(sharedContext->moduleInst);
+        auto translationKey = baseInfo.operands[0];
+
+        if (translationCache.containsKey(translationKey))
+        {
+            // If we already have a translation for this function, return the requested value.
+            return materialize(&builder, baseInfo, translationCache[translationKey].fwdDiffFunc);
+        }
+
+        IRFunc* funcToTranslate =
+            (as<IRGeneric>(translationKey) ? cast<IRFunc>(getGenericReturnVal(translationKey))
+                                           : cast<IRFunc>(translationKey));
+
+        // Intrinsics are not currently explicitly differentiated.
+        //
+        // TODO: What about intrinsics that are accessed via dynamic dispatch?
+        //
+        if (funcToTranslate->findDecoration<IRIntrinsicOpDecoration>())
+            return nullptr;
+
+        // Create a new context for the translation.
+        ForwardDiffTranslationFuncContext context(funcToTranslate, true, sharedContext, sink);
+        builder.setInsertAfter(funcToTranslate);
+
+        // Translate, cache and return the result.
+        ForwardDiffTranslationFuncContext::Result translationResult = context.translate(&builder);
+        translationCache.add(translationKey, translationResult);
+        return materialize(&builder, baseInfo, translationResult.fwdDiffFunc);
     }
 };
 

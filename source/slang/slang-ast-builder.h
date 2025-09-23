@@ -222,8 +222,8 @@ public:
 
     Dictionary<GenericDecl*, List<Val*>> m_cachedGenericDefaultArgs;
 
-    HashSet<Val*> m_valsRequiringResolution;
-    Dictionary<Val*, Val*> m_resolvedVals;
+    // HashSet<Val*> m_valsRequiringResolution;
+    // Dictionary<Val*, Val*> m_resolvedVals;
 
     // For [PrimalSubstitute] and [PrimalSubstituteOf] decorators
     Dictionary<Decl*, ShortList<Decl*, 4>> m_substituteMap;
@@ -666,7 +666,10 @@ public:
         Type* superType,
         ArrayView<SubtypeWitness*> witnesses);
 
-    UnknownSubtypeWitness* getUnknownSubtypeWitness(Type* subType, Type* superType);
+    UnknownSubtypeWitness* getUnknownSubtypeWitness(
+        Type* subType,
+        Type* superType,
+        ModuleDecl* module);
 
     SubtypeWitness* getExpandSubtypeWitness(
         Type* subType,

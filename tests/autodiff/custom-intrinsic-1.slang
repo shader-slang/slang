@@ -34,7 +34,7 @@ namespace myintrinsiclib
     {
         return DifferentialPair<T>(
             myexp(dpx.p),
-            T.dmul(myexp(dpx.p), dpx.d));
+            __mul_p_d(myexp(dpx.p), dpx.d));
     }
 
     
@@ -62,7 +62,7 @@ namespace myintrinsiclib
     {
         return DifferentialPair<T>(
             mysin(dpx.p),
-            T.dmul(mycos(dpx.p), dpx.d));
+            __mul_p_d(mycos(dpx.p), dpx.d));
     }
 
     // Cosine
@@ -89,7 +89,7 @@ namespace myintrinsiclib
     {
         return DifferentialPair<T>(
             mycos(dpx.p),
-            T.dmul(-sin(dpx.p), dpx.d));
+            __mul_p_d(-sin(dpx.p), dpx.d));
     }
 
     // Sine and cosine
@@ -110,8 +110,8 @@ namespace myintrinsiclib
         T _c;
         mysincos(x.p, _s, _c);
 
-        s = DifferentialPair<T>(_s, T.dmul(_c, x.d));
-        c = DifferentialPair<T>(_c, T.dmul(-_s, x.d));
+        s = DifferentialPair<T>(_s, __mul_p_d(_c, x.d));
+        c = DifferentialPair<T>(_c, __mul_p_d(-_s, x.d));
     }
 };
 

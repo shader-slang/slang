@@ -8204,6 +8204,7 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
 
     addToWorkList(thisInst, other);
 
+    List<IRInst*> duplicateAnnotations;
     for (Index i = 0; i < workList.getCount(); i++)
     {
         auto workItem = workList[i];
@@ -8279,6 +8280,10 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
                     // If existingVal has been replaced by something else, use that.
                     dedupContext->getInstReplacementMap().tryGetValue(existingVal, existingVal);
                     addToWorkList(user, existingVal);
+
+                    if (!user->hasUses() && (as<IRDifferentiableTypeAnnotation>(user) ||
+                                             as<IRAssociatedInstAnnotation>(user)))
+                        duplicateAnnotations.add(user);
                 }
                 else
                 {
@@ -8325,6 +8330,9 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
 
         ff->debugValidate();
     }
+
+    for (auto annotation : duplicateAnnotations)
+        annotation->removeAndDeallocate();
 }
 
 void IRInst::replaceUsesWith(IRInst* other)
@@ -8751,6 +8759,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_GetCurrentStage:
     case kIROp_DetachDerivative:
     case kIROp_FuncTypeOf:
+    case kIROp_MakeIDifferentiableWitness:
         return false;
 
     case kIROp_FunctionCopy:

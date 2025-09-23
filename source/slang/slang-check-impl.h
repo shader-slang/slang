@@ -1648,7 +1648,7 @@ public:
     Type* tryGetDifferentialPairType(Type* primalType);
 
     // Convert a function's original type to it's forward/backward diff'd type.
-    Type* getForwardDiffFuncType(FuncType* originalType, Type* thisType = nullptr);
+    Type* getForwardDiffFuncType(FuncType* originalType, QualType thisType);
     Type* getBackwardDiffFuncType(FuncType* originalType);
 
     /// Registers a type as conforming to IDifferentiable, along with a witness
@@ -2470,6 +2470,8 @@ public:
         Type* subTypeForAdditionalWitnesses = nullptr;
         Dictionary<Type*, SubtypeWitness*>* additionalSubtypeWitnesses = nullptr;
     };
+
+    bool hasGeneric(ConstraintSystem& system, Decl* generic);
 
     Type* TryJoinVectorAndScalarType(
         ConstraintSystem* constraints,

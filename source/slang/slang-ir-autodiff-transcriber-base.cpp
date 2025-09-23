@@ -192,6 +192,19 @@ IRInst* AutoDiffTranscriberBase::maybeCloneForPrimalInst(IRBuilder* builder, IRI
             maybeCloneForPrimalInst(&subBuilder, child);
         }
         cloneEnv.mapOldValToNew[inst] = cloneResult;
+
+        // Also clone any inst annotations immediately.
+        traverseUsers(
+            inst,
+            [&](IRInst* user)
+            {
+                if (auto diffAnnotation = as<IRDifferentiableTypeAnnotation>(user))
+                {
+                    if (diffAnnotation->getBaseType() == inst)
+                        maybeCloneForPrimalInst(builder, user);
+                }
+            });
+
         return cloneResult;
     }
 
@@ -272,6 +285,14 @@ IRType* AutoDiffTranscriberBase::differentiateType(IRBuilder* builder, IRType* o
     if (isNoDiffType(origType))
         return nullptr;
 
+    if (auto origPtrType = asRelevantPtrType(origType))
+    {
+        if (auto diffValueType = differentiateType(builder, origPtrType->getValueType()))
+            return builder->getPtrTypeWithAddressSpace(diffValueType, origPtrType);
+        else
+            return nullptr;
+    }
+
     // Special-case for differentiable existential types.
     if (as<IRInterfaceType>(origType))
     {
@@ -292,6 +313,7 @@ IRType* AutoDiffTranscriberBase::differentiateType(IRBuilder* builder, IRType* o
     }
 
     auto primalType = lookupPrimalInst(builder, origType, origType);
+    /*
     if (primalType->getOp() == kIROp_Param && primalType->getParent() &&
         primalType->getParent()->getParent() &&
         primalType->getParent()->getParent()->getOp() == kIROp_Generic)
@@ -300,7 +322,27 @@ IRType* AutoDiffTranscriberBase::differentiateType(IRBuilder* builder, IRType* o
             (IRType*)differentiableTypeConformanceContext.getDifferentialForType(builder, origType);
         return (IRType*)findOrTranscribePrimalInst(builder, diffType);
     }
-    return (IRType*)transcribe(builder, origType);
+    return (IRType*)transcribe(builder, origType);*/
+
+    // AD 2.0
+    // TODO: Replace with tryGetAssociationOfKind()
+    auto diffTypeWitness = differentiableTypeConformanceContext.lookUpConformanceForType(
+        origType,
+        DiffConformanceKind::Any);
+    if (differentiableTypeConformanceContext.isDifferentiableValueType(origType))
+        return (IRType*)differentiableTypeConformanceContext.lookUpInterfaceMethod(
+            builder,
+            origType,
+            this->autoDiffSharedContext->differentialAssocTypeStructKey,
+            builder->getTypeKind());
+    else if (differentiableTypeConformanceContext.isDifferentiablePtrType(origType))
+        return (IRType*)differentiableTypeConformanceContext.lookUpInterfaceMethod(
+            builder,
+            origType,
+            this->autoDiffSharedContext->differentialAssocRefTypeStructKey,
+            builder->getTypeKind());
+    else
+        return nullptr;
 }
 
 IRType* AutoDiffTranscriberBase::_differentiateTypeImpl(IRBuilder* builder, IRType* origType)
@@ -625,13 +667,15 @@ InstPair AutoDiffTranscriberBase::transcribeLookupInterfaceMethod(
     IRBuilder* builder,
     IRLookupWitnessMethod* lookupInst)
 {
+    auto primal = maybeCloneForPrimalInst(builder, lookupInst);
+
     auto primalWt = findOrTranscribePrimalInst(builder, lookupInst->getWitnessTable());
     auto primalKey = findOrTranscribePrimalInst(builder, lookupInst->getRequirementKey());
     auto primalType = findOrTranscribePrimalInst(builder, lookupInst->getFullType());
-    auto primal = (IRSpecialize*)builder->emitLookupInterfaceMethodInst(
+    /*auto primal = (IRSpecialize*)builder->emitLookupInterfaceMethodInst(
         (IRType*)primalType,
         primalWt,
-        primalKey);
+        primalKey);*/
 
     auto interfaceType = as<IRInterfaceType>(unwrapAttributedType(
         as<IRWitnessTableTypeBase>(lookupInst->getWitnessTable()->getDataType())
@@ -1176,8 +1220,29 @@ IRInst* AutoDiffTranscriberBase::transcribe(IRBuilder* builder, IRInst* origInst
                 break;
             }
         }
+
+        /*
+        if (pair.primal != origInst)
+        {
+            // If we generated a non-trivial primal inst,
+            // also handle all inst annotations.
+            //
+            traverseUsers(
+                origInst,
+                [&](IRInst* user)
+                {
+                    if (auto diffAnnotation = as<IRDifferentiableTypeAnnotation>(user))
+                    {
+                        if (diffAnnotation->getBaseType() == origInst)
+                            this->transcribe(builder, user);
+                    }
+                });
+        }
+        */
+
         return pair.differential;
     }
+
     getSink()->diagnose(
         origInst->sourceLoc,
         Diagnostics::internalCompilerError,

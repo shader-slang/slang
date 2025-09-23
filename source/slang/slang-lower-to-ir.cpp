@@ -1306,33 +1306,6 @@ top:
             auto result = builder->emitCast(info->type, getSimpleVal(context, baseVal));
             return LoweredValInfo::simple(result);
         }
-    case LoweredValInfo::Flavor::MetaEnumerator:
-        {
-            auto info = lowered.getMetaEnumeratorInfo();
-            auto enumeratorType = info->val->getDataType();
-
-            // Calculate effective type of the boxed value.
-            IRType* boxedValueType = nullptr;
-            switch (enumeratorType->getOp())
-            {
-            case kIROp_TypeEnumeratorType:
-                boxedValueType =
-                    context->irBuilder->getTypeKind(); // Type of a type is just a type kind,
-                break;
-            case kIROp_FuncEnumeratorType:
-                boxedValueType =
-                    (IRType*)enumeratorType->getOperand(1); // Extract the effective func type.
-                break;
-            case kIROp_TableEnumeratorType:
-                SLANG_ASSERT(as<IRWitnessTableType>(enumeratorType->getOperand(1)));
-                boxedValueType =
-                    (IRType*)enumeratorType->getOperand(1); // Extract the effective table type.
-                break;
-            }
-
-            return LoweredValInfo::simple(
-                builder->emitIntrinsicInst(boxedValueType, kIROp_Box, 1, &info->val));
-        }
     default:
         SLANG_UNEXPECTED("unhandled value flavor");
         UNREACHABLE_RETURN(LoweredValInfo());
@@ -1491,15 +1464,6 @@ static void addLinkageDecoration(
             builder->addTorchEntryPointDecoration(inst, decl->getName()->text.getUnownedSlice());
             builder->addCudaHostDecoration(inst);
             builder->addExternCppDecoration(inst, decl->getName()->text.getUnownedSlice());
-
-            // Temp decorations to get this function through the linker.
-            builder->addKeepAliveDecoration(inst);
-            builder->addHLSLExportDecoration(inst);
-        }
-        else if (as<AutoPyBindCudaAttribute>(modifier))
-        {
-            builder->addAutoPyBindCudaDecoration(inst, decl->getName()->text.getUnownedSlice());
-            builder->addAutoPyBindExportInfoDecoration(inst);
 
             // Temp decorations to get this function through the linker.
             builder->addKeepAliveDecoration(inst);
@@ -1875,8 +1839,9 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     {
         auto elementWitness = lowerVal(context, witness->getPatternTypeWitness());
         auto irBuilder = getBuilder();
-        auto subType = lowerType(context, witness->getSub());
-        auto witnessTableType = irBuilder->getWitnessTableType(subType);
+        // auto subType = lowerType(context, witness->getSub());
+        auto supType = lowerType(context, witness->getSup());
+        auto witnessTableType = irBuilder->getWitnessTableType(supType);
         return LoweredValInfo::simple(
             irBuilder->emitEachInst(witnessTableType, getSimpleVal(context, elementWitness)));
     }
@@ -1885,29 +1850,6 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     {
         if (as<ThisTypeConstraintDecl>(val->getDeclRef()))
             return LoweredValInfo::simple(context->thisTypeWitness);
-        /*if (auto thisTypeConstraint = as<ThisTypeConstraintDecl>(val->getDeclRef()))
-        {
-            IRType* enumeratorBase = lowerType(context, val->getSup());
-            IRType* witnessTableType = context->irBuilder->getWitnessTableType(enumeratorBase);
-
-            List<IRInst*> operands;
-            operands.add(enumeratorBase);
-            operands.add(witnessTableType);
-
-            IRType* enumeratorType = (IRType*)context->irBuilder->emitIntrinsicInst(
-                context->irBuilder->getTypeKind(),
-                kIROp_TableEnumeratorType,
-                operands.getCount(),
-                operands.getBuffer());
-
-            List<IRInst*> enumeratorOperands;
-            enumeratorOperands.add(enumeratorBase);
-            return LoweredValInfo::simple(context->irBuilder->emitIntrinsicInst(
-                enumeratorType,
-                kIROp_ForEachTableOf,
-                enumeratorOperands.getCount(),
-                enumeratorOperands.getBuffer()));
-        }*/
 
         return emitDeclRef(
             context,
@@ -3652,10 +3594,10 @@ void _lowerFuncDeclBaseTypeInfo(
 
         if (!as<FuncType>(resolvedFuncType))
         {
-            if (getCurrentASTBuilder()->m_resolvedVals.containsKey(resolvedFuncType))
+            if (context->getMainModuleDecl()->m_resolvedVals.containsKey(resolvedFuncType))
             {
                 effectiveFuncType =
-                    as<FuncType>(getCurrentASTBuilder()->m_resolvedVals[resolvedFuncType]);
+                    as<FuncType>(context->getMainModuleDecl()->m_resolvedVals[resolvedFuncType]);
                 SLANG_ASSERT(effectiveFuncType);
             }
             else
@@ -3685,16 +3627,32 @@ void _lowerFuncDeclBaseTypeInfo(
             {
                 thisType = as<Type>(
                     thisType->substitute(getCurrentASTBuilder(), SubstitutionSet(declRef)));
-                if (isDeclRefTypeOf<CallableDecl>(thisType))
-                {
-                    // If the `this` type is a callable, then we need to
-                    // get the `this` parameter type of the callable.
-                    //
-                    thisType = getThisParamTypeForCallable(
-                        context,
-                        as<DeclRefType>(thisType)->getDeclRef());
-                }
+            }
 
+            // If we're looking something up on a callable, the this-type determination will
+            // continue up the chain until we find a non-callable.
+            // For now, we assume only one level of indirection is needed.
+            //
+            if (isDeclRefTypeOf<CallableDecl>(thisType))
+            {
+                auto baseCallableDeclRef = as<DeclRefType>(thisType)->getDeclRef();
+                ParameterListCollectMode innerCallableCollectMode =
+                    getModeForCollectingParentParameters(
+                        baseCallableDeclRef.getDecl(),
+                        baseCallableDeclRef.getParent().getDecl());
+
+                if (innerCallableCollectMode != kParameterListCollectMode_Static)
+                {
+                    thisType = getThisParamTypeForCallable(context, baseCallableDeclRef);
+                }
+                else
+                {
+                    thisType = nullptr;
+                }
+            }
+
+            if (thisType)
+            {
                 // Need to check for no-diff-this attribute on the target decl-ref for
                 // functions that are members of other functions.
                 //
@@ -3712,7 +3670,7 @@ void _lowerFuncDeclBaseTypeInfo(
                     break;
                 case kParameterDirection_Ref:
                     // The `this` parameter is passed by reference, so we
-                    thisType = context->astBuilder->getRefType(thisType, AddressSpace::Generic);
+                    thisType = context->astBuilder->getRefType(thisType);
                     break;
                 case kParameterDirection_ConstRef:
                     // The `this` parameter is passed by const reference, so we
@@ -8998,10 +8956,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         for (Index i = specializationLayers.getCount(); i > 0; --i)
                         {
                             auto& specializationArgs = specializationLayers[i - 1];
-                            SLANG_ASSERT(!as<IRGeneric>(irSatisfyingVal->getDataType()));
+                            // SLANG_ASSERT(!as<IRGeneric>(irSatisfyingVal->getDataType()));
                             // Copy specialization arguments onto the outer generic
                             irSatisfyingVal = subIRBuilder.emitSpecializeInst(
-                                irSatisfyingVal->getDataType(),
+                                as<IRGeneric>(irSatisfyingVal)
+                                    ? (IRType*)subIRBuilder.emitSpecializeInst(
+                                          subIRBuilder.getTypeKind(),
+                                          irSatisfyingVal->getDataType(),
+                                          specializationArgs)
+                                    : irSatisfyingVal->getDataType(),
                                 irSatisfyingVal,
                                 specializationArgs);
                         }
@@ -10025,10 +9988,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     associatedTypeDecl->getMembersOfType<TypeConstraintDecl>().getCount();
             }
 
-            if (auto callableDecl = as<CallableDecl>(requirementDecl))
-            {
+            auto callableDecl = as<CallableDecl>(requirementDecl);
+
+            if (auto genDecl = as<GenericDecl>(requirementDecl))
+                callableDecl = as<CallableDecl>(genDecl->inner);
+
+            if (callableDecl)
                 operandCount += callableDecl->getMembersOfType<TypeConstraintDecl>().getCount();
-            }
         }
 
         // Allocate an IRInterfaceType with the `operandCount` operands.
@@ -10356,6 +10322,22 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitEnumDecl(EnumDecl* decl)
     {
+        // TODO: if we ever support `enum` types with payloads, we would
+        // need to make the `enum` lower to some kind of custom "tagged union"
+        // type.
+
+        NestedContext nestedContext(this);
+        auto subBuilder = nestedContext.getBuilder();
+        auto subContext = nestedContext.getContext();
+        auto outerGeneric = emitOuterGenerics(subContext, decl, decl);
+
+        IRType* loweredTagType = lowerType(subContext, decl->tagType);
+        IRType* enumType = subBuilder->createEnumType(loweredTagType);
+        addLinkageDecoration(context, enumType, decl);
+
+        auto loweredEnumType = finishOuterGenerics(subBuilder, enumType, outerGeneric);
+        context->setGlobalValue(decl, LoweredValInfo::simple(loweredEnumType));
+
         // Given a declaration of a type, we need to make sure
         // to output "witness tables" for any interfaces this
         // type has declared conformance to.
@@ -10364,20 +10346,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             ensureDecl(context, inheritanceDecl);
         }
 
-        NestedContext nestedContext(this);
-        auto subBuilder = nestedContext.getBuilder();
-        auto subContext = nestedContext.getContext();
-        auto outerGeneric = emitOuterGenerics(subContext, decl, decl);
-
-        // TODO: if we ever support `enum` types with payloads, we would
-        // need to make the `enum` lower to some kind of custom "tagged union"
-        // type.
-
-        IRType* loweredTagType = lowerType(subContext, decl->tagType);
-        IRType* enumType = subBuilder->createEnumType(loweredTagType);
-        addLinkageDecoration(context, enumType, decl);
-
-        return LoweredValInfo::simple(finishOuterGenerics(subBuilder, enumType, outerGeneric));
+        return LoweredValInfo::simple(loweredEnumType);
     }
 
     LoweredValInfo visitThisTypeDecl(ThisTypeDecl* decl)
@@ -11123,10 +11092,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     for (auto param : paramCloneInfos)
                     {
                         typeBuilder.setInsertInto(param.clonedParam);
-                        param.clonedParam->setFullType((IRType*)cloneInst(
-                            &cloneEnv,
-                            &typeBuilder,
-                            param.originalParam->getFullType()));
+                        auto paramType = param.originalParam->getFullType();
+                        // TODO: This clone seems a bit hacky..
+                        param.clonedParam->setFullType(
+                            as<IRModuleInst>(paramType->getParent())
+                                ? paramType
+                                : (IRType*)cloneInst(
+                                      &cloneEnv,
+                                      &typeBuilder,
+                                      param.originalParam->getFullType()));
                         cloneInstDecorationsAndChildren(
                             &cloneEnv,
                             typeBuilder.getModule(),
@@ -11582,6 +11556,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // TODO: REMOVE ASAP (should be in the context)
         HashSet<DeclRefBase*> workingSet;
+        HashSet<Type*> workingTypeSet;
 
         // If our function is differentiable, register a callback so the derivative
         // annotations for types can be lowered.
@@ -11603,10 +11578,17 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
 
             subContext->registerTypeCallback(
-                [=](IRGenContext* context, Type* type, IRType* irType)
+                [resolveddiffTypeWitnessMap,
+                 subContext,
+                 &workingTypeSet](IRGenContext* context, Type* type, IRType* irType)
                 {
+                    if (workingTypeSet.contains(type))
+                        return irType;
+
                     if (resolveddiffTypeWitnessMap.containsKey(type))
                     {
+                        workingTypeSet.add(type);
+
                         auto irWitness = lowerVal(subContext, resolveddiffTypeWitnessMap[type]).val;
                         if (irWitness)
                         {
@@ -11617,6 +11599,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                                 2,
                                 args);
                         }
+
+                        workingTypeSet.remove(type);
                     }
 
                     return irType;
@@ -11627,28 +11611,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 {
                     if (workingSet.contains(val))
                         return irVal;
-
-                    /*if (diffAttr->hasWitnessForVal(val))
-                    {
-                        workingSet.add(val);
-
-                        auto list = diffAttr->tryGetWitnessList(val);
-                        for (auto witness : list)
-                        {
-                            auto irWitness = lowerVal(subContext, witness).val;
-                            if (irWitness)
-                            {
-                                IRInst* args[] = {irVal, irWitness};
-                                context->irBuilder->emitIntrinsicInst(
-                                    context->irBuilder->getVoidType(),
-                                    kIROp_WitnessTableAnnotation,
-                                    2,
-                                    args);
-                            }
-                        }
-
-                        workingSet.remove(val);
-                    }*/
 
                     if (diffAttr->hasAssociatedVals(val))
                     {
@@ -11727,7 +11689,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // Register the value now, to avoid any possible infinite recursion when lowering the body
         // or attributes.
-        IRFunc* irFunc = subBuilder->createFunc();
+        IRInst* irFunc = subBuilder->createFunc();
         context->setGlobalValue(decl, LoweredValInfo::simple(findOuterMostGeneric(irFunc)));
 
         FuncDeclBaseTypeInfo info;
@@ -11747,7 +11709,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
 
         // need to create an IR function here
-        IRInst* irFunc = nullptr;
+        // IRInst* irFunc = nullptr;
         if (auto synFuncDecl = as<SynthesizedFuncDecl>(decl))
         {
             List<IRInst*> irOperands;
@@ -11794,25 +11756,66 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         SLANG_UNEXPECTED("Unexpected operand type in synthesized function");
                     }
                 }
-
-                auto synthOp = subBuilder->emitIntrinsicInst(
-                    info.type,
-                    (IROp)synFuncDecl->irOp,
-                    (UInt)irOperands.getCount(),
-                    irOperands.getBuffer());
-
-                irFunc = synthOp;
             }
-        }
-        else
-        {
-            irFunc = subBuilder->createFunc();
+
+            auto synthOp = subBuilder->emitIntrinsicInst(
+                info.type,
+                (IROp)synFuncDecl->irOp,
+                (UInt)irOperands.getCount(),
+                irOperands.getBuffer());
+
+            irFunc->replaceUsesWith(synthOp);
+            irFunc->removeAndDeallocate();
+            context->setGlobalValue(decl, LoweredValInfo::simple(synthOp));
+
+            irFunc = synthOp;
         }
 
         addNameHint(subContext, irFunc, decl);
         addLinkageDecoration(subContext, irFunc, decl);
         maybeAddDebugLocationDecoration(subContext, irFunc);
 
+        if (auto autoPyBindModifier = decl->findModifier<AutoPyBindCudaAttribute>())
+        {
+            FuncDeclBaseTypeInfo innerInfoFwd;
+            _lowerFuncDeclBaseTypeInfo(
+                context,
+                autoPyBindModifier->fwdDiffFuncDeclRef->declRef.as<FunctionDeclBase>(),
+                innerInfoFwd);
+
+            auto loweredFwdDiffFunc = emitDeclRef(
+                context,
+                autoPyBindModifier->fwdDiffFuncDeclRef->declRef.as<FunctionDeclBase>(),
+                innerInfoFwd.type);
+
+            SLANG_ASSERT(loweredFwdDiffFunc.flavor == LoweredValInfo::Flavor::Simple);
+            auto irFwdDiffFunc = getSimpleVal(context, loweredFwdDiffFunc);
+
+            FuncDeclBaseTypeInfo innerInfoBwd;
+            _lowerFuncDeclBaseTypeInfo(
+                context,
+                autoPyBindModifier->bwdDiffFuncDeclRef->declRef.as<FunctionDeclBase>(),
+                innerInfoBwd);
+
+            auto loweredBwdDiffFunc = emitDeclRef(
+                context,
+                autoPyBindModifier->bwdDiffFuncDeclRef->declRef.as<FunctionDeclBase>(),
+                innerInfoBwd.type);
+
+            SLANG_ASSERT(loweredBwdDiffFunc.flavor == LoweredValInfo::Flavor::Simple);
+            auto irBwdDiffFunc = getSimpleVal(context, loweredBwdDiffFunc);
+
+            subContext->irBuilder->addAutoPyBindCudaDecoration(
+                irFunc,
+                decl->getName()->text.getUnownedSlice(),
+                irFwdDiffFunc,
+                irBwdDiffFunc);
+            subContext->irBuilder->addAutoPyBindExportInfoDecoration(irFunc);
+
+            // Temp decorations to get this function through the linker.
+            subContext->irBuilder->addKeepAliveDecoration(irFunc);
+            subContext->irBuilder->addHLSLExportDecoration(irFunc);
+        }
 
         // Always force inline diff setter accessor to prevent downstream compiler from complaining
         // fields are not fully initialized for the first `inout` parameter.
@@ -13373,11 +13376,9 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         // instructions remain.
 
         checkForMissingReturns(module, compileRequest->getSink(), CodeGenTarget::None, true);
-        // Check for invalid differentiable function body.
 
-        // Temporarily disabled to bring-up AD 2.0
-        // Re-enable by using differentiability info from the annotations.
-        // checkAutoDiffUsages(module, compileRequest->getSink());
+        // Check for invalid differentiable function body.
+        checkAutoDiffUsages(module, compileRequest->getSink());
 
         checkForOperatorShiftOverflow(module, linkage->m_optionSet, compileRequest->getSink());
     }

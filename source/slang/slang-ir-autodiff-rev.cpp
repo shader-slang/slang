@@ -746,6 +746,24 @@ IRFunc* BackwardDiffTranscriberBase::generateNewForwardDerivativeForFunc(
     return fwdDiffFunc;
 }
 
+IRFunc* BackwardDiffTranscriberBase::generateTrivialForwardDerivativeForFunc(
+    IRBuilder* builder,
+    IRFunc* originalFunc,
+    IRFunc* diffPropagateFunc)
+{
+    IRInst* operand = originalFunc;
+    // Generate a `OpTrivialForwardDifferentiate' inst and translate it.
+    IRInst* trivialFwdDiffInst = builder->emitIntrinsicInst(
+        diffPropagateFunc->getDataType(),
+        kIROp_TrivialForwardDifferentiate,
+        1,
+        &operand);
+
+    TrivialForwardDiffTranslator translator;
+    return cast<IRFunc>(
+        translator.processTranslationRequest(trivialFwdDiffInst, autoDiffSharedContext, sink));
+}
+
 InstPair BackwardDiffTranscriberBase::transcribeFuncParam(
     IRBuilder* builder,
     IRParam* origParam,
@@ -808,7 +826,8 @@ void BackwardDiffTranscriberBase::_transcribeFuncImpl(
     IRInst*& applyFuncInst,
     IRInst*& propagateFuncInst,
     IRInst*& contextGetValFuncInst,
-    IRInst*& contextTypeInst)
+    IRInst*& contextTypeInst,
+    bool isTrivial)
 {
     differentiableTypeConformanceContext.setFunc(targetFunc);
 
@@ -821,29 +840,16 @@ void BackwardDiffTranscriberBase::_transcribeFuncImpl(
 
     IRBuilder tempBuilder = *builder;
     tempBuilder.setInsertBefore(propagateFunc);
-    /*if (auto outerGeneric = findOuterGeneric(propagateFunc))
-    {
-        tempBuilder.setInsertBefore(outerGeneric);
-    }
-    else
-    {
-        tempBuilder.setInsertBefore(propagateFunc);
-    }*/
 
-    auto fwdDiffFunc = generateNewForwardDerivativeForFunc(&tempBuilder, targetFunc, propagateFunc);
+    auto fwdDiffFunc =
+        (!isTrivial)
+            ? generateNewForwardDerivativeForFunc(&tempBuilder, targetFunc, propagateFunc)
+            : generateTrivialForwardDerivativeForFunc(&tempBuilder, targetFunc, propagateFunc);
     if (!fwdDiffFunc)
         return;
 
-    bool isResultDifferentiable = as<IRDifferentialPairType>(fwdDiffFunc->getResultType());
-
     // Split first block into a paramter block.
     this->makeParameterBlock(&tempBuilder, as<IRFunc>(fwdDiffFunc));
-
-    // This steps adds a decoration to instructions that are computing the differential.
-    // TODO: This is disabled for now because fwd-mode already adds differential decorations
-    // wherever need. We need to run this pass only for user-writted forward derivativecode.
-    //
-    // diffPropagationPass->propagateDiffInstDecoration(builder, fwdDiffFunc);
 
     diffUnzipPass->unzipDiffInsts(fwdDiffFunc);
     IRFunc* unzippedFwdDiffFunc = fwdDiffFunc;
@@ -860,34 +866,15 @@ void BackwardDiffTranscriberBase::_transcribeFuncImpl(
             block->insertAtEnd(propagateFunc);
     }
 
-    // Transpose the first block (parameter block)
-    /*
-    auto paramTransposeInfo = splitAndTransposeParameterBlock(
-        builder,
-        propagateFunc,
-        targetFunc->sourceLoc,
-        isResultDifferentiable);
-    */
-
-    // The insts we inserted in paramTransposeInfo.mapPrimalSpecificParamToReplacementInPropFunc
-    // may be used by write back logic that we are going to insert later.
-    // Before then we want to keep them alive.
-    //_lockPrimalParamReplacementInsts(builder, paramTransposeInfo);
-
     builder->setInsertInto(propagateFunc);
 
     // Transpose differential blocks from unzippedFwdDiffFunc into diffFunc (with dOutParameter)
     // representing the derivative of the return value.
-    /*DiffTransposePass::FuncTranspositionInfo transposeInfo = {
-        paramTransposeInfo.dOutParam,
-        paramTransposeInfo.transposedInstMap};*/
     diffTransposePass->transposeDiffBlocksInFunc(propagateFunc, {});
 
     // Apply checkpointing policy to legalize cross-scope uses of primal values
     // using either recompute or store strategies.
     auto primalsInfo = applyCheckpointPolicy(propagateFunc);
-
-    // eliminateDeadCode(propagateFunc);
 
     // Extracts the primal computations into its own func, turn all accesses to stored primal insts
     // into explicit intermediate data structure reads and writes.
@@ -903,50 +890,6 @@ void BackwardDiffTranscriberBase::_transcribeFuncImpl(
     // At this point the unzipped func is just an empty shell
     // and we can simply remove it.
     unzippedFwdDiffFunc->removeAndDeallocate();
-
-    // Write back derivatives to inout parameters.
-    // writeBackDerivativeToInOutParams(paramTransposeInfo, propagateFunc);
-
-    // Remove primalFunc specific params.
-    /*List<IRInst*> paramsToRemove;
-    for (auto param : propagateFunc->getParams())
-    {
-        if (!paramTransposeInfo.propagateFuncParams.contains(param))
-            paramsToRemove.add(param);
-    }
-    for (auto param : paramsToRemove)
-    {
-        if (param->hasUses())
-        {
-            IRInst* replacement = nullptr;
-            paramTransposeInfo.mapPrimalSpecificParamToReplacementInPropFunc.tryGetValue(
-                param,
-                replacement);
-
-            if (replacement)
-                param->replaceUsesWith(replacement);
-        }
-        param->removeAndDeallocate();
-    }*/
-
-    //_unlockPrimalParamReplacementInsts(paramTransposeInfo);
-
-    // If primal function is nested in a generic, we want to create separate generics for all the
-    // associated things we have just created.
-    // auto primalOuterGeneric = findOuterGeneric(targetFunc);
-    // IRInst* specializedFunc = nullptr;
-    // auto intermediateTypeGeneric =
-    //    hoistValueFromGeneric(*builder, intermediateType, specializedFunc, true);
-    // builder->setInsertBefore(targetFunc);
-    // builder->addBackwardDerivativeIntermediateTypeDecoration(targetFunc,
-    // intermediateTypeGeneric);
-
-    // auto primalFuncGeneric =
-    //     hoistValueFromGeneric(*builder, extractedPrimalFunc, specializedFunc, true);
-
-    // builder->setInsertBefore(targetFunc);
-    // IRInst* applyFunc = maybeSpecializeWithGeneric(*builder, primalFuncGeneric,
-    // primalOuterGeneric);
 
     // Copy over checkpoint preference hints.
     {
@@ -983,7 +926,7 @@ void BackwardDiffTranscriberBase::_transcribeFuncImpl(
     if (diffResultType)
     {
         propagateResultType =
-            fromDirectionAndType(builder, IRParameterDirection::In, diffResultType);
+            fromDirectionAndType(builder, ParameterDirectionInfo::Kind::In, diffResultType);
     }
     else
     {
@@ -1017,6 +960,10 @@ void BackwardDiffTranscriberBase::_transcribeFuncImpl(
     generateName(builder, targetFunc, propagateFunc, "s_bwdProp_");
     generateName(builder, targetFunc, getValFunc, "s_getVal_");
     generateName(builder, targetFunc, intermediateType, "s_bwdCallableCtx_");
+
+    copyDebugInfo(targetFunc, applyFunc);
+    copyDebugInfo(targetFunc, propagateFunc);
+    copyDebugInfo(targetFunc, getValFunc);
 
     IRBuilder subBuilder = *builder;
 
@@ -1920,6 +1867,7 @@ LegacyBackwardDiffTranslationFuncContext::Result LegacyBackwardDiffTranslationFu
     List<IRInst*> applyBwdFuncArgs;
     List<IRInst*> bwdPropFuncParams;
 
+    // TODO: This logic is annoyingly confusing.. rewrite as a switch-case.
     UIndex bwdDiffParamIdx = 0;
     for (UIndex i = 0; i < applyBwdFuncType->getParamCount(); i++)
     {
@@ -1938,7 +1886,8 @@ LegacyBackwardDiffTranslationFuncContext::Result LegacyBackwardDiffTranslationFu
         if (as<IROutType>(applyParamType))
         {
             // There won't be any parameter in the legacy bwd_diff function for this parameter.
-            applyBwdFuncArgs.add(builder->emitVar(as<IROutType>(applyParamType)->getValueType()));
+            applyBwdFuncArgs.add(
+                builder->emitVar(as<IRPtrTypeBase>(applyParamType)->getValueType()));
 
             if (!as<IRVoidType>(bwdPropParamType))
             {
@@ -1948,8 +1897,18 @@ LegacyBackwardDiffTranslationFuncContext::Result LegacyBackwardDiffTranslationFu
             }
             continue;
         }
+        else if (as<IRInOutType>(applyParamType) && as<IRVoidType>(bwdPropParamType))
+        {
+            auto var = builder->emitVar(as<IRPtrTypeBase>(applyParamType)->getValueType());
+            applyBwdFuncArgs.add(var);
+            builder->emitStore(var, bwdDiffFuncParams[bwdDiffParamIdx]);
+            bwdDiffParamIdx++;
+            continue;
+        }
         else if (!as<IRVoidType>(bwdPropParamType))
         {
+            // TODO: STOPPED HERE: Handle inout no-diff parameters.
+
             // inout diff-pair or in diff-ptr-pair
             if (auto bwdDiffParamPtrType =
                     as<IRPtrTypeBase>(this->bwdDiffFuncType->getParamType(bwdDiffParamIdx)))
@@ -1957,11 +1916,24 @@ LegacyBackwardDiffTranslationFuncContext::Result LegacyBackwardDiffTranslationFu
                 // as<IRDifferentialPairType>(bwdParamPtrType);
                 if (auto applyParamPtrType = as<IRPtrTypeBase>(applyParamType))
                 {
-                    applyBwdFuncArgs.add(builder->emitIntrinsicInst(
+                    /*applyBwdFuncArgs.add(builder->emitIntrinsicInst(
                         builder->getPtrType(applyParamPtrType->getValueType()),
                         kIROp_DifferentialPairGetPrimalUserCode,
                         1,
-                        &bwdDiffFuncParams[bwdDiffParamIdx]));
+                        &bwdDiffFuncParams[bwdDiffParamIdx]));*/
+
+                    // The legacy bwd_diff function should not modify the primal values,
+                    // so we'll create a local var and load the primal into it.
+                    //
+                    auto var = builder->emitVar(as<IRPtrTypeBase>(applyParamType)->getValueType());
+                    applyBwdFuncArgs.add(var);
+                    builder->emitStore(
+                        var,
+                        builder->emitLoad(builder->emitIntrinsicInst(
+                            builder->getPtrType(applyParamPtrType->getValueType()),
+                            kIROp_DifferentialPairGetPrimalUserCode,
+                            1,
+                            &bwdDiffFuncParams[bwdDiffParamIdx])));
                 }
                 else
                 {

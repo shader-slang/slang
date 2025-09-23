@@ -52,6 +52,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     Foo<float> a = {0.0};
     var p = diffPair(3.0, 1.0);
-    let rs = __fwd_diff(test)(a, p);
+    let rs = fwd_diff(test)(a, p);
     outputBuffer[0] = rs.d;
 }

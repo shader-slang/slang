@@ -232,6 +232,9 @@ FIDDLE() namespace Slang
         saturated_cooperation_using,
         IDifferentiable,
         IDifferentiablePtr,
+        IForwardDifferentiable,
+        IBackwardDifferentiable,
+        IBwdCallable,
         NullDifferential,
         OperatorAddressOf,
         COUNT

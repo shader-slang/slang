@@ -354,10 +354,35 @@ Val* GenericAppDeclRef::_resolveImplOverride()
             diff = true;
     }
     if (diff)
-        resolvedVal = astBuilder->getGenericAppDeclRef(
-            resolvedGenericDeclRef,
-            resolvedArgs.getArrayView(),
-            getDecl());
+    {
+        if (getDecl()->isChildOf(resolvedGenericDeclRef->getDecl()))
+        {
+            resolvedVal = astBuilder->getGenericAppDeclRef(
+                resolvedGenericDeclRef,
+                resolvedArgs.getArrayView(),
+                getDecl());
+        }
+        else if (getDecl() == getGenericDecl()->inner)
+        {
+            // Use the inner of the resolved generic decl ref.
+            resolvedVal = astBuilder->getGenericAppDeclRef(
+                resolvedGenericDeclRef,
+                resolvedArgs.getArrayView());
+        }
+        else
+        {
+            // If we hit this case, we're referencing something that isn't
+            // the direct child (->inner) of the generic decl.
+            // There's no easy way to figure out which child of the new generic
+            // we should be referencing, so we'll assert out here instead of
+            // trying to continue with an ill-formed decl ref.
+            //
+            SLANG_ASSERT(
+                "Cannot resolve generic app decl ref to a non-direct child of the resolved generic "
+                "decl "
+                "ref");
+        }
+    }
     return resolvedVal;
 }
 

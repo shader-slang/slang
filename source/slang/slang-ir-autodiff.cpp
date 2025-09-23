@@ -1013,13 +1013,15 @@ AutoDiffSharedContext::AutoDiffSharedContext(TargetProgram* target, IRModuleInst
         differentialAssocTypeStructKey = findDifferentialTypeStructKey();
         differentialAssocTypeWitnessStructKey = findDifferentialTypeWitnessStructKey();
         differentialAssocTypeWitnessTableType = findDifferentialTypeWitnessTableType();
+
         zeroMethodStructKey = findZeroMethodStructKey();
         zeroMethodType = cast<IRFuncType>(
             getInterfaceEntryAtIndex(differentiableInterfaceType, 2)->getRequirementVal());
         addMethodStructKey = findAddMethodStructKey();
+        // 3 and 4 would be dzero : IForwardDifferentiable and dzero : IBackwardDifferentiable
         addMethodType = cast<IRFuncType>(
-            getInterfaceEntryAtIndex(differentiableInterfaceType, 3)->getRequirementVal());
-        mulMethodStructKey = findMulMethodStructKey();
+            getInterfaceEntryAtIndex(differentiableInterfaceType, 5)->getRequirementVal());
+
         nullDifferentialStructType = findNullDifferentialStructType();
         nullDifferentialWitness = findNullDifferentialWitness();
 
@@ -1355,6 +1357,25 @@ IRInst* DifferentiableTypeConformanceContext::lookUpConformanceForType(
 {
     IRInst* foundResult = nullptr;
     differentiableTypeWitnessDictionary.tryGetValue(type, foundResult);
+
+    if (!foundResult)
+    {
+        traverseUsers(
+            type,
+            [&](IRInst* user)
+            {
+                if (auto diffAnnotation = as<IRDifferentiableTypeAnnotation>(user))
+                {
+                    if (diffAnnotation->getBaseType() == type)
+                    {
+                        differentiableTypeWitnessDictionary.add(
+                            (IRType*)type,
+                            diffAnnotation->getWitness());
+                        foundResult = diffAnnotation->getWitness();
+                    }
+                }
+            });
+    }
 
     if (!foundResult)
         return nullptr;
@@ -1747,11 +1768,6 @@ IRType* DifferentiableTypeConformanceContext::differentiateType(
         else
             return nullptr;
 
-    case kIROp_ExtractExistentialType:
-        {
-            SLANG_UNIMPLEMENTED_X("Impl");
-        }
-
     case kIROp_TypePack:
     case kIROp_TupleType:
         {
@@ -1826,7 +1842,25 @@ IRInst* DifferentiableTypeConformanceContext::tryGetDifferentiableWitness(
     SLANG_RELEASE_ASSERT(primalType);
     if (auto primalPairType = as<IRDifferentialPairTypeBase>(primalType))
     {
-        witness = buildDifferentiablePairWitness(builder, primalPairType, kind);
+        // witness = buildDifferentiablePairWitness(builder, primalPairType, kind);
+        IRBuilder subBuilder(builder->getModule());
+        subBuilder.setInsertInto(builder->getModule());
+        List<IRInst*> operands;
+        operands.add(primalPairType);
+        if (isDifferentiableValueType(primalPairType))
+            return subBuilder.emitIntrinsicInst(
+                subBuilder.getWitnessTableType(this->sharedContext->differentiableInterfaceType),
+                kIROp_MakeIDifferentiableWitness,
+                operands.getCount(),
+                operands.getBuffer());
+        else if (isDifferentiablePtrType(primalPairType))
+            return subBuilder.emitIntrinsicInst(
+                subBuilder.getWitnessTableType(this->sharedContext->differentiablePtrInterfaceType),
+                kIROp_MakeIDifferentiableWitness,
+                operands.getCount(),
+                operands.getBuffer());
+        else
+            SLANG_UNEXPECTED("unsupported diff type");
     }
     else if (auto arrayType = as<IRArrayType>(primalType))
     {
@@ -2610,58 +2644,22 @@ void stripTempDecorations(IRInst* inst)
     }
 }
 
-
-std::tuple<IRParameterDirection, IRType*> splitDirectionAndType(IRType* type)
+ParameterDirectionInfo transposeDirection(ParameterDirectionInfo direction)
 {
-    switch (type->getOp())
+    switch (direction.kind)
     {
-    case kIROp_InOutType:
-        return std::make_tuple(IRParameterDirection::InOut, as<IRInOutType>(type)->getValueType());
-    case kIROp_OutType:
-        return std::make_tuple(IRParameterDirection::Out, as<IROutType>(type)->getValueType());
-    case kIROp_RefType:
-        return std::make_tuple(IRParameterDirection::Ref, as<IRRefType>(type)->getValueType());
-    case kIROp_ConstRefType:
-        return std::make_tuple(
-            IRParameterDirection::ConstRef,
-            as<IRConstRefType>(type)->getValueType());
-    default:
-        return std::make_tuple(IRParameterDirection::In, type);
-    }
-}
-
-IRParameterDirection transposeDirection(IRParameterDirection direction)
-{
-    switch (direction)
-    {
-    case IRParameterDirection::In:
-        return IRParameterDirection::Out;
-    case IRParameterDirection::Out:
-        return IRParameterDirection::In;
-    case IRParameterDirection::InOut:
-        return IRParameterDirection::InOut;
-    case IRParameterDirection::Ref:
-        return IRParameterDirection::Ref;
-    case IRParameterDirection::ConstRef:
-        return IRParameterDirection::ConstRef;
-    default:
-        SLANG_UNREACHABLE("Invalid parameter direction");
-    }
-}
-
-IRType* fromDirectionAndType(IRBuilder* builder, IRParameterDirection direction, IRType* type)
-{
-    switch (direction)
-    {
-    case IRParameterDirection::In:
-        return type;
-    case IRParameterDirection::Out:
-        return builder->getOutType(type);
-    case IRParameterDirection::InOut:
-        return builder->getInOutType(type);
-    case IRParameterDirection::ConstRef:
-        return builder->getConstRefType(type);
-    case IRParameterDirection::Ref: // unhandled for now..
+    case ParameterDirectionInfo::Kind::In:
+        return ParameterDirectionInfo(ParameterDirectionInfo::Kind::Out);
+    case ParameterDirectionInfo::Kind::Out:
+        return ParameterDirectionInfo(ParameterDirectionInfo::Kind::In);
+    case ParameterDirectionInfo::Kind::InOut:
+        return ParameterDirectionInfo(ParameterDirectionInfo::Kind::InOut);
+    case ParameterDirectionInfo::Kind::Ref:
+        return ParameterDirectionInfo(ParameterDirectionInfo::Kind::Ref, direction.addressSpace);
+    case ParameterDirectionInfo::Kind::ConstRef:
+        return ParameterDirectionInfo(
+            ParameterDirectionInfo::Kind::ConstRef,
+            direction.addressSpace);
     default:
         SLANG_UNREACHABLE("Invalid parameter direction");
     }
@@ -2770,7 +2768,7 @@ struct AutoDiffPass : public InstPassBase
         return modified;
     }
 
-    IRInst* processIntermediateContextTypeBase(IRBuilder* builder, IRInst* base)
+    /*IRInst* processIntermediateContextTypeBase(IRBuilder* builder, IRInst* base)
     {
         if (auto spec = as<IRSpecialize>(base))
         {
@@ -2825,7 +2823,9 @@ struct AutoDiffPass : public InstPassBase
         }
         return nullptr;
     }
+    */
 
+    /*
     bool lowerIntermediateContextType(IRBuilder* builder)
     {
         bool result = false;
@@ -2905,14 +2905,14 @@ struct AutoDiffPass : public InstPassBase
         }
         // Now we generate the differential type for the intermediate context type
         // to allow higher order differentiation.
-        /*
-        Disabled for AD 2.0 (dropping support for differentiating bwd-diffed funcs)
+
+        //Disabled for AD 2.0 (dropping support for differentiating bwd-diffed funcs)
         generateDifferentialImplementationForContextType(
             loweredIntermediateTypes,
             typeToBwdFuncMap);
-        */
         return result;
     }
+    */
 
     // Utility function for topology sorting the intermediate context types.
     bool isIntermediateContextTypeReadyForProcess(
@@ -3527,20 +3527,21 @@ struct AutoDiffPass : public InstPassBase
     // function, because that is the case of dynamic dispatch.
     bool isReachableInst(IRInst* inst)
     {
+        if (as<IRTranslateBase>(inst))
+            return true;
+
+        if (as<IRTranslatedTypeBase>(inst))
+            return true;
+
         switch (inst->getOp())
         {
-        case kIROp_ForwardDifferentiate:
-        case kIROp_BackwardDifferentiate:
-        case kIROp_BackwardDifferentiatePrimal:
-        case kIROp_BackwardDifferentiatePropagate:
-        case kIROp_BackwardDiffIntermediateContextType:
         case kIROp_Func:
             return true;
         case kIROp_Generic:
             // For generic, if it's a generic function and it's used by any other reachable
             // inst, we will consider it reachable.
             auto genericIR = as<IRGeneric>(inst);
-            if (as<IRFunc>(findInnerMostGenericReturnVal(genericIR)))
+            if (as<IRFuncType>(findInnerMostGenericReturnVal(genericIR)->getDataType()))
             {
                 for (auto use = inst->firstUse; use; use = use->nextUse)
                 {
@@ -3573,10 +3574,10 @@ struct AutoDiffPass : public InstPassBase
         for (auto child = module->getModuleInst()->getFirstChild(); child;
              child = child->getNextInst())
         {
-            if (isReachableInst(child))
-            {
-                addToWorkList(child);
-            }
+            // if (isReachableInst(child))
+            //{
+            addToWorkList(child);
+            //}
         }
 
         while (workList.getCount() != 0)
@@ -3658,9 +3659,15 @@ struct AutoDiffPass : public InstPassBase
                 {
                 case kIROp_ForwardDifferentiate:
                     {
-                        // auto baseFunc = as<IRForwardDifferentiate>(translateInst)->getBaseFn();
-                        // translationResult = forwardTranscriber.transcribe(&subBuilder, baseFunc);
                         translationResult = fwdDiffTranslator.processTranslationRequest(
+                            translateInst,
+                            autodiffContext,
+                            getSink());
+                    }
+                    break;
+                case kIROp_TrivialForwardDifferentiate:
+                    {
+                        translationResult = trivialFwdDiffTranslator.processTranslationRequest(
                             translateInst,
                             autodiffContext,
                             getSink());
@@ -3671,11 +3678,18 @@ struct AutoDiffPass : public InstPassBase
                 case kIROp_BackwardContextGetPrimalVal:
                 case kIROp_BackwardDiffIntermediateContextType:
                     {
-                        // TODO: old code..
-                        // auto baseFunc = translateInst->getOperand(0);
-                        // translationResult = backwardPropagateTranscriber.transcribe(&subBuilder,
-                        // baseFunc);
                         translationResult = bwdDiffTranslator.processTranslationRequest(
+                            translateInst,
+                            autodiffContext,
+                            getSink());
+                    }
+                    break;
+                case kIROp_TrivialBackwardDifferentiatePrimal:
+                case kIROp_TrivialBackwardDifferentiatePropagate:
+                case kIROp_TrivialBackwardContextGetPrimalVal:
+                case kIROp_TrivialBackwardDiffIntermediateContextType:
+                    {
+                        translationResult = trivialBwdDiffTranslator.processTranslationRequest(
                             translateInst,
                             autodiffContext,
                             getSink());
@@ -3737,59 +3751,6 @@ struct AutoDiffPass : public InstPassBase
                     changed = true;
                 }
             }
-
-            // Run transcription logic to generate the body of forward/backward derivatives
-            // functions. While doing so, we may discover new functions to differentiate, so we
-            // keep running until the worklist goes dry.
-            /*List<IRFunc*> autodiffCleanupList;
-            while (autodiffContext->followUpFunctionsToTranscribe.getCount() != 0)
-            {
-                changed = true;
-                auto followUpWorkList = _Move(autodiffContext->followUpFunctionsToTranscribe);
-                for (auto task : followUpWorkList)
-                {
-                    auto diffFunc = as<IRFunc>(task.resultFunc);
-                    SLANG_ASSERT(diffFunc);
-
-                    // We're running in to some situations where the follow-up task
-                    // has already been completed (diffFunc has been generated, processed,
-                    // and deallocated). Skip over these for now.
-                    //
-                    if (!diffFunc->getDataType())
-                        continue;
-
-                    auto primalFunc = as<IRFunc>(task.originalFunc);
-                    SLANG_ASSERT(primalFunc);
-                    switch (task.type)
-                    {
-                    case FuncBodyTranscriptionTaskType::Forward:
-                        forwardTranscriber.transcribeFunc(builder, primalFunc, diffFunc);
-                        break;
-                    case FuncBodyTranscriptionTaskType::BackwardPrimal:
-                        backwardPrimalTranscriber.transcribeFunc(builder, primalFunc, diffFunc);
-                        break;
-                    case FuncBodyTranscriptionTaskType::BackwardPropagate:
-                        backwardPropagateTranscriber.transcribeFunc(builder, primalFunc, diffFunc);
-                        break;
-                    default:
-                        break;
-                    }
-
-                    autodiffCleanupList.add(diffFunc);
-                }
-            }
-
-
-            for (auto diffFunc : autodiffCleanupList)
-            {
-                // Get rid of block-level decorations that are used to keep track of
-                // different block types. These don't work well with the IR simplification
-                // passes since they don't expect decorations in blocks.
-                //
-                stripTempDecorations(diffFunc);
-            }
-
-            autodiffCleanupList.clear();*/
 
 #if _DEBUG
             validateIRModule(module, sink);
@@ -3884,8 +3845,10 @@ protected:
     // AD 2.0 Translators
 
     ForwardDiffTranslator fwdDiffTranslator;
+    TrivialForwardDiffTranslator trivialFwdDiffTranslator;
 
     BackwardDiffTranslator bwdDiffTranslator;
+    TrivialBackwardDiffTranslator trivialBwdDiffTranslator;
 
     LegacyBackwardDiffTranslator legacyBwdDiffTranslator;
 
@@ -4091,6 +4054,8 @@ bool finalizeAutoDiffPass(TargetProgram* target, IRModule* module)
     // Create shared context for all auto-diff related passes
     AutoDiffSharedContext autodiffContext(target, module->getModuleInst());
 
+    modified |= processDiffTypeWitnessSynthesisInsts(&autodiffContext);
+
     // Replaces IRDifferentialPairType with an auto-generated struct,
     // IRDifferentialPairGetDifferential with 'differential' field access,
     // IRDifferentialPairGetPrimal with 'primal' field access, and
@@ -4284,6 +4249,27 @@ bool isDiffInst(IRInst* inst)
         return isDiffInst(block);
 
     return false;
+}
+
+void copyDebugInfo(IRInst* srcFunc, IRInst* destFunc)
+{
+    // Copy debug decorations.
+    for (auto decor : srcFunc->getDecorations())
+    {
+        switch (decor->getOp())
+        {
+        case kIROp_DebugInlinedAt:
+        case kIROp_DebugScope:
+        case kIROp_DebugNoScope:
+        case kIROp_DebugInlinedVariable:
+        case kIROp_DebugFuncDecoration:
+        case kIROp_DebugLocationDecoration:
+            cloneDecoration(decor, destFunc);
+            break;
+        default:
+            break;
+        }
+    }
 }
 
 } // namespace Slang

@@ -320,7 +320,8 @@ Val* UnknownSubtypeWitness::_substituteImplOverride(
         return this;
     (*ioDiff)++;
 
-    auto newSubtypeWitness = getCurrentASTBuilder()->getUnknownSubtypeWitness(newSub, newSup);
+    auto newSubtypeWitness =
+        getCurrentASTBuilder()->getUnknownSubtypeWitness(newSub, newSup, getModule());
 
     if (newSubtypeWitness == this)
     {
@@ -328,20 +329,20 @@ Val* UnknownSubtypeWitness::_substituteImplOverride(
         return this;
     }
 
-    if (getCurrentASTBuilder()->m_resolvedVals.containsKey(this) &&
-        !getCurrentASTBuilder()->m_resolvedVals.containsKey(newSubtypeWitness))
+    if (this->getModule()->m_resolvedVals.containsKey(this) &&
+        !this->getModule()->m_resolvedVals.containsKey(newSubtypeWitness))
     {
         // Add the new subtype witness to the cache.
-        getCurrentASTBuilder()->m_resolvedVals.add(
+        this->getModule()->m_resolvedVals.add(
             newSubtypeWitness,
-            getCurrentASTBuilder()->m_resolvedVals[this]->substitute(astBuilder, subst));
+            this->getModule()->m_resolvedVals[this]->substitute(astBuilder, subst));
     }
 
-    if (getCurrentASTBuilder()->m_valsRequiringResolution.contains(this) &&
-        !getCurrentASTBuilder()->m_valsRequiringResolution.contains(newSubtypeWitness))
+    if (this->getModule()->m_valsRequiringResolution.contains(this) &&
+        !this->getModule()->m_valsRequiringResolution.contains(newSubtypeWitness))
     {
         // Add the new subtype witness to the cache.
-        getCurrentASTBuilder()->m_valsRequiringResolution.add(newSubtypeWitness);
+        this->getModule()->m_valsRequiringResolution.add(newSubtypeWitness);
     }
 
     return newSubtypeWitness;
@@ -354,10 +355,10 @@ void UnknownSubtypeWitness::_toTextOverride(StringBuilder& out)
 
 Val* UnknownSubtypeWitness::_resolveImplOverride()
 {
-    if (getCurrentASTBuilder()->m_resolvedVals.containsKey(this))
+    if (getModule()->m_resolvedVals.containsKey(this))
     {
         // Return the resolved value from the cache.
-        return getCurrentASTBuilder()->m_resolvedVals[this];
+        return getModule()->m_resolvedVals[this];
     }
 
     return this;
@@ -517,6 +518,7 @@ Val* EachSubtypeWitness::_substituteImplOverride(
     auto newSup = as<Type>(getSup()->substituteImpl(astBuilder, subst, &diff));
     if (!diff)
         return this;
+    (*ioDiff)++;
     return getCurrentASTBuilder()->getEachSubtypeWitness(newSub, newSup, newPatternWitness);
 }
 

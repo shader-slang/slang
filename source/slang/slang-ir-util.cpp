@@ -165,6 +165,52 @@ IROp getTypeStyle(BaseType op)
     }
 }
 
+// Split into direction and type
+std::tuple<ParameterDirectionInfo, IRType*> splitDirectionAndType(IRType* paramType)
+{
+    if (as<IROutType>(paramType))
+        return {
+            ParameterDirectionInfo(ParameterDirectionInfo::Kind::Out),
+            as<IROutType>(paramType)->getValueType()};
+    else if (as<IRInOutType>(paramType))
+        return {
+            ParameterDirectionInfo(ParameterDirectionInfo::Kind::InOut),
+            as<IRInOutType>(paramType)->getValueType()};
+    else if (as<IRRefType>(paramType))
+        return {
+            ParameterDirectionInfo(
+                ParameterDirectionInfo::Kind::Ref,
+                as<IRRefType>(paramType)->getAddressSpace()),
+            as<IRRefType>(paramType)->getValueType()};
+    else if (as<IRConstRefType>(paramType))
+        return {
+            ParameterDirectionInfo(
+                ParameterDirectionInfo::Kind::ConstRef,
+                as<IRConstRefType>(paramType)->getAddressSpace()),
+            as<IRConstRefType>(paramType)->getValueType()};
+    else
+        return {ParameterDirectionInfo(ParameterDirectionInfo::Kind::In), paramType};
+}
+
+IRType* fromDirectionAndType(IRBuilder* builder, ParameterDirectionInfo direction, IRType* type)
+{
+    switch (direction.kind)
+    {
+    case ParameterDirectionInfo::Kind::In:
+        return type;
+    case ParameterDirectionInfo::Kind::Out:
+        return builder->getOutType(type);
+    case ParameterDirectionInfo::Kind::InOut:
+        return builder->getInOutType(type);
+    case ParameterDirectionInfo::Kind::ConstRef:
+        return builder->getConstRefType(type, direction.addressSpace);
+    case ParameterDirectionInfo::Kind::Ref:
+        return builder->getRefType(type, direction.addressSpace);
+    default:
+        SLANG_UNEXPECTED("Unhandled parameter direction in fromDirectionAndType");
+    }
+}
+
 IRInst* specializeWithGeneric(
     IRBuilder& builder,
     IRInst* genericToSpecialize,
@@ -1282,27 +1328,13 @@ void forEachAssociatedCallee(IRInst* callee, TFunc callback)
     // if (!resolvedFunc)
     //    return;
 
-    // TODO: Verify this logic for generic witness table entries.
-    for (auto use = callee->firstUse; use; use = use->nextUse)
-    {
-        if (auto annotation = as<IRWitnessTableAnnotation>(use->getUser()))
+    traverseUsers<IRAssociatedInstAnnotation>(
+        callee,
+        [&](IRAssociatedInstAnnotation* annotation)
         {
             if (annotation->getTarget() == callee)
-            {
-                for (auto child : annotation->getWitnessTable()->getChildren())
-                {
-                    if (auto entry = as<IRWitnessTableEntry>(child))
-                    {
-                        // If the child is a witness table entry (and not a type), we can treat it
-                        // as an associated callee.
-                        //
-                        // if (entry->getSatisfyingVal()->getDataType()->getOp() != kIROp_TypeKind)
-                        callback(entry->getSatisfyingVal());
-                    }
-                }
-            }
-        }
-    }
+                callback(annotation->getInst());
+        });
 
     // We'll scan for appropriate decorations and return
     // the function references.
@@ -1872,6 +1904,12 @@ UnownedStringSlice getBuiltinFuncName(IRInst* callee)
         return UnownedStringSlice::fromLiteral("IDifferentiable");
     case KnownBuiltinDeclName::IDifferentiablePtr:
         return UnownedStringSlice::fromLiteral("IDifferentiablePtr");
+    case KnownBuiltinDeclName::IForwardDifferentiable:
+        return UnownedStringSlice::fromLiteral("IForwardDifferentiable");
+    case KnownBuiltinDeclName::IBackwardDifferentiable:
+        return UnownedStringSlice::fromLiteral("IBackwardDifferentiable");
+    case KnownBuiltinDeclName::IBwdCallable:
+        return UnownedStringSlice::fromLiteral("IBwdCallable");
     case KnownBuiltinDeclName::NullDifferential:
         return UnownedStringSlice::fromLiteral("NullDifferential");
     default:

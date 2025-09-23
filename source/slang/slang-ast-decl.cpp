@@ -488,7 +488,7 @@ ThisTypeDecl* InterfaceDecl::getThisTypeDecl()
 
 ThisTypeDecl* FunctionInterfaceDecl::getThisTypeDecl()
 {
-    for (auto member : members)
+    for (auto member : getDirectMemberDecls())
     {
         if (auto thisTypeDeclCandidate = as<ThisTypeDecl>(member))
         {

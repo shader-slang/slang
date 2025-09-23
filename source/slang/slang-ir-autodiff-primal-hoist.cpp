@@ -314,7 +314,7 @@ bool canInstBeStored(IRInst* inst)
     //
     if (as<IRTypeType>(inst->getDataType()) || as<IRWitnessTableType>(inst->getDataType()) ||
         as<IRTypeKind>(inst->getDataType()) || as<IRFuncType>(inst->getDataType()) ||
-        !inst->getDataType())
+        as<IRGenericKind>(inst->getDataType()) || !inst->getDataType())
         return false;
 
     return true;
