@@ -100,14 +100,14 @@ struct DeferBufferLoadContext
             align = load->findAttr<IRAlignedAttr>();
         if (!as<IRModuleInst>(ptr->getParent()))
         {
-            builder.setInsertAfter(ptr);
+            setInsertAfterOrdinaryInst(&builder, ptr);
             IRType* valueType = tryGetPointedToType(&builder, ptr->getFullType());
             result = builder.emitLoad(valueType, ptr, align);
             mapPtrToValue[ptr] = result;
         }
         else
         {
-            builder.setInsertBefore(loadInst);
+            setInsertBeforeOrdinaryInst(&builder, loadInst);
             IRType* valueType = tryGetPointedToType(&builder, ptr->getFullType());
             result = builder.emitLoad(valueType, ptr, align);
             // Since we are inserting the load in a local scope, we can't register

@@ -31,10 +31,7 @@ struct TransformParamsToConstRefContext
         case kIROp_StructType:
         case kIROp_ArrayType:
         case kIROp_UnsizedArrayType:
-        case kIROp_VectorType:
-        case kIROp_MatrixType:
         case kIROp_TupleType:
-        case kIROp_CoopVectorType:
             // valid type, continue to check
             break;
         default:
@@ -70,6 +67,8 @@ struct TransformParamsToConstRefContext
                     case kIROp_FieldExtract:
                         {
                             // Transform the IRFieldExtract into a IRFieldAddress
+                            if (isUseBaseAddrOperand(use, user))
+                                break;
                             auto fieldExtract = as<IRFieldExtract>(use->getUser());
                             builder.setInsertBefore(fieldExtract);
                             auto fieldAddr = builder.emitFieldAddress(
@@ -77,11 +76,13 @@ struct TransformParamsToConstRefContext
                                 fieldExtract->getField());
                             fieldExtract->replaceUsesWith(fieldAddr);
                             _addToWorkList(fieldAddr);
-                            break;
+                            return;
                         }
                     case kIROp_GetElement:
                         {
                             // Transform the IRGetElement into a IRGetElementPtr
+                            if (isUseBaseAddrOperand(use, user))
+                                break;
                             auto getElement = as<IRGetElement>(use->getUser());
 
                             builder.setInsertBefore(getElement);
@@ -90,7 +91,7 @@ struct TransformParamsToConstRefContext
                                 getElement->getIndex());
                             getElement->replaceUsesWith(elemAddr);
                             _addToWorkList(elemAddr);
-                            break;
+                            return;
                         }
                     case kIROp_Store:
                         {
@@ -106,19 +107,15 @@ struct TransformParamsToConstRefContext
                                 user->removeAndDeallocate();
                                 dest->replaceUsesWith(inst);
                                 dest->removeAndDeallocate();
-                                break;
+                                return;
                             }
-                            [[fallthrough]];
-                        }
-                    default:
-                        {
-                            // Insert a load before the user and replace the user with the load
-                            builder.setInsertBefore(user);
-                            auto loadInst = builder.emitLoad(inst);
-                            use->set(loadInst);
                             break;
                         }
                     }
+                    // Insert a load before the user and replace the user with the load
+                    builder.setInsertBefore(user);
+                    auto loadInst = builder.emitLoad(inst);
+                    use->set(loadInst);
                 });
         }
     }
@@ -136,6 +133,8 @@ struct TransformParamsToConstRefContext
     // Check if `load` is an `IRLoad(addr)` where `addr` is a immutable location.
     IRInst* isLoadFromImmutableAddress(IRInst* load)
     {
+        if (load->getOp() != kIROp_Load)
+            return nullptr;
         auto addr = load->getOperand(0);
         auto root = getRootAddr(addr);
         if (!root)
@@ -283,6 +282,8 @@ struct TransformParamsToConstRefContext
         {
             return;
         }
+
+        fixUpFuncType(func);
 
         // Second pass: Update function body according to the new `constref` parameters
         rewriteParamUseSitesToSupportConstRefUsage(updatedParams);

@@ -1208,7 +1208,7 @@ struct LoweredElementTypeContext
                     builder.getIntValue(builder.getUInt64Type(), offset));
             }
             newArrayPtrVal = builder.emitBitCast(
-                builder.getPtrType(loweredInnerType.loweredType),
+                builder.getPtrType(loweredInnerType.loweredType, ptrType),
                 newArrayPtrVal);
             traverseUses(
                 fieldAddr,
@@ -1271,6 +1271,8 @@ struct LoweredElementTypeContext
                         switch (user->getOp())
                         {
                         case kIROp_FieldAddress:
+                            if (!isUseBaseAddrOperand(use, user))
+                                break;
                             // If our logical struct type ends with an unsized array field, the
                             // storage struct type won't have this field defined.
                             // Therefore, all fieldAddress(obj, lastField) inst retrieving the last
@@ -1292,7 +1294,7 @@ struct LoweredElementTypeContext
                         case kIROp_RWStructuredBufferGetElementPtr:
                             {
                                 // gep(castStorageToLogical(x)) ==> castStorageToLogical(gep(x))
-                                if (user->getOperand(0) != castInst)
+                                if (!isUseBaseAddrOperand(use, user))
                                     break;
                                 auto logicalBaseType = castInst->getDataType();
                                 auto logicalType = user->getDataType();
@@ -1380,7 +1382,7 @@ struct LoweredElementTypeContext
                                 //   create a temp var to hold the result of the memory load,
                                 //   Then we create a `CastStorageToLogicalDeref(tempVar)`
                                 //   structure and use it to replace `user`.
-                                if (user->getOperand(0) != castInst)
+                                if (!isUseBaseAddrOperand(use, user))
                                     break;
                                 // If loaded value is itself a pointer or buffer,
                                 // stop pushing the cast along the resulting address.
@@ -1424,6 +1426,8 @@ struct LoweredElementTypeContext
                         case kIROp_FieldExtract:
                         case kIROp_GetElement:
                             {
+                                if (!isUseBaseAddrOperand(use, user))
+                                    break;
                                 // elementExtract(castStorageToLogicalDeref(addr), key)
                                 // ==> load(gep(castStorageToLogical(addr), key)
                                 builder.setInsertBefore(user);
@@ -1433,9 +1437,9 @@ struct LoweredElementTypeContext
                                     castInst->getBufferType());
                                 IRInst* gep = nullptr;
                                 if (user->getOp() == kIROp_GetElement)
-                                    gep = builder.emitElementAddress(castAddr, user->getOperand(0));
+                                    gep = builder.emitElementAddress(castAddr, user->getOperand(1));
                                 else
-                                    gep = builder.emitFieldAddress(castAddr, user->getOperand(0));
+                                    gep = builder.emitFieldAddress(castAddr, user->getOperand(1));
                                 auto load = builder.emitLoad(gep);
                                 user->replaceUsesWith(load);
                                 user->removeAndDeallocate();
@@ -1688,6 +1692,19 @@ struct LoweredElementTypeContext
                     auto user = use->getUser();
                     if (use != &user->typeUse)
                         return;
+                    // We don't want to insert cast instructions for uses of
+                    // intermediate address instruction that are themselves
+                    // derived from some other base address. We will let
+                    // the later part of the pass to systematically propagate
+                    // the cast through them.
+                    switch (user->getOp())
+                    {
+                    case kIROp_FieldAddress:
+                    case kIROp_GetElementPtr:
+                    case kIROp_GetOffsetPtr:
+                    case kIROp_RWStructuredBufferGetElementPtr:
+                        return;
+                    }
                     auto ptrVal = use->getUser();
                     builder.setInsertAfter(ptrVal);
                     builder.replaceOperand(use, loweredBufferType);
@@ -1840,7 +1857,7 @@ struct LoweredElementTypeContext
                             addr);
                         user->replaceUsesWith(unpackedVal);
                         user->removeAndDeallocate();
-                        break;
+                        return;
                     }
                 case kIROp_Store:
                 case kIROp_RWStructuredBufferStore:
@@ -1884,14 +1901,15 @@ struct LoweredElementTypeContext
                         {
                             SLANG_UNREACHABLE("unhandled store type");
                         }
-                        break;
+                        return;
                     }
                 default:
-                    SLANG_UNREACHABLE(
-                        "lowerBufferElementType: unknown user of CastStorageToLogical.");
-
                     break;
                 }
+                // If the pointer is used in any other way that we don't recognize,
+                // preserve it as is without translation.
+                builder.setInsertBefore(user);
+                builder.replaceOperand(use, ptrVal);
             });
 
         if (!castInst->hasUses())
@@ -1937,8 +1955,10 @@ struct LoweredElementTypeContext
         auto matrixTypeInfo =
             getTypeLoweringMap(workItem.config).mapLoweredTypeToInfo.tryGetValue(loweredMatrixType);
         SLANG_ASSERT(matrixTypeInfo);
+        if (matrixTypeInfo->loweredType == matrixTypeInfo->originalType)
+            return;
         auto matrixType = as<IRMatrixType>(matrixTypeInfo->originalType);
-        auto rowCount = getIntVal(matrixType->getRowCount());
+        auto colCount = getIntVal(matrixType->getColumnCount());
         traverseUses(
             majorAddr,
             [&](IRUse* use)
@@ -1959,7 +1979,7 @@ struct LoweredElementTypeContext
                         if (getIntVal(matrixType->getLayout()) == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR)
                         {
                             List<IRInst*> args;
-                            for (IRIntegerValue i = 0; i < rowCount; i++)
+                            for (IRIntegerValue i = 0; i < colCount; i++)
                             {
                                 auto vector =
                                     builder.emitLoad(builder.emitElementAddress(dataPtr, i));
@@ -1996,7 +2016,7 @@ struct LoweredElementTypeContext
                             matrixTypeInfo->loweredInnerStructKey);
                         if (getIntVal(matrixType->getLayout()) == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR)
                         {
-                            for (IRIntegerValue i = 0; i < rowCount; i++)
+                            for (IRIntegerValue i = 0; i < colCount; i++)
                             {
                                 auto vectorAddr = builder.emitElementAddress(dataPtr, i);
                                 auto elementAddr =

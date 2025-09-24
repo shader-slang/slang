@@ -2512,6 +2512,20 @@ bool isImmutableLocation(IRInst* loc)
     if (auto textureType = as<IRTextureType>(type))
         return textureType->getAccess() == SLANG_RESOURCE_ACCESS_READ;
 
+    if (auto ptrType = as<IRPtrTypeBase>(type))
+    {
+        if (ptrType->getAccessQualifier() == AccessQualifier::Read)
+            return true;
+        switch (ptrType->getAddressSpace())
+        {
+        case AddressSpace::BuiltinInput:
+        case AddressSpace::Input:
+        case AddressSpace::MetalObjectData:
+        case AddressSpace::Uniform:
+        case AddressSpace::UniformConstant:
+            return true;
+        }
+    }
     return false;
 }
 } // namespace Slang

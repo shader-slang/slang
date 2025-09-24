@@ -420,6 +420,14 @@ bool isSignedType(IRType* type);
 bool isIROpaqueType(IRType* type);
 
 bool isImmutableLocation(IRInst* loc);
+
+// Check if `use` is the `baseAddr` operand of a GetElement/FieldExtract inst.
+// This is true if `use` is the first operand of the user inst.
+inline bool isUseBaseAddrOperand(IRUse* use, IRInst* user)
+{
+    return user->getOperands() == use;
+}
+
 } // namespace Slang
 
 #endif

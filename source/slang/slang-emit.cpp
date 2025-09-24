@@ -97,6 +97,7 @@
 #include "slang-ir-restructure.h"
 #include "slang-ir-sccp.h"
 #include "slang-ir-simplify-for-emit.h"
+#include "slang-ir-specialize-address-space.h"
 #include "slang-ir-specialize-arrays.h"
 #include "slang-ir-specialize-buffer-load-arg.h"
 #include "slang-ir-specialize-matrix-layout.h"
@@ -1813,11 +1814,11 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.meshOutput)
         legalizeMeshOutputTypes(irModule);
 
-    BufferElementTypeLoweringOptions bufferElementTypeLoweringOptions;
-    bufferElementTypeLoweringOptions.use16ByteArrayElementForConstantBuffer =
-        isWGPUTarget(targetRequest);
-    lowerBufferElementTypeToStorageType(targetProgram, irModule, bufferElementTypeLoweringOptions);
-    performForceInlining(irModule);
+
+    // Lower all bit_cast operations on complex types into leaf-level
+    // bit_cast on basic types.
+    if (requiredLoweringPassSet.bitcast)
+        lowerBitCast(targetProgram, irModule, sink);
 
     // Rewrite functions that return arrays to return them via `out` parameter,
     // since our target languages doesn't allow returning arrays.
@@ -1833,12 +1834,22 @@ Result linkAndOptimizeIR(
             rcpWOfPositionInput(irModule);
     }
 
-    // Lower all bit_cast operations on complex types into leaf-level
-    // bit_cast on basic types.
-    if (requiredLoweringPassSet.bitcast)
-        lowerBitCast(targetProgram, irModule, sink);
-
     bool emitSpirvDirectly = targetProgram->shouldEmitSPIRVDirectly();
+
+    BufferElementTypeLoweringOptions bufferElementTypeLoweringOptions;
+    bufferElementTypeLoweringOptions.use16ByteArrayElementForConstantBuffer =
+        isWGPUTarget(targetRequest);
+    lowerBufferElementTypeToStorageType(targetProgram, irModule, bufferElementTypeLoweringOptions);
+
+    if (target == CodeGenTarget::GLSL)
+    {
+        // If we are generating code for glsl, perform address space propagation now,
+        // so that the GLSL emitter can recognize buffer pointers from ordinary pointers.
+        NoOpInitialAddressSpaceAssigner addrSpaceAssigner;
+        specializeAddressSpace(irModule, &addrSpaceAssigner);
+    }
+
+    performForceInlining(irModule);
 
     if (emitSpirvDirectly)
     {

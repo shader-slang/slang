@@ -263,7 +263,9 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                                 }
                                 if (!fullySpecialized)
                                     break;
-
+                                // If callee doesn't have a body, don't specialize.
+                                if (!callee->getFirstBlock())
+                                    break;
                                 FuncSpecializationKey key(callee, argAddrSpaces);
                                 IRFunc* specializedCallee = nullptr;
                                 if (IRFunc** specializedFunc =
@@ -482,6 +484,16 @@ void propagateAddressSpaceFromInsts(List<IRInst*>&& workList)
             }
         }
     }
+}
+
+AddressSpace NoOpInitialAddressSpaceAssigner::getAddressSpaceFromVarType(IRInst*)
+{
+    return AddressSpace::Generic;
+}
+
+AddressSpace NoOpInitialAddressSpaceAssigner::getLeafInstAddressSpace(IRInst*)
+{
+    return AddressSpace::Generic;
 }
 
 } // namespace Slang
