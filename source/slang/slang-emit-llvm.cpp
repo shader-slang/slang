@@ -81,6 +81,13 @@ static UInt parseNumber(const char*& cursor, const char* end)
     return n;
 }
 
+struct VariableDebugInfo
+{
+    llvm::DIVariable* debugVar;
+    bool attached = false;
+    bool isStackVar = false;
+};
+
 struct LLVMEmitter
 {
     llvm::LLVMContext llvmContext;
@@ -101,7 +108,7 @@ struct LLVMEmitter
 
     Dictionary<IRInst*, llvm::DIFile*> sourceDebugInfo;
     Dictionary<IRInst*, llvm::DISubprogram*> functionDebugInfo;
-    Dictionary<IRInst*, llvm::DIVariable*> variableDebugInfo;
+    Dictionary<IRInst*, VariableDebugInfo> variableDebugInfoMap;
 
     List<llvm::DIScope*> debugScopeStack;
 
@@ -470,7 +477,7 @@ struct LLVMEmitter
         for (auto field : irStruct->getFields())
         {
             if(field->getKey() == irKey)
-                return mapStructIndexToLLVM(irStruct, i);
+                return i;
             i++;
         }
         SLANG_UNEXPECTED("Requested key that doesn't exist in struct!");
@@ -486,6 +493,43 @@ struct LLVMEmitter
             }
         }
         return false;
+    }
+
+    IRIntegerValue getOffset(IRStructField* field)
+    {
+        IRIntegerValue offset = 0;
+        if (getOptions().shouldUseCLayout())
+        {
+            Slang::getOffset(
+                getOptions(),
+                IRTypeLayoutRules::get(IRTypeLayoutRuleName::C),
+                field,
+                &offset);
+        }
+        else if (getOptions().shouldUseScalarLayout())
+        {
+            Slang::getOffset(
+                getOptions(),
+                IRTypeLayoutRules::get(IRTypeLayoutRuleName::Scalar),
+                field,
+                &offset);
+        }
+        else
+        {
+            auto structType = as<IRStructType>(field->getParent());
+            UInt index = 0;
+            for (auto ff : structType->getFields())
+            {
+                if(ff == field)
+                    break;
+                index++;
+            }
+            auto llvmType = llvm::cast<llvm::StructType>(ensureType(structType));
+            auto dataLayout = targetMachine->createDataLayout();
+            const llvm::StructLayout* llvmStructLayout = dataLayout.getStructLayout(llvmType);
+            offset = llvmStructLayout->getElementOffset(index);
+        }
+        return offset;
     }
 
     IRSizeAndAlignment getSizeAndAlignment(IRInst* val)
@@ -650,6 +694,27 @@ struct LLVMEmitter
         }
     }
 
+    void declareAllocaDebugVar(llvm::StringRef name, llvm::Value* llvmVar, IRType* type)
+    {
+        if (!debug)
+            return;
+
+        auto varType = ensureDebugType(type);
+
+        llvm::DILocation* loc = llvmBuilder->getCurrentDebugLocation();
+        auto debugVar = llvmDebugBuilder.createAutoVariable(
+            debugScopeStack.getLast(), name, loc->getFile(), loc->getLine(),
+            varType, getOptions().getOptimizationLevel() == OptimizationLevel::None
+        );
+        llvmDebugBuilder.insertDeclare(
+            llvmVar,
+            llvm::cast<llvm::DILocalVariable>(debugVar),
+            llvmDebugBuilder.createExpression(),
+            loc,
+            llvmBuilder->GetInsertBlock()
+        );
+    }
+
     // Caution! This is only for emitting things which are considered
     // instructions in LLVM! It won't work for IRBlocks, IRFuncs & such.
     llvm::Value* emitLLVMInstruction(IRInst* inst, llvm::Value* storeOnReturn)
@@ -722,7 +787,13 @@ struct LLVMEmitter
 
                 llvm::StringRef name;
                 if (maybeGetName(&name, inst))
+                {
                     llvmVar->setName(name);
+                    // TODO: This may be a bit of a hack. DebugVar fails to get
+                    // linked to the actual Var sometimes, which is why we do
+                    // this :/
+                    declareAllocaDebugVar(name, llvmVar, ptrType->getValueType());
+                }
 
                 llvmInst = llvmVar;
             }
@@ -1002,7 +1073,31 @@ struct LLVMEmitter
                     baseStructType = as<IRStructType>(ptrType->getValueType());
                 }
 
-                std::size_t index = getStructIndexByKey(baseStructType, key);
+                UInt index = getStructIndexByKey(baseStructType, key);
+
+                if (as<IRDebugVar>(base))
+                {
+                    // This is emitted to annotate member accesses of structs.
+                    llvm::DILocation* loc = llvmBuilder->getCurrentDebugLocation();
+
+                    llvm::StringRef name = "";
+                    maybeGetName(&name, inst);
+
+                    IRStructField* field = findStructField(baseStructType, index);
+
+                    variableDebugInfoMap[inst] = {
+                        llvmDebugBuilder.createAutoVariable(
+                            debugScopeStack.getLast(), name, loc->getFile(), loc->getLine(),
+                            ensureDebugType(field->getFieldType()),
+                            getOptions().getOptimizationLevel() == OptimizationLevel::None
+                        ),
+                        false,
+                        false
+                    };
+                    return nullptr;
+                }
+
+                index = mapStructIndexToLLVM(baseStructType, index);
 
                 auto llvmStructType = ensureType(baseStructType);
                 auto llvmBase = findValue(base);
@@ -1020,7 +1115,9 @@ struct LLVMEmitter
                 auto fieldExtractInst = static_cast<IRFieldExtract*>(inst);
                 auto structType = as<IRStructType>(fieldExtractInst->getBase()->getDataType());
                 auto llvmBase = findValue(fieldExtractInst->getBase());
-                unsigned idx = getStructIndexByKey(structType, as<IRStructKey>(fieldExtractInst->getField()));
+                unsigned idx = mapStructIndexToLLVM(
+                    structType,
+                    getStructIndexByKey(structType, as<IRStructKey>(fieldExtractInst->getField())));
 
                 IRType* elementType = nullptr;
                 llvm::Value* ptr = emitGetElementPtr(llvmBase, llvmBuilder->getInt32(idx), structType, elementType);
@@ -1163,18 +1260,26 @@ struct LLVMEmitter
 
                 if (argIndex)
                 {
-                    variableDebugInfo[inst] = llvmDebugBuilder.createParameterVariable(
-                        debugScopeStack.getLast(), name, getIntVal(argIndex), file,
-                        line, varType,
-                        getOptions().getOptimizationLevel() == OptimizationLevel::None
-                    );
+                    variableDebugInfoMap[inst] = {
+                        llvmDebugBuilder.createParameterVariable(
+                            debugScopeStack.getLast(), name, getIntVal(argIndex), file,
+                            line, varType,
+                            getOptions().getOptimizationLevel() == OptimizationLevel::None
+                        ),
+                        false,
+                        false
+                    };
                 }
                 else
                 {
-                    variableDebugInfo[inst] = llvmDebugBuilder.createAutoVariable(
-                        debugScopeStack.getLast(), name, file, line, varType,
-                        getOptions().getOptimizationLevel() == OptimizationLevel::None
-                    );
+                    variableDebugInfoMap[inst] = {
+                        llvmDebugBuilder.createAutoVariable(
+                            debugScopeStack.getLast(), name, file, line, varType,
+                            getOptions().getOptimizationLevel() == OptimizationLevel::None
+                        ),
+                        false,
+                        false
+                    };
                 }
             }
             return nullptr;
@@ -1183,19 +1288,36 @@ struct LLVMEmitter
             if (debug)
             {
                 auto debugValueInst = static_cast<IRDebugValue*>(inst);
-                llvm::DIVariable* debugVar = variableDebugInfo[debugValueInst->getDebugVar()];
+                VariableDebugInfo& debugInfo = variableDebugInfoMap.getValue(debugValueInst->getDebugVar());
 
                 llvm::DILocation* loc = llvmBuilder->getCurrentDebugLocation();
                 if (!loc)
-                    loc = llvm::DILocation::get(llvmContext, debugVar->getLine(), 0, debugVar->getScope());
+                    loc = llvm::DILocation::get(llvmContext, debugInfo.debugVar->getLine(), 0, debugInfo.debugVar->getScope());
 
-                llvmDebugBuilder.insertDbgValueIntrinsic(
-                    findValue(debugValueInst->getValue()),
-                    llvm::cast<llvm::DILocalVariable>(debugVar),
-                    llvmDebugBuilder.createExpression(),
-                    loc,
-                    llvmBuilder->GetInsertBlock()
-                );
+                llvm::Value* value = findValue(debugValueInst->getValue());
+                llvm::AllocaInst* alloca = llvm::dyn_cast<llvm::AllocaInst>(value);
+                if (!debugInfo.attached && alloca)
+                {
+                    debugInfo.isStackVar = true;
+                    llvmDebugBuilder.insertDeclare(
+                        alloca,
+                        llvm::cast<llvm::DILocalVariable>(debugInfo.debugVar),
+                        llvmDebugBuilder.createExpression(),
+                        loc,
+                        llvmBuilder->GetInsertBlock()
+                    );
+                }
+                else if(!debugInfo.isStackVar)
+                {
+                    llvmDebugBuilder.insertDbgValueIntrinsic(
+                        findValue(debugValueInst->getValue()),
+                        llvm::cast<llvm::DILocalVariable>(debugInfo.debugVar),
+                        llvmDebugBuilder.createExpression(),
+                        loc,
+                        llvmBuilder->GetInsertBlock()
+                    );
+                }
+                debugInfo.attached = true;
             }
             return nullptr;
 
@@ -1501,12 +1623,19 @@ struct LLVMEmitter
                 auto vecType = static_cast<IRVectorType*>(type);
                 auto elemCount = int(getIntVal(vecType->getElementCount()));
                 llvm::DIType* elemType = ensureDebugType(vecType->getElementType());
-                IRSizeAndAlignment sizeAndAlignment;
-                getCSizeAndAlignment(getOptions(), vecType, &sizeAndAlignment);
+                IRSizeAndAlignment sizeAndAlignment = getSizeAndAlignment(vecType);
+
+                if (sizeAndAlignment.size < sizeAndAlignment.alignment)
+                    sizeAndAlignment.size = sizeAndAlignment.alignment;
 
                 llvm::Metadata *subscript = llvmDebugBuilder.getOrCreateSubrange(0, elemCount);
                 llvm::DINodeArray subscriptArray = llvmDebugBuilder.getOrCreateArray(subscript);
-                llvmType = llvmDebugBuilder.createVectorType(sizeAndAlignment.size*8, sizeAndAlignment.alignment*8, elemType, subscriptArray);
+                llvmType = llvmDebugBuilder.createVectorType(
+                    sizeAndAlignment.size*8,
+                    sizeAndAlignment.alignment*8,
+                    elemType,
+                    subscriptArray
+                );
             }
             break;
 
@@ -1516,8 +1645,7 @@ struct LLVMEmitter
                 llvm::DIType* elemType = ensureDebugType(arrayType->getElementType());
                 auto elemCount = int(getIntVal(arrayType->getElementCount()));
 
-                IRSizeAndAlignment sizeAndAlignment;
-                getCSizeAndAlignment(getOptions(), arrayType, &sizeAndAlignment);
+                IRSizeAndAlignment sizeAndAlignment = getSizeAndAlignment(arrayType);
 
                 llvm::Metadata *subscript = llvmDebugBuilder.getOrCreateSubrange(0, elemCount);
                 llvm::DINodeArray subscriptArray = llvmDebugBuilder.getOrCreateArray(subscript);
@@ -1529,17 +1657,38 @@ struct LLVMEmitter
             {
                 auto structType = static_cast<IRStructType*>(type);
 
-                IRSizeAndAlignment sizeAndAlignment;
-                getCSizeAndAlignment(getOptions(), structType, &sizeAndAlignment);
+                IRSizeAndAlignment sizeAndAlignment = getSizeAndAlignment(structType);
 
-                llvm::DINodeArray fieldTypes;
+                llvm::DILocation* loc = llvmBuilder->getCurrentDebugLocation();
+                List<llvm::Metadata*> types;
                 for (auto field : structType->getFields())
                 {
                     auto fieldType = field->getFieldType();
                     if (as<IRVoidType>(fieldType))
                         continue;
-                    fieldTypes->push_back(ensureDebugType(fieldType));
+                    llvm::DIType* debugType = ensureDebugType(fieldType);
+
+                    IRSizeAndAlignment sizeAndAlignment = getSizeAndAlignment(field->getFieldType());
+                    IRIntegerValue offset = getOffset(field);
+
+                    IRStructKey* key = field->getKey();
+                    llvm::StringRef name;
+                    if (auto nameDecor = key->findDecoration<IRNameHintDecoration>())
+                    {
+                        auto decorName = nameDecor->getName();
+                        name = llvm::StringRef(decorName.begin(), decorName.getLength());
+                    }
+                    types.add(llvmDebugBuilder.createMemberType(
+                        compileUnit, name, loc->getFile(), loc->getLine(),
+                        sizeAndAlignment.size * 8, sizeAndAlignment.alignment * 8,
+                        offset * 8,
+                        llvm::DINode::FlagZero,
+                        debugType
+                    ));
                 }
+                llvm::DINodeArray fieldTypes = llvmDebugBuilder.getOrCreateArray(
+                    llvm::ArrayRef<llvm::Metadata*>(types.begin(), types.end())
+                );
 
                 llvm::StringRef name;
                 maybeGetName(&name, type);
@@ -1553,9 +1702,9 @@ struct LLVMEmitter
                     scope,
                     name,
                     file,
+                    line,
                     sizeAndAlignment.size*8,
                     sizeAndAlignment.alignment*8,
-                    line,
                     llvm::DINode::FlagZero,
                     nullptr,
                     fieldTypes
