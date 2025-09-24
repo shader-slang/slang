@@ -20,7 +20,6 @@
 #include <llvm/Passes/PassBuilder.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
-#include <llvm/Transforms/Scalar/Scalarizer.h>
 #include <llvm/Target/TargetMachine.h>
 #include <llvm/Target/TargetOptions.h>
 #include <llvm/TargetParser/Host.h>
@@ -149,14 +148,16 @@ struct LLVMEmitter
             llvmBuilder->getPtrTy(0)
         );
 
-        // TODO: Take the target triple as a parameter to allow
-        // cross-compilation.
-        std::string target_triple_str = llvm::sys::getDefaultTargetTriple();
+        auto targetTripleOption = getOptions().getStringOption(CompilerOptionName::LLVMTargetTriple).getUnownedSlice();
+        std::string targetTripleStr = llvm::sys::getDefaultTargetTriple();
+        if (targetTripleOption.getLength() != 0)
+            targetTripleStr = std::string(targetTripleOption.begin(), targetTripleOption.getLength());
+
         std::string error;
-        const llvm::Target* target = llvm::TargetRegistry::lookupTarget(target_triple_str, error);
+        const llvm::Target* target = llvm::TargetRegistry::lookupTarget(targetTripleStr, error);
         if (!target)
         {
-            codeGenContext->getSink()->diagnose(SourceLoc(), Diagnostics::unrecognizedTargetTriple, target_triple_str.c_str(), error.c_str());
+            codeGenContext->getSink()->diagnose(SourceLoc(), Diagnostics::unrecognizedTargetTriple, targetTripleStr.c_str(), error.c_str());
             return;
         }
 
@@ -203,9 +204,9 @@ struct LLVMEmitter
             break;
         }
 
-        llvm::Triple target_triple(target_triple_str);
+        llvm::Triple targetTriple(targetTripleStr);
         targetMachine = target->createTargetMachine(
-            target_triple, "generic", "", opt, llvm::Reloc::PIC_, std::nullopt,
+            targetTriple, "generic", "", opt, llvm::Reloc::PIC_, std::nullopt,
             optLevel
         );
 
@@ -2369,23 +2370,6 @@ struct LLVMEmitter
             );
         }
         
-        // TODO: Not sure if necessary. Will know more after eliminating
-        // aggregate types. We may be able to just create aggregate loads and
-        // stores such that this is taken into account.
-        // https://llvm.org/docs/Frontend/PerformanceTips.html#avoid-creating-values-of-aggregate-type
-        /*
-        if (getOptions().shouldUseCLayout() || getOptions().shouldUseScalarLayout())
-        {
-            llvm::legacy::PassManager pass;
-            llvm::ScalarizerPassOptions scalarOptions;
-            scalarOptions.ScalarizeMinBits = 0;
-            scalarOptions.ScalarizeVariableInsertExtract = true;
-            scalarOptions.ScalarizeLoadStore = true;
-            pass.add(llvm::createScalarizerPass(scalarOptions));
-            pass.run(llvmModule);
-        }
-        */
-
         llvm::verifyModule(llvmModule, &llvm::errs());
 
         if (getOptions().getOptimizationLevel() != OptimizationLevel::None)

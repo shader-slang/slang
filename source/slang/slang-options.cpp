@@ -743,7 +743,12 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::EmitSeparateDebug,
          "-separate-debug-info",
          nullptr,
-         "Emit debug data to a separate file, and strip it from the main output file."}};
+         "Emit debug data to a separate file, and strip it from the main output file."},
+        {OptionKind::LLVMTargetTriple,
+         "-llvm-target-triple",
+         "-llvm-target-triple <target triple>",
+         "Sets the target triple for the LLVM target, enabling cross "
+         "compilation. The default value is the host platform."}};
 
     _addOptions(makeConstArrayView(targetOpts), options);
 
@@ -3260,6 +3265,13 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 // This will emit a separate debug file, containing all debug info in
                 // a .dbg.spv file. The main output SPIRV will have all debug info stripped.
                 linkage->m_optionSet.set(OptionKind::EmitSeparateDebug, true);
+                break;
+            }
+        case OptionKind::LLVMTargetTriple:
+            {
+                CommandLineArg targetTriple;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(targetTriple));
+                linkage->m_optionSet.set(CompilerOptionName::LLVMTargetTriple, targetTriple.value);
                 break;
             }
         default:
