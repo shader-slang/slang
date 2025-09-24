@@ -4241,6 +4241,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         break;
                     }
                 }
+                break;
             }
         case kIROp_GetVulkanRayTracingPayloadLocation:
             {
