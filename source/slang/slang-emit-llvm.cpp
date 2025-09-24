@@ -302,8 +302,6 @@ struct LLVMEmitter
         case kIROp_PtrLit:
         case kIROp_MakeVector:
         case kIROp_MakeMatrix:
-        case kIROp_MakeArray:
-        case kIROp_MakeStruct:
             llvmValue = maybeEnsureConstant(inst);
             break;
         default:
@@ -445,14 +443,36 @@ struct LLVMEmitter
         return nullptr;
     }
 
-    std::size_t findStructKeyIndex(IRStructType* irStruct, IRStructKey* irKey)
+    // Returns the index of the given struct field in the corresponding LLVM
+    // struct. There may be differences due to added padding fields.
+    UInt mapStructIndexToLLVM(IRStructType* irStruct, UInt irIndex)
     {
-        std::size_t index = 0;
+        // TODO: Once padded structs exist, update this to map the indices
+        // correctly.
+        (void)irStruct;
+        return irIndex;
+    }
+
+    IRStructField* findStructField(IRStructType* irStruct, UInt irIndex)
+    {
+        UInt i = 0;
+        for (auto field : irStruct->getFields())
+        {
+            if (i == irIndex)
+                return field;
+            i++;
+        }
+        return nullptr;
+    }
+
+    UInt getStructIndexByKey(IRStructType* irStruct, IRStructKey* irKey)
+    {
+        UInt i = 0;
         for (auto field : irStruct->getFields())
         {
             if(field->getKey() == irKey)
-                return index;
-            index++;
+                return mapStructIndexToLLVM(irStruct, i);
+            i++;
         }
         SLANG_UNEXPECTED("Requested key that doesn't exist in struct!");
     }
@@ -467,6 +487,172 @@ struct LLVMEmitter
             }
         }
         return false;
+    }
+
+    IRSizeAndAlignment getSizeAndAlignment(IRInst* val)
+    {
+        if (auto type = as<IRType>(val))
+        {
+            IRSizeAndAlignment elementSizeAlignment;
+
+            if (getOptions().shouldUseCLayout())
+            {
+                Slang::getSizeAndAlignment(
+                    getOptions(),
+                    IRTypeLayoutRules::get(IRTypeLayoutRuleName::C),
+                    type,
+                    &elementSizeAlignment);
+            }
+            else if (getOptions().shouldUseScalarLayout())
+            {
+                Slang::getSizeAndAlignment(
+                    getOptions(),
+                    IRTypeLayoutRules::get(IRTypeLayoutRuleName::Scalar),
+                    type,
+                    &elementSizeAlignment);
+            }
+            else
+            {
+                // Align according to LLVM rules for maximum performance.
+                // We can't always use this, as the llvmType may be packed and
+                // specify an alignment of 1 for itself, even though we have
+                // better guarantees.
+                auto llvmType = ensureType(type);
+                auto dataLayout = targetMachine->createDataLayout();
+                elementSizeAlignment.alignment = dataLayout.getABITypeAlign(llvmType).value();
+                elementSizeAlignment.size = dataLayout.getTypeStoreSize(llvmType);
+            }
+
+            return elementSizeAlignment;
+        }
+        else return getSizeAndAlignment(val->getDataType());
+    }
+
+    llvm::Value* emitAlloca(IRType* type, size_t count = 1)
+    {
+        auto llvmType = ensureType(type);
+        IRSizeAndAlignment sizeAlign = getSizeAndAlignment(type);
+
+        return llvmBuilder->Insert(new llvm::AllocaInst(
+            llvmType, 0, llvmBuilder->getInt32(count), llvm::Align(sizeAlign.alignment)
+        ));
+    }
+
+    llvm::Value* emitGetElementPtr(llvm::Value* ptr, llvm::Value* indexInst, IRType* aggregateType, IRType*& elementType)
+    {
+        if(auto structType = as<IRStructType>(aggregateType))
+        {
+            // 'index' must be constant for struct types.
+            int64_t index = 0;
+            if (auto intLit = llvm::cast<llvm::ConstantInt>(indexInst))
+            {
+                index = intLit->getValue().getLimitedValue();
+            }
+            else
+            {
+                SLANG_ASSERT_FAILURE("GetElement on structs only supports constant indices on LLVM");
+            }
+
+            elementType = findStructField(structType, index)->getFieldType();
+            UInt llvmIndex = mapStructIndexToLLVM(structType, index);
+
+            llvm::Value* indices[2] = {
+                llvmBuilder->getInt32(0),
+                llvmBuilder->getInt32(llvmIndex),
+            };
+            return llvmBuilder->CreateGEP(ensureType(aggregateType), ptr, indices);
+        }
+        else if(auto arrayType = as<IRArrayType>(aggregateType))
+        {
+            elementType = arrayType->getElementType();
+        }
+        else if(auto vectorType = as<IRVectorType>(aggregateType))
+        {
+            elementType = vectorType->getElementType();
+        }
+        else if(auto matrixType = as<IRMatrixType>(aggregateType))
+        {
+            elementType = matrixType->getElementType();
+        }
+        else
+        {
+            SLANG_ASSERT_FAILURE("Unhandled type for GetElementPtr!");
+        }
+
+        llvm::Value* indices[2] = {
+            llvmBuilder->getInt32(0),
+            indexInst
+        };
+        return llvmBuilder->CreateGEP(ensureType(aggregateType), ptr, indices);
+    }
+
+    llvm::Value* emitLoad(llvm::Value* llvmPtr, IRType* srcType, bool isVolatile = false)
+    {
+        switch(srcType->getOp())
+        {
+        case kIROp_ArrayType:
+        case kIROp_StructType:
+            {
+                llvm::Value* llvmVar = emitAlloca(srcType);
+                IRSizeAndAlignment elementSizeAlignment = getSizeAndAlignment(srcType);
+
+                // Pointer-to-pointer copy, so generate inline memcpy.
+                llvmBuilder->CreateMemCpyInline(
+                    llvmVar,
+                    llvm::MaybeAlign(elementSizeAlignment.alignment),
+                    llvmPtr,
+                    llvm::MaybeAlign(elementSizeAlignment.alignment),
+                    llvmBuilder->getInt32(elementSizeAlignment.size),
+                    isVolatile
+                );
+                return llvmVar;
+            }
+        default:
+            {
+                auto llvmType = ensureType(srcType);
+                return llvmBuilder->CreateLoad(llvmType, llvmPtr, isVolatile);
+            }
+        }
+    }
+
+    llvm::Value* emitLoad(IRInst* srcPtr, bool isVolatile = false)
+    {
+        auto ptrType = as<IRPtrTypeBase>(srcPtr->getDataType());
+        auto valueType = ptrType->getValueType();
+
+        auto llvmPtr = findValue(srcPtr);
+        return emitLoad(llvmPtr, valueType, isVolatile);
+    }
+
+    // All CreateStore calls must be bottlenecked here.
+    llvm::Value* emitStore(llvm::Value* llvmPtr, IRInst* srcVal, bool isVolatile = false)
+    {
+        auto llvmVal = findValue(srcVal);
+
+        switch(srcVal->getDataType()->getOp())
+        {
+        case kIROp_ArrayType:
+        case kIROp_StructType:
+            {
+                // Arrays and struct values are always represented with an alloca
+                // pointer.
+                SLANG_ASSERT(llvmVal->getType()->isPointerTy());
+
+                IRSizeAndAlignment elementSizeAlignment = getSizeAndAlignment(srcVal);
+
+                // Pointer-to-pointer copy, so generate inline memcpy.
+                return llvmBuilder->CreateMemCpyInline(
+                    llvmPtr,
+                    llvm::MaybeAlign(elementSizeAlignment.alignment),
+                    llvmVal,
+                    llvm::MaybeAlign(elementSizeAlignment.alignment),
+                    llvmBuilder->getInt32(elementSizeAlignment.size),
+                    isVolatile
+                );
+            }
+        default:
+            return llvmBuilder->CreateStore(llvmVal, llvmPtr, isVolatile);
+        }
     }
 
     // Caution! This is only for emitting things which are considered
@@ -522,7 +708,7 @@ struct LLVMEmitter
                 }
                 else if (storeOnReturn)
                 {
-                    llvmBuilder->CreateStore(findValue(retVal), storeOnReturn);
+                    emitStore(storeOnReturn, retVal);
                     llvmInst = llvmBuilder->CreateRetVoid();
                 }
                 else
@@ -536,9 +722,8 @@ struct LLVMEmitter
             {
                 auto var = static_cast<IRVar*>(inst);
                 auto ptrType = var->getDataType();
-                auto llvmType = ensureType(ptrType->getValueType());
 
-                llvm::AllocaInst* llvmVar = llvmBuilder->CreateAlloca(llvmType);
+                llvm::Value* llvmVar = emitAlloca(ptrType->getValueType());
 
                 llvm::StringRef name;
                 if (maybeGetName(&name, inst))
@@ -592,33 +777,26 @@ struct LLVMEmitter
         case kIROp_Store:
             {
                 auto storeInst = static_cast<IRStore*>(inst);
-                auto llvmPtr = findValue(storeInst->getPtr());
-                auto llvmVal = findValue(storeInst->getVal());
-                llvmInst = llvmBuilder->CreateStore(llvmVal, llvmPtr, isVolatile(storeInst->getPtr()));
+                llvmInst = emitStore(findValue(storeInst->getPtr()), storeInst->getVal(), isVolatile(storeInst->getPtr()));
             }
             break;
 
         case kIROp_Load:
             {
                 auto loadInst = static_cast<IRLoad*>(inst);
-                auto ptrType = as<IRPtrTypeBase>(loadInst->getPtr()->getDataType());
-                auto llvmType = ensureType(ptrType->getValueType());
-                auto llvmPtr = findValue(loadInst->getPtr());
-                llvmInst = llvmBuilder->CreateLoad(llvmType, llvmPtr, isVolatile(loadInst->getPtr()));
+                llvmInst = emitLoad(loadInst->getPtr(), isVolatile(loadInst->getPtr()));
             }
             break;
 
         case kIROp_MakeArray:
         case kIROp_MakeStruct:
-            llvmInst = maybeEnsureConstant(inst);
-            if (!llvmInst)
             {
-                auto llvmType = ensureType(inst->getDataType());
-
-                llvmInst = llvm::PoisonValue::get(llvmType);
+                llvmInst = emitAlloca(inst->getDataType());
                 for (UInt aa = 0; aa < inst->getOperandCount(); ++aa)
                 {
-                    llvmInst = llvmBuilder->CreateInsertValue(llvmInst, findValue(inst->getOperand(aa)), aa);
+                    IRType* elementType = nullptr;
+                    llvm::Value* ptr = emitGetElementPtr(llvmInst, llvmBuilder->getInt32(aa), inst->getDataType(), elementType);
+                    emitStore(ptr, inst->getOperand(aa));
                 }
             }
             break;
@@ -830,7 +1008,7 @@ struct LLVMEmitter
                     baseStructType = as<IRStructType>(ptrType->getValueType());
                 }
 
-                std::size_t index = findStructKeyIndex(baseStructType, key);
+                std::size_t index = getStructIndexByKey(baseStructType, key);
 
                 auto llvmStructType = ensureType(baseStructType);
                 auto llvmBase = findValue(base);
@@ -848,8 +1026,11 @@ struct LLVMEmitter
                 auto fieldExtractInst = static_cast<IRFieldExtract*>(inst);
                 auto structType = as<IRStructType>(fieldExtractInst->getBase()->getDataType());
                 auto llvmBase = findValue(fieldExtractInst->getBase());
-                unsigned idx = findStructKeyIndex(structType, as<IRStructKey>(fieldExtractInst->getField()));
-                llvmInst = llvmBuilder->CreateExtractValue(llvmBase, idx);
+                unsigned idx = getStructIndexByKey(structType, as<IRStructKey>(fieldExtractInst->getField()));
+
+                IRType* elementType = nullptr;
+                llvm::Value* ptr = emitGetElementPtr(llvmBase, llvmBuilder->getInt32(idx), structType, elementType);
+                llvmInst = emitLoad(ptr, elementType);
             }
             break;
 
@@ -865,12 +1046,13 @@ struct LLVMEmitter
                     baseType = ptrType->getValueType();
                 }
 
-                llvm::Value* indices[2] = {
-                    llvmBuilder->getInt32(0),
-                    findValue(indexInst)
-                };
-
-                llvmInst = llvmBuilder->CreateGEP(ensureType(baseType), findValue(baseInst), indices);
+                IRType* elementType = nullptr;
+                llvmInst = emitGetElementPtr(
+                    findValue(baseInst),
+                    findValue(indexInst),
+                    baseType,
+                    elementType
+                );
             }
             break;
 
@@ -880,25 +1062,21 @@ struct LLVMEmitter
                 auto baseInst = geInst->getBase();
                 auto indexInst = geInst->getIndex();
 
+                auto llvmVal = findValue(baseInst);
+
                 auto baseTy = baseInst->getDataType();
                 if (as<IRVectorType>(baseTy) || as<IRMatrixType>(baseTy))
                 {
                     // For vectors, we can use extractelement
-                    llvmInst = llvmBuilder->CreateExtractElement(findValue(baseInst), findValue(indexInst));
+                    llvmInst = llvmBuilder->CreateExtractElement(llvmVal, findValue(indexInst));
                 }
-                else
+                else if(as<IRArrayType>(baseTy) || as<IRStructType>(baseTy))
                 {
-                    int64_t index = 0;
-                    if (auto intLit = as<IRIntLit>(indexInst))
-                    {
-                        index = intLit->getValue();
-                    }
-                    else
-                    {
-                        SLANG_ASSERT_FAILURE("GetElement on aggregates only supports constant indices on LLVM");
-                    }
-                    // Other aggregates need extractvalue.
-                    llvmInst = llvmBuilder->CreateExtractValue(findValue(baseInst), index);
+                    // emitGEP + emitLoad.
+                    SLANG_ASSERT(llvmVal->getType()->isPointerTy());
+                    IRType* elementType = nullptr;
+                    llvm::Value* ptr = emitGetElementPtr(llvmVal, findValue(indexInst), baseTy, elementType);
+                    llvmInst = emitLoad(ptr, elementType);
                 }
             }
             break;
@@ -915,7 +1093,17 @@ struct LLVMEmitter
                     args.add(findValue(arg));
                 }
 
-                llvmInst = llvmBuilder->CreateCall(llvmFunc, llvm::ArrayRef(args.begin(), args.end()));
+                auto returnType = ensureType(inst->getDataType());
+                llvm::Value* allocValue = nullptr;
+                // If attempting to return an aggregate, turn it into an extra
+                // output parameter that is passed with a pointer.
+                if (returnType->isAggregateType())
+                {
+                    allocValue = emitAlloca(inst->getDataType());
+                    args.add(allocValue);
+                }
+                auto returnVal = llvmBuilder->CreateCall(llvmFunc, llvm::ArrayRef(args.begin(), args.end()));
+                llvmInst = allocValue ? allocValue : returnVal;
             }
             break;
 
@@ -1180,12 +1368,24 @@ struct LLVMEmitter
             {
                 auto funcType = static_cast<IRFuncType*>(type);
 
-                auto returnType = ensureType(funcType->getResultType());
                 List<llvm::Type*> paramTypes;
                 for (UInt i = 0; i < funcType->getParamCount(); ++i)
                 {
                     IRType* paramType = funcType->getParamType(i);
-                    paramTypes.add(ensureType(paramType));
+                    auto llvmType = ensureType(paramType);
+                    // Aggregates are passed with a pointer.
+                    if (llvmType->isAggregateType())
+                        llvmType = llvm::PointerType::get(llvmContext, 0);
+                    paramTypes.add(llvmType);
+                }
+
+                auto returnType = ensureType(funcType->getResultType());
+                // If attempting to return an aggregate, turn it into an extra
+                // output parameter that is passed with a pointer.
+                if (returnType->isAggregateType())
+                {
+                    paramTypes.add(llvm::PointerType::get(llvmContext, 0));
+                    returnType = llvm::Type::getVoidTy(llvmContext);
                 }
 
                 llvmType = llvm::FunctionType::get(
@@ -1964,7 +2164,11 @@ struct LLVMEmitter
     void emitFuncDefinition(IRFunc* func)
     {
         llvm::Function* llvmFunc = ensureFuncDecl(func);
-        emitGlobalValueWithCode(func, llvmFunc, nullptr);
+
+        llvm::Value* storeArg = nullptr;
+        if (ensureType(func->getResultType())->isAggregateType())
+            storeArg = llvmFunc->getArg(0);
+        emitGlobalValueWithCode(func, llvmFunc, storeArg);
     }
 
     void emitGlobalFunctions(IRModule* irModule)
