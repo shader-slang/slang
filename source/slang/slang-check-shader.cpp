@@ -341,73 +341,6 @@ bool doStructFieldsHaveSemantic(Type* type)
     return doStructFieldsHaveSemanticImpl(type, seenTypes);
 }
 
-// Helper function to recursively check if a type contains resource types
-// This implements a simplified version of the logic from SemanticsVisitor::getTypeTags
-// focusing specifically on detecting resource types that cannot be returned from entry points
-static bool containsResourceTypeImpl(Type* type, HashSet<Type*>& seenTypes)
-{
-    // Guard against infinite recursion in case of circular references
-    if (seenTypes.contains(type))
-        return false;
-    seenTypes.add(type);
-
-    // Check for direct resource types - these correspond to TypeTag::Opaque in getTypeTags
-    if (as<ResourceType>(type) || as<UntypedBufferResourceType>(type) ||
-        as<SamplerStateType>(type) || as<HLSLStructuredBufferTypeBase>(type) ||
-        as<DynamicResourceType>(type))
-    {
-        return true;
-    }
-
-    // Check for arrays - recursively check element type
-    if (auto arrayType = as<ArrayExpressionType>(type))
-    {
-        return containsResourceTypeImpl(arrayType->getElementType(), seenTypes);
-    }
-
-    // Check for modified types (e.g., const, uniform, etc.)
-    if (auto modifiedType = as<ModifiedType>(type))
-    {
-        return containsResourceTypeImpl(modifiedType->getBase(), seenTypes);
-    }
-
-    // Check for struct types by examining their fields
-    // This handles the case mentioned in the comment: structs containing resource fields
-    if (auto declRefType = as<DeclRefType>(type))
-    {
-        if (auto structDecl = as<StructDecl>(declRefType->getDeclRef().getDecl()))
-        {
-            // Check all fields of the struct
-            for (auto member : structDecl->getDirectMemberDecls())
-            {
-                if (auto field = as<VarDecl>(member))
-                {
-                    if (containsResourceTypeImpl(field->getType(), seenTypes))
-                        return true;
-                }
-            }
-        }
-    }
-
-    // Check for vector and matrix types
-    if (auto vectorType = as<VectorExpressionType>(type))
-    {
-        return containsResourceTypeImpl(vectorType->getElementType(), seenTypes);
-    }
-
-    if (auto matrixType = as<MatrixExpressionType>(type))
-    {
-        return containsResourceTypeImpl(matrixType->getElementType(), seenTypes);
-    }
-
-    return false;
-}
-
-static bool containsResourceType(Type* type)
-{
-    HashSet<Type*> seenTypes;
-    return containsResourceTypeImpl(type, seenTypes);
-}
 
 // Validate that an entry point function conforms to any additional
 // constraints based on the stage (and profile?) it specifies.
@@ -444,17 +377,29 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     auto entryPointName = entryPointFuncDecl->getName();
 
     auto module = getModule(entryPointFuncDecl);
-    auto linkage = module->getLinkage();
+    auto linkage = entryPoint->getLinkage();
 
     // Check if the return type is valid for a shader entry point
     auto returnType = entryPointFuncDecl->returnType.type;
-    if (returnType && containsResourceType(returnType))
+    if (returnType)
     {
-        sink->diagnose(
-            entryPointFuncDecl,
-            Diagnostics::entryPointCannotReturnResourceType,
-            entryPointName,
-            returnType);
+        // Use the existing getTypeTags functionality to check for resource types
+        // Create a temporary SemanticsVisitor to access getTypeTags
+        SharedSemanticsContext shared(linkage, module, sink);
+        SemanticsVisitor visitor(&shared);
+
+        auto typeTags = visitor.getTypeTags(returnType);
+        bool hasResourceOrUnsizedTypes = (((int)typeTags & (int)TypeTag::Opaque) != 0) ||
+                                         (((int)typeTags & (int)TypeTag::Unsized) != 0);
+
+        if (hasResourceOrUnsizedTypes)
+        {
+            sink->diagnose(
+                entryPointFuncDecl,
+                Diagnostics::entryPointCannotReturnResourceType,
+                entryPointName,
+                returnType);
+        }
     }
 
     // Every entry point needs to have a stage specified either via
