@@ -2042,7 +2042,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         List<IRType*> paramTypes;
         for (Index pp = 0; pp < paramCount; ++pp)
         {
-            paramTypes.add(lowerType(context, type->getParamType(pp)));
+            paramTypes.add(lowerType(context, type->getParamTypeWithDirectionWrapper(pp)));
         }
         if (type->getErrorType()->equals(context->astBuilder->getBottomType()))
         {
@@ -2820,12 +2820,14 @@ void addArg(
                     // from the arg.
                     paramType = lowerType(context, argType);
                 }
+#if 0
                 if (auto refType = as<IRConstRefType>(paramType))
                 {
                     paramType = refType->getValueType();
                     argVal = LoweredValInfo::simple(
                         context->irBuilder->emitLoad(getSimpleVal(context, argPtr)));
                 }
+#endif
 
                 LoweredValInfo tempVar = createVar(context, paramType);
 
@@ -3814,13 +3816,13 @@ struct ExprLoweringContext
 
         for (Index i = 0; i < argCount; ++i)
         {
-            IRType* paramType = lowerType(context, funcType->getParamType(i));
-            ParameterDirection paramDirection = funcType->getParamDirection(i);
+            auto paramInfo = funcType->getParamInfo(i);
+            IRType* paramType = lowerType(context, paramInfo.type);
             addDirectCallArgs(
                 expr,
                 i,
                 paramType,
-                paramDirection,
+                paramInfo.direction,
                 DeclRef<ParamDecl>(),
                 ioArgs,
                 ioFixups);
@@ -4736,16 +4738,55 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
         if (loweredBase.flavor != LoweredValInfo::Flavor::Ptr)
         {
-            SLANG_ASSERT(as<ConstRefType>(expr->type));
-            // If the base isn't a pointer, then we are trying to form
-            // a const ref to a temporary value.
-            // To do so we must copy it into a variable.
+            // If the base expression is not one that (trivially)
+            // lower to a pointer, then we have a bit of a problem,
+            // because the semantics of forming a reference are
+            // that we should refer to the memory location of
+            // the operand itself.
+            //
+            // For now, we are hacking this case by supporting
+            // formation of a *read-only* reference when the base
+            // expression is an r-value, by first copying the base
+            // expression into a temporary.
+            //
+            // Note that this approach is semantically incorrect,
+            // and a fix should be made further up the stack to
+            // rule out whatever is happening here.
+            //
+            // TODO(tfoley): Investigate why this case is arising
+            // at all, and/or eliminate the explicit `Ref` type
+            // entirely, so we don't have to deal with it.
+
+
+            // We start by asserting that the reference type we
+            // are being asked to form is read-only.
+            //
+            SLANG_ASSERT(as<ExplicitRefType>(expr->type) && !QualType(expr->type).isLeftValue);
+
+            // Now we perpetrate our hackery, by forming a simple value
+            // for the operand in an SSA register and copying it into
+            // a temporary.
+            //
+            // TODO(tfoley): This logic might be better expressed by
+            // forming a `LoweredValInfo` for the temporary and then
+            // using the `assign()` operation to write the base into it,
+            // since that operation might produce simpler code than
+            // we get by using `getSimpleVal` here.
+            //
             auto baseVal = getSimpleVal(context, loweredBase);
             auto tempVar = context->irBuilder->emitVar(baseVal->getFullType());
             context->irBuilder->emitStore(tempVar, baseVal);
             loweredBase.val = tempVar;
         }
 
+        // Note that the `flavor` of the lowered value that we return
+        // is always `Simple`, because at the level of the IR a value
+        // of type `Ref` is just a pointer.
+        //
+        // In the case where the hack above was used to introduce a
+        // temporary, the pointer value is the address of the temporary
+        // variable itself.
+        //
         loweredBase.flavor = LoweredValInfo::Flavor::Simple;
         return loweredBase;
     }
@@ -7486,7 +7527,7 @@ IRInst* getOrEmitDebugSource(IRGenContext* context, PathInfo path)
         content = UnownedStringSlice((char*)outBlob->getBufferPointer(), outBlob->getBufferSize());
     IRBuilder builder(*context->irBuilder);
     builder.setInsertInto(context->irBuilder->getModule());
-    auto debugSrcInst = builder.emitDebugSource(path.foundPath.getUnownedSlice(), content);
+    auto debugSrcInst = builder.emitDebugSource(path.foundPath.getUnownedSlice(), content, false);
     context->shared->mapSourcePathToDebugSourceInst[path.foundPath] = debugSrcInst;
     return debugSrcInst;
 }
@@ -11708,6 +11749,33 @@ bool isAbstractWitnessTable(IRInst* inst)
     return false;
 }
 
+static IRInst* maybeCloneThisTypeWitness(
+    IRGenContext* context,
+    IRInst* thisTypeWitness,
+    Type* thisType)
+{
+    auto currentInsertLoc = context->irBuilder->getInsertLoc().getParent();
+    auto parentOfThisTypeWitness = thisTypeWitness->parent;
+
+    while (currentInsertLoc != nullptr)
+    {
+        // If current insert location is same as scope of ThisTypeWitness, don't copy it.
+        if (parentOfThisTypeWitness == currentInsertLoc)
+        {
+            return thisTypeWitness;
+        }
+
+        currentInsertLoc = currentInsertLoc->parent;
+    }
+
+    auto thisTypeIR = as<IRThisType>(lowerType(context, thisType));
+    SLANG_RELEASE_ASSERT(thisTypeIR);
+
+    auto newThisTypeWitness =
+        context->irBuilder->createThisTypeWitness((IRType*)thisTypeIR->getConstraintType());
+    return newThisTypeWitness;
+}
+
 LoweredValInfo emitDeclRef(IRGenContext* context, Decl* decl, DeclRefBase* subst, IRType* type)
 {
     const auto initialSubst = subst;
@@ -11857,40 +11925,23 @@ LoweredValInfo emitDeclRef(IRGenContext* context, Decl* decl, DeclRefBase* subst
             // witness table for the concrete type that conforms to `ISomething<Foo>`.
             //
             auto irWitnessTable = lowerSimpleVal(context, thisTypeSubst->getWitness());
-            if (isAbstractWitnessTable(irWitnessTable))
-            {
-                // If `thisTypeSubst` doesn't lower into a concrete IRWitnessTable,
-                // this is a lookup of an interface requirement
-                // defined in some base interface from an interface type.
-                // For now we just lower that decl as if it is referenced
-                // from the same interface directly, e.g. a reference to
-                // IBase.AssocType from IDerived:IBase will be lowered as
-                // IRAssocType(IBase).
-                // We may want to consider unifying our IR representation to
-                // represent associated types with lookupWitness inst even inside
-                // interface definitions.
-                return emitDeclRef(
-                    context,
-                    decl->getDefaultDeclRef(),
-                    context->irBuilder->getTypeKind());
-            }
-
             SLANG_RELEASE_ASSERT(irWitnessTable);
 
-            //
-            // The key to use for looking up the interface member is
-            // derived from the declaration.
-            //
+            if (isAbstractWitnessTable(irWitnessTable))
+            {
+                // Copy ThisTypeWitness locally if necessary
+                irWitnessTable = maybeCloneThisTypeWitness(
+                    context,
+                    irWitnessTable,
+                    thisTypeSubst->getLookupSource());
+            }
+
             auto irRequirementKey = getInterfaceRequirementKey(context, decl);
-            //
-            // Those two pieces of information tell us what we need to
-            // do in order to look up the value that satisfied the requirement.
-            //
-            auto irSatisfyingVal = context->irBuilder->emitLookupInterfaceMethodInst(
+            auto irLookupWitness = context->irBuilder->emitLookupInterfaceMethodInst(
                 type,
                 irWitnessTable,
                 irRequirementKey);
-            return LoweredValInfo::simple(irSatisfyingVal);
+            return LoweredValInfo::simple(irLookupWitness);
         }
         else
         {
@@ -12130,7 +12181,8 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         {
             auto debugSource = builder->emitDebugSource(
                 source->getPathInfo().getMostUniqueIdentity().getUnownedSlice(),
-                source->getContent());
+                source->getContent(),
+                source->isIncludedFile());
             context->shared->mapSourceFileToDebugSourceInst.add(source, debugSource);
         }
     }
