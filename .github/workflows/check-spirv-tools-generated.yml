@@ -200,4 +200,3 @@ jobs:
             echo "Please ensure that external/spirv-tools-generated/ contains the correct generated files"
             echo "that match the current version of external/spirv-tools/"
           fi
-
