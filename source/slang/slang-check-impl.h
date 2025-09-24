@@ -2929,7 +2929,8 @@ public:
 
     // Check a member expr as a general member lookup.
     // This is the default/fallback behavior if the base type isn't swizzlable.
-    Expr* checkGeneralMemberLookupExpr(MemberExpr* expr, Type* baseType);
+    // preDerefBase is optional second base to do a lookup if member was not found in baseType.
+    Expr* checkGeneralMemberLookupExpr(MemberExpr* expr, Type* baseType, Expr* preDerefBase = nullptr);
 
     /// Perform semantic checking of an assignment where the operands have already been checked.
     Expr* checkAssignWithCheckedOperands(AssignExpr* expr);
