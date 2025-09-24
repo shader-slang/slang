@@ -278,6 +278,12 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
         {
             outOptions.showAdapterInfo = true;
         }
+        else if (argValue == "-ignore-abort-msg")
+        {
+#ifdef _MSC_VER
+            _set_abort_behavior(0, _WRITE_ABORT_MSG);
+#endif
+        }
         else if (argValue == "-cache-rhi-device")
         {
             outOptions.cacheRhiDevice = true;

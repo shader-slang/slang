@@ -15,9 +15,9 @@ void modify(inout int v)
 void computeMain(int3 v : SV_DispatchThreadID)
 {
     int3 u = v;
-    // METAL: int [[TEMP:[a-zA-Z0-9_]+]] = u{{.*}}.x;
+    // METAL: int [[TEMP:[a-zA-Z0-9_]+]] = [[OUT:[a-zA-Z0-9_]+]].x;
     // METAL: modify{{.*}}(&[[TEMP]])
-    // METAL: u{{.*}}.x = [[TEMP]];
+    // METAL: [[OUT]].x = [[TEMP]];
 
     modify(u.x);
     // BUF: 2
