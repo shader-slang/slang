@@ -10354,10 +10354,10 @@ matrix<T, N, M> fwidth_fine(matrix<T, N, M> x)
 }
 
 __intrinsic_op($(kIROp_ResolveVaryingInputRef))
-Ref<T> __ResolveVaryingInputRef<T>(__constref T attribute);
+Ref<T, Access.Read, AddressSpace.VaryingInput> __ResolveVaryingInputRef<T>(__constref T attribute);
 
 __intrinsic_op($(kIROp_GetPerVertexInputArray))
-Ref<Array<T, 3>> __GetPerVertexInputArray<T>(__constref T attribute);
+Ref<Array<T, 3>, Access.Read, AddressSpace.VaryingInput> __GetPerVertexInputArray<T>(__constref T attribute);
 
 T __GetAttributeAtVertex<T>(__constref T attribute, uint vertexIndex)
 {
