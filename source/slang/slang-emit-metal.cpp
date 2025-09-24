@@ -292,7 +292,18 @@ static IRImageSubscript* isTextureAccess(IRInst* inst)
 
 void MetalSourceEmitter::emitAtomicImageCoord(IRImageSubscript* inst)
 {
-    auto resourceType = as<IRResourceTypeBase>(inst->getImage()->getDataType());
+    auto imageDataType = inst->getImage()->getDataType();
+    auto resourceType = as<IRResourceTypeBase>(imageDataType);
+
+    // If the image data type is a pointer, get the value type
+    if (!resourceType)
+    {
+        if (auto ptrType = as<IRPtrTypeBase>(imageDataType))
+        {
+            resourceType = as<IRResourceTypeBase>(ptrType->getValueType());
+        }
+    }
+
     if (auto textureType = as<IRTextureType>(resourceType))
     {
         if (as<IRVectorType>(textureType->getElementType()))
