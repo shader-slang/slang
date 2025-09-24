@@ -66,6 +66,7 @@ jobs:
             "-expected-failure-list" "tests/expected-failure-github.txt"
             "-skip-reference-image-generation"
             "-show-adapter-info"
+            "-ignore-abort-msg"
             "-enable-debug-layers" "${{ inputs.enable-debug-layers }}"
           )
 
@@ -106,10 +107,10 @@ jobs:
             -server-count ${{ inputs.server-count }} \
             -category ${{ inputs.test-category }} \
             -emit-spirv-via-glsl \
+            -ignore-abort-msg \
             -api vk \
             -expected-failure-list tests/expected-failure-via-glsl.txt \
-            -skip-reference-image-generation \
-            -show-adapter-info
+            -skip-reference-image-generation
 
   # Run slang-rhi tests when:
   # 1. full-gpu-tests is enabled AND
