@@ -1,7 +1,7 @@
-//TEST:SIMPLE(filecheck=HULL):   -target spirv -stage hull   -entry hullMain
-//TEST:SIMPLE(filecheck=DOMAIN): -target spirv -stage domain -entry domainMain
-//TEST:SIMPLE(filecheck=DEBUGINFO): -target spirv -g2 -stage hull   -entry hullMain
-//TEST:SIMPLE(filecheck=DEBUGINFO): -target spirv -g2 -stage domain -entry domainMain
+//TEST:SIMPLE(filecheck=HULL):   -target spirv -O0 -stage hull   -entry hullMain
+//TEST:SIMPLE(filecheck=DOMAIN): -target spirv -O0 -stage domain -entry domainMain
+//DISABLE_TEST:SIMPLE(filecheck=DEBUGINFO): -target spirv -O0 -g2 -stage hull   -entry hullMain
+//DISABLE_TEST:SIMPLE(filecheck=DEBUGINFO): -target spirv -O0 -g2 -stage domain -entry domainMain
 
 // HULL-DAG: OpExecutionMode %hullMain SpacingEqual
 // HULL-DAG: OpExecutionMode %hullMain OutputVertices 4

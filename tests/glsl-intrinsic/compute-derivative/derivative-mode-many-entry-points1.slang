@@ -14,7 +14,9 @@ buffer MyBlockName
     int result;
 } outputBuffer;
 
+#if !defined(GLSL_SYNTAX)
 [DerivativeGroupQuad]
+#endif
 [shader("compute")]
 [numthreads(2,2,1)]
 void main1(uint3 dispatchThreadID : SV_DispatchThreadID)
@@ -22,6 +24,7 @@ void main1(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer.result = asint(ddx(1));
 }
 
+#if !defined(GLSL_SYNTAX)
 [DerivativeGroupLinear]
 [shader("compute")]
 [numthreads(4,1,1)]
@@ -29,3 +32,4 @@ void main2(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     outputBuffer.result = asint(ddx(1));
 }
+#endif

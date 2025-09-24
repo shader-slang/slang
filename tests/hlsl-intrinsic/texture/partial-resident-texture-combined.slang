@@ -199,7 +199,7 @@ bool TEST_sparse<T>(
          ;
  }
 
-[numthreads(4, 1, 1)]
+[numthreads(2, 2, 1)]
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     bool result = true

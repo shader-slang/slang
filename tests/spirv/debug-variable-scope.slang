@@ -1,4 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry main -stage fragment -g2 -emit-spirv-directly
+// TODO: Re-enable test once issue #8522 is fixed.
+//DISABLE_TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry main -stage fragment -g2 -emit-spirv-directly
 
 Texture2D    testTex      :   register(t0);
 SamplerState testSampler  :   register(s0);

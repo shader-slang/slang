@@ -2,7 +2,7 @@
 //TEST:SIMPLE(filecheck=CHECK_SPV): -entry computeMain -target spirv-assembly -profile cs_6_5 
 
 //CHECK_GLSL:rayQueryGetIntersectionClusterIdNV 
-//CHECK_SPV:OpRayQueryGetClusterIdNV  
+//CHECK_SPV:OpRayQueryGetIntersectionClusterIdNV  
 
 uniform RaytracingAccelerationStructure accelStruct;
 
