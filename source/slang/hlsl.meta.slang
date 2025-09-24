@@ -17181,7 +17181,7 @@ ${{{{
             // If a 'Texture[index]' is referred to by a '__ref', call 'kIROp_ImageSubscript(index)'.
             // This allows call's to stay aware that the input is from a 'Texture'.
             __intrinsic_op($(kIROp_ImageSubscript))
-            [nonmutating]
+            [constref]
             ref;
 ${{{{
         } // access != SLANG_RESOURCE_ACCESS_READ
@@ -22921,14 +22921,51 @@ struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
     __intrinsic_op($(kIROp_CastUInt2ToDescriptorHandle))
     __init(uint2 handleValue);
 
+    /// Constructor for uint64_t handles
     [ForceInline]
-    bool equals(DescriptorHandle<T> other) { return all(__vectorEql((uint2)this, (uint2)other)); }
+    [require(spvBindlessTextureNV)]
+    __intrinsic_op($(kIROp_CastUInt64ToDescriptorHandle))
+    __init(uint64_t handleValue);
 
     [ForceInline]
-    bool lessThan(DescriptorHandle<T> other) { let vthis = ((uint2)this); let vother = (uint2)other; return vthis.x < vother.x || (vthis.x == vother.x && vthis.y < vother.y); }
+    bool equals(DescriptorHandle<T> other)
+    {
+        __target_switch
+        {
+        case spvBindlessTextureNV:
+            return (uint64_t)this == (uint64_t)other;
+        default:
+            return all(__vectorEql((uint2)this, (uint2)other));
+        }
+    }
 
     [ForceInline]
-    bool lessThanOrEquals(DescriptorHandle<T> other) { let vthis = ((uint2)this); let vother = (uint2)other; return vthis.x < vother.x || (vthis.x == vother.x && vthis.y <= vother.y); }
+    bool lessThan(DescriptorHandle<T> other)
+    {
+        __target_switch
+        {
+        case spvBindlessTextureNV:
+            return (uint64_t)this < (uint64_t)other;
+        default:
+            let vthis = ((uint2)this);
+            let vother = (uint2)other;
+            return vthis.x < vother.x || (vthis.x == vother.x && vthis.y < vother.y);
+        }
+    }
+
+    [ForceInline]
+    bool lessThanOrEquals(DescriptorHandle<T> other)
+    {
+        __target_switch
+        {
+        case spvBindlessTextureNV:
+            return (uint64_t)this <= (uint64_t)other;
+        default:
+            let vthis = ((uint2)this);
+            let vother = (uint2)other;
+            return vthis.x < vother.x || (vthis.x == vother.x && vthis.y <= vother.y);
+        }
+    }
 }
 
 extension uint2
@@ -22937,6 +22974,13 @@ extension uint2
     [require(glsl_spirv)]
     [require(hlsl, sm_6_6)]
     [require(wgsl)]
+    __init<T:IOpaqueDescriptor>(DescriptorHandle<T> bindless);
+}
+
+extension uint64_t
+{
+    __intrinsic_op($(kIROp_CastDescriptorHandleToUInt64))
+    [require(spvBindlessTextureNV)]
     __init<T:IOpaqueDescriptor>(DescriptorHandle<T> bindless);
 }
 
@@ -23015,6 +23059,8 @@ T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handle
             return __makeCombinedTextureSamplerFromHandle<T>((uint2)handleValue);
         else
             return __loadResourceDescriptorFromHeap<T>(((uint2)handleValue).x);
+    case spvBindlessTextureNV:
+        return __castDescriptorHandleToResource<T>(handleValue);
     case spirv:
     case glsl:
 
