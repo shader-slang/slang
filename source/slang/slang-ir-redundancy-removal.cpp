@@ -133,14 +133,19 @@ bool isAddressMutable(IRInst* inst)
     {
     case kIROp_ParameterBlockType:
     case kIROp_ConstantBufferType:
-    case kIROp_StructuredBufferLoad:
-    case kIROp_GetStructuredBufferPtr:
     case kIROp_ConstRefType:
         return false; // immutable
+
+    // We should consider StructuredBuffer as mutable by default, since the resources may alias.
+    // There could be anotherRWStructuredBuffer pointing to the same memory location as the
+    // structured buffer.
+    case kIROp_StructuredBufferLoad:
+    case kIROp_GetStructuredBufferPtr:
+	return true; // mutable
     }
 
-    if (auto ptr = as<IRPtrTypeBase>(rootType))
-        return ptr->getAccessQualifier() == AccessQualifier::ReadWrite;
+    // Similarly, IRPtrTypeBase should also be considered writable always,
+    // because there can be aliasing.
 
     return true; // mutable
 }
