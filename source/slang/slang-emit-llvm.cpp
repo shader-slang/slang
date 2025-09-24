@@ -301,7 +301,6 @@ struct LLVMEmitter
         case kIROp_StringLit:
         case kIROp_PtrLit:
         case kIROp_MakeVector:
-        case kIROp_MakeMatrix:
             llvmValue = maybeEnsureConstant(inst);
             break;
         default:
@@ -570,10 +569,6 @@ struct LLVMEmitter
         {
             elementType = vectorType->getElementType();
         }
-        else if(auto matrixType = as<IRMatrixType>(aggregateType))
-        {
-            elementType = matrixType->getElementType();
-        }
         else
         {
             SLANG_ASSERT_FAILURE("Unhandled type for GetElementPtr!");
@@ -802,7 +797,6 @@ struct LLVMEmitter
             break;
 
         case kIROp_MakeVector:
-        case kIROp_MakeMatrix:
             llvmInst = maybeEnsureConstant(inst);
             if (!llvmInst)
             {
@@ -1065,7 +1059,7 @@ struct LLVMEmitter
                 auto llvmVal = findValue(baseInst);
 
                 auto baseTy = baseInst->getDataType();
-                if (as<IRVectorType>(baseTy) || as<IRMatrixType>(baseTy))
+                if (as<IRVectorType>(baseTy))
                 {
                     // For vectors, we can use extractelement
                     llvmInst = llvmBuilder->CreateExtractElement(llvmVal, findValue(indexInst));
@@ -1322,16 +1316,6 @@ struct LLVMEmitter
                 llvmType = llvm::VectorType::get(elemType, llvm::ElementCount::getFixed(elemCount));
             }
             break;
-        case kIROp_MatrixType:
-            {
-                auto matType = static_cast<IRMatrixType*>(type);
-                llvm::Type* elemType = ensureType(matType->getElementType());
-                auto elemCount =
-                    int(getIntVal(matType->getRowCount())) *
-                    int(getIntVal(matType->getColumnCount()));
-                llvmType = llvm::VectorType::get(elemType, llvm::ElementCount::getFixed(elemCount));
-            }
-            break;
         case kIROp_ArrayType:
             {
                 auto arrayType = static_cast<IRArrayType*>(type);
@@ -1519,22 +1503,6 @@ struct LLVMEmitter
                 llvm::DIType* elemType = ensureDebugType(vecType->getElementType());
                 IRSizeAndAlignment sizeAndAlignment;
                 getCSizeAndAlignment(getOptions(), vecType, &sizeAndAlignment);
-
-                llvm::Metadata *subscript = llvmDebugBuilder.getOrCreateSubrange(0, elemCount);
-                llvm::DINodeArray subscriptArray = llvmDebugBuilder.getOrCreateArray(subscript);
-                llvmType = llvmDebugBuilder.createVectorType(sizeAndAlignment.size*8, sizeAndAlignment.alignment*8, elemType, subscriptArray);
-            }
-            break;
-
-        case kIROp_MatrixType:
-            {
-                auto matType = static_cast<IRMatrixType*>(type);
-                auto elemCount =
-                    int(getIntVal(matType->getRowCount())) *
-                    int(getIntVal(matType->getColumnCount()));
-                llvm::DIType* elemType = ensureDebugType(matType->getElementType());
-                IRSizeAndAlignment sizeAndAlignment;
-                getCSizeAndAlignment(getOptions(), matType, &sizeAndAlignment);
 
                 llvm::Metadata *subscript = llvmDebugBuilder.getOrCreateSubrange(0, elemCount);
                 llvm::DINodeArray subscriptArray = llvmDebugBuilder.getOrCreateArray(subscript);
@@ -1788,7 +1756,6 @@ struct LLVMEmitter
             }
             break;
         case kIROp_MakeVector:
-        case kIROp_MakeMatrix:
             {
                 List<llvm::Constant*> values;
                 for (UInt aa = 0; aa < inst->getOperandCount(); ++aa)
