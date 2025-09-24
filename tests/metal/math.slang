@@ -15,8 +15,8 @@
 //TEST_INPUT:ubuffer(data=[0 1 -1], stride=4):name=inputBuffer
 RWStructuredBuffer<int> inputBuffer;
 
-//TEST_INPUT: ubuffer(data=[0], stride=4, count=441):out,name outputBuffer
-RWStructuredBuffer<int> outputBuffer;
+//TEST_INPUT: ubuffer(data=[0], stride=4, count=449):out,name outputBuffer
+RWStructuredBuffer<uint> outputBuffer;
 
 // METALLIB: define void @computeMain
 
@@ -107,6 +107,8 @@ void Test_Scalar(inout int i)
         // METALLIB: cospi.f32
     ;outputBuffer[i++] = true
         && one == cospi<T>(zero)
+
+    ;outputBuffer[i++] = reinterpret<uint>(cospi<T>(zero))
 
         // METAL: divide(
         // METALLIB: fdiv
@@ -393,6 +395,8 @@ void Test_Vector(inout int i)
         // METAL-NOT: cospi(
     ;outputBuffer[i++] = true
         && one == cospi<T>(zero)
+
+    ;outputBuffer[i++] = reinterpret<uint>(cospi<T>(zero))
 
         // METAL: divide(
         // METAL-NOT: divide(
