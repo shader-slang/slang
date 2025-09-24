@@ -6,6 +6,211 @@
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 
+/// This file implements an important IR transformation pass in the Slang compiler
+/// that rewrites buffer element types into valid storage types, a.k.a physical types
+/// in SPIRV terminology.
+///
+/// Many of our targets have special restrictions on what is allowed to be used as a
+/// buffer element. Examples are:
+/// - In HLSL and SPIRV, if you have ConstantBuffer<T>, T must be a struct.
+/// - In SPIRV, `bool` is considered a logical type, meaning it cannot appear inside
+///   buffers. bool vectors and matrices needs to be lowered into arrays.
+/// - In SPIRV, if `T` is used to declare a buffer, then every member in `T` must have
+///   explicit offset. But if it is used to declare a local variable, then it cannot
+///   have explicit member offset. This means that we cannot use the same `Foo` struct
+///   inside a `StructuredBuffer<Foo>` and also use it to declare a local variable.
+///
+/// We use the terms "physical", "storage", or "lowered" types to refer to types that
+/// are legal to use as buffer elements. In contrast, the terms "original" or "logical"
+/// refers to types that are declared by the user in its original form.
+/// For example, `bool4` is a "logical" type, and its lowered type is `int4`.
+///
+///
+/// # Algorithm Overview
+/// ----------------------
+///
+/// This pass performs the transformation to create one "storage" type for each type that
+/// are used in each kind of buffer. For example, if user defined `Foo`, and used it in
+/// `ConstantBuffer<Foo>` and `StructuredBuffer<Foo>` and is targeting SPIRV, this pass will
+/// create `Foo_std140` and `Foo_std430` types, and update the buffer to be
+/// `ConstantBuffer<Foo_std140>` and `StructuredBuffer<Foo_std430>`.
+///
+/// The pass will rewrite all the code that uses this buffers, and insert translations between
+/// Foo_std140/Foo_std430 and Foo to keep types consistent.
+///
+/// For example, given:
+/// ```
+/// struct Foo {
+///     bool4x4 v;
+/// }
+/// ConstantBuffer<Foo> cb;
+/// bool test(Foo f) {
+///     return f.v[0][1];
+/// }
+/// void main() { test(cb); }
+/// ```
+///
+/// This pass will rewrite it as:
+/// ```
+/// struct Foo {
+///     bool4x4 v;
+/// }
+/// struct Foo_std140 {
+///     Matrix_bool4x4_std140 v;
+/// };
+/// struct Matrix_bool4x4_std140 {
+///     int4 values[4];
+/// };
+/// ConstantBuffer<Foo_std140> cb;
+/// bool test_1(Foo_std140 f) {
+///     return f.v.values[0][1];
+/// }
+/// void main() { test_1(cb); }
+/// ```
+///
+/// Note that the one important optimization here is we will defer the translation from
+/// storage type to logical type at latest possible time. In the example above, we could
+/// have loaded `cb` and then immediately translate it into `Foo` and call `test` with
+/// the translated value. However that can lead to code that create unnecessary copies
+/// that can't always be removed by the downstream compiler, particulary if there are
+/// arrays whose element type needs non-trivial translation.
+///
+/// To avoid the performance issue, we will defer this translation until a logical value
+/// is actually needed. This is done by pushing the translation to the use sites, and
+/// across function call boundaries, specializing any functions being called along the
+/// chain. This case, since we are calling `test()` from `main()` with `Foo_std140`, instead
+/// of converting the `Foo_std140` to `Foo` before the call, we create a specialization
+/// of `test` that accepts `Foo_std140` instead.
+///
+/// To enable this interprecedural transformation, the pass is organized as two phases:
+/// 1. Create lowered / storage types for all buffer element types, and update
+///    global buffer declarations to use storage types. This is implemented in `processModule()`
+/// 2. Insert a `CastStorageToLogical(loweredBuffer)` inst, and replace all uses of
+///    `loweredBuffer` with the cast inst. This is implemented in `processModule()`
+/// 3. Push the `CastStorageToLogical` insts to as late as possible, which means if we see
+///    `FieldAddress(CastStorageToLogical(storageAddr), memberKey)`, we should translate
+///    it into `CastStorageToLogical(FieldAddress(storageAddr, memberKey)`.
+///    If we see a `CastStorageToLogical` inst being used as argument to call a function `f`,
+///    specialize `f` to take a pointer to the storage type instead, and insert a
+///    `CastStorageToLogical(param)` to convert the param type to logical type at the
+///    beginning of the specialized function. (implemented in `deferStorageToLogicalCasts()`)
+///
+/// Repeat step 2 and 3 until no more changes can be made, then proceed to step 4.
+///
+/// 4. Materialize all remaining `CastStorageToLogical(addr)` by replacing all `load` of such
+///    cast insts with `call unpackStorage(addr)`, where `unpackStorage` is a function we
+///    synthesize that reads from an address of a storage type and returns a logical type;
+///    and replacing all `store(CastStorageToLogical(addr), value)` with `packStorage(addr, value)`,
+///    where `packStorage` is a function we synthesis that writes a logical value into a storage
+///    addr. This is implemented in `materializeStorageToLogicalCasts()`.
+///
+/// That's the main idea of the pass.
+///
+/// # Propagating through SSA values
+///
+/// Note that `kIROp_CastStorageToLogical` is a pseudo instruction introduced in this pass that
+/// has the semantics of "converting a pointer to a storage value into a pointer to a logical
+/// value". A dual of this inst is `kIROp_CastStorageToLogicalDeref`, which has an additional
+/// builtin "load" semantic. That is, given `Ptr<StorageType> addr`, `CastStorageToLogical(addr)`
+/// will have type `Ptr<LogicalType>`, and `CastStorageToLogicalDeref(addr)` will have type
+/// `LogicalType`. In other words, `CastStorageToLogicalDeref(addr)` is equivalent to
+/// `load(CastStorageToLogical(addr))`.
+///
+/// The `CastStorageToLogicalDeref` pseudo inst is needed to push defer through `load`s.
+/// Consider the following example:
+/// ```
+///    ptr : StorageType* = ...
+///    lptr : LogicalType* = CastStorageToLogical(ptr);
+///    l = load(lptr)
+///    m = fieldExtract(l, member)
+///    call f, m
+/// ```
+/// In this case, only l.member is used, so we should avoid translating other unrelated members
+/// from storage type to logical type. To achieve this we must be able to push the
+/// `CastStorageToLogical` operation beyond the `load`. The steps to achieve this are:
+/// 1. we process `lptr` inst by inspecting its users. We find that a `load` (l) uses it.
+/// 2. replace the `load` with `CastStorageToLogicalDeref(ptr)`, the IR become:
+/// ```
+///    ptr : StorageType* = ...
+///    l_1 = CastStorageToLogicalDeref(ptr);
+///    m = fieldExtract(l_1, member);
+///    call f, m
+/// ```
+/// 3. push the new `l_1` inst to worklist, and when it gets processed, we continue to inspect
+///    its users, and find that it is being used by `fieldExtract`. We will rewrite the
+///    `fieldExtract` into `CastStorageToLogicalDeref(fieldAddr(ptr, member))`, and the IR become:
+///    ```
+///       ptr : StorageType* = ...
+///       m_ptr = FieldAddr(ptr, member)
+///       m = CastStorageToLogicalDeref(m_ptr);
+///       call f, m
+///    ```
+/// 4. Since there are no more uses of `m` that can be translated, stop. Note that it is possible
+///    to continue specializing `f` and replace its first parameter's type to storage type. However
+///    this implementation currently does not specialize functions whose parameter type is not a
+///    pointer/reference type. When we target SPIRV, we will already be running the
+///    `transformParamsToConstRef` pass that would have converted `f` to take in `ConstRef<T>`.
+///    In this case, the initial IR would be in the form of
+///    ```
+///       ptr : StorageType* = ...
+///       lptr : LogicalType* = CastStorageToLogical(ptr);
+///       l = load(lptr)
+///       m = fieldExtract(l, member)
+///       var tmpVar : MemberLogiocalType  [[ImmutableTempVar]]
+///       store tmpVar, m
+///       call f, tmpVar
+///    ```
+///    To allow us to remove the `tmpVar` store introduced during `transformParamsToConstRef`,
+///    this pass also handles the propagation through temp var stores. After pushing the cast
+///    through `m`, we will get IR to this form:
+///    ```
+///       ptr : StorageType* = ...
+///       m_ptr = FieldAddr(ptr, member)
+///       m = CastStorageToLogicalDeref(m_ptr);
+///       var tmpVar : MemberLogiocalType  [[ImmutableTempVar]]
+///       store tmpVar, m
+///       call f, tmpVar
+///    ```
+///    This time, we will see that `m` is being used by a `store` into a `[[ImmutableTempVar]]` var,
+///    and we can safely replace all uses of `tmpVar` to `m_ptr`, and therefore the IR will become:
+///    ```
+///       ptr : StorageType* = ...
+///       m_ptr = FieldAddr(ptr, member)
+///       m = CastStorageToLogical(m_ptr);
+///       call f, m_ptr
+///    ```
+///    Now, we are in the case where a `CastStorageToLogical` is used as argument in a `call`.
+///    This will trigger our function specialization rule to create `f_1` that accepets a
+///    `StorageMember*`, and we will rewrite the IR again to:
+///    ```
+///       ptr : StorageType* = ...
+///       m_ptr = FieldAddr(ptr, member)
+///       call f_1, m_ptr
+///    ```
+///
+/// # Trailing Pointer Rewrite
+///
+/// Another transformation done in this pass is it also rewrites struct with unsized trailing
+/// arrays. Since an unsized type isn't a physical type and cannot be used as a pointee type,
+/// we will have problem translating the following code to SPIRV:
+/// ```
+/// struct Foo { int count; int[] values; }
+/// uniform Foo* b;
+/// ```
+///
+/// When we create a storage type for `Foo`, we will define it as:
+/// ```
+/// struct Foo_std430 { int count; }
+/// ```
+/// Where we removed the trailing array.
+/// This makes `Foo_std430` an ordinary sized type that can be used freely as pointee type
+/// in SPIRV.
+///
+/// However this does mean that we also need to translate things like `ptr->values[2]`
+/// into `((int*)(ptr+1))[2]`. Which we also handle during step 2 of the algorithm.
+/// (`maybeTranslateTailingPointerGetElementAddress`)
+///
+
 namespace Slang
 {
 
@@ -957,9 +1162,9 @@ struct LoweredElementTypeContext
     bool maybeTranslateTailingPointerGetElementAddress(
         IRBuilder& builder,
         IRFieldAddress* fieldAddr,
-        IRCastStorageToLogical* castInst,
+        IRCastStorageToLogicalBase* castInst,
         TypeLoweringConfig& config,
-        List<IRCastStorageToLogical*>& castInstWorkList)
+        List<IRCastStorageToLogicalBase*>& castInstWorkList)
     {
         // If we are accessing an unsized array element from a pointer, we need to
         // compute
@@ -1040,7 +1245,8 @@ struct LoweredElementTypeContext
 
     void deferStorageToLogicalCasts(
         IRModule* module,
-        List<IRCastStorageToLogical*> castInstWorkList)
+        List<IRCastStorageToLogicalBase*> castInstWorkList,
+        HashSet<IRInst*>& loweredStorageBufferTypes)
     {
         IRBuilder builder(module);
 
@@ -1158,6 +1364,108 @@ struct LoweredElementTypeContext
                                 callWorkList.add((IRCall*)user);
                                 break;
                             }
+                        case kIROp_Load:
+                        case kIROp_StructuredBufferLoad:
+                        case kIROp_RWStructuredBufferLoad:
+                        case kIROp_StructuredBufferLoadStatus:
+                        case kIROp_RWStructuredBufferLoadStatus:
+                        case kIROp_StructuredBufferConsume:
+                            {
+                                // If we see a load(CastStorageToLogical(storageAddr)),
+                                // then based on what `storageAddr` is, we will push down
+                                // the cast differently.
+                                // - If `storageAddr` is already a tempVar that we introduced to
+                                //   hold the value of a buffer resource load, we can simply
+                                //   convert this into `CastStorageToLogicalDeref(storageAddr)`.
+                                // - Otherwise, if `storageAddr` is a buffer location, we will
+                                //   create a temp var to hold the result of the memory load,
+                                //   Then we create a `CastStorageToLogicalDeref(tempVar)`
+                                //   structure and use it to replace `user`.
+                                if (user->getOperand(0) != castInst)
+                                    break;
+                                // If loaded value is itself a pointer or buffer,
+                                // stop pushing the cast along the resulting address.
+                                // we will handle loads from the pointer separately.
+                                if (as<IRPointerLikeType>(user->getDataType()) ||
+                                    as<IRPtrTypeBase>(user->getDataType()) ||
+                                    as<IRHLSLStructuredBufferTypeBase>(user->getDataType()))
+                                    break;
+                                builder.setInsertBefore(user);
+                                IRCloneEnv cloneEnv;
+                                auto newLoad = cloneInst(&cloneEnv, &builder, user);
+                                newLoad->setOperand(0, ptrVal);
+                                auto elementStorageType =
+                                    tryGetPointedToType(&builder, ptrVal->getDataType());
+                                newLoad->setFullType(elementStorageType);
+                                IRInst* tempVar = nullptr;
+                                if (auto load = as<IRLoad>(user))
+                                {
+                                    auto rootAddr = getRootAddr(ptrVal);
+                                    if (rootAddr->findDecorationImpl(
+                                            kIROp_TempCallArgImmutableVarDecoration))
+                                        tempVar = ptrVal;
+                                }
+                                if (!tempVar)
+                                {
+                                    tempVar = builder.emitVar(elementStorageType);
+                                    builder.addDecoration(
+                                        tempVar,
+                                        kIROp_TempCallArgImmutableVarDecoration);
+                                    builder.emitStore(tempVar, newLoad);
+                                }
+                                auto newCast = builder.emitCastStorageToLogicalDeref(
+                                    user->getFullType(),
+                                    tempVar,
+                                    castInst->getBufferType());
+                                user->replaceUsesWith(newCast);
+                                user->removeAndDeallocate();
+                                castInstWorkList.add(newCast);
+                                break;
+                            }
+                        case kIROp_FieldExtract:
+                        case kIROp_GetElement:
+                            {
+                                // elementExtract(castStorageToLogicalDeref(addr), key)
+                                // ==> load(gep(castStorageToLogical(addr), key)
+                                builder.setInsertBefore(user);
+                                auto castAddr = builder.emitCastStorageToLogical(
+                                    builder.getPtrType(castInst->getDataType()),
+                                    ptrVal,
+                                    castInst->getBufferType());
+                                IRInst* gep = nullptr;
+                                if (user->getOp() == kIROp_GetElement)
+                                    gep = builder.emitElementAddress(castAddr, user->getOperand(0));
+                                else
+                                    gep = builder.emitFieldAddress(castAddr, user->getOperand(0));
+                                auto load = builder.emitLoad(gep);
+                                user->replaceUsesWith(load);
+                                user->removeAndDeallocate();
+                                castInstWorkList.add(castAddr);
+                                break;
+                            }
+                        case kIROp_Store:
+                            {
+                                // If we see `store(tempVar, castStorageToLogicalDeref(addr))`,
+                                // replace `tempVar` with `castStorageToLogical(addr)`.
+                                if (castInst->getOp() != kIROp_CastStorageToLogicalDeref)
+                                    break;
+                                auto store = as<IRStore>(user);
+                                if (store->getVal() != castInst)
+                                    break;
+                                auto dest = store->getPtr();
+                                if (!dest->findDecorationImpl(
+                                        kIROp_TempCallArgImmutableVarDecoration))
+                                    break;
+                                builder.setInsertBefore(user);
+                                auto castAddr = builder.emitCastStorageToLogical(
+                                    builder.getPtrType(castInst->getDataType()),
+                                    ptrVal,
+                                    castInst->getBufferType());
+                                dest->replaceUsesWith(castAddr);
+                                dest->removeAndDeallocate();
+                                castInstWorkList.add(castAddr);
+                                break;
+                            }
                         }
                     });
             }
@@ -1167,12 +1475,14 @@ struct LoweredElementTypeContext
             // the parameter type from logical type to storage type, and insert a
             // castStorageToLogical on the parameter. Then we go back to the beginning and make sure
             // we process those newly created castStorageToLogical insts.
-            List<IRCastStorageToLogical*> newCasts;
+            List<IRCastStorageToLogicalBase*> newCasts;
             for (auto call : callWorkList)
             {
                 auto calleeFunc = as<IRGlobalValueWithParams>(call->getCallee());
+                // We compute the func type for the specialized func based on the arguments
+                // provided, and check the specialization cache to reuse existing specialization
+                // when possible.
                 List<IRInst*> oldParams;
-
                 for (auto param : calleeFunc->getParams())
                     oldParams.add(param);
                 SLANG_ASSERT(oldParams.getCount() == (Index)call->getArgCount());
@@ -1210,6 +1520,7 @@ struct LoweredElementTypeContext
                         call,
                         specializedFuncType,
                         newCasts);
+                    specializedFuncs[key] = specializedFunc;
                 }
                 builder.setInsertBefore(call);
                 auto newCall = builder.emitCallInst(
@@ -1235,7 +1546,7 @@ struct LoweredElementTypeContext
     IRFunc* createSpecializedFuncThatUseStorageType(
         IRCall* call,
         IRFuncType* specializedFuncType,
-        List<IRCastStorageToLogical*>& outNewCasts)
+        List<IRCastStorageToLogicalBase*>& outNewCasts)
     {
         IRBuilder builder(call);
         builder.setInsertBefore(call->getCallee());
@@ -1338,7 +1649,7 @@ struct LoweredElementTypeContext
         }
 
 
-        List<IRCastStorageToLogical*> castInstWorkList;
+        List<IRCastStorageToLogicalBase*> castInstWorkList;
 
         for (auto& bufferTypeInfo : bufferTypeInsts)
         {
@@ -1401,7 +1712,10 @@ struct LoweredElementTypeContext
         // This means that `FieldAddr(CastStorageToLogical(buffer), field0))` is translated to
         // `CastStorageToLogical(FieldAddr(buffer, field0))`. This way we can be sure that we are
         // doing minimal packing/unpacking.
-        deferStorageToLogicalCasts(module, _Move(castInstWorkList));
+        HashSet<IRInst*> storageBufferTypes;
+        for (auto& b : bufferTypeInsts)
+            storageBufferTypes.add(b.loweredBufferType);
+        deferStorageToLogicalCasts(module, _Move(castInstWorkList), storageBufferTypes);
 
         // Now translate the `CastStorageToLogical` into actual packing/unpacking code.
         materializeStorageToLogicalCasts(module->getModuleInst());
@@ -1417,16 +1731,34 @@ struct LoweredElementTypeContext
         }
     }
 
-    void materializeStorageToLogicalCastsImpl(IRCastStorageToLogical* castInst)
+    void materializeStorageToLogicalCastsImpl(IRCastStorageToLogicalBase* castInst)
     {
+        IRBuilder builder(castInst);
+
+        if (castInst->getOp() == kIROp_CastStorageToLogicalDeref)
+        {
+            // Convert CastStorageToLogicalDeref to load(CastStorageToLogical) to reuse
+            // the same materialization logic for CastStorageToLogical.
+            //
+            builder.setInsertBefore(castInst);
+            auto ptrType = builder.getPtrType(castInst->getDataType());
+            auto castPtr = builder.emitCastStorageToLogical(
+                (IRType*)ptrType,
+                castInst->getVal(),
+                castInst->getBufferType());
+            auto load = builder.emitLoad(castPtr);
+            castInst->replaceUsesWith(load);
+            castInst->removeAndDeallocate();
+            materializeStorageToLogicalCastsImpl(castPtr);
+            return;
+        }
+
         // Translate the values to use new lowered buffer type instead.
 
         auto ptrVal = castInst->getOperand(0);
         auto oldPtrType = castInst->getFullType();
         auto originalElementType = oldPtrType->getOperand(0);
         auto config = getTypeLoweringConfigForBuffer(target, (IRType*)castInst->getBufferType());
-
-        IRBuilder builder(ptrVal);
 
 
         LoweredElementTypeInfo loweredElementTypeInfo = {};
@@ -1487,6 +1819,8 @@ struct LoweredElementTypeContext
                 case kIROp_RWStructuredBufferLoadStatus:
                 case kIROp_StructuredBufferConsume:
                     {
+                        if (castInst != user->getOperand(0))
+                            break;
                         builder.setInsertBefore(user);
                         auto addr = getBufferAddr(builder, user);
                         if (addr == castInst)
@@ -1568,11 +1902,13 @@ struct LoweredElementTypeContext
             castInst->removeAndDeallocate();
     }
 
-    void collectCastStorageToLogicalInsts(List<IRCastStorageToLogical*>& insts, IRInst* root)
+    void collectCastStorageToLogicalInsts(List<IRCastStorageToLogicalBase*>& insts, IRInst* root)
     {
-        if (root->getOp() == kIROp_CastStorageToLogical)
+        switch (root->getOp())
         {
-            insts.add((IRCastStorageToLogical*)root);
+        case kIROp_CastStorageToLogical:
+        case kIROp_CastStorageToLogicalDeref:
+            insts.add((IRCastStorageToLogicalBase*)root);
             return;
         }
         for (auto child : root->getChildren())
@@ -1583,7 +1919,7 @@ struct LoweredElementTypeContext
 
     void materializeStorageToLogicalCasts(IRInst* root)
     {
-        List<IRCastStorageToLogical*> castInsts;
+        List<IRCastStorageToLogicalBase*> castInsts;
         collectCastStorageToLogicalInsts(castInsts, root);
         for (auto inst : castInsts)
         {

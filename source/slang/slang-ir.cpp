@@ -6188,6 +6188,16 @@ IRCastStorageToLogical* IRBuilder::emitCastStorageToLogical(
     return (IRCastStorageToLogical*)emitIntrinsicInst(type, kIROp_CastStorageToLogical, 2, args);
 }
 
+IRCastStorageToLogicalDeref* IRBuilder::emitCastStorageToLogicalDeref(
+    IRType* type,
+    IRInst* val,
+    IRInst* bufferType)
+{
+    IRInst* args[] = {val, bufferType};
+    return (IRCastStorageToLogicalDeref*)
+        emitIntrinsicInst(type, kIROp_CastStorageToLogicalDeref, 2, args);
+}
+
 IRGlobalConstant* IRBuilder::emitGlobalConstant(IRType* type)
 {
     auto inst = createInst<IRGlobalConstant>(this, kIROp_GlobalConstant, type);

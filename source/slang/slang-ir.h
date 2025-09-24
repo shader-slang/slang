@@ -1533,7 +1533,7 @@ struct IRUniformParameterGroupType : IRParameterGroupType
 
 
 FIDDLE()
-struct IRGLSLShaderStorageBufferType : IRBuiltinGenericType
+struct IRGLSLShaderStorageBufferType : IRPointerLikeType
 {
     FIDDLE(leafInst())
     IRType* getDataLayout() { return (IRType*)getOperand(1); }

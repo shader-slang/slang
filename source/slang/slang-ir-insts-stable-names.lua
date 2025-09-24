@@ -670,6 +670,6 @@ return {
 	["SPIRVAsmOperand.__imageType"] = 666,
 	["SPIRVAsmOperand.__sampledImageType"] = 667,
 	["Type.CLayout"] = 668,
-	["CastLogicalToStorage"] = 669,
-	["CastStorageToLogical"] = 670,
+	["CastStorageToLogicalBase.CastStorageToLogical"] = 669,
+	["CastStorageToLogicalBase.CastStorageToLogicalDeref"] = 670,
 }

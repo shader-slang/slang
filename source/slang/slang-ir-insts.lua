@@ -1893,8 +1893,14 @@ local insts = {
 	{ CastDescriptorHandleToUInt2 = { min_operands = 1 } },
 	-- Represents a psuedo cast to convert between a logical type (user declared) and a storage Type
 	-- (valid in buffer locations). The operand can either be a value or an address.
-	{ CastLogicalToStorage = { min_operands = 1 } },
-	{ CastStorageToLogical = { min_operands = 2, struct_name = "CastStorageToLogical" } },
+	{
+		CastStorageToLogicalBase =
+		{
+			min_operands = 2, struct_name = "CastStorageToLogicalBase",
+			{ CastStorageToLogical = { min_operands = 2, struct_name = "CastStorageToLogical" } },
+			{ CastStorageToLogicalDeref = { min_operands = 2, struct_name = "CastStorageToLogicalDeref" } },
+		}
+	},
 	-- Represents a no-op cast to convert a resource pointer to a resource on targets where the resource handles are
 	-- already concrete types.
 	{ CastDescriptorHandleToResource = { min_operands = 1 } },
