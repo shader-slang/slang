@@ -3644,6 +3644,11 @@ static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine
         ioCmdLine.addArg("-enable-debug-layers");
     }
 
+    if (options.ignoreAbortMsg)
+    {
+        ioCmdLine.addArg("-ignore-abort-msg");
+    }
+
     if (options.cacheRhiDevice)
     {
         ioCmdLine.addArg("-cache-rhi-device");

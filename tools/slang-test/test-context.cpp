@@ -196,6 +196,12 @@ SlangResult TestContext::_createJSONRPCConnection(RefPtr<JSONRPCConnection>& out
     {
         CommandLine cmdLine;
         cmdLine.setExecutableLocation(ExecutableLocation(exeDirectoryPath, "test-server"));
+
+        if (options.ignoreAbortMsg)
+        {
+            cmdLine.addArg("-ignore-abort-msg");
+        }
+
         SLANG_RETURN_ON_FAIL(Process::create(
             cmdLine,
             Process::Flag::AttachDebugger | Process::Flag::DisableStdErrRedirection,

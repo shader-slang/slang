@@ -142,6 +142,9 @@ struct Options
     Slang::HashSet<Slang::String> capabilities;
     Slang::HashSet<Slang::String> expectedFailureList;
 
+    // Ignore abort message dialog popup on Windows
+    bool ignoreAbortMsg = false;
+
     /// Parse the args, report any errors into stdError, and write the results into optionsOut
     static SlangResult parse(
         int argc,
