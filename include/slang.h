@@ -1072,6 +1072,8 @@ typedef uint32_t SlangSizeT;
 
         ExperimentalFeature, // bool, enable experimental features
 
+        LLVMTargetTriple, // string
+
         CountOf,
     };
 
