@@ -141,7 +141,7 @@ bool isAddressMutable(IRInst* inst)
     // structured buffer.
     case kIROp_StructuredBufferLoad:
     case kIROp_GetStructuredBufferPtr:
-	return true; // mutable
+        return true; // mutable
     }
 
     // Similarly, IRPtrTypeBase should also be considered writable always,
