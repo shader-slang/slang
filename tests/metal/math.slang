@@ -23,6 +23,31 @@ RWStructuredBuffer<int> outputBuffer;
 // It is unclear why "nextafter" is not working for Metal.
 #define TEST_WHEN_nextafter_WORKS 0
 
+// NOTE: This test is mainly equality comparisons of math functions results
+// against a precise expected value, but the Metal spec defines a minimum
+// accuracy for many of these math functions such that a range of results may
+// be allowed, presumably corresponding to different generations of hardware.
+// Exact comparisons are preferred here for simplicity's sake, but in cases
+// where, e.g., an M1 may yield a different result from an M4, this test checks
+// that the value falls within the documented range instead.
+
+__generic<T:__BuiltinFloatingPointType>
+bool fuzzyCompare(const T value, const T expected, const T epsilon)
+{
+    return
+        value <= (expected + epsilon) &&
+        value >= (expected - epsilon);
+}
+
+__generic<T:__BuiltinFloatingPointType, let N : int>
+bool fuzzyCompare(const vector<T,N> value, const vector<T,N> expected, const vector<T,N> epsilon)
+{
+    return all(
+        value <= (expected + epsilon) &&
+        value >= (expected - epsilon)
+        );
+}
+
 __generic<T:__BuiltinFloatingPointType>
 bool Test_Scalar()
 {
@@ -31,6 +56,8 @@ bool Test_Scalar()
     const T one = T(inputBuffer[1]);
 
     const int zeroInt = int(inputBuffer[0]);
+
+    const T EPS_E2N13 = T(0.0001220703125); // 2^-13
 
     T outFloat1, outFloat2;
     int outInt;
@@ -89,7 +116,7 @@ bool Test_Scalar()
 
         // METAL: cospi(
         // METALLIB: cospi.f32
-        && one == cospi<T>(zero)
+        && fuzzyCompare<T>(cospi<T>(zero), one, EPS_E2N13)
 
         // METAL: divide(
         // METALLIB: fdiv
@@ -260,6 +287,8 @@ bool Test_Vector()
 
     const vector<int,N> zeroInt = int(inputBuffer[0]);
 
+    const vector<T,N> EPS_E2N13 = T(0.0001220703125); // 2^-13
+
     vector<T,N> outFloat1, outFloat2;
     vector<int,N> outInt;
 
@@ -317,7 +346,7 @@ bool Test_Vector()
 
         // METAL: cospi(
         // METAL-NOT: cospi(
-        && one == cospi<T>(zero)
+        && fuzzyCompare<T,N>(cospi<T>(zero), one, EPS_E2N13)
 
         // METAL: divide(
         // METAL-NOT: divide(
