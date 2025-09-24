@@ -1399,7 +1399,7 @@ struct LoweredElementTypeContext
                                     tryGetPointedToType(&builder, ptrVal->getDataType());
                                 newLoad->setFullType(elementStorageType);
                                 IRInst* tempVar = nullptr;
-                                if (auto load = as<IRLoad>(user))
+                                if (as<IRLoad>(user))
                                 {
                                     auto rootAddr = getRootAddr(ptrVal);
                                     if (rootAddr->findDecorationImpl(
