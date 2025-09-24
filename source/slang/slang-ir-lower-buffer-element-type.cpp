@@ -1245,8 +1245,7 @@ struct LoweredElementTypeContext
 
     void deferStorageToLogicalCasts(
         IRModule* module,
-        List<IRCastStorageToLogicalBase*> castInstWorkList,
-        HashSet<IRInst*>& loweredStorageBufferTypes)
+        List<IRCastStorageToLogicalBase*> castInstWorkList)
     {
         IRBuilder builder(module);
 
@@ -1712,10 +1711,7 @@ struct LoweredElementTypeContext
         // This means that `FieldAddr(CastStorageToLogical(buffer), field0))` is translated to
         // `CastStorageToLogical(FieldAddr(buffer, field0))`. This way we can be sure that we are
         // doing minimal packing/unpacking.
-        HashSet<IRInst*> storageBufferTypes;
-        for (auto& b : bufferTypeInsts)
-            storageBufferTypes.add(b.loweredBufferType);
-        deferStorageToLogicalCasts(module, _Move(castInstWorkList), storageBufferTypes);
+        deferStorageToLogicalCasts(module, _Move(castInstWorkList));
 
         // Now translate the `CastStorageToLogical` into actual packing/unpacking code.
         materializeStorageToLogicalCasts(module->getModuleInst());
