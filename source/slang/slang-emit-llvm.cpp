@@ -18,23 +18,9 @@
 #include <llvm/IR/Verifier.h>
 #include <llvm/MC/TargetRegistry.h>
 #include <llvm/Passes/PassBuilder.h>
-#include <llvm/Passes/StandardInstrumentations.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
-#include <llvm/Transforms/InstCombine/InstCombine.h>
-#include <llvm/Transforms/AggressiveInstCombine/AggressiveInstCombine.h>
-#include <llvm/Transforms/Scalar.h>
-#include <llvm/Transforms/Scalar/GVN.h>
-#include <llvm/Transforms/Scalar/Reassociate.h>
-#include <llvm/Transforms/Scalar/SimplifyCFG.h>
-#include <llvm/Transforms/Scalar/LoopUnrollPass.h>
-#include <llvm/Transforms/Scalar/IndVarSimplify.h>
-#include <llvm/Transforms/Scalar/DeadStoreElimination.h>
-#include <llvm/Transforms/Scalar/DCE.h>
-#include <llvm/Transforms/Utils/Mem2Reg.h>
-#include <llvm/Transforms/Utils/LoopSimplify.h>
-#include <llvm/Transforms/IPO/Inliner.h>
-#include <llvm/Transforms/IPO/ModuleInliner.h>
+#include <llvm/Transforms/Scalar/Scalarizer.h>
 #include <llvm/Target/TargetMachine.h>
 #include <llvm/Target/TargetOptions.h>
 #include <llvm/TargetParser/Host.h>
@@ -168,8 +154,53 @@ struct LLVMEmitter
         }
 
         llvm::TargetOptions opt;
+
+        opt.setFPDenormalMode(getLLVMDenormalMode(getOptions().getDenormalModeFp64()));
+        opt.setFP32DenormalMode(getLLVMDenormalMode(getOptions().getDenormalModeFp32()));
+
+        opt.NoTrappingFPMath = 1;
+        switch(getOptions().getFloatingPointMode())
+        {
+        default:
+        case FloatingPointMode::Default:
+            break;
+        case FloatingPointMode::Fast:
+            opt.UnsafeFPMath = 1;
+            opt.NoSignedZerosFPMath = 1;
+            opt.ApproxFuncFPMath = 1;
+            break;
+        case FloatingPointMode::Precise:
+            opt.UnsafeFPMath = 0;
+            opt.NoInfsFPMath = 0;
+            opt.NoNaNsFPMath = 0;
+            opt.NoSignedZerosFPMath = 0;
+            opt.ApproxFuncFPMath = 0;
+            break;
+        }
+
+        llvm::CodeGenOptLevel optLevel = llvm::CodeGenOptLevel::None;
+        switch(getOptions().getOptimizationLevel())
+        {
+        case OptimizationLevel::None:
+            optLevel = llvm::CodeGenOptLevel::None;
+            break;
+        default:
+        case OptimizationLevel::Default:
+            optLevel = llvm::CodeGenOptLevel::Less;
+            break;
+        case OptimizationLevel::High:
+            optLevel = llvm::CodeGenOptLevel::Default;
+            break;
+        case OptimizationLevel::Maximal:
+            optLevel = llvm::CodeGenOptLevel::Aggressive;
+            break;
+        }
+
         llvm::Triple target_triple(target_triple_str);
-        targetMachine = target->createTargetMachine(target_triple, "generic", "", opt, llvm::Reloc::PIC_);
+        targetMachine = target->createTargetMachine(
+            target_triple, "generic", "", opt, llvm::Reloc::PIC_, std::nullopt,
+            optLevel
+        );
 
         debug = getOptions().getDebugInfoLevel() != DebugInfoLevel::None;
 
@@ -238,6 +269,20 @@ struct LLVMEmitter
     CompilerOptionSet& getOptions()
     {
         return codeGenContext->getTargetProgram()->getOptionSet();
+    }
+
+    llvm::DenormalMode getLLVMDenormalMode(FloatingPointDenormalMode mode)
+    {
+        switch(mode)
+        {
+        default:
+        case FloatingPointDenormalMode::Any:
+            return llvm::DenormalMode::getDefault();
+        case FloatingPointDenormalMode::Preserve:
+            return llvm::DenormalMode::getPreserveSign();
+        case FloatingPointDenormalMode::FlushToZero:
+            return llvm::DenormalMode::getPositiveZero();
+        }
     }
 
     // Finds the value of an instruction that has already been emitted, OR
@@ -1952,6 +1997,9 @@ struct LLVMEmitter
     {
         mapInstToLLVM.clear();
 
+        llvmModule.setDataLayout(targetMachine->createDataLayout());
+        llvmModule.setTargetTriple(targetMachine->getTargetTriple());
+
         llvm::LoopAnalysisManager loopAnalysisManager;
         llvm::FunctionAnalysisManager functionAnalysisManager;
         llvm::CGSCCAnalysisManager CGSCCAnalysisManager;
@@ -2000,6 +2048,23 @@ struct LLVMEmitter
                 ctorArray, "llvm.global_ctors"
             );
         }
+        
+        // TODO: Not sure if necessary. Will know more after eliminating
+        // aggregate types. We may be able to just create aggregate loads and
+        // stores such that this is taken into account.
+        // https://llvm.org/docs/Frontend/PerformanceTips.html#avoid-creating-values-of-aggregate-type
+        /*
+        if (getOptions().shouldUseCLayout() || getOptions().shouldUseScalarLayout())
+        {
+            llvm::legacy::PassManager pass;
+            llvm::ScalarizerPassOptions scalarOptions;
+            scalarOptions.ScalarizeMinBits = 0;
+            scalarOptions.ScalarizeVariableInsertExtract = true;
+            scalarOptions.ScalarizeLoadStore = true;
+            pass.add(llvm::createScalarizerPass(scalarOptions));
+            pass.run(llvmModule);
+        }
+        */
 
         llvm::verifyModule(llvmModule, &llvm::errs());
 
@@ -2024,6 +2089,7 @@ struct LLVMEmitter
 
     void generateObjectCode(List<uint8_t>& objectOut)
     {
+        // These must always be set when generating object code.
         llvmModule.setDataLayout(targetMachine->createDataLayout());
         llvmModule.setTargetTriple(targetMachine->getTargetTriple());
 
