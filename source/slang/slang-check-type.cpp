@@ -27,7 +27,7 @@ Type* getPointedToTypeIfCanImplicitDeref(Type* type)
     {
         return ptrType->getValueType();
     }
-    else if (auto refType = as<RefType>(type))
+    else if (auto refType = as<ExplicitRefType>(type))
     {
         return refType->getValueType();
     }
@@ -146,6 +146,7 @@ Type* SemanticsVisitor::ExtractGenericArgType(Expr* exp)
 IntVal* SemanticsVisitor::ExtractGenericArgInteger(
     Expr* exp,
     Type* genericParamType,
+    ConstantFoldingKind kind,
     DiagnosticSink* sink)
 {
     IntVal* val = CheckIntegerConstantExpression(
@@ -153,7 +154,7 @@ IntVal* SemanticsVisitor::ExtractGenericArgInteger(
         genericParamType ? IntegerConstantExpressionCoercionType::SpecificType
                          : IntegerConstantExpressionCoercionType::AnyInteger,
         genericParamType,
-        ConstantFoldingKind::SpecializationConstant,
+        kind,
         sink);
     if (val)
         return val;
@@ -168,7 +169,11 @@ IntVal* SemanticsVisitor::ExtractGenericArgInteger(
 
 IntVal* SemanticsVisitor::ExtractGenericArgInteger(Expr* exp, Type* genericParamType)
 {
-    return ExtractGenericArgInteger(exp, genericParamType, getSink());
+    return ExtractGenericArgInteger(
+        exp,
+        genericParamType,
+        ConstantFoldingKind::LinkTime,
+        getSink());
 }
 
 Val* SemanticsVisitor::ExtractGenericArgVal(Expr* exp)

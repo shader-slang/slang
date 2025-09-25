@@ -129,6 +129,8 @@ if(SLANG_ENABLE_GFX)
     #
     # GFX
     #
+    # `gfx` is kept here for legacy reasons. It's not used by any slang tests but some external
+    # projects use it. We should remove it in the future.
     slang_add_target(
         gfx
         ${SLANG_LIB_TYPE}
@@ -187,40 +189,9 @@ if(SLANG_ENABLE_GFX)
         FOLDER gfx
     )
 
-    #
-    # `platform` contains all the platform abstractions for a GUI application.
-    #
-    slang_add_target(
-        platform
-        ${SLANG_LIB_TYPE}
-        EXCLUDE_FROM_ALL
-        USE_FEWER_WARNINGS
-        LINK_WITH_PRIVATE
-            core
-            imgui
-            stb
-            $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
-            $<$<BOOL:${SLANG_ENABLE_SLANG_RHI}>:slang-rhi>
-            "$<$<PLATFORM_ID:Darwin>:-framework Cocoa>"
-            "$<$<PLATFORM_ID:Darwin>:-framework QuartzCore>"
-            ${CMAKE_DL_LIBS}
-        LINK_WITH_FRAMEWORK Foundation Cocoa QuartzCore
-        EXTRA_COMPILE_DEFINITIONS_PRIVATE
-            $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB=1>
-        INCLUDE_FROM_PRIVATE
-            imgui
-            $<$<BOOL:${SLANG_ENABLE_SLANG_RHI}>:slang-rhi>
-        INCLUDE_DIRECTORIES_PUBLIC
-            .
-            platform
-            if
-            (not ${SLANG_OVERRIDE_GLM_PATH})
-        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external else ()
-        INCLUDE_DIRECTORIES_PUBLIC ${SLANG_OVERRIDE_GLM_PATH} endif ()
-        EXPORT_MACRO_PREFIX SLANG_PLATFORM
-    )
-
-    set(modules_dest_dir $<TARGET_FILE_DIR:slang-test>)
+    # Since slang-test does not depend on gfx, we just copy the gfx modules to the slangc
+    # directory. So even if slang-test is not built, the gfx modules are still available.
+    set(modules_dest_dir $<TARGET_FILE_DIR:slangc>)
     add_custom_target(
         copy-gfx-slang-modules
         COMMAND ${CMAKE_COMMAND} -E make_directory ${modules_dest_dir}
@@ -239,16 +210,14 @@ if(SLANG_ENABLE_GFX)
         DESTINATION ${runtime_subdir}
     )
 endif()
-if(SLANG_ENABLE_TESTS)
+if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
     # The test executables and runtime-loaded modules
     slang_add_target(
         test-server
         EXECUTABLE
         EXCLUDE_FROM_ALL
         LINK_WITH_PRIVATE core compiler-core slang
-        INCLUDE_FROM_PRIVATE
-            unit-test
-            $<$<BOOL:${SLANG_ENABLE_SLANG_RHI}>:slang-rhi>
+        INCLUDE_FROM_PRIVATE unit-test slang-rhi
         FOLDER test
     )
     slang_add_target(
@@ -271,7 +240,7 @@ if(SLANG_ENABLE_TESTS)
             stb
             ${CMAKE_DL_LIBS}
             Threads::Threads
-        INCLUDE_FROM_PRIVATE $<$<BOOL:${SLANG_ENABLE_SLANG_RHI}>:slang-rhi>
+        INCLUDE_FROM_PRIVATE slang-rhi
         REQUIRES
             # Shared libraries dlopened by slang-test
             slang-reflection-test
@@ -296,7 +265,9 @@ if(SLANG_ENABLE_TESTS)
         PROPERTY VS_STARTUP_PROJECT slang-test
     )
 
-    add_dependencies(slang-test copy-gfx-slang-modules)
+    if(SLANG_ENABLE_GFX)
+        add_dependencies(slang-test copy-gfx-slang-modules)
+    endif()
 
     include(CTest)
     add_test(
@@ -322,62 +293,88 @@ if(SLANG_ENABLE_TESTS)
     )
 
     # These are libraries loaded at runtime from the test executable:
-    if(SLANG_ENABLE_GFX)
-        slang_add_target(
-            gfx-unit-test
-            MODULE
-            EXCLUDE_FROM_ALL
-            EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
-            USE_FEWER_WARNINGS
-            LINK_WITH_PRIVATE
-                core
-                slang
-                unit-test
-                stb
-                platform
-                $<$<BOOL:${SLANG_ENABLE_SLANG_RHI}>:slang-rhi>
-            INCLUDE_FROM_PRIVATE $<$<BOOL:${SLANG_ENABLE_SLANG_RHI}>:slang-rhi>
-            INCLUDE_DIRECTORIES_PUBLIC
-                .
-                platform
-                if
-                (not ${SLANG_OVERRIDE_GLM_PATH})
-            INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external else ()
-            INCLUDE_DIRECTORIES_PUBLIC ${SLANG_OVERRIDE_GLM_PATH} endif ()
-            OUTPUT_NAME gfx-unit-test-tool
-            REQUIRED_BY slang-test
-            FOLDER test/tools
-        )
-        if(SLANG_ENABLE_SLANG_RHI)
-            slang_add_target(
-                render-test
-                MODULE
-                EXCLUDE_FROM_ALL
-                EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
-                USE_FEWER_WARNINGS
-                LINK_WITH_PRIVATE
-                    core
-                    compiler-core
-                    slang
-                    slang-rhi
-                    platform
-                    stb
-                    $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
-                EXTRA_COMPILE_DEFINITIONS_PRIVATE
-                    $<$<BOOL:${SLANG_ENABLE_CUDA}>:RENDER_TEST_CUDA>
-                    $<$<BOOL:${SLANG_ENABLE_OPTIX}>:RENDER_TEST_OPTIX>
-                EXTRA_COMPILE_OPTIONS_PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/EHa>
-                OUTPUT_NAME render-test-tool
-                REQUIRED_BY slang-test
-                FOLDER test/tools
-            )
-        endif()
-    endif()
+    #
+    # `platform` contains all the platform abstractions for a GUI application.
+    #
+    slang_add_target(
+        platform
+        ${SLANG_LIB_TYPE}
+        EXCLUDE_FROM_ALL
+        USE_FEWER_WARNINGS
+        LINK_WITH_PRIVATE
+            core
+            imgui
+            stb
+            $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
+            slang-rhi
+            "$<$<PLATFORM_ID:Darwin>:-framework Cocoa>"
+            "$<$<PLATFORM_ID:Darwin>:-framework QuartzCore>"
+            ${CMAKE_DL_LIBS}
+        LINK_WITH_FRAMEWORK Foundation Cocoa QuartzCore
+        EXTRA_COMPILE_DEFINITIONS_PRIVATE
+            $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB=1>
+        INCLUDE_FROM_PRIVATE imgui slang-rhi
+        INCLUDE_DIRECTORIES_PUBLIC
+            .
+            platform
+            if
+            (not ${SLANG_OVERRIDE_GLM_PATH})
+        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external else ()
+        INCLUDE_DIRECTORIES_PUBLIC ${SLANG_OVERRIDE_GLM_PATH} endif ()
+        EXPORT_MACRO_PREFIX SLANG_PLATFORM
+    )
+
+    slang_add_target(
+        gfx-unit-test
+        MODULE
+        EXCLUDE_FROM_ALL
+        EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
+        USE_FEWER_WARNINGS
+        LINK_WITH_PRIVATE core slang unit-test stb platform slang-rhi
+        INCLUDE_FROM_PRIVATE slang-rhi
+        INCLUDE_DIRECTORIES_PUBLIC
+            .
+            platform
+            if
+            (not ${SLANG_OVERRIDE_GLM_PATH})
+        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external else ()
+        INCLUDE_DIRECTORIES_PUBLIC ${SLANG_OVERRIDE_GLM_PATH} endif ()
+        OUTPUT_NAME gfx-unit-test-tool
+        REQUIRED_BY slang-test
+        FOLDER test/tools
+    )
+
+    slang_add_target(
+        render-test
+        MODULE
+        EXCLUDE_FROM_ALL
+        EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
+        USE_FEWER_WARNINGS
+        LINK_WITH_PRIVATE
+            core
+            compiler-core
+            slang
+            slang-rhi
+            platform
+            stb
+            $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
+        INCLUDE_FROM_PRIVATE slang-rhi
+        EXTRA_COMPILE_DEFINITIONS_PRIVATE
+            $<$<BOOL:${SLANG_ENABLE_CUDA}>:RENDER_TEST_CUDA>
+            $<$<BOOL:${SLANG_ENABLE_OPTIX}>:RENDER_TEST_OPTIX>
+        EXTRA_COMPILE_OPTIONS_PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/EHa>
+        OUTPUT_NAME render-test-tool
+        REQUIRED_BY slang-test
+        FOLDER test/tools
+    )
+
     slang_add_target(
         slang-unit-test
         MODULE
         EXCLUDE_FROM_ALL
-        EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
+        EXTRA_COMPILE_DEFINITIONS_PRIVATE
+            SLANG_SHARED_LIBRARY_TOOL
+            SLANG_NO_DEPRECATION
         USE_FEWER_WARNINGS
         LINK_WITH_PRIVATE core compiler-core unit-test slang Threads::Threads
         OUTPUT_NAME slang-unit-test-tool

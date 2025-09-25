@@ -1,11 +1,13 @@
 // byte-address-buffer-aligned.slang
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -d3d12 -profile cs_6_0 -use-dxil -shaderobj -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -d3d12 -profile cs_6_0 -shaderobj -output-using-type
 //DISABLED_TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -vk -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -cuda -shaderobj -output-using-type
 
 //TEST:SIMPLE(filecheck=CHECK1):-target glsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK2):-target hlsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK3):-target spirv -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK3):-target spirv -emit-spirv-directly -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_CUDA):-target cuda -entry computeMain -stage compute
 
 // Confirm compilation of `(RW)ByteAddressBuffer` with aligned load / stores to wider data types.
 
@@ -115,3 +117,16 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
     buffer0.StoreAligned(8, buffer0.LoadAligned<float4>(32));
     buffer0.StoreAligned(8, buffer0.LoadAligned<float4>(8));
 }
+
+// CHECK_CUDA: ).Load<float4{{.*}}>(32U);
+// CHECK_CUDA: .Store(32U,{{.*}});
+// CHECK_CUDA: ).Load<float{{.*}}>(8U);
+// CHECK_CUDA: ).Load<float{{.*}}>(12U);
+// CHECK_CUDA: ).Load<float{{.*}}>(16U);
+// CHECK_CUDA: ).Load<float{{.*}}>(20U);
+// CHECK_CUDA: .Store(32U,make_float4{{.*}});
+// CHECK_CUDA: ).Load<float4{{.*}}>(32U);
+// CHECK_CUDA: .Store(8U,{{.*}});
+// CHECK_CUDA: .Store(12U,{{.*}});
+// CHECK_CUDA: .Store(16U,{{.*}});
+// CHECK_CUDA: .Store(20U,{{.*}});

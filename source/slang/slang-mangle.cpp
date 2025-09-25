@@ -191,6 +191,7 @@ void emitBaseType(ManglingContext* context, BaseType baseType)
     case BaseType::IntPtr:
         emitRaw(context, "ip");
         break;
+
     default:
         SLANG_UNEXPECTED("unimplemented case in base type mangling");
         break;
@@ -252,7 +253,7 @@ void emitType(ManglingContext* context, Type* type)
         auto n = funcType->getParamCount();
         emit(context, n);
         for (Index i = 0; i < n; ++i)
-            emitType(context, funcType->getParamType(i));
+            emitType(context, funcType->getParamTypeWithDirectionWrapper(i));
         emitType(context, funcType->getResultType());
         emitType(context, funcType->getErrorType());
     }

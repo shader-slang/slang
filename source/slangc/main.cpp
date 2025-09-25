@@ -30,20 +30,14 @@ static SlangResult _compile(SlangCompileRequest* compileRequest, int argc, const
     spSetDiagnosticCallback(compileRequest, &_diagnosticCallback, nullptr);
     spSetCommandLineCompilerMode(compileRequest);
 
-    char const* appName = "slangc";
-    if (argc > 0)
-        appName = argv[0];
-
+    SlangResult res = spProcessCommandLineArguments(compileRequest, &argv[1], argc - 1);
+    if (SLANG_FAILED(res))
     {
-        const SlangResult res = spProcessCommandLineArguments(compileRequest, &argv[1], argc - 1);
-        if (SLANG_FAILED(res))
-        {
-            // TODO: print usage message
-            return res;
-        }
+        // TODO: print usage message
+        return res;
     }
 
-    SlangResult res = SLANG_OK;
+    res = SLANG_OK;
 
 #ifndef _DEBUG
     try

@@ -426,6 +426,8 @@ struct LoweredElementTypeContext
             return "std430";
         case IRTypeLayoutRuleName::Natural:
             return "natural";
+        case IRTypeLayoutRuleName::C:
+            return "c";
         default:
             return "default";
         }
@@ -664,7 +666,10 @@ struct LoweredElementTypeContext
             // For spirv backend, we always want to lower all array types, even if the element type
             // comes out the same. This is because different layout rules may have different array
             // stride requirements.
-            if (!target->shouldEmitSPIRVDirectly())
+            //
+            // Additionally, `buffer` blocks do not work correctly unless lowered when targeting
+            // GLSL.
+            if (!isKhronosTarget(target->getTargetReq()))
             {
                 // For non-spirv target, we skip lowering this type if all field types are
                 // unchanged.
@@ -797,7 +802,26 @@ struct LoweredElementTypeContext
                     if (as<IRBoolType>(scalarType))
                     {
                         // Bool is an abstract type in SPIRV, so we need to lower them into an int.
-                        info.loweredType = builder.getIntType();
+
+                        // Find an integer type of the correct size for the current layout rule.
+                        IRSizeAndAlignment boolSizeAndAlignment;
+                        if (getSizeAndAlignment(
+                                target->getOptionSet(),
+                                config.layoutRule,
+                                scalarType,
+                                &boolSizeAndAlignment) == SLANG_OK)
+                        {
+                            IntInfo ii;
+                            ii.width = boolSizeAndAlignment.size * 8;
+                            ii.isSigned = true;
+                            info.loweredType = builder.getType(getIntTypeOpFromInfo(ii));
+                        }
+                        else
+                        {
+                            // Just in case that fails for some reason, just use an int.
+                            info.loweredType = builder.getIntType();
+                        }
+
                         if (vectorType)
                             info.loweredType = builder.getVectorType(
                                 info.loweredType,
@@ -1467,6 +1491,8 @@ IRTypeLayoutRules* getTypeLayoutRulesFromOp(IROp layoutTypeOp, IRTypeLayoutRules
         return IRTypeLayoutRules::getStd430();
     case kIROp_ScalarBufferLayoutType:
         return IRTypeLayoutRules::getNatural();
+    case kIROp_CBufferLayoutType:
+        return IRTypeLayoutRules::getC();
     }
     return defaultLayout;
 }
@@ -1481,6 +1507,10 @@ IRTypeLayoutRules* getTypeLayoutRuleForBuffer(TargetProgram* target, IRType* buf
         // If we are just emitting GLSL, we can just use the general layout rule.
         if (!target->shouldEmitSPIRVDirectly())
             return IRTypeLayoutRules::getNatural();
+
+        // If the user specified a C-compatible buffer layout, then do that.
+        if (target->getOptionSet().shouldUseCLayout())
+            return IRTypeLayoutRules::getC();
 
         // If the user specified a scalar buffer layout, then just use that.
         if (target->getOptionSet().shouldUseScalarLayout())

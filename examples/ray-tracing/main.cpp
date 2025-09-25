@@ -283,7 +283,7 @@ struct RayTracing : public WindowedAppBase
 
     Slang::Result initialize()
     {
-        SLANG_RETURN_ON_FAIL(initializeBase("Ray Tracing", 1024, 768));
+        SLANG_RETURN_ON_FAIL(initializeBase("Ray Tracing", 1024, 768, getDeviceType()));
 
         if (!isTestMode())
         {

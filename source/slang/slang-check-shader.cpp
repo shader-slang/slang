@@ -238,6 +238,25 @@ DeclRef<FuncDecl> findFunctionDeclByName(Module* translationUnit, Name* name, Di
     {
         entryPointFuncDeclRef = declRefExpr->declRef.as<FuncDecl>();
 
+        if (!entryPointFuncDeclRef)
+        {
+            if (auto genDeclRef = as<GenericDecl>(declRefExpr->declRef))
+            {
+                SharedSemanticsContext context(
+                    translationUnit->getLinkage(),
+                    translationUnit,
+                    sink);
+                SemanticsVisitor visitor(&context);
+                entryPointFuncDeclRef = createDefaultSubstitutionsIfNeeded(
+                                            translationUnit->getASTBuilder(),
+                                            &visitor,
+                                            translationUnit->getASTBuilder()->getMemberDeclRef(
+                                                genDeclRef,
+                                                genDeclRef.getDecl()->inner))
+                                            .as<FuncDecl>();
+            }
+        }
+
         if (entryPointFuncDeclRef && getModule(entryPointFuncDeclRef.getDecl()) != translationUnit)
             entryPointFuncDeclRef = DeclRef<FuncDecl>();
     }
@@ -549,10 +568,23 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 targetOptionSet.hasOption(CompilerOptionName::Profile) &&
                 (targetOptionSet.getIntOption(CompilerOptionName::Profile) !=
                  SLANG_PROFILE_UNKNOWN);
-            bool specificCapabilityRequested =
-                targetOptionSet.hasOption(CompilerOptionName::Capability) &&
-                (targetOptionSet.getIntOption(CompilerOptionName::Capability) !=
-                 SLANG_CAPABILITY_UNKNOWN);
+            bool specificCapabilityRequested = false;
+            for (auto atomVal : targetOptionSet.getArray(CompilerOptionName::Capability))
+            {
+                switch (atomVal.kind)
+                {
+                case CompilerOptionValueKind::Int:
+                    if (atomVal.intValue != SLANG_CAPABILITY_UNKNOWN)
+                        specificCapabilityRequested = true;
+                    break;
+                case CompilerOptionValueKind::String:
+                    // User made a specific capability request
+                    specificCapabilityRequested = true;
+                    break;
+                }
+                if (specificCapabilityRequested)
+                    break;
+            }
 
             if (auto declaredCapsMod =
                     entryPointFuncDecl->findModifier<ExplicitlyDeclaredCapabilityModifier>())
@@ -746,13 +778,13 @@ Type* getParamTypeWithDirectionWrapper(ASTBuilder* astBuilder, DeclRef<VarDeclBa
     case kParameterDirection_In:
         return result;
     case kParameterDirection_ConstRef:
-        return astBuilder->getConstRefType(result);
+        return astBuilder->getConstRefParamType(result);
     case kParameterDirection_Out:
         return astBuilder->getOutType(result);
     case kParameterDirection_InOut:
         return astBuilder->getInOutType(result);
     case kParameterDirection_Ref:
-        return astBuilder->getRefType(result, AddressSpace::Generic);
+        return astBuilder->getRefParamType(result);
     default:
         return result;
     }
@@ -1238,9 +1270,20 @@ RefPtr<ComponentType> createUnspecializedGlobalAndEntryPointsComponentType(
 RefPtr<ComponentType::SpecializationInfo> Module::_validateSpecializationArgsImpl(
     SpecializationArg const* args,
     Index argCount,
+    Index& outConsumedArgCount,
     DiagnosticSink* sink)
 {
-    SLANG_ASSERT(argCount == getSpecializationParamCount());
+    if (argCount < getSpecializationParamCount())
+    {
+        sink->diagnose(
+            SourceLoc(),
+            Diagnostics::mismatchSpecializationArguments,
+            getSpecializationParamCount(),
+            argCount);
+        return nullptr;
+    }
+    outConsumedArgCount = getSpecializationParamCount();
+    argCount = outConsumedArgCount;
 
     SharedSemanticsContext semanticsContext(getLinkage(), this, sink);
     SemanticsVisitor visitor(&semanticsContext);
@@ -1455,6 +1498,7 @@ static void _extractSpecializationArgs(
 RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArgsImpl(
     SpecializationArg const* inArgs,
     Index inArgCount,
+    Index& outConsumedArgCount,
     DiagnosticSink* sink)
 {
     auto args = inArgs;
@@ -1463,15 +1507,16 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
     SharedSemanticsContext sharedSemanticsContext(getLinkage(), nullptr, sink);
     SemanticsVisitor visitor(&sharedSemanticsContext);
 
-    // The first N arguments will be for the explicit generic parameters
+    // The last N arguments will be for the implicit existential arguments
     // of the entry point (if it has any).
     //
+    auto existentialSpecializationParamCount = getExistentialSpecializationParamCount();
     auto genericSpecializationParamCount = getGenericSpecializationParamCount();
-    SLANG_ASSERT(argCount >= genericSpecializationParamCount);
 
     RefPtr<EntryPointSpecializationInfo> info = new EntryPointSpecializationInfo();
 
     DeclRef<FuncDecl> specializedFuncDeclRef = m_funcDeclRef;
+    Index genericArgCount = genericSpecializationParamCount;
     if (genericSpecializationParamCount)
     {
         // We need to construct a generic application and use
@@ -1481,83 +1526,69 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
         auto genericDeclRef = m_funcDeclRef.getParent().as<GenericDecl>();
         SLANG_ASSERT(genericDeclRef); // otherwise we wouldn't have generic parameters
 
-        List<Val*> genericArgs;
+        bool isVariadic =
+            (genericDeclRef.getDecl()->getMembersOfType<GenericTypePackParamDecl>().getCount() !=
+             0);
 
-        for (Index ii = 0; ii < genericSpecializationParamCount; ++ii)
+        // If function is variadic generic, it will consume all the provided arguments.
+        if (isVariadic)
+            genericArgCount = argCount - existentialSpecializationParamCount;
+
+        if (genericArgCount < 0)
+        {
+            sink->diagnose(
+                SourceLoc(),
+                Diagnostics::mismatchSpecializationArguments,
+                genericSpecializationParamCount + existentialSpecializationParamCount,
+                argCount);
+            return nullptr;
+        }
+
+        List<Expr*> genericArgs;
+
+        auto astBuilder = getLinkage()->getASTBuilder();
+        for (Index ii = 0; ii < genericArgCount; ++ii)
         {
             auto specializationArg = args[ii];
-            genericArgs.add(specializationArg.val);
+            if (specializationArg.expr)
+            {
+                genericArgs.add(specializationArg.expr);
+                continue;
+            }
+            auto typeExpr = astBuilder->create<SharedTypeExpr>();
+            typeExpr->type = astBuilder->getTypeType((Type*)specializationArg.val);
+            genericArgs.add(typeExpr);
         }
-        auto astBuilder = getLinkage()->getASTBuilder();
-        for (auto constraintDecl : getMembersOfType<GenericTypeConstraintDecl>(
-                 getLinkage()->getASTBuilder(),
-                 DeclRef<ContainerDecl>(genericDeclRef)))
+        auto genAppExpr = astBuilder->create<GenericAppExpr>();
+        auto genExpr = astBuilder->create<VarExpr>();
+        genExpr->declRef = genericDeclRef;
+        genExpr->type = astBuilder->getOrCreate<GenericDeclRefType>();
+        genExpr->checked = true;
+        genAppExpr->functionExpr = genExpr;
+        genAppExpr->arguments = _Move(genericArgs);
+        auto checkedExpr = visitor.CheckTerm(genAppExpr);
+        if (auto partiallyAppliedExpr = as<PartiallyAppliedGenericExpr>(checkedExpr))
         {
-            DeclRef<GenericTypeConstraintDecl> constraintDeclRef =
-                astBuilder->getDirectDeclRef(constraintDecl.getDecl());
-            int argIndex = -1;
-            int ii = 0;
-
-            // Find the generic parameter type (T) that this constraint (T:IFoo) is applying to.
-            auto genericParamType = getSub(astBuilder, constraintDeclRef);
-            auto genParamDeclRefType = as<DeclRefType>(genericParamType);
-            if (!genParamDeclRefType)
-            {
-                continue;
-            }
-            auto genParamDeclRef = genParamDeclRefType->getDeclRef();
-
-            // Find the generic argument index of the corresponding generic parameter type in the
-            // generic parameter set.
-            //
-            for (auto member : genericDeclRef.getDecl()->getMembersOfType<GenericTypeParamDecl>())
-            {
-                if (member == genParamDeclRef.getDecl())
-                {
-                    argIndex = ii;
-                    break;
-                }
-                ii++;
-            }
-            if (argIndex == -1)
-            {
-                SLANG_ASSERT(!"generic parameter not found in generic decl");
-                continue;
-            }
-            auto sub = as<Type>(args[argIndex].val);
-            if (!sub)
-            {
-                sink->diagnose(
-                    constraintDecl,
-                    Diagnostics::expectedTypeForSpecializationArg,
-                    argIndex);
-                continue;
-            }
-
-            auto sup = getSup(astBuilder, constraintDeclRef);
-            auto subTypeWitness = visitor.isSubtype(sub, sup, IsSubTypeOptions::None);
-            if (subTypeWitness)
-            {
-                genericArgs.add(subTypeWitness);
-            }
-            else
-            {
-                // TODO: diagnose a problem here
-                sink->diagnose(
-                    constraintDecl,
-                    Diagnostics::typeArgumentDoesNotConformToInterface,
-                    sub,
-                    sup);
-                continue;
-            }
+            // If checked generic is partially applied generic, we try to force conversion into
+            // a fully defined declref by calling `trySolveConstraintSystem`.
+            SemanticsVisitor::ConstraintSystem system;
+            system.genericDecl = genericDeclRef.getDecl();
+            ConversionCost outCost;
+            specializedFuncDeclRef = visitor
+                                         .trySolveConstraintSystem(
+                                             &system,
+                                             genericDeclRef,
+                                             partiallyAppliedExpr->knownGenericArgs.getArrayView(),
+                                             outCost)
+                                         .as<FuncDecl>();
+        }
+        else if (auto declRefExpr = as<DeclRefExpr>(checkedExpr))
+        {
+            specializedFuncDeclRef = declRefExpr->declRef.as<FuncDecl>();
         }
 
-        specializedFuncDeclRef =
-            getLinkage()
-                ->getASTBuilder()
-                ->getGenericAppDeclRef(genericDeclRef, genericArgs.getArrayView())
-                .as<FuncDecl>();
-        SLANG_ASSERT(specializedFuncDeclRef);
+        if (!specializedFuncDeclRef)
+            return nullptr;
     }
 
     info->specializedFuncDeclRef = specializedFuncDeclRef;
@@ -1567,11 +1598,19 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
     // specialization parameters, attached to the value parameters
     // of the entry point.
     //
-    args += genericSpecializationParamCount;
-    argCount -= genericSpecializationParamCount;
+    args += genericArgCount;
+    argCount -= genericArgCount;
+    outConsumedArgCount = genericArgCount + existentialSpecializationParamCount;
 
-    auto existentialSpecializationParamCount = getExistentialSpecializationParamCount();
-    SLANG_ASSERT(argCount == existentialSpecializationParamCount);
+    if (argCount < existentialSpecializationParamCount)
+    {
+        sink->diagnose(
+            SourceLoc(),
+            Diagnostics::mismatchSpecializationArguments,
+            genericSpecializationParamCount + existentialSpecializationParamCount,
+            argCount);
+        return nullptr;
+    }
 
     for (Index ii = 0; ii < existentialSpecializationParamCount; ++ii)
     {

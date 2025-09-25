@@ -1,4 +1,5 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
 
 struct GradientBuffer
 {

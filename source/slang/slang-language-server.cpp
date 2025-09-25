@@ -160,6 +160,7 @@ SlangResult LanguageServer::parseNextMessage()
                     caps.semanticTokensProvider.full = true;
                     caps.semanticTokensProvider.range = false;
                     caps.signatureHelpProvider.triggerCharacters.add("(");
+                    caps.signatureHelpProvider.triggerCharacters.add("<");
                     caps.signatureHelpProvider.triggerCharacters.add(",");
                     caps.signatureHelpProvider.retriggerCharacters.add(",");
                     for (auto tokenType : kSemanticTokenTypes)
@@ -247,14 +248,6 @@ SlangResult LanguageServerCore::didOpenTextDocument(const DidOpenTextDocumentPar
 {
     String canonicalPath = uriToCanonicalPath(args.textDocument.uri);
     m_workspace->openDoc(canonicalPath, args.textDocument.text);
-
-    auto version = m_workspace->getCurrentVersion();
-    Module* parsedModule = version->getOrLoadModule(canonicalPath);
-    if (!parsedModule)
-    {
-        return SLANG_FAIL;
-    }
-
     return SLANG_OK;
 }
 
@@ -271,6 +264,7 @@ SlangResult LanguageServer::didOpenTextDocument(const DidOpenTextDocumentParams&
     {
         publishDiagnostics();
     }
+    m_pendingModulesToUpdateDiagnostics.add(uriToCanonicalPath(args.textDocument.uri));
     return result;
 }
 
@@ -669,7 +663,7 @@ LanguageServerResult<LanguageServerProtocol::Hover> LanguageServerCore::hover(
             }
             else if (auto overloadedExpr2 = as<OverloadedExpr2>(node))
             {
-                numOverloads = overloadedExpr2->candidiateExprs.getCount();
+                numOverloads = overloadedExpr2->candidateExprs.getCount();
             }
         }
         if (numOverloads > 1)
@@ -878,9 +872,9 @@ LanguageServerResult<LanguageServerProtocol::Hover> LanguageServerCore::hover(
     }
     else if (auto overloadedExpr2 = as<OverloadedExpr2>(leafNode))
     {
-        if (overloadedExpr2->candidiateExprs.getCount() > 0)
+        if (overloadedExpr2->candidateExprs.getCount() > 0)
         {
-            auto candidateExpr = overloadedExpr2->candidiateExprs[0];
+            auto candidateExpr = overloadedExpr2->candidateExprs[0];
             fillExprHoverInfo(candidateExpr);
         }
     }
@@ -1705,13 +1699,32 @@ LanguageServerResult<LanguageServerProtocol::SignatureHelp> LanguageServerCore::
         bool useOriginalExpr = true;
         if (auto originalDeclRefExpr = as<DeclRefExpr>(appExpr->originalFunctionExpr))
         {
+            // If the original expr doesn't map to a valid declref, we will use the checked
+            // func expr instead.
             if (!originalDeclRefExpr->declRef)
             {
                 useOriginalExpr = false;
             }
         }
+        if (as<GenericAppExpr>(appExpr->originalFunctionExpr))
+        {
+            if (as<DeclRefExpr>(funcExpr))
+            {
+                // If the original function is a fully specialized generic app, use the checked func
+                // expr for signature help.
+                useOriginalExpr = false;
+            }
+        }
         if (useOriginalExpr)
             funcExpr = appExpr->originalFunctionExpr;
+    }
+    if (auto partialGenAppExpr = as<PartiallyAppliedGenericExpr>(funcExpr))
+    {
+        funcExpr = partialGenAppExpr->originalExpr;
+    }
+    if (auto genAppExpr = as<GenericAppExpr>(funcExpr))
+    {
+        funcExpr = genAppExpr->functionExpr;
     }
     if (!funcExpr)
     {
@@ -1741,6 +1754,22 @@ LanguageServerResult<LanguageServerProtocol::SignatureHelp> LanguageServerCore::
         if (!declRef.getDecl())
             return;
 
+        // If funcExpr is a direct reference to a generic, we should either
+        // show the generic signature if we are inside `<>`, or show the function
+        // parameter signature if we are inside `()`. If we are inside `()`, we will
+        // need to form a decl ref to the inner decl and show its signature.
+        if (!as<GenericAppExpr>(appExpr))
+        {
+            if (auto genDeclRef = as<GenericDecl>(declRef))
+            {
+                declRef = createDefaultSubstitutionsIfNeeded(
+                    version->linkage->getASTBuilder(),
+                    &semanticsVisitor,
+                    version->linkage->getASTBuilder()->getMemberDeclRef(
+                        declRef,
+                        genDeclRef.getDecl()->inner));
+            }
+        }
         // If we have a better match than the current best, we will update response.activeSignature
         // to this signature.
         if (auto callableDeclRef = declRef.as<CallableDecl>())
@@ -1832,12 +1861,20 @@ LanguageServerResult<LanguageServerProtocol::SignatureHelp> LanguageServerCore::
     {
         if (auto typeType = as<TypeType>(declRefExpr->type.type))
         {
-            // Look for initializers
-            auto ctors =
-                semanticsVisitor.lookupConstructorsInType(typeType->getType(), declRefExpr->scope);
-            for (auto ctor : ctors)
+            if (as<GenericDeclRefType>(typeType->getType()))
             {
-                addDeclRef(ctor.declRef);
+                addDeclRef(declRefExpr->declRef);
+            }
+            else
+            {
+                // Look for initializers
+                auto ctors = semanticsVisitor.lookupConstructorsInType(
+                    typeType->getType(),
+                    declRefExpr->scope);
+                for (auto ctor : ctors)
+                {
+                    addDeclRef(ctor.declRef);
+                }
             }
         }
         else
@@ -1847,14 +1884,19 @@ LanguageServerResult<LanguageServerProtocol::SignatureHelp> LanguageServerCore::
     }
     else if (auto overloadedExpr = as<OverloadedExpr>(funcExpr))
     {
+        bool isGenApp = as<GenericAppExpr>(appExpr) != nullptr;
         for (auto item : overloadedExpr->lookupResult2)
         {
+            // Skip non-generic candidates if we are inside a generic app expr (e.g.
+            // `f<WE_ARE_HERE>`).
+            if (isGenApp && !as<GenericDecl>(item.declRef))
+                continue;
             addDeclRef(item.declRef);
         }
     }
     else if (auto overloadedExpr2 = as<OverloadedExpr2>(funcExpr))
     {
-        for (auto item : overloadedExpr2->candidiateExprs)
+        for (auto item : overloadedExpr2->candidateExprs)
         {
             addExpr(item);
         }

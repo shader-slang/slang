@@ -9,6 +9,7 @@
 #include "../core/slang-performance-profiler.h"
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-writer.h"
+#include "slang-check-out-of-bound-access.h"
 #include "slang-emit-c-like.h"
 #include "slang-emit-cpp.h"
 #include "slang-emit-cuda.h"
@@ -34,6 +35,7 @@
 #include "slang-ir-dce.h"
 #include "slang-ir-defer-buffer-load.h"
 #include "slang-ir-defunctionalization.h"
+#include "slang-ir-detect-uninitialized-resources.h"
 #include "slang-ir-diff-call.h"
 #include "slang-ir-dll-export.h"
 #include "slang-ir-dll-import.h"
@@ -60,6 +62,7 @@
 #include "slang-ir-legalize-empty-array.h"
 #include "slang-ir-legalize-global-values.h"
 #include "slang-ir-legalize-image-subscript.h"
+#include "slang-ir-legalize-matrix-types.h"
 #include "slang-ir-legalize-mesh-outputs.h"
 #include "slang-ir-legalize-uniform-buffer-load.h"
 #include "slang-ir-legalize-varying-params.h"
@@ -107,6 +110,7 @@
 #include "slang-ir-strip-default-construct.h"
 #include "slang-ir-strip-legalization-insts.h"
 #include "slang-ir-synthesize-active-mask.h"
+#include "slang-ir-transform-params-to-constref.h"
 #include "slang-ir-translate-global-varying-var.h"
 #include "slang-ir-undo-param-copy.h"
 #include "slang-ir-uniformity.h"
@@ -798,7 +802,7 @@ Result linkAndOptimizeIR(
     // can assume that all ordinary/uniform data is strictly
     // passed using constant buffers.
     //
-    collectGlobalUniformParameters(irModule, outLinkedIR.globalScopeVarLayout);
+    collectGlobalUniformParameters(irModule, outLinkedIR.globalScopeVarLayout, target);
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "GLOBAL UNIFORMS COLLECTED");
 #endif
@@ -1100,6 +1104,8 @@ Result linkAndOptimizeIR(
         break;
     }
 
+    detectUninitializedResources(irModule, sink);
+
     if (codeGenContext->removeAvailableInDownstreamIR)
     {
         removeAvailableInDownstreamModuleDecorations(target, irModule);
@@ -1109,6 +1115,7 @@ Result linkAndOptimizeIR(
     {
         checkForRecursiveTypes(irModule, sink);
         checkForRecursiveFunctions(codeGenContext->getTargetReq(), irModule, sink);
+        checkForOutOfBoundAccess(irModule, sink);
 
         if (requiredLoweringPassSet.missingReturn)
             checkForMissingReturns(irModule, sink, target, false);
@@ -1257,10 +1264,17 @@ Result linkAndOptimizeIR(
 
     legalizeEmptyArray(irModule, sink);
 
+    // For CUDA targets, always inline global constants to avoid dynamic initialization
+    // of __device__ variables rejected by NVRTC. This runs independently of the broader
+    // resource/existential type legalization, which remains disabled for CUDA.
+    if (target == CodeGenTarget::CUDASource || options.shouldLegalizeExistentialAndResourceTypes)
+    {
+        inlineGlobalConstantsForLegalization(irModule);
+    }
+
     // We don't need the legalize pass for C/C++ based types
     if (options.shouldLegalizeExistentialAndResourceTypes)
     {
-        inlineGlobalConstantsForLegalization(irModule);
 
         // The Slang language allows interfaces to be used like
         // ordinary types (including placing them in constant
@@ -1297,6 +1311,9 @@ Result linkAndOptimizeIR(
 #endif
         validateIRModuleIfEnabled(codeGenContext, irModule);
 
+        if (!validateStructuredBufferResourceTypes(irModule, sink, targetRequest))
+            return SLANG_FAIL;
+
         // Many of our target languages and/or downstream compilers
         // don't support `struct` types that have resource-type fields.
         // In order to work around this limitation, we will rewrite the
@@ -1332,7 +1349,11 @@ Result linkAndOptimizeIR(
         legalizeEmptyTypes(targetProgram, irModule, sink);
     }
 
+    legalizeMatrixTypes(targetProgram, irModule, sink);
+    dumpIRIfEnabled(codeGenContext, irModule, "AFTER-MATRIX-LEGALIZATION");
+
     legalizeVectorTypes(irModule, sink);
+    dumpIRIfEnabled(codeGenContext, irModule, "AFTER-VECTOR-LEGALIZATION");
 
     // Once specialization and type legalization have been performed,
     // we should perform some of our basic optimization steps again,
@@ -1704,6 +1725,12 @@ Result linkAndOptimizeIR(
         // For CUDA/OptiX like targets, add our pass to replace inout parameter copies with direct
         // pointers
         undoParameterCopy(irModule);
+        // Transform struct parameters to use ConstRef for better performance
+        if (isCPUTarget(targetRequest) || isCUDATarget(targetRequest) ||
+            isMetalTarget(targetRequest))
+        {
+            transformParamsToConstRef(irModule, codeGenContext->getSink());
+        }
 #if 0
         dumpIRIfEnabled(codeGenContext, irModule, "PARAMETER COPIES REPLACED WITH DIRECT POINTERS");
 #endif
@@ -2267,7 +2294,8 @@ public:
     {
         ComPtr<ISlangBlob> spirvBlob;
         SlangResult res = artifact->loadBlob(ArtifactKeep::Yes, spirvBlob.writeRef());
-        if (SLANG_FAILED(res) || !spirvBlob)
+        if (SLANG_FAILED(res) || !spirvBlob ||
+            spirvBlob->getBufferSize() < SPV_INDEX_INSTRUCTION_START * sizeof(SpvWord))
             return SLANG_FAIL;
 
         // Populate the full array of SPIR-V words.

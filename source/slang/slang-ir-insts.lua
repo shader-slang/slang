@@ -206,6 +206,7 @@ local insts = {
 			{ Std140Layout = { struct_name = "Std140BufferLayoutType", hoistable = true } },
 			{ Std430Layout = { struct_name = "Std430BufferLayoutType", hoistable = true } },
 			{ ScalarLayout = { struct_name = "ScalarBufferLayoutType", hoistable = true } },
+			{ CLayout = { struct_name = "CBufferLayoutType", hoistable = true } },
 			{ SubpassInputType = { operands = { { "elementType", "IRType" }, { "isMultisampleInst" } }, hoistable = true } },
 			{ TextureFootprintType = { min_operands = 1, hoistable = true } },
 			{ TextureShape1DType = { hoistable = true } },
@@ -2026,7 +2027,7 @@ local insts = {
 		EndFragmentShaderInterlock = { struct_name = "EndFragmentShaderInterlock" },
 	},
 	-- DebugInfo
-	{ DebugSource = { min_operands = 2, hoistable = true } },
+	{ DebugSource = { min_operands = 3, hoistable = true } },
 	{
 		DebugLine = {
 			min_operands = 5,

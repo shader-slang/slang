@@ -3,6 +3,7 @@
 
 #include "slang-ir-entry-point-pass.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-mangle.h"
 
@@ -218,7 +219,6 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
     IRStructType* paramStructType = nullptr;
     IRParam* collectedParam = nullptr;
 
-    IRVarLayout* entryPointParamsLayout = nullptr;
     bool needConstantBuffer = false;
 
     void processEntryPointImpl(EntryPointInfo const& info) SLANG_OVERRIDE
@@ -261,7 +261,7 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
         // If we are in the latter case we will need to make sure to allocate
         // an explicit IR constant buffer for that wrapper,
         //
-        entryPointParamsLayout = entryPointLayout->getParamsLayout();
+        auto entryPointParamsLayout = entryPointLayout->getParamsLayout();
         needConstantBuffer =
             as<IRParameterGroupTypeLayout>(entryPointParamsLayout->getTypeLayout()) != nullptr;
 
@@ -275,12 +275,15 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
         if (m_options.alwaysCreateCollectedParam)
             ensureCollectedParamAndTypeHaveBeenCreated();
 
+        IRStructTypeLayout::Builder structLayoutBuilder(builder);
+
         // We will be removing any uniform parameters we run into, so we
         // need to iterate the parameter list carefully to deal with
         // us modifying it along the way.
         //
         IRParam* nextParam = nullptr;
         UInt paramCounter = 0;
+        HashSet<LayoutResourceKind> resourceKinds;
         for (IRParam* param = entryPointFunc->getFirstParam(); param; param = nextParam)
         {
             nextParam = param->getNextParam();
@@ -305,6 +308,9 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
             //
             if (isVaryingParameter(paramLayout))
                 continue;
+
+            for (auto offsetAttr : paramLayout->getOffsetAttrs())
+                resourceKinds.add(offsetAttr->getResourceKind());
 
             // At this point we know that `param` is not a varying shader parameter,
             // so that we want to turn it into an equivalent global shader parameter.
@@ -338,6 +344,9 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
             //
             auto paramFieldKey = cast<IRStructKey>(
                 entryPointParamsStructLayout->getFieldLayoutAttrs()[paramIndex]->getFieldKey());
+            structLayoutBuilder.addField(
+                paramFieldKey,
+                entryPointParamsStructLayout->getFieldLayout(paramIndex));
 
             auto paramField = builder->createStructField(paramStructType, paramFieldKey, paramType);
             SLANG_UNUSED(paramField);
@@ -413,9 +422,110 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
             param->removeAndDeallocate();
         }
 
+        // Filter unrelated offset attrs from entryPointParamsLayout.
+        // Since entryPointParamsLayout will now be used as the varLayout for the newly created
+        // struct typed uniform parameter, and we need to ensure it only contains uniform parameter
+        // offsets, not varying ones, so isVaryingParameter() can correctly identify the newly
+        // created struct param as a uniform param.
+
         if (collectedParam)
         {
             collectedParam->insertBefore(entryPointFunc->getFirstBlock()->getFirstChild());
+            IRTypeLayout* entryPointUniformsTypeLayout = nullptr;
+
+            if (auto originalParamGroupLayout =
+                    as<IRParameterGroupTypeLayout>(entryPointParamsLayout->getTypeLayout()))
+            {
+                // If the original entry point layout is a parameter gorup layout,
+                // the new layout of the newly created `entryPointParams` param should also
+                // be a parameter group layout, but with unrelated offsets (e.g. varying offsets)
+                // stripped off.
+                // We will now create this layout inst.
+                //
+                // Register any existing ResourceKinds on the container var layout as "related".
+                for (auto offsetAttr :
+                     originalParamGroupLayout->getContainerVarLayout()->getOffsetAttrs())
+                {
+                    resourceKinds.add(offsetAttr->getResourceKind());
+                }
+                // Create the struct layout for parameters that goes into the `EntryPointParams`
+                // struct.
+                auto entryPointUniformStructTypeLayout = structLayoutBuilder.build();
+                auto originalElementVarLayout = originalParamGroupLayout->getElementVarLayout();
+                IRVarLayout::Builder elementVarLayoutBuilder(
+                    builder,
+                    entryPointUniformStructTypeLayout);
+                elementVarLayoutBuilder.cloneEverythingButOffsetsFrom(originalElementVarLayout);
+                // We assume everything in "pendingLayout" will appear as uniform parameters at
+                // the moment. This means that we can just copy them as is through the pass right
+                // now.
+                elementVarLayoutBuilder.setPendingVarLayout(
+                    originalElementVarLayout->getPendingVarLayout());
+
+                IRParameterGroupTypeLayout::Builder paramGroupTypeLayoutBuilder(builder);
+                // Filter offsets for the `elementVarLayout` part of the new parameter group layout.
+                for (auto resKind : resourceKinds)
+                {
+                    auto originalOffset = originalElementVarLayout->findOffsetAttr(resKind);
+                    if (!originalOffset)
+                        continue;
+                    auto resInfo = elementVarLayoutBuilder.findOrAddResourceInfo(resKind);
+                    resInfo->offset = originalOffset->getOffset();
+                    resInfo->space = originalOffset->getSpace();
+                }
+                for (auto resKind : resourceKinds)
+                {
+                    if (auto sizeAttr = originalParamGroupLayout->findSizeAttr(resKind))
+                        paramGroupTypeLayoutBuilder.addResourceUsage(sizeAttr);
+                }
+                auto newElementVarLayout = elementVarLayoutBuilder.build();
+                // The "containerVarLayout" part should remain unchanged from the original layout.
+                // Because this is where we store the offset of the default constant buffer itself.
+                paramGroupTypeLayoutBuilder.setContainerVarLayout(
+                    originalParamGroupLayout->getContainerVarLayout());
+                paramGroupTypeLayoutBuilder.setPendingTypeLayout(
+                    originalParamGroupLayout->getPendingDataTypeLayout());
+                // The "elementVarLayout" part should be the new one we just created.
+                paramGroupTypeLayoutBuilder.setElementVarLayout(newElementVarLayout);
+                // The "offsetElementTypeLayout" part is just redundant convenient info that
+                // can be calculated from `entryPointUniformStructTypeLayout` and
+                // `newElementVarLayout`.
+                paramGroupTypeLayoutBuilder.setOffsetElementTypeLayout(applyOffsetToTypeLayout(
+                    builder,
+                    entryPointUniformStructTypeLayout,
+                    newElementVarLayout));
+                // Now we have the new type layout for the `EntryPointParams` parameter.
+                entryPointUniformsTypeLayout = paramGroupTypeLayoutBuilder.build();
+            }
+            else
+            {
+                // If the original entry point layout isn't a constant buffer, we will simply use
+                // the new struct type layout as the entrypoint layout.
+                entryPointUniformsTypeLayout = structLayoutBuilder.build();
+            }
+
+            // Now create the var layout for the new `entryPointParams` parameter.
+            // This can be done by simply filtering out unrelated offset attributes from the
+            // original var layout.
+            IRVarLayout::Builder varLayoutBuilder(builder, entryPointUniformsTypeLayout);
+            varLayoutBuilder.cloneEverythingButOffsetsFrom(entryPointParamsLayout);
+            List<IRVarOffsetAttr*> filteredOffsetAttrs;
+            for (auto offsetAttr : entryPointParamsLayout->getOffsetAttrs())
+            {
+                if (resourceKinds.contains(offsetAttr->getResourceKind()))
+                {
+                    filteredOffsetAttrs.add(offsetAttr);
+                }
+            }
+            for (auto offset : filteredOffsetAttrs)
+            {
+                auto resInfo = varLayoutBuilder.findOrAddResourceInfo(offset->getResourceKind());
+                resInfo->offset = offset->getOffset();
+                resInfo->space = offset->getSpace();
+            }
+            varLayoutBuilder.setPendingVarLayout(entryPointParamsLayout->getPendingVarLayout());
+            auto entryPointUniformsVarLayout = varLayoutBuilder.build();
+            builder->addLayoutDecoration(collectedParam, entryPointUniformsVarLayout);
         }
 
         fixUpFuncType(entryPointFunc);
@@ -447,6 +557,9 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
             if (m_options.targetReq->getOptionSet().getBoolOption(
                     CompilerOptionName::GLSLForceScalarLayout))
                 layoutType = builder.getType(kIROp_ScalarBufferLayoutType);
+            else if (m_options.targetReq->getOptionSet().getBoolOption(
+                         CompilerOptionName::ForceCLayout))
+                layoutType = builder.getType(kIROp_CBufferLayoutType);
             else if (isKhronosTarget(m_options.targetReq))
                 layoutType = builder.getType(kIROp_Std430BufferLayoutType);
             else
@@ -463,13 +576,6 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
         }
 
         collectedParam->insertBefore(m_entryPoint.func);
-
-        // No matter what, the global shader parameter should have the layout
-        // information from the entry point attached to it, so that the
-        // contained parameters will end up in the right place(s).
-        //
-        builder.addLayoutDecoration(collectedParam, entryPointParamsLayout);
-
         // We add a name hint to the global parameter so that it will
         // emit to more readable code when referenced.
         //

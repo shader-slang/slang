@@ -142,12 +142,12 @@ option(
 )
 option(
     SLANG_ENABLE_TESTS
-    "Enable test targets, some tests may require SLANG_ENABLE_GFX, SLANG_ENABLE_SLANGD or SLANG_ENABLE_SLANGRT"
+    "Enable test targets, some tests may require SLANG_ENABLE_SLANG_RHI, SLANG_ENABLE_SLANGD or SLANG_ENABLE_SLANGRT"
     ON
 )
 option(
     SLANG_ENABLE_EXAMPLES
-    "Enable example targets, requires SLANG_ENABLE_GFX"
+    "Enable example targets, requires SLANG_ENABLE_SLANG_RHI"
     ON
 )
 option(SLANG_ENABLE_REPLAYER "Enable slang-replay tool" ON)
@@ -174,6 +174,27 @@ advanced_option(
     SLANG_USE_SYSTEM_UNORDERED_DENSE
     "Build using system unordered dense"
     OFF
+)
+advanced_option(
+    SLANG_USE_SYSTEM_SPIRV_TOOLS
+    "Build using system SPIR-V tools library"
+    OFF
+)
+advanced_option(
+    SLANG_USE_SYSTEM_GLSLANG
+    "Build using system glslang library"
+    OFF
+)
+if(WIN32)
+    set(SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC_DEFAULT ON)
+else()
+    set(SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC_DEFAULT OFF)
+endif()
+
+advanced_option(
+    SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC
+    "Enable mimalloc for SPIRV-Tools to improve compilation performance"
+    ${SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC_DEFAULT}
 )
 
 option(
@@ -389,8 +410,8 @@ if(SLANG_ENABLE_NVAPI AND NOT CMAKE_SYSTEM_NAME MATCHES "Windows")
     message(SEND_ERROR "SLANG_ENABLE_NVAPI is only supported on Windows")
 endif()
 
-if(SLANG_ENABLE_TESTS AND NOT SLANG_ENABLE_GFX)
-    message(SEND_ERROR "SLANG_ENABLE_TESTS requires SLANG_ENABLE_GFX")
+if(SLANG_ENABLE_TESTS AND NOT SLANG_ENABLE_SLANG_RHI)
+    message(SEND_ERROR "SLANG_ENABLE_TESTS requires SLANG_ENABLE_SLANG_RHI")
 endif()
 
 #
@@ -402,6 +423,33 @@ find_package(Threads REQUIRED)
 
 if(${SLANG_USE_SYSTEM_UNORDERED_DENSE})
     find_package(unordered_dense CONFIG QUIET)
+endif()
+
+if(SLANG_USE_SYSTEM_SPIRV_HEADERS)
+    find_package(SPIRV-Headers REQUIRED)
+endif()
+
+if(${SLANG_USE_SYSTEM_MINIZ})
+    find_package(miniz REQUIRED)
+    add_library(miniz ALIAS miniz::miniz)
+endif()
+
+if(${SLANG_USE_SYSTEM_LZ4})
+    find_package(lz4 REQUIRED)
+    add_library(lz4_static ALIAS LZ4::lz4)
+endif()
+
+if(${SLANG_USE_SYSTEM_VULKAN_HEADERS})
+    find_package(VulkanHeaders REQUIRED)
+endif()
+
+if(${SLANG_USE_SYSTEM_SPIRV_TOOLS})
+    find_package(SPIRV-Tools REQUIRED)
+endif()
+
+if(${SLANG_USE_SYSTEM_GLSLANG})
+    find_package(glslang REQUIRED)
+    add_library(glslang ALIAS glslang::glslang)
 endif()
 
 add_subdirectory(external)

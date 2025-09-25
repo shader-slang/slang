@@ -1821,11 +1821,12 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
             // We need to compute whether an entry point consumes
             // any sample-rate inputs, and along with explicitly
             // `sample`-qualified parameters, we also need to
-            // detect use of `SV_SampleIndex` as an input.
+            // detect use of `SV_SampleIndex` and
+            // `SV_VulkanSamplePosition` as an input.
             //
             if (state.directionMask & kEntryPointParameterDirection_Input)
             {
-                if (sn == "sv_sampleindex")
+                if (sn == "sv_sampleindex" || sn == "sv_vulkansampleposition")
                 {
                     state.isSampleRate = true;
                 }
@@ -2216,7 +2217,13 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     // A matrix is processed as if it was an array of rows
     else if (auto matrixType = as<MatrixExpressionType>(type))
     {
-        auto rowCount = getIntVal(matrixType->getRowCount());
+        auto foldedRowCountVal =
+            context->getTargetProgram()->getProgram()->tryFoldIntVal(matrixType->getRowCount());
+        IntegerLiteralValue rowCount = 0;
+        if (!foldedRowCountVal)
+        {
+            rowCount = getIntVal(foldedRowCountVal);
+        }
         return processSimpleEntryPointParameter(
             context,
             matrixType,
@@ -2228,10 +2235,15 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     {
         // Note: Bad Things will happen if we have an array input
         // without a semantic already being enforced.
+        UInt elementCount = 0;
 
-        auto elementCount = (UInt)getIntVal(arrayType->getElementCount());
-        if (arrayType->isUnsized())
-            elementCount = 0;
+        if (!arrayType->isUnsized())
+        {
+            auto intVal = context->getTargetProgram()->getProgram()->tryFoldIntVal(
+                arrayType->getElementCount());
+            if (intVal)
+                elementCount = (UInt)getIntVal(intVal);
+        }
 
         // We use the first element to derive the layout for the element type
         auto elementTypeLayout = processEntryPointVaryingParameter(
@@ -2332,13 +2344,13 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     {
         SLANG_ASSERT(ptrType->astNodeType == ASTNodeType::PtrType);
 
+        auto typeLayout = processSimpleEntryPointParameter(context, ptrType, state, varLayout);
+        RefPtr<PointerTypeLayout> ptrTypeLayout = typeLayout.as<PointerTypeLayout>();
+
         // Work out the layout for the value/target type
         auto valueTypeLayout =
             processEntryPointVaryingParameter(context, ptrType->getValueType(), state, varLayout);
-
-        RefPtr<PointerTypeLayout> ptrTypeLayout = new PointerTypeLayout();
         ptrTypeLayout->valueTypeLayout = valueTypeLayout;
-
         return ptrTypeLayout;
     }
     else if (auto optionalType = as<OptionalType>(type))
@@ -2408,7 +2420,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         if (auto structDeclRef = declRef.as<StructDecl>())
         {
             RefPtr<StructTypeLayout> structLayout = new StructTypeLayout();
-            structLayout->type = type;
+            structLayout->type = declRefType;
 
             // We will recursively walk the fields of a `struct` type
             // to compute layouts for those fields.
@@ -2456,7 +2468,11 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                 //
                 for (auto fieldTypeResInfo : fieldTypeLayout->resourceInfos)
                 {
-                    SLANG_RELEASE_ASSERT(fieldTypeResInfo.count != 0);
+                    // If the field is a Conditional<T, false> type, then it could have 0 size.
+                    // We should skip this field if it has no use of layout units.
+                    if (fieldTypeResInfo.count == 0)
+                        continue;
+
                     auto kind = fieldTypeResInfo.kind;
 
                     auto structTypeResInfo = structLayout->findOrAddResourceInfo(kind);
@@ -2538,6 +2554,16 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                     type,
                     globalGenericParamDecl.getDecl());
             }
+        }
+        else if (auto enumDeclRef = declRef.as<EnumDecl>())
+        {
+            // We handle an enumeration type as its tag type for varying parameters.
+            // This allows enums to be used in vertex output/input similar to their
+            // underlying integer types.
+            //
+            auto tagType = enumDeclRef.getDecl()->tagType;
+            SLANG_ASSERT(tagType);
+            return processEntryPointVaryingParameter(context, tagType, state, varLayout);
         }
         else if (auto associatedTypeParam = declRef.as<AssocTypeDecl>())
         {

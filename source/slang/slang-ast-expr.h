@@ -2,6 +2,8 @@
 #pragma once
 
 #include "slang-ast-base.h"
+
+//
 #include "slang-ast-expr.h.fiddle"
 
 FIDDLE()
@@ -79,7 +81,7 @@ class OverloadedExpr2 : public Expr
     Expr* base = nullptr;
 
     // The lookup result that was ambiguous
-    List<Expr*> candidiateExprs;
+    List<Expr*> candidateExprs;
 };
 
 FIDDLE(abstract)
@@ -501,6 +503,13 @@ class CountOfExpr : public SizeOfLikeExpr
 };
 
 FIDDLE()
+class AddressOfExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() Expr* arg = nullptr;
+};
+
+FIDDLE()
 class MakeOptionalExpr : public Expr
 {
     FIDDLE(...)
@@ -800,6 +809,7 @@ class PartiallyAppliedGenericExpr : public Expr
     FIDDLE(...)
 public:
     Expr* originalExpr = nullptr;
+    Expr* baseExpr = nullptr;
 
     /// The generic being applied
     DeclRef<GenericDecl> baseGenericDeclRef;

@@ -15,28 +15,6 @@ using Slang::ComPtr;
 
 namespace gfx_test
 {
-class DebugPrinter : public rhi::IDebugCallback
-{
-public:
-    virtual SLANG_NO_THROW void SLANG_MCALL handleMessage(
-        rhi::DebugMessageType type,
-        rhi::DebugMessageSource source,
-        const char* message) override
-    {
-        static const char* kTypeStrings[] = {"INFO", "WARN", "ERROR"};
-        static const char* kSourceStrings[] = {"Layer", "Driver", "Slang"};
-        if (type == rhi::DebugMessageType::Error)
-        {
-            printf("[%s] (%s) %s\n", kTypeStrings[int(type)], kSourceStrings[int(source)], message);
-            fflush(stdout);
-        }
-    }
-    static DebugPrinter* getInstance()
-    {
-        static DebugPrinter instance;
-        return &instance;
-    }
-};
 
 void diagnoseIfNeeded(slang::IBlob* diagnosticsBlob)
 {
@@ -273,7 +251,8 @@ Slang::ComPtr<IDevice> createTestingDevice(
     if (context->enableDebugLayers)
     {
         deviceDesc.enableValidation = context->enableDebugLayers;
-        deviceDesc.debugCallback = DebugPrinter::getInstance();
+        deviceDesc.debugCallback = context->debugCallback;
+        getRHI()->enableDebugLayers();
     }
 
     D3D12DeviceExtendedDesc extDesc = {};

@@ -453,6 +453,9 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
 
     switch (type->getOp())
     {
+    case kIROp_BoolType:
+        sb << "bool";
+        break;
     case kIROp_FloatType:
         sb << "float";
         break;
@@ -715,6 +718,30 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
         break;
     case kIROp_IntLit:
         sb << as<IRIntLit>(type)->getValue();
+        break;
+    case kIROp_BoolLit:
+        sb << (as<IRBoolLit>(type)->getValue() ? "true" : "false");
+        break;
+    case kIROp_FloatLit:
+        sb << as<IRFloatLit>(type)->getValue();
+        break;
+    case kIROp_StringLit:
+        {
+            auto stringLit = as<IRStringLit>(type);
+            sb << "\"";
+            sb << stringLit->getStringSlice();
+            sb << "\"";
+        }
+        break;
+    case kIROp_VoidLit:
+        sb << "void";
+        break;
+    case kIROp_PtrLit:
+        {
+            auto ptrLit = as<IRPtrLit>(type);
+            sb << "ptr_";
+            sb << (UInt64)ptrLit->getValue();
+        }
         break;
     default:
         if (auto decor = type->findDecoration<IRNameHintDecoration>())

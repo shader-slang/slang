@@ -524,6 +524,7 @@ enum class IRTypeLayoutRuleName
     Std430,
     Std140,
     D3DConstantBuffer,
+    C,
     _Count,
 };
 
@@ -960,6 +961,7 @@ struct IRType : IRInst
 };
 
 IRType* unwrapArray(IRType* type);
+IRType* unwrapArrayAndPointers(IRType* type);
 
 FIDDLE()
 struct IRBasicType : IRType
@@ -1680,15 +1682,22 @@ struct IRPtrTypeBase : IRType
     FIDDLE(baseInst())
     IRType* getValueType() { return (IRType*)getOperand(0); }
 
+    AccessQualifier getAccessQualifier()
+    {
+        return getOperandCount() > 1
+                   ? (AccessQualifier) static_cast<IRIntLit*>(getOperand(1))->getValue()
+                   : AccessQualifier::ReadWrite;
+    }
+
     bool hasAddressSpace()
     {
-        return getOperandCount() > 1 && getAddressSpace() != AddressSpace::Generic;
+        return getOperandCount() > 2 && getAddressSpace() != AddressSpace::Generic;
     }
 
     AddressSpace getAddressSpace()
     {
-        return getOperandCount() > 1
-                   ? (AddressSpace) static_cast<IRIntLit*>(getOperand(1))->getValue()
+        return getOperandCount() > 2
+                   ? (AddressSpace) static_cast<IRIntLit*>(getOperand(2))->getValue()
                    : AddressSpace::Generic;
     }
 };
@@ -2409,6 +2418,7 @@ public:
     //
     const static UInt k_minSupportedModuleVersion = 1;
     const static UInt k_maxSupportedModuleVersion = 1;
+    static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
 private:
     friend struct IRSerialReadContext;
@@ -2640,6 +2650,10 @@ bool isMovableInst(IRInst* inst);
 
 #if SLANG_ENABLE_IR_BREAK_ALLOC
 uint32_t& _debugGetIRAllocCounter();
+extern uint32_t _slangIRAllocBreak;
+extern bool _slangIRPrintStackAtBreak;
+void _debugSetInstBeingCloned(uint32_t uid);
+void _debugResetInstBeingCloned();
 #endif
 
 // TODO: Ellie, comment and move somewhere more appropriate?

@@ -1,7 +1,8 @@
 // This is similar to wave-lane-at.slang but tests more limited supported types for vk.
 // We have this 'simple' test, because we can't do matrix (or imat) operations on GLSL/Vk target
 //TEST_CATEGORY(wave, compute)
-//TEST:COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -profile cs_6_0 -shaderobj -render-feature hardware-device
+//TEST:COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -shaderobj -render-feature hardware-device
+//TEST:COMPARE_COMPUTE_EX:-cuda -compute -profile cs_6_0 -shaderobj -render-feature hardware-device
 //TEST(vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 //TEST:COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj
 //TEST:COMPARE_COMPUTE_EX:-metal -compute -shaderobj

@@ -5,6 +5,7 @@
 #include "slang-check.h"
 #include "slang-compiler.h"
 #include "slang-deprecated.h"
+#include "slang-lookup.h"
 #include "slang-syntax.h"
 #include "slang-type-layout.h"
 #include "slang.h"
@@ -986,6 +987,45 @@ SLANG_API SlangReflectionFunction* spReflection_FindFunctionByNameInType(
     try
     {
         auto result = program->findDeclFromStringInType(type, name, LookupMask::Function, &sink);
+        return tryConvertExprToFunctionReflection(astBuilder, result);
+    }
+    catch (...)
+    {
+    }
+    return nullptr;
+}
+
+
+SLANG_API SlangReflectionFunction* spReflection_TryResolveOverloadedFunction(
+    SlangReflection* reflection,
+    uint32_t candidateCount,
+    SlangReflectionFunction** candidates)
+{
+    auto programLayout = convert(reflection);
+    auto program = programLayout->getProgram();
+    auto astBuilder = program->getLinkage()->getASTBuilder();
+    SLANG_AST_BUILDER_RAII(astBuilder);
+    OverloadedExpr* overloadedFunc = nullptr;
+    if (candidateCount == 1)
+    {
+        overloadedFunc = convertToOverloadedFunc(candidates[0]);
+        if (!overloadedFunc)
+            return candidates[0];
+    }
+    else
+    {
+        overloadedFunc = astBuilder->create<OverloadedExpr>();
+        overloadedFunc->type = astBuilder->getOrCreate<OverloadGroupType>();
+        for (uint32_t i = 0; i < candidateCount; i++)
+        {
+            auto func = convertToFunc(candidates[i]);
+            AddToLookupResult(overloadedFunc->lookupResult2, LookupResultItem(func));
+        }
+    }
+
+    try
+    {
+        auto result = program->tryResolveOverloadedExpr(overloadedFunc);
         return tryConvertExprToFunctionReflection(astBuilder, result);
     }
     catch (...)
@@ -3431,10 +3471,21 @@ SLANG_API SlangReflectionDecl* spReflectionFunction_asDecl(SlangReflectionFuncti
 SLANG_API char const* spReflectionFunction_GetName(SlangReflectionFunction* inFunc)
 {
     auto func = convertToFunc(inFunc);
-    if (!func)
-        return nullptr;
+    if (func)
+        return getText(func.getDecl()->getName()).getBuffer();
 
-    return getText(func.getDecl()->getName()).getBuffer();
+    // If convertToFunc failed, this might be an overloaded function.
+    // Try to get the name from the first overload candidate.
+    auto overloadedFunc = convertToOverloadedFunc(inFunc);
+    if (overloadedFunc && overloadedFunc->lookupResult2.items.getCount() > 0)
+    {
+        auto firstOverload = overloadedFunc->lookupResult2.items[0].declRef;
+        if (auto funcDeclRef = firstOverload.as<FunctionDeclBase>())
+        {
+            return getText(funcDeclRef.getDecl()->getName()).getBuffer();
+        }
+    }
+    return nullptr;
 }
 
 SLANG_API SlangReflectionType* spReflectionFunction_GetResultType(SlangReflectionFunction* inFunc)
@@ -3459,6 +3510,21 @@ SLANG_API SlangReflectionModifier* spReflectionFunction_FindModifier(
         return nullptr;
 
     auto varRefl = convert(funcDeclRef.as<Decl>());
+    if (!varRefl)
+        return nullptr;
+
+    return spReflectionVariable_FindModifier(varRefl, modifierID);
+}
+
+SLANG_API SlangReflectionModifier* spReflectionDecl_findModifier(
+    SlangReflectionDecl* decl,
+    SlangModifierID modifierID)
+{
+    Decl* slangDecl = (Decl*)decl;
+    if (!slangDecl)
+        return nullptr;
+
+    auto varRefl = convert(DeclRef<Decl>(slangDecl));
     if (!varRefl)
         return nullptr;
 

@@ -143,6 +143,10 @@ build/Debug/bin/slang-test
 
 See the [documentation on testing](../tools/slang-test/README.md) for more information.
 
+## Debugging
+
+See the [documentation on debugging](/docs/debugging.md).
+
 ## More niche topics
 
 ### CMake options
@@ -215,7 +219,7 @@ There are several options for getting llvm-support:
       the case that a prebuilt binary can't be found then the build will proceed
       as though `DISABLE` was chosen
 - Use a system supplied LLVM: `-DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM`, you
-  must have llvm-13.0 and a matching libclang installed. It's important that
+  must have llvm-14.0 and a matching libclang installed. It's important that
   either:
     - You don't end up linking to a dynamic libllvm.so, this will almost
       certainly cause multiple versions of LLVM to be loaded at runtime,
@@ -349,7 +353,7 @@ encouraged but it isn't a continuously maintained setup.
 
 _MSVC_ 19 is tested in CI and is the recommended minimum version.
 
-_Clang_ 15.0 is tested in CI and is the recommended minimum version.
+_Clang_ 17.0 is tested in CI and is the recommended minimum version.
 
 ## Static linking against libslang
 
