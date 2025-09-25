@@ -672,4 +672,5 @@ return {
 	["Type.CLayout"] = 668,
 	["CastStorageToLogicalBase.CastStorageToLogical"] = 669,
 	["CastStorageToLogicalBase.CastStorageToLogicalDeref"] = 670,
+	["Decoration.DisableCopyEliminationDecoration"] = 671,
 }

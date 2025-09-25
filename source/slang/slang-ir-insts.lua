@@ -1480,6 +1480,7 @@ local insts = {
 					struct_name = "NonCopyableTypeDecoration",
 				},
 			},
+			{ DisableCopyEliminationDecoration = {} },
 			{
 				DynamicUniform = {
 					-- Marks a value to be dynamically uniform.

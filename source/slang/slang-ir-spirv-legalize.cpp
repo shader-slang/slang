@@ -898,14 +898,17 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         {
             auto arg = inst->getArg(i);
             auto paramType = funcType->getParamType(i);
-            if (as<IRPtrType>(paramType))
+            if (auto ptrType = as<IRPtrType>(paramType))
             {
-                // If the parameter has an explicit pointer type,
-                // then we know the user is using the variable pointer
-                // capability to pass a true pointer.
-                // In this case we should not rewrite the call.
-                newArgs.add(arg);
-                continue;
+                if (ptrType->getAddressSpace() == AddressSpace::UserPointer)
+                {
+                    // If the parameter has an explicit pointer type,
+                    // then we know the user is using the variable pointer
+                    // capability to pass a true pointer.
+                    // In this case we should not rewrite the call.
+                    newArgs.add(arg);
+                    continue;
+                }
             }
             auto ptrType = as<IRPtrTypeBase>(arg->getDataType());
             if (!as<IRPtrTypeBase>(arg->getDataType()))
@@ -954,6 +957,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
             // If we reach here, we need to allocate a temp var.
             auto tempVar = builder.emitVar(ptrType->getValueType());
+            builder.addDecoration(tempVar, kIROp_DisableCopyEliminationDecoration);
             auto load = builder.emitLoad(arg);
             builder.emitStore(tempVar, load);
             newArgs.add(tempVar);
