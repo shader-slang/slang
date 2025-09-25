@@ -1841,12 +1841,17 @@ Result linkAndOptimizeIR(
         isWGPUTarget(targetRequest);
     lowerBufferElementTypeToStorageType(targetProgram, irModule, bufferElementTypeLoweringOptions);
 
+    // If we are generating code for glsl or metal, perform address space propagation now.
+    // For SPIRV, we will do that during spirv legalization that happens after
+    // `linkAndOptimizeIR`.
     if (target == CodeGenTarget::GLSL)
     {
-        // If we are generating code for glsl, perform address space propagation now,
-        // so that the GLSL emitter can recognize buffer pointers from ordinary pointers.
         NoOpInitialAddressSpaceAssigner addrSpaceAssigner;
         specializeAddressSpace(irModule, &addrSpaceAssigner);
+    }
+    else if (isMetalTarget(targetRequest))
+    {
+        specializeAddressSpaceForMetal(irModule);
     }
 
     performForceInlining(irModule);

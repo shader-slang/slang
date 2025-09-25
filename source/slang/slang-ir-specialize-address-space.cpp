@@ -249,18 +249,24 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                             {
                                 List<AddressSpace> argAddrSpaces;
                                 bool fullySpecialized = true;
+                                bool hasSpecializableArg = false;
                                 for (UInt i = 0; i < callInst->getArgCount(); i++)
                                 {
                                     auto arg = callInst->getArg(i);
                                     auto argAddrSpace = getAddrSpace(arg);
                                     argAddrSpaces.add(getAddrSpace(arg));
-                                    if (argAddrSpace == AddressSpace::Generic &&
-                                        as<IRPtrTypeBase>(arg->getDataType()))
+                                    if (as<IRPtrTypeBase>(arg->getDataType()))
                                     {
-                                        fullySpecialized = false;
-                                        break;
+                                        hasSpecializableArg = true;
+                                        if (argAddrSpace == AddressSpace::Generic)
+                                        {
+                                            fullySpecialized = false;
+                                            break;
+                                        }
                                     }
                                 }
+                                if (!hasSpecializableArg)
+                                    break;
                                 if (!fullySpecialized)
                                     break;
                                 // If callee doesn't have a body, don't specialize.

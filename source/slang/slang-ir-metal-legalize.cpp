@@ -256,10 +256,13 @@ void legalizeIRForMetal(IRModule* module, DiagnosticSink* sink)
 
     legalizeEntryPointVaryingParamsForMetal(module, sink, entryPoints);
 
+    processInst(module->getModuleInst(), sink);
+}
+
+void specializeAddressSpaceForMetal(IRModule* module)
+{
     MetalAddressSpaceAssigner metalAddressSpaceAssigner;
     specializeAddressSpace(module, &metalAddressSpaceAssigner);
-
-    processInst(module->getModuleInst(), sink);
 }
 
 } // namespace Slang
