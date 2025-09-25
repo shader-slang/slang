@@ -293,7 +293,7 @@ static IRImageSubscript* isTextureAccess(IRInst* inst)
 void MetalSourceEmitter::emitImageOperandWithAccessor(IRInst* imageOperand)
 {
     emitOperand(imageOperand, getInfo(EmitOp::Postfix));
-    
+
     // Check if the image operand is a pointer type
     if (as<IRPtrTypeBase>(imageOperand->getDataType()))
     {
