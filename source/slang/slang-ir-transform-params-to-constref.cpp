@@ -67,7 +67,7 @@ struct TransformParamsToConstRefContext
                     case kIROp_FieldExtract:
                         {
                             // Transform the IRFieldExtract into a IRFieldAddress
-                            if (isUseBaseAddrOperand(use, user))
+                            if (!isUseBaseAddrOperand(use, user))
                                 break;
                             auto fieldExtract = as<IRFieldExtract>(user);
                             builder.setInsertBefore(fieldExtract);
@@ -81,7 +81,7 @@ struct TransformParamsToConstRefContext
                     case kIROp_GetElement:
                         {
                             // Transform the IRGetElement into a IRGetElementPtr
-                            if (isUseBaseAddrOperand(use, user))
+                            if (!isUseBaseAddrOperand(use, user))
                                 break;
                             auto getElement = as<IRGetElement>(user);
                             builder.setInsertBefore(getElement);

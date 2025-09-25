@@ -1119,7 +1119,17 @@ struct LoweredElementTypeContext
             as<IRHLSLStructuredBufferTypeBase>(originalPtrLikeType) ||
             as<IRGLSLShaderStorageBufferType>(originalPtrLikeType))
         {
-            return builder.getPtrType(newElementType);
+            ShortList<IRInst*> operands;
+            operands.add(newElementType);
+            for (UInt i = 1; i < originalPtrLikeType->getOperandCount(); i++)
+            {
+                operands.add(originalPtrLikeType->getOperand(0));
+            }
+            return (IRType*)builder.emitIntrinsicInst(
+                builder.getTypeKind(),
+                originalPtrLikeType->getOp(),
+                (UInt)operands.getCount(),
+                operands.getArrayView().getBuffer());
         }
         SLANG_UNREACHABLE("unhandled ptr like or buffer type");
     }
@@ -1139,20 +1149,20 @@ struct LoweredElementTypeContext
         TypeLoweringConfig config;
     };
 
-    IRInst* getBufferAddr(IRBuilder& builder, IRInst* loadStoreInst)
+    IRInst* getBufferAddr(IRBuilder& builder, IRInst* loadStoreInst, IRInst* baseAddr)
     {
         switch (loadStoreInst->getOp())
         {
         case kIROp_Load:
         case kIROp_Store:
-            return loadStoreInst->getOperand(0);
+            return baseAddr;
         case kIROp_StructuredBufferLoad:
         case kIROp_StructuredBufferLoadStatus:
         case kIROp_RWStructuredBufferLoad:
         case kIROp_RWStructuredBufferLoadStatus:
         case kIROp_RWStructuredBufferStore:
             return builder.emitRWStructuredBufferGetElementPtr(
-                loadStoreInst->getOperand(0),
+                baseAddr,
                 loadStoreInst->getOperand(1));
         default:
             return nullptr;
@@ -1414,6 +1424,9 @@ struct LoweredElementTypeContext
                                 //   create a temp var to hold the result of the memory load,
                                 //   Then we create a `CastStorageToLogicalDeref(tempVar)`
                                 //   structure and use it to replace `user`.
+                                // Note that it is important to introduce a temp var and preserve
+                                // the buffer load operation, so we are not changing the memory
+                                // semantics of the original program.
                                 if (!isUseBaseAddrOperand(use, user))
                                     break;
                                 // If loaded value is itself a pointer or buffer,
@@ -1744,7 +1757,7 @@ struct LoweredElementTypeContext
                         return;
                     }
                     auto ptrVal = use->getUser();
-                    builder.setInsertAfter(ptrVal);
+                    setInsertAfterOrdinaryInst(&builder, ptrVal);
                     builder.replaceOperand(use, loweredBufferType);
                     auto logicalBufferType = getLoweredPtrLikeType(bufferType, elementType);
                     auto castStorageToLogical =
@@ -1785,7 +1798,11 @@ struct LoweredElementTypeContext
     void materializeStorageToLogicalCastsImpl(IRCastStorageToLogicalBase* castInst)
     {
         IRBuilder builder(castInst);
-
+        if (!castInst->hasUses())
+        {
+            castInst->removeAndDeallocate();
+            return;
+        }
         if (castInst->getOp() == kIROp_CastStorageToLogicalDeref)
         {
             // Convert CastStorageToLogicalDeref to load(CastStorageToLogical) to reuse
@@ -1874,9 +1891,7 @@ struct LoweredElementTypeContext
                         if (castInst != user->getOperand(0))
                             break;
                         builder.setInsertBefore(user);
-                        auto addr = getBufferAddr(builder, user);
-                        if (addr == castInst)
-                            addr = ptrVal;
+                        auto addr = getBufferAddr(builder, user, ptrVal);
                         if (!addr)
                         {
                             IRCloneEnv cloneEnv = {};
@@ -1908,37 +1923,44 @@ struct LoweredElementTypeContext
                         IRCloneEnv cloneEnv = {};
                         builder.setInsertBefore(user);
                         auto originalVal = getStoreVal(user);
-                        IRInst* addr = getBufferAddr(builder, user);
-                        if (addr)
+                        if (auto sbAppend = as<IRStructuredBufferAppend>(user))
                         {
-                            addr = ptrVal;
+                            builder.setInsertBefore(sbAppend);
+                            IRInst* addr = nullptr;
+                            if (originalVal->getOp() == kIROp_CastStorageToLogicalDeref)
+                            {
+                                addr = originalVal->getOperand(0);
+                            }
+                            else
+                            {
+                                addr = builder.emitVar(loweredElementTypeInfo.loweredType);
+                                loweredElementTypeInfo.convertOriginalToLowered
+                                    .applyDestinationDriven(builder, addr, originalVal);
+                            }
+                            auto packedVal = builder.emitLoad(addr);
+                            sbAppend->setOperand(1, packedVal);
+                        }
+                        else
+                        {
+                            IRInst* addr = getBufferAddr(builder, user, ptrVal);
                             if (auto alignedAttr = user->findAttr<IRAlignedAttr>())
                             {
                                 builder.addAlignedAddressDecoration(
                                     addr,
                                     alignedAttr->getAlignment());
                             }
-
-                            loweredElementTypeInfo.convertOriginalToLowered.applyDestinationDriven(
-                                builder,
-                                addr,
-                                originalVal);
+                            if (originalVal->getOp() == kIROp_CastStorageToLogicalDeref)
+                            {
+                                auto valAddr = originalVal->getOperand(0);
+                                auto storageVal = builder.emitLoad(valAddr);
+                                builder.emitStore(addr, storageVal);
+                            }
+                            else
+                            {
+                                loweredElementTypeInfo.convertOriginalToLowered
+                                    .applyDestinationDriven(builder, addr, originalVal);
+                            }
                             user->removeAndDeallocate();
-                        }
-                        else if (auto sbAppend = as<IRStructuredBufferAppend>(user))
-                        {
-                            builder.setInsertBefore(sbAppend);
-                            addr = builder.emitVar(loweredElementTypeInfo.loweredType);
-                            loweredElementTypeInfo.convertOriginalToLowered.applyDestinationDriven(
-                                builder,
-                                addr,
-                                originalVal);
-                            auto packedVal = builder.emitLoad(addr);
-                            sbAppend->setOperand(1, packedVal);
-                        }
-                        else
-                        {
-                            SLANG_UNREACHABLE("unhandled store type");
                         }
                         return;
                     }
@@ -1955,29 +1977,39 @@ struct LoweredElementTypeContext
             castInst->removeAndDeallocate();
     }
 
-    void collectCastStorageToLogicalInsts(List<IRCastStorageToLogicalBase*>& insts, IRInst* root)
+    void collectInstsOfType(List<IRCastStorageToLogicalBase*>& insts, IRInst* root, IROp op)
     {
-        switch (root->getOp())
+        if (root->getOp() == op)
         {
-        case kIROp_CastStorageToLogical:
-        case kIROp_CastStorageToLogicalDeref:
             insts.add((IRCastStorageToLogicalBase*)root);
             return;
         }
         for (auto child : root->getChildren())
         {
-            collectCastStorageToLogicalInsts(insts, child);
+            collectInstsOfType(insts, child, op);
         }
     }
 
     void materializeStorageToLogicalCasts(IRInst* root)
     {
+        // We will process all CastStorageToLogical insts first, before
+        // processing all CastStorageToLogicalDeref.
+        // This is because when we materialize a
+        // `store(CastStorageToLogical(addr), CastStorageToLogicalDeref(src))`,
+        // we can just fold out CastStorageToLogicalDeref and emit
+        // `store(addr, load(src))` instead.
+        // If we materialized `CastStorageToLogicalDeref` first we will
+        // miss this opportunity and generate more bloated code.
+        //
         List<IRCastStorageToLogicalBase*> castInsts;
-        collectCastStorageToLogicalInsts(castInsts, root);
+        collectInstsOfType(castInsts, root, kIROp_CastStorageToLogical);
         for (auto inst : castInsts)
-        {
             materializeStorageToLogicalCastsImpl(inst);
-        }
+
+        castInsts.clear();
+        collectInstsOfType(castInsts, root, kIROp_CastStorageToLogicalDeref);
+        for (auto inst : castInsts)
+            materializeStorageToLogicalCastsImpl(inst);
     }
 
     // Lower all getElementPtr insts of a lowered matrix out of existance.
