@@ -1,3 +1,5 @@
+# CoopVec tests failures are due to a bug in old VulkanSDK version 1.4.313.0 or below.
+# When we upgrade VulkanSDK version on all CI machines, they should be removed from this list.
 tests/cooperative-vector/matrix-mul-bias-mut.slang (vk)
 tests/cooperative-vector/matrix-mul-bias-packed-mut.slang (vk)
 tests/cooperative-vector/matrix-mul-bias-packed.slang (vk)
@@ -15,10 +17,7 @@ tests/cooperative-vector/matrix-mul-rw.slang (vk)
 tests/cooperative-vector/matrix-mul-rwbyteaddress-packed.slang (vk)
 tests/cooperative-vector/matrix-mul-structuredbuffer-packed.slang (vk)
 tests/cooperative-vector/matrix-mul.slang (vk)
-tests/cooperative-vector/outer-product-structuredbuffer.slang (vk)
-tests/cooperative-vector/outer-product.slang (vk)
-tests/cooperative-vector/reduce-sum-accumulate-structuredbuffer.slang.3 syn (cuda)
-tests/cooperative-vector/reduce-sum-accumulate.slang.3 syn (cuda)
+
 tests/language-feature/saturated-cooperation/simple.slang (vk)
 tests/language-feature/saturated-cooperation/fuse3.slang (vk)
 tests/language-feature/saturated-cooperation/fuse-product.slang (vk)

@@ -1,4 +1,3 @@
-// Fails because VVL 1.4.313.0 has a bug that sees int32_t as uint32_t in validation layers, issue #7715
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -render-feature cooperative-vector -output-using-type
 
 // These platforms don't support these operations from structured buffers
@@ -16,7 +15,7 @@ RWStructuredBuffer<int32_t> outputBuffer;
 
 //TEST_INPUT:ubuffer(data=[67305985], stride=4),name=input
 //[1 2 3 4]
-StructuredBuffer<int32_t> input;
+StructuredBuffer<uint32_t> input;
 
 //TEST_INPUT:ubuffer(data=[67305985 134678021 202050057 269422093], stride=4),name=matrix
 //[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16]
@@ -25,7 +24,11 @@ StructuredBuffer<uint8_t> matrix;
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    let vec = coopVecLoad<1, int32_t>(input);
+    // Expected to fail with Vulkan 1.4.313.0 or below due to a bug in the VVL
+    // The VVL incorrectly reports that the result type in the following command is `VK_COMPONENT_TYPE_UINT32_KHR`.
+    // Tracking the issue in github #7715.
+
+    let vec = coopVecLoad<1, uint32_t>(input);
     let result = coopVecMatMulPacked<int32_t, 4>(
         vec,
         CoopVecComponentType::SignedInt8Packed,
