@@ -2139,6 +2139,10 @@ IRType* getElementType(IRBuilder& builder, IRType* valueType)
     {
         return vectorType->getElementType();
     }
+    else if (auto basicType = as<IRBasicType>(valueType))
+    {
+        return basicType;
+    }
     else if (auto coopVecType = as<IRCoopVectorType>(valueType))
     {
         return coopVecType->getElementType();
