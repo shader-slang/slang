@@ -16,7 +16,7 @@ RWStructuredBuffer<int32_t> outputBuffer;
 
 //TEST_INPUT:ubuffer(data=[67305985], stride=4),name=input
 //[1 2 3 4]
-StructuredBuffer<int32_t> input;
+StructuredBuffer<uint32_t> input;
 
 //TEST_INPUT:ubuffer(data=[67305985 134678021 202050057 269422093], stride=4),name=matrix
 //[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16]
@@ -25,7 +25,7 @@ StructuredBuffer<uint8_t> matrix;
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    let vec = coopVecLoad<1, int32_t>(input);
+    let vec = coopVecLoad<1, uint32_t>(input);
     let result = coopVecMatMulPacked<int32_t, 4>(
         vec,
         CoopVecComponentType::SignedInt8Packed,

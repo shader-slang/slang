@@ -22,7 +22,7 @@ ByteAddressBuffer matrix;
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    let vec = coopVecLoad<1, int32_t>(input);
+    let vec = coopVecLoad<1, uint32_t>(input);
     var result = CoopVec<int32_t, 4>(1);
     result.matMulAccumPacked(
         vec,
