@@ -51,7 +51,7 @@ uniform StructuredBuffer<float>.Handle buffer2;
 uniform RWStructuredBuffer<float>.Handle rwBuffer;
 uniform RaytracingAccelerationStructure.Handle rayAcceleration;
 
-
+[numthreads(2,2,1)]
 [shader("compute")]
 void computeMain()
 {
