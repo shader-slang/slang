@@ -266,6 +266,8 @@ struct LLVMEmitter
         );
         if(llvm::parseAssemblyInto(buf, &llvmModule, &llvmSummaryIndex, diag))
         {
+            //auto msg = diag.getMessage();
+            //printf("%s\n", msg.str().c_str());
             SLANG_UNEXPECTED("Failed to parse LLVM prelude!");
         }
     }
@@ -1778,7 +1780,8 @@ struct LLVMEmitter
         {
             switch (decor->getOp())
             {
-            case kIROp_ExportDecoration:
+            case kIROp_ExternCDecoration:
+            case kIROp_ExternCppDecoration:
             case kIROp_DownstreamModuleExportDecoration:
             case kIROp_HLSLExportDecoration:
             case kIROp_DllExportDecoration:
