@@ -3,7 +3,6 @@
 //TEST:SIMPLE(filecheck=SAMPLED_IMAGE): -target spirv -capability spvBindlessTextureNV -stage compute -entry computeMain -DSAMPLED_IMAGE
 //TEST:SIMPLE(filecheck=STORAGE_IMAGE): -target spirv -capability spvBindlessTextureNV -stage compute -entry computeMain -DSTORAGE_IMAGE
 
-[require(spvBindlessTextureNV)]
 [[vk::binding(0)]] RWTexture1D<float> t1;
 [[vk::binding(1)]] RWTexture1D<float> t2;
 [[vk::binding(2)]] RWTexture1D<float> t3;
