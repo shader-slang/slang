@@ -188,7 +188,7 @@ jobs:
       compiler: cl
       platform: x86_64
       config: debug
-      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+      runs-on: '["Windows", "self-hosted", "VK_SDK_TEST"]'
       test-category: full
       full-gpu-tests: true
 

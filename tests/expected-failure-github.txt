@@ -1,3 +1,8 @@
+tests/glsl-intrinsic/shader-subgroup/shader-subgroup-builtin-variables.slang.8 (mtl)
+tests/glsl-intrinsic/shader-subgroup/shader-subgroup-builtin-variables-2.slang.3 (mtl)
+
+# VVL error with VulkanSDK 1.4.321. Tracking on github #8145
+# It requires an update of Tint/Dawn but the latest Tint/Dawn causes another issue #8379
 tests/bugs/array-size-groupshared.slang.1 syn (wgpu)
 tests/bugs/generic-groupshared.slang.2 syn (wgpu)
 tests/compute/groupshared.slang.4 syn (wgpu)
