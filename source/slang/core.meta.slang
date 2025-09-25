@@ -3221,21 +3221,27 @@ int __SyntaxError()
 /// Can't be called in the C/C++ style. Need to use __size_of<some_type>() as opposed to sizeof(some_type).
 __generic<T>
 [__readNone]
-[require(cpp_cuda)]
+[require(cpp_cuda_llvm)]
 int __sizeOf()
 {
-    __intrinsic_asm "sizeof($[0])", T;
+    __target_switch
+    {
+    case cpp: __intrinsic_asm "sizeof($[0])", T;
+    case cuda: __intrinsic_asm "sizeof($[0])", T;
+    case llvm: __intrinsic_asm "%size = getelementptr $[0], ptr null, i32 1\n%result = ptrtoint ptr %size to i32", T;
+    }
 }
 
 __generic<T>
 [__readNone]
-[require(cpp_cuda)]
+[require(cpp_cuda_llvm)]
 int __sizeOf(T v)
 {
     __target_switch
     {
     case cpp: __intrinsic_asm "sizeof($T0)";
     case cuda: __intrinsic_asm "sizeof($T0)";
+    case llvm: __intrinsic_asm "%size = getelementptr $T0, ptr null, i32 1\n%result = ptrtoint ptr %size to i32";
     }
 }
 
