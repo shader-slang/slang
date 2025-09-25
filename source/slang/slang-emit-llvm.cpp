@@ -3,6 +3,7 @@
 #include "slang-ir-util.h"
 #include "slang-ir-layout.h"
 #include "../core/slang-char-util.h"
+#include "../core/slang-func-ptr.h"
 #include <llvm/AsmParser/Parser.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constants.h>
@@ -229,9 +230,10 @@ struct LLVMEmitter
             // parameter!
             compileUnit = llvmDebugBuilder.createCompileUnit(
                 // TODO: We should probably apply for a language ID in DWARF? Not
-                // sure how that process goes. Anyway, let's just use C as the ID
-                // until this target is properly usable.
-                llvm::dwarf::DW_LANG_C,
+                // sure how that process goes. Anyway, let's just use C++ as the
+                // ID until this target is properly usable. C doesn't work
+                // because debuggers won't use the un-mangled name in that lang.
+                llvm::dwarf::DW_LANG_C_plus_plus,
 
                 // The "compile unit" model doesn't work super well for Slang -
                 // we're supposed to only have one for the debug info per output
@@ -664,12 +666,9 @@ struct LLVMEmitter
         return emitLoad(llvmPtr, valueType, isVolatile);
     }
 
-    // All CreateStore calls must be bottlenecked here.
-    llvm::Value* emitStore(llvm::Value* llvmPtr, IRInst* srcVal, bool isVolatile = false)
+    llvm::Value* emitStore(llvm::Value* llvmPtr, llvm::Value* llvmVal, IRType* srcType, bool isVolatile = false)
     {
-        auto llvmVal = findValue(srcVal);
-
-        switch(srcVal->getDataType()->getOp())
+        switch(srcType->getOp())
         {
         case kIROp_ArrayType:
         case kIROp_StructType:
@@ -678,7 +677,7 @@ struct LLVMEmitter
                 // pointer.
                 SLANG_ASSERT(llvmVal->getType()->isPointerTy());
 
-                IRSizeAndAlignment elementSizeAlignment = getSizeAndAlignment(srcVal);
+                IRSizeAndAlignment elementSizeAlignment = getSizeAndAlignment(srcType);
 
                 // Pointer-to-pointer copy, so generate inline memcpy.
                 return llvmBuilder->CreateMemCpyInline(
@@ -693,6 +692,13 @@ struct LLVMEmitter
         default:
             return llvmBuilder->CreateStore(llvmVal, llvmPtr, isVolatile);
         }
+    }
+
+    // All CreateStore calls must be bottlenecked here.
+    llvm::Value* emitStore(llvm::Value* llvmPtr, IRInst* srcVal, bool isVolatile = false)
+    {
+        auto llvmVal = findValue(srcVal);
+        return emitStore(llvmPtr, llvmVal, srcVal->getDataType(), isVolatile);
     }
 
     void declareAllocaDebugVar(llvm::StringRef name, llvm::Value* llvmVar, IRType* type)
@@ -716,9 +722,12 @@ struct LLVMEmitter
         );
     }
 
+    using FuncPrologueCallback = Func<void>;
+    using FuncEpilogueCallback = Func<llvm::Value*, IRReturn*>;
+
     // Caution! This is only for emitting things which are considered
     // instructions in LLVM! It won't work for IRBlocks, IRFuncs & such.
-    llvm::Value* emitLLVMInstruction(IRInst* inst, llvm::Value* storeOnReturn)
+    llvm::Value* emitLLVMInstruction(IRInst* inst, FuncEpilogueCallback onReturn)
     {
         llvm::Value* llvmInst = nullptr;
         switch (inst->getOp())
@@ -762,19 +771,21 @@ struct LLVMEmitter
         case kIROp_Return:
             {
                 IRReturn* retInst = static_cast<IRReturn*>(inst);
-                auto retVal = retInst->getVal();
-                if (retVal->getOp() == kIROp_VoidLit)
+                llvmInst = onReturn(retInst);
+
+                // If onReturnCallback didn't generate the return instruction
+                // for us, we have to do it here.
+                if (!llvmInst)
                 {
-                    llvmInst = llvmBuilder->CreateRetVoid();
-                }
-                else if (storeOnReturn)
-                {
-                    emitStore(storeOnReturn, retVal);
-                    llvmInst = llvmBuilder->CreateRetVoid();
-                }
-                else
-                {
-                    llvmInst = llvmBuilder->CreateRet(findValue(retVal));
+                    auto retVal = retInst->getVal();
+                    if (retVal->getOp() == kIROp_VoidLit)
+                    {
+                        llvmInst = llvmBuilder->CreateRetVoid();
+                    }
+                    else
+                    {
+                        llvmInst = llvmBuilder->CreateRet(findValue(retVal));
+                    }
                 }
             }
             break;
@@ -786,14 +797,14 @@ struct LLVMEmitter
 
                 llvm::Value* llvmVar = emitAlloca(ptrType->getValueType());
 
-                llvm::StringRef name;
-                if (maybeGetName(&name, inst))
+                llvm::StringRef linkageName, prettyName;
+                if (maybeGetName(&linkageName, &prettyName, inst))
                 {
-                    llvmVar->setName(name);
+                    llvmVar->setName(linkageName);
                     // TODO: This may be a bit of a hack. DebugVar fails to get
                     // linked to the actual Var sometimes, which is why we do
                     // this :/
-                    declareAllocaDebugVar(name, llvmVar, ptrType->getValueType());
+                    declareAllocaDebugVar(prettyName, llvmVar, ptrType->getValueType());
                 }
 
                 llvmInst = llvmVar;
@@ -1081,14 +1092,14 @@ struct LLVMEmitter
                     // This is emitted to annotate member accesses of structs.
                     llvm::DILocation* loc = llvmBuilder->getCurrentDebugLocation();
 
-                    llvm::StringRef name = "";
-                    maybeGetName(&name, inst);
+                    llvm::StringRef linkageName, prettyName;
+                    maybeGetName(&linkageName, &prettyName, inst);
 
                     IRStructField* field = findStructField(baseStructType, index);
 
                     variableDebugInfoMap[inst] = {
                         llvmDebugBuilder.createAutoVariable(
-                            debugScopeStack.getLast(), name, loc->getFile(), loc->getLine(),
+                            debugScopeStack.getLast(), prettyName, loc->getFile(), loc->getLine(),
                             ensureDebugType(field->getFieldType()),
                             getOptions().getOptimizationLevel() == OptimizationLevel::None
                         ),
@@ -1256,14 +1267,15 @@ struct LLVMEmitter
                 auto file = sourceDebugInfo.getValue(debugVarInst->getSource());
                 auto line = getIntVal(debugVarInst->getLine());
                 IRInst* argIndex = debugVarInst->getArgIndex();
-                llvm::StringRef name;
-                maybeGetName(&name, inst);
+
+                llvm::StringRef linkageName, prettyName;
+                maybeGetName(&linkageName, &prettyName, inst);
 
                 if (argIndex)
                 {
                     variableDebugInfoMap[inst] = {
                         llvmDebugBuilder.createParameterVariable(
-                            debugScopeStack.getLast(), name, getIntVal(argIndex), file,
+                            debugScopeStack.getLast(), prettyName, getIntVal(argIndex), file,
                             line, varType,
                             getOptions().getOptimizationLevel() == OptimizationLevel::None
                         ),
@@ -1275,7 +1287,7 @@ struct LLVMEmitter
                 {
                     variableDebugInfoMap[inst] = {
                         llvmDebugBuilder.createAutoVariable(
-                            debugScopeStack.getLast(), name, file, line, varType,
+                            debugScopeStack.getLast(), prettyName, file, line, varType,
                             getOptions().getOptimizationLevel() == OptimizationLevel::None
                         ),
                         false,
@@ -1353,24 +1365,40 @@ struct LLVMEmitter
         return llvmInst;
     }
 
-    bool maybeGetName(llvm::StringRef* nameOut, IRInst* irInst)
-    {
-        UnownedStringSlice name;
+    bool maybeGetName(
+        llvm::StringRef* linkageNameOut,
+        llvm::StringRef* prettyNameOut,
+        IRInst* irInst
+    ){
+        *linkageNameOut = "";
+        *prettyNameOut = "";
+
+        UnownedStringSlice linkageName;
+        UnownedStringSlice prettyName;
         if (auto externCppDecoration = irInst->findDecoration<IRExternCppDecoration>())
         {
-            name = externCppDecoration->getName();
+            linkageName = externCppDecoration->getName();
         }
         else if (auto linkageDecoration = irInst->findDecoration<IRLinkageDecoration>())
         {
-            name = linkageDecoration->getMangledName();
+            linkageName = linkageDecoration->getMangledName();
         }
-        else if (auto nameDecor = irInst->findDecoration<IRNameHintDecoration>())
-        {
-            name = nameDecor->getName();
-        }
-        else return false;
 
-        *nameOut = llvm::StringRef(name.begin(), name.getLength());
+        if (auto nameDecor = irInst->findDecoration<IRNameHintDecoration>())
+        {
+            prettyName = nameDecor->getName();
+        }
+
+        if (prettyName.getLength() == 0)
+            prettyName = linkageName;
+        else if (linkageName.getLength() == 0)
+            linkageName = prettyName;
+
+        if (prettyName.getLength() == 0 || linkageName.getLength() == 0)
+            return false;
+
+        *linkageNameOut = llvm::StringRef(linkageName.begin(), linkageName.getLength());
+        *prettyNameOut = llvm::StringRef(prettyName.begin(), prettyName.getLength());
         return true;
     }
 
@@ -1465,9 +1493,9 @@ struct LLVMEmitter
                     llvmContext,
                     llvm::ArrayRef<llvm::Type*>(fieldTypes.getBuffer(), fieldTypes.getCount())
                 );
-                llvm::StringRef name;
-                if (maybeGetName(&name, type))
-                    llvmStructType->setName(name);
+                llvm::StringRef linkageName, prettyName;
+                if (maybeGetName(&linkageName, &prettyName, type))
+                    llvmStructType->setName(linkageName);
                 llvmType = llvmStructType;
             }
             break;
@@ -1594,7 +1622,11 @@ struct LLVMEmitter
             break;
 
         case kIROp_NativeStringType:
-            llvmType = llvmDebugBuilder.createStringType("NativeString", ptrSize);
+            {
+                llvmType = llvmDebugBuilder.createPointerType(
+                    llvmDebugBuilder.createBasicType("char", 8, llvm::dwarf::DW_ATE_signed_char),
+                    ptrSize);
+            }
             break;
 
         case kIROp_OutType:
@@ -1660,7 +1692,11 @@ struct LLVMEmitter
 
                 IRSizeAndAlignment sizeAndAlignment = getSizeAndAlignment(structType);
 
-                llvm::DILocation* loc = llvmBuilder->getCurrentDebugLocation();
+                llvm::DIFile* file;
+                llvm::DIScope* scope;
+                unsigned line;
+                findDebugLocation(structType, file, scope, line);
+
                 List<llvm::Metadata*> types;
                 for (auto field : structType->getFields())
                 {
@@ -1673,14 +1709,11 @@ struct LLVMEmitter
                     IRIntegerValue offset = getOffset(field);
 
                     IRStructKey* key = field->getKey();
-                    llvm::StringRef name;
-                    if (auto nameDecor = key->findDecoration<IRNameHintDecoration>())
-                    {
-                        auto decorName = nameDecor->getName();
-                        name = llvm::StringRef(decorName.begin(), decorName.getLength());
-                    }
+                    llvm::StringRef linkageName, prettyName;
+                    maybeGetName(&linkageName, &prettyName, key);
+
                     types.add(llvmDebugBuilder.createMemberType(
-                        compileUnit, name, loc->getFile(), loc->getLine(),
+                        scope, prettyName, file, line,
                         sizeAndAlignment.size * 8, sizeAndAlignment.alignment * 8,
                         offset * 8,
                         llvm::DINode::FlagZero,
@@ -1691,17 +1724,12 @@ struct LLVMEmitter
                     llvm::ArrayRef<llvm::Metadata*>(types.begin(), types.end())
                 );
 
-                llvm::StringRef name;
-                maybeGetName(&name, type);
-
-                llvm::DIFile* file;
-                llvm::DIScope* scope;
-                unsigned line;
-                findDebugLocation(type, file, scope, line);
+                llvm::StringRef linkageName, prettyName;
+                maybeGetName(&linkageName, &prettyName, type);
 
                 llvmType = llvmDebugBuilder.createStructType(
                     scope,
-                    name,
+                    prettyName,
                     file,
                     line,
                     sizeAndAlignment.size*8,
@@ -1734,9 +1762,9 @@ struct LLVMEmitter
 
         default:
             {
-                llvm::StringRef name;
-                maybeGetName(&name, type);
-                llvmType = llvmDebugBuilder.createUnspecifiedType(name);
+                llvm::StringRef linkageName, prettyName;
+                maybeGetName(&linkageName, &prettyName, type);
+                llvmType = llvmDebugBuilder.createUnspecifiedType(prettyName);
             }
             break;
         }
@@ -1772,16 +1800,15 @@ struct LLVMEmitter
         }
         llvm::DIFile* file = sourceDebugInfo.getValue(debugFunc->getFile());
 
-        llvm::StringRef name = getStringLitAsLLVMString(debugFunc->getName());
-        llvm::StringRef mangledName = name;
-        maybeGetName(&mangledName, func);
+        llvm::StringRef linkageName, prettyName;
+        maybeGetName(&linkageName, &prettyName, func);
 
         int line = getIntVal(debugFunc->getLine());
 
         auto sp = llvmDebugBuilder.createFunction(
             file,
-            name,
-            mangledName,
+            prettyName,
+            linkageName,
             file,
             line,
             llvm::cast<llvm::DISubroutineType>(ensureDebugType(as<IRType>(debugFunc->getDebugType()))),
@@ -1808,9 +1835,9 @@ struct LLVMEmitter
             llvmModule
         );
 
-        llvm::StringRef name;
-        if (maybeGetName(&name, func))
-            llvmFunc->setName(name);
+        llvm::StringRef linkageName, prettyName;
+        if (maybeGetName(&linkageName, &prettyName, func))
+            llvmFunc->setName(linkageName);
 
         UInt i = 0;
         for (auto pp = func->getFirstParam(); pp; pp = pp->getNextParam(), ++i)
@@ -1819,12 +1846,13 @@ struct LLVMEmitter
 
             if (as<IROutType>(funcType->getParamType(i)))
                 llvmArg->addAttr(llvm::Attribute::WriteOnly);
-            if (as<IRConstRefType>(funcType->getParamType(i)))
+            else if (as<IRConstRefType>(funcType->getParamType(i)))
                 llvmArg->addAttr(llvm::Attribute::ReadOnly);
 
-            llvm::StringRef name;
-            if (maybeGetName(&name, pp))
-                llvmArg->setName(name);
+            llvm::StringRef linkageName, prettyName;
+            if (maybeGetName(&linkageName, &prettyName, pp))
+                llvmArg->setName(linkageName);
+
             mapInstToLLVM[pp] = llvmArg;
         }
 
@@ -1970,9 +1998,9 @@ struct LLVMEmitter
         // inlined into where they're needed.
         llvm::GlobalVariable* llvmVar = new llvm::GlobalVariable(varType, false, getLinkageType(var));
 
-        llvm::StringRef name;
-        if (maybeGetName(&name, var))
-            llvmVar->setName(name);
+        llvm::StringRef linkageName, prettyName;
+        if (maybeGetName(&linkageName, &prettyName, var))
+            llvmVar->setName(linkageName);
 
         llvmModule.insertGlobalVariable(llvmVar);
         mapInstToLLVM[var] = llvmVar;
@@ -2032,17 +2060,23 @@ struct LLVMEmitter
         llvm::FunctionType* ctorType = llvm::FunctionType::get(
             llvm::Type::getVoidTy(llvmContext), {}, false);
 
-        llvm::StringRef varName;
         std::string ctorName = "__slang_init_";
-        maybeGetName(&varName, var);
-        ctorName += varName;
+
+        llvm::StringRef linkageName, prettyName;
+        maybeGetName(&linkageName, &prettyName, var);
+        ctorName += linkageName;
 
         llvmBuilder->SetCurrentDebugLocation(llvm::DebugLoc());
         llvm::Function* llvmCtor = llvm::Function::Create(
             ctorType, llvm::GlobalValue::InternalLinkage, ctorName, llvmModule
         );
 
-        emitGlobalValueWithCode(var, llvmCtor, llvmVar);
+        auto prologue = [](){};
+        auto epilogue = [&](IRReturn* ret) -> llvm::Value* {
+            emitStore(llvmVar, ret->getVal());
+            return llvmBuilder->CreateRetVoid();
+        };
+        emitGlobalValueWithCode(var, llvmCtor, prologue, epilogue);
 
         llvm::Constant* ctorData[3] = {
             llvmBuilder->getInt32(globalCtors.getCount()),
@@ -2194,8 +2228,12 @@ struct LLVMEmitter
         return out;
     }
 
-    void emitGlobalValueWithCode(IRGlobalValueWithCode* code, llvm::Function* llvmFunc, llvm::Value* storeOnReturn)
-    {
+    void emitGlobalValueWithCode(
+        IRGlobalValueWithCode* code,
+        llvm::Function* llvmFunc,
+        FuncPrologueCallback prologueCallback,
+        FuncEpilogueCallback epilogueCallback
+    ){
         llvmBuilder->SetCurrentDebugLocation(llvm::DebugLoc());
 
         auto func = as<IRFunc>(code);
@@ -2266,10 +2304,21 @@ struct LLVMEmitter
                 llvm::BasicBlock* llvmBlock = llvm::cast<llvm::BasicBlock>(mapInstToLLVM.getValue(irBlock));
                 llvmBuilder->SetInsertPoint(llvmBlock);
 
+                if (irBlock == code->getFirstBlock())
+                {
+                    if (sp)
+                    {
+                        llvmBuilder->SetCurrentDebugLocation(
+                            llvm::DILocation::get(llvmContext, sp->getLine(), 0, debugScopeStack.getLast())
+                        );
+                    }
+                    prologueCallback();
+                }
+
                 // Then, add the regular instructions.
                 for (auto irInst: irBlock->getOrdinaryInsts())
                 {
-                    emitLLVMInstruction(irInst, storeOnReturn);
+                    emitLLVMInstruction(irInst, epilogueCallback);
                 }
             }
         }
@@ -2285,7 +2334,113 @@ struct LLVMEmitter
         llvm::Value* storeArg = nullptr;
         if (ensureType(func->getResultType())->isAggregateType())
             storeArg = llvmFunc->getArg(0);
-        emitGlobalValueWithCode(func, llvmFunc, storeArg);
+
+        // The prologue and epilogue are needed to deal with out and inout - the
+        // correct semantics for them involve copy-in and copy-out, which we
+        // implement in the prologue (emitted before first instruction in entry
+        // block) and epilogue (emitted before return).
+        //
+        // This difference can be seen in this case:
+        //
+        // void evilFunction(out int a, out int b)
+        // {
+        //     a = 1;
+        //     b = 2;
+        //     // Must print "1, 2" even when a and b are given the same
+        //     // argument.
+        //     printf("%d, %d\n", a, b);
+        // }
+        //
+        // void entryPoint()
+        // {
+        //     int num;
+        //     evilFunction(num, num);
+        // }
+        //
+        // However, this can be optimized. If the function only takes one
+        // parameter that is 'out' or 'inout' and zero pointers, it cannot
+        // alias, and therefore it being backed by a pointer is unobservable.
+
+        int pointerCount = 0;
+        for (auto pp = func->getFirstParam(); pp; pp = pp->getNextParam())
+        {
+            if (as<IRPtrTypeBase>(pp->getDataType()))
+                pointerCount++;
+        }
+
+        auto prologue = [&](){
+            if(pointerCount <= 1)
+                return;
+            UInt i = 0;
+            for (auto pp = func->getFirstParam(); pp; pp = pp->getNextParam(), ++i)
+            {
+                llvm::Value* llvmArg = llvmFunc->getArg(i);
+                auto argType = pp->getDataType();
+
+                llvm::StringRef linkageName, prettyName;
+                maybeGetName(&linkageName, &prettyName, pp);
+
+                if (auto outType = as<IROutType>(argType))
+                {
+                    // Replace with uninitialized alloca, parameter is only for
+                    // copy-out!
+                    llvmArg = emitAlloca(outType->getValueType());
+                    declareAllocaDebugVar(prettyName, llvmArg, outType->getValueType());
+                }
+                else if (auto inOutType = as<IRInOutType>(argType))
+                {
+                    // Replace with initialized alloca.
+                    auto newArg = emitAlloca(inOutType->getValueType());
+                    IRSizeAndAlignment elementSizeAlignment = getSizeAndAlignment(inOutType->getValueType());
+                    llvmBuilder->CreateMemCpyInline(
+                        newArg,
+                        llvm::MaybeAlign(elementSizeAlignment.alignment),
+                        llvmArg,
+                        llvm::MaybeAlign(elementSizeAlignment.alignment),
+                        llvmBuilder->getInt32(elementSizeAlignment.size)
+                    );
+                    llvmArg = newArg;
+                    declareAllocaDebugVar(prettyName, llvmArg, inOutType->getValueType());
+                }
+                mapInstToLLVM[pp] = llvmArg;
+            }
+        };
+
+        auto epilogue = [&](IRReturn* ret) -> llvm::Value* {
+            if (pointerCount > 1)
+            {
+                UInt i = 0;
+                for (auto pp = func->getFirstParam(); pp; pp = pp->getNextParam(), ++i)
+                {
+                    llvm::Value* llvmArg = llvmFunc->getArg(i);
+                    auto argType = pp->getDataType();
+
+                    if (as<IROutType>(argType) || as<IRInOutType>(argType))
+                    {
+                        auto ptrType = as<IRPtrTypeBase>(argType);
+                        // Copy-out!
+                        IRSizeAndAlignment elementSizeAlignment = getSizeAndAlignment(ptrType->getValueType());
+                        llvmBuilder->CreateMemCpyInline(
+                            llvmArg,
+                            llvm::MaybeAlign(elementSizeAlignment.alignment),
+                            mapInstToLLVM.getValue(pp),
+                            llvm::MaybeAlign(elementSizeAlignment.alignment),
+                            llvmBuilder->getInt32(elementSizeAlignment.size)
+                        );
+                    }
+                }
+            }
+
+            if (storeArg)
+            {
+                emitStore(storeArg, ret->getVal());
+                return llvmBuilder->CreateRetVoid();
+            }
+
+            return nullptr;
+        };
+
+        emitGlobalValueWithCode(func, llvmFunc, prologue, epilogue);
     }
 
     void emitGlobalFunctions(IRModule* irModule)
