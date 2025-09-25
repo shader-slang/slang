@@ -2128,6 +2128,41 @@ IRType* getIRVectorBaseType(IRType* type)
     return as<IRVectorType>(type)->getElementType();
 }
 
+IRType* getElementType(IRBuilder& builder, IRType* valueType)
+{
+    valueType = (IRType*)unwrapAttributedType(valueType);
+    if (auto arrayType = as<IRArrayTypeBase>(valueType))
+    {
+        return arrayType->getElementType();
+    }
+    else if (auto vectorType = as<IRVectorType>(valueType))
+    {
+        return vectorType->getElementType();
+    }
+    else if (auto coopVecType = as<IRCoopVectorType>(valueType))
+    {
+        return coopVecType->getElementType();
+    }
+    else if (auto matrixType = as<IRMatrixType>(valueType))
+    {
+        return builder.getVectorType(matrixType->getElementType(), matrixType->getColumnCount());
+    }
+    else if (auto coopMatType = as<IRCoopMatrixType>(valueType))
+    {
+        return coopMatType->getElementType();
+    }
+    else if (const auto basicType = as<IRBasicType>(valueType))
+    {
+        // HLSL support things like float.x, in which case we just return the base pointer.
+        return basicType;
+    }
+    else if (auto hlslInputPatchType = as<IRHLSLInputPatchType>(valueType))
+    {
+        return hlslInputPatchType->getElementType();
+    }
+    return nullptr;
+}
+
 Int getSpecializationConstantId(IRGlobalParam* param)
 {
     auto layout = findVarLayout(param);

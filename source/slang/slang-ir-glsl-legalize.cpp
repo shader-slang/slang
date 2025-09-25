@@ -2348,11 +2348,11 @@ ScalarizedVal getSubscriptVal(
             auto inputAdapter = val.impl.as<ScalarizedTypeAdapterValImpl>();
             RefPtr<ScalarizedTypeAdapterValImpl> resultAdapter = new ScalarizedTypeAdapterValImpl();
 
-            resultAdapter->pretendType = inputAdapter->pretendType;
-            resultAdapter->actualType = inputAdapter->actualType;
+            resultAdapter->pretendType = elementType;
+            resultAdapter->actualType = getElementType(*builder, inputAdapter->actualType);
 
             resultAdapter->val =
-                getSubscriptVal(builder, inputAdapter->actualType, inputAdapter->val, indexVal);
+                getSubscriptVal(builder, resultAdapter->actualType, inputAdapter->val, indexVal);
             return ScalarizedVal::typeAdapter(resultAdapter);
         }
 
@@ -3178,20 +3178,48 @@ void tryReplaceUsesOfStageInput(
                     IRBuilder builder(user);
                     setInsertBeforeOrdinaryInst(&builder, user);
                     auto typeAdapter = as<ScalarizedTypeAdapterValImpl>(val.impl);
-                    auto materializedInner = materializeValue(&builder, typeAdapter->val);
-                    auto adapted = adaptType(
-                        &builder,
-                        materializedInner,
-                        typeAdapter->pretendType,
-                        typeAdapter->actualType);
-                    if (user->getOp() == kIROp_Load)
+                    switch (user->getOp())
                     {
-                        user->replaceUsesWith(adapted.irValue);
-                        user->removeAndDeallocate();
-                    }
-                    else
-                    {
-                        use->set(adapted.irValue);
+                    case kIROp_Load:
+                        {
+                            auto materialized = materializeValue(&builder, val);
+                            user->replaceUsesWith(materialized);
+                            user->removeAndDeallocate();
+                        }
+                        break;
+                    case kIROp_GetElementPtr:
+                        {
+                            auto targetType = typeAdapter->pretendType;
+                            auto elementType = getElementType(builder, targetType);
+                            SLANG_ASSERT(elementType);
+                            auto subscriptVal = getSubscriptVal(
+                                &builder,
+                                (IRType*)elementType,
+                                val,
+                                user->getOperand(1));
+                            tryReplaceUsesOfStageInput(context, subscriptVal, user);
+                        }
+                        break;
+                    case kIROp_FieldAddress:
+                        {
+                            auto targetType = as<IRStructType>(typeAdapter->pretendType);
+                            SLANG_ASSERT(targetType);
+                            auto subscriptVal = extractField(
+                                &builder,
+                                val,
+                                kMaxUInt,
+                                (IRStructKey*)user->getOperand(1));
+                            tryReplaceUsesOfStageInput(context, subscriptVal, user);
+                        }
+                        break;
+                    default:
+                        {
+                            auto materialized = materializeValue(&builder, val);
+                            auto tmpVar = builder.emitVar(materialized->getDataType());
+                            builder.emitStore(tmpVar, materialized);
+                            use->set(tmpVar);
+                        }
+                        break;
                     }
                 });
         }
@@ -3220,7 +3248,9 @@ void tryReplaceUsesOfStageInput(
                     }
                     else
                     {
-                        use->set(materializedInner);
+                        auto tmpVar = builder.emitVar(materializedInner->getDataType());
+                        builder.emitStore(tmpVar, materializedInner);
+                        use->set(tmpVar);
                     }
                 });
             break;
@@ -3233,6 +3263,9 @@ void tryReplaceUsesOfStageInput(
                 [&](IRUse* use)
                 {
                     auto user = use->getUser();
+                    IRBuilder builder(user);
+                    setInsertBeforeOrdinaryInst(&builder, user);
+
                     switch (user->getOp())
                     {
                     case kIROp_FieldExtract:
@@ -3274,8 +3307,6 @@ void tryReplaceUsesOfStageInput(
                         {
                             auto arrayType = as<IRArrayTypeBase>(tupleVal->type);
                             SLANG_ASSERT(arrayType);
-                            IRBuilder builder(originalVal);
-                            setInsertBeforeOrdinaryInst(&builder, originalVal);
                             auto subscriptVal = getSubscriptVal(
                                 &builder,
                                 (IRType*)arrayType->getElementType(),
@@ -3286,8 +3317,6 @@ void tryReplaceUsesOfStageInput(
                         break;
                     case kIROp_Load:
                         {
-                            IRBuilder builder(user);
-                            setInsertBeforeOrdinaryInst(&builder, user);
                             auto materializedVal = materializeTupleValue(&builder, val);
                             user->replaceUsesWith(materializedVal);
                             user->removeAndDeallocate();

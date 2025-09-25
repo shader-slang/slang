@@ -290,7 +290,7 @@ struct LoweredElementTypeContext
             else
             {
                 auto val = builder.emitIntrinsicInst(
-                    tryGetPointedToType(&builder, dest->getDataType()),
+                    tryGetPointedToOrBufferElementType(&builder, dest->getDataType()),
                     op,
                     1,
                     &operand);
@@ -1193,7 +1193,7 @@ struct LoweredElementTypeContext
             getSizeAndAlignment(
                 target->getOptionSet(),
                 config.layoutRule,
-                tryGetPointedToType(&builder, fieldAddr->getBase()->getDataType()),
+                tryGetPointedToOrBufferElementType(&builder, fieldAddr->getBase()->getDataType()),
                 &baseSizeAlignment);
 
             // Convert pointer to uint64 and adjust offset.
@@ -1300,7 +1300,7 @@ struct LoweredElementTypeContext
                                 auto logicalType = user->getDataType();
                                 IRInst* storageBaseAddr = ptrVal;
                                 auto originalBaseValueType =
-                                    tryGetPointedToType(&builder, logicalBaseType);
+                                    tryGetPointedToOrBufferElementType(&builder, logicalBaseType);
                                 if (user->getOp() == kIROp_GetElementPtr)
                                 {
                                     // If original type is an array, the lowered type will be a
@@ -1308,17 +1308,20 @@ struct LoweredElementTypeContext
                                     // appended with a field extract.
                                     if (as<IRArrayType>(originalBaseValueType))
                                     {
-                                        builder.setInsertBefore(user);
-                                        List<IRInst*> args;
-                                        for (UInt i = 0; i < user->getOperandCount(); i++)
-                                            args.add(user->getOperand(i));
                                         auto arrayLowerInfo =
                                             getLoweredTypeInfo(originalBaseValueType, config);
-                                        storageBaseAddr = builder.emitFieldAddress(
-                                            builder.getPtrType(
-                                                arrayLowerInfo.loweredInnerArrayType),
-                                            ptrVal,
-                                            arrayLowerInfo.loweredInnerStructKey);
+                                        if (arrayLowerInfo.loweredInnerArrayType)
+                                        {
+                                            builder.setInsertBefore(user);
+                                            List<IRInst*> args;
+                                            for (UInt i = 0; i < user->getOperandCount(); i++)
+                                                args.add(user->getOperand(i));
+                                            storageBaseAddr = builder.emitFieldAddress(
+                                                builder.getPtrType(
+                                                    arrayLowerInfo.loweredInnerArrayType),
+                                                ptrVal,
+                                                arrayLowerInfo.loweredInnerStructKey);
+                                        }
                                     }
                                     if (as<IRMatrixType>(originalBaseValueType))
                                     {
@@ -1332,18 +1335,47 @@ struct LoweredElementTypeContext
                                     }
                                 }
 
-                                ShortList<IRInst*> newArgs;
-                                newArgs.add(storageBaseAddr);
-                                for (UInt i = 1; i < user->getOperandCount(); i++)
-                                    newArgs.add(user->getOperand(i));
+
                                 builder.setInsertBefore(user);
-                                auto logicalValueType = tryGetPointedToType(&builder, logicalType);
-                                auto storageTypeInfo = getLoweredTypeInfo(logicalValueType, config);
-                                auto storageGEP = builder.emitIntrinsicInst(
-                                    builder.getPtrType(storageTypeInfo.loweredType),
-                                    user->getOp(),
-                                    newArgs.getCount(),
-                                    newArgs.getArrayView().getBuffer());
+                                IRInst* storageGEP = nullptr;
+                                switch (user->getOp())
+                                {
+                                case kIROp_GetElementPtr:
+                                case kIROp_FieldAddress:
+                                    {
+                                        // For standard gep instructions, use the
+                                        // IR builder to auto-deduce result type
+                                        // of the new GEP inst.
+                                        ShortList<IRInst*> newArgs;
+                                        for (UInt i = 1; i < user->getOperandCount(); i++)
+                                            newArgs.add(user->getOperand(i));
+                                        storageGEP = builder.emitElementAddress(
+                                            storageBaseAddr,
+                                            newArgs.getArrayView().arrayView);
+                                        break;
+                                    }
+                                default:
+                                    {
+                                        // For non-standard gep instructions, e.g.
+                                        // RWStructuredBufferGetElementPtr,
+                                        // manually create the inst here.
+                                        ShortList<IRInst*> newArgs;
+                                        newArgs.add(storageBaseAddr);
+                                        for (UInt i = 1; i < user->getOperandCount(); i++)
+                                            newArgs.add(user->getOperand(i));
+                                        auto logicalValueType = tryGetPointedToOrBufferElementType(
+                                            &builder,
+                                            logicalType);
+                                        auto storageTypeInfo =
+                                            getLoweredTypeInfo(logicalValueType, config);
+                                        storageGEP = builder.emitIntrinsicInst(
+                                            builder.getPtrType(storageTypeInfo.loweredType),
+                                            user->getOp(),
+                                            newArgs.getCount(),
+                                            newArgs.getArrayView().getBuffer());
+                                        break;
+                                    }
+                                }
                                 auto castOfGEP = builder.emitCastStorageToLogical(
                                     logicalType,
                                     storageGEP,
@@ -1391,12 +1423,17 @@ struct LoweredElementTypeContext
                                     as<IRPtrTypeBase>(user->getDataType()) ||
                                     as<IRHLSLStructuredBufferTypeBase>(user->getDataType()))
                                     break;
+                                // Don't push the cast beyond the load if we are already
+                                // a simple type.
+                                if (!isCompositeType(user->getDataType()))
+                                    break;
                                 builder.setInsertBefore(user);
                                 IRCloneEnv cloneEnv;
                                 auto newLoad = cloneInst(&cloneEnv, &builder, user);
                                 newLoad->setOperand(0, ptrVal);
-                                auto elementStorageType =
-                                    tryGetPointedToType(&builder, ptrVal->getDataType());
+                                auto elementStorageType = tryGetPointedToOrBufferElementType(
+                                    &builder,
+                                    ptrVal->getDataType());
                                 newLoad->setFullType(elementStorageType);
                                 IRInst* tempVar = nullptr;
                                 if (as<IRLoad>(user))
@@ -1498,8 +1535,9 @@ struct LoweredElementTypeContext
                     if (auto castArg = as<IRCastStorageToLogical>(arg))
                     {
                         auto oldParamPtrType = oldParams[i]->getDataType();
-                        auto storageValueType =
-                            tryGetPointedToType(&builder, castArg->getOperand(0)->getDataType());
+                        auto storageValueType = tryGetPointedToOrBufferElementType(
+                            &builder,
+                            castArg->getOperand(0)->getDataType());
                         auto storagePtrType =
                             getLoweredPtrLikeType(oldParamPtrType, storageValueType);
                         paramTypes.add(storagePtrType);
@@ -1777,8 +1815,9 @@ struct LoweredElementTypeContext
         LoweredElementTypeInfo loweredElementTypeInfo = {};
         if (auto getElementPtr = as<IRGetElementPtr>(ptrVal))
         {
-            if (auto arrayType = as<IRArrayTypeBase>(
-                    tryGetPointedToType(&builder, getElementPtr->getBase()->getDataType())))
+            if (auto arrayType = as<IRArrayTypeBase>(tryGetPointedToOrBufferElementType(
+                    &builder,
+                    getElementPtr->getBase()->getDataType())))
             {
                 // For WGSL, an array of scalar or vector type will always be converted to
                 // an array of 16-byte aligned vector type. In this case, we will run into a

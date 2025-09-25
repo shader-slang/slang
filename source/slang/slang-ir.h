@@ -1760,6 +1760,8 @@ struct IRGetStringHash : IRInst
 /// The given IR `builder` will be used if new instructions need to be created.
 IRType* tryGetPointedToType(IRBuilder* builder, IRType* type);
 
+IRType* tryGetPointedToOrBufferElementType(IRBuilder* builder, IRType* type);
+
 FIDDLE()
 struct IRFuncType : IRType
 {
