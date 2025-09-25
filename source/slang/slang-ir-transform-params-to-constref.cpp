@@ -246,6 +246,25 @@ struct TransformParamsToConstRefContext
     {
         HashSet<IRParam*> updatedParams;
 
+        // If the function is used in any way that is not understood by the
+        // compiler, do not modify it.
+        // For example, if the function is used as callback, we must preserve
+        // its signature.
+        for (auto use = func->firstUse; use; use = use->nextUse)
+        {
+            auto user = use->getUser();
+            if (as<IRDecoration>(user))
+                continue;
+            if (auto call = as<IRCall>(user))
+            {
+                if (call->getCalleeUse() == use)
+                    continue;
+            }
+            // If we reach here, we encountered a non-call use of the func,
+            // we will stop processing.
+            return;
+        }
+
         // First pass: Transform parameter types
         for (auto param = func->getFirstParam(); param; param = param->getNextParam())
         {
