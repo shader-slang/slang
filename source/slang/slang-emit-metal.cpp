@@ -290,6 +290,21 @@ static IRImageSubscript* isTextureAccess(IRInst* inst)
     return as<IRImageSubscript>(getRootAddr(inst->getOperand(0)));
 }
 
+void MetalSourceEmitter::emitImageOperandWithAccessor(IRInst* imageOperand)
+{
+    emitOperand(imageOperand, getInfo(EmitOp::Postfix));
+    
+    // Check if the image operand is a pointer type
+    if (as<IRPtrTypeBase>(imageOperand->getDataType()))
+    {
+        m_writer->emit("->");
+    }
+    else
+    {
+        m_writer->emit(".");
+    }
+}
+
 void MetalSourceEmitter::emitAtomicImageCoord(IRImageSubscript* inst)
 {
     auto imageDataType = inst->getImage()->getDataType();
@@ -314,7 +329,7 @@ void MetalSourceEmitter::emitAtomicImageCoord(IRImageSubscript* inst)
                 "atomic operation on non-scalar texture");
         }
     }
-    bool isArray = getIntVal(resourceType->getIsArrayInst()) != 0;
+    bool isArray = resourceType && getIntVal(resourceType->getIsArrayInst()) != 0;
     if (isArray)
     {
         emitOperand(inst->getCoord(), getInfo(EmitOp::Postfix));
@@ -386,8 +401,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         bool isImageOp = false;
         if (auto imageSubscript = isTextureAccess(inst))
         {
-            emitOperand(imageSubscript->getImage(), getInfo(EmitOp::Postfix));
-            m_writer->emit(".");
+            emitImageOperandWithAccessor(imageSubscript->getImage());
             m_writer->emit(imageFunc);
             m_writer->emit("(");
             emitAtomicImageCoord(imageSubscript);
@@ -450,8 +464,8 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             bool isImageOp = false;
             if (auto imageSubscript = isTextureAccess(inst))
             {
-                emitOperand(imageSubscript->getImage(), getInfo(EmitOp::Postfix));
-                m_writer->emit(".atomic_load(");
+                emitImageOperandWithAccessor(imageSubscript->getImage());
+                m_writer->emit("atomic_load(");
                 emitAtomicImageCoord(imageSubscript);
                 isImageOp = true;
             }
@@ -476,8 +490,8 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             bool isImageOp = false;
             if (auto imageSubscript = isTextureAccess(inst))
             {
-                emitOperand(imageSubscript->getImage(), getInfo(EmitOp::Postfix));
-                m_writer->emit(".atomic_store(");
+                emitImageOperandWithAccessor(imageSubscript->getImage());
+                m_writer->emit("atomic_store(");
                 emitAtomicImageCoord(imageSubscript);
                 isImageOp = true;
             }
@@ -526,8 +540,8 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit(";\n");
             if (imageSubscript)
             {
-                emitOperand(imageSubscript->getImage(), getInfo(EmitOp::Postfix));
-                m_writer->emit(".atomic_compare_exchange_weak(");
+                emitImageOperandWithAccessor(imageSubscript->getImage());
+                m_writer->emit("atomic_compare_exchange_weak(");
                 emitAtomicImageCoord(imageSubscript);
             }
             else
@@ -599,8 +613,8 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             bool isImageOp = false;
             if (auto imageSubscript = isTextureAccess(inst))
             {
-                emitOperand(imageSubscript->getImage(), getInfo(EmitOp::Postfix));
-                m_writer->emit(".atomic_fetch_add(");
+                emitImageOperandWithAccessor(imageSubscript->getImage());
+                m_writer->emit("atomic_fetch_add(");
                 emitAtomicImageCoord(imageSubscript);
                 isImageOp = true;
             }
@@ -627,8 +641,8 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             bool isImageOp = false;
             if (auto imageSubscript = isTextureAccess(inst))
             {
-                emitOperand(imageSubscript->getImage(), getInfo(EmitOp::Postfix));
-                m_writer->emit(".atomic_fetch_sub(");
+                emitImageOperandWithAccessor(imageSubscript->getImage());
+                m_writer->emit("atomic_fetch_sub(");
                 emitAtomicImageCoord(imageSubscript);
                 isImageOp = true;
             }
