@@ -81,13 +81,6 @@ static UInt parseNumber(const char*& cursor, const char* end)
     return n;
 }
 
-struct VariableDebugInfo
-{
-    llvm::DIVariable* debugVar;
-    bool attached = false;
-    bool isStackVar = false;
-};
-
 struct LLVMEmitter
 {
     llvm::LLVMContext llvmContext;
@@ -96,27 +89,57 @@ struct LLVMEmitter
     llvm::DIBuilder llvmDebugBuilder;
     llvm::ModuleSummaryIndex llvmSummaryIndex;
     llvm::DICompileUnit* compileUnit;
+    llvm::TargetMachine* targetMachine;
+    CodeGenContext* codeGenContext;
+
+    bool debug = false;
+    IRTypeLayoutRules* explicitLayoutRules = nullptr;
 
     // The LLVM value class is closest to Slang's IRInst, as it can represent
     // constants, instructions and functions, whereas llvm::Instruction only
     // handles instructions.
     Dictionary<IRInst*, llvm::Value*> mapInstToLLVM;
     Dictionary<IRType*, llvm::Type*> mapTypeToLLVM;
+    // Contains structs and arrays without trailing padding, as needed for e.g.
+    // scalar layout.
+    Dictionary<IRType*, llvm::Type*> mapTypeToLLVMUnpadded;
     Dictionary<IRType*, llvm::DIType*> mapTypeToDebugLLVM;
     List<llvm::Constant*> globalCtors;
     llvm::StructType* llvmCtorType;
 
+    // Map of DebugSource instructions to LLVM debug files
     Dictionary<IRInst*, llvm::DIFile*> sourceDebugInfo;
     Dictionary<IRInst*, llvm::DISubprogram*> functionDebugInfo;
+
+    struct VariableDebugInfo
+    {
+        llvm::DIVariable* debugVar;
+        // attached = first related DebugValue has been processed
+        bool attached = false;
+        // isStackVar = has been alloca'd and declared as debugValue. Doesn't
+        // necessarily need further DebugValue tracking after that, since a
+        // real variable now actually exists in LLVM.
+        bool isStackVar = false;
+    };
     Dictionary<IRInst*, VariableDebugInfo> variableDebugInfoMap;
+
+    // Used to skip some instructions whose value is derived from DebugVar.
+    HashSet<IRInst*> debugInsts;
+
+    // This is used to map struct fields to LLVM aggregates, in case the
+    // aggregates have padding entries which affect the indexing:
+    //     UInt llvmFieldIndex = structIndexMapping[slangStruct][slangFieldIndex];
+    Dictionary<IRStructType*, List<UInt>> structIndexMapping;
 
     List<llvm::DIScope*> debugScopeStack;
 
-    CodeGenContext* codeGenContext;
+    // Used to add code in the entry block of a function
+    using FuncPrologueCallback = Func<void>;
 
-    llvm::TargetMachine* targetMachine;
-
-    bool debug = false;
+    // Used to add code in in front of return in a function. If it returns
+    // nullptr, the LLVM return instruction is generated "normally". Otherwise,
+    // it's expected that you generated it in this function.
+    using FuncEpilogueCallback = Func<llvm::Value*, IRReturn*>;
 
     LLVMEmitter(CodeGenContext* codeGenContext)
         : llvmModule("module", llvmContext),
@@ -143,12 +166,18 @@ struct LLVMEmitter
             llvmBuilder = new llvm::IRBuilder<>(llvmContext);
         }
 
+        // Functions that initialize global variables are "constructors" in
+        // LLVM; they're called automatically at the start of the program and
+        // need to be recorded with this type.
         llvmCtorType = llvm::StructType::get(
             llvmBuilder->getInt32Ty(),
             llvmBuilder->getPtrTy(0),
             llvmBuilder->getPtrTy(0)
         );
 
+        // TODO: Should probably complain here if the target machine's pointer
+        // size doesn't match SLANG_PTR_IS_32 & SLANG_PTR_IS_64. Although, I'd
+        // rather just fix the whole pointer size mechanism in Slang.
         auto targetTripleOption = getOptions().getStringOption(CompilerOptionName::LLVMTargetTriple).getUnownedSlice();
         std::string targetTripleStr = llvm::sys::getDefaultTargetTriple();
         if (targetTripleOption.getLength() != 0)
@@ -255,6 +284,13 @@ struct LLVMEmitter
                 0
             );
         }
+
+        if (getOptions().shouldUseCLayout())
+            explicitLayoutRules = IRTypeLayoutRules::get(IRTypeLayoutRuleName::C);
+        else if (getOptions().shouldUseScalarLayout())
+            explicitLayoutRules = IRTypeLayoutRules::get(IRTypeLayoutRuleName::Scalar);
+        else if (getOptions().shouldUseDXLayout())
+            explicitLayoutRules = IRTypeLayoutRules::get(IRTypeLayoutRuleName::D3DConstantBuffer);
 
         debugScopeStack.add(compileUnit);
 
@@ -458,10 +494,14 @@ struct LLVMEmitter
     // struct. There may be differences due to added padding fields.
     UInt mapStructIndexToLLVM(IRStructType* irStruct, UInt irIndex)
     {
-        // TODO: Once padded structs exist, update this to map the indices
-        // correctly.
-        (void)irStruct;
-        return irIndex;
+        if (explicitLayoutRules)
+        {
+            return structIndexMapping.getValue(irStruct)[irIndex];
+        }
+        else
+        {
+            return irIndex;
+        }
     }
 
     IRStructField* findStructField(IRStructType* irStruct, UInt irIndex)
@@ -503,19 +543,11 @@ struct LLVMEmitter
     IRIntegerValue getOffset(IRStructField* field)
     {
         IRIntegerValue offset = 0;
-        if (getOptions().shouldUseCLayout())
+        if (explicitLayoutRules)
         {
             Slang::getOffset(
                 getOptions(),
-                IRTypeLayoutRules::get(IRTypeLayoutRuleName::C),
-                field,
-                &offset);
-        }
-        else if (getOptions().shouldUseScalarLayout())
-        {
-            Slang::getOffset(
-                getOptions(),
-                IRTypeLayoutRules::get(IRTypeLayoutRuleName::Scalar),
+                explicitLayoutRules,
                 field,
                 &offset);
         }
@@ -543,19 +575,11 @@ struct LLVMEmitter
         {
             IRSizeAndAlignment elementSizeAlignment;
 
-            if (getOptions().shouldUseCLayout())
+            if (explicitLayoutRules)
             {
                 Slang::getSizeAndAlignment(
                     getOptions(),
-                    IRTypeLayoutRules::get(IRTypeLayoutRuleName::C),
-                    type,
-                    &elementSizeAlignment);
-            }
-            else if (getOptions().shouldUseScalarLayout())
-            {
-                Slang::getSizeAndAlignment(
-                    getOptions(),
-                    IRTypeLayoutRules::get(IRTypeLayoutRuleName::Scalar),
+                    explicitLayoutRules,
                     type,
                     &elementSizeAlignment);
             }
@@ -723,9 +747,6 @@ struct LLVMEmitter
             llvmBuilder->GetInsertBlock()
         );
     }
-
-    using FuncPrologueCallback = Func<void>;
-    using FuncEpilogueCallback = Func<llvm::Value*, IRReturn*>;
 
     // Caution! This is only for emitting things which are considered
     // instructions in LLVM! It won't work for IRBlocks, IRFuncs & such.
@@ -1089,25 +1110,13 @@ struct LLVMEmitter
 
                 UInt index = getStructIndexByKey(baseStructType, key);
 
-                if (as<IRDebugVar>(base))
+                if (debugInsts.contains(base))
                 {
-                    // This is emitted to annotate member accesses of structs.
-                    llvm::DILocation* loc = llvmBuilder->getCurrentDebugLocation();
-
-                    llvm::StringRef linkageName, prettyName;
-                    maybeGetName(&linkageName, &prettyName, inst);
-
-                    IRStructField* field = findStructField(baseStructType, index);
-
-                    variableDebugInfoMap[inst] = {
-                        llvmDebugBuilder.createAutoVariable(
-                            debugScopeStack.getLast(), prettyName, loc->getFile(), loc->getLine(),
-                            ensureDebugType(field->getFieldType()),
-                            getOptions().getOptimizationLevel() == OptimizationLevel::None
-                        ),
-                        false,
-                        false
-                    };
+                    debugInsts.add(inst);
+                    // This is emitted to annotate member accesses of structs,
+                    // but we don't need that because our structs are
+                    // stack-allocated (in LLVM IR's mind) and already declared
+                    // as variables.
                     return nullptr;
                 }
 
@@ -1128,7 +1137,15 @@ struct LLVMEmitter
             {
                 auto fieldExtractInst = static_cast<IRFieldExtract*>(inst);
                 auto structType = as<IRStructType>(fieldExtractInst->getBase()->getDataType());
-                auto llvmBase = findValue(fieldExtractInst->getBase());
+                auto base = fieldExtractInst->getBase();
+
+                if (debugInsts.contains(base))
+                {
+                    debugInsts.add(inst);
+                    return nullptr;
+                }
+
+                auto llvmBase = findValue(base);
                 unsigned idx = mapStructIndexToLLVM(
                     structType,
                     getStructIndexByKey(structType, as<IRStructKey>(fieldExtractInst->getField())));
@@ -1144,6 +1161,12 @@ struct LLVMEmitter
                 auto gepInst = static_cast<IRGetElementPtr*>(inst);
                 auto baseInst = gepInst->getBase();
                 auto indexInst = gepInst->getIndex();
+
+                if (debugInsts.contains(baseInst))
+                {
+                    debugInsts.add(inst);
+                    return nullptr;
+                }
 
                 IRType* baseType = nullptr;
                 if (auto ptrType = as<IRPtrTypeBase>(baseInst->getDataType()))
@@ -1166,6 +1189,12 @@ struct LLVMEmitter
                 auto geInst = static_cast<IRGetElement*>(inst);
                 auto baseInst = geInst->getBase();
                 auto indexInst = geInst->getIndex();
+
+                if (debugInsts.contains(baseInst))
+                {
+                    debugInsts.add(inst);
+                    return nullptr;
+                }
 
                 auto llvmVal = findValue(baseInst);
 
@@ -1259,6 +1288,7 @@ struct LLVMEmitter
             break;
 
         case kIROp_DebugVar:
+            debugInsts.add(inst);
             if (debug)
             {
                 auto debugVarInst = static_cast<IRDebugVar*>(inst);
@@ -1300,10 +1330,15 @@ struct LLVMEmitter
             return nullptr;
 
         case kIROp_DebugValue:
+            debugInsts.add(inst);
             if (debug)
             {
                 auto debugValueInst = static_cast<IRDebugValue*>(inst);
-                VariableDebugInfo& debugInfo = variableDebugInfoMap.getValue(debugValueInst->getDebugVar());
+                auto debugVar = debugValueInst->getDebugVar();
+                if (!variableDebugInfoMap.containsKey(debugVar))
+                    return nullptr;
+
+                VariableDebugInfo& debugInfo = variableDebugInfoMap.getValue(debugVar);
 
                 llvm::DILocation* loc = llvmBuilder->getCurrentDebugLocation();
                 if (!loc)
@@ -1337,6 +1372,7 @@ struct LLVMEmitter
             return nullptr;
 
         case kIROp_DebugLine:
+            debugInsts.add(inst);
             if (debug)
             {
                 auto debugLineInst = static_cast<IRDebugLine*>(inst);
@@ -1402,6 +1438,148 @@ struct LLVMEmitter
         *linkageNameOut = llvm::StringRef(linkageName.begin(), linkageName.getLength());
         *prettyNameOut = llvm::StringRef(prettyName.begin(), prettyName.getLength());
         return true;
+    }
+
+    llvm::Type* emitArrayType(IRArrayType* arrayType, bool padded)
+    {
+        auto elemType = ensureType(arrayType->getElementType());
+        auto elemCount = int(getIntVal(arrayType->getElementCount()));
+
+        // The stride of an array must be based on the type with trailing
+        // padding included, but the last entry in that array may be missing
+        // trailing padding. To allow that in LLVM, we remove the last element
+        // and leave it up to emitStructType to add enough padding to cover for
+        // the last element too. Indexing beyond the length of an array is
+        // explicitly allowed in LLVM. We only need to do this if there's
+        // trailing padding, though.
+        IRSizeAndAlignment sizeAndAlignment = getSizeAndAlignment(arrayType->getElementType());
+        bool hasTrailingPadding = sizeAndAlignment.size != align(sizeAndAlignment.size, sizeAndAlignment.alignment);
+        if (elemCount != 0 && !padded && hasTrailingPadding)
+        {
+            elemCount--;
+        }
+
+        return llvm::ArrayType::get(elemType, elemCount);
+    }
+
+    void emitPadding(List<llvm::Type*>& fields, UInt& curSize, UInt targetSize)
+    {
+        if(curSize < targetSize)
+        {
+            UInt bytes = targetSize - curSize;
+            curSize = targetSize;
+            fields.add(llvm::ArrayType::get(llvmBuilder->getInt8Ty(), bytes));
+        }
+    }
+
+    llvm::Type* emitStructType(IRStructType* structType, bool padded)
+    {
+        List<llvm::Type*> fieldTypes;
+
+        bool isPacked = false;
+
+        if (explicitLayoutRules)
+        {
+            // This layout is not native to LLVM, so we have to generate a
+            // packed struct with manual padding.
+            isPacked = true;
+
+            List<UInt> fieldMapping;
+            UInt llvmSize = 0;
+
+            IRSizeAndAlignment sizeAndAlignment;
+            Slang::getSizeAndAlignment(getOptions(), explicitLayoutRules, structType, &sizeAndAlignment);
+
+            auto dataLayout = targetMachine->createDataLayout();
+
+            for (auto field : structType->getFields())
+            {
+                auto fieldType = field->getFieldType();
+                if (as<IRVoidType>(fieldType))
+                    continue;
+
+                IRIntegerValue offset = 0;
+                Slang::getOffset(getOptions(), explicitLayoutRules, field, &offset);
+
+                // Insert padding until we're at the requested offset.
+                emitPadding(fieldTypes, llvmSize, offset);
+
+                // Record the current llvm field index for the mapping. 
+                fieldMapping.add(fieldTypes.getCount());
+
+                // We don't want structs or arrays padded up to their alignment,
+                // because scalar layout may pack fields in their predecessor's
+                // trailing padding.
+                auto llvmFieldType = ensureUnpaddedType(fieldType);
+                fieldTypes.add(llvmFieldType);
+
+                // Can't use Slang's sizeAndAlignment here, since e.g. an
+                // unpadded array may be entirely missing the last entry to
+                // achieve this alignment. So it's best to just query the size
+                // from LLVM.
+                llvmSize += dataLayout.getTypeStoreSize(llvmFieldType);
+            }
+
+            if (padded)
+            {
+                // If trailing padding is desired, insert it.
+                sizeAndAlignment.size = align(sizeAndAlignment.size, sizeAndAlignment.alignment);
+            }
+            emitPadding(fieldTypes, llvmSize, sizeAndAlignment.size);
+            structIndexMapping[structType] = std::move(fieldMapping);
+        }
+        else
+        {
+            // "Native" layout, so just dump the fields in an unpacked LLVM
+            // aggregate.
+            isPacked = false;
+            for (auto field : structType->getFields())
+            {
+                auto fieldType = field->getFieldType();
+                if (as<IRVoidType>(fieldType))
+                    continue;
+                fieldTypes.add(ensureType(fieldType));
+            }
+        }
+
+        auto llvmStructType = llvm::StructType::get(
+            llvmContext,
+            llvm::ArrayRef<llvm::Type*>(fieldTypes.getBuffer(), fieldTypes.getCount()),
+            isPacked
+        );
+        llvm::StringRef linkageName, prettyName;
+        if (maybeGetName(&linkageName, &prettyName, structType))
+            llvmStructType->setName(linkageName);
+        return llvmStructType;
+    }
+
+    llvm::Type* ensureUnpaddedType(IRType* type)
+    {
+        if (mapTypeToLLVMUnpadded.containsKey(type))
+            return mapTypeToLLVMUnpadded.getValue(type);
+
+        llvm::Type* llvmType = nullptr;
+        switch (type->getOp())
+        {
+        case kIROp_StructType:
+            {
+                auto structType = static_cast<IRStructType*>(type);
+                llvmType = emitStructType(structType, false);
+            }
+            break;
+        case kIROp_ArrayType:
+            {
+                auto arrayType = static_cast<IRArrayType*>(type);
+                llvmType = emitArrayType(arrayType, false);
+            }
+            break;
+        default:
+            // No padding issues, just return type normally.
+            return ensureType(type);
+        }
+
+        mapTypeToLLVMUnpadded[type] = llvmType;
+        return llvmType;
     }
 
     llvm::Type* ensureType(IRType* type)
@@ -1472,33 +1650,14 @@ struct LLVMEmitter
         case kIROp_ArrayType:
             {
                 auto arrayType = static_cast<IRArrayType*>(type);
-                auto elemType = ensureType(arrayType->getElementType());
-                auto elemCount = int(getIntVal(arrayType->getElementCount()));
-
-                llvmType = llvm::ArrayType::get(elemType, elemCount);
+                llvmType = emitArrayType(arrayType, true);
             }
             break;
         case kIROp_StructType:
             {
                 auto structType = static_cast<IRStructType*>(type);
 
-                List<llvm::Type*> fieldTypes;
-                for (auto field : structType->getFields())
-                {
-                    auto fieldType = field->getFieldType();
-                    if (as<IRVoidType>(fieldType))
-                        continue;
-                    fieldTypes.add(ensureType(fieldType));
-                }
-
-                auto llvmStructType = llvm::StructType::get(
-                    llvmContext,
-                    llvm::ArrayRef<llvm::Type*>(fieldTypes.getBuffer(), fieldTypes.getCount())
-                );
-                llvm::StringRef linkageName, prettyName;
-                if (maybeGetName(&linkageName, &prettyName, type))
-                    llvmStructType->setName(linkageName);
-                llvmType = llvmStructType;
+                llvmType = emitStructType(structType, true);
             }
             break;
         case kIROp_FuncType:
@@ -1682,6 +1841,8 @@ struct LLVMEmitter
 
                 IRSizeAndAlignment sizeAndAlignment = getSizeAndAlignment(arrayType);
 
+                sizeAndAlignment.size = align(sizeAndAlignment.size, sizeAndAlignment.alignment);
+
                 llvm::Metadata *subscript = llvmDebugBuilder.getOrCreateSubrange(0, elemCount);
                 llvm::DINodeArray subscriptArray = llvmDebugBuilder.getOrCreateArray(subscript);
                 llvmType = llvmDebugBuilder.createArrayType(sizeAndAlignment.size*8, sizeAndAlignment.alignment*8, elemType, subscriptArray);
@@ -1728,6 +1889,8 @@ struct LLVMEmitter
 
                 llvm::StringRef linkageName, prettyName;
                 maybeGetName(&linkageName, &prettyName, type);
+
+                sizeAndAlignment.size = align(sizeAndAlignment.size, sizeAndAlignment.alignment);
 
                 llvmType = llvmDebugBuilder.createStructType(
                     scope,
@@ -2127,7 +2290,11 @@ struct LLVMEmitter
 
     // Using std::string as the LLVM API works with that. It's not to be
     // ingested by Slang.
-    std::string expandIntrinsic(llvm::Function* llvmFunc, IRFunc* parentFunc, UnownedStringSlice intrinsicText)
+    std::string expandIntrinsic(
+        llvm::Function* llvmFunc,
+        IRInst* intrinsicInst,
+        IRFunc* parentFunc,
+        UnownedStringSlice intrinsicText)
     {
         std::string out;
         llvm::raw_string_ostream expanded(out);
@@ -2205,6 +2372,21 @@ struct LLVMEmitter
                         llvmParam->print(expanded);
                     }
                     break;
+                case '[':
+                    {
+                        UInt argIndex = parseNumber(cursor, end)+1;
+
+                        SLANG_RELEASE_ASSERT(argIndex < intrinsicInst->getOperandCount());
+
+                        auto arg = intrinsicInst->getOperand(argIndex);
+
+                        auto llvmType = ensureType(as<IRType>(arg));
+                        llvmType->print(expanded);
+
+                        SLANG_ASSERT(*cursor == ']');
+                        cursor++;
+                    }
+                    break;
                 default:
                     SLANG_UNEXPECTED("bad format in intrinsic definition");
                     break;
@@ -2250,7 +2432,7 @@ struct LLVMEmitter
             {
                 llvm::BasicBlock::Create(llvmContext, "", llvmFunc);
 
-                std::string llvmTextIR = expandIntrinsic(llvmFunc, func, intrinsicDef);
+                std::string llvmTextIR = expandIntrinsic(llvmFunc, intrinsicInst, func, intrinsicDef);
                 std::string llvmFuncName = llvmFunc->getName().str();
                 llvmFunc->eraseFromParent();
 

@@ -67,3 +67,10 @@ target machine.
 
 `-fvk-use-c-layout` and `-fvk-use-scalar-layout` are supported, although they
 may generate very inefficient code.
+
+## `sizeof`
+
+Slang's `sizeof` may appear to "lie" to you about structs that contain padding,
+unless you specify `-fvk-use-scalar-layout`. That's because it queries layout
+information without knowing about the actual layout being used. Use `__sizeOf`
+instead to get accurate sizes from LLVM, e.g. for memory allocation purposes.
