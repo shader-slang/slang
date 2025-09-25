@@ -1079,6 +1079,12 @@ IRInst* getOrCreateBuiltinParamForHullShader(
             if (sysAttr->getName().caseInsensitiveEquals(builtinSemantic))
             {
                 outputControlPointIdParam = param;
+                if (as<IRPtrTypeBase>(outputControlPointIdParam->getDataType()))
+                {
+                    IRBuilder builder(param);
+                    setInsertAfterOrdinaryInst(&builder, param);
+                    outputControlPointIdParam = builder.emitLoad(param);
+                }
                 break;
             }
         }

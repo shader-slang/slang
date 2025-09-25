@@ -2151,11 +2151,6 @@ IRType* getElementType(IRBuilder& builder, IRType* valueType)
     {
         return coopMatType->getElementType();
     }
-    else if (const auto basicType = as<IRBasicType>(valueType))
-    {
-        // HLSL support things like float.x, in which case we just return the base pointer.
-        return basicType;
-    }
     else if (auto hlslInputPatchType = as<IRHLSLInputPatchType>(valueType))
     {
         return hlslInputPatchType->getElementType();

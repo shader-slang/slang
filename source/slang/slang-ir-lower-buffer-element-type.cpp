@@ -1106,13 +1106,7 @@ struct LoweredElementTypeContext
         builder.setInsertAfter(newElementType);
         if (auto ptrType = as<IRPtrTypeBase>(originalPtrLikeType))
         {
-            // Intentionally drop address space info from the pointer type to keep
-            // the IR simple. There are passes after this that may alter the arguments
-            // to functions to have a different address-space, so we want to have new
-            // functions and instructs we introduce in this pass address-space generic.
-            // and let the follow-up address-space specialization pass to fill in the final
-            // address space.
-            return builder.getPtrType(ptrType->getOp(), newElementType);
+            return builder.getPtrType(newElementType, ptrType);
         }
 
         if (as<IRPointerLikeType>(originalPtrLikeType) ||

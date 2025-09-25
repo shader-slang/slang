@@ -5494,6 +5494,11 @@ IRInst* IRBuilder::emitElementAddress(IRInst* basePtr, IRInst* index)
     }
     IRType* type = nullptr;
     valueType = unwrapAttributedType(valueType);
+    if (as<IRBasicType>(valueType))
+    {
+        // HLSL support things like float.x, in which case we just return the base pointer.
+        return basePtr;
+    }
     type = getElementType(*this, (IRType*)valueType);
     if (!type)
     {
