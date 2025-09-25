@@ -1247,6 +1247,31 @@ struct LoweredElementTypeContext
         return false;
     }
 
+
+    // Helper function to discover all `call`s in `func` that has at least one argument
+    // that is `CastStorageToPhysical`.
+    void discoverCallsToProcess(List<IRCall*>& callWorkList, IRFunc* func)
+    {
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst : block->getChildren())
+            {
+                auto call = as<IRCall>(inst);
+                if (!call)
+                    continue;
+                for (UInt i = 0; i < call->getArgCount(); i++)
+                {
+                    auto arg = call->getArg(i);
+                    if (arg->getOp() == kIROp_CastStorageToLogical)
+                    {
+                        callWorkList.add(call);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
     void deferStorageToLogicalCasts(
         IRModule* module,
         List<IRCastStorageToLogicalBase*> castInstWorkList)
@@ -1258,7 +1283,7 @@ struct LoweredElementTypeContext
             // We process call instructions after other instructions, so we
             // can be sure that all castStorageToLogical insts have already
             // been pushed to the call argument lists before we process it.
-            HashSet<IRCall*> callWorkList;
+            HashSet<IRCall*> callWorkListSet;
             // Defer the storage-to-logical cast operation to latest possible time to avoid
             // unnecessary packing/unpacking.
             for (Index i = 0; i < castInstWorkList.getCount(); i++)
@@ -1398,7 +1423,10 @@ struct LoweredElementTypeContext
                                 // and push the cast to inside the callee.
                                 // We will process calls after other gep insts, so for now just add
                                 // it into a separate worklist.
-                                callWorkList.add((IRCall*)user);
+                                if (castInst->getOp() == kIROp_CastStorageToLogical)
+                                {
+                                    callWorkListSet.add((IRCall*)user);
+                                }
                                 break;
                             }
                         case kIROp_Load:
@@ -1523,8 +1551,12 @@ struct LoweredElementTypeContext
             // castStorageToLogical on the parameter. Then we go back to the beginning and make sure
             // we process those newly created castStorageToLogical insts.
             List<IRCastStorageToLogicalBase*> newCasts;
-            for (auto call : callWorkList)
+            List<IRCall*> callWorkList;
+            for (auto call : callWorkListSet)
+                callWorkList.add(call);
+            for (Index c = 0; c < callWorkList.getCount(); c++)
             {
+                auto call = callWorkList[c];
                 auto calleeFunc = as<IRGlobalValueWithParams>(call->getCallee());
                 // We compute the func type for the specialized func based on the arguments
                 // provided, and check the specialization cache to reuse existing specialization
@@ -1569,6 +1601,11 @@ struct LoweredElementTypeContext
                         specializedFuncType,
                         newCasts);
                     specializedFuncs[key] = specializedFunc;
+
+                    // The cloned function may also contain `call`s with
+                    // `CastStorageToLogical` arguments, and we want to add
+                    // thoses calls to the callWorkList for further processing.
+                    discoverCallsToProcess(callWorkList, specializedFunc);
                 }
                 builder.setInsertBefore(call);
                 auto newCall = builder.emitCallInst(
@@ -1620,7 +1657,7 @@ struct LoweredElementTypeContext
             auto logicalParamType = param->getFullType();
             auto storageType = specializedFuncType->getParamType(i);
             param->setFullType((IRType*)storageType);
-            setInsertBeforeOrdinaryInst(&builder, param);
+            setInsertAfterOrdinaryInst(&builder, param);
 
             // Store uses of param before creating a cast inst that uses it.
             uses.clear();
