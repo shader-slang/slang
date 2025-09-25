@@ -4,8 +4,10 @@
 //TEST:COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -shaderobj
 //TEST(vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 //TEST:COMPARE_COMPUTE_EX:-cuda -compute -capability cuda_sm_7_0 -shaderobj
-//TEST:COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj
 //TEST:COMPARE_COMPUTE_EX:-metal -compute -shaderobj
+
+// WGSL doesn't support wave functions in a dynamic control flow; it works with uniform control flow.
+//DISABLE_TEST:COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -14,16 +16,16 @@ RWStructuredBuffer<int> outputBuffer;
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     int idx = int(dispatchThreadID.x);
-    
+
     int value = 0;
-    
+
     if (idx == 2)
     {
         // diverge
         return;
     }
-    
+
     value = WaveActiveMin(idx + 1);
-    
+
     outputBuffer[idx] = value;
 }

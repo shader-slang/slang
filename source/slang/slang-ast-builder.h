@@ -109,6 +109,7 @@ protected:
     Type* m_noneType = nullptr;
     Type* m_diffInterfaceType = nullptr;
     Type* m_builtinTypes[Index(BaseType::CountOf)];
+    Dictionary<String, Type*> m_magicEnumTypes;
 
     Dictionary<String, Decl*> m_magicDecls;
     Dictionary<BuiltinRequirementKind, Decl*> m_builtinRequirementDecls;
@@ -512,6 +513,8 @@ public:
     Type* getSpecializedBuiltinType(Type* typeParam, const char* magicTypeName);
     Type* getSpecializedBuiltinType(ArrayView<Val*> genericArgs, const char* magicTypeName);
 
+    Type* getMagicEnumType(const char* magicEnumName);
+
     Type* getDefaultLayoutType();
     Type* getDefaultPushConstantLayoutType();
     Type* getStd140LayoutType();
@@ -533,17 +536,23 @@ public:
     PtrType* getPtrType(Type* valueType, AccessQualifier accessQualifier, AddressSpace addrSpace);
     PtrType* getPtrType(Type* valueType, Val* accessQualifier, Val* addrSpace);
 
-    // Construct the type `Out<valueType>`
-    OutType* getOutType(Type* valueType);
+    // Construct the type `OutParam<valueType>`
+    OutParamType* getOutType(Type* valueType);
 
-    // Construct the type `InOut<valueType>`
-    InOutType* getInOutType(Type* valueType);
+    // Construct the type `InOutParam<valueType>`
+    InOutParamType* getInOutType(Type* valueType);
+
+    // Construct the type `RefParam<valueType>`
+    RefParamType* getRefParamType(Type* valueType);
+
+    // Construct the type `ConstRefParam<valueType>`
+    ConstRefParamType* getConstRefParamType(Type* valueType);
 
     // Construct the type `Ref<valueType>`
-    RefType* getRefType(Type* valueType);
+    ExplicitRefType* getExplicitRefType(Type* valueType);
 
-    // Construct the type `ConstRef<valueType>`
-    ConstRefType* getConstRefType(Type* valueType);
+    // Construct the type `Ref<valueType, .Read>`
+    ExplicitRefType* getExplicitConstRefType(Type* valueType);
 
     // Construct the type `Optional<valueType>`
     OptionalType* getOptionalType(Type* valueType);

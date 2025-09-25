@@ -802,7 +802,7 @@ Result linkAndOptimizeIR(
     // can assume that all ordinary/uniform data is strictly
     // passed using constant buffers.
     //
-    collectGlobalUniformParameters(irModule, outLinkedIR.globalScopeVarLayout);
+    collectGlobalUniformParameters(irModule, outLinkedIR.globalScopeVarLayout, target);
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "GLOBAL UNIFORMS COLLECTED");
 #endif
@@ -1264,10 +1264,17 @@ Result linkAndOptimizeIR(
 
     legalizeEmptyArray(irModule, sink);
 
+    // For CUDA targets, always inline global constants to avoid dynamic initialization
+    // of __device__ variables rejected by NVRTC. This runs independently of the broader
+    // resource/existential type legalization, which remains disabled for CUDA.
+    if (target == CodeGenTarget::CUDASource || options.shouldLegalizeExistentialAndResourceTypes)
+    {
+        inlineGlobalConstantsForLegalization(irModule);
+    }
+
     // We don't need the legalize pass for C/C++ based types
     if (options.shouldLegalizeExistentialAndResourceTypes)
     {
-        inlineGlobalConstantsForLegalization(irModule);
 
         // The Slang language allows interfaces to be used like
         // ordinary types (including placing them in constant
@@ -2287,7 +2294,8 @@ public:
     {
         ComPtr<ISlangBlob> spirvBlob;
         SlangResult res = artifact->loadBlob(ArtifactKeep::Yes, spirvBlob.writeRef());
-        if (SLANG_FAILED(res) || !spirvBlob)
+        if (SLANG_FAILED(res) || !spirvBlob ||
+            spirvBlob->getBufferSize() < SPV_INDEX_INSTRUCTION_START * sizeof(SpvWord))
             return SLANG_FAIL;
 
         // Populate the full array of SPIR-V words.
