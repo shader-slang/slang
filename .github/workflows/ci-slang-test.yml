@@ -38,6 +38,7 @@ on:
 jobs:
   test-slang:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
+    timeout-minutes: 30
     defaults:
       run:
         shell: bash
@@ -119,6 +120,7 @@ jobs:
   # expensive slang-rhi tests are excluded with -tce option, because they are not relevant for Slang.
   test-slang-rhi:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
+    timeout-minutes: 30
     if: inputs.full-gpu-tests && (github.event_name == 'pull_request' || inputs.config == 'release')
     defaults:
       run:
@@ -152,6 +154,7 @@ jobs:
   # This is to reduce the CI load but do some check on pull requests.
   test-slangpy:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
+    timeout-minutes: 30
     if: inputs.full-gpu-tests && (github.event_name == 'pull_request' || inputs.config == 'release')
     defaults:
       run:
