@@ -2707,14 +2707,14 @@ static Expr* _applyModifiersToTypeExpr(Parser* parser, Expr* typeExpr, Modifiers
     }
 }
 
-/// Apply any type modifier in `ioBaseModifiers` to the given `typeExpr`.
+/// Move any type modifier in `ioBaseModifiers` to the given `typeExpr`.
 ///
 /// If any type modifiers were present, `ioBaseModifiers` will be updated
 /// to only include those modifiers that were not type modifiers (if any).
 ///
 /// If no type modifiers were present, `ioBaseModifiers` will remain unchanged.
 ///
-static Expr* _applyTypeModifiersToTypeExpr(
+static Expr* _moveTypeModifiersToTypeExpr(
     Parser* parser,
     Expr* typeExpr,
     Modifiers& ioBaseModifiers)
@@ -2762,7 +2762,7 @@ static Expr* _applyTypeModifiersToTypeExpr(
             // a pointer to the type modifier into the "link" for
             // the type modifier list, and updating the link to point
             // to the `next` field of the current modifier (since that
-            // fill be the location any further type modifiers need
+            // will be the location any further type modifiers need
             // to be linked).
             //
             *typeModifierLink = typeModifier;
@@ -2794,7 +2794,7 @@ static Expr* _applyTypeModifiersToTypeExpr(
 static TypeSpec _applyModifiersToTypeSpec(
     Parser* parser,
     TypeSpec typeSpec,
-    Modifiers const& inModifiers)
+    Modifiers& modifiers)
 {
     // It is possible that the form of the type specifier will have
     // included a declaration directly (e.g., using `struct { ... }`
@@ -2808,8 +2808,7 @@ static TypeSpec _applyModifiersToTypeSpec(
         // and any modifiers that logically belong to the declaration to
         // the declaration.
         //
-        Modifiers modifiers = inModifiers;
-        typeSpec.expr = _applyTypeModifiersToTypeExpr(parser, typeSpec.expr, modifiers);
+        typeSpec.expr = _moveTypeModifiersToTypeExpr(parser, typeSpec.expr, modifiers);
 
         // Any remaining modifiers should instead be applied to the declaration.
         _addModifiers(decl, modifiers);
@@ -2820,7 +2819,7 @@ static TypeSpec _applyModifiersToTypeSpec(
         // This may result in modifiers being applied that do not belong on a type;
         // in that case we rely on downstream semantic checking to diagnose any error.
         //
-        typeSpec.expr = _applyModifiersToTypeExpr(parser, typeSpec.expr, inModifiers);
+        typeSpec.expr = _applyModifiersToTypeExpr(parser, typeSpec.expr, modifiers);
     }
 
     return typeSpec;
@@ -2961,7 +2960,7 @@ static TypeSpec _parseTypeSpec(Parser* parser, Modifiers& ioModifiers)
     // or which of them might be type modifiers, so we will delegate
     // figuring that out to a subroutine.
     //
-    typeSpec.expr = _applyTypeModifiersToTypeExpr(parser, typeSpec.expr, ioModifiers);
+    typeSpec.expr = _moveTypeModifiersToTypeExpr(parser, typeSpec.expr, ioModifiers);
 
     return typeSpec;
 }
@@ -2991,11 +2990,10 @@ static TypeSpec _parseTypeSpec(Parser* parser)
 static DeclBase* ParseDeclaratorDecl(
     Parser* parser,
     ContainerDecl* containerDecl,
-    Modifiers const& inModifiers)
+    Modifiers& modifiers)
 {
     SourceLoc startPosition = parser->tokenReader.peekLoc();
 
-    Modifiers modifiers = inModifiers;
     auto typeSpec = _parseTypeSpec(parser, modifiers);
 
     if (typeSpec.expr == nullptr && typeSpec.decl == nullptr)
