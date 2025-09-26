@@ -812,9 +812,23 @@ void fixUpFuncType(IRFunc* func, IRType* resultType)
     builder.setInsertBefore(func);
 
     List<IRType*> paramTypes;
-    for (auto param : func->getParams())
+    // As for extern function, it's not definition, that is no params. After legalize SPIR-V, the
+    // function type hasn't params, it's a error signature. When we fix the function type, extern
+    // function should check the param types in function type instead of params.
+    if (func->isDefinition())
     {
-        paramTypes.add(param->getFullType());
+        for (auto param : func->getParams())
+        {
+            paramTypes.add(param->getFullType());
+        }
+    }
+    else
+    {
+        auto funcType = as<IRFuncType>(func->getFullType());
+        for (auto paramType : funcType->getParamTypes())
+        {
+            paramTypes.add(paramType);
+        }
     }
 
     auto funcType = builder.getFuncType(paramTypes, resultType);
