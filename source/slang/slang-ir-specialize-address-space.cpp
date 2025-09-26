@@ -168,6 +168,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                     {
                     case kIROp_Var:
                     case kIROp_RWStructuredBufferGetElementPtr:
+                    case kIROp_Load:
                         {
                             // The address space of these insts should be assigned by the initial
                             // address space assigner.
@@ -200,16 +201,6 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                             {
                                 mapVarValueToAddrSpace[inst->getOperand(0)] = addrSpace;
                                 mapInstToAddrSpace[inst] = addrSpace;
-                                changed = true;
-                            }
-                        }
-                        break;
-                    case kIROp_Load:
-                        {
-                            if (auto addrSpace =
-                                    mapVarValueToAddrSpace.tryGetValue(inst->getOperand(0)))
-                            {
-                                mapInstToAddrSpace[inst] = *addrSpace;
                                 changed = true;
                             }
                         }
