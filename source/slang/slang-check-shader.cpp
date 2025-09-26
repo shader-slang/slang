@@ -341,6 +341,7 @@ bool doStructFieldsHaveSemantic(Type* type)
     return doStructFieldsHaveSemanticImpl(type, seenTypes);
 }
 
+
 // Validate that an entry point function conforms to any additional
 // constraints based on the stage (and profile?) it specifies.
 void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
@@ -376,7 +377,30 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     auto entryPointName = entryPointFuncDecl->getName();
 
     auto module = getModule(entryPointFuncDecl);
-    auto linkage = module->getLinkage();
+    auto linkage = entryPoint->getLinkage();
+
+    // Check if the return type is valid for a shader entry point
+    auto returnType = entryPointFuncDecl->returnType.type;
+    if (returnType)
+    {
+        // Use the existing getTypeTags functionality to check for resource types
+        // Create a temporary SemanticsVisitor to access getTypeTags
+        SharedSemanticsContext shared(linkage, module, sink);
+        SemanticsVisitor visitor(&shared);
+
+        auto typeTags = visitor.getTypeTags(returnType);
+        bool hasResourceOrUnsizedTypes = (((int)typeTags & (int)TypeTag::Opaque) != 0) ||
+                                         (((int)typeTags & (int)TypeTag::Unsized) != 0);
+
+        if (hasResourceOrUnsizedTypes)
+        {
+            sink->diagnose(
+                entryPointFuncDecl,
+                Diagnostics::entryPointCannotReturnResourceType,
+                entryPointName,
+                returnType);
+        }
+    }
 
     // Every entry point needs to have a stage specified either via
     // command-line/API options, or via an explicit `[shader("...")]` attribute.
