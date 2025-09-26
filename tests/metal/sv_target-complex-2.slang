@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=METAL): -target metal
-//TEST:SIMPLE(filecheck=METAL_ASM): -target metallib
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl
 //TEST:SIMPLE(filecheck=WGSLSPIRV): -target wgsl-spirv-asm
 
@@ -16,7 +16,7 @@ struct Output
     float4 Material : SV_Target2;
 }
 
-// METAL_ASM: define {{.*}} @fragmentMain
+// METALLIB: define {{.*}} @fragmentMain
 // METAL: color(0)
 // METAL: color(1)
 // METAL-DAG: color(3)

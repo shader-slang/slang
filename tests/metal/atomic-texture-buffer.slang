@@ -2,6 +2,10 @@
 //TEST:SIMPLE(filecheck=METAL_FLOAT): -target metal -stage compute -entry computeMain -DFLOAT
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 
+// Test framework does not support RWBuffer
+// TODO: github issue #8456
+
+
 // METAL_FLOAT: floating point atomic operation
 
 //METALLIB: @computeMain
