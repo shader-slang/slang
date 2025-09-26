@@ -498,6 +498,10 @@ struct LLVMEmitter
     {
         if (explicitLayoutRules)
         {
+            // `structIndexMapping` is filled out through ensureType(), so we
+            // have to call it first even though we don't care about the result
+            // here.
+            ensureType(irStruct);
             return structIndexMapping.getValue(irStruct)[irIndex];
         }
         else
@@ -636,7 +640,7 @@ struct LLVMEmitter
             };
             return llvmBuilder->CreateGEP(ensureType(aggregateType), ptr, indices);
         }
-        else if(auto arrayType = as<IRArrayType>(aggregateType))
+        else if(auto arrayType = as<IRArrayTypeBase>(aggregateType))
         {
             elementType = arrayType->getElementType();
         }
@@ -1245,7 +1249,7 @@ struct LLVMEmitter
                     // For vectors, we can use extractelement
                     llvmInst = llvmBuilder->CreateExtractElement(llvmVal, findValue(indexInst));
                 }
-                else if(as<IRArrayType>(baseTy) || as<IRStructType>(baseTy))
+                else if(as<IRArrayTypeBase>(baseTy) || as<IRStructType>(baseTy))
                 {
                     // emitGEP + emitLoad.
                     SLANG_ASSERT(llvmVal->getType()->isPointerTy());
@@ -1481,18 +1485,26 @@ struct LLVMEmitter
         return true;
     }
 
-    llvm::Type* emitArrayType(IRArrayType* arrayType, bool padded)
+    llvm::Type* emitArrayType(IRArrayTypeBase* arrayType, bool padded)
     {
         auto elemType = ensureType(arrayType->getElementType());
-        auto elemCount = int(getIntVal(arrayType->getElementCount()));
+        auto irElemCount = arrayType->getElementCount();
+
+        if (!irElemCount)
+        {
+            // UnsizedArrayType. Lowers as a zero-sized array for LLVM, luckily.
+            return llvm::ArrayType::get(elemType, 0);
+        }
+
+        auto elemCount = int(getIntVal(irElemCount));
 
         // The stride of an array must be based on the type with trailing
         // padding included, but the last entry in that array may be missing
-        // trailing padding. To allow that in LLVM, we remove the last element
-        // and leave it up to emitStructType to add enough padding to cover for
-        // the last element too. Indexing beyond the length of an array is
-        // explicitly allowed in LLVM. We only need to do this if there's
-        // trailing padding, though.
+        // trailing padding in some layouts. To allow that in LLVM when an
+        // unpadded array is requested, we remove the last element and leave it
+        // up to emitStructType to add enough padding to cover for the last
+        // element too. Indexing beyond the length of an array is explicitly
+        // allowed in LLVM.
         IRSizeAndAlignment sizeAndAlignment = getSizeAndAlignment(arrayType->getElementType());
         bool hasTrailingPadding = sizeAndAlignment.size != align(sizeAndAlignment.size, sizeAndAlignment.alignment);
         if (elemCount != 0 && !padded && hasTrailingPadding)
@@ -1608,9 +1620,10 @@ struct LLVMEmitter
                 llvmType = emitStructType(structType, false);
             }
             break;
+        case kIROp_UnsizedArrayType:
         case kIROp_ArrayType:
             {
-                auto arrayType = static_cast<IRArrayType*>(type);
+                auto arrayType = static_cast<IRArrayTypeBase*>(type);
                 llvmType = emitArrayType(arrayType, false);
             }
             break;
@@ -1688,9 +1701,10 @@ struct LLVMEmitter
                 llvmType = llvm::VectorType::get(elemType, llvm::ElementCount::getFixed(elemCount));
             }
             break;
+        case kIROp_UnsizedArrayType:
         case kIROp_ArrayType:
             {
-                auto arrayType = static_cast<IRArrayType*>(type);
+                auto arrayType = static_cast<IRArrayTypeBase*>(type);
                 llvmType = emitArrayType(arrayType, true);
             }
             break;
@@ -1874,11 +1888,13 @@ struct LLVMEmitter
             }
             break;
 
+        case kIROp_UnsizedArrayType:
         case kIROp_ArrayType:
             {
-                auto arrayType = static_cast<IRArrayType*>(type);
+                auto arrayType = static_cast<IRArrayTypeBase*>(type);
                 llvm::DIType* elemType = ensureDebugType(arrayType->getElementType());
-                auto elemCount = int(getIntVal(arrayType->getElementCount()));
+                auto irElemCount = arrayType->getElementCount();
+                auto elemCount = irElemCount ? getIntVal(irElemCount) : 0;
 
                 IRSizeAndAlignment sizeAndAlignment = getSizeAndAlignment(arrayType);
 
