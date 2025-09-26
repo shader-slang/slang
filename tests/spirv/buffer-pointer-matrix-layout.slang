@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -output-using-type -xslang -matrix-layout-column-major
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -output-using-type -xslang -matrix-layout-column-major -emit-spirv-directly
 
 // TEST_INPUT: set ptr = ubuffer(data=[1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0 10.0 11.0 12.0],stride=4)
 uniform float3x4 *ptr;
