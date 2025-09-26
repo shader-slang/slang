@@ -17,6 +17,7 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/ModuleSummaryIndex.h>
 #include <llvm/IR/Verifier.h>
+#include <llvm/Linker/Linker.h>
 #include <llvm/MC/TargetRegistry.h>
 #include <llvm/Passes/PassBuilder.h>
 #include <llvm/Support/TargetSelect.h>
@@ -85,9 +86,9 @@ struct LLVMEmitter
 {
     llvm::LLVMContext llvmContext;
     llvm::Module llvmModule;
+    llvm::Linker llvmLinker;
     llvm::IRBuilderBase* llvmBuilder;
     llvm::DIBuilder llvmDebugBuilder;
-    llvm::ModuleSummaryIndex llvmSummaryIndex;
     llvm::DICompileUnit* compileUnit;
     llvm::TargetMachine* targetMachine;
     CodeGenContext* codeGenContext;
@@ -143,8 +144,8 @@ struct LLVMEmitter
 
     LLVMEmitter(CodeGenContext* codeGenContext)
         : llvmModule("module", llvmContext),
+          llvmLinker(llvmModule),
           llvmDebugBuilder(llvmModule),
-          llvmSummaryIndex(true),
           codeGenContext(codeGenContext)
     {
         auto session = codeGenContext->getSession();
@@ -295,6 +296,7 @@ struct LLVMEmitter
         debugScopeStack.add(compileUnit);
 
         String prelude = session->getPreludeForLanguage(SourceLanguage::LLVM);
+        llvm::ModuleSummaryIndex llvmSummaryIndex(true);
         llvm::SMDiagnostic diag;
         llvm::MemoryBufferRef buf(
             llvm::StringRef(prelude.begin(), prelude.getLength()),
@@ -735,6 +737,9 @@ struct LLVMEmitter
         auto varType = ensureDebugType(type);
 
         llvm::DILocation* loc = llvmBuilder->getCurrentDebugLocation();
+        if (!loc)
+            return;
+
         auto debugVar = llvmDebugBuilder.createAutoVariable(
             debugScopeStack.getLast(), name, loc->getFile(), loc->getLine(),
             varType, getOptions().getOptimizationLevel() == OptimizationLevel::None
@@ -1080,15 +1085,29 @@ struct LLVMEmitter
             break;
 
         case kIROp_PtrCast:
+            {
+                // ptr-to-ptr casts are no-ops due to opaque pointers.
+                llvmInst = findValue(inst->getOperand(0));
+            }
+            break;
+
         case kIROp_BitCast:
             {
                 auto fromValue = inst->getOperand(0);
                 auto toTypeV = inst->getDataType();
-                llvmInst = llvmBuilder->CreateCast(
-                    llvm::Instruction::CastOps::BitCast,
-                    findValue(fromValue),
-                    ensureType(toTypeV)
-                );
+
+                auto llvmFromValue = findValue(fromValue);
+                auto llvmFromType = llvmFromValue->getType();
+                auto llvmToType = ensureType(toTypeV);
+
+                auto op = llvm::Instruction::CastOps::BitCast;
+                // It appears that sometimes casts between ints and ptrs occur
+                // as bitcasts. Fix the operation in that case.
+                if (llvmFromType->isPointerTy() && llvmToType->isIntegerTy())
+                    op = llvm::Instruction::CastOps::PtrToInt;
+                else if (llvmFromType->isIntegerTy() && llvmToType->isPointerTy())
+                    op = llvm::Instruction::CastOps::IntToPtr;
+                llvmInst = llvmBuilder->CreateCast(op, llvmFromValue, llvmToType);
             }
             break;
 
@@ -1153,6 +1172,28 @@ struct LLVMEmitter
                 IRType* elementType = nullptr;
                 llvm::Value* ptr = emitGetElementPtr(llvmBase, llvmBuilder->getInt32(idx), structType, elementType);
                 llvmInst = emitLoad(ptr, elementType);
+            }
+            break;
+
+        case kIROp_GetOffsetPtr:
+            {
+                auto gopInst = static_cast<IRGetOffsetPtr*>(inst);
+                auto baseInst = gopInst->getBase();
+                auto offsetInst = gopInst->getOffset();
+
+                if (debugInsts.contains(baseInst))
+                {
+                    debugInsts.add(inst);
+                    return nullptr;
+                }
+
+                IRType* baseType = nullptr;
+                if (auto ptrType = as<IRPtrTypeBase>(baseInst->getDataType()))
+                {
+                    baseType = ptrType->getValueType();
+                }
+
+                llvmInst = llvmBuilder->CreateGEP(ensureType(baseType), findValue(baseInst), findValue(offsetInst));
             }
             break;
 
@@ -2399,13 +2440,20 @@ struct LLVMEmitter
             }
         }
 
-        expanded << "\nret ";
-        auto llvmResultType = ensureType(resultType);
-        llvmResultType->print(expanded);
+        bool hasReturnValue = as<IRVoidType>(resultType) == nullptr;
+        bool resultFound =
+            out.find("%result=") != std::string::npos ||
+            out.find("%result =") != std::string::npos;
 
-        if (as<IRVoidType>(resultType) == nullptr)
+        if (!hasReturnValue || resultFound)
         {
-            expanded << " %result";
+            expanded << "\nret ";
+            if (hasReturnValue)
+            {
+                auto llvmResultType = ensureType(resultType);
+                llvmResultType->print(expanded);
+                expanded << " %result";
+            }
         }
 
         expanded << "\n}\n";
@@ -2430,28 +2478,31 @@ struct LLVMEmitter
             intrinsic = Slang::findTargetIntrinsicDefinition(func, codeGenContext->getTargetReq()->getTargetCaps(), intrinsicDef, intrinsicInst);
             if (intrinsic)
             {
-                llvm::BasicBlock::Create(llvmContext, "", llvmFunc);
+                llvm::BasicBlock* bb = llvm::BasicBlock::Create(llvmContext, "", llvmFunc);
 
+                llvmFunc->setLinkage(llvm::Function::LinkageTypes::ExternalLinkage);
+
+                std::string funcName = llvmFunc->getName().str();
                 std::string llvmTextIR = expandIntrinsic(llvmFunc, intrinsicInst, func, intrinsicDef);
                 std::string llvmFuncName = llvmFunc->getName().str();
-                llvmFunc->eraseFromParent();
 
-                // This function is defined by an intrinsic.
+                bb->eraseFromParent();
+
                 llvm::SMDiagnostic diag;
-                llvm::MemoryBufferRef buf(
-                    llvm::StringRef(llvmTextIR),
-                    llvm::StringRef("inline-llvm-ir")
-                );
-                if(llvm::parseAssemblyInto(buf, &llvmModule, &llvmSummaryIndex, diag))
+                std::unique_ptr<llvm::Module> sourceModule = llvm::parseAssemblyString(
+                    llvmTextIR, diag, llvmContext);
+
+                if (!sourceModule)
                 {
                     //auto msg = diag.getMessage();
-                    //printf("%s\n", llvmTextIR.c_str());
                     //printf("%s\n", msg.str().c_str());
                     SLANG_UNEXPECTED("Failed to parse LLVM inline IR!");
                 }
 
-                llvmFunc = cast<llvm::Function>(llvmModule.getNamedValue(llvmFuncName));
+                llvmLinker.linkInModule(std::move(sourceModule), llvm::Linker::OverrideFromSrc);
 
+                llvmFunc = cast<llvm::Function>(llvmModule.getNamedValue(funcName));
+                llvmFunc->setLinkage(llvm::Function::LinkageTypes::PrivateLinkage);
                 // Intrinsic functions usually do nothing other than call a single
                 // instruction; we can just inline them by default.
                 llvmFunc->addFnAttr(llvm::Attribute::AttrKind::AlwaysInline);
@@ -2710,6 +2761,11 @@ struct LLVMEmitter
             );
         }
         
+        //std::string out;
+        //llvm::raw_string_ostream rso(out);
+        //llvmModule.print(rso, nullptr);
+        //printf("%s\n", out.c_str());
+
         llvm::verifyModule(llvmModule, &llvm::errs());
 
         if (getOptions().getOptimizationLevel() != OptimizationLevel::None)

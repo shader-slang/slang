@@ -277,6 +277,10 @@ alias any_cpp_target = cpp | cuda;
 /// [Compound]
 alias cpp_cuda = cpp | cuda;
 
+/// CPP and LLVM code-gen targets
+/// [Compound]
+alias cpp_llvm = cpp | llvm;
+
 /// CPP, CUDA and LLVM code-gen targets
 /// [Compound]
 alias cpp_cuda_llvm = cpp | cuda | llvm;
