@@ -1029,6 +1029,9 @@ Compound Capabilities
 `cpp_hlsl`
 > CPP, and HLSL code-gen targets
 
+`cpp_llvm`
+> CPP and LLVM code-gen targets
+
 `cuda_glsl_hlsl`
 > CUDA, GLSL, and HLSL code-gen targets
 

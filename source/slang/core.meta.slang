@@ -1955,21 +1955,28 @@ __magic_type(NativeStringType)
 __intrinsic_type($(kIROp_NativeStringType))
 struct NativeString
 {
-    [require(cpp)]
+    [require(cpp_llvm)]
     int getLength()
     {
         __target_switch
         {
         case cpp: __intrinsic_asm "int(strlen($0))";
+        case llvm:
+            Ptr<int8_t> str = Ptr<int8_t>(getBuffer());
+            int len = 0;
+            while(str[len] != 0)
+                len++;
+            return len;
         }
     }
 
-    [require(cpp)]
+    [require(cpp_llvm)]
     Ptr<void> getBuffer()
     {
         __target_switch
         {
         case cpp: __intrinsic_asm "(void*)((const char*)($0))";
+        case llvm: __intrinsic_asm "ret $0";
         }
     }
 
