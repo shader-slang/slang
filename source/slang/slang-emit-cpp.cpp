@@ -1172,8 +1172,9 @@ void CPPSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
             auto arrayType = static_cast<IRArrayType*>(type);
             auto elementType = arrayType->getElementType();
             int elementCount = int(getIntVal(arrayType->getElementCount()));
-            auto nameHint = arrayType->findDecoration<IRNameHintDecoration>();
-            bool isCoopVec = nameHint && (nameHint->getName() == UnownedStringSlice("CoopVec"));
+            bool isCoopVec = false;
+            if (auto intrinsicDecor = arrayType->findDecoration<IRIntrinsicOpDecoration>())
+                isCoopVec = intrinsicDecor->getIntrinsicOp() == kIROp_CoopVectorType;
             if (isCoopVec && isOptixCoopVec)
             {
                 m_writer->emit("OptixCoopVec<");

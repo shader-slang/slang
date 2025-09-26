@@ -78,19 +78,34 @@ void makeFuncReturnViaOutParam(IRBuilder& builder, IRFunc* func)
     }
 }
 
-void legalizeArrayReturnType(IRModule* module)
+static bool targetSupportsCoopVec(CodeGenTarget target)
+{
+    return target == CodeGenTarget::SPIRV || target == CodeGenTarget::CUDASource ||
+           target == CodeGenTarget::PTX;
+}
+
+static bool isCoopVecArray(IRType* type)
+{
+    if (auto intrinsicDecor = type->findDecoration<IRIntrinsicOpDecoration>())
+        return intrinsicDecor->getIntrinsicOp() == kIROp_CoopVectorType;
+    return false;
+}
+
+void legalizeArrayReturnType(IRModule* module, CodeGenTarget target)
 {
     IRBuilder builder(module);
 
     for (auto inst : module->getGlobalInsts())
     {
-        if (auto func = as<IRFunc>(inst))
-        {
-            if (func->getResultType()->getOp() == kIROp_ArrayType)
-            {
-                makeFuncReturnViaOutParam(builder, func);
-            }
-        }
+        auto func = as<IRFunc>(inst);
+        if (!func || func->getResultType()->getOp() != kIROp_ArrayType)
+            continue;
+
+        // Skip CoopVec arrays on targets that support them natively
+        if (isCoopVecArray(func->getResultType()) && targetSupportsCoopVec(target))
+            continue;
+
+        makeFuncReturnViaOutParam(builder, func);
     }
 }
 } // namespace Slang
