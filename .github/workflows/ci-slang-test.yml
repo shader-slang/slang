@@ -38,6 +38,7 @@ on:
 jobs:
   test-slang:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
+    timeout-minutes: 30
     defaults:
       run:
         shell: bash
@@ -66,6 +67,7 @@ jobs:
             "-expected-failure-list" "tests/expected-failure-github.txt"
             "-skip-reference-image-generation"
             "-show-adapter-info"
+            "-ignore-abort-msg"
             "-enable-debug-layers" "${{ inputs.enable-debug-layers }}"
           )
 
@@ -106,10 +108,10 @@ jobs:
             -server-count ${{ inputs.server-count }} \
             -category ${{ inputs.test-category }} \
             -emit-spirv-via-glsl \
+            -ignore-abort-msg \
             -api vk \
             -expected-failure-list tests/expected-failure-via-glsl.txt \
-            -skip-reference-image-generation \
-            -show-adapter-info
+            -skip-reference-image-generation
 
   # Run slang-rhi tests when:
   # 1. full-gpu-tests is enabled AND
@@ -118,6 +120,7 @@ jobs:
   # expensive slang-rhi tests are excluded with -tce option, because they are not relevant for Slang.
   test-slang-rhi:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
+    timeout-minutes: 30
     if: inputs.full-gpu-tests && (github.event_name == 'pull_request' || inputs.config == 'release')
     defaults:
       run:
@@ -151,6 +154,7 @@ jobs:
   # This is to reduce the CI load but do some check on pull requests.
   test-slangpy:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
+    timeout-minutes: 30
     if: inputs.full-gpu-tests && (github.event_name == 'pull_request' || inputs.config == 'release')
     defaults:
       run:
@@ -185,7 +189,7 @@ jobs:
           python -m pip install --verbose slangpy --user
 
           # Get site packages directory
-          SITE_PACKAGES=$(python -c "import slangpy; import os; print(os.path.dirname(os.path.dirname(slangpy.__file__)))")
+          SITE_PACKAGES=$(python -c "import slangpy; import os; print(os.path.dirname(os.path.dirname(slangpy.__file__)))" | tail -n 1)
           echo "Site packages directory: $SITE_PACKAGES"
           echo "bin_dir location: $bin_dir"
           echo "lib_dir location: $lib_dir"
@@ -206,12 +210,8 @@ jobs:
             python -m pip install -r requirements-dev.txt --user
             python -m pip install pytest-github-actions-annotate-failures --user
             python -m pip install pytest-xdist --user
-          else
-            echo "Skipping Python package installation on self-hosted runner"
-            # TODO: remove this once we have pytest-xdist installed on all self-hosted runners
-            python -m pip install pytest-xdist --user
           fi
 
           echo "Running pytest on slangpy tests..."
           export PYTHONPATH="$SITE_PACKAGES"
-          python -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n auto --maxprocesses=4
+          python -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n auto --maxprocesses=3

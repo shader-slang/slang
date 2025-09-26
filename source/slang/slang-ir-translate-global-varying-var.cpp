@@ -184,13 +184,6 @@ struct GlobalVarTranslationContext
                 }
                 else
                 {
-                    if (!hasExistingLayout)
-                    {
-                        fieldTypeLayoutBuilder.addResourceUsage(
-                            LayoutResourceKind::VaryingInput,
-                            LayoutSize(1));
-                    }
-
                     // Start off the offset as nextOffset. If the global "in"s have existing
                     // offsetAttr's, we will add the offsets from those as well.
                     auto resInfo =
@@ -290,8 +283,27 @@ struct GlobalVarTranslationContext
                     auto key = builder.createStructKey();
                     auto ptrType = as<IRPtrTypeBase>(output->getDataType());
                     builder.createStructField(resultType, key, ptrType->getValueType());
-                    IRTypeLayout::Builder fieldTypeLayout(&builder);
-                    IRVarLayout::Builder varLayoutBuilder(&builder, fieldTypeLayout.build());
+
+                    IRTypeLayout::Builder fieldTypeLayoutBuilder(&builder);
+                    IRTypeLayout* fieldTypeLayout = nullptr;
+                    bool hasExistingLayout = false;
+                    if (auto existingLayoutDecoration =
+                            output->findDecoration<IRLayoutDecoration>())
+                    {
+                        if (auto existingVarLayout =
+                                as<IRVarLayout>(existingLayoutDecoration->getLayout()))
+                        {
+                            fieldTypeLayout = existingVarLayout->getTypeLayout();
+                            hasExistingLayout = true;
+                        }
+                    }
+
+                    if (!hasExistingLayout)
+                    {
+                        fieldTypeLayout = fieldTypeLayoutBuilder.build();
+                    }
+
+                    IRVarLayout::Builder varLayoutBuilder(&builder, fieldTypeLayout);
                     varLayoutBuilder.setStage(entryPointDecor->getProfile().getStage());
                     if (auto semanticDecor = output->findDecoration<IRSemanticDecoration>())
                     {
@@ -301,9 +313,6 @@ struct GlobalVarTranslationContext
                     }
                     else
                     {
-                        fieldTypeLayout.addResourceUsage(
-                            LayoutResourceKind::VaryingOutput,
-                            LayoutSize(1));
                         if (auto layoutDecor = findVarLayout(output))
                         {
                             if (auto offsetAttr =

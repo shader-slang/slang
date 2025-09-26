@@ -98,16 +98,28 @@ IArtifact* TargetProgram::getOrCreateEntryPointResult(Int entryPointIndex, Diagn
     if (IArtifact* artifact = m_entryPointResults[entryPointIndex])
         return artifact;
 
-    // If we haven't yet computed a layout for this target
-    // program, we need to make sure that is done before
-    // code generation.
-    //
-    if (!getOrCreateIRModuleForLayout(sink))
+    try
     {
+        // If we haven't yet computed a layout for this target
+        // program, we need to make sure that is done before
+        // code generation.
+        //
+        if (!getOrCreateIRModuleForLayout(sink))
+        {
+            return nullptr;
+        }
+
+        return _createEntryPointResult(entryPointIndex, sink);
+    }
+    catch (const Exception& e)
+    {
+        sink->diagnose(
+            SourceLoc(),
+            Diagnostics::compilationAbortedDueToException,
+            typeid(e).name(),
+            e.Message);
         return nullptr;
     }
-
-    return _createEntryPointResult(entryPointIndex, sink);
 }
 
 } // namespace Slang

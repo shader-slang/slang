@@ -3279,6 +3279,7 @@ struct IRDebugSource : IRInst
     FIDDLE(leafInst())
     IRInst* getFileName() { return getOperand(0); }
     IRInst* getSource() { return getOperand(1); }
+    IRInst* getIsIncludedFile() { return getOperand(2); }
 };
 
 FIDDLE()
@@ -3912,7 +3913,10 @@ public:
         return (IRMetalMeshType*)getType(kIROp_MetalMeshType, 5, ops);
     }
 
-    IRInst* emitDebugSource(UnownedStringSlice fileName, UnownedStringSlice source);
+    IRInst* emitDebugSource(
+        UnownedStringSlice fileName,
+        UnownedStringSlice source,
+        bool isIncludedFile);
     IRInst* emitDebugBuildIdentifier(UnownedStringSlice buildIdentifier, IRIntegerValue flags);
     IRInst* emitDebugBuildIdentifier(IRInst* debugBuildIdentifier);
     IRInst* emitDebugLine(
