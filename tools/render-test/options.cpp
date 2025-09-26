@@ -34,6 +34,7 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
     case RenderApiType::Metal:
         return rhi::DeviceType::Metal;
     case RenderApiType::CPU:
+    case RenderApiType::LLVM:
         return rhi::DeviceType::CPU;
     case RenderApiType::CUDA:
         return rhi::DeviceType::CUDA;

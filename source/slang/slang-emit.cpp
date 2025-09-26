@@ -2871,7 +2871,6 @@ SlangResult emitHostVMCode(CodeGenContext* codeGenContext, ComPtr<IArtifact>& ou
 SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtifact>& outArtifact)
 {
     auto target = codeGenContext->getTargetFormat();
-    bool objectCode = target == CodeGenTarget::LLVMObjectCode;
 
     LinkedIR linkedIR;
     LinkingAndOptimizationOptions linkingAndOptimizationOptions;
@@ -2884,23 +2883,37 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
 
     ComPtr<ISlangBlob> blob;
 
-    if (objectCode)
+    switch (target)
     {
-        List<uint8_t> object;
-        emitLLVMObjectFromIR(codeGenContext, irModule, object);
-        blob = RawBlob::create(object.getBuffer(), object.getCount());
+    case CodeGenTarget::LLVMObjectCode:
+        {
+            List<uint8_t> object;
+            emitLLVMObjectFromIR(codeGenContext, irModule, object);
+            blob = RawBlob::create(object.getBuffer(), object.getCount());
+            auto artifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(codeGenContext->getTargetFormat()));
+            artifact->addRepresentationUnknown(blob);
+            outArtifact.swap(artifact);
+        }
+        break;
+    case CodeGenTarget::LLVMAssembly:
+        {
+            String irString;
+            emitLLVMAssemblyFromIR(codeGenContext, irModule, irString);
+            blob = StringBlob::create(irString);
+            auto artifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(codeGenContext->getTargetFormat()));
+            artifact->addRepresentationUnknown(blob);
+            outArtifact.swap(artifact);
+        }
+        break;
+    case CodeGenTarget::LLVMShaderHostCallable:
+    case CodeGenTarget::LLVMHostHostCallable:
+        {
+            IArtifact* artifact = nullptr;
+            emitLLVMJITFromIR(codeGenContext, irModule, &artifact);
+            outArtifact = ComPtr<IArtifact>(artifact);
+        }
+        break;
     }
-    else
-    {
-        String irString;
-        emitLLVMAssemblyFromIR(codeGenContext, irModule, irString);
-        blob = StringBlob::create(irString);
-    }
-
-    auto artifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(codeGenContext->getTargetFormat()));
-    artifact->addRepresentationUnknown(blob);
-
-    outArtifact.swap(artifact);
 
     return SLANG_OK;
 }

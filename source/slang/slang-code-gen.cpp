@@ -1162,6 +1162,8 @@ SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
         return SLANG_OK;
     case CodeGenTarget::LLVMAssembly:
     case CodeGenTarget::LLVMObjectCode:
+    case CodeGenTarget::LLVMShaderHostCallable:
+    case CodeGenTarget::LLVMHostHostCallable:
 #if SLANG_ENABLE_LLVM_TARGET
         SLANG_RETURN_ON_FAIL(emitLLVMForEntryPoints(this, outArtifact));
         return SLANG_OK;
@@ -1226,6 +1228,8 @@ SlangResult CodeGenContext::emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     case CodeGenTarget::HostVM:
     case CodeGenTarget::LLVMAssembly:
     case CodeGenTarget::LLVMObjectCode:
+    case CodeGenTarget::LLVMHostHostCallable:
+    case CodeGenTarget::LLVMShaderHostCallable:
         {
             SLANG_RETURN_ON_FAIL(_emitEntryPoints(outArtifact));
 

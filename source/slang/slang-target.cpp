@@ -184,6 +184,8 @@ CapabilitySet TargetRequest::getTargetCaps()
 
     case CodeGenTarget::LLVMAssembly:
     case CodeGenTarget::LLVMObjectCode:
+    case CodeGenTarget::LLVMShaderHostCallable:
+    case CodeGenTarget::LLVMHostHostCallable:
         atoms.add(CapabilityName::llvm);
         break;
 

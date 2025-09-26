@@ -4,7 +4,10 @@
 #include "slang-ir-layout.h"
 #include "../core/slang-char-util.h"
 #include "../core/slang-func-ptr.h"
+#include "../compiler-core/slang-artifact-associated-impl.h"
+#include "../compiler-core/slang-artifact-desc-util.h"
 #include <llvm/AsmParser/Parser.h>
+#include <llvm/ExecutionEngine/Orc/LLJIT.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
@@ -31,6 +34,53 @@ using namespace slang;
 
 namespace Slang
 {
+
+class LLVMJITSharedLibrary2 : public ComBaseObject, public ISlangSharedLibrary
+{
+public:
+    SLANG_COM_BASE_IUNKNOWN_ALL
+
+    virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE
+    {
+        if (auto ptr = getInterface(guid))
+        {
+            return ptr;
+        }
+        return getObject(guid);
+    }
+
+    virtual SLANG_NO_THROW void* SLANG_MCALL findSymbolAddressByName(char const* name)
+        SLANG_OVERRIDE
+    {
+        auto fn = jit->lookup(name);
+        return fn ? (void*)fn.get().getValue() : nullptr;
+    }
+
+    LLVMJITSharedLibrary2(std::unique_ptr<llvm::orc::LLJIT> jit)
+        : jit(std::move(jit))
+    {
+    }
+
+protected:
+    ISlangUnknown* getInterface(const SlangUUID& uuid)
+    {
+        if (uuid == ISlangUnknown::getTypeGuid() || uuid == ISlangCastable::getTypeGuid() ||
+            uuid == ISlangSharedLibrary::getTypeGuid())
+        {
+            return static_cast<ISlangSharedLibrary*>(this);
+        }
+        return nullptr;
+    }
+
+    void* getObject(const SlangUUID& uuid)
+    {
+        SLANG_UNUSED(uuid);
+        return nullptr;
+    }
+
+
+    std::unique_ptr<llvm::orc::LLJIT> jit;
+};
 
 struct BinaryLLVMOutputStream: public llvm::raw_pwrite_stream
 {
@@ -84,11 +134,11 @@ static UInt parseNumber(const char*& cursor, const char* end)
 
 struct LLVMEmitter
 {
-    llvm::LLVMContext llvmContext;
-    llvm::Module llvmModule;
-    llvm::Linker llvmLinker;
-    llvm::IRBuilderBase* llvmBuilder;
-    llvm::DIBuilder llvmDebugBuilder;
+    std::unique_ptr<llvm::LLVMContext> llvmContext;
+    std::unique_ptr<llvm::Module> llvmModule;
+    std::unique_ptr<llvm::Linker> llvmLinker;
+    std::unique_ptr<llvm::IRBuilderBase> llvmBuilder;
+    std::unique_ptr<llvm::DIBuilder> llvmDebugBuilder;
     llvm::DICompileUnit* compileUnit;
     llvm::TargetMachine* targetMachine;
     CodeGenContext* codeGenContext;
@@ -142,12 +192,14 @@ struct LLVMEmitter
     // it's expected that you generated it in this function.
     using FuncEpilogueCallback = Func<llvm::Value*, IRReturn*>;
 
-    LLVMEmitter(CodeGenContext* codeGenContext)
-        : llvmModule("module", llvmContext),
-          llvmLinker(llvmModule),
-          llvmDebugBuilder(llvmModule),
-          codeGenContext(codeGenContext)
+    LLVMEmitter(CodeGenContext* codeGenContext, bool useJIT = false)
+        : codeGenContext(codeGenContext)
     {
+        llvmContext.reset(new llvm::LLVMContext());
+        llvmModule.reset(new llvm::Module("module", *llvmContext));
+        llvmLinker.reset(new llvm::Linker(*llvmModule));
+        llvmDebugBuilder.reset(new llvm::DIBuilder(*llvmModule));
+
         auto session = codeGenContext->getSession();
 
         llvm::InitializeAllTargetInfos();
@@ -160,11 +212,11 @@ struct LLVMEmitter
         {
             // The default IR builder has a built-in constant folder; for
             // absolutely zero optimization, we need to disable it like this.
-            llvmBuilder = new llvm::IRBuilder<llvm::NoFolder>(llvmContext);
+            llvmBuilder.reset(new llvm::IRBuilder<llvm::NoFolder>(*llvmContext));
         }
         else
         {
-            llvmBuilder = new llvm::IRBuilder<>(llvmContext);
+            llvmBuilder.reset(new llvm::IRBuilder<>(*llvmContext));
         }
 
         // Functions that initialize global variables are "constructors" in
@@ -181,7 +233,7 @@ struct LLVMEmitter
         // rather just fix the whole pointer size mechanism in Slang.
         auto targetTripleOption = getOptions().getStringOption(CompilerOptionName::LLVMTargetTriple).getUnownedSlice();
         std::string targetTripleStr = llvm::sys::getDefaultTargetTriple();
-        if (targetTripleOption.getLength() != 0)
+        if (targetTripleOption.getLength() != 0 && !useJIT)
             targetTripleStr = std::string(targetTripleOption.begin(), targetTripleOption.getLength());
 
         std::string error;
@@ -245,7 +297,7 @@ struct LLVMEmitter
 
         if (debug)
         {
-            llvmModule.addModuleFlag(
+            llvmModule->addModuleFlag(
                 llvm::Module::Warning,
                 "Debug Info Version",
                  llvm::DEBUG_METADATA_VERSION
@@ -258,7 +310,7 @@ struct LLVMEmitter
 
             // TODO: Separate debug info - that'll need to use the SplitName
             // parameter!
-            compileUnit = llvmDebugBuilder.createCompileUnit(
+            compileUnit = llvmDebugBuilder->createCompileUnit(
                 // TODO: We should probably apply for a language ID in DWARF? Not
                 // sure how that process goes. Anyway, let's just use C++ as the
                 // ID until this target is properly usable. C doesn't work
@@ -274,7 +326,7 @@ struct LLVMEmitter
                 // Anyway, for now, we'll give no name to the "compile unit" and
                 // just operate with individual files separately. This doesn't
                 // prevent the debugger from seeing our source in any way.
-                llvmDebugBuilder.createFile("<slang-llvm>", "."),
+                llvmDebugBuilder->createFile("<slang-llvm>", "."),
 
                 "Slang compiler",
 
@@ -302,7 +354,7 @@ struct LLVMEmitter
             llvm::StringRef(prelude.begin(), prelude.getLength()),
             llvm::StringRef("prelude")
         );
-        if(llvm::parseAssemblyInto(buf, &llvmModule, &llvmSummaryIndex, diag))
+        if(llvm::parseAssemblyInto(buf, llvmModule.get(), &llvmSummaryIndex, diag))
         {
             //auto msg = diag.getMessage();
             //printf("%s\n", msg.str().c_str());
@@ -313,7 +365,6 @@ struct LLVMEmitter
     ~LLVMEmitter()
     {
         delete targetMachine;
-        delete llvmBuilder;
     }
 
     CompilerOptionSet& getOptions()
@@ -744,14 +795,14 @@ struct LLVMEmitter
         if (!loc)
             return;
 
-        auto debugVar = llvmDebugBuilder.createAutoVariable(
+        auto debugVar = llvmDebugBuilder->createAutoVariable(
             debugScopeStack.getLast(), name, loc->getFile(), loc->getLine(),
             varType, getOptions().getOptimizationLevel() == OptimizationLevel::None
         );
-        llvmDebugBuilder.insertDeclare(
+        llvmDebugBuilder->insertDeclare(
             llvmVar,
             llvm::cast<llvm::DILocalVariable>(debugVar),
-            llvmDebugBuilder.createExpression(),
+            llvmDebugBuilder->createExpression(),
             loc,
             llvmBuilder->GetInsertBlock()
         );
@@ -1289,7 +1340,7 @@ struct LLVMEmitter
         case kIROp_Printf:
             {
                 // This function comes from the prelude.
-                auto llvmFunc = cast<llvm::Function>(llvmModule.getNamedValue("printf"));
+                auto llvmFunc = cast<llvm::Function>(llvmModule->getNamedValue("printf"));
                 SLANG_ASSERT(llvmFunc);
 
                 List<llvm::Value*> args;
@@ -1311,7 +1362,7 @@ struct LLVMEmitter
                                 llvmValue = llvmBuilder->CreateCast(
                                     llvm::Instruction::CastOps::FPExt,
                                     llvmValue,
-                                    llvm::Type::getDoubleTy(llvmContext)
+                                    llvmBuilder->getDoubleTy()
                                 );
                             }
                             else if (valueType->isIntegerTy() && valueType->getScalarSizeInBits() < 32)
@@ -1320,7 +1371,7 @@ struct LLVMEmitter
                                 llvmValue = llvmBuilder->CreateCast(
                                     llvm::Instruction::CastOps::SExt,
                                     llvmValue,
-                                    llvm::Type::getInt32Ty(llvmContext)
+                                    llvmBuilder->getInt32Ty()
                                 );
                             }
                             args.add(llvmValue);
@@ -1351,7 +1402,7 @@ struct LLVMEmitter
                 if (argIndex)
                 {
                     variableDebugInfoMap[inst] = {
-                        llvmDebugBuilder.createParameterVariable(
+                        llvmDebugBuilder->createParameterVariable(
                             debugScopeStack.getLast(), prettyName, getIntVal(argIndex), file,
                             line, varType,
                             getOptions().getOptimizationLevel() == OptimizationLevel::None
@@ -1363,7 +1414,7 @@ struct LLVMEmitter
                 else
                 {
                     variableDebugInfoMap[inst] = {
-                        llvmDebugBuilder.createAutoVariable(
+                        llvmDebugBuilder->createAutoVariable(
                             debugScopeStack.getLast(), prettyName, file, line, varType,
                             getOptions().getOptimizationLevel() == OptimizationLevel::None
                         ),
@@ -1387,27 +1438,27 @@ struct LLVMEmitter
 
                 llvm::DILocation* loc = llvmBuilder->getCurrentDebugLocation();
                 if (!loc)
-                    loc = llvm::DILocation::get(llvmContext, debugInfo.debugVar->getLine(), 0, debugInfo.debugVar->getScope());
+                    loc = llvm::DILocation::get(*llvmContext, debugInfo.debugVar->getLine(), 0, debugInfo.debugVar->getScope());
 
                 llvm::Value* value = findValue(debugValueInst->getValue());
                 llvm::AllocaInst* alloca = llvm::dyn_cast<llvm::AllocaInst>(value);
                 if (!debugInfo.attached && alloca)
                 {
                     debugInfo.isStackVar = true;
-                    llvmDebugBuilder.insertDeclare(
+                    llvmDebugBuilder->insertDeclare(
                         alloca,
                         llvm::cast<llvm::DILocalVariable>(debugInfo.debugVar),
-                        llvmDebugBuilder.createExpression(),
+                        llvmDebugBuilder->createExpression(),
                         loc,
                         llvmBuilder->GetInsertBlock()
                     );
                 }
                 else if(!debugInfo.isStackVar)
                 {
-                    llvmDebugBuilder.insertDbgValueIntrinsic(
+                    llvmDebugBuilder->insertDbgValueIntrinsic(
                         findValue(debugValueInst->getValue()),
                         llvm::cast<llvm::DILocalVariable>(debugInfo.debugVar),
-                        llvmDebugBuilder.createExpression(),
+                        llvmDebugBuilder->createExpression(),
                         loc,
                         llvmBuilder->GetInsertBlock()
                     );
@@ -1431,7 +1482,7 @@ struct LLVMEmitter
                 debugLineInst->getColEnd();
 
                 llvmBuilder->SetCurrentDebugLocation(
-                    llvm::DILocation::get(llvmContext, line, col, debugScopeStack.getLast())
+                    llvm::DILocation::get(*llvmContext, line, col, debugScopeStack.getLast())
                 );
             }
             return nullptr;
@@ -1596,7 +1647,7 @@ struct LLVMEmitter
         }
 
         auto llvmStructType = llvm::StructType::get(
-            llvmContext,
+            *llvmContext,
             llvm::ArrayRef<llvm::Type*>(fieldTypes.getBuffer(), fieldTypes.getCount()),
             isPacked
         );
@@ -1646,16 +1697,16 @@ struct LLVMEmitter
         switch (type->getOp())
         {
         case kIROp_VoidType:
-            llvmType = llvm::Type::getVoidTy(llvmContext);
+            llvmType = llvmBuilder->getVoidTy();
             break;
         case kIROp_Int8Type:
         case kIROp_UInt8Type:
         case kIROp_BoolType:
-            llvmType = llvm::Type::getInt8Ty(llvmContext);
+            llvmType = llvmBuilder->getInt8Ty();
             break;
         case kIROp_Int16Type:
         case kIROp_UInt16Type:
-            llvmType = llvm::Type::getInt16Ty(llvmContext);
+            llvmType = llvmBuilder->getInt16Ty();
             break;
         case kIROp_IntType:
         case kIROp_UIntType:
@@ -1663,7 +1714,7 @@ struct LLVMEmitter
         case kIROp_IntPtrType:
         case kIROp_UIntPtrType:
 #endif
-            llvmType = llvm::Type::getInt32Ty(llvmContext);
+            llvmType = llvmBuilder->getInt32Ty();
             break;
         case kIROp_Int64Type:
         case kIROp_UInt64Type:
@@ -1671,7 +1722,7 @@ struct LLVMEmitter
         case kIROp_IntPtrType:
         case kIROp_UIntPtrType:
 #endif
-            llvmType = llvm::Type::getInt64Ty(llvmContext);
+            llvmType = llvmBuilder->getInt64Ty();
             break;
         case kIROp_PtrType:
         case kIROp_NativePtrType:
@@ -1682,16 +1733,16 @@ struct LLVMEmitter
         case kIROp_ConstRefType:
             // LLVM only has opaque pointers now, so everything that lowers as
             // a pointer is just that same opaque pointer.
-            llvmType = llvm::PointerType::get(llvmContext, 0);
+            llvmType = llvmBuilder->getPtrTy(0);
             break;
         case kIROp_HalfType:
-            llvmType = llvm::Type::getHalfTy(llvmContext);
+            llvmType = llvmBuilder->getHalfTy();
             break;
         case kIROp_FloatType:
-            llvmType = llvm::Type::getFloatTy(llvmContext);
+            llvmType = llvmBuilder->getFloatTy();
             break;
         case kIROp_DoubleType:
-            llvmType = llvm::Type::getDoubleTy(llvmContext);
+            llvmType = llvmBuilder->getDoubleTy();
             break;
         case kIROp_VectorType:
             {
@@ -1726,7 +1777,7 @@ struct LLVMEmitter
                     auto llvmType = ensureType(paramType);
                     // Aggregates are passed with a pointer.
                     if (llvmType->isAggregateType())
-                        llvmType = llvm::PointerType::get(llvmContext, 0);
+                        llvmType = llvmBuilder->getPtrTy(0);
                     paramTypes.add(llvmType);
                 }
 
@@ -1735,8 +1786,8 @@ struct LLVMEmitter
                 // output parameter that is passed with a pointer.
                 if (returnType->isAggregateType())
                 {
-                    paramTypes.add(llvm::PointerType::get(llvmContext, 0));
-                    returnType = llvm::Type::getVoidTy(llvmContext);
+                    paramTypes.add(llvmBuilder->getPtrTy(0));
+                    returnType = llvmBuilder->getVoidTy();
                 }
 
                 llvmType = llvm::FunctionType::get(
@@ -1786,61 +1837,61 @@ struct LLVMEmitter
         switch (type->getOp())
         {
         case kIROp_VoidType:
-            llvmType = llvmDebugBuilder.createUnspecifiedType("void");
+            llvmType = llvmDebugBuilder->createUnspecifiedType("void");
             break;
         case kIROp_Int8Type:
-            llvmType = llvmDebugBuilder.createBasicType("int8_t", 8, llvm::dwarf::DW_ATE_signed);
+            llvmType = llvmDebugBuilder->createBasicType("int8_t", 8, llvm::dwarf::DW_ATE_signed);
             break;
         case kIROp_UInt8Type:
-            llvmType = llvmDebugBuilder.createBasicType("int8_t", 8, llvm::dwarf::DW_ATE_unsigned);
+            llvmType = llvmDebugBuilder->createBasicType("int8_t", 8, llvm::dwarf::DW_ATE_unsigned);
             break;
         case kIROp_BoolType:
-            llvmType = llvmDebugBuilder.createBasicType("bool", 1, llvm::dwarf::DW_ATE_boolean);
+            llvmType = llvmDebugBuilder->createBasicType("bool", 1, llvm::dwarf::DW_ATE_boolean);
             break;
         case kIROp_Int16Type:
-            llvmType = llvmDebugBuilder.createBasicType("int16_t", 16, llvm::dwarf::DW_ATE_signed);
+            llvmType = llvmDebugBuilder->createBasicType("int16_t", 16, llvm::dwarf::DW_ATE_signed);
             break;
         case kIROp_UInt16Type:
-            llvmType = llvmDebugBuilder.createBasicType("uint16_t", 16, llvm::dwarf::DW_ATE_unsigned);
+            llvmType = llvmDebugBuilder->createBasicType("uint16_t", 16, llvm::dwarf::DW_ATE_unsigned);
             break;
         case kIROp_IntType:
-            llvmType = llvmDebugBuilder.createBasicType("int", 32, llvm::dwarf::DW_ATE_signed);
+            llvmType = llvmDebugBuilder->createBasicType("int", 32, llvm::dwarf::DW_ATE_signed);
             break;
         case kIROp_UIntType:
-            llvmType = llvmDebugBuilder.createBasicType("uint", 32, llvm::dwarf::DW_ATE_unsigned);
+            llvmType = llvmDebugBuilder->createBasicType("uint", 32, llvm::dwarf::DW_ATE_unsigned);
             break;
 
         case kIROp_IntPtrType:
-            llvmType = llvmDebugBuilder.createBasicType("intptr", ptrSize, llvm::dwarf::DW_ATE_signed);
+            llvmType = llvmDebugBuilder->createBasicType("intptr", ptrSize, llvm::dwarf::DW_ATE_signed);
             break;
 
         case kIROp_UIntPtrType:
-            llvmType = llvmDebugBuilder.createBasicType("uintptr", ptrSize, llvm::dwarf::DW_ATE_unsigned);
+            llvmType = llvmDebugBuilder->createBasicType("uintptr", ptrSize, llvm::dwarf::DW_ATE_unsigned);
             break;
 
         case kIROp_Int64Type:
-            llvmType = llvmDebugBuilder.createBasicType("int64_t", 64, llvm::dwarf::DW_ATE_signed);
+            llvmType = llvmDebugBuilder->createBasicType("int64_t", 64, llvm::dwarf::DW_ATE_signed);
             break;
 
         case kIROp_UInt64Type:
-            llvmType = llvmDebugBuilder.createBasicType("uint64_t", 64, llvm::dwarf::DW_ATE_unsigned);
+            llvmType = llvmDebugBuilder->createBasicType("uint64_t", 64, llvm::dwarf::DW_ATE_unsigned);
             break;
 
         case kIROp_PtrType:
             {
                 auto ptr = as<IRPtrType>(type);
-                llvmType = llvmDebugBuilder.createPointerType(ensureDebugType(ptr->getValueType()), ptrSize);
+                llvmType = llvmDebugBuilder->createPointerType(ensureDebugType(ptr->getValueType()), ptrSize);
             }
             break;
 
         case kIROp_NativePtrType:
-            llvmType = llvmDebugBuilder.createBasicType("NativeRef", ptrSize, llvm::dwarf::DW_ATE_address);
+            llvmType = llvmDebugBuilder->createBasicType("NativeRef", ptrSize, llvm::dwarf::DW_ATE_address);
             break;
 
         case kIROp_NativeStringType:
             {
-                llvmType = llvmDebugBuilder.createPointerType(
-                    llvmDebugBuilder.createBasicType("char", 8, llvm::dwarf::DW_ATE_signed_char),
+                llvmType = llvmDebugBuilder->createPointerType(
+                    llvmDebugBuilder->createBasicType("char", 8, llvm::dwarf::DW_ATE_signed_char),
                     ptrSize);
             }
             break;
@@ -1851,20 +1902,20 @@ struct LLVMEmitter
         case kIROp_ConstRefType:
             {
                 auto ptr = as<IRPtrTypeBase>(type);
-                llvmType = llvmDebugBuilder.createReferenceType(llvm::dwarf::DW_TAG_reference_type, ensureDebugType(ptr->getValueType()), ptrSize);
+                llvmType = llvmDebugBuilder->createReferenceType(llvm::dwarf::DW_TAG_reference_type, ensureDebugType(ptr->getValueType()), ptrSize);
             }
             break;
 
         case kIROp_HalfType:
-            llvmType = llvmDebugBuilder.createBasicType("half", 16, llvm::dwarf::DW_ATE_float);
+            llvmType = llvmDebugBuilder->createBasicType("half", 16, llvm::dwarf::DW_ATE_float);
             break;
 
         case kIROp_FloatType:
-            llvmType = llvmDebugBuilder.createBasicType("float", 32, llvm::dwarf::DW_ATE_float);
+            llvmType = llvmDebugBuilder->createBasicType("float", 32, llvm::dwarf::DW_ATE_float);
             break;
 
         case kIROp_DoubleType:
-            llvmType = llvmDebugBuilder.createBasicType("double", 64, llvm::dwarf::DW_ATE_float);
+            llvmType = llvmDebugBuilder->createBasicType("double", 64, llvm::dwarf::DW_ATE_float);
             break;
 
         case kIROp_VectorType:
@@ -1877,9 +1928,9 @@ struct LLVMEmitter
                 if (sizeAndAlignment.size < sizeAndAlignment.alignment)
                     sizeAndAlignment.size = sizeAndAlignment.alignment;
 
-                llvm::Metadata *subscript = llvmDebugBuilder.getOrCreateSubrange(0, elemCount);
-                llvm::DINodeArray subscriptArray = llvmDebugBuilder.getOrCreateArray(subscript);
-                llvmType = llvmDebugBuilder.createVectorType(
+                llvm::Metadata *subscript = llvmDebugBuilder->getOrCreateSubrange(0, elemCount);
+                llvm::DINodeArray subscriptArray = llvmDebugBuilder->getOrCreateArray(subscript);
+                llvmType = llvmDebugBuilder->createVectorType(
                     sizeAndAlignment.size*8,
                     sizeAndAlignment.alignment*8,
                     elemType,
@@ -1900,9 +1951,9 @@ struct LLVMEmitter
 
                 sizeAndAlignment.size = align(sizeAndAlignment.size, sizeAndAlignment.alignment);
 
-                llvm::Metadata *subscript = llvmDebugBuilder.getOrCreateSubrange(0, elemCount);
-                llvm::DINodeArray subscriptArray = llvmDebugBuilder.getOrCreateArray(subscript);
-                llvmType = llvmDebugBuilder.createArrayType(sizeAndAlignment.size*8, sizeAndAlignment.alignment*8, elemType, subscriptArray);
+                llvm::Metadata *subscript = llvmDebugBuilder->getOrCreateSubrange(0, elemCount);
+                llvm::DINodeArray subscriptArray = llvmDebugBuilder->getOrCreateArray(subscript);
+                llvmType = llvmDebugBuilder->createArrayType(sizeAndAlignment.size*8, sizeAndAlignment.alignment*8, elemType, subscriptArray);
             }
             break;
 
@@ -1932,7 +1983,7 @@ struct LLVMEmitter
                     llvm::StringRef linkageName, prettyName;
                     maybeGetName(&linkageName, &prettyName, key);
 
-                    types.add(llvmDebugBuilder.createMemberType(
+                    types.add(llvmDebugBuilder->createMemberType(
                         scope, prettyName, file, line,
                         sizeAndAlignment.size * 8, sizeAndAlignment.alignment * 8,
                         offset * 8,
@@ -1940,7 +1991,7 @@ struct LLVMEmitter
                         debugType
                     ));
                 }
-                llvm::DINodeArray fieldTypes = llvmDebugBuilder.getOrCreateArray(
+                llvm::DINodeArray fieldTypes = llvmDebugBuilder->getOrCreateArray(
                     llvm::ArrayRef<llvm::Metadata*>(types.begin(), types.end())
                 );
 
@@ -1949,7 +2000,7 @@ struct LLVMEmitter
 
                 sizeAndAlignment.size = align(sizeAndAlignment.size, sizeAndAlignment.alignment);
 
-                llvmType = llvmDebugBuilder.createStructType(
+                llvmType = llvmDebugBuilder->createStructType(
                     scope,
                     prettyName,
                     file,
@@ -1975,8 +2026,8 @@ struct LLVMEmitter
                     elements.add(ensureDebugType(paramType));
                 }
 
-                llvmType = llvmDebugBuilder.createSubroutineType(
-                    llvmDebugBuilder.getOrCreateTypeArray(
+                llvmType = llvmDebugBuilder->createSubroutineType(
+                    llvmDebugBuilder->getOrCreateTypeArray(
                         llvm::ArrayRef<llvm::Metadata*>(elements.begin(), elements.end()))
                 );
             }
@@ -1986,7 +2037,7 @@ struct LLVMEmitter
             {
                 llvm::StringRef linkageName, prettyName;
                 maybeGetName(&linkageName, &prettyName, type);
-                llvmType = llvmDebugBuilder.createUnspecifiedType(prettyName);
+                llvmType = llvmDebugBuilder->createUnspecifiedType(prettyName);
             }
             break;
         }
@@ -2028,7 +2079,7 @@ struct LLVMEmitter
 
         int line = getIntVal(debugFunc->getLine());
 
-        auto sp = llvmDebugBuilder.createFunction(
+        auto sp = llvmDebugBuilder->createFunction(
             file,
             prettyName,
             linkageName,
@@ -2055,7 +2106,7 @@ struct LLVMEmitter
             llvmFuncType,
             getLinkageType(func),
             "", // Name is conditionally set below.
-            llvmModule
+            *llvmModule
         );
 
         llvm::StringRef linkageName, prettyName;
@@ -2143,13 +2194,11 @@ struct LLVMEmitter
                 {
                     llvmConstant = llvm::ConstantExpr::getIntToPtr(
                         llvm::ConstantInt::get(
-                            llvm::IntegerType::get(llvmContext,
 #if SLANG_PTR_IS_64
-                                64
+                            llvmBuilder->getInt64Ty(),
 #else
-                                32
+                            llvmBuilder->getInt32Ty(),
 #endif
-                            ),
                             ((uintptr_t)ptrLit->getValue())),
                         llvmType
                     );
@@ -2225,7 +2274,7 @@ struct LLVMEmitter
         if (maybeGetName(&linkageName, &prettyName, var))
             llvmVar->setName(linkageName);
 
-        llvmModule.insertGlobalVariable(llvmVar);
+        llvmModule->insertGlobalVariable(llvmVar);
         mapInstToLLVM[var] = llvmVar;
         return llvmVar;
     }
@@ -2281,7 +2330,7 @@ struct LLVMEmitter
         llvmVar->setInitializer(getZeroInitializer(llvmVar->getValueType()));
 
         llvm::FunctionType* ctorType = llvm::FunctionType::get(
-            llvm::Type::getVoidTy(llvmContext), {}, false);
+            llvmBuilder->getVoidTy(), {}, false);
 
         std::string ctorName = "__slang_init_";
 
@@ -2291,7 +2340,7 @@ struct LLVMEmitter
 
         llvmBuilder->SetCurrentDebugLocation(llvm::DebugLoc());
         llvm::Function* llvmCtor = llvm::Function::Create(
-            ctorType, llvm::GlobalValue::InternalLinkage, ctorName, llvmModule
+            ctorType, llvm::GlobalValue::InternalLinkage, ctorName, *llvmModule
         );
 
         auto prologue = [](){};
@@ -2324,7 +2373,7 @@ struct LLVMEmitter
                 std::filesystem::path path(
                     std::string(filename.begin(), filename.getLength())
                 );
-                sourceDebugInfo[inst] = llvmDebugBuilder.createFile(
+                sourceDebugInfo[inst] = llvmDebugBuilder->createFile(
                     path.filename().c_str(),
                     path.parent_path().c_str(),
                     std::nullopt,
@@ -2494,7 +2543,7 @@ struct LLVMEmitter
             intrinsic = Slang::findTargetIntrinsicDefinition(func, codeGenContext->getTargetReq()->getTargetCaps(), intrinsicDef, intrinsicInst);
             if (intrinsic)
             {
-                llvm::BasicBlock* bb = llvm::BasicBlock::Create(llvmContext, "", llvmFunc);
+                llvm::BasicBlock* bb = llvm::BasicBlock::Create(*llvmContext, "", llvmFunc);
 
                 llvmFunc->setLinkage(llvm::Function::LinkageTypes::ExternalLinkage);
 
@@ -2506,7 +2555,7 @@ struct LLVMEmitter
 
                 llvm::SMDiagnostic diag;
                 std::unique_ptr<llvm::Module> sourceModule = llvm::parseAssemblyString(
-                    llvmTextIR, diag, llvmContext);
+                    llvmTextIR, diag, *llvmContext);
 
                 if (!sourceModule)
                 {
@@ -2515,9 +2564,9 @@ struct LLVMEmitter
                     SLANG_UNEXPECTED("Failed to parse LLVM inline IR!");
                 }
 
-                llvmLinker.linkInModule(std::move(sourceModule), llvm::Linker::OverrideFromSrc);
+                llvmLinker->linkInModule(std::move(sourceModule), llvm::Linker::OverrideFromSrc);
 
-                llvmFunc = cast<llvm::Function>(llvmModule.getNamedValue(funcName));
+                llvmFunc = cast<llvm::Function>(llvmModule->getNamedValue(funcName));
                 llvmFunc->setLinkage(llvm::Function::LinkageTypes::PrivateLinkage);
                 // Intrinsic functions usually do nothing other than call a single
                 // instruction; we can just inline them by default.
@@ -2544,7 +2593,7 @@ struct LLVMEmitter
             // Create all blocks first
             for (auto irBlock : code->getBlocks())
             {
-                llvm::BasicBlock* llvmBlock = llvm::BasicBlock::Create(llvmContext, "", llvmFunc);
+                llvm::BasicBlock* llvmBlock = llvm::BasicBlock::Create(*llvmContext, "", llvmFunc);
                 mapInstToLLVM[irBlock] = llvmBlock;
             }
 
@@ -2561,7 +2610,7 @@ struct LLVMEmitter
                     if (sp)
                     {
                         llvmBuilder->SetCurrentDebugLocation(
-                            llvm::DILocation::get(llvmContext, sp->getLine(), 0, debugScopeStack.getLast())
+                            llvm::DILocation::get(*llvmContext, sp->getLine(), 0, debugScopeStack.getLast())
                         );
                     }
                     prologueCallback();
@@ -2725,8 +2774,8 @@ struct LLVMEmitter
     {
         mapInstToLLVM.clear();
 
-        llvmModule.setDataLayout(targetMachine->createDataLayout());
-        llvmModule.setTargetTriple(targetMachine->getTargetTriple());
+        llvmModule->setDataLayout(targetMachine->createDataLayout());
+        llvmModule->setTargetTriple(targetMachine->getTargetTriple());
 
         llvm::LoopAnalysisManager loopAnalysisManager;
         llvm::FunctionAnalysisManager functionAnalysisManager;
@@ -2761,7 +2810,7 @@ struct LLVMEmitter
 
         // Run the actual optimizations.
         llvm::ModulePassManager modulePassManager = passBuilder.buildPerModuleDefaultPipeline(llvmLevel);
-        modulePassManager.run(llvmModule, moduleAnalysisManager);
+        modulePassManager.run(*llvmModule, moduleAnalysisManager);
     }
 
     void finalize()
@@ -2772,7 +2821,7 @@ struct LLVMEmitter
             auto ctorArrayType = llvm::ArrayType::get(llvmCtorType, globalCtors.getCount());
             auto ctorArray = llvm::ConstantArray::get(ctorArrayType, llvm::ArrayRef(globalCtors.begin(), globalCtors.end()));
             new llvm::GlobalVariable(
-                llvmModule, ctorArrayType, false, llvm::GlobalValue::AppendingLinkage,
+                *llvmModule, ctorArrayType, false, llvm::GlobalValue::AppendingLinkage,
                 ctorArray, "llvm.global_ctors"
             );
         }
@@ -2782,7 +2831,7 @@ struct LLVMEmitter
         //llvmModule.print(rso, nullptr);
         //printf("%s\n", out.c_str());
 
-        llvm::verifyModule(llvmModule, &llvm::errs());
+        llvm::verifyModule(*llvmModule, &llvm::errs());
 
         if (getOptions().getOptimizationLevel() != OptimizationLevel::None)
         {
@@ -2791,7 +2840,7 @@ struct LLVMEmitter
 
         if (debug)
         {
-            llvmDebugBuilder.finalize();
+            llvmDebugBuilder->finalize();
         }
     }
 
@@ -2799,15 +2848,15 @@ struct LLVMEmitter
     {
         std::string out;
         llvm::raw_string_ostream rso(out);
-        llvmModule.print(rso, nullptr);
+        llvmModule->print(rso, nullptr);
         assemblyOut = out.c_str();
     }
 
     void generateObjectCode(List<uint8_t>& objectOut)
     {
         // These must always be set when generating object code.
-        llvmModule.setDataLayout(targetMachine->createDataLayout());
-        llvmModule.setTargetTriple(targetMachine->getTargetTriple());
+        llvmModule->setDataLayout(targetMachine->createDataLayout());
+        llvmModule->setTargetTriple(targetMachine->getTargetTriple());
 
         BinaryLLVMOutputStream output(objectOut);
 
@@ -2819,7 +2868,70 @@ struct LLVMEmitter
             return;
         }
 
-        pass.run(llvmModule);
+        pass.run(*llvmModule);
+    }
+
+    SlangResult generateJITLibrary(IArtifact** outArtifact)
+    {
+        std::unique_ptr<llvm::orc::LLJIT> jit;
+        ComPtr<IArtifactDiagnostics> diagnostics(new ArtifactDiagnostics());
+        {
+            llvm::orc::LLJITBuilder jitBuilder;
+            llvm::Expected<std::unique_ptr<llvm::orc::LLJIT>> expectJit = jitBuilder.create();
+
+            if (!expectJit)
+            {
+                auto err = expectJit.takeError();
+
+                std::string jitErrorString;
+                llvm::raw_string_ostream jitErrorStream(jitErrorString);
+
+                jitErrorStream << err;
+
+                ArtifactDiagnostic diagnostic;
+
+                StringBuilder buf;
+                buf << "Unable to create JIT engine: " << jitErrorString.c_str();
+
+                diagnostic.severity = ArtifactDiagnostic::Severity::Error;
+                diagnostic.stage = ArtifactDiagnostic::Stage::Link;
+                diagnostic.text = TerminatedCharSlice(buf.getBuffer(), buf.getLength());
+
+                // Add the error
+                diagnostics->add(diagnostic);
+                diagnostics->setResult(SLANG_FAIL);
+
+                auto artifact = ArtifactUtil::createArtifact(
+                    ArtifactDesc::make(ArtifactKind::None, ArtifactPayload::None));
+                ArtifactUtil::addAssociated(artifact, diagnostics);
+
+                *outArtifact = artifact.detach();
+                return SLANG_OK;
+            }
+            jit = std::move(*expectJit);
+        }
+        llvm::orc::ThreadSafeModule threadSafeModule(
+            std::move(llvmModule), std::move(llvmContext));
+
+        if (auto err = jit->addIRModule(std::move(threadSafeModule)))
+        {
+            return SLANG_FAIL;
+        }
+
+        // Create the shared library
+        ComPtr<ISlangSharedLibrary> sharedLibrary(new LLVMJITSharedLibrary2(std::move(jit)));
+
+        const auto targetDesc = ArtifactDescUtil::makeDescForCompileTarget(
+            SlangCompileTarget(getOptions().getTarget()));
+
+        auto artifact = ArtifactUtil::createArtifact(targetDesc);
+        ArtifactUtil::addAssociated(artifact, diagnostics);
+
+        artifact->addRepresentation(sharedLibrary);
+
+        *outArtifact = artifact.detach();
+
+        return SLANG_OK;
     }
 };
 
@@ -2845,6 +2957,17 @@ SlangResult emitLLVMObjectFromIR(
     emitter.finalize();
     emitter.generateObjectCode(objectOut);
     return SLANG_OK;
+}
+
+SlangResult emitLLVMJITFromIR(
+    CodeGenContext* codeGenContext,
+    IRModule* irModule,
+    IArtifact** outArtifact)
+{
+    LLVMEmitter emitter(codeGenContext, true);
+    emitter.processModule(irModule);
+    emitter.finalize();
+    return emitter.generateJITLibrary(outArtifact);
 }
 
 } // namespace Slang

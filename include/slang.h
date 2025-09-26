@@ -642,6 +642,8 @@ typedef uint32_t SlangSizeT;
         SLANG_HOST_VM, ///< Bytecode that can be interpreted by the Slang VM
         SLANG_LLVM_ASSEMBLY,         ///< LLVM IR assembly
         SLANG_LLVM_OBJECT_CODE,      ///< Object code generated via LLVM
+        SLANG_LLVM_SHADER_HOST_CALLABLE, ///< Host callable shader code via LLVM
+        SLANG_LLVM_HOST_HOST_CALLABLE, ///< Host callable host code via LLVM
         SLANG_TARGET_COUNT_OF,
     };
 
