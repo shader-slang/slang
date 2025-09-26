@@ -157,6 +157,9 @@ void HLSLSourceEmitter::_emitHLSLRegisterSemantic(
     case LayoutResourceKind::GenericResource:
     case LayoutResourceKind::ExistentialTypeParam:
     case LayoutResourceKind::ExistentialObjectParam:
+    case LayoutResourceKind::VaryingInput:
+    case LayoutResourceKind::VaryingOutput:
+    case LayoutResourceKind::DescriptorTableSlot: // Vulkan descriptor bindings, not HLSL registers
         // ignore
         break;
     default:
@@ -1763,7 +1766,13 @@ void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
         }
     }
 
+    // Call base class method for standard parameter emission
     Super::emitSimpleFuncParamImpl(param);
+
+    // CROSS-TARGET BINDING PRESERVATION FIX:
+    // Emit HLSL register semantics for function parameters with explicit bindings
+    // This ensures register(t10, space0) appears in HLSL output for entry point parameters
+    emitLayoutSemantics(param, "register");
 }
 
 static UnownedStringSlice _getInterpolationModifierText(IRInterpolationMode mode)

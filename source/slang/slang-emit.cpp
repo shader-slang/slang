@@ -859,7 +859,7 @@ Result linkAndOptimizeIR(
     switch (target)
     {
     default:
-        moveEntryPointUniformParamsToGlobalScope(irModule);
+        moveEntryPointUniformParamsToGlobalScope(irModule, targetRequest);
 #if 0
         dumpIRIfEnabled(codeGenContext, irModule, "ENTRY POINT UNIFORMS MOVED");
 #endif

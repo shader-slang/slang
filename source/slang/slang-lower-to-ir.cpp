@@ -10915,6 +10915,20 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                             addVarDecorations(context, irParam, paramDecl);
                             subBuilder->addHighLevelDeclDecoration(irParam, paramDecl);
                             irParam->sourceLoc = paramDecl->loc;
+
+                            // Check for explicit HLSL binding decorations on entry point parameters
+                            // This ensures register semantics are emitted in HLSL output
+                            bool hasLayoutSemantic = false;
+                            for (auto modifier : paramDecl->modifiers)
+                            {
+                                if (as<HLSLLayoutSemantic>(modifier))
+                                {
+                                    hasLayoutSemantic = true;
+                                    break;
+                                }
+                            }
+                            if (hasLayoutSemantic)
+                                subBuilder->addHasExplicitHLSLBindingDecoration(irParam);
                         }
                         addParamNameHint(irParam, paramInfo);
 
@@ -10963,6 +10977,20 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                             addVarDecorations(context, irParam, paramDecl);
                             subBuilder->addHighLevelDeclDecoration(irParam, paramDecl);
                             irParam->sourceLoc = paramDecl->loc;
+
+                            // Check for explicit HLSL binding decorations on entry point parameters
+                            // This ensures register semantics are emitted in HLSL output
+                            bool hasLayoutSemantic = false;
+                            for (auto modifier : paramDecl->modifiers)
+                            {
+                                if (as<HLSLLayoutSemantic>(modifier))
+                                {
+                                    hasLayoutSemantic = true;
+                                    break;
+                                }
+                            }
+                            if (hasLayoutSemantic)
+                                subBuilder->addHasExplicitHLSLBindingDecoration(irParam);
                         }
                         addParamNameHint(irParam, paramInfo);
                         paramVal = LoweredValInfo::simple(irParam);
