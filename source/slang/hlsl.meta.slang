@@ -23740,7 +23740,7 @@ struct CoopMat
 
     // TODO: make this function an intrinsic and support all types via the single intrinsic
     [require(cooperative_matrix, vk_mem_model)]
-    void CoherentStore<
+    void StoreCoherent<
         let matrixLayout : CoopMatMatrixLayout
     >(T* buffer, uint element, uint stride, constexpr MemoryScope memoryScope)
     {
@@ -23869,7 +23869,7 @@ ${{{{
     [ForceInline]
     [__NoSideEffect]
     [require(cooperative_matrix, vk_mem_model)]
-    static This CoherentLoad<
+    static This LoadCoherent<
         let matrixLayout : CoopMatMatrixLayout
     >(T* buffer, uint element, uint stride, constexpr MemoryScope memoryScope)
     {
@@ -24440,7 +24440,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 
 [ForceInline]
 [require(cooperative_matrix, vk_mem_model)]
-CoopMat<T, S, M, N, R> coopMatCoherentLoad<
+CoopMat<T, S, M, N, R> coopMatLoadCoherent<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,
     let M : int,
@@ -24453,7 +24453,7 @@ CoopMat<T, S, M, N, R> coopMatCoherentLoad<
     uint stride,
     constexpr MemoryScope memoryScope)
 {
-    return CoopMat<T, S, M, N, R>.CoherentLoad<matrixLayout>(buffer, element, stride, memoryScope);
+    return CoopMat<T, S, M, N, R>.LoadCoherent<matrixLayout>(buffer, element, stride, memoryScope);
 }
 
 [ForceInline]
@@ -24824,7 +24824,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
 
     // TODO: make this function an intrinsic and support all types via the single intrinsic
     [require(cooperative_vector, vk_mem_model)]
-    void coherentStore(T* buffer, int32_t byteOffset16ByteAligned = 0, constexpr MemoryScope memoryScope = MemoryScope::Device)
+    void storeCoherent(T* buffer, int32_t byteOffset16ByteAligned = 0, constexpr MemoryScope memoryScope = MemoryScope::Device)
     {
         enableVMMDeviceScopeCapabilityIfNeeded(memoryScope);
         let pointer = Ptr<T[]>(buffer);
@@ -25010,7 +25010,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
 
     // TODO: make this function an intrinsic and support all types via the single intrinsic
     [require(cooperative_vector, vk_mem_model)]
-    static CoopVec<T, N> coherentLoad(T* buffer, int32_t byteOffset16ByteAligned = 0, constexpr MemoryScope memoryScope = MemoryScope::Device)
+    static CoopVec<T, N> loadCoherent(T* buffer, int32_t byteOffset16ByteAligned = 0, constexpr MemoryScope memoryScope = MemoryScope::Device)
     {
         enableVMMDeviceScopeCapabilityIfNeeded(memoryScope);
         let pointer = Ptr<T[]>(buffer);
@@ -26464,9 +26464,9 @@ CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(T* buffer, i
 
 [ForceInline]
 [require(spirv, cooperative_vector, vk_mem_model)]
-CoopVec<T, N> coopVecCoherentLoad<let N : int, T : __BuiltinArithmeticType>(T* buffer, int32_t byteOffset16ByteAligned = 0, constexpr MemoryScope memoryScope = MemoryScope::Device)
+CoopVec<T, N> coopVecLoadCoherent<let N : int, T : __BuiltinArithmeticType>(T* buffer, int32_t byteOffset16ByteAligned = 0, constexpr MemoryScope memoryScope = MemoryScope::Device)
 {
-    return CoopVec<T, N>.coherentLoad(buffer, byteOffset16ByteAligned, memoryScope);
+    return CoopVec<T, N>.loadCoherent(buffer, byteOffset16ByteAligned, memoryScope);
 }
 
 // Groupshared

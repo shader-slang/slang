@@ -20,5 +20,5 @@ void computeMain()
     Ptr<int> ptrIn = inputBuffer;
     Ptr<int> secondPtrIn = ptrIn;
     Ptr<int> ptrOut = outputBuffer;
-    coherentStore(ptrOut, coherentLoad(&secondPtrIn[1], 4, MemoryScope::Device), 4, MemoryScope::Device);
+    storeCoherent<4, MemoryScope::Device>(ptrOut, loadCoherent<4, MemoryScope::Device>(&secondPtrIn[1]));
 }

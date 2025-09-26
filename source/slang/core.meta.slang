@@ -1355,32 +1355,18 @@ extension<T, AddressSpace addrSpace> Ptr<T, Access::ReadWrite, addrSpace>
     }
 }
 
-// `ptr` is the value to be loaded.
-// `alignment` is the alignment to load with. Must be a power of two. Not always used.
-// `scope` controls the memory scope that an operation is coherent to.
-[require(SPV_KHR_vulkan_memory_model)]
-__intrinsic_op($(kIROp_CoherentLoad))
-__generic<T, Access access, AddressSpace addrSpace> 
-T coherentLoad(Ptr<T, access, addrSpace> ptr, int alignment, constexpr MemoryScope scope = MemoryScope::Device);
-
-// `ptr` is the dst for the store.
-// `val` is the value to store into `ptr`.
-// `alignment` is the alignment to load with. Must be a power of two. Not always used.
-// `scope` controls the memory scope that an operation is coherent to.
-[require(SPV_KHR_vulkan_memory_model)]
-__intrinsic_op($(kIROp_CoherentStore))
-__generic<T, AddressSpace addrSpace> 
-void coherentStore(Ptr<T, Access::ReadWrite, addrSpace> ptr, T val, int alignment, constexpr MemoryScope scope = MemoryScope::Device);
+internal struct __AlignedAttr
+{}
 
 //@hidden:
 __intrinsic_op($(kIROp_AlignedAttr))
-void __align_attr(int alignment);
+internal __AlignedAttr __align_attr(int alignment);
 
 __intrinsic_op($(kIROp_Load))
-T __load_aligned<T, U>(T* ptr, U alignmentAttr);
+internal T __load_aligned<T>(T* ptr, __AlignedAttr alignmentAttr);
 
 __intrinsic_op($(kIROp_Store))
-void __store_aligned<T, U>(T* ptr, T value, U alignmentAttr);
+internal void __store_aligned<T>(T* ptr, T value, __AlignedAttr alignmentAttr);
 
 //@public:
 
@@ -1411,6 +1397,44 @@ T loadAligned<int alignment, T>(T* ptr)
 void storeAligned<int alignment, T>(T* ptr, T value)
 {
     __store_aligned(ptr, value, __align_attr(alignment));
+}
+
+internal struct __MemoryScopeAttr
+{}
+
+//@hidden:
+__intrinsic_op($(kIROp_MemoryScopeAttr))
+internal __MemoryScopeAttr __memoryscope_attr(MemoryScope scope);
+
+__intrinsic_op($(kIROp_Load))
+internal T __load_coherent<T, Access access, AddressSpace addrSpace>(Ptr<T, access, addrSpace> ptr, __AlignedAttr alignmentAttr, __MemoryScopeAttr memoryScopeAttr);
+
+__intrinsic_op($(kIROp_Store))
+internal void __store_coherent<T, AddressSpace addrSpace>(Ptr<T, Access::ReadWrite, addrSpace> ptr, T value, __AlignedAttr alignmentAttr, __MemoryScopeAttr memoryScopeAttr);
+
+/// Store a value coherently to a memoryscope.
+/// Tighter memory scopes may be faster to operate on.
+/// @param ptr The pointer to store value to.
+/// @param value The value to store.
+///
+[require(SPV_KHR_vulkan_memory_model)]
+[ForceInline]
+__generic<int alignment, MemoryScope scope, T, AddressSpace addrSpace> 
+void storeCoherent(Ptr<T, Access::ReadWrite, addrSpace> ptr, T value)
+{
+    __store_coherent<T, addrSpace>(ptr, value, __align_attr(alignment), __memoryscope_attr(scope));
+}
+
+/// Load a value coherently to a memoryscope.
+/// Tighter memory scopes may be faster to operate on.
+/// @param ptr The pointer to load from.
+///
+[require(SPV_KHR_vulkan_memory_model)]
+[ForceInline]
+__generic<int alignment, MemoryScope scope, T, Access access, AddressSpace addrSpace> 
+T loadCoherent(Ptr<T, access, addrSpace> ptr)
+{
+    return __load_coherent<T, access, addrSpace>(ptr, __align_attr(alignment), __memoryscope_attr(scope));
 }
 
 ${{{

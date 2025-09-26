@@ -24,6 +24,6 @@ void computeMain()
     Ptr<uint> ptrIn = __getAddress(texture[1]);
     Ptr<uint> secondPtrIn = ptrIn;
 
-    coherentStore(ptrIn, 5, 4, MemoryScope::Device);
-    outputBuffer[0] = coherentLoad(ptrIn, 4, MemoryScope::Device);
+    storeCoherent<4, MemoryScope::Device>(ptrIn, 5);
+    outputBuffer[0] = loadCoherent<4, MemoryScope::Device>(ptrIn);
 }

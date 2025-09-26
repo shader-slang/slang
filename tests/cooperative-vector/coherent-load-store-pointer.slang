@@ -27,12 +27,12 @@ uniform int32_t* outputBuffer;
 void computeMain()
 {
     //// First half of input.
-    let a = coopVecCoherentLoad<4, int32_t>(inputBuffer, 0, MemoryScope::Device);
+    let a = coopVecLoadCoherent<4, int32_t>(inputBuffer, 0, MemoryScope::Device);
     //// Second half of input.
-    let b = coopVecCoherentLoad<4, int32_t>(inputBuffer + 4, 4 * 4, MemoryScope::Device);
+    let b = coopVecLoadCoherent<4, int32_t>(inputBuffer + 4, 4 * 4, MemoryScope::Device);
     //// Store second half of input to first half of output buffer.
-    b.coherentStore(outputBuffer, 0, MemoryScope::Device);
+    b.storeCoherent(outputBuffer, 0, MemoryScope::Device);
     //// Store first half of input to second half of output buffer.
-    a.coherentStore(outputBuffer, 4 * 4, MemoryScope::Device);
+    a.storeCoherent(outputBuffer, 4 * 4, MemoryScope::Device);
 }
 

@@ -2191,35 +2191,19 @@ struct IRAlignedAttr : IRAttr
 };
 
 FIDDLE()
+struct IRMemoryScopeAttr : IRAttr
+{
+    FIDDLE(leafInst())
+    IRInst* getMemoryScope() { return getOperand(0); }
+};
+
+FIDDLE()
 struct IRLoad : IRInst
 {
     FIDDLE(leafInst())
     IRUse ptr;
 
     IRInst* getPtr() { return ptr.get(); }
-};
-
-FIDDLE()
-struct IRCoherentOperation : IRInst
-{
-    FIDDLE(baseInst())
-    IRInst* getPtr() { return getOperand(0); }
-    IRIntLit* getMemoryScope() { return cast<IRIntLit>(getOperand(getOperandCount() - 1)); }
-};
-
-FIDDLE()
-struct IRCoherentLoad : IRCoherentOperation
-{
-    FIDDLE(leafInst())
-    IRInst* getAlignment() { return getOperand(1); }
-};
-
-FIDDLE()
-struct IRCoherentStore : IRCoherentOperation
-{
-    FIDDLE(leafInst())
-    IRInst* getSrc() { return getOperand(1); }
-    IRInst* getAlignment() { return getOperand(2); }
 };
 
 FIDDLE()
@@ -2255,6 +2239,17 @@ struct IRStore : IRInst
 
 FIDDLE()
 struct IRAtomicStore : IRAtomicOperation
+{
+    FIDDLE(leafInst())
+    IRUse ptr;
+    IRUse val;
+
+    IRInst* getPtr() { return ptr.get(); }
+    IRInst* getVal() { return val.get(); }
+};
+
+FIDDLE()
+struct IRAtomicExchange : IRAtomicOperation
 {
     FIDDLE(leafInst())
     IRUse ptr;
@@ -4374,7 +4369,7 @@ public:
 
     IRInst* emitLoad(IRType* type, IRInst* ptr);
     IRInst* emitLoad(IRType* type, IRInst* ptr, IRInst* align);
-    IRInst* emitLoad(IRType* type, IRInst* ptr, IRAlignedAttr* align);
+    IRInst* emitLoad(IRType* type, IRInst* ptr, ArrayView<IRInst*> attributes);
     IRInst* emitLoad(IRInst* ptr);
 
     IRInst* emitLoadReverseGradient(IRType* type, IRInst* diffValue);
@@ -4384,6 +4379,7 @@ public:
 
     IRInst* emitStore(IRInst* dstPtr, IRInst* srcVal);
     IRInst* emitStore(IRInst* dstPtr, IRInst* srcVal, IRInst* align);
+    IRInst* emitStore(IRInst* dstPtr, IRInst* srcVal, IRInst* align, IRInst* memoryScope);
 
     IRInst* emitAtomicStore(IRInst* dstPtr, IRInst* srcVal, IRInst* memoryOrder);
 

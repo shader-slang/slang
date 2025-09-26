@@ -659,17 +659,6 @@ local insts = {
 			{ atomicDec = { min_operands = 1 } },
 		},
 	},
-	-- CoherentOperations
-	{
-		CoherentOperation = {
-			{
-				CoherentLoad = { min_operands = 3 },
-			},
-			{
-				CoherentStore = { min_operands = 4 },
-			},
-		},
-	},
 	-- Produced and removed during backward auto-diff pass as a temporary placeholder representing the
 	-- currently accumulated derivative to pass to some dOut argument in a nested call.
 	{ LoadReverseGradient = { min_operands = 1 } },
@@ -2005,6 +1994,7 @@ local insts = {
 				},
 			},
 			{ Aligned = { struct_name = "AlignedAttr", min_operands = 1 } },
+			{ MemoryScope = { struct_name = "MemoryScopeAttr", min_operands = 1 } },
 			{
 				SemanticAttr = {
 					{ userSemantic = { struct_name = "UserSemanticAttr", min_operands = 2 } },

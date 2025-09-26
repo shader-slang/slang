@@ -5155,18 +5155,20 @@ IRInst* IRBuilder::emitLoad(IRType* type, IRInst* ptr, IRInst* align)
     return inst;
 }
 
-IRInst* IRBuilder::emitLoad(IRType* type, IRInst* ptr, IRAlignedAttr* align)
+IRInst* IRBuilder::emitLoad(IRType* type, IRInst* ptr, ArrayView<IRInst*> attributes)
 {
-    if (align)
-    {
-        auto inst = createInst<IRLoad>(this, kIROp_Load, type, ptr, align);
-        addInst(inst);
-        return inst;
-    }
-    else
-    {
-        return emitLoad(type, ptr);
-    }
+    ShortList<IRInst*> params;
+    params.add(ptr);
+    params.addRange(attributes);
+    auto inst = createInst<IRLoad>(
+        this,
+        kIROp_Load,
+        type,
+        params.getCount(),
+        params.getArrayView().getBuffer());
+
+    addInst(inst);
+    return inst;
 }
 
 IRInst* IRBuilder::emitLoad(IRInst* ptr)
@@ -5217,6 +5219,21 @@ IRInst* IRBuilder::emitStore(IRInst* dstPtr, IRInst* srcVal, IRInst* align)
         dstPtr,
         srcVal,
         getAttr(kIROp_AlignedAttr, align));
+
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitStore(IRInst* dstPtr, IRInst* srcVal, IRInst* align, IRInst* memoryScope)
+{
+    auto inst = createInst<IRStore>(
+        this,
+        kIROp_Store,
+        nullptr,
+        dstPtr,
+        srcVal,
+        getAttr(kIROp_AlignedAttr, align),
+        getAttr(kIROp_MemoryScopeAttr, memoryScope));
 
     addInst(inst);
     return inst;

@@ -127,21 +127,29 @@ struct DeferBufferLoadContext
         IRInst* result = nullptr;
         if (mapPtrToValue.tryGetValue(ptr, result))
             return result;
-        IRAlignedAttr* align = nullptr;
+        ShortList<IRInst*> attributes;
         if (auto load = as<IRLoad>(loadInst))
-            align = load->findAttr<IRAlignedAttr>();
+        {
+            for (auto attr : load->getAllAttrs())
+            {
+                if(auto alignedAttr = as<IRAlignedAttr>(attr))
+                    attributes.add(alignedAttr);
+                else if (auto memoryScopeAttr = as<IRMemoryScopeAttr>(attr))
+                    attributes.add(memoryScopeAttr);
+            }
+        }
         if (!as<IRModuleInst>(ptr->getParent()))
         {
             builder.setInsertAfter(ptr);
             IRType* valueType = tryGetPointedToType(&builder, ptr->getFullType());
-            result = builder.emitLoad(valueType, ptr, align);
+            result = builder.emitLoad(valueType, ptr, attributes.getArrayView().arrayView);
             mapPtrToValue[ptr] = result;
         }
         else
         {
             builder.setInsertBefore(loadInst);
             IRType* valueType = tryGetPointedToType(&builder, ptr->getFullType());
-            result = builder.emitLoad(valueType, ptr, align);
+            result = builder.emitLoad(valueType, ptr, attributes.getArrayView().arrayView);
             // Since we are inserting the load in a local scope, we can't register
             // the mapping to the pointer, since the global pointer needs to be
             // loaded once per function.

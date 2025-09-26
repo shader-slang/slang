@@ -29,6 +29,6 @@ void computeMain()
     int32_t* ptrOut = outputBuffer;
 
     let stride = 16;
-    let mat = coopMatCoherentLoad<int32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator, CoopMatMatrixLayout.RowMajor>(ptrIn, 0, stride, MemoryScope::Device);
-    mat.CoherentStore<CoopMatMatrixLayout.RowMajor>(ptrOut, 0, 16, MemoryScope::Device);
+    let mat = coopMatLoadCoherent<int32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator, CoopMatMatrixLayout.RowMajor>(ptrIn, 0, stride, MemoryScope::Device);
+    mat.StoreCoherent<CoopMatMatrixLayout.RowMajor>(ptrOut, 0, 16, MemoryScope::Device);
 }
