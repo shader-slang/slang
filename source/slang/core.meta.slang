@@ -1373,20 +1373,6 @@ struct Ptr<
     }
 };
 
-extension<T, AddressSpace addrSpace> Ptr<T, Access::ReadWrite, addrSpace>
-{
-    // We have a `ref` accessor if we are ReadWrite. This means only `ReadWrite`
-    // can be used as an L-value.
-    __generic<TInt : __BuiltinIntegerType>
-    __subscript(TInt index) -> Ref<T>
-    {
-        // If a 'Ptr[index]' is referred to by a '__ref', call 'kIROp_GetOffsetPtr(index)'
-        __intrinsic_op($(kIROp_GetOffsetPtr))
-        [nonmutating]
-        ref;
-    }
-}
-
 internal struct __AlignedAttr
 {}
 

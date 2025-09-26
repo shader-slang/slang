@@ -7110,7 +7110,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 memoryScopeAttr = foundMemoryScopeAttr;
         }
 
-        // determine coherence
+        // Determine coherence
         {
             bool isCoherent = false;
             if (memoryScopeAttr)
@@ -7143,7 +7143,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
         }
 
-        // determine alignment
+        // Determine alignment
         {
             auto ptrType = as<IRPtrTypeBase>(ptr->getDataType());
             if (ptrType && addressSpaceToStorageClass(ptrType->getAddressSpace()) ==
