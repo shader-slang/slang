@@ -248,27 +248,21 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                             if (callee)
                             {
                                 List<AddressSpace> argAddrSpaces;
-                                bool fullySpecialized = true;
                                 bool hasSpecializableArg = false;
                                 for (UInt i = 0; i < callInst->getArgCount(); i++)
                                 {
                                     auto arg = callInst->getArg(i);
-                                    auto argAddrSpace = getAddrSpace(arg);
                                     argAddrSpaces.add(getAddrSpace(arg));
                                     if (as<IRPtrTypeBase>(arg->getDataType()))
                                     {
                                         hasSpecializableArg = true;
-                                        if (argAddrSpace == AddressSpace::Generic)
-                                        {
-                                            fullySpecialized = false;
-                                            break;
-                                        }
                                     }
                                 }
                                 if (!hasSpecializableArg)
+                                {
+                                    workList.add(callee);
                                     break;
-                                if (!fullySpecialized)
-                                    break;
+                                }
                                 // If callee doesn't have a body, don't specialize.
                                 if (!callee->getFirstBlock())
                                     break;
