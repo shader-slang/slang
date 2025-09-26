@@ -18,6 +18,13 @@ SlangResult emitLLVMObjectFromIR(
     IRModule* irModule,
     List<uint8_t>& objectOut);
 
+// Generates an ISlangSharedLibrary or an error.
+SlangResult emitLLVMJITFromIR(
+    CodeGenContext* codeGenContext,
+    IRModule* irModule,
+    IArtifact** outArtifact);
+
+
 } // namespace Slang
 
 #endif

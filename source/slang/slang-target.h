@@ -53,6 +53,8 @@ enum class CodeGenTarget : SlangCompileTargetIntegral
     HostVM = SLANG_HOST_VM,
     LLVMAssembly = SLANG_LLVM_ASSEMBLY,
     LLVMObjectCode = SLANG_LLVM_OBJECT_CODE,
+    LLVMShaderHostCallable = SLANG_LLVM_SHADER_HOST_CALLABLE,
+    LLVMHostHostCallable = SLANG_LLVM_HOST_HOST_CALLABLE,
     CountOf = SLANG_TARGET_COUNT_OF,
 };
 

@@ -18,6 +18,7 @@ namespace Slang
     {RenderApiType::CPU, "cpu", ""},
     {RenderApiType::CUDA, "cuda", "cuda,ptx"},
     {RenderApiType::WebGPU, "wgpu,webgpu", "wgsl"},
+    {RenderApiType::LLVM, "llvm", "llvm"},
 };
 
 static int _calcAvailableApis()
@@ -299,6 +300,10 @@ static bool _canLoadSharedLibrary(const char* libName)
         return true;
     // We'll assume CUDA is available, and if not, trying to create it will detect it
     case RenderApiType::CUDA:
+        return true;
+    case RenderApiType::LLVM:
+        // TODO: Check for presence of slang-llvm once the implementation has
+        // migrated there.
         return true;
     default:
         break;

@@ -335,6 +335,12 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
     case SLANG_LLVM_OBJECT_CODE:
         return Desc::make(Kind::ObjectCode, Payload::HostCPU, Style::Host, 0);
 
+    case SLANG_LLVM_SHADER_HOST_CALLABLE:
+        return Desc::make(Kind::HostCallable, Payload::HostCPU, Style::Kernel, 0);
+
+    case SLANG_LLVM_HOST_HOST_CALLABLE:
+        return Desc::make(Kind::HostCallable, Payload::HostCPU, Style::Host, 0);
+
     default:
         break;
     }
