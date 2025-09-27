@@ -1160,10 +1160,12 @@ SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     case CodeGenTarget::HostVM:
         SLANG_RETURN_ON_FAIL(emitHostVMCode(this, outArtifact));
         return SLANG_OK;
-    case CodeGenTarget::LLVMAssembly:
-    case CodeGenTarget::LLVMObjectCode:
-    case CodeGenTarget::LLVMShaderHostCallable:
+    case CodeGenTarget::LLVMHostAssembly:
+    case CodeGenTarget::LLVMHostObjectCode:
     case CodeGenTarget::LLVMHostHostCallable:
+    case CodeGenTarget::LLVMShaderAssembly:
+    case CodeGenTarget::LLVMShaderObjectCode:
+    case CodeGenTarget::LLVMShaderHostCallable:
 #if SLANG_ENABLE_LLVM_TARGET
         SLANG_RETURN_ON_FAIL(emitLLVMForEntryPoints(this, outArtifact));
         return SLANG_OK;
@@ -1226,9 +1228,11 @@ SlangResult CodeGenContext::emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     case CodeGenTarget::HostSharedLibrary:
     case CodeGenTarget::WGSLSPIRVAssembly:
     case CodeGenTarget::HostVM:
-    case CodeGenTarget::LLVMAssembly:
-    case CodeGenTarget::LLVMObjectCode:
+    case CodeGenTarget::LLVMHostAssembly:
+    case CodeGenTarget::LLVMHostObjectCode:
     case CodeGenTarget::LLVMHostHostCallable:
+    case CodeGenTarget::LLVMShaderAssembly:
+    case CodeGenTarget::LLVMShaderObjectCode:
     case CodeGenTarget::LLVMShaderHostCallable:
         {
             SLANG_RETURN_ON_FAIL(_emitEntryPoints(outArtifact));

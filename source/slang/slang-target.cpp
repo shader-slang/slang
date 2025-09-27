@@ -182,10 +182,12 @@ CapabilitySet TargetRequest::getTargetCaps()
         atoms.add(CapabilityName::wgsl);
         break;
 
-    case CodeGenTarget::LLVMAssembly:
-    case CodeGenTarget::LLVMObjectCode:
-    case CodeGenTarget::LLVMShaderHostCallable:
+    case CodeGenTarget::LLVMHostAssembly:
+    case CodeGenTarget::LLVMHostObjectCode:
     case CodeGenTarget::LLVMHostHostCallable:
+    case CodeGenTarget::LLVMShaderAssembly:
+    case CodeGenTarget::LLVMShaderObjectCode:
+    case CodeGenTarget::LLVMShaderHostCallable:
         atoms.add(CapabilityName::llvm);
         break;
 

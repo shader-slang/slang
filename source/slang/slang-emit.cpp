@@ -838,8 +838,9 @@ Result linkAndOptimizeIR(
         {
         case CodeGenTarget::HostCPPSource:
         case CodeGenTarget::HostVM:
-        case CodeGenTarget::LLVMAssembly:
-        case CodeGenTarget::LLVMObjectCode:
+        case CodeGenTarget::LLVMHostAssembly:
+        case CodeGenTarget::LLVMHostObjectCode:
+        case CodeGenTarget::LLVMHostHostCallable:
             break;
         case CodeGenTarget::CUDASource:
             collectOptiXEntryPointUniformParams(irModule);
@@ -875,8 +876,9 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CUDASource:
     case CodeGenTarget::HostVM:
-    case CodeGenTarget::LLVMAssembly:
-    case CodeGenTarget::LLVMObjectCode:
+    case CodeGenTarget::LLVMHostAssembly:
+    case CodeGenTarget::LLVMHostObjectCode:
+    case CodeGenTarget::LLVMHostHostCallable:
         break;
     }
 
@@ -1676,6 +1678,9 @@ Result linkAndOptimizeIR(
         break;
     case CodeGenTarget::CSource:
     case CodeGenTarget::CPPSource:
+    case CodeGenTarget::LLVMShaderAssembly:
+    case CodeGenTarget::LLVMShaderObjectCode:
+    case CodeGenTarget::LLVMShaderHostCallable:
         {
             legalizeEntryPointVaryingParamsForCPU(irModule, codeGenContext->getSink());
         }
@@ -1772,6 +1777,9 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::Metal:
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::LLVMShaderAssembly:
+    case CodeGenTarget::LLVMShaderObjectCode:
+    case CodeGenTarget::LLVMShaderHostCallable:
         // For CUDA/OptiX like targets, add our pass to replace inout parameter copies with direct
         // pointers
         undoParameterCopy(irModule);
@@ -2885,7 +2893,11 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
 
     switch (target)
     {
-    case CodeGenTarget::LLVMObjectCode:
+    // At this point there should be no difference between host style and shader
+    // style from LLVM's perspective: the shader style has already been
+    // lowered/legalized into host style.
+    case CodeGenTarget::LLVMHostObjectCode:
+    case CodeGenTarget::LLVMShaderObjectCode:
         {
             List<uint8_t> object;
             emitLLVMObjectFromIR(codeGenContext, irModule, object);
@@ -2895,7 +2907,8 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
             outArtifact.swap(artifact);
         }
         break;
-    case CodeGenTarget::LLVMAssembly:
+    case CodeGenTarget::LLVMHostAssembly:
+    case CodeGenTarget::LLVMShaderAssembly:
         {
             String irString;
             emitLLVMAssemblyFromIR(codeGenContext, irModule, irString);
@@ -2905,8 +2918,8 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
             outArtifact.swap(artifact);
         }
         break;
-    case CodeGenTarget::LLVMShaderHostCallable:
     case CodeGenTarget::LLVMHostHostCallable:
+    case CodeGenTarget::LLVMShaderHostCallable:
         {
             IArtifact* artifact = nullptr;
             emitLLVMJITFromIR(codeGenContext, irModule, &artifact);

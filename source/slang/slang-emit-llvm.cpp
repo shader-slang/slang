@@ -2051,6 +2051,7 @@ struct LLVMEmitter
         {
             switch (decor->getOp())
             {
+            case kIROp_EntryPointDecoration:
             case kIROp_ExternCDecoration:
             case kIROp_ExternCppDecoration:
             case kIROp_DownstreamModuleExportDecoration:
