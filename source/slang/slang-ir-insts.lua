@@ -1891,6 +1891,8 @@ local insts = {
 	{ EnumCast = { min_operands = 1 } },
 	{ CastUInt2ToDescriptorHandle = { min_operands = 1 } },
 	{ CastDescriptorHandleToUInt2 = { min_operands = 1 } },
+	{ CastUInt64ToDescriptorHandle = { min_operands = 1 } },
+	{ CastDescriptorHandleToUInt64 = { min_operands = 1 } },
 	-- Represents a no-op cast to convert a resource pointer to a resource on targets where the resource handles are
 	-- already concrete types.
 	{ CastDescriptorHandleToResource = { min_operands = 1 } },
