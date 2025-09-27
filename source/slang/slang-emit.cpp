@@ -1386,17 +1386,7 @@ Result linkAndOptimizeIR(
     specializeFuncsForBufferLoadArgs(codeGenContext, irModule);
 
     // Push `structuredBufferLoad` to the end of access chain to avoid loading unnecessary data.
-    if (isKhronosTarget(targetRequest) || isMetalTarget(targetRequest) ||
-        isWGPUTarget(targetRequest))
-        deferBufferLoad(irModule);
-
-    // We also want to specialize calls to functions that
-    // takes unsized array parameters if possible.
-    // Moreover, for Khronos targets, we also want to specialize calls to functions
-    // that takes arrays/structs containing arrays as parameters with the actual
-    // global array object to avoid loading big arrays into SSA registers, which seems
-    // to cause performance issues.
-    specializeArrayParameters(codeGenContext, irModule);
+    deferBufferLoad(codeGenContext, irModule);
 
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER RESOURCE SPECIALIZATION");

@@ -20,7 +20,13 @@ We should rewrite the code into:
 */
 
 struct IRModule;
+struct IRType;
+struct CodeGenContext;
 
-void deferBufferLoad(IRModule* module);
+void deferBufferLoad(CodeGenContext* context, IRModule* module);
+
+// Returns true if the type is suitable for defer-load optimization.
+// Generally, we want to defer loading large structs or composites that contain arrays.
+bool isTypePreferrableToDeferLoad(CodeGenContext* context, IRType* type);
 
 } // namespace Slang

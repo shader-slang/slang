@@ -47,17 +47,26 @@ bool FunctionCallSpecializeCondition::isParamSuitableForSpecialization(
         // of the indexing operation is also
         // suitable for specialization.
         //
-        if (arg->getOp() == kIROp_GetElement || arg->getOp() == kIROp_Load)
+        switch (arg->getOp())
         {
-            auto base = arg->getOperand(0);
+        case kIROp_GetElement:
+        case kIROp_GetElementPtr:
+        case kIROp_FieldAddress:
+        case kIROp_FieldExtract:
+        case kIROp_Load:
+            {
+                auto base = arg->getOperand(0);
 
-            // We will "recurse" on the base of
-            // the indexing operation by continuing
-            // our loop with the `base` as our new
-            // argument.
-            //
-            arg = base;
-            continue;
+                // We will "recurse" on the base of
+                // the indexing operation by continuing
+                // our loop with the `base` as our new
+                // argument.
+                //
+                arg = base;
+                continue;
+            }
+        default:
+            break;
         }
 
         // By default, we will *not* consider an argument
@@ -546,7 +555,7 @@ struct FunctionParameterSpecializationContext
             // Similarly for other global constants
             ioInfo.key.vals.add(globalConstant);
         }
-        else if (oldArg->getOp() == kIROp_GetElement)
+        else if (oldArg->getOp() == kIROp_GetElement || oldArg->getOp() == kIROp_GetElementPtr)
         {
             // This is the case where the `oldArg` is
             // in the form `oldBase[oldIndex]`
@@ -586,6 +595,26 @@ struct FunctionParameterSpecializationContext
             ioInfo.key.vals.add(irType);
 
             ioInfo.newArgs.add(oldIndex);
+        }
+        else if (oldArg->getOp() == kIROp_FieldExtract || oldArg->getOp() == kIROp_FieldAddress)
+        {
+            // This is the case where the `oldArg` is
+            // in the form `oldBase.structKey`
+            //
+            auto oldBase = oldArg->getOperand(0);
+            auto structKey = oldArg->getOperand(1);
+
+            // Similar to the getElement case, we recursively setting up whatever
+            // `oldBase` needs first.
+            //
+            getCallInfoForArg(ioInfo, oldBase);
+
+            // The main difference from the `getElement` case is we actually want
+            // the structKey to be in the specialization key because it will be baked
+            // into the specialized function.
+            // And we won't introduce a new parameter to hold the index.
+            //
+            ioInfo.key.vals.add(structKey);
         }
         else if (oldArg->getOp() == kIROp_Load)
         {
@@ -718,6 +747,28 @@ struct FunctionParameterSpecializationContext
         }
     }
 
+    static bool isElementAccessInst(IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_GetElementPtr:
+        case kIROp_GetElement:
+            return true;
+        }
+        return false;
+    }
+
+    static bool isFieldAccessInst(IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_FieldAddress:
+        case kIROp_FieldExtract:
+            return true;
+        }
+        return false;
+    }
+
     IRInst* getSpecializedValueForArg(FuncSpecializationInfo& ioInfo, IRInst* oldArg)
     {
         // The logic here parallels `gatherCallInfoForArg`,
@@ -741,7 +792,7 @@ struct FunctionParameterSpecializationContext
             // to resolve the uses
             return globalFunc;
         }
-        else if (oldArg->getOp() == kIROp_GetElement)
+        else if (isElementAccessInst(oldArg))
         {
             // This is the case where the argument is
             // in the form `oldBase[oldIndex]`.
@@ -801,7 +852,9 @@ struct FunctionParameterSpecializationContext
             // of things, and then inserted to a more permanent location later.
             //
             builder->setInsertLoc(IRInsertLoc());
-            auto newVal = builder->emitElementExtract(oldArg->getFullType(), newBase, newIndex);
+            IRInst* newOperands[] = {newBase, newIndex};
+            auto newVal =
+                builder->emitIntrinsicInst(oldArg->getFullType(), oldArg->getOp(), 2, newOperands);
 
             // Because our new instruction wasn't
             // actually inserted anywhere, we need to
@@ -809,6 +862,30 @@ struct FunctionParameterSpecializationContext
             // that should be inserted into the body of
             // the specialized callee.
             //
+            ioInfo.newBodyInsts.add(newVal);
+
+            return newVal;
+        }
+        else if (isFieldAccessInst(oldArg))
+        {
+            // This is the case where the argument is
+            // in the form `oldBase.structKey`.
+            //
+            auto oldBase = oldArg->getOperand(0);
+            auto structKey = oldArg->getOperand(1);
+
+            // We handle this case in a similar way as the `oldBase[oldIndex]`
+            // case, except that we don't need to introduce a new parameter
+            // for the index, since the struct key is known at compile-time.
+            auto newBase = getSpecializedValueForArg(ioInfo, oldBase);
+
+            auto builder = getBuilder();
+
+            builder->setInsertLoc(IRInsertLoc());
+            IRInst* newOperands[] = {newBase, structKey};
+            auto newVal =
+                builder->emitIntrinsicInst(oldArg->getFullType(), oldArg->getOp(), 2, newOperands);
+
             ioInfo.newBodyInsts.add(newVal);
 
             return newVal;

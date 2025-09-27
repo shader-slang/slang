@@ -3,14 +3,92 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-layout.h"
 #include "slang-ir-redundancy-removal.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 
 namespace Slang
 {
+
+// Generally, we want to specialize arguments that are large in size, or arguments that
+// are arrays or composite type that contains arrays.
+// This is because:
+// 1. Struct types without arrays will eventually be SROA's into registers and then effectively
+//    DCE'd, so they usually won't cause performance issues. In fact, front loading structs
+//    and reusing the loaded value instead of repetitively loading from constant memory is
+//    usually beneficial to performance. However large struct values can be SROA'd into a large
+//    number of registers, causing slow downstream compilation. Therefore we should avoid/defer
+//    loading them into registers if we can.
+// 2. Arrays usually cannot be SROA'd into individual registers, which usually leads to
+//    large register consumption if they ever get loaded, so we want to defer loading array
+//    typed values as much as possible.
+
+// If the argument data is bigger than this threshold, it is considered a large object
+// and we will try to specialize it even if it doesn't contain arrays.
+static const int kBufferLoadElementSizeSpecializationThreshold = 128;
+
+// If the argument data is smaller than this threshold, it is considered a tiny object
+// and we will not consider specializing it, even if it contains arrays.
+static const int kBufferLoadElementSizeSpecializationMinThreshold = 16;
+
+static bool isCompositeTypeContainingArrays(IRType* type)
+{
+    if (auto structType = as<IRStructType>(type))
+    {
+        for (auto field : structType->getFields())
+        {
+            if (const auto arrayType = as<IRArrayTypeBase>(field->getFieldType()))
+            {
+                return true;
+            }
+            if (auto subStructType = as<IRStructType>(field->getFieldType()))
+            {
+                if (isCompositeTypeContainingArrays(subStructType))
+                    return true;
+            }
+        }
+    }
+    else if (as<IRArrayTypeBase>(type))
+    {
+        return true;
+    }
+    return false;
+}
+
+bool isTypePreferrableToDeferLoad(CodeGenContext* codeGenContext, IRType* type)
+{
+    // We only want to defer loading values that are "large enough" that
+    // we expect them to be expensive to pass by value.
+    //
+    IRSizeAndAlignment sizeAlignment = {};
+    if (SLANG_FAILED(getNaturalSizeAndAlignment(
+            codeGenContext->getTargetProgram()->getOptionSet(),
+            type,
+            &sizeAlignment)))
+        return false;
+
+    // If the argument is very small, don't bother specializing.
+    if (sizeAlignment.size < kBufferLoadElementSizeSpecializationMinThreshold)
+        return false;
+
+    // If the argument is somewhat small, don't specialize, unless it contains
+    // arrays.
+    if (sizeAlignment.size < kBufferLoadElementSizeSpecializationThreshold)
+    {
+        // We generally do not specialize for small values, except it contains
+        // arrays that usually present a challenge for the SROA pass to eliminate
+        // unnecessary loads.
+        if (!isCompositeTypeContainingArrays(type))
+            return false;
+    }
+    return true;
+}
+
 struct DeferBufferLoadContext
 {
+    CodeGenContext* codeGenContext;
+
     // Map an original SSA value to a pointer that can be used to load the value.
     Dictionary<IRInst*, IRInst*> mapValueToPtr;
 
@@ -149,23 +227,11 @@ struct DeferBufferLoadContext
         return result;
     }
 
-    static bool isSimpleType(IRInst* type)
-    {
-        if (auto modType = as<IRRateQualifiedType>(type))
-            type = modType->getValueType();
-        if (as<IRStructType>(type))
-            return false;
-        if (as<IRTupleType>(type))
-            return false;
-        if (as<IRArrayTypeBase>(type))
-            return false;
-        return true;
-    }
-
     void deferBufferLoadInst(IRBuilder& builder, List<IRInst*>& workList, IRInst* loadInst)
     {
         // Don't defer the load anymore if the type is simple.
-        if (isSimpleType(loadInst->getDataType()) || loadInst->findAttr<IRAlignedAttr>())
+        if (!isTypePreferrableToDeferLoad(codeGenContext, loadInst->getDataType()) ||
+            loadInst->findAttr<IRAlignedAttr>())
         {
             auto materializedVal = materializePointer(builder, loadInst);
             loadInst->transferDecorationsTo(materializedVal);
@@ -259,9 +325,10 @@ struct DeferBufferLoadContext
     }
 };
 
-void deferBufferLoad(IRModule* module)
+void deferBufferLoad(CodeGenContext* codeGenContext, IRModule* module)
 {
     DeferBufferLoadContext context;
+    context.codeGenContext = codeGenContext;
     for (auto childInst : module->getGlobalInsts())
     {
         if (auto code = as<IRGlobalValueWithCode>(childInst))
