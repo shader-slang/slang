@@ -5623,12 +5623,16 @@ Expr* SemanticsVisitor::checkBaseForMemberExpr(
     return resultBaseExpr;
 }
 
-Expr* SemanticsVisitor::checkGeneralMemberLookupExpr(MemberExpr* expr, Type* baseType, Expr* preDerefBase)
+Expr* SemanticsVisitor::checkGeneralMemberLookupExpr(
+    MemberExpr* expr,
+    Type* baseType,
+    Expr* preDerefBase)
 {
     LookupResult lookupResult =
         lookUpMember(m_astBuilder, this, expr->name, baseType, m_outerScope);
     if (preDerefBase && !lookupResult.isValid())
-        lookupResult = lookUpMember(m_astBuilder, this, expr->name, preDerefBase->type, m_outerScope);
+        lookupResult =
+            lookUpMember(m_astBuilder, this, expr->name, preDerefBase->type, m_outerScope);
     bool diagnosed = false;
     lookupResult = filterLookupResultByVisibilityAndDiagnose(lookupResult, expr->loc, diagnosed);
     lookupResult =
