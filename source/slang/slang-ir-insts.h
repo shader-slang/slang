@@ -3264,18 +3264,6 @@ struct IRCastStorageToLogicalBase : IRInst
 };
 
 FIDDLE()
-struct IRCastStorageToLogical : IRCastStorageToLogicalBase
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRCastStorageToLogicalDeref : IRCastStorageToLogicalBase
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
 struct IRDebugSource : IRInst
 {
     FIDDLE(leafInst())
