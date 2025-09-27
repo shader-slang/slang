@@ -2222,6 +2222,7 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_DebugInlinedVariable:
     case kIROp_DebugFunction:
     case kIROp_GetArrayLength:
+    case kIROp_GetTrailingElementCount:
     case kIROp_SizeOf:
     case kIROp_AlignOf:
     case kIROp_Printf:

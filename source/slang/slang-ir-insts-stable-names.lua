@@ -672,4 +672,5 @@ return {
 	["Type.CLayout"] = 668,
 	["CastUInt64ToDescriptorHandle"] = 669,
 	["CastDescriptorHandleToUInt64"] = 670,
+	["GetTrailingElementCount"] = 671,
 }

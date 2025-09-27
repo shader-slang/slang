@@ -2214,6 +2214,52 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             }
             return false;
         }
+    case kIROp_GetTrailingElementCount:
+        {
+            auto ssboOperand = inst->getOperand(0);
+            auto ssboType = as<IRGLSLShaderStorageBufferType>(ssboOperand->getDataType());
+            if (!ssboType)
+            {
+                m_writer->emit("0");
+                return true;
+            }
+
+            auto elementType = ssboType->getElementType();
+            auto structType = as<IRStructType>(elementType);
+            if (!structType)
+            {
+                m_writer->emit("0");
+                return true;
+            }
+
+            // Find the last field
+            IRStructField* lastField = structType->getFields().getLast();
+            if (!lastField)
+            {
+                m_writer->emit("0");
+                return true;
+            }
+
+            auto lastFieldType = lastField->getFieldType();
+
+            if (auto unsizedArrayType = as<IRUnsizedArrayType>(lastFieldType))
+            {
+                // Emit .length() call on the last field
+                auto prec = getInfo(EmitOp::Postfix);
+                EmitOpInfo outerPrec = inOuterPrec;
+                bool needClose = maybeEmitParens(outerPrec, prec);
+                emitOperand(ssboOperand, prec);
+                m_writer->emit(".");
+                m_writer->emit(getName(lastField->getKey()));
+                m_writer->emit(".length()");
+                maybeCloseParens(needClose);
+                return true;
+            }
+
+            // Return 0 if the last field is not an unsized array
+            m_writer->emit("0");
+            return true;
+        }
     case kIROp_MakeVectorFromScalar:
     case kIROp_MatrixReshape:
         {
