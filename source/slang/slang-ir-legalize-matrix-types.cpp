@@ -59,8 +59,12 @@ struct MatrixTypeLoweringContext
                 return as<IRBoolType>(elementType) || as<IRUIntType>(elementType) ||
                        as<IRIntType>(elementType);
             }
-        case CodeGenTarget::LLVMAssembly:
-        case CodeGenTarget::LLVMObjectCode:
+        case CodeGenTarget::LLVMHostAssembly:
+        case CodeGenTarget::LLVMHostObjectCode:
+        case CodeGenTarget::LLVMHostHostCallable:
+        case CodeGenTarget::LLVMShaderAssembly:
+        case CodeGenTarget::LLVMShaderObjectCode:
+        case CodeGenTarget::LLVMShaderHostCallable:
             // Always lower all matrices on LLVM; we'd need to break them up
             // like this for data layout reasons anyway.
             return true;

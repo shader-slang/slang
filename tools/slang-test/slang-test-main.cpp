@@ -1214,10 +1214,12 @@ static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
     case SLANG_METAL:
     case SLANG_WGSL:
     case SLANG_HOST_VM:
-    case SLANG_LLVM_ASSEMBLY:
-    case SLANG_LLVM_OBJECT_CODE:
-    case SLANG_LLVM_SHADER_HOST_CALLABLE:
+    case SLANG_LLVM_HOST_ASSEMBLY:
+    case SLANG_LLVM_HOST_OBJECT_CODE:
     case SLANG_LLVM_HOST_HOST_CALLABLE:
+    case SLANG_LLVM_SHADER_ASSEMBLY:
+    case SLANG_LLVM_SHADER_OBJECT_CODE:
+    case SLANG_LLVM_SHADER_HOST_CALLABLE:
         {
             return 0;
         }

@@ -3867,9 +3867,11 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     case CodeGenTarget::Metal:
                     case CodeGenTarget::WGSL:
                     case CodeGenTarget::HostVM:
-                    case CodeGenTarget::LLVMAssembly:
-                    case CodeGenTarget::LLVMObjectCode:
+                    case CodeGenTarget::LLVMHostAssembly:
+                    case CodeGenTarget::LLVMHostObjectCode:
                     case CodeGenTarget::LLVMHostHostCallable:
+                    case CodeGenTarget::LLVMShaderAssembly:
+                    case CodeGenTarget::LLVMShaderObjectCode:
                     case CodeGenTarget::LLVMShaderHostCallable:
                         rawOutput.isWholeProgram = true;
                         break;
