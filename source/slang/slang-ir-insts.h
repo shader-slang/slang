@@ -4581,7 +4581,7 @@ public:
     IRInst* emitCastPtrToInt(IRInst* val);
     IRInst* emitCastIntToPtr(IRType* ptrType, IRInst* val);
 
-    IRCastStorageToLogical* emitCastStorageToLogical(IRType* type, IRInst* val, IRInst* bufferType);
+    IRInst* emitCastStorageToLogical(IRType* type, IRInst* val, IRInst* bufferType);
     IRCastStorageToLogicalDeref* emitCastStorageToLogicalDeref(
         IRType* type,
         IRInst* val,

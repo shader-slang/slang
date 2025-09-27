@@ -6173,11 +6173,10 @@ IRInst* IRBuilder::emitCastIntToPtr(IRType* ptrType, IRInst* val)
     return inst;
 }
 
-IRCastStorageToLogical* IRBuilder::emitCastStorageToLogical(
-    IRType* type,
-    IRInst* val,
-    IRInst* bufferType)
+IRInst* IRBuilder::emitCastStorageToLogical(IRType* type, IRInst* val, IRInst* bufferType)
 {
+    if (type == val->getDataType())
+        return val;
     IRInst* args[] = {val, bufferType};
     return (IRCastStorageToLogical*)emitIntrinsicInst(type, kIROp_CastStorageToLogical, 2, args);
 }

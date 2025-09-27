@@ -1230,7 +1230,8 @@ struct LoweredElementTypeContext
                             castInst->getBufferType());
                         fieldAddrUser->replaceUsesWith(castedGEP);
                         fieldAddrUser->removeAndDeallocate();
-                        castInstWorkList.add(castedGEP);
+                        if (auto castStorage = as<IRCastStorageToLogicalBase>(castedGEP))
+                            castInstWorkList.add(castStorage);
                     }
                     else if (fieldAddrUser->getOp() == kIROp_GetOffsetPtr)
                     {
@@ -1411,7 +1412,8 @@ struct LoweredElementTypeContext
                                     castInst->getBufferType());
                                 user->replaceUsesWith(castOfGEP);
                                 user->removeAndDeallocate();
-                                castInstWorkList.add(castOfGEP);
+                                if (auto castStorage = as<IRCastStorageToLogical>(castOfGEP))
+                                    castInstWorkList.add(castStorage);
                                 break;
                             }
                         case kIROp_Call:
@@ -1515,7 +1517,8 @@ struct LoweredElementTypeContext
                                 auto load = builder.emitLoad(gep);
                                 user->replaceUsesWith(load);
                                 user->removeAndDeallocate();
-                                castInstWorkList.add(castAddr);
+                                if (auto castStorage = as<IRCastStorageToLogical>(castAddr))
+                                    castInstWorkList.add(castStorage);
                                 break;
                             }
                         case kIROp_Store:
@@ -1538,7 +1541,8 @@ struct LoweredElementTypeContext
                                     castInst->getBufferType());
                                 dest->replaceUsesWith(castAddr);
                                 dest->removeAndDeallocate();
-                                castInstWorkList.add(castAddr);
+                                if (auto castStorage = as<IRCastStorageToLogical>(castAddr))
+                                    castInstWorkList.add(castStorage);
                                 break;
                             }
                         }
@@ -1665,7 +1669,8 @@ struct LoweredElementTypeContext
                 uses.add(use);
             auto castedParam =
                 builder.emitCastStorageToLogical(logicalParamType, param, cast->getBufferType());
-            outNewCasts.add(castedParam);
+            if (auto castStorage = as<IRCastStorageToLogicalBase>(castedParam))
+                outNewCasts.add(castStorage);
 
             // Replace all previous uses of param to use castedParam instead.
             for (auto use : uses)
@@ -1800,7 +1805,8 @@ struct LoweredElementTypeContext
                             if (ptrUse->getUser() != castStorageToLogical)
                                 builder.replaceOperand(ptrUse, castStorageToLogical);
                         });
-                    castInstWorkList.add(castStorageToLogical);
+                    if (auto castStorage = as<IRCastStorageToLogical>(castStorageToLogical))
+                        castInstWorkList.add(castStorage);
                 });
             bufferTypeInfo.loweredBufferType = loweredBufferType;
         }
@@ -1848,7 +1854,8 @@ struct LoweredElementTypeContext
             auto load = builder.emitLoad(castPtr);
             castInst->replaceUsesWith(load);
             castInst->removeAndDeallocate();
-            materializeStorageToLogicalCastsImpl(castPtr);
+            if (auto castStorage = as<IRCastStorageToLogical>(castPtr))
+                materializeStorageToLogicalCastsImpl(castStorage);
             return;
         }
 
