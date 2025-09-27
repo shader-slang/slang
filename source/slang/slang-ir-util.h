@@ -376,6 +376,10 @@ void verifyComputeDerivativeGroupModifiers(
 int getIRVectorElementSize(IRType* type);
 IRType* getIRVectorBaseType(IRType* type);
 
+// Retrieves the element type of a pointer, buffer, array, vector or matrix type.
+// This is the result type of a ElementExtract operation on a value of `type`.
+IRType* getElementType(IRBuilder& builder, IRType* type);
+
 Int getSpecializationConstantId(IRGlobalParam* param);
 
 void legalizeDefUse(IRGlobalValueWithCode* func);
@@ -418,6 +422,16 @@ IRType* getUnsignedTypeFromSignedType(IRBuilder* builder, IRType* type);
 bool isSignedType(IRType* type);
 
 bool isIROpaqueType(IRType* type);
+
+bool isImmutableLocation(IRInst* loc);
+
+// Check if `use` is the `baseAddr` operand of a GetElement/FieldExtract inst.
+// This is true if `use` is the first operand of the user inst.
+inline bool isUseBaseAddrOperand(IRUse* use, IRInst* user)
+{
+    return user->getOperands() == use;
+}
+
 } // namespace Slang
 
 #endif

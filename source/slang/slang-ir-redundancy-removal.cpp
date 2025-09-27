@@ -196,6 +196,9 @@ static bool eliminateRedundantTemporaryCopyInFunc(IRFunc* func)
                     continue;
                 }
 
+                if (destPtr->findDecorationImpl(kIROp_DisableCopyEliminationDecoration))
+                    continue;
+
                 // Check if we're storing a load result
                 auto loadInst = as<IRLoad>(storedValue);
                 if (!loadInst)

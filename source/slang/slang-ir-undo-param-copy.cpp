@@ -6,7 +6,7 @@
 
 namespace Slang
 {
-// This pass transforms variables decorated with TempCallArgVarDecoration
+// This pass transforms variables decorated with TempCallArgImmutableVarDecoration
 // by replacing them with direct references to the original parameters.
 // This is important for CUDA/OptiX targets where functions like 'IgnoreHit'
 // can prevent copy-back operations from executing.
@@ -52,7 +52,7 @@ struct UndoParameterCopyVisitor
             {
                 if (auto varInst = as<IRVar>(inst))
                 {
-                    if (varInst->findDecoration<IRTempCallArgVarDecoration>())
+                    if (varInst->findDecoration<IRTempCallArgImmutableVarDecoration>())
                     {
                         IRStore* initializingStore = nullptr;
                         IRInst* originalParamPtr = nullptr;

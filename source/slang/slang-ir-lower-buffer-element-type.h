@@ -10,7 +10,7 @@ struct IRType;
 
 struct BufferElementTypeLoweringOptions
 {
-    bool lowerBufferPointer = false;
+    bool lowerBufferPointer = true;
 
     // For WGSL, we can only create arrays that has a stride of 16 bytes for constant buffers.
     bool use16ByteArrayElementForConstantBuffer = false;

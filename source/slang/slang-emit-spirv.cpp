@@ -7038,7 +7038,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             getStructFieldId(baseStructType, as<IRStructKey>(fieldAddress->getField())),
             builder.getIntType());
         SLANG_ASSERT(as<IRPtrTypeBase>(fieldAddress->getFullType()));
-        return emitOpInBoundsAccessChain(
+        return emitOpAccessChain(
             parent,
             fieldAddress,
             fieldAddress->getFullType(),

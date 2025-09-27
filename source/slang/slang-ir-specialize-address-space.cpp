@@ -168,6 +168,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                     {
                     case kIROp_Var:
                     case kIROp_RWStructuredBufferGetElementPtr:
+                    case kIROp_Load:
                         {
                             // The address space of these insts should be assigned by the initial
                             // address space assigner.
@@ -200,16 +201,6 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                             {
                                 mapVarValueToAddrSpace[inst->getOperand(0)] = addrSpace;
                                 mapInstToAddrSpace[inst] = addrSpace;
-                                changed = true;
-                            }
-                        }
-                        break;
-                    case kIROp_Load:
-                        {
-                            if (auto addrSpace =
-                                    mapVarValueToAddrSpace.tryGetValue(inst->getOperand(0)))
-                            {
-                                mapInstToAddrSpace[inst] = *addrSpace;
                                 changed = true;
                             }
                         }
@@ -248,22 +239,24 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                             if (callee)
                             {
                                 List<AddressSpace> argAddrSpaces;
-                                bool fullySpecialized = true;
+                                bool hasSpecializableArg = false;
                                 for (UInt i = 0; i < callInst->getArgCount(); i++)
                                 {
                                     auto arg = callInst->getArg(i);
-                                    auto argAddrSpace = getAddrSpace(arg);
                                     argAddrSpaces.add(getAddrSpace(arg));
-                                    if (argAddrSpace == AddressSpace::Generic &&
-                                        as<IRPtrTypeBase>(arg->getDataType()))
+                                    if (as<IRPtrTypeBase>(arg->getDataType()))
                                     {
-                                        fullySpecialized = false;
-                                        break;
+                                        hasSpecializableArg = true;
                                     }
                                 }
-                                if (!fullySpecialized)
+                                if (!hasSpecializableArg)
+                                {
+                                    workList.add(callee);
                                     break;
-
+                                }
+                                // If callee doesn't have a body, don't specialize.
+                                if (!callee->getFirstBlock())
+                                    break;
                                 FuncSpecializationKey key(callee, argAddrSpaces);
                                 IRFunc* specializedCallee = nullptr;
                                 if (IRFunc** specializedFunc =
@@ -482,6 +475,16 @@ void propagateAddressSpaceFromInsts(List<IRInst*>&& workList)
             }
         }
     }
+}
+
+AddressSpace NoOpInitialAddressSpaceAssigner::getAddressSpaceFromVarType(IRInst*)
+{
+    return AddressSpace::Generic;
+}
+
+AddressSpace NoOpInitialAddressSpaceAssigner::getLeafInstAddressSpace(IRInst*)
+{
+    return AddressSpace::Generic;
 }
 
 } // namespace Slang

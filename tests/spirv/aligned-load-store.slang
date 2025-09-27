@@ -4,8 +4,6 @@
 // CHECK: OpStore {{.*}} Aligned 16
 
 // CHECK: OpLoad {{.*}} Aligned 16
-// CHECK: OpLoad {{.*}} Aligned 16
-// CHECK: OpStore {{.*}} Aligned 16
 // CHECK: OpStore {{.*}} Aligned 16
 
 uniform float4* data;

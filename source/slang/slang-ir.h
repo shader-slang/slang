@@ -1533,7 +1533,7 @@ struct IRUniformParameterGroupType : IRParameterGroupType
 
 
 FIDDLE()
-struct IRGLSLShaderStorageBufferType : IRBuiltinGenericType
+struct IRGLSLShaderStorageBufferType : IRPointerLikeType
 {
     FIDDLE(leafInst())
     IRType* getDataLayout() { return (IRType*)getOperand(1); }
@@ -1759,6 +1759,8 @@ struct IRGetStringHash : IRInst
 ///
 /// The given IR `builder` will be used if new instructions need to be created.
 IRType* tryGetPointedToType(IRBuilder* builder, IRType* type);
+
+IRType* tryGetPointedToOrBufferElementType(IRBuilder* builder, IRType* type);
 
 FIDDLE()
 struct IRFuncType : IRType

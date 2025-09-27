@@ -1312,7 +1312,6 @@ enum Access : uint64_t
 /// @param T The type of the value pointed to.
 /// @remarks `T* val` is equivalent to `Ptr<T> val`.
 __magic_type(PtrType)
-__intrinsic_type($(kIROp_PtrType))
 struct Ptr<
     T, 
     Access access = Access::ReadWrite, 
