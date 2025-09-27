@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=SPV): -target spirv -O0
+//TEST:SIMPLE(filecheck=SPV): -target spirv
 
 struct Bottom
 {
@@ -26,6 +26,8 @@ struct Root
 ConstantBuffer<Root> cb;
 
 RWStructuredBuffer<float> outputBuffer;
+
+// SPV-NOT: OpCompositeConstruct
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
