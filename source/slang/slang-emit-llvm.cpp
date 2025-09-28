@@ -144,6 +144,7 @@ struct LLVMEmitter
     CodeGenContext* codeGenContext;
 
     bool debug = false;
+    bool inlineGlobalInstructions = false;
     IRTypeLayoutRules* explicitLayoutRules = nullptr;
 
     // The LLVM value class is closest to Slang's IRInst, as it can represent
@@ -155,6 +156,12 @@ struct LLVMEmitter
     // scalar layout.
     Dictionary<IRType*, llvm::Type*> mapTypeToLLVMUnpadded;
     Dictionary<IRType*, llvm::DIType*> mapTypeToDebugLLVM;
+
+    // Global instructions that have been promoted into global variables. That
+    // happens when they get referenced. Later on, constructors for these must
+    // be generated.
+    Dictionary<IRInst*, llvm::GlobalVariable*> promotedGlobalInsts;
+
     List<llvm::Constant*> globalCtors;
     llvm::StructType* llvmCtorType;
 
@@ -395,11 +402,14 @@ struct LLVMEmitter
     }
 
     // Finds the value of an instruction that has already been emitted, OR
-    // creates the value if it's a constant.
+    // creates the value if it's a constant. Also, if inlineGlobalInstructions
+    // is set, this will inline such instructions as needed.
     llvm::Value* findValue(IRInst* inst)
     {
         if (mapInstToLLVM.containsKey(inst))
             return mapInstToLLVM.getValue(inst);
+
+        bool globalInstruction = inst->getParent()->getOp() == kIROp_ModuleInst;
 
         llvm::Value* llvmValue = nullptr;
         switch (inst->getOp())
@@ -416,9 +426,41 @@ struct LLVMEmitter
             llvmValue = maybeEnsureConstant(inst);
             break;
         default:
-            SLANG_UNEXPECTED(
-                "Unsupported value type for LLVM target, or referring to an "
-                "instruction that hasn't been emitted yet!");
+            if (globalInstruction && inlineGlobalInstructions)
+            {
+                return emitLLVMInstruction(inst);
+            }
+            else if (globalInstruction && !inlineGlobalInstructions)
+            {
+                // This is a global instruction getting referenced. So, we generate
+                // a global variable for it (if we don't have one yet) and report
+                // this incident.
+                llvm::GlobalVariable* llvmVar = nullptr;
+                auto llvmType = ensureType(inst->getDataType());
+                if (promotedGlobalInsts.containsKey(inst))
+                {
+                    llvmVar = promotedGlobalInsts.getValue(inst);
+                }
+                else
+                {
+                    llvmVar = new llvm::GlobalVariable(llvmType, false, llvm::GlobalValue::PrivateLinkage);
+                    llvmModule->insertGlobalVariable(llvmVar);
+                    llvmVar->setInitializer(getZeroInitializer(llvmType));
+                    promotedGlobalInsts[inst] = llvmVar;
+                }
+
+                // Aggregates are passed around as pointers.
+                if (llvmType->isAggregateType())
+                    return llvmVar;
+                // Otherwise, we'll need a load instruction to get the value.
+                return llvmBuilder->CreateLoad(llvmType, llvmVar, false);
+            }
+            else
+            {
+                SLANG_UNEXPECTED(
+                    "Unsupported value type for LLVM target, or referring to an "
+                    "instruction that hasn't been emitted yet!");
+            }
             break;
         }
 
@@ -819,10 +861,18 @@ struct LLVMEmitter
         );
     }
 
+    static llvm::Value* _defaultOnReturnHandler(IRReturn*)
+    {
+        SLANG_ASSERT_FAILURE("Unexpected terminator in global scope!");
+        return nullptr;
+    }
+
     // Caution! This is only for emitting things which are considered
     // instructions in LLVM! It won't work for IRBlocks, IRFuncs & such.
-    llvm::Value* emitLLVMInstruction(IRInst* inst, FuncEpilogueCallback onReturn)
-    {
+    llvm::Value* emitLLVMInstruction(
+        IRInst* inst,
+        FuncEpilogueCallback onReturn = _defaultOnReturnHandler
+    ){
         llvm::Value* llvmInst = nullptr;
         switch (inst->getOp())
         {
@@ -2493,7 +2543,8 @@ struct LLVMEmitter
         emitGlobalValueWithCode(var, llvmCtor, prologue, epilogue);
 
         llvm::Constant* ctorData[3] = {
-            llvmBuilder->getInt32(globalCtors.getCount()),
+            // Leave some room for other global constructors to run first.
+            llvmBuilder->getInt32(globalCtors.getCount()+16),
             llvmCtor,
             llvmVar
         };
@@ -2535,33 +2586,6 @@ struct LLVMEmitter
                 ensureGlobalVarDecl(globalVar);
         }
     }
-
-    /*
-    void emitGlobalInstructions(IRModule* irModule)
-    {
-        llvm::FunctionType* ctorType = llvm::FunctionType::get(
-            llvmBuilder->getVoidTy(), {}, false);
-
-        std::string ctorName = "__slang_global_insts";
-
-        llvmBuilder->SetCurrentDebugLocation(llvm::DebugLoc());
-        llvm::Function* llvmCtor = llvm::Function::Create(
-            ctorType, llvm::GlobalValue::InternalLinkage, ctorName, *llvmModule
-        );
-
-        llvm::Constant* ctorData[3] = {
-            llvmBuilder->getInt32(globalCtors.getCount()),
-            llvmCtor,
-            llvmBuilder->get
-            llvm::PointerType
-        };
-
-        llvm::Constant *ctorEntry = llvm::ConstantStruct::get(llvmCtorType,
-            llvm::ArrayRef(ctorData, llvmCtorType->getNumElements()));
-
-        globalCtors.add(ctorEntry);
-    }
-    */
 
     // Using std::string as the LLVM API works with that. It's not to be
     // ingested by Slang.
@@ -2931,12 +2955,50 @@ struct LLVMEmitter
         }
     }
 
+    void emitGlobalInstructionCtor()
+    {
+        llvm::FunctionType* ctorType = llvm::FunctionType::get(
+            llvmBuilder->getVoidTy(), {}, false);
+
+        std::string ctorName = "__slang_global_insts";
+
+        llvmBuilder->SetCurrentDebugLocation(llvm::DebugLoc());
+        llvm::Function* llvmCtor = llvm::Function::Create(
+            ctorType, llvm::GlobalValue::InternalLinkage, ctorName, *llvmModule
+        );
+
+        llvm::BasicBlock* entryBlock = llvm::BasicBlock::Create(*llvmContext, "", llvmCtor);
+        llvmBuilder->SetInsertPoint(entryBlock);
+
+        inlineGlobalInstructions = true;
+
+        for (auto [inst, globalVar]: promotedGlobalInsts)
+        {
+            auto llvmInst = emitLLVMInstruction(inst);
+            emitStore(globalVar, llvmInst, inst->getDataType());
+        }
+
+        inlineGlobalInstructions = false;
+        llvmBuilder->CreateRetVoid();
+
+        llvm::Constant* ctorData[3] = {
+            llvmBuilder->getInt32(0),
+            llvmCtor,
+            llvm::ConstantPointerNull::get(llvm::PointerType::get(*llvmContext, 0))
+        };
+
+        llvm::Constant *ctorEntry = llvm::ConstantStruct::get(llvmCtorType,
+            llvm::ArrayRef(ctorData, llvmCtorType->getNumElements()));
+
+        globalCtors.add(ctorEntry);
+    }
+
     void processModule(IRModule* irModule)
     {
         emitGlobalDebugInfo(irModule);
         emitGlobalDeclarations(irModule);
-        //emitGlobalInstructions(irModule);
         emitGlobalFunctions(irModule);
+        emitGlobalInstructionCtor();
     }
 
     // Optimizes the LLVM IR and destroys mapInstToLLVM.
