@@ -723,6 +723,9 @@ struct IntroduceExplicitGlobalContextPass
         addKernelContextNameHint(contextParam);
         contextParam->insertBefore(firstBlock->getFirstOrdinaryInst());
 
+        // Update the type of the function to reflect this new parameter.
+        fixUpFuncType(func);
+
         // The new parameter can be registered as the context value
         // to be used for `func` right away.
         //
