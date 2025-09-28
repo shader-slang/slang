@@ -178,9 +178,17 @@ struct LLVMEmitter
     HashSet<IRInst*> debugInsts;
 
     // This is used to map struct fields to LLVM aggregates, in case the
-    // aggregates have padding entries which affect the indexing:
-    //     UInt llvmFieldIndex = structIndexMapping[slangStruct][slangFieldIndex];
-    Dictionary<IRStructType*, List<UInt>> structIndexMapping;
+    // aggregates have padding entries which complicate the indexing.
+    struct StructLayoutMappingInfo
+    {
+        List<UInt> fieldIndexToLLVM;
+        // Excludes trailing padding
+        List<UInt> sizePerLLVMField;
+        // Which is stored here separately, due to the padded / unpadded type
+        // split.
+        UInt trailingPadding;
+    };
+    Dictionary<IRStructType*, StructLayoutMappingInfo> structLayoutInfo;
 
     List<llvm::DIScope*> debugScopeStack;
 
@@ -402,6 +410,9 @@ struct LLVMEmitter
         case kIROp_StringLit:
         case kIROp_PtrLit:
         case kIROp_MakeVector:
+            // kIROp_MakeArray & kIROp_MakeStruct are intentionally omitted
+            // here; they must not be emitted as values in any other context
+            // than global vars.
             llvmValue = maybeEnsureConstant(inst);
             break;
         default:
@@ -545,7 +556,7 @@ struct LLVMEmitter
 
     // Returns the index of the given struct field in the corresponding LLVM
     // struct. There may be differences due to added padding fields.
-    UInt mapStructIndexToLLVM(IRStructType* irStruct, UInt irIndex)
+    UInt mapFieldIndexToLLVM(IRStructType* irStruct, UInt irIndex)
     {
         if (explicitLayoutRules)
         {
@@ -553,7 +564,7 @@ struct LLVMEmitter
             // have to call it first even though we don't care about the result
             // here.
             ensureType(irStruct);
-            return structIndexMapping.getValue(irStruct)[irIndex];
+            return structLayoutInfo.getValue(irStruct).fieldIndexToLLVM[irIndex];
         }
         else
         {
@@ -683,7 +694,7 @@ struct LLVMEmitter
             }
 
             elementType = findStructField(structType, index)->getFieldType();
-            UInt llvmIndex = mapStructIndexToLLVM(structType, index);
+            UInt llvmIndex = mapFieldIndexToLLVM(structType, index);
 
             llvm::Value* indices[2] = {
                 llvmBuilder->getInt32(0),
@@ -1210,7 +1221,7 @@ struct LLVMEmitter
                     return nullptr;
                 }
 
-                index = mapStructIndexToLLVM(baseStructType, index);
+                index = mapFieldIndexToLLVM(baseStructType, index);
 
                 auto llvmStructType = ensureType(baseStructType);
                 auto llvmBase = findValue(base);
@@ -1236,7 +1247,7 @@ struct LLVMEmitter
                 }
 
                 auto llvmBase = findValue(base);
-                unsigned idx = mapStructIndexToLLVM(
+                unsigned idx = mapFieldIndexToLLVM(
                     structType,
                     getStructIndexByKey(structType, as<IRStructKey>(fieldExtractInst->getField())));
 
@@ -1510,8 +1521,6 @@ struct LLVMEmitter
 
         SLANG_ASSERT(llvmInst);
 
-        if(llvmInst)
-            mapInstToLLVM[inst] = llvmInst;
         return llvmInst;
     }
 
@@ -1552,6 +1561,26 @@ struct LLVMEmitter
         return true;
     }
 
+    // True for arrays that have trailing padding. Those arrays are split into
+    // a struct:
+    //
+    // struct
+    // {
+    //     paddedElemType init[count-1];
+    //     unpaddedElemType last;
+    // };
+    bool needsUnpaddedArrayTypeWorkaround(IRArrayTypeBase* arrayType)
+    {
+        if (!explicitLayoutRules)
+            return false;
+
+        auto irElemCount = arrayType->getElementCount();
+        auto elemCount = int(getIntVal(irElemCount));
+        IRSizeAndAlignment sizeAndAlignment = getSizeAndAlignment(arrayType->getElementType());
+        bool hasTrailingPadding = sizeAndAlignment.size != align(sizeAndAlignment.size, sizeAndAlignment.alignment);
+        return elemCount != 0 && hasTrailingPadding;
+    }
+
     llvm::Type* emitArrayType(IRArrayTypeBase* arrayType, bool padded)
     {
         auto elemType = ensureType(arrayType->getElementType());
@@ -1568,28 +1597,39 @@ struct LLVMEmitter
         // The stride of an array must be based on the type with trailing
         // padding included, but the last entry in that array may be missing
         // trailing padding in some layouts. To allow that in LLVM when an
-        // unpadded array is requested, we remove the last element and leave it
-        // up to emitStructType to add enough padding to cover for the last
-        // element too. Indexing beyond the length of an array is explicitly
-        // allowed in LLVM.
-        IRSizeAndAlignment sizeAndAlignment = getSizeAndAlignment(arrayType->getElementType());
-        bool hasTrailingPadding = sizeAndAlignment.size != align(sizeAndAlignment.size, sizeAndAlignment.alignment);
-        if (elemCount != 0 && !padded && hasTrailingPadding)
+        // unpadded array is requested, we remove the last element from the
+        // array and emit one unpadded instance separately after the array.
+        //
+        // Unpadded types are never accessed directly, they're only ever
+        // members in a struct that get interpreted as their padded versions
+        // when accessed. Their size must be correct so that GEP works correctly
+        // on that outer struct, but other than that, it doesn't matter what we
+        // emit. 
+        //
+        // We can therefore pick any representation that is convenient to
+        // fill in maybeEnsureConstant, as that's the only context where these
+        // are used as value types.
+        if (!padded && needsUnpaddedArrayTypeWorkaround(arrayType))
         {
-            elemCount--;
+            llvm::Type* fieldTypes[2] = {
+                llvm::ArrayType::get(elemType, elemCount-1),
+                ensureUnpaddedType(arrayType->getElementType())
+            };
+            return llvm::StructType::get(*llvmContext, fieldTypes, true);
         }
-
-        return llvm::ArrayType::get(elemType, elemCount);
+        else return llvm::ArrayType::get(elemType, elemCount);
     }
 
-    void emitPadding(List<llvm::Type*>& fields, UInt& curSize, UInt targetSize)
+    UInt emitPadding(List<llvm::Type*>& fields, UInt& curSize, UInt targetSize)
     {
         if(curSize < targetSize)
         {
             UInt bytes = targetSize - curSize;
             curSize = targetSize;
             fields.add(llvm::ArrayType::get(llvmBuilder->getInt8Ty(), bytes));
+            return bytes;
         }
+        return 0;
     }
 
     llvm::Type* emitStructType(IRStructType* structType, bool padded)
@@ -1605,6 +1645,7 @@ struct LLVMEmitter
             isPacked = true;
 
             List<UInt> fieldMapping;
+            List<UInt> sizePerLLVMField;
             UInt llvmSize = 0;
 
             IRSizeAndAlignment sizeAndAlignment;
@@ -1622,7 +1663,9 @@ struct LLVMEmitter
                 Slang::getOffset(getOptions(), explicitLayoutRules, field, &offset);
 
                 // Insert padding until we're at the requested offset.
-                emitPadding(fieldTypes, llvmSize, offset);
+                UInt padding = emitPadding(fieldTypes, llvmSize, offset);
+                if (padding > 0)
+                    sizePerLLVMField.add(padding);
 
                 // Record the current llvm field index for the mapping. 
                 fieldMapping.add(fieldTypes.getCount());
@@ -1633,20 +1676,26 @@ struct LLVMEmitter
                 auto llvmFieldType = ensureUnpaddedType(fieldType);
                 fieldTypes.add(llvmFieldType);
 
-                // Can't use Slang's sizeAndAlignment here, since e.g. an
-                // unpadded array may be entirely missing the last entry to
-                // achieve this alignment. So it's best to just query the size
-                // from LLVM.
-                llvmSize += dataLayout.getTypeStoreSize(llvmFieldType);
+                // Let's query the size from LLVM just to be safe, although I
+                // think we could use getSizeAndAlignment() too.
+                UInt fieldSize = dataLayout.getTypeStoreSize(llvmFieldType);
+                llvmSize += fieldSize;
+                sizePerLLVMField.add(fieldSize);
             }
 
+            UInt paddedSize = align(sizeAndAlignment.size, sizeAndAlignment.alignment);
+            UInt trailingPadding = paddedSize - llvmSize;
             if (padded)
             {
                 // If trailing padding is desired, insert it.
-                sizeAndAlignment.size = align(sizeAndAlignment.size, sizeAndAlignment.alignment);
+                sizeAndAlignment.size = paddedSize;
             }
             emitPadding(fieldTypes, llvmSize, sizeAndAlignment.size);
-            structIndexMapping[structType] = std::move(fieldMapping);
+            structLayoutInfo[structType] = {
+                std::move(fieldMapping),
+                sizePerLLVMField,
+                trailingPadding
+            };
         }
         else
         {
@@ -2165,9 +2214,20 @@ struct LLVMEmitter
         return llvm::StringRef(source.begin(), source.getLength());
     }
 
-    llvm::Constant* maybeEnsureConstant(IRInst* inst)
+    llvm::Constant* getZeroPaddingConstant(UInt size)
     {
-        if (mapInstToLLVM.containsKey(inst))
+        auto byteType = llvmBuilder->getInt8Ty();
+        auto type = llvm::ArrayType::get(byteType, size);
+        auto zero = llvm::ConstantInt::get(byteType, 0);
+        auto zeros = List<llvm::Constant*>::makeRepeated(zero, size);
+        return llvm::ConstantArray::get(type, llvm::ArrayRef(zeros.begin(), zeros.end()));
+    }
+
+    llvm::Constant* maybeEnsureConstant(IRInst* inst, bool padded = true)
+    {
+        // We don't save unpadded constants for now, we can just re-emit them
+        // when needed.
+        if (mapInstToLLVM.containsKey(inst) && padded)
             return llvm::dyn_cast<llvm::Constant>(mapInstToLLVM.getValue(inst));
 
         llvm::Constant* llvmConstant = nullptr;
@@ -2235,26 +2295,89 @@ struct LLVMEmitter
                 llvmConstant = llvm::ConstantVector::get(llvm::ArrayRef(values.begin(), values.end()));
             }
             break;
-            // TODO: Deal with alignment in these, otherwise they're incorrect.
-            /*
+            // TODO: It may be possible to remove both MakeArray and MakeStruct
+            // here; that only causes more complex code for initializing global
+            // variables. However, that should get cleaned up by any level of
+            // optimization by LLVM.
         case kIROp_MakeArray:
             {
-                auto llvmType = ensureType(inst->getDataType());
+                auto arrayType = cast<IRArrayTypeBase>(inst->getDataType());
                 List<llvm::Constant*> values;
                 for (UInt aa = 0; aa < inst->getOperandCount(); ++aa)
                 {
-                    auto constVal = maybeEnsureConstant(inst->getOperand(aa));
+                    auto constVal = maybeEnsureConstant(inst->getOperand(aa), true);
                     if (!constVal)
                         return nullptr;
                     values.add(constVal);
                 }
-                llvmConstant = llvm::ConstantArray::get(
-                    llvm::cast<llvm::ArrayType>(llvmType),
-                    llvm::ArrayRef(values.begin(), values.end()));
+
+                if (!padded && needsUnpaddedArrayTypeWorkaround(arrayType))
+                {
+                    // This should be a struct for the workaround.
+                    auto llvmType = ensureUnpaddedType(arrayType);
+                    auto paddedElemType = ensureType(arrayType->getElementType());
+
+                    auto initPart = llvm::ConstantArray::get(
+                        llvm::ArrayType::get(paddedElemType, values.getCount()-1),
+                        llvm::ArrayRef(values.begin(), values.getCount()-1));
+
+                    auto lastPart = maybeEnsureConstant(inst->getOperand(inst->getOperandCount()-1), false);
+
+                    llvm::Constant* parts[2] = {initPart, lastPart};
+
+                    llvmConstant = llvm::ConstantStruct::get(
+                        llvm::cast<llvm::StructType>(llvmType), parts
+                    );
+                }
+                else
+                {
+                    // No workaround needed for the type, so lowers directly as
+                    // an array.
+                    auto llvmType = ensureType(inst->getDataType());
+                    llvmConstant = llvm::ConstantArray::get(
+                        llvm::cast<llvm::ArrayType>(llvmType),
+                        llvm::ArrayRef(values.begin(), values.end()));
+                }
             }
             break;
         case kIROp_MakeStruct:
+            if (explicitLayoutRules)
             {
+                // The struct is packed, so we need to insert padding manually.
+                auto structType = cast<IRStructType>(inst->getDataType());
+                auto llvmType = padded ? ensureType(structType) : ensureUnpaddedType(structType);
+
+                auto& structInfo = structLayoutInfo.getValue(structType);
+
+                List<llvm::Constant*> values;
+                for (UInt aa = 0; aa < inst->getOperandCount(); ++aa)
+                {
+                    auto constVal = maybeEnsureConstant(inst->getOperand(aa), false);
+                    if (!constVal)
+                        return nullptr;
+
+                    UInt entryIndex = structInfo.fieldIndexToLLVM[aa];
+
+                    // Add padding entries until we get to the current field.
+                    while (UInt(values.getCount()) < entryIndex)
+                    {
+                        UInt padSize = structInfo.sizePerLLVMField[values.getCount()];
+                        values.add(getZeroPaddingConstant(padSize));
+                    }
+
+                    values.add(constVal);
+                }
+
+                if (padded && structInfo.trailingPadding)
+                    values.add(getZeroPaddingConstant(structInfo.trailingPadding));
+                llvmConstant = llvm::ConstantStruct::get(
+                    llvm::cast<llvm::StructType>(llvmType),
+                    llvm::ArrayRef(values.begin(), values.end()));
+            }
+            else
+            {
+                // The struct is not packed, we can just make the struct the
+                // way LLVM wants.
                 auto llvmType = ensureType(inst->getDataType());
                 List<llvm::Constant*> values;
                 for (UInt aa = 0; aa < inst->getOperandCount(); ++aa)
@@ -2269,12 +2392,11 @@ struct LLVMEmitter
                     llvm::ArrayRef(values.begin(), values.end()));
             }
             break;
-            */
         default:
             break;
         }
 
-        if (llvmConstant)
+        if (llvmConstant && padded)
             mapInstToLLVM[inst] = llvmConstant;
         return llvmConstant;
     }
@@ -2413,6 +2535,33 @@ struct LLVMEmitter
                 ensureGlobalVarDecl(globalVar);
         }
     }
+
+    /*
+    void emitGlobalInstructions(IRModule* irModule)
+    {
+        llvm::FunctionType* ctorType = llvm::FunctionType::get(
+            llvmBuilder->getVoidTy(), {}, false);
+
+        std::string ctorName = "__slang_global_insts";
+
+        llvmBuilder->SetCurrentDebugLocation(llvm::DebugLoc());
+        llvm::Function* llvmCtor = llvm::Function::Create(
+            ctorType, llvm::GlobalValue::InternalLinkage, ctorName, *llvmModule
+        );
+
+        llvm::Constant* ctorData[3] = {
+            llvmBuilder->getInt32(globalCtors.getCount()),
+            llvmCtor,
+            llvmBuilder->get
+            llvm::PointerType
+        };
+
+        llvm::Constant *ctorEntry = llvm::ConstantStruct::get(llvmCtorType,
+            llvm::ArrayRef(ctorData, llvmCtorType->getNumElements()));
+
+        globalCtors.add(ctorEntry);
+    }
+    */
 
     // Using std::string as the LLVM API works with that. It's not to be
     // ingested by Slang.
@@ -2639,7 +2788,9 @@ struct LLVMEmitter
                 // Then, add the regular instructions.
                 for (auto irInst: irBlock->getOrdinaryInsts())
                 {
-                    emitLLVMInstruction(irInst, epilogueCallback);
+                    auto llvmInst = emitLLVMInstruction(irInst, epilogueCallback);
+                    if(llvmInst)
+                        mapInstToLLVM[irInst] = llvmInst;
                 }
             }
         }
@@ -2782,10 +2933,9 @@ struct LLVMEmitter
 
     void processModule(IRModule* irModule)
     {
-        // Start by emitting all function declarations, so that the functions
-        // can freely refer to each other later on.
         emitGlobalDebugInfo(irModule);
         emitGlobalDeclarations(irModule);
+        //emitGlobalInstructions(irModule);
         emitGlobalFunctions(irModule);
     }
 
