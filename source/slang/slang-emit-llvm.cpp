@@ -445,7 +445,7 @@ struct LLVMEmitter
                 {
                     llvmVar = new llvm::GlobalVariable(llvmType, false, llvm::GlobalValue::PrivateLinkage);
                     llvmModule->insertGlobalVariable(llvmVar);
-                    llvmVar->setInitializer(getZeroInitializer(llvmType));
+                    llvmVar->setInitializer(llvm::PoisonValue::get(llvmType));
                     promotedGlobalInsts[inst] = llvmVar;
                 }
 
@@ -2471,31 +2471,6 @@ struct LLVMEmitter
         return llvmVar;
     }
 
-    llvm::Constant* getZeroInitializer(llvm::Type* type)
-    {
-        if (type->isVectorTy())
-        {
-            auto vectorType = llvm::cast<llvm::VectorType>(type);
-            return llvm::ConstantVector::getSplat(
-                vectorType->getElementCount(),
-                getZeroInitializer(vectorType->getElementType())
-            );
-        }
-        else if (type->isPointerTy())
-        {
-            return llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(type));
-        }
-        else if (type->isFloatingPointTy())
-        {
-            return llvm::ConstantFP::getZero(type);
-        }
-        else if (type->isIntegerTy())
-        {
-            return llvm::ConstantInt::get(type, 0);
-        }
-        return llvm::ConstantAggregateZero::get(type);
-    }
-
     void emitGlobalVarCtor(IRGlobalVar* var)
     {
         llvm::GlobalVariable* llvmVar = llvm::cast<llvm::GlobalVariable>(mapInstToLLVM.getValue(var));
@@ -2518,8 +2493,8 @@ struct LLVMEmitter
             }
         }
 
-        // Zero-initialize and add a global ctor.
-        llvmVar->setInitializer(getZeroInitializer(llvmVar->getValueType()));
+        // Poison and add a global ctor.
+        llvmVar->setInitializer(llvm::PoisonValue::get(llvmVar->getValueType()));
 
         llvm::FunctionType* ctorType = llvm::FunctionType::get(
             llvmBuilder->getVoidTy(), {}, false);
