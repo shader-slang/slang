@@ -851,6 +851,9 @@ Result linkAndOptimizeIR(
             break;
 
         case CodeGenTarget::CPPSource:
+        case CodeGenTarget::LLVMShaderAssembly:
+        case CodeGenTarget::LLVMShaderObjectCode:
+        case CodeGenTarget::LLVMShaderHostCallable:
             passOptions.alwaysCreateCollectedParam = true;
             [[fallthrough]];
         default:
@@ -879,6 +882,9 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::LLVMHostAssembly:
     case CodeGenTarget::LLVMHostObjectCode:
     case CodeGenTarget::LLVMHostHostCallable:
+    case CodeGenTarget::LLVMShaderAssembly:
+    case CodeGenTarget::LLVMShaderObjectCode:
+    case CodeGenTarget::LLVMShaderHostCallable:
         break;
     }
 
@@ -1777,9 +1783,6 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::Metal:
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CUDASource:
-    case CodeGenTarget::LLVMShaderAssembly:
-    case CodeGenTarget::LLVMShaderObjectCode:
-    case CodeGenTarget::LLVMShaderHostCallable:
         // For CUDA/OptiX like targets, add our pass to replace inout parameter copies with direct
         // pointers
         undoParameterCopy(irModule);
@@ -1793,6 +1796,10 @@ Result linkAndOptimizeIR(
         dumpIRIfEnabled(codeGenContext, irModule, "PARAMETER COPIES REPLACED WITH DIRECT POINTERS");
 #endif
         validateIRModuleIfEnabled(codeGenContext, irModule);
+        [[fallthrough]];
+    case CodeGenTarget::LLVMShaderAssembly:
+    case CodeGenTarget::LLVMShaderObjectCode:
+    case CodeGenTarget::LLVMShaderHostCallable:
         moveGlobalVarInitializationToEntryPoints(irModule, targetProgram);
         introduceExplicitGlobalContext(irModule, target);
         if (target == CodeGenTarget::CPPSource)
@@ -2882,6 +2889,7 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
 
     LinkedIR linkedIR;
     LinkingAndOptimizationOptions linkingAndOptimizationOptions;
+    linkingAndOptimizationOptions.shouldLegalizeExistentialAndResourceTypes = false;
     SLANG_RETURN_ON_FAIL(
         linkAndOptimizeIR(codeGenContext, linkingAndOptimizationOptions, linkedIR));
 

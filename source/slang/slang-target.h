@@ -84,6 +84,7 @@ bool isCUDATarget(TargetRequest* targetReq);
 
 // Are we generating code for a CPU target
 bool isCPUTarget(TargetRequest* targetReq);
+bool isCPUTarget(CodeGenTarget codeGenTarget);
 
 /// Are we generating code for the WebGPU API?
 bool isWGPUTarget(TargetRequest* targetReq);

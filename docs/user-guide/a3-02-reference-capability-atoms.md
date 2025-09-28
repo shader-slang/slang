@@ -999,6 +999,9 @@ Compound Capabilities
 `cpp_cuda_glsl_hlsl_spirv_wgsl`
 > CPP, CUDA, GLSL, HLSL, SPIRV and WGSL code-gen targets
 
+`cpp_cuda_glsl_hlsl_spirv_wgsl_llvm`
+> CPP, CUDA, GLSL, HLSL, SPIRV, WGSL and LLVM code-gen targets
+
 `cpp_cuda_glsl_spirv`
 > CPP, CUDA, GLSL and SPIRV code-gen targets
 
