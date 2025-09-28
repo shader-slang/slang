@@ -564,6 +564,9 @@ struct IntroduceExplicitGlobalContextPass
                 builder.emitStore(fieldPtr, var);
             }
         }
+
+        // Update entry point function type after potentially adding parameters.
+        fixUpFuncType(entryPointFunc);
     }
 
     void replaceUsesOfGlobalParam(IRGlobalParam* globalParam)
