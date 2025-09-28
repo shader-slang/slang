@@ -949,6 +949,22 @@ struct LLVMEmitter
             }
             break;
 
+        case kIROp_Undefined:
+            {
+                auto type = inst->getDataType();
+                auto llvmType = ensureType(type);
+                if (llvmType->isAggregateType())
+                {
+                    // Aggregates are always stack-allocated.
+                    llvmInst = emitAlloca(inst->getDataType());
+                }
+                else
+                {
+                    llvmInst = llvm::PoisonValue::get(llvmType);
+                }
+            }
+            break;
+
         case kIROp_MakeArray:
         case kIROp_MakeStruct:
             {
@@ -2219,6 +2235,8 @@ struct LLVMEmitter
                 llvmConstant = llvm::ConstantVector::get(llvm::ArrayRef(values.begin(), values.end()));
             }
             break;
+            // TODO: Deal with alignment in these, otherwise they're incorrect.
+            /*
         case kIROp_MakeArray:
             {
                 auto llvmType = ensureType(inst->getDataType());
@@ -2251,6 +2269,7 @@ struct LLVMEmitter
                     llvm::ArrayRef(values.begin(), values.end()));
             }
             break;
+            */
         default:
             break;
         }
@@ -2635,7 +2654,7 @@ struct LLVMEmitter
 
         llvm::Value* storeArg = nullptr;
         if (ensureType(func->getResultType())->isAggregateType())
-            storeArg = llvmFunc->getArg(0);
+            storeArg = llvmFunc->getArg(llvmFunc->arg_size()-1);
 
         // The prologue and epilogue are needed to deal with out and inout - the
         // correct semantics for them involve copy-in and copy-out, which we
