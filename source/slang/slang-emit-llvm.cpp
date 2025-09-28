@@ -2974,8 +2974,19 @@ struct LLVMEmitter
 
         for (auto [inst, globalVar]: promotedGlobalInsts)
         {
-            auto llvmInst = emitLLVMInstruction(inst);
-            emitStore(globalVar, llvmInst, inst->getDataType());
+            // See if we can lower it directly as a constant
+            auto constVal = maybeEnsureConstant(inst);
+            if (constVal)
+            {
+                globalVar->setInitializer(constVal);
+            }
+            else
+            {
+                // Otherwise, emit the instructions needed to construct the
+                // value.
+                auto llvmInst = emitLLVMInstruction(inst);
+                emitStore(globalVar, llvmInst, inst->getDataType());
+            }
         }
 
         inlineGlobalInstructions = false;
