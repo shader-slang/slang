@@ -2682,8 +2682,13 @@ bool isSPIRV(CodeGenTarget codeGenTarget)
 
 bool isCPUTarget(TargetRequest* targetReq)
 {
+    return isCPUTarget(targetReq->getTarget());
+}
+
+bool isCPUTarget(CodeGenTarget codeGenTarget)
+{
     return ArtifactDescUtil::isCpuLikeTarget(
-        ArtifactDescUtil::makeDescForCompileTarget(asExternal(targetReq->getTarget())));
+        ArtifactDescUtil::makeDescForCompileTarget(asExternal(codeGenTarget)));
 }
 
 bool isCUDATarget(TargetRequest* targetReq)
