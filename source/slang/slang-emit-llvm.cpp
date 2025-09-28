@@ -145,6 +145,7 @@ struct LLVMEmitter
 
     bool debug = false;
     bool inlineGlobalInstructions = false;
+    bool storeScalarizedVectors = false;
     IRTypeLayoutRules* explicitLayoutRules = nullptr;
 
     // The LLVM value class is closest to Slang's IRInst, as it can represent
@@ -359,6 +360,9 @@ struct LLVMEmitter
             explicitLayoutRules = IRTypeLayoutRules::get(IRTypeLayoutRuleName::Scalar);
         else if (getOptions().shouldUseDXLayout())
             explicitLayoutRules = IRTypeLayoutRules::get(IRTypeLayoutRuleName::D3DConstantBuffer);
+
+        IRSizeAndAlignment vectorAlignment = explicitLayoutRules->getVectorSizeAndAlignment(IRSizeAndAlignment(4, 4), 3);
+        storeScalarizedVectors = vectorAlignment.alignment < vectorAlignment.size;
 
         debugScopeStack.add(compileUnit);
 
@@ -766,13 +770,13 @@ struct LLVMEmitter
 
     llvm::Value* emitLoad(llvm::Value* llvmPtr, IRType* srcType, bool isVolatile = false)
     {
+        IRSizeAndAlignment elementSizeAlignment = getSizeAndAlignment(srcType);
         switch(srcType->getOp())
         {
         case kIROp_ArrayType:
         case kIROp_StructType:
             {
                 llvm::Value* llvmVar = emitAlloca(srcType);
-                IRSizeAndAlignment elementSizeAlignment = getSizeAndAlignment(srcType);
 
                 // Pointer-to-pointer copy, so generate inline memcpy.
                 llvmBuilder->CreateMemCpyInline(
@@ -788,7 +792,11 @@ struct LLVMEmitter
         default:
             {
                 auto llvmType = ensureType(srcType);
-                return llvmBuilder->CreateLoad(llvmType, llvmPtr, isVolatile);
+                return llvmBuilder->CreateAlignedLoad(
+                    llvmType,
+                    llvmPtr,
+                    llvm::MaybeAlign(elementSizeAlignment.alignment),
+                    isVolatile);
             }
         }
     }
@@ -804,6 +812,7 @@ struct LLVMEmitter
 
     llvm::Value* emitStore(llvm::Value* llvmPtr, llvm::Value* llvmVal, IRType* srcType, bool isVolatile = false)
     {
+        IRSizeAndAlignment sizeAlignment = getSizeAndAlignment(srcType);
         switch(srcType->getOp())
         {
         case kIROp_ArrayType:
@@ -813,20 +822,18 @@ struct LLVMEmitter
                 // pointer.
                 SLANG_ASSERT(llvmVal->getType()->isPointerTy());
 
-                IRSizeAndAlignment elementSizeAlignment = getSizeAndAlignment(srcType);
-
                 // Pointer-to-pointer copy, so generate inline memcpy.
                 return llvmBuilder->CreateMemCpyInline(
                     llvmPtr,
-                    llvm::MaybeAlign(elementSizeAlignment.alignment),
+                    llvm::MaybeAlign(sizeAlignment.alignment),
                     llvmVal,
-                    llvm::MaybeAlign(elementSizeAlignment.alignment),
-                    llvmBuilder->getInt32(elementSizeAlignment.size),
+                    llvm::MaybeAlign(sizeAlignment.alignment),
+                    llvmBuilder->getInt32(sizeAlignment.size),
                     isVolatile
                 );
             }
         default:
-            return llvmBuilder->CreateStore(llvmVal, llvmPtr, isVolatile);
+            return llvmBuilder->CreateAlignedStore(llvmVal, llvmPtr, llvm::MaybeAlign(sizeAlignment.alignment), isVolatile);
         }
     }
 
@@ -1633,13 +1640,24 @@ struct LLVMEmitter
 
     llvm::Type* emitArrayType(IRArrayTypeBase* arrayType, bool padded)
     {
-        auto elemType = ensureType(arrayType->getElementType());
+        auto elemType = arrayType->getElementType();
+        llvm::Type* llvmElemType;
+
+        if (cast<IRVectorType>(elemType) && storeScalarizedVectors)
+        {
+            llvmElemType = ensureUnpaddedType(elemType);
+        }
+        else
+        {
+            llvmElemType = ensureType(elemType);
+        }
+
         auto irElemCount = arrayType->getElementCount();
 
         if (!irElemCount)
         {
             // UnsizedArrayType. Lowers as a zero-sized array for LLVM, luckily.
-            return llvm::ArrayType::get(elemType, 0);
+            return llvm::ArrayType::get(llvmElemType, 0);
         }
 
         auto elemCount = int(getIntVal(irElemCount));
@@ -1662,12 +1680,12 @@ struct LLVMEmitter
         if (!padded && needsUnpaddedArrayTypeWorkaround(arrayType))
         {
             llvm::Type* fieldTypes[2] = {
-                llvm::ArrayType::get(elemType, elemCount-1),
+                llvm::ArrayType::get(llvmElemType, elemCount-1),
                 ensureUnpaddedType(arrayType->getElementType())
             };
             return llvm::StructType::get(*llvmContext, fieldTypes, true);
         }
-        else return llvm::ArrayType::get(elemType, elemCount);
+        else return llvm::ArrayType::get(llvmElemType, elemCount);
     }
 
     UInt emitPadding(List<llvm::Type*>& fields, UInt& curSize, UInt targetSize)
@@ -1780,6 +1798,14 @@ struct LLVMEmitter
         llvm::Type* llvmType = nullptr;
         switch (type->getOp())
         {
+        case kIROp_VectorType:
+            {
+                auto vecType = static_cast<IRVectorType*>(type);
+                llvm::Type* elemType = ensureType(vecType->getElementType());
+                auto elemCount = int(getIntVal(vecType->getElementCount()));
+                llvmType = llvm::ArrayType::get(elemType, elemCount);
+            }
+            break;
         case kIROp_StructType:
             {
                 auto structType = static_cast<IRStructType*>(type);
@@ -2334,6 +2360,7 @@ struct LLVMEmitter
             break;
         case kIROp_MakeVector:
             {
+                auto vectorType = cast<IRVectorType>(inst->getDataType());
                 List<llvm::Constant*> values;
                 for (UInt aa = 0; aa < inst->getOperandCount(); ++aa)
                 {
@@ -2342,20 +2369,39 @@ struct LLVMEmitter
                         return nullptr;
                     values.add(constVal);
                 }
-                llvmConstant = llvm::ConstantVector::get(llvm::ArrayRef(values.begin(), values.end()));
+                if (!padded)
+                {
+                    // To remove padding and alignment requirements from the
+                    // vector, lower it as an array.
+                    auto elemType = ensureType(vectorType->getElementType());
+                    llvmConstant = llvm::ConstantArray::get(
+                        llvm::ArrayType::get(elemType, values.getCount()),
+                        llvm::ArrayRef(values.begin(), values.end()));
+                }
+                else
+                {
+                    llvmConstant = llvm::ConstantVector::get(llvm::ArrayRef(values.begin(), values.end()));
+                }
             }
             break;
-            // TODO: It may be possible to remove both MakeArray and MakeStruct
-            // here; that only causes more complex code for initializing global
-            // variables. However, that should get cleaned up by any level of
-            // optimization by LLVM.
+            // It is possible to remove both MakeArray and MakeStruct here;
+            // that only causes more complex code for initializing global
+            // variables. That seems to be cleaned up by optimizations in LLVM.
+            // So if we want to simplify the codebase a bit, we can remove them
+            // and simplify StructLayoutMappingInfo as well.
         case kIROp_MakeArray:
             {
                 auto arrayType = cast<IRArrayTypeBase>(inst->getDataType());
                 List<llvm::Constant*> values;
+
+                bool padElements = true;
+                // Vectors don't get padded in arrays if they must be scalarized.
+                if (cast<IRVectorType>(arrayType->getElementType()) && storeScalarizedVectors)
+                    padElements = false;
+
                 for (UInt aa = 0; aa < inst->getOperandCount(); ++aa)
                 {
-                    auto constVal = maybeEnsureConstant(inst->getOperand(aa), true);
+                    auto constVal = maybeEnsureConstant(inst->getOperand(aa), padElements);
                     if (!constVal)
                         return nullptr;
                     values.add(constVal);
@@ -2932,6 +2978,9 @@ struct LLVMEmitter
 
     void emitGlobalInstructionCtor()
     {
+        if (promotedGlobalInsts.getCount() == 0)
+            return;
+
         llvm::FunctionType* ctorType = llvm::FunctionType::get(
             llvmBuilder->getVoidTy(), {}, false);
 
