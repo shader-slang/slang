@@ -1166,22 +1166,113 @@ void serialize(S const& serializer, CapabilityTargetSet& value)
     }
 }
 
+// Optimized CapabilitySet serialization using direct UIntSet buffer serialization
 template<typename S>
 void serialize(S const& serializer, CapabilitySet& value)
 {
-    serialize(serializer, value.getCapabilityTargetSets());
+    SLANG_PROFILE_SECTION(serialize_CapabilitySet);
 
-    // The value for each entry in `getCapabilityTargetSets()` have
-    // a `target` field that is redundant with the key for
-    // that entry. Rather than serialize the key as part
-    // of the `CapabilityTargetSet` type, we instead copy
-    // it over from the key to the value in the case where
-    // we are reading.
-    //
-    if (isReading(serializer))
+    if (isWriting(serializer))
     {
-        for (auto& p : value.getCapabilityTargetSets())
-            p.second.target = p.first;
+        // Serialize as a flat sequence of (target, stage, bufferCount, buffer_data...)
+        // This leverages UIntSet's efficient List<uint64_t> internal storage
+
+        // First, count the number of entries to serialize
+        UInt entryCount = 0;
+        for (const auto& targetPair : value.getCapabilityTargetSets())
+        {
+            for (const auto& stagePair : targetPair.second.shaderStageSets)
+            {
+                if (stagePair.second.atomSet && !stagePair.second.atomSet->isEmpty())
+                {
+                    entryCount++;
+                }
+            }
+        }
+
+        serialize(serializer, entryCount);
+
+        // Now serialize each entry with its raw buffer data
+        for (const auto& targetPair : value.getCapabilityTargetSets())
+        {
+            CapabilityAtom target = targetPair.first;
+            const auto& targetSet = targetPair.second;
+
+            for (const auto& stagePair : targetSet.shaderStageSets)
+            {
+                CapabilityAtom stage = stagePair.first;
+                const auto& stageSet = stagePair.second;
+
+                if (stageSet.atomSet && !stageSet.atomSet->isEmpty())
+                {
+                    // Serialize target and stage identifiers
+                    serialize(serializer, target);
+                    serialize(serializer, stage);
+
+                    // Get direct access to UIntSet's internal buffer
+                    const auto& buffer = stageSet.atomSet->getBuffer();
+                    UInt bufferCount = UInt(buffer.getCount());
+
+                    // Serialize buffer count and raw UInt64 data (correct type for serialization)
+                    serialize(serializer, bufferCount);
+                    for (UInt i = 0; i < bufferCount; i++)
+                    {
+                        UInt64 element = UInt64(buffer[i]);
+                        serialize(serializer, element);
+                    }
+                }
+            }
+        }
+    }
+    else
+    {
+        // Read and directly reconstruct the nested structure
+        UInt entryCount = 0;
+        serialize(serializer, entryCount);
+
+        // Clear existing data
+        value.getCapabilityTargetSets().clear();
+
+        // Read each entry and directly populate the target structure
+        for (UInt entry = 0; entry < entryCount; entry++)
+        {
+            CapabilityAtom target = CapabilityAtom(0);
+            CapabilityAtom stage = CapabilityAtom(0);
+            UInt bufferCount = 0;
+
+            serialize(serializer, target);
+            serialize(serializer, stage);
+            serialize(serializer, bufferCount);
+
+            // Get references to target structures and populate directly
+            auto& targetSet = value.getCapabilityTargetSets()[target];
+            targetSet.target = target;
+
+            auto& stageSet = targetSet.shaderStageSets[stage];
+            stageSet.stage = stage;
+
+            // Create CapabilityAtomSet and reconstruct from buffer data
+            CapabilityAtomSet atomSet;
+            if (bufferCount > 0)
+            {
+                // Read UInt64 buffer data and populate UIntSet using public API
+                atomSet.resizeBackingBufferDirectly(bufferCount);
+
+                for (UInt i = 0; i < bufferCount; i++)
+                {
+                    UInt64 element = 0;
+                    serialize(serializer, element);
+
+                    // Use addRawElement to populate the UIntSet directly
+                    if (element != 0)
+                    {
+                        atomSet.addRawElement(UIntSet::Element(element), i);
+                    }
+                }
+            }
+
+            stageSet.atomSet = atomSet;
+        }
     }
 }
 
