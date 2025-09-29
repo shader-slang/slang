@@ -2077,6 +2077,18 @@ DIAGNOSTIC(
     "expected a constant value of type '$0' as argument for specialization parameter '$1'")
 
 DIAGNOSTIC(
+    38010,
+    Warning,
+    unhandledModOnEntryPointParameter,
+    "$0 on parameter '$1' is unsupported on entry point parameters and will be ignored")
+
+DIAGNOSTIC(
+    38011,
+    Error,
+    entryPointCannotReturnResourceType,
+    "entry point '$0' cannot return type '$1' that contains resource types")
+
+DIAGNOSTIC(
     38100,
     Error,
     typeDoesntImplementInterfaceRequirement,
@@ -2442,10 +2454,7 @@ DIAGNOSTIC(
     "\"index\"] attribute to provide a binding location.")
 DIAGNOSTIC(40006, Error, unimplementedSystemValueSemantic, "unknown system-value semantic '$0'")
 
-
 DIAGNOSTIC(49999, Error, unknownSystemValueSemantic, "unknown system-value semantic '$0'")
-
-DIAGNOSTIC(40006, Error, needCompileTimeConstant, "expected a compile-time constant")
 
 DIAGNOSTIC(40007, Internal, irValidationFailed, "IR validation failed: $0")
 
@@ -2469,6 +2478,9 @@ DIAGNOSTIC(
     unconstrainedGenericParameterNotAllowedInDynamicFunction,
     "unconstrained generic paramter '$0' is not allowed in a dynamic function.")
 
+DIAGNOSTIC(40012, Error, needCompileTimeConstant, "expected a compile-time constant")
+
+DIAGNOSTIC(40013, Error, argIsNotConstexpr, "arg $0 in '$1' is not a compile-time constant")
 
 DIAGNOSTIC(
     40020,
@@ -2960,12 +2972,16 @@ DIAGNOSTIC(
     Error,
     divisionByMatrixNotSupported,
     "division by matrix is not supported for Metal and WGSL targets.")
-
 DIAGNOSTIC(
     56103,
     Error,
     int16NotSupportedInWGSL,
     "16-bit integer type '$0' is not supported by the WGSL backend.")
+DIAGNOSTIC(
+    56104,
+    Error,
+    assignToRefNotSupported,
+    "whole struct must be assiged to mesh output at once for Metal target.")
 
 DIAGNOSTIC(57001, Warning, spirvOptFailed, "spirv-opt failed. $0")
 DIAGNOSTIC(57002, Error, unknownPatchConstantParameter, "unknown patch constant parameter '$0'.")

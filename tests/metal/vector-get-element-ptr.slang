@@ -14,9 +14,9 @@ void modify(inout int v)
 void computeMain(int3 v : SV_DispatchThreadID)
 {
     int3 u = v;
-    // CHECK: int [[TEMP:[a-zA-Z0-9_]+]] = u{{.*}}.x;
+    // CHECK: int [[TEMP:[a-zA-Z0-9_]+]] = [[OUT:[a-zA-Z0-9_]+]].x;
     // CHECK: modify{{.*}}(&[[TEMP]])
-    // CHECK: u{{.*}}.x = [[TEMP]];
+    // CHECK: [[OUT]].x = [[TEMP]];
 
     modify(u.x);
     // BUF: 2

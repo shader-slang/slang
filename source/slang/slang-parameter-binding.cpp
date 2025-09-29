@@ -2348,13 +2348,13 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     {
         SLANG_ASSERT(ptrType->astNodeType == ASTNodeType::PtrType);
 
+        auto typeLayout = processSimpleEntryPointParameter(context, ptrType, state, varLayout);
+        RefPtr<PointerTypeLayout> ptrTypeLayout = typeLayout.as<PointerTypeLayout>();
+
         // Work out the layout for the value/target type
         auto valueTypeLayout =
             processEntryPointVaryingParameter(context, ptrType->getValueType(), state, varLayout);
-
-        RefPtr<PointerTypeLayout> ptrTypeLayout = new PointerTypeLayout();
         ptrTypeLayout->valueTypeLayout = valueTypeLayout;
-
         return ptrTypeLayout;
     }
     else if (auto optionalType = as<OptionalType>(type))

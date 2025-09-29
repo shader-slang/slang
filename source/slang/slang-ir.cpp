@@ -3379,10 +3379,16 @@ IRInst* IRBuilder::emitOutImplicitCast(IRInst* type, IRInst* value)
 {
     return emitIntrinsicInst((IRType*)type, kIROp_OutImplicitCast, 1, &value);
 }
-IRInst* IRBuilder::emitDebugSource(UnownedStringSlice fileName, UnownedStringSlice source)
+IRInst* IRBuilder::emitDebugSource(
+    UnownedStringSlice fileName,
+    UnownedStringSlice source,
+    bool isIncludedFile)
 {
-    IRInst* args[] = {getStringValue(fileName), getStringValue(source)};
-    return emitIntrinsicInst(getVoidType(), kIROp_DebugSource, 2, args);
+    IRInst* args[] = {
+        getStringValue(fileName),
+        getStringValue(source),
+        getBoolValue(isIncludedFile)};
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugSource, 3, args);
 }
 IRInst* IRBuilder::emitDebugBuildIdentifier(
     UnownedStringSlice buildIdentifier,
@@ -8703,6 +8709,8 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_EnumCast:
     case kIROp_CastUInt2ToDescriptorHandle:
     case kIROp_CastDescriptorHandleToUInt2:
+    case kIROp_CastUInt64ToDescriptorHandle:
+    case kIROp_CastDescriptorHandleToUInt64:
     case kIROp_CastDescriptorHandleToResource:
     case kIROp_GetDynamicResourceHeap:
     case kIROp_CastDynamicResource:

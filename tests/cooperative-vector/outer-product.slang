@@ -1,4 +1,3 @@
-// Fails because VVL 1.4.313.0 has a bug that sees int32_t as uint32_t in validation layers, issue #7715
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -render-feature cooperative-vector -output-using-type
 
 // HLSL doesn't support the training operations
@@ -65,7 +64,7 @@ void computeMain()
         output,
         0,
         32,
-        CoopVecMatrixLayout::RowMajor,
+        CoopVecMatrixLayout::TrainingOptimal,
         CoopVecComponentType::Float16,
     );
 
