@@ -10,7 +10,7 @@ struct LoweredCombinedSamplerStructInfo
 {
     IRStructKey* texture;
     IRStructKey* sampler;
-    IRStructType* type;
+    IRType* type; // Can be IRStructType* or IRArrayType* (array of IRStructType elements)
     IRType* samplerType;
     IRType* textureType;
     IRTypeLayout* typeLayout;
@@ -100,6 +100,48 @@ struct LowerCombinedSamplerContext
         mapLoweredTypeToLoweredInfo.add(info.type, info);
         return info;
     }
+
+    LoweredCombinedSamplerStructInfo lowerCombinedTextureSamplerTypeArray(
+        IRArrayTypeBase* arrayType)
+    {
+        if (auto loweredInfo = mapTypeToLoweredInfo.tryGetValue(arrayType))
+            return *loweredInfo;
+
+        // Lower the element type to get struct layout
+        auto elementInfo =
+            lowerCombinedTextureSamplerType(as<IRTextureTypeBase>(arrayType->getElementType()));
+
+        // Create array type of the lowered struct
+        IRBuilder builder(arrayType);
+        auto arrayOfStructsType =
+            builder.getArrayType(elementInfo.type, arrayType->getElementCount());
+
+        // Create array type layout with struct as element layout
+        IRArrayTypeLayout::Builder arrayLayoutBuilder(&builder, elementInfo.typeLayout);
+        // Copy resource usage from element to array (multiplied by array size)
+        IRIntegerValue arraySize = getIntVal(arrayType->getElementCount());
+        for (auto sizeAttr : elementInfo.typeLayout->getSizeAttrs())
+        {
+            arrayLayoutBuilder.addResourceUsage(
+                sizeAttr->getResourceKind(),
+                LayoutSize(sizeAttr->getSize().getFiniteValue() * arraySize));
+        }
+        auto arrayTypeLayout = arrayLayoutBuilder.build();
+
+        // Populate typeInfo with array layout info
+        LoweredCombinedSamplerStructInfo info;
+        info.type = arrayOfStructsType;
+        info.typeLayout = arrayTypeLayout;
+        info.texture = elementInfo.texture;
+        info.sampler = elementInfo.sampler;
+        info.textureType = elementInfo.textureType;
+        info.samplerType = elementInfo.samplerType;
+
+        // Store this info so it can be found later by the replacement logic
+        mapTypeToLoweredInfo.add(arrayType, info);
+        mapLoweredTypeToLoweredInfo.add(arrayOfStructsType, info);
+        return info;
+    }
 };
 
 void lowerCombinedTextureSamplers(
@@ -115,57 +157,93 @@ void lowerCombinedTextureSamplers(
     // Lower combined texture sampler type into a struct type.
     for (auto globalInst : module->getGlobalInsts())
     {
-        auto textureType = as<IRTextureTypeBase>(globalInst);
-        if (!textureType || getIntVal(textureType->getIsCombinedInst()) == 0)
-            continue;
-        auto typeInfo = context.lowerCombinedTextureSamplerType(textureType);
+        IRType* dataType = nullptr;
+        auto globalParam = as<IRGlobalParam>(globalInst);
+        auto globalVar = as<IRGlobalVar>(globalInst);
 
-        for (auto use = textureType->firstUse; use; use = use->nextUse)
+        // Handle global parameters
+        if (globalParam)
         {
-            auto typeUser = use->getUser();
-            if (use != &typeUser->typeUse)
-                continue;
-
-            auto layoutDecor = typeUser->findDecoration<IRLayoutDecoration>();
-            if (!layoutDecor)
-                continue;
-            // Replace the original VarLayout with the new StructTypeVarLayout.
-            auto varLayout = as<IRVarLayout>(layoutDecor->getLayout());
-            if (!varLayout)
-                continue;
-            IRBuilder subBuilder(typeUser);
-            IRVarLayout::Builder newVarLayoutBuilder(&subBuilder, typeInfo.typeLayout);
-            newVarLayoutBuilder.cloneEverythingButOffsetsFrom(varLayout);
-            IRVarOffsetAttr* resOffsetAttr = nullptr;
-            IRVarOffsetAttr* descriptorTableSlotOffsetAttr = nullptr;
-
-            for (auto offsetAttr : varLayout->getOffsetAttrs())
-            {
-                LayoutResourceKind resKind = offsetAttr->getResourceKind();
-                if (resKind == LayoutResourceKind::UnorderedAccess ||
-                    resKind == LayoutResourceKind::ShaderResource)
-                    resOffsetAttr = offsetAttr;
-                else if (resKind == LayoutResourceKind::DescriptorTableSlot)
-                    descriptorTableSlotOffsetAttr = offsetAttr;
-                auto info = newVarLayoutBuilder.findOrAddResourceInfo(resKind);
-                info->offset = offsetAttr->getOffset();
-                info->space = offsetAttr->getSpace();
-                info->kind = offsetAttr->getResourceKind();
-            }
-            // If the user provided an layout offset for the texture but not for descriptor table
-            // slot, then we use the texture offset for the descriptor table slot offset.
-            if (resOffsetAttr && !descriptorTableSlotOffsetAttr)
-            {
-                auto info = newVarLayoutBuilder.findOrAddResourceInfo(
-                    LayoutResourceKind::DescriptorTableSlot);
-                info->offset = resOffsetAttr->getOffset();
-                info->space = resOffsetAttr->getSpace();
-                info->kind = LayoutResourceKind::DescriptorTableSlot;
-            }
-            auto newVarLayout = newVarLayoutBuilder.build();
-            subBuilder.addLayoutDecoration(typeUser, newVarLayout);
-            varLayout->removeAndDeallocate();
+            dataType = globalParam->getDataType();
         }
+        // Handle global variables
+        else if (globalVar)
+        {
+            dataType = globalVar->getDataType();
+            if (auto ptrType = as<IRPtrType>(dataType))
+                dataType = ptrType->getValueType();
+        }
+        // Handle other global instructions
+        else
+        {
+            dataType = as<IRType>(globalInst);
+        }
+
+        // Lower the data type
+        LoweredCombinedSamplerStructInfo typeInfo;
+        // Lower individual combined texture sampler type
+        if (auto textureType = as<IRTextureTypeBase>(dataType))
+        {
+            if (getIntVal(textureType->getIsCombinedInst()) == 0)
+                continue;
+
+            // Lower the combined texture sampler type
+            typeInfo = context.lowerCombinedTextureSamplerType(textureType);
+        }
+        // Lower array and its element type if that is a combined texture sampler type
+        else if (auto arrayType = as<IRArrayTypeBase>(dataType))
+        {
+            auto elementType = as<IRTextureTypeBase>(arrayType->getElementType());
+            if (!elementType || getIntVal(elementType->getIsCombinedInst()) == 0)
+                continue;
+
+            // Lower the array of combined texture sampler type and its element type
+            typeInfo = context.lowerCombinedTextureSamplerTypeArray(arrayType);
+        }
+        else
+        {
+            continue;
+        }
+
+        auto layoutDecor = globalInst->findDecoration<IRLayoutDecoration>();
+        if (!layoutDecor)
+            continue;
+        // Replace the original VarLayout with the new StructTypeVarLayout.
+        auto varLayout = as<IRVarLayout>(layoutDecor->getLayout());
+        if (!varLayout)
+            continue;
+        IRBuilder subBuilder(globalInst);
+        IRVarLayout::Builder newVarLayoutBuilder(&subBuilder, typeInfo.typeLayout);
+        newVarLayoutBuilder.cloneEverythingButOffsetsFrom(varLayout);
+        IRVarOffsetAttr* resOffsetAttr = nullptr;
+        IRVarOffsetAttr* descriptorTableSlotOffsetAttr = nullptr;
+
+        for (auto offsetAttr : varLayout->getOffsetAttrs())
+        {
+            LayoutResourceKind resKind = offsetAttr->getResourceKind();
+            if (resKind == LayoutResourceKind::UnorderedAccess ||
+                resKind == LayoutResourceKind::ShaderResource)
+                resOffsetAttr = offsetAttr;
+            else if (resKind == LayoutResourceKind::DescriptorTableSlot)
+                descriptorTableSlotOffsetAttr = offsetAttr;
+            auto info = newVarLayoutBuilder.findOrAddResourceInfo(resKind);
+            info->offset = offsetAttr->getOffset();
+            info->space = offsetAttr->getSpace();
+            info->kind = offsetAttr->getResourceKind();
+        }
+        // If the user provided an layout offset for the texture but not for descriptor table
+        // slot, then we use the texture offset for the descriptor table slot offset.
+        if (resOffsetAttr && !descriptorTableSlotOffsetAttr)
+        {
+            auto info =
+                newVarLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::DescriptorTableSlot);
+            info->offset = resOffsetAttr->getOffset();
+            info->space = resOffsetAttr->getSpace();
+            info->kind = LayoutResourceKind::DescriptorTableSlot;
+        }
+        auto newVarLayout = newVarLayoutBuilder.build();
+        subBuilder.addLayoutDecoration(globalInst, newVarLayout);
+        varLayout->removeAndDeallocate();
     }
 
     // If no combined texture sampler type exist in the IR module,
