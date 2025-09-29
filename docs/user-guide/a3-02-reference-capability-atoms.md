@@ -984,6 +984,9 @@ Compound Capabilities
 `cpp_cuda_hlsl_spirv`
 > CPP, CUDA, HLSL, and SPIRV code-gen targets
 
+`cpp_cuda_metal_spirv`
+> CPP, CUDA, Metal, and SPIRV code-gen targets
+
 `cpp_cuda_spirv`
 > CPP, CUDA and SPIRV code-gen targets
 

@@ -135,6 +135,7 @@ jobs:
       config: debug
       runs-on: '["ubuntu-22.04"]'
       test-category: smoke
+      server-count: 1
 
   test-linux-release-gcc-x86_64:
     needs: [filter, build-linux-release-gcc-x86_64]
@@ -147,6 +148,7 @@ jobs:
       config: release
       runs-on: '["ubuntu-22.04"]'
       test-category: full
+      server-count: 1
 
   # macOS tests
   test-macos-debug-clang-aarch64:
@@ -202,3 +204,45 @@ jobs:
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
       test-category: full
       full-gpu-tests: true
+
+  check-ci:
+    needs:
+      [
+        test-windows-release-cl-x86_64-gpu,
+        test-windows-debug-cl-x86_64-gpu,
+        test-macos-release-clang-aarch64,
+        test-macos-debug-clang-aarch64,
+        test-linux-release-gcc-x86_64,
+        test-linux-debug-gcc-x86_64,
+      ]
+    runs-on: ubuntu-latest
+    if: always() # Always run, even if dependencies fail
+    steps:
+      - name: Check CI Results
+        run: |
+          echo "=== CI Results Summary ==="
+          echo "Windows Release GPU: ${{ needs.test-windows-release-cl-x86_64-gpu.result }}"
+          echo "Windows Debug GPU: ${{ needs.test-windows-debug-cl-x86_64-gpu.result }}"
+          echo "macOS Release ARM64: ${{ needs.test-macos-release-clang-aarch64.result }}"
+          echo "macOS Debug ARM64: ${{ needs.test-macos-debug-clang-aarch64.result }}"
+          echo "Linux Release x64: ${{ needs.test-linux-release-gcc-x86_64.result }}"
+          echo "Linux Debug x64: ${{ needs.test-linux-debug-gcc-x86_64.result }}"
+
+          # Check if any required jobs failed (allow success or skipped)
+          if [[ "${{ needs.test-windows-release-cl-x86_64-gpu.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-windows-debug-cl-x86_64-gpu.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-macos-release-clang-aarch64.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-macos-debug-clang-aarch64.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-linux-release-gcc-x86_64.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-linux-debug-gcc-x86_64.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-windows-release-cl-x86_64-gpu.result }}" == "cancelled" ]] || \
+             [[ "${{ needs.test-windows-debug-cl-x86_64-gpu.result }}" == "cancelled" ]] || \
+             [[ "${{ needs.test-macos-release-clang-aarch64.result }}" == "cancelled" ]] || \
+             [[ "${{ needs.test-macos-debug-clang-aarch64.result }}" == "cancelled" ]] || \
+             [[ "${{ needs.test-linux-release-gcc-x86_64.result }}" == "cancelled" ]] || \
+             [[ "${{ needs.test-linux-debug-gcc-x86_64.result }}" == "cancelled" ]]; then
+            echo "❌ One or more CI jobs failed or were cancelled"
+            exit 1
+          fi
+
+          echo "✅ All CI jobs completed successfully (passed or skipped)!"

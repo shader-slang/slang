@@ -11,6 +11,9 @@ struct IRVarLayout;
 /// Collect global-scope shader parameters that use uniform/ordinary
 /// storage into a single `struct` (possibly wrapped in a constant buffer).
 ///
-void collectGlobalUniformParameters(IRModule* module, IRVarLayout* globalScopeVarLayout);
+void collectGlobalUniformParameters(
+    IRModule* module,
+    IRVarLayout* globalScopeVarLayout,
+    CodeGenTarget target = CodeGenTarget::Unknown);
 
 } // namespace Slang

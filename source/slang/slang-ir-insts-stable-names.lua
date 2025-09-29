@@ -670,4 +670,6 @@ return {
 	["SPIRVAsmOperand.__imageType"] = 666,
 	["SPIRVAsmOperand.__sampledImageType"] = 667,
 	["Type.CLayout"] = 668,
+	["CastUInt64ToDescriptorHandle"] = 669,
+	["CastDescriptorHandleToUInt64"] = 670,
 }
