@@ -2083,6 +2083,12 @@ DIAGNOSTIC(
     "$0 on parameter '$1' is unsupported on entry point parameters and will be ignored")
 
 DIAGNOSTIC(
+    38011,
+    Error,
+    entryPointCannotReturnResourceType,
+    "entry point '$0' cannot return type '$1' that contains resource types")
+
+DIAGNOSTIC(
     38100,
     Error,
     typeDoesntImplementInterfaceRequirement,
