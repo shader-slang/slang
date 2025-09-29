@@ -1093,80 +1093,153 @@ void serialize(S const& serializer, DeclAssociationList& value)
     serialize(serializer, value.associations);
 }
 
+// Intermediate type for CapabilitySet serialization.
 //
-// The various types used to store capabilities on declarations
-// are all semantically equivalent to simpler types.
+// This essentially flattens the hierarchy found in CapabilitySet, making it
+// about twice as fast to deserialize. Deserializing capability sets was taking
+// up a significant part of AST deserialization time.
 //
+// This follows the same pattern as ASTModuleInfo and ContainerDeclDirectMemberDeclsInfo
+FIDDLE()
+struct CapabilitySetInfo
+{
+    FIDDLE(...)
 
-// A `CapabilityAtomSet` is an optimized representation of a
-// set of a `CapabilityAtom`s (which we can encode as just
-// a sequence).
-//
-SLANG_DECLARE_FOSSILIZED_AS(CapabilityAtomSet, List<CapabilityAtom>);
+    // Store the capability data as a list of entries
+    // Each entry contains: target, stage, and buffer data
+    struct Entry
+    {
+        CapabilityAtom target;
+        CapabilityAtom stage;
+        List<UInt64> bufferData;
+    };
 
-// A `CapabilityStateSet` can simply be encoded using its `atomSet` member.
-//
-SLANG_DECLARE_FOSSILIZED_AS_MEMBER(CapabilityStageSet, atomSet);
+    FIDDLE() List<Entry> entries;
+};
 
-// A `CapabilityStageSet` is really just a wrapper around a `CapabilityStageSets`
-// (which is itself just a dictionary of `CapabilityStateSet`s).
-//
-SLANG_DECLARE_FOSSILIZED_AS(CapabilityTargetSet, CapabilityStageSets);
-
-// A `CapabilitySet` is really just a wrapper around a `CapabilityTargetSets`
-// (which is itself just a dictionary of `CapabilityTargetSet`s).
-//
-SLANG_DECLARE_FOSSILIZED_AS(CapabilitySet, CapabilityTargetSets);
+// Forward declare the intermediate type
+template<typename S>
+void serialize(S const& serializer, CapabilitySetInfo::Entry& value);
 
 template<typename S>
-void serialize(S const& serializer, CapabilityAtomSet& value)
+void serialize(S const& serializer, CapabilitySetInfo& value);
+
+// Declare fossilized representation for CapabilitySetInfo::Entry
+template<>
+struct FossilizedTypeTraits<CapabilitySetInfo::Entry>
 {
-    SLANG_SCOPED_SERIALIZER_ARRAY(serializer);
-    if (isWriting(serializer))
+    struct FossilizedType
     {
-        for (auto rawAtom : value)
+        Fossilized<CapabilityAtom> target;
+        Fossilized<CapabilityAtom> stage;
+        Fossilized<List<UInt64>> bufferData;
+    };
+};
+
+// Serialize a CapabilitySetInfo::Entry
+template<typename S>
+void serialize(S const& serializer, CapabilitySetInfo::Entry& value)
+{
+    SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
+    serialize(serializer, value.target);
+    serialize(serializer, value.stage);
+    serialize(serializer, value.bufferData);
+}
+
+// Declare fossilized representation for CapabilitySetInfo
+template<>
+struct FossilizedTypeTraits<CapabilitySetInfo>
+{
+    struct FossilizedType
+    {
+        Fossilized<List<CapabilitySetInfo::Entry>> entries;
+    };
+};
+
+// Serialize a CapabilitySetInfo
+template<typename S>
+void serialize(S const& serializer, CapabilitySetInfo& value)
+{
+    SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
+    serialize(serializer, value.entries);
+}
+
+// A `CapabilitySet` is serialized via the intermediate `CapabilitySetInfo` type
+SLANG_DECLARE_FOSSILIZED_AS(CapabilitySet, CapabilitySetInfo);
+
+// Helper function to collect CapabilitySetInfo from a CapabilitySet
+static CapabilitySetInfo _collectCapabilitySetInfo(const CapabilitySet& capSet)
+{
+    CapabilitySetInfo info;
+
+    // Collect all non-empty entries
+    for (const auto& targetPair : capSet.getCapabilityTargetSets())
+    {
+        CapabilityAtom target = targetPair.first;
+        const auto& targetSet = targetPair.second;
+
+        for (const auto& stagePair : targetSet.shaderStageSets)
         {
-            auto atom = CapabilityAtom(rawAtom);
-            serialize(serializer, atom);
+            CapabilityAtom stage = stagePair.first;
+            const auto& stageSet = stagePair.second;
+
+            if (stageSet.atomSet && !stageSet.atomSet->isEmpty())
+            {
+                CapabilitySetInfo::Entry entry;
+                entry.target = target;
+                entry.stage = stage;
+
+                // Copy buffer data
+                const auto& buffer = stageSet.atomSet->getBuffer();
+                for (Index i = 0; i < buffer.getCount(); i++)
+                {
+                    entry.bufferData.add(UInt64(buffer[i]));
+                }
+
+                info.entries.add(entry);
+            }
         }
     }
-    else
+
+    return info;
+}
+
+// Helper function to reconstruct a CapabilitySet from CapabilitySetInfo
+static void _reconstructCapabilitySet(CapabilitySet& capSet, const CapabilitySetInfo& info)
+{
+    // Clear existing data
+    capSet.getCapabilityTargetSets().clear();
+
+    // Reconstruct from entries
+    for (const auto& entry : info.entries)
     {
-        while (hasElements(serializer))
+        // Get references to target structures and populate directly
+        auto& targetSet = capSet.getCapabilityTargetSets()[entry.target];
+        targetSet.target = entry.target;
+
+        auto& stageSet = targetSet.shaderStageSets[entry.stage];
+        stageSet.stage = entry.stage;
+
+        // Create CapabilityAtomSet and reconstruct from buffer data
+        CapabilityAtomSet atomSet;
+        if (entry.bufferData.getCount() > 0)
         {
-            CapabilityAtom atom = CapabilityAtom(0);
-            serialize(serializer, atom);
-            value.add(UInt(atom));
+            atomSet.resizeBackingBufferDirectly(entry.bufferData.getCount());
+
+            for (Index i = 0; i < entry.bufferData.getCount(); i++)
+            {
+                if (entry.bufferData[i] != 0)
+                {
+                    atomSet.addRawElement(UIntSet::Element(entry.bufferData[i]), i);
+                }
+            }
         }
+
+        stageSet.atomSet = atomSet;
     }
 }
 
-template<typename S>
-void serialize(S const& serializer, CapabilityStageSet& value)
-{
-    serialize(serializer, value.atomSet);
-}
-
-template<typename S>
-void serialize(S const& serializer, CapabilityTargetSet& value)
-{
-    serialize(serializer, value.shaderStageSets);
-
-    // The value for each entry in `shaderStageSets` have
-    // a `stage` field that is redundant with the key for
-    // that entry. Rather than serialize the key as part
-    // of the `CapabilityStageSet` type, we instead copy
-    // it over from the key to the value in the case where
-    // we are reading.
-    //
-    if (isReading(serializer))
-    {
-        for (auto& p : value.shaderStageSets)
-            p.second.stage = p.first;
-    }
-}
-
-// Optimized CapabilitySet serialization using direct UIntSet buffer serialization
+// Simplified CapabilitySet serialization using intermediate data structure
 template<typename S>
 void serialize(S const& serializer, CapabilitySet& value)
 {
@@ -1174,105 +1247,20 @@ void serialize(S const& serializer, CapabilitySet& value)
 
     if (isWriting(serializer))
     {
-        // Serialize as a flat sequence of (target, stage, bufferCount, buffer_data...)
-        // This leverages UIntSet's efficient List<uint64_t> internal storage
+        // Collect intermediate representation
+        CapabilitySetInfo info = _collectCapabilitySetInfo(value);
 
-        // First, count the number of entries to serialize
-        UInt entryCount = 0;
-        for (const auto& targetPair : value.getCapabilityTargetSets())
-        {
-            for (const auto& stagePair : targetPair.second.shaderStageSets)
-            {
-                if (stagePair.second.atomSet && !stagePair.second.atomSet->isEmpty())
-                {
-                    entryCount++;
-                }
-            }
-        }
-
-        serialize(serializer, entryCount);
-
-        // Now serialize each entry with its raw buffer data
-        for (const auto& targetPair : value.getCapabilityTargetSets())
-        {
-            CapabilityAtom target = targetPair.first;
-            const auto& targetSet = targetPair.second;
-
-            for (const auto& stagePair : targetSet.shaderStageSets)
-            {
-                CapabilityAtom stage = stagePair.first;
-                const auto& stageSet = stagePair.second;
-
-                if (stageSet.atomSet && !stageSet.atomSet->isEmpty())
-                {
-                    // Serialize target and stage identifiers
-                    serialize(serializer, target);
-                    serialize(serializer, stage);
-
-                    // Get direct access to UIntSet's internal buffer
-                    const auto& buffer = stageSet.atomSet->getBuffer();
-                    UInt bufferCount = UInt(buffer.getCount());
-
-                    // Serialize buffer count and raw UInt64 data (correct type for serialization)
-                    serialize(serializer, bufferCount);
-                    for (UInt i = 0; i < bufferCount; i++)
-                    {
-                        UInt64 element = UInt64(buffer[i]);
-                        serialize(serializer, element);
-                    }
-                }
-            }
-        }
+        // Serialize the intermediate representation
+        serialize(serializer, info);
     }
     else
     {
-        // Read and directly reconstruct the nested structure
-        UInt entryCount = 0;
-        serialize(serializer, entryCount);
+        // Deserialize the intermediate representation
+        CapabilitySetInfo info;
+        serialize(serializer, info);
 
-        // Clear existing data
-        value.getCapabilityTargetSets().clear();
-
-        // Read each entry and directly populate the target structure
-        for (UInt entry = 0; entry < entryCount; entry++)
-        {
-            CapabilityAtom target = CapabilityAtom(0);
-            CapabilityAtom stage = CapabilityAtom(0);
-            UInt bufferCount = 0;
-
-            serialize(serializer, target);
-            serialize(serializer, stage);
-            serialize(serializer, bufferCount);
-
-            // Get references to target structures and populate directly
-            auto& targetSet = value.getCapabilityTargetSets()[target];
-            targetSet.target = target;
-
-            auto& stageSet = targetSet.shaderStageSets[stage];
-            stageSet.stage = stage;
-
-            // Create CapabilityAtomSet and reconstruct from buffer data
-            CapabilityAtomSet atomSet;
-            if (bufferCount > 0)
-            {
-                // Read UInt64 buffer data and populate UIntSet using public API
-                atomSet.resizeBackingBufferDirectly(bufferCount);
-
-                for (UInt i = 0; i < bufferCount; i++)
-                {
-                    UInt64 element = 0;
-                    serialize(serializer, element);
-
-                    // Use addRawElement to populate the UIntSet directly
-                    if (element != 0)
-                    {
-                        atomSet.addRawElement(UIntSet::Element(element), i);
-                    }
-                }
-            }
-
-            stageSet.atomSet = atomSet;
-        }
+        // Reconstruct the CapabilitySet
+        _reconstructCapabilitySet(value, info);
     }
 }
 
