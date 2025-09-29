@@ -188,18 +188,18 @@ bool TEST_sparse<T>(
      typealias TN = T;
      constexpr const int2 offset = int2(0, 0);
      uint status;
- 
+
      int sampleIndex = 0;
      int2 iuv = int2(1, 1);
      int3 iuvs = int3(iuv, sampleIndex);
- 
+
      return true
          && (status = getNotMapped(), all(TN(T(1)) == s2D.Load(iuvs, offset, status))) && CheckAccessFullyMapped(status)
          && (status = getNotMapped(), all(TN(T(1)) == s2DMS.Load(iuv, sampleIndex, offset, status))) && CheckAccessFullyMapped(status)
          ;
  }
 
-[numthreads(4, 1, 1)]
+[numthreads(2, 2, 1)]
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     bool result = true

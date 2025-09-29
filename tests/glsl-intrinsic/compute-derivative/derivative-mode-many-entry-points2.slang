@@ -12,14 +12,15 @@ buffer MyBlockName
 } outputBuffer;
 
 [DerivativeGroupQuad]
-[shader("compute")]
 [numthreads(2,2,1)]
+[shader("compute")]
 void main1(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     outputBuffer.result = asint(ddx(1)) + asint(ddx(1)) ;
 }
 
 [DerivativeGroupLinear]
+[numthreads(4,1,1)]
 [shader("compute")]
 void main2(uint3 dispatchThreadID : SV_DispatchThreadID)
 {

@@ -80,6 +80,7 @@ prelude/*.h.cpp
 /multiple-definitions.hlsl
 /external/slang-llvm/
 /external/slang-glslang/
+/external/mimalloc/
 
 build/**/*.tlog
 build/**/*.lastbuildstate

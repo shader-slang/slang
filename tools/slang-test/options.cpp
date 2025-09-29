@@ -90,6 +90,13 @@ static bool _isSubCommand(const char* arg)
         "  -use-test-server               Run tests using test server\n"
         "  -use-fully-isolated-test-server  Run each test in isolated server\n"
         "  -capability <name>             Compile with the given capability\n"
+
+        // Recent Windows runtime versions started opening a dialog popup window when
+        // `abort()` is called, which breaks the CI workflow and some scripts that
+        // expect a normal termination.
+        // It can be helpful for debugging but we should ignore it for CI.
+        "  -ignore-abort-msg              Ignore abort message dialog popup on Windows\n"
+
         "  -enable-debug-layers [true|false] Enable or disable Validation Layer for Vulkan\n"
         "                                 and Debug Device for DX\n"
         "  -cache-rhi-device [true|false] Enable or disable RHI device caching (default: true)\n"
@@ -432,6 +439,13 @@ static bool _isSubCommand(const char* arg)
                 return SLANG_FAIL;
             }
             optionsOut->capabilities.add(*argCursor++);
+        }
+        else if (strcmp(arg, "-ignore-abort-msg") == 0)
+        {
+            optionsOut->ignoreAbortMsg = true;
+#ifdef _MSC_VER
+            _set_abort_behavior(0, _WRITE_ABORT_MSG);
+#endif
         }
         else if (strcmp(arg, "-expected-failure-list") == 0)
         {
