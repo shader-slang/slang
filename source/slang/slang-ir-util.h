@@ -423,13 +423,19 @@ bool isSignedType(IRType* type);
 
 bool isIROpaqueType(IRType* type);
 
-bool isImmutableLocation(IRInst* loc);
+// Returns true if the memory location pointed to by `ptrInst` is immutable.
+// An immutable location is the memory region that can't be modified by the user code.
+// Examples are ConstantBuffer and shader resource contents(e.g. StructuredBuffer).
+// Note that this is to be disguished from the access qualifier of the pointer itself,
+// e.g. a `ptrInst` of type `Ptr<T, Access.Read>` may still point to a mutable location,
+// so this function returns false in that case.
+bool isPointerToImmutableLocation(IRInst* ptrInst);
 
 // Check if `use` is the `baseAddr` operand of a GetElement/FieldExtract inst.
 // This is true if `use` is the first operand of the user inst.
 inline bool isUseBaseAddrOperand(IRUse* use, IRInst* user)
 {
-    return user->getOperands() == use;
+    return user->getOperandUse(0) == use;
 }
 
 } // namespace Slang

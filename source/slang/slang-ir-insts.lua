@@ -1473,7 +1473,8 @@ local insts = {
 					struct_name = "RequireFullQuadsDecoration",
 				},
 			},
-			{ TempCallArgVar = { struct_name = "TempCallArgImmutableVarDecoration" } },
+			{ TempCallArgImmutableVar = { struct_name = "TempCallArgImmutableVarDecoration" } },
+			{ TempCallArgVar = { struct_name = "TempCallArgVarDecoration" } },
 			{
 				nonCopyable = {
 					-- Marks a type to be non copyable, causing SSA pass to skip turning variables of the the type into SSA values.

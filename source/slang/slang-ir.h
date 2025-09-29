@@ -695,6 +695,12 @@ struct IRInst
 
     IRUse* getOperands();
 
+    IRUse* getOperandUse(UInt index)
+    {
+        SLANG_ASSERT(index < getOperandCount());
+        return getOperands() + index;
+    }
+
     IRInst* getOperand(UInt index)
     {
         SLANG_ASSERT(index < getOperandCount());

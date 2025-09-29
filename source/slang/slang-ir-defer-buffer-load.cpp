@@ -79,7 +79,7 @@ struct DeferBufferLoadContext
         case kIROp_Load:
             {
                 auto rootAddr = getRootAddr(inst->getOperand(0));
-                return isImmutableLocation(rootAddr);
+                return isPointerToImmutableLocation(rootAddr);
             }
         default:
             return false;

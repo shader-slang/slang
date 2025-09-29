@@ -2517,13 +2517,13 @@ bool isIROpaqueType(IRType* type)
     }
 }
 
-bool isImmutableLocation(IRInst* loc)
+bool isPointerToImmutableLocation(IRInst* loc)
 {
     switch (loc->getOp())
     {
     case kIROp_GetStructuredBufferPtr:
     case kIROp_ImageSubscript:
-        return isImmutableLocation(loc->getOperand(0));
+        return isPointerToImmutableLocation(loc->getOperand(0));
     default:
         break;
     }
@@ -2548,8 +2548,6 @@ bool isImmutableLocation(IRInst* loc)
 
     if (auto ptrType = as<IRPtrTypeBase>(type))
     {
-        if (ptrType->getAccessQualifier() == AccessQualifier::Read)
-            return true;
         switch (ptrType->getAddressSpace())
         {
         case AddressSpace::BuiltinInput:

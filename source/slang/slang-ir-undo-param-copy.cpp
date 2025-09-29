@@ -52,7 +52,17 @@ struct UndoParameterCopyVisitor
             {
                 if (auto varInst = as<IRVar>(inst))
                 {
-                    if (varInst->findDecoration<IRTempCallArgImmutableVarDecoration>())
+                    bool isTempCallArgVar = false;
+                    for (auto decor : varInst->getDecorations())
+                    {
+                        if (as<IRTempCallArgImmutableVarDecoration>(decor) ||
+                            as<IRTempCallArgVarDecoration>(decor))
+                        {
+                            isTempCallArgVar = true;
+                            break;
+                        }
+                    }
+                    if (isTempCallArgVar)
                     {
                         IRStore* initializingStore = nullptr;
                         IRInst* originalParamPtr = nullptr;

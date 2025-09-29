@@ -208,7 +208,7 @@
 ///
 /// However this does mean that we also need to translate things like `ptr->values[2]`
 /// into `((int*)(ptr+1))[2]`. Which we also handle during step 2 of the algorithm.
-/// (`maybeTranslateTailingPointerGetElementAddress`)
+/// (`maybeTranslateTrailingPointerGetElementAddress`)
 ///
 
 namespace Slang
@@ -1117,7 +1117,7 @@ struct LoweredElementTypeContext
             operands.add(newElementType);
             for (UInt i = 1; i < originalPtrLikeType->getOperandCount(); i++)
             {
-                operands.add(originalPtrLikeType->getOperand(0));
+                operands.add(originalPtrLikeType->getOperand(i));
             }
             return (IRType*)builder.emitIntrinsicInst(
                 builder.getTypeKind(),
@@ -1163,7 +1163,7 @@ struct LoweredElementTypeContext
         }
     }
 
-    bool maybeTranslateTailingPointerGetElementAddress(
+    bool maybeTranslateTrailingPointerGetElementAddress(
         IRBuilder& builder,
         IRFieldAddress* fieldAddr,
         IRCastStorageToLogicalBase* castInst,
@@ -1311,7 +1311,7 @@ struct LoweredElementTypeContext
                             // That is, we should first compute the tailing pointer of the
                             // struct, and replace all getElementPtr(fieldAddr, idx) with
                             // getOffsetPtr(tailingPtr, idx).
-                            if (maybeTranslateTailingPointerGetElementAddress(
+                            if (maybeTranslateTrailingPointerGetElementAddress(
                                     builder,
                                     (IRFieldAddress*)user,
                                     castInst,

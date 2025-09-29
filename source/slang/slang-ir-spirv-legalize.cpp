@@ -971,7 +971,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 as<IRConstRefType>(funcType->getParamType(i)))
                 continue;
             // If the buffer location is immutable, don't write back.
-            if (isImmutableLocation(root))
+            if (isPointerToImmutableLocation(root))
                 continue;
             writeBacks.add(WriteBackPair{arg, tempVar});
         }
