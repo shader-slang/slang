@@ -700,6 +700,7 @@ struct SharedSemanticsContext : public RefObject
     GLSLBindingOffsetTracker m_glslBindingOffsetTracker;
 
     Dictionary<Decl*, bool> m_typeContainsRecursionCache;
+    Dictionary<Decl*, bool> m_typeContainsParameterBlockCache;
 
 public:
     SharedSemanticsContext(

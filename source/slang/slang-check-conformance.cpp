@@ -7,6 +7,85 @@
 
 namespace Slang
 {
+// Forward declaration
+bool containsParameterBlockImpl(SemanticsVisitor* visitor, Type* type, HashSet<Decl*>& currentPath);
+
+bool containsParameterBlock(SemanticsVisitor* visitor, Type* type)
+{
+    HashSet<Decl*> currentPath;
+    return containsParameterBlockImpl(visitor, type, currentPath);
+}
+
+bool containsParameterBlockImpl(SemanticsVisitor* visitor, Type* type, HashSet<Decl*>& currentPath)
+{
+    // Skip modified types (const, etc.)
+    while (auto modifiedType = as<ModifiedType>(type))
+        type = modifiedType->getBase();
+
+    // Check if this is a ParameterBlockType directly
+    if (as<ParameterBlockType>(type))
+    {
+        return true;
+    }
+
+    // Check if this is an array type and look inside it
+    if (auto arrayType = as<ArrayExpressionType>(type))
+    {
+        return containsParameterBlockImpl(visitor, arrayType->getElementType(), currentPath);
+    }
+
+    // Check if this is a DeclRefType (struct, class, etc.)
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        auto typeDecl = declRefType->getDeclRef().getDecl();
+
+        // Check global cache first - if we've already fully analyzed this type, use that result
+        auto shared = visitor->getShared();
+        if (auto cachedResult = shared->m_typeContainsParameterBlockCache.tryGetValue(typeDecl))
+        {
+            return *cachedResult;
+        }
+
+        // If we're currently exploring this type, we're in a cycle - but for ParameterBlock
+        // checking, cycles don't matter, we just need to know if there's a ParameterBlock
+        if (currentPath.contains(typeDecl))
+        {
+            return false;
+        }
+
+        // Add to current exploration path
+        currentPath.add(typeDecl);
+
+        bool hasParameterBlock = false;
+
+        // Check members if it's an aggregate type
+        if (auto aggTypeDecl = declRefType->getDeclRef().as<AggTypeDecl>())
+        {
+            for (auto member : aggTypeDecl.getDecl()->getMembersOfType<VarDeclBase>())
+            {
+                // Skip static members
+                if (member->hasModifier<HLSLStaticModifier>())
+                    continue;
+
+                if (containsParameterBlockImpl(visitor, member->getType(), currentPath))
+                {
+                    hasParameterBlock = true;
+                    break;
+                }
+            }
+        }
+
+        // Remove from current exploration path
+        currentPath.remove(typeDecl);
+
+        // Cache the result globally
+        shared->m_typeContainsParameterBlockCache[typeDecl] = hasParameterBlock;
+
+        return hasParameterBlock;
+    }
+
+    return false;
+}
 bool SemanticsVisitor::isInterfaceSafeForTaggedUnion(DeclRef<InterfaceDecl> interfaceDeclRef)
 {
     for (auto memberDeclRef : getMembers(m_astBuilder, interfaceDeclRef))
@@ -360,6 +439,12 @@ TypeTag SemanticsVisitor::getTypeTags(Type* type)
     {
         auto elementTags = getTypeTags(parameterGroupType->getElementType());
         elementTags = (TypeTag)(((int)elementTags & ~(int)TypeTag::Unsized) | (int)TypeTag::Opaque);
+        
+        // ParameterBlockType is a subclass of UniformParameterGroupType
+        if (as<ParameterBlockType>(type))
+        {
+            elementTags = (TypeTag)((int)elementTags | (int)TypeTag::ContainsParameterBlock);
+        }
         return elementTags;
     }
     else if (
@@ -372,7 +457,17 @@ TypeTag SemanticsVisitor::getTypeTags(Type* type)
     else if (auto declRefType = as<DeclRefType>(type))
     {
         if (auto aggTypeDecl = as<AggTypeDecl>(declRefType->getDeclRef()))
-            return aggTypeDecl.getDecl()->typeTags;
+        {
+            TypeTag tags = aggTypeDecl.getDecl()->typeTags;
+            
+            // Check recursively if this struct contains a ParameterBlock
+            if (containsParameterBlock(this, type))
+            {
+                tags = (TypeTag)((int)tags | (int)TypeTag::ContainsParameterBlock);
+            }
+            
+            return tags;
+        }
     }
     return TypeTag::None;
 }

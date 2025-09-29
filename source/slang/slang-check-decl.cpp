@@ -2843,6 +2843,13 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     }
 
     TypeTag varTypeTags = getTypeTags(varDecl->getType());
+    
+    // Check if this variable's type contains a ParameterBlock and propagate the flag
+    if (as<ParameterBlockType>(varDecl->getType()))
+    {
+        varTypeTags = (TypeTag)((int)varTypeTags | (int)TypeTag::ContainsParameterBlock);
+    }
+    
     auto parentDecl = as<AggTypeDecl>(getParentDecl(varDecl));
     if (parentDecl)
     {
@@ -10756,7 +10763,10 @@ void SemanticsVisitor::validateArrayElementTypeForVariable(VarDeclBase* varDecl)
         return;
 
     const auto elementType = arrayType->getElementType();
-    if (as<ParameterBlockType>(elementType))
+    
+    // Check if the element type contains a ParameterBlockType using the TypeTag system
+    auto elementTypeTags = getTypeTags(elementType);
+    if ((int)elementTypeTags & (int)TypeTag::ContainsParameterBlock)
     {
         getSink()->diagnose(varDecl, Diagnostics::disallowedArrayOfParameterBlock);
         return;
