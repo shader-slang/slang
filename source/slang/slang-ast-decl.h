@@ -377,7 +377,6 @@ enum class TypeTag
     Incomplete = 2,
     LinkTimeSized = 4,
     Opaque = 8,
-    ContainsParameterBlock = 16,
 };
 
 // Declaration of a type that represents some sort of aggregate
