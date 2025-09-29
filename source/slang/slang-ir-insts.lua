@@ -1996,6 +1996,7 @@ local insts = {
 				},
 			},
 			{ Aligned = { struct_name = "AlignedAttr", min_operands = 1 } },
+			{ MemoryScope = { struct_name = "MemoryScopeAttr", min_operands = 1 } },
 			{
 				SemanticAttr = {
 					{ userSemantic = { struct_name = "UserSemanticAttr", min_operands = 2 } },
