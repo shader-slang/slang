@@ -21,17 +21,17 @@ void rayGenerationMain()
 
     int idx = int(launchID.x);
 
-    RayDesc ray;  
+    RayDesc ray;
     ray.Origin = float3(idx, 0, 0);
     ray.TMin = 0.01f;
     ray.Direction = float3(0, 1, 0);
     ray.TMax = 1e4f;
-    
-    HitObject hit = HitObject::MakeMiss(idx, ray);
-    
+
+    HitObject hit = HitObject::MakeMiss(0, idx, ray);
+
     // Let's try assigning. This should work on VK
     // because it will SSA out such there isn't an assignment in GLSL output.
-    hit = HitObject::MakeMiss(idx + 1, ray);
+    hit = HitObject::MakeMiss(0, idx + 1, ray);
     
     int r = int(hit.IsMiss());
     

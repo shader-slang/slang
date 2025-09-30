@@ -3859,6 +3859,7 @@ slangOptixHitObjectGetClusterId(OptixTraversableHandle* hitObj)
 
 #if (OPTIX_VERSION >= 80100)
 static __forceinline__ __device__ void optixMakeMissHitObject(
+    uint RayFlags,
     uint MissShaderIndex,
     RayDesc Ray,
     OptixTraversableHandle* missObj)
@@ -3872,7 +3873,7 @@ static __forceinline__ __device__ void optixMakeMissHitObject(
         0.f /* rayTime */
 #if (OPTIX_VERSION >= 90000)
         ,
-        OPTIX_RAY_FLAG_NONE /* rayFlags*/
+        RayFlags /* rayFlags*/
 #endif
     );
 }
@@ -3880,6 +3881,7 @@ static __forceinline__ __device__ void optixMakeMissHitObject(
 
 #if (OPTIX_VERSION >= 80100)
 static __forceinline__ __device__ void optixMakeMissHitObject(
+    uint RayFlags,
     uint MissShaderIndex,
     RayDesc Ray,
     float CurrentTime,
@@ -3894,7 +3896,7 @@ static __forceinline__ __device__ void optixMakeMissHitObject(
         CurrentTime
 #if (OPTIX_VERSION >= 90000)
         ,
-        OPTIX_RAY_FLAG_NONE /* rayFlags*/
+        RayFlags /* rayFlags*/
 #endif
     );
 }
@@ -4155,10 +4157,7 @@ static __forceinline__ __device__ void slangOptixMakeNopHitObject(OptixTraversab
 
 #if (OPTIX_VERSION >= 80100)
 template<typename T>
-static __forceinline__ __device__ void optixInvoke(
-    OptixTraversableHandle AccelerationStructure,
-    OptixTraversableHandle* HitOrMiss,
-    T Payload)
+static __forceinline__ __device__ void optixInvoke(OptixTraversableHandle* HitOrMiss, T Payload)
 {
     uint32_t r0, r1;
     packOptiXRayPayloadPointer((void*)Payload, r0, r1);

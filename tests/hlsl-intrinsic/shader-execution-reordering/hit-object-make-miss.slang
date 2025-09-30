@@ -15,13 +15,13 @@ void rayGenerationMain()
 {
     int idx = DispatchRaysIndex().x;
 
-    RayDesc ray;  
+    RayDesc ray;
     ray.Origin = float3(idx, 0, 0);
     ray.TMin = 0.01f;
     ray.Direction = float3(0, 1, 0);
     ray.TMax = 1e4f;
     // SPIRV: OpHitObjectRecordMissNV
-    HitObject hit = HitObject::MakeMiss(idx, ray);
+    HitObject hit = HitObject::MakeMiss(0, idx, ray);
 
     // SPIRV: OpHitObjectIsMissNV
     int r = int(hit.IsMiss());

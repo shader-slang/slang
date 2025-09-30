@@ -43,7 +43,7 @@ void main()
             someInData1);
     outputBuffer1[0] = outputBuffer1[0]+someInData1.data;
 
-    // CHECK: NvTraceRayHitObject(
+    // CHECK: dx::HitObject::TraceRay(
     HitObject::TraceRay(as,
              1,
              0xff,
@@ -66,10 +66,9 @@ void main()
             someInData1);
     outputBuffer1[0] = outputBuffer1[0]+someInData1.data;
 
-    // CHECK: NvInvokeHitObject(
+    // CHECK: dx::HitObject::Invoke(
     HitObject hitObject_HitOrMiss;
     HitObject::Invoke(
-        as,
         hitObject_HitOrMiss,
         someInData1);
     outputBuffer1[0] = outputBuffer1[0]+someInData1.data;

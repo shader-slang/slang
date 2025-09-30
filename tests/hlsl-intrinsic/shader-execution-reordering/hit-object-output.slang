@@ -21,9 +21,9 @@ struct MyAttributes
     uint value;
 };
 
-struct MyRayPayload
+struct [raypayload] MyRayPayload
 {
-    uint value;
+    uint value : read(caller, anyhit, closesthit, miss) : write(caller);
 };
 
 void accumulate(inout uint value, HitObject hit)
@@ -81,7 +81,7 @@ void myMakeMiss(
     inout HitObject h)
 {
     RayDesc ray = makeRay(idx, 1);
-    h = HitObject::MakeMiss(idx, ray);
+    h = HitObject::MakeMiss(0, idx, ray);
 }
 
 void rayGenerationMain() 

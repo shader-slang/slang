@@ -1,23 +1,37 @@
 Shader Execution Reordering (SER)
 =================================
 
-Slang provides preliminary support for Shader Execution Reordering (SER). The API hasn't been finalized and may change in the future.
+Slang supports Shader Execution Reordering (SER) as specified in HLSL Shader Model 6.9. This is a required feature for devices with raytracing support in SM 6.9+.
 
-The feature is available on D3D12 via [NVAPI](nvapi-support.md) and on Vulkan through the [GL_NV_shader_invocation_reorder](https://github.com/KhronosGroup/GLSL/blob/master/extensions/nv/GLSL_NV_shader_invocation_reorder.txt) extension.
+The feature is available on D3D12 as part of the official HLSL API (SM 6.9+) and on Vulkan through the [GL_NV_shader_invocation_reorder](https://github.com/KhronosGroup/GLSL/blob/master/extensions/nv/GLSL_NV_shader_invocation_reorder.txt) extension.
+
+## Official HLSL API (Shader Model 6.9+)
+
+The official HLSL API uses the `dx` namespace for all SER types and intrinsics:
+- `dx::HitObject` - type for representing ray hits/misses
+- `dx::MaybeReorderThread()` - function for reordering threads
+
+## Slang Convenience API
+
+For cross-platform compatibility, Slang provides convenience wrappers:
+- `HitObject` - maps to the appropriate backend (e.g., `dx::HitObject` on HLSL)
+- `ReorderThread()` - maps to the appropriate backend (e.g., `dx::MaybeReorderThread()` on HLSL)
+
+These wrappers work across all supported backends (HLSL, GLSL/Vulkan, CUDA, SPIR-V).
 
 ## Vulkan
 
-SER as implemented on Vulkan has extra limitations on usage. On D3D via NvAPI `HitObject` variables are like regular variables. They can be assigned, passed to functions and so forth. Using `GL_NV_shader_invocation_reorder` on Vulkan, this isn't the case and `HitObject` variables are special and act is if their introduction allocates a single unique entry. One implication of this is there are limitations on Vulkan around HitObject with flow control, and assignment to HitObject variables. 
+SER as implemented on Vulkan has extra limitations on usage. Using `GL_NV_shader_invocation_reorder` on Vulkan, `HitObject` variables are special and act as if their introduction allocates a single unique entry. One implication of this is there are limitations on Vulkan around HitObject with flow control and assignment to HitObject variables.
 
-TODO: Examples and discussion around these limitation.
+TODO: Examples and discussion around these limitations.
 
 ## Links
 
 * [SER white paper for NVAPI](https://developer.nvidia.com/sites/default/files/akamai/gameworks/ser-whitepaper.pdf)
 
-# Preliminary API
+# API Reference
 
-The API is preliminary and based on the NvAPI SER interface. It may change with future Slang versions.
+Slang provides a cross-platform API for SER that works across supported backends.
 
 ## Free Functions
 
@@ -250,11 +264,10 @@ static HitObject HitObject.MakeNop();
 Invokes closesthit or miss shading for the specified hit object. In case of a NOP HitObject, no
 shader is invoked.
 
-## Signature 
+## Signature
 
 ```
 static void HitObject.Invoke<payload_t>(
-    RaytracingAccelerationStructure AccelerationStructure,
     HitObject            HitOrMiss,
     inout payload_t      Payload);
 ```

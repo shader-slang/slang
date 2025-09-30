@@ -104,10 +104,10 @@ void rayGenerationMain()
 
     outputBuffer[idx] = calcValue(hit);
     HitObject miss[2];
-    // CHECK: optixMakeMissHitObject(0U, ray_0, &miss_0[int(0)]);
-    miss[0] = HitObject::MakeMiss(0u, ray);
-    // CHECK: optixMakeMissHitObject(0U, ray_0, 1.0f, &miss_0[int(1)]);
-    miss[1] = HitObject::MakeMotionMiss(0u, ray, 1.f);
+    // CHECK: optixMakeMissHitObject(0U, 0U, ray_0, &miss_0[int(0)]);
+    miss[0] = HitObject::MakeMiss(0u, 0u, ray);
+    // CHECK: optixMakeMissHitObject(0U, 0U, ray_0, 1.0f, &miss_0[int(1)]);
+    miss[1] = HitObject::MakeMotionMiss(0u, 0u, ray, 1.f);
 
     uint hitGroupRecordIndex = 0;
     uint instanceIndex = 0xff;
@@ -141,7 +141,7 @@ void rayGenerationMain()
     SomeValues otherValues = { idx * -2, idx * 8.0f };
 
     // CHECK: optixInvoke
-    HitObject::Invoke(scene, hit, otherValues);
+    HitObject::Invoke(hit, otherValues);
     HitObject motionHitObj[2];
     // CHECK: optixMakeHitObject
     motionHitObj[0] = HitObject::MakeMotionHit(

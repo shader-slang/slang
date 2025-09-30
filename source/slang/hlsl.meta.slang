@@ -20709,16 +20709,16 @@ struct HitObject
         /// Creates a HitObject representing a miss based on values explicitly passed as arguments, without
         /// tracing a ray. The provided shader table index must reference a valid miss record in the shader
         /// table.
-    [__requiresNVAPI]
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     static HitObject MakeMiss(
+        uint RayFlags,
         uint MissShaderIndex,
         RayDesc Ray)
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "($2=NvMakeMiss($0,$1))";
+        case hlsl: __intrinsic_asm "($3=dx::HitObject::MakeMiss($0,$1,$2))";
         case glsl:
             __glslMakeMiss(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
         case cuda: __intrinsic_asm "optixMakeMissHitObject";
@@ -20749,13 +20749,14 @@ struct HitObject
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_motion_raygen_closesthit_miss)]
     static HitObject MakeMotionMiss(
+        uint RayFlags,
         uint MissShaderIndex,
         RayDesc Ray,
         float CurrentTime)
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "($3=NvMakeMotionMiss($0,$1,$2))";
+        case hlsl: __intrinsic_asm "($4=dx::HitObject::MakeMotionMiss($0,$1,$2,$3))";
         case glsl:
             __glslMakeMotionMiss(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax, CurrentTime);
         case cuda: __intrinsic_asm "optixMakeMissHitObject";
@@ -20789,7 +20790,6 @@ struct HitObject
         /// ReorderThread will group NOP hit objects together. This can be useful in some reordering
         /// scenarios where future control flow for some threads is known to process neither a hit nor a
         /// miss.
-    [__requiresNVAPI]
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     static HitObject MakeNop()
@@ -20797,7 +20797,7 @@ struct HitObject
         __target_switch
         {
         case hlsl:
-            __intrinsic_asm "($0 = NvMakeNop())";
+            __intrinsic_asm "($0 = dx::HitObject::MakeNop())";
         case glsl:
             __glslMakeNop(__return_val);
         case cuda: __intrinsic_asm "slangOptixMakeNopHitObject";
@@ -20815,23 +20815,20 @@ struct HitObject
     [require(hlsl, ser)]
     __generic<payload_t>
     static void __InvokeHLSL(
-        RaytracingAccelerationStructure AccelerationStructure,
         HitObject HitOrMiss,
         inout payload_t Payload)
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "NvInvokeHitObject";
+        case hlsl: __intrinsic_asm "dx::HitObject::Invoke";
         }
     }
 
         /// Invokes closesthit or miss shading for the specified hit object. In case of a NOP HitObject, no
         /// shader is invoked.
-    [__requiresNVAPI]
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     static void Invoke<payload_t>(
-        RaytracingAccelerationStructure AccelerationStructure,
         HitObject HitOrMiss,
         inout payload_t Payload)
     {
@@ -20839,7 +20836,6 @@ struct HitObject
         {
         case hlsl:
             __InvokeHLSL(
-                AccelerationStructure,
                 HitOrMiss,
                 __forceVarIntoRayPayloadStructTemporarily(Payload));
         case glsl:
@@ -20880,7 +20876,6 @@ struct HitObject
     }
 
         /// Returns true if the HitObject encodes a miss, otherwise returns false.
-    [__requiresNVAPI]
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     bool IsMiss()
@@ -20901,7 +20896,6 @@ struct HitObject
     }
 
         /// Returns true if the HitObject encodes a hit, otherwise returns false.
-    [__requiresNVAPI]
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     bool IsHit()
@@ -20922,7 +20916,6 @@ struct HitObject
     }
 
         /// Returns true if the HitObject encodes a nop, otherwise returns false.
-    [__requiresNVAPI]
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     bool IsNop()
@@ -20943,7 +20936,6 @@ struct HitObject
     }
 
         /// Queries ray properties from HitObject. Valid if the hit object represents a hit or a miss.
-    [__requiresNVAPI]
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     RayDesc GetRayDesc()
@@ -20973,7 +20965,6 @@ struct HitObject
     }
 
         /// Queries shader table index from HitObject. Valid if the hit object represents a hit or a miss.
-    [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
@@ -20994,7 +20985,6 @@ struct HitObject
         }
     }
 
-    [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
     [require(cuda_hlsl, ser_raygen_closesthit_miss)]
@@ -21007,7 +20997,6 @@ struct HitObject
         }
     }
         /// Returns the instance index of a hit. Valid if the hit object represents a hit.
-    [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
@@ -21029,7 +21018,6 @@ struct HitObject
     }
 
         /// Returns the instance ID of a hit. Valid if the hit object represents a hit.
-    [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
@@ -21051,7 +21039,6 @@ struct HitObject
     }
 
         /// Returns the geometry index of a hit. Valid if the hit object represents a hit.
-    [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
@@ -21073,7 +21060,6 @@ struct HitObject
     }
 
         /// Returns the primitive index of a hit. Valid if the hit object represents a hit.
-    [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
@@ -21095,7 +21081,6 @@ struct HitObject
     }
 
         /// Returns the hit kind. Valid if the hit object represents a hit.
-    [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
     [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
@@ -21116,7 +21101,6 @@ struct HitObject
     }
 
     /// Returns the cluster ID of the current hit. Valid if the hit object represents a hit.
-    [__requiresNVAPI]
     __glsl_extension(GL_NV_cluster_acceleration_structure)
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
@@ -21138,7 +21122,6 @@ struct HitObject
         }
     }
 
-    [__requiresNVAPI]
     [NonUniformReturn]
     [require(cuda_hlsl_spirv, raytracing_lss_ho)]
     float4 GetSpherePositionAndRadius()
@@ -21163,7 +21146,6 @@ struct HitObject
         }
     }
 
-    [__requiresNVAPI]
     [NonUniformReturn]
     [require(cuda_hlsl_spirv, raytracing_lss_ho)]
     float2x4 GetLssPositionsAndRadii()
@@ -21194,7 +21176,6 @@ struct HitObject
         }
     }
 
-    [__requiresNVAPI]
     [NonUniformReturn]
     [require(cuda_hlsl_spirv, raytracing_lss_ho)]
     bool IsSphereHit()
@@ -21216,7 +21197,6 @@ struct HitObject
         }
     }
 
-    [__requiresNVAPI]
     [NonUniformReturn]
     [require(cuda_hlsl_spirv, raytracing_lss_ho)]
     bool IsLssHit()
@@ -21238,7 +21218,6 @@ struct HitObject
         }
     }
 
-    [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
     [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
@@ -21258,7 +21237,6 @@ struct HitObject
         }
     }
 
-    [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
     [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
@@ -21356,7 +21334,7 @@ struct HitObject
         case hlsl:
             {
                 attr_t v;
-                __hlslGetAttributesFromHitObject(v);
+                __hlslGetAttributesFromHitObject(this, v);
                 return v;
             }
         case glsl:
@@ -21386,7 +21364,6 @@ struct HitObject
     }
         /// Loads a root constant from the local root table referenced by the hit object. Valid if the hit object
         /// represents a hit or a miss. RootConstantOffsetInBytes must be a multiple of 4.
-    [__requiresNVAPI]
     [require(cuda_hlsl, ser_raygen_closesthit_miss)]
     uint LoadLocalRootTableConstant(uint RootConstantOffsetInBytes)
     {
@@ -21401,17 +21378,15 @@ struct HitObject
     /// !!!! Internal NVAPI HLSL impl. Not part of interface! !!!!!!!!!!!!
     ///
 
-    [__requiresNVAPI]
     [require(hlsl, ser_raygen_closesthit_miss)]
-    void __hlslGetAttributesFromHitObject<T>(out T t)
+    void __hlslGetAttributesFromHitObject<T>(HitObject hitObj, out T t)
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "NvGetAttributesFromHitObject($0, $1)";
+        case hlsl: __intrinsic_asm "($2=$0.GetAttributes<$[0]>())", T;
         }
     }
 
-    [__requiresNVAPI]
     [require(hlsl, ser_raygen_closesthit_miss)]
     static void __hlslMakeHitWithRecordIndex<attr_t>(
         uint HitGroupRecordIndex,
@@ -21426,11 +21401,10 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "NvMakeHitWithRecordIndex";
+        case hlsl: __intrinsic_asm "($8=dx::HitObject::MakeHit($0,$1,$2,$3,$4,$5,$6,$7))";
         }
     }
 
-    [__requiresNVAPI]
     [require(hlsl, ser_raygen_closesthit_miss)]
     static void __hlslMakeHit<attr_t>(RaytracingAccelerationStructure AccelerationStructure,
         uint InstanceIndex,
@@ -21445,11 +21419,10 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "NvMakeHit";
+        case hlsl: __intrinsic_asm "($9=dx::HitObject::MakeHit($0,$1,$2,$3,$4,$5,$6,$7,$8))";
         }
     }
 
-    [__requiresNVAPI]
     [require(hlsl, ser_raygen_closesthit_miss)]
     static void __hlslTraceRay<payload_t>(
         RaytracingAccelerationStructure AccelerationStructure,
@@ -21464,7 +21437,7 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "NvTraceRayHitObject";
+        case hlsl: __intrinsic_asm "($8=dx::HitObject::TraceRay($0,$1,$2,$3,$4,$5,$6,$7))";
         }
     }
 
@@ -21758,7 +21731,6 @@ struct HitObject
     /// NumCoherenceHintBits.
     /// Where possible, reordering will also attempt to retain locality in the thread’s launch indices
     /// (DispatchRaysIndex in DXR).
-[__requiresNVAPI]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 [ForceInline]
@@ -21767,7 +21739,7 @@ void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
 {
     __target_switch
     {
-    case hlsl: __intrinsic_asm "NvReorderThread";
+    case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
     case glsl: __intrinsic_asm "reorderThreadNV";
     case cuda: __intrinsic_asm "optixReorder";
     case spirv:
@@ -21796,7 +21768,6 @@ void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
     /// groups, it will attempt to order threads by the value of their coherence hints. And within ranges
     /// of equal coherence hints, it will attempt to maximize locality in 3D space of the ray hit (if any).
 
-[__requiresNVAPI]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 [ForceInline]
@@ -21805,7 +21776,7 @@ void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHi
 {
     __target_switch
     {
-    case hlsl: __intrinsic_asm "NvReorderThread";
+    case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
     case glsl: __intrinsic_asm "reorderThreadNV";
     case cuda: __intrinsic_asm "optixReorder($1, $2)";
     case spirv:
@@ -21824,7 +21795,6 @@ void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHi
     // ```
     // With CoherenceHint and NumCoherenceHintBitsFromLSB as 0, meaning they are ignored.
 
-[__requiresNVAPI]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 [ForceInline]
@@ -21833,7 +21803,7 @@ void ReorderThread( HitObject HitOrMiss )
 {
     __target_switch
     {
-    case hlsl: __intrinsic_asm "NvReorderThread";
+    case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
     case glsl: __intrinsic_asm "reorderThreadNV";
     case cuda: __intrinsic_asm "optixReorder()";
     case spirv:
@@ -21878,7 +21848,6 @@ void debugBreak()
 
 // https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GL_EXT_shader_realtime_clock.txt
 
-[__requiresNVAPI]
 __glsl_extension(GL_EXT_shader_realtime_clock)
 [NonUniformReturn]
 [require(cpp_cuda_glsl_hlsl_spirv, shaderclock)]
@@ -21910,7 +21879,6 @@ int64_t __cudaCppGetRealtimeClock()
     }
 }
 
-[__requiresNVAPI]
 __glsl_extension(GL_EXT_shader_realtime_clock)
 [NonUniformReturn]
 [require(cpp_cuda_glsl_hlsl_spirv, shaderclock)]
@@ -22146,7 +22114,6 @@ ${{{{
 }}}}
 
 [__NoSideEffect]
-[__requiresNVAPI]
 [require(glsl_hlsl_spirv, texturefootprint)]
 vector<uint, ND> __textureFootprintGetAnchor<let ND:int>(__TextureFootprintData<ND> data, int nd)
 {
@@ -22164,7 +22131,6 @@ vector<uint, ND> __textureFootprintGetAnchor<let ND:int>(__TextureFootprintData<
 }
 
 [__NoSideEffect]
-[__requiresNVAPI]
 [require(glsl_hlsl_spirv, texturefootprint)]
 vector<uint, ND> __textureFootprintGetOffset<let ND:int>(__TextureFootprintData<ND> data, int nd)
 {
@@ -22195,7 +22161,6 @@ struct __TextureFootprintData<let ND:int>
     property anchor : Anchor
     {
         [__NoSideEffect]
-        [__requiresNVAPI]
         [ForceInline]
         get { return __textureFootprintGetAnchor(this, ND); }
     }
@@ -22203,7 +22168,6 @@ struct __TextureFootprintData<let ND:int>
     property offset : Offset
     {
         [__NoSideEffect]
-        [__requiresNVAPI]
         [ForceInline]
         get { return __textureFootprintGetOffset(this, ND); }
     }
@@ -22211,7 +22175,6 @@ struct __TextureFootprintData<let ND:int>
     property mask : Mask
     {
         [__NoSideEffect]
-        [__requiresNVAPI]
         get
         {
             __target_switch
@@ -22231,7 +22194,6 @@ struct __TextureFootprintData<let ND:int>
     property lod : LOD
     {
         [__NoSideEffect]
-        [__requiresNVAPI]
         get
         {
             __target_switch
@@ -22251,7 +22213,6 @@ struct __TextureFootprintData<let ND:int>
     property granularity : Granularity
     {
         [__NoSideEffect]
-        [__requiresNVAPI]
         get
         {
             __target_switch
@@ -22450,7 +22411,6 @@ ${
     [__NoSideEffect]
     __glsl_version(450)
     __glsl_extension(GL_NV_shader_texture_footprint)
-    [__requiresNVAPI]
     [require(glsl_spirv, texturefootprint)]
     bool __queryFootprintLodGLSL(
             SamplerState            sampler,
@@ -22483,7 +22443,6 @@ ${{{
     [__NoSideEffect]
     __glsl_version(450)
     __glsl_extension(GL_NV_shader_texture_footprint)
-    [__requiresNVAPI]
     [require(glsl_spirv, texturefootprint)]
     bool __queryFootprintGradGLSL(
             SamplerState    sampler,
@@ -22581,7 +22540,6 @@ for(auto levelChoice : kLevelChoices)
 }}}}
 
     [__NoSideEffect]
-    [__requiresNVAPI]
     [require(hlsl, texturefootprint)]
     static __FootprintData __queryFootprint$(CoarseOrFine)NVAPI(
         int                     nd,
@@ -22600,7 +22558,6 @@ for(auto levelChoice : kLevelChoices)
     }
 
     [__NoSideEffect]
-    [__requiresNVAPI]
     [require(hlsl, texturefootprint)]
     static __FootprintData __queryFootprint$(CoarseOrFine)BiasNVAPI(
         int                     nd,
@@ -22620,7 +22577,6 @@ for(auto levelChoice : kLevelChoices)
     }
 
     [__NoSideEffect]
-    [__requiresNVAPI]
     [require(hlsl, texturefootprint)]
     static __FootprintData __queryFootprint$(CoarseOrFine)LevelNVAPI(
         int                     nd,
@@ -22640,7 +22596,6 @@ for(auto levelChoice : kLevelChoices)
     }
 
     [__NoSideEffect]
-    [__requiresNVAPI]
     [require(hlsl, texturefootprint)]
     static __FootprintData __queryFootprint$(CoarseOrFine)GradNVAPI(
         int                     nd,
@@ -22909,7 +22864,6 @@ ${{{{
 __generic<Shape:__ITextureShape1D2D3D, let format : int>
 extension _Texture<float, Shape, 0, 0, 0, $(kCoreModule_ResourceAccessReadWrite), 0, 0, format>
 {
-    [__requiresNVAPI]
     [ForceInline]
     __glsl_extension(GL_EXT_shader_atomic_float)
     [require(glsl_hlsl_metal_spirv, atomic_glsl_hlsl_nvapi_cuda_metal_float1)]

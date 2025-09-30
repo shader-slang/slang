@@ -6032,14 +6032,15 @@ __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
 [require(glsl_spirv, ser_raygen_closesthit_miss)]
 public void hitObjectRecordMissNV(
-    inout hitObjectNV hitObject, 
-    uint sbtRecordIndex, 
+    inout hitObjectNV hitObject,
+    uint sbtRecordIndex,
     vec3 origin,
     float Tmin,
     vec3 direction,
     float Tmax)
 {
     hitObject = HitObject::MakeMiss(
+        0,  // RayFlags (not used in GLSL/SPIRV SER)
         sbtRecordIndex,
         { origin, Tmin, direction, Tmax }
         );
@@ -6052,8 +6053,8 @@ __glsl_extension(GL_NV_ray_tracing_motion_blur)
 [ForceInline]
 [require(glsl_spirv, ser_motion_raygen_closesthit_miss)]
 public void hitObjectRecordMissMotionNV(
-    inout hitObjectNV hitObject, 
-    uint sbtRecordIndex, 
+    inout hitObjectNV hitObject,
+    uint sbtRecordIndex,
     vec3 origin,
     float Tmin,
     vec3 direction,
@@ -6061,6 +6062,7 @@ public void hitObjectRecordMissMotionNV(
     float currentTime)
 {
     hitObject = HitObject::MakeMotionMiss(
+        0,  // RayFlags (not used in GLSL/SPIRV SER)
         sbtRecordIndex,
         { origin, Tmin, direction, Tmax },
         currentTime
