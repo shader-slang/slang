@@ -241,7 +241,12 @@ extern "C"
 #endif
         bool glslang_disassembleSPIRV(const uint32_t* contents, int contentsSize)
 {
-    return glslang_disassembleSPIRVWithResult(contents, contentsSize, nullptr);
+    char* result = nullptr;
+    auto succ = glslang_disassembleSPIRVWithResult(contents, contentsSize, &result);
+    if (result)
+        fprintf(stdout, "%s\n", result);
+    delete result;
+    return succ;
 }
 
 // Apply the SPIRV-Tools optimizer to generated SPIR-V based on the desired optimization level

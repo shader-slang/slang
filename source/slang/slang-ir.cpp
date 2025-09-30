@@ -386,6 +386,20 @@ IRType* tryGetPointedToType(IRBuilder* builder, IRType* type)
     return nullptr;
 }
 
+IRType* tryGetPointedToOrBufferElementType(IRBuilder* builder, IRType* type)
+{
+    if (auto rateQualType = as<IRRateQualifiedType>(type))
+    {
+        type = rateQualType->getValueType();
+    }
+    auto resultType = tryGetPointedToType(builder, type);
+    if (resultType)
+        return resultType;
+    if (auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type))
+        return structuredBufferType->getElementType();
+    return nullptr;
+}
+
 
 // IRBlock
 
@@ -5480,39 +5494,19 @@ IRInst* IRBuilder::emitElementAddress(IRInst* basePtr, IRInst* index)
     }
     IRType* type = nullptr;
     valueType = unwrapAttributedType(valueType);
-    if (auto arrayType = as<IRArrayTypeBase>(valueType))
-    {
-        type = arrayType->getElementType();
-    }
-    else if (auto vectorType = as<IRVectorType>(valueType))
-    {
-        type = vectorType->getElementType();
-    }
-    else if (auto coopVecType = as<IRCoopVectorType>(valueType))
-    {
-        type = coopVecType->getElementType();
-    }
-    else if (auto matrixType = as<IRMatrixType>(valueType))
-    {
-        type = getVectorType(matrixType->getElementType(), matrixType->getColumnCount());
-    }
-    else if (auto coopMatType = as<IRCoopMatrixType>(valueType))
-    {
-        type = coopMatType->getElementType();
-    }
-    else if (const auto basicType = as<IRBasicType>(valueType))
+    if (as<IRBasicType>(valueType))
     {
         // HLSL support things like float.x, in which case we just return the base pointer.
         return basePtr;
     }
-    else if (const auto tupleType = as<IRTupleType>(valueType))
+    type = getElementType(*this, (IRType*)valueType);
+    if (!type)
     {
-        SLANG_ASSERT(as<IRIntLit>(index));
-        type = (IRType*)tupleType->getOperand(getIntVal(index));
-    }
-    else if (auto hlslInputPatchType = as<IRHLSLInputPatchType>(valueType))
-    {
-        type = hlslInputPatchType->getElementType();
+        if (const auto tupleType = as<IRTupleType>(valueType))
+        {
+            SLANG_ASSERT(as<IRIntLit>(index));
+            type = (IRType*)tupleType->getOperand(getIntVal(index));
+        }
     }
 
     SLANG_RELEASE_ASSERT(type);
@@ -6179,6 +6173,24 @@ IRInst* IRBuilder::emitCastIntToPtr(IRType* ptrType, IRInst* val)
     return inst;
 }
 
+IRInst* IRBuilder::emitCastStorageToLogical(IRType* type, IRInst* val, IRInst* bufferType)
+{
+    if (type == val->getDataType())
+        return val;
+    IRInst* args[] = {val, bufferType};
+    return (IRCastStorageToLogical*)emitIntrinsicInst(type, kIROp_CastStorageToLogical, 2, args);
+}
+
+IRCastStorageToLogicalDeref* IRBuilder::emitCastStorageToLogicalDeref(
+    IRType* type,
+    IRInst* val,
+    IRInst* bufferType)
+{
+    IRInst* args[] = {val, bufferType};
+    return (IRCastStorageToLogicalDeref*)
+        emitIntrinsicInst(type, kIROp_CastStorageToLogicalDeref, 2, args);
+}
+
 IRGlobalConstant* IRBuilder::emitGlobalConstant(IRType* type)
 {
     auto inst = createInst<IRGlobalConstant>(this, kIROp_GlobalConstant, type);
@@ -6627,6 +6639,7 @@ IRInst* IRBuilder::emitGenericAsm(UnownedStringSlice asmText)
 IRInst* IRBuilder::emitRWStructuredBufferGetElementPtr(IRInst* structuredBuffer, IRInst* index)
 {
     const auto sbt = cast<IRHLSLStructuredBufferTypeBase>(structuredBuffer->getDataType());
+    SLANG_ASSERT(sbt);
     const auto t = getPtrType(sbt->getElementType());
     IRInst* const operands[2] = {structuredBuffer, index};
     const auto i = createInst<IRRWStructuredBufferGetElementPtr>(
