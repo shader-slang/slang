@@ -2062,6 +2062,21 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         }
     }
 
+    IRInst* convertToUInt64Value(IRInst* inst)
+    {
+        if (inst->getOp() == kIROp_IntLit)
+        {
+            auto constVal = as<IRConstant>(inst);
+            return context->irBuilder->getIntValue(
+                context->irBuilder->getUInt64Type(),
+                constVal->value.intVal);
+        }
+        else
+        {
+            return context->irBuilder->emitCast(context->irBuilder->getUInt64Type(), inst);
+        }
+    }
+
     IRType* visitPtrType(PtrType* type)
     {
         auto astValueType = type->getValueType();
@@ -2072,12 +2087,14 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
         if (auto astAccessQualifier = type->getAccessQualifier())
         {
-            accessQualifier = getSimpleVal(context, lowerVal(context, astAccessQualifier));
+            accessQualifier =
+                convertToUInt64Value(getSimpleVal(context, lowerVal(context, astAccessQualifier)));
         }
 
         if (auto astAddrSpace = type->getAddressSpace())
         {
-            addrSpace = getSimpleVal(context, lowerVal(context, astAddrSpace));
+            addrSpace =
+                convertToUInt64Value(getSimpleVal(context, lowerVal(context, astAddrSpace)));
         }
         else
         {

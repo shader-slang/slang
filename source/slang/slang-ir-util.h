@@ -376,6 +376,10 @@ void verifyComputeDerivativeGroupModifiers(
 int getIRVectorElementSize(IRType* type);
 IRType* getIRVectorBaseType(IRType* type);
 
+// Retrieves the element type of a pointer, buffer, array, vector or matrix type.
+// This is the result type of a ElementExtract operation on a value of `type`.
+IRType* getElementType(IRBuilder& builder, IRType* type);
+
 Int getSpecializationConstantId(IRGlobalParam* param);
 
 void legalizeDefUse(IRGlobalValueWithCode* func);
@@ -418,6 +422,22 @@ IRType* getUnsignedTypeFromSignedType(IRBuilder* builder, IRType* type);
 bool isSignedType(IRType* type);
 
 bool isIROpaqueType(IRType* type);
+
+// Returns true if the memory location pointed to by `ptrInst` is immutable.
+// An immutable location is the memory region that can't be modified by the user code.
+// Examples are ConstantBuffer and shader resource contents(e.g. StructuredBuffer).
+// Note that this is to be disguished from the access qualifier of the pointer itself,
+// e.g. a `ptrInst` of type `Ptr<T, Access.Read>` may still point to a mutable location,
+// so this function returns false in that case.
+bool isPointerToImmutableLocation(IRInst* ptrInst);
+
+// Check if `use` is the `baseAddr` operand of a GetElement/FieldExtract inst.
+// This is true if `use` is the first operand of the user inst.
+inline bool isUseBaseAddrOperand(IRUse* use, IRInst* user)
+{
+    return user->getOperandUse(0) == use;
+}
+
 } // namespace Slang
 
 #endif
