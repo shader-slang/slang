@@ -3963,7 +3963,6 @@ static __forceinline__ __device__ void slangOptixMakeNopHitObject(OptixTraversab
 
 template<typename T>
 static __forceinline__ __device__ void optixInvoke(
-    OptixTraversableHandle AccelerationStructure,
     OptixTraversableHandle* HitOrMiss,
     T Payload)
 {
