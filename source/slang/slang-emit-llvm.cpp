@@ -2,6 +2,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir-layout.h"
+#include "slang-ir-lower-buffer-element-type.h"
 #include "../core/slang-char-util.h"
 #include "../core/slang-func-ptr.h"
 #include "../compiler-core/slang-artifact-associated-impl.h"
@@ -440,6 +441,7 @@ public:
         case kIROp_ArrayType:  // Arrays are passed as pointers in SSA values
         case kIROp_UnsizedArrayType:
         case kIROp_StructType: // Structs are passed as pointers in SSA values
+        case kIROp_ConstantBufferType:
             // LLVM only has opaque pointers now, so everything that lowers as
             // a pointer is just that same opaque pointer.
             llvmType = builder->getPtrTy(0);
@@ -478,6 +480,12 @@ public:
                     llvm::ArrayRef(paramTypes.begin(), paramTypes.end()),
                     false);
             }
+            break;
+        case kIROp_HLSLRWStructuredBufferType:
+            llvmType = llvm::StructType::get(
+                builder->getPtrTy(0),
+                builder->getIntPtrTy(targetDataLayout)
+            );
             break;
         default:
             SLANG_UNEXPECTED("Unsupported type for LLVM target!");
@@ -878,17 +886,15 @@ public:
             break;
         case kIROp_ArrayType:
         case kIROp_StructType:
+            // Arrays and struct values are always represented with an alloca
+            // pointer.
+            SLANG_ASSERT(llvmVal->getType()->isPointerTy());
             if (rules != defaultPointerRules)
             {
-                // TODO: Implement this, we need it to support RWStructuredBuffer.
-                SLANG_ASSERT_FAILURE("Unimplemented: Store into differing type layout");
+                return crossLayoutMemCpy(llvmPtr, llvmVal, valType, rules, defaultPointerRules, isVolatile);
             }
-
+            else
             {
-                // Arrays and struct values are always represented with an alloca
-                // pointer.
-                SLANG_ASSERT(llvmVal->getType()->isPointerTy());
-
                 // Pointer-to-pointer copy, so generate inline memcpy.
                 return builder->CreateMemCpyInline(
                     llvmPtr,
@@ -936,10 +942,11 @@ public:
         case kIROp_StructType:
             if (rules != defaultPointerRules)
             {
-                // TODO: Implement this, we need it to support RWStructuredBuffer.
-                SLANG_ASSERT_FAILURE("Unimplemented: Load from differing type layout");
+                llvm::Value* llvmVar = emitAlloca(valType, rules);
+                crossLayoutMemCpy(llvmVar, llvmPtr, valType, defaultPointerRules, rules, isVolatile);
+                return llvmVar;
             }
-
+            else
             {
                 llvm::Value* llvmVar = emitAlloca(valType, rules);
 
@@ -1265,6 +1272,95 @@ public:
     }
 
 private:
+    // Copies data from a pointer to another, taking layout differences into
+    // account.
+    llvm::Value* crossLayoutMemCpy(
+        llvm::Value* dstPtr,
+        llvm::Value* srcPtr,
+        IRType* type,
+        IRTypeLayoutRules* dstLayout,
+        IRTypeLayoutRules* srcLayout,
+        bool isVolatile
+    ){
+        IRSizeAndAlignment dstSizeAlignment = getSizeAndAlignment(type, dstLayout);
+        IRSizeAndAlignment srcSizeAlignment = getSizeAndAlignment(type, srcLayout);
+
+        int minSize = std::min(dstSizeAlignment.size, srcSizeAlignment.size);
+
+        switch(type->getOp())
+        {
+        case kIROp_ArrayType:
+            {
+                auto arrayType = as<IRArrayTypeBase>(type);
+                auto elemType = arrayType->getElementType();
+                auto irElemCount = arrayType->getElementCount();
+                auto elemCount = getIntVal(irElemCount);
+
+                llvm::Value* last = nullptr;
+                for (int elem = 0; elem < elemCount; ++elem)
+                {
+                    IRType* dummy;
+                    auto dstElemPtr = emitGetElementPtr(dstPtr, builder->getInt32(elem), type, dstLayout, dummy);
+                    auto srcElemPtr = emitGetElementPtr(srcPtr, builder->getInt32(elem), type, srcLayout, dummy);
+                    last = crossLayoutMemCpy(
+                        dstElemPtr,
+                        srcElemPtr,
+                        elemType,
+                        dstLayout,
+                        srcLayout,
+                        isVolatile
+                    );
+                }
+                return last;
+            }
+            break;
+        case kIROp_StructType:
+            {
+                auto structType = as<IRStructType>(type);
+
+                llvm::Value* last = nullptr;
+                UInt fieldIndex = 0;
+                for (auto field : structType->getFields())
+                {
+                    auto fieldType = field->getFieldType();
+                    if (as<IRVoidType>(fieldType))
+                        continue;
+
+                    IRType* dummy;
+                    UInt dstFieldIndex = mapFieldIndexToLLVM(structType, dstLayout, fieldIndex);
+                    UInt srcFieldIndex = mapFieldIndexToLLVM(structType, srcLayout, fieldIndex);
+                    auto dstElemPtr = emitGetElementPtr(dstPtr, builder->getInt32(dstFieldIndex), type, dstLayout, dummy);
+                    auto srcElemPtr = emitGetElementPtr(srcPtr, builder->getInt32(srcFieldIndex), type, srcLayout, dummy);
+
+                    last = crossLayoutMemCpy(
+                        dstElemPtr,
+                        srcElemPtr,
+                        fieldType,
+                        dstLayout,
+                        srcLayout,
+                        isVolatile
+                    );
+                    fieldIndex++;
+                }
+                return last;
+            }
+            break;
+        default:
+            // Assume that there are no substantial layout differences (aside
+            // from trailing padding, which is skipped via minSize), so copying
+            // is safe.
+            return builder->CreateMemCpyInline(
+                dstPtr,
+                llvm::MaybeAlign(dstSizeAlignment.alignment),
+                srcPtr,
+                llvm::MaybeAlign(srcSizeAlignment.alignment),
+                builder->getInt32(minSize),
+                isVolatile
+            );
+        }
+        return nullptr;
+    }
+
     UInt getVectorAlignedCount(IRVectorType* vecType, IRTypeLayoutRules* rules)
     {
         int elemCount = getIntVal(vecType->getElementCount());
@@ -1973,6 +2069,34 @@ struct LLVMEmitter
         return nullptr;
     }
 
+    IRTypeLayoutRules* getPtrLayoutRules(IRInst* ptr)
+    {
+        // Check if this store is actually into an RWStructuredBuffer.
+        // If so, we need to take its layout into account.
+        if (auto structuredBufferInst = as<IRRWStructuredBufferGetElementPtr>(ptr))
+        {
+            auto baseType = cast<IRHLSLStructuredBufferTypeBase>(
+                structuredBufferInst->getBase()->getDataType());
+            return getTypeLayoutRuleForBuffer(codeGenContext->getTargetProgram(), baseType);
+        }
+        else if (auto gep = as<IRGetElementPtr>(ptr))
+        {
+            // Transitive
+            return getPtrLayoutRules(gep->getBase());
+        }
+        else if (auto off = as<IRGetOffsetPtr>(ptr))
+        {
+            // Transitive
+            return getPtrLayoutRules(off->getBase());
+        }
+        else if (auto fieldAddr = as<IRFieldAddress>(ptr))
+        {
+            // Transitive
+            return getPtrLayoutRules(fieldAddr->getBase());
+        }
+        return defaultPointerRules;
+    }
+
     // Caution! This is only for emitting things which are considered
     // instructions in LLVM! It won't work for IRBlocks, IRFuncs & such.
     llvm::Value* emitLLVMInstruction(
@@ -2105,13 +2229,15 @@ struct LLVMEmitter
         case kIROp_Store:
             {
                 auto storeInst = static_cast<IRStore*>(inst);
+                auto ptr = storeInst->getPtr();
                 auto val = storeInst->getVal();
+
                 llvmInst = types->emitStore(
-                    findValue(storeInst->getPtr()),
+                    findValue(ptr),
                     findValue(val),
                     val->getDataType(),
-                    defaultPointerRules,
-                    isVolatile(storeInst->getPtr())
+                    getPtrLayoutRules(ptr),
+                    isVolatile(ptr)
                 );
             }
             break;
@@ -2119,11 +2245,13 @@ struct LLVMEmitter
         case kIROp_Load:
             {
                 auto loadInst = static_cast<IRLoad*>(inst);
+                auto ptr = loadInst->getPtr();
+
                 llvmInst = types->emitLoad(
-                    findValue(loadInst->getPtr()),
+                    findValue(ptr),
                     loadInst->getDataType(),
-                    defaultPointerRules,
-                    isVolatile(loadInst->getPtr())
+                    getPtrLayoutRules(ptr),
+                    isVolatile(ptr)
                 );
             }
             break;
@@ -2380,6 +2508,8 @@ struct LLVMEmitter
                     baseStructType = as<IRStructType>(ptrType->getValueType());
                 }
 
+                auto rules = getPtrLayoutRules(base);
+
                 UInt index = getStructIndexByKey(baseStructType, key);
 
                 if (debugInsts.contains(base))
@@ -2392,9 +2522,9 @@ struct LLVMEmitter
                     return nullptr;
                 }
 
-                index = types->mapFieldIndexToLLVM(baseStructType, defaultPointerRules, index);
+                index = types->mapFieldIndexToLLVM(baseStructType, rules, index);
 
-                auto llvmStructType = types->getStorageType(baseStructType, defaultPointerRules);
+                auto llvmStructType = types->getStorageType(baseStructType, rules);
                 auto llvmBase = findValue(base);
                 llvm::Value* idx[2] = {
                     llvmBuilder->getInt32(0),
@@ -2417,18 +2547,20 @@ struct LLVMEmitter
                     return nullptr;
                 }
 
+                auto rules = getPtrLayoutRules(base);
+
                 auto llvmBase = findValue(base);
                 unsigned idx = types->mapFieldIndexToLLVM(
                     structType,
-                    defaultPointerRules,
+                    rules,
                     getStructIndexByKey(structType, as<IRStructKey>(fieldExtractInst->getField())));
 
                 IRType* elementType = nullptr;
                 llvm::Value* ptr = types->emitGetElementPtr(
                     llvmBase, llvmBuilder->getInt32(idx), structType,
-                    defaultPointerRules, elementType);
+                    rules, elementType);
 
-                llvmInst = types->emitLoad(ptr, elementType, defaultPointerRules);
+                llvmInst = types->emitLoad(ptr, elementType, rules);
             }
             break;
 
@@ -2451,7 +2583,7 @@ struct LLVMEmitter
                 }
 
                 llvmInst = llvmBuilder->CreateGEP(
-                    types->getStorageType(baseType, defaultPointerRules),
+                    types->getStorageType(baseType, getPtrLayoutRules(baseInst)),
                     findValue(baseInst), findValue(offsetInst));
             }
             break;
@@ -2479,7 +2611,7 @@ struct LLVMEmitter
                     findValue(baseInst),
                     findValue(indexInst),
                     baseType,
-                    defaultPointerRules,
+                    getPtrLayoutRules(baseInst),
                     elementType
                 );
             }
@@ -2510,10 +2642,11 @@ struct LLVMEmitter
                     // emitGEP + emitLoad.
                     SLANG_ASSERT(llvmVal->getType()->isPointerTy());
                     IRType* elementType = nullptr;
+                    auto rules = getPtrLayoutRules(baseInst);
                     llvm::Value* ptr = types->emitGetElementPtr(
                         llvmVal, findValue(indexInst), baseTy,
-                        defaultPointerRules, elementType);
-                    llvmInst = types->emitLoad(ptr, elementType, defaultPointerRules);
+                        rules, elementType);
+                    llvmInst = types->emitLoad(ptr, elementType, rules);
                 }
             }
             break;
@@ -2587,6 +2720,24 @@ struct LLVMEmitter
                 }
 
                 llvmInst = llvmBuilder->CreateCall(llvmFunc, llvm::ArrayRef(args.begin(), args.end()));
+            }
+            break;
+
+        case kIROp_RWStructuredBufferGetElementPtr:
+            {
+                auto gepInst = static_cast<IRRWStructuredBufferGetElementPtr*>(inst);
+
+                auto baseType = cast<IRHLSLRWStructuredBufferType>(gepInst->getBase()->getDataType());
+                auto llvmBase = findValue(gepInst->getBase());
+                auto llvmIndex = findValue(gepInst->getIndex());
+
+                auto llvmPtr = llvmBuilder->CreateExtractValue(llvmBase, 0);
+
+                llvm::Value* indices[] = {llvmIndex};
+                IRTypeLayoutRules* layout = getTypeLayoutRuleForBuffer(codeGenContext->getTargetProgram(), baseType);
+                return llvmBuilder->CreateGEP(
+                    types->getStorageType(baseType->getElementType(), layout),
+                    llvmPtr, indices);
             }
             break;
 
@@ -3086,7 +3237,7 @@ struct LLVMEmitter
 
                 llvmLinker->linkInModule(std::move(sourceModule), llvm::Linker::OverrideFromSrc);
 
-                llvmFunc = cast<llvm::Function>(llvmModule->getNamedValue(funcName));
+                llvmFunc = llvm::cast<llvm::Function>(llvmModule->getNamedValue(funcName));
                 llvmFunc->setLinkage(llvm::Function::LinkageTypes::PrivateLinkage);
                 // Intrinsic functions usually do nothing other than call a single
                 // instruction; we can just inline them by default.
