@@ -719,6 +719,7 @@ SLANG_API SlangScalarType spReflectionType_GetScalarType(SlangReflectionType* in
             CASE(UInt, UINT32);
             CASE(UInt64, UINT64);
             CASE(Half, FLOAT16);
+            CASE(BFloat16, BFLOAT16);
             CASE(Float, FLOAT32);
             CASE(Double, FLOAT64);
 

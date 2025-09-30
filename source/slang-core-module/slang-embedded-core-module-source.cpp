@@ -23,11 +23,12 @@ enum
     BOOL_RESULT = 1 << 2,
     BOOL_MASK = 1 << 3,
     UINT_MASK = 1 << 4,
+    BFLOAT_MASK = 1 << 5,
 
     INT_MASK = SINT_MASK | UINT_MASK,
-    ARITHMETIC_MASK = INT_MASK | FLOAT_MASK,
+    ARITHMETIC_MASK = INT_MASK | FLOAT_MASK | BFLOAT_MASK,
     LOGICAL_MASK = INT_MASK | BOOL_MASK,
-    ANY_MASK = INT_MASK | FLOAT_MASK | BOOL_MASK,
+    ANY_MASK = INT_MASK | FLOAT_MASK | BOOL_MASK | BFLOAT_MASK,
 };
 
 // We are going to declare initializers that allow for conversion between
@@ -46,6 +47,7 @@ enum BaseTypeConversionKind : uint8_t
     kBaseTypeConversionKind_Signed,
     kBaseTypeConversionKind_Unsigned,
     kBaseTypeConversionKind_Float,
+    kBaseTypeConversionKind_BFloat,
     kBaseTypeConversionKind_Error,
 };
 enum BaseTypeConversionRank : uint8_t
@@ -112,6 +114,11 @@ static const BaseTypeConversionInfo kBaseTypes[] = {
      BaseType::Half,
      FLOAT_MASK,
      kBaseTypeConversionKind_Float,
+     kBaseTypeConversionRank_Int16},
+    {"bfloat16_t",
+     BaseType::BFloat16,
+     BFLOAT_MASK,
+     kBaseTypeConversionKind_BFloat,
      kBaseTypeConversionRank_Int16},
     {"float",
      BaseType::Float,
@@ -301,7 +308,7 @@ struct IntrinsicOpInfo
     {kIROp_Mul, "mul", "*", "__BuiltinArithmeticType", ARITHMETIC_MASK},
     {kIROp_Div, "div", "/", "__BuiltinArithmeticType", ARITHMETIC_MASK},
     {kIROp_IRem, "irem", "%", "__BuiltinIntegerType", INT_MASK},
-    {kIROp_FRem, "frem", "%", "__BuiltinFloatingPointType", FLOAT_MASK},
+    {kIROp_FRem, "frem", "%", "__BuiltinFloatingPointType", FLOAT_MASK | BFLOAT_MASK},
     {kIROp_And, "logicalAnd", "&&", nullptr, BOOL_MASK | BOOL_RESULT},
     {kIROp_Or, "logicalOr", "||", nullptr, BOOL_MASK | BOOL_RESULT},
     {kIROp_BitAnd, "and", "&", "__BuiltinLogicalType", LOGICAL_MASK},

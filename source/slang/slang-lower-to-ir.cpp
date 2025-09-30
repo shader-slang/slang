@@ -4922,6 +4922,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 return LoweredValInfo::simple(getBuilder()->getIntValue(type, 0));
 
             case BaseType::Half:
+            case BaseType::BFloat16:
             case BaseType::Float:
             case BaseType::Double:
                 return LoweredValInfo::simple(getBuilder()->getFloatValue(type, 0.0));

@@ -113,6 +113,8 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
 
         case BaseType::Half:
             return SimpleLayoutInfo(LayoutResourceKind::Uniform, 2, 2);
+        case BaseType::BFloat16:
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 2, 2);
         case BaseType::Float:
             return SimpleLayoutInfo(LayoutResourceKind::Uniform, 4, 4);
         case BaseType::Double:

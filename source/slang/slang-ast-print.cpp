@@ -216,6 +216,9 @@ void ASTPrinter::addExpr(Expr* expr)
         case BaseType::Half:
             sb << "h";
             break;
+        case BaseType::BFloat16:
+            sb << "bf16";
+            break;
         default:
             // Don't add a suffix for other types
             break;

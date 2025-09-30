@@ -810,7 +810,7 @@ struct DifferentialPtrPair : IDifferentiablePtrType
 /// Represents builtin floating point scalar types.
 /// To define generic functions that work with both scalar and vector types, use `IFloat` instead.
 ///
-/// Implemented by `float`, `half` and `double` types.
+/// Implemented by `float`, `half`, `bfloat16` and `double` types.
 [sealed]
 [builtin]
 [TreatAsDifferentiable]
@@ -1031,6 +1031,7 @@ ${{{{
     switch (kBaseTypes[tt].tag)
     {
     case BaseType::Half:
+    case BaseType::BFloat16:
     case BaseType::Float:
     case BaseType::Double:
 }}}}
@@ -1105,7 +1106,7 @@ ${{{{
             builtinConversionKind = kBuiltinConversion_FloatToDouble;
 
         const char* attrib = "";
-        if ((kBaseTypes[tt].flags & kBaseTypes[ss].flags & FLOAT_MASK) != 0)
+        if ((kBaseTypes[tt].flags & kBaseTypes[ss].flags & (FLOAT_MASK | BFLOAT_MASK)) != 0)
             attrib = "[TreatAsDifferentiable]";
 }}}}
     $(attrib)
@@ -1198,6 +1199,7 @@ ${{{{
     default:
         break;
     case BaseType::Half:
+    case BaseType::BFloat16:
     case BaseType::Float:
     case BaseType::Double:
 }}}}
@@ -2013,6 +2015,12 @@ extension half : IRangedValue
     static const half minValue = half(-65504);
 }
 
+extension bfloat16_t : IRangedValue
+{
+    static const bfloat16_t maxValue = bfloat16_t(338953140000000000000000000000000000000.0f);
+    static const bfloat16_t minValue = bfloat16_t(-338953140000000000000000000000000000000.0f);
+}
+
 extension float : IRangedValue
 {
     static const float maxValue = 340282346638528859811704183484516925440.0f;
@@ -2356,6 +2364,7 @@ static const struct {
 } kTypes[] =
 {
     {"half",        "f16"},
+    {"bfloat16_t",  "bf16"},
     {"float",       ""},
     {"double",      "d"},
 
@@ -3596,6 +3605,10 @@ __intrinsic_op($(kIROp_IsHalf))
 bool __isHalf_impl(T t);
 
 __generic<T>
+__intrinsic_op($(kIROp_IsBFloat16))
+bool __isBFloat16_impl(T t);
+
+__generic<T>
 [__unsafeForceInlineEarly]
 bool __isFloat()
 {
@@ -3607,6 +3620,13 @@ __generic<T>
 bool __isHalf()
 {
     return __isHalf_impl(__declVal<T>());
+}
+
+__generic<T>
+[__unsafeForceInlineEarly]
+bool __isBFloat16()
+{
+    return __isBFloat16_impl(__declVal<T>());
 }
 
 __generic<T>

@@ -2216,7 +2216,7 @@ bool isKeyword(const UnownedStringSlice& slice)
     if (isDeclKeyword(slice))
         return true;
     static const char* knownTypeNames[] =
-        {"int", "float", "half", "double", "bool", "void", "uint"};
+        {"int", "float", "half", "bfloat16", "double", "bool", "void", "uint"};
     for (auto typeName : knownTypeNames)
     {
         if (slice == typeName)

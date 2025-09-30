@@ -685,4 +685,6 @@ return {
 	["StoreBase.copyLogical"] = 681,
 	["MakeStorageTypeLoweringConfig"] = 682,
 	["Decoration.experimentalModule"] = 683,
+	["Type.BasicType.BFloat16"] = 684,
+	["IsBFloat16"] = 685,
 }

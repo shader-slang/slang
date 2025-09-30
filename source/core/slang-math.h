@@ -14,6 +14,13 @@ namespace Slang
 // Smallest (denormalized) value. 1 / 2^24
 #define SLANG_HALF_SUB_NORMAL_MIN (1.0f / 16777216.0f)
 
+// The largest positive (or negative) number for bfloat16
+#define SLANG_BFLOAT16_MAX 0x1.fep127f
+// Smallest (denormalized) value for bfloat16. 1 / 2^133
+#define SLANG_BFLOAT16_SUB_NORMAL_MIN 0x1.p-133f
+// Binary value of NaN for bfloat16
+#define SLANG_BFLOAT16_NAN_BINARY 0x7fffu
+
 class Math
 {
 public:
@@ -246,6 +253,20 @@ inline float HalfToFloat(unsigned short input)
         o.ivalue |= 255 << 23;
     o.ivalue |= (input & 0x8000) << 16; // sign bit
     return o.fvalue;
+}
+
+inline unsigned short FloatToBfloat16(float input)
+{
+    if (input != input)
+        return SLANG_BFLOAT16_NAN_BINARY;
+    const unsigned bits = (unsigned)FloatAsInt(input);
+    const unsigned roundingBias = ((bits >> 16) & 1) + 0x7fffu;
+    return (unsigned short)((bits + roundingBias) >> 16);
+}
+
+inline float Bfloat16ToFloat(unsigned short input)
+{
+    return IntAsFloat(int(input) << 16u);
 }
 
 class Random

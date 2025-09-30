@@ -9,6 +9,7 @@ Items with ^ means there is some discussion about support later in the document 
 | Feature                                              | D3D11 | D3D12     | VK      | CUDA           | Metal | CPU       |
 | ---------------------------------------------------- | ----- | --------- | ------- | -------------- | ----- | --------- |
 | [Half Type](#half)                                   | No    | Yes ^     | Yes     | Yes ^          | Yes   | No +      |
+| [BFloat16 Type](#bfloat16)                           | No    | No        | Limited | No +           | No    | No        |
 | Double Type                                          | Yes   | Yes       | Yes     | Yes            | No    | Yes       |
 | Double Intrinsics                                    | No    | Limited + | Limited | Most           | No    | Yes       |
 | [u/int8_t Type](#int8_t)                             | No    | No        | Yes ^   | Yes            | Yes   | Yes       |
@@ -52,6 +53,14 @@ Items with ^ means there is some discussion about support later in the document 
 There appears to be a problem writing to a StructuredBuffer containing half on D3D12. D3D12 also appears to have problems doing calculations with half.
 
 In order for half to work in CUDA, NVRTC must be able to include `cuda_fp16.h` and related files. Please read the [CUDA target documentation](cuda-target.md) for more details.
+
+<a id="bfloat16"></a>
+
+## BFloat16 Type
+
+This type is not supported in D3D12. Vulkan has limited support for it, namely only using it on CoopMat, CoopVec, and type conversion.
+
+However, slang will not cause any errors if used incorrectly, such as performing arithmetic operations on it.
 
 <a id="int8_t"></a>
 
