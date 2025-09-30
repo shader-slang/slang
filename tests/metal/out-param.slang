@@ -1,5 +1,7 @@
-//TEST:SIMPLE(filecheck=CHECK): -target metal
+//TEST:SIMPLE(filecheck=METAL): -target metal
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib
+//TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-metal -compute -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -output-using-type
 
 // Test that we can specailize mutable parameters based on the argument
 // address space when generating code for Metal.
@@ -14,6 +16,15 @@ RWStructuredBuffer<int> outputBuffer;
 // CHECK-DAG: void Test_out_param_wrapper{{.*}}(int {{.*}}, KernelContext{{.*}} thread* {{.*}})
 // CHECK-DAG: void Test_out_param_wrapper{{.*}}(int thread* value{{.*}})
 // CHECK-DAG: void Test_out_param_wrapper{{.*}}(int threadgroup* value{{.*}})
+
+// METAL: void Test_out_param{{.*}}(int thread* value{{.*}})
+// METAL: void Test_out_param{{.*}}(int device* value{{.*}})
+// METAL: void Test_out_param{{.*}}(int threadgroup* value{{.*}})
+
+// METAL: void Test_out_param_wrapper{{.*}}(int thread* value{{.*}})
+// METAL: void Test_out_param_wrapper{{.*}}(int device* value{{.*}})
+// METAL: void Test_out_param_wrapper{{.*}}(int threadgroup* value{{.*}})
+
 
 void Test_out_param(out int value)
 {
@@ -41,4 +52,7 @@ void computeMain()
     outputBuffer[2] = sharedValue[0];
 
     outputBuffer[0]++;
+    // BUF: 2
+    // BUF: 1
+    // BUF: 1
 }

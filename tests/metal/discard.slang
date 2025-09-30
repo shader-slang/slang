@@ -1,9 +1,9 @@
-//TEST:SIMPLE(filecheck=CHECK): -target metal
-//TEST:SIMPLE(filecheck=CHECK-ASM): -target metallib
+//TEST:SIMPLE(filecheck=METAL): -target metal
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib
 
-// CHECK: discard_fragment();
+// METAL: discard_fragment();
 
-// CHECK-ASM: define {{.*}} @main_fragment1
+// METALLIB: define {{.*}} @main_fragment1
 
 struct VOut
 {
