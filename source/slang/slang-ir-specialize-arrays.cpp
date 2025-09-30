@@ -11,38 +11,14 @@ namespace Slang
 struct ArrayParameterSpecializationCondition : FunctionCallSpecializeCondition
 {
     // This pass is intended to specialize functions
-    // with struct parameters that has array fields
-    // to avoid performance problems for GLSL targets.
-    // Returns true if `type` is an `IRStructType` with array-typed fields.
-    // It will also specialize functions with unsized array parameters into
-    // sized arrays, if the function is called with an argument that has a
-    // sized array type.
+    // with unsized array parameter called with a sized-array argument.
     //
-    bool isStructTypeWithArray(IRType* type)
-    {
-        if (auto structType = as<IRStructType>(type))
-        {
-            for (auto field : structType->getFields())
-            {
-                if (const auto arrayType = as<IRArrayType>(field->getFieldType()))
-                {
-                    return true;
-                }
-                if (auto subStructType = as<IRStructType>(field->getFieldType()))
-                {
-                    if (isStructTypeWithArray(subStructType))
-                        return true;
-                }
-            }
-        }
-        return false;
-    }
 
-    bool doesParamWantSpecialization(IRParam* param, IRInst* arg)
+    bool doesParamWantSpecialization(IRParam* param, IRInst* arg, IRInst* callInst)
     {
+        SLANG_UNUSED(param);
         SLANG_UNUSED(arg);
-        if (isKhronosTarget(codeGenContext->getTargetReq()))
-            return isStructTypeWithArray(param->getDataType());
+        SLANG_UNUSED(callInst);
         return false;
     }
 

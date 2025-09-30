@@ -12,7 +12,7 @@ class Module;
 class FunctionCallSpecializeCondition
 {
 public:
-    virtual bool doesParamWantSpecialization(IRParam* param, IRInst* arg) = 0;
+    virtual bool doesParamWantSpecialization(IRParam* param, IRInst* arg, IRInst* callInst) = 0;
 
     virtual bool isParamSuitableForSpecialization(IRParam* param, IRInst* arg);
 

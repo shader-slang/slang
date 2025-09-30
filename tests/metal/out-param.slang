@@ -7,13 +7,13 @@
 //TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
-// CHECK: void Test_out_param{{.*}}(int thread* value{{.*}})
-// CHECK: void Test_out_param{{.*}}(int device* value{{.*}})
-// CHECK: void Test_out_param{{.*}}(int threadgroup* value{{.*}})
+// CHECK-DAG: void Test_out_param{{.*}}(int thread* value{{.*}})
+// CHECK-DAG: void Test_out_param{{.*}}(int threadgroup* value{{.*}})
+// CHECK-DAG: void Test_out_param{{.*}}(int {{.*}}, KernelContext{{.*}} thread* {{.*}})
 
-// CHECK: void Test_out_param_wrapper{{.*}}(int thread* value{{.*}})
-// CHECK: void Test_out_param_wrapper{{.*}}(int device* value{{.*}})
-// CHECK: void Test_out_param_wrapper{{.*}}(int threadgroup* value{{.*}})
+// CHECK-DAG: void Test_out_param_wrapper{{.*}}(int {{.*}}, KernelContext{{.*}} thread* {{.*}})
+// CHECK-DAG: void Test_out_param_wrapper{{.*}}(int thread* value{{.*}})
+// CHECK-DAG: void Test_out_param_wrapper{{.*}}(int threadgroup* value{{.*}})
 
 void Test_out_param(out int value)
 {
