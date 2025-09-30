@@ -20548,7 +20548,6 @@ struct HitObject
     [require(hlsl, ser)]
     __generic<payload_t>
     static void __InvokeHLSL(
-        RaytracingAccelerationStructure AccelerationStructure,
         HitObject HitOrMiss,
         inout payload_t Payload)
     {
@@ -20564,7 +20563,6 @@ struct HitObject
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     static void Invoke<payload_t>(
-        RaytracingAccelerationStructure AccelerationStructure,
         HitObject HitOrMiss,
         inout payload_t Payload)
     {
@@ -20572,7 +20570,6 @@ struct HitObject
         {
         case hlsl:
             __InvokeHLSL(
-                AccelerationStructure,
                 HitOrMiss,
                 __forceVarIntoRayPayloadStructTemporarily(Payload));
         case glsl:

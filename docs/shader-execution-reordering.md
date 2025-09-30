@@ -250,11 +250,10 @@ static HitObject HitObject.MakeNop();
 Invokes closesthit or miss shading for the specified hit object. In case of a NOP HitObject, no
 shader is invoked.
 
-## Signature 
+## Signature
 
 ```
 static void HitObject.Invoke<payload_t>(
-    RaytracingAccelerationStructure AccelerationStructure,
     HitObject            HitOrMiss,
     inout payload_t      Payload);
 ```
