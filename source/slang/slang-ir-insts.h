@@ -3256,6 +3256,14 @@ struct IRCastFloatToInt : IRInst
 };
 
 FIDDLE()
+struct IRCastStorageToLogicalBase : IRInst
+{
+    FIDDLE(baseInst())
+    IRInst* getVal() { return getOperand(0); }
+    IRInst* getBufferType() { return getOperand(1); }
+};
+
+FIDDLE()
 struct IRDebugSource : IRInst
 {
     FIDDLE(leafInst())
@@ -4572,6 +4580,12 @@ public:
     IRInst* emitCastPtrToBool(IRInst* val);
     IRInst* emitCastPtrToInt(IRInst* val);
     IRInst* emitCastIntToPtr(IRType* ptrType, IRInst* val);
+
+    IRInst* emitCastStorageToLogical(IRType* type, IRInst* val, IRInst* bufferType);
+    IRCastStorageToLogicalDeref* emitCastStorageToLogicalDeref(
+        IRType* type,
+        IRInst* val,
+        IRInst* bufferType);
 
     IRGlobalConstant* emitGlobalConstant(IRType* type);
 

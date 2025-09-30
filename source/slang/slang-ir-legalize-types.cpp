@@ -2344,6 +2344,10 @@ static LegalVal legalizeCoopMatMapElementIFunc(
 
 static LegalVal legalizeInst(IRTypeLegalizationContext* context, IRInst* inst)
 {
+    LegalVal legalVal;
+    if (context->mapValToLegalVal.tryGetValue(inst, legalVal))
+        return legalVal;
+
     // Any additional instructions we need to emit
     // in the process of legalizing `inst` should
     // by default be insertied right before `inst`.
@@ -2463,7 +2467,7 @@ static LegalVal legalizeInst(IRTypeLegalizationContext* context, IRInst* inst)
     auto builder = context->builder;
     builder->setInsertBefore(inst);
 
-    LegalVal legalVal = legalizeInst(context, inst, legalType, legalArgs.getArrayView().arrayView);
+    legalVal = legalizeInst(context, inst, legalType, legalArgs.getArrayView().arrayView);
 
     if (legalVal.flavor == LegalVal::Flavor::simple)
     {
@@ -2789,7 +2793,9 @@ private:
 static LegalVal legalizeFunc(IRTypeLegalizationContext* context, IRFunc* irFunc)
 {
     LegalFuncBuilder builder(context);
-    return builder.build(irFunc);
+    auto legalVal = builder.build(irFunc);
+    registerLegalizedValue(context, irFunc, legalVal);
+    return legalVal;
 }
 
 static void cloneDecorationToVar(IRInst* srcInst, IRInst* varInst)

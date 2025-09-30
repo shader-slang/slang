@@ -2128,6 +2128,40 @@ IRType* getIRVectorBaseType(IRType* type)
     return as<IRVectorType>(type)->getElementType();
 }
 
+IRType* getElementType(IRBuilder& builder, IRType* valueType)
+{
+    valueType = (IRType*)unwrapAttributedType(valueType);
+    if (auto arrayType = as<IRArrayTypeBase>(valueType))
+    {
+        return arrayType->getElementType();
+    }
+    else if (auto vectorType = as<IRVectorType>(valueType))
+    {
+        return vectorType->getElementType();
+    }
+    else if (auto basicType = as<IRBasicType>(valueType))
+    {
+        return basicType;
+    }
+    else if (auto coopVecType = as<IRCoopVectorType>(valueType))
+    {
+        return coopVecType->getElementType();
+    }
+    else if (auto matrixType = as<IRMatrixType>(valueType))
+    {
+        return builder.getVectorType(matrixType->getElementType(), matrixType->getColumnCount());
+    }
+    else if (auto coopMatType = as<IRCoopMatrixType>(valueType))
+    {
+        return coopMatType->getElementType();
+    }
+    else if (auto hlslInputPatchType = as<IRHLSLInputPatchType>(valueType))
+    {
+        return hlslInputPatchType->getElementType();
+    }
+    return nullptr;
+}
+
 Int getSpecializationConstantId(IRGlobalParam* param)
 {
     auto layout = findVarLayout(param);
@@ -2483,4 +2517,47 @@ bool isIROpaqueType(IRType* type)
     }
 }
 
+bool isPointerToImmutableLocation(IRInst* loc)
+{
+    switch (loc->getOp())
+    {
+    case kIROp_GetStructuredBufferPtr:
+    case kIROp_ImageSubscript:
+        return isPointerToImmutableLocation(loc->getOperand(0));
+    default:
+        break;
+    }
+
+    auto type = loc->getDataType();
+    if (!type)
+        return false;
+
+    switch (type->getOp())
+    {
+    case kIROp_HLSLStructuredBufferType:
+    case kIROp_HLSLByteAddressBufferType:
+    case kIROp_ConstantBufferType:
+    case kIROp_ParameterBlockType:
+        return true;
+    default:
+        break;
+    }
+
+    if (auto textureType = as<IRTextureType>(type))
+        return textureType->getAccess() == SLANG_RESOURCE_ACCESS_READ;
+
+    if (auto ptrType = as<IRPtrTypeBase>(type))
+    {
+        switch (ptrType->getAddressSpace())
+        {
+        case AddressSpace::BuiltinInput:
+        case AddressSpace::Input:
+        case AddressSpace::MetalObjectData:
+        case AddressSpace::Uniform:
+        case AddressSpace::UniformConstant:
+            return true;
+        }
+    }
+    return false;
+}
 } // namespace Slang

@@ -67,38 +67,6 @@ struct DeferBufferLoadContext
         return result;
     }
 
-    static bool isImmutableLocation(IRInst* loc)
-    {
-        switch (loc->getOp())
-        {
-        case kIROp_GetStructuredBufferPtr:
-        case kIROp_ImageSubscript:
-            return isImmutableLocation(loc->getOperand(0));
-        default:
-            break;
-        }
-
-        auto type = loc->getDataType();
-        if (!type)
-            return false;
-
-        switch (type->getOp())
-        {
-        case kIROp_HLSLStructuredBufferType:
-        case kIROp_HLSLByteAddressBufferType:
-        case kIROp_ConstantBufferType:
-        case kIROp_ParameterBlockType:
-            return true;
-        default:
-            break;
-        }
-
-        if (auto textureType = as<IRTextureType>(type))
-            return textureType->getAccess() == SLANG_RESOURCE_ACCESS_READ;
-
-        return false;
-    }
-
     static bool isImmutableBufferLoad(IRInst* inst)
     {
         // Note: we cannot defer loads from RWStructuredBuffer because there can be other
@@ -111,7 +79,7 @@ struct DeferBufferLoadContext
         case kIROp_Load:
             {
                 auto rootAddr = getRootAddr(inst->getOperand(0));
-                return isImmutableLocation(rootAddr);
+                return isPointerToImmutableLocation(rootAddr);
             }
         default:
             return false;
@@ -132,14 +100,14 @@ struct DeferBufferLoadContext
             align = load->findAttr<IRAlignedAttr>();
         if (!as<IRModuleInst>(ptr->getParent()))
         {
-            builder.setInsertAfter(ptr);
+            setInsertAfterOrdinaryInst(&builder, ptr);
             IRType* valueType = tryGetPointedToType(&builder, ptr->getFullType());
             result = builder.emitLoad(valueType, ptr, align);
             mapPtrToValue[ptr] = result;
         }
         else
         {
-            builder.setInsertBefore(loadInst);
+            setInsertBeforeOrdinaryInst(&builder, loadInst);
             IRType* valueType = tryGetPointedToType(&builder, ptr->getFullType());
             result = builder.emitLoad(valueType, ptr, align);
             // Since we are inserting the load in a local scope, we can't register
