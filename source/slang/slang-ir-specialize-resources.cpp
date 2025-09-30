@@ -20,7 +20,7 @@ struct ResourceParameterSpecializationCondition : FunctionCallSpecializeConditio
     TargetRequest* targetRequest = nullptr;
     TargetProgram* targetProgram = nullptr;
 
-    bool doesParamWantSpecialization(IRParam* param, IRInst* arg, IRInst* callInst)
+    bool doesParamWantSpecialization(IRParam* param, IRInst* arg, IRCall* callInst)
     {
         SLANG_UNUSED(arg);
         SLANG_UNUSED(callInst);

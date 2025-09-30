@@ -7,12 +7,14 @@ struct CodeGenContext;
 struct IRInst;
 struct IRModule;
 struct IRParam;
+struct IRCall;
+
 class Module;
 
 class FunctionCallSpecializeCondition
 {
 public:
-    virtual bool doesParamWantSpecialization(IRParam* param, IRInst* arg, IRInst* callInst) = 0;
+    virtual bool doesParamWantSpecialization(IRParam* param, IRInst* arg, IRCall* callInst) = 0;
 
     virtual bool isParamSuitableForSpecialization(IRParam* param, IRInst* arg);
 

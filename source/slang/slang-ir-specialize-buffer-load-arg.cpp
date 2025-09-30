@@ -38,7 +38,7 @@ struct FuncBufferLoadSpecializationCondition : FunctionCallSpecializeCondition
 
     CodeGenContext* codegenContext;
 
-    virtual bool doesParamWantSpecialization(IRParam* param, IRInst* arg, IRInst* callInst)
+    virtual bool doesParamWantSpecialization(IRParam* param, IRInst* arg, IRCall* callInst)
     {
         // We only want to specialize for `struct` types and not base types.
         //

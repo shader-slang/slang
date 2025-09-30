@@ -273,7 +273,7 @@ struct FunctionParameterSpecializationContext
     // Of course, now we need to back-fill the predicates that
     // the above function used to evaluate prameters and arguments.
 
-    bool doesParamWantSpecialization(IRParam* param, IRInst* arg, IRInst* callInst)
+    bool doesParamWantSpecialization(IRParam* param, IRInst* arg, IRCall* callInst)
     {
         return condition->doesParamWantSpecialization(param, arg, callInst);
     }
@@ -576,11 +576,7 @@ struct FunctionParameterSpecializationContext
             ioInfo.key.vals.add(oldArg->getFullType());
             ioInfo.newArgs.add(oldArg);
         }
-        else if (
-            oldArg->getOp() == kIROp_GetElement || oldArg->getOp() == kIROp_GetElementPtr ||
-            oldArg->getOp() == kIROp_RWStructuredBufferGetElementPtr ||
-            oldArg->getOp() == kIROp_StructuredBufferLoad ||
-            oldArg->getOp() == kIROp_ByteAddressBufferLoad)
+        else if (isElementAccessInst(oldArg))
         {
             // This is the case where the `oldArg` is
             // in the form `oldBase[oldIndex]`
@@ -621,7 +617,7 @@ struct FunctionParameterSpecializationContext
 
             ioInfo.newArgs.add(oldIndex);
         }
-        else if (oldArg->getOp() == kIROp_FieldExtract || oldArg->getOp() == kIROp_FieldAddress)
+        else if (isFieldAccessInst(oldArg))
         {
             // This is the case where the `oldArg` is
             // in the form `oldBase.structKey`
@@ -742,7 +738,7 @@ struct FunctionParameterSpecializationContext
         FuncSpecializationInfo& ioInfo,
         IRParam* oldParam,
         IRInst* oldArg,
-        IRInst* callInst)
+        IRCall* callInst)
     {
         // As always, the easy case is when the parameter of
         // the original function doesn't need specialization.
@@ -779,6 +775,8 @@ struct FunctionParameterSpecializationContext
         }
     }
 
+    // Returns true if `inst` is an instruction that accesses an element from an array or a buffer.
+    //
     static bool isElementAccessInst(IRInst* inst)
     {
         switch (inst->getOp())
@@ -793,6 +791,9 @@ struct FunctionParameterSpecializationContext
         return false;
     }
 
+    // Returns true if `inst` is an instruction that accesses a field from a struct, that is
+    // either a FieldAddress or FieldExtract.
+    //
     static bool isFieldAccessInst(IRInst* inst)
     {
         switch (inst->getOp())

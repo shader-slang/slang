@@ -17,13 +17,11 @@ RWStructuredBuffer<int> outputBuffer;
 // CHECK-DAG: void Test_out_param_wrapper{{.*}}(int thread* value{{.*}})
 // CHECK-DAG: void Test_out_param_wrapper{{.*}}(int threadgroup* value{{.*}})
 
-// METAL: void Test_out_param{{.*}}(int thread* value{{.*}})
-// METAL: void Test_out_param{{.*}}(int device* value{{.*}})
-// METAL: void Test_out_param{{.*}}(int threadgroup* value{{.*}})
+// METAL-DAG: void Test_out_param{{.*}}(int thread* value{{.*}})
+// METAL-DAG: void Test_out_param{{.*}}(int threadgroup* value{{.*}})
 
-// METAL: void Test_out_param_wrapper{{.*}}(int thread* value{{.*}})
-// METAL: void Test_out_param_wrapper{{.*}}(int device* value{{.*}})
-// METAL: void Test_out_param_wrapper{{.*}}(int threadgroup* value{{.*}})
+// METAL-DAG: void Test_out_param_wrapper{{.*}}(int thread* value{{.*}})
+// METAL-DAG: void Test_out_param_wrapper{{.*}}(int threadgroup* value{{.*}})
 
 
 void Test_out_param(out int value)
