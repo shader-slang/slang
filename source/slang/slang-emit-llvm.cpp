@@ -219,6 +219,22 @@ static void findDebugLocation(
     else findDebugLocation(compileUnit, sourceDebugInfo, inst->getParent(), file, scope, line);
 }
 
+static llvm::Instruction::CastOps getLLVMIntExtensionOp(IRType* type)
+{
+    switch(type->getOp())
+    {
+    case kIROp_BoolType:
+    case kIROp_UInt16Type:
+    case kIROp_UIntType:
+    case kIROp_UInt64Type:
+    case kIROp_UIntPtrType:
+    case kIROp_PtrType:
+        return llvm::Instruction::CastOps::ZExt;
+    default:
+        return llvm::Instruction::CastOps::SExt;
+    }
+}
+
 static UInt parseNumber(const char*& cursor, const char* end)
 {
     char d = *cursor;
@@ -316,6 +332,12 @@ private:
         {
             return withTrailingPadding ? padded : unpadded;
         }
+
+        StorageTypeInfo& operator=(llvm::Type* type)
+        {
+            padded = unpadded = type;
+            return *this;
+        }
     };
 
     Dictionary<IRType*, llvm::Type*> valueTypeMap;
@@ -328,6 +350,12 @@ private:
         llvm::Constant* get(bool withTrailingPadding)
         {
             return withTrailingPadding ? padded : unpadded;
+        }
+
+        ConstantInfo& operator=(llvm::Constant* constant)
+        {
+            padded = unpadded = constant;
+            return *this;
         }
     };
     Dictionary<IRInst*, ConstantInfo> constantMap;
@@ -377,8 +405,10 @@ public:
             break;
         case kIROp_Int8Type:
         case kIROp_UInt8Type:
-        case kIROp_BoolType:
             llvmType = builder->getInt8Ty();
+            break;
+        case kIROp_BoolType:
+            llvmType = builder->getInt1Ty();
             break;
         case kIROp_Int16Type:
         case kIROp_UInt16Type:
@@ -462,19 +492,31 @@ public:
     // MemCpy and global variables.
     llvm::Type* getStorageType(IRType* type, IRTypeLayoutRules* rules, bool withTrailingPadding = true)
     {
-        Dictionary<IRType*, StorageTypeInfo>& types = storageTypeMap[rules];
-        if (types.containsKey(type))
-            return types.getValue(type).get(withTrailingPadding);
+        {
+            Dictionary<IRType*, StorageTypeInfo>& types = storageTypeMap[rules];
+            if (types.containsKey(type))
+                return types.getValue(type).get(withTrailingPadding);
+        }
 
         StorageTypeInfo llvmTypeInfo;
         switch (type->getOp())
         {
+        case kIROp_BoolType:
+            if (rules)
+            {
+                IRSizeAndAlignment sizeAlignment;
+                Slang::getSizeAndAlignment(*compilerOptions, rules, type, &sizeAlignment);
+                llvmTypeInfo = builder->getIntNTy(sizeAlignment.size * 8);
+            }
+            else llvmTypeInfo = builder->getInt8Ty();
+            break;
+
         case kIROp_StructType:
             {
                 auto structType = static_cast<IRStructType*>(type);
                 llvmTypeInfo = rules ? 
-                    getNativeStructTypeInfo(structType) :
-                    getExplicitLayoutStructTypeInfo(structType, rules);
+                    getExplicitLayoutStructTypeInfo(structType, rules) :
+                    getNativeStructTypeInfo(structType);
             }
             break;
 
@@ -499,23 +541,26 @@ public:
 
                 int alignedCount = getVectorAlignedCount(vecType, rules);
 
-                llvmTypeInfo.padded = llvmTypeInfo.unpadded = llvm::ArrayType::get(elemType, elemCount);
+                llvmTypeInfo = llvm::ArrayType::get(elemType, elemCount);
                 if (alignedCount != elemCount)
                     llvmTypeInfo.padded = llvm::ArrayType::get(elemType, alignedCount);
 
                 llvmTypeInfo.trailingPadding = (alignedCount - elemCount) * elementAlignment.size;
             }
-            else llvmTypeInfo.unpadded = llvmTypeInfo.padded = getValueType(type);
+            else llvmTypeInfo = getValueType(type);
             break;
 
         default:
             // No special storage considerations, just use the same type as SSA
             // values.
-            llvmTypeInfo.unpadded = llvmTypeInfo.padded = getValueType(type);
+            llvmTypeInfo = getValueType(type);
             break;
         }
 
-        types[type] = std::move(llvmTypeInfo);
+        {
+            Dictionary<IRType*, StorageTypeInfo>& types = storageTypeMap[rules];
+            types[type] = std::move(llvmTypeInfo);
+        }
         return llvmTypeInfo.get(withTrailingPadding);
     }
 
@@ -823,6 +868,14 @@ public:
         IRSizeAndAlignment sizeAlignment = getSizeAndAlignment(valType, rules);
         switch(valType->getOp())
         {
+        case kIROp_BoolType:
+            {
+                // Booleans are i1 in values, but something larger in memory.
+                auto storageType = getStorageType(valType, rules);
+                auto expanded = builder->CreateZExt(llvmVal, storageType);
+                return builder->CreateAlignedStore(expanded, llvmPtr, llvm::MaybeAlign(sizeAlignment.alignment), isVolatile);
+            }
+            break;
         case kIROp_ArrayType:
         case kIROp_StructType:
             if (rules != defaultPointerRules)
@@ -865,6 +918,20 @@ public:
 
         switch(valType->getOp())
         {
+        case kIROp_BoolType:
+            {
+                // Booleans are i1 in values, but something larger in memory.
+                auto llvmType = getValueType(valType);
+                auto storageType = getStorageType(valType, rules);
+                auto storageBool = builder->CreateAlignedLoad(
+                    storageType,
+                    llvmPtr,
+                    llvm::MaybeAlign(elementSizeAlignment.alignment),
+                    isVolatile);
+
+                return builder->CreateTrunc(storageBool, llvmType);
+            }
+            break;
         case kIROp_ArrayType:
         case kIROp_StructType:
             if (rules != defaultPointerRules)
@@ -971,7 +1038,7 @@ public:
                 IRBasicType* type = as<IRBasicType>(inst->getDataType());
                 if (type)
                 {
-                    llvmConstant.padded = llvmConstant.unpadded = llvm::ConstantInt::get(getValueType(type), litInst->value.intVal);
+                    llvmConstant = llvm::ConstantInt::get(getValueType(type), litInst->value.intVal);
                 }
                 break;
             }
@@ -982,13 +1049,13 @@ public:
                 IRBasicType* type = as<IRBasicType>(inst->getDataType());
                 if (type)
                 {
-                    llvmConstant.padded = llvmConstant.unpadded = llvm::ConstantFP::get(getValueType(type), litInst->value.floatVal);
+                    llvmConstant = llvm::ConstantFP::get(getValueType(type), litInst->value.floatVal);
                 }
             }
             break;
 
         case kIROp_StringLit:
-            llvmConstant.padded = llvmConstant.unpadded = builder->CreateGlobalString(getStringLitAsLLVMString(inst));
+            llvmConstant = builder->CreateGlobalString(getStringLitAsLLVMString(inst));
             break;
 
         case kIROp_PtrLit:
@@ -998,11 +1065,11 @@ public:
                 auto llvmType = llvm::cast<llvm::PointerType>(getValueType(type));
                 if (ptrLit->getValue() == nullptr)
                 {
-                    llvmConstant.padded = llvmConstant.unpadded = llvm::ConstantPointerNull::get(llvmType);
+                    llvmConstant = llvm::ConstantPointerNull::get(llvmType);
                 }
                 else
                 {
-                    llvmConstant.padded = llvmConstant.unpadded = llvm::ConstantExpr::getIntToPtr(
+                    llvmConstant = llvm::ConstantExpr::getIntToPtr(
                         llvm::ConstantInt::get(
 #if SLANG_PTR_IS_64
                             builder->getInt64Ty(),
@@ -1032,7 +1099,7 @@ public:
                     // To remove padding and alignment requirements from the
                     // vector, lower it as an array.
                     auto elemType = getValueType(vectorType->getElementType());
-                    llvmConstant.padded = llvmConstant.unpadded = llvm::ConstantArray::get(
+                    llvmConstant = llvm::ConstantArray::get(
                         llvm::ArrayType::get(elemType, values.getCount()),
                         llvm::ArrayRef(values.begin(), values.end()));
 
@@ -1051,8 +1118,8 @@ public:
                 }
                 else
                 {
-                    llvmConstant.padded = llvmConstant.unpadded =
-                        llvm::ConstantVector::get(llvm::ArrayRef(values.begin(), values.end()));
+                    llvmConstant = llvm::ConstantVector::get(
+                        llvm::ArrayRef(values.begin(), values.end()));
                 }
             }
             break;
@@ -1073,7 +1140,7 @@ public:
                 }
 
                 auto llvmPaddedType = getStorageType(arrayType, defaultPointerRules, true);
-                llvmConstant.unpadded = llvmConstant.padded = llvm::ConstantArray::get(
+                llvmConstant = llvm::ConstantArray::get(
                     llvm::cast<llvm::ArrayType>(llvmPaddedType),
                     llvm::ArrayRef(values.begin(), values.end()));
 
@@ -1151,7 +1218,7 @@ public:
                         return nullptr;
                     values.add(constVal);
                 }
-                llvmConstant.unpadded = llvmConstant.padded = llvm::ConstantStruct::get(
+                llvmConstant = llvm::ConstantStruct::get(
                     llvm::cast<llvm::StructType>(llvmType),
                     llvm::ArrayRef(values.begin(), values.end()));
             }
@@ -1344,7 +1411,7 @@ private:
         if (maybeGetName(&linkageName, &prettyName, structType))
             llvmStructType->setName(linkageName);
 
-        llvmTypeInfo.unpadded = llvmTypeInfo.padded = llvmStructType;
+        llvmTypeInfo = llvmStructType;
         return llvmTypeInfo;
     }
 
@@ -1384,14 +1451,13 @@ private:
         if (irElemCount == nullptr)
         {
             // UnsizedArrayType. Lowers as a zero-sized array for LLVM, luckily.
-            llvmTypeInfo.unpadded = llvmTypeInfo.padded = llvm::ArrayType::get(llvmPaddedElemType, 0);
+            llvmTypeInfo = llvm::ArrayType::get(llvmPaddedElemType, 0);
             return llvmTypeInfo;
         }
 
         auto elemCount = int(getIntVal(irElemCount));
 
-        llvmTypeInfo.padded = llvm::ArrayType::get(llvmPaddedElemType, elemCount);
-        llvmTypeInfo.unpadded = llvmTypeInfo.padded;
+        llvmTypeInfo = llvm::ArrayType::get(llvmPaddedElemType, elemCount);
 
         // The stride of an array must be based on the element type with
         // trailing padding included, but the last entry in that array may be
@@ -2163,9 +2229,7 @@ struct LLVMEmitter
                     if (toInfo.width > fromInfo.width)
                     {
                         // Source is signed, so sign extend.
-                        cast = fromInfo.isSigned ?
-                            llvm::Instruction::CastOps::SExt :
-                            llvm::Instruction::CastOps::ZExt;
+                        cast = getLLVMIntExtensionOp(fromType);
                     }
                     llvmInst = llvmBuilder->CreateCast(cast, llvmValue, types->getValueType(toTypeV));
                 }
@@ -2495,7 +2559,8 @@ struct LLVMEmitter
                         // Flatten the tuple resulting from the variadic pack.
                         for (UInt bb = 0; bb < makeStruct->getOperandCount(); ++bb)
                         {
-                            auto llvmValue = findValue(makeStruct->getOperand(bb));
+                            auto op = makeStruct->getOperand(bb);
+                            auto llvmValue = findValue(op);
                             auto valueType = llvmValue->getType();
 
                             if (valueType->isFloatingPointTy() && valueType->getScalarSizeInBits() < 64)
@@ -2511,7 +2576,7 @@ struct LLVMEmitter
                             {
                                 // Ints are upcasted to at least i32.
                                 llvmValue = llvmBuilder->CreateCast(
-                                    llvm::Instruction::CastOps::SExt,
+                                    getLLVMIntExtensionOp(op->getDataType()),
                                     llvmValue,
                                     llvmBuilder->getInt32Ty()
                                 );
