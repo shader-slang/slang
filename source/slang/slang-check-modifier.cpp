@@ -9,6 +9,7 @@
 // focused on `[attributes]`.
 
 #include "slang-lookup.h"
+#include "slang-target.h"
 
 namespace Slang
 {
@@ -1674,6 +1675,42 @@ Modifier* SemanticsVisitor::checkModifier(
                 return nullptr;
             }
             return m;
+        }
+    }
+
+    // Check for layout qualifiers on incompatible targets
+    if (auto layoutMod = as<GLSLBufferDataLayoutModifier>(m))
+    {
+        String layoutName;
+        
+        if (as<GLSLStd140Modifier>(layoutMod))
+            layoutName = "std140";
+        else if (as<GLSLStd430Modifier>(layoutMod))
+            layoutName = "std430";
+        else if (as<GLSLScalarModifier>(layoutMod))
+            layoutName = "scalar";
+        else
+            layoutName = "layout";
+            
+        for (auto target : getLinkage()->targets)
+        {
+            if (!isKhronosTarget(target->getTarget()) && !isWGPUTarget(target->getTarget()))
+            {
+                String targetName;
+                switch (target->getTarget())
+                {
+                case CodeGenTarget::HLSL: targetName = "HLSL"; break;
+                case CodeGenTarget::DXIL: targetName = "DXIL"; break;
+                case CodeGenTarget::DXBytecode: targetName = "DXBC"; break;
+                case CodeGenTarget::CSource: targetName = "C"; break;
+                case CodeGenTarget::CPPSource: targetName = "C++"; break;
+                case CodeGenTarget::CUDASource: targetName = "CUDA"; break;
+                case CodeGenTarget::MetalLib: targetName = "Metal"; break;
+                default: targetName = "unknown"; break;
+                }
+                getSink()->diagnose(m, Diagnostics::layoutQualifierUnsupportedForTarget, layoutName, targetName);
+                break;
+            }
         }
     }
 
