@@ -1152,6 +1152,12 @@ void GLSLSourceEmitter::_emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloa
             }
             break;
         }
+    case kIROp_BFloat16Type:
+        {
+            _requireBaseType(BaseType::BFloat16);
+            m_writer->emit("bf16");
+            break;
+        }
     case kIROp_DoubleType:
         m_writer->emit("d");
         break;
@@ -3393,6 +3399,12 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         {
             _requireBaseType(BaseType::Half);
             m_writer->emit("float16_t");
+            return;
+        }
+    case kIROp_BFloat16Type:
+        {
+            _requireBaseType(BaseType::BFloat16);
+            m_writer->emit("bfloat16_t");
             return;
         }
     case kIROp_StructType:

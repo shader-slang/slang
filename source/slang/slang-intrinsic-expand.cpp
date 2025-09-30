@@ -97,6 +97,8 @@ static BaseType _getBaseTypeFromScalarType(SlangScalarType type)
         return BaseType::UInt8;
     case SLANG_SCALAR_TYPE_FLOAT16:
         return BaseType::Half;
+    case SLANG_SCALAR_TYPE_BFLOAT16:
+        return BaseType::BFloat16;
     case SLANG_SCALAR_TYPE_FLOAT32:
         return BaseType::Float;
     case SLANG_SCALAR_TYPE_FLOAT64:
@@ -705,6 +707,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
                 CASE(UInt64Type, U64);
                 CASE(IntPtrType, IPTR);
                 CASE(UIntPtrType, UPTR);
+                CASE(BFloat16Type, BF16);
                 CASE(HalfType, F16);
                 CASE(FloatType, F32);
                 CASE(DoubleType, F64);
