@@ -2283,6 +2283,11 @@ DIAGNOSTIC(
     Error,
     recursiveTypesFoundInStructuredBuffer,
     "structured buffer element type '$0' contains recursive type references")
+DIAGNOSTIC(
+    38206,
+    Error,
+    cannotUseUnsizedTypeInStructuredBuffer,
+    "cannot use unsized type '$0' as element type in structured buffer")
 
 // 39xxx - Type layout and parameter binding.
 

@@ -15174,6 +15174,16 @@ void validateStructuredBufferElementType(SemanticsVisitor* visitor, VarDeclBase*
     // Get the element type
     auto elementType = structuredBufferType->getElementType();
 
+    // Check if the element type is unsized
+    TypeTag elementTypeTags = visitor->getTypeTags(elementType);
+    if ((int)elementTypeTags & (int)TypeTag::Unsized)
+    {
+        visitor->getSink()->diagnose(
+            varDecl->loc,
+            Diagnostics::cannotUseUnsizedTypeInStructuredBuffer,
+            elementType);
+    }
+
     // Check if the element type contains recursive references
     if (containsRecursiveType(visitor, elementType))
     {
