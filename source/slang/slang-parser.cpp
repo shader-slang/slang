@@ -4249,6 +4249,9 @@ static void parseModernVarDeclBaseCommon(Parser* parser, VarDeclBase* decl)
         decl->type = parser->ParseTypeExp();
     }
 
+    auto modifiers = _parseOptSemantics(parser);
+    _addModifiers(decl, modifiers);
+
     if (AdvanceIf(parser, TokenType::OpAssign))
     {
         decl->initExpr = parser->ParseInitExpr();
@@ -4350,6 +4353,8 @@ static NodeBase* parseFuncDecl(Parser* parser, void* /*userData*/)
         {
             parser->PushScope(decl);
             parseModernParamList(parser, decl);
+            auto funcScope = parser->currentScope;
+            parser->PopScope();
             if (AdvanceIf(parser, "throws"))
             {
                 decl->errorType = parser->ParseTypeExp();
@@ -4358,8 +4363,6 @@ static NodeBase* parseFuncDecl(Parser* parser, void* /*userData*/)
             {
                 decl->returnType = parser->ParseTypeExp();
             }
-            auto funcScope = parser->currentScope;
-            parser->PopScope();
             maybeParseGenericConstraints(parser, genericParent);
             parser->PushScope(funcScope);
             decl->body = parseOptBody(parser);
@@ -5508,10 +5511,16 @@ Decl* Parser::ParseStruct()
                 rs->wrappedType = ParseTypeExp();
                 PushScope(rs);
                 PopScope();
-                ReadToken(TokenType::Semicolon);
+                if (!LookAheadToken(TokenType::Semicolon))
+                {
+                    this->diagnose(
+                        this->tokenReader.peekToken().loc,
+                        Diagnostics::unexpectedTokenExpectedTokenType,
+                        "';'");
+                }
                 return rs;
             }
-            if (AdvanceIf(this, TokenType::Semicolon))
+            if (LookAheadToken(TokenType::Semicolon))
             {
                 rs->hasBody = false;
                 return rs;
