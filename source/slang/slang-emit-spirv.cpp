@@ -7172,9 +7172,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return ensureInst(zero);
         }
 
-        auto lastFieldType = lastField->getFieldType();
-
-        if (auto unsizedArrayType = as<IRUnsizedArrayType>(lastFieldType))
+        if (as<IRUnsizedArrayType>(lastField->getFieldType()))
         {
             // Use SPIR-V OpArrayLength to get the runtime array length
             auto memberIndex = (int32_t)getStructFieldId(structType, lastField->getKey());

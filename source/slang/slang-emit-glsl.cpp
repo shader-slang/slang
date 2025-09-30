@@ -2240,9 +2240,7 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 return true;
             }
 
-            auto lastFieldType = lastField->getFieldType();
-
-            if (auto unsizedArrayType = as<IRUnsizedArrayType>(lastFieldType))
+            if (as<IRUnsizedArrayType>(lastField->getFieldType()))
             {
                 // Emit .length() call on the last field
                 auto prec = getInfo(EmitOp::Postfix);
