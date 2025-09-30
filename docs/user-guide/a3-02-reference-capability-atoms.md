@@ -626,6 +626,9 @@ Extensions
 `SPV_KHR_vulkan_memory_model`
 > Represents the SPIR-V extension for SPV_KHR_vulkan_memory_model.
 
+`SPV_NV_bindless_texture`
+> Represents the SPIR-V extension for SPV_NV_bindless_texture.
+
 `SPV_NV_cluster_acceleration_structure`
 > Represents the SPIR-V extension for cluster acceleration structure.
 
@@ -674,6 +677,9 @@ Extensions
 
 `spvAtomicFloat64MinMaxEXT`
 > Represents the SPIR-V capability for atomic float 64 min/max operations.
+
+`spvBindlessTextureNV`
+> Represents the SPIR-V capability for the bindless texture.
 
 `spvCooperativeMatrixBlockLoadsNV`
 > Represents the SPIR-V capability for cooperative matrix 2
