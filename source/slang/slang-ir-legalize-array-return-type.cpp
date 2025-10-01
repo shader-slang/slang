@@ -99,9 +99,7 @@ void legalizeArrayReturnType(IRModule* module, TargetRequest* targetReq)
         bool isCoopVecArray = nameHint && (nameHint->getName() == UnownedStringSlice("CoopVec"));
         if (isCoopVecArray)
         {
-            if (isCUDATarget(targetReq) ||
-                isD3DTarget(targetReq) ||
-                isCPUTarget(targetReq))
+            if (isCUDATarget(targetReq) || isD3DTarget(targetReq) || isCPUTarget(targetReq))
                 continue;
         }
 
