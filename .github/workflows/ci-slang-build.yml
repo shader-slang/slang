@@ -78,6 +78,19 @@ jobs:
           path: ir-version-check-artifact/
           retention-days: 1
 
+      - name: Build generators for cross-compilation
+        if: (inputs.os == 'windows' && inputs.platform == 'aarch64') || inputs.platform == 'wasm'
+        run: |
+          cmake --workflow --preset generators --fresh
+          mkdir generators
+          cmake --install build --config Release --component generators --prefix generators
+
+      - name: Setup Windows ARM64 cross-compilation
+        if: inputs.os == 'windows' && inputs.platform == 'aarch64'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64_arm64
+
       - name: Build Slang
         run: |
           echo "cmake version: $(cmake --version)"
@@ -99,9 +112,6 @@ jobs:
               ./emsdk activate latest
               source ./emsdk_env.sh
             popd
-            cmake --workflow --preset generators --fresh
-            mkdir generators
-            cmake --install build --config Release --component generators --prefix generators
             emcmake cmake -DSLANG_GENERATORS_PATH=generators/bin --preset emscripten -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
             cmake --build --preset emscripten --config "$cmake_config" --target slang-wasm
             mkdir "build.em/$cmake_config/bin/smoke"
@@ -122,7 +132,15 @@ jobs:
               echo "ℹ️  ccache_symlinks_path not set - building without ccache"
             fi
 
-            if [[ "${{ inputs.os }}" =~ "windows" && "${{ inputs.config }}" == "debug" ]]; then
+            if [[ "${{ inputs.os }}" == "windows" && "${{ inputs.platform }}" == "aarch64" ]]; then
+              # Windows ARM64 cross-compilation
+              cmake --preset default --fresh \
+                -DSLANG_GENERATORS_PATH=generators/bin \
+                -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
+                -DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }} \
+                "${cmake_launcher_defines[@]}"
+              cmake --workflow --preset "${{ inputs.config }}"
+            elif [[ "${{ inputs.os }}" =~ "windows" && "${{ inputs.config }}" == "debug" ]]; then
               # Doing a debug build will try to link against a release built llvm, this
               # is a problem on Windows, so make slang-llvm in release build and use
               # that as though it's a fetched binary via these presets.

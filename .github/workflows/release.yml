@@ -40,6 +40,13 @@ jobs:
             }
           - {
               os: windows,
+              platform: x86_64,
+              runs-on: ["Windows", "self-hosted", "GCP-T4"],
+              compiler: cl,
+            }
+          - {
+              os: windows,
+              platform: aarch64,
               runs-on: ["Windows", "self-hosted", "GCP-T4"],
               compiler: cl,
             }
@@ -77,6 +84,12 @@ jobs:
           cmake --workflow --preset generators --fresh
           mkdir build-platform-generators
           cmake --install build --config Release --component generators --prefix build-platform-generators
+
+      - name: Setup Windows ARM64 cross-compilation
+        if: matrix.os == 'windows' && matrix.platform == 'aarch64'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64_arm64
 
       - name: Build Slang
         run: |

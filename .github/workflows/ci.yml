@@ -123,6 +123,17 @@ jobs:
       config: release
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
 
+  build-windows-release-cl-aarch64:
+    needs: [filter]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-build.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: aarch64
+      config: release
+      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+
   # Linux tests
   test-linux-debug-gcc-x86_64:
     needs: [filter, build-linux-debug-gcc-x86_64]
@@ -210,6 +221,7 @@ jobs:
       [
         test-windows-release-cl-x86_64-gpu,
         test-windows-debug-cl-x86_64-gpu,
+        build-windows-release-cl-aarch64,
         test-macos-release-clang-aarch64,
         test-macos-debug-clang-aarch64,
         test-linux-release-gcc-x86_64,
@@ -223,6 +235,7 @@ jobs:
           echo "=== CI Results Summary ==="
           echo "Windows Release GPU: ${{ needs.test-windows-release-cl-x86_64-gpu.result }}"
           echo "Windows Debug GPU: ${{ needs.test-windows-debug-cl-x86_64-gpu.result }}"
+          echo "Windows Release ARM64 (build only): ${{ needs.build-windows-release-cl-aarch64.result }}"
           echo "macOS Release ARM64: ${{ needs.test-macos-release-clang-aarch64.result }}"
           echo "macOS Debug ARM64: ${{ needs.test-macos-debug-clang-aarch64.result }}"
           echo "Linux Release x64: ${{ needs.test-linux-release-gcc-x86_64.result }}"
@@ -231,12 +244,14 @@ jobs:
           # Check if any required jobs failed (allow success or skipped)
           if [[ "${{ needs.test-windows-release-cl-x86_64-gpu.result }}" == "failure" ]] || \
              [[ "${{ needs.test-windows-debug-cl-x86_64-gpu.result }}" == "failure" ]] || \
+             [[ "${{ needs.build-windows-release-cl-aarch64.result }}" == "failure" ]] || \
              [[ "${{ needs.test-macos-release-clang-aarch64.result }}" == "failure" ]] || \
              [[ "${{ needs.test-macos-debug-clang-aarch64.result }}" == "failure" ]] || \
              [[ "${{ needs.test-linux-release-gcc-x86_64.result }}" == "failure" ]] || \
              [[ "${{ needs.test-linux-debug-gcc-x86_64.result }}" == "failure" ]] || \
              [[ "${{ needs.test-windows-release-cl-x86_64-gpu.result }}" == "cancelled" ]] || \
              [[ "${{ needs.test-windows-debug-cl-x86_64-gpu.result }}" == "cancelled" ]] || \
+             [[ "${{ needs.build-windows-release-cl-aarch64.result }}" == "cancelled" ]] || \
              [[ "${{ needs.test-macos-release-clang-aarch64.result }}" == "cancelled" ]] || \
              [[ "${{ needs.test-macos-debug-clang-aarch64.result }}" == "cancelled" ]] || \
              [[ "${{ needs.test-linux-release-gcc-x86_64.result }}" == "cancelled" ]] || \
