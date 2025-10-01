@@ -180,6 +180,48 @@ jobs:
       - name: Check documented compiler versions
         run: bash extras/verify-documented-compiler-version.sh
 
+      - name: Verify Windows binary architecture
+        if: inputs.os == 'windows' && inputs.platform != 'wasm'
+        run: |
+          echo "Verifying Windows binary architecture for ${{ inputs.platform }}..."
+          
+          # Check main Windows binaries
+          failed=0
+          for binary in "build/$cmake_config/bin/slangc.exe" "build/$cmake_config/bin/slang.dll"; do
+            if [[ -f "$binary" ]]; then
+              echo "Checking: $binary"
+              file_output=$(file "$binary")
+              echo "  Output: $file_output"
+              
+              if [[ "${{ inputs.platform }}" == "aarch64" ]]; then
+                if echo "$file_output" | grep -iE "ARM64|Aarch64|PE32\+ executable.*Aarch64" > /dev/null; then
+                  echo "  ✓ Correct architecture (ARM64)"
+                else
+                  echo "  ✗ ERROR: Expected ARM64 but got x64 binary!"
+                  echo "  This means cross-compilation failed - the binary is for the wrong architecture"
+                  failed=1
+                fi
+              elif [[ "${{ inputs.platform }}" == "x86_64" ]]; then
+                if echo "$file_output" | grep -iE "x86-64|x64|AMD64|PE32\+ executable.*x86-64" > /dev/null; then
+                  echo "  ✓ Correct architecture (x86-64)"
+                else
+                  echo "  ✗ ERROR: Expected x86-64 but got wrong architecture!"
+                  failed=1
+                fi
+              fi
+            else
+              echo "Warning: $binary not found"
+            fi
+          done
+          
+          if [[ $failed -ne 0 ]]; then
+            echo "❌ Architecture verification failed!"
+            echo "This likely means the cross-compilation setup is not working correctly."
+            exit 1
+          else
+            echo "✅ All Windows binaries have correct architecture"
+          fi
+
       - name: Prepare artifacts for upload
         run: |
           # Create a staging directory for artifacts with config-specific subdirectory

@@ -172,6 +172,48 @@ jobs:
           cp slang-macos-dist.zip "slang-macos-dist-${{matrix.platform}}.zip"
           echo "SLANG_NOTARIZED_DIST=slang-macos-dist-${{matrix.platform}}.zip" >> "$GITHUB_OUTPUT"
 
+      - name: Verify Windows binary architecture
+        if: matrix.os == 'windows'
+        run: |
+          echo "Verifying Windows binary architecture for ${{ matrix.platform }}..."
+          
+          # Check main Windows binaries
+          failed=0
+          for binary in "$bin_dir/slangc.exe" "$bin_dir/slang.dll"; do
+            if [[ -f "$binary" ]]; then
+              echo "Checking: $binary"
+              file_output=$(file "$binary")
+              echo "  Output: $file_output"
+              
+              if [[ "${{ matrix.platform }}" == "aarch64" ]]; then
+                if echo "$file_output" | grep -iE "ARM64|Aarch64|PE32\+ executable.*Aarch64" > /dev/null; then
+                  echo "  ✓ Correct architecture (ARM64)"
+                else
+                  echo "  ✗ ERROR: Expected ARM64 but got x64 binary!"
+                  echo "  This is the issue reported in #8578 - cross-compilation failed"
+                  failed=1
+                fi
+              elif [[ "${{ matrix.platform }}" == "x86_64" ]]; then
+                if echo "$file_output" | grep -iE "x86-64|x64|AMD64|PE32\+ executable.*x86-64" > /dev/null; then
+                  echo "  ✓ Correct architecture (x86-64)"
+                else
+                  echo "  ✗ ERROR: Expected x86-64 but got wrong architecture!"
+                  failed=1
+                fi
+              fi
+            else
+              echo "Warning: $binary not found"
+            fi
+          done
+          
+          if [[ $failed -ne 0 ]]; then
+            echo "❌ Architecture verification failed!"
+            echo "Windows ARM64 binaries are incorrectly built as x64 - aborting release"
+            exit 1
+          else
+            echo "✅ All Windows binaries have correct architecture"
+          fi
+
       - name: Package Slang
         id: package
         run: |
