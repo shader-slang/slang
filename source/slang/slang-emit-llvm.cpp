@@ -127,11 +127,7 @@ static bool maybeGetName(
 
     UnownedStringSlice linkageName;
     UnownedStringSlice prettyName;
-    if (auto entryPointDecoration = irInst->findDecoration<IREntryPointDecoration>())
-    {
-        linkageName = entryPointDecoration->getName()->getStringSlice();
-    }
-    else if (auto externCppDecoration = irInst->findDecoration<IRExternCppDecoration>())
+    if (auto externCppDecoration = irInst->findDecoration<IRExternCppDecoration>())
     {
         linkageName = externCppDecoration->getName();
     }
@@ -2087,20 +2083,6 @@ struct LLVMEmitter
         {
             return getTypeLayoutRuleForBuffer(codeGenContext->getTargetProgram(), cbufType);
         }
-        else if (auto paramType = as<IRParam>(ptr))
-        {
-            // TODO: WART: Entry point varying params are assumed to use CPU
-            // layout in CPU targets, but they're in no way decorated to
-            // communicate that. Hence, we deduce the need for this layout here.
-            // This is by no means ideal. Maybe they could be ConstantBuffers
-            // too?
-            IRInst* func = paramType->getParent()->getParent();
-
-            if (func->findDecoration<IREntryPointDecoration>())
-            {
-                return IRTypeLayoutRules::get(IRTypeLayoutRuleName::C);
-            }
-        }
         else if (auto gep = as<IRGetElementPtr>(ptr))
         {
             // Transitive
@@ -3324,6 +3306,205 @@ struct LLVMEmitter
             debugScopeStack.removeLast();
     }
 
+    void emitComputeEntryPointDispatcher(
+        IRFunc* entryPoint,
+        llvm::Function* llvmEntryPoint,
+        IREntryPointDecoration* entryPointDecor)
+    {
+        llvmBuilder->SetCurrentDebugLocation(llvm::DebugLoc());
+        auto numThreadsDecor = entryPoint->findDecoration<IRNumThreadsDecoration>();
+        SLANG_ASSERT(numThreadsDecor);
+        entryPointDecor->getName();
+
+        llvm::Type* uintType = llvmBuilder->getInt32Ty();
+
+        llvm::Type* argTypes[3] = {
+            llvmBuilder->getPtrTy(0),
+            llvmBuilder->getPtrTy(0),
+            llvmBuilder->getPtrTy(0)
+        };
+
+        llvm::FunctionType* dispatcherType = llvm::FunctionType::get(
+            llvmBuilder->getVoidTy(), argTypes, false);
+
+        auto entryPointName = entryPointDecor->getName()->getStringSlice();
+        llvm::Function* dispatcher = llvm::Function::Create(
+            dispatcherType, llvm::GlobalValue::ExternalLinkage,
+            llvm::StringRef(entryPointName.begin(), entryPointName.getLength()), *llvmModule
+        );
+
+        llvm::BasicBlock* entryBlock = llvm::BasicBlock::Create(*llvmContext, "entry", dispatcher);
+        llvmBuilder->SetInsertPoint(entryBlock);
+
+        // This has to be ABI-compatible with the C++ target. So don't go
+        // changing this without a good reason to.
+        llvm::StructType* varyingInputType = llvm::StructType::get(
+            // startGroupID
+            llvm::ArrayType::get(uintType, 3),
+            // endGroupID
+            llvm::ArrayType::get(uintType, 3)
+        );
+        // This is the data passed to the actual entry point.
+        llvm::StructType* threadVaryingInputType = llvm::StructType::get(
+            // groupID
+            llvm::VectorType::get(uintType, llvm::ElementCount::getFixed(3)),
+            // groupThreadID
+            llvm::VectorType::get(uintType, llvm::ElementCount::getFixed(3))
+        );
+
+        llvm::Value* varyingInput = dispatcher->getArg(0);
+        llvm::Value* threadInput = llvmBuilder->CreateAlloca(threadVaryingInputType);
+
+        llvm::Value* startGroupID[3];
+        llvm::Value* endGroupID[3];
+        llvm::Value* groupID[3];
+        llvm::Value* threadID[3];
+        llvm::Value* workGroupSize[3] = {
+            llvmBuilder->getInt32(getIntVal(numThreadsDecor->getX())),
+            llvmBuilder->getInt32(getIntVal(numThreadsDecor->getY())),
+            llvmBuilder->getInt32(getIntVal(numThreadsDecor->getZ()))
+        };
+
+        for(int i = 0; i < 3; ++i)
+        {
+            llvm::Value* gepIndices[3] = {
+                llvmBuilder->getInt32(0),
+                llvmBuilder->getInt32(0), // startGroupID && groupID
+                llvmBuilder->getInt32(i),
+            };
+
+            auto startGroupPtr = llvmBuilder->CreateGEP(varyingInputType, varyingInput, gepIndices);
+            startGroupID[i] = llvmBuilder->CreateLoad(uintType, startGroupPtr,
+                llvm::Twine("startGroupID").concat(llvm::Twine(i))
+            );
+            groupID[i] = llvmBuilder->CreateGEP(threadVaryingInputType, threadInput, gepIndices,
+                llvm::Twine("groupID").concat(llvm::Twine(i))
+            );
+            // Pick endGroupID & groupThreadID
+            gepIndices[1] = llvmBuilder->getInt32(1);
+            auto endGroupPtr = llvmBuilder->CreateGEP(varyingInputType, varyingInput, gepIndices);
+            endGroupID[i] = llvmBuilder->CreateLoad(uintType, endGroupPtr,
+                llvm::Twine("endGroupID").concat(llvm::Twine(i))
+            );
+            threadID[i] = llvmBuilder->CreateGEP(threadVaryingInputType, threadInput, gepIndices,
+                llvm::Twine("threadID").concat(llvm::Twine(i))
+            );
+        }
+        // We need 6 nested loops... :(
+
+        llvm::BasicBlock* wgEntryBlocks[3];
+        llvm::BasicBlock* wgBodyBlocks[3];
+        llvm::BasicBlock* wgEndBlocks[3];
+        llvm::BasicBlock* threadEntryBlocks[3];
+        llvm::BasicBlock* threadBodyBlocks[3];
+        llvm::BasicBlock* threadEndBlocks[3];
+        llvm::BasicBlock* endBlock;
+
+        // Create all blocks first, so that they can jump around.
+        for(int i = 0; i < 3; ++i)
+        {
+            wgEntryBlocks[i] = llvm::BasicBlock::Create(*llvmContext,
+                llvm::Twine("groupEntry").concat(llvm::Twine(i)),
+                dispatcher);
+            wgBodyBlocks[i] = llvm::BasicBlock::Create(
+                *llvmContext,
+                llvm::Twine("groupBody").concat(llvm::Twine(i)),
+                dispatcher);
+        }
+        for(int i = 0; i < 3; ++i)
+        {
+            threadEntryBlocks[i] = llvm::BasicBlock::Create(
+                *llvmContext,
+                llvm::Twine("threadEntry").concat(llvm::Twine(i)),
+                dispatcher
+            );
+            threadBodyBlocks[i] = llvm::BasicBlock::Create(
+                *llvmContext,
+                llvm::Twine("threadBody").concat(llvm::Twine(i)),
+                dispatcher);
+        }
+
+        for(int i = 2; i >= 0; --i)
+        {
+            threadEndBlocks[i] = llvm::BasicBlock::Create(*llvmContext,
+                llvm::Twine("threadEnd").concat(llvm::Twine(i)),
+                dispatcher);
+        }
+        for(int i = 2; i >= 0; --i)
+        {
+            wgEndBlocks[i] = llvm::BasicBlock::Create(
+                *llvmContext,
+                llvm::Twine("groupEnd").concat(llvm::Twine(i)),
+                dispatcher);
+        }
+        endBlock =  llvm::BasicBlock::Create(
+            *llvmContext,
+            llvm::Twine("end"),
+            dispatcher);
+
+        // Populate group dispatch headers.
+        for(int i = 0; i < 3; ++i)
+        {
+            llvmBuilder->CreateStore(startGroupID[i], groupID[i]);
+            llvmBuilder->CreateBr(wgEntryBlocks[i]);
+            llvmBuilder->SetInsertPoint(wgEntryBlocks[i]);
+            auto id = llvmBuilder->CreateLoad(uintType, groupID[i]);
+            auto cond = llvmBuilder->CreateCmp(llvm::CmpInst::Predicate::ICMP_ULT, id, endGroupID[i]);
+
+            auto merge = i == 0 ? endBlock : wgEndBlocks[i-1];
+
+            llvmBuilder->CreateCondBr(cond, wgBodyBlocks[i], merge);
+            llvmBuilder->SetInsertPoint(wgBodyBlocks[i]);
+        }
+
+        // Populate thread dispatch headers.
+        for(int i = 0; i < 3; ++i)
+        {
+            llvmBuilder->CreateStore(llvmBuilder->getInt32(0), threadID[i]);
+            llvmBuilder->CreateBr(threadEntryBlocks[i]);
+            llvmBuilder->SetInsertPoint(threadEntryBlocks[i]);
+
+            auto id = llvmBuilder->CreateLoad(uintType, threadID[i]);
+            auto cond = llvmBuilder->CreateCmp(llvm::CmpInst::Predicate::ICMP_ULT, id, workGroupSize[i]);
+
+            auto merge = i == 0 ? wgEndBlocks[2] : threadEndBlocks[i-1];
+            llvmBuilder->CreateCondBr(cond, threadBodyBlocks[i], merge);
+            llvmBuilder->SetInsertPoint(threadBodyBlocks[i]);
+        }
+
+        // Do the call to the actual entry point function.
+        llvm::Value* args[3] = {
+            threadInput,
+            dispatcher->getArg(1),
+            dispatcher->getArg(2)
+        };
+        llvmBuilder->CreateCall(llvmEntryPoint, args);
+        llvmBuilder->CreateBr(threadEndBlocks[2]);
+
+        // Finish thread dispatch blocks
+        for(int i = 2; i >= 0; --i)
+        {
+            llvmBuilder->SetInsertPoint(threadEndBlocks[i]);
+            auto id = llvmBuilder->CreateLoad(uintType, threadID[i]);
+            auto inc = llvmBuilder->CreateAdd(id, llvmBuilder->getInt32(1));
+            llvmBuilder->CreateStore(inc, threadID[i]);
+            llvmBuilder->CreateBr(threadEntryBlocks[i]);
+        }
+
+        // Finish group dispatch blocks
+        for(int i = 2; i >= 0; --i)
+        {
+            llvmBuilder->SetInsertPoint(wgEndBlocks[i]);
+            auto id = llvmBuilder->CreateLoad(uintType, groupID[i]);
+            auto inc = llvmBuilder->CreateAdd(id, llvmBuilder->getInt32(1));
+            llvmBuilder->CreateStore(inc, groupID[i]);
+            llvmBuilder->CreateBr(wgEntryBlocks[i]);
+        }
+
+        llvmBuilder->SetInsertPoint(endBlock);
+        llvmBuilder->CreateRetVoid();
+    }
+
     void emitFuncDefinition(IRFunc* func)
     {
         llvm::Function* llvmFunc = ensureFuncDecl(func);
@@ -3439,6 +3620,14 @@ struct LLVMEmitter
         };
 
         emitGlobalValueWithCode(func, llvmFunc, prologue, epilogue);
+
+        // We need to emit the dispatching functions for entry points so that
+        // they can be called.
+        auto entryPointDecor = func->findDecoration<IREntryPointDecoration>();
+        if (entryPointDecor && entryPointDecor->getProfile().getStage() == Stage::Compute)
+        {
+            emitComputeEntryPointDispatcher(func, llvmFunc, entryPointDecor);
+        }
     }
 
     void emitGlobalFunctions(IRModule* irModule)
