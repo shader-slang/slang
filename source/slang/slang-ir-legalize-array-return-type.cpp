@@ -98,7 +98,8 @@ void legalizeArrayReturnType(IRModule* module, TargetRequest* targetReq)
         // Skip CoopVec arrays on targets that support them natively
         auto nameHint = resultType->findDecoration<IRNameHintDecoration>();
         bool isCoopVecArray = nameHint && (nameHint->getName() == UnownedStringSlice("CoopVec"));
-        if (isCoopVecArray && (isKhronosTarget(targetReq) || isCUDATarget(targetReq) || isD3DTarget(targetReq)))
+        if (isCoopVecArray &&
+            (isKhronosTarget(targetReq) || isCUDATarget(targetReq) || isD3DTarget(targetReq)))
             continue;
 
         makeFuncReturnViaOutParam(builder, func);
