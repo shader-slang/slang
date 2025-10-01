@@ -78,19 +78,6 @@ jobs:
           path: ir-version-check-artifact/
           retention-days: 1
 
-      - name: Build generators for cross-compilation
-        if: (inputs.os == 'windows' && inputs.platform == 'aarch64') || inputs.platform == 'wasm'
-        run: |
-          cmake --workflow --preset generators --fresh
-          mkdir generators
-          cmake --install build --config Release --component generators --prefix generators
-
-      - name: Setup Windows ARM64 cross-compilation
-        if: inputs.os == 'windows' && inputs.platform == 'aarch64'
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: x64_arm64
-
       - name: Build Slang
         run: |
           echo "cmake version: $(cmake --version)"
@@ -112,6 +99,9 @@ jobs:
               ./emsdk activate latest
               source ./emsdk_env.sh
             popd
+            cmake --workflow --preset generators --fresh
+            mkdir generators
+            cmake --install build --config Release --component generators --prefix generators
             emcmake cmake -DSLANG_GENERATORS_PATH=generators/bin --preset emscripten -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
             cmake --build --preset emscripten --config "$cmake_config" --target slang-wasm
             mkdir "build.em/$cmake_config/bin/smoke"
@@ -132,15 +122,7 @@ jobs:
               echo "ℹ️  ccache_symlinks_path not set - building without ccache"
             fi
 
-            if [[ "${{ inputs.os }}" == "windows" && "${{ inputs.platform }}" == "aarch64" ]]; then
-              # Windows ARM64 cross-compilation
-              cmake --preset default --fresh \
-                -DSLANG_GENERATORS_PATH=generators/bin \
-                -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
-                -DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }} \
-                "${cmake_launcher_defines[@]}"
-              cmake --workflow --preset "${{ inputs.config }}"
-            elif [[ "${{ inputs.os }}" =~ "windows" && "${{ inputs.config }}" == "debug" ]]; then
+            if [[ "${{ inputs.os }}" =~ "windows" && "${{ inputs.config }}" == "debug" ]]; then
               # Doing a debug build will try to link against a release built llvm, this
               # is a problem on Windows, so make slang-llvm in release build and use
               # that as though it's a fetched binary via these presets.
@@ -179,48 +161,6 @@ jobs:
 
       - name: Check documented compiler versions
         run: bash extras/verify-documented-compiler-version.sh
-
-      - name: Verify Windows binary architecture
-        if: inputs.os == 'windows' && inputs.platform != 'wasm'
-        run: |
-          echo "Verifying Windows binary architecture for ${{ inputs.platform }}..."
-          
-          # Check main Windows binaries
-          failed=0
-          for binary in "build/$cmake_config/bin/slangc.exe" "build/$cmake_config/bin/slang.dll"; do
-            if [[ -f "$binary" ]]; then
-              echo "Checking: $binary"
-              file_output=$(file "$binary")
-              echo "  Output: $file_output"
-              
-              if [[ "${{ inputs.platform }}" == "aarch64" ]]; then
-                if echo "$file_output" | grep -iE "ARM64|Aarch64|PE32\+ executable.*Aarch64" > /dev/null; then
-                  echo "  ✓ Correct architecture (ARM64)"
-                else
-                  echo "  ✗ ERROR: Expected ARM64 but got x64 binary!"
-                  echo "  This means cross-compilation failed - the binary is for the wrong architecture"
-                  failed=1
-                fi
-              elif [[ "${{ inputs.platform }}" == "x86_64" ]]; then
-                if echo "$file_output" | grep -iE "x86-64|x64|AMD64|PE32\+ executable.*x86-64" > /dev/null; then
-                  echo "  ✓ Correct architecture (x86-64)"
-                else
-                  echo "  ✗ ERROR: Expected x86-64 but got wrong architecture!"
-                  failed=1
-                fi
-              fi
-            else
-              echo "Warning: $binary not found"
-            fi
-          done
-          
-          if [[ $failed -ne 0 ]]; then
-            echo "❌ Architecture verification failed!"
-            echo "This likely means the cross-compilation setup is not working correctly."
-            exit 1
-          else
-            echo "✅ All Windows binaries have correct architecture"
-          fi
 
       - name: Prepare artifacts for upload
         run: |
