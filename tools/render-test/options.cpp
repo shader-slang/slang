@@ -297,11 +297,14 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
             {
                 // Look up the rendering API if set
                 UnownedStringSlice argName = argSlice.tail(1);
-                DeviceType deviceType = _toRenderType(RenderApiUtil::findApiTypeByName(argName));
+                RenderApiType renderApi = RenderApiUtil::findApiTypeByName(argName);
+                DeviceType deviceType = _toRenderType(renderApi);
 
                 if (deviceType != DeviceType::Default)
                 {
                     outOptions.deviceType = deviceType;
+                    if (renderApi == RenderApiType::LLVM)
+                        outOptions.useLLVMDirectly = true;
                     continue;
                 }
 

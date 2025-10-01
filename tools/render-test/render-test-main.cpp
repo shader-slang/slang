@@ -1581,10 +1581,20 @@ static SlangResult _innerMain(
         slangPassThrough = SLANG_PASS_THROUGH_METAL;
         break;
     case DeviceType::CPU:
-        input.target = SLANG_SHADER_HOST_CALLABLE;
-        input.profile = "";
-        nativeLanguage = SLANG_SOURCE_LANGUAGE_CPP;
-        slangPassThrough = SLANG_PASS_THROUGH_GENERIC_C_CPP;
+        if (options.useLLVMDirectly)
+        {
+            input.target = SLANG_LLVM_SHADER_HOST_CALLABLE;
+            input.profile = "";
+            nativeLanguage = SLANG_SOURCE_LANGUAGE_LLVM;
+            slangPassThrough = SLANG_PASS_THROUGH_NONE;
+        }
+        else
+        {
+            input.target = SLANG_SHADER_HOST_CALLABLE;
+            input.profile = "";
+            nativeLanguage = SLANG_SOURCE_LANGUAGE_CPP;
+            slangPassThrough = SLANG_PASS_THROUGH_GENERIC_C_CPP;
+        }
         break;
     case DeviceType::CUDA:
         input.target = SLANG_PTX;
@@ -1655,10 +1665,12 @@ static SlangResult _innerMain(
 #endif
             }
         case DeviceType::CPU:
+            if (!options.useLLVMDirectly)
             {
                 // As long as we have CPU, then this should work
                 return spSessionCheckPassThroughSupport(session, SLANG_PASS_THROUGH_GENERIC_C_CPP);
             }
+            else return SLANG_OK;
         default:
             break;
         }
