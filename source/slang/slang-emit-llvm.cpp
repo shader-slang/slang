@@ -127,7 +127,11 @@ static bool maybeGetName(
 
     UnownedStringSlice linkageName;
     UnownedStringSlice prettyName;
-    if (auto externCppDecoration = irInst->findDecoration<IRExternCppDecoration>())
+    if (auto entryPointDecoration = irInst->findDecoration<IREntryPointDecoration>())
+    {
+        linkageName = entryPointDecoration->getName()->getStringSlice();
+    }
+    else if (auto externCppDecoration = irInst->findDecoration<IRExternCppDecoration>())
     {
         linkageName = externCppDecoration->getName();
     }
@@ -2079,6 +2083,24 @@ struct LLVMEmitter
                 structuredBufferInst->getBase()->getDataType());
             return getTypeLayoutRuleForBuffer(codeGenContext->getTargetProgram(), baseType);
         }
+        else if (auto cbufType = as<IRConstantBufferType>(ptr->getDataType()))
+        {
+            return getTypeLayoutRuleForBuffer(codeGenContext->getTargetProgram(), cbufType);
+        }
+        else if (auto paramType = as<IRParam>(ptr))
+        {
+            // TODO: WART: Entry point varying params are assumed to use CPU
+            // layout in CPU targets, but they're in no way decorated to
+            // communicate that. Hence, we deduce the need for this layout here.
+            // This is by no means ideal. Maybe they could be ConstantBuffers
+            // too?
+            IRInst* func = paramType->getParent()->getParent();
+
+            if (func->findDecoration<IREntryPointDecoration>())
+            {
+                return IRTypeLayoutRules::get(IRTypeLayoutRuleName::C);
+            }
+        }
         else if (auto gep = as<IRGetElementPtr>(ptr))
         {
             // Transitive
@@ -2496,6 +2518,17 @@ struct LLVMEmitter
             {
                 auto fieldAddressInst = static_cast<IRFieldAddress*>(inst);
                 auto base = fieldAddressInst->getBase();
+
+                if (debugInsts.contains(base))
+                {
+                    debugInsts.add(inst);
+                    // This is emitted to annotate member accesses of structs,
+                    // but we don't need that because our structs are
+                    // stack-allocated (in LLVM IR's mind) and already declared
+                    // as variables.
+                    return nullptr;
+                }
+
                 auto key = as<IRStructKey>(fieldAddressInst->getField());
 
                 IRStructType* baseStructType = nullptr;
@@ -2511,16 +2544,6 @@ struct LLVMEmitter
                 auto rules = getPtrLayoutRules(base);
 
                 UInt index = getStructIndexByKey(baseStructType, key);
-
-                if (debugInsts.contains(base))
-                {
-                    debugInsts.add(inst);
-                    // This is emitted to annotate member accesses of structs,
-                    // but we don't need that because our structs are
-                    // stack-allocated (in LLVM IR's mind) and already declared
-                    // as variables.
-                    return nullptr;
-                }
 
                 index = types->mapFieldIndexToLLVM(baseStructType, rules, index);
 
@@ -3553,7 +3576,7 @@ struct LLVMEmitter
         
         //std::string out;
         //llvm::raw_string_ostream rso(out);
-        //llvmModule.print(rso, nullptr);
+        //llvmModule->print(rso, nullptr);
         //printf("%s\n", out.c_str());
 
         llvm::verifyModule(*llvmModule, &llvm::errs());
