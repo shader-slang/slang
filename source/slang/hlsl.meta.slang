@@ -22772,7 +22772,7 @@ enum DescriptorKind
     CombinedTextureSampler, /// A combined texture and sampler state descriptor.
     ConstantBuffer, /// A constant buffer descriptor.
     StorageBuffer, /// A storage buffer descriptor.
-    Buffer = 5, /// Deprecated. Use `StorageBuffer` instead.
+    Buffer = 4, /// Deprecated. Use `StorageBuffer` instead.
     Sampler, /// A sampler state descriptor.
     AccelerationStructure, /// A ray tracing acceleration structure descriptor.
     UniformTexelBuffer, /// A uniform texel buffer descriptor (read-only).
