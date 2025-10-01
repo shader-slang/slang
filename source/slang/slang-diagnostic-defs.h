@@ -1691,6 +1691,22 @@ DIAGNOSTIC(
     Error,
     invalidEqualityConstraintSupType,
     "type '$0' is not a proper type to use in a generic equality constraint.")
+DIAGNOSTIC(
+    30405,
+    Error,
+    noValidEqualityConstraintSubType,
+    "generic equality constraint requires at least one operand to be dependant on the generic "
+    "declaration")
+DIAGNOSTIC(
+    30402,
+    Note,
+    invalidEqualityConstraintSubType,
+    "type '$0' cannot be constrained by a type equality")
+DIAGNOSTIC(
+    30407,
+    Warning,
+    failedEqualityConstraintCanonicalOrder,
+    "failed to resolve canonical order of generic equality constraint.")
 
 // 305xx: initializer lists
 DIAGNOSTIC(30500, Error, tooManyInitializers, "too many initializers (expected $0, got $1)")
@@ -2075,6 +2091,18 @@ DIAGNOSTIC(
     Error,
     expectedValueOfTypeForSpecializationArg,
     "expected a constant value of type '$0' as argument for specialization parameter '$1'")
+
+DIAGNOSTIC(
+    38010,
+    Warning,
+    unhandledModOnEntryPointParameter,
+    "$0 on parameter '$1' is unsupported on entry point parameters and will be ignored")
+
+DIAGNOSTIC(
+    38011,
+    Error,
+    entryPointCannotReturnResourceType,
+    "entry point '$0' cannot return type '$1' that contains resource types")
 
 DIAGNOSTIC(
     38100,

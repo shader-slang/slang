@@ -1683,13 +1683,14 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
         bool optional = AdvanceIf(parser, "optional", &whereToken);
 
         auto subType = parser->ParseTypeExp();
-        if (AdvanceIf(parser, TokenType::Colon))
+        Token constraintToken;
+        if (AdvanceIf(parser, TokenType::Colon, &constraintToken))
         {
             for (;;)
             {
                 auto constraint = parser->astBuilder->create<GenericTypeConstraintDecl>();
                 constraint->whereTokenLoc = whereToken.loc;
-                parser->FillPosition(constraint);
+                constraint->loc = constraintToken.loc;
                 constraint->sub = subType;
                 constraint->sup = parser->ParseTypeExp();
                 if (optional)
@@ -1703,12 +1704,12 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
                     break;
             }
         }
-        else if (AdvanceIf(parser, TokenType::OpEql))
+        else if (AdvanceIf(parser, TokenType::OpEql, &constraintToken))
         {
             auto constraint = parser->astBuilder->create<GenericTypeConstraintDecl>();
             constraint->whereTokenLoc = whereToken.loc;
             constraint->isEqualityConstraint = true;
-            parser->FillPosition(constraint);
+            constraint->loc = constraintToken.loc;
             constraint->sub = subType;
             constraint->sup = parser->ParseTypeExp();
             if (optional)

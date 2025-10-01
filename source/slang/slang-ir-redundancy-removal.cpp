@@ -126,6 +126,205 @@ bool removeRedundancy(IRModule* module, bool hoistLoopInvariantInsts)
     return changed;
 }
 
+bool isAddressMutable(IRInst* inst)
+{
+    auto rootType = getRootAddr(inst)->getDataType();
+    switch (rootType->getOp())
+    {
+    case kIROp_ParameterBlockType:
+    case kIROp_ConstantBufferType:
+    case kIROp_ConstRefType:
+        return false; // immutable
+
+    // We should consider StructuredBuffer as mutable by default, since the resources may alias.
+    // There could be anotherRWStructuredBuffer pointing to the same memory location as the
+    // structured buffer.
+    case kIROp_StructuredBufferLoad:
+    case kIROp_GetStructuredBufferPtr:
+        return true; // mutable
+    }
+
+    // Similarly, IRPtrTypeBase should also be considered writable always,
+    // because there can be aliasing.
+
+    return true; // mutable
+}
+
+/// Eliminate redundant temporary variable copies in load-store patterns.
+/// This optimization looks for patterns where a value is loaded from memory
+/// and immediately stored to a temporary variable, which is then only used
+/// in read-only contexts. In such cases, the temporary variable and the
+/// load-store indirection can be eliminated by using the original memory
+/// location directly.
+/// Returns true if any changes were made.
+static bool eliminateRedundantTemporaryCopyInFunc(IRFunc* func)
+{
+    // Consider the following IR pattern:
+    // ```
+    // let %temp = var
+    // let %value = load(%sourcePtr)
+    // store(%temp, %value)
+    // ```
+    // We can replace "%temp" with "%sourcePtr" without the load and store indirection
+    // if "%temp" is used only in read-only contexts.
+
+    bool overallChanged = false;
+    for (bool changed = true; changed;)
+    {
+        changed = false;
+
+        HashSet<IRInst*> toRemove;
+
+        for (auto block : func->getBlocks())
+        {
+            for (auto blockInst : block->getChildren())
+            {
+                auto storeInst = as<IRStore>(blockInst);
+                if (!storeInst)
+                {
+                    // We are interested only in IRStore.
+                    continue;
+                }
+
+                auto storedValue = storeInst->getVal();
+                auto destPtr = storeInst->getPtr();
+
+                if (destPtr->getOp() != kIROp_Var)
+                {
+                    // Only optimize temporary variable.
+                    // Don't optimize stores to permanent memory locations.
+                    continue;
+                }
+
+                if (destPtr->findDecorationImpl(kIROp_DisableCopyEliminationDecoration))
+                    continue;
+
+                // Check if we're storing a load result
+                auto loadInst = as<IRLoad>(storedValue);
+                if (!loadInst)
+                {
+                    // Skip because only IRLoad is expected for the optimization.
+                    continue;
+                }
+
+                auto loadPtr = loadInst->getPtr();
+
+                if (isAddressMutable(loadPtr))
+                {
+                    // If the input is mutable, we cannot optimize,
+                    // because any function calls may alter the content of the input
+                    // and we cannot replace the temporary copy with a memory pointer.
+                    continue;
+                }
+
+                // Storing address-sapce for later use.
+                AddressSpace loadAddressSpace = AddressSpace::Generic;
+                if (auto rootPtrType = as<IRPtrTypeBase>(getRootAddr(loadPtr)->getDataType()))
+                {
+                    loadAddressSpace = rootPtrType->getAddressSpace();
+                }
+
+                // Do not optimize loads from semantic parameters because some semantics have
+                // builtin types that are vector types but pretend to be scalar types (e.g.,
+                // SV_DispatchThreadID is used as 'int id' but maps to 'float3
+                // gl_GlobalInvocationID'). The legalization step must remove the load instruction
+                // to maintain this pretense, which breaks our load/store optimization assumptions.
+                // Skip optimization when loading from semantics to let legalization handle the load
+                // removal.
+                if (auto param = as<IRParam>(loadPtr))
+                    if (param->findDecoration<IRSemanticDecoration>())
+                        continue;
+
+                // Check all uses of the destination variable
+                for (auto use = destPtr->firstUse; use; use = use->nextUse)
+                {
+                    auto user = use->getUser();
+                    if (user == storeInst)
+                    {
+                        // Skip the store itself
+                        continue; // check the next use
+                    }
+
+                    if (as<IRStore>(use->getUser()))
+                    {
+                        // We cannot optimize when the variable is reused
+                        // with another store.
+                        goto unsafeToOptimize;
+                    }
+
+                    if (as<IRLoad>(user))
+                    {
+                        // Allow loads because IRLoad is read-only operation
+                        continue; // Check the next use
+                    }
+
+                    // For function calls, check if the pointer is treated as immutable.
+                    if (auto call = as<IRCall>(user))
+                    {
+                        auto callee = call->getCallee();
+                        auto funcInst = as<IRFunc>(callee);
+                        if (!funcInst)
+                            goto unsafeToOptimize;
+
+                        UIndex argIndex = (UIndex)(use - call->getArgs());
+                        SLANG_ASSERT(argIndex < call->getArgCount());
+                        SLANG_ASSERT(call->getArg(argIndex) == destPtr);
+
+                        IRParam* param = funcInst->getFirstParam();
+                        for (UIndex i = 0; i < argIndex; i++)
+                        {
+                            if (param)
+                                param = param->getNextParam();
+                        }
+                        if (nullptr == param)
+                            goto unsafeToOptimize; // IRFunc might be incomplete yet
+
+                        if (auto paramPtrType = as<IRConstRefType>(param->getFullType()))
+                        {
+                            if (paramPtrType->getAddressSpace() != loadAddressSpace)
+                                goto unsafeToOptimize; // incompatible address space
+
+                            continue; // safe so far and check the next use
+                        }
+                        goto unsafeToOptimize; // must be const-ref
+                    }
+
+                    // TODO: there might be more cases that is safe to optimize
+                    // We need to add more cases here as needed.
+
+                    // If we get here, the pointer is used with an unexpected IR.
+                    goto unsafeToOptimize;
+                }
+
+                // If we get here, all uses are safe to optimize.
+
+                // Replace all uses of destPtr with loadedPtr
+                destPtr->replaceUsesWith(loadPtr);
+
+                // Mark instructions for removal
+                toRemove.add(storeInst);
+                toRemove.add(destPtr);
+
+                // Note: loadInst might be still in use.
+                // We need to rely on DCE to delete it if unused.
+
+                changed = true;
+                overallChanged = true;
+
+            unsafeToOptimize:;
+            }
+        }
+
+        // Remove marked instructions
+        for (auto instToRemove : toRemove)
+        {
+            instToRemove->removeAndDeallocate();
+        }
+    }
+
+    return overallChanged;
+}
+
 bool removeRedundancyInFunc(IRGlobalValueWithCode* func, bool hoistLoopInvariantInsts)
 {
     auto root = func->getFirstBlock();
@@ -163,6 +362,7 @@ bool removeRedundancyInFunc(IRGlobalValueWithCode* func, bool hoistLoopInvariant
     if (auto normalFunc = as<IRFunc>(func))
     {
         result |= eliminateRedundantLoadStore(normalFunc);
+        result |= eliminateRedundantTemporaryCopyInFunc(normalFunc);
     }
     return result;
 }

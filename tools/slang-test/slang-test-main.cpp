@@ -3643,6 +3643,16 @@ static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine
     {
         ioCmdLine.addArg("-enable-debug-layers");
     }
+
+    if (options.ignoreAbortMsg)
+    {
+        ioCmdLine.addArg("-ignore-abort-msg");
+    }
+
+    if (options.cacheRhiDevice)
+    {
+        ioCmdLine.addArg("-cache-rhi-device");
+    }
 }
 
 static SlangResult _extractProfileTime(const UnownedStringSlice& text, double& timeOut)
@@ -4766,6 +4776,23 @@ static bool shouldRunTest(TestContext* context, String filePath)
     if (!endsWithAllowedExtension(context, filePath))
         return false;
 
+    // Check exclude prefixes first - if any match, skip the test
+    for (auto& excludePrefix : context->options.excludePrefixes)
+    {
+        if (filePath.startsWith(excludePrefix))
+        {
+            if (context->options.verbosity == VerbosityLevel::Verbose)
+            {
+                context->getTestReporter()->messageFormat(
+                    TestMessageType::Info,
+                    "%s file is excluded from the test because it is found from the exclusion "
+                    "list\n",
+                    filePath.getBuffer());
+            }
+            return false;
+        }
+    }
+
     if (!context->options.testPrefixes.getCount())
     {
         return true;
@@ -5129,6 +5156,15 @@ static SlangResult runUnitTestModule(
     return SLANG_OK;
 }
 
+static void cleanupRenderTestDeviceCache(TestContext& context)
+{
+    auto cleanFunc = context.getCleanDeviceCacheFunc("render-test");
+    if (cleanFunc)
+    {
+        cleanFunc();
+    }
+}
+
 SlangResult innerMain(int argc, char** argv)
 {
     auto stdWriters = StdWriters::initDefaultSingleton();
@@ -5420,12 +5456,15 @@ SlangResult innerMain(int argc, char** argv)
         }
 
         reporter.outputSummary();
+
+        cleanupRenderTestDeviceCache(context);
         return reporter.didAllSucceed() ? SLANG_OK : SLANG_FAIL;
     }
 }
 
 int main(int argc, char** argv)
 {
+    // Fallback: run without cleanup if context initialization fails
     SlangResult res = innerMain(argc, argv);
     slang::shutdown();
     Slang::RttiInfo::deallocateAll();

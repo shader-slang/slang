@@ -3,9 +3,9 @@
 
 // CHECK_SPIRV: OpEntryPoint
 // CHECK_SPIRV: OpVariable {{.*}} Input {{.*}} Location 0
-// CHECK_SPIRV: OpVariable {{.*}} Uniform
-// CHECK_SPIRV: OpVariable {{.*}} Input {{.*}} Location 1
-// CHECK_SPIRV: OpVariable {{.*}} Output {{.*}} Location 0
+// CHECK_SPIRV-DAG: OpVariable {{.*}} Uniform
+// CHECK_SPIRV-DAG: OpVariable {{.*}} Input {{.*}} Location 1
+// CHECK_SPIRV-DAG: OpVariable {{.*}} Output {{.*}} Location 0
 
 // CHECK_GLSL: layout(location = 0)
 // CHECK_GLSL-NEXT: in

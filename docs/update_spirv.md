@@ -55,6 +55,10 @@ cd ../..
    git -C external/spirv-tools/external/spirv-headers log -1 --oneline
    git -C external/spirv-headers checkout [commit hash from the previous command]
    ```
+   Alternatively you can get the hash value of spirv-headers with the following command,
+   ```
+   grep spirv_headers_revision external/spirv-tools/DEPS
+   ```
 
 Note that the update of SPIRV-Headers should be done after running `python3.exe utils\git-sync-deps`, because the python script will update `external/spirv-tools/external/spirv-headers` to whichever commit the current SPIRV-Tools depends on.
 

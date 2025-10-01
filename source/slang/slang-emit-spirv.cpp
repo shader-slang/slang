@@ -1500,12 +1500,30 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             m_addressingMode,
             m_memoryModel);
 
+        // Emit OpSamplerImageAddressingModeNV if bindless texture capability is enabled
+        auto targetCaps = m_targetProgram->getTargetReq()->getTargetCaps();
+
+        if (targetCaps.implies(CapabilityAtom::spvBindlessTextureNV))
+        {
+            requireSPIRVCapability((SpvCapability)SpvCapabilityBindlessTextureNV);
+            requireSPIRVCapability(SpvCapabilityInt64); // Required for 64-bit addressing mode
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_bindless_texture"));
+
+            emitInstCustomOperandFunc(
+                getSection(SpvLogicalSectionID::MemoryModel),
+                nullptr,
+                SpvOpSamplerImageAddressingModeNV,
+                [&]()
+                {
+                    emitOperand(SpvWord(64)); // 64-bit addressing mode
+                });
+        }
+
         if (m_memoryModel == SpvMemoryModelVulkan)
         {
             requireSPIRVCapability(SpvCapabilityVulkanMemoryModel);
             ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_vulkan_memory_model"));
 
-            auto targetCaps = m_targetProgram->getTargetReq()->getTargetCaps();
             if (targetCaps.implies(CapabilityAtom::spvVulkanMemoryModelDeviceScopeKHR))
             {
                 requireSPIRVCapability(SpvCapabilityVulkanMemoryModelDeviceScope);
@@ -2129,7 +2147,25 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
                 IRBuilder builder(inst);
                 builder.setInsertBefore(inst);
-                return emitOpTypeVector(inst, builder.getUIntType(), SpvLiteralInteger::from32(2));
+                auto targetCaps = m_targetProgram->getTargetReq()->getTargetCaps();
+
+                if (targetCaps.implies(CapabilityAtom::spvBindlessTextureNV))
+                {
+                    // For spvBindlessTextureNV, DescriptorHandleType should be a uint64_t
+                    // (OpTypeInt 64 0)
+                    return emitOpTypeInt(
+                        inst,
+                        SpvLiteralInteger::from32(64),
+                        SpvLiteralInteger::from32(0));
+                }
+                else
+                {
+                    // For other targets, use uint2 (OpTypeVector of 2 uint32)
+                    return emitOpTypeVector(
+                        inst,
+                        builder.getUIntType(),
+                        SpvLiteralInteger::from32(2));
+                }
             }
         case kIROp_SubpassInputType:
             return ensureSubpassInputType(inst, cast<IRSubpassInputType>(inst));
@@ -4154,10 +4190,57 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_CastDescriptorHandleToUInt2:
         case kIROp_CastUInt2ToDescriptorHandle:
         case kIROp_GlobalValueRef:
+        case kIROp_CastUInt64ToDescriptorHandle:
+        case kIROp_CastDescriptorHandleToUInt64:
             {
                 auto inner = ensureInst(inst->getOperand(0));
                 registerInst(inst, inner);
                 result = inner;
+                break;
+            }
+        case kIROp_CastDescriptorHandleToResource:
+            // Convert DescriptorHandle (uint64_t handle) to appropriate resource type
+            {
+                auto targetCaps = m_targetProgram->getTargetReq()->getTargetCaps();
+
+                if (targetCaps.implies(CapabilityAtom::spvBindlessTextureNV))
+                {
+                    requireSPIRVCapability((SpvCapability)SpvCapabilityBindlessTextureNV);
+                    ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_bindless_texture"));
+
+                    auto operand = ensureInst(inst->getOperand(0));
+                    SpvOp conversionOp = SpvOpConvertUToSampledImageNV;
+                    IRType* resultType = inst->getDataType();
+
+                    switch (resultType->getOp())
+                    {
+                    case kIROp_TextureType:
+                        conversionOp = SpvOpConvertUToSampledImageNV;
+                        result = emitInst(
+                            parent,
+                            inst,
+                            conversionOp,
+                            inst->getDataType(),
+                            kResultID,
+                            operand);
+                        break;
+                    case kIROp_SamplerStateType:
+                        conversionOp = SpvOpConvertUToSamplerNV;
+                        result = emitInst(
+                            parent,
+                            inst,
+                            conversionOp,
+                            inst->getDataType(),
+                            kResultID,
+                            operand);
+                        break;
+                    default:
+                        // Unsupported result type for descriptor-to-resource conversion
+                        SLANG_UNEXPECTED(
+                            "Unsupported result type for CastDescriptorHandleToResource");
+                        break;
+                    }
+                }
                 break;
             }
         case kIROp_GetVulkanRayTracingPayloadLocation:
@@ -6955,7 +7038,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             getStructFieldId(baseStructType, as<IRStructKey>(fieldAddress->getField())),
             builder.getIntType());
         SLANG_ASSERT(as<IRPtrTypeBase>(fieldAddress->getFullType()));
-        return emitOpInBoundsAccessChain(
+        return emitOpAccessChain(
             parent,
             fieldAddress,
             fieldAddress->getFullType(),

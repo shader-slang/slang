@@ -179,14 +179,27 @@ static LegalVal maybeMaterializeWrappedValue(IRTypeLegalizationContext* context,
 static LegalVal legalizeOperand(IRTypeLegalizationContext* context, IRInst* irValue)
 {
     LegalVal legalVal;
+
+    // Special handling for type operands
+    if (auto oldType = as<IRType>(irValue))
+    {
+        // e.g. ParameterBlock<Struct>, the inst. ParameterBlockType holds the operand `StructType`,
+        // if we don't legalize it here and the same structType is legalized somewhere else, the
+        // operand of ParameterBlockType might not get updated, and it would result in a type
+        // mismatch.
+        auto legalType = legalizeType(context, oldType);
+        if (legalType.flavor == LegalType::Flavor::simple)
+            return LegalVal::simple(legalType.getSimple());
+        // legalType is not simple, fallback to the original value
+    }
+
     if (context->mapValToLegalVal.tryGetValue(irValue, legalVal))
     {
         return maybeMaterializeWrappedValue(context, legalVal);
     }
 
     // For now, assume that anything not covered
-    // by the mapping is legal as-is.
-
+    // by the type legalization or val mapping is legal as-is.
     return LegalVal::simple(irValue);
 }
 
@@ -2331,6 +2344,10 @@ static LegalVal legalizeCoopMatMapElementIFunc(
 
 static LegalVal legalizeInst(IRTypeLegalizationContext* context, IRInst* inst)
 {
+    LegalVal legalVal;
+    if (context->mapValToLegalVal.tryGetValue(inst, legalVal))
+        return legalVal;
+
     // Any additional instructions we need to emit
     // in the process of legalizing `inst` should
     // by default be insertied right before `inst`.
@@ -2386,7 +2403,8 @@ static LegalVal legalizeInst(IRTypeLegalizationContext* context, IRInst* inst)
     for (UInt aa = 0; aa < argCount; ++aa)
     {
         auto oldArg = inst->getOperand(aa);
-        auto legalArg = legalizeOperand(context, oldArg);
+
+        LegalVal legalArg = legalizeOperand(context, oldArg);
         legalArgs.add(legalArg);
 
         if (legalArg.flavor != LegalVal::Flavor::simple)
@@ -2449,7 +2467,7 @@ static LegalVal legalizeInst(IRTypeLegalizationContext* context, IRInst* inst)
     auto builder = context->builder;
     builder->setInsertBefore(inst);
 
-    LegalVal legalVal = legalizeInst(context, inst, legalType, legalArgs.getArrayView().arrayView);
+    legalVal = legalizeInst(context, inst, legalType, legalArgs.getArrayView().arrayView);
 
     if (legalVal.flavor == LegalVal::Flavor::simple)
     {
@@ -2775,7 +2793,9 @@ private:
 static LegalVal legalizeFunc(IRTypeLegalizationContext* context, IRFunc* irFunc)
 {
     LegalFuncBuilder builder(context);
-    return builder.build(irFunc);
+    auto legalVal = builder.build(irFunc);
+    registerLegalizedValue(context, irFunc, legalVal);
+    return legalVal;
 }
 
 static void cloneDecorationToVar(IRInst* srcInst, IRInst* varInst)

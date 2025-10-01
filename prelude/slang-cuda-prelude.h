@@ -2312,7 +2312,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uintptr_t UPTR_max(uintptr_t a, uintptr_t b)
 template<typename T>
 struct StructuredBuffer
 {
-    SLANG_CUDA_CALL const T& operator[](size_t index) const
+    SLANG_CUDA_CALL T& operator[](size_t index) const
     {
 #ifndef SLANG_CUDA_STRUCTURED_BUFFER_NO_COUNT
         SLANG_BOUND_CHECK(index, count);
@@ -2320,7 +2320,7 @@ struct StructuredBuffer
         return data[index];
     }
 
-    SLANG_CUDA_CALL const T& Load(size_t index) const
+    SLANG_CUDA_CALL T& Load(size_t index) const
     {
 #ifndef SLANG_CUDA_STRUCTURED_BUFFER_NO_COUNT
         SLANG_BOUND_CHECK(index, count);
