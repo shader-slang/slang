@@ -576,10 +576,11 @@ public:
     {
         // First, ensure we have storage info for this type!
         getStorageType(type, rules);
-        auto& storageInfo = storageTypeMap.getValue(rules).getValue(type);
-
-        if (storageInfo.debugType)
-            return storageInfo.debugType;
+        {
+            auto& storageInfo = storageTypeMap.getValue(rules).getValue(type);
+            if (storageInfo.debugType)
+                return storageInfo.debugType;
+        }
 
         llvm::DIType* llvmType = nullptr;
 #if SLANG_PTR_IS_32
@@ -792,7 +793,10 @@ public:
             break;
         }
 
-        storageInfo.debugType = llvmType;
+        {
+            auto& storageInfo = storageTypeMap.getValue(rules).getValue(type);
+            storageInfo.debugType = llvmType;
+        }
         return llvmType;
     }
 
@@ -2766,7 +2770,7 @@ struct LLVMEmitter
                 {
                     variableDebugInfoMap[inst] = {
                         llvmDebugBuilder->createParameterVariable(
-                            debugScopeStack.getLast(), prettyName, getIntVal(argIndex), file,
+                            debugScopeStack.getLast(), prettyName, getIntVal(argIndex)+1, file,
                             line, varType,
                             getOptions().getOptimizationLevel() == OptimizationLevel::None
                         ),
