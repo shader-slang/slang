@@ -40,13 +40,6 @@ jobs:
             }
           - {
               os: windows,
-              platform: x86_64,
-              runs-on: ["Windows", "self-hosted", "GCP-T4"],
-              compiler: cl,
-            }
-          - {
-              os: windows,
-              platform: aarch64,
               runs-on: ["Windows", "self-hosted", "GCP-T4"],
               compiler: cl,
             }
