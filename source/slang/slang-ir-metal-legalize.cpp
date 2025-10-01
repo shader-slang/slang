@@ -172,7 +172,7 @@ struct MetalAddressSpaceAssigner : InitialAddressSpaceAssigner
         {
             if (ptrType->hasAddressSpace())
                 return ptrType->getAddressSpace();
-            return AddressSpace::Global;
+            return AddressSpace::Generic;
         }
         return AddressSpace::Generic;
     }

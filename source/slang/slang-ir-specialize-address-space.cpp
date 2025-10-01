@@ -131,7 +131,6 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
     bool processFunction(IRFunc* func)
     {
         bool retValAddrSpaceChanged = false;
-        Dictionary<IRInst*, AddressSpace> mapVarValueToAddrSpace;
         bool changed = true;
         while (changed)
         {
@@ -152,18 +151,23 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                         continue;
                     }
 
-                    // If the inst already has a pointer type with explicit address space, then use
-                    // it.
-                    if (auto ptrType = as<IRPtrTypeBase>(inst->getDataType()))
+                    // If the inst already has a pointer/pointer-like type with explicit address
+                    // space, then use it.
+                    auto addrSpaceFromType =
+                        addrSpaceAssigner->getAddressSpaceFromVarType(inst->getDataType());
+                    if (addrSpaceFromType != AddressSpace::Generic)
                     {
-                        if (ptrType->hasAddressSpace())
-                        {
-                            mapInstToAddrSpace[inst] = ptrType->getAddressSpace();
+                        mapInstToAddrSpace[inst] = addrSpaceFromType;
+                        changed = true;
+
+                        // Don't return early if the inst itself is a call, as we may still need to
+                        // specialize it down below.
+                        if (inst->getOp() != kIROp_Call)
                             continue;
-                        }
                     }
 
-                    // Otherwise, try to assign an address space based on the instruction type.
+                    // Try to assign an address space based on the instruction type, and specialize
+                    // calls.
                     switch (inst->getOp())
                     {
                     case kIROp_Var:
@@ -195,15 +199,6 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                         }
                         break;
                     case kIROp_Store:
-                        {
-                            auto addrSpace = getAddrSpace(inst->getOperand(1));
-                            if (addrSpace != AddressSpace::Generic)
-                            {
-                                mapVarValueToAddrSpace[inst->getOperand(0)] = addrSpace;
-                                mapInstToAddrSpace[inst] = addrSpace;
-                                changed = true;
-                            }
-                        }
                         break;
                     case kIROp_Param:
                         if (!isFirstBlock)
@@ -243,8 +238,9 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                                 for (UInt i = 0; i < callInst->getArgCount(); i++)
                                 {
                                     auto arg = callInst->getArg(i);
-                                    argAddrSpaces.add(getAddrSpace(arg));
-                                    if (as<IRPtrTypeBase>(arg->getDataType()))
+                                    auto addrSpace = getAddrSpace(arg);
+                                    argAddrSpaces.add(addrSpace);
+                                    if (addrSpace != AddressSpace::Generic)
                                     {
                                         hasSpecializableArg = true;
                                     }
@@ -477,8 +473,13 @@ void propagateAddressSpaceFromInsts(List<IRInst*>&& workList)
     }
 }
 
-AddressSpace NoOpInitialAddressSpaceAssigner::getAddressSpaceFromVarType(IRInst*)
+AddressSpace NoOpInitialAddressSpaceAssigner::getAddressSpaceFromVarType(IRInst* type)
 {
+    if (auto ptrType = as<IRPtrTypeBase>(type))
+    {
+        if (ptrType->hasAddressSpace())
+            return ptrType->getAddressSpace();
+    }
     return AddressSpace::Generic;
 }
 

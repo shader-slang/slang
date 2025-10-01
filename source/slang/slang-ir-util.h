@@ -70,6 +70,8 @@ bool isPointerOfType(IRInst* ptrType, IRInst* elementType);
 // True if ptrType is a pointer type to a type of opCode
 bool isPointerOfType(IRInst* ptrType, IROp opCode);
 
+bool isUserPointerType(IRInst* type);
+
 // Builds a dictionary that maps from requirement key to requirement value for `interfaceType`.
 Dictionary<IRInst*, IRInst*> buildInterfaceRequirementDict(IRInterfaceType* interfaceType);
 
@@ -204,6 +206,12 @@ IRInst* getRootAddr(
     List<IRInst*>* outTypes = nullptr);
 
 bool canAddressesPotentiallyAlias(IRGlobalValueWithCode* func, IRInst* addr1, IRInst* addr2);
+
+bool canAddressesPotentiallyAlias(
+    TargetRequest* target,
+    IRGlobalValueWithCode* func,
+    IRInst* addr1,
+    IRInst* addr2);
 
 String dumpIRToString(
     IRInst* root,

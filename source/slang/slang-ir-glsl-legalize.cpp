@@ -2694,7 +2694,10 @@ static void legalizeMeshPayloadInputParam(
     pp->replaceUsesWith(g);
     struct MeshPayloadInputSpecializationCondition : FunctionCallSpecializeCondition
     {
-        bool doesParamWantSpecialization(IRParam*, IRInst* arg) { return arg == g; }
+        bool doesParamWantSpecialization(IRParam*, IRInst* arg, IRCall* /*call*/)
+        {
+            return arg == g;
+        }
         IRInst* g;
     } condition;
     condition.g = g;
@@ -2794,7 +2797,10 @@ static void legalizeMeshOutputParam(
     // pp is only removed later on, so sadly we have to keep it around for now
     struct MeshOutputSpecializationCondition : FunctionCallSpecializeCondition
     {
-        bool doesParamWantSpecialization(IRParam*, IRInst* arg) { return arg == g; }
+        bool doesParamWantSpecialization(IRParam*, IRInst* arg, IRCall* /*call*/)
+        {
+            return arg == g;
+        }
         IRInst* g;
     } condition;
     condition.g = g;
