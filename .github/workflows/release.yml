@@ -85,11 +85,11 @@ jobs:
           mkdir build-platform-generators
           cmake --install build --config Release --component generators --prefix build-platform-generators
 
-      - name: Setup Windows ARM64 cross-compilation
-        if: matrix.os == 'windows' && matrix.platform == 'aarch64'
+      - name: Setup Windows dev tools for host and target architecture
+        if: matrix.os == 'windows'
         uses: ilammy/msvc-dev-cmd@v1
         with:
-          arch: x64_arm64
+          arch: ${{ matrix.platform == 'aarch64' && 'amd64_arm64' || 'amd64' }}
 
       - name: Build Slang
         run: |
