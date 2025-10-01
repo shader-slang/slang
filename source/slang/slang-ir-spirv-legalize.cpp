@@ -1627,7 +1627,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         if (hlslExportDecor || downstreamExportDecor)
         {
             IRBuilder builder(func);
-            builder.addDecoration(func, kIROp_SpirVExportDecoration);
+            builder.addDecorationIfNotExist(func, kIROp_SpirVExportDecoration);
+            return;
         }
         // Check the `UserExtern` decoration or `DownstreamImport` decoration. If any performs, we
         // assume this function is imported, add SpirV extern decoration and add linkage attribute
@@ -1640,7 +1641,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         if (userExternDecor || downstreamImportDecor || availableInDownstreamDecor)
         {
             IRBuilder builder(func);
-            builder.addDecoration(func, kIROp_SpirVExternDecoration);
+            builder.addDecorationIfNotExist(func, kIROp_SpirVExternDecoration);
             // If function comes from downstream IR, mangled name is stored in `ExportDecoration`
             // instead of `ImportDecoration`, also need to fix this.
             auto exportDecor = func->findDecoration<IRExportDecoration>();
@@ -2331,10 +2332,14 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         {
             if (auto func = as<IRFunc>(globalInst))
             {
-                legalizeSPIRVLinkageFunc(func);
                 if (auto entryPointDecor = func->findDecoration<IREntryPointDecoration>())
                 {
                     legalizeSPIRVEntryPoint(func, entryPointDecor);
+                }
+                else
+                {
+                    // Add linkage attribute for non entry point functions.
+                    legalizeSPIRVLinkageFunc(func);
                 }
                 // SPIRV requires a dominator block to appear before dominated blocks.
                 // After legalizing the control flow, we need to sort our blocks to ensure this
