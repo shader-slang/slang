@@ -69,8 +69,18 @@ jobs:
 
           - { build-slang-llvm: false }
           - { os: linux, platform: x86_64, build-slang-llvm: true }
-          - { os: windows, platform: x86_64, arch: amd64, build-slang-llvm: true }
-          - { os: macos, platform: aarch64, arch: arm64, build-slang-llvm: true }
+          - {
+              os: windows,
+              platform: x86_64,
+              arch: amd64,
+              build-slang-llvm: true,
+            }
+          - {
+              os: macos,
+              platform: aarch64,
+              arch: arm64,
+              build-slang-llvm: true,
+            }
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
     container: ${{ matrix.image || '' }}
