@@ -2,7 +2,6 @@
 #include "slang-glslang.h"
 
 #include "SPIRV/GlslangToSpv.h"
-#include "glslang/MachineIndependent/localintermediate.h"
 #include "glslang/Public/ShaderLang.h"
 #include "slang.h"
 #include "spirv-tools/libspirv.h"
@@ -810,7 +809,7 @@ static int glslang_compileGLSLToSPIRV(glslang_CompileRequest_1_2 request)
             continue;
         if (debugLevel == SLANG_DEBUG_INFO_LEVEL_MAXIMAL)
         {
-            stageIntermediate->addSourceText(sourceText, sourceTextLength);
+            shader->addSourceText(sourceText, sourceTextLength);
         }
 
         std::vector<unsigned int> spirv;
