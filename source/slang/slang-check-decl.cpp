@@ -8992,6 +8992,7 @@ void SemanticsDeclBodyVisitor::visitEnumDecl(EnumDecl* decl)
                 tryConstantFoldExpr(explicitTagValExpr, ConstantFoldingKind::CompileTime, nullptr);
             if (explicitTagVal)
             {
+                caseDecl->tagVal = explicitTagVal;
                 if (auto constIntVal = as<ConstantIntVal>(explicitTagVal))
                 {
                     defaultTag = constIntVal->getValue();
@@ -9005,8 +9006,10 @@ void SemanticsDeclBodyVisitor::visitEnumDecl(EnumDecl* decl)
             else
             {
                 // If this happens, then the explicit tag value expression
-                // doesn't seem to be a constant after all. In this case
-                // we expect the checking logic to have applied already.
+                // doesn't seem to be a constant after all.
+                getSink()->diagnose(
+                    explicitTagValExpr,
+                    Diagnostics::expectedIntegerConstantNotConstant);
             }
         }
         else
@@ -9017,8 +9020,8 @@ void SemanticsDeclBodyVisitor::visitEnumDecl(EnumDecl* decl)
             tagValExpr->loc = caseDecl->loc;
             tagValExpr->type = QualType(tagType);
             tagValExpr->value = defaultTag;
-
             caseDecl->tagExpr = tagValExpr;
+            caseDecl->tagVal = m_astBuilder->getIntVal(enumType, defaultTag);
         }
 
         // Default tag for the next case will be one more than
@@ -9058,15 +9061,9 @@ void SemanticsDeclBodyVisitor::visitEnumCaseDecl(EnumCaseDecl* decl)
     if (auto initExpr = decl->tagExpr)
     {
         initExpr = CheckTerm(initExpr);
-        initExpr = coerce(CoercionSite::General, tagType, initExpr, getSink());
 
-        // We want to enforce that this is an integer constant
-        // expression.
-        decl->tagVal = CheckIntegerConstantExpression(
-            initExpr,
-            IntegerConstantExpressionCoercionType::AnyInteger,
-            nullptr,
-            ConstantFoldingKind::CompileTime);
+        if (initExpr->type != decl->type.type)
+            initExpr = coerce(CoercionSite::General, tagType, initExpr, getSink());
 
         decl->tagExpr = initExpr;
     }
