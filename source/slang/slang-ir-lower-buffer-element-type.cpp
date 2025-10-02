@@ -2331,7 +2331,8 @@ struct KhronosTargetBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLo
         return DefaultBufferElementTypeLoweringPolicy::shouldLowerMatrixType(matrixType, config);
     }
 
-    virtual bool shouldAlwaysCreateLoweredStorageTypeForCompositeTypes(TypeLoweringConfig config)
+    virtual bool shouldAlwaysCreateLoweredStorageTypeForCompositeTypes(
+        TypeLoweringConfig config) override
     {
         // For spirv backend, we always want to lower all array types, even if the element type
         // comes out the same. This is because different layout rules may have different array
