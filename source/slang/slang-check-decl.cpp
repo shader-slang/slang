@@ -7193,6 +7193,18 @@ bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
         if (!diffMemberType)
             continue;
 
+        // Since the conformance checking happens before the decl body checking, the
+        // DerivativeMemberAttribute might not have been checked yet. So we need to make sure
+        // they are checked before we use them. `checkDerivativeMemberAttributeReferences`
+        // already handles the case that the attribute has already been checked.
+        checkDerivativeMemberAttributeReferences(varMember, derivativeAttr);
+
+        // If there is anything wrong in the checking, `checkDerivativeMemberAttributeReferences`
+        // will diagnose an error, and `derivativeAttr->memberDeclRef` will be null. We will skip
+        // the remaining synthesis to avoid crash.
+        if (!derivativeAttr->memberDeclRef)
+            continue;
+
         // Pull up the derivative member name from the attribute
         auto derivMemberName = derivativeAttr->memberDeclRef->declRef.getName();
 
@@ -8145,16 +8157,6 @@ void SemanticsVisitor::checkAggTypeConformance(AggTypeDecl* decl)
         auto inheritanceDecls = decl->getMembersOfType<InheritanceDecl>().toList();
         for (auto inheritanceDecl : inheritanceDecls)
         {
-            // Special handling for when we check for conformance against `IDifferentiable`
-            // We will reference-checking for the [DerivativeMember(DiffType.member)]
-            // attributes here, since they have to be performed after types can be referenced
-            // and before conformance checking, where this information can be used to synthesize
-            // member methods (such as `dzero`, `dadd`, etc..)
-            //
-            if (inheritanceDecl->getSup().type->equals(
-                    astBuilder->getDifferentiableInterfaceType()))
-                checkDifferentiableMembersInType(decl);
-
             checkConformance(type, inheritanceDecl, decl);
         }
 

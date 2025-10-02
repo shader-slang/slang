@@ -1689,7 +1689,7 @@ FIDDLE()
 class DerivativeMemberAttribute : public Attribute
 {
     FIDDLE(...)
-    FIDDLE() DeclRefExpr* memberDeclRef;
+    FIDDLE() DeclRefExpr* memberDeclRef = nullptr;
 };
 
 /// An attribute that marks an interface type as a COM interface declaration.
