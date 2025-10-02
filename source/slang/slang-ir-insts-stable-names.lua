@@ -676,4 +676,6 @@ return {
 	["CastStorageToLogicalBase.CastStorageToLogicalDeref"] = 672,
 	["Decoration.DisableCopyEliminationDecoration"] = 673,
 	["Decoration.TempCallArgImmutableVar"] = 674,
+	["Decoration.spirvExport"] = 675,
+	["Decoration.spirvExtern"] = 676,
 }
