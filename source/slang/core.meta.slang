@@ -149,6 +149,9 @@ interface IRangedValue
 __attributeTarget(DeclBase)
 attribute_syntax [TreatAsDifferentiable] : TreatAsDifferentiableAttribute;
 
+__attributeTarget(DeclBase)
+attribute_syntax [MaybeDifferentiable] : MaybeDifferentiableAttribute;
+
 /// Represents types that provide arithmetic operations.
 interface IArithmetic : IComparable
 {
@@ -680,7 +683,7 @@ interface IForwardDifferentiable<FType>
     // IRForwardDifferentiate()
     // 
     __builtin_requirement($( (int)BuiltinRequirementKind::ForwardDerivativeFunc))
-    //static __associatedfunc FType.__fwd_diff_func_type fwd_diff;
+    [MaybeDifferentiable]
     static __associatedfunc __fwd_diff_func_type(FType) fwd_diff; // -> fwd_diff
 };
 

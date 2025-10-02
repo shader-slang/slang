@@ -686,9 +686,12 @@ static bool _isDifferentiableFunc(IRInst* func)
     return false;
 }
 
-static IRFuncType* _getCalleeActualFuncType(IRInst* callee)
+static IRFuncType* _getCalleeActualFuncType(
+    DifferentiableTypeConformanceContext* context,
+    IRInst* callee)
 {
-    auto type = callee->getFullType();
+    IRBuilder builder(callee);
+    auto type = context->resolveType(&builder, callee->getFullType());
     if (auto funcType = as<IRFuncType>(type))
         return funcType;
     if (auto specialize = as<IRSpecialize>(callee))
@@ -726,6 +729,78 @@ IRInst* tryFindPrimalSubstitute(IRBuilder* builder, IRInst* callee)
         }
     }
     return callee;
+}
+
+static void emitCalleeAnnotationsForHigherOrderDiff(
+    IRBuilder* builder,
+    DifferentiableTypeConformanceContext* context,
+    IRInst* primalCallee)
+{
+    auto fwdDiffCallee =
+        context->tryGetAssociationOfKind(primalCallee, FunctionAssociationKind::ForwardDerivative);
+
+    // Pull up `primal : IForwardDifferentiable`
+    if (auto fwdDiffTable = context->tryGetAssociationOfKind(
+            primalCallee,
+            FunctionAssociationKind::ForwardDerivativeWitnessTable))
+    {
+        IRInterfaceType* fwdDiffInterfaceType = cast<IRInterfaceType>(
+            getGenericReturnVal(context->sharedContext->forwardDifferentiableInterfaceType));
+        auto fwdDiffReqKey = cast<IRInterfaceRequirementEntry>(fwdDiffInterfaceType->getOperand(0))
+                                 ->getRequirementKey();
+        auto fwdDiffTableReqKey =
+            cast<IRInterfaceRequirementEntry>(fwdDiffInterfaceType->getOperand(1))
+                ->getRequirementKey();
+
+        IRInst* callee = primalCallee;
+
+        // Lookup primal.fwd_diff : IForwardDifferentiable
+        auto higherOrderFwdDiffTable = _lookupWitness(
+            builder,
+            fwdDiffTable,
+            fwdDiffTableReqKey,
+            builder->getWitnessTableType((IRType*)builder->emitSpecializeInst(
+                builder->getTypeKind(),
+                context->sharedContext->forwardDifferentiableInterfaceType,
+                1,
+                &fwdDiffCallee)));
+
+        // Lookup `primal.fwd_diff.fwd_diff`
+        IRInst* operand = fwdDiffCallee->getFullType();
+        auto higherOrderFwdDiffFunc = _lookupWitness(
+            builder,
+            higherOrderFwdDiffTable,
+            fwdDiffReqKey,
+            (IRType*)builder->emitIntrinsicInst(
+                builder->getTypeKind(),
+                kIROp_ForwardDiffFuncType,
+                1,
+                &operand));
+
+        {
+            IRInst* args[] = {
+                fwdDiffCallee,
+                builder->getIntValue((int)FunctionAssociationKind::ForwardDerivative),
+                higherOrderFwdDiffFunc};
+            builder->emitIntrinsicInst(
+                builder->getVoidType(),
+                kIROp_AssociatedInstAnnotation,
+                3,
+                args);
+        }
+
+        {
+            IRInst* args[] = {
+                fwdDiffCallee,
+                builder->getIntValue((int)FunctionAssociationKind::ForwardDerivativeWitnessTable),
+                higherOrderFwdDiffTable};
+            builder->emitIntrinsicInst(
+                builder->getVoidType(),
+                kIROp_AssociatedInstAnnotation,
+                3,
+                args);
+        }
+    }
 }
 
 // Differentiating a call instruction here is primarily about generating
@@ -793,43 +868,13 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
         }
     }
 
-    // auto substPrimalCallee = tryFindPrimalSubstitute(builder, primalCallee);
-
-    /*if (diffCallee)
+    if (as<IRVoidLit>(diffCallee))
     {
+        // Diagnose.
+        getSink()->diagnose(
+            origCall->sourceLoc,
+            Diagnostics::encounteredNonDifferentiableFunctionDuringHigherOrderDiff);
     }
-    else if (substPrimalCallee == primalCallee)
-    {
-        instMapD.tryGetValue(origCallee, diffCallee);
-    }
-    else
-    {
-        if (_isDifferentiableFunc(origCallee))
-            diffCallee = findOrTranscribeDiffInst(builder, origCallee);
-        primalCallee = substPrimalCallee;
-    }
-
-    if (diffCallee)
-    {
-    }
-    else if (
-        auto derivativeReferenceDecor =
-            primalCallee->findDecoration<IRForwardDerivativeDecoration>())
-    {
-        // If the user has already provided an differentiated implementation, use that.
-        diffCallee = derivativeReferenceDecor->getForwardDerivativeFunc();
-    }
-    else if (_isDifferentiableFunc(primalCallee))
-    {
-        // If the function is marked for auto-diff, push a `differentiate` inst for a follow up pass
-        // to generate the implementation.
-        diffCallee = builder->emitForwardDifferentiateInst(
-            differentiateFunctionType(
-                builder,
-                primalCallee,
-                as<IRFuncType>(primalCallee->getFullType())),
-            primalCallee);
-    }*/
 
     if (!diffCallee)
     {
@@ -838,11 +883,12 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
         return InstPair(primalCall, nullptr);
     }
 
-    auto calleeType = _getCalleeActualFuncType(primalCallee);
+    auto calleeType = _getCalleeActualFuncType(&differentiableTypeConformanceContext, primalCallee);
     SLANG_ASSERT(calleeType);
     SLANG_RELEASE_ASSERT(calleeType->getParamCount() == origCall->getArgCount());
 
-    auto diffCalleeType = _getCalleeActualFuncType(diffCallee);
+    auto diffCalleeType =
+        _getCalleeActualFuncType(&differentiableTypeConformanceContext, diffCallee);
     SLANG_ASSERT(diffCalleeType);
     SLANG_RELEASE_ASSERT(diffCalleeType->getParamCount() == origCall->getArgCount());
 
@@ -1027,6 +1073,13 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
     undefinedInst->removeAndDeallocate();
 
     argBuilder.markInstAsMixedDifferential(callInst, diffReturnType);
+
+    IRBuilder annotationBuilder(argBuilder.getModule());
+    annotationBuilder.setInsertInto(argBuilder.getModule());
+    emitCalleeAnnotationsForHigherOrderDiff(
+        &annotationBuilder,
+        &differentiableTypeConformanceContext,
+        primalCallee);
 
     // Stick a link back the primal callee so that any future passes can
     // use this info (e.g. backward AD pass would want to retreive the primalCallee
@@ -1598,45 +1651,61 @@ InstPair ForwardDiffTranscriber::transcribeIfElse(IRBuilder* builder, IRIfElse* 
 
 InstPair ForwardDiffTranscriber::transcribeMakeDifferentialPair(
     IRBuilder* builder,
-    IRMakeDifferentialPairUserCode* origInst)
+    IRInst* origInst)
 {
-    auto primalVal = findOrTranscribePrimalInst(builder, origInst->getPrimalValue());
+    auto origPrimalVal = origInst->getOperand(0);
+    auto origDiffVal = origInst->getOperand(1);
+
+    auto primalVal = findOrTranscribePrimalInst(builder, origPrimalVal);
     SLANG_ASSERT(primalVal);
-    auto diffPrimalVal = findOrTranscribePrimalInst(builder, origInst->getDifferentialValue());
+    auto diffPrimalVal = findOrTranscribePrimalInst(builder, origDiffVal);
     SLANG_ASSERT(diffPrimalVal);
 
-    auto primalDiffVal = findOrTranscribeDiffInst(builder, origInst->getPrimalValue());
+    auto primalDiffVal = findOrTranscribeDiffInst(builder, origPrimalVal);
     if (!primalDiffVal)
-        primalDiffVal =
-            getDifferentialZeroOfType(builder, origInst->getPrimalValue()->getDataType());
+        primalDiffVal = getDifferentialZeroOfType(builder, origPrimalVal->getDataType());
     SLANG_ASSERT(primalDiffVal);
 
-    auto diffDiffVal = findOrTranscribeDiffInst(builder, origInst->getDifferentialValue());
+    auto diffDiffVal = findOrTranscribeDiffInst(builder, origDiffVal);
     if (!diffDiffVal)
-        diffDiffVal =
-            getDifferentialZeroOfType(builder, origInst->getDifferentialValue()->getDataType());
+        diffDiffVal = getDifferentialZeroOfType(builder, origDiffVal->getDataType());
     SLANG_ASSERT(diffDiffVal);
 
     auto primalPairType = findOrTranscribePrimalInst(builder, origInst->getFullType());
     auto diffPairType = findOrTranscribeDiffInst(builder, origInst->getFullType());
-    auto primalPair = builder->emitMakeDifferentialPairUserCode(
-        (IRType*)primalPairType,
-        primalVal,
-        diffPrimalVal);
-    auto diffPair = builder->emitMakeDifferentialPairUserCode(
-        (IRType*)diffPairType,
-        primalDiffVal,
-        diffDiffVal);
-    return InstPair(primalPair, diffPair);
+    if (origInst->getOp() == kIROp_MakeDifferentialPairUserCode)
+    {
+        auto primalPair = builder->emitMakeDifferentialPairUserCode(
+            (IRType*)primalPairType,
+            primalVal,
+            diffPrimalVal);
+        auto diffPair = builder->emitMakeDifferentialPairUserCode(
+            (IRType*)diffPairType,
+            primalDiffVal,
+            diffDiffVal);
+        return InstPair(primalPair, diffPair);
+    }
+    else if (origInst->getOp() == kIROp_MakeDifferentialPair)
+    {
+        auto primalPair =
+            builder->emitMakeDifferentialPair((IRType*)primalPairType, primalVal, diffPrimalVal);
+        auto diffPair =
+            builder->emitMakeDifferentialPair((IRType*)diffPairType, primalDiffVal, diffDiffVal);
+        return InstPair(primalPair, diffPair);
+    }
+    else
+    {
+        SLANG_UNEXPECTED("unknown make differential pair op");
+    }
 }
 
 InstPair ForwardDiffTranscriber::transcribeDifferentialPairGetElement(
     IRBuilder* builder,
     IRInst* origInst)
 {
-    SLANG_ASSERT(
+    /*SLANG_ASSERT(
         origInst->getOp() == kIROp_DifferentialPairGetDifferentialUserCode ||
-        origInst->getOp() == kIROp_DifferentialPairGetPrimalUserCode);
+        origInst->getOp() == kIROp_DifferentialPairGetPrimalUserCode);*/
 
     auto primalVal = findOrTranscribePrimalInst(builder, origInst->getOperand(0));
     SLANG_ASSERT(primalVal);
@@ -1645,17 +1714,18 @@ InstPair ForwardDiffTranscriber::transcribeDifferentialPairGetElement(
     SLANG_ASSERT(diffVal);
 
     auto primalType = findOrTranscribePrimalInst(builder, origInst->getFullType());
+    auto diffResultType = differentiateType(builder, origInst->getFullType());
 
     auto primalResult =
         builder->emitIntrinsicInst((IRType*)primalType, origInst->getOp(), 1, &primalVal);
 
-    auto diffValPairType = as<IRDifferentialPairUserCodeType>(diffVal->getDataType());
+    /*auto diffValPairType = as<IRDifferentialPairUserCodeType>(diffVal->getDataType());
     IRInst* diffResultType = nullptr;
     if (origInst->getOp() == kIROp_DifferentialPairGetDifferentialUserCode)
         diffResultType =
             differentiableTypeConformanceContext.getDiffTypeFromPairType(builder, diffValPairType);
     else
-        diffResultType = diffValPairType->getValueType();
+        diffResultType = diffValPairType->getValueType();*/
     auto diffResult =
         builder->emitIntrinsicInst((IRType*)diffResultType, origInst->getOp(), 1, &diffVal);
     return InstPair(primalResult, diffResult);
@@ -2017,7 +2087,7 @@ SlangResult ForwardDiffTranscriber::prepareFuncForForwardDiff(IRFunc* func)
         auto simplifyOptions = IRSimplificationOptions::getDefault(nullptr);
         simplifyOptions.removeRedundancy = true;
         simplifyOptions.hoistLoopInvariantInsts = true;
-        simplifyFunc(autoDiffSharedContext->targetProgram, func, simplifyOptions);
+        simplifyFunc(nullptr, func, simplifyOptions);
     }
     return result;
 }
@@ -2237,12 +2307,13 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
         return transcribeSwitch(builder, as<IRSwitch>(origInst));
 
     case kIROp_MakeDifferentialPairUserCode:
-        return transcribeMakeDifferentialPair(
-            builder,
-            as<IRMakeDifferentialPairUserCode>(origInst));
+    case kIROp_MakeDifferentialPair:
+        return transcribeMakeDifferentialPair(builder, origInst);
 
     case kIROp_DifferentialPairGetPrimalUserCode:
     case kIROp_DifferentialPairGetDifferentialUserCode:
+    case kIROp_DifferentialPairGetPrimal:
+    case kIROp_DifferentialPairGetDifferential:
         return transcribeDifferentialPairGetElement(builder, origInst);
 
     case kIROp_ExtractExistentialValue:
@@ -2487,6 +2558,142 @@ InstPair ForwardDiffTranscriber::transcribeFuncParam(
         builder->getInsertLoc().getBlock()->addParam(primalParam);
     }
     return InstPair(primalInst, nullptr);
+}
+
+
+IRInst* maybeTranslateForwardDerivative(
+    AutoDiffSharedContext* sharedContext,
+    DiagnosticSink* sink,
+    IRForwardDifferentiate* inst)
+{
+    ForwardDiffTranscriber transcriber(sharedContext, sink);
+    auto base = inst->getOperand(0);
+
+    if (as<IRGeneric>(base))
+        base = getGenericReturnVal(base);
+
+    if (!as<IRFunc>(base))
+        return inst;
+
+    IRFunc* targetFunc = cast<IRFunc>(base);
+
+    IRInst* fwdDiffFunc;
+    IRBuilder builder(sharedContext->moduleInst);
+
+    builder.setInsertAfter(targetFunc);
+    transcriber._transcribeFuncImpl(&builder, targetFunc, fwdDiffFunc);
+
+    // TODO: Should hoist outside..
+    return fwdDiffFunc;
+}
+
+IRInst* maybeTranslateTrivialForwardDerivative(
+    AutoDiffSharedContext* sharedContext,
+    DiagnosticSink* sink,
+    IRTrivialForwardDifferentiate* inst)
+{
+    ForwardDiffTranscriber transcriber(sharedContext, sink);
+    auto base = inst->getOperand(0);
+
+    if (as<IRGeneric>(base))
+        base = getGenericReturnVal(base);
+
+    if (!as<IRFunc>(base))
+        return inst;
+
+    IRFunc* targetFunc = cast<IRFunc>(base);
+
+    IRBuilder builder(sharedContext->moduleInst);
+
+    builder.setInsertAfter(targetFunc);
+
+    IRInst* fwdDiffFunc = builder.createFunc();
+    IRInst* typeOperand = targetFunc->getFullType();
+    fwdDiffFunc->setFullType(transcriber.differentiableTypeConformanceContext.resolveType(
+        &builder,
+        builder
+            .emitIntrinsicInst(builder.getTypeKind(), kIROp_ForwardDiffFuncType, 1, &typeOperand)));
+    transcriber.generateTrivialFwdDiffFunc(targetFunc, cast<IRFunc>(fwdDiffFunc));
+
+    return fwdDiffFunc;
+}
+
+IRInst* maybeTranslateForwardDerivativeWitness(
+    AutoDiffSharedContext* sharedContext,
+    DiagnosticSink* sink,
+    IRSynthesizedForwardDerivativeWitnessTable* translateInst)
+{
+    auto fwdDiffWitnessSynInst = as<IRSynthesizedForwardDerivativeWitnessTable>(translateInst);
+    auto fwdDiffFunc = fwdDiffWitnessSynInst->getOperand(0);
+
+    auto baseConformanceType = cast<IRInterfaceType>(
+        getGenericReturnVal(sharedContext->forwardDifferentiableInterfaceType));
+
+    IRBuilder builder(sharedContext->moduleInst);
+    builder.setInsertAfter(translateInst);
+    auto newWitnessTable = builder.createWitnessTable(
+        (IRType*)cast<IRWitnessTableType>(fwdDiffWitnessSynInst->getDataType())
+            ->getConformanceType(),
+        (IRType*)fwdDiffFunc);
+
+    // For now, we're going to hardcode the fact that the IForwardDifferentiable interface
+    // always contains exactly 3 requirements, the fwd_diff and its two derivatives.
+    //
+    SLANG_ASSERT(baseConformanceType->getRequirementCount() == 3);
+    IRInst* fwdDiffFuncTypeOperand = fwdDiffFunc->getFullType();
+    auto higherOrderfwdDiffFn = builder.emitForwardDifferentiateInst(
+        (IRType*)builder.emitIntrinsicInst(
+            builder.getTypeKind(),
+            kIROp_ForwardDiffFuncType,
+            1,
+            &fwdDiffFuncTypeOperand),
+        fwdDiffFunc);
+    builder.createWitnessTableEntry(
+        newWitnessTable,
+        as<IRInterfaceRequirementEntry>(baseConformanceType->getOperand(0))->getRequirementKey(),
+        higherOrderfwdDiffFn);
+
+    // Add synthetic witness inst to further generate higher order derivatives if necessary.
+    auto higherOrderFwdDiffFwdWitness = builder.emitIntrinsicInst(
+        (IRType*)builder.getWitnessTableType((IRType*)builder.emitSpecializeInst(
+            builder.getTypeKind(),
+            sharedContext->forwardDifferentiableInterfaceType,
+            List<IRInst*>(higherOrderfwdDiffFn))),
+        kIROp_SynthesizedForwardDerivativeWitnessTable,
+        1,
+        &higherOrderfwdDiffFn);
+    builder.createWitnessTableEntry(
+        newWitnessTable,
+        as<IRInterfaceRequirementEntry>(baseConformanceType->getOperand(1))->getRequirementKey(),
+        higherOrderFwdDiffFwdWitness);
+
+    /*auto higherOrderFwdDiffBwdWitness = builder.emitIntrinsicInst(
+        (IRType*)builder.emitSpecializeInst(
+            builder.getTypeKind(),
+            sharedContext->backwardDifferentiableInterfaceType,
+            List<IRInst*>(higherOrderfwdDiffFn)),
+        kIROp_SynthesizedBackwardDerivativeWitnessTable,
+        1,
+        &higherOrderfwdDiffFn);*/
+    builder.createWitnessTableEntry(
+        newWitnessTable,
+        as<IRInterfaceRequirementEntry>(baseConformanceType->getOperand(2))->getRequirementKey(),
+        /*higherOrderFwdDiffBwdWitness*/
+        builder.getVoidValue());
+
+    List<IRInst*> args = {
+        fwdDiffFunc,
+        builder.getIntValue((int)FunctionAssociationKind::ForwardDerivative),
+        higherOrderfwdDiffFn};
+
+    // Also emit annotations.
+    builder.emitIntrinsicInst(
+        (IRType*)builder.getVoidType(),
+        kIROp_AssociatedInstAnnotation,
+        args.getCount(),
+        args.getBuffer());
+
+    return newWitnessTable;
 }
 
 } // namespace Slang

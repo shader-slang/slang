@@ -100,6 +100,10 @@ IRCollectionBase* CollectionBuilder::createCollection(IROp op, const HashSet<IRI
 
 IROp CollectionBuilder::getCollectionTypeForInst(IRInst* inst)
 {
+    // Special case for void-lit. TODO: Should be ValCollection?
+    if (inst->getOp() == kIROp_VoidLit)
+        return kIROp_TypeCollection;
+
     if (as<IRGeneric>(inst))
         return kIROp_GenericCollection;
 

@@ -4009,6 +4009,11 @@ public:
         return (IRMetalMeshType*)getType(kIROp_MetalMeshType, 5, ops);
     }
 
+    IRWeakUse* getWeakUse(IRInst* inst)
+    {
+        return cast<IRWeakUse>(emitIntrinsicInst(nullptr, kIROp_WeakUse, 1, &inst));
+    }
+
     IRInst* emitDebugSource(UnownedStringSlice fileName, UnownedStringSlice source);
     IRInst* emitDebugBuildIdentifier(UnownedStringSlice buildIdentifier, IRIntegerValue flags);
     IRInst* emitDebugBuildIdentifier(IRInst* debugBuildIdentifier);

@@ -5,6 +5,7 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-loop-unroll.h"
 #include "slang-ir-lower-witness-lookup-chain.h"
 #include "slang-ir-lower-witness-lookup.h"
 #include "slang-ir-peephole.h"
@@ -479,81 +480,6 @@ struct SpecializationContext
         //
         if (!canSpecializeGeneric(genericVal))
         {
-            // We have to consider a special case here if baseVal is
-            // an intrinsic, and contains a custom differential.
-            // This is a case where the base cannot be specialized since it has
-            // no body, but the custom should be specialized.
-            // A better way to handle this would be to grab a reference to the
-            // appropriate custom differential, if one exists, at checking time
-            // during CheckInvoke() and construct it's specialization args appropriately.
-            //
-            // For now, we will overwrite the specialization args for the differential
-            // using the args for the base.
-            //
-            /*auto genericReturnVal = findInnerMostGenericReturnVal(genericVal);
-            if (genericReturnVal->findDecoration<IRTargetIntrinsicDecoration>())
-            {
-                for (auto decor : genericReturnVal->getDecorations())
-                {
-                    bool specialized = false;
-                    if (decor->getOp() == kIROp_ForwardDerivativeDecoration ||
-                        decor->getOp() == kIROp_UserDefinedBackwardDerivativeDecoration)
-                    {
-                        // If we already have a diff func on this specialize, skip.
-                        if (const auto specDiffRef = specInst->findDecorationImpl(decor->getOp()))
-                        {
-                            continue;
-                        }
-
-                        auto specDiffFunc = as<IRSpecialize>(decor->getOperand(0));
-
-                        // If the base is specialized, the JVP version must be also be a specialized
-                        // generic.
-                        //
-                        SLANG_RELEASE_ASSERT(specDiffFunc);
-
-                        // Build specialization arguments from specInst.
-                        // Note that if we've reached this point, we can safely assume
-                        // that our args are fully specialized/concrete.
-                        //
-                        UCount argCount = specInst->getArgCount();
-                        ShortList<IRInst*> args;
-                        for (UIndex ii = 0; ii < argCount; ii++)
-                            args.add(specInst->getArg(ii));
-
-                        IRBuilder builder(module);
-
-                        // Specialize the custom derivative function type with the original
-                        // arguments.
-                        builder.setInsertInto(module);
-                        auto newDiffFuncType = builder.emitSpecializeInst(
-                            builder.getTypeKind(),
-                            specDiffFunc->getBase()->getDataType(),
-                            argCount,
-                            args.getArrayView().getBuffer());
-
-                        // Specialize the custom derivative function with the original arguments.
-                        builder.setInsertBefore(specInst);
-                        auto newDiffFunc = builder.emitSpecializeInst(
-                            (IRType*)newDiffFuncType,
-                            specDiffFunc->getBase(),
-                            argCount,
-                            args.getArrayView().getBuffer());
-
-                        // Add the new spec insts to the list so they get specialized with
-                        // the usual logic.
-                        //
-                        addToWorkList(newDiffFuncType);
-                        addToWorkList(newDiffFunc);
-
-                        builder.addDecoration(specInst, decor->getOp(), newDiffFunc);
-
-                        specialized = true;
-                    }
-                    if (specialized)
-                        return true;
-                }
-            }*/
             return false;
         }
 
@@ -1044,6 +970,13 @@ struct SpecializationContext
                 return entry->getSatisfyingVal();
             }
         }
+
+        if (witnessTable->getConformanceType()->getOp() == kIROp_VoidType)
+        {
+            IRBuilder builder(module);
+            return builder.getVoidValue();
+        }
+
         return nullptr;
     }
     template<typename TDict>
@@ -1250,7 +1183,8 @@ struct SpecializationContext
                         // of an IR generic, because we don't actually want
                         // to perform specialization inside of generics.
                         //
-                        addToWorkList(child);
+                        if (!isAnnotation(child))
+                            addToWorkList(child);
                     }
                 }
                 if (hasSpecialization)
@@ -1264,6 +1198,7 @@ struct SpecializationContext
                 this->changed = true;
                 eliminateDeadCode(module->getModuleInst());
                 applySparseConditionalConstantPropagationForGlobalScope(this->module, this->sink);
+                unrollLoopsInModule(targetProgram, module, sink);
 
                 // Sync our local dictionary with the one in the IR.
                 readSpecializationDictionaries();

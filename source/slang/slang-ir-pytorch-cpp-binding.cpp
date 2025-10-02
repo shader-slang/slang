@@ -1329,7 +1329,7 @@ void handleAutoBindNames(IRModule* module)
     //
     for (auto globalInst : module->getGlobalInsts())
     {
-        if (globalInst->findDecoration<IRAutoPyBindCudaDecoration>())
+        if (auto autobindDecor = globalInst->findDecoration<IRAutoPyBindCudaDecoration>())
         {
             // Find an extern decoration on the original function, and append a prefix to the name.
             if (auto externCppHint = globalInst->findDecoration<IRExternCppDecoration>())
@@ -1342,6 +1342,8 @@ void handleAutoBindNames(IRModule* module)
                 externCppHint->removeAndDeallocate();
                 builder.addExternCppDecoration(globalInst, nameBuilder.getUnownedSlice());
             }
+
+            autobindDecor->removeAndDeallocate();
         }
     }
 }

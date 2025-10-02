@@ -671,6 +671,16 @@ bool isWeakReferenceOperand(IRInst* inst, UInt operandIndex)
         // Ignore all operands of SpecializationDictionaryItem.
         // This inst is used as a cache and shouldn't hold anything alive.
         return true;
+    case kIROp_WeakUse:
+        return true;
+    case kIROp_AssociatedInstAnnotation:
+        if (operandIndex == 0)
+            return true;
+        break;
+    case kIROp_DifferentiableTypeAnnotation:
+        if (operandIndex == 0)
+            return true;
+        break;
     default:
         break;
     }

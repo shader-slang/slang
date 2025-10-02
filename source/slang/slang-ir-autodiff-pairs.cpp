@@ -173,6 +173,7 @@ struct DiffPairLoweringPass : InstPassBase
 
                 case kIROp_MakeDifferentialPairUserCode:
                 case kIROp_MakeDifferentialPtrPair:
+                case kIROp_MakeDifferentialPair:
                     lowerMakePair(builder, inst);
                     break;
 
@@ -240,8 +241,8 @@ public:
                         SLANG_ASSERT(as<IRDifferentialPairTypeBase>(baseType));
                         auto confType =
                             cast<IRWitnessTableType>(inst->getDataType())->getConformanceType();
-                        if (as<IRDifferentialPairType>(confType) ||
-                            as<IRDifferentialPairUserCodeType>(confType))
+                        if (as<IRDifferentialPairType>(baseType) ||
+                            as<IRDifferentialPairUserCodeType>(baseType))
                         {
                             auto synWitness =
                                 diffTypeConformanceContext.buildDifferentiablePairWitness(
@@ -252,7 +253,7 @@ public:
                             inst->removeAndDeallocate();
                             modified = true;
                         }
-                        else if (as<IRDifferentialPtrPairType>(confType))
+                        else if (as<IRDifferentialPtrPairType>(baseType))
                         {
                             auto synWitness =
                                 diffTypeConformanceContext.buildDifferentiablePairWitness(

@@ -99,9 +99,7 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
 
     InstPair transcribeSwitch(IRBuilder* builder, IRSwitch* origSwitch);
 
-    InstPair transcribeMakeDifferentialPair(
-        IRBuilder* builder,
-        IRMakeDifferentialPairUserCode* origInst);
+    InstPair transcribeMakeDifferentialPair(IRBuilder* builder, IRInst* origInst);
 
     InstPair transcribeMakeExistential(IRBuilder* builder, IRMakeExistential* origMakeExistential);
 
@@ -185,7 +183,7 @@ struct ForwardDiffTranslationFuncContext
         , isTrivial(isTrivial)
         , sink(sink)
     {
-        diffTypeContext.setFunc(as<IRFunc>(targetFunc));
+        diffTypeContext.setFunc(targetFunc);
     }
 
     Result translate(IRBuilder* builder)
@@ -340,9 +338,7 @@ struct ForwardDiffTranslator
             }
             else
             {
-                // Not sure what to do here..
-                SLANG_UNEXPECTED(
-                    "Expected a function or a specialization for backward differentiation.");
+                return false;
             }
         }
     }
@@ -366,7 +362,6 @@ struct ForwardDiffTranslator
         AutoDiffSharedContext* sharedContext,
         DiagnosticSink* sink)
     {
-        // auto baseInst = getBaseForTranslateInst(translateInst);
         auto baseInfo = getTranslationBaseInfo(translateInst);
 
         /*auto globalValToTranslate = as<IRFunc>(getResolvedInstForDecorations(baseInst));
@@ -412,17 +407,6 @@ struct TrivialForwardDiffTranslator
 {
     // Keep track of global insts that have already been translated.
     Dictionary<IRInst*, ForwardDiffTranslationFuncContext::Result> translationCache;
-
-    IRInst* getBaseForTranslateInst(IRInst* inst)
-    {
-        switch (inst->getOp())
-        {
-        case kIROp_TrivialForwardDifferentiate:
-            return inst->getOperand(0);
-        default:
-            return nullptr;
-        }
-    }
 
     // TODO: MERGE
     struct TranslationBaseInfo
@@ -528,9 +512,7 @@ struct TrivialForwardDiffTranslator
             }
             else
             {
-                // Not sure what to do here..
-                SLANG_UNEXPECTED(
-                    "Expected a function or a specialization for backward differentiation.");
+                return false;
             }
         }
     }
@@ -554,15 +536,23 @@ struct TrivialForwardDiffTranslator
         AutoDiffSharedContext* sharedContext,
         DiagnosticSink* sink)
     {
-        // auto baseInst = getBaseForTranslateInst(translateInst);
+        /*auto translationBase = translateInst->getOperand(0);
+        if (as<IRFunc>(translationBase))
+            return translateInst;
+        else if (as<IRGeneric>(translationBase))
+            return translateInst;
+
+        // Create a new context for the translation.
+        IRBuilder builder(sharedContext->moduleInst);
+        ForwardDiffTranslationFuncContext context(translationBase, true, sharedContext, sink);
+        builder.setInsertAfter(funcToTranslate);
+        auto translationResult = context.translate(&builder);
+        return translationResult.fwdDiffFunc;*/
+
         auto baseInfo = getTranslationBaseInfo(translateInst);
 
-        /*auto globalValToTranslate = as<IRFunc>(getResolvedInstForDecorations(baseInst));
-        if (!globalValToTranslate)
-        {
-            // TODO: diagnose
-            SLANG_UNEXPECTED("Expected a global value with code for forward differentiation.");
-        }*/
+        if (baseInfo.flavor == TranslationBaseInfo::Flavor::Unknown)
+            return nullptr;
 
         IRBuilder builder(sharedContext->moduleInst);
         auto translationKey = baseInfo.operands[0];
@@ -595,5 +585,35 @@ struct TrivialForwardDiffTranslator
     }
 };
 
+
+// This translator supports higher order auto-diff by synthesizing new conformances to
+// IForwardDifferentiable and IBackwardDifferentiable wherever necessary.
+//
+struct ForwardDiffWitnessTranslator
+{
+    IRInst* processTranslationRequest(
+        IRInst* translateInst,
+        AutoDiffSharedContext* sharedContext,
+        DiagnosticSink* sink)
+    {
+        return nullptr;
+    }
+};
+
+
+IRInst* maybeTranslateForwardDerivative(
+    AutoDiffSharedContext* sharedContext,
+    DiagnosticSink* sink,
+    IRForwardDifferentiate* inst);
+
+IRInst* maybeTranslateTrivialForwardDerivative(
+    AutoDiffSharedContext* sharedContext,
+    DiagnosticSink* sink,
+    IRTrivialForwardDifferentiate* inst);
+
+IRInst* maybeTranslateForwardDerivativeWitness(
+    AutoDiffSharedContext* sharedContext,
+    DiagnosticSink* sink,
+    IRSynthesizedForwardDerivativeWitnessTable* translateInst);
 
 } // namespace Slang

@@ -139,6 +139,11 @@ struct GenerateWitnessTableWrapperContext
         auto concreteType = witnessTable->getConcreteType();
         IRIntegerValue typeSize, sizeLimit;
         bool isTypeOpaque = false;
+        //
+        // TODO: Do we need this anymore? After the dynamic specialization pass,
+        // we'll only come into lowerGenerics() for pointer-based dynamic dispatch
+        // in which case we'll use pointers for the storage too?
+        //
         if (doesTypeHaveStorage(concreteType) && !sharedContext->doesTypeFitInAnyValue(
                                                      concreteType,
                                                      interfaceType,

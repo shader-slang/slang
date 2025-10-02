@@ -534,7 +534,8 @@ struct BackwardDiffTranslator
         DiagnosticSink* sink)
     {
         auto baseInfo = getTranslationBaseInfo(translateInst);
-        SLANG_ASSERT(baseInfo.flavor != TranslationBaseInfo::Flavor::Unknown);
+        if (baseInfo.flavor == TranslationBaseInfo::Flavor::Unknown)
+            return nullptr;
 
         auto translationKey = baseInfo.funcToTranslate;
         // as<IRFunc>(getResolvedInstForDecorations(baseInfo.getBase()));
@@ -724,7 +725,8 @@ struct TrivialBackwardDiffTranslator
         DiagnosticSink* sink)
     {
         auto baseInfo = getTranslationBaseInfo(translateInst);
-        SLANG_ASSERT(baseInfo.flavor != TranslationBaseInfo::Flavor::Unknown);
+        if (baseInfo.flavor == TranslationBaseInfo::Flavor::Unknown)
+            return nullptr;
 
         auto translationKey = baseInfo.funcToTranslate;
         // as<IRFunc>(getResolvedInstForDecorations(baseInfo.getBase()));
@@ -878,7 +880,6 @@ struct LegacyBackwardDiffTranslator
             context(applyBwdFunc, contextType, bwdPropFunc, bwdDiffFuncType, sharedContext, sink);
 
         IRBuilder builder(sharedContext->moduleInst);
-        // builder.setInsertAfter(as<IRGlobalValueWithCode>(applyBwdFunc));
 
         // This will nest the func at the right place (inside any generic contexts).
         builder.setInsertAfter(translateInst);
@@ -1065,9 +1066,7 @@ struct LegacyToNewBackwardDiffTranslator
             }
             else
             {
-                // Not sure what to do here..
-                SLANG_UNEXPECTED(
-                    "Expected a function or a specialization for backward differentiation.");
+                return false;
             }
         }
     }
@@ -1089,21 +1088,6 @@ struct LegacyToNewBackwardDiffTranslator
         return info;
     }
 
-    /*IRInst* getCacheKeyForTranslateInst(IRInst* translateInst)
-    {
-        switch (translateInst->getOp())
-        {
-        case kIROp_BackwardPrimalFromLegacyBwdDiffFunc:
-        case kIROp_BackwardPropagateFromLegacyBwdDiffFunc:
-        case kIROp_BackwardContextFromLegacyBwdDiffFunc:
-        case kIROp_BackwardContextGetValFromLegacyBwdDiffFunc:
-            return translateInst->getOperand(0);
-        default:
-            SLANG_UNEXPECTED("Unexpected backward differentiation operation.");
-            return nullptr;
-        }
-    }*/
-
     IRInst* processTranslationRequest(
         IRInst* translateInst,
         AutoDiffSharedContext* sharedContext,
@@ -1111,6 +1095,9 @@ struct LegacyToNewBackwardDiffTranslator
     {
         // IRInst* key = getCacheKeyForTranslateInst(translateInst);
         auto baseInfo = getTranslationBaseInfo(translateInst);
+
+        if (baseInfo.flavor == TranslationBaseInfo::Flavor::Unknown)
+            return nullptr;
 
         IRBuilder builder(sharedContext->moduleInst);
         auto instKey = builder.emitIntrinsicInst(
@@ -1170,5 +1157,26 @@ struct LegacyToNewBackwardDiffTranslator
         return materialize(&builder, baseInfo, extractRelevantGlobalVal(translationResult));
     }
 };
+
+
+IRInst* maybeTranslateLegacyToNewBackwardDerivative(
+    AutoDiffSharedContext* sharedContext,
+    DiagnosticSink* sink,
+    IRBackwardFromLegacyBwdDiffFunc* translateInst);
+
+IRInst* maybeTranslateLegacyBackwardDerivative(
+    AutoDiffSharedContext* sharedContext,
+    DiagnosticSink* sink,
+    IRLegacyBackwardDifferentiate* translateInst);
+
+IRInst* maybeTranslateBackwardDerivative(
+    AutoDiffSharedContext* sharedContext,
+    DiagnosticSink* sink,
+    IRBackwardDifferentiate* translateInst);
+
+IRInst* maybeTranslateTrivialBackwardDerivative(
+    AutoDiffSharedContext* sharedContext,
+    DiagnosticSink* sink,
+    IRTrivialBackwardDifferentiate* translateInst);
 
 } // namespace Slang

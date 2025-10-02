@@ -2894,6 +2894,21 @@ void SemanticsVisitor::compareMemoryQualifierOfParamToArgument(ParamDecl* paramI
     // dropping a `restrict` qualifier from arguments is allowed in GLSL with memory qualifiers
 }
 
+DeclRef<CallableDecl> getResolvedFunc(DeclRef<CallableDecl> declRef)
+{
+    // Resolve aliases
+    if (auto funcAliasDecl = as<FuncAliasDecl>(declRef.getDecl()))
+    {
+        auto target = substituteDeclRef(
+                          SubstitutionSet(declRef),
+                          getCurrentASTBuilder(),
+                          funcAliasDecl->targetDeclRef)
+                          .as<CallableDecl>();
+        return getResolvedFunc(target);
+    }
+
+    return declRef;
+}
 
 // For AD 2.0, we represent derivatives as lookups
 // instead of operators.
@@ -2920,9 +2935,19 @@ static Expr* convertHigherOrderExprToLookup(
         return resultExpr;
     }
 
+
+    if (auto hofExpr = as<HigherOrderInvokeExpr>(resultExpr->baseFunction))
+    {
+        resultExpr->baseFunction = convertHigherOrderExprToLookup(visitor, hofExpr);
+    }
+
     if (auto declRefExpr = as<DeclRefExpr>(resultExpr->baseFunction))
     {
-        auto funcAsType = DeclRefType::create(visitor->getASTBuilder(), declRefExpr->declRef);
+        auto callableDeclRef = declRefExpr->declRef.as<CallableDecl>()
+                                   ? getResolvedFunc(declRefExpr->declRef.as<CallableDecl>())
+                                   : declRefExpr->declRef;
+
+        auto funcAsType = DeclRefType::create(visitor->getASTBuilder(), callableDeclRef);
 
         auto result = lookUpMember(
             visitor->getASTBuilder(),
@@ -3315,6 +3340,48 @@ Expr* SemanticsExprVisitor::convertToLogicOperatorExpr(InvokeExpr* expr)
     return newExpr;
 }
 
+/*
+// Check if a witness is synthesized.
+bool isConcreteWitness(SubtypeWitness* witness)
+{
+    if (auto declaredWitness = as<DeclaredSubtypeWitness>(witness))
+    {
+        if (auto inheritanceDecl = as<InheritanceDecl>(declaredWitness->getDeclRef().getDecl()))
+        {
+            // An inheritance decl is concrete if it is not marked with the `synthesized` modifier.
+            return !inheritanceDecl->findModifier<SynthesizedModifier>();
+        }
+    }
+    else if (auto transitiveWitness = as<TransitiveSubtypeWitness>(witness))
+    {
+        return isConcreteWitness(transitiveWitness->getSubToMid()) &&
+               isConcreteWitness(transitiveWitness->getMidToSup());
+    }
+
+    return true;
+}
+
+// Check if a lookup uses any synthesized witnesses.
+bool isConcreteLookup(DeclRefBase* declRef)
+{
+    if (as<DirectDeclRef>(declRef))
+        return (
+            !as<InheritanceDecl>(declRef->getDecl()) ||
+            declRef->getDecl()->findModifier<SynthesizedModifier>() == nullptr);
+    else if (auto genDeclRef = as<GenericAppDeclRef>(declRef))
+        return isConcreteLookup(genDeclRef->getBase());
+    else if (auto lookupDeclRef = as<LookupDeclRef>(declRef))
+        return isConcreteWitness(lookupDeclRef->getWitness()) &&
+               isConcreteLookup(lookupDeclRef->getBase());
+    else if (auto memberDeclRef = as<MemberDeclRef>(declRef))
+        return isConcreteLookup(memberDeclRef->getBase()) &&
+               (!as<InheritanceDecl>(memberDeclRef->getDecl()) ||
+                memberDeclRef->getDecl()->findModifier<SynthesizedModifier>() == nullptr);
+    else
+        return true;
+}
+*/
+
 void registerAssociatedMethods(SemanticsVisitor* context, DeclRef<Decl> declRef)
 {
     // Lower witness for ForwardDifferentiable for this function.
@@ -3372,11 +3439,62 @@ void registerAssociatedMethods(SemanticsVisitor* context, DeclRef<Decl> declRef)
             return nullptr;
         };
 
-        maybeRegisterVal(
-            funcAsType,
-            declRef.declRefBase,
-            context->getName("fwd_diff"),
-            FunctionAssociationKind::ForwardDerivative);
+        auto maybeRegisterWitness = [&](Type* baseForLookup,
+                                        Val* baseForRegistry,
+                                        Type* superType,
+                                        FunctionAssociationKind kind) -> Val*
+        {
+            if (auto witness = context->tryGetSubtypeWitness(baseForLookup, superType))
+            {
+                context->getParentDifferentiableAttribute()->addAssocVal(
+                    baseForRegistry,
+                    (SlangInt)kind,
+                    witness);
+                return (Val*)witness;
+            }
+
+            return nullptr;
+        };
+
+        // Register `fwd_diff` method.
+        // 'fwd_diff' methods might be further differentiable, so we'll keep registering
+        // until we hit a synthesized lookup (at which point, the IR will synthesize the
+        // methods on demand).
+        //
+        /*{
+            auto targetDeclRef = declRef;
+            do
+            {
+                auto targetDeclRefType =
+                    DeclRefType::create(context->getASTBuilder(), targetDeclRef);
+                auto fwdDiffFuncDeclRef = maybeRegisterVal(
+                    targetDeclRefType,
+                    targetDeclRef.declRefBase,
+                    context->getName("fwd_diff"),
+                    FunctionAssociationKind::ForwardDerivative);
+
+                if (!fwdDiffFuncDeclRef)
+                    break;
+
+                // Update targetDeclRef to the newly registered fwdDiffFuncDeclRef
+                targetDeclRef = DeclRef<Decl>(as<DeclRefBase>(fwdDiffFuncDeclRef));
+            } while (isConcreteLookup(targetDeclRef));
+        }*/
+
+        if (maybeRegisterVal(
+                funcAsType,
+                declRef.declRefBase,
+                context->getName("fwd_diff"),
+                FunctionAssociationKind::ForwardDerivative))
+        {
+            // Also lower the associated fwd-diff table.
+            // TODO: lower the bwd-diff table too.
+            maybeRegisterWitness(
+                funcAsType,
+                declRef.declRefBase,
+                context->getASTBuilder()->getForwardDiffFuncInterfaceType(funcAsType),
+                FunctionAssociationKind::ForwardDerivativeWitnessTable);
+        }
 
         if (maybeRegisterVal(
                 funcAsType,

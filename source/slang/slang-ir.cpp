@@ -8760,6 +8760,13 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_DetachDerivative:
     case kIROp_FuncTypeOf:
     case kIROp_MakeIDifferentiableWitness:
+    case kIROp_GetTagForMappedCollection:
+    case kIROp_GetTagForSpecializedCollection:
+    case kIROp_GetTagForSuperCollection:
+    case kIROp_GetTagFromSequentialID:
+    case kIROp_GetSequentialIDFromTag:
+    case kIROp_CastTaggedUnionToInterfacePtr:
+    case kIROp_CastInterfaceToTaggedUnionPtr:
         return false;
 
     case kIROp_FunctionCopy:

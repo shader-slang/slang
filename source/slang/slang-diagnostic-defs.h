@@ -2213,6 +2213,12 @@ DIAGNOSTIC(
     Error,
     cannotUseConstRefOnDifferentiableMemberMethod,
     "cannot use '[constref]' on a differentiable member method of a differentiable type.")
+DIAGNOSTIC(
+    38035,
+    Error,
+    encounteredNonDifferentiableFunctionDuringHigherOrderDiff,
+    "cannot propagate through non-differentiable function. mismatch encountered during "
+    "higher-order differentiation")
 
 DIAGNOSTIC(
     38040,

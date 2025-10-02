@@ -20,7 +20,7 @@ public:
     Dictionary<IRInst*, DifferentiableLevel> differentiableFunctions;
 
     CheckDifferentiabilityPassContext(IRModule* inModule, DiagnosticSink* inSink)
-        : InstPassBase(inModule), sink(inSink), sharedContext(nullptr, inModule->getModuleInst())
+        : InstPassBase(inModule), sink(inSink), sharedContext(inModule->getModuleInst())
     {
     }
 

@@ -20,8 +20,12 @@ IRInst* getCollectionElement(IRCollectionTagType* collectionTagType, UInt index)
 template<typename F>
 void forEachInCollection(IRCollectionBase* info, F func)
 {
+    ShortList<IRInst*, 8> operandList;
     for (UInt i = 0; i < info->getOperandCount(); ++i)
-        func(info->getOperand(i));
+        operandList.add(info->getOperand(i));
+
+    for (auto inst : operandList)
+        func(inst);
 }
 
 template<typename F>

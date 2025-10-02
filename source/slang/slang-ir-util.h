@@ -96,6 +96,7 @@ std::tuple<ParameterDirectionInfo, IRType*> splitDirectionAndType(IRType* paramT
 
 IRType* fromDirectionAndType(IRBuilder* builder, ParameterDirectionInfo direction, IRType* type);
 
+bool isAnnotation(IRInst* inst);
 
 bool isPtrToClassType(IRInst* type);
 
@@ -455,6 +456,11 @@ IRType* getUnsignedTypeFromSignedType(IRBuilder* builder, IRType* type);
 bool isSignedType(IRType* type);
 
 bool isIROpaqueType(IRType* type);
+
+IRInst* tryGetTranslation(IRModule* module, IRInst* inst);
+
+IRInst* registerTranslation(IRModule* module, IRInst* from, IRInst* to);
+
 } // namespace Slang
 
 #endif

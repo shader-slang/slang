@@ -2615,6 +2615,15 @@ void SemanticsVisitor::AddDeclRefOverloadCandidates(
         auto type = getNamedType(m_astBuilder, typeDefDeclRef);
         AddTypeOverloadCandidates(type, context);
     }
+    else if (auto funcAliasDeclRef = item.declRef.as<FuncAliasDecl>())
+    {
+        auto funcDeclRef = substituteDeclRef(
+                               SubstitutionSet(item.declRef),
+                               m_astBuilder,
+                               funcAliasDeclRef.getDecl()->targetDeclRef)
+                               .as<CallableDecl>();
+        AddFuncOverloadCandidate(item, funcDeclRef, context, baseCost);
+    }
     else if (auto genericTypeParamDeclRef = item.declRef.as<GenericTypeParamDecl>())
     {
         auto type = DeclRefType::create(m_astBuilder, genericTypeParamDeclRef);

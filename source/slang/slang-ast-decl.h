@@ -647,6 +647,14 @@ class FunctionDeclBase : public CallableDecl
     Stmt* body = nullptr;
 };
 
+FIDDLE()
+class FuncAliasDecl : public CallableDecl
+{
+    FIDDLE(...)
+    FIDDLE() DeclRef<CallableDecl> targetDeclRef;
+};
+
+
 // A constructor/initializer to create instances of a type
 FIDDLE()
 class ConstructorDecl : public FunctionDeclBase

@@ -1947,6 +1947,8 @@ local insts = {
 		{ BackwardDifferentiatePropagate = { min_operands = 1 } },
 		{ BackwardContextGetPrimalVal = { min_operands = 1 } },
 
+		{ TrivialBackwardDifferentiate = { min_operands = 1 } },
+
 		{ TrivialBackwardDifferentiatePrimal = { min_operands = 1 } },
 		{ TrivialBackwardDifferentiatePropagate = { min_operands = 1 } },
 		{ TrivialBackwardContextGetPrimalVal = { min_operands = 1 } },
@@ -1955,13 +1957,20 @@ local insts = {
 
 		{ BackwardDifferentiate = { min_operands = 3 } },
 		{ ForwardDifferentiate = { min_operands = 1 } },
+
+		{ LegacyBackwardDifferentiate = { min_operands = 3 } },
 		
 		{ BackwardPrimalFromLegacyBwdDiffFunc = { min_operands = 2 } },
 		{ BackwardContextGetValFromLegacyBwdDiffFunc = { min_operands = 2 } },
 		{ BackwardPropagateFromLegacyBwdDiffFunc = { min_operands = 2 } },
 
 		{ BackwardFromLegacyBwdDiffFunc = { min_operands = 2 } },
-		{ ForwardDifferentiatePropagate = { min_operands = 1 } }
+		{ ForwardDifferentiatePropagate = { min_operands = 1 } },
+
+		-- For higher-order derivatives.
+		{ SynthesizedForwardDerivativeWitnessTable = { min_operands = 1 } },
+		{ SynthesizedBackwardDerivativeWitnessTable = { min_operands = 1 } },
+		{ MakeIDifferentiableWitness = { min_operands = 1 } }
 	} },
 	{ PrimalSubstitute = { min_operands = 1 } },
 	{ DispatchKernel = { min_operands = 3 } },
@@ -2259,9 +2268,7 @@ local insts = {
 	{ GetSequentialIDFromTag = {
 		-- Translate a tag from the given collection (a 'local' ID) to a sequential ID (a 'global' ID)
 	} },
-	{ MakeIDifferentiableWitness = {
-		hoistable = true
-	} }
+	{ WeakUse = { hoistable = true } }
 }
 
 -- A function to calculate some useful properties and put it in the table,

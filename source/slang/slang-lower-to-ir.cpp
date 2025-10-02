@@ -3888,6 +3888,23 @@ struct ExprLoweringContext
         Expr* baseExpr = nullptr;
     };
 
+
+    DeclRef<Decl> resolveAliases(DeclRef<Decl> declRef)
+    {
+        // Resolve aliases
+        if (auto funcAliasDecl = as<FuncAliasDecl>(declRef.getDecl()))
+        {
+            auto target = substituteDeclRef(
+                              SubstitutionSet(declRef),
+                              getCurrentASTBuilder(),
+                              funcAliasDecl->targetDeclRef)
+                              .as<CallableDecl>();
+            return resolveAliases(target);
+        }
+
+        return declRef;
+    }
+
     // Try to resolve a the function expression for a call
     // into a reference to a specific declaration, along
     // with some contextual information about the declaration
@@ -3931,18 +3948,18 @@ struct ExprLoweringContext
         // and try to tease them apart.
         if (auto memberFuncExpr = as<MemberExpr>(funcExpr))
         {
-            outInfo->funcDeclRef = memberFuncExpr->declRef;
+            outInfo->funcDeclRef = resolveAliases(memberFuncExpr->declRef);
             outInfo->baseExpr = memberFuncExpr->baseExpression;
             return true;
         }
         else if (auto staticMemberFuncExpr = as<StaticMemberExpr>(funcExpr))
         {
-            outInfo->funcDeclRef = staticMemberFuncExpr->declRef;
+            outInfo->funcDeclRef = resolveAliases(staticMemberFuncExpr->declRef);
             return true;
         }
         else if (auto varExpr = as<VarExpr>(funcExpr))
         {
-            outInfo->funcDeclRef = varExpr->declRef;
+            outInfo->funcDeclRef = resolveAliases(varExpr->declRef);
             return true;
         }
         else
@@ -8738,6 +8755,39 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
     }
 
+    LoweredValInfo visitFuncAliasDecl(FuncAliasDecl* decl)
+    {
+        // A type alias declaration may be generic, if it is
+        // nested under a generic type/function/etc.
+        //
+        NestedContext nested(this);
+        auto subBuilder = nested.getBuilder();
+        auto subContext = nested.getContext();
+
+        ensureInsertAtGlobalScope(nested.getBuilder());
+
+        IRGeneric* outerGeneric = emitOuterGenerics(subContext, decl, decl);
+
+        // TODO: if a type alias declaration can have linkage,
+        // we will need to lower it to some kind of global
+        // value in the IR so that we can attach a name to it.
+        //
+        // For now, we can only attach a name *if* the type
+        // alias is somehow generic.
+        if (outerGeneric)
+        {
+            addLinkageDecoration(context, outerGeneric, decl);
+        }
+
+        FuncDeclBaseTypeInfo info;
+        _lowerFuncDeclBaseTypeInfo(subContext, decl->targetDeclRef.as<FunctionDeclBase>(), info);
+
+        auto result = emitDeclRef(subContext, decl->targetDeclRef, info.type);
+        SLANG_ASSERT(result.flavor == LoweredValInfo::Flavor::Simple);
+        return LoweredValInfo::simple(
+            finishOuterGenerics(subBuilder, getSimpleVal(subContext, result), outerGeneric));
+    }
+
     LoweredValInfo visitTypeDefDecl(TypeDefDecl* decl)
     {
         // A type alias declaration may be generic, if it is
@@ -9233,7 +9283,19 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto irSubType = lowerType(subContext, subType);
 
         // Create the IR-level witness table
-        auto irWitnessTable = subBuilder->createWitnessTable(irWitnessTableBaseType, irSubType);
+        IRInst* irWitnessTable;
+        if (!inheritanceDecl->findModifier<SynthesizedModifier>())
+            irWitnessTable = subBuilder->createWitnessTable(irWitnessTableBaseType, irSubType);
+        else
+        {
+            // TODO: Store the op in the modifier
+            IRInst* subTypeInst = irSubType;
+            irWitnessTable = subBuilder->emitIntrinsicInst(
+                subBuilder->getWitnessTableType(irWitnessTableBaseType),
+                kIROp_SynthesizedForwardDerivativeWitnessTable,
+                1,
+                &subTypeInst);
+        }
 
         // Override with the correct witness-table
         context->setGlobalValue(
@@ -9289,13 +9351,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // including any cases where there are sub-witness-tables for conformances
             bool isExplicitExtern = false;
             bool isImported = isImportedDecl(context, parentDecl, isExplicitExtern);
-            if (!isImported || isExplicitExtern)
+            bool isSynthesized = inheritanceDecl->findModifier<SynthesizedModifier>();
+            if ((!isImported || isExplicitExtern) && !isSynthesized)
             {
                 Dictionary<WitnessTable*, IRWitnessTable*> mapASTToIRWitnessTable;
                 lowerWitnessTable(
                     subContext,
                     inheritanceDecl->witnessTable,
-                    irWitnessTable,
+                    cast<IRWitnessTable>(irWitnessTable),
                     mapASTToIRWitnessTable);
             }
 
@@ -11623,46 +11686,61 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                             auto associatedVal = idValPair.value->resolve();
 
                             IRInst* irAssocVal = nullptr;
-                            auto associatedDeclRef = as<DeclRefBase>(associatedVal);
-                            SLANG_ASSERT(associatedDeclRef);
-
-                            if (auto funcDeclRef =
-                                    DeclRef<Decl>(associatedDeclRef).as<FunctionDeclBase>())
+                            if (auto associatedDeclRef = as<DeclRefBase>(associatedVal))
                             {
-                                FuncDeclBaseTypeInfo innerInfo;
-                                _lowerFuncDeclBaseTypeInfo(context, funcDeclRef, innerInfo);
+                                if (auto funcAliasDeclRef =
+                                        DeclRef<Decl>(associatedDeclRef).as<FuncAliasDecl>())
+                                {
+                                    associatedDeclRef = substituteDeclRef(
+                                        SubstitutionSet(associatedDeclRef),
+                                        getCurrentASTBuilder(),
+                                        funcAliasDeclRef.getDecl()->targetDeclRef);
+                                }
 
-                                auto targetDeclRefInfo =
-                                    emitDeclRef(context, funcDeclRef, innerInfo.type);
+                                if (auto funcDeclRef =
+                                        DeclRef<Decl>(associatedDeclRef).as<FunctionDeclBase>())
+                                {
+                                    FuncDeclBaseTypeInfo innerInfo;
+                                    _lowerFuncDeclBaseTypeInfo(context, funcDeclRef, innerInfo);
 
-                                SLANG_ASSERT(
-                                    targetDeclRefInfo.flavor == LoweredValInfo::Flavor::Simple);
-                                auto _targetIRFunc = getSimpleVal(context, targetDeclRefInfo);
-                                irAssocVal = _targetIRFunc;
-                            }
-                            else if (
-                                auto typeAliasDeclRef =
-                                    DeclRef<Decl>(associatedDeclRef).as<TypeAliasDecl>())
-                            {
+                                    auto targetDeclRefInfo =
+                                        emitDeclRef(context, funcDeclRef, innerInfo.type);
 
-                                auto typeToLower = substituteType(
-                                    SubstitutionSet(typeAliasDeclRef),
-                                    getCurrentASTBuilder(),
-                                    typeAliasDeclRef.getDecl()->type);
-                                irAssocVal = lowerType(context, typeToLower);
+                                    SLANG_ASSERT(
+                                        targetDeclRefInfo.flavor == LoweredValInfo::Flavor::Simple);
+                                    auto _targetIRFunc = getSimpleVal(context, targetDeclRefInfo);
+                                    irAssocVal = _targetIRFunc;
+                                }
+                                else if (
+                                    auto typeAliasDeclRef =
+                                        DeclRef<Decl>(associatedDeclRef).as<TypeAliasDecl>())
+                                {
+
+                                    auto typeToLower = substituteType(
+                                        SubstitutionSet(typeAliasDeclRef),
+                                        getCurrentASTBuilder(),
+                                        typeAliasDeclRef.getDecl()->type);
+                                    irAssocVal = lowerType(context, typeToLower);
+                                }
+                                else
+                                {
+                                    // Assume that we have a direct reference to a type here...
+                                    LoweredValInfo info = emitDeclRef(
+                                        context,
+                                        associatedDeclRef,
+                                        subBuilder->getTypeKind());
+                                    SLANG_ASSERT(info.flavor == LoweredValInfo::Flavor::Simple);
+                                    if (info.flavor == LoweredValInfo::Flavor::Simple)
+                                    {
+                                        irAssocVal = getSimpleVal(context, info);
+                                    }
+                                }
                             }
                             else
                             {
-                                // Assume that we have a direct reference to a type here...
-                                LoweredValInfo info = emitDeclRef(
-                                    context,
-                                    associatedDeclRef,
-                                    subBuilder->getTypeKind());
-                                SLANG_ASSERT(info.flavor == LoweredValInfo::Flavor::Simple);
-                                if (info.flavor == LoweredValInfo::Flavor::Simple)
-                                {
-                                    irAssocVal = getSimpleVal(context, info);
-                                }
+                                auto loweredVal = lowerVal(context, associatedVal);
+                                SLANG_ASSERT(loweredVal.flavor == LoweredValInfo::Flavor::Simple);
+                                irAssocVal = getSimpleVal(context, loweredVal);
                             }
 
                             if (irAssocVal)
@@ -11777,33 +11855,41 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         if (auto autoPyBindModifier = decl->findModifier<AutoPyBindCudaAttribute>())
         {
-            FuncDeclBaseTypeInfo innerInfoFwd;
-            _lowerFuncDeclBaseTypeInfo(
-                context,
-                autoPyBindModifier->fwdDiffFuncDeclRef->declRef.as<FunctionDeclBase>(),
-                innerInfoFwd);
+            IRInst* irFwdDiffFunc = nullptr;
+            if (autoPyBindModifier->fwdDiffFuncDeclRef)
+            {
+                FuncDeclBaseTypeInfo innerInfoFwd;
+                _lowerFuncDeclBaseTypeInfo(
+                    context,
+                    autoPyBindModifier->fwdDiffFuncDeclRef->declRef.as<FunctionDeclBase>(),
+                    innerInfoFwd);
 
-            auto loweredFwdDiffFunc = emitDeclRef(
-                context,
-                autoPyBindModifier->fwdDiffFuncDeclRef->declRef.as<FunctionDeclBase>(),
-                innerInfoFwd.type);
+                auto loweredFwdDiffFunc = emitDeclRef(
+                    context,
+                    autoPyBindModifier->fwdDiffFuncDeclRef->declRef.as<FunctionDeclBase>(),
+                    innerInfoFwd.type);
 
-            SLANG_ASSERT(loweredFwdDiffFunc.flavor == LoweredValInfo::Flavor::Simple);
-            auto irFwdDiffFunc = getSimpleVal(context, loweredFwdDiffFunc);
+                SLANG_ASSERT(loweredFwdDiffFunc.flavor == LoweredValInfo::Flavor::Simple);
+                irFwdDiffFunc = getSimpleVal(context, loweredFwdDiffFunc);
+            }
 
-            FuncDeclBaseTypeInfo innerInfoBwd;
-            _lowerFuncDeclBaseTypeInfo(
-                context,
-                autoPyBindModifier->bwdDiffFuncDeclRef->declRef.as<FunctionDeclBase>(),
-                innerInfoBwd);
+            IRInst* irBwdDiffFunc = nullptr;
+            if (autoPyBindModifier->bwdDiffFuncDeclRef)
+            {
+                FuncDeclBaseTypeInfo innerInfoBwd;
+                _lowerFuncDeclBaseTypeInfo(
+                    context,
+                    autoPyBindModifier->bwdDiffFuncDeclRef->declRef.as<FunctionDeclBase>(),
+                    innerInfoBwd);
 
-            auto loweredBwdDiffFunc = emitDeclRef(
-                context,
-                autoPyBindModifier->bwdDiffFuncDeclRef->declRef.as<FunctionDeclBase>(),
-                innerInfoBwd.type);
+                auto loweredBwdDiffFunc = emitDeclRef(
+                    context,
+                    autoPyBindModifier->bwdDiffFuncDeclRef->declRef.as<FunctionDeclBase>(),
+                    innerInfoBwd.type);
 
-            SLANG_ASSERT(loweredBwdDiffFunc.flavor == LoweredValInfo::Flavor::Simple);
-            auto irBwdDiffFunc = getSimpleVal(context, loweredBwdDiffFunc);
+                SLANG_ASSERT(loweredBwdDiffFunc.flavor == LoweredValInfo::Flavor::Simple);
+                irBwdDiffFunc = getSimpleVal(context, loweredBwdDiffFunc);
+            }
 
             subContext->irBuilder->addAutoPyBindCudaDecoration(
                 irFunc,

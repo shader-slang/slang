@@ -1237,6 +1237,7 @@ Result linkAndOptimizeIR(
     //
     // Specialization passes and auto-diff passes runs in an iterative loop
     // since each pass can enable the other pass to progress further.
+    /*
     for (;;)
     {
         bool changed = false;
@@ -1300,19 +1301,7 @@ Result linkAndOptimizeIR(
         if (!changed)
             break;
     }
-
-    // Report checkpointing information
-    if (codeGenContext->shouldReportCheckpointIntermediates())
-    {
-        simplifyIR(targetProgram, irModule, fastIRSimplificationOptions, sink);
-        reportCheckpointIntermediates(codeGenContext, sink, irModule);
-    }
-
-    // Finalization is always run so AD-related instructions can be removed,
-    // even if the AD pass itself is not run.
-    //
-    finalizeAutoDiffPass(targetProgram, irModule);
-    eliminateDeadCode(irModule, deadCodeEliminationOptions);
+    */
 
     // Often we will have witness table requirements specialized with abstract types that are
     // satisfied by witness tables that are specialized with concrete types (that satisfy the
@@ -1322,11 +1311,32 @@ Result linkAndOptimizeIR(
     // These two passes will fix up the witness table types by using the abstract version
     // everywhere.
     //
-    fixupSpecializedWitnessTables(targetProgram, irModule);
-    fixupLookupWitnessTypes(targetProgram, irModule);
+    // fixupSpecializedWitnessTables(targetProgram, irModule);
+    // fixupLookupWitnessTypes(targetProgram, irModule);
 
     // After auto-diff, we can perform more aggressive specialization with dynamic-dispatch
     // lowering.
+    //
+    if (!codeGenContext->isSpecializationDisabled())
+    {
+        SpecializationOptions specOptions;
+        specOptions.lowerWitnessLookups = true;
+        specializeModule(targetProgram, irModule, codeGenContext->getSink(), specOptions);
+    }
+
+    // Report checkpointing information
+    if (codeGenContext->shouldReportCheckpointIntermediates())
+    {
+        simplifyIR(targetProgram, irModule, fastIRSimplificationOptions, sink);
+        reportCheckpointIntermediates(codeGenContext, sink, irModule);
+    }
+
+    finalizeAutoDiffPass(targetProgram, irModule);
+    eliminateDeadCode(irModule, deadCodeEliminationOptions);
+
+    // We'll run the specialization pass again since the auto-diff finalization may have
+    // introduced new dynamic dispatch instructions (usually for existential differential
+    // pairs)
     //
     if (!codeGenContext->isSpecializationDisabled())
     {
@@ -1934,6 +1944,26 @@ Result linkAndOptimizeIR(
     default:
         break;
     }
+
+    // get rid of weak-use insts and any dictionaries in the
+    // module inst.
+    //
+    // -- put into a pass --
+    List<IRInst*> weakUseInsts;
+    for (auto insts : irModule->getModuleInst()->getGlobalInsts())
+    {
+        if (insts->getOp() == kIROp_WeakUse)
+            weakUseInsts.add(insts);
+    }
+
+    for (auto weakUse : weakUseInsts)
+    {
+        weakUse->removeAndDeallocate();
+    }
+
+    irModule->getTranslationCache().clear();
+
+    // -----
 
     if (!isSPIRV(targetRequest->getTarget()))
     {

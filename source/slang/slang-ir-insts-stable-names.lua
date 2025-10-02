@@ -705,7 +705,12 @@ return {
 	["WitnessTableAnnotation"] = 706,
 	["AssociatedInstAnnotation"] = 707,
 	["FuncTypeOf"] = 708,
-	["MakeIDifferentiableWitness"] = 709,
+	["TranslateBase.MakeIDifferentiableWitness"] = 709,
 	["SumVectorElements"] = 710,
-	["SumMatrixElements"] = 711
+	["SumMatrixElements"] = 711,
+	["TranslateBase.SynthesizedForwardDerivativeWitnessTable"] = 712,
+	["TranslateBase.SynthesizedBackwardDerivativeWitnessTable"] = 713,
+	["TranslateBase.LegacyBackwardDifferentiate"] = 714,
+	["TranslateBase.TrivialBackwardDifferentiate"] = 715,
+	["WeakUse"] = 716
 }

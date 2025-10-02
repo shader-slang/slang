@@ -2295,4 +2295,140 @@ LegacyToNewBackwardDiffTranslationFuncContext::Result LegacyToNewBackwardDiffTra
     return {applyFuncGlobalVal, contextTypeGlobalVal, getValFuncGlobalVal, bwdPropFuncGlobalVal};
 }
 
+
+IRInst* maybeTranslateLegacyToNewBackwardDerivative(
+    AutoDiffSharedContext* sharedContext,
+    DiagnosticSink* sink,
+    IRBackwardFromLegacyBwdDiffFunc*
+        translateInst) // TODO: Make this be legacy backward differentiate
+{
+    IRInst* primalFunc = translateInst->getOperand(0);
+    IRInst* bwdDiffFunc = translateInst->getOperand(1);
+
+    LegacyToNewBackwardDiffTranslationFuncContext context(
+        primalFunc,
+        bwdDiffFunc,
+        sharedContext,
+        sink);
+
+    IRBuilder builder(sharedContext->moduleInst);
+    builder.setInsertBefore(translateInst);
+
+    LegacyToNewBackwardDiffTranslationFuncContext::Result translationResult =
+        context.translate(&builder);
+    return builder.emitMakeTuple(
+        {translationResult.applyBwdFunc,
+         translationResult.bwdPropFunc,
+         translationResult.getValFunc,
+         translationResult.contextType});
+}
+
+IRInst* maybeTranslateLegacyBackwardDerivative(
+    AutoDiffSharedContext* sharedContext,
+    DiagnosticSink* sink,
+    IRLegacyBackwardDifferentiate*
+        translateInst) // TODO: Make this be legacy backward differentiate
+{
+    IRInst* applyBwdFunc = translateInst->getOperand(0);
+    IRInst* contextType = translateInst->getOperand(1);
+    IRInst* bwdPropFunc = translateInst->getOperand(2);
+    IRFuncType* bwdDiffFuncType = cast<IRFuncType>(translateInst->getDataType());
+
+    LegacyBackwardDiffTranslationFuncContext
+        context(applyBwdFunc, contextType, bwdPropFunc, bwdDiffFuncType, sharedContext, sink);
+
+    IRBuilder builder(sharedContext->moduleInst);
+
+    // This will nest the func at the right place (inside any generic contexts).
+    builder.setInsertAfter(translateInst);
+
+    LegacyBackwardDiffTranslationFuncContext::Result translationResult =
+        context.translate(&builder);
+    return translationResult.bwdDiffFunc;
+}
+
+IRInst* maybeTranslateBackwardDerivative(
+    AutoDiffSharedContext* sharedContext,
+    DiagnosticSink* sink,
+    IRBackwardDifferentiate* translateInst)
+{
+    // TODO: This is a temporary redirect into the old solution.. once we
+    // know things work, we can just move the logic into this class.
+
+    // Do the reverse-mode translation & return the 4-tuple result.
+    BackwardDiffPropagateTranscriber transcriber(sharedContext, sink);
+    IRBuilder builder(sharedContext->moduleInst);
+
+    auto baseFunc = translateInst->getOperand(0);
+    if (as<IRGeneric>(translateInst->getOperand(0)))
+    {
+        baseFunc = getGenericReturnVal(translateInst->getOperand(0));
+    }
+
+    if (!as<IRFunc>(baseFunc))
+        return translateInst;
+
+    auto targetFunc = cast<IRFunc>(baseFunc);
+
+    IRInst* bwdPrimalFunc;
+    IRInst* bwdPropagateFunc;
+    IRInst* bwdContextGetValFunc;
+    IRInst* bwdContextType;
+    transcriber._transcribeFuncImpl(
+        &builder,
+        targetFunc,
+        bwdPrimalFunc,
+        bwdPropagateFunc,
+        bwdContextGetValFunc,
+        bwdContextType,
+        false);
+
+    builder.setInsertAfter(translateInst);
+    return builder.emitMakeTuple(
+        {bwdPrimalFunc, bwdPropagateFunc, bwdContextGetValFunc, (IRType*)bwdContextType});
+}
+
+
+IRInst* maybeTranslateTrivialBackwardDerivative(
+    AutoDiffSharedContext* sharedContext,
+    DiagnosticSink* sink,
+    IRTrivialBackwardDifferentiate* translateInst)
+{
+    // TODO: This is a temporary redirect into the old solution.. once we
+    // know things work, we can just move the logic into this class.
+
+    // Do the reverse-mode translation & return the 4-tuple result.
+    BackwardDiffPropagateTranscriber transcriber(sharedContext, sink);
+    IRBuilder builder(sharedContext->moduleInst);
+
+    auto baseFunc = translateInst->getOperand(0);
+    if (as<IRGeneric>(translateInst->getOperand(0)))
+    {
+        baseFunc = getGenericReturnVal(translateInst->getOperand(0));
+    }
+
+    if (!as<IRFunc>(baseFunc))
+        return translateInst;
+
+    auto targetFunc = cast<IRFunc>(baseFunc);
+
+    IRInst* bwdPrimalFunc;
+    IRInst* bwdPropagateFunc;
+    IRInst* bwdContextGetValFunc;
+    IRInst* bwdContextType;
+    transcriber._transcribeFuncImpl(
+        &builder,
+        targetFunc,
+        bwdPrimalFunc,
+        bwdPropagateFunc,
+        bwdContextGetValFunc,
+        bwdContextType,
+        true);
+
+    builder.setInsertAfter(translateInst);
+    return builder.emitMakeTuple(
+        {bwdPrimalFunc, bwdPropagateFunc, bwdContextGetValFunc, (IRType*)bwdContextType});
+}
+
+
 } // namespace Slang

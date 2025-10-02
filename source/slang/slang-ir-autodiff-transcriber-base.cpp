@@ -280,6 +280,41 @@ IRType* AutoDiffTranscriberBase::getOrCreateDiffPairType(IRBuilder* builder, IRI
     return getOrCreateDiffPairType(builder, primalType, witness);
 }
 
+static void addTypeAnnotationsForHigherOrderDiff(
+    IRBuilder* builder,
+    DifferentiableTypeConformanceContext* differentiableTypeConformanceContext,
+    IRType* origType,
+    IRType* diffType)
+{
+    // Check if the diffType already has an annotation.
+    if (differentiableTypeConformanceContext->lookUpConformanceForType(
+            diffType,
+            DiffConformanceKind::Any))
+        return;
+
+    // Orig : IDifferentiable
+    /*
+    auto diffWitness = differentiableTypeConformanceContext->lookUpConformanceForType(
+        origType,
+        DiffConformanceKind::Any);
+    */
+    auto diffWitness = differentiableTypeConformanceContext->tryGetDifferentiableWitness(
+        builder,
+        origType,
+        DiffConformanceKind::Any);
+
+    // Differential : IDifferentiable
+    auto diffWitnessDiffWitness = _lookupWitness(
+        builder,
+        diffWitness,
+        differentiableTypeConformanceContext->sharedContext->differentialAssocTypeWitnessStructKey,
+        builder->getWitnessTableType(
+            differentiableTypeConformanceContext->sharedContext->differentiableInterfaceType));
+
+    IRInst* args[] = {diffType, diffWitnessDiffWitness};
+    builder->emitIntrinsicInst(builder->getVoidType(), kIROp_DifferentiableTypeAnnotation, 2, args);
+}
+
 IRType* AutoDiffTranscriberBase::differentiateType(IRBuilder* builder, IRType* origType)
 {
     if (isNoDiffType(origType))
@@ -330,11 +365,19 @@ IRType* AutoDiffTranscriberBase::differentiateType(IRBuilder* builder, IRType* o
         origType,
         DiffConformanceKind::Any);
     if (differentiableTypeConformanceContext.isDifferentiableValueType(origType))
-        return (IRType*)differentiableTypeConformanceContext.lookUpInterfaceMethod(
+    {
+        auto diffValueType = (IRType*)differentiableTypeConformanceContext.lookUpInterfaceMethod(
             builder,
             origType,
             this->autoDiffSharedContext->differentialAssocTypeStructKey,
             builder->getTypeKind());
+        addTypeAnnotationsForHigherOrderDiff(
+            builder,
+            &differentiableTypeConformanceContext,
+            origType,
+            diffValueType);
+        return diffValueType;
+    }
     else if (differentiableTypeConformanceContext.isDifferentiablePtrType(origType))
         return (IRType*)differentiableTypeConformanceContext.lookUpInterfaceMethod(
             builder,

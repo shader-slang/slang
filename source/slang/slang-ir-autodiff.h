@@ -87,8 +87,6 @@ ParameterDirectionInfo transposeDirection(ParameterDirectionInfo direction);
 
 struct AutoDiffSharedContext
 {
-    TargetProgram* targetProgram = nullptr;
-
     IRModuleInst* moduleInst = nullptr;
 
     // A reference to the builtin IDifferentiable interface type.
@@ -96,6 +94,12 @@ struct AutoDiffSharedContext
     // that conform to a base type.
     //
     IRInterfaceType* differentiableInterfaceType = nullptr;
+
+    // Reference to the generic IForwardDifferentiable<F>
+    // and IBackwardDifferentiable<F> interfaces.
+    //
+    IRGeneric* forwardDifferentiableInterfaceType = nullptr;
+    IRGeneric* backwardDifferentiableInterfaceType = nullptr;
 
     // The struct key for the 'Differential' associated type
     // defined inside IDifferential. We use this to lookup the differential
@@ -161,10 +165,12 @@ struct AutoDiffSharedContext
 
     DiffTranscriberSet transcriberSet;
 
-    AutoDiffSharedContext(TargetProgram* target, IRModuleInst* inModuleInst);
+    AutoDiffSharedContext(IRModuleInst* inModuleInst);
 
 private:
     IRInst* findDifferentiableInterface();
+    IRInst* findForwardDifferentiableInterface();
+    IRInst* findBackwardDifferentiableInterface();
 
     IRStructType* findNullDifferentialStructType();
 

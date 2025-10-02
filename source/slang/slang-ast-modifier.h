@@ -1586,6 +1586,16 @@ class SpecializeAttribute : public Attribute
     FIDDLE(...)
 };
 
+
+// Attribute intended only for interface requirements, to indicate an optional conformance
+// to IForwardDifferentiable<Self> and IBackwardDifferentiable<Self>.
+//
+FIDDLE()
+class MaybeDifferentiableAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
 /// An attribute that marks a type, function or variable as differentiable.
 FIDDLE()
 class DifferentiableAttribute : public Attribute

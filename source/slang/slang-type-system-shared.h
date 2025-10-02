@@ -142,8 +142,9 @@ enum class FunctionAssociationKind
 {
     Unknown = 0,
     ForwardDerivative = 1,
-    BackwardDerivativeApply = 2,
-    BackwardDerivativeContext = 3,
+    ForwardDerivativeWitnessTable = 2,
+    BackwardDerivativeApply = 3,
+    BackwardDerivativeContext = 4,
     BackwardDerivativeContextGetVal = 4,
     BackwardDerivativePropagate = 5
 };

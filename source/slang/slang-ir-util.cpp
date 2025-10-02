@@ -68,6 +68,11 @@ bool isPointerOfType(IRInst* type, IRInst* elementType)
     return false;
 }
 
+bool isAnnotation(IRInst* inst)
+{
+    return as<IRDifferentiableTypeAnnotation>(inst) || as<IRAssociatedInstAnnotation>(inst);
+}
+
 bool isPtrToClassType(IRInst* type)
 {
     return isPointerOfType(type, kIROp_ClassType);
@@ -1437,6 +1442,12 @@ IRInst* findInterfaceRequirement(IRInterfaceType* type, IRInst* key)
 
 IRInst* findWitnessTableEntry(IRWitnessTable* table, IRInst* key)
 {
+    if (table->getConformanceType()->getOp() == kIROp_VoidType)
+    {
+        IRBuilder builder(table->getModule());
+        return builder.getVoidValue();
+    }
+
     for (auto entry : table->getEntries())
     {
         if (entry->getRequirementKey() == key)
@@ -2566,6 +2577,30 @@ bool isIROpaqueType(IRType* type)
     default:
         return false;
     }
+}
+
+IRInst* tryGetTranslation(IRModule* module, IRInst* inst)
+{
+    IRWeakUse* weakUse = nullptr;
+    if (module->getTranslationCache().tryGetValue(inst, weakUse))
+    {
+        if (weakUse->getOperand(0)->getOp() != kIROp_Undefined)
+            return weakUse->getOperand(0);
+        else
+        {
+            module->getTranslationCache().remove(inst);
+            return nullptr;
+        }
+    }
+    return nullptr;
+}
+
+IRInst* registerTranslation(IRModule* module, IRInst* from, IRInst* to)
+{
+    IRBuilder builder(module);
+    auto weakUse = builder.getWeakUse(to);
+    module->getTranslationCache().add(from, weakUse);
+    return to;
 }
 
 } // namespace Slang

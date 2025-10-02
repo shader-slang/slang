@@ -2414,6 +2414,8 @@ public:
 
     ContainerPool& getContainerPool() { return m_containerPool; }
 
+    Dictionary<IRInst*, IRWeakUse*>& getTranslationCache() { return m_mapInstToTranslation; }
+
     //
     // The range of module versions this compiler supports
     //
@@ -2486,6 +2488,9 @@ private:
     /// insts when unnecessary.
     ///
     Dictionary<IRInst*, UInt> m_mapInstToUniqueId;
+
+    // Translation cache.
+    Dictionary<IRInst*, IRWeakUse*> m_mapInstToTranslation;
 };
 
 

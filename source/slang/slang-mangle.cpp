@@ -666,6 +666,19 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
     //
     if (auto callableDeclRef = declRef.as<CallableDecl>())
     {
+        // If we're dealing with an alias, then pull the parameters from
+        // the target decl-ref. We're careful to only do this when emitting
+        // the parameter and result names, since we don't want to accidentally
+        // overwrite the function name (which should be the name of the alias).
+        //
+        if (auto funcAliasDeclRef = callableDeclRef.as<FuncAliasDecl>())
+        {
+            callableDeclRef = substituteDeclRef(
+                                  SubstitutionSet(funcAliasDeclRef),
+                                  context->astBuilder,
+                                  funcAliasDeclRef.getDecl()->targetDeclRef)
+                                  .as<CallableDecl>();
+        }
         // Get parameter type as a list.
         List<Type*> parameterTypes;
         List<ParameterDirection> parameterDirections;
@@ -832,18 +845,6 @@ void mangleName(ManglingContext* context, DeclRef<Decl> declRef)
         emitQualifiedName(context, makeDeclRef(innerDecl), true);
         return;
     }
-    /*else if (auto fwdReq = as<ForwardDerivativeRequirementDecl>(decl))
-    {
-        emitRaw(context, "FwdReq_");
-        emitQualifiedName(context, fwdReq->originalRequirementDecl, true);
-        return;
-    }
-    else if (auto bwdReq = as<BackwardDerivativeRequirementDecl>(decl))
-    {
-        emitRaw(context, "BwdReq_");
-        emitQualifiedName(context, bwdReq->originalRequirementDecl, true);
-        return;
-    }*/
     else
     {
         // TODO: handle other cases
