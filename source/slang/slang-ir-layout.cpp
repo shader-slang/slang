@@ -699,12 +699,37 @@ Result getNaturalSizeAndAlignment(
         outSizeAndAlignment);
 }
 
+Result getTargetSizeAndAlignment(
+    TargetProgram* target,
+    IRType* type,
+    IRSizeAndAlignment* outSizeAndAlignment)
+{
+    // For WGSL, use std430-like layout rules for better vector alignment compatibility with Tint
+    IRTypeLayoutRules* rules = IRTypeLayoutRules::getNatural();
+    if (target->getTargetReq()->getTarget() == CodeGenTarget::WGSL)
+    {
+        rules = IRTypeLayoutRules::getStd430();
+    }
+    return getSizeAndAlignment(target->getOptionSet(), rules, type, outSizeAndAlignment);
+}
+
 Result getNaturalOffset(
     CompilerOptionSet& optionSet,
     IRStructField* field,
     IRIntegerValue* outOffset)
 {
     return getOffset(optionSet, IRTypeLayoutRules::getNatural(), field, outOffset);
+}
+
+Result getTargetOffset(TargetProgram* target, IRStructField* field, IRIntegerValue* outOffset)
+{
+    // For WGSL, use std430-like layout rules for better vector alignment compatibility with Tint
+    IRTypeLayoutRules* rules = IRTypeLayoutRules::getNatural();
+    if (target->getTargetReq()->getTarget() == CodeGenTarget::WGSL)
+    {
+        rules = IRTypeLayoutRules::getStd430();
+    }
+    return getOffset(target->getOptionSet(), rules, field, outOffset);
 }
 
 

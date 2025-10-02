@@ -23,6 +23,7 @@
 namespace Slang
 {
 struct CompilerOptionSet;
+class TargetProgram;
 
 /// Align `value` to the next multiple of `alignment`, which must be a power of two.
 inline IRIntegerValue align(IRIntegerValue value, int alignment)
@@ -123,6 +124,23 @@ Result getNaturalOffset(
     CompilerOptionSet& optionSet,
     IRStructField* field,
     IRIntegerValue* outOffset);
+
+/// Compute (if necessary) and return the target-appropriate size and alignment of `type`.
+///
+/// For WGSL, this uses std430-like layout rules for better vector alignment compatibility.
+/// For other targets, this uses natural layout rules.
+///
+Result getTargetSizeAndAlignment(
+    TargetProgram* target,
+    IRType* type,
+    IRSizeAndAlignment* outSizeAndAlignment);
+
+/// Compute (if necessary) and return the target-appropriate offset of `field`
+///
+/// For WGSL, this uses std430-like layout rules for better vector alignment compatibility.
+/// For other targets, this uses natural layout rules.
+///
+Result getTargetOffset(TargetProgram* target, IRStructField* field, IRIntegerValue* outOffset);
 
 /// Compute (if necessary) and return the std430 size and alignment of `type`.
 ///
