@@ -7193,11 +7193,19 @@ bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
         if (!diffMemberType)
             continue;
 
-        // Pull up the derivative member name from the attribute
+        // Since the conformance checking happens before the decl body checking, the
+        // DerivativeMemberAttribute might not have been checked yet. So we need to make sure
+        // they are checked before we use them. `checkDerivativeMemberAttributeReferences`
+        // already handles the case that the attribute has already been checked.
         checkDerivativeMemberAttributeReferences(varMember, derivativeAttr);
+
+        // If there is anything wrong in the checking, `checkDerivativeMemberAttributeReferences`
+        // will diagnose an error, and `derivativeAttr->memberDeclRef` will be null. We will skip
+        // the remaining synthesis to avoid crash.
         if (!derivativeAttr->memberDeclRef)
             continue;
 
+        // Pull up the derivative member name from the attribute
         auto derivMemberName = derivativeAttr->memberDeclRef->declRef.getName();
 
         // Construct reference exprs to the member's corresponding fields in each parameter.
