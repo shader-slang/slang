@@ -3620,6 +3620,15 @@ struct IRCollectionTaggedUnionType : IRTypeFlowData
     }
 };
 
+FIDDLE()
+struct IRBoundVal : IRInst
+{
+    FIDDLE(leafInst())
+    IRBoundVal* getOuter() { return cast<IRBoundVal>(getOperand(0)); }
+    IRInst* getBase() { return getOperand(1); }
+    IRInst* getArgBinding(UInt index) { return getOperand(2 + index); }
+};
+
 FIDDLE(allOtherInstStructs())
 
 struct IRBuilderSourceLocRAII;
@@ -4012,6 +4021,31 @@ public:
     IRWeakUse* getWeakUse(IRInst* inst)
     {
         return cast<IRWeakUse>(emitIntrinsicInst(nullptr, kIROp_WeakUse, 1, &inst));
+    }
+
+    IRBoundVal* getBoundVal(
+        IRBoundVal* outer,
+        IRInst* base,
+        UInt argBindingCount,
+        IRInst* const* argBindings)
+    {
+        ShortList<IRInst*, 8> args;
+        args.add(outer);
+        args.add(base);
+        for (UInt i = 0; i < argBindingCount; ++i)
+            args.add(argBindings[i]);
+        return (IRBoundVal*)emitIntrinsicInst(
+            nullptr,
+            kIROp_BoundVal,
+            args.getCount(),
+            args.getArrayView().getBuffer());
+    }
+
+    // IRBoundVal* getBoundVal(IRBoundVal* outer, IRInst* base) { return getBoundVal(outer, base); }
+
+    IRBoundVal* getBoundVal(IRBoundVal* outer, IRInst* base, List<IRInst*> const& argBindings)
+    {
+        return getBoundVal(outer, base, argBindings.getCount(), argBindings.getBuffer());
     }
 
     IRInst* emitDebugSource(UnownedStringSlice fileName, UnownedStringSlice source);
