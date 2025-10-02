@@ -201,9 +201,13 @@ void validateIRInstOperand(IRValidateContext* context, IRInst* inst, IRUse* oper
                 // in order.
                 if (context)
                 {
+                    // There is exception that the use of an inst is defined before the inst,
+                    // e.g. generic parameter can be defined before its data type in some cases.
+                    // In those cases we allow relaxing the rule.
                     validate(
                         context,
-                        context->seenInsts.contains(operandValue),
+                        context->seenInsts.contains(operandValue) ||
+                            canRelaxInstOrderRule(operandValue, inst),
                         inst,
                         "def must come before use in same block");
                 }
