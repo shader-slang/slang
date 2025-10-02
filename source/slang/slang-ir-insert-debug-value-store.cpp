@@ -146,7 +146,9 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
         {
             paramVal = param;
         }
-        else if (as<IRBorrowInOutParamType>(param->getDataType()) || as<IRBorrowInParamType>(param->getDataType()))
+        else if (
+            as<IRBorrowInOutParamType>(param->getDataType()) ||
+            as<IRBorrowInParamType>(param->getDataType()))
         {
             paramVal = builder.emitLoad(param);
         }

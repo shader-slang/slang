@@ -2524,8 +2524,9 @@ void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
         }
         // TODO: what are other modifiers we need to propagate through?
     }
-    if (auto t =
-            composeGetters<IRMeshOutputType>(inst->getFullType(), &IROutParamTypeBase::getValueType))
+    if (auto t = composeGetters<IRMeshOutputType>(
+            inst->getFullType(),
+            &IROutParamTypeBase::getValueType))
     {
         IROp op;
         switch (t->getOp())
@@ -2774,13 +2775,13 @@ static void applyOutArgumentFixups(IRGenContext* context, List<OutArgumentFixup>
 /// Add one argument value to the argument list for a call being constructed
 void addArg(
     IRGenContext* context,
-    List<IRInst*>* ioArgs,             //< The argument list being built
-    List<OutArgumentFixup>* ioFixups,  //< "Fixup" logic to apply for `out` or `inout` arguments
-    LoweredValInfo argVal,             //< The lowered value of the argument to add
-    IRType* paramType,                 //< The type of the corresponding parameter
-    ParamPassingMode paramDirection, //< The direction of the parameter (`in`, `out`, etc.)
-    Type* argType,                     //< The AST-level type of the argument
-    SourceLoc loc)                     //< A location to use if we need to report an error
+    List<IRInst*>* ioArgs,            //< The argument list being built
+    List<OutArgumentFixup>* ioFixups, //< "Fixup" logic to apply for `out` or `inout` arguments
+    LoweredValInfo argVal,            //< The lowered value of the argument to add
+    IRType* paramType,                //< The type of the corresponding parameter
+    ParamPassingMode paramDirection,  //< The direction of the parameter (`in`, `out`, etc.)
+    Type* argType,                    //< The AST-level type of the argument
+    SourceLoc loc)                    //< A location to use if we need to report an error
 {
     switch (paramDirection)
     {

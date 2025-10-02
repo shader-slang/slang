@@ -2636,7 +2636,8 @@ void consolidateRayTracingParameters(GLSLLegalizationContext* context, IRFunc* f
         if (!isVaryingParameter(paramLayout))
             continue;
         builder->setInsertBefore(firstBlock->getFirstOrdinaryInst());
-        if (as<IROutParamType>(param->getDataType()) || as<IRBorrowInOutParamType>(param->getDataType()))
+        if (as<IROutParamType>(param->getDataType()) ||
+            as<IRBorrowInOutParamType>(param->getDataType()))
         {
             outParams.add(param);
         }

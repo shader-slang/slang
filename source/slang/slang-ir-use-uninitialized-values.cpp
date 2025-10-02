@@ -263,7 +263,10 @@ static InstructionUsageType getCallUsageType(IRCall* call, IRInst* inst)
     // Consider it as a store if its passed
     // as an out/inout/ref parameter
     auto type = unwrapAttributedType(ftype->getParamType(index));
-    return (as<IROutParamType>(type) || as<IRBorrowInOutParamType>(type) || as<IRRefParamType>(type)) ? Store : Load;
+    return (as<IROutParamType>(type) || as<IRBorrowInOutParamType>(type) ||
+            as<IRRefParamType>(type))
+               ? Store
+               : Load;
 }
 
 static InstructionUsageType getInstructionUsageType(IRInst* user, IRInst* inst)

@@ -13313,8 +13313,8 @@ ArgsWithDirectionInfo getImaginaryArgsToForwardDerivative(
     }
 
     ParamPassingMode thisTypeDirection = (thisArgExpr && !thisArgExpr->type.isLeftValue)
-                                               ? ParamPassingMode::In
-                                               : ParamPassingMode::BorrowInOut;
+                                             ? ParamPassingMode::In
+                                             : ParamPassingMode::BorrowInOut;
 
     List<Expr*> imaginaryArguments;
     for (auto param : originalFuncDecl->getParameters())
@@ -13374,8 +13374,8 @@ ArgsWithDirectionInfo getImaginaryArgsToBackwardDerivative(
     }
 
     ParamPassingMode thisTypeDirection = (thisArgExpr && !thisArgExpr->type.isLeftValue)
-                                               ? ParamPassingMode::In
-                                               : ParamPassingMode::BorrowInOut;
+                                             ? ParamPassingMode::In
+                                             : ParamPassingMode::BorrowInOut;
 
     List<Expr*> imaginaryArguments;
     List<ParamPassingMode> expectedParamDirections;

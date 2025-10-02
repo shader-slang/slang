@@ -218,7 +218,8 @@ struct ExtractPrimalFuncContext
         auto paramBlock = func->getFirstBlock();
         builder.setInsertInto(paramBlock);
         auto oldIntermediateParam = func->getLastParam();
-        auto outIntermediary = builder.emitParam(builder.getOutParamType((IRType*)intermediateType));
+        auto outIntermediary =
+            builder.emitParam(builder.getOutParamType((IRType*)intermediateType));
         oldIntermediateParam->transferDecorationsTo(outIntermediary);
         primalParams.add(outIntermediary);
         oldIntermediateParam->replaceUsesWith(outIntermediary);

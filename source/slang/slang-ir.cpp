@@ -2949,13 +2949,14 @@ IRBorrowInOutParamType* IRBuilder::getBorrowInOutParamType(IRType* valueType)
 
 IRRefParamType* IRBuilder::getRefParamType(IRType* valueType, AddressSpace addrSpace)
 {
-    return (IRRefParamType*)getPtrType(kIROp_RefParamType, valueType, AccessQualifier::ReadWrite, addrSpace);
+    return (IRRefParamType*)
+        getPtrType(kIROp_RefParamType, valueType, AccessQualifier::ReadWrite, addrSpace);
 }
 
 IRBorrowInParamType* IRBuilder::getBorrowInParamType(IRType* valueType, AddressSpace addrSpace)
 {
-    return (
-        IRBorrowInParamType*)getPtrType(kIROp_BorrowInParamType, valueType, AccessQualifier::Read, addrSpace);
+    return (IRBorrowInParamType*)
+        getPtrType(kIROp_BorrowInParamType, valueType, AccessQualifier::Read, addrSpace);
 }
 
 IRSPIRVLiteralType* IRBuilder::getSPIRVLiteralType(IRType* type)
