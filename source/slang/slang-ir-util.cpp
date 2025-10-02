@@ -2575,7 +2575,8 @@ bool isGenericParameter(IRInst* inst)
 
 bool canRelaxInstOrderRule(IRInst* inst, IRInst* useOfInst)
 {
-    return isGenericParameter(useOfInst) && (useOfInst->getDataType() == inst);
+    bool isSameBlock = (inst->getParent() == useOfInst->getParent());
+    return isSameBlock && isGenericParameter(useOfInst) && (useOfInst->getDataType() == inst);
 }
 
 } // namespace Slang
