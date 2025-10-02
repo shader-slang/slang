@@ -3199,6 +3199,7 @@ struct LLVMEmitter
                 llvmResultType->print(expanded);
                 expanded << " %result";
             }
+            else expanded << "void";
         }
 
         expanded << "\n}\n";
@@ -3239,8 +3240,8 @@ struct LLVMEmitter
 
                 if (!sourceModule)
                 {
-                    //auto msg = diag.getMessage();
-                    //printf("%s\n", msg.str().c_str());
+                    auto msg = diag.getMessage();
+                    printf("%s\n", msg.str().c_str());
                     SLANG_UNEXPECTED("Failed to parse LLVM inline IR!");
                 }
 
