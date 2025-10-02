@@ -1863,7 +1863,8 @@ void convertAtomicToStorageBuffer(
                         auto funcTypeInst = (user->getOperand(0));
                         auto funcType = funcTypeInst->getFullType();
 
-                        auto paramReplacment = builder.getBorrowInOutParamType(builder.getUIntType());
+                        auto paramReplacment =
+                            builder.getBorrowInOutParamType(builder.getUIntType());
                         funcType->getOperand(1)->replaceUsesWith(paramReplacment);
                         builder.addForceInlineDecoration(funcTypeInst);
 

@@ -1218,8 +1218,10 @@ void GLSLSourceEmitter::_maybeEmitGLSLBuiltin(IRGlobalParam* var, UnownedStringS
         // GLSL has some specific requirements about how these are declared,
         // Do it manually here to avoid `emitGlobalParam` emitting
         // decorations/layout we are not allowed to output.
-        auto varType =
-            composeGetters<IRType>(var, &IRGlobalParam::getDataType, &IROutParamTypeBase::getValueType);
+        auto varType = composeGetters<IRType>(
+            var,
+            &IRGlobalParam::getDataType,
+            &IROutParamTypeBase::getValueType);
         SLANG_ASSERT(varType && "Indices mesh output dind't have an 'out' type");
 
         m_writer->emit("out ");

@@ -1916,7 +1916,7 @@ public:
         ParamPassingMode actualDir =
             ParamPassingMode::In; // For direction mismatches: the actual direction
         ParamPassingMode expectedDir =
-            ParamPassingMode::In;     // For direction mismatches: the expected direction
+            ParamPassingMode::In;       // For direction mismatches: the expected direction
         ParamDecl* paramDecl = nullptr; // For direction mismatches: the parameter declaration
     };
 
