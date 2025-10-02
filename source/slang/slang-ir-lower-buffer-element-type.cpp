@@ -290,7 +290,11 @@ struct BufferElementTypeLoweringPolicy : public RefObject
 
     /// Returns true if we should always create a fresh lowered storage type for a composite type,
     /// even if every member/element of the composite type is not changed by the lowering.
-    virtual bool shouldAlwaysCreateLoweredStorageTypeForCompositeTypes() { return false; }
+    virtual bool shouldAlwaysCreateLoweredStorageTypeForCompositeTypes(TypeLoweringConfig config)
+    {
+        SLANG_UNUSED(config);
+        return false;
+    }
 
     /// Returns true if the target requires all array of scalars or vectors inside a constant buffer
     /// to be translated into a 16-byte aligned vector type.
@@ -624,7 +628,8 @@ struct LoweredElementTypeContext
 
             // We can skip lowering this type if all field types are unchanged, unless the target
             // specific policy tells us to always create a lowered type.
-            if (!leafTypeLoweringPolicy->shouldAlwaysCreateLoweredStorageTypeForCompositeTypes())
+            if (!leafTypeLoweringPolicy->shouldAlwaysCreateLoweredStorageTypeForCompositeTypes(
+                    config))
             {
                 if (!loweredInnerTypeInfo.convertLoweredToOriginal)
                 {
@@ -704,7 +709,8 @@ struct LoweredElementTypeContext
 
             // We can skip lowering this type if all field types are unchanged, unless the target
             // specific policy tells us to always create a lowered type.
-            if (!leafTypeLoweringPolicy->shouldAlwaysCreateLoweredStorageTypeForCompositeTypes())
+            if (!leafTypeLoweringPolicy->shouldAlwaysCreateLoweredStorageTypeForCompositeTypes(
+                    config))
             {
                 if (isTrivial)
                 {
@@ -2325,7 +2331,7 @@ struct KhronosTargetBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLo
         return DefaultBufferElementTypeLoweringPolicy::shouldLowerMatrixType(matrixType, config);
     }
 
-    virtual bool shouldAlwaysCreateLoweredStorageTypeForCompositeTypes()
+    virtual bool shouldAlwaysCreateLoweredStorageTypeForCompositeTypes(TypeLoweringConfig config)
     {
         // For spirv backend, we always want to lower all array types, even if the element type
         // comes out the same. This is because different layout rules may have different array
@@ -2333,7 +2339,7 @@ struct KhronosTargetBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLo
         //
         // Additionally, `buffer` blocks do not work correctly unless lowered when targeting
         // GLSL.
-        return true;
+        return target->shouldEmitSPIRVDirectly() || config.addressSpace != AddressSpace::Input;
     }
 
     LoweredElementTypeInfo lowerLeafLogicalType(IRType* type, TypeLoweringConfig config) override
@@ -2462,7 +2468,6 @@ BufferElementTypeLoweringPolicy* getBufferElementTypeLoweringPolicy(
         return new WGSLBufferElementTypeLoweringPolicy(target, options);
     }
     SLANG_UNREACHABLE("unknown buffer element type lowering policy");
-    return nullptr;
 }
 
 } // namespace Slang
