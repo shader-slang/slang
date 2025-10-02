@@ -525,11 +525,11 @@ protected:
         // the strategy we take.
         //
         auto paramType = param->getDataType();
-        if (auto inOutType = as<IRInOutType>(paramType))
+        if (auto inOutType = as<IRBorrowInOutParamType>(paramType))
         {
             processInOutParam(param, inOutType);
         }
-        else if (auto outType = as<IROutType>(paramType))
+        else if (auto outType = as<IROutParamType>(paramType))
         {
             processOutParam(param, outType);
         }
@@ -545,16 +545,16 @@ protected:
     // that provides baseline behavior that should in theory work for
     // multiple targets.
     //
-    virtual void processInOutParam(IRParam* param, IRInOutType* inOutType)
+    virtual void processInOutParam(IRParam* param, IRBorrowInOutParamType* inOutType)
     {
         processMutableParam(param, inOutType);
     }
-    virtual void processOutParam(IRParam* param, IROutType* inOutType)
+    virtual void processOutParam(IRParam* param, IROutParamType* inOutType)
     {
         processMutableParam(param, inOutType);
     }
 
-    void processMutableParam(IRParam* param, IROutTypeBase* paramPtrType)
+    void processMutableParam(IRParam* param, IROutParamTypeBase* paramPtrType)
     {
         // The deafult handling of any mutable (`out` or `inout`) parameter
         // will be to introduce a local variable of the corresponding
@@ -577,7 +577,7 @@ protected:
         builder.addSimpleDecoration<IRTempCallArgVarDecoration>(localVar);
         auto localVal = LegalizedVaryingVal::makeAddress(localVar);
 
-        if (const auto inOutType = as<IRInOutType>(paramPtrType))
+        if (const auto inOutType = as<IRBorrowInOutParamType>(paramPtrType))
         {
             // If the parameter was an `inout` and not just an `out`
             // parameter, we will create one more more legal `in`
@@ -1562,7 +1562,7 @@ void depointerizeInputParams(IRFunc* entryPointFunc)
     Index i = 0;
     for (auto param : entryPointFunc->getParams())
     {
-        if (auto constRefType = as<IRConstRefType>(param->getFullType()))
+        if (auto constRefType = as<IRBorrowInParamType>(param->getFullType()))
         {
             switch (constRefType->getValueType()->getOp())
             {
@@ -3555,7 +3555,7 @@ protected:
                     builder.setInsertBefore(
                         entryPoint.entryPointFunc->getFirstBlock()->getFirstOrdinaryInst());
                     const auto annotatedPayloadType = builder.getPtrType(
-                        kIROp_RefType,
+                        kIROp_RefParamType,
                         payloadPtrType->getValueType(),
                         AddressSpace::MetalObjectData);
                     auto packedParam = builder.emitParam(annotatedPayloadType);
@@ -3598,7 +3598,7 @@ protected:
                 IRPtrTypeBase* type = as<IRPtrTypeBase>(param->getDataType());
 
                 const auto annotatedPayloadType =
-                    builder.getConstRefType(type->getValueType(), AddressSpace::MetalObjectData);
+                    builder.getBorrowInParamType(type->getValueType(), AddressSpace::MetalObjectData);
 
                 param->setFullType(annotatedPayloadType);
             }
@@ -3660,7 +3660,7 @@ protected:
             }
             if (param->findDecorationImpl(kIROp_IndicesDecoration))
             {
-                auto indicesRefType = (IRConstRefType*)param->getDataType();
+                auto indicesRefType = (IRBorrowInParamType*)param->getDataType();
                 auto indicesOutputType = (IRIndicesType*)indicesRefType->getValueType();
                 indicesType = indicesOutputType->getElementType();
                 maxPrimitives = indicesOutputType->getMaxElementCount();
@@ -3670,7 +3670,7 @@ protected:
             }
             if (param->findDecorationImpl(kIROp_PrimitivesDecoration))
             {
-                auto primitivesRefType = (IRConstRefType*)param->getDataType();
+                auto primitivesRefType = (IRBorrowInParamType*)param->getDataType();
                 auto primitivesOutputType = (IRPrimitivesType*)primitivesRefType->getValueType();
                 primitiveType = primitivesOutputType->getElementType();
                 SLANG_ASSERT(primitiveType);
@@ -4036,7 +4036,7 @@ void legalizeVertexShaderOutputParamsForMetal(DiagnosticSink* sink, EntryPointIn
     // handled further down the pipeline
     const bool hasOutParameters = anyOf(
         oldFunc->getParams(),
-        [](auto param) { return as<IROutTypeBase>(param->getFullType()); });
+        [](auto param) { return as<IROutParamTypeBase>(param->getFullType()); });
 
     auto returnType = oldFunc->getResultType();
     if (!as<IRStructType>(returnType) && !hasOutParameters)

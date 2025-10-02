@@ -143,7 +143,7 @@ struct TransformParamsToConstRefContext
         switch (root->getDataType()->getOp())
         {
         case kIROp_ConstantBufferType:
-        case kIROp_ConstRefType:
+        case kIROp_BorrowInParamType:
         case kIROp_ParameterBlockType:
             return addr;
         default:
@@ -270,17 +270,17 @@ struct TransformParamsToConstRefContext
         {
             if (shouldTransformParam(param))
             {
-                // Our goal here is to transform `in T` parameters to const-ref.
+                // Our goal here is to transform `in T` parameters to `borrow in T`.
                 // We are selective about what we will transform for a few reasons:
                 // 1. no reason to transform simple primitives like `int`.
                 // 2. not every type makes sense as constref. For example, `ParameterBlock`.
-                // 3. constref is not 100% stable, so we need to be selective on what we let
-                //    transform into constref.
+                // 3. `borrow in` is not 100% stable, so we need to be selective on what we let
+                //    transform into `borrow in`.
                 //
                 // This allows us to pass the address of variables directly into a function,
                 // giving us the choice to remove copies into a parameter.
                 auto paramType = param->getDataType();
-                auto constRefType = builder.getConstRefType(paramType, AddressSpace::Generic);
+                auto constRefType = builder.getBorrowInParamType(paramType, AddressSpace::Generic);
                 param->setFullType(constRefType);
 
                 changed = true;

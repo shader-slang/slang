@@ -339,16 +339,16 @@ class InOutModifier : public OutModifier
 };
 
 
-// `__ref` modifier for by-reference parameter passing
+// `ref` modifier for by-reference parameter passing
 FIDDLE()
 class RefModifier : public Modifier
 {
     FIDDLE(...)
 };
 
-// `__ref` modifier for by-reference parameter passing
+// `borrow` modifier for borrow parameter passing
 FIDDLE()
-class ConstRefModifier : public Modifier
+class BorrowModifier : public Modifier
 {
     FIDDLE(...)
 };

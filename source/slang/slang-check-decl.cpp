@@ -5202,13 +5202,13 @@ void SemanticsVisitor::addRequiredParamsToSynthesizedDecl(
             }
             else if (
                 as<InOutModifier>(modifier) || as<OutModifier>(modifier) ||
-                as<ConstRefModifier>(modifier) || as<RefModifier>(modifier))
+                as<BorrowModifier>(modifier) || as<RefModifier>(modifier))
             {
                 auto clonedModifier =
                     (Modifier*)m_astBuilder->createByNodeType(modifier->astNodeType);
                 clonedModifier->keywordName = modifier->keywordName;
                 addModifier(synParamDecl, clonedModifier);
-                if (as<ConstRefModifier>(modifier))
+                if (as<BorrowModifier>(modifier))
                     paramType.isLeftValue = false;
             }
         }
@@ -5361,15 +5361,15 @@ static bool isWrapperTypeDecl(Decl* decl)
 // Is it allowed to have an interface method parameter whose direction is `reqDir`, and an
 // implementing method parameter whose direction is `implDir`?
 //
-static bool matchParamDirection(ParameterDirection implDir, ParameterDirection reqDir)
+static bool matchParamDirection(ParamPassingMode implDir, ParamPassingMode reqDir)
 {
     // If the parameter directions match exactly, then we are good.
     if (implDir == reqDir)
         return true;
     // Otherwise, we only allow the cases where reqDir is `InOut` and implDir is `In` or `Out`.
-    if (implDir == kParameterDirection_In && reqDir == kParameterDirection_InOut)
+    if (implDir == ParamPassingMode::In && reqDir == ParamPassingMode::BorrowInOut)
         return true;
-    if (implDir == kParameterDirection_Out && reqDir == kParameterDirection_InOut)
+    if (implDir == ParamPassingMode::Out && reqDir == ParamPassingMode::BorrowInOut)
         return true;
     return false;
 }
@@ -9438,8 +9438,8 @@ bool SemanticsVisitor::doFunctionSignaturesMatch(DeclRef<FuncDecl> fst, DeclRef<
 
         // If one parameter is `constref` and the other isn't, then they don't match.
         //
-        if (fstParam.getDecl()->hasModifier<ConstRefModifier>() !=
-            sndParam.getDecl()->hasModifier<ConstRefModifier>())
+        if (fstParam.getDecl()->hasModifier<BorrowModifier>() !=
+            sndParam.getDecl()->hasModifier<BorrowModifier>())
             return false;
     }
 
@@ -9960,7 +9960,7 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
                     isMutable = true;
                     continue;
                 }
-                if (as<RefModifier>(modifier) || as<ConstRefModifier>(modifier))
+                if (as<RefModifier>(modifier) || as<BorrowModifier>(modifier))
                 {
                     hasRefModifier = true;
                 }
@@ -9971,7 +9971,7 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
                 if (isMutable)
                     newModifiers.add(this->getASTBuilder()->create<RefModifier>());
                 else
-                    newModifiers.add(this->getASTBuilder()->create<ConstRefModifier>());
+                    newModifiers.add(this->getASTBuilder()->create<BorrowModifier>());
             }
             paramDecl->modifiers.first = newModifiers.getFirst();
             for (Index i = 0; i < newModifiers.getCount(); i++)
@@ -9990,7 +9990,7 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
         for (auto modifier : paramDecl->modifiers)
         {
             if (as<OutModifier>(modifier) || as<InOutModifier>(modifier) ||
-                as<RefModifier>(modifier) || as<ConstRefModifier>(modifier))
+                as<RefModifier>(modifier) || as<BorrowModifier>(modifier))
             {
                 getSink()->diagnose(modifier, Diagnostics::parameterPackMustBeConst);
             }
@@ -10532,17 +10532,17 @@ void SemanticsDeclHeaderVisitor::setFuncTypeIntoRequirementDecl(
         param->type.type = paramType;
         switch (paramDir)
         {
-        case ParameterDirection::kParameterDirection_InOut:
+        case ParamPassingMode::BorrowInOut:
             addModifier(param, m_astBuilder->create<InOutModifier>());
             break;
-        case ParameterDirection::kParameterDirection_Out:
+        case ParamPassingMode::Out:
             addModifier(param, m_astBuilder->create<OutModifier>());
             break;
-        case ParameterDirection::kParameterDirection_Ref:
+        case ParamPassingMode::Ref:
             addModifier(param, m_astBuilder->create<RefModifier>());
             break;
-        case ParameterDirection::kParameterDirection_ConstRef:
-            addModifier(param, m_astBuilder->create<ConstRefModifier>());
+        case ParamPassingMode::BorrowIn:
+            addModifier(param, m_astBuilder->create<BorrowModifier>());
             break;
         default:
             break;
@@ -10655,11 +10655,11 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
             }
             if (!paramDecl->hasModifier<NoDiffModifier>())
             {
-                if (auto modifier = paramDecl->findModifier<ConstRefModifier>())
+                if (auto modifier = paramDecl->findModifier<BorrowModifier>())
                 {
                     getSink()->diagnose(
                         modifier,
-                        Diagnostics::cannotUseConstRefOnDifferentiableParameter);
+                        Diagnostics::cannotUseBorrowInOnDifferentiableParameter);
                 }
             }
         }
@@ -12944,10 +12944,10 @@ Type* getTypeForThisExpr(SemanticsVisitor* visitor, DeclRef<FunctionDeclBase> fu
 struct ArgsWithDirectionInfo
 {
     List<Expr*> args;
-    List<ParameterDirection> directions;
+    List<ParamPassingMode> directions;
 
     Expr* thisArg;
-    ParameterDirection thisArgDirection;
+    ParamPassingMode thisArgDirection;
 };
 
 template<typename TDerivativeAttr>
@@ -12956,9 +12956,9 @@ void checkDerivativeAttributeImpl(
     Decl* funcDecl,
     TDerivativeAttr* attr,
     const List<Expr*>& imaginaryArguments,
-    const List<ParameterDirection>& expectedParamDirections,
+    const List<ParamPassingMode>& expectedParamDirections,
     Expr* expectedThisArg,
-    ParameterDirection expectedThisArgDirection)
+    ParamPassingMode expectedThisArgDirection)
 {
     if (isInterfaceRequirement(funcDecl))
     {
@@ -13053,20 +13053,20 @@ void checkDerivativeAttributeImpl(
     }
 
     // If left value is true, then convert the
-    // inner type to an InOutType.
+    // inner type to an BorrowInOutParamType.
     //
     auto qualTypeToString = [&](QualType qualType) -> String
     {
         Type* type = qualType.type;
         if (qualType.isLeftValue)
         {
-            type = ctx.getASTBuilder()->getInOutType(type);
+            type = ctx.getASTBuilder()->getBorrowInOutParamType(type);
         }
         return type->toString();
     };
 
     List<Expr*> argList = imaginaryArguments;
-    List<ParameterDirection> paramDirections = expectedParamDirections;
+    List<ParamPassingMode> paramDirections = expectedParamDirections;
     bool expectStaticFunc = false;
 
     if (expectedThisArg)
@@ -13273,7 +13273,7 @@ ArgsWithDirectionInfo getImaginaryArgsToFunc(
     SourceLoc loc)
 {
     List<Expr*> imaginaryArguments;
-    List<ParameterDirection> directions;
+    List<ParamPassingMode> directions;
     for (auto param : func->getParameters())
     {
         auto arg = astBuilder->create<VarExpr>();
@@ -13284,7 +13284,7 @@ ArgsWithDirectionInfo getImaginaryArgsToFunc(
         imaginaryArguments.add(arg);
         directions.add(getParameterDirection(param));
     }
-    return {imaginaryArguments, directions, nullptr, ParameterDirection::kParameterDirection_In};
+    return {imaginaryArguments, directions, nullptr, ParamPassingMode::In};
 }
 
 ArgsWithDirectionInfo getImaginaryArgsToForwardDerivative(
@@ -13312,9 +13312,9 @@ ArgsWithDirectionInfo getImaginaryArgsToForwardDerivative(
         }
     }
 
-    ParameterDirection thisTypeDirection = (thisArgExpr && !thisArgExpr->type.isLeftValue)
-                                               ? ParameterDirection::kParameterDirection_In
-                                               : ParameterDirection::kParameterDirection_InOut;
+    ParamPassingMode thisTypeDirection = (thisArgExpr && !thisArgExpr->type.isLeftValue)
+                                               ? ParamPassingMode::In
+                                               : ParamPassingMode::BorrowInOut;
 
     List<Expr*> imaginaryArguments;
     for (auto param : originalFuncDecl->getParameters())
@@ -13335,7 +13335,7 @@ ArgsWithDirectionInfo getImaginaryArgsToForwardDerivative(
     }
 
     // Copy parameter directions as is.
-    List<ParameterDirection> expectedParamDirections;
+    List<ParamPassingMode> expectedParamDirections;
     for (auto param : originalFuncDecl->getParameters())
     {
         expectedParamDirections.add(getParameterDirection(param));
@@ -13373,12 +13373,12 @@ ArgsWithDirectionInfo getImaginaryArgsToBackwardDerivative(
         }
     }
 
-    ParameterDirection thisTypeDirection = (thisArgExpr && !thisArgExpr->type.isLeftValue)
-                                               ? ParameterDirection::kParameterDirection_In
-                                               : ParameterDirection::kParameterDirection_InOut;
+    ParamPassingMode thisTypeDirection = (thisArgExpr && !thisArgExpr->type.isLeftValue)
+                                               ? ParamPassingMode::In
+                                               : ParamPassingMode::BorrowInOut;
 
     List<Expr*> imaginaryArguments;
-    List<ParameterDirection> expectedParamDirections;
+    List<ParamPassingMode> expectedParamDirections;
 
     auto isOutParam = [&](ParamDecl* param)
     {
@@ -13395,7 +13395,7 @@ ArgsWithDirectionInfo getImaginaryArgsToBackwardDerivative(
         arg->type.type = param->getType();
         arg->loc = loc;
 
-        ParameterDirection direction = getParameterDirection(param);
+        ParamPassingMode direction = getParameterDirection(param);
 
         bool isDiffParam = (!param->findModifier<NoDiffModifier>());
         if (isDiffParam)
@@ -13414,13 +13414,13 @@ ArgsWithDirectionInfo getImaginaryArgsToBackwardDerivative(
                         visitor->getASTBuilder(),
                         pairType->getPrimalType());
 
-                    direction = ParameterDirection::kParameterDirection_In;
+                    direction = ParamPassingMode::In;
                 }
                 else
                 {
                     // in T : IDifferentiable -> inout DifferentialPair<T>
                     // inout T : IDifferentiable -> inout DifferentialPair<T>
-                    direction = ParameterDirection::kParameterDirection_InOut;
+                    direction = ParamPassingMode::BorrowInOut;
                 }
             }
             else if (auto refPairType = as<DifferentialPtrPairType>(diffPair))
@@ -13444,7 +13444,7 @@ ArgsWithDirectionInfo getImaginaryArgsToBackwardDerivative(
             // no_diff inout T -> in T
             // no_diff in T -> in T
             //
-            direction = ParameterDirection::kParameterDirection_In;
+            direction = ParamPassingMode::In;
         }
 
         imaginaryArguments.add(arg);
@@ -13459,7 +13459,7 @@ ArgsWithDirectionInfo getImaginaryArgsToBackwardDerivative(
         arg->type.type = diffReturnType;
         arg->loc = loc;
         imaginaryArguments.add(arg);
-        expectedParamDirections.add(ParameterDirection::kParameterDirection_In);
+        expectedParamDirections.add(ParamPassingMode::In);
     }
 
     return {imaginaryArguments, expectedParamDirections, thisArgExpr, thisTypeDirection};

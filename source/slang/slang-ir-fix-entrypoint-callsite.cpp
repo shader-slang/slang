@@ -81,7 +81,7 @@ void fixEntryPointCallsites(IRFunc* entryPoint)
             {
                 auto paramType = params[i]->getDataType();
                 auto arg = call->getArg(i);
-                if (auto refType = as<IRConstRefType>(paramType))
+                if (auto refType = as<IRBorrowInParamType>(paramType))
                 {
                     if (!as<IRPtrTypeBase>(arg->getDataType()))
                     {

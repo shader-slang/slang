@@ -1180,13 +1180,13 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             return;
         }
     case kIROp_PtrType:
-    case kIROp_InOutType:
-    case kIROp_OutType:
-    case kIROp_RefType:
-    case kIROp_ConstRefType:
+    case kIROp_BorrowInOutParamType:
+    case kIROp_OutParamType:
+    case kIROp_RefParamType:
+    case kIROp_BorrowInParamType:
         {
             auto ptrType = cast<IRPtrTypeBase>(type);
-            if (type->getOp() == kIROp_ConstRefType)
+            if (type->getOp() == kIROp_BorrowInParamType)
             {
                 m_writer->emit("const ");
             }

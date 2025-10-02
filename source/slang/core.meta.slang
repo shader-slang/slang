@@ -1526,8 +1526,12 @@ extension uintptr_t : IRangedValue
 
 //@hidden:
 
+// TODO(tfoley): This should really map over to `kIROp_PtrType`,
+// but is currently still mapping to the IR opcode used for `ref`
+// parameters.
+//
 __magic_type(ExplicitRefType)
-__intrinsic_type($(kIROp_RefType))
+__intrinsic_type($(kIROp_RefParamType))
 struct Ref<
     T, 
     Access access = Access::ReadWrite, 
@@ -1535,23 +1539,23 @@ struct Ref<
 {};
 
 __magic_type(OutParamType)
-__intrinsic_type($(kIROp_OutType))
+__intrinsic_type($(kIROp_OutParamType))
 struct OutParam<T>
 {};
 
-__magic_type(InOutParamType)
-__intrinsic_type($(kIROp_InOutType))
-struct InOutParam<T>
+__magic_type(BorrowInOutParamType)
+__intrinsic_type($(kIROp_BorrowInOutParamType))
+struct BorrowInOutParam<T>
 {};
 
 __magic_type(RefParamType)
-__intrinsic_type($(kIROp_RefType))
+__intrinsic_type($(kIROp_RefParamType))
 struct RefParam<T>
 {};
 
-__magic_type(ConstRefParamType)
-__intrinsic_type($(kIROp_ConstRefType))
-struct ConstRefParam<T>
+__magic_type(BorrowInParamType)
+__intrinsic_type($(kIROp_BorrowInParamType))
+struct BorrowInParam<T>
 {};
 
 // __Addr<T> is AddressSpace::Generic since Slang will specalize & validate the address-space

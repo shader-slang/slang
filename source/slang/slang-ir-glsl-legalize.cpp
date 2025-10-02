@@ -1429,7 +1429,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         break;
     case LayoutResourceKind::VaryingOutput:
         addrSpace = systemValueInfo ? AddressSpace::BuiltinOutput : AddressSpace::Output;
-        ptrOpCode = kIROp_OutType;
+        ptrOpCode = kIROp_OutParamType;
         break;
     default:
         break;
@@ -2555,8 +2555,8 @@ static void consolidateParameters(GLSLLegalizationContext* context, List<IRParam
         auto _paramType = _param->getDataType();
         IRType* valueType = _paramType;
 
-        if (as<IROutTypeBase>(_paramType))
-            valueType = as<IROutTypeBase>(_paramType)->getValueType();
+        if (as<IROutParamTypeBase>(_paramType))
+            valueType = as<IROutParamTypeBase>(_paramType)->getValueType();
 
         auto key = builder->createStructKey();
         if (auto nameDecor = _param->findDecoration<IRNameHintDecoration>())
@@ -2600,13 +2600,13 @@ static void consolidateParameters(GLSLLegalizationContext* context, List<IRParam
 
         // If the parameter is an out/inout type, we need to create a pointer type
         IRType* fieldPtrType = nullptr;
-        if (as<IROutType>(_paramType))
+        if (as<IROutParamType>(_paramType))
         {
-            fieldPtrType = builder->getPtrType(kIROp_OutType, fieldType);
+            fieldPtrType = builder->getPtrType(kIROp_OutParamType, fieldType);
         }
-        else if (as<IRInOutType>(_paramType))
+        else if (as<IRBorrowInOutParamType>(_paramType))
         {
-            fieldPtrType = builder->getPtrType(kIROp_InOutType, fieldType);
+            fieldPtrType = builder->getPtrType(kIROp_BorrowInOutParamType, fieldType);
         }
 
         auto fieldAddr =
@@ -2636,7 +2636,7 @@ void consolidateRayTracingParameters(GLSLLegalizationContext* context, IRFunc* f
         if (!isVaryingParameter(paramLayout))
             continue;
         builder->setInsertBefore(firstBlock->getFirstOrdinaryInst());
-        if (as<IROutType>(param->getDataType()) || as<IRInOutType>(param->getDataType()))
+        if (as<IROutParamType>(param->getDataType()) || as<IRBorrowInOutParamType>(param->getDataType()))
         {
             outParams.add(param);
         }
@@ -3019,7 +3019,7 @@ static void legalizeMeshOutputParam(
                 auto t = composeGetters<IRType>(
                     builtin.param,
                     &IRInst::getFullType,
-                    &IROutTypeBase::getValueType,
+                    &IROutParamTypeBase::getValueType,
                     &IRArrayTypeBase::getElementType);
                 auto key = builder->createStructKey();
                 auto n = builtin.nameDecoration->getStringSlice();
@@ -3386,7 +3386,7 @@ void legalizeEntryPointParameterForGLSL(
     {
         IRType* type = pp->getFullType();
         // Strip out type
-        if (auto outType = as<IROutTypeBase>(type))
+        if (auto outType = as<IROutParamTypeBase>(type))
         {
             type = outType->getValueType();
         }
@@ -3581,7 +3581,7 @@ void legalizeEntryPointParameterForGLSL(
     // Is the parameter type a special pointer type
     // that indicates the parameter is used for `out`
     // or `inout` access?
-    if (as<IROutTypeBase>(paramType))
+    if (as<IROutParamTypeBase>(paramType))
     {
         // Okay, we have the more interesting case here,
         // where the parameter was being passed by reference.
@@ -3592,7 +3592,7 @@ void legalizeEntryPointParameterForGLSL(
         auto localVariable = builder->emitVar(valueType);
         auto localVal = ScalarizedVal::address(localVariable);
 
-        if (const auto inOutType = as<IRInOutType>(paramType))
+        if (const auto inOutType = as<IRBorrowInOutParamType>(paramType))
         {
             // In the `in out` case we need to declare two
             // sets of global variables: one for the `in`
@@ -3663,7 +3663,7 @@ void legalizeEntryPointParameterForGLSL(
         // reference. We simply replace existing uses of the parameter
         // with the real global variable.
         SLANG_ASSERT(
-            ptrType->getOp() == kIROp_ConstRefType ||
+            ptrType->getOp() == kIROp_BorrowInParamType ||
             ptrType->getAddressSpace() == AddressSpace::Input ||
             ptrType->getAddressSpace() == AddressSpace::BuiltinInput);
 

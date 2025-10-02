@@ -54,7 +54,7 @@ enum ParameterCheckType
 static ParameterCheckType isPotentiallyUnintended(IRParam* param, Stage stage, int index)
 {
     IRType* type = param->getFullType();
-    if (auto out = as<IROutType>(param->getFullType()))
+    if (auto out = as<IROutParamType>(param->getFullType()))
     {
         // Don't check `out Vertices<T>` or `out Indices<T>` parameters
         // in mesh shaders.
@@ -75,7 +75,7 @@ static ParameterCheckType isPotentiallyUnintended(IRParam* param, Stage stage, i
 
         return AsOut;
     }
-    else if (auto inout = as<IRInOutType>(type))
+    else if (auto inout = as<IRBorrowInOutParamType>(type))
     {
         // TODO: some way to check if the method
         // is actually used for autodiff
@@ -263,7 +263,7 @@ static InstructionUsageType getCallUsageType(IRCall* call, IRInst* inst)
     // Consider it as a store if its passed
     // as an out/inout/ref parameter
     auto type = unwrapAttributedType(ftype->getParamType(index));
-    return (as<IROutType>(type) || as<IRInOutType>(type) || as<IRRefType>(type)) ? Store : Load;
+    return (as<IROutParamType>(type) || as<IRBorrowInOutParamType>(type) || as<IRRefParamType>(type)) ? Store : Load;
 }
 
 static InstructionUsageType getInstructionUsageType(IRInst* user, IRInst* inst)
