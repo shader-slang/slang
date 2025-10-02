@@ -7194,6 +7194,10 @@ bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
             continue;
 
         // Pull up the derivative member name from the attribute
+        checkDerivativeMemberAttributeReferences(varMember, derivativeAttr);
+        if (!derivativeAttr->memberDeclRef)
+            continue;
+
         auto derivMemberName = derivativeAttr->memberDeclRef->declRef.getName();
 
         // Construct reference exprs to the member's corresponding fields in each parameter.
@@ -8107,29 +8111,6 @@ void SemanticsVisitor::checkDifferentiableMembersInType(AggTypeDecl* decl)
     }
 }
 
-bool SemanticsVisitor::shouldCheckDerivativeMemberReference(AggTypeDecl* decl)
-{
-    auto astBuilder = getASTBuilder();
-    auto inheritanceDecls = decl->getMembersOfType<InheritanceDecl>().toList();
-    for (auto inheritanceDecl : inheritanceDecls)
-    {
-        if (inheritanceDecl->getSup().type->equals(astBuilder->getDifferentiableInterfaceType()))
-        {
-            return true;
-        }
-
-        if (auto interfaceDecl =
-                isDeclRefTypeOf<InterfaceDecl>(inheritanceDecl->base.type).getDecl())
-        {
-            if (shouldCheckDerivativeMemberReference(interfaceDecl))
-            {
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
 void SemanticsVisitor::checkAggTypeConformance(AggTypeDecl* decl)
 {
     // After we've checked members, we need to go through
@@ -8163,17 +8144,6 @@ void SemanticsVisitor::checkAggTypeConformance(AggTypeDecl* decl)
         // be required to implement all interface requirements,
         // just with `abstract` methods that replicate things?
         // (That's what C# does).
-
-        // Special handling for when we check for conformance against `IDifferentiable`
-        // We will reference-checking for the [DerivativeMember(DiffType.member)]
-        // attributes here, since they have to be performed after types can be referenced
-        // and before conformance checking, where this information can be used to synthesize
-        // member methods (such as `dzero`, `dadd`, etc..)
-        //
-        if (shouldCheckDerivativeMemberReference(decl))
-        {
-            checkDifferentiableMembersInType(decl);
-        }
 
         // Make a copy of inhertanceDecls first since `checkConformance` may modify decl->members.
         auto inheritanceDecls = decl->getMembersOfType<InheritanceDecl>().toList();

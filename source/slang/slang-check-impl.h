@@ -3002,8 +3002,6 @@ public:
     void checkRayPayloadStructFields(StructDecl* structDecl);
 
     CatchStmt* findMatchingCatchStmt(Type* errorType);
-
-    bool shouldCheckDerivativeMemberReference(AggTypeDecl* decl);
 };
 
 
