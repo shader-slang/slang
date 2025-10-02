@@ -8167,8 +8167,8 @@ static void _maybeHoistOperand(IRUse* use)
             // There is exception that the use of an inst can be defined before the inst,
             // e.g. generic parameter can be defined before its data type in some cases.
             // And moving the datatype of a generic parameter before the parameter will result
-            // in incorrect IR layout, because we require that generic parameters are laid consecutively
-            // at first block of a generic.
+            // in incorrect IR layout, because we require that generic parameters are laid
+            // consecutively at first block of a generic.
             if (_isInstDefinedAfter(operand, user) && !canRelaxInstOrderRule(operand, user))
             {
                 operand->insertBefore(user);
