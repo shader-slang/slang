@@ -6379,6 +6379,7 @@ vector<T, N> abs(vector<T, N> x)
         result:$$vector<T,N> = OpExtInst glsl450 SAbs $x;
     };
     case wgsl: __intrinsic_asm "abs";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.abs($0)";
     default:
         VECTOR_MAP_UNARY(T, N, abs, x);
     }
@@ -6431,6 +6432,7 @@ vector<T, N> abs(vector<T, N> x)
         result:$$vector<T,N> = OpExtInst glsl450 FAbs $x;
     };
     case wgsl: __intrinsic_asm "abs";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.fabs($0)";
     default:
         VECTOR_MAP_UNARY(T, N, abs, x);
     }
@@ -6522,6 +6524,7 @@ vector<T, N> acos(vector<T, N> x)
         OpExtInst $$vector<T, N> result glsl450 Acos $x
     };
     case wgsl: __intrinsic_asm "acos";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.acos($0)";
     default:
         VECTOR_MAP_UNARY(T, N, acos, x);
     }
@@ -6928,7 +6931,7 @@ double2 asdouble(uint2 lowbits, uint2 highbits)
 /// Reinterpret bits as a float.
 /// @category conversion
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 float asfloat(int x)
 {
     __target_switch
@@ -6942,11 +6945,12 @@ float asfloat(int x)
         OpBitcast $$float result $x
     };
     case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     }
 }
 
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 float asfloat(uint x)
 {
     __target_switch
@@ -6960,12 +6964,13 @@ float asfloat(uint x)
         OpBitcast $$float result $x
     };
     case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     }
 }
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 vector<float, N> asfloat(vector< int, N> x)
 {
     __target_switch
@@ -6977,6 +6982,7 @@ vector<float, N> asfloat(vector< int, N> x)
         OpBitcast $$vector<float, N> result $x
     };
     case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     default:
         VECTOR_MAP_UNARY(float, N, asfloat, x);
     }
@@ -6984,7 +6990,7 @@ vector<float, N> asfloat(vector< int, N> x)
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 vector<float,N> asfloat(vector<uint,N> x)
 {
     __target_switch
@@ -6996,6 +7002,7 @@ vector<float,N> asfloat(vector<uint,N> x)
         OpBitcast $$vector<float,N> result $x
     };
     case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     default:
         VECTOR_MAP_UNARY(float, N, asfloat, x);
     }
@@ -7003,7 +7010,7 @@ vector<float,N> asfloat(vector<uint,N> x)
 
 __generic<let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 matrix<float,N,M> asfloat(matrix< int,N,M> x)
 {
     __target_switch
@@ -7016,7 +7023,7 @@ matrix<float,N,M> asfloat(matrix< int,N,M> x)
 
 __generic<let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 matrix<float,N,M> asfloat(matrix<uint,N,M> x)
 {
     __target_switch
@@ -7082,6 +7089,7 @@ vector<T, N> asin(vector<T, N> x)
         OpExtInst $$vector<T, N> result glsl450 Asin $x
     };
     case wgsl: __intrinsic_asm "asin";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.asin($0)";
     default:
         VECTOR_MAP_UNARY(T,N,asin,x);
     }
@@ -7160,7 +7168,7 @@ matrix<T, N, M> asinh(matrix<T, N, M> x)
 /// Reinterpret bits as an int.
 /// @category conversion
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 int asint(float x)
 {
     __target_switch
@@ -7174,11 +7182,12 @@ int asint(float x)
     case spirv: return spirv_asm {
         OpBitcast $$int result $x
     };
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     }
 }
 
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 int asint(uint x)
 {
     __target_switch
@@ -7192,12 +7201,13 @@ int asint(uint x)
         OpBitcast $$int result $x
     };
     case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     }
 }
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 vector<int, N> asint(vector<float, N> x)
 {
     __target_switch
@@ -7209,6 +7219,7 @@ vector<int, N> asint(vector<float, N> x)
         OpBitcast $$vector<int, N> result $x
     };
     case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     default:
         VECTOR_MAP_UNARY(int, N, asint, x);
     }
@@ -7216,7 +7227,7 @@ vector<int, N> asint(vector<float, N> x)
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 vector<int, N> asint(vector<uint, N> x)
 {
     if(N == 1)
@@ -7230,6 +7241,7 @@ vector<int, N> asint(vector<uint, N> x)
         OpBitcast $$vector<int, N> result $x
     };
     case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     default:
         VECTOR_MAP_UNARY(int, N, asint, x);
     }
@@ -7237,7 +7249,7 @@ vector<int, N> asint(vector<uint, N> x)
 
 __generic<let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_4_0)]
 matrix<int, N, M> asint(matrix<float, N, M> x)
 {
     __target_switch
@@ -7250,7 +7262,7 @@ matrix<int, N, M> asint(matrix<float, N, M> x)
 
 __generic<let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_4_0)]
 matrix<int, N, M> asint(matrix<uint, N, M> x)
 {
     __target_switch
@@ -7307,7 +7319,7 @@ void asuint(double value, out uint lowbits, out uint highbits)
 // Reinterpret bits as a uint.
 
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 uint asuint(float x)
 {
     __target_switch
@@ -7321,11 +7333,12 @@ uint asuint(float x)
     case spirv: return spirv_asm {
         OpBitcast $$uint result $x
     };
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     }
 }
 
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 uint asuint(int x)
 {
     __target_switch
@@ -7339,12 +7352,13 @@ uint asuint(int x)
         OpBitcast $$uint result $x
     };
     case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     }
 }
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 vector<uint,N> asuint(vector<float,N> x)
 {
     __target_switch
@@ -7358,12 +7372,13 @@ vector<uint,N> asuint(vector<float,N> x)
     default:
         VECTOR_MAP_UNARY(uint, N, asuint, x);
     case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     }
 }
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 vector<uint, N> asuint(vector<int, N> x)
 {
     if(N == 1)
@@ -7377,6 +7392,7 @@ vector<uint, N> asuint(vector<int, N> x)
         OpBitcast $$vector<uint, N> result $x
     };
     case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     default:
         VECTOR_MAP_UNARY(uint, N, asuint, x);
     }
@@ -7384,7 +7400,7 @@ vector<uint, N> asuint(vector<int, N> x)
 
 __generic<let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_4_0)]
 matrix<uint,N,M> asuint(matrix<float,N,M> x)
 {
     __target_switch
@@ -7397,7 +7413,7 @@ matrix<uint,N,M> asuint(matrix<float,N,M> x)
 
 __generic<let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_4_0)]
 matrix<uint, N, M> asuint(matrix<int, N, M> x)
 {
     __target_switch
@@ -7465,7 +7481,7 @@ matrix<uint,N,M> asuint(matrix<uint,N,M> x)
 // Float->unsigned cases:
 
 [__readNone]
-[require(cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 uint16_t asuint16(float16_t value)
 {
     __target_switch
@@ -7476,11 +7492,12 @@ uint16_t asuint16(float16_t value)
     case spirv: return spirv_asm {
         OpBitcast $$uint16_t result $value
     };
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     }
 }
 
 [__readNone]
-[require(cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 vector<uint16_t,N> asuint16<let N : int>(vector<float16_t,N> value)
 {
     __target_switch
@@ -7489,6 +7506,7 @@ vector<uint16_t,N> asuint16<let N : int>(vector<float16_t,N> value)
     case spirv: return spirv_asm {
         result:$$vector<uint16_t,N> = OpBitcast $value
     };
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     default:
         VECTOR_MAP_UNARY(uint16_t, N, asuint16, value);
     }
@@ -7502,7 +7520,7 @@ matrix<uint16_t,R,C> asuint16<let R : int, let C : int>(matrix<float16_t,R,C> va
 // Unsigned->float cases:
 
 [__readNone]
-[require(cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 float16_t asfloat16(uint16_t value)
 {
     __target_switch
@@ -7513,6 +7531,7 @@ float16_t asfloat16(uint16_t value)
     case spirv: return spirv_asm {
         OpBitcast $$float16_t result $value
     };
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     }
 }
 
@@ -7525,6 +7544,7 @@ vector<float16_t,N> asfloat16<let N : int>(vector<uint16_t,N> value)
     case spirv: return spirv_asm {
         result:$$vector<float16_t,N> = OpBitcast $value
     };
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     default:
         VECTOR_MAP_UNARY(float16_t, N, asfloat16, value);
     }
@@ -7548,6 +7568,7 @@ int16_t asint16(float16_t value)
     case spirv: return spirv_asm {
         OpBitcast $$int16_t result $value
     };
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     default: return asuint16(value);
     }
 }
@@ -7560,6 +7581,7 @@ vector<int16_t,N> asint16<let N : int>(vector<float16_t,N> value)
     {
     case hlsl: __intrinsic_asm "asint16";
     case metal: __intrinsic_asm "as_type<$TR>($0)";
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     default: return asuint16(value);
     }
 }
@@ -7587,6 +7609,7 @@ float16_t asfloat16(int16_t value)
     case spirv: return spirv_asm {
         OpBitcast $$float16_t result $value
     };
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     default: return asfloat16(asuint16(value));
     }
 }
@@ -7602,6 +7625,7 @@ vector<float16_t,N> asfloat16<let N : int>(vector<int16_t,N> value)
     case spirv: return spirv_asm {
         OpBitcast $$vector<float16_t,N> result $value
     };
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     default: return asfloat16(asuint16(value));
     }
 }
@@ -7655,6 +7679,7 @@ vector<T, N> atan(vector<T, N> x)
         OpExtInst $$vector<T, N> result glsl450 Atan $x
     };
     case wgsl: __intrinsic_asm "atan";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.atan($0)";
     default:
         VECTOR_MAP_UNARY(T, N, atan, x);
     }
@@ -7825,6 +7850,7 @@ vector<T, N> ceil(vector<T, N> x)
         OpExtInst $$vector<T, N> result glsl450 Ceil $x
     };
     case wgsl: __intrinsic_asm "ceil";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.ceil($0)";
     default:
         VECTOR_MAP_UNARY(T, N, ceil, x);
     }
@@ -8155,6 +8181,7 @@ vector<T, N> cos(vector<T, N> x)
         OpExtInst $$vector<T, N> result glsl450 Cos $x
     };
     case wgsl: __intrinsic_asm "cos";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.cos($0)";
     default:
         VECTOR_MAP_UNARY(T,N, cos, x);
     }
@@ -8842,7 +8869,7 @@ void DeviceMemoryBarrierWithGroupSync()
 /// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T distance(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
@@ -8861,7 +8888,7 @@ T distance(vector<T, N> x, vector<T, N> y)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T distance(T x, T y)
 {
     __target_switch
@@ -9309,7 +9336,7 @@ matrix<T,N,M> EvaluateAttributeSnapped(__constref matrix<T,N,M> x, int2 offset)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T exp(T x)
 {
     __target_switch
@@ -9323,13 +9350,14 @@ T exp(T x)
         OpExtInst $$T result glsl450 Exp $x
     };
     case wgsl: __intrinsic_asm "exp";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.exp($0)";
     }
 }
 
 /// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> exp(vector<T, N> x)
 {
     __target_switch
@@ -9341,6 +9369,7 @@ vector<T, N> exp(vector<T, N> x)
         OpExtInst $$vector<T, N> result glsl450 Exp $x
     };
     case wgsl: __intrinsic_asm "exp";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.exp($0)";
     default:
         VECTOR_MAP_UNARY(T, N, exp, x);
     }
@@ -9366,7 +9395,7 @@ matrix<T, N, M> exp(matrix<T, N, M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T exp2(T x)
 {
     __target_switch
@@ -9394,13 +9423,15 @@ T exp2(T x)
         __intrinsic_asm "$P_exp2($0)";
     case wgsl:
         __intrinsic_asm "exp2";
+    case llvm:
+        __intrinsic_asm "%result = call $T0 @llvm.exp2($0)";
     }
 
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> exp2(vector<T,N> x)
 {
     __target_switch
@@ -9413,6 +9444,7 @@ vector<T,N> exp2(vector<T,N> x)
         OpExtInst $$vector<T,N> result glsl450 Exp2 $x
     };
     case wgsl: __intrinsic_asm "exp2";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.exp2($0)";
     default:
         VECTOR_MAP_UNARY(T, N, exp2, x);
     }
@@ -9420,7 +9452,7 @@ vector<T,N> exp2(vector<T,N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,N,M> exp2(matrix<T,N,M> x)
 {
     __target_switch
@@ -9925,6 +9957,7 @@ vector<T, N> floor(vector<T, N> x)
         OpExtInst $$vector<T, N> result glsl450 Floor $x
     };
     case wgsl: __intrinsic_asm "floor";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.floor($0)";
     default:
         VECTOR_MAP_UNARY(T, N, floor, x);
     }
@@ -10126,7 +10159,7 @@ matrix<T, N, M> fmod(matrix<T, N, M> x, matrix<T, N, M> y)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T frac(T x)
 {
     __target_switch
@@ -10140,12 +10173,14 @@ T frac(T x)
         OpExtInst $$T result glsl450 Fract $x
     };
     case wgsl: __intrinsic_asm "fract";
+    default:
+        return x - floor(x);
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> frac(vector<T, N> x)
 {
     __target_switch
@@ -10157,6 +10192,8 @@ vector<T, N> frac(vector<T, N> x)
         OpExtInst $$vector<T, N> result glsl450 Fract $x
     };
     case wgsl: __intrinsic_asm "fract";
+    case llvm:
+        return x - floor(x);
     default:
         VECTOR_MAP_UNARY(T, N, frac, x);
     }
@@ -11031,7 +11068,7 @@ matrix<bool, N, M> isnan(matrix<T, N, M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T ldexp(T x, T exp)
 {
     __target_switch
@@ -11046,7 +11083,7 @@ T ldexp(T x, T exp)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> ldexp(vector<T, N> x, vector<T, N> exp)
 {
     __target_switch
@@ -11061,7 +11098,7 @@ vector<T, N> ldexp(vector<T, N> x, vector<T, N> exp)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> ldexp(matrix<T, N, M> x, matrix<T, N, M> exp)
 {
     __target_switch
@@ -11074,7 +11111,7 @@ matrix<T, N, M> ldexp(matrix<T, N, M> x, matrix<T, N, M> exp)
 
 __generic<T : __BuiltinFloatingPointType, E : __BuiltinIntegerType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T ldexp(T x, E exp)
 {
     __target_switch
@@ -11086,6 +11123,7 @@ T ldexp(T x, E exp)
         OpExtInst $$T result glsl450 Ldexp $x $exp
     };
     case wgsl: __intrinsic_asm "ldexp";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.ldexp($0, $1)";
     default:
         return ldexp(x, __realCast<T>(exp));
     }
@@ -11093,7 +11131,7 @@ T ldexp(T x, E exp)
 
 __generic<T : __BuiltinFloatingPointType, E : __BuiltinIntegerType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> ldexp(vector<T, N> x, vector<E, N> exp)
 {
     __target_switch
@@ -11105,6 +11143,7 @@ vector<T, N> ldexp(vector<T, N> x, vector<E, N> exp)
         OpExtInst $$vector<T,N> result glsl450 Ldexp $x $exp
     };
     case wgsl: __intrinsic_asm "ldexp";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.ldexp($0, $1)";
     default:
         vector<T,N> temp;
         [ForceUnroll]
@@ -11269,6 +11308,7 @@ vector<T, N> log(vector<T, N> x)
         OpExtInst $$vector<T, N> result glsl450 Log $x
     };
     case wgsl: __intrinsic_asm "log";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.log($0)";
     default:
         VECTOR_MAP_UNARY(T, N, log, x);
     }
@@ -11335,6 +11375,7 @@ vector<T,N> log10(vector<T,N> x)
             result:$$vector<T,N> = OpVectorTimesScalar %baseElog $tmp
         };
     }
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.log10($0)";
     default:
         VECTOR_MAP_UNARY(T, N, log10, x);
     }
@@ -11391,6 +11432,7 @@ vector<T,N> log2(vector<T,N> x)
         OpExtInst $$vector<T,N> result glsl450 Log2 $x
     };
     case wgsl: __intrinsic_asm "log2";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.log2($0)";
     default:
         VECTOR_MAP_UNARY(T, N, log2, x);
     }
@@ -11449,6 +11491,7 @@ vector<T, N> mad(vector<T, N> mvalue, vector<T, N> avalue, vector<T, N> bvalue)
         OpExtInst $$vector<T, N> result glsl450 Fma $mvalue $avalue $bvalue
     };
     case wgsl: __intrinsic_asm "fma";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.fma($0, $1, $2)";
     default:
         VECTOR_MAP_TRINARY(T, N, mad, mvalue, avalue, bvalue);
     }
@@ -11591,6 +11634,13 @@ vector<T, N> max(vector<T, N> x, vector<T, N> y)
         }
     }
     case wgsl: __intrinsic_asm "max";
+    case llvm:
+    {
+        if (__isSignedInt<T>())
+            __intrinsic_asm "%result = call $T0 @llvm.smax($0, $1)";
+        else
+            __intrinsic_asm "%result = call $T0 @llvm.umax($0, $1)";
+    }
     default:
         VECTOR_MAP_BINARY(T, N, max, x, y);
     }
@@ -11644,6 +11694,7 @@ vector<T, N> max(vector<T, N> x, vector<T, N> y)
         result:$$vector<T, N> = OpExtInst glsl450 FMax $x $y
     };
     case wgsl: __intrinsic_asm "max";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.maximumnum($0, $1)";
     default:
         VECTOR_MAP_BINARY(T, N, max, x, y);
     }
@@ -11826,6 +11877,13 @@ vector<T,N> min(vector<T,N> x, vector<T,N> y)
             };
     }
     case wgsl: __intrinsic_asm "min";
+    case llvm:
+    {
+        if (__isSignedInt<T>())
+            __intrinsic_asm "%result = call $T0 @llvm.smin($0, $1)";
+        else
+            __intrinsic_asm "%result = call $T0 @llvm.umin($0, $1)";
+    }
     default:
         VECTOR_MAP_BINARY(T, N, min, x, y);
     }
@@ -11878,6 +11936,7 @@ vector<T,N> min(vector<T,N> x, vector<T,N> y)
         result:$$vector<T,N> = OpExtInst glsl450 FMin $x $y
     };
     case wgsl: __intrinsic_asm "min";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.minimumnum($0, $1)";
     default:
         VECTOR_MAP_BINARY(T, N, min, x, y);
     }
@@ -12687,7 +12746,7 @@ T pow(T x, T y)
         OpExtInst $$T result glsl450 Pow $x $y
     };
     case wgsl: __intrinsic_asm "pow";
-    case llvm: __intrinsic_asm "%result = call $T0 @llvm.pow($0)";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.pow($0, $1)";
     }
 }
 
@@ -12705,6 +12764,7 @@ vector<T, N> pow(vector<T, N> x, vector<T, N> y)
         OpExtInst $$vector<T, N> result glsl450 Pow $x $y
     };
     case wgsl: __intrinsic_asm "pow";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.pow($0, $1)";
     default:
         VECTOR_MAP_BINARY(T, N, pow, x, y);
     }
@@ -12949,6 +13009,7 @@ vector<T, N> rcp(vector<T, N> x)
     case glsl:
     case spirv:
     case wgsl:
+    case llvm:
         return T(1.0) / x;
     default:
         VECTOR_MAP_UNARY(T, N, rcp, x);
@@ -13253,6 +13314,8 @@ vector<T, N> rsqrt(vector<T, N> x)
     case spirv: return spirv_asm {
         OpExtInst $$vector<T, N> result glsl450 InverseSqrt $x
     };
+    case llvm:
+        return vector<T, N>(1.0) / sqrt(x);
     default:
         VECTOR_MAP_UNARY(T, N, rsqrt, x);
     }
@@ -13394,6 +13457,8 @@ int sign(T x)
         else
             return __int_cast<int>(spirv_asm {OpExtInst $$T result glsl450 SSign $x});
     case wgsl: __intrinsic_asm "i32(sign($0))";
+    default:
+        return x == T(0) ? 0 : (x < T(0) ? -1 : 1);
     }
 }
 
@@ -13418,6 +13483,11 @@ vector<int, N> sign(vector<T, N> x)
         else
             return __int_cast<int>(spirv_asm {OpExtInst $$vector<T,N> result glsl450 SSign $x});
     case wgsl: __intrinsic_asm "vec$N0<i32>(sign($0))";
+    case llvm:
+        return select(
+            x == vector<T, N>(0),
+            vector<int, N>(0),
+            select(x < vector<T, N>(0), vector<int, N>(-1), vector<int, N>(1)));
     default:
         VECTOR_MAP_UNARY(int, N, sign, x);
     }
@@ -13474,6 +13544,7 @@ vector<T, N> sin(vector<T, N> x)
         OpExtInst $$vector<T, N> result glsl450 Sin $x
     };
     case wgsl: __intrinsic_asm "sin";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.sin($0)";
     default:
         VECTOR_MAP_UNARY(T, N, sin, x);
     }
@@ -13535,6 +13606,7 @@ void sincos(T x, out T s, out T c)
         //__intrinsic_asm "*($1) = sincos($0, *($2))";
         s = __sincos_metal(x, c);
         return;
+    case llvm: __intrinsic_asm "%parts = call { $T0, $T0 } @llvm.sincos($0)\n%sinval = extractvalue {$T0, $T0} %parts, 0\n%cosval = extractvalue {$T0, $T0} %parts, 1\nstore $T0 %sinval, $1\nstore $T0 %cosval, $2\n";
     default:
         s = sin(x);
         c = cos(x);
@@ -13554,6 +13626,7 @@ void sincos(vector<T,N> x, out vector<T,N> s, out vector<T,N> c)
         //__intrinsic_asm "*($1) = sincos($0, *($2))";
         s = __sincos_metal(x, c);
         return;
+    case llvm: __intrinsic_asm "%parts = call { $T0, $T0 } @llvm.sincos($0)\n%sinval = extractvalue {$T0, $T0} %parts, 0\n%cosval = extractvalue {$T0, $T0} %parts, 1\nstore $T0 %sinval, $1\nstore $T0 %cosval, $2\n";
     default:
         s = sin(x);
         c = cos(x);
@@ -13613,6 +13686,7 @@ vector<T, N> sinh(vector<T, N> x)
         OpExtInst $$vector<T, N> result glsl450 Sinh $x
     };
     case wgsl: __intrinsic_asm "sinh";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.sinh($0)";
     default:
         VECTOR_MAP_UNARY(T, N, sinh, x);
     }
@@ -13758,6 +13832,7 @@ vector<T, N> sqrt(vector<T, N> x)
         OpExtInst $$vector<T, N> result glsl450 Sqrt $x
     };
     case wgsl: __intrinsic_asm "sqrt";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.sqrt($0)";
     default:
         VECTOR_MAP_UNARY(T, N, sqrt, x);
     }
@@ -13870,6 +13945,7 @@ vector<T, N> tan(vector<T, N> x)
         OpExtInst $$vector<T, N> result glsl450 Tan $x
     };
     case wgsl: __intrinsic_asm "tan";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.tan($0)";
     default:
         VECTOR_MAP_UNARY(T, N, tan, x);
     }
@@ -13926,6 +14002,7 @@ vector<T,N> tanh(vector<T,N> x)
         OpExtInst $$vector<T,N> result glsl450 Tanh $x
     };
     case wgsl: __intrinsic_asm "tanh";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.tanh($0)";
     default:
         VECTOR_MAP_UNARY(T, N, tanh, x);
     }
@@ -14046,7 +14123,7 @@ matrix<T, M, N> transpose(matrix<T, N, M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T trunc(T x)
 {
     __target_switch
@@ -14060,12 +14137,13 @@ T trunc(T x)
         OpExtInst $$T result glsl450 Trunc $x
     };
     case wgsl: __intrinsic_asm "trunc";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.trunc($0)";
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> trunc(vector<T, N> x)
 {
     __target_switch
@@ -14077,6 +14155,7 @@ vector<T, N> trunc(vector<T, N> x)
         OpExtInst $$vector<T, N> result glsl450 Trunc $x
     };
     case wgsl: __intrinsic_asm "trunc";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.trunc($0)";
     default:
         VECTOR_MAP_UNARY(T, N, trunc, x);
     }
@@ -14084,7 +14163,7 @@ vector<T, N> trunc(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> trunc(matrix<T, N, M> x)
 {
     __target_switch
