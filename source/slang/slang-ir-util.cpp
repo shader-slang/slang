@@ -2560,4 +2560,22 @@ bool isPointerToImmutableLocation(IRInst* loc)
     }
     return false;
 }
+
+bool isGenericParameter(IRInst* inst)
+{
+    // The generic parameter must be in the first block
+    bool isParam = inst->getOp() == kIROp_Param;
+    bool isGeneric = false;
+    if (auto irBlock = as<IRBlock>(inst->parent))
+    {
+        isGeneric = as<IRGeneric>(irBlock->getParent()) != nullptr;
+    }
+    return isParam && isGeneric;
+}
+
+bool canRelaxInstOrderRule(IRInst* inst, IRInst* useOfInst)
+{
+    return isGenericParameter(useOfInst) && (useOfInst->getDataType() == inst);
+}
+
 } // namespace Slang

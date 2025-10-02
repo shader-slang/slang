@@ -203,7 +203,7 @@ void validateIRInstOperand(IRValidateContext* context, IRInst* inst, IRUse* oper
                 {
                     validate(
                         context,
-                        context->seenInsts.contains(operandValue),
+                        context->seenInsts.contains(operandValue) || canRelaxInstOrderRule(operandValue, inst),
                         inst,
                         "def must come before use in same block");
                 }

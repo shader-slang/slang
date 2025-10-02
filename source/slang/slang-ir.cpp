@@ -8164,7 +8164,7 @@ static void _maybeHoistOperand(IRUse* use)
                 continue;
 
             // If the operand is defined after user, move it to before user.
-            if (_isInstDefinedAfter(operand, user))
+            if (_isInstDefinedAfter(operand, user) && !canRelaxInstOrderRule(operand, user))
             {
                 operand->insertBefore(user);
                 for (UInt i = 0; i < operand->getOperandCount(); i++)
