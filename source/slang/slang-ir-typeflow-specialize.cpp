@@ -77,24 +77,6 @@ struct Element
                 SLANG_ASSERT(foundParent);
             }
             break;
-        case kIROp_BoundVal:
-            {
-                auto boundVal = cast<IRBoundVal>(context);
-                auto block = cast<IRBlock>(inst->getParent());
-                auto parentVal = block->getParent();
-
-                for (auto bindingContext = boundVal; bindingContext;
-                     bindingContext = as<IRBoundVal>(bindingContext)->getOuter())
-                {
-                    if (bindingContext->getBase() == parentVal)
-                    {
-                        return;
-                    }
-                }
-
-                SLANG_ASSERT(!"Binding context has no parent for the inst");
-            }
-            break;
         default:
             {
                 SLANG_UNEXPECTED("Invalid context for Element");
@@ -1009,18 +991,6 @@ struct TypeFlowSpecializationContext
 
     IRInst* analyzeTranslation(IRInst* context, IRInst* inst)
     {
-        // Collect operand infos.
-        List<IRInst*> operandBoundVals;
-        for (UInt i = 0; i < inst->getOperandCount(); i++)
-        {
-            auto operand = inst->getOperand(i);
-            auto operandInfo = tryGetInfo(context, operand);
-            if (!operandInfo)
-                return none();
-            SLANG_ASSERT(operandInfo);
-        }
-
-        /*
         auto info = tryGetInfo(context, inst->getOperand(0));
         if (!info)
             return none();
@@ -1036,58 +1006,18 @@ struct TypeFlowSpecializationContext
         else
             SLANG_UNEXPECTED("Unexpected info type for translation.");
 
-        List<IRInst*> nullArgs;
-        UCount translatedInstArgCount = cast<IRFuncType>(inst->getDataType())->getParamCount();
-        for (Index i = 0; i < translatedInstArgCount; ++i)
-            nullArgs.add(nullptr);
-
-        HashSet<IRInst*> resultSet;
-
-        SLANG_ASSERT(collection->isSingleton());
-
         forEachInCollection(
             collection,
-            [&](IRInst* element)
+            [&](IRInst* instElement)
             {
-                // Stick the translation op onto the base.
-                //
-                // Importantly, we're building up a 'callable' object with
-                // bindings for parameters, parent generics, etc..
-                // but we won't actually materialize the expensive
-                // translation until an inter-prodecural edge forces us to (in which
-                // case we can be reasonably sure that the translated method will
-                // actually be called).
-                //
-                auto boundVal = cast<IRBoundVal>(element);
-                auto target = boundVal->getBase();
-                auto translatedTarget =
-                    builder.emitIntrinsicInst(nullptr, inst->getOp(), 1, &target);
-
-                // Default context for the new bound val.
-                auto newBoundVal =
-                    builder.getBoundVal(boundVal->getOuter(), translatedTarget, nullArgs);
-
-                resultSet.add(newBoundVal);
+                if (auto specInst = as<IRSpecialize>(instElement))
+                {
+                }
+                else
+                {
+                    SLANG_UNEXPECTED("Unexpected element type in translation collection.");
+                }
             });
-
-        return cBuilder.makeSet(resultSet);
-        */
-    }
-
-    IRInst* analyzeFunc(IRInst* context, IRInst* inst)
-    {
-        // We're probably inside a generic (shouldn't see this in any other case..)
-        IRBuilder builder(module);
-
-        auto parentContext = cast<IRBoundVal>(context);
-        SLANG_ASSERT(as<IRGeneric>(parentContext->getBase()));
-
-        auto funcType = cast<IRFuncType>(inst->getDataType());
-        List<IRInst*> nullArgs;
-        for (Index i = 0; i < funcType->getParamCount(); ++i)
-            nullArgs.add(nullptr);
-
-        return cBuilder.makeSingletonSet(builder.getBoundVal(parentContext, inst, nullArgs));
     }
 
     void processInstForPropagation(IRInst* context, IRInst* inst, WorkQueue& workQueue)
@@ -1146,9 +1076,6 @@ struct TypeFlowSpecializationContext
             break;
         case kIROp_FieldExtract:
             info = analyzeFieldExtract(context, as<IRFieldExtract>(inst));
-            break;
-        case kIROp_Func:
-            info = analyzeFunc(context, as<IRFunc>(inst));
             break;
         default:
             info = analyzeDefault(context, inst);
@@ -1753,74 +1680,12 @@ struct TypeFlowSpecializationContext
         }
     }
 
-    IRInst* findContextForCall(IRInst* callee, List<IRInst*>& argInfos)
-    {
-        switch (callee->getOp())
-        {
-        case kIROp_Func:
-            {
-                // Default to a single realization of a func.
-                //
-                // We can do multiple later if needed.
-                //
-                if (!mostGeneralContextMap.containsKey(callee))
-                {
-                    List<IRInst*> nullArgs;
-                    for (auto arg : argInfos)
-                        nullArgs.add(nullptr);
-                    IRBuilder builder(module);
-                    mostGeneralContextMap[callee] =
-                        builder.getWeakUse(builder.getBoundVal(nullptr, callee, nullArgs));
-                }
-
-                return mostGeneralContextMap[callee];
-            }
-            break;
-        case kIROp_Generic:
-            {
-                IRBuilder builder(module);
-                return builder.getBoundVal(nullptr, callee, argInfos);
-            }
-            break;
-        case kIROp_BoundVal:
-            {
-                auto base = cast<IRBoundVal>(callee)->getBase();
-
-                // Wont try to narrow the context for funcs, just return the existing
-                // context (which should necessarily be compatible)
-                //
-                if (as<IRFunc>(base))
-                    return callee;
-
-                if (as<IRGeneric>(base))
-                {
-                    IRBuilder builder(module);
-                    List<IRInst*> baseArgs;
-                    for (auto argBinding : cast<IRBoundVal>(callee)->getArgBindings())
-                        baseArgs.add(argBinding);
-
-                    return builder.getBoundVal(nullptr, base, baseArgs);
-                }
-            }
-        }
-    }
-
     IRInst* _analyzeInvoke(IRInst* context, IRInst* inst, WorkQueue& workQueue)
     {
         SLANG_ASSERT(as<IRSpecialize>(inst) || as<IRCall>(inst));
 
-        // auto callee = resolve(inst->getOperand(0));
-        auto calleeInfo = tryGetInfo(context, inst->getOperand(0));
-
-        List<IRInst*> argInfos;
-        for (UInt i = 1; i < inst->getOperandCount(); ++i)
-        {
-            auto arg = inst->getOperand(i);
-            if (auto argInfo = tryGetInfo(context, arg))
-                argInfos.add(argInfo);
-            else
-                argInfos.add(nullptr);
-        }
+        auto callee = resolve(inst->getOperand(0));
+        auto calleeInfo = tryGetInfo(context, callee);
 
         //
         // Propagate the input judgments to the call & append a work item
@@ -1847,12 +1712,9 @@ struct TypeFlowSpecializationContext
             // Note that doing this only when we need to create an inter-procedural
             // edge makes sure that translations only happen when necessary.
             //
-
-            // auto resolvedCallee = getResolvedGlobalInst(callee);
-            // if (resolvedCallee != callee)
-            //     callee->replaceUsesWith(resolvedCallee);
-
-            auto resolvedCallee = findContextForCall(callee, argInfos);
+            auto resolvedCallee = getResolvedGlobalInst(callee);
+            if (resolvedCallee != callee)
+                callee->replaceUsesWith(resolvedCallee);
 
             discoverContext(resolvedCallee, workQueue);
 
@@ -3935,16 +3797,6 @@ struct TypeFlowSpecializationContext
     // translation insts.
     //
     TranslationContext translationContext;
-
-    //
-    // Callee context maps.
-    //
-
-    // Map from a callee to "most general version".
-    // We default to this context when calling, unless
-    // we decide to create a different, more specialized context
-    //
-    Dictionary<IRInst*, IRInst*> mostGeneralContextMap;
 };
 
 // Main entry point

@@ -2268,12 +2268,7 @@ local insts = {
 	{ GetSequentialIDFromTag = {
 		-- Translate a tag from the given collection (a 'local' ID) to a sequential ID (a 'global' ID)
 	} },
-	{ WeakUse = { 
-		hoistable = true 
-	} },
-	{ BoundVal = { 
-		hoistable = true
-	} }
+	{ WeakUse = { hoistable = true } }
 }
 
 -- A function to calculate some useful properties and put it in the table,
