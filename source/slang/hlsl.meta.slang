@@ -39,6 +39,7 @@ struct DefaultPushConstantDataLayout : IBufferDataLayout
 __intrinsic_type($(kIROp_Std140BufferLayoutType))
 [require(spirv)]
 [require(glsl)]
+[require(wgsl)]
 __magic_type(Std140DataLayoutType)
 struct Std140DataLayout : IBufferDataLayout
 {};
@@ -47,6 +48,7 @@ struct Std140DataLayout : IBufferDataLayout
 __intrinsic_type($(kIROp_Std430BufferLayoutType))
 [require(spirv)]
 [require(glsl)]
+[require(wgsl)]
 __magic_type(Std430DataLayoutType)
 struct Std430DataLayout : IBufferDataLayout
 {};
