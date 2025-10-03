@@ -1965,10 +1965,29 @@ struct LLVMEmitter
         return llvmBuilder->CreateCmp(pred, findValue(inst->getOperand(0)), findValue(inst->getOperand(1)));
     }
 
+    llvm::Value* _coerceNumeric(llvm::Value* val, llvm::Type* type, bool isSigned)
+    {
+        auto valWidth = val->getType()->getPrimitiveSizeInBits();
+        auto targetWidth = type->getPrimitiveSizeInBits();
+        bool isFloat = type->isFloatTy();
+
+        if (valWidth < targetWidth)
+        {
+            return isFloat ? llvmBuilder->CreateFPExt(val, type) :
+                isSigned ? llvmBuilder->CreateSExt(val, type) : llvmBuilder->CreateZExt(val, type);
+        }
+        else if (valWidth > targetWidth)
+        {
+            return isFloat ? llvmBuilder->CreateFPTrunc(val, type) : llvmBuilder->CreateTrunc(val, type);
+        }
+        return val;
+    }
+
     llvm::Value* _emitArithmetic(IRInst* inst)
     {
         bool isFloat, isSigned;
         getUnderlyingTypeInfo(inst, isFloat, isSigned);
+        auto resultType = types->getValueType(inst->getDataType());
 
         if (inst->getOperandCount() == 1)
         {
@@ -2033,7 +2052,14 @@ struct LLVMEmitter
                 SLANG_UNEXPECTED("Unsupported binary arithmetic op");
                 break;
             }
-            return llvmBuilder->CreateBinOp(op, findValue(inst->getOperand(0)), findValue(inst->getOperand(1)));
+
+            // Some ops in Slang, e.g. Lsh, may have differing types for the
+            // operands. This is not allowed by LLVM. Both sides must match
+            // the result type. Hence, we coerce as needed.
+            auto a = _coerceNumeric(findValue(inst->getOperand(0)), resultType, isSigned);
+            auto b = _coerceNumeric(findValue(inst->getOperand(1)), resultType, isSigned);
+
+            return llvmBuilder->CreateBinOp(op, a, b);
         }
         else
         {
@@ -2276,6 +2302,20 @@ struct LLVMEmitter
                 {
                     llvmInst = llvm::PoisonValue::get(types->getValueType(type));
                 }
+            }
+            break;
+
+        case kIROp_MakeUInt64:
+            {
+                auto lowbits = findValue(inst->getOperand(0));
+                auto highbits = findValue(inst->getOperand(1));
+
+                auto i64Type = llvmBuilder->getInt64Ty();
+
+                lowbits = llvmBuilder->CreateZExt(lowbits, i64Type);
+                highbits = llvmBuilder->CreateZExt(highbits, i64Type);
+                highbits = llvmBuilder->CreateShl(highbits, llvmBuilder->getInt64(32));
+                llvmInst = llvmBuilder->CreateOr(lowbits, highbits);
             }
             break;
 
