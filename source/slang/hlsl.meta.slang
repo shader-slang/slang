@@ -6898,7 +6898,7 @@ bool any(matrix<T, N, M> x)
 /// @category conversion
 __glsl_extension(GL_ARB_gpu_shader5)
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 double asdouble(uint lowbits, uint highbits)
 {
     __target_switch
@@ -6911,12 +6911,15 @@ double asdouble(uint lowbits, uint highbits)
         %v:$$uint2 = OpCompositeConstruct $lowbits $highbits;
         result:$$double = OpExtInst glsl450 59 %v
     };
+    case llvm:
+        uint64_t val = uint64_t(lowbits) | (uint64_t(highbits)<<32u);
+        return bit_cast<double>(val);
     }
 }
 
 __glsl_extension(GL_ARB_gpu_shader5)
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 double2 asdouble(uint2 lowbits, uint2 highbits)
 {
     __target_switch
@@ -7295,7 +7298,7 @@ matrix<int,N,M> asint(matrix<int,N,M> x)
 /// @category conversion
 __glsl_extension(GL_ARB_gpu_shader5)
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_4_0)]
 void asuint(double value, out uint lowbits, out uint highbits)
 {
     __target_switch
@@ -7312,6 +7315,11 @@ void asuint(double value, out uint lowbits, out uint highbits)
         };
         lowbits = uv.x;
         highbits = uv.y;
+        return;
+    case llvm:
+        let value = bit_cast<uint64_t>(value);
+        lowbits = uint(value);
+        highbits = uint(value>>32u);
         return;
     }
 }
