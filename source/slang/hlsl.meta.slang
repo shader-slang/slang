@@ -6758,7 +6758,7 @@ matrix<T, N, M> acosh(matrix<T, N, M> x)
 // Test if all components are non-zero.
 __generic<T : __BuiltinType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 bool all(T x)
 {
     __target_switch
@@ -6783,6 +6783,15 @@ bool all(T x)
             return __slang_noop_cast<bool>(x);
         else
             return false;
+    case llvm:
+        if (__isFloat<T>())
+            __intrinsic_asm "%result = fcmp une $0, 0.0";
+        else if (__isInt<T>())
+            __intrinsic_asm "%result = icmp ne $0, 0";
+        else if (__isBool<T>())
+            __intrinsic_asm "ret $0";
+        else
+            return false;
     default:
         __intrinsic_asm "bool($0)";
     }
@@ -6790,7 +6799,7 @@ bool all(T x)
 
 __generic<T : __BuiltinType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 bool all(vector<T,N> x)
 {
     if(N == 1)
@@ -6851,7 +6860,7 @@ bool all(vector<T,N> x)
 
 __generic<T : __BuiltinType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 bool all(matrix<T,N,M> x)
 {
     __target_switch
@@ -6931,7 +6940,7 @@ uint3 WorkgroupCount()
 
 __generic<T : __BuiltinType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 bool any(T x)
 {
     __target_switch
@@ -6960,12 +6969,21 @@ bool any(T x)
         else if (__isBool<T>())
             return __slang_noop_cast<bool>(x);
         return false;
+    case llvm:
+        if (__isFloat<T>())
+            __intrinsic_asm "%result = fcmp une $0, 0.0";
+        else if (__isInt<T>())
+            __intrinsic_asm "%result = icmp ne $0, 0";
+        else if (__isBool<T>())
+            __intrinsic_asm "ret $0";
+        else
+            return false;
     }
 }
 
 __generic<T : __BuiltinType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 bool any(vector<T, N> x)
 {
     if(N == 1)
@@ -7034,7 +7052,7 @@ bool any(vector<T, N> x)
 
 __generic<T : __BuiltinType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 bool any(matrix<T, N, M> x)
 {
     __target_switch

@@ -1099,10 +1099,20 @@ public:
                 List<llvm::Constant*> values;
                 for (UInt aa = 0; aa < inst->getOperandCount(); ++aa)
                 {
-                    auto constVal = maybeEmitConstant(inst->getOperand(aa), storage);
+                    auto partInst = inst->getOperand(aa);
+                    auto constVal = maybeEmitConstant(partInst, storage);
                     if (!constVal)
                         return nullptr;
-                    values.add(constVal);
+                    if (auto subvectorType = as<IRVectorType>(partInst->getDataType()))
+                    {
+                        auto elemCount = getIntVal(subvectorType->getElementCount());
+                        for (IRIntegerValue j = 0; j < elemCount; ++j)
+                        {
+                            auto index = llvm::ConstantInt::get(builder->getInt32Ty(), j);
+                            values.add(llvm::ConstantExpr::getExtractElement(constVal, index));
+                        }
+                    }
+                    else values.add(constVal);
                 }
 
                 if (defaultPointerRules && storage)
@@ -1962,7 +1972,10 @@ struct LLVMEmitter
         }
 
         SLANG_ASSERT(inst->getOperandCount() == 2);
-        return llvmBuilder->CreateCmp(pred, findValue(inst->getOperand(0)), findValue(inst->getOperand(1)));
+
+        auto a = findValue(inst->getOperand(0));
+        auto b = findValue(inst->getOperand(1));
+        return llvmBuilder->CreateCmp(pred, a, b);
     }
 
     llvm::Value* _coerceNumeric(llvm::Value* val, llvm::Type* type, bool isSigned)
@@ -2344,9 +2357,27 @@ struct LLVMEmitter
             {
                 auto llvmType = types->getValueType(inst->getDataType());
                 llvmInst = llvm::PoisonValue::get(llvmType);
+                UInt elemIndex = 0;
                 for (UInt aa = 0; aa < inst->getOperandCount(); ++aa)
                 {
-                    llvmInst = llvmBuilder->CreateInsertElement(llvmInst, findValue(inst->getOperand(aa)), aa);
+                    auto val = findValue(inst->getOperand(aa));
+                    auto valType = val->getType();
+                    if (valType->isVectorTy())
+                    {
+                        auto vecType = llvm::cast<llvm::FixedVectorType>(valType);
+                        auto elemCount = vecType->getNumElements();
+                        for (UInt j = 0; j < elemCount; ++j)
+                        {
+                            auto entry = llvmBuilder->CreateExtractElement(val, j);
+                            llvmInst = llvmBuilder->CreateInsertElement(llvmInst, entry, elemIndex);
+                            elemIndex++;
+                        }
+                    }
+                    else
+                    {
+                        llvmInst = llvmBuilder->CreateInsertElement(llvmInst, val, elemIndex);
+                        elemIndex++;
+                    }
                 }
             }
             break;
