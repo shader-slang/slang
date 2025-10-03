@@ -9924,6 +9924,38 @@ internal uint __metal_ctz(uint value)
     }
 }
 
+internal int __llvm_ctlz(int value)
+{
+    __target_switch
+    {
+    case llvm: __intrinsic_asm "%result = call i32 @llvm.ctlz($0, i1 1)";
+    }
+}
+
+internal uint __llvm_ctlz(uint value)
+{
+    __target_switch
+    {
+    case llvm: __intrinsic_asm "%result = call i32 @llvm.ctlz($0, i1 1)";
+    }
+}
+
+internal int __llvm_cttz(int value)
+{
+    __target_switch
+    {
+    case llvm: __intrinsic_asm "%result = call i32 @llvm.cttz($0, i1 1)";
+    }
+}
+
+internal uint __llvm_cttz(uint value)
+{
+    __target_switch
+    {
+    case llvm: __intrinsic_asm "%result = call i32 @llvm.cttz($0, i1 1)";
+    }
+}
+
 /// Find first set bit starting at high bit and working down.
 /// @param value The value to find set bits in.
 /// @return The bit index number of the most significant bit,
@@ -9935,7 +9967,7 @@ internal uint __metal_ctz(uint value)
 ///          or `FindUMsb` if `value` is unsigned.
 /// @category bitops Bit operation functions
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 int firstbithigh(int value)
 {
     __target_switch
@@ -9956,12 +9988,20 @@ int firstbithigh(int value)
         OpExtInst $$int result glsl450 FindSMsb $value
     };
     case wgsl: __intrinsic_asm "firstLeadingBit";
+    case llvm:
+        {
+            if ((int)value < 0)
+                value = ~value;
+            if (value == 0)
+                return ~0u;
+            return 31 - __llvm_ctlz(value);
+        }
     }
 }
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 vector<int, N> firstbithigh(vector<int, N> value)
 {
     __target_switch
@@ -9978,7 +10018,7 @@ vector<int, N> firstbithigh(vector<int, N> value)
 }
 
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 uint firstbithigh(uint value)
 {
     __target_switch
@@ -9999,12 +10039,20 @@ uint firstbithigh(uint value)
         OpExtInst $$uint result glsl450 FindUMsb $value
     };
     case wgsl: __intrinsic_asm "firstLeadingBit";
+    case llvm:
+        {
+            if ((int)value < 0)
+                value = ~value;
+            if (value == 0)
+                return ~0u;
+            return 31 - __llvm_ctlz(value);
+        }
     }
 }
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 vector<uint,N> firstbithigh(vector<uint,N> value)
 {
     __target_switch
@@ -10027,7 +10075,7 @@ vector<uint,N> firstbithigh(vector<uint,N> value)
 /// @remarks For SPIR-V, this function maps to GLSL extended instruction `FindILsb`.
 /// @category bitops
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 int firstbitlow(int value)
 {
     __target_switch
@@ -10041,12 +10089,13 @@ int firstbitlow(int value)
         OpExtInst $$int result glsl450 FindILsb $value
     };
     case wgsl: __intrinsic_asm "firstTrailingBit";
+    case llvm: return value == 0 ? -1 : __llvm_cttz(value);
     }
 }
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 vector<int,N> firstbitlow(vector<int,N> value)
 {
     __target_switch
@@ -10063,7 +10112,7 @@ vector<int,N> firstbitlow(vector<int,N> value)
 }
 
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 uint firstbitlow(uint value)
 {
     __target_switch
@@ -10077,12 +10126,13 @@ uint firstbitlow(uint value)
         OpExtInst $$uint result glsl450 FindILsb $value
     };
     case wgsl: __intrinsic_asm "firstTrailingBit";
+    case llvm: return value == 0 ? -1 : __llvm_cttz(value);
     }
 }
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 vector<uint,N> firstbitlow(vector<uint,N> value)
 {
     __target_switch
