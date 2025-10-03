@@ -632,9 +632,9 @@ static QualType getParamQualType(ASTBuilder* astBuilder, DeclRef<ParamDecl> para
     bool isLVal = false;
     switch (getParameterDirection(param.getDecl()))
     {
-    case kParameterDirection_InOut:
-    case kParameterDirection_Out:
-    case kParameterDirection_Ref:
+    case ParamPassingMode::BorrowInOut:
+    case ParamPassingMode::Out:
+    case ParamPassingMode::Ref:
         isLVal = true;
         break;
     }
@@ -647,11 +647,11 @@ static QualType getParamQualType(Type* paramType)
     // the accessors for the parameters of a `FuncType` should
     // directly return a `QualType` for each parameter rather than
     // a plain `Type` that potentially includes a wrapping
-    // `ParamDirectionType`.
+    // `ParamPassingModeType`.
     //
     // In addition, the determination of what value category a reference
     // to a parameter should be (and thus what the `QualType` sould be)
-    // should be driven by computing the `ParameterDirection` first,
+    // should be driven by computing the `ParamPassingMode` first,
     // and then using the direction to determine the value category
     // (so as to isolate the code that needs to care about the wrapper
     // types to just the computation of the dirction).
@@ -661,10 +661,10 @@ static QualType getParamQualType(Type* paramType)
     //
     bool isLVal = false;
     Type* valueType = paramType;
-    if (auto paramDirType = as<ParamDirectionType>(paramType))
+    if (auto paramDirType = as<ParamPassingModeType>(paramType))
     {
         valueType = paramDirType->getValueType();
-        if (as<InOutParamType>(paramDirType))
+        if (as<BorrowInOutParamType>(paramDirType))
             isLVal = true;
         if (as<OutParamType>(paramDirType))
             isLVal = true;
@@ -3031,7 +3031,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
         // `openExistential` operation that was applied to `out` arguments.
         //
         auto funcType = context.bestCandidate->funcType;
-        ShortList<ParameterDirection> paramDirections;
+        ShortList<ParamPassingMode> paramDirections;
         if (funcType)
         {
             for (Index i = 0; i < funcType->getParamCount(); i++)
@@ -3053,10 +3053,10 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
             {
                 switch (paramDirections[i])
                 {
-                case kParameterDirection_Out:
-                case kParameterDirection_InOut:
-                case kParameterDirection_Ref:
-                case kParameterDirection_ConstRef:
+                case ParamPassingMode::Out:
+                case ParamPassingMode::BorrowInOut:
+                case ParamPassingMode::Ref:
+                case ParamPassingMode::BorrowIn:
                     break;
                 default:
                     continue;

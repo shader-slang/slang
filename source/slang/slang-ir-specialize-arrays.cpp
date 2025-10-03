@@ -26,19 +26,19 @@ struct ArrayParameterSpecializationCondition : FunctionCallSpecializeCondition
     {
         auto paramType = param->getDataType();
         auto argType = arg->getDataType();
-        if (auto outTypeBase = as<IROutTypeBase>(paramType))
+        if (auto outTypeBase = as<IROutParamTypeBase>(paramType))
         {
             paramType = outTypeBase->getValueType();
             SLANG_ASSERT(as<IRPtrTypeBase>(argType));
             argType = as<IRPtrTypeBase>(argType)->getValueType();
         }
-        else if (auto refType = as<IRRefType>(paramType))
+        else if (auto refType = as<IRRefParamType>(paramType))
         {
             paramType = refType->getValueType();
             SLANG_ASSERT(as<IRPtrTypeBase>(argType));
             argType = as<IRPtrTypeBase>(argType)->getValueType();
         }
-        else if (auto constRefType = as<IRConstRefType>(paramType))
+        else if (auto constRefType = as<IRBorrowInParamType>(paramType))
         {
             paramType = constRefType->getValueType();
             SLANG_ASSERT(as<IRPtrTypeBase>(argType));

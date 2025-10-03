@@ -488,7 +488,7 @@ static bool isValidAtomicDest(bool skipFuncParamValidation, IRInst* dst)
     if (auto param = as<IRParam>(dst))
     {
         auto paramType = param->getDataType();
-        if (auto outType = as<IROutTypeBase>(paramType))
+        if (auto outType = as<IROutParamTypeBase>(paramType))
         {
             if (outType->getAddressSpace() == AddressSpace::GroupShared)
             {

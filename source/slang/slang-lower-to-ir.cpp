@@ -387,7 +387,7 @@ struct ImplicitCastLValueInfo : ExtendedValueInfo
     LoweredValInfo base;
 
     // The type of the lvalue (inout, out, ref, etc.)
-    ParameterDirection lValueType;
+    ParamPassingMode lValueType;
 };
 
 LoweredValInfo LoweredValInfo::boundMember(BoundMemberInfo* boundMemberInfo)
@@ -2524,8 +2524,9 @@ void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
         }
         // TODO: what are other modifiers we need to propagate through?
     }
-    if (auto t =
-            composeGetters<IRMeshOutputType>(inst->getFullType(), &IROutTypeBase::getValueType))
+    if (auto t = composeGetters<IRMeshOutputType>(
+            inst->getFullType(),
+            &IROutParamTypeBase::getValueType))
     {
         IROp op;
         switch (t->getOp())
@@ -2774,17 +2775,17 @@ static void applyOutArgumentFixups(IRGenContext* context, List<OutArgumentFixup>
 /// Add one argument value to the argument list for a call being constructed
 void addArg(
     IRGenContext* context,
-    List<IRInst*>* ioArgs,             //< The argument list being built
-    List<OutArgumentFixup>* ioFixups,  //< "Fixup" logic to apply for `out` or `inout` arguments
-    LoweredValInfo argVal,             //< The lowered value of the argument to add
-    IRType* paramType,                 //< The type of the corresponding parameter
-    ParameterDirection paramDirection, //< The direction of the parameter (`in`, `out`, etc.)
-    Type* argType,                     //< The AST-level type of the argument
-    SourceLoc loc)                     //< A location to use if we need to report an error
+    List<IRInst*>* ioArgs,            //< The argument list being built
+    List<OutArgumentFixup>* ioFixups, //< "Fixup" logic to apply for `out` or `inout` arguments
+    LoweredValInfo argVal,            //< The lowered value of the argument to add
+    IRType* paramType,                //< The type of the corresponding parameter
+    ParamPassingMode paramDirection,  //< The direction of the parameter (`in`, `out`, etc.)
+    Type* argType,                    //< The AST-level type of the argument
+    SourceLoc loc)                    //< A location to use if we need to report an error
 {
     switch (paramDirection)
     {
-    case kParameterDirection_Ref:
+    case ParamPassingMode::Ref:
         {
             // According to our "calling convention" we need to
             // pass a pointer into the callee. Unlike the case for
@@ -2808,9 +2809,9 @@ void addArg(
         }
         break;
 
-    case kParameterDirection_Out:
-    case kParameterDirection_InOut:
-    case kParameterDirection_ConstRef:
+    case ParamPassingMode::Out:
+    case ParamPassingMode::BorrowInOut:
+    case ParamPassingMode::BorrowIn:
         {
             // According to our "calling convention" we need to
             // pass a pointer into the callee.
@@ -2838,7 +2839,7 @@ void addArg(
                     paramType = lowerType(context, argType);
                 }
 #if 0
-                if (auto refType = as<IRConstRefType>(paramType))
+                if (auto refType = as<IRBorrowInParamType>(paramType))
                 {
                     paramType = refType->getValueType();
                     argVal = LoweredValInfo::simple(
@@ -2853,8 +2854,8 @@ void addArg(
                 // in the argument, which we accomplish by assigning
                 // from the l-value to our temp.
                 //
-                if (paramDirection == kParameterDirection_InOut ||
-                    paramDirection == kParameterDirection_ConstRef)
+                if (paramDirection == ParamPassingMode::BorrowInOut ||
+                    paramDirection == ParamPassingMode::BorrowIn)
                 {
                     assign(context, tempVar, argVal);
                 }
@@ -2868,7 +2869,7 @@ void addArg(
                 // Finally, after the call we will need
                 // to copy in the other direction: from our
                 // temp back to the original l-value.
-                if (paramDirection != kParameterDirection_ConstRef)
+                if (paramDirection != ParamPassingMode::BorrowIn)
                 {
                     OutArgumentFixup fixup;
                     fixup.src = tempVar;
@@ -2900,17 +2901,17 @@ void addArg(
 void addCallArgsForParam(
     IRGenContext* context,
     IRType* paramType,
-    ParameterDirection paramDirection,
+    ParamPassingMode paramDirection,
     Expr* argExpr,
     List<IRInst*>* ioArgs,
     List<OutArgumentFixup>* ioFixups)
 {
     switch (paramDirection)
     {
-    case kParameterDirection_Ref:
-    case kParameterDirection_ConstRef:
-    case kParameterDirection_Out:
-    case kParameterDirection_InOut:
+    case ParamPassingMode::Ref:
+    case ParamPassingMode::BorrowIn:
+    case ParamPassingMode::Out:
+    case ParamPassingMode::BorrowInOut:
         {
             LoweredValInfo loweredArg = lowerLValueExpr(context, argExpr);
             addArg(
@@ -2938,38 +2939,38 @@ void addCallArgsForParam(
 //
 
 /// Compute the direction for a parameter based on its declaration
-ParameterDirection getParameterDirection(VarDeclBase* paramDecl)
+ParamPassingMode getParameterDirection(VarDeclBase* paramDecl)
 {
     if (paramDecl->hasModifier<RefModifier>())
     {
-        return kParameterDirection_Ref;
+        return ParamPassingMode::Ref;
     }
-    if (paramDecl->hasModifier<ConstRefModifier>() || paramDecl->hasModifier<HLSLPayloadModifier>())
+    if (paramDecl->hasModifier<BorrowModifier>() || paramDecl->hasModifier<HLSLPayloadModifier>())
     {
         // The payload types are a groupshared variable, and we really don't
         // want to copy that into registers in every invocation on platforms
         // where this matters, so treat them as by-reference here.
 
-        return kParameterDirection_ConstRef;
+        return ParamPassingMode::BorrowIn;
     }
     if (paramDecl->hasModifier<InOutModifier>())
     {
         // The AST specified `inout`:
-        return kParameterDirection_InOut;
+        return ParamPassingMode::BorrowInOut;
     }
     if (paramDecl->hasModifier<OutModifier>())
     {
         // We saw an `out` modifier, so now we need
         // to check if there was a paired `in`.
         if (paramDecl->hasModifier<InModifier>())
-            return kParameterDirection_InOut;
+            return ParamPassingMode::BorrowInOut;
         else
-            return kParameterDirection_Out;
+            return ParamPassingMode::Out;
     }
     else
     {
         // No direction modifier, or just `in`:
-        return kParameterDirection_In;
+        return ParamPassingMode::In;
     }
 }
 
@@ -2978,22 +2979,22 @@ ParameterDirection getParameterDirection(VarDeclBase* paramDecl)
 /// If the given declaration doesn't care about the direction of a `this` parameter, then
 /// it will return the provided `defaultDirection` instead.
 ///
-ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection defaultDirection)
+ParamPassingMode getThisParamDirection(Decl* parentDecl, ParamPassingMode defaultDirection)
 {
     auto parentParent = getParentAggTypeDecl(parentDecl);
 
     // The `this` parameter for a `class` is always `in`.
     if (as<ClassDecl>(parentParent))
     {
-        return kParameterDirection_In;
+        return ParamPassingMode::In;
     }
 
     if (parentParent && parentParent->findModifier<NonCopyableTypeAttribute>())
     {
         if (parentDecl->hasModifier<MutatingAttribute>())
-            return kParameterDirection_Ref;
+            return ParamPassingMode::Ref;
         else
-            return kParameterDirection_ConstRef;
+            return ParamPassingMode::BorrowIn;
     }
 
     // Applications can opt in to a mutable `this` parameter,
@@ -3002,15 +3003,15 @@ ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection de
     //
     if (parentDecl->hasModifier<MutatingAttribute>())
     {
-        return kParameterDirection_InOut;
+        return ParamPassingMode::BorrowInOut;
     }
     else if (parentDecl->hasModifier<ConstRefAttribute>())
     {
-        return kParameterDirection_ConstRef;
+        return ParamPassingMode::BorrowIn;
     }
     else if (parentDecl->hasModifier<RefAttribute>())
     {
-        return kParameterDirection_Ref;
+        return ParamPassingMode::Ref;
     }
 
     // A `set` accessor on a property or subscript declaration
@@ -3019,11 +3020,11 @@ ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection de
     //
     if (parentDecl->hasModifier<NonmutatingAttribute>())
     {
-        return kParameterDirection_In;
+        return ParamPassingMode::In;
     }
     else if (as<SetterDecl>(parentDecl))
     {
-        return kParameterDirection_InOut;
+        return ParamPassingMode::BorrowInOut;
     }
 
     // Declarations that represent abstract storage (a property
@@ -3050,7 +3051,7 @@ ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection de
 
     // For now we make any `this` parameter default to `in`.
     //
-    return kParameterDirection_In;
+    return ParamPassingMode::In;
 }
 
 DeclRef<Decl> createDefaultSpecializedDeclRefImpl(
@@ -3203,10 +3204,10 @@ struct IRLoweringParameterInfo
     Type* type = nullptr;
 
     // The direction (`in` vs `out` vs `in out`)
-    ParameterDirection direction;
+    ParamPassingMode direction;
 
     // The direction declared in user code.
-    ParameterDirection declaredDirection = ParameterDirection::kParameterDirection_In;
+    ParamPassingMode declaredDirection = ParamPassingMode::In;
 
     // The variable/parameter declaration for
     // this parameter (if any)
@@ -3272,7 +3273,7 @@ ParameterListCollectMode getModeForCollectingParentParameters(Decl* decl, Contai
 // When dealing with a member function, we need to be able to add the `this`
 // parameter for the enclosing type:
 //
-void addThisParameter(ParameterDirection direction, Type* type, ParameterLists* ioParameterLists)
+void addThisParameter(ParamPassingMode direction, Type* type, ParameterLists* ioParameterLists)
 {
     IRLoweringParameterInfo info;
     info.type = type;
@@ -3291,7 +3292,7 @@ void maybeAddReturnDestinationParam(ParameterLists* ioParameterLists, Type* resu
         IRLoweringParameterInfo info;
         info.type = resultType;
         info.decl = nullptr;
-        info.direction = kParameterDirection_Ref;
+        info.direction = ParamPassingMode::Ref;
         info.declaredDirection = info.direction;
         info.isReturnDestination = true;
         ioParameterLists->params.add(info);
@@ -3300,13 +3301,13 @@ void maybeAddReturnDestinationParam(ParameterLists* ioParameterLists, Type* resu
 
 void makeVaryingInputParamConstRef(IRLoweringParameterInfo& paramInfo)
 {
-    if (paramInfo.direction != kParameterDirection_In)
+    if (paramInfo.direction != ParamPassingMode::In)
         return;
     if (paramInfo.decl->findModifier<HLSLUniformModifier>())
         return;
     if (as<HLSLPatchType>(paramInfo.type))
         return;
-    paramInfo.direction = kParameterDirection_ConstRef;
+    paramInfo.direction = ParamPassingMode::BorrowIn;
 }
 //
 // And here is our function that will do the recursive walk:
@@ -3315,7 +3316,7 @@ void collectParameterLists(
     DeclRef<Decl> const& declRef,
     ParameterLists* ioParameterLists,
     ParameterListCollectMode mode,
-    ParameterDirection thisParamDirection)
+    ParamPassingMode thisParamDirection)
 {
     // Don't collect any parameters beyond certain decls.
     if (as<InterfaceDefaultImplDecl>(declRef) || as<AggTypeDeclBase>(declRef))
@@ -3337,7 +3338,7 @@ void collectParameterLists(
         if (innerMode < mode)
             innerMode = mode;
 
-        ParameterDirection innerThisParamDirection =
+        ParamPassingMode innerThisParamDirection =
             getThisParamDirection(declRef.getDecl(), thisParamDirection);
 
 
@@ -3368,7 +3369,7 @@ void collectParameterLists(
                 else if (auto bwdDerivDeclRef = declRef.as<BackwardDerivativeRequirementDecl>())
                 {
                     thisType = bwdDerivDeclRef.getDecl()->diffThisType;
-                    innerThisParamDirection = kParameterDirection_InOut;
+                    innerThisParamDirection = ParamPassingMode::BorrowInOut;
                 }
 
                 addThisParameter(innerThisParamDirection, thisType, ioParameterLists);
@@ -3383,10 +3384,10 @@ void collectParameterLists(
     {
         // We need a special case here when lowering the varying parameters of an entrypoint
         // function. Due to the existence of `EvaluateAttributeAtSample` and friends, we need to
-        // always lower the varying inputs as `__constref` parameters so we can pass pointers to
+        // always lower the varying inputs as `borrow in` parameters so we can pass pointers to
         // these intrinsics.
         // This means that although these parameters are declared as "in" parameters in the source,
-        // we will actually treat them as __constref parameters when lowering to IR. A complication
+        // we will actually treat them as `borrow in` parameters when lowering to IR. A complication
         // result from this is that if the original source code actually modifies the input
         // parameter we still need to create a local var to hold the modified value. In the future
         // when we are able to update our language spec to always assume input parameters are
@@ -3467,7 +3468,7 @@ void _lowerFuncDeclBaseTypeInfo(
         declRef,
         &parameterLists,
         kParameterListCollectMode_Default,
-        kParameterDirection_In);
+        ParamPassingMode::In);
 
     auto& paramTypes = outInfo.paramTypes;
 
@@ -3477,7 +3478,7 @@ void _lowerFuncDeclBaseTypeInfo(
 
         switch (paramInfo.direction)
         {
-        case kParameterDirection_In:
+        case ParamPassingMode::In:
             // Simple case of a by-value input parameter.
             break;
 
@@ -3485,17 +3486,17 @@ void _lowerFuncDeclBaseTypeInfo(
         // then we will represent it with a pointer type in
         // the IR, but we will use a specialized pointer
         // type that encodes the parameter direction information.
-        case kParameterDirection_Out:
-            irParamType = builder->getOutType(irParamType);
+        case ParamPassingMode::Out:
+            irParamType = builder->getOutParamType(irParamType);
             break;
-        case kParameterDirection_InOut:
-            irParamType = builder->getInOutType(irParamType);
+        case ParamPassingMode::BorrowInOut:
+            irParamType = builder->getBorrowInOutParamType(irParamType);
             break;
-        case kParameterDirection_Ref:
-            irParamType = builder->getRefType(irParamType, AddressSpace::Generic);
+        case ParamPassingMode::Ref:
+            irParamType = builder->getRefParamType(irParamType, AddressSpace::Generic);
             break;
-        case kParameterDirection_ConstRef:
-            irParamType = builder->getConstRefType(irParamType, AddressSpace::Generic);
+        case ParamPassingMode::BorrowIn:
+            irParamType = builder->getBorrowInParamType(irParamType, AddressSpace::Generic);
             break;
         default:
             SLANG_UNEXPECTED("unknown parameter direction");
@@ -3753,7 +3754,7 @@ struct ExprLoweringContext
         InvokeExpr* expr,
         Index argIndex,
         IRType* paramType,
-        ParameterDirection paramDirection,
+        ParamPassingMode paramDirection,
         DeclRef<ParamDecl> paramDeclRef,
         List<IRInst*>* ioArgs,
         List<OutArgumentFixup>* ioFixups)
@@ -4073,7 +4074,7 @@ struct ExprLoweringContext
                 addCallArgsForParam(
                     context,
                     irThisType,
-                    getThisParamDirection(funcDeclRef.getDecl(), kParameterDirection_In),
+                    getThisParamDirection(funcDeclRef.getDecl(), ParamPassingMode::In),
                     baseExpr,
                     &irArgs,
                     &argFixups);
@@ -5851,9 +5852,9 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
         RefPtr<ImplicitCastLValueInfo> lValueInfo = new ImplicitCastLValueInfo();
         lValueInfo->type = irType;
         lValueInfo->base = loweredArg;
-        lValueInfo->lValueType = kParameterDirection_InOut;
+        lValueInfo->lValueType = ParamPassingMode::BorrowInOut;
         if (as<OutImplicitCastExpr>(expr))
-            lValueInfo->lValueType = kParameterDirection_Out;
+            lValueInfo->lValueType = ParamPassingMode::Out;
         context->shared->extValues.add(lValueInfo);
         return LoweredValInfo::implicitCastedLValue(lValueInfo);
     }
@@ -7809,7 +7810,7 @@ LoweredValInfo tryGetAddress(
             if (baseAddr.flavor == LoweredValInfo::Flavor::Ptr)
             {
                 IRInst* result = nullptr;
-                if (info->lValueType == kParameterDirection_InOut)
+                if (info->lValueType == ParamPassingMode::BorrowInOut)
                     result = context->irBuilder->emitInOutImplicitCast(
                         context->irBuilder->getPtrType(info->type),
                         baseAddr.val);
@@ -10940,8 +10941,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         if (paramInfo.isReturnDestination)
                             subContext->returnDestination = paramVal;
 
-                        if (paramInfo.declaredDirection == kParameterDirection_In &&
-                            paramInfo.direction == kParameterDirection_ConstRef)
+                        if (paramInfo.declaredDirection == ParamPassingMode::In &&
+                            paramInfo.direction == ParamPassingMode::BorrowIn)
                         {
                             // If the parameter is originally declared as "in", but we are
                             // lowering it as constref for any reason (e.g. it is a varying input),
@@ -10967,7 +10968,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     }
                     break;
 
-                case kParameterDirection_In:
+                case ParamPassingMode::In:
                     {
                         // Simple case of a by-value input parameter.
                         //

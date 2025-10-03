@@ -1793,10 +1793,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 return emitOpTypeFloat(inst, SpvLiteralInteger::from32(int32_t(i.width)));
             }
         case kIROp_PtrType:
-        case kIROp_RefType:
-        case kIROp_ConstRefType:
-        case kIROp_OutType:
-        case kIROp_InOutType:
+        case kIROp_RefParamType:
+        case kIROp_BorrowInParamType:
+        case kIROp_OutParamType:
+        case kIROp_BorrowInOutParamType:
             {
                 SpvStorageClass storageClass = SpvStorageClassFunction;
                 auto ptrType = as<IRPtrTypeBase>(inst);
@@ -8167,10 +8167,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             break;
 
         case kIROp_PtrType:
-        case kIROp_RefType:
-        case kIROp_ConstRefType:
-        case kIROp_OutType:
-        case kIROp_InOutType:
+        case kIROp_RefParamType:
+        case kIROp_BorrowInParamType:
+        case kIROp_OutParamType:
+        case kIROp_BorrowInOutParamType:
             if (auto ptrType = as<IRPtrTypeBase>(type))
                 return checkTypeNeedsStorageCapability(
                     ptrType->getValueType(),

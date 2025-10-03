@@ -2224,8 +2224,8 @@ DIAGNOSTIC(
 DIAGNOSTIC(
     38034,
     Error,
-    cannotUseConstRefOnDifferentiableParameter,
-    "cannot use '__constref' on a differentiable parameter.")
+    cannotUseBorrowInOnDifferentiableParameter,
+    "cannot use 'borrow in' on a differentiable parameter.")
 DIAGNOSTIC(
     38034,
     Error,

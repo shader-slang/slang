@@ -2753,7 +2753,7 @@ private:
             // except we wrap the simple type in `Out<...>` to indicate
             // that we are producing an `out` parameter.
             //
-            m_paramTypes.add(m_context->builder->getOutType(t.getSimple()));
+            m_paramTypes.add(m_context->builder->getOutParamType(t.getSimple()));
             break;
 
             // The remaining cases are all simple recursion on the

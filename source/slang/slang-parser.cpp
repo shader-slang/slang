@@ -9589,7 +9589,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseModifier("out", getSyntaxClass<OutModifier>()),
     _makeParseModifier("inout", getSyntaxClass<InOutModifier>()),
     _makeParseModifier("__ref", getSyntaxClass<RefModifier>()),
-    _makeParseModifier("__constref", getSyntaxClass<ConstRefModifier>()),
+    _makeParseModifier("__constref", getSyntaxClass<BorrowModifier>()),
     _makeParseModifier("const", getSyntaxClass<ConstModifier>()),
     _makeParseModifier("__builtin", getSyntaxClass<BuiltinModifier>()),
     _makeParseModifier("highp", getSyntaxClass<GLSLPrecisionModifier>()),
