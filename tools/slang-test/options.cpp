@@ -566,8 +566,14 @@ static bool _isSubCommand(const char* arg)
     // first positional argument is source shader path
     optionsOut->testPrefixes.clear();
     optionsOut->testPrefixes.reserve(positionalArgs.getCount());
+    optionsOut->rawTestPaths.clear();
+    optionsOut->rawTestPaths.reserve(positionalArgs.getCount());
     for (auto testPrefix : positionalArgs)
     {
+        // Store the raw path for file existence checks
+        optionsOut->rawTestPaths.add(testPrefix);
+
+        // Also store the simplified version for prefix matching
         Slang::StringBuilder sb;
         Slang::Path::simplify(testPrefix, Slang::Path::SimplifyStyle::NoRoot, sb);
         optionsOut->testPrefixes.add(sb);

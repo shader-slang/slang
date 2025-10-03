@@ -64,6 +64,9 @@ struct Options
     // only run test cases with names have one of these prefixes.
     Slang::List<Slang::String> testPrefixes;
 
+    // Original unsimplified paths (for checking file existence)
+    Slang::List<Slang::String> rawTestPaths;
+
     // skip test cases with names that have one of these prefixes.
     Slang::List<Slang::String> excludePrefixes;
 
