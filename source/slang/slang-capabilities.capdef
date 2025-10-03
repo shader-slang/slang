@@ -305,6 +305,10 @@ alias cpp_cuda_glsl_spirv = cpp | cuda | glsl | spirv;
 /// [Compound]
 alias cpp_cuda_glsl_hlsl = cpp | cuda | glsl | hlsl;
 
+/// CPP, CUDA, GLSL, HLSL, and LLVM code-gen targets
+/// [Compound]
+alias cpp_cuda_glsl_hlsl_llvm = cpp | cuda | glsl | hlsl | llvm;
+
 /// CPP, CUDA, GLSL, HLSL, and SPIRV code-gen targets
 /// [Compound]
 alias cpp_cuda_glsl_hlsl_spirv = cpp | cuda | glsl | hlsl | spirv;
@@ -2347,7 +2351,7 @@ alias quad_control = _sm_6_7
 
 /// Capabilities required to enable shader breakpoints
 /// [Compound]
-alias breakpoint = GL_EXT_debug_printf | hlsl | _cuda_sm_8_0 | cpp;
+alias breakpoint = GL_EXT_debug_printf | hlsl | _cuda_sm_8_0 | cpp | llvm;
 
 /// Collection of capabilities for raytracing with all raytracing stages.
 /// [Compound]
