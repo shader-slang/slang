@@ -1,20 +1,19 @@
 // slang-session.cpp
 #include "slang-session.h"
 
+#include "../core/slang-shared-library.h"
 #include "compiler-core/slang-artifact-util.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
+#include "slang-neural-config.h"
 #include "slang-options.h"
 #include "slang-parser.h"
 #include "slang-preprocessor.h"
 #include "slang-serialize-ast.h"
 #include "slang-serialize-container.h"
 #include "slang-serialize-ir.h"
-
-#include "../core/slang-shared-library.h"
-#include "slang-neural-config.h"
 
 namespace Slang
 {
@@ -23,7 +22,8 @@ namespace Slang
 static String findNeuralModulePath()
 {
     // Get the path of the currently loaded libslang.so/slang.dll by using a known exported symbol
-    String libslangPath = SharedLibraryUtils::getSharedLibraryFileName((void*)slang_createGlobalSession);
+    String libslangPath =
+        SharedLibraryUtils::getSharedLibraryFileName((void*)slang_createGlobalSession);
     if (libslangPath.getLength() == 0)
         return String();
 
@@ -41,7 +41,8 @@ static String findNeuralModulePath()
         return neuralModulePath;
 
     // If not found in lib directory, try looking in the parent directory
-    // This handles the case where libslang.so is in lib/ and neural module is in lib/slang-neural-module/
+    // This handles the case where libslang.so is in lib/ and neural module is in
+    // lib/slang-neural-module/
     String parentDir = Path::getParentDirectory(libslangDir);
     if (parentDir.getLength() > 0)
     {
@@ -1478,7 +1479,8 @@ RefPtr<Module> Linkage::findOrImportModule(
         {
             // Found neural module, load it directly
             ComPtr<ISlangBlob> fileContents;
-            SlangResult result = getFileSystemExt()->loadFile(neuralModulePath.getBuffer(), fileContents.writeRef());
+            SlangResult result =
+                getFileSystemExt()->loadFile(neuralModulePath.getBuffer(), fileContents.writeRef());
             if (SLANG_SUCCEEDED(result))
             {
                 auto pathInfo = PathInfo::makeFromString(neuralModulePath);
