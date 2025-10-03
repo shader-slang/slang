@@ -8927,6 +8927,26 @@ T dot(vector<T, N> x, vector<T, N> y)
     }
 }
 
+// These overloads serve to implement 1-vector support as most backends as
+// implemented above only support this operation for 2,3,4 vectors
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[ForceInline]
+vector<T, 1> dot(vector<T, 1> x, vector<T, 1> y)
+{
+    return x[0] * y[0];
+}
+
+// These overloads serve to implement 1-vector support as most backends as
+// implemented above only support this operation for 2,3,4 vectors
+__generic<T : __BuiltinIntegerType>
+[__readNone]
+[ForceInline]
+vector<T, 1> dot(vector<T, 1> x, vector<T, 1> y)
+{
+    return x[0] * y[0];
+}
+
 /// Helper for computing distance terms for lighting (obsolete).
 /// Use the subtraction operator '-' instead.
 /// @deprecated
