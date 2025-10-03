@@ -1836,6 +1836,7 @@ public:
         bool ignoreUnallowedModifier);
 
     void checkModifiers(ModifiableSyntaxNode* syntaxNode);
+    void redistributeNoDiffFromReturnType(FuncDecl* funcDecl);
     void checkVisibility(Decl* decl);
 
     bool doesAccessorMatchRequirement(

@@ -2105,6 +2105,12 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
     // TODO(tfoley): need to make sure this only
     // performs semantic checks on a `SharedModifier` once...
 
+    // Handle function return type no_diff redistribution
+    if (auto funcDecl = as<FuncDecl>(syntaxNode))
+    {
+        redistributeNoDiffFromReturnType(funcDecl);
+    }
+
     // The process of checking a modifier may produce a new modifier in its place,
     // so we will build up a new linked list of modifiers that will replace
     // the old list.
@@ -2267,6 +2273,132 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
                 }
             }
         }
+    }
+}
+
+/// Visitor to find and extract no_diff modifiers from type expressions
+class NoDiffExtractorVisitor : public ExprVisitor<NoDiffExtractorVisitor, Expr*>
+{
+private:
+    List<NoDiffModifier*> m_extractedNoDiffModifiers;
+
+public:
+    NoDiffExtractorVisitor()
+    {}
+
+    List<NoDiffModifier*>& getExtractedModifiers() { return m_extractedNoDiffModifiers; }
+
+    // Default case - for any Expr type we haven't specifically handled
+    // We just return the expression unchanged since we don't know how to recurse into it
+    Expr* visitExpr(Expr* expr)
+    {
+        return expr;
+    }
+
+    // === Type Expressions Used in Traditional Function Declarations ===
+
+    // The key case - handle ModifiedTypeExpr
+    Expr* visitModifiedTypeExpr(ModifiedTypeExpr* modifiedTypeExpr)
+    {
+        // First, recursively process the base type
+        modifiedTypeExpr->base.exp = dispatch(modifiedTypeExpr->base.exp);
+
+        // Now examine the modifiers on this ModifiedTypeExpr
+        int modifierCount = 0;
+
+        // Walk through the modifier chain
+        Modifier** modifierPtr = &modifiedTypeExpr->modifiers.first;
+        Modifier* modifier = *modifierPtr;
+        while (modifier)
+        {
+            if (auto noDiffModifier = as<NoDiffModifier>(modifier))
+            {
+                // Found a no_diff modifier - extract it
+                auto next = modifier->next;
+                modifier->next = nullptr; // Unlink
+                m_extractedNoDiffModifiers.add(noDiffModifier);
+                *modifierPtr = next;
+            } else {
+                modifierPtr = &modifier->next;
+                modifierCount++;
+            }
+            modifier = *modifierPtr;
+        }
+
+        // Decide what to return based on remaining modifiers
+        if (modifierCount == 0)
+        {
+            // No modifiers left - eliminate the ModifiedTypeExpr node
+            // Return the base type directly
+            return modifiedTypeExpr->base.exp;
+        }
+        else
+        {
+            // Still has other modifiers - keep ModifiedTypeExpr
+            return modifiedTypeExpr;
+        }
+    }
+
+    // === Type Expressions That Can Wrap ModifiedTypeExpr ===
+    // Based on parser analysis of traditional function declaration parsing
+
+    // PointerTypeExpr - from pointer declarators (e.g., no_diff float*)
+    Expr* visitPointerTypeExpr(PointerTypeExpr* ptrExpr)
+    {
+        ptrExpr->base.exp = dispatch(ptrExpr->base.exp);
+        return ptrExpr;
+    }
+
+    // IndexExpr - used for array type syntax (e.g., no_diff float[N])
+    // Note: Parser uses IndexExpr for array types in declarators
+    Expr* visitIndexExpr(IndexExpr* indexExpr)
+    {
+        indexExpr->baseExpression = dispatch(indexExpr->baseExpression);
+        return indexExpr;
+    }
+
+    // GenericAppExpr - generic applications (e.g., vector<no_diff float, 4>)
+    Expr* visitGenericAppExpr(GenericAppExpr* genericApp)
+    {
+        // We don't dispatch to the arguments to the generic
+        genericApp->functionExpr = dispatch(genericApp->functionExpr);
+        return genericApp;
+    }
+
+    // MemberExpr - member type access (e.g., MyType.InnerType where InnerType is no_diff float)
+    Expr* visitMemberExpr(MemberExpr* memberExpr)
+    {
+        memberExpr->baseExpression = dispatch(memberExpr->baseExpression);
+        return memberExpr;
+    }
+
+    // StaticMemberExpr - static member access (e.g., MyStruct::Type where Type is no_diff float)
+    Expr* visitStaticMemberExpr(StaticMemberExpr* staticMemberExpr)
+    {
+        staticMemberExpr->baseExpression = dispatch(staticMemberExpr->baseExpression);
+        return staticMemberExpr;
+    }
+
+    // VarExpr - base type names - these are leaf nodes, no recursion needed
+    // (handled by default visitExpr)
+};
+
+/// Extract no_diff modifiers from function return type and apply to function
+void SemanticsVisitor::redistributeNoDiffFromReturnType(FuncDecl* funcDecl)
+{
+    // Only process if we have a return type expression
+    if (!funcDecl->returnType.exp)
+        return;
+
+    // Create visitor and extract no_diff modifiers
+    NoDiffExtractorVisitor extractor;
+    funcDecl->returnType.exp = extractor.dispatch(funcDecl->returnType.exp);
+
+    // Apply any extracted no_diff modifiers to the function
+    for (auto noDiffModifier : extractor.getExtractedModifiers())
+    {
+        // Add the no_diff modifier to the function's modifier list
+        addModifier(funcDecl, noDiffModifier);
     }
 }
 
