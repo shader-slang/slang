@@ -13,8 +13,46 @@
 #include "slang-serialize-container.h"
 #include "slang-serialize-ir.h"
 
+#include "../core/slang-shared-library.h"
+#include "slang-neural-config.h"
+
 namespace Slang
 {
+
+// Helper function to find the neural.slang module path
+static String findNeuralModulePath()
+{
+    // Get the path of the currently loaded libslang.so/slang.dll by using a known exported symbol
+    String libslangPath = SharedLibraryUtils::getSharedLibraryFileName((void*)slang_createGlobalSession);
+    if (libslangPath.getLength() == 0)
+        return String();
+
+    // Get the directory containing libslang.so
+    String libslangDir = Path::getParentDirectory(libslangPath);
+    if (libslangDir.getLength() == 0)
+        return String();
+
+    // Look for neural module directory in the same directory as libslang.so
+    String neuralModuleDir = Path::combine(libslangDir, SLANG_NEURAL_MODULE_DIR_NAME);
+
+    // Check if the neural module file exists
+    String neuralModulePath = Path::combine(neuralModuleDir, SLANG_NEURAL_MODULE_FILE_NAME);
+    if (File::exists(neuralModulePath))
+        return neuralModulePath;
+
+    // If not found in lib directory, try looking in the parent directory
+    // This handles the case where libslang.so is in lib/ and neural module is in lib/slang-neural-module/
+    String parentDir = Path::getParentDirectory(libslangDir);
+    if (parentDir.getLength() > 0)
+    {
+        neuralModuleDir = Path::combine(parentDir, SLANG_NEURAL_MODULE_DIR_NAME);
+        neuralModulePath = Path::combine(neuralModuleDir, SLANG_NEURAL_MODULE_FILE_NAME);
+        if (File::exists(neuralModulePath))
+            return neuralModulePath;
+    }
+
+    return String();
+}
 
 Linkage::Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinkage)
     : m_session(session)
@@ -1430,6 +1468,33 @@ RefPtr<Module> Linkage::findOrImportModule(
             sink->diagnose(requestingLoc, Diagnostics::glslModuleNotAvailable, moduleName);
         }
         return glslModule;
+    }
+
+    // Special case for neural module - search for it relative to libslang.so location
+    if (moduleName->text == "neural")
+    {
+        String neuralModulePath = findNeuralModulePath();
+        if (neuralModulePath.getLength() > 0)
+        {
+            // Found neural module, load it directly
+            ComPtr<ISlangBlob> fileContents;
+            SlangResult result = getFileSystemExt()->loadFile(neuralModulePath.getBuffer(), fileContents.writeRef());
+            if (SLANG_SUCCEEDED(result))
+            {
+                auto pathInfo = PathInfo::makeFromString(neuralModulePath);
+                RefPtr<Module> module = loadModuleImpl(
+                    moduleName,
+                    pathInfo,
+                    fileContents,
+                    requestingLoc,
+                    sink,
+                    nullptr,
+                    ModuleBlobType::IR);
+                if (module)
+                    return module;
+            }
+        }
+        // If neural module not found or failed to load, continue with normal search
     }
 
     // We are going to use a loop to search for a suitable file to
