@@ -434,10 +434,10 @@ public:
         case kIROp_PtrType:
         case kIROp_NativePtrType:
         case kIROp_NativeStringType:
-        case kIROp_OutType:
-        case kIROp_InOutType:
-        case kIROp_RefType:
-        case kIROp_ConstRefType:
+        case kIROp_OutParamType:
+        case kIROp_RefParamType:
+        case kIROp_BorrowInOutParamType:
+        case kIROp_BorrowInParamType:
         case kIROp_ArrayType:  // Arrays are passed as pointers in SSA values
         case kIROp_UnsizedArrayType:
         case kIROp_StructType: // Structs are passed as pointers in SSA values
@@ -659,10 +659,10 @@ public:
             }
             break;
 
-        case kIROp_OutType:
-        case kIROp_InOutType:
-        case kIROp_RefType:
-        case kIROp_ConstRefType:
+        case kIROp_OutParamType:
+        case kIROp_RefParamType:
+        case kIROp_BorrowInOutParamType:
+        case kIROp_BorrowInParamType:
             {
                 auto ptr = as<IRPtrTypeBase>(type);
                 llvmType = debugBuilder->createReferenceType(llvm::dwarf::DW_TAG_reference_type, getDebugType(ptr->getValueType(), rules), ptrSize);
@@ -2342,10 +2342,12 @@ struct LLVMEmitter
                 auto fromType = getVectorOrCoopMatrixElementType(fromTypeV);
                 auto toType = getVectorOrCoopMatrixElementType(toTypeV);
 
-                auto fromInfo = getIntTypeInfo(fromType);
-                auto toInfo = getIntTypeInfo(toType);
+                auto llvmFromType = llvm::cast<llvm::IntegerType>(types->getValueType(fromType));
+                auto llvmToType = llvm::cast<llvm::IntegerType>(types->getValueType(toType));
+                auto fromWidth = llvmFromType->getBitWidth();
+                auto toWidth = llvmToType->getBitWidth();
 
-                if (fromInfo.width == toInfo.width)
+                if (fromWidth == toWidth)
                 {
                     // LLVM integers are sign-ambiguous, so if the width is the
                     // same, there's nothing to do.
@@ -2362,7 +2364,7 @@ struct LLVMEmitter
                 else
                 {
                     llvm::Instruction::CastOps cast = llvm::Instruction::CastOps::Trunc;
-                    if (toInfo.width > fromInfo.width)
+                    if (toWidth > fromWidth)
                     {
                         // Source is signed, so sign extend.
                         cast = getLLVMIntExtensionOp(fromType);
@@ -2938,9 +2940,9 @@ struct LLVMEmitter
         {
             auto llvmArg = llvmFunc->getArg(i);
 
-            if (as<IROutType>(funcType->getParamType(i)))
+            if (as<IROutParamType>(funcType->getParamType(i)))
                 llvmArg->addAttr(llvm::Attribute::WriteOnly);
-            else if (as<IRConstRefType>(funcType->getParamType(i)))
+            else if (as<IRBorrowInParamType>(funcType->getParamType(i)))
                 llvmArg->addAttr(llvm::Attribute::ReadOnly);
 
             llvm::StringRef linkageName, prettyName;
@@ -3563,14 +3565,14 @@ struct LLVMEmitter
                 llvm::StringRef linkageName, prettyName;
                 maybeGetName(&linkageName, &prettyName, pp);
 
-                if (auto outType = as<IROutType>(argType))
+                if (auto outType = as<IROutParamType>(argType))
                 {
                     // Replace with uninitialized alloca, parameter is only for
                     // copy-out!
                     llvmArg = types->emitAlloca(outType->getValueType(), defaultPointerRules);
                     declareAllocaDebugVar(prettyName, llvmArg, outType->getValueType());
                 }
-                else if (auto inOutType = as<IRInOutType>(argType))
+                else if (auto inOutType = as<IRBorrowInOutParamType>(argType))
                 {
                     // Replace with initialized alloca.
                     auto newArg = types->emitAlloca(inOutType->getValueType(), defaultPointerRules);
@@ -3598,7 +3600,7 @@ struct LLVMEmitter
                     llvm::Value* llvmArg = llvmFunc->getArg(i);
                     auto argType = pp->getDataType();
 
-                    if (as<IROutType>(argType) || as<IRInOutType>(argType))
+                    if (as<IROutParamType>(argType) || as<IRBorrowInOutParamType>(argType))
                     {
                         auto ptrType = as<IRPtrTypeBase>(argType);
                         // Copy-out!

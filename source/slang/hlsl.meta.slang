@@ -8461,7 +8461,7 @@ internal uint __emulatedCountbits64(uint64_t value)
 /// @category bitops
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 __generic<T : __BuiltinIntegerType>
 uint countbits(T value)
 {
@@ -8523,13 +8523,20 @@ uint countbits(T value)
                 return countbits(__intCast<uint32_t>(value));
             }
             __intrinsic_asm "countOneBits";
+    case llvm:
+        if (T is int32_t || T is uint32_t)
+            __intrinsic_asm "%result = call $T0 @llvm.ctpop($0)";
+        else if (T is int64_t || T is uint64_t || T is uintptr_t || T is intptr_t)
+            __intrinsic_asm "%c = call $T0 @llvm.ctpop($0)\n%result = trunc $T0 %c to $TR";
+        else
+            __intrinsic_asm "%c = call $T0 @llvm.ctpop($0)\n%result = zext $T0 %c to $TR";
     }
 }
 
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 vector<uint, N> countbits(vector<T, N> value)
 {
     // Emulate 8-bit support
@@ -8577,6 +8584,13 @@ vector<uint, N> countbits(vector<T, N> value)
             return ret;
         }
             __intrinsic_asm "countOneBits";
+    case llvm:
+        if (T is int32_t || T is uint32_t)
+            __intrinsic_asm "%result = call $T0 @llvm.ctpop($0)";
+        else if (T is int64_t || T is uint64_t || T is uintptr_t || T is intptr_t)
+            __intrinsic_asm "%c = call $T0 @llvm.ctpop($0)\n%result = trunc $T0 %c to $TR";
+        else
+            __intrinsic_asm "%c = call $T0 @llvm.ctpop($0)\n%result = zext $T0 %c to $TR";
     default:
         VECTOR_MAP_UNARY(uint, N, countbits, value);
     }
