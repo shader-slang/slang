@@ -1908,6 +1908,7 @@ local insts = {
 	-- Represents a no-op cast to convert a resource pointer to a resource on targets where the resource handles are
 	-- already concrete types.
 	{ CastDescriptorHandleToResource = { min_operands = 1 } },
+	{ CastResourceToDescriptorHandle = { min_operands = 1 } },
 	{ TreatAsDynamicUniform = { min_operands = 1 } },
 	{ sizeOf = { min_operands = 1 } },
 	{ alignOf = { min_operands = 1 } },

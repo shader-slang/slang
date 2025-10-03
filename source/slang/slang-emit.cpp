@@ -120,6 +120,7 @@
 #include "slang-ir-variable-scope-correction.h"
 #include "slang-ir-vk-invert-y.h"
 #include "slang-ir-wgsl-legalize.h"
+#include "slang-ir-wrap-cbuffer-element.h"
 #include "slang-ir-wrap-structured-buffers.h"
 #include "slang-legalize-types.h"
 #include "slang-lower-to-ir.h"
@@ -1276,6 +1277,23 @@ Result linkAndOptimizeIR(
     // We don't need the legalize pass for C/C++ based types
     if (options.shouldLegalizeExistentialAndResourceTypes)
     {
+        if (isMetalTarget(targetRequest))
+        {
+            // Metal is a special target in that we want to legalize constant buffer
+            // types as if it is a bindful target, and skip legalizing parameter block
+            // types as if it is a bindless target.
+            // To achieve this, we want to ensure that all resource typed fields in parameter blocks
+            // are translated into descriptor handles first before running the resource type
+            // legalization pass for metal, so that type legalization pass won't mess around with
+            // them.
+            BufferElementTypeLoweringOptions bufferElementTypeLoweringOptions = {};
+            bufferElementTypeLoweringOptions.loweringPolicyKind =
+                BufferElementTypeLoweringPolicyKind::MetalParameterBlock;
+            lowerBufferElementTypeToStorageType(
+                targetProgram,
+                irModule,
+                bufferElementTypeLoweringOptions);
+        }
 
         // The Slang language allows interfaces to be used like
         // ordinary types (including placing them in constant
@@ -1403,17 +1421,17 @@ Result linkAndOptimizeIR(
     // Some information for `static_assert` is available only after the specialization.
     checkStaticAssert(irModule->getModuleInst(), sink);
 
-    // For HLSL (and fxc/dxc) only, we need to "wrap" any
-    // structured buffers defined over matrix types so
-    // that they instead use an intermediate `struct`.
-    // This is required to get those targets to respect
-    // the options for matrix layout set via `#pragma`
-    // or command-line options.
-    //
     switch (target)
     {
     case CodeGenTarget::HLSL:
         {
+            // For HLSL(fxc) only, we need to "wrap" any
+            // structured buffers defined over matrix types so
+            // that they instead use an intermediate `struct`.
+            // This is required to get those targets to respect
+            // the options for matrix layout set via `#pragma`
+            // or command-line options.
+            //
             wrapStructuredBuffersOfMatrices(irModule);
 #if 0
             dumpIRIfEnabled(codeGenContext, irModule, "STRUCTURED BUFFERS WRAPPED");
@@ -1421,7 +1439,12 @@ Result linkAndOptimizeIR(
             validateIRModuleIfEnabled(codeGenContext, irModule);
         }
         break;
-
+    case CodeGenTarget::Metal:
+    case CodeGenTarget::MetalLib:
+        // Metal does not allow `ConstantBuffer<StructuredBuffer<T>>`, so we need to create
+        // a wrapper struct for the `StructuredBuffer<T>`.
+        wrapCBufferElementsForMetal(irModule);
+        break;
     default:
         break;
     }
@@ -1828,11 +1851,16 @@ Result linkAndOptimizeIR(
             rcpWOfPositionInput(irModule);
     }
 
-    bool emitSpirvDirectly = targetProgram->shouldEmitSPIRVDirectly();
-
-    BufferElementTypeLoweringOptions bufferElementTypeLoweringOptions;
-    bufferElementTypeLoweringOptions.use16ByteArrayElementForConstantBuffer =
-        isWGPUTarget(targetRequest);
+    BufferElementTypeLoweringOptions bufferElementTypeLoweringOptions = {};
+    if (isWGPUTarget(targetRequest))
+        bufferElementTypeLoweringOptions.loweringPolicyKind =
+            BufferElementTypeLoweringPolicyKind::WGSL;
+    else if (isKhronosTarget(targetRequest))
+        bufferElementTypeLoweringOptions.loweringPolicyKind =
+            BufferElementTypeLoweringPolicyKind::KhronosTarget;
+    else
+        bufferElementTypeLoweringOptions.loweringPolicyKind =
+            BufferElementTypeLoweringPolicyKind::Default;
     lowerBufferElementTypeToStorageType(targetProgram, irModule, bufferElementTypeLoweringOptions);
 
     // If we are generating code for glsl or metal, perform address space propagation now.
@@ -1850,6 +1878,7 @@ Result linkAndOptimizeIR(
 
     performForceInlining(irModule);
 
+    bool emitSpirvDirectly = targetProgram->shouldEmitSPIRVDirectly();
     if (emitSpirvDirectly)
     {
         performIntrinsicFunctionInlining(irModule);
