@@ -4948,34 +4948,17 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
         else if (auto vectorType = as<VectorExpressionType>(type))
         {
-            UInt elementCount = (UInt)getIntVal(vectorType->getElementCount());
-
             auto irDefaultValue =
                 getSimpleVal(context, getDefaultVal(vectorType->getElementType()));
-
-            List<IRInst*> args;
-            for (UInt ee = 0; ee < elementCount; ++ee)
-            {
-                args.add(irDefaultValue);
-            }
             return LoweredValInfo::simple(
-                getBuilder()->emitMakeVector(irType, args.getCount(), args.getBuffer()));
+                getBuilder()->emitMakeVectorFromScalar(irType, irDefaultValue));
         }
         else if (auto matrixType = as<MatrixExpressionType>(type))
         {
-            UInt rowCount = (UInt)getIntVal(matrixType->getRowCount());
-
-            auto rowType = matrixType->getRowType();
-
-            auto irDefaultValue = getSimpleVal(context, getDefaultVal(rowType));
-
-            List<IRInst*> args;
-            for (UInt rr = 0; rr < rowCount; ++rr)
-            {
-                args.add(irDefaultValue);
-            }
+            auto irDefaultValue =
+                getSimpleVal(context, getDefaultVal(matrixType->getElementType()));
             return LoweredValInfo::simple(
-                getBuilder()->emitMakeMatrix(irType, args.getCount(), args.getBuffer()));
+                getBuilder()->emitMakeMatrixFromScalar(irType, irDefaultValue));
         }
         else if (auto arrayType = as<ArrayExpressionType>(type))
         {
