@@ -3283,7 +3283,7 @@ struct LLVMEmitter
                 if (!sourceModule)
                 {
                     auto msg = diag.getMessage();
-                    printf("%s\n", msg.str().c_str());
+                    printf("inline ir:\n%s\nerror: %s\n", llvmTextIR.c_str(), msg.str().c_str());
                     SLANG_UNEXPECTED("Failed to parse LLVM inline IR!");
                 }
 
