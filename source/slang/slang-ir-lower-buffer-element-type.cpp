@@ -2340,7 +2340,7 @@ struct KhronosTargetBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLo
         //
         // Additionally, `buffer` blocks do not work correctly unless lowered when targeting
         // GLSL.
-        return target->shouldEmitSPIRVDirectly() || config.addressSpace != AddressSpace::Input;
+        return target->shouldEmitSPIRVDirectly() && config.addressSpace != AddressSpace::Input;
     }
 
     LoweredElementTypeInfo lowerLeafLogicalType(IRType* type, TypeLoweringConfig config) override
@@ -2430,7 +2430,7 @@ struct MetalParameterBlockElementTypeLoweringPolicy : DefaultBufferElementTypeLo
             info.originalType = type;
             info.loweredType = builder.getType(kIROp_DescriptorHandleType, type);
             info.convertLoweredToOriginal = kIROp_CastDescriptorHandleToResource;
-            info.convertOriginalToLowered = kIROp_BitCast;
+            info.convertOriginalToLowered = kIROp_CastResourceToDescriptorHandle;
             return info;
         }
         return DefaultBufferElementTypeLoweringPolicy::lowerLeafLogicalType(type, config);
