@@ -68,7 +68,17 @@ struct CDataLayout : IBufferDataLayout
 __generic<T, L : IBufferDataLayout = DefaultDataLayout>
 __intrinsic_type($(kIROp_GLSLShaderStorageBufferType))
 __magic_type(GLSLShaderStorageBufferType)
-struct GLSLShaderStorageBuffer {}
+struct GLSLShaderStorageBuffer
+{
+    /// Get the count of trailing array elements in the buffer's element type.
+    /// Returns 0 if the last member is not an array.
+    /// Returns the fixed size for compile-time sized arrays.
+    /// Returns the runtime length for unsized arrays (using GetArrayLength IR op).
+    __intrinsic_op($(kIROp_GetTrailingElementCount))
+    [require(glsl_spirv)]
+    [constref]
+    uint getTrailingElementCount();
+}
 
 __generic<T,L:IBufferDataLayout>
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))

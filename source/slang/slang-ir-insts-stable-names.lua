@@ -676,4 +676,5 @@ return {
 	["CastStorageToLogicalBase.CastStorageToLogicalDeref"] = 672,
 	["Decoration.DisableCopyEliminationDecoration"] = 673,
 	["Decoration.TempCallArgImmutableVar"] = 674,
+	["GetTrailingElementCount"] = 675,
 }

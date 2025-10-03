@@ -1913,6 +1913,7 @@ local insts = {
 	{ alignOf = { min_operands = 1 } },
 	{ countOf = { min_operands = 1 } },
 	{ GetArrayLength = { min_operands = 1 } },
+	{ GetTrailingElementCount = { min_operands = 1 } },
 	{ IsType = { min_operands = 3 } },
 	{ TypeEquals = { min_operands = 2 } },
 	{ IsInt = { min_operands = 1 } },

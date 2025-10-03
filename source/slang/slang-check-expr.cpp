@@ -5623,14 +5623,21 @@ Expr* SemanticsVisitor::checkBaseForMemberExpr(
     return resultBaseExpr;
 }
 
-Expr* SemanticsVisitor::checkGeneralMemberLookupExpr(MemberExpr* expr, Type* baseType)
+Expr* SemanticsVisitor::checkGeneralMemberLookupExpr(
+    MemberExpr* expr,
+    Type* baseType,
+    Expr* preDerefBase)
 {
     LookupResult lookupResult =
         lookUpMember(m_astBuilder, this, expr->name, baseType, m_outerScope);
+    if (preDerefBase && !lookupResult.isValid())
+        lookupResult =
+            lookUpMember(m_astBuilder, this, expr->name, preDerefBase->type, m_outerScope);
     bool diagnosed = false;
     lookupResult = filterLookupResultByVisibilityAndDiagnose(lookupResult, expr->loc, diagnosed);
     lookupResult =
         filterLookupResultByCheckedOptionalAndDiagnose(lookupResult, expr->loc, diagnosed);
+
     if (!lookupResult.isValid())
     {
         return lookupMemberResultFailure(expr, baseType, diagnosed);
@@ -5688,8 +5695,10 @@ Expr* SemanticsVisitor::checkGeneralMemberLookupExpr(MemberExpr* expr, Type* bas
 Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
 {
     bool needDeref = false;
+    Expr* checkedPreDerefBaseExpr = CheckTerm(expr->baseExpression);
+
     expr->baseExpression =
-        checkBaseForMemberExpr(expr->baseExpression, CheckBaseContext::Member, needDeref);
+        checkBaseForMemberExpr(checkedPreDerefBaseExpr, CheckBaseContext::Member, needDeref);
 
     if (!needDeref && as<DerefMemberExpr>(expr) && !as<PtrType>(expr->baseExpression->type))
     {
@@ -5764,7 +5773,15 @@ Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
     }
     else
     {
-        return checkGeneralMemberLookupExpr(expr, baseType);
+        // For GLSLShaderStorageBuffer<T>, allow member lookup first in
+        // T via implicit deference, and then GLSLShaderStorageBuffer itself
+        bool allowLookupInPreDeref =
+            needDeref && as<GLSLShaderStorageBufferType>(checkedPreDerefBaseExpr->type);
+
+        return checkGeneralMemberLookupExpr(
+            expr,
+            baseType,
+            (allowLookupInPreDeref ? checkedPreDerefBaseExpr : nullptr));
     }
 }
 
