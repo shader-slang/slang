@@ -4865,20 +4865,50 @@ void runTestsInParallel(TestContext* context, int count, const F& f)
 void runTestsInDirectory(TestContext* context)
 {
     List<String> files;
-    getFilesInDirectory(context->options.testDir, files);
+    List<String> explicitFiles;
 
-    // NTFS on Windows stores files in sorted order but not on Linux/Macos.
-    // Because of that, the testing on Linux/Macos were randomly failing, which
-    // is a good thing because it reveals problems. But it is useless
-    // if we cannot reproduce the failures deterministrically.
-    // https://github.com/shader-slang/slang/issues/7388
-    //
-    // TODO: We need a way to shuffle the list in a deterministic manner.
-    files.sort();
-
-    auto processFile = [&](String file)
+    // Check if any rawTestPaths are actual files (using unsimplified paths)
+    // If so, treat them as explicit files to run (bypassing shouldRunTest filtering)
+    for (const auto& rawPath : context->options.rawTestPaths)
     {
-        if (shouldRunTest(context, file))
+        SlangPathType pathType;
+        if (SLANG_SUCCEEDED(Path::getPathType(rawPath, &pathType)) &&
+            pathType == SLANG_PATH_TYPE_FILE && endsWithAllowedExtension(context, rawPath))
+        {
+            explicitFiles.add(rawPath);
+        }
+    }
+
+    // Discover files in testDir only if we don't have explicit files,
+    // or if we have rawTestPaths that are not files (they're directories or prefixes)
+    bool hasNonFilePrefix = false;
+    for (const auto& rawPath : context->options.rawTestPaths)
+    {
+        SlangPathType pathType;
+        if (SLANG_FAILED(Path::getPathType(rawPath, &pathType)) || pathType != SLANG_PATH_TYPE_FILE)
+        {
+            hasNonFilePrefix = true;
+            break;
+        }
+    }
+
+    if (explicitFiles.getCount() == 0 || hasNonFilePrefix)
+    {
+        getFilesInDirectory(context->options.testDir, files);
+
+        // NTFS on Windows stores files in sorted order but not on Linux/Macos.
+        // Because of that, the testing on Linux/Macos were randomly failing, which
+        // is a good thing because it reveals problems. But it is useless
+        // if we cannot reproduce the failures deterministrically.
+        // https://github.com/shader-slang/slang/issues/7388
+        //
+        // TODO: We need a way to shuffle the list in a deterministic manner.
+        files.sort();
+    }
+
+    auto processFile = [&](String file, bool isExplicit)
+    {
+        if (isExplicit || shouldRunTest(context, file))
         {
             SlangResult result = _runTestsOnFile(context, file);
             if (SLANG_FAILED(result))
@@ -4912,17 +4942,32 @@ void runTestsInDirectory(TestContext* context)
     }
     if (!useMultiThread)
     {
+        // Process explicit files first
+        for (auto file : explicitFiles)
+        {
+            processFile(file, true);
+        }
+        // Then process discovered files
         for (auto file : files)
         {
-            processFile(file);
+            processFile(file, false);
         }
     }
     else
     {
+        // For multithreaded mode, combine both lists
+        List<String> allFiles;
+        allFiles.addRange(explicitFiles);
+        allFiles.addRange(files);
+
         runTestsInParallel(
             context,
-            (int)files.getCount(),
-            [&](int index) { processFile(files[index]); });
+            (int)allFiles.getCount(),
+            [&](int index)
+            {
+                bool isExplicit = index < explicitFiles.getCount();
+                processFile(allFiles[index], isExplicit);
+            });
     }
 }
 
