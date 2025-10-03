@@ -934,7 +934,7 @@ FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declR
         {
             paramType = astBuilder->getRefParamType(paramType);
         }
-        else if (paramDecl->findModifier<ConstRefModifier>())
+        else if (paramDecl->findModifier<BorrowModifier>())
         {
             paramType = astBuilder->getConstRefParamType(paramType);
         }
@@ -942,11 +942,11 @@ FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declR
         {
             if (paramDecl->findModifier<InOutModifier>() || paramDecl->findModifier<InModifier>())
             {
-                paramType = astBuilder->getInOutType(paramType);
+                paramType = astBuilder->getBorrowInOutParamType(paramType);
             }
             else
             {
-                paramType = astBuilder->getOutType(paramType);
+                paramType = astBuilder->getOutParamType(paramType);
             }
         }
         paramTypes.add(paramType);

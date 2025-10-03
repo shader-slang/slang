@@ -1619,7 +1619,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
         auto ptrType = load->getPtr()->getDataType();
         if (load->getPtr()->getOp() == kIROp_GlobalParam)
         {
-            if (ptrType->getOp() == kIROp_ConstRefType)
+            if (ptrType->getOp() == kIROp_BorrowInParamType)
                 return true;
             if (auto ptrTypeBase = as<IRPtrTypeBase>(ptrType))
             {
@@ -3880,24 +3880,24 @@ void CLikeSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
     // encoded as a parameter of pointer type, so
     // we need to decode that here.
     //
-    if (auto outType = as<IROutType>(type))
+    if (auto outType = as<IROutParamType>(type))
     {
         m_writer->emit("out ");
         type = outType->getValueType();
     }
-    else if (auto inOutType = as<IRInOutType>(type))
+    else if (auto inOutType = as<IRBorrowInOutParamType>(type))
     {
         m_writer->emit("inout ");
         type = inOutType->getValueType();
     }
-    else if (auto refType = as<IRRefType>(type))
+    else if (auto refType = as<IRRefParamType>(type))
     {
         // Note: There is no HLSL/GLSL equivalent for by-reference parameters,
         // so we don't actually expect to encounter these in user code.
         m_writer->emit("inout ");
         type = refType->getValueType();
     }
-    else if (auto constRefType = as<IRConstRefType>(type))
+    else if (auto constRefType = as<IRBorrowInParamType>(type))
     {
         type = constRefType->getValueType();
     }
@@ -4949,7 +4949,7 @@ void CLikeSourceEmitter::emitGlobalParam(IRGlobalParam* varDecl)
             varType = ptrType->getValueType();
             break;
         default:
-            if (as<IROutTypeBase>(ptrType))
+            if (as<IROutParamTypeBase>(ptrType))
                 varType = ptrType->getValueType();
             break;
         }

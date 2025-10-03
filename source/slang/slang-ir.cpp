@@ -2937,25 +2937,26 @@ IRPtrType* IRBuilder::getPtrType(IRType* valueType)
     return (IRPtrType*)getPtrType(kIROp_PtrType, valueType);
 }
 
-IROutType* IRBuilder::getOutType(IRType* valueType)
+IROutParamType* IRBuilder::getOutParamType(IRType* valueType)
 {
-    return (IROutType*)getPtrType(kIROp_OutType, valueType);
+    return (IROutParamType*)getPtrType(kIROp_OutParamType, valueType);
 }
 
-IRInOutType* IRBuilder::getInOutType(IRType* valueType)
+IRBorrowInOutParamType* IRBuilder::getBorrowInOutParamType(IRType* valueType)
 {
-    return (IRInOutType*)getPtrType(kIROp_InOutType, valueType);
+    return (IRBorrowInOutParamType*)getPtrType(kIROp_BorrowInOutParamType, valueType);
 }
 
-IRRefType* IRBuilder::getRefType(IRType* valueType, AddressSpace addrSpace)
+IRRefParamType* IRBuilder::getRefParamType(IRType* valueType, AddressSpace addrSpace)
 {
-    return (IRRefType*)getPtrType(kIROp_RefType, valueType, AccessQualifier::ReadWrite, addrSpace);
+    return (IRRefParamType*)
+        getPtrType(kIROp_RefParamType, valueType, AccessQualifier::ReadWrite, addrSpace);
 }
 
-IRConstRefType* IRBuilder::getConstRefType(IRType* valueType, AddressSpace addrSpace)
+IRBorrowInParamType* IRBuilder::getBorrowInParamType(IRType* valueType, AddressSpace addrSpace)
 {
-    return (
-        IRConstRefType*)getPtrType(kIROp_ConstRefType, valueType, AccessQualifier::Read, addrSpace);
+    return (IRBorrowInParamType*)
+        getPtrType(kIROp_BorrowInParamType, valueType, AccessQualifier::Read, addrSpace);
 }
 
 IRSPIRVLiteralType* IRBuilder::getSPIRVLiteralType(IRType* type)
@@ -4025,11 +4026,11 @@ IRInst* IRBuilder::emitDefaultConstruct(IRType* type, bool fallback)
     case kIROp_StringType:
         return getStringValue(UnownedStringSlice());
     case kIROp_PtrType:
-    case kIROp_InOutType:
-    case kIROp_OutType:
+    case kIROp_BorrowInOutParamType:
+    case kIROp_OutParamType:
     case kIROp_RawPointerType:
-    case kIROp_RefType:
-    case kIROp_ConstRefType:
+    case kIROp_RefParamType:
+    case kIROp_BorrowInParamType:
     case kIROp_ComPtrType:
     case kIROp_NativePtrType:
     case kIROp_NativeStringType:
@@ -4182,11 +4183,11 @@ static TypeCastStyle _getTypeStyleId(IRType* type)
     case kIROp_BoolType:
         return TypeCastStyle::Bool;
     case kIROp_PtrType:
-    case kIROp_InOutType:
-    case kIROp_OutType:
+    case kIROp_BorrowInOutParamType:
+    case kIROp_OutParamType:
     case kIROp_RawPointerType:
-    case kIROp_RefType:
-    case kIROp_ConstRefType:
+    case kIROp_RefParamType:
+    case kIROp_BorrowInParamType:
         return TypeCastStyle::Ptr;
     case kIROp_EnumType:
         return TypeCastStyle::Enum;
@@ -8164,7 +8165,12 @@ static void _maybeHoistOperand(IRUse* use)
                 continue;
 
             // If the operand is defined after user, move it to before user.
-            if (_isInstDefinedAfter(operand, user))
+            // There is exception that the use of an inst can be defined before the inst,
+            // e.g. generic parameter can be defined before its data type in some cases.
+            // And moving the datatype of a generic parameter before the parameter will result
+            // in incorrect IR layout, because we require that generic parameters are laid
+            // consecutively at first block of a generic.
+            if (_isInstDefinedAfter(operand, user) && !canRelaxInstOrderRule(operand, user))
             {
                 operand->insertBefore(user);
                 for (UInt i = 0; i < operand->getOperandCount(); i++)

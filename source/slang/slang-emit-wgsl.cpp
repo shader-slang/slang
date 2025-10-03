@@ -567,10 +567,10 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         }
 
     case kIROp_PtrType:
-    case kIROp_InOutType:
-    case kIROp_OutType:
-    case kIROp_RefType:
-    case kIROp_ConstRefType:
+    case kIROp_BorrowInOutParamType:
+    case kIROp_OutParamType:
+    case kIROp_RefParamType:
+    case kIROp_BorrowInParamType:
         {
             auto ptrType = cast<IRPtrTypeBase>(type);
             m_writer->emit("ptr<");

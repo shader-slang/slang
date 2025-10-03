@@ -347,17 +347,17 @@ IRType* AutoDiffTranscriberBase::_differentiateTypeImpl(IRBuilder* builder, IRTy
     case kIROp_FuncType:
         return differentiateFunctionType(builder, nullptr, as<IRFuncType>(primalType));
 
-    case kIROp_OutType:
+    case kIROp_OutParamType:
         if (auto diffValueType =
-                differentiateType(builder, as<IROutType>(primalType)->getValueType()))
-            return builder->getOutType(diffValueType);
+                differentiateType(builder, as<IROutParamType>(primalType)->getValueType()))
+            return builder->getOutParamType(diffValueType);
         else
             return nullptr;
 
-    case kIROp_InOutType:
+    case kIROp_BorrowInOutParamType:
         if (auto diffValueType =
-                differentiateType(builder, as<IRInOutType>(primalType)->getValueType()))
-            return builder->getInOutType(diffValueType);
+                differentiateType(builder, as<IRBorrowInOutParamType>(primalType)->getValueType()))
+            return builder->getBorrowInOutParamType(diffValueType);
         else
             return nullptr;
 

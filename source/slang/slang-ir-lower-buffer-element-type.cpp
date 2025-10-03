@@ -452,7 +452,7 @@ struct LoweredElementTypeContext
         IRBuilder builder(structType);
         builder.setInsertAfter(structType);
         auto func = builder.createFunc();
-        auto refStructType = builder.getRefType(structType, AddressSpace::Generic);
+        auto refStructType = builder.getRefParamType(structType, AddressSpace::Generic);
         auto funcType = builder.getFuncType(1, (IRType**)&refStructType, arrayType);
         func->setFullType(funcType);
         builder.addNameHintDecoration(func, UnownedStringSlice("unpackStorage"));
@@ -516,7 +516,7 @@ struct LoweredElementTypeContext
         IRBuilder builder(structType);
         builder.setInsertAfter(structType);
         auto func = builder.createFunc();
-        auto outLoweredType = builder.getRefType(structType, AddressSpace::Generic);
+        auto outLoweredType = builder.getRefParamType(structType, AddressSpace::Generic);
         IRType* paramTypes[] = {outLoweredType, structType};
         auto funcType = builder.getFuncType(2, paramTypes, builder.getVoidType());
         func->setFullType(funcType);
@@ -757,7 +757,7 @@ struct LoweredElementTypeContext
                     info.convertLoweredToOriginal.func,
                     UnownedStringSlice("unpackStorage"));
                 builder.addForceInlineDecoration(info.convertLoweredToOriginal.func);
-                auto refLoweredType = builder.getRefType(loweredType, AddressSpace::Generic);
+                auto refLoweredType = builder.getRefParamType(loweredType, AddressSpace::Generic);
                 info.convertLoweredToOriginal.func->setFullType(
                     builder.getFuncType(1, (IRType**)&refLoweredType, type));
                 builder.emitBlock();
@@ -794,7 +794,7 @@ struct LoweredElementTypeContext
                     UnownedStringSlice("packStorage"));
                 builder.addForceInlineDecoration(info.convertOriginalToLowered.func);
 
-                auto outLoweredType = builder.getRefType(loweredType, AddressSpace::Generic);
+                auto outLoweredType = builder.getRefParamType(loweredType, AddressSpace::Generic);
                 IRType* paramTypes[] = {outLoweredType, type};
                 info.convertOriginalToLowered.func->setFullType(
                     builder.getFuncType(2, paramTypes, builder.getVoidType()));
@@ -2105,7 +2105,7 @@ struct DefaultBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
         IRBuilder builder(structType);
         builder.setInsertAfter(structType);
         auto func = builder.createFunc();
-        auto refStructType = builder.getRefType(structType, AddressSpace::Generic);
+        auto refStructType = builder.getRefParamType(structType, AddressSpace::Generic);
         auto funcType = builder.getFuncType(1, (IRType**)&refStructType, matrixType);
         func->setFullType(funcType);
         builder.addNameHintDecoration(func, UnownedStringSlice("unpackStorage"));
@@ -2158,7 +2158,7 @@ struct DefaultBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
         IRBuilder builder(structType);
         builder.setInsertAfter(structType);
         auto func = builder.createFunc();
-        auto outStructType = builder.getRefType(structType, AddressSpace::Generic);
+        auto outStructType = builder.getRefParamType(structType, AddressSpace::Generic);
         IRType* paramTypes[] = {outStructType, matrixType};
         auto funcType = builder.getFuncType(2, paramTypes, builder.getVoidType());
         func->setFullType(funcType);

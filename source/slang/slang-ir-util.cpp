@@ -312,8 +312,8 @@ bool isWrapperType(IRInst* inst)
     case kIROp_VectorType:
     case kIROp_MatrixType:
     case kIROp_PtrType:
-    case kIROp_RefType:
-    case kIROp_ConstRefType:
+    case kIROp_RefParamType:
+    case kIROp_BorrowInParamType:
     case kIROp_HLSLStructuredBufferType:
     case kIROp_HLSLRWStructuredBufferType:
     case kIROp_HLSLRasterizerOrderedStructuredBufferType:
@@ -1021,11 +1021,11 @@ bool isPtrLikeOrHandleType(IRInst* type)
     case kIROp_ComPtrType:
     case kIROp_RawPointerType:
     case kIROp_RTTIPointerType:
-    case kIROp_OutType:
-    case kIROp_InOutType:
+    case kIROp_OutParamType:
+    case kIROp_BorrowInOutParamType:
     case kIROp_PtrType:
-    case kIROp_RefType:
-    case kIROp_ConstRefType:
+    case kIROp_RefParamType:
+    case kIROp_BorrowInParamType:
     case kIROp_GLSLShaderStorageBufferType:
         return true;
     }
@@ -1358,7 +1358,7 @@ bool areCallArgumentsSideEffectFree(IRCall* call, SideEffectAnalysisOptions opti
                         if (!funcType)
                             return false;
                         if (funcType->getParamCount() > i &&
-                            as<IROutType>(funcType->getParamType(i)))
+                            as<IROutParamType>(funcType->getParamType(i)))
                             continue;
 
                         // We are an argument to an inout parameter.
@@ -1762,7 +1762,7 @@ IRPtrTypeBase* isMutablePointerType(IRInst* inst)
 {
     switch (inst->getOp())
     {
-    case kIROp_ConstRefType:
+    case kIROp_BorrowInParamType:
         return nullptr;
     default:
         return asRelevantPtrType(inst);
@@ -2744,4 +2744,23 @@ bool isPointerToImmutableLocation(IRInst* loc)
     }
     return false;
 }
+
+bool isGenericParameter(IRInst* inst)
+{
+    // The generic parameter must be in the first block
+    bool isParam = inst->getOp() == kIROp_Param;
+    bool isGeneric = false;
+    if (auto irBlock = as<IRBlock>(inst->parent))
+    {
+        isGeneric = as<IRGeneric>(irBlock->getParent()) != nullptr;
+    }
+    return isParam && isGeneric;
+}
+
+bool canRelaxInstOrderRule(IRInst* inst, IRInst* useOfInst)
+{
+    bool isSameBlock = (inst->getParent() == useOfInst->getParent());
+    return isSameBlock && isGenericParameter(useOfInst) && (useOfInst->getDataType() == inst);
+}
+
 } // namespace Slang

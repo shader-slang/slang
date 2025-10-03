@@ -40,15 +40,47 @@ jobs:
             }
           - {
               os: windows,
+              platform: x86_64,
+              arch: amd64,
               runs-on: ["Windows", "self-hosted", "GCP-T4"],
               compiler: cl,
             }
-          - { os: macos, runs-on: macos-latest, compiler: clang }
+          - {
+              os: windows,
+              platform: aarch64,
+              arch: amd64_arm64,
+              runs-on: ["Windows", "self-hosted", "GCP-T4"],
+              compiler: cl,
+            }
+          - {
+              os: macos,
+              platform: x86_64,
+              arch: x86_64,
+              runs-on: macos-latest,
+              compiler: clang,
+            }
+          - {
+              os: macos,
+              platform: aarch64,
+              arch: arm64,
+              runs-on: macos-latest,
+              compiler: clang,
+            }
 
           - { build-slang-llvm: false }
           - { os: linux, platform: x86_64, build-slang-llvm: true }
-          - { os: windows, platform: x86_64, build-slang-llvm: true }
-          - { os: macos, platform: aarch64, build-slang-llvm: true }
+          - {
+              os: windows,
+              platform: x86_64,
+              arch: amd64,
+              build-slang-llvm: true,
+            }
+          - {
+              os: macos,
+              platform: aarch64,
+              arch: arm64,
+              build-slang-llvm: true,
+            }
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
     container: ${{ matrix.image || '' }}
@@ -78,11 +110,16 @@ jobs:
           mkdir build-platform-generators
           cmake --install build --config Release --component generators --prefix build-platform-generators
 
-      - name: Setup Windows dev tools for host and target architecture
+      - name: Setup Windows dev tools for target architecture
         if: matrix.os == 'windows'
         uses: ilammy/msvc-dev-cmd@v1
         with:
-          arch: ${{ matrix.platform == 'aarch64' && 'amd64_arm64' || 'amd64' }}
+          arch: ${{ matrix.arch }}
+
+      - name: Setup macOS dev tools for target architecture
+        if: matrix.os == 'macos'
+        run: |
+          echo "CMAKE_OSX_ARCHITECTURES=${{ matrix.arch }}" >> "$GITHUB_ENV"
 
       - name: Build Slang
         run: |

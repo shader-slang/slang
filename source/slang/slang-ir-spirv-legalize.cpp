@@ -316,7 +316,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             {
                 // Skip load's for referenced `Input` variables since a ref implies
                 // passing as is, which needs to be a pointer (pass as is).
-                if (user->getDataType() && user->getDataType()->getOp() == kIROp_RefType &&
+                if (user->getDataType() && user->getDataType()->getOp() == kIROp_RefParamType &&
                     (addressSpace == AddressSpace::Input ||
                      addressSpace == AddressSpace::BuiltinInput))
                 {
@@ -943,7 +943,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     if (funcType)
                     {
                         if (funcType->getParamCount() > i &&
-                            as<IRRefType>(funcType->getParamType(i)))
+                            as<IRRefParamType>(funcType->getParamType(i)))
                         {
                             // If we are passing an address from a structured buffer as a
                             // ref argument, pass the original pointer as is.
@@ -968,7 +968,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             //
             // If callee doesn't modify the memory location, no need to write back.
             if (funcType && funcType->getParamCount() > i &&
-                as<IRConstRefType>(funcType->getParamType(i)))
+                as<IRBorrowInParamType>(funcType->getParamType(i)))
                 continue;
             // If the buffer location is immutable, don't write back.
             if (isPointerToImmutableLocation(root))
