@@ -678,6 +678,9 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     }
     else if (semanticName == "sv_drawindex")
     {
+        context->requireGLSLVersion(ProfileVersion::GLSL_460);
+        context->requireGLSLExtension(toSlice("GL_ARB_shader_draw_parameters"));
+
         name = "gl_DrawID";
         requiredType = builder->getBasicType(BaseType::Int);
     }
