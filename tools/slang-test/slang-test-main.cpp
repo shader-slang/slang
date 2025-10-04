@@ -4893,6 +4893,19 @@ void runTestsInDirectory(TestContext* context)
                     context->getTestReporter()->addResult(TestResult::Fail);
                 }
 
+                // Add parsing failures to retry list for intermittent issues (file I/O, etc.)
+                if (!context->isRetry)
+                {
+                    // Only add if this is not a retry attempt.
+                    RefPtr<FileTestInfoImpl> fileTestInfo = new FileTestInfoImpl();
+                    fileTestInfo->filePath = file;
+                    fileTestInfo->testName = "parsing failure"; // Use "parsing failure" as test name to indicate it's a file test failure
+                    // Leave options empty for parsing failures
+                    
+                    std::lock_guard lock(context->mutexFailedTests);
+                    context->failedFileTests.add(fileTestInfo);
+                }
+
                 // Output there was some kind of error trying to run the tests on this file
                 // fprintf(stderr, "slang-test: unable to parse test '%s'\n", file.getBuffer());
             }
@@ -5434,13 +5447,26 @@ SlangResult innerMain(int argc, char** argv)
                 FileTestInfoImpl* fileTestInfo = static_cast<FileTestInfoImpl*>(test.Ptr());
                 TestReporter::SuiteScope suiteScope(&reporter, "tests");
                 TestReporter::TestScope scope(&reporter, fileTestInfo->testName);
-                auto newResult = runTest(
-                    &context,
-                    fileTestInfo->filePath,
-                    fileTestInfo->outputStem,
-                    fileTestInfo->testName,
-                    fileTestInfo->options);
-                reporter.addResult(newResult);
+                
+                // Check if this is a parsing failure retry (testName == "parsing failure" indicates parsing failure)
+                if (fileTestInfo->testName == "parsing failure")
+                {
+                    // Retry the entire file parsing
+                    SlangResult result = _runTestsOnFile(&context, fileTestInfo->filePath);
+                    TestResult newResult = SLANG_SUCCEEDED(result) ? TestResult::Pass : TestResult::Fail;
+                    reporter.addResult(newResult);
+                }
+                else
+                {
+                    // Normal test execution retry
+                    auto newResult = runTest(
+                        &context,
+                        fileTestInfo->filePath,
+                        fileTestInfo->outputStem,
+                        fileTestInfo->testName,
+                        fileTestInfo->options);
+                    reporter.addResult(newResult);
+                }
             }
         }
         else
