@@ -135,7 +135,8 @@ struct MatrixTypeLoweringContext
                 for (IRIntegerValue col = 0; col < columnCount->getValue(); col++)
                 {
                     SLANG_ASSERT(
-                        operandIndex < makeMatrix->getOperandCount() && "Operand index out of bounds");
+                        operandIndex < makeMatrix->getOperandCount() &&
+                        "Operand index out of bounds");
                     rowElements.add(getReplacement(makeMatrix->getOperand(operandIndex)));
                     operandIndex++;
                 }
@@ -160,7 +161,8 @@ struct MatrixTypeLoweringContext
                 rowVectors.add(rowVector);
             }
         }
-        else SLANG_ASSERT_FAILURE("makeMatrix operand count must match matrix dimensions");
+        else
+            SLANG_ASSERT_FAILURE("makeMatrix operand count must match matrix dimensions");
 
         SLANG_ASSERT(
             rowVectors.getCount() == rowCount->getValue() &&
