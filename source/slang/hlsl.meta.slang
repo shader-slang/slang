@@ -9573,7 +9573,7 @@ vector<T, N> exp(vector<T, N> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> exp(matrix<T, N, M> x)
 {
     __target_switch
@@ -9664,12 +9664,13 @@ matrix<T,N,M> exp2(matrix<T,N,M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T exp10(T x)
 {
     __target_switch
     {
     case metal: __intrinsic_asm "exp10";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.exp10($0)";
     default:
         const T ln10 = T(2.302585092994045901); // ln(10)
         return exp(x * ln10);
@@ -9678,12 +9679,13 @@ T exp10(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N: int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> exp10(vector<T,N> x)
 {
     __target_switch
     {
     case metal: __intrinsic_asm "exp10";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.exp10($0)";
     default:
         const T ln10 = T(2.30258509299); // ln(10)
         return exp(x * ln10);
@@ -9692,7 +9694,7 @@ vector<T,N> exp10(vector<T,N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,N,M> exp10(matrix<T,N,M> x)
 {
     __target_switch
