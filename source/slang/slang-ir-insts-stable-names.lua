@@ -670,7 +670,11 @@ return {
 	["SPIRVAsmOperand.__imageType"] = 666,
 	["SPIRVAsmOperand.__sampledImageType"] = 667,
 	["Type.CLayout"] = 668,
-	["CastUInt64ToDescriptorHandle"] = 669,
+    ["CastUInt64ToDescriptorHandle"] = 669,
 	["CastDescriptorHandleToUInt64"] = 670,
-	["Attr.MemoryScope"] = 671,
+	["CastStorageToLogicalBase.CastStorageToLogical"] = 671,
+	["CastStorageToLogicalBase.CastStorageToLogicalDeref"] = 672,
+	["Decoration.DisableCopyEliminationDecoration"] = 673,
+	["Decoration.TempCallArgImmutableVar"] = 674,
+	["Attr.MemoryScope"] = 675,
 }

@@ -135,6 +135,16 @@ struct MetalAddressSpaceAssigner : InitialAddressSpaceAssigner
         case kIROp_RWStructuredBufferGetElementPtr:
             outAddressSpace = AddressSpace::Global;
             return true;
+        case kIROp_Load:
+            {
+                auto addrSpace = getAddressSpaceFromVarType(inst->getDataType());
+                if (addrSpace != AddressSpace::Generic)
+                {
+                    outAddressSpace = addrSpace;
+                    return true;
+                }
+            }
+            return false;
         default:
             return false;
         }
@@ -162,7 +172,7 @@ struct MetalAddressSpaceAssigner : InitialAddressSpaceAssigner
         {
             if (ptrType->hasAddressSpace())
                 return ptrType->getAddressSpace();
-            return AddressSpace::Global;
+            return AddressSpace::Generic;
         }
         return AddressSpace::Generic;
     }
@@ -256,10 +266,13 @@ void legalizeIRForMetal(IRModule* module, DiagnosticSink* sink)
 
     legalizeEntryPointVaryingParamsForMetal(module, sink, entryPoints);
 
+    processInst(module->getModuleInst(), sink);
+}
+
+void specializeAddressSpaceForMetal(IRModule* module)
+{
     MetalAddressSpaceAssigner metalAddressSpaceAssigner;
     specializeAddressSpace(module, &metalAddressSpaceAssigner);
-
-    processInst(module->getModuleInst(), sink);
 }
 
 } // namespace Slang

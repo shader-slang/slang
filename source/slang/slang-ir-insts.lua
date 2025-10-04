@@ -1473,6 +1473,7 @@ local insts = {
 					struct_name = "RequireFullQuadsDecoration",
 				},
 			},
+			{ TempCallArgImmutableVar = { struct_name = "TempCallArgImmutableVarDecoration" } },
 			{ TempCallArgVar = { struct_name = "TempCallArgVarDecoration" } },
 			{
 				nonCopyable = {
@@ -1480,6 +1481,7 @@ local insts = {
 					struct_name = "NonCopyableTypeDecoration",
 				},
 			},
+			{ DisableCopyEliminationDecoration = {} },
 			{
 				DynamicUniform = {
 					-- Marks a value to be dynamically uniform.
@@ -1891,6 +1893,16 @@ local insts = {
 	{ EnumCast = { min_operands = 1 } },
 	{ CastUInt2ToDescriptorHandle = { min_operands = 1 } },
 	{ CastDescriptorHandleToUInt2 = { min_operands = 1 } },
+	-- Represents a psuedo cast to convert between a logical type (user declared) and a storage Type
+	-- (valid in buffer locations). The operand can either be a value or an address.
+	{
+		CastStorageToLogicalBase =
+		{
+			min_operands = 2, struct_name = "CastStorageToLogicalBase",
+			{ CastStorageToLogical = { min_operands = 2, struct_name = "CastStorageToLogical" } },
+			{ CastStorageToLogicalDeref = { min_operands = 2, struct_name = "CastStorageToLogicalDeref" } },
+		}
+	},
 	{ CastUInt64ToDescriptorHandle = { min_operands = 1 } },
 	{ CastDescriptorHandleToUInt64 = { min_operands = 1 } },
 	-- Represents a no-op cast to convert a resource pointer to a resource on targets where the resource handles are
