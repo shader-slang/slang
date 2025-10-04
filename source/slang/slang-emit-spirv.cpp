@@ -2681,7 +2681,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         // Vulkan spec 16.1: "The “Depth” operand of OpTypeImage is ignored."
         SpvWord depth =
-            ImageOpConstants::unknownDepthImage; // No knowledge of if this is a depth image
+            inst->isShadow()
+                ? ImageOpConstants::isDepthImage       // But we respect the `isShadow` flag of the
+                                                       // texture
+                : ImageOpConstants::unknownDepthImage; // No knowledge of if this is a depth image
+
         SpvWord ms = inst->isMultisample() ? ImageOpConstants::isMultisampled
                                            : ImageOpConstants::notMultisampled;
 
