@@ -525,6 +525,8 @@ struct MatrixTypeLoweringContext
         case kIROp_Sub:
         case kIROp_Mul:
         case kIROp_Div:
+        case kIROp_IRem:
+        case kIROp_FRem:
         case kIROp_Lsh:
         case kIROp_Rsh:
         case kIROp_And:
