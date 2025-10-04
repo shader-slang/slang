@@ -302,6 +302,7 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
     case kIROp_GlobalGenericParam:
     case kIROp_WitnessTable:
     case kIROp_InterfaceType:
+    case kIROp_SymbolAlias:
         return cloneGlobalValue(this, originalValue);
 
     case kIROp_BoolLit:
@@ -346,7 +347,6 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
             return builder->getVoidValue();
         }
         break;
-
     default:
         {
             // In the default case, assume that we have some sort of "hoistable"
