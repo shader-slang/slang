@@ -2553,7 +2553,7 @@ void SemanticsDeclHeaderVisitor::visitStructDecl(StructDecl* structDecl)
         structDecl->addTag(TypeTag::Incomplete);
     }
 
-    // Slang supports a convenient syntax to create a wrapper type from
+    // Slang supports a convenient syntax to create a link-time aliased type from
     // an existing type that implements a given interface. For example,
     // the user can write: struct FooWrapper:IFoo = Foo;
     // In this case we need to check the aliasedType expr.
@@ -2561,6 +2561,7 @@ void SemanticsDeclHeaderVisitor::visitStructDecl(StructDecl* structDecl)
     {
         SemanticsVisitor visitor(withDeclToExcludeFromLookup(structDecl));
         structDecl->aliasedType = visitor.CheckProperType(structDecl->aliasedType);
+        structDecl->addTag(getTypeTags(structDecl->aliasedType));
     }
 
     checkVisibility(structDecl);
