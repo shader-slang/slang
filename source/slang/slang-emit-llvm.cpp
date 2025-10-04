@@ -2224,6 +2224,12 @@ struct LLVMEmitter
             llvmInst = _emitCompare(inst);
             break;
 
+        case kIROp_Specialize:
+        case kIROp_MissingReturn:
+        case kIROp_StaticAssert:
+        case kIROp_Unmodified:
+            return nullptr;
+
         case kIROp_Add:
         case kIROp_Sub:
         case kIROp_Mul:
