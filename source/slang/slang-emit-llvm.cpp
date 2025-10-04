@@ -1144,6 +1144,41 @@ public:
                 }
             }
             break;
+        case kIROp_MakeVectorFromScalar:
+            {
+                auto vectorType = cast<IRVectorType>(inst->getDataType());
+                int elemCount = getIntVal(vectorType->getElementCount());
+                llvm::Constant* value = maybeEmitConstant(inst->getOperand(0), storage);
+                if (!value)
+                    return nullptr;
+
+                if (defaultPointerRules && storage)
+                {
+                    auto elemType = getValueType(vectorType->getElementType());
+                    auto values = List<llvm::Constant*>::makeRepeated(value, elemCount);
+                    llvmConstant = llvm::ConstantArray::get(
+                        llvm::ArrayType::get(elemType, values.getCount()),
+                        llvm::ArrayRef(values.begin(), values.end()));
+
+                    int alignedCount = getVectorAlignedCount(vectorType, defaultPointerRules);
+                    if (alignedCount != values.getCount())
+                    {
+                        while (values.getCount() < alignedCount)
+                            values.add(llvm::PoisonValue::get(elemType));
+
+                        llvmConstant.padded = llvm::ConstantArray::get(
+                            llvm::ArrayType::get(elemType, values.getCount()),
+                            llvm::ArrayRef(values.begin(), values.end()));
+                    }
+                }
+                else
+                {
+                    llvmConstant = llvm::ConstantVector::getSplat(
+                        llvm::ElementCount::getFixed(elemCount),
+                        value);
+                }
+            }
+            break;
             // It is possible to remove both MakeArray and MakeStruct here;
             // that only causes more complex code for initializing global
             // variables.
@@ -1877,6 +1912,7 @@ struct LLVMEmitter
         case kIROp_StringLit:
         case kIROp_PtrLit:
         case kIROp_MakeVector:
+        case kIROp_MakeVectorFromScalar:
             // kIROp_MakeArray & kIROp_MakeStruct are intentionally omitted
             // here; they must not be emitted as values in any other context
             // than global vars.
@@ -1980,19 +2016,37 @@ struct LLVMEmitter
 
     llvm::Value* _coerceNumeric(llvm::Value* val, llvm::Type* type, bool isSigned)
     {
-        auto valWidth = val->getType()->getPrimitiveSizeInBits();
+        auto valType = val->getType();
+        auto valWidth = valType->getPrimitiveSizeInBits();
         auto targetWidth = type->getPrimitiveSizeInBits();
-        bool isFloat = type->isFloatTy();
 
-        if (valWidth < targetWidth)
+        if (type->isVectorTy() && !valType->isVectorTy())
         {
-            return isFloat ? llvmBuilder->CreateFPExt(val, type) :
-                isSigned ? llvmBuilder->CreateSExt(val, type) : llvmBuilder->CreateZExt(val, type);
+            auto vecType = llvm::cast<llvm::VectorType>(type);
+            // Splat into vector
+            return llvmBuilder->CreateVectorSplat(
+                vecType->getElementCount(),
+                _coerceNumeric(val, vecType->getElementType(), isSigned));
         }
-        else if (valWidth > targetWidth)
+        else if (type->isFloatingPointTy())
         {
-            return isFloat ? llvmBuilder->CreateFPTrunc(val, type) : llvmBuilder->CreateTrunc(val, type);
+            // Extend or truncate float
+            if (valWidth < targetWidth)
+            {
+                return llvmBuilder->CreateFPExt(val, type);
+            }
+            else if (valWidth > targetWidth)
+            {
+                return llvmBuilder->CreateFPTrunc(val, type);
+            }
         }
+        else if (type->isIntegerTy())
+        {
+            // Extend or truncate int
+            if (valWidth != targetWidth)
+                return isSigned ? llvmBuilder->CreateSExtOrTrunc(val, type) : llvmBuilder->CreateZExtOrTrunc(val, type);
+        }
+
         return val;
     }
 
@@ -2273,6 +2327,18 @@ struct LLVMEmitter
             }
             break;
 
+        case kIROp_Select:
+            {
+                auto selectInst = static_cast<IRSelect*>(inst);
+
+                llvmInst = llvmBuilder->CreateSelect(
+                    findValue(selectInst->getCondition()),
+                    findValue(selectInst->getTrueResult()),
+                    findValue(selectInst->getFalseResult())
+                );
+            }
+            break;
+
         case kIROp_Store:
             {
                 auto storeInst = static_cast<IRStore*>(inst);
@@ -2379,6 +2445,16 @@ struct LLVMEmitter
                         elemIndex++;
                     }
                 }
+            }
+            break;
+
+        case kIROp_MakeVectorFromScalar:
+            llvmInst = types->maybeEmitConstant(inst);
+            if (!llvmInst)
+            {
+                auto llvmType = llvm::cast<llvm::VectorType>(types->getValueType(inst->getDataType()));
+                auto val = findValue(inst->getOperand(0));
+                llvmInst = llvmBuilder->CreateVectorSplat(llvmType->getElementCount(), val);
             }
             break;
 

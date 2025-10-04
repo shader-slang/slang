@@ -13587,7 +13587,7 @@ vector<int, N> sign(vector<T, N> x)
 
 __generic<T : __BuiltinSignedArithmeticType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<int, N, M> sign(matrix<T, N, M> x)
 {
     __target_switch
