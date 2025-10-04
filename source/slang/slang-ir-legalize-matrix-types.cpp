@@ -126,27 +126,41 @@ struct MatrixTypeLoweringContext
         UInt operandIndex = 0;
 
         // Assert that we have the expected number of operands
-        SLANG_ASSERT(
-            makeMatrix->getOperandCount() == UInt(rowCount->getValue() * columnCount->getValue()) &&
-            "makeMatrix operand count must match matrix dimensions");
-
-        for (IRIntegerValue row = 0; row < rowCount->getValue(); row++)
+        if (makeMatrix->getOperandCount() == UInt(rowCount->getValue() * columnCount->getValue()))
         {
-            List<IRInst*> rowElements;
-            for (IRIntegerValue col = 0; col < columnCount->getValue(); col++)
+            // Each operand is a matrix element
+            for (IRIntegerValue row = 0; row < rowCount->getValue(); row++)
             {
-                SLANG_ASSERT(
-                    operandIndex < makeMatrix->getOperandCount() && "Operand index out of bounds");
-                rowElements.add(getReplacement(makeMatrix->getOperand(operandIndex)));
-                operandIndex++;
-            }
+                List<IRInst*> rowElements;
+                for (IRIntegerValue col = 0; col < columnCount->getValue(); col++)
+                {
+                    SLANG_ASSERT(
+                        operandIndex < makeMatrix->getOperandCount() && "Operand index out of bounds");
+                    rowElements.add(getReplacement(makeMatrix->getOperand(operandIndex)));
+                    operandIndex++;
+                }
 
-            SLANG_ASSERT(
-                rowElements.getCount() == columnCount->getValue() &&
-                "Row elements count must match column count");
-            auto rowVector = builder.emitMakeVector(vectorType, rowElements);
-            rowVectors.add(rowVector);
+                SLANG_ASSERT(
+                    rowElements.getCount() == columnCount->getValue() &&
+                    "Row elements count must match column count");
+                auto rowVector = builder.emitMakeVector(vectorType, rowElements);
+                rowVectors.add(rowVector);
+            }
         }
+        else if (makeMatrix->getOperandCount() == UInt(rowCount->getValue()))
+        {
+            // Each operand is a vector with width columnCount->getValue().
+            for (IRIntegerValue row = 0; row < rowCount->getValue(); row++)
+            {
+                auto rowVector = getReplacement(makeMatrix->getOperand(row));
+                auto vecType = as<IRVectorType>(rowVector->getDataType());
+                SLANG_ASSERT(
+                    getIntVal(vecType->getElementCount()) == columnCount->getValue() &&
+                    "Row elements count must match column count");
+                rowVectors.add(rowVector);
+            }
+        }
+        else SLANG_ASSERT_FAILURE("makeMatrix operand count must match matrix dimensions");
 
         SLANG_ASSERT(
             rowVectors.getCount() == rowCount->getValue() &&
@@ -527,6 +541,10 @@ struct MatrixTypeLoweringContext
         case kIROp_Not:
         case kIROp_BitNot:
         case kIROp_Neg:
+        case kIROp_IntCast:
+        case kIROp_FloatCast:
+        case kIROp_CastIntToFloat:
+        case kIROp_CastFloatToInt:
             return legalizeUnaryOperation(inst, inst->getOp());
         default:
             break;
