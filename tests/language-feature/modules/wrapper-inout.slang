@@ -1,10 +1,12 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -output-using-type
 
 public interface ITest {
+    __init();
     public int testDir(inout int a);
 };
 
 public struct TestImpl : ITest {
+    __init(){}
     public int testDir(inout int a) {
         int oldA = a;
         a = 5;
@@ -21,7 +23,7 @@ public struct Test : ITest = TestImpl;
 [numthreads(1,1,1)]
 void computeMain()
 {
-    Test data;
+    Test data = {};
     int a = 516;
     int b = data.testDir(a);
     // CHECK: 5

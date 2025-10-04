@@ -5191,9 +5191,11 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         // If we are trying to get the layout of some extern type, do our best
         // to look it up in other loaded modules and generate the type layout
         // based on that.
-        declRefType = context.lookupExternDeclRefType(declRefType);
-        auto declRef = declRefType->getDeclRef();
+        auto resolvedType = context.lookupExternDeclRefType(declRefType);
+        if (resolvedType != type)
+            return _createTypeLayout(context, resolvedType);
 
+        auto declRef = declRefType->getDeclRef();
 
         if (auto structDeclRef = declRef.as<StructDecl>())
         {
@@ -5888,20 +5890,31 @@ GlobalGenericParamDecl* GenericParamTypeLayout::getGlobalGenericParamDecl()
     return rsDeclRef.getDecl();
 }
 
-DeclRefType* TypeLayoutContext::lookupExternDeclRefType(DeclRefType* declRefType)
+Type* TypeLayoutContext::lookupExternDeclRefType(DeclRefType* declRefType)
 {
     const auto declRef = declRefType->getDeclRef();
     const auto decl = declRef.getDecl();
     const auto isExtern =
         decl->hasModifier<ExternAttribute>() || decl->hasModifier<ExternModifier>();
+    Type* resultType = declRefType;
     if (isExtern)
     {
         if (!externTypeMap)
             buildExternTypeMap();
         const auto mangledName = getMangledName(targetReq->getLinkage()->getASTBuilder(), decl);
-        externTypeMap->tryGetValue(mangledName, declRefType);
+        externTypeMap->tryGetValue(mangledName, resultType);
     }
-    return declRefType;
+
+    // If the type is an alias of another type, then we should create the type layout
+    // from the aliased type instead.
+    if (auto aggTypeDeclRef = isDeclRefTypeOf<AggTypeDecl>(resultType))
+    {
+        if (auto aliasedType = as<Type>(getAliasedType(astBuilder, aggTypeDeclRef)))
+        {
+            return aliasedType;
+        }
+    }
+    return resultType;
 }
 
 void TypeLayoutContext::buildExternTypeMap()
