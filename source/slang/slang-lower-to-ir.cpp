@@ -8601,8 +8601,21 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto aggTypeParentDecl = as<AggTypeDecl>(parentDecl);
         if (aggTypeParentDecl && aggTypeParentDecl->wrappedType.type && inheritanceDecl->witnessVal)
         {
-            auto wrappedWitness = lowerVal(context, inheritanceDecl->witnessVal);
-            auto alias = getBuilder()->emitSymbolAlias(wrappedWitness.val);
+            NestedContext nested(this);
+            auto subBuilder = nested.getBuilder();
+            auto subContext = nested.getContext();
+            auto outerGeneric = emitOuterGenerics(subContext, inheritanceDecl, inheritanceDecl);
+
+            auto wrappedWitness = lowerVal(subContext, inheritanceDecl->witnessVal);
+            IRInst* alias = nullptr;
+            if (outerGeneric)
+            {
+                alias = finishOuterGenerics(subBuilder, wrappedWitness.val, outerGeneric);
+            }
+            else
+            {
+                alias = getBuilder()->emitSymbolAlias(wrappedWitness.val);
+            }
             auto mangledName = getMangledNameForConformanceWitness(
                 context->astBuilder,
                 parentDecl,
@@ -9754,30 +9767,37 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto subBuilder = nestedContext.getBuilder();
         auto subContext = nestedContext.getContext();
 
+        // Emit any generics that should wrap the actual type.
+        auto outerGeneric = emitOuterGenerics(subContext, decl, decl);
+
         if (decl->wrappedType)
         {
             // If the type decl is an alias of another type, then we lower it into
             // a IRSymbolAlias.
-            auto loweredType = lowerType(context, decl->wrappedType);
+            auto loweredType = lowerType(subContext, decl->wrappedType);
             if (loweredType)
             {
-                auto alias = subBuilder->emitSymbolAlias(loweredType);
-                addLinkageDecoration(context, alias, decl);
-                context->setGlobalValue(decl, LoweredValInfo::simple(alias));
+                IRInst* alias = nullptr;
+                if (outerGeneric)
+                {
+                    alias = finishOuterGenerics(subBuilder, loweredType, outerGeneric);
+                }
+                else
+                {
+                    alias = subBuilder->emitSymbolAlias(loweredType);
+                }
+                addLinkageDecoration(subContext, alias, decl);
 
                 // Enumerate all witnesses and lower IRSymbolAlias for them as well.
                 for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
                 {
                     if (!inheritanceDecl->witnessVal)
                         continue;
-                    ensureDecl(context, inheritanceDecl);
+                    ensureDecl(subContext, inheritanceDecl);
                 }
                 return LoweredValInfo::simple(alias);
             }
         }
-
-        // Emit any generics that should wrap the actual type.
-        auto outerGeneric = emitOuterGenerics(subContext, decl, decl);
 
         IRType* irAggType = nullptr;
         if (as<StructDecl>(decl))
