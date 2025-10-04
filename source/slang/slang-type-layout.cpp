@@ -5955,7 +5955,7 @@ void TypeLayoutContext::buildExternTypeMap()
         }
     };
 
-    for (const auto& m : linkage->loadedModulesList)
+    for (const auto& m : programLayout->getProgram()->getModuleDependencies())
     {
         const auto& ast = m->getModuleDecl();
         for (auto member : ast->getDirectMemberDecls())
