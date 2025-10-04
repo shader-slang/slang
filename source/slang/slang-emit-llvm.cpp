@@ -1790,6 +1790,8 @@ struct LLVMEmitter
             targetTriple, "generic", "", opt, llvm::Reloc::PIC_, std::nullopt,
             optLevel
         );
+        llvmModule->setDataLayout(targetMachine->createDataLayout());
+        llvmModule->setTargetTriple(targetTriple);
 
         debug = getOptions().getDebugInfoLevel() != DebugInfoLevel::None;
 
@@ -3400,6 +3402,9 @@ struct LLVMEmitter
                     SLANG_UNEXPECTED("Failed to parse LLVM inline IR!");
                 }
 
+                sourceModule->setDataLayout(targetMachine->createDataLayout());
+                sourceModule->setTargetTriple(targetMachine->getTargetTriple());
+
                 llvmLinker->linkInModule(std::move(sourceModule), llvm::Linker::OverrideFromSrc);
 
                 llvmFunc = llvm::cast<llvm::Function>(llvmModule->getNamedValue(funcName));
@@ -3871,9 +3876,6 @@ struct LLVMEmitter
     {
         mapInstToLLVM.clear();
 
-        llvmModule->setDataLayout(targetMachine->createDataLayout());
-        llvmModule->setTargetTriple(targetMachine->getTargetTriple());
-
         llvm::LoopAnalysisManager loopAnalysisManager;
         llvm::FunctionAnalysisManager functionAnalysisManager;
         llvm::CGSCCAnalysisManager CGSCCAnalysisManager;
@@ -3930,10 +3932,9 @@ struct LLVMEmitter
 
         llvm::verifyModule(*llvmModule, &llvm::errs());
 
-        if (getOptions().getOptimizationLevel() != OptimizationLevel::None)
-        {
-            optimize();
-        }
+        // O0 is separately handled inside `optimize()`; we need to call it in
+        // any case to make sure that `ForceInline` functions get inlined.
+        optimize();
 
         if (debug)
         {
@@ -3951,10 +3952,6 @@ struct LLVMEmitter
 
     void generateObjectCode(List<uint8_t>& objectOut)
     {
-        // These must always be set when generating object code.
-        llvmModule->setDataLayout(targetMachine->createDataLayout());
-        llvmModule->setTargetTriple(targetMachine->getTargetTriple());
-
         BinaryLLVMOutputStream output(objectOut);
 
         llvm::legacy::PassManager pass;

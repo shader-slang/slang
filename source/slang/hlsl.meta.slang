@@ -11770,7 +11770,13 @@ T max(T x, T y)
         result:$$T = OpExtInst glsl450 FMax $x $y
     };
     case wgsl: __intrinsic_asm "max";
-    case llvm: __intrinsic_asm "%result = call $T0 @llvm.maximumnum($0, $1)";
+    case llvm:
+        // Unfortunately, as of LLVM 21.1.1, maximumnum seems to generate
+        // invalid code on x86.
+        //__intrinsic_asm "%result = call $T0 @llvm.maximumnum($0, $1)";
+        if (isnan(x)) return y;
+        if (isnan(y)) return x;
+        return x > y ? x : y;
     }
 }
 
@@ -11788,7 +11794,7 @@ vector<T, N> max(vector<T, N> x, vector<T, N> y)
         result:$$vector<T, N> = OpExtInst glsl450 FMax $x $y
     };
     case wgsl: __intrinsic_asm "max";
-    case llvm: __intrinsic_asm "%result = call $T0 @llvm.maximumnum($0, $1)";
+    //case llvm: __intrinsic_asm "%result = call $T0 @llvm.maximumnum($0, $1)";
     default:
         VECTOR_MAP_BINARY(T, N, max, x, y);
     }
@@ -12012,7 +12018,13 @@ T min(T x, T y)
         result:$$T = OpExtInst glsl450 FMin $x $y
     };
     case wgsl: __intrinsic_asm "min";
-    case llvm: __intrinsic_asm "%result = call $T0 @llvm.minimumnum($0, $1)";
+    case llvm:
+        // Unfortunately, as of LLVM 21.1.1, minimumnum seems to generate
+        // invalid code on x86.
+        // __intrinsic_asm "%result = call $T0 @llvm.minimumnum($0, $1)";
+        if (isnan(x)) return y;
+        if (isnan(y)) return x;
+        return x < y ? x : y;
     }
 }
 
@@ -12030,7 +12042,7 @@ vector<T,N> min(vector<T,N> x, vector<T,N> y)
         result:$$vector<T,N> = OpExtInst glsl450 FMin $x $y
     };
     case wgsl: __intrinsic_asm "min";
-    case llvm: __intrinsic_asm "%result = call $T0 @llvm.minimumnum($0, $1)";
+    //case llvm: __intrinsic_asm "%result = call $T0 @llvm.minimumnum($0, $1)";
     default:
         VECTOR_MAP_BINARY(T, N, min, x, y);
     }
@@ -14152,7 +14164,7 @@ vector<T,N> tanpi(vector<T,N> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_spirv_wgsl_llvm, sm_4_0_version)]
 [PreferRecompute]
 matrix<T, M, N> transpose(matrix<T, N, M> x)
 {
@@ -14174,7 +14186,7 @@ matrix<T, M, N> transpose(matrix<T, N, M> x)
 }
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 [PreferRecompute]
 matrix<T, M, N> transpose(matrix<T, N, M> x)
 {
@@ -14192,7 +14204,7 @@ matrix<T, M, N> transpose(matrix<T, N, M> x)
 }
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 [PreferRecompute]
 [OverloadRank(-1)]
 matrix<T, M, N> transpose(matrix<T, N, M> x)
