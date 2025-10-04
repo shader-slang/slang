@@ -5920,7 +5920,6 @@ Type* TypeLayoutContext::lookupExternDeclRefType(DeclRefType* declRefType)
 void TypeLayoutContext::buildExternTypeMap()
 {
     externTypeMap.emplace();
-    const auto linkage = targetReq->getLinkage();
 
     HashSet<String> externNames;
     Dictionary<String, DeclRefType*> allTypes;
