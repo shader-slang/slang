@@ -2556,7 +2556,7 @@ void SemanticsDeclHeaderVisitor::visitStructDecl(StructDecl* structDecl)
     // Slang supports a convenient syntax to create a wrapper type from
     // an existing type that implements a given interface. For example,
     // the user can write: struct FooWrapper:IFoo = Foo;
-    // In this case we need to check the wrapped type expr.
+    // In this case we need to check the aliasedType expr.
     if (structDecl->aliasedType.exp)
     {
         SemanticsVisitor visitor(withDeclToExcludeFromLookup(structDecl));
