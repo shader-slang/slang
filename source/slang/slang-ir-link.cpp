@@ -1411,7 +1411,10 @@ IRInst* cloneInst(
             builder,
             cast<IRGlobalGenericParam>(originalInst),
             originalValues);
-
+    case kIROp_SymbolAlias:
+        // If we encounter a symbol alias, we want to clone
+        // the value it refers to instead of the alias itself.
+        return context->maybeCloneValue(cast<IRSymbolAlias>(originalInst)->getOperand(0));
     default:
         break;
     }

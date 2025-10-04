@@ -506,6 +506,13 @@ class InheritanceDecl : public TypeConstraintDecl
     // this inheritance declaration.
     FIDDLE() RefPtr<WitnessTable> witnessTable;
 
+    // If the inheritance decl is in a link-time type declaration
+    // (e.g. `export struct Foo : IFoo = FooImpl;`), then we will
+    // store the witness that `FooImpl:IFoo` here.
+    // TODO: If we made `WitnessTable` a `Val`, we should be able
+    // to unify these two cases.
+    FIDDLE() Witness* witnessVal = nullptr;
+
     // Overrides should be public so base classes can access
     const TypeExp& _getSupOverride() const { return base; }
 };

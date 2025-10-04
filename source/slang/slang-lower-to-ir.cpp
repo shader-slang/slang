@@ -8593,12 +8593,35 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitInheritanceDecl(InheritanceDecl* inheritanceDecl)
     {
+        // If the inheritance decl is nested inside a link-time type alias declaration,
+        // e.g. in `export struct Foo:IFoo = FooImpl`,
+        // then we need to emit a symbo alias to the `FooImpl:IFoo`.
+        //
+        auto parentDecl = inheritanceDecl->parentDecl;
+        auto aggTypeParentDecl = as<AggTypeDecl>(parentDecl);
+        if (aggTypeParentDecl && aggTypeParentDecl->wrappedType.type && inheritanceDecl->witnessVal)
+        {
+            auto wrappedWitness = lowerVal(context, inheritanceDecl->witnessVal);
+            auto alias = getBuilder()->emitSymbolAlias(wrappedWitness.val);
+            auto mangledName = getMangledNameForConformanceWitness(
+                context->astBuilder,
+                parentDecl,
+                inheritanceDecl->base.type);
+            bool explicitExtern = false;
+            if (isImportedDecl(context, parentDecl, explicitExtern))
+                getBuilder()->addImportDecoration(alias, mangledName.getUnownedSlice());
+            else
+                getBuilder()->addExportDecoration(alias, mangledName.getUnownedSlice());
+
+            context->setGlobalValue(inheritanceDecl, LoweredValInfo::simple(alias));
+            return LoweredValInfo::simple(alias);
+        }
+
         // An inheritance clause inside of an `interface`
         // declaration should not give rise to a witness
         // table, because it represents something the
         // interface requires, and not what it provides.
         //
-        auto parentDecl = inheritanceDecl->parentDecl;
         if (const auto parentInterfaceDecl = as<InterfaceDecl>(parentDecl))
         {
             return LoweredValInfo::simple(getInterfaceRequirementKey(inheritanceDecl));
@@ -9724,16 +9747,34 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             SLANG_UNREACHABLE("associatedtype should have been handled by visitAssocTypeDecl.");
         }
 
-        // TODO(JS):
-        // Not clear what to do around HLSLExportModifier.
-        // The HLSL spec says it only applies to functions, so we ignore for now.
-
         // We are going to create nested IR building state
         // to use when emitting the members of the type.
         //
         NestedContext nestedContext(this);
         auto subBuilder = nestedContext.getBuilder();
         auto subContext = nestedContext.getContext();
+
+        if (decl->wrappedType)
+        {
+            // If the type decl is an alias of another type, then we lower it into
+            // a IRSymbolAlias.
+            auto loweredType = lowerType(context, decl->wrappedType);
+            if (loweredType)
+            {
+                auto alias = subBuilder->emitSymbolAlias(loweredType);
+                addLinkageDecoration(context, alias, decl);
+                context->setGlobalValue(decl, LoweredValInfo::simple(alias));
+
+                // Enumerate all witnesses and lower IRSymbolAlias for them as well.
+                for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
+                {
+                    if (!inheritanceDecl->witnessVal)
+                        continue;
+                    ensureDecl(context, inheritanceDecl);
+                }
+                return LoweredValInfo::simple(alias);
+            }
+        }
 
         // Emit any generics that should wrap the actual type.
         auto outerGeneric = emitOuterGenerics(subContext, decl, decl);
