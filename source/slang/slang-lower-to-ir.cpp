@@ -8599,7 +8599,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         //
         auto parentDecl = inheritanceDecl->parentDecl;
         auto aggTypeParentDecl = as<AggTypeDecl>(parentDecl);
-        if (aggTypeParentDecl && aggTypeParentDecl->wrappedType.type && inheritanceDecl->witnessVal)
+        if (aggTypeParentDecl && aggTypeParentDecl->aliasedType.type && inheritanceDecl->witnessVal)
         {
             NestedContext nested(this);
             auto subBuilder = nested.getBuilder();
@@ -9770,11 +9770,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // Emit any generics that should wrap the actual type.
         auto outerGeneric = emitOuterGenerics(subContext, decl, decl);
 
-        if (decl->wrappedType)
+        if (decl->aliasedType)
         {
             // If the type decl is an alias of another type, then we lower it into
             // a IRSymbolAlias.
-            auto loweredType = lowerType(subContext, decl->wrappedType);
+            auto loweredType = lowerType(subContext, decl->aliasedType);
             if (loweredType)
             {
                 IRInst* alias = nullptr;

@@ -198,7 +198,7 @@ inline Type* getTargetType(ASTBuilder* astBuilder, DeclRef<ExtensionDecl> declRe
 
 inline Type* getAliasedType(ASTBuilder* astBuilder, DeclRef<AggTypeDecl> declRef)
 {
-    return declRef.substitute(astBuilder, declRef.getDecl()->wrappedType.Ptr());
+    return declRef.substitute(astBuilder, declRef.getDecl()->aliasedType.Ptr());
 }
 
 inline FilteredMemberRefList<VarDecl> getFields(

@@ -2557,10 +2557,10 @@ void SemanticsDeclHeaderVisitor::visitStructDecl(StructDecl* structDecl)
     // an existing type that implements a given interface. For example,
     // the user can write: struct FooWrapper:IFoo = Foo;
     // In this case we need to check the wrapped type expr.
-    if (structDecl->wrappedType.exp)
+    if (structDecl->aliasedType.exp)
     {
         SemanticsVisitor visitor(withDeclToExcludeFromLookup(structDecl));
-        structDecl->wrappedType = visitor.CheckProperType(structDecl->wrappedType);
+        structDecl->aliasedType = visitor.CheckProperType(structDecl->aliasedType);
     }
 
     checkVisibility(structDecl);
@@ -7655,21 +7655,21 @@ bool SemanticsVisitor::checkConformance(
         // : IFoo`.
         auto aggTypeDecl = as<AggTypeDecl>(declRef.getDecl());
 
-        if (aggTypeDecl && aggTypeDecl->wrappedType)
+        if (aggTypeDecl && aggTypeDecl->aliasedType)
         {
-            auto witness = tryGetSubtypeWitness(aggTypeDecl->wrappedType, superType);
+            auto witness = tryGetSubtypeWitness(aggTypeDecl->aliasedType, superType);
             if (witness)
             {
                 inheritanceDecl->witnessVal = witness;
             }
             else
             {
-                if (!as<ErrorType>(aggTypeDecl->wrappedType))
+                if (!as<ErrorType>(aggTypeDecl->aliasedType))
                 {
                     getSink()->diagnose(
                         inheritanceDecl,
                         Diagnostics::typeArgumentDoesNotConformToInterface,
-                        aggTypeDecl->wrappedType,
+                        aggTypeDecl->aliasedType,
                         superType);
                 }
             }

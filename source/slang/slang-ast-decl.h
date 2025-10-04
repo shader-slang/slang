@@ -386,8 +386,10 @@ class AggTypeDecl : public AggTypeDeclBase
     FIDDLE(...)
     FIDDLE() TypeTag typeTags = TypeTag::None;
 
-    // Used if this type declaration is a wrapper, i.e. struct FooWrapper:IFoo = Foo;
-    TypeExp wrappedType;
+    // Used if this type declaration is an alias of another, e.g.
+    // in `struct FooWrapper:IFoo = Foo;`, `aliasedType` would be `Foo`.
+    TypeExp aliasedType;
+
     bool hasBody = true;
 
     void unionTagsWith(TypeTag other);
