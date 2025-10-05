@@ -10762,7 +10762,7 @@ void SemanticsVisitor::validateArrayElementTypeForVariable(VarDeclBase* varDecl)
     TypeTag elementTags = getTypeTags(elementType);
     if ((int)elementTags & (int)TypeTag::NonAddressable)
     {
-        getSink()->diagnose(varDecl, Diagnostics::disallowedArrayOfParameterBlock);
+        getSink()->diagnose(varDecl, Diagnostics::disallowedArrayOfParameterBlock, elementType);
         return;
     }
 }
@@ -15107,6 +15107,16 @@ void validateStructuredBufferElementType(SemanticsVisitor* visitor, VarDeclBase*
         visitor->getSink()->diagnose(
             varDecl->loc,
             Diagnostics::recursiveTypesFoundInStructuredBuffer,
+            elementType);
+    }
+
+    // Check if the element type is NonAddressable
+    TypeTag elementTags = visitor->getTypeTags(elementType);
+    if ((int)elementTags & (int)TypeTag::NonAddressable)
+    {
+        visitor->getSink()->diagnose(
+            varDecl->loc,
+            Diagnostics::nonAddressableTypeInStructuredBuffer,
             elementType);
     }
 }

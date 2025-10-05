@@ -348,7 +348,10 @@ TypeTag SemanticsVisitor::getTypeTags(Type* type)
             typeTag = (TypeTag)((int)typeTag | (int)TypeTag::LinkTimeSized);
         }
         if (!sized)
-            typeTag = (TypeTag)((int)typeTag | (int)TypeTag::Unsized);
+        {
+            // Unbounded arrays are both Unsized and NonAddressable
+            typeTag = (TypeTag)((int)typeTag | (int)TypeTag::Unsized | (int)TypeTag::NonAddressable);
+        }
 
         return typeTag;
     }

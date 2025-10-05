@@ -661,7 +661,13 @@ DIAGNOSTIC(
     30027,
     Error,
     disallowedArrayOfParameterBlock,
-    "Arrays of ParameterBlock are not allowed")
+    "Arrays of non-addressable type '$0' are not allowed")
+
+DIAGNOSTIC(
+    30028,
+    Error,
+    nonAddressableTypeInStructuredBuffer,
+    "StructuredBuffer element type '$0' is non-addressable and cannot be used in StructuredBuffer")
 DIAGNOSTIC(
     30029,
     Error,
