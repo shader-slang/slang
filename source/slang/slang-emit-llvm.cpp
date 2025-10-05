@@ -2319,10 +2319,14 @@ struct LLVMEmitter
         case kIROp_Switch:
             {
                 auto switchInst = static_cast<IRSwitch*>(inst);
-                auto llvmMergeBlock = llvm::cast<llvm::BasicBlock>(findValue(switchInst->getBreakLabel()));
+                auto defaultBlock = llvm::cast<llvm::BasicBlock>(findValue(switchInst->getBreakLabel()));
                 auto llvmCondition = findValue(switchInst->getCondition());
 
-                auto llvmSwitch = llvmBuilder->CreateSwitch(llvmCondition, llvmMergeBlock, switchInst->getCaseCount());
+                auto defaultLabel = switchInst->getDefaultLabel();
+                if (defaultLabel)
+                    defaultBlock = llvm::cast<llvm::BasicBlock>(findValue(defaultLabel));
+
+                auto llvmSwitch = llvmBuilder->CreateSwitch(llvmCondition, defaultBlock, switchInst->getCaseCount());
                 for (UInt c = 0; c < switchInst->getCaseCount(); c++)
                 {
                     auto value = switchInst->getCaseValue(c);
@@ -2424,6 +2428,27 @@ struct LLVMEmitter
                         elementType);
                     auto op = inst->getOperand(aa);
                     types->emitStore(ptr, findValue(op), op->getDataType(), defaultPointerRules);
+                }
+            }
+            break;
+
+        case kIROp_MakeArrayFromElement:
+            {
+                auto arrayType = cast<IRArrayType>(inst->getDataType());
+                auto elementCount = getIntVal(arrayType->getElementCount());
+                llvmInst = types->emitAlloca(inst->getDataType(), defaultPointerRules);
+                auto element = inst->getOperand(0);
+                auto llvmElement = findValue(element);
+                for (IRIntegerValue i = 0; i < elementCount; ++i)
+                {
+                    IRType* elementType = nullptr;
+                    llvm::Value* ptr = types->emitGetElementPtr(
+                        llvmInst,
+                        llvmBuilder->getInt32(i),
+                        inst->getDataType(),
+                        defaultPointerRules,
+                        elementType);
+                    types->emitStore(ptr, llvmElement, element->getDataType(), defaultPointerRules);
                 }
             }
             break;
