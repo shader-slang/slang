@@ -344,10 +344,10 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
             }
         }
         break;
-    case kIROp_OutType:
-    case kIROp_InOutType:
-    case kIROp_RefType:
-    case kIROp_ConstRefType:
+    case kIROp_OutParamType:
+    case kIROp_BorrowInOutParamType:
+    case kIROp_RefParamType:
+    case kIROp_BorrowInParamType:
     case kIROp_RawPointerType:
     case kIROp_PtrType:
     case kIROp_NativePtrType:
@@ -786,6 +786,7 @@ IRTypeLayoutRules* IRTypeLayoutRules::get(IRTypeLayoutRuleName name)
     case IRTypeLayoutRuleName::Std140:
         return getStd140();
     case IRTypeLayoutRuleName::Natural:
+    case IRTypeLayoutRuleName::MetalParameterBlock:
         return getNatural();
     case IRTypeLayoutRuleName::C:
         return getC();

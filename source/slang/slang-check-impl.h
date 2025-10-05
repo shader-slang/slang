@@ -1913,10 +1913,10 @@ public:
         DeclRef<Decl> candidateMethod; // The method that was considered but failed
         Type* actualType = nullptr;    // For type mismatches: the actual type found
         Type* expectedType = nullptr;  // For type mismatches: the expected type
-        ParameterDirection actualDir =
-            kParameterDirection_In; // For direction mismatches: the actual direction
-        ParameterDirection expectedDir =
-            kParameterDirection_In;     // For direction mismatches: the expected direction
+        ParamPassingMode actualDir =
+            ParamPassingMode::In; // For direction mismatches: the actual direction
+        ParamPassingMode expectedDir =
+            ParamPassingMode::In;       // For direction mismatches: the expected direction
         ParamDecl* paramDecl = nullptr; // For direction mismatches: the parameter declaration
     };
 
@@ -3239,7 +3239,7 @@ bool isImmutableBufferType(Type* type);
 
 // Check if `type` is nullable. An `Optional<T>` will occupy the same space as `T`, if `T`
 // is nullable.
-bool isNullableType(Type* type);
+bool doesTypeHaveAnUnusedBitPatternThatCanBeUsedForOptionalRepresentation(Type* type);
 
 EnumDecl* isEnumType(Type* type);
 

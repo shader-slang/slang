@@ -118,12 +118,12 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
         builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
         auto paramType = param->getDataType();
         bool isRefParam = false;
-        if (auto outType = as<IROutTypeBase>(paramType))
+        if (auto outType = as<IROutParamTypeBase>(paramType))
         {
             isRefParam = true;
             paramType = outType->getValueType();
         }
-        else if (auto ptrType = as<IRConstRefType>(param->getDataType()))
+        else if (auto ptrType = as<IRBorrowInParamType>(param->getDataType()))
         {
             isRefParam = true;
             paramType = ptrType->getValueType();
@@ -146,7 +146,9 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
         {
             paramVal = param;
         }
-        else if (as<IRInOutType>(param->getDataType()) || as<IRConstRefType>(param->getDataType()))
+        else if (
+            as<IRBorrowInOutParamType>(param->getDataType()) ||
+            as<IRBorrowInParamType>(param->getDataType()))
         {
             paramVal = builder.emitLoad(param);
         }

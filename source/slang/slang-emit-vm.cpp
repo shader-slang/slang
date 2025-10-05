@@ -356,9 +356,9 @@ public:
         case kIROp_UInt64Type:
         case kIROp_UIntPtrType:
         case kIROp_PtrType:
-        case kIROp_OutType:
-        case kIROp_InOutType:
-        case kIROp_RefType:
+        case kIROp_OutParamType:
+        case kIROp_BorrowInOutParamType:
+        case kIROp_RefParamType:
         case kIROp_NativePtrType:
             extCode.scalarType = kSlangByteCodeScalarTypeUnsignedInt;
             extCode.scalarBitWidth = 3;
