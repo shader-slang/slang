@@ -1666,7 +1666,7 @@ struct LLVMEmitter
 
     // Map of DebugSource instructions to LLVM debug files
     Dictionary<IRInst*, llvm::DIFile*> sourceDebugInfo;
-    Dictionary<IRInst*, llvm::DISubprogram*> debugFuncToLLVM;
+    Dictionary<IRInst*, llvm::DISubprogram*> funcToDebugLLVM;
 
     struct VariableDebugInfo
     {
@@ -3247,23 +3247,15 @@ struct LLVMEmitter
 
     llvm::DISubprogram* ensureDebugFunc(IRGlobalValueWithCode* func, IRDebugFunction* debugFunc)
     {
-        if (debugFuncToLLVM.containsKey(debugFunc))
+        if (funcToDebugLLVM.containsKey(func))
         {
-            return debugFuncToLLVM[debugFunc];
+            return funcToDebugLLVM[func];
         }
         llvm::DIFile* file = sourceDebugInfo.getValue(debugFunc->getFile());
 
         llvm::StringRef linkageName, prettyName;
 
-        if (func)
-        {
-            maybeGetName(&linkageName, &prettyName, func);
-        }
-        else
-        {
-            auto name = cast<IRStringLit>(debugFunc->getName())->getStringSlice();
-            linkageName = prettyName = llvm::StringRef(name.begin(), name.getLength());
-        }
+        maybeGetName(&linkageName, &prettyName, func);
 
         int line = getIntVal(debugFunc->getLine());
 
@@ -3278,7 +3270,7 @@ struct LLVMEmitter
             llvm::DINode::FlagPrototyped,
             llvm::DISubprogram::SPFlagDefinition
         );
-        debugFuncToLLVM[debugFunc] = sp;
+        funcToDebugLLVM[func] = sp;
         return sp;
     }
 
