@@ -8474,7 +8474,7 @@ vector<uint, N> countbits(vector<T, N> value)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,3> cross(vector<T,3> left, vector<T,3> right)
 {
     // TODO: SPIRV does not support integer vectors.
@@ -8497,7 +8497,7 @@ vector<T,3> cross(vector<T,3> left, vector<T,3> right)
 
 __generic<T : __BuiltinIntegerType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, 3> cross(vector<T, 3> left, vector<T, 3> right)
 {
     __target_switch
@@ -8518,7 +8518,7 @@ vector<T, 3> cross(vector<T, 3> left, vector<T, 3> right)
 
 // Convert encoded color
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 int4 D3DCOLORtoUBYTE4(float4 color)
 {
     __target_switch

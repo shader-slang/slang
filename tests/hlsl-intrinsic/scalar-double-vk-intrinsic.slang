@@ -4,6 +4,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj -render-feature double
 
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-llvm -compute -output-using-type -shaderobj
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<double> outputBuffer;
