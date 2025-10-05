@@ -189,17 +189,6 @@ void main(uint tid : SV_DispatchThreadID)
 }
 ```
 
-## Restrictions
-
-Unlike preprocessors, link-time constants and types can only be used in places where shader parameter layout cannot be
-affected. This means that link-time constants and types are subject to the following restrictions:
-- Link-time constants cannot be used to define array sizes.
-- Link-time types are considered "incomplete" types. A struct or array type that has incomplete typed element is also an incomplete type.
-  Incomplete types cannot be used as `ConstantBuffer` or `ParameterBlock` element type, and cannot be used directly as the type of
-  a uniform variable.
-
-However it is allowed to use incomplete types as the element type of `StructuredBuffer` or `GLSLStorageBuffer`.
-
 ## Using Precompiling Modules with the API
 
 In addition to using `slangc` for precompiling Slang modules, the `IModule` class provides a method to serialize itself to disk:
