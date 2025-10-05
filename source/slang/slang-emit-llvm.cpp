@@ -2850,6 +2850,53 @@ struct LLVMEmitter
             }
             break;
 
+        case kIROp_BitfieldExtract:
+            {
+                auto type = types->getValueType(inst->getDataType());
+                auto val = _coerceNumeric(findValue(inst->getOperand(0)), type, false);
+                auto off = _coerceNumeric(findValue(inst->getOperand(1)), type, false);
+                auto bts = _coerceNumeric(findValue(inst->getOperand(2)), type, false);
+
+                bool isFloat, isSigned;
+                getUnderlyingTypeInfo(inst, isFloat, isSigned);
+
+                auto shiftedVal = llvmBuilder->CreateLShr(
+                    val, _coerceNumeric(off, val->getType(), false)
+                );
+
+                auto numBits = _coerceNumeric(llvmBuilder->getInt32(type->getScalarSizeInBits()), val->getType(), false);
+                auto highBits = llvmBuilder->CreateSub(numBits, bts);
+                shiftedVal = llvmBuilder->CreateShl(shiftedVal, highBits);
+                if (isSigned)
+                    llvmInst = llvmBuilder->CreateAShr(shiftedVal, highBits);
+                else
+                    llvmInst = llvmBuilder->CreateLShr(shiftedVal, highBits);
+            }
+            break;
+
+        case kIROp_BitfieldInsert:
+            {
+                auto type = types->getValueType(inst->getDataType());
+                auto val = _coerceNumeric(findValue(inst->getOperand(0)), type, false);
+                auto insert = _coerceNumeric(findValue(inst->getOperand(1)), type, false);
+                auto off = _coerceNumeric(findValue(inst->getOperand(2)), type, false);
+                auto bts = _coerceNumeric(findValue(inst->getOperand(3)), type, false);
+
+                auto one = _coerceNumeric(llvmBuilder->getInt32(1), val->getType(), false);
+                auto mask = llvmBuilder->CreateShl(one, bts);
+                mask = llvmBuilder->CreateSub(mask, one);
+                mask = llvmBuilder->CreateShl(mask, off);
+
+                insert = llvmBuilder->CreateShl(insert, off);
+                insert = llvmBuilder->CreateAnd(insert, mask);
+
+                auto notMask = llvmBuilder->CreateNot(mask);
+
+                val = llvmBuilder->CreateAnd(val, notMask);
+                llvmInst = llvmBuilder->CreateOr(val, insert);
+            }
+            break;
+
         case kIROp_Call:
             {
                 auto callInst = static_cast<IRCall*>(inst);

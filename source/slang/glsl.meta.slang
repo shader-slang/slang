@@ -851,7 +851,7 @@ public int32_t pack32(i8vec4 v);
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, GLSL_400)]
 public T faceforward(T n, T i, T ng)
 {
     __target_switch
@@ -873,7 +873,7 @@ __generic<T : __BuiltinFloatingPointType, let C : int, let R : int>
 [__readNone]
 [ForceInline]
 [OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, GLSL_400)]
 public matrix<T, R, C> outerProduct(vector<T, C> c, vector<T, R> r)
 {
     __target_switch
@@ -920,7 +920,7 @@ public matrix<T,N,N> inverse(matrix<T,N,N> m)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, GLSL_400)]
 public uint uaddCarry(highp uint x, highp uint y, out lowp uint carry)
 {
     __target_switch
@@ -943,7 +943,7 @@ public uint uaddCarry(highp uint x, highp uint y, out lowp uint carry)
 __generic<let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, GLSL_400)]
 public vector<uint,N> uaddCarry(highp vector<uint,N> x, highp vector<uint,N> y, out lowp vector<uint,N> carry)
 {
     __target_switch
@@ -963,7 +963,7 @@ public vector<uint,N> uaddCarry(highp vector<uint,N> x, highp vector<uint,N> y, 
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, GLSL_400)]
 public uint usubBorrow(highp uint x, highp uint y, out lowp uint borrow)
 {
     __target_switch
@@ -985,7 +985,7 @@ public uint usubBorrow(highp uint x, highp uint y, out lowp uint borrow)
 __generic<let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, GLSL_400)]
 public vector<uint,N> usubBorrow(highp vector<uint,N> x, highp vector<uint,N> y, out lowp vector<uint,N> borrow)
 {
     __target_switch
@@ -1005,7 +1005,7 @@ public vector<uint,N> usubBorrow(highp vector<uint,N> x, highp vector<uint,N> y,
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, GLSL_400)]
 public void umulExtended(highp uint x, highp uint y, out highp uint msb, out highp uint lsb)
 {
     __target_switch
@@ -1020,7 +1020,7 @@ public void umulExtended(highp uint x, highp uint y, out highp uint msb, out hig
         OpStore &msb %msb;
     };
     default:
-        uint64_t result = x * y;
+        uint64_t result = uint64_t(x) * uint64_t(y);
         msb = uint(result >> 32);
         lsb = uint(result);
     }
@@ -1029,7 +1029,7 @@ public void umulExtended(highp uint x, highp uint y, out highp uint msb, out hig
 __generic<let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, GLSL_400)]
 public void umulExtended(highp vector<uint,N> x, highp vector<uint,N> y, out highp vector<uint,N> msb, out highp vector<uint,N> lsb)
 {
     __target_switch
@@ -1054,7 +1054,7 @@ public void umulExtended(highp vector<uint,N> x, highp vector<uint,N> y, out hig
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, GLSL_400)]
 public void imulExtended(highp int x, highp int y, out highp int msb, out highp int lsb)
 {
     __target_switch
@@ -1069,7 +1069,7 @@ public void imulExtended(highp int x, highp int y, out highp int msb, out highp 
         OpStore &msb %msb;
     };
     default:
-        int64_t result = x * y;
+        int64_t result = int64_t(x) * int64_t(y);
         msb = int(result >> 32);
         lsb = int(result);
     }
@@ -1078,7 +1078,7 @@ public void imulExtended(highp int x, highp int y, out highp int msb, out highp 
 __generic<let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, GLSL_400)]
 public void imulExtended(highp vector<int,N> x, highp vector<int,N> y, out highp vector<int,N> msb, out highp vector<int,N> lsb)
 {
     __target_switch
@@ -1103,7 +1103,7 @@ public void imulExtended(highp vector<int,N> x, highp vector<int,N> y, out highp
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, GLSL_400)]
 public int bitfieldReverse(highp int value)
 {
     __target_switch
@@ -1112,6 +1112,7 @@ public int bitfieldReverse(highp int value)
     case spirv: return spirv_asm {
         result:$$int = OpBitReverse $value
     };
+    case llvm: __intrinsic_asm "%result = call $TR @llvm.bitreverse($0)";
     default:
         value = ((value & 0xAAAAAAAA) >> 1) | ((value & 0x55555555) << 1);
         value = ((value & 0xCCCCCCCC) >> 2) | ((value & 0x33333333) << 2);
@@ -1125,7 +1126,7 @@ public int bitfieldReverse(highp int value)
 __generic<let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, GLSL_400)]
 public vector<int,N> bitfieldReverse(highp vector<int,N> value)
 {
     __target_switch
@@ -1134,6 +1135,7 @@ public vector<int,N> bitfieldReverse(highp vector<int,N> value)
     case spirv: return spirv_asm {
         result:$$vector<int,N> = OpBitReverse $value
     };
+    case llvm: __intrinsic_asm "%result = call $TR @llvm.bitreverse($0)";
     default:
         VECTOR_MAP_UNARY(int, N, bitfieldReverse, value);
     }
@@ -1141,7 +1143,7 @@ public vector<int,N> bitfieldReverse(highp vector<int,N> value)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, GLSL_400)]
 public uint bitfieldReverse(highp uint value)
 {
     __target_switch
@@ -1150,6 +1152,7 @@ public uint bitfieldReverse(highp uint value)
     case spirv: return spirv_asm {
         result:$$uint = OpBitReverse $value
     };
+    case llvm: __intrinsic_asm "%result = call $TR @llvm.bitreverse($0)";
     default:
         value = ((value & 0xAAAAAAAA) >> 1) | ((value & 0x55555555) << 1);
         value = ((value & 0xCCCCCCCC) >> 2) | ((value & 0x33333333) << 2);
@@ -1163,7 +1166,7 @@ public uint bitfieldReverse(highp uint value)
 __generic<let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, GLSL_400)]
 public vector<uint,N> bitfieldReverse(highp vector<uint,N> value)
 {
     __target_switch
@@ -1172,6 +1175,7 @@ public vector<uint,N> bitfieldReverse(highp vector<uint,N> value)
     case spirv: return spirv_asm {
         result:$$vector<uint,N> = OpBitReverse $value
     };
+    case llvm: __intrinsic_asm "%result = call $TR @llvm.bitreverse($0)";
     default:
         VECTOR_MAP_UNARY(int, N, bitfieldReverse, value);
     }
@@ -1179,7 +1183,7 @@ public vector<uint,N> bitfieldReverse(highp vector<uint,N> value)
 
 [__readNone] 
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 public uint bitCount(uint value)
 {
     return countbits(value);
@@ -1188,7 +1192,7 @@ public uint bitCount(uint value)
 __generic<let N:int>
 [__readNone] 
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 public vector<uint,N> bitCount(vector<uint,N> value)
 {
     return countbits(value);
@@ -1196,7 +1200,7 @@ public vector<uint,N> bitCount(vector<uint,N> value)
 
 [__readNone] 
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 public int bitCount(int value)
 {
     __target_switch
@@ -1213,7 +1217,7 @@ public int bitCount(int value)
 __generic<let N:int>
 [__readNone] 
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 public vector<int,N> bitCount(vector<int,N> value)
 {
     __target_switch
@@ -1229,7 +1233,7 @@ public vector<int,N> bitCount(vector<int,N> value)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 public int findLSB(int v)
 {
     return firstbitlow(v);
@@ -1238,7 +1242,7 @@ public int findLSB(int v)
 __generic<let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 public vector<int,N> findLSB(vector<int,N> value)
 {
     return firstbitlow(value);
@@ -1246,7 +1250,7 @@ public vector<int,N> findLSB(vector<int,N> value)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 public uint findLSB(uint v)
 {
     return firstbitlow(v);
@@ -1255,7 +1259,7 @@ public uint findLSB(uint v)
 __generic<let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 public vector<uint,N> findLSB(vector<uint,N> value)
 {
     return firstbitlow(value);
@@ -1263,7 +1267,7 @@ public vector<uint,N> findLSB(vector<uint,N> value)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 public int findMSB(int value)
 {
     return firstbithigh(value);
@@ -1272,7 +1276,7 @@ public int findMSB(int value)
 __generic<let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 public vector<int,N> findMSB(vector<int,N> value)
 {
     return firstbithigh(value);
@@ -1280,7 +1284,7 @@ public vector<int,N> findMSB(vector<int,N> value)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 public uint findMSB(uint value)
 {
     return firstbithigh(value);
@@ -1289,7 +1293,7 @@ public uint findMSB(uint value)
 __generic<let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 public vector<uint,N> findMSB(vector<uint,N> value)
 {
     return firstbithigh(value);
