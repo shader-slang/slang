@@ -164,6 +164,8 @@ export struct Sampler : ISampler = FooSampler;
 ```
 
 The `=` syntax defines a typealias that allows `Sampler` to resolve to `FooSampler` at link-time.
+Note that both the name and type conformance clauses must match exactly between an `export` and an `extern` declaration
+for link-time types to resolve correctly.
 
 When all these three modules are linked, we will produce a specialized shader that uses the `FooSampler`.
 
