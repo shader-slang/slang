@@ -13,6 +13,7 @@
 
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-slang -vk -compute -profile cs_6_2 -render-features half -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -cuda -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -llvm -compute -shaderobj
 
 // Unavailable on D3D and fxc-based targets, because fxc doesn't
 // support loading anything besides `uint` from a byte-address
