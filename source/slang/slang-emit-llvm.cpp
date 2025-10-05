@@ -481,7 +481,10 @@ public:
                     false);
             }
             break;
+        case kIROp_HLSLStructuredBufferType:
         case kIROp_HLSLRWStructuredBufferType:
+        case kIROp_HLSLByteAddressBufferType:
+        case kIROp_HLSLRWByteAddressBufferType:
             llvmType = llvm::StructType::get(
                 builder->getPtrTy(0),
                 builder->getIntPtrTy(targetDataLayout)
@@ -2901,9 +2904,49 @@ struct LLVMEmitter
 
                 llvm::Value* indices[] = {llvmIndex};
                 IRTypeLayoutRules* layout = getTypeLayoutRuleForBuffer(codeGenContext->getTargetProgram(), baseType);
-                return llvmBuilder->CreateGEP(
+                llvmInst = llvmBuilder->CreateGEP(
                     types->getStorageType(baseType->getElementType(), layout),
                     llvmPtr, indices);
+            }
+            break;
+
+        case kIROp_ByteAddressBufferLoad:
+            {
+                auto llvmBase = findValue(inst->getOperand(0));
+                auto llvmIndex = findValue(inst->getOperand(1));
+
+                llvm::Value* indices[] = {llvmIndex};
+                auto llvmBasePtr = llvmBuilder->CreateExtractValue(llvmBase, 0);
+                auto llvmPtr = llvmBuilder->CreateGEP(
+                    llvmBuilder->getInt8Ty(),
+                    llvmBasePtr,
+                    indices);
+                llvmInst = types->emitLoad(
+                    llvmPtr,
+                    inst->getDataType(),
+                    defaultPointerRules
+                );
+            }
+            break;
+
+        case kIROp_ByteAddressBufferStore:
+            {
+                auto llvmBase = findValue(inst->getOperand(0));
+                auto llvmIndex = findValue(inst->getOperand(1));
+
+                llvm::Value* indices[] = {llvmIndex};
+                auto llvmBasePtr = llvmBuilder->CreateExtractValue(llvmBase, 0);
+                auto llvmPtr = llvmBuilder->CreateGEP(
+                    llvmBuilder->getInt8Ty(),
+                    llvmBasePtr,
+                    indices);
+                auto val = inst->getOperand(inst->getOperandCount() - 1);
+                llvmInst = types->emitStore(
+                    llvmPtr,
+                    findValue(val),
+                    val->getDataType(),
+                    defaultPointerRules
+                );
             }
             break;
 
