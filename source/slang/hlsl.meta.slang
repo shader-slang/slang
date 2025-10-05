@@ -6513,7 +6513,7 @@ T abs(T x)
         result:$$T = OpExtInst glsl450 SAbs $x
     };
     case wgsl: __intrinsic_asm "abs";
-    case llvm: __intrinsic_asm "%result = call $T0 @llvm.abs($0)";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.abs($0, i1 true)";
     //default:
     // Note: this simple definition may not be appropriate for floating-point inputs
     // return x < 0 ? -x : x;
@@ -6534,7 +6534,7 @@ vector<T, N> abs(vector<T, N> x)
         result:$$vector<T,N> = OpExtInst glsl450 SAbs $x;
     };
     case wgsl: __intrinsic_asm "abs";
-    case llvm: __intrinsic_asm "%result = call $T0 @llvm.abs($0)";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.abs($0, i1 true)";
     default:
         VECTOR_MAP_UNARY(T, N, abs, x);
     }
