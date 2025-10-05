@@ -3078,6 +3078,9 @@ struct LLVMEmitter
             }
             break;
 
+        case kIROp_Unreachable:
+            return llvmBuilder->CreateUnreachable();
+
         case kIROp_DebugVar:
             debugInsts.add(inst);
             if (debug)
