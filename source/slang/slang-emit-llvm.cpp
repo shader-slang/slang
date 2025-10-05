@@ -2500,10 +2500,10 @@ struct LLVMEmitter
                 auto fromType = getVectorOrCoopMatrixElementType(fromTypeV);
                 auto toType = getVectorOrCoopMatrixElementType(toTypeV);
 
-                auto llvmFromType = llvm::cast<llvm::IntegerType>(types->getValueType(fromType));
-                auto llvmToType = llvm::cast<llvm::IntegerType>(types->getValueType(toType));
-                auto fromWidth = llvmFromType->getBitWidth();
-                auto toWidth = llvmToType->getBitWidth();
+                auto llvmFromType = types->getValueType(fromTypeV);
+                auto llvmToType = types->getValueType(toTypeV);
+                auto fromWidth = llvmFromType->getScalarSizeInBits();
+                auto toWidth = llvmToType->getScalarSizeInBits();
 
                 if (fromWidth == toWidth)
                 {
@@ -2513,20 +2513,25 @@ struct LLVMEmitter
                 }
                 else if(as<IRBoolType>(toType))
                 {
+                    llvm::Constant* zero = llvm::ConstantInt::get(
+                        types->getValueType(fromType), 0);
+                    if (toTypeV != toType)
+                    { // Vector
+                        zero = llvm::ConstantVector::getSplat(
+                            llvm::cast<llvm::VectorType>(llvmToType)->getElementCount(),
+                            zero);
+                    }
                     llvmInst = llvmBuilder->CreateCmp(
                         llvm::CmpInst::Predicate::ICMP_NE,
                         llvmValue,
-                        llvm::ConstantInt::get(types->getValueType(fromType), 0)
+                        zero
                     );
                 }
                 else
                 {
                     llvm::Instruction::CastOps cast = llvm::Instruction::CastOps::Trunc;
                     if (toWidth > fromWidth)
-                    {
-                        // Source is signed, so sign extend.
                         cast = getLLVMIntExtensionOp(fromType);
-                    }
                     llvmInst = llvmBuilder->CreateCast(cast, llvmValue, types->getValueType(toTypeV));
                 }
             }
@@ -2539,8 +2544,8 @@ struct LLVMEmitter
                 auto fromTypeV = inst->getOperand(0)->getDataType();
                 auto toTypeV = inst->getDataType();
 
-                auto llvmFromType = types->getValueType(getVectorOrCoopMatrixElementType(fromTypeV));
-                auto llvmToType = types->getValueType(getVectorOrCoopMatrixElementType(toTypeV));
+                auto llvmFromType = types->getValueType(fromTypeV);
+                auto llvmToType = types->getValueType(toTypeV);
 
                 auto fromSize = llvmFromType->getScalarSizeInBits();
                 auto toSize = llvmToType->getScalarSizeInBits();
@@ -2910,6 +2915,53 @@ struct LLVMEmitter
             }
             break;
 
+        case kIROp_StructuredBufferLoad:
+        case kIROp_RWStructuredBufferLoad:
+            {
+                auto base = inst->getOperand(0);
+                auto llvmBase = findValue(base);
+                auto llvmIndex = findValue(inst->getOperand(1));
+
+                auto baseType = cast<IRHLSLStructuredBufferTypeBase>(base->getDataType());
+
+                auto llvmBasePtr = llvmBuilder->CreateExtractValue(llvmBase, 0);
+                IRTypeLayoutRules* layout = getTypeLayoutRuleForBuffer(codeGenContext->getTargetProgram(), baseType);
+
+                llvm::Value* indices[] = {llvmIndex};
+                auto llvmPtr = llvmBuilder->CreateGEP(
+                    types->getStorageType(baseType->getElementType(), layout),
+                    llvmBasePtr, indices);
+                llvmInst = types->emitLoad(
+                    llvmPtr,
+                    inst->getDataType(),
+                    layout);
+            }
+            break;
+
+        case kIROp_RWStructuredBufferStore:
+            {
+                auto base = inst->getOperand(0);
+                auto llvmBase = findValue(base);
+                auto llvmIndex = findValue(inst->getOperand(1));
+                auto val = inst->getOperand(2);
+
+                auto baseType = cast<IRHLSLStructuredBufferTypeBase>(base->getDataType());
+
+                auto llvmBasePtr = llvmBuilder->CreateExtractValue(llvmBase, 0);
+                IRTypeLayoutRules* layout = getTypeLayoutRuleForBuffer(codeGenContext->getTargetProgram(), baseType);
+
+                llvm::Value* indices[] = {llvmIndex};
+                auto llvmPtr = llvmBuilder->CreateGEP(
+                    types->getStorageType(baseType->getElementType(), layout),
+                    llvmBasePtr, indices);
+                llvmInst = types->emitStore(
+                    llvmPtr,
+                    findValue(val),
+                    val->getDataType(),
+                    layout);
+            }
+            break;
+
         case kIROp_ByteAddressBufferLoad:
             {
                 auto llvmBase = findValue(inst->getOperand(0));
@@ -2924,8 +2976,7 @@ struct LLVMEmitter
                 llvmInst = types->emitLoad(
                     llvmPtr,
                     inst->getDataType(),
-                    defaultPointerRules
-                );
+                    defaultPointerRules);
             }
             break;
 
@@ -2945,8 +2996,7 @@ struct LLVMEmitter
                     llvmPtr,
                     findValue(val),
                     val->getDataType(),
-                    defaultPointerRules
-                );
+                    defaultPointerRules);
             }
             break;
 
