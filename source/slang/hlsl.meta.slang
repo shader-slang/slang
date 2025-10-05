@@ -8869,7 +8869,7 @@ ${{{{
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 T degrees(T x)
 {
     __target_switch
@@ -8887,7 +8887,7 @@ T degrees(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 vector<T, N> degrees(vector<T, N> x)
 {
     __target_switch
@@ -8905,7 +8905,7 @@ vector<T, N> degrees(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 matrix<T, N, M> degrees(matrix<T, N, M> x)
 {
     __target_switch
@@ -8923,7 +8923,7 @@ matrix<T, N, M> degrees(matrix<T, N, M> x)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [PreferCheckpoint]
-[require(cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 T determinant(matrix<T,N,N> m)
 {
     __target_switch
@@ -8975,7 +8975,7 @@ T determinant(matrix<T,N,N> m)
 /// @category math
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
-[require(cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 T determinant(matrix<T,N,N> m)
 {
     __target_switch
@@ -9730,7 +9730,11 @@ float f16tof32(uint value)
         };
     }
     case wgsl: __intrinsic_asm "unpack2x16float($0).x";
-    case llvm: __intrinsic_asm "%a = trunc $0 to i16\n%b = bitcast i16 %a to half\n%result = fpext half %b to float";
+    case llvm: __intrinsic_asm R"(
+        %a = trunc $0 to i16
+        %b = bitcast i16 %a to half
+        %result = fpext half %b to float
+    )";
     }
 }
 
@@ -9779,7 +9783,11 @@ uint f32tof16(float value)
         };
     }
     case wgsl: __intrinsic_asm "pack2x16float(vec2f($0,0.0))";
-    case llvm: __intrinsic_asm "%a = fptrunc $0 to half\n%b = bitcast half %a to i16\n%result = zext i16 %b to i32";
+    case llvm: __intrinsic_asm R"(
+        %a = fptrunc $0 to half
+        %b = bitcast half %a to i16
+        %result = zext i16 %b to i32
+    )";
     }
 }
 
@@ -9895,7 +9903,7 @@ vector<float16_t, N> f32tof16_(vector<float, N> value)
 /// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> faceforward(vector<T,N> n, vector<T,N> i, vector<T,N> ng)
 {
     __target_switch
@@ -10463,7 +10471,7 @@ matrix<T, N, M> frac(matrix<T, N, M> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T fract(T x)
 {
     return frac(x);
@@ -10472,7 +10480,7 @@ T fract(T x)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> fract(vector<T, N> x)
 {
     return frac(x);
@@ -10486,7 +10494,7 @@ vector<T, N> fract(vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T frexp(T x, out int exp)
 {
     __target_switch
@@ -10503,6 +10511,14 @@ T frexp(T x, out int exp)
         T fract;
         __wgsl_frexp<T>(x, fract, exp);
         return fract;
+    case llvm:
+        __intrinsic_asm R"(
+            %a = call {$TR, i32} @llvm.frexp($0)
+            %f = extractvalue {$TR, i32} %a, 0
+            %e = extractvalue {$TR, i32} %a, 1
+            store i32 %e, $1
+            ret $TR %f
+        )";
     }
 }
 
@@ -10518,7 +10534,7 @@ void __wgsl_frexp(T x, out T fract, out int exp)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> frexp(vector<T, N> x, out vector<int, N> exp)
 {
     __target_switch
@@ -10550,7 +10566,7 @@ void __wgsl_frexp(vector<T, N> x, out vector<T, N> fract, out vector<int, N> exp
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> frexp(matrix<T, N, M> x, out matrix<int, N, M, L> exp)
 {
     __target_switch
@@ -12433,7 +12449,12 @@ T modf(T x, out T ip)
         T fract;
         __wgsl_modf<T>(x, fract, ip);
         return fract;
-    case llvm: __intrinsic_asm "%values = call {$T0, $T0} @llvm.modf($0)\n%ipa = extractvalue {$T0, $T0} %values, 1\n%result = extractvalue {$T0, $T0} %values, 0\nstore $T0 %ipa, $1";
+    case llvm: __intrinsic_asm R"(
+        %values = call {$T0, $T0} @llvm.modf($0)
+        %ipa = extractvalue {$T0, $T0} %values, 1
+        %result = extractvalue {$T0, $T0} %values, 0
+        store $T0 %ipa, $1
+    )";
     }
 }
 
@@ -13868,7 +13889,13 @@ void sincos(T x, out T s, out T c)
         //__intrinsic_asm "*($1) = sincos($0, *($2))";
         s = __sincos_metal(x, c);
         return;
-    case llvm: __intrinsic_asm "%parts = call { $T0, $T0 } @llvm.sincos($0)\n%sinval = extractvalue {$T0, $T0} %parts, 0\n%cosval = extractvalue {$T0, $T0} %parts, 1\nstore $T0 %sinval, $1\nstore $T0 %cosval, $2\n";
+    case llvm: __intrinsic_asm R"(
+        %parts = call { $T0, $T0 } @llvm.sincos($0)
+        %sinval = extractvalue {$T0, $T0} %parts, 0
+        %cosval = extractvalue {$T0, $T0} %parts, 1
+        store $T0 %sinval, $1
+        store $T0 %cosval, $2
+    )";
     default:
         s = sin(x);
         c = cos(x);
@@ -13888,7 +13915,13 @@ void sincos(vector<T,N> x, out vector<T,N> s, out vector<T,N> c)
         //__intrinsic_asm "*($1) = sincos($0, *($2))";
         s = __sincos_metal(x, c);
         return;
-    case llvm: __intrinsic_asm "%parts = call { $T0, $T0 } @llvm.sincos($0)\n%sinval = extractvalue {$T0, $T0} %parts, 0\n%cosval = extractvalue {$T0, $T0} %parts, 1\nstore $T0 %sinval, $1\nstore $T0 %cosval, $2\n";
+    case llvm: __intrinsic_asm R"(
+        %parts = call { $T0, $T0 } @llvm.sincos($0)
+        %sinval = extractvalue {$T0, $T0} %parts, 0
+        %cosval = extractvalue {$T0, $T0} %parts, 1
+        store $T0 %sinval, $1
+        store $T0 %cosval, $2
+    )";
     default:
         s = sin(x);
         c = cos(x);
