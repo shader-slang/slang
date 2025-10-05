@@ -15,15 +15,17 @@ most users of Slang currently do not need.
 * `-target llvm-ir` generates LLVM IR without tuning to a specific target machine.
 * `-target llvm-obj` generates position-independent object code, which can be 
 linked into an executable or a static or dynamic library.
+* `-target llvm-shader-ir` is like `llvm-ir` but generates a dispatch function for compute shader entry points.
+* `-target llvm-shader-obj` is like `llvm-obj` but generates a dispatch function for compute shader entry points.
 * Other, direct-to-executable or library targets may be added later, once the
   LLVM target has stabilized.
 
 # Features
 
 * Compile stand-alone programs in Slang for platforms supported by LLVM
-* Focus on correctness: `out`, `inout`, scalar layout, etc. semantics are handled correctly
+* Focus on memory layout correctness: scalar layout, etc. semantics are handled correctly
 * Does not depend on external compilers (although, currently depends on external linkers!)
-* Plays nice with debuggers!
+* Works well with debuggers!
 
 # Standalone programs
 
@@ -81,6 +83,21 @@ Luckily, C requires that arrays are automatically casted into pointers during
 parameter passing, which we also do. However, we also pass structures as
 pointers to a stack-allocated copy. For some calling conventions, this is
 incorrect behavior (notably, SysV).
+
+## Missing synchronization primitives
+
+* No barriers.
+* No atomics.
+* No wave operations.
+
+This limitation stems from the fact that work items / threads of a work group
+are currently run serially instead of actually being in parallel. This may be
+improved upon later.
+
+## Missing resource types
+
+* No texture types.
+* No acceleration structures.
 
 # Gotchas
 

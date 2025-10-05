@@ -6,6 +6,7 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-llvm -compute
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<float> outputBuffer;
