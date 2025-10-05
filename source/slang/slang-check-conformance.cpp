@@ -356,6 +356,11 @@ TypeTag SemanticsVisitor::getTypeTags(Type* type)
     {
         return getTypeTags(modifiedType->getBase());
     }
+    if (as<ParameterBlockType>(type))
+    {
+        // ParameterBlock types are non-addressable
+        return TypeTag::NonAddressable;
+    }
     if (auto parameterGroupType = as<UniformParameterGroupType>(type))
     {
         auto elementTags = getTypeTags(parameterGroupType->getElementType());
@@ -371,8 +376,35 @@ TypeTag SemanticsVisitor::getTypeTags(Type* type)
     }
     else if (auto declRefType = as<DeclRefType>(type))
     {
-        if (auto aggTypeDecl = as<AggTypeDecl>(declRefType->getDeclRef()))
-            return aggTypeDecl.getDecl()->typeTags;
+        if (auto aggTypeDeclRef = as<AggTypeDecl>(declRefType->getDeclRef()))
+        {
+            auto aggTypeDecl = aggTypeDeclRef.getDecl();
+
+            // Start with the stored tags
+            TypeTag tags = aggTypeDecl->typeTags;
+
+            // Check if any member has NonAddressable tag
+            // We need to check members to propagate NonAddressable
+            for (auto member : aggTypeDecl->getMembersOfType<VarDeclBase>())
+            {
+                // Skip static members
+                if (member->hasModifier<HLSLStaticModifier>())
+                    continue;
+
+                // Get tags for the member type
+                TypeTag memberTags = getTypeTags(member->getType());
+
+                // If member is NonAddressable, the struct is also NonAddressable
+                if ((int)memberTags & (int)TypeTag::NonAddressable)
+                {
+                    tags = (TypeTag)((int)tags | (int)TypeTag::NonAddressable);
+                    // We found a NonAddressable member, no need to check further
+                    break;
+                }
+            }
+
+            return tags;
+        }
     }
     return TypeTag::None;
 }
