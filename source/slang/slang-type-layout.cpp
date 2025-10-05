@@ -5890,6 +5890,23 @@ GlobalGenericParamDecl* GenericParamTypeLayout::getGlobalGenericParamDecl()
     return rsDeclRef.getDecl();
 }
 
+// Get the decl ref to the outer generic if the decl referenced by `declRef` is generic.
+DeclRef<GenericDecl> getOuterGeneric(DeclRef<Decl> declRef)
+{
+    if (auto directDeclRef = as<DirectDeclRef>(declRef.declRefBase))
+    {
+        if (as<GenericDecl>(directDeclRef->getDecl()))
+            return DeclRef<GenericDecl>(directDeclRef);
+        if (as<GenericDecl>(directDeclRef->getParent()->getDecl()))
+            return DeclRef<GenericDecl>(directDeclRef->getParent());
+    }
+    else if (auto genAppDeclRef = as<GenericAppDeclRef>(declRef.declRefBase))
+    {
+        return DeclRef<GenericDecl>(genAppDeclRef->getBase());
+    }
+    return DeclRef<GenericDecl>();
+}
+
 Type* TypeLayoutContext::lookupExternDeclRefType(DeclRefType* declRefType)
 {
     const auto declRef = declRefType->getDeclRef();
@@ -5903,6 +5920,24 @@ Type* TypeLayoutContext::lookupExternDeclRefType(DeclRefType* declRefType)
             buildExternTypeMap();
         const auto mangledName = getMangledName(targetReq->getLinkage()->getASTBuilder(), decl);
         externTypeMap->tryGetValue(mangledName, resultType);
+        if (auto resolvedDeclRef = isDeclRefTypeOf<Decl>(resultType))
+        {
+            if (resolvedDeclRef != declRef)
+            {
+                // If declRef is a GenericApp, we should replace the generic base to
+                // resolveDeclRef's base.
+                if (auto originalGenericApp = as<GenericAppDeclRef>(declRef.declRefBase))
+                {
+                    if (auto resolvedOuterGeneric = getOuterGeneric(resolvedDeclRef.getDecl()))
+                    {
+                        auto substGenericApp = astBuilder->getGenericAppDeclRef(
+                            resolvedOuterGeneric,
+                            originalGenericApp->getArgs());
+                        resultType = DeclRefType::create(astBuilder, substGenericApp);
+                    }
+                }
+            }
+        }
     }
 
     // If the type is an alias of another type, then we should create the type layout
@@ -5928,6 +5963,8 @@ void TypeLayoutContext::buildExternTypeMap()
     // We'll match them up later
     auto processDecl = [&](auto&& go, Decl* decl) -> void
     {
+        if (auto genericDecl = as<GenericDecl>(decl))
+            decl = genericDecl->inner;
         const auto isExtern =
             decl->hasModifier<ExternAttribute>() || decl->hasModifier<ExternModifier>();
 
@@ -5945,7 +5982,7 @@ void TypeLayoutContext::buildExternTypeMap()
             }
         }
 
-        if (auto scopeDecl = as<ScopeDecl>(decl))
+        if (auto scopeDecl = isStaticScopeDecl(decl))
         {
             for (auto member : scopeDecl->getDirectMemberDecls())
             {

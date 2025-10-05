@@ -1030,4 +1030,8 @@ void addSiblingScopeForContainerDecl(
     ContainerDecl* source);
 void addSiblingScopeForContainerDecl(ASTBuilder* builder, Scope* destScope, ContainerDecl* source);
 
+// Cast `decl` to a valid `ContainerDecl*` if its members will become global scope symbols after
+// lowering to IR. This currently includes: `NamespaceDecl`, `ModuleDecl` and `FileDecl`.
+ContainerDecl* isStaticScopeDecl(Decl* decl);
+
 } // namespace Slang
