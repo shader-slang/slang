@@ -163,16 +163,7 @@ import common;
 export struct Sampler : ISampler = FooSampler;
 ```
 
-The `=` syntax is a syntactic sugar that expands to the following code:
-
-```csharp
-export struct Sampler : ISampler
-{
-    FooSampler inner;
-    int getSampleCount() { return inner.getSampleCount(); }
-    float sample(int index) { return inner.sample(index); }
-}
-```
+The `=` syntax defines a typealias that allows `Sampler` to resolve to `FooSampler` at link-time.
 
 When all these three modules are linked, we will produce a specialized shader that uses the `FooSampler`.
 
