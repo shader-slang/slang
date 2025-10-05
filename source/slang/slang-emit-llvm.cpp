@@ -2692,7 +2692,43 @@ struct LLVMEmitter
                     op = llvm::Instruction::CastOps::PtrToInt;
                 else if (llvmFromType->isIntegerTy() && llvmToType->isPointerTy())
                     op = llvm::Instruction::CastOps::IntToPtr;
-                llvmInst = llvmBuilder->CreateCast(op, llvmFromValue, llvmToType);
+                else if (llvmFromType->isPointerTy() && !llvmToType->isPointerTy())
+                {
+                    // Cast from pointer to ???, so first cast to int and then
+                    // perform the bitcast.
+                    llvmFromValue = llvmBuilder->CreateCast(
+                        llvm::Instruction::CastOps::PtrToInt,
+                        llvmFromValue,
+#if SLANG_PTR_IS_64
+                        llvmBuilder->getInt64Ty()
+#else
+                        llvmBuilder->getInt32Ty()
+#endif
+                    );
+                    llvmInst = llvmBuilder->CreateCast(op, llvmFromValue, llvmToType);
+                }
+                else if (!llvmFromType->isPointerTy() && llvmToType->isPointerTy())
+                {
+                    // Cast from ??? to pointer, so first bitcast to equally
+                    // sized int type and then do IntToPtr cast.
+                    llvmInst = llvmBuilder->CreateCast(op, llvmFromValue,
+#if SLANG_PTR_IS_64
+                        llvmBuilder->getInt64Ty()
+#else
+                        llvmBuilder->getInt32Ty()
+#endif
+                    );
+                    llvmInst = llvmBuilder->CreateCast(
+                        llvm::Instruction::CastOps::IntToPtr,
+                        llvmInst,
+                        llvmToType
+                    );
+                }
+                else
+                {
+                    // Normal case with no pointer shenanigans.
+                    llvmInst = llvmBuilder->CreateCast(op, llvmFromValue, llvmToType);
+                }
             }
             break;
 
