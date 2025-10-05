@@ -1666,7 +1666,7 @@ struct LLVMEmitter
 
     // Map of DebugSource instructions to LLVM debug files
     Dictionary<IRInst*, llvm::DIFile*> sourceDebugInfo;
-    Dictionary<IRInst*, llvm::DISubprogram*> functionDebugInfo;
+    Dictionary<IRInst*, llvm::DISubprogram*> debugFuncToLLVM;
 
     struct VariableDebugInfo
     {
@@ -1684,6 +1684,7 @@ struct LLVMEmitter
     HashSet<IRInst*> debugInsts;
 
     List<llvm::DIScope*> debugScopeStack;
+    bool debugInlinedScope = false;
 
     // Used to add code in the entry block of a function
     using FuncPrologueCallback = Func<void>;
@@ -1896,6 +1897,11 @@ struct LLVMEmitter
         case FloatingPointDenormalMode::FlushToZero:
             return llvm::DenormalMode::getPositiveZero();
         }
+    }
+
+    llvm::DIScope* getCurrentDebugScope()
+    {
+        return debugScopeStack.getLast();
     }
 
     // Finds the value of an instruction that has already been emitted, OR
@@ -2153,7 +2159,7 @@ struct LLVMEmitter
             return;
 
         auto debugVar = llvmDebugBuilder->createAutoVariable(
-            debugScopeStack.getLast(), name, loc->getFile(), loc->getLine(),
+            getCurrentDebugScope(), name, loc->getFile(), loc->getLine(),
             varType, getOptions().getOptimizationLevel() == OptimizationLevel::None
         );
         llvmDebugBuilder->insertDeclare(
@@ -3088,11 +3094,11 @@ struct LLVMEmitter
                 llvm::StringRef linkageName, prettyName;
                 maybeGetName(&linkageName, &prettyName, inst);
 
-                if (argIndex)
+                if (argIndex && !debugInlinedScope)
                 {
                     variableDebugInfoMap[inst] = {
                         llvmDebugBuilder->createParameterVariable(
-                            debugScopeStack.getLast(), prettyName, getIntVal(argIndex)+1, file,
+                            getCurrentDebugScope(), prettyName, getIntVal(argIndex)+1, file,
                             line, varType,
                             getOptions().getOptimizationLevel() == OptimizationLevel::None
                         ),
@@ -3104,7 +3110,7 @@ struct LLVMEmitter
                 {
                     variableDebugInfoMap[inst] = {
                         llvmDebugBuilder->createAutoVariable(
-                            debugScopeStack.getLast(), prettyName, file, line, varType,
+                            getCurrentDebugScope(), prettyName, file, line, varType,
                             getOptions().getOptimizationLevel() == OptimizationLevel::None
                         ),
                         false,
@@ -3171,9 +3177,40 @@ struct LLVMEmitter
                 debugLineInst->getColEnd();
 
                 llvmBuilder->SetCurrentDebugLocation(
-                    llvm::DILocation::get(*llvmContext, line, col, debugScopeStack.getLast())
+                    llvm::DILocation::get(*llvmContext, line, col, getCurrentDebugScope())
                 );
             }
+            return nullptr;
+
+        case kIROp_DebugScope:
+            debugInsts.add(inst);
+            if (debug)
+            {
+                // TODO: Couldn't figure out how to track scope of inlined
+                // functions properly in LLVM, but we can simply avoid cases
+                // where it would matter.
+                //
+                // LLVM loves to say:
+                //     !dbg attachment points at wrong subprogram for function
+                // if your scope points to something other than the surrounding
+                // function, seemingly making it useless for inlined functions.
+
+                debugInlinedScope = true;
+            }
+            return nullptr;
+
+        case kIROp_DebugNoScope:
+            debugInsts.add(inst);
+            if (debug)
+            {
+                debugInlinedScope = false;
+            }
+            return nullptr;
+
+        case kIROp_DebugInlinedAt:
+        case kIROp_DebugInlinedVariable:
+            debugInsts.add(inst);
+            // TODO: Unhandled debug insts
             return nullptr;
 
         default:
@@ -3210,14 +3247,23 @@ struct LLVMEmitter
 
     llvm::DISubprogram* ensureDebugFunc(IRGlobalValueWithCode* func, IRDebugFunction* debugFunc)
     {
-        if (functionDebugInfo.containsKey(func))
+        if (debugFuncToLLVM.containsKey(debugFunc))
         {
-            return functionDebugInfo[func];
+            return debugFuncToLLVM[debugFunc];
         }
         llvm::DIFile* file = sourceDebugInfo.getValue(debugFunc->getFile());
 
         llvm::StringRef linkageName, prettyName;
-        maybeGetName(&linkageName, &prettyName, func);
+
+        if (func)
+        {
+            maybeGetName(&linkageName, &prettyName, func);
+        }
+        else
+        {
+            auto name = cast<IRStringLit>(debugFunc->getName())->getStringSlice();
+            linkageName = prettyName = llvm::StringRef(name.begin(), name.getLength());
+        }
 
         int line = getIntVal(debugFunc->getLine());
 
@@ -3232,7 +3278,7 @@ struct LLVMEmitter
             llvm::DINode::FlagPrototyped,
             llvm::DISubprogram::SPFlagDefinition
         );
-        functionDebugInfo[func] = sp;
+        debugFuncToLLVM[debugFunc] = sp;
         return sp;
     }
 
@@ -3536,6 +3582,7 @@ struct LLVMEmitter
         FuncEpilogueCallback epilogueCallback
     ){
         llvmBuilder->SetCurrentDebugLocation(llvm::DebugLoc());
+        debugInlinedScope = false;
 
         auto func = as<IRFunc>(code);
         bool intrinsic = false;
@@ -3616,7 +3663,7 @@ struct LLVMEmitter
                     if (sp)
                     {
                         llvmBuilder->SetCurrentDebugLocation(
-                            llvm::DILocation::get(*llvmContext, sp->getLine(), 0, debugScopeStack.getLast())
+                            llvm::DILocation::get(*llvmContext, sp->getLine(), 0, getCurrentDebugScope())
                         );
                     }
                     prologueCallback();
