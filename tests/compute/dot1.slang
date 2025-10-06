@@ -3,6 +3,7 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-mtl -output-using-type
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-wgsl -output-using-type
 
 // Test for dot product with 1-element vectors (float and int)
 

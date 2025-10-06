@@ -8869,6 +8869,12 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 T dot(vector<T, N> x, vector<T, N> y)
 {
+    // Handle 1-vector case explicitly since many backends don't support it natively
+    if (N == 1)
+    {
+        return x[0] * y[0];
+    }
+    
     __target_switch
     {
     case glsl: __intrinsic_asm "dot";
@@ -8891,6 +8897,12 @@ __generic<T : __BuiltinIntegerType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 T dot(vector<T, N> x, vector<T, N> y)
 {
+    // Handle 1-vector case explicitly since many backends don't support it natively
+    if (N == 1)
+    {
+        return x[0] * y[0];
+    }
+    
     __target_switch
     {
     case hlsl: __intrinsic_asm "dot";
@@ -8925,26 +8937,6 @@ T dot(vector<T, N> x, vector<T, N> y)
             result += x[i] * y[i];
         return result;
     }
-}
-
-// These overloads serve to implement 1-vector support as most backends as
-// implemented above only support this operation for 2,3,4 vectors
-__generic<T : __BuiltinFloatingPointType>
-[__readNone]
-[ForceInline]
-vector<T, 1> dot(vector<T, 1> x, vector<T, 1> y)
-{
-    return x[0] * y[0];
-}
-
-// These overloads serve to implement 1-vector support as most backends as
-// implemented above only support this operation for 2,3,4 vectors
-__generic<T : __BuiltinIntegerType>
-[__readNone]
-[ForceInline]
-vector<T, 1> dot(vector<T, 1> x, vector<T, 1> y)
-{
-    return x[0] * y[0];
 }
 
 /// Helper for computing distance terms for lighting (obsolete).
