@@ -1,0 +1,86 @@
+result code = 0
+standard error = {
+}
+standard output = {
+{
+    "parameters": [
+
+    ],
+    "entryPoints": [
+        {
+            "name": "computeMain",
+            "stage": "compute",
+            "parameters": [
+                {
+                    "name": "bindlessStruct",
+                    "binding": {"kind": "uniform", "offset": 0, "size": 64, "elementStride": 0},
+                    "type": {
+                        "kind": "struct",
+                        "name": "BindlessData",
+                        "fields": [
+                            {
+                                "name": "data1",
+                                "type": {
+                                    "kind": "vector",
+                                    "elementCount": 4,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    }
+                                },
+                                "binding": {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 4}
+                            },
+                            {
+                                "name": "textureHandle",
+                                "type": {
+                                    "kind": "resource",
+                                    "baseShape": "texture2D",
+                                    "resultType": {
+                                        "kind": "vector",
+                                        "elementCount": 4,
+                                        "elementType": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        }
+                                    }
+                                },
+                                "binding": {"kind": "uniform", "offset": 16, "size": 8, "elementStride": 0}
+                            },
+                            {
+                                "name": "bufferHandle",
+                                "type": {
+                                    "kind": "resource",
+                                    "baseShape": "structuredBuffer",
+                                    "access": "readWrite",
+                                    "resultType": {
+                                        "kind": "vector",
+                                        "elementCount": 4,
+                                        "elementType": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        }
+                                    }
+                                },
+                                "binding": {"kind": "uniform", "offset": 24, "size": 16, "elementStride": 0}
+                            },
+                            {
+                                "name": "data2",
+                                "type": {
+                                    "kind": "vector",
+                                    "elementCount": 4,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    }
+                                },
+                                "binding": {"kind": "uniform", "offset": 48, "size": 16, "elementStride": 4}
+                            }
+                        ]
+                    }
+                }
+            ],
+            "threadGroupSize": [1, 1, 1]
+        }
+    ]
+}
+}
