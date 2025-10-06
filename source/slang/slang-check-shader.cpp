@@ -843,15 +843,15 @@ Type* getParamTypeWithDirectionWrapper(ASTBuilder* astBuilder, DeclRef<VarDeclBa
     auto direction = getParameterDirection(paramDeclRef.getDecl());
     switch (direction)
     {
-    case kParameterDirection_In:
+    case ParamPassingMode::In:
         return result;
-    case kParameterDirection_ConstRef:
+    case ParamPassingMode::BorrowIn:
         return astBuilder->getConstRefParamType(result);
-    case kParameterDirection_Out:
-        return astBuilder->getOutType(result);
-    case kParameterDirection_InOut:
-        return astBuilder->getInOutType(result);
-    case kParameterDirection_Ref:
+    case ParamPassingMode::Out:
+        return astBuilder->getOutParamType(result);
+    case ParamPassingMode::BorrowInOut:
+        return astBuilder->getBorrowInOutParamType(result);
+    case ParamPassingMode::Ref:
         return astBuilder->getRefParamType(result);
     default:
         return result;

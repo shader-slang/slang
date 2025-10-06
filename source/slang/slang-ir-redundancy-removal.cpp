@@ -133,7 +133,7 @@ bool isAddressMutable(IRInst* inst)
     {
     case kIROp_ParameterBlockType:
     case kIROp_ConstantBufferType:
-    case kIROp_ConstRefType:
+    case kIROp_BorrowInParamType:
         return false; // immutable
 
     // We should consider StructuredBuffer as mutable by default, since the resources may alias.
@@ -195,6 +195,9 @@ static bool eliminateRedundantTemporaryCopyInFunc(IRFunc* func)
                     // Don't optimize stores to permanent memory locations.
                     continue;
                 }
+
+                if (destPtr->findDecorationImpl(kIROp_DisableCopyEliminationDecoration))
+                    continue;
 
                 // Check if we're storing a load result
                 auto loadInst = as<IRLoad>(storedValue);
@@ -276,7 +279,7 @@ static bool eliminateRedundantTemporaryCopyInFunc(IRFunc* func)
                         if (nullptr == param)
                             goto unsafeToOptimize; // IRFunc might be incomplete yet
 
-                        if (auto paramPtrType = as<IRConstRefType>(param->getFullType()))
+                        if (auto paramPtrType = as<IRBorrowInParamType>(param->getFullType()))
                         {
                             if (paramPtrType->getAddressSpace() != loadAddressSpace)
                                 goto unsafeToOptimize; // incompatible address space
@@ -565,7 +568,7 @@ bool isExternallyModifiableAddr(IRInst* rootVar)
     if (!rootVar)
         return false;
 
-    auto ptr = as<IRConstRefType>(rootVar->getDataType());
+    auto ptr = as<IRBorrowInParamType>(rootVar->getDataType());
     if (!ptr)
         return true;
 
