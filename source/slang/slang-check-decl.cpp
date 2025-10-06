@@ -6023,32 +6023,6 @@ bool SemanticsVisitor::trySynthesizePropertyRequirementWitness(
     return true;
 }
 
-bool SemanticsVisitor::trySynthesizeAssociatedTypeRequirementWitness(
-    ConformanceCheckingContext* context,
-    LookupResult const& inLookupResult,
-    DeclRef<AssocTypeDecl> requiredMemberDeclRef,
-    RefPtr<WitnessTable> witnessTable)
-{
-    SLANG_UNUSED(context);
-    SLANG_UNUSED(inLookupResult);
-    SLANG_UNUSED(requiredMemberDeclRef);
-    SLANG_UNUSED(witnessTable);
-    return false;
-}
-
-bool SemanticsVisitor::trySynthesizeAssociatedConstantRequirementWitness(
-    ConformanceCheckingContext* context,
-    LookupResult const& inLookupResult,
-    DeclRef<VarDeclBase> requiredMemberDeclRef,
-    RefPtr<WitnessTable> witnessTable)
-{
-    SLANG_UNUSED(context);
-    SLANG_UNUSED(inLookupResult);
-    SLANG_UNUSED(requiredMemberDeclRef);
-    SLANG_UNUSED(witnessTable);
-    return false;
-}
-
 bool SemanticsVisitor::synthesizeAccessorRequirements(
     ConformanceCheckingContext* context,
     DeclRef<ContainerDecl> requiredMemberDeclRef,
@@ -6527,21 +6501,13 @@ bool SemanticsVisitor::trySynthesizeRequirementWitness(
         }
         else
         {
-            return trySynthesizeAssociatedTypeRequirementWitness(
-                context,
-                lookupResult,
-                requiredAssocTypeDeclRef,
-                witnessTable);
+            return false;
         }
     }
 
     if (auto requiredConstantDeclRef = requiredMemberDeclRef.as<VarDeclBase>())
     {
-        return trySynthesizeAssociatedConstantRequirementWitness(
-            context,
-            lookupResult,
-            requiredConstantDeclRef,
-            witnessTable);
+        return false;
     }
 
     if (auto requiredCtor = requiredMemberDeclRef.as<ConstructorDecl>())
