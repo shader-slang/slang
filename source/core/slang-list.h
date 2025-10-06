@@ -583,7 +583,7 @@ public:
     }
 
     template<typename T2>
-    Index binarySearch(const T2& obj)
+    Index binarySearch(const T2& obj) const
     {
         return binarySearch(
             obj,

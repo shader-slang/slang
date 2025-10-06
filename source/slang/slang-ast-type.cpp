@@ -544,7 +544,7 @@ void OutParamType::_toTextOverride(StringBuilder& out)
     out << toSlice("out ") << getValueType();
 }
 
-void InOutParamType::_toTextOverride(StringBuilder& out)
+void BorrowInOutParamType::_toTextOverride(StringBuilder& out)
 {
     out << toSlice("inout ") << getValueType();
 }
@@ -554,7 +554,7 @@ void RefParamType::_toTextOverride(StringBuilder& out)
     out << toSlice("ref ") << getValueType();
 }
 
-void ConstRefParamType::_toTextOverride(StringBuilder& out)
+void BorrowInParamType::_toTextOverride(StringBuilder& out)
 {
     out << toSlice("borrow ") << getValueType();
 }
@@ -580,31 +580,31 @@ Type* NamedExpressionType::_createCanonicalTypeOverride()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FuncType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-ParameterDirection getParamPassingModeFromPossiblyWrappedParamType(Type* paramType)
+ParamPassingMode getParamPassingModeFromPossiblyWrappedParamType(Type* paramType)
 {
     if (as<RefParamType>(paramType))
     {
-        return kParameterDirection_Ref;
+        return ParamPassingMode::Ref;
     }
-    else if (as<ConstRefParamType>(paramType))
+    else if (as<BorrowInParamType>(paramType))
     {
-        return kParameterDirection_ConstRef;
+        return ParamPassingMode::BorrowIn;
     }
-    else if (as<InOutType>(paramType))
+    else if (as<BorrowInOutParamType>(paramType))
     {
-        return kParameterDirection_InOut;
+        return ParamPassingMode::BorrowInOut;
     }
     else if (as<OutType>(paramType))
     {
-        return kParameterDirection_Out;
+        return ParamPassingMode::Out;
     }
     else
     {
-        return kParameterDirection_In;
+        return ParamPassingMode::In;
     }
 }
 
-ParameterDirection FuncType::getParamDirection(Index index)
+ParamPassingMode FuncType::getParamDirection(Index index)
 {
     auto paramType = getParamTypeWithDirectionWrapper(index);
     return getParamPassingModeFromPossiblyWrappedParamType(paramType);
@@ -613,7 +613,7 @@ ParameterDirection FuncType::getParamDirection(Index index)
 Type* FuncType::getParamValueType(Index index)
 {
     auto paramType = getParamTypeWithDirectionWrapper(index);
-    if (auto wrappedParamType = as<ParamDirectionType>(paramType))
+    if (auto wrappedParamType = as<ParamPassingModeType>(paramType))
         return wrappedParamType->getValueType();
     return paramType;
 }
@@ -1402,10 +1402,10 @@ Val* TextureTypeBase::getFormat()
 
 Type* removeParamDirType(Type* type)
 {
-    for (auto paramDirType = as<ParamDirectionType>(type); paramDirType;)
+    for (auto paramDirType = as<ParamPassingModeType>(type); paramDirType;)
     {
         type = paramDirType->getValueType();
-        paramDirType = as<ParamDirectionType>(type);
+        paramDirType = as<ParamPassingModeType>(type);
     }
     return type;
 }

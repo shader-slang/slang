@@ -1691,6 +1691,22 @@ DIAGNOSTIC(
     Error,
     invalidEqualityConstraintSupType,
     "type '$0' is not a proper type to use in a generic equality constraint.")
+DIAGNOSTIC(
+    30405,
+    Error,
+    noValidEqualityConstraintSubType,
+    "generic equality constraint requires at least one operand to be dependant on the generic "
+    "declaration")
+DIAGNOSTIC(
+    30402,
+    Note,
+    invalidEqualityConstraintSubType,
+    "type '$0' cannot be constrained by a type equality")
+DIAGNOSTIC(
+    30407,
+    Warning,
+    failedEqualityConstraintCanonicalOrder,
+    "failed to resolve canonical order of generic equality constraint.")
 
 // 305xx: initializer lists
 DIAGNOSTIC(30500, Error, tooManyInitializers, "too many initializers (expected $0, got $1)")
@@ -2208,8 +2224,8 @@ DIAGNOSTIC(
 DIAGNOSTIC(
     38034,
     Error,
-    cannotUseConstRefOnDifferentiableParameter,
-    "cannot use '__constref' on a differentiable parameter.")
+    cannotUseBorrowInOnDifferentiableParameter,
+    "cannot use 'borrow in' on a differentiable parameter.")
 DIAGNOSTIC(
     38034,
     Error,

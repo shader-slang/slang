@@ -510,14 +510,14 @@ Type* ASTBuilder::getScalarLayoutType()
 }
 
 // Construct the type `Out<valueType>`
-OutType* ASTBuilder::getOutType(Type* valueType)
+OutType* ASTBuilder::getOutParamType(Type* valueType)
 {
     return dynamicCast<OutType>(getPtrType(valueType, "OutParamType"));
 }
 
-InOutType* ASTBuilder::getInOutType(Type* valueType)
+BorrowInOutParamType* ASTBuilder::getBorrowInOutParamType(Type* valueType)
 {
-    return dynamicCast<InOutType>(getPtrType(valueType, "InOutParamType"));
+    return dynamicCast<BorrowInOutParamType>(getPtrType(valueType, "BorrowInOutParamType"));
 }
 
 RefParamType* ASTBuilder::getRefParamType(Type* valueType)
@@ -525,9 +525,9 @@ RefParamType* ASTBuilder::getRefParamType(Type* valueType)
     return dynamicCast<RefParamType>(getPtrType(valueType, "RefParamType"));
 }
 
-ConstRefParamType* ASTBuilder::getConstRefParamType(Type* valueType)
+BorrowInParamType* ASTBuilder::getConstRefParamType(Type* valueType)
 {
-    return dynamicCast<ConstRefParamType>(getPtrType(valueType, "ConstRefParamType"));
+    return dynamicCast<BorrowInParamType>(getPtrType(valueType, "BorrowInParamType"));
 }
 
 ExplicitRefType* ASTBuilder::getExplicitRefType(Type* valueType)

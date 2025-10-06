@@ -524,6 +524,7 @@ enum class IRTypeLayoutRuleName
     Std430,
     Std140,
     D3DConstantBuffer,
+    MetalParameterBlock,
     C,
     _Count,
 };
@@ -694,6 +695,12 @@ struct IRInst
     // operands of the instruction.
 
     IRUse* getOperands();
+
+    IRUse* getOperandUse(UInt index)
+    {
+        SLANG_ASSERT(index < getOperandCount());
+        return getOperands() + index;
+    }
 
     IRInst* getOperand(UInt index)
     {
@@ -1533,7 +1540,7 @@ struct IRUniformParameterGroupType : IRParameterGroupType
 
 
 FIDDLE()
-struct IRGLSLShaderStorageBufferType : IRBuiltinGenericType
+struct IRGLSLShaderStorageBufferType : IRPointerLikeType
 {
     FIDDLE(leafInst())
     IRType* getDataLayout() { return (IRType*)getOperand(1); }
@@ -1759,6 +1766,8 @@ struct IRGetStringHash : IRInst
 ///
 /// The given IR `builder` will be used if new instructions need to be created.
 IRType* tryGetPointedToType(IRBuilder* builder, IRType* type);
+
+IRType* tryGetPointedToOrBufferElementType(IRBuilder* builder, IRType* type);
 
 FIDDLE()
 struct IRFuncType : IRType
