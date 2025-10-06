@@ -1683,7 +1683,7 @@ struct LLVMEmitter
     // Used to skip some instructions whose value is derived from DebugVar.
     HashSet<IRInst*> debugInsts;
 
-    List<llvm::DIScope*> debugScopeStack;
+    llvm::DILocalScope* currentLocalScope = nullptr;
     bool debugInlinedScope = false;
 
     // Used to add code in the entry block of a function
@@ -1858,8 +1858,6 @@ struct LLVMEmitter
             sourceDebugInfo,
             defaultPointerRules));
 
-        debugScopeStack.add(compileUnit);
-
         String prelude = session->getPreludeForLanguage(SourceLanguage::LLVM);
         llvm::ModuleSummaryIndex llvmSummaryIndex(true);
         llvm::SMDiagnostic diag;
@@ -1897,11 +1895,6 @@ struct LLVMEmitter
         case FloatingPointDenormalMode::FlushToZero:
             return llvm::DenormalMode::getPositiveZero();
         }
-    }
-
-    llvm::DIScope* getCurrentDebugScope()
-    {
-        return debugScopeStack.getLast();
     }
 
     // Finds the value of an instruction that has already been emitted, OR
@@ -2159,7 +2152,7 @@ struct LLVMEmitter
             return;
 
         auto debugVar = llvmDebugBuilder->createAutoVariable(
-            getCurrentDebugScope(), name, loc->getFile(), loc->getLine(),
+            currentLocalScope, name, loc->getFile(), loc->getLine(),
             varType, getOptions().getOptimizationLevel() == OptimizationLevel::None
         );
         llvmDebugBuilder->insertDeclare(
@@ -3119,7 +3112,7 @@ struct LLVMEmitter
 
         case kIROp_DebugVar:
             debugInsts.add(inst);
-            if (debug)
+            if (debug && currentLocalScope)
             {
                 auto debugVarInst = static_cast<IRDebugVar*>(inst);
 
@@ -3137,7 +3130,7 @@ struct LLVMEmitter
                 {
                     variableDebugInfoMap[inst] = {
                         llvmDebugBuilder->createParameterVariable(
-                            getCurrentDebugScope(), prettyName, getIntVal(argIndex)+1, file,
+                            currentLocalScope, prettyName, getIntVal(argIndex)+1, file,
                             line, varType,
                             getOptions().getOptimizationLevel() == OptimizationLevel::None
                         ),
@@ -3149,7 +3142,7 @@ struct LLVMEmitter
                 {
                     variableDebugInfoMap[inst] = {
                         llvmDebugBuilder->createAutoVariable(
-                            getCurrentDebugScope(), prettyName, file, line, varType,
+                            currentLocalScope, prettyName, file, line, varType,
                             getOptions().getOptimizationLevel() == OptimizationLevel::None
                         ),
                         false,
@@ -3161,7 +3154,7 @@ struct LLVMEmitter
 
         case kIROp_DebugValue:
             debugInsts.add(inst);
-            if (debug)
+            if (debug && currentLocalScope)
             {
                 auto debugValueInst = static_cast<IRDebugValue*>(inst);
                 auto debugVar = debugValueInst->getDebugVar();
@@ -3203,7 +3196,7 @@ struct LLVMEmitter
 
         case kIROp_DebugLine:
             debugInsts.add(inst);
-            if (debug)
+            if (debug && currentLocalScope)
             {
                 auto debugLineInst = static_cast<IRDebugLine*>(inst);
 
@@ -3216,7 +3209,7 @@ struct LLVMEmitter
                 debugLineInst->getColEnd();
 
                 llvmBuilder->SetCurrentDebugLocation(
-                    llvm::DILocation::get(*llvmContext, line, col, getCurrentDebugScope())
+                    llvm::DILocation::get(*llvmContext, line, col, currentLocalScope)
                 );
             }
             return nullptr;
@@ -3290,13 +3283,25 @@ struct LLVMEmitter
         {
             return funcToDebugLLVM[func];
         }
-        llvm::DIFile* file = sourceDebugInfo.getValue(debugFunc->getFile());
+
+        IRType* funcType = nullptr;
+        llvm::DIFile* file = nullptr;
+        int line = 0;
+        if (debugFunc)
+        {
+            funcType = as<IRType>(debugFunc->getDebugType());
+            file = sourceDebugInfo.getValue(debugFunc->getFile());
+            line = getIntVal(debugFunc->getLine());
+        }
+        else
+        {
+            funcType = as<IRType>(func->getDataType());
+            file = compileUnit->getFile();
+        }
 
         llvm::StringRef linkageName, prettyName;
 
         maybeGetName(&linkageName, &prettyName, func);
-
-        int line = getIntVal(debugFunc->getLine());
 
         auto sp = llvmDebugBuilder->createFunction(
             file,
@@ -3304,7 +3309,7 @@ struct LLVMEmitter
             linkageName,
             file,
             line,
-            llvm::cast<llvm::DISubroutineType>(types->getDebugType(as<IRType>(debugFunc->getDebugType()), defaultPointerRules)),
+            llvm::cast<llvm::DISubroutineType>(types->getDebugType(funcType, defaultPointerRules)),
             line,
             llvm::DINode::FlagPrototyped,
             llvm::DISubprogram::SPFlagDefinition
@@ -3660,16 +3665,18 @@ struct LLVMEmitter
         }
 
         llvm::DISubprogram* sp = nullptr;
-        if (auto debugFuncDecoration = code->findDecoration<IRDebugFuncDecoration>(); debugFuncDecoration && debug)
-        {
-            auto debugFunc = as<IRDebugFunction>(debugFuncDecoration->getDebugFunc());
+        if (debug)
+        { 
+            IRDebugFunction* debugFunc = nullptr;
+            if (auto debugFuncDecoration = code->findDecoration<IRDebugFuncDecoration>())
+                debugFunc = as<IRDebugFunction>(debugFuncDecoration->getDebugFunc());
             sp = ensureDebugFunc(code, debugFunc);
         }
 
         if (sp != nullptr)
         {
             llvmFunc->setSubprogram(sp);
-            debugScopeStack.add(sp);
+            currentLocalScope = sp;
         }
 
         if (!intrinsic)
@@ -3694,7 +3701,7 @@ struct LLVMEmitter
                     if (sp)
                     {
                         llvmBuilder->SetCurrentDebugLocation(
-                            llvm::DILocation::get(*llvmContext, sp->getLine(), 0, getCurrentDebugScope())
+                            llvm::DILocation::get(*llvmContext, sp->getLine(), 0, sp)
                         );
                     }
                     prologueCallback();
@@ -3710,8 +3717,7 @@ struct LLVMEmitter
             }
         }
 
-        if (sp != nullptr)
-            debugScopeStack.removeLast();
+        currentLocalScope = nullptr;
     }
 
     void emitComputeEntryPointDispatcher(
