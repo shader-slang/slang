@@ -1520,6 +1520,15 @@ struct CPUEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalize
         groupThreadIndex = emitCalcGroupIndex(builder, groupThreadID, groupExtents);
     }
 
+    static bool isVectorParam(IRType* type)
+    {
+        if (as<IRVectorType>(type))
+            return true;
+        else if (auto ptr = as<IRPtrTypeBase>(type))
+            return isVectorParam(ptr->getValueType());
+        return false;
+    }
+
     LegalizedVaryingVal createLegalSystemVaryingValImpl(VaryingParamInfo const& info) SLANG_OVERRIDE
     {
         // Because all of the relvant system values were synthesized
@@ -1539,10 +1548,10 @@ struct CPUEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalize
         case SystemValueSemanticName::GroupIndex:
             return LegalizedVaryingVal::makeValue(groupThreadIndex);
         case SystemValueSemanticName::DispatchThreadID:
-            if (as<IRBasicType>(info.type))
-                return LegalizedVaryingVal::makeValue(dispatchThreadID1D);
-            else
+            if (isVectorParam(info.type))
                 return LegalizedVaryingVal::makeValue(dispatchThreadID);
+            else
+                return LegalizedVaryingVal::makeValue(dispatchThreadID1D);
         default:
             return diagnoseUnsupportedSystemVal(info);
         }
