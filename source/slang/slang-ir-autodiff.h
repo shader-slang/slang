@@ -376,8 +376,8 @@ struct DifferentiableTypeConformanceContext
             case kIROp_VectorType:
             case kIROp_ArrayType:
             case kIROp_PtrType:
-            case kIROp_OutType:
-            case kIROp_InOutType:
+            case kIROp_OutParamType:
+            case kIROp_BorrowInOutParamType:
                 origType = (IRType*)origType->getOperand(0);
                 continue;
             default:
@@ -396,8 +396,8 @@ struct DifferentiableTypeConformanceContext
             case kIROp_VectorType:
             case kIROp_ArrayType:
             case kIROp_PtrType:
-            case kIROp_OutType:
-            case kIROp_InOutType:
+            case kIROp_OutParamType:
+            case kIROp_BorrowInOutParamType:
                 origType = (IRType*)origType->getOperand(0);
                 continue;
             default:

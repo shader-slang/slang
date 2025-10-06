@@ -2814,7 +2814,7 @@ bool DefaultCheckpointPolicy::canRecompute(UseOrPseudoUse use)
         {
             // An exception is a load of a constref parameter, which should
             // remain constant throughout the function.
-            if (as<IRConstRefType>(getRootAddr(ptr)->getDataType()))
+            if (as<IRBorrowInParamType>(getRootAddr(ptr)->getDataType()))
                 return true;
             if (isInstInPrimalOrTransposedParameterBlocks(ptr))
                 return false;

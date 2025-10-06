@@ -144,8 +144,8 @@ local insts = {
 				PtrTypeBase = {
 					hoistable = true,
 					{ Ptr = { struct_name = "PtrType", min_operands = 1 } },
-					{ Ref = { struct_name = "RefType", min_operands = 1 } },
-					{ ConstRef = { struct_name = "ConstRefType", min_operands = 1 } },
+					{ RefParam = { struct_name = "RefParamType", min_operands = 1 } },
+					{ BorrowInParam = { struct_name = "BorrowInParamType", min_operands = 1 } },
 					{
 						PseudoPtr = {
 							-- A `PsuedoPtr<T>` logically represents a pointer to a value of type
@@ -157,9 +157,9 @@ local insts = {
 						},
 					},
 					{
-						OutTypeBase = {
-							{ Out = { struct_name = "OutType", min_operands = 1 } },
-							{ InOut = { struct_name = "InOutType", min_operands = 1 } },
+						OutParamTypeBase = {
+							{ OutParam = { struct_name = "OutParamType", min_operands = 1 } },
+							{ BorrowInOutParam = { struct_name = "BorrowInOutParamType", min_operands = 1 } },
 						},
 					},
 				},
@@ -1908,6 +1908,7 @@ local insts = {
 	-- Represents a no-op cast to convert a resource pointer to a resource on targets where the resource handles are
 	-- already concrete types.
 	{ CastDescriptorHandleToResource = { min_operands = 1 } },
+	{ CastResourceToDescriptorHandle = { min_operands = 1 } },
 	{ TreatAsDynamicUniform = { min_operands = 1 } },
 	{ sizeOf = { min_operands = 1 } },
 	{ alignOf = { min_operands = 1 } },

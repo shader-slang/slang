@@ -446,6 +446,14 @@ inline bool isUseBaseAddrOperand(IRUse* use, IRInst* user)
     return user->getOperandUse(0) == use;
 }
 
+// Check if the inst is a generic parameter.
+bool isGenericParameter(IRInst* inst);
+
+// Usually we want to enforce that an instruction is defined before any of its uses, but
+// if the use is a generic parameter, we can relax this rule when the instruction is the data type
+// of the generic parameter.
+bool canRelaxInstOrderRule(IRInst* instToCheck, IRInst* otherInst);
+
 } // namespace Slang
 
 #endif

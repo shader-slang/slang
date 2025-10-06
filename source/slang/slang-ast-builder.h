@@ -537,16 +537,16 @@ public:
     PtrType* getPtrType(Type* valueType, Val* accessQualifier, Val* addrSpace);
 
     // Construct the type `OutParam<valueType>`
-    OutParamType* getOutType(Type* valueType);
+    OutParamType* getOutParamType(Type* valueType);
 
     // Construct the type `InOutParam<valueType>`
-    InOutParamType* getInOutType(Type* valueType);
+    BorrowInOutParamType* getBorrowInOutParamType(Type* valueType);
 
     // Construct the type `RefParam<valueType>`
     RefParamType* getRefParamType(Type* valueType);
 
-    // Construct the type `ConstRefParam<valueType>`
-    ConstRefParamType* getConstRefParamType(Type* valueType);
+    // Construct the type `ImmutableBorrowParam<valueType>`
+    BorrowInParamType* getConstRefParamType(Type* valueType);
 
     // Construct the type `Ref<valueType>`
     ExplicitRefType* getExplicitRefType(Type* valueType);

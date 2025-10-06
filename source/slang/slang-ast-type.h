@@ -713,14 +713,8 @@ class PtrType : public PtrTypeBase
 
 /// A pointer-like type used to represent a parameter-passing mode.
 ///
-/// Historically the codebase has referredd to different parameter-passing
-/// modes as parameter "directions," because they initially included
-/// only `in`, `out`, and `inout`. The name is confusing when applied
-/// to things like `ref` parameters, but we haven't had time to rename
-/// everything yet.
-///
 FIDDLE()
-class ParamDirectionType : public PtrTypeBase
+class ParamPassingModeType : public PtrTypeBase
 {
     FIDDLE(...)
 };
@@ -729,13 +723,12 @@ class ParamDirectionType : public PtrTypeBase
 // logical pointer that is passed for an `out`
 // or `in out` parameter
 FIDDLE(abstract)
-class OutParamTypeBase : public ParamDirectionType
+class OutParamTypeBase : public ParamPassingModeType
 {
     FIDDLE(...)
 };
-using OutTypeBase = OutParamTypeBase;
 
-// The type for an `out` parameter, e.g., `out T`
+// The type for an output parameter, e.g., `out T`
 FIDDLE()
 class OutParamType : public OutParamTypeBase
 {
@@ -744,24 +737,23 @@ class OutParamType : public OutParamTypeBase
 };
 using OutType = OutParamType;
 
-// The type for an `in out` parameter, e.g., `in out T`
+// The type for a mutable borrow input/output parameter, e.g., `in out T`
 FIDDLE()
-class InOutParamType : public OutParamTypeBase
-{
-    FIDDLE(...)
-    void _toTextOverride(StringBuilder& out);
-};
-using InOutType = InOutParamType;
-
-// The type for an `ref` parameter, e.g., `ref T`
-FIDDLE()
-class RefParamType : public ParamDirectionType
+class BorrowInOutParamType : public OutParamTypeBase
 {
     FIDDLE(...)
     void _toTextOverride(StringBuilder& out);
 };
 
-/// The type for a `constref` parameter, e.g., `constref T`
+// The type for a by-reference parameter, e.g., `ref T`
+FIDDLE()
+class RefParamType : public ParamPassingModeType
+{
+    FIDDLE(...)
+    void _toTextOverride(StringBuilder& out);
+};
+
+/// The type for a immutable borrow input parameter, e.g., `borrow T`
 ///
 /// Note that, despite the modifier currently used to represent
 /// this case in code, this is *not* comparable to the `ref`
@@ -769,7 +761,7 @@ class RefParamType : public ParamDirectionType
 /// equivalent of `inout`.
 ///
 FIDDLE()
-class ConstRefParamType : public ParamDirectionType
+class BorrowInParamType : public ParamPassingModeType
 {
     FIDDLE(...)
     void _toTextOverride(StringBuilder& out);
@@ -880,14 +872,14 @@ class FuncType : public Type
 
     /// Get the parameter-passing mode of one of the function's parameters, by index.
     ///
-    ParameterDirection getParamDirection(Index index);
+    ParamPassingMode getParamDirection(Index index);
 
     /// Combined information on the type and parameter-passing mode of a parameter.
     ///
     struct ParamInfo
     {
         /// The parameter-passing mode used for the parameter.
-        ParameterDirection direction = kParameterDirection_In;
+        ParamPassingMode direction = ParamPassingMode::In;
 
         /// The user-perceived type of the parameter.
         Type* type = nullptr;

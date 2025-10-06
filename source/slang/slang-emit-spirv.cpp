@@ -1793,10 +1793,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 return emitOpTypeFloat(inst, SpvLiteralInteger::from32(int32_t(i.width)));
             }
         case kIROp_PtrType:
-        case kIROp_RefType:
-        case kIROp_ConstRefType:
-        case kIROp_OutType:
-        case kIROp_InOutType:
+        case kIROp_RefParamType:
+        case kIROp_BorrowInParamType:
+        case kIROp_OutParamType:
+        case kIROp_BorrowInOutParamType:
             {
                 SpvStorageClass storageClass = SpvStorageClassFunction;
                 auto ptrType = as<IRPtrTypeBase>(inst);
@@ -2681,7 +2681,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         // Vulkan spec 16.1: "The “Depth” operand of OpTypeImage is ignored."
         SpvWord depth =
-            ImageOpConstants::unknownDepthImage; // No knowledge of if this is a depth image
+            inst->isShadow()
+                ? ImageOpConstants::isDepthImage       // But we respect the `isShadow` flag of the
+                                                       // texture
+                : ImageOpConstants::unknownDepthImage; // No knowledge of if this is a depth image
+
         SpvWord ms = inst->isMultisample() ? ImageOpConstants::isMultisampled
                                            : ImageOpConstants::notMultisampled;
 
@@ -8189,10 +8193,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             break;
 
         case kIROp_PtrType:
-        case kIROp_RefType:
-        case kIROp_ConstRefType:
-        case kIROp_OutType:
-        case kIROp_InOutType:
+        case kIROp_RefParamType:
+        case kIROp_BorrowInParamType:
+        case kIROp_OutParamType:
+        case kIROp_BorrowInOutParamType:
             if (auto ptrType = as<IRPtrTypeBase>(type))
                 return checkTypeNeedsStorageCapability(
                     ptrType->getValueType(),

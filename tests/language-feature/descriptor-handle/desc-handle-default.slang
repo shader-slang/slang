@@ -32,12 +32,12 @@ Texture1D<float> t4;
 //MIX-DAG: OpDecorate %__slang_resource_heap{{.*}} Binding 0
 //MIX-DAG: OpDecorate %__slang_resource_heap{{.*}} Binding 5
 //MIX-DAG: OpDecorate %__slang_resource_heap{{.*}} Binding 6
+//MIX-DAG: OpDecorate %__slang_resource_heap{{.*}} Binding 7
 
 //MIX-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 1
 //MIX-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 2
 //MIX-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 3
 //MIX-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 4
-//MIX-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 7
 //MIX-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 8
 
 #ifdef SAMPLER
@@ -88,6 +88,8 @@ uniform RWBuffer<float>.Handle rwTexelBuffer;
 
 #ifdef UNIFORM_BUFFER
 //UNIFORM_BUFFER: OpDecorate %__slang_resource_heap{{.*}} Binding 6
+//UNIFORM_BUFFER-NEXT: OpDecorate %__slang_resource_heap{{.*}} DescriptorSet 3
+//UNIFORM_BUFFER: OpDecorate %__slang_resource_heap{{.*}} Binding 7
 //UNIFORM_BUFFER-NEXT: OpDecorate %__slang_resource_heap{{.*}} DescriptorSet 3
 struct Data
 {

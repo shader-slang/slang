@@ -3753,10 +3753,10 @@ public:
     // Form a ptr type to `valueType` using the same opcode and address space as `ptrWithAddrSpace`.
     IRPtrTypeBase* getPtrTypeWithAddressSpace(IRType* valueType, IRPtrTypeBase* ptrWithAddrSpace);
 
-    IROutType* getOutType(IRType* valueType);
-    IRInOutType* getInOutType(IRType* valueType);
-    IRRefType* getRefType(IRType* valueType, AddressSpace addrSpace);
-    IRConstRefType* getConstRefType(IRType* valueType, AddressSpace addrSpace);
+    IROutParamType* getOutParamType(IRType* valueType);
+    IRBorrowInOutParamType* getBorrowInOutParamType(IRType* valueType);
+    IRRefParamType* getRefParamType(IRType* valueType, AddressSpace addrSpace);
+    IRBorrowInParamType* getBorrowInParamType(IRType* valueType, AddressSpace addrSpace);
     IRPtrType* getPtrType(
         IROp op,
         IRType* valueType,
