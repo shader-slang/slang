@@ -99,7 +99,7 @@ void legalizeArrayReturnType(IRModule* module, TargetRequest* targetReq)
         bool isCoopVecArray = nameHint && (nameHint->getName() == UnownedStringSlice("CoopVec"));
         if (isCoopVecArray)
         {
-            // CoopVec types are lowered from IRCoopVectorType to arrays with a "CoopVec" name hint.  
+            // CoopVec types are lowered from IRCoopVectorType to arrays with a "CoopVec" name hint.
             // CUDA, D3D, and CPU targets can return these arrays directly without legalization,
             // while other targets (GLSL, Metal, SPIR-V) require transformation to out parameters.
             if (isCUDATarget(targetReq) || isD3DTarget(targetReq) || isCPUTarget(targetReq))
