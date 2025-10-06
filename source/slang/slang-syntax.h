@@ -238,7 +238,7 @@ SubstitutionSet makeSubstitutionFromIncompleteSet(
 
 Val::OperandView<Val> findInnerMostGenericArgs(SubstitutionSet subst);
 
-ParameterDirection getParameterDirection(VarDeclBase* varDecl);
+ParamPassingMode getParameterDirection(VarDeclBase* varDecl);
 
 inline Type* getTagType(ASTBuilder* astBuilder, DeclRef<EnumDecl> declRef)
 {

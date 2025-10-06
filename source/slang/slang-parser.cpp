@@ -1683,13 +1683,14 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
         bool optional = AdvanceIf(parser, "optional", &whereToken);
 
         auto subType = parser->ParseTypeExp();
-        if (AdvanceIf(parser, TokenType::Colon))
+        Token constraintToken;
+        if (AdvanceIf(parser, TokenType::Colon, &constraintToken))
         {
             for (;;)
             {
                 auto constraint = parser->astBuilder->create<GenericTypeConstraintDecl>();
                 constraint->whereTokenLoc = whereToken.loc;
-                parser->FillPosition(constraint);
+                constraint->loc = constraintToken.loc;
                 constraint->sub = subType;
                 constraint->sup = parser->ParseTypeExp();
                 if (optional)
@@ -1703,12 +1704,12 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
                     break;
             }
         }
-        else if (AdvanceIf(parser, TokenType::OpEql))
+        else if (AdvanceIf(parser, TokenType::OpEql, &constraintToken))
         {
             auto constraint = parser->astBuilder->create<GenericTypeConstraintDecl>();
             constraint->whereTokenLoc = whereToken.loc;
             constraint->isEqualityConstraint = true;
-            parser->FillPosition(constraint);
+            constraint->loc = constraintToken.loc;
             constraint->sub = subType;
             constraint->sup = parser->ParseTypeExp();
             if (optional)
@@ -4247,6 +4248,9 @@ static void parseModernVarDeclBaseCommon(Parser* parser, VarDeclBase* decl)
         decl->type = parser->ParseTypeExp();
     }
 
+    auto modifiers = _parseOptSemantics(parser);
+    _addModifiers(decl, modifiers);
+
     if (AdvanceIf(parser, TokenType::OpAssign))
     {
         decl->initExpr = parser->ParseInitExpr();
@@ -4348,6 +4352,8 @@ static NodeBase* parseFuncDecl(Parser* parser, void* /*userData*/)
         {
             parser->PushScope(decl);
             parseModernParamList(parser, decl);
+            auto funcScope = parser->currentScope;
+            parser->PopScope();
             if (AdvanceIf(parser, "throws"))
             {
                 decl->errorType = parser->ParseTypeExp();
@@ -4356,8 +4362,6 @@ static NodeBase* parseFuncDecl(Parser* parser, void* /*userData*/)
             {
                 decl->returnType = parser->ParseTypeExp();
             }
-            auto funcScope = parser->currentScope;
-            parser->PopScope();
             maybeParseGenericConstraints(parser, genericParent);
             parser->PushScope(funcScope);
             decl->body = parseOptBody(parser);
@@ -5506,10 +5510,16 @@ Decl* Parser::ParseStruct()
                 rs->wrappedType = ParseTypeExp();
                 PushScope(rs);
                 PopScope();
-                ReadToken(TokenType::Semicolon);
+                if (!LookAheadToken(TokenType::Semicolon))
+                {
+                    this->diagnose(
+                        this->tokenReader.peekToken().loc,
+                        Diagnostics::unexpectedTokenExpectedTokenType,
+                        "';'");
+                }
                 return rs;
             }
-            if (AdvanceIf(this, TokenType::Semicolon))
+            if (LookAheadToken(TokenType::Semicolon))
             {
                 rs->hasBody = false;
                 return rs;
@@ -9577,7 +9587,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseModifier("out", getSyntaxClass<OutModifier>()),
     _makeParseModifier("inout", getSyntaxClass<InOutModifier>()),
     _makeParseModifier("__ref", getSyntaxClass<RefModifier>()),
-    _makeParseModifier("__constref", getSyntaxClass<ConstRefModifier>()),
+    _makeParseModifier("__constref", getSyntaxClass<BorrowModifier>()),
     _makeParseModifier("const", getSyntaxClass<ConstModifier>()),
     _makeParseModifier("__builtin", getSyntaxClass<BuiltinModifier>()),
     _makeParseModifier("highp", getSyntaxClass<GLSLPrecisionModifier>()),

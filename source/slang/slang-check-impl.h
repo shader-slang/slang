@@ -1913,10 +1913,10 @@ public:
         DeclRef<Decl> candidateMethod; // The method that was considered but failed
         Type* actualType = nullptr;    // For type mismatches: the actual type found
         Type* expectedType = nullptr;  // For type mismatches: the expected type
-        ParameterDirection actualDir =
-            kParameterDirection_In; // For direction mismatches: the actual direction
-        ParameterDirection expectedDir =
-            kParameterDirection_In;     // For direction mismatches: the expected direction
+        ParamPassingMode actualDir =
+            ParamPassingMode::In; // For direction mismatches: the actual direction
+        ParamPassingMode expectedDir =
+            ParamPassingMode::In;       // For direction mismatches: the expected direction
         ParamDecl* paramDecl = nullptr; // For direction mismatches: the parameter declaration
     };
 
