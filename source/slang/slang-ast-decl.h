@@ -386,11 +386,11 @@ class AggTypeDecl : public AggTypeDeclBase
     FIDDLE(...)
     FIDDLE() TypeTag typeTags = TypeTag::None;
 
-    // When user defines a agg type in the syntax of
+    // When user defines an agg type in the syntax of
     // `struct FooAlias : IFoo = Foo;`
     // The user is defining a link-time type alias. In contrast
     // to an ordinary typealias, a link-time alias is not folded in
-    // the front-end, and rsolved during linking.
+    // the front-end, and resolved during linking.
     // `aliasedType` is used to store the alised type (in this case `Foo`)
     // when the agg type decl is declared in the link-time alias syntax.
     //

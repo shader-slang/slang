@@ -1260,6 +1260,7 @@ FIDDLE() namespace Slang
         Type* Ptr() { return type; }
         operator Type*() { return type; }
         Type* operator->() { return Ptr(); }
+        operator bool const() { return type != nullptr; }
 
         ThisType& operator=(const ThisType& rhs) = default;
 
