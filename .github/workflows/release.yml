@@ -42,14 +42,14 @@ jobs:
               os: windows,
               platform: x86_64,
               arch: amd64,
-              runs-on: ["Windows", "self-hosted", "GCP-T4"],
+              runs-on: windows-latest,
               compiler: cl,
             }
           - {
               os: windows,
               platform: aarch64,
               arch: amd64_arm64,
-              runs-on: ["Windows", "self-hosted", "GCP-T4"],
+              runs-on: windows-latest,
               compiler: cl,
             }
           - {
