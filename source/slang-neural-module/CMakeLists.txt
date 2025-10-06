@@ -7,7 +7,18 @@
 #
 set(SLANG_NEURAL_MODULE_DIR_NAME "slang-neural-module" CACHE STRING "Directory name for neural module")
 set(SLANG_NEURAL_MODULE_FILE_NAME "neural.slang-module" CACHE STRING "File name for neural module")
-set(SLANG_NEURAL_MODULE_INSTALL_DIR "lib/slang-neural-module" CACHE STRING "Installation directory for neural module")
+
+# Determine the library directory based on platform
+# On Windows: shared libraries (.dll) go to bin/
+# On Linux/Mac: shared libraries (.so/.dylib) go to lib/
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    set(slang_library_dir "bin")
+else()
+    set(slang_library_dir "lib")
+endif()
+
+# Set install directory using the platform-specific library directory
+set(SLANG_NEURAL_MODULE_INSTALL_DIR "${slang_library_dir}/${SLANG_NEURAL_MODULE_DIR_NAME}" CACHE STRING "Installation directory for neural module")
 
 #
 # Generate the neural module configuration header
@@ -28,7 +39,8 @@ set_target_properties(generate_neural_config_header PROPERTIES FOLDER "generated
 
 glob_append(neural_shader_sources "*.slang")
 
-set(neural_output_dir "${CMAKE_BINARY_DIR}/$<CONFIG>/lib/${SLANG_NEURAL_MODULE_DIR_NAME}")
+# Set output directories for build tree
+set(neural_output_dir "${CMAKE_BINARY_DIR}/$<CONFIG>/${slang_library_dir}/${SLANG_NEURAL_MODULE_DIR_NAME}")
 set(neural_module_file "${neural_output_dir}/${SLANG_NEURAL_MODULE_FILE_NAME}")
 
 # Copy neural shader files to output directory

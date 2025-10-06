@@ -1,6 +1,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-slang -compute -shaderobj -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type
 
 
 import neural;
@@ -11,34 +12,20 @@ import neural;
 // 5 6 7 8
 RWStructuredBuffer<float> parameters;
 
-
 // set up a 2x1 matrix for output
 //TEST_INPUT: ubuffer(data=[0 0], stride=4):out,name=output
 RWStructuredBuffer<float> output;
 
+//TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name=dInput
+RWStructuredBuffer<float> dInput;
 
-//TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name=dout_input
-RWStructuredBuffer<float> dout_input;
-
-//TEST_INPUT: ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=dparameters
-RWStructuredBuffer<float> dparameters;
+//TEST_INPUT: ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=dParameters
+RWStructuredBuffer<float> dParameters;
 
 typealias BufferStorage = StructuredBufferStorage<float>;
 
-OutputVector testForward<InputVector, OutputVector>(
-    InputVector input)
-    where InputVector : IVector<float, 4>
-    where OutputVector : IVector<float, 2>
-{
-    BufferStorage storage = BufferStorage(parameters);
-    BufferStorage.Address address = 0;
-
-    var outputVec = input.eval<2, false, BufferStorage, OutputVector>(storage, address);
-    return outputVec;
-}
-
 [Differentiable]
-OutputVector testBackward<InputVector, OutputVector>(
+OutputVector testInlineVectorMatMulAdd<InputVector, OutputVector>(
     InputVector input,
     BufferStorage storage,
     BufferStorage.Address address)
@@ -55,9 +42,13 @@ void computeMain()
 {
     float[4] inputData = {1.0f, 2.0f, 3.0f, 4.0f};
     let input = InlineVector<float, 4>(inputData);
+    BufferStorage storage = BufferStorage(parameters);
+    BufferStorage dstorage = BufferStorage(dParameters);
+    BufferStorage.Address address = 0;
 
-    let outputVec = testForward<InlineVector<float, 4>, InlineVector<float, 2>>(input);
-    
+    // Run the forward pass
+    let outputVec = testInlineVectorMatMulAdd<InlineVector<float, 4>, InlineVector<float, 2>>(input, storage, address);
+
     // BUFFER: 50.0
     // BUFFER: 60.0
     // (1*1 + 2*3 + 3*5 + 4*7) = 50.0
@@ -65,26 +56,24 @@ void computeMain()
     output[0] = outputVec[0];
     output[1] = outputVec[1];
 
-    BufferStorage storage = BufferStorage(parameters);
-    BufferStorage dstorage = BufferStorage(dparameters);
-    BufferStorage.Address address = 0;
 
     var parameterDiffPair = DifferentialPtrPair<BufferStorage>(storage, dstorage);
-
     let dRes = InlineVector<float, 2>(1.0f);
     var dPair = diffPair(input);
 
+    // Run the backward pass
     // dInput = W^T * dOutput
     // dInput = {3, 7, 11, 15}
-    bwd_diff(testBackward<InlineVector<float, 4>, InlineVector<float, 2>>)(dPair, parameterDiffPair, address, dRes);
+    bwd_diff(testInlineVectorMatMulAdd<InlineVector<float, 4>, InlineVector<float, 2>>)
+                (dPair, parameterDiffPair, address, dRes);
     // BUFFER: 3.0
     // BUFFER: 7.0
     // BUFFER: 11.0
     // BUFFER: 15.0
-    dout_input[0] = dPair.d[0];
-    dout_input[1] = dPair.d[1];
-    dout_input[2] = dPair.d[2];
-    dout_input[3] = dPair.d[3];
+    dInput[0] = dPair.d[0];
+    dInput[1] = dPair.d[1];
+    dInput[2] = dPair.d[2];
+    dInput[3] = dPair.d[3];
 
     // dW = dOutput * dInput^T
     // dW = [1, 1]^T * [1, 2, 3, 4]    // dW = {5, 11, 17, 23}
