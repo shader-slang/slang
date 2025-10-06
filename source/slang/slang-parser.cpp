@@ -2792,10 +2792,7 @@ static Expr* _moveTypeModifiersToTypeExpr(
     return _applyModifiersToTypeExpr(parser, typeExpr, typeModifiers);
 }
 
-static TypeSpec _applyModifiersToTypeSpec(
-    Parser* parser,
-    TypeSpec typeSpec,
-    Modifiers& modifiers)
+static TypeSpec _applyModifiersToTypeSpec(Parser* parser, TypeSpec typeSpec, Modifiers& modifiers)
 {
     // It is possible that the form of the type specifier will have
     // included a declaration directly (e.g., using `struct { ... }`
