@@ -4567,8 +4567,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
                     const auto memoryScope =
                         emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
-                    const auto memorySemantics =
-                        emitMemorySemanticMask(inst->getOperand(1), ptr);
+                    const auto memorySemantics = emitMemorySemanticMask(inst->getOperand(1), ptr);
                     result = emitOpAtomicLoad(
                         parent,
                         inst,
@@ -4588,7 +4587,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
                 IRAtomicStore* atomicStore = as<IRAtomicStore>(inst);
                 auto ptr = atomicStore->getPtr();
-                auto val = atomicStore->getVal(); 
+                auto val = atomicStore->getVal();
                 IRBuilder builder{inst};
                 if (isAtomicableAddressSpace(inst->getOperand(0)->getDataType()))
                 {
@@ -4597,15 +4596,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
                     const auto memoryScope =
                         emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
-                    const auto memorySemantics =
-                        emitMemorySemanticMask(inst->getOperand(2), ptr);
-                    result = emitOpAtomicStore(
-                        parent,
-                        inst,
-                        ptr,
-                        memoryScope,
-                        memorySemantics,
-                        val);
+                    const auto memorySemantics = emitMemorySemanticMask(inst->getOperand(2), ptr);
+                    result =
+                        emitOpAtomicStore(parent, inst, ptr, memoryScope, memorySemantics, val);
                     ensureAtomicCapability(inst, SpvOpAtomicStore);
                 }
                 else
@@ -4627,8 +4620,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
                     const auto memoryScope =
                         emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
-                    const auto memorySemantics =
-                        emitMemorySemanticMask(inst->getOperand(2), ptr);
+                    const auto memorySemantics = emitMemorySemanticMask(inst->getOperand(2), ptr);
                     result = emitOpAtomicExchange(
                         parent,
                         inst,
@@ -7224,7 +7216,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 if constexpr (memoryAccessType == MemoryAccessType::Load)
                     memoryAccessMaskOut |= SpvMemoryAccessMakePointerVisibleMask;
                 else
-                    memoryAccessMaskOut |= SpvMemoryAccessMakePointerAvailableMask; 
+                    memoryAccessMaskOut |= SpvMemoryAccessMakePointerAvailableMask;
                 if (memoryScopeOut == MemoryScope::Device)
                     requireSPIRVCapability(SpvCapabilityVulkanMemoryModelDeviceScope);
             }
@@ -7260,7 +7252,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         int memoryAccessMask = 0;
         int alignment = -1;
         MemoryScope memoryScope{};
-        getMemoryAccessOperandsOfLoadStore<MemoryAccessType::Load>(inst, ptr, memoryAccessMask, alignment, memoryScope);
+        getMemoryAccessOperandsOfLoadStore<MemoryAccessType::Load>(
+            inst,
+            ptr,
+            memoryAccessMask,
+            alignment,
+            memoryScope);
         return emitInstCustomOperandFunc(
             parent,
             inst,
@@ -7290,12 +7287,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     SpvInst* emitStore(SpvInstParent* parent, IRInst* inst, IRInst* ptr, IRInst* val)
     {
         requireVariableBufferCapabilityIfNeeded(inst->getDataType());
-        
+
         IRBuilder builder(inst);
         int memoryAccessMask = 0;
         int alignment = -1;
         MemoryScope memoryScope{};
-        getMemoryAccessOperandsOfLoadStore<MemoryAccessType::Store>(inst, ptr, memoryAccessMask, alignment, memoryScope);
+        getMemoryAccessOperandsOfLoadStore<MemoryAccessType::Store>(
+            inst,
+            ptr,
+            memoryAccessMask,
+            alignment,
+            memoryScope);
         return emitInstCustomOperandFunc(
             parent,
             inst,

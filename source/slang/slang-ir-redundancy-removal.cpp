@@ -454,7 +454,7 @@ static MemoryScope getMemoryScopeOfLoadStore(IRInst* inst)
 {
     SLANG_ASSERT(as<IRLoad>(inst) || as<IRStore>(inst));
     auto memoryScope = inst->findAttr<IRMemoryScopeAttr>();
-    if(!memoryScope)
+    if (!memoryScope)
         return MemoryScope::Invocation;
     return (MemoryScope)getIntVal(memoryScope->getMemoryScope());
 }
@@ -526,8 +526,8 @@ bool tryRemoveRedundantStore(IRGlobalValueWithCode* func, IRStore* store)
     {
         if (auto nextStore = as<IRStore>(next))
         {
-            if (nextStore->getPtr() == store->getPtr()
-                && isMemoryScopeSubsetOf(memoryScopeOfStore, getMemoryScopeOfLoadStore(nextStore)))
+            if (nextStore->getPtr() == store->getPtr() &&
+                isMemoryScopeSubsetOf(memoryScopeOfStore, getMemoryScopeOfLoadStore(nextStore)))
             {
                 hasOverridingStore = true;
                 break;
@@ -644,8 +644,8 @@ bool tryRemoveRedundantLoad(IRGlobalValueWithCode* func, IRLoad* load)
     {
         if (auto store = as<IRStore>(prev))
         {
-            if (store->getPtr() == load->getPtr()
-                && isMemoryScopeSubsetOf(memoryScopeOfLoad, getMemoryScopeOfLoadStore(store)))
+            if (store->getPtr() == load->getPtr() &&
+                isMemoryScopeSubsetOf(memoryScopeOfLoad, getMemoryScopeOfLoadStore(store)))
             {
                 auto value = store->getVal();
                 load->replaceUsesWith(value);
