@@ -18379,6 +18379,120 @@ static const uint HIT_KIND_TRIANGLE_FRONT_FACE = 254;
 static const uint HIT_KIND_TRIANGLE_BACK_FACE = 255;
 
 //
+// OptiX Multi-level Traversal Types and Intrinsics
+//
+
+/// Handle to an OptiX traversable object (acceleration structure, instance, etc.)
+/// @category raytracing
+typedef uint64_t OptixTraversableHandle;
+
+/// Enumeration of OptiX transform types used by multi-level traversal
+/// @category raytracing
+typedef uint OptixTransformType;
+
+/// No transformation applied
+static const uint OPTIX_TRANSFORM_TYPE_NONE = 0;
+/// Static matrix transformation
+static const uint OPTIX_TRANSFORM_TYPE_STATIC_TRANSFORM = 1;
+/// Matrix motion transformation  
+static const uint OPTIX_TRANSFORM_TYPE_MATRIX_MOTION_TRANSFORM = 2;
+/// SRT (scale/rotation/translation) motion transformation
+static const uint OPTIX_TRANSFORM_TYPE_SRT_MOTION_TRANSFORM = 3;
+/// Instance transformation
+static const uint OPTIX_TRANSFORM_TYPE_INSTANCE = 4;
+
+/// Returns the transform type of a traversable handle from a transform list.
+/// @param handle Traversable handle to query
+/// @return Transform type enumeration value
+/// @remarks Available in all OptiX program types
+/// @category raytracing
+[__readNone]
+[require(cuda)]
+OptixTransformType optixGetTransformTypeFromHandle(OptixTraversableHandle handle)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "optixGetTransformTypeFromHandle";
+    }
+}
+
+/// Returns an instance traversable from an IAS by index.
+/// @param ias Instance acceleration structure handle
+/// @param instIdx Instance index
+/// @return Traversable handle for the specified instance
+/// @remarks IAS must be built with OPTIX_BUILD_FLAG_ALLOW_RANDOM_INSTANCE_ACCESS
+/// @category raytracing
+[__readNone]
+[require(cuda)]
+OptixTraversableHandle optixGetInstanceTraversableFromIAS(OptixTraversableHandle ias, uint instIdx)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "optixGetInstanceTraversableFromIAS";
+    }
+}
+
+/// Returns the instance ID from an OptixInstance traversable.
+/// @param handle Traversable handle to query
+/// @return Instance ID, or 0 if handle does not reference an OptixInstance
+/// @remarks Available in all OptiX program types
+/// @category raytracing
+[__readNone]
+[require(cuda)]
+uint optixGetInstanceIdFromHandle(OptixTraversableHandle handle)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "optixGetInstanceIdFromHandle";
+    }
+}
+
+/// Returns the child traversable handle from an OptixInstance traversable.
+/// @param handle Instance traversable handle to query
+/// @return Child traversable handle, or 0 if handle does not reference an OptixInstance
+/// @remarks Available in all OptiX program types
+/// @category raytracing
+[__readNone]
+[require(cuda)]
+OptixTraversableHandle optixGetInstanceChildFromHandle(OptixTraversableHandle handle)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "optixGetInstanceChildFromHandle";
+    }
+}
+
+/// Returns the object-to-world transform from an OptixInstance traversable.
+/// @param handle Instance traversable handle to query
+/// @return Pointer to 3x4 transform matrix (12 floats), or 0 if handle does not reference an OptixInstance
+/// @remarks Available in all OptiX program types
+/// @category raytracing
+[__readNone]
+[require(cuda)]
+uint64_t optixGetInstanceTransformFromHandle(OptixTraversableHandle handle)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "optixGetInstanceTransformFromHandle";
+    }
+}
+
+/// Returns the world-to-object transform from an OptixInstance traversable.
+/// @param handle Instance traversable handle to query
+/// @return Pointer to 3x4 transform matrix (12 floats), or 0 if handle does not reference an OptixInstance
+/// @remarks Available in all OptiX program types
+/// @category raytracing
+[__readNone]
+[require(cuda)]
+uint64_t optixGetInstanceInverseTransformFromHandle(OptixTraversableHandle handle)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "optixGetInstanceInverseTransformFromHandle";
+    }
+}
+
+//
 // Shader Model 6.4
 // @public:
 //

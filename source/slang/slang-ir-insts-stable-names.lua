@@ -680,4 +680,10 @@ return {
 	["SymbolAlias"] = 676,
 	["Decoration.InParamProxyVar"] = 677,
 	["Attr.MemoryScope"] = 678,
+	["getOptiXTransformTypeFromHandle"] = 679,
+	["getOptiXInstanceTraversableFromIAS"] = 680,
+	["getOptiXInstanceIdFromHandle"] = 681,
+	["getOptiXInstanceChildFromHandle"] = 682,
+	["getOptiXInstanceTransformFromHandle"] = 683,
+	["getOptiXInstanceInverseTransformFromHandle"] = 684,
 }
