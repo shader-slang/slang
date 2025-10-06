@@ -677,4 +677,10 @@ return {
 	["Decoration.DisableCopyEliminationDecoration"] = 673,
 	["Decoration.TempCallArgImmutableVar"] = 674,
 	["CastResourceToDescriptorHandle"] = 675,
+	["getOptiXTransformTypeFromHandle"] = 676,
+	["getOptiXInstanceTraversableFromIAS"] = 677,
+	["getOptiXInstanceIdFromHandle"] = 678,
+	["getOptiXInstanceChildFromHandle"] = 679,
+	["getOptiXInstanceTransformFromHandle"] = 680,
+	["getOptiXInstanceInverseTransformFromHandle"] = 681,
 }
