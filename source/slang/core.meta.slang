@@ -1368,6 +1368,7 @@ struct Ptr<
 
         __intrinsic_op($(kIROp_GetOffsetPtr))
         [nonmutating]
+        [__NoSideEffect]
         ref;
     }
 };
@@ -1448,6 +1449,7 @@ void storeCoherent(Ptr<T, Access::ReadWrite, addrSpace> ptr, T value)
 ///
 [require(SPV_KHR_vulkan_memory_model)]
 [ForceInline]
+[__NoSideEffect]
 __generic<int alignment, MemoryScope scope, T, Access access, AddressSpace addrSpace> 
 T loadCoherent(Ptr<T, access, addrSpace> ptr)
 {
