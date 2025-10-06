@@ -152,10 +152,9 @@ struct DeferBufferLoadContext
     void deferBufferLoadInst(IRBuilder& builder, List<IRInst*>& workList, IRInst* loadInst)
     {
         bool failDueToAttributeFound = false;
-        for(auto attr : loadInst->getAllAttrs())
+        for (auto attr : loadInst->getAllAttrs())
         {
-            if(as<IRAlignedAttr>(attr)
-                || as<IRMemoryScopeAttr>(attr))
+            if (as<IRAlignedAttr>(attr) || as<IRMemoryScopeAttr>(attr))
             {
                 failDueToAttributeFound = true;
                 break;
