@@ -1163,7 +1163,8 @@ struct SpecializationContext
                     // top-down through the program, so that we want to process
                     // the children of an instruction in their original order.
                     //
-                    for (auto child = inst->getLastDecorationOrChild(); child; child = child->getPrevInst())
+                    for (auto child = inst->getLastDecorationOrChild(); child;
+                         child = child->getPrevInst())
                     {
                         // Also note that `addToWorkList` has been written
                         // to avoid adding any instruction that is a descendent
@@ -2064,8 +2065,7 @@ struct SpecializationContext
                 oldDebugFunc->getLine(),
                 oldDebugFunc->getCol(),
                 oldDebugFunc->getFile(),
-                newFuncType
-            );
+                newFuncType);
             debugFuncDecor->removeAndDeallocate();
             builder->addDecoration(newFunc, kIROp_DebugFuncDecoration, newDebugFunc);
         }
