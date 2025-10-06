@@ -18617,6 +18617,126 @@ static const uint HIT_KIND_TRIANGLE_FRONT_FACE = 254;
 static const uint HIT_KIND_TRIANGLE_BACK_FACE = 255;
 
 //
+// Multi-level Traversal Intrinsics
+//
+
+/// Type representing transform types in multi-level traversal.
+/// @category raytracing
+typedef uint TRAVERSABLE_TRANSFORM_TYPE;
+
+/// No transformation applied
+/// @category raytracing
+static const TRAVERSABLE_TRANSFORM_TYPE TRAVERSABLE_TRANSFORM_TYPE_NONE = 0;
+
+/// Static matrix transformation
+/// @category raytracing
+static const TRAVERSABLE_TRANSFORM_TYPE TRAVERSABLE_TRANSFORM_TYPE_STATIC = 1;
+
+/// Matrix motion transformation
+/// @category raytracing
+static const TRAVERSABLE_TRANSFORM_TYPE TRAVERSABLE_TRANSFORM_TYPE_MATRIX_MOTION = 2;
+
+/// SRT (scale/rotation/translation) motion transformation
+/// @category raytracing
+static const TRAVERSABLE_TRANSFORM_TYPE TRAVERSABLE_TRANSFORM_TYPE_SRT_MOTION = 3;
+
+/// Instance transformation
+/// @category raytracing
+static const TRAVERSABLE_TRANSFORM_TYPE TRAVERSABLE_TRANSFORM_TYPE_INSTANCE = 4;
+
+/// Returns the transform type of a traversable handle from a transform list.
+/// @param handle Traversable handle to query
+/// @return Transform type enumeration value
+/// @remarks Currently only supported on CUDA/OptiX
+/// @category raytracing
+[__readNone]
+[require(optix_multilevel_traversal)]
+TRAVERSABLE_TRANSFORM_TYPE GetTraversableTransformType(uint64_t handle)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "optixGetTransformTypeFromHandle";
+    }
+}
+
+/// Returns an instance traversable from an IAS by index.
+/// @param ias Instance acceleration structure handle
+/// @param instIdx Instance index
+/// @return Traversable handle for the specified instance
+/// @remarks IAS must be built with OPTIX_BUILD_FLAG_ALLOW_RANDOM_INSTANCE_ACCESS
+/// @remarks Currently only supported on CUDA/OptiX
+/// @category raytracing
+[__readNone]
+[require(optix_multilevel_traversal)]
+uint64_t GetInstanceTraversable(uint64_t ias, uint instIdx)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "optixGetInstanceTraversableFromIAS";
+    }
+}
+
+/// Returns the instance ID from a traversable handle.
+/// @param handle Traversable handle to query
+/// @return Instance ID, or 0 if handle does not reference an instance
+/// @remarks Currently only supported on CUDA/OptiX
+/// @category raytracing
+[__readNone]
+[require(optix_multilevel_traversal)]
+uint GetTraversableInstanceId(uint64_t handle)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "optixGetInstanceIdFromHandle";
+    }
+}
+
+/// Returns the child traversable handle from an instance traversable.
+/// @param handle Instance traversable handle to query
+/// @return Child traversable handle, or 0 if handle does not reference an instance
+/// @remarks Currently only supported on CUDA/OptiX
+/// @category raytracing
+[__readNone]
+[require(optix_multilevel_traversal)]
+uint64_t GetTraversableChild(uint64_t handle)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "optixGetInstanceChildFromHandle";
+    }
+}
+
+/// Returns the object-to-world transform from an instance traversable.
+/// @param handle Instance traversable handle to query
+/// @return Pointer to 3x4 transform matrix (12 floats), or 0 if handle does not reference an instance
+/// @remarks Currently only supported on CUDA/OptiX
+/// @category raytracing
+[__readNone]
+[require(optix_multilevel_traversal)]
+uint64_t GetTraversableObjectToWorld(uint64_t handle)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "_slang_optixGetInstanceTransformFromHandle";
+    }
+}
+
+/// Returns the world-to-object transform from an instance traversable.
+/// @param handle Instance traversable handle to query
+/// @return Pointer to 3x4 transform matrix (12 floats), or 0 if handle does not reference an instance
+/// @remarks Currently only supported on CUDA/OptiX
+/// @category raytracing
+[__readNone]
+[require(optix_multilevel_traversal)]
+uint64_t GetTraversableWorldToObject(uint64_t handle)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "_slang_optixGetInstanceInverseTransformFromHandle";
+    }
+}
+
+//
 // Shader Model 6.4
 // @public:
 //
