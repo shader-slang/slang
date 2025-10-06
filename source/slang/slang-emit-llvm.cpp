@@ -431,6 +431,11 @@ public:
 #endif
             llvmType = builder->getInt64Ty();
             break;
+
+        case kIROp_RateQualifiedType:
+            llvmType = getValueType(as<IRRateQualifiedType>(type)->getValueType());
+            break;
+
         case kIROp_PtrType:
         case kIROp_NativePtrType:
         case kIROp_NativeStringType:
@@ -559,6 +564,15 @@ public:
                 llvmTypeInfo.trailingPadding = (alignedCount - elemCount) * elementAlignment.size;
             }
             else llvmTypeInfo = getValueType(type);
+            break;
+
+        case kIROp_RateQualifiedType:
+            {
+                auto rqt = as<IRRateQualifiedType>(type);
+                auto valType = rqt->getValueType();
+                llvmTypeInfo.padded = getStorageType(valType, rules, true);
+                llvmTypeInfo.unpadded = getStorageType(valType, rules, false);
+            }
             break;
 
         default:
@@ -3728,7 +3742,6 @@ struct LLVMEmitter
         llvmBuilder->SetCurrentDebugLocation(llvm::DebugLoc());
         auto numThreadsDecor = entryPoint->findDecoration<IRNumThreadsDecoration>();
         SLANG_ASSERT(numThreadsDecor);
-        entryPointDecor->getName();
 
         llvm::Type* uintType = llvmBuilder->getInt32Ty();
 
