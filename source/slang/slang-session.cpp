@@ -27,30 +27,18 @@ static String findNeuralModulePath()
     if (libslangPath.getLength() == 0)
         return String();
 
-    // Get the directory containing libslang.so
+    // Get the directory containing libslang.so/slang.dll
     String libslangDir = Path::getParentDirectory(libslangPath);
     if (libslangDir.getLength() == 0)
         return String();
 
-    // Look for neural module directory in the same directory as libslang.so
+    // The neural module is always in the same directory as libslang.so/slang.dll
+    // e.g., bin/slang-neural-module/ on Windows, lib/slang-neural-module/ on Linux/Mac
     String neuralModuleDir = Path::combine(libslangDir, SLANG_NEURAL_MODULE_DIR_NAME);
-
-    // Check if the neural module file exists
     String neuralModulePath = Path::combine(neuralModuleDir, SLANG_NEURAL_MODULE_FILE_NAME);
+
     if (File::exists(neuralModulePath))
         return neuralModulePath;
-
-    // If not found in lib directory, try looking in the parent directory
-    // This handles the case where libslang.so is in lib/ and neural module is in
-    // lib/slang-neural-module/
-    String parentDir = Path::getParentDirectory(libslangDir);
-    if (parentDir.getLength() > 0)
-    {
-        neuralModuleDir = Path::combine(parentDir, SLANG_NEURAL_MODULE_DIR_NAME);
-        neuralModulePath = Path::combine(neuralModuleDir, SLANG_NEURAL_MODULE_FILE_NAME);
-        if (File::exists(neuralModulePath))
-            return neuralModulePath;
-    }
 
     return String();
 }

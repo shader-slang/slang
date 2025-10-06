@@ -1,61 +1,166 @@
 implementing neural;
 
-// Storage interfaces
+/**
+Storage interface for accessing neural network parameters.
+Provides an abstraction for reading/writing parameters from various storage backends
+(GPU buffers, shared memory, etc.). Supports automatic differentiation for gradient accumulation.
+@param T The element type (must be a floating-point type).
+@remarks Type constraints:
+- `T` must conform to `__BuiltinFloatingPointType` (float, double, half, etc.)
+- `T.Differential` must conform to `__BuiltinFloatingPointType` for automatic differentiation
+@see `StructuredBufferStorage`, `BindlessBufferStorage`
+@category neural
+*/
 public interface IStorage<T> : IDifferentiablePtrType
     where T : __BuiltinFloatingPointType
     where T.Differential : __BuiltinFloatingPointType
 {
+    /**
+    Address type for this storage backend.
+    @remarks Different storage types may use different addressing schemes (indices, pointers, etc.).
+    */
     public associatedtype Address;
 
+    /**
+    Reads a value from storage.
+    @param[in] address The address to read from.
+    @return The value at the specified address.
+    */
     public T read(Address address);
+
+    /**
+    Atomically adds a value to storage (for gradient accumulation).
+    @param[in] address The address to add to.
+    @param[in] value The value to add.
+    */
     public void atomicAdd(Address address, T value);
+
+    /**
+    Writes a value to storage.
+    @param[in] address The address to write to.
+    @param[in] value The value to write.
+    */
     public void write(Address address, T value);
 
+    /**
+    Computes an offset address.
+    @param[in] base The base address.
+    @param[in] elements Number of elements to offset by.
+    @return The offset address.
+    */
     public static Address getOffset(Address base, int elements);
 }
 
+/**
+Interface for pointer-like addressing with direct subscript access.
+Provides array-like access patterns for storage backends that support pointer arithmetic.
+@param T The element type.
+@see `BindlessBufferStorage.BindlessAddress`
+@category neural
+*/
 public interface IPointerLikeAddress<T> : IDifferentiablePtrType
 {
+    /**
+    Array-style element access.
+    @param[in] index The element index.
+    @return Reference to the element at the given index.
+    */
     public __subscript(uint index) -> T { get; set; }
+
+    /**
+    Computes an offset pointer.
+    @param[in] elements Number of elements to offset by.
+    @return The offset pointer.
+    */
     public This getOffset(int elements);
+
+    /**
+    Atomically adds a value at an index.
+    @param[in] index The element index.
+    @param[in] value The value to add.
+    */
     public void atomicAdd(uint index, T value);
 }
 
+/**
+GPU structured buffer storage implementation.
+Implements IStorage using GPU structured buffers (RWStructuredBuffer).
+Supports offset-based addressing and atomic operations for gradient accumulation.
+@param T The element type (must be a floating-point type).
+@remarks Type constraints:
+- `T` must conform to `__BuiltinFloatingPointType` (float, double, half, etc.)
+- `T.Differential` must conform to `__BuiltinFloatingPointType` for automatic differentiation
+@category neural
+*/
 public struct StructuredBufferStorage<T> : IStorage<T>
     where T : __BuiltinFloatingPointType
     where T.Differential : __BuiltinFloatingPointType
 {
+    /// Address type is a simple unsigned integer index.
     public typealias Address = uint;
+
+    /// The underlying buffer type.
     public typealias BufferType = RWStructuredBuffer<T>;
+
+    /// Differential type for automatic differentiation.
     public typealias Differential = StructuredBufferStorage<T.Differential>;
 
+    /// The underlying GPU buffer.
     public BufferType m_buffer;
 
-    // This the the start index of the storage object in the buffer, by default it's always 0.
-    // The Storage object is instantiated at a specific index in the buffer, this address is the base address.
+    /**
+    Base address offset within the buffer.
+    @remarks Allows multiple storage instances to share the same buffer at different offsets.
+    Default is 0 (start of buffer).
+    */
     public Address m_baseAddress = 0U;
 
+    /**
+    Constructor.
+    @param[in] buffer The underlying structured buffer.
+    @param[in] baseAddress Optional base address offset (default: 0).
+    */
     public __init(BufferType buffer, Address baseAddress = 0U)
     {
         this.m_buffer = buffer;
         this.m_baseAddress = baseAddress;
     }
 
+    /**
+    Reads a value from the buffer.
+    @param[in] address The address relative to base address.
+    @return The value at the specified address.
+    */
     public T read(Address address)
     {
         return m_buffer[address + m_baseAddress];
     }
 
+    /**
+    Atomically adds a value (for gradient accumulation).
+    @param[in] address The address relative to base address.
+    @param[in] value The value to add.
+    */
     public void atomicAdd(Address address, T value)
     {
         __atomic_add(m_buffer[address + m_baseAddress], value);
     }
 
+    /**
+    Writes a value to the buffer.
+    @param[in] address The address relative to base address.
+    @param[in] value The value to write.
+    */
     public void write(Address address, T value)
     {
         m_buffer[address + m_baseAddress] = value;
     }
 
+    /**
+    Gets a buffer reference from an address (for advanced use cases).
+    @param[in] address The address to get buffer from.
+    @return A buffer reference starting at the specified address.
+    */
     // [require(cpp_cuda_metal_spirv)]
     public BufferType getBufferFromAddress(Address address)
     {
@@ -63,6 +168,12 @@ public struct StructuredBufferStorage<T> : IStorage<T>
         return bit_cast<BufferType>(ptr);
     }
 
+    /**
+    Computes an offset address.
+    @param[in] base The base address.
+    @param[in] elements Number of elements to offset by.
+    @return The offset address.
+    */
     public static Address getOffset(Address base, int elements)
     {
         return base + elements;
@@ -73,10 +184,24 @@ public struct StructuredBufferStorage<T> : IStorage<T>
 // Bindless buffer storage //
 /////////////////////////////
 
+/**
+Bindless buffer storage implementation using buffer handles.
+Provides pointer-like addressing through buffer handles, enabling more flexible
+memory access patterns suitable for dynamic or sparse data structures.
+@param T The element type (must be a floating-point type).
+@remarks Type constraints:
+- `T` must conform to `__BuiltinFloatingPointType` (float, double, half, etc.)
+- `T.Differential` must conform to `__BuiltinFloatingPointType` for automatic differentiation
+@category neural
+*/
 public struct BindlessBufferStorage<T> : IStorage<T>
     where T : __BuiltinFloatingPointType
     where T.Differential : __BuiltinFloatingPointType
 {
+    /**
+    Bindless address type with pointer-like semantics.
+    Wraps a buffer handle and base index to provide array-like access.
+    */
     public struct BindlessAddress : IPointerLikeAddress<T>
     {
         public typealias Differential =
