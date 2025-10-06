@@ -1,13 +1,35 @@
+/**
+Neural network primitives for Slang.
+This module provides differentiable data structures and operations for implementing
+neural networks in Slang shaders. It includes vector types, storage abstractions, and
+automatic differentiation support for training neural networks on the GPU.
+
+@remarks EXPERIMENTAL: This module is under active design and may change significantly
+or be removed in future versions. DO NOT USE IN PRODUCTION.
+
+@category neural
+
+Features:
+- Differentiable vector types (IVector, InlineVector)
+- Storage abstractions for GPU buffers (IStorage, StructuredBufferStorage)
+- Automatic differentiation support
+- Linear transformations with optional bias
+- Atomic operations for gradient accumulation
+
+Example Usage:
+```
+// Create an input vector
+InlineVector<float, 4> input = InlineVector<float, 4>({1.0, 2.0, 3.0, 4.0});
+
+// Set up storage for weights
+StructuredBufferStorage<float> storage = StructuredBufferStorage<float>(weightsBuffer);
+
+// Perform linear transformation: output = W * input
+InlineVector<float, 2> output = input.eval<2, false>(storage, 0);
+```
+*/
+
 module neural;
 
-// __include activations;
-// __include cooperative_vector;
-// __include encoders;
 __include "inline-vector";
-// __include interfaces;
-// __include lattice;
-// __include layers;
-// __include losses;
-// __include optimizers;
 __include "storages";
-// __include vector_ops;

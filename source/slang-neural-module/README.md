@@ -12,11 +12,13 @@ The following CMake variables control the neural module configuration:
 
 - `SLANG_NEURAL_MODULE_DIR_NAME` (default: "slang-neural-module")
   - The directory name for the neural module relative to libslang location
-  
+
 - `SLANG_NEURAL_MODULE_FILE_NAME` (default: "neural.slang-module") 
   - The file name for the compiled neural module
-  
-- `SLANG_NEURAL_MODULE_INSTALL_DIR` (default: "lib/slang-neural-module")
+
+- `SLANG_NEURAL_MODULE_INSTALL_DIR`
+  - **Windows**: `bin/slang-neural-module` (installed next to slang.dll)
+  - **Linux/Mac**: `lib/slang-neural-module` (installed next to libslang.so/libslang.dylib)
   - The installation directory for the neural module in release packages
 
 ## Files Involved
@@ -50,5 +52,12 @@ To change the neural module paths:
 2. The slang library includes the header directory privately (not exposed in public API)
 3. C++ code includes `slang-neural-config.h` and uses the constants internally
 4. Neural module CMakeLists.txt uses the same variables for consistent paths
+5. Neural module is placed in the same directory as libslang.so/slang.dll:
+   - **Build - Windows**: `build/Debug/bin/slang-neural-module/`
+   - **Build - Linux/Mac**: `build/Debug/lib/slang-neural-module/`
+   - **Install - Windows**: `<prefix>/bin/slang-neural-module/`
+   - **Install - Linux/Mac**: `<prefix>/lib/slang-neural-module/`
 
 This ensures that both the C++ runtime search logic and the CMake build logic use exactly the same path configuration, while keeping the implementation details internal to the slang library.
+
+The neural module is automatically co-located with the slang library for easy discovery at runtime.
