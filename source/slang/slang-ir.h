@@ -995,6 +995,13 @@ struct IRStringTypeBase : IRType
     FIDDLE(baseInst())
 };
 
+FIDDLE()
+struct IRShortStringType : IRStringTypeBase
+{
+    FIDDLE(leafInst())
+
+    IRInst* getLength() { return (IRInst*)getOperand(0); }
+};
 
 // True if types are equal
 // Note compares nominal types by name alone
@@ -2426,7 +2433,7 @@ public:
     // anything to do with serialization format
     //
     const static UInt k_minSupportedModuleVersion = 1;
-    const static UInt k_maxSupportedModuleVersion = 1;
+    const static UInt k_maxSupportedModuleVersion = 2;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
 private:
