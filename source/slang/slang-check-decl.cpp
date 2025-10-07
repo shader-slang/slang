@@ -614,7 +614,6 @@ private:
         Decl* member,
         Expr* rightHandSideExpr);
     Expr* createCtorParamExpr(ConstructorDecl* ctor, Index paramIndex);
-    void maybeInsertDefaultInitExpr(StructDecl* structDecl);
 };
 
 template<typename VisitorType>
@@ -9918,51 +9917,6 @@ void SemanticsDeclBodyVisitor::synthesizeCtorBodyForMemberVar(
     seqStmtChild->stmts.add(stmt);
 }
 
-// This function inserts the default initialization expression for every member who
-// has init expression at beginning of the user-defined ctor. We don't need to do this
-// for synthesized ctor, because synthesized ctor already handle this at the function
-// parameters
-void SemanticsDeclBodyVisitor::maybeInsertDefaultInitExpr(StructDecl* structDecl)
-{
-    // If there is no explicit constructor, we don't need to do anything.
-    if (!_hasExplicitConstructor(structDecl, false))
-        return;
-
-    // traverse all the constructors and insert the default initialization expressions.
-    for (auto ctor : structDecl->getMembersOfType<ConstructorDecl>())
-    {
-        ThisExpr* thisExpr = m_astBuilder->create<ThisExpr>();
-        thisExpr->scope = ctor->ownedScope;
-        thisExpr->type = ctor->returnType.type;
-        auto seqStmtChild = m_astBuilder->create<SeqStmt>();
-
-        for (auto varDeclBase : structDecl->getDirectMemberDeclsOfType<VarDeclBase>())
-        {
-            if (varDeclBase->hasModifier<HLSLStaticModifier>() ||
-                varDeclBase->getName() == nullptr || varDeclBase->initExpr == nullptr)
-                continue;
-
-            auto assign = createMemberAssignmentExpr(
-                thisExpr,
-                ctor->ownedScope,
-                varDeclBase,
-                varDeclBase->initExpr);
-            if (!assign)
-                continue;
-
-            auto stmt = m_astBuilder->create<ExpressionStmt>();
-            stmt->expression = assign;
-            stmt->loc = varDeclBase->loc;
-            seqStmtChild->stmts.add(stmt);
-        }
-        if (seqStmtChild->stmts.getCount() != 0)
-        {
-            auto seqStmt = _ensureCtorBodyIsSeqStmt(m_astBuilder, ctor);
-            seqStmt->stmts.insert(0, seqStmtChild);
-        }
-    }
-}
-
 void SemanticsDeclBodyVisitor::synthesizeCtorBody(
     DeclAndCtorInfo& structDeclInfo,
     List<DeclAndCtorInfo>& inheritanceDefaultCtorList,
@@ -10063,7 +10017,6 @@ void SemanticsDeclBodyVisitor::visitAggTypeDecl(AggTypeDecl* aggTypeDecl)
     }
 
     synthesizeCtorBody(structDeclInfo, inheritanceDefaultCtorList, structDecl);
-    maybeInsertDefaultInitExpr(structDecl);
 
     if (structDeclInfo.defaultCtor)
     {
