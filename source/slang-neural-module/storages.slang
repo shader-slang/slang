@@ -33,6 +33,7 @@ public interface IStorage<T> : IDifferentiablePtrType
     @param[in] address The address to add to.
     @param[in] value The value to add.
     */
+    [require(cuda_glsl_hlsl_metal_spirv, sm_6_6)]
     public void atomicAdd(Address address, T value);
 
     /**
@@ -141,9 +142,39 @@ public struct StructuredBufferStorage<T> : IStorage<T>
     @param[in] address The address relative to base address.
     @param[in] value The value to add.
     */
+    [require(cuda_glsl_hlsl_metal_spirv, sm_6_6)]
     public void atomicAdd(Address address, T value)
     {
-        __atomic_add(m_buffer[address + m_baseAddress], value);
+        __target_switch
+        {
+        case hlsl: atomicAddForHLSL(address, value);
+        default: __atomic_add(m_buffer[address + m_baseAddress], value);
+        }
+    }
+
+    /**
+    Atomic add implementation for HLSL using InterlockedCompareExchangeFloatBitwise.
+    Uses compare-and-swap loop to atomically add floating-point values.
+    @param[in] address The address relative to base address.
+    @param[in] value The value to add.
+    @remarks This method uses a compare-and-swap loop which may have performance
+    implications under high contention. Only required for HLSL targets.
+    Requires Shader Model 6.6 or higher for `InterlockedCompareExchangeFloatBitwise` support.
+    */
+    [require(hlsl, sm_6_6)]
+    internal void atomicAddForHLSL(Address address, T value)
+    {
+        T compareValue;
+        uint bufferIndex = address + m_baseAddress;
+
+        // Compare-and-swap loop
+        bool success = false;
+        do
+        {
+            compareValue = m_buffer[bufferIndex];
+            T newValue = compareValue + value;
+            success = __atomic_compare_exchange(m_buffer[bufferIndex], compareValue, newValue) == compareValue;
+        } while (!success);
     }
 
     /**
