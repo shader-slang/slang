@@ -10704,13 +10704,13 @@ void SemanticsDeclHeaderVisitor::checkInterfaceRequirement(Decl* decl)
 
 bool doesTypeHaveNoDiffModifier(Type* type)
 {
-      if (auto modifiedType = as<ModifiedType>(type))
-      {
-           if (modifiedType->findModifier<NoDiffModifierVal>() != nullptr)
-               return true;
-           return doesTypeHaveNoDiffModifier(modifiedType->getBase());
-      }
-      return false;
+    if (auto modifiedType = as<ModifiedType>(type))
+    {
+        if (modifiedType->findModifier<NoDiffModifierVal>() != nullptr)
+            return true;
+        return doesTypeHaveNoDiffModifier(modifiedType->getBase());
+    }
+    return false;
 }
 
 void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
@@ -10731,7 +10731,8 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
     }
     decl->errorType = errorType;
 
-    if (doesTypeHaveNoDiffModifier(decl->returnType.type)) {
+    if (doesTypeHaveNoDiffModifier(decl->returnType.type))
+    {
         auto noDiffMod = m_astBuilder->create<NoDiffModifier>();
         noDiffMod->loc = decl->loc;
         addModifier(decl, noDiffMod);
