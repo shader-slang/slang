@@ -3394,6 +3394,11 @@ IRInst* IRBuilder::emitOutImplicitCast(IRInst* type, IRInst* value)
 {
     return emitIntrinsicInst((IRType*)type, kIROp_OutImplicitCast, 1, &value);
 }
+IRInst* IRBuilder::emitSymbolAlias(IRInst* aliasedSymbol)
+{
+    return emitIntrinsicInst(aliasedSymbol->getFullType(), kIROp_SymbolAlias, 1, &aliasedSymbol);
+}
+
 IRInst* IRBuilder::emitDebugSource(
     UnownedStringSlice fileName,
     UnownedStringSlice source,

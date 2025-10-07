@@ -5504,7 +5504,7 @@ Decl* Parser::ParseStruct()
             parseOptionalInheritanceClause(this, rs);
             if (AdvanceIf(this, TokenType::OpAssign))
             {
-                rs->wrappedType = ParseTypeExp();
+                rs->aliasedType = ParseTypeExp();
                 PushScope(rs);
                 PopScope();
                 if (!LookAheadToken(TokenType::Semicolon))
