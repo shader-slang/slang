@@ -6,4 +6,6 @@ namespace Slang
 {
 // Main entry point for the pass
 bool specializeDynamicInsts(IRModule* module, DiagnosticSink* sink);
+
+bool isDynamicGeneric(IRInst* callee);
 } // namespace Slang

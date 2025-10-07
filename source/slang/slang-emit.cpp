@@ -1143,8 +1143,9 @@ Result linkAndOptimizeIR(
         SLANG_RETURN_ON_FAIL(performTypeInlining(irModule, sink));
     }
 
+    // Tagged union type lowering typically generates more reinterpret instructions.
     if (lowerTaggedUnionTypes(irModule, sink))
-        requiredLoweringPassSet.reinterpret = true; // TODO: Is this the right way to handle this?
+        requiredLoweringPassSet.reinterpret = true;
 
     lowerTagInsts(irModule, sink);
     lowerTypeCollections(irModule, sink);

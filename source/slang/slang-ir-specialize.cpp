@@ -272,7 +272,7 @@ struct SpecializationContext
     // using the simple key type defined as part of the IR cloning infrastructure.
     //
     typedef IRSimpleSpecializationKey Key;
-    Dictionary<Key, IRInst*> genericSpecializations;
+    Dictionary<Key, IRSpecializationDictionaryItem*> genericSpecializations;
 
 
     // Now let's look at the task of finding or generation a
@@ -329,9 +329,14 @@ struct SpecializationContext
             // existing specialization that has been registered.
             // If one is found, our work is done.
             //
-            IRInst* specializedVal = nullptr;
-            if (genericSpecializations.tryGetValue(key, specializedVal))
-                return specializedVal;
+            IRSpecializationDictionaryItem* specializationEntry = nullptr;
+            if (genericSpecializations.tryGetValue(key, specializationEntry))
+            {
+                if (specializationEntry->getOperand(0)->getOp() != kIROp_Undefined)
+                    return specializationEntry->getOperand(0);
+                else
+                    genericSpecializations.remove(key);
+            }
         }
 
         // If no existing specialization is found, we need
@@ -357,8 +362,12 @@ struct SpecializationContext
         // specializations so that we don't instantiate
         // this generic again for the same arguments.
         //
-        genericSpecializations.add(key, specializedVal);
-        addEntryToIRDictionary(kIROp_GenericSpecializationDictionary, key.vals, specializedVal);
+        genericSpecializations.add(
+            key,
+            addEntryToIRDictionary(
+                kIROp_GenericSpecializationDictionary,
+                key.vals,
+                specializedVal));
 
         return specializedVal;
     }
@@ -1039,10 +1048,7 @@ struct SpecializationContext
                     dict.remove(key);
                 continue;
             }
-            auto value = as<typename std::remove_pointer<typename TDict::ValueType>::type>(
-                item->getOperand(0));
-            SLANG_ASSERT(value);
-            dict[key] = value;
+            dict[key] = item;
         }
 
         // Clean up the IR dictionary
@@ -1085,7 +1091,10 @@ struct SpecializationContext
         return dictInst;
     }
 
-    void addEntryToIRDictionary(IROp dictOp, const List<IRInst*>& key, IRInst* val)
+    IRSpecializationDictionaryItem* addEntryToIRDictionary(
+        IROp dictOp,
+        const List<IRInst*>& key,
+        IRInst* val)
     {
         auto dictInst = getOrCreateIRDictionary(dictOp);
         List<IRInst*> args;
@@ -1093,11 +1102,11 @@ struct SpecializationContext
         args.addRange(key);
         IRBuilder builder(module);
         builder.setInsertInto(dictInst);
-        builder.emitIntrinsicInst(
+        return cast<IRSpecializationDictionaryItem>(builder.emitIntrinsicInst(
             nullptr,
             kIROp_SpecializationDictionaryItem,
             (UInt)args.getCount(),
-            args.getBuffer());
+            args.getBuffer()));
     }
 
     // All of the machinery for generic specialization
@@ -1216,7 +1225,7 @@ struct SpecializationContext
                 applySparseConditionalConstantPropagationForGlobalScope(this->module, this->sink);
 
                 // Sync our local dictionary with the one in the IR.
-                readSpecializationDictionaries();
+                // readSpecializationDictionaries();
             }
 
             // Once the work list has gone dry, we should have the invariant
@@ -1237,7 +1246,7 @@ struct SpecializationContext
                     eliminateDeadCode(module->getModuleInst());
 
                     // Sync our local dictionary with the one in the IR.
-                    readSpecializationDictionaries();
+                    // readSpecializationDictionaries();
                 }
             }
 
@@ -1560,18 +1569,32 @@ struct SpecializationContext
         // Once we've constructed our key, we can try to look for an
         // existing specialization of the callee that we can use.
         //
+        IRSpecializationDictionaryItem* specializedCalleeEntry = nullptr;
         IRFunc* specializedCallee = nullptr;
-        if (!existentialSpecializedFuncs.tryGetValue(key, specializedCallee))
+        if (existentialSpecializedFuncs.tryGetValue(key, specializedCalleeEntry))
+        {
+            if (specializedCalleeEntry->getOperand(0)->getOp() != kIROp_Undefined)
+            {
+                specializedCallee = cast<IRFunc>(specializedCalleeEntry->getOperand(0));
+            }
+            else
+            {
+                existentialSpecializedFuncs.remove(key);
+            }
+        }
+
+        if (!specializedCallee)
         {
             // If we didn't find a specialized callee already made, then we
             // will go ahead and create one, and then register it in our cache.
             //
             specializedCallee = createExistentialSpecializedFunc(inst, calleeFunc);
-            existentialSpecializedFuncs.add(key, specializedCallee);
-            addEntryToIRDictionary(
-                kIROp_ExistentialFuncSpecializationDictionary,
-                key.vals,
-                specializedCallee);
+            existentialSpecializedFuncs.add(
+                key,
+                addEntryToIRDictionary(
+                    kIROp_ExistentialFuncSpecializationDictionary,
+                    key.vals,
+                    specializedCallee));
         }
 
         // At this point we have found or generated a specialized version
@@ -1795,7 +1818,8 @@ struct SpecializationContext
     // In order to cache and re-use functions that have had existential-type
     // parameters specialized, we need storage for the cache.
     //
-    Dictionary<IRSimpleSpecializationKey, IRFunc*> existentialSpecializedFuncs;
+    Dictionary<IRSimpleSpecializationKey, IRSpecializationDictionaryItem*>
+        existentialSpecializedFuncs;
 
     // The logic for creating a specialized callee function by plugging
     // in concrete types for existentials is similar to other cases of
@@ -2600,7 +2624,8 @@ struct SpecializationContext
         }
     }
 
-    Dictionary<IRSimpleSpecializationKey, IRStructType*> existentialSpecializedStructs;
+    Dictionary<IRSimpleSpecializationKey, IRSpecializationDictionaryItem*>
+        existentialSpecializedStructs;
 
     bool maybeSpecializeBindExistentialsType(IRBindExistentialsType* type)
     {
@@ -2694,10 +2719,23 @@ struct SpecializationContext
                 key.vals.add(type->getExistentialArg(ii));
             }
 
-            IRStructType* newStructType = nullptr;
+            IRSpecializationDictionaryItem* newStructTypeEntry = nullptr;
             addUsersToWorkList(type);
 
-            if (!existentialSpecializedStructs.tryGetValue(key, newStructType))
+            IRStructType* newStructType = nullptr;
+            if (existentialSpecializedStructs.tryGetValue(key, newStructTypeEntry))
+            {
+                if (newStructTypeEntry->getOperand(0)->getOp() != kIROp_Undefined)
+                {
+                    newStructType = cast<IRStructType>(newStructTypeEntry->getOperand(0));
+                }
+                else
+                {
+                    existentialSpecializedStructs.remove(key);
+                }
+            }
+
+            if (!newStructType)
             {
                 builder.setInsertBefore(baseStructType);
                 newStructType = builder.createStructType();
@@ -2725,11 +2763,12 @@ struct SpecializationContext
                     builder.createStructField(newStructType, oldField->getKey(), newFieldType);
                 }
 
-                existentialSpecializedStructs.add(key, newStructType);
-                addEntryToIRDictionary(
-                    kIROp_ExistentialTypeSpecializationDictionary,
-                    key.vals,
-                    newStructType);
+                existentialSpecializedStructs.add(
+                    key,
+                    addEntryToIRDictionary(
+                        kIROp_ExistentialTypeSpecializationDictionary,
+                        key.vals,
+                        newStructType));
             }
 
             type->replaceUsesWith(newStructType);

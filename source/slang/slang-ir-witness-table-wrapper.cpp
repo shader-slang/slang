@@ -275,7 +275,7 @@ IRInst* maybeUnpackArg(
         if (as<IRPtrTypeBase>(paramType))
         {
             auto tempVar = builder->emitVar(paramValType);
-            if (as<IRInOutType>(paramType))
+            if (as<IRBorrowInOutParamType>(paramType))
                 builder->emitStore(
                     tempVar,
                     builder->emitUnpackAnyValue(paramValType, builder->emitLoad(arg)));
@@ -302,7 +302,7 @@ IRInst* maybeUnpackArg(
     {
         // if parameter expects an `out` pointer, store the unpacked val into a
         // variable and pass in a pointer to that variable.
-        if (as<IROutType>(paramType))
+        if (as<IROutParamType>(paramType))
         {
             auto tempVar = builder->emitVar(paramValType);
 

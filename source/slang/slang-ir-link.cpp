@@ -806,6 +806,18 @@ IRStructType* cloneStructTypeImpl(
     return clonedStruct;
 }
 
+IREnumType* cloneEnumTypeImpl(
+    IRSpecContextBase* context,
+    IRBuilder* builder,
+    IREnumType* originalEnum,
+    IROriginalValuesForClone const& originalValues)
+{
+    auto clonedEnum =
+        builder->createEnumType(cloneType(context, (IRType*)originalEnum->getOperand(0)));
+    cloneSimpleGlobalValueImpl(context, originalEnum, originalValues, clonedEnum);
+    return clonedEnum;
+}
+
 
 IRInterfaceType* cloneInterfaceTypeImpl(
     IRSpecContextBase* context,
@@ -1388,6 +1400,9 @@ IRInst* cloneInst(
             builder,
             cast<IRStructType>(originalInst),
             originalValues);
+
+    case kIROp_EnumType:
+        return cloneEnumTypeImpl(context, builder, cast<IREnumType>(originalInst), originalValues);
 
     case kIROp_InterfaceType:
         return cloneInterfaceTypeImpl(
@@ -2400,6 +2415,10 @@ struct IRPrelinkContext : IRSpecContext
             break;
         case kIROp_ClassType:
             clonedInst = builderForClone->createClassType();
+            break;
+        case kIROp_EnumType:
+            clonedInst = builderForClone->createEnumType(
+                cloneType(this, (IRType*)cast<IREnumType>(originalVal)->getOperand(0)));
             break;
         default:
             return completeClonedInst(IRSpecContext::maybeCloneValue(originalVal));

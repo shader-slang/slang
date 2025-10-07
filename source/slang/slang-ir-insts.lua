@@ -2187,21 +2187,77 @@ local insts = {
 		},
 	},
 	{
-		-- A collection of IR instructions used for propagation analysis
-		-- The operands are the elements of the set, sorted by unique ID to ensure canonical ordering
 		TypeFlowData = {
+			-- A collection of IR instructions used for propagation analysis.
 			hoistable = true,
 			{
 				CollectionBase = {
+					-- Base class for all collection types.
+					--
+					-- Semantically, collections model sets of concrete values, and use Slang's de-duplication infrastructure
+					-- to allow set-equality to be the same as inst identity.
+					--
+					-- - Collection ops have one or more operands that represent the elements of the collection
+					--
+					-- - Collection ops must have at least one operand. A zero-operand collection is illegal.
+					--   The type-flow pass will represent this case using nullptr, so that uniqueness is preserved.
+					--
+					-- - All operands of a collection _must_ be concrete, individual insts 
+					--      - Operands should NOT be an interface or abstract type.
+					--      - Operands should NOT be type parameters or existentail types (i.e. insts that appear in blocks)
+					--      - Operands should NOT be collections (i.e. collections should be flat and never heirarchical)
+					-- 
+					-- - Since collections are hositable, collection ops should (consequently) only appear in the global scope.
+					--
+					-- - Collection operands must be consistently sorted. i.e. a TypeCollection(A, B) and TypeCollection(B, A)
+					--   cannot exist at the same time, but either one is okay.
+					--
+					-- - To help with the implementation of collections, the CollectionBuilder class is provided
+					--   in slang-ir-typeflow-collection.h.
+					--   All collection insts must be built using the CollectionBuilder, which uses a persistent map on the module
+					--   inst to ensure stable ordering.
+					--
 					{ TypeCollection = {} },
 					{ FuncCollection = {} },
 					{ TableCollection = {} },
 					{ GenericCollection = {} },
 				},
 			},
-			{ UnboundedCollection = {} },
-			{ CollectionTagType = {} }, -- Operand is TypeCollection/FuncCollection/TableCollection (funcs/tables)
-			{ CollectionTaggedUnionType = {}} -- Operand is TypeCollection, TableCollection for existential
+			{ UnboundedCollection = {
+				--
+				-- A catch-all opcode to represent unbounded collections during
+				-- the type-flow specialization pass.
+				-- 
+				-- This op is usually used to mark insts that can contain a dynamic type
+				-- whose information cannot be gleaned from the type-flow analysis.
+				--
+				-- E.g. COM interface objects, whose implementations can be fully external to
+				-- the linkage
+				-- 
+				-- This op is only used to denote that an inst is unbounded so the specialization
+				-- pass does not attempt to specialize it. It should not appear in the code after
+				-- the specialization pass.
+				--
+			} },
+			{ CollectionTagType = {
+				-- Represents a tag-type for a collection.
+				--
+				-- An inst whose type is CollectionTagType(collection) is semantically carrying a run-time value that points to
+				-- one of the elements of the collection operand.
+				--
+				-- Only operand is a CollectionBase
+			} }, 
+			{ CollectionTaggedUnionType = {
+				-- Represents a tagged union type.
+				--
+				-- An inst whose type is a CollectionTaggedUnionType(typeCollection, tableCollection) is semantically carrying a tuple of 
+				-- two values: a value of CollectionTagType(tableCollection) to represent the tag, and a payload value of type 
+				-- typeCollection (which conceptually represents a union/"anyvalue" type)
+				--
+				-- This is most commonly used to specialize the type of existential insts once the possibilities can be statically determined.
+				-- 
+				-- Operands are a TypeCollection and a TableCollection that represent the possibilities of the existential
+			}} 
 		},
 	},
 	{ CastInterfaceToTaggedUnionPtr = {

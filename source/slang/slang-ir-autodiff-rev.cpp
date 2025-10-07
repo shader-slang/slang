@@ -1435,24 +1435,24 @@ InstPair BackwardDiffTranscriberBase::transcribeSpecialize(
         {
             args.add(primalSpecialize->getArg(i));
         }
+
         IRType* typeForSpecialization = nullptr;
-        if ((*diffBase)->getDataType()->getOp() == kIROp_TypeKind ||
-            (*diffBase)->getDataType()->getOp() == kIROp_GenericKind)
+        switch ((*diffBase)->getDataType()->getOp())
         {
+        case kIROp_TypeKind:
+        case kIROp_GenericKind:
             typeForSpecialization = (*diffBase)->getDataType();
-        }
-        else if ((*diffBase)->getDataType()->getOp() == kIROp_Generic)
-        {
+            break;
+        case kIROp_Generic:
             typeForSpecialization = (IRType*)builder->emitSpecializeInst(
                 builder->getTypeKind(),
                 (*diffBase)->getDataType(),
                 args.getCount(),
                 args.getBuffer());
-        }
-        else
-        {
-            // Default to type kind for now.
+            break;
+        default:
             typeForSpecialization = builder->getTypeKind();
+            break;
         }
 
         auto diffSpecialize = builder->emitSpecializeInst(

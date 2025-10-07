@@ -238,6 +238,30 @@ struct WorkQueue
     }
 };
 
+bool isDynamicGeneric(IRInst* callee)
+{
+    // If the callee is a specialization, and at least one of its arguments
+    // is a type-flow-collection, then it is a dynamic generic.
+    //
+    if (auto specialize = as<IRSpecialize>(callee))
+    {
+        for (UInt i = 0; i < specialize->getArgCount(); i++)
+        {
+            // Only functions need dynamic-aware specialization.
+            auto generic = specialize->getBase();
+            if (getGenericReturnVal(generic)->getOp() != kIROp_Func)
+                return false;
+
+            auto arg = specialize->getArg(i);
+            if (as<IRCollectionBase>(arg))
+                return true; // Found a type-flow-collection argument
+        }
+        return false; // No type-flow-collection arguments found
+    }
+
+    return false;
+}
+
 struct TypeFlowSpecializationContext
 {
     struct ParameterDirectionInfo
@@ -245,13 +269,13 @@ struct TypeFlowSpecializationContext
         enum Kind
         {
             In,
+            BorrowIn,
             Out,
-            InOut,
-            Ref,
-            ConstRef
+            BorrowInOut,
+            Ref
         } kind;
 
-        // For Ref and ConstRef
+        // For Ref and BorrowInOut
         AddressSpace addressSpace;
 
         ParameterDirectionInfo(Kind kind, AddressSpace addressSpace = (AddressSpace)0)
@@ -341,9 +365,6 @@ struct TypeFlowSpecializationContext
                 if (as<IRGeneric>(inst) && as<IRInterfaceType>(getGenericReturnVal(inst)))
                     return none();
 
-                // TODO: We really should return something like Singleton(collectionInst) here
-                // instead of directly returning the collection.
-                //
                 return cBuilder.makeSingletonSet(inst);
             }
             else
@@ -695,8 +716,6 @@ struct TypeFlowSpecializationContext
             break;
         }
 
-        // TODO: Remove this workaround.. there are a few insts
-        // where we shouldn't
         bool takeUnion = !as<IRSpecialize>(inst);
         updateInfo(context, inst, info, takeUnion, workQueue);
     }
@@ -1597,8 +1616,8 @@ struct TypeFlowSpecializationContext
                         switch (paramDirection.kind)
                         {
                         case ParameterDirectionInfo::Kind::Out:
-                        case ParameterDirectionInfo::Kind::InOut:
-                        case ParameterDirectionInfo::Kind::ConstRef:
+                        case ParameterDirectionInfo::Kind::BorrowInOut:
+                        case ParameterDirectionInfo::Kind::BorrowIn:
                             {
                                 IRBuilder builder(module);
                                 if (!argInfo)
@@ -1659,7 +1678,8 @@ struct TypeFlowSpecializationContext
                     if (paramInfo)
                     {
                         if (paramDirections[argIndex].kind == ParameterDirectionInfo::Kind::Out ||
-                            paramDirections[argIndex].kind == ParameterDirectionInfo::Kind::InOut)
+                            paramDirections[argIndex].kind ==
+                                ParameterDirectionInfo::Kind::BorrowInOut)
                         {
                             auto arg = callInst->getArg(argIndex);
                             auto argPtrType = as<IRPtrTypeBase>(arg->getDataType());
@@ -2256,26 +2276,26 @@ struct TypeFlowSpecializationContext
     // Split into direction and type
     std::tuple<ParameterDirectionInfo, IRType*> getParameterDirectionAndType(IRType* paramType)
     {
-        if (as<IROutType>(paramType))
+        if (as<IROutParamType>(paramType))
             return {
                 ParameterDirectionInfo(ParameterDirectionInfo::Kind::Out),
-                as<IROutType>(paramType)->getValueType()};
-        else if (as<IRInOutType>(paramType))
+                as<IROutParamType>(paramType)->getValueType()};
+        else if (as<IRBorrowInOutParamType>(paramType))
             return {
-                ParameterDirectionInfo(ParameterDirectionInfo::Kind::InOut),
-                as<IRInOutType>(paramType)->getValueType()};
-        else if (as<IRRefType>(paramType))
+                ParameterDirectionInfo(ParameterDirectionInfo::Kind::BorrowInOut),
+                as<IRBorrowInOutParamType>(paramType)->getValueType()};
+        else if (as<IRRefParamType>(paramType))
             return {
                 ParameterDirectionInfo(
                     ParameterDirectionInfo::Kind::Ref,
-                    as<IRRefType>(paramType)->getAddressSpace()),
-                as<IRRefType>(paramType)->getValueType()};
-        else if (as<IRConstRefType>(paramType))
+                    as<IRRefParamType>(paramType)->getAddressSpace()),
+                as<IRRefParamType>(paramType)->getValueType()};
+        else if (as<IRBorrowInParamType>(paramType))
             return {
                 ParameterDirectionInfo(
-                    ParameterDirectionInfo::Kind::ConstRef,
-                    as<IRConstRefType>(paramType)->getAddressSpace()),
-                as<IRConstRefType>(paramType)->getValueType()};
+                    ParameterDirectionInfo::Kind::BorrowIn,
+                    as<IRBorrowInParamType>(paramType)->getAddressSpace()),
+                as<IRBorrowInParamType>(paramType)->getValueType()};
         else
             return {ParameterDirectionInfo(ParameterDirectionInfo::Kind::In), paramType};
     }
@@ -2287,13 +2307,13 @@ struct TypeFlowSpecializationContext
         case ParameterDirectionInfo::Kind::In:
             return type;
         case ParameterDirectionInfo::Kind::Out:
-            return builder->getOutType(type);
-        case ParameterDirectionInfo::Kind::InOut:
-            return builder->getInOutType(type);
-        case ParameterDirectionInfo::Kind::ConstRef:
-            return builder->getConstRefType(type, direction.addressSpace);
+            return builder->getOutParamType(type);
+        case ParameterDirectionInfo::Kind::BorrowInOut:
+            return builder->getBorrowInOutParamType(type);
+        case ParameterDirectionInfo::Kind::BorrowIn:
+            return builder->getBorrowInParamType(type, direction.addressSpace);
         case ParameterDirectionInfo::Kind::Ref:
-            return builder->getRefType(type, direction.addressSpace);
+            return builder->getRefParamType(type, direction.addressSpace);
         default:
             SLANG_UNEXPECTED("Unhandled parameter direction in fromDirectionAndType");
         }
@@ -2486,25 +2506,6 @@ struct TypeFlowSpecializationContext
         allParamTypes.addRange(paramTypes);
 
         return builder.getFuncType(allParamTypes, resultType);
-    }
-
-    bool isDynamicGeneric(IRInst* callee)
-    {
-        // If the callee is a specialization, and at least one of its arguments
-        // is a type-flow-collection, then it is a dynamic generic.
-        //
-        if (auto specialize = as<IRSpecialize>(callee))
-        {
-            for (UInt i = 0; i < specialize->getArgCount(); i++)
-            {
-                auto arg = specialize->getArg(i);
-                if (as<IRCollectionBase>(arg))
-                    return true; // Found a type-flow-collection argument
-            }
-            return false; // No type-flow-collection arguments found
-        }
-
-        return false;
     }
 
     IRInst* getCalleeForContext(IRInst* context)
@@ -2701,8 +2702,8 @@ struct TypeFlowSpecializationContext
                 newArgs.add(upcastCollection(context, arg, paramType));
                 break;
             case ParameterDirectionInfo::Kind::Out:
-            case ParameterDirectionInfo::Kind::InOut:
-            case ParameterDirectionInfo::Kind::ConstRef:
+            case ParameterDirectionInfo::Kind::BorrowInOut:
+            case ParameterDirectionInfo::Kind::BorrowIn:
             case ParameterDirectionInfo::Kind::Ref:
                 {
                     newArgs.add(arg);
