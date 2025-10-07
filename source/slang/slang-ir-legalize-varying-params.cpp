@@ -1018,6 +1018,62 @@ protected:
 
         return LegalizedVaryingVal();
     }
+
+    LegalizedVaryingVal createLegalizedSystemValue(VaryingParamInfo const& info, IRInst* id)
+    {
+        // If the parameter type is not uint3, we need to extract components as needed
+        auto paramType = info.type->getOperand(0);
+        IRBuilder builder(m_module);
+        builder.setInsertBefore(m_firstOrdinaryInst);
+
+        if (as<IRBasicType>(paramType))
+        {
+            auto uintType = builder.getBasicType(BaseType::UInt);
+            UInt swizzleIndex = 0;
+            auto xComponent = builder.emitSwizzle(uintType, id, 1, &swizzleIndex);
+
+            if (auto basicType = as<IRBasicType>(paramType))
+            {
+                if (basicType->getBaseType() != BaseType::UInt)
+                {
+                    xComponent = builder.emitBitCast(basicType, xComponent);
+                }
+            }
+            return LegalizedVaryingVal::makeValue(xComponent);
+        }
+        // For vector types, use a swizzle to extract the needed components
+        else if (auto vectorType = as<IRVectorType>(paramType))
+        {
+            auto elementCount = getIntVal(vectorType->getElementCount());
+
+            if (elementCount > 0 && elementCount <= 3)
+            {
+                // Setup indices for the swizzle (0 for x, 1 for y, 2 for z)
+                UInt swizzleIndices[3] = {0, 1, 2};
+                auto uintType = builder.getBasicType(BaseType::UInt);
+
+                // Use a swizzle to extract all needed components at once
+                auto extractedVector = builder.emitSwizzle(
+                    builder.getVectorType(uintType, elementCount),
+                    id,
+                    elementCount,
+                    swizzleIndices);
+
+                // Cast if the element type is not uint
+                auto elementType = vectorType->getElementType();
+                if (auto basicElementType = as<IRBasicType>(elementType))
+                {
+                    if (basicElementType->getBaseType() != BaseType::UInt)
+                    {
+                        extractedVector = builder.emitBitCast(vectorType, extractedVector);
+                    }
+                }
+                return LegalizedVaryingVal::makeValue(extractedVector);
+            }
+        }
+        // Default to the full uint3 if the parameter type doesn't match our expectations
+        return LegalizedVaryingVal::makeValue(id);
+    }
 };
 
 // With the target-independent core of the pass out of the way, we can
@@ -1274,13 +1330,13 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         switch (info.systemValueSemanticName)
         {
         case SystemValueSemanticName::GroupID:
-            return createLegalizedVal(info, blockIdxGlobalParam);
+            return createLegalizedSystemValue(info, blockIdxGlobalParam);
         case SystemValueSemanticName::GroupThreadID:
-            return createLegalizedVal(info, threadIdxGlobalParam);
+            return createLegalizedSystemValue(info, threadIdxGlobalParam);
         case SystemValueSemanticName::GroupIndex:
-            return createLegalizedVal(info, groupThreadIndex);
+            return createLegalizedSystemValue(info, groupThreadIndex);
         case SystemValueSemanticName::DispatchThreadID:
-            return createLegalizedVal(info, dispatchThreadID);
+            return createLegalizedSystemValue(info, dispatchThreadID);
         default:
             return diagnoseUnsupportedSystemVal(info);
         }
@@ -1334,62 +1390,6 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         default:
             return diagnoseUnsupportedUserVal(info);
         }
-    }
-
-    LegalizedVaryingVal createLegalizedVal(VaryingParamInfo const& info, IRInst* id)
-    {
-        // If the parameter type is not uint3, we need to extract components as needed
-        auto paramType = info.type->getOperand(0);
-        IRBuilder builder(m_module);
-        builder.setInsertBefore(m_firstOrdinaryInst);
-
-        if (as<IRBasicType>(paramType))
-        {
-            auto uintType = builder.getBasicType(BaseType::UInt);
-            UInt swizzleIndex = 0;
-            auto xComponent = builder.emitSwizzle(uintType, id, 1, &swizzleIndex);
-
-            if (auto basicType = as<IRBasicType>(paramType))
-            {
-                if (basicType->getBaseType() != BaseType::UInt)
-                {
-                    xComponent = builder.emitBitCast(basicType, xComponent);
-                }
-            }
-            return LegalizedVaryingVal::makeValue(xComponent);
-        }
-        // For vector types, use a swizzle to extract the needed components
-        else if (auto vectorType = as<IRVectorType>(paramType))
-        {
-            auto elementCount = getIntVal(vectorType->getElementCount());
-
-            if (elementCount > 0 && elementCount <= 3)
-            {
-                // Setup indices for the swizzle (0 for x, 1 for y, 2 for z)
-                UInt swizzleIndices[3] = {0, 1, 2};
-                auto uintType = builder.getBasicType(BaseType::UInt);
-
-                // Use a swizzle to extract all needed components at once
-                auto extractedVector = builder.emitSwizzle(
-                    builder.getVectorType(uintType, elementCount),
-                    id,
-                    elementCount,
-                    swizzleIndices);
-
-                // Cast if the element type is not uint
-                auto elementType = vectorType->getElementType();
-                if (auto basicElementType = as<IRBasicType>(elementType))
-                {
-                    if (basicElementType->getBaseType() != BaseType::UInt)
-                    {
-                        extractedVector = builder.emitBitCast(vectorType, extractedVector);
-                    }
-                }
-                return LegalizedVaryingVal::makeValue(extractedVector);
-            }
-        }
-        // Default to the full uint3 if the parameter type doesn't match our expectations
-        return LegalizedVaryingVal::makeValue(id);
     }
 };
 
@@ -1465,7 +1465,6 @@ struct CPUEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalize
     IRInst* groupThreadID = nullptr;
     IRInst* groupExtents = nullptr;
     IRInst* dispatchThreadID = nullptr;
-    IRInst* dispatchThreadID1D = nullptr;
     IRInst* groupThreadIndex = nullptr;
 
     void beginEntryPointImpl() SLANG_OVERRIDE
@@ -1473,7 +1472,6 @@ struct CPUEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalize
         groupID = nullptr;
         groupThreadID = nullptr;
         dispatchThreadID = nullptr;
-        dispatchThreadID1D = nullptr;
 
         IRBuilder builder(m_module);
 
@@ -1514,19 +1512,8 @@ struct CPUEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalize
 
         dispatchThreadID =
             emitCalcDispatchThreadID(builder, uint3Type, groupID, groupThreadID, groupExtents);
-        UInt idx = 0;
-        dispatchThreadID1D = builder.emitSwizzle(uintType, dispatchThreadID, 1, &idx);
 
         groupThreadIndex = emitCalcGroupIndex(builder, groupThreadID, groupExtents);
-    }
-
-    static bool isVectorParam(IRType* type)
-    {
-        if (as<IRVectorType>(type))
-            return true;
-        else if (auto ptr = as<IRPtrTypeBase>(type))
-            return isVectorParam(ptr->getValueType());
-        return false;
     }
 
     LegalizedVaryingVal createLegalSystemVaryingValImpl(VaryingParamInfo const& info) SLANG_OVERRIDE
@@ -1542,16 +1529,13 @@ struct CPUEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalize
         switch (info.systemValueSemanticName)
         {
         case SystemValueSemanticName::GroupID:
-            return LegalizedVaryingVal::makeValue(groupID);
+            return createLegalizedSystemValue(info, groupID);
         case SystemValueSemanticName::GroupThreadID:
-            return LegalizedVaryingVal::makeValue(groupThreadID);
+            return createLegalizedSystemValue(info, groupThreadID);
         case SystemValueSemanticName::GroupIndex:
-            return LegalizedVaryingVal::makeValue(groupThreadIndex);
+            return createLegalizedSystemValue(info, groupThreadIndex);
         case SystemValueSemanticName::DispatchThreadID:
-            if (isVectorParam(info.type))
-                return LegalizedVaryingVal::makeValue(dispatchThreadID);
-            else
-                return LegalizedVaryingVal::makeValue(dispatchThreadID1D);
+            return createLegalizedSystemValue(info, dispatchThreadID);
         default:
             return diagnoseUnsupportedSystemVal(info);
         }
