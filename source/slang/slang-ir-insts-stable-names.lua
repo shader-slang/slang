@@ -677,5 +677,6 @@ return {
 	["Decoration.DisableCopyEliminationDecoration"] = 673,
 	["Decoration.TempCallArgImmutableVar"] = 674,
 	["CastResourceToDescriptorHandle"] = 675,
-	["Attr.MemoryScope"] = 676,
+	["SymbolAlias"] = 676,
+	["Attr.MemoryScope"] = 677,
 }

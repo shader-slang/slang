@@ -3921,6 +3921,8 @@ public:
         return (IRMetalMeshType*)getType(kIROp_MetalMeshType, 5, ops);
     }
 
+    IRInst* emitSymbolAlias(IRInst* aliasedSymbol);
+
     IRInst* emitDebugSource(
         UnownedStringSlice fileName,
         UnownedStringSlice source,
