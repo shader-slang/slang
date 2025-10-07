@@ -109,6 +109,7 @@ protected:
     Type* m_noneType = nullptr;
     Type* m_diffInterfaceType = nullptr;
     Type* m_builtinTypes[Index(BaseType::CountOf)];
+    Dictionary<String, Type*> m_magicEnumTypes;
 
     Dictionary<String, Decl*> m_magicDecls;
     Dictionary<BuiltinRequirementKind, Decl*> m_builtinRequirementDecls;
@@ -512,6 +513,8 @@ public:
     Type* getSpecializedBuiltinType(Type* typeParam, const char* magicTypeName);
     Type* getSpecializedBuiltinType(ArrayView<Val*> genericArgs, const char* magicTypeName);
 
+    Type* getMagicEnumType(const char* magicEnumName);
+
     Type* getDefaultLayoutType();
     Type* getDefaultPushConstantLayoutType();
     Type* getStd140LayoutType();
@@ -530,19 +533,26 @@ public:
     Type* getDiffInterfaceType() { return m_sharedASTBuilder->getDiffInterfaceType(); }
     // Construct the type `Ptr<valueType>`, where `Ptr`
     // is looked up as a builtin type.
-    PtrType* getPtrType(Type* valueType, AddressSpace addrSpace);
+    PtrType* getPtrType(Type* valueType, AccessQualifier accessQualifier, AddressSpace addrSpace);
+    PtrType* getPtrType(Type* valueType, Val* accessQualifier, Val* addrSpace);
 
-    // Construct the type `Out<valueType>`
-    OutType* getOutType(Type* valueType);
+    // Construct the type `OutParam<valueType>`
+    OutParamType* getOutParamType(Type* valueType);
 
-    // Construct the type `InOut<valueType>`
-    InOutType* getInOutType(Type* valueType);
+    // Construct the type `InOutParam<valueType>`
+    BorrowInOutParamType* getBorrowInOutParamType(Type* valueType);
+
+    // Construct the type `RefParam<valueType>`
+    RefParamType* getRefParamType(Type* valueType);
+
+    // Construct the type `ImmutableBorrowParam<valueType>`
+    BorrowInParamType* getConstRefParamType(Type* valueType);
 
     // Construct the type `Ref<valueType>`
-    RefType* getRefType(Type* valueType, AddressSpace addrSpace);
+    ExplicitRefType* getExplicitRefType(Type* valueType);
 
-    // Construct the type `ConstRef<valueType>`
-    ConstRefType* getConstRefType(Type* valueType);
+    // Construct the type `Ref<valueType, .Read>`
+    ExplicitRefType* getExplicitConstRefType(Type* valueType);
 
     // Construct the type `Optional<valueType>`
     OptionalType* getOptionalType(Type* valueType);
@@ -550,7 +560,16 @@ public:
     // Construct a pointer type like `Ptr<valueType>`, but where
     // the actual type name for the pointer type is given by `ptrTypeName`
     PtrTypeBase* getPtrType(Type* valueType, char const* ptrTypeName);
-    PtrTypeBase* getPtrType(Type* valueType, AddressSpace addrSpace, char const* ptrTypeName);
+    PtrTypeBase* getPtrType(
+        Type* valueType,
+        Val* accessQualifier,
+        Val* addrSpace,
+        char const* ptrTypeName);
+    PtrTypeBase* getPtrType(
+        Type* valueType,
+        AccessQualifier accessQualifier,
+        AddressSpace addrSpace,
+        char const* ptrTypeName);
 
     ArrayExpressionType* getArrayType(Type* elementType, IntVal* elementCount);
 

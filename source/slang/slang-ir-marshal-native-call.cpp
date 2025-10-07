@@ -28,10 +28,10 @@ IRType* NativeCallMarshallingContext::getNativeType(IRBuilder& builder, IRType* 
                 nativeElementType,
                 arrayType->getElementCount());
         }
-    case kIROp_InOutType:
-    case kIROp_RefType:
-    case kIROp_ConstRefType:
-    case kIROp_OutType:
+    case kIROp_BorrowInOutParamType:
+    case kIROp_RefParamType:
+    case kIROp_BorrowInParamType:
+    case kIROp_OutParamType:
         return builder.getPtrType(getNativeType(builder, (IRType*)type->getOperand(0)));
     default:
         return type;
@@ -97,10 +97,10 @@ void NativeCallMarshallingContext::marshalManagedValueToNativeValue(
 {
     switch (originalParamType->getOp())
     {
-    case kIROp_InOutType:
-    case kIROp_RefType:
-    case kIROp_ConstRefType:
-    case kIROp_OutType:
+    case kIROp_BorrowInOutParamType:
+    case kIROp_RefParamType:
+    case kIROp_BorrowInParamType:
+    case kIROp_OutParamType:
         return marshalRefManagedValueToNativeValue(builder, originalArg, args);
     case kIROp_StringType:
         {
@@ -161,9 +161,9 @@ void NativeCallMarshallingContext::marshalManagedValueToNativeResultValue(
 {
     switch (originalArg->getDataType()->getOp())
     {
-    case kIROp_InOutType:
-    case kIROp_RefType:
-    case kIROp_ConstRefType:
+    case kIROp_BorrowInOutParamType:
+    case kIROp_RefParamType:
+    case kIROp_BorrowInParamType:
         SLANG_UNREACHABLE("out and ref types should be handled before reaching here.");
         break;
     case kIROp_StringType:

@@ -149,7 +149,6 @@ RWStructuredBuffer<float> output;
 void main(uint tid : SV_DispatchThreadID)
 {
     Sampler sampler;
-    [ForceUnroll]
     for (int i = 0; i < sampler.getSampleCount(); i++)
         output[tid] += sampler.sample(i);
 }
@@ -164,16 +163,9 @@ import common;
 export struct Sampler : ISampler = FooSampler;
 ```
 
-The `=` syntax is a syntactic sugar that expands to the following code:
-
-```csharp
-export struct Sampler : ISampler
-{
-    FooSampler inner;
-    int getSampleCount() { return inner.getSampleCount(); }
-    float sample(int index) { return inner.sample(index); }
-}
-```
+The `=` syntax defines a typealias that allows `Sampler` to resolve to `FooSampler` at link-time.
+Note that both the name and type conformance clauses must match exactly between an `export` and an `extern` declaration
+for link-time types to resolve correctly. Link-time types can also be generic, and may conform to generic interfaces.
 
 When all these three modules are linked, we will produce a specialized shader that uses the `FooSampler`.
 
@@ -196,17 +188,6 @@ void main(uint tid : SV_DispatchThreadID)
         output[tid] += sample(i);
 }
 ```
-
-## Restrictions
-
-Unlike preprocessors, link-time constants and types can only be used in places where shader parameter layout cannot be
-affected. This means that link-time constants and types are subject to the following restrictions:
-- Link-time constants cannot be used to define array sizes.
-- Link-time types are considered "incomplete" types. A struct or array type that has incomplete typed element is also an incomplete type.
-  Incomplete types cannot be used as `ConstantBuffer` or `ParameterBlock` element type, and cannot be used directly as the type of
-  a uniform variable.
-
-However it is allowed to use incomplete types as the element type of `StructuredBuffer` or `GLSLStorageBuffer`.
 
 ## Using Precompiling Modules with the API
 

@@ -3256,11 +3256,20 @@ struct IRCastFloatToInt : IRInst
 };
 
 FIDDLE()
+struct IRCastStorageToLogicalBase : IRInst
+{
+    FIDDLE(baseInst())
+    IRInst* getVal() { return getOperand(0); }
+    IRInst* getBufferType() { return getOperand(1); }
+};
+
+FIDDLE()
 struct IRDebugSource : IRInst
 {
     FIDDLE(leafInst())
     IRInst* getFileName() { return getOperand(0); }
     IRInst* getSource() { return getOperand(1); }
+    IRInst* getIsIncludedFile() { return getOperand(2); }
 };
 
 FIDDLE()
@@ -3721,21 +3730,49 @@ public:
     IRGenericKind* getGenericKind();
 
     IRPtrType* getPtrType(IRType* valueType);
+    IRPtrTypeBase* getPtrType(IROp op, IRType* valueType);
 
     // Form a ptr type to `valueType` using the same opcode and address space as `ptrWithAddrSpace`.
     IRPtrTypeBase* getPtrTypeWithAddressSpace(IRType* valueType, IRPtrTypeBase* ptrWithAddrSpace);
 
-    IROutType* getOutType(IRType* valueType);
-    IRInOutType* getInOutType(IRType* valueType);
-    IRRefType* getRefType(IRType* valueType, AddressSpace addrSpace);
-    IRConstRefType* getConstRefType(IRType* valueType);
-    IRConstRefType* getConstRefType(IRType* valueType, AddressSpace addrSpace);
-    IRPtrTypeBase* getPtrType(IROp op, IRType* valueType);
-    IRPtrType* getPtrType(IROp op, IRType* valueType, AddressSpace addressSpace);
-    IRPtrType* getPtrType(IROp op, IRType* valueType, IRInst* addressSpace);
+    IROutParamType* getOutParamType(IRType* valueType);
+    IRBorrowInOutParamType* getBorrowInOutParamType(IRType* valueType);
+    IRRefParamType* getRefParamType(IRType* valueType, AddressSpace addrSpace);
+    IRBorrowInParamType* getBorrowInParamType(IRType* valueType, AddressSpace addrSpace);
+    IRPtrType* getPtrType(
+        IROp op,
+        IRType* valueType,
+        AccessQualifier accessQualifier,
+        AddressSpace addressSpace);
+    IRPtrType* getPtrType(
+        IROp op,
+        IRType* valueType,
+        IRInst* accessQualifier,
+        IRInst* addressSpace);
+    IRPtrType* getPtrType(IROp op, IRType* valueType, AddressSpace addressSpace)
+    {
+        return getPtrType(op, valueType, AccessQualifier::ReadWrite, addressSpace);
+    }
+    IRPtrType* getPtrType(
+        IRType* valueType,
+        AccessQualifier accessQualifier,
+        AddressSpace addressSpace)
+    {
+        return getPtrType(kIROp_PtrType, valueType, accessQualifier, addressSpace);
+    }
     IRPtrType* getPtrType(IRType* valueType, AddressSpace addressSpace)
     {
-        return getPtrType(kIROp_PtrType, valueType, addressSpace);
+        return getPtrType(valueType, AccessQualifier::ReadWrite, addressSpace);
+    }
+    // Copies the op-type of the oldPtrType, access-qualifier and address-space.
+    // Does not reuse the same `inst` for access-qualifier and address-space.
+    IRPtrTypeBase* getPtrType(IRType* valueType, IRPtrTypeBase* oldPtrType)
+    {
+        return getPtrType(
+            oldPtrType->getOp(),
+            valueType,
+            oldPtrType->getAccessQualifier(),
+            oldPtrType->getAddressSpace());
     }
 
     IRTextureTypeBase* getTextureType(
@@ -3866,7 +3903,12 @@ public:
         return (IRMetalMeshType*)getType(kIROp_MetalMeshType, 5, ops);
     }
 
-    IRInst* emitDebugSource(UnownedStringSlice fileName, UnownedStringSlice source);
+    IRInst* emitSymbolAlias(IRInst* aliasedSymbol);
+
+    IRInst* emitDebugSource(
+        UnownedStringSlice fileName,
+        UnownedStringSlice source,
+        bool isIncludedFile);
     IRInst* emitDebugBuildIdentifier(UnownedStringSlice buildIdentifier, IRIntegerValue flags);
     IRInst* emitDebugBuildIdentifier(IRInst* debugBuildIdentifier);
     IRInst* emitDebugLine(
@@ -4540,6 +4582,12 @@ public:
     IRInst* emitCastPtrToBool(IRInst* val);
     IRInst* emitCastPtrToInt(IRInst* val);
     IRInst* emitCastIntToPtr(IRType* ptrType, IRInst* val);
+
+    IRInst* emitCastStorageToLogical(IRType* type, IRInst* val, IRInst* bufferType);
+    IRCastStorageToLogicalDeref* emitCastStorageToLogicalDeref(
+        IRType* type,
+        IRInst* val,
+        IRInst* bufferType);
 
     IRGlobalConstant* emitGlobalConstant(IRType* type);
 

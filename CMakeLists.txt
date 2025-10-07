@@ -142,12 +142,12 @@ option(
 )
 option(
     SLANG_ENABLE_TESTS
-    "Enable test targets, some tests may require SLANG_ENABLE_GFX, SLANG_ENABLE_SLANGD or SLANG_ENABLE_SLANGRT"
+    "Enable test targets, some tests may require SLANG_ENABLE_SLANG_RHI, SLANG_ENABLE_SLANGD or SLANG_ENABLE_SLANGRT"
     ON
 )
 option(
     SLANG_ENABLE_EXAMPLES
-    "Enable example targets, requires SLANG_ENABLE_GFX"
+    "Enable example targets, requires SLANG_ENABLE_SLANG_RHI"
     ON
 )
 option(SLANG_ENABLE_REPLAYER "Enable slang-replay tool" ON)
@@ -184,6 +184,17 @@ advanced_option(
     SLANG_USE_SYSTEM_GLSLANG
     "Build using system glslang library"
     OFF
+)
+if(WIN32)
+    set(SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC_DEFAULT ON)
+else()
+    set(SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC_DEFAULT OFF)
+endif()
+
+advanced_option(
+    SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC
+    "Enable mimalloc for SPIRV-Tools to improve compilation performance"
+    ${SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC_DEFAULT}
 )
 
 option(
@@ -399,8 +410,8 @@ if(SLANG_ENABLE_NVAPI AND NOT CMAKE_SYSTEM_NAME MATCHES "Windows")
     message(SEND_ERROR "SLANG_ENABLE_NVAPI is only supported on Windows")
 endif()
 
-if(SLANG_ENABLE_TESTS AND NOT SLANG_ENABLE_GFX)
-    message(SEND_ERROR "SLANG_ENABLE_TESTS requires SLANG_ENABLE_GFX")
+if(SLANG_ENABLE_TESTS AND NOT SLANG_ENABLE_SLANG_RHI)
+    message(SEND_ERROR "SLANG_ENABLE_TESTS requires SLANG_ENABLE_SLANG_RHI")
 endif()
 
 #
@@ -519,14 +530,19 @@ write_basic_package_version_file(
     COMPATIBILITY SameMajorVersion
 )
 
-# Write SlangConfig.cmake which should allow find_pacakage(SLANG) to work correctly
+# Write SlangConfig.cmake which should allow find_package(SLANG) to work correctly
 # SlangConfig.cmake will define slang::slang target that can be linked with using
 # target_link_libraries. It will also define SLANG_EXECUTABLE export variable that
 # should point to slangc if SLANG_ENABLE_SLANGC is ON.
+if(WIN32)
+    set(SLANG_CMAKE_CONFIG_DIR cmake)
+else()
+    set(SLANG_CMAKE_CONFIG_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME})
+endif()
 configure_package_config_file(
     "${PROJECT_SOURCE_DIR}/cmake/SlangConfig.cmake.in"
     "${PROJECT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
-    INSTALL_DESTINATION cmake
+    INSTALL_DESTINATION ${SLANG_CMAKE_CONFIG_DIR}
 )
 
 # Conditionally handle the case for Emscripten where slang does not create
@@ -538,7 +554,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
             EXPORT SlangTargets
             FILE ${PROJECT_NAME}Targets.cmake
             NAMESPACE ${PROJECT_NAME}::
-            DESTINATION cmake
+            DESTINATION ${SLANG_CMAKE_CONFIG_DIR}
         )
     endif()
 endif()
@@ -547,5 +563,5 @@ install(
     FILES
         "${PROJECT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
         "${PROJECT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
-    DESTINATION cmake
+    DESTINATION ${SLANG_CMAKE_CONFIG_DIR}
 )

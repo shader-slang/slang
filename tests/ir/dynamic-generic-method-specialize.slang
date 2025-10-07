@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -profile sm_5_0 -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -profile sm_5_0 -use-dxbc -output-using-type
 
 // Test that we can specialize a generic method called through a dynamic interface.
 

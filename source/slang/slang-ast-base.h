@@ -598,6 +598,20 @@ protected:
     ASTBuilder* m_astBuilderForReflection;
 };
 
+struct TypePair
+{
+    Type* type0;
+    Type* type1;
+    HashCode getHashCode() const
+    {
+        return combineHash(Slang::getHashCode(type0), Slang::getHashCode(type1));
+    }
+    bool operator==(const TypePair& other) const
+    {
+        return type0 == other.type0 && type1 == other.type1;
+    }
+};
+
 template<typename T>
 SLANG_FORCE_INLINE T* as(Type* obj)
 {
@@ -659,12 +673,7 @@ class DeclRefBase : public Val
     SourceLoc getNameLoc() const;
     SourceLoc getLoc() const;
     DeclRefBase* getParent();
-    String toString() const
-    {
-        StringBuilder sb;
-        const_cast<DeclRefBase*>(this)->toText(sb);
-        return sb.produceString();
-    }
+    String toString() const;
     DeclRefBase* getBase();
     void toText(StringBuilder& out);
 };

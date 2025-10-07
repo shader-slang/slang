@@ -1,8 +1,8 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -entry computeMain -target glsl -profile cs_6_5 
-//TEST:SIMPLE(filecheck=CHECK_SPV): -entry computeMain -target spirv-assembly -profile cs_6_5 
+//TEST:SIMPLE(filecheck=CHECK_GLSL): -entry computeMain -target glsl -profile cs_6_5
+//TEST:SIMPLE(filecheck=CHECK_SPV): -entry computeMain -target spirv-assembly -profile cs_6_5
 
-//CHECK_GLSL:rayQueryGetIntersectionClusterIdNV 
-//CHECK_SPV:OpRayQueryGetClusterIdNV  
+//CHECK_GLSL:rayQueryGetIntersectionClusterIdNV
+//CHECK_SPV:OpRayQueryGetIntersectionClusterIdNV
 
 uniform RaytracingAccelerationStructure accelStruct;
 
@@ -41,15 +41,15 @@ float GetRayT<let RAY_QUERY_FLAGS: uint>(uint rayInlineFlags)
                 return 0.0f;
         }
     }
-    else 
+    else
     {
         if( rq.CommittedStatus() == COMMITTED_TRIANGLE_HIT )
-        {  
+        {
             rq.Abort();
             return rq.CommittedRayT();
         }
     }
-    
+
     int committedClusterId = rq.CommittedClusterID();
     ray.TMin = 0.01f + committedClusterId;
     return 0.0f;

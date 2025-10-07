@@ -1207,6 +1207,7 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_KHR_cooperative_matrix` : enables the SPV_KHR_cooperative_matrix extension 
 * `SPV_NV_tensor_addressing` : enables the SPV_NV_tensor_addressing extension 
 * `SPV_NV_cooperative_matrix2` : enables the SPV_NV_cooperative_matrix2 extension 
+* `SPV_NV_bindless_texture` : enables the SPV_NV_bindless_texture extension 
 * `spvDeviceGroup` 
 * `spvAtomicFloat32AddEXT` 
 * `spvAtomicFloat16AddEXT` 
@@ -1259,6 +1260,7 @@ A capability describes an optional feature that a target may or may not support.
 * `spvQuadControlKHR` 
 * `spvVulkanMemoryModelKHR` 
 * `spvVulkanMemoryModelDeviceScopeKHR` 
+* `spvBindlessTextureNV` 
 * `metallib_latest` 
 * `dxil_lib` 
 * `any_target` 
@@ -1267,6 +1269,7 @@ A capability describes an optional feature that a target may or may not support.
 * `any_cpp_target` 
 * `cpp_cuda` 
 * `cpp_cuda_spirv` 
+* `cpp_cuda_metal_spirv` 
 * `cuda_spirv` 
 * `cpp_cuda_glsl_spirv` 
 * `cpp_cuda_glsl_hlsl` 

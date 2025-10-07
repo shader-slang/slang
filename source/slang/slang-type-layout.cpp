@@ -1387,7 +1387,7 @@ LayoutRulesImpl kCPushConstantRulesImpl_ = {
 
 LayoutRulesImpl kCVaryingInputLayoutRulesImpl_ = {
     &kCLayoutRulesFamilyImpl,
-    &kGLSLVaryingOutputLayoutRulesImpl,
+    &kGLSLVaryingInputLayoutRulesImpl,
     &kGLSLObjectLayoutRulesImpl,
 };
 
@@ -2667,6 +2667,11 @@ bool isKhronosTarget(CodeGenTarget target)
 bool isKhronosTarget(TargetRequest* targetReq)
 {
     return isKhronosTarget(targetReq->getTarget());
+}
+
+bool isSPIRV(CodeGenTarget codeGenTarget)
+{
+    return codeGenTarget == CodeGenTarget::SPIRV || codeGenTarget == CodeGenTarget::SPIRVAssembly;
 }
 
 bool isCPUTarget(TargetRequest* targetReq)
@@ -4913,7 +4918,8 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     else if (auto vecType = as<VectorExpressionType>(type))
     {
         auto elementType = vecType->getElementType();
-        size_t elementCount = (size_t)getIntVal(vecType->getElementCount());
+        size_t elementCount =
+            (size_t)getIntVal(context.tryResolveLinkTimeVal(vecType->getElementCount()));
 
         auto element = _createTypeLayout(context, elementType);
 
@@ -4939,8 +4945,9 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     }
     else if (auto matType = as<MatrixExpressionType>(type))
     {
-        size_t rowCount = (size_t)getIntVal(matType->getRowCount());
-        size_t colCount = (size_t)getIntVal(matType->getColumnCount());
+        size_t rowCount = (size_t)getIntVal(context.tryResolveLinkTimeVal(matType->getRowCount()));
+        size_t colCount =
+            (size_t)getIntVal(context.tryResolveLinkTimeVal(matType->getColumnCount()));
 
         auto elementType = matType->getElementType();
         auto elementResult = _createTypeLayout(context, elementType);
@@ -5026,7 +5033,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             context,
             arrayType,
             arrayType->getElementType(),
-            arrayType->getElementCount());
+            context.tryResolveLinkTimeVal(arrayType->getElementCount()));
     }
     else if (auto atomicType = as<AtomicType>(type))
     {
@@ -5081,9 +5088,26 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     }
     else if (auto optionalType = as<OptionalType>(type))
     {
-        // OptionalType should be laid out the same way as Tuple<T, bool>.
-        if (isNullableType(optionalType->getValueType()))
+        // Sometimes a type `T` has an unused bit pattern that
+        // can be used to represent the null/absent optional value,
+        // and for such types the size of an `Optional<T>` can be
+        // the same as a `T`, by making use of that unused pattern.
+        //
+        if (doesTypeHaveAnUnusedBitPatternThatCanBeUsedForOptionalRepresentation(
+                optionalType->getValueType()))
             return _createTypeLayout(context, optionalType->getValueType());
+
+        // For all other types, an `Optional<T>` is laid out more-or-less
+        // as tuple of a `T` and a `bool`.
+        //
+        // TODO(tfoley): This code implements the `(T,bool)` ordering,
+        // which provides more easy opportunities to generate compact
+        // layouts by using "tail padding" than the `(bool, T)` ordering.
+        // However the "natural layout" implementation does not match
+        // what is being done here (it uses the `(bool, T)` ordering).
+        // The discrepancy should probably be fixed, but doing so would
+        // technically be a breaking change.
+        //
         Array<Type*, 2> types =
             makeArray(optionalType->getValueType(), context.astBuilder->getBoolType());
         auto tupleType = context.astBuilder->getTupleType(types.getView());
@@ -5167,16 +5191,18 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         // If we are trying to get the layout of some extern type, do our best
         // to look it up in other loaded modules and generate the type layout
         // based on that.
-        declRefType = context.lookupExternDeclRefType(declRefType);
-        auto declRef = declRefType->getDeclRef();
+        auto resolvedType = context.lookupExternDeclRefType(declRefType);
+        if (resolvedType != type)
+            return _createTypeLayout(context, resolvedType);
 
+        auto declRef = declRefType->getDeclRef();
 
         if (auto structDeclRef = declRef.as<StructDecl>())
         {
             StructTypeLayoutBuilder typeLayoutBuilder;
             StructTypeLayoutBuilder pendingDataTypeLayoutBuilder;
 
-            typeLayoutBuilder.beginLayout(type, rules);
+            typeLayoutBuilder.beginLayout(declRefType, rules);
             auto typeLayout = typeLayoutBuilder.getTypeLayout();
 
             _addLayout(context, type, typeLayout);
@@ -5673,6 +5699,20 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
 
         return typeLayout;
     }
+    else if (as<PtrType>(type))
+    {
+        RefPtr<TypeLayout> typeLayout = new PointerTypeLayout();
+        typeLayout->type = type;
+        typeLayout->rules = rules;
+
+        for (int rr = 0; rr < varyingRulesCount; ++rr)
+        {
+            auto info = varyingRules[rr]->GetPointerLayout();
+            typeLayout->addResourceUsage(info.kind, info.size);
+        }
+
+        return typeLayout;
+    }
     else if (auto vecType = as<VectorExpressionType>(type))
     {
         auto elementType = vecType->getElementType();
@@ -5850,26 +5890,71 @@ GlobalGenericParamDecl* GenericParamTypeLayout::getGlobalGenericParamDecl()
     return rsDeclRef.getDecl();
 }
 
-DeclRefType* TypeLayoutContext::lookupExternDeclRefType(DeclRefType* declRefType)
+// Get the decl ref to the outer generic if the decl referenced by `declRef` is generic.
+DeclRef<GenericDecl> getOuterGeneric(DeclRef<Decl> declRef)
+{
+    if (auto directDeclRef = as<DirectDeclRef>(declRef.declRefBase))
+    {
+        if (as<GenericDecl>(directDeclRef->getDecl()))
+            return DeclRef<GenericDecl>(directDeclRef);
+        if (as<GenericDecl>(directDeclRef->getParent()->getDecl()))
+            return DeclRef<GenericDecl>(directDeclRef->getParent());
+    }
+    else if (auto genAppDeclRef = as<GenericAppDeclRef>(declRef.declRefBase))
+    {
+        return DeclRef<GenericDecl>(genAppDeclRef->getBase());
+    }
+    return DeclRef<GenericDecl>();
+}
+
+Type* TypeLayoutContext::lookupExternDeclRefType(DeclRefType* declRefType)
 {
     const auto declRef = declRefType->getDeclRef();
     const auto decl = declRef.getDecl();
     const auto isExtern =
         decl->hasModifier<ExternAttribute>() || decl->hasModifier<ExternModifier>();
+    Type* resultType = declRefType;
     if (isExtern)
     {
         if (!externTypeMap)
             buildExternTypeMap();
         const auto mangledName = getMangledName(targetReq->getLinkage()->getASTBuilder(), decl);
-        externTypeMap->tryGetValue(mangledName, declRefType);
+        externTypeMap->tryGetValue(mangledName, resultType);
+        if (auto resolvedDeclRef = isDeclRefTypeOf<Decl>(resultType))
+        {
+            if (resolvedDeclRef != declRef)
+            {
+                // If declRef is a GenericApp, we should replace the generic base to
+                // resolveDeclRef's base.
+                if (auto originalGenericApp = as<GenericAppDeclRef>(declRef.declRefBase))
+                {
+                    if (auto resolvedOuterGeneric = getOuterGeneric(resolvedDeclRef.getDecl()))
+                    {
+                        auto substGenericApp = astBuilder->getGenericAppDeclRef(
+                            resolvedOuterGeneric,
+                            originalGenericApp->getArgs());
+                        resultType = DeclRefType::create(astBuilder, substGenericApp);
+                    }
+                }
+            }
+        }
     }
-    return declRefType;
+
+    // If the type is an alias of another type, then we should create the type layout
+    // from the aliased type instead.
+    if (auto aggTypeDeclRef = isDeclRefTypeOf<AggTypeDecl>(resultType))
+    {
+        if (auto aliasedType = as<Type>(getAliasedType(astBuilder, aggTypeDeclRef)))
+        {
+            return aliasedType;
+        }
+    }
+    return resultType;
 }
 
 void TypeLayoutContext::buildExternTypeMap()
 {
     externTypeMap.emplace();
-    const auto linkage = targetReq->getLinkage();
 
     HashSet<String> externNames;
     Dictionary<String, DeclRefType*> allTypes;
@@ -5878,6 +5963,8 @@ void TypeLayoutContext::buildExternTypeMap()
     // We'll match them up later
     auto processDecl = [&](auto&& go, Decl* decl) -> void
     {
+        if (auto genericDecl = as<GenericDecl>(decl))
+            decl = genericDecl->inner;
         const auto isExtern =
             decl->hasModifier<ExternAttribute>() || decl->hasModifier<ExternModifier>();
 
@@ -5895,7 +5982,7 @@ void TypeLayoutContext::buildExternTypeMap()
             }
         }
 
-        if (auto scopeDecl = as<ScopeDecl>(decl))
+        if (auto scopeDecl = isStaticScopeDecl(decl))
         {
             for (auto member : scopeDecl->getDirectMemberDecls())
             {
@@ -5904,7 +5991,7 @@ void TypeLayoutContext::buildExternTypeMap()
         }
     };
 
-    for (const auto& m : linkage->loadedModulesList)
+    for (const auto& m : programLayout->getProgram()->getModuleDependencies())
     {
         const auto& ast = m->getModuleDecl();
         for (auto member : ast->getDirectMemberDecls())

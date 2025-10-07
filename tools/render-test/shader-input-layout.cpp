@@ -1015,9 +1015,12 @@ struct ShaderInputLayoutParser
         for (auto& line : lines)
         {
             lineNum++;
-            if (line.startsWith("//TEST_INPUT:"))
+            if (!line.startsWith("//"))
+                continue;
+            line = line.getUnownedSlice().tail(2).trim();
+            if (line.startsWith("TEST_INPUT:"))
             {
-                auto lineContent = line.subString(13, line.getLength() - 13);
+                auto lineContent = line.subString(11, line.getLength() - 11);
                 Misc::TokenReader parser(lineContent);
                 try
                 {

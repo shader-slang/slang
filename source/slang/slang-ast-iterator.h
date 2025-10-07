@@ -251,6 +251,7 @@ struct ASTIterator
             iterator->maybeDispatchCallback(expr);
         }
         void visitReturnValExpr(ReturnValExpr* expr) { iterator->maybeDispatchCallback(expr); }
+        void visitAddressOfExpr(AddressOfExpr* expr) { iterator->maybeDispatchCallback(expr); }
 
         void visitAndTypeExpr(AndTypeExpr* expr)
         {
@@ -542,7 +543,7 @@ void ASTIterator<CallbackFunc, FilterFunc>::visitDecl(DeclBase* decl)
             visitDecl(member);
         }
         if (auto aggTypeDecl = as<AggTypeDecl>(decl))
-            visitExpr(aggTypeDecl->wrappedType.exp);
+            visitExpr(aggTypeDecl->aliasedType.exp);
     }
     for (auto modifier : decl->modifiers)
     {

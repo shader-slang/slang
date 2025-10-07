@@ -1476,9 +1476,9 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit(">");
             return;
         }
-    case kIROp_ConstRefType:
+    case kIROp_BorrowInParamType:
         {
-            emitSimpleTypeImpl(as<IRConstRefType>(type)->getValueType());
+            emitSimpleTypeImpl(as<IRBorrowInParamType>(type)->getValueType());
             return;
         }
     default:

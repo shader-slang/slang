@@ -11,8 +11,6 @@ RWStructuredBuffer<float> outputBuffer;
 // CHECK-DAG: OpSpecConstant %float 1
 // CHECK-DAG: OpSpecConstant %ulong 256
 // CHECK-DAG: OpSpecConstant %float 100
-// CHECK-DAG: OpSpecConstantOp %half FConvert
-// CHECK-DAG: OpSpecConstantOp %int UConvert
 
 // CHECK-NOT: OpSpecConstantOp {{.*}} FAdd
 // CHECK-NOT: OpSpecConstantOp {{.*}} FSub

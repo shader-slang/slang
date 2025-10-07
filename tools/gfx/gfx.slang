@@ -1967,7 +1967,7 @@ SLANG_GFX_IMPORT public bool gfxIsTypelessFormat(Format format);
 SLANG_GFX_IMPORT public Result gfxGetFormatInfo(Format format, FormatInfo *outInfo);
 
 /// Given a type returns a function that can conpublic struct it, or nullptr if there isn't one
-SLANG_GFX_IMPORT public Result gfxCreateDevice(const DeviceDesc* desc, out Optional<IDevice> outDevice);
+SLANG_GFX_IMPORT public Result gfxCreateDevice(const Ptr<DeviceDesc> desc, out Optional<IDevice> outDevice);
 
 /// Reports current set of live objects in gfx.
 /// Currently this only calls D3D's ReportLiveObjects.

@@ -223,6 +223,9 @@ public:
     void ICompositeComponentType_linkWithOptions(
         ObjectID objectId,
         ParameterBlock const& parameterBlock);
+    void ICompositeComponentType_queryInterface(
+        ObjectID objectId,
+        ParameterBlock const& parameterBlock);
 
     void ITypeConformance_getSession(ObjectID objectId, ParameterBlock const& parameterBlock);
     void ITypeConformance_getLayout(ObjectID objectId, ParameterBlock const& parameterBlock);
@@ -246,6 +249,14 @@ public:
         ParameterBlock const& parameterBlock);
     void ITypeConformance_renameEntryPoint(ObjectID objectId, ParameterBlock const& parameterBlock);
     void ITypeConformance_linkWithOptions(ObjectID objectId, ParameterBlock const& parameterBlock);
+
+    // IComponentType2 methods.
+    void IComponentType2_getTargetCompileResult(
+        ObjectID objectId,
+        ParameterBlock const& parameterBlock);
+    void IComponentType2_getEntryPointCompileResult(
+        ObjectID objectId,
+        ParameterBlock const& parameterBlock);
 
 private:
     Slang::List<IDecoderConsumer*> m_consumers;

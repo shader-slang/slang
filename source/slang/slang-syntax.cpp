@@ -925,23 +925,28 @@ FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declR
         {
             paramType = astBuilder->getErrorType();
         }
+
+        // TODO(tfoley): This code should first compute the appropriate
+        // parameter-passing mode ("direction") for the `paramDecl` and
+        // then use that mode to decide which wrapper type to use.
+        //
         if (paramDecl->findModifier<RefModifier>())
         {
-            paramType = astBuilder->getRefType(paramType, AddressSpace::Generic);
+            paramType = astBuilder->getRefParamType(paramType);
         }
-        else if (paramDecl->findModifier<ConstRefModifier>())
+        else if (paramDecl->findModifier<BorrowModifier>())
         {
-            paramType = astBuilder->getConstRefType(paramType);
+            paramType = astBuilder->getConstRefParamType(paramType);
         }
         else if (paramDecl->findModifier<OutModifier>())
         {
             if (paramDecl->findModifier<InOutModifier>() || paramDecl->findModifier<InModifier>())
             {
-                paramType = astBuilder->getInOutType(paramType);
+                paramType = astBuilder->getBorrowInOutParamType(paramType);
             }
             else
             {
-                paramType = astBuilder->getOutType(paramType);
+                paramType = astBuilder->getOutParamType(paramType);
             }
         }
         paramTypes.add(paramType);

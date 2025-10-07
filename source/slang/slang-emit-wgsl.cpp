@@ -295,6 +295,11 @@ void WGSLSourceEmitter::emitStructFieldAttributes(
 {
     SLANG_UNUSED(allowOffsetLayout);
 
+    // If the struct type is not used for physical storage, then we don't need to
+    // emit any layout attributes.
+    if (!structType->findDecoration<IRPhysicalTypeDecoration>())
+        return;
+
     // Tint emits errors unless we explicitly spell out the layout in some cases, so emit
     // offset and align attribtues for all fields.
     IRSizeAndAlignmentDecoration* const sizeAndAlignmentDecoration =
@@ -562,10 +567,10 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         }
 
     case kIROp_PtrType:
-    case kIROp_InOutType:
-    case kIROp_OutType:
-    case kIROp_RefType:
-    case kIROp_ConstRefType:
+    case kIROp_BorrowInOutParamType:
+    case kIROp_OutParamType:
+    case kIROp_RefParamType:
+    case kIROp_BorrowInParamType:
         {
             auto ptrType = cast<IRPtrTypeBase>(type);
             m_writer->emit("ptr<");

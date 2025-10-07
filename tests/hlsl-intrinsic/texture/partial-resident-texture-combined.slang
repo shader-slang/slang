@@ -1,5 +1,5 @@
 // TODO: There are issues running tests combined texture samplers in DX12. (Github issue #6982)
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -shaderobj -output-using-type -use-dxil -profile cs_6_7 -dx12 -Xslang -DTARGET_DX12 -xslang -Wno-41024
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -shaderobj -output-using-type -profile cs_6_7 -dx12 -Xslang -DTARGET_DX12 -xslang -Wno-41024
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-vk -compute -shaderobj -output-using-type -emit-spirv-directly -render-feature hardware-device -xslang -DVK -xslang -Wno-41024
 
@@ -188,18 +188,18 @@ bool TEST_sparse<T>(
      typealias TN = T;
      constexpr const int2 offset = int2(0, 0);
      uint status;
- 
+
      int sampleIndex = 0;
      int2 iuv = int2(1, 1);
      int3 iuvs = int3(iuv, sampleIndex);
- 
+
      return true
          && (status = getNotMapped(), all(TN(T(1)) == s2D.Load(iuvs, offset, status))) && CheckAccessFullyMapped(status)
          && (status = getNotMapped(), all(TN(T(1)) == s2DMS.Load(iuv, sampleIndex, offset, status))) && CheckAccessFullyMapped(status)
          ;
  }
 
-[numthreads(4, 1, 1)]
+[numthreads(2, 2, 1)]
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     bool result = true
