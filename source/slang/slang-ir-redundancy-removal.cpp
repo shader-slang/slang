@@ -436,6 +436,7 @@ static int getMemoryScopeOrder(MemoryScope scope)
     case MemoryScope::Subgroup:
         return 2;
     case MemoryScope::Invocation:
+    default:
         return 1;
     }
 }
