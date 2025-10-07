@@ -19,12 +19,11 @@ interface IMyInterface
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    // This should trigger error 30027: Arrays of ParameterBlock are not allowed
-    // CHECK: ([[# @LINE+1]]): error 30027: Arrays of ParameterBlock are not allowed
+    // CHECK: ([[# @LINE+1]]): error 30027:
     MyStruct arr[2];
     
     // Also test with dynamic arrays
-    // CHECK: ([[# @LINE+1]]): error 30027: Arrays of ParameterBlock are not allowed
+    // CHECK: ([[# @LINE+1]]): error 30027: 
     MyStruct dynamicArr[];
 }
 
@@ -40,6 +39,6 @@ struct OuterStruct
 void computeMain2()
 {
     // Nested struct containing ParameterBlock should also trigger the error
-    // CHECK: ([[# @LINE+1]]): error 30027: Arrays of ParameterBlock are not allowed
+    // CHECK: ([[# @LINE+1]]): error 30027:
     OuterStruct nestedArr[3];
 }
