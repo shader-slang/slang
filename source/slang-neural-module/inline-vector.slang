@@ -73,7 +73,7 @@ public interface IVector<T, int N> : IDifferentiable
     - `OutputVector` must conform to `IVector<T, OutputSize>`
     */
     [BackwardDifferentiable]
-    public OutputVector mad<int OutputSize, bool Bias, Storage, OutputVector>(
+    public OutputVector matmul<int OutputSize, bool Bias, Storage, OutputVector>(
         Storage storage,
         no_diff Storage.Address address)
             where Storage : IStorage<T>
@@ -96,7 +96,7 @@ public interface IVector<T, int N> : IDifferentiable
     - `OutputVector` must conform to `IVector<T, OutputSize>`
     */
     [BackwardDifferentiable]
-    public OutputVector mad<int OutputSize, BindlessStorage, OutputVector>(
+    public OutputVector matmul<int OutputSize, bool Bias, BindlessStorage, OutputVector>(
         BindlessStorage.Address parameters)
             where BindlessStorage : IStorage<T>
             where BindlessStorage.Address : IPointerLikeAddress<T>
@@ -169,8 +169,8 @@ public struct InlineVector<T, int N> : IVector<T, N>
         set() { this.m_data[index] = newValue; }
     }
 
-    [BackwardDerivative(madbwd)]
-    public OutputVector mad<int OutputSize, bool Bias, Storage, OutputVector>(
+    [BackwardDerivative(matmulBwd)]
+    public OutputVector matmul<int OutputSize, bool Bias, Storage, OutputVector>(
         Storage storage,
         no_diff Storage.Address address)
         where Storage : IStorage<T>
@@ -191,25 +191,23 @@ public struct InlineVector<T, int N> : IVector<T, N>
             }
         }
 
-        // TODO: transpose if N >> OutputSize or OutputSize < 4
-        let weightSliceAddress = address;
-        [MaxIters(N)]
-        for (int j = 0; j < N; j++)
+        [MaxIters(OutputSize)]
+        for (int row = 0; row < OutputSize; row++)
         {
-            let x = m_data[j];
-
+            // get the address of each row of the weight matrix
+            let rowOffset = Storage.getOffset(address, row * N);
             [ForceUnroll]
-            for (int i = 0; i < OutputSize; i++)
+            for (int col = 0; col < N; col++)
             {
-                let elementOffset = Storage.getOffset(address, j * OutputSize + i);
-                output[i] += x * storage.read(elementOffset);
+                let elementOffset = Storage.getOffset(rowOffset, col);
+                output[row] += m_data[col] * storage.read(elementOffset);
             }
         }
 
         return output;
     }
 
-    static void madbwd<int OutputSize, bool Bias, Storage, OutputVector>(
+    static void matmulBwd<int OutputSize, bool Bias, Storage, OutputVector>(
         inout DifferentialPair<This> dthis,
         DifferentialPtrPair<Storage> dstorage,
         no_diff Storage.Address address,
@@ -237,18 +235,20 @@ public struct InlineVector<T, int N> : IVector<T, N>
         }
 
         // Derivative of the weights is the outer product of the input and the output differential
-        [MaxIters(N)]
-        for (int i = 0; i < N; i++)
+        // dW = dOutput * dInput^T
+
+        [MaxIters(OutputSize)]
+        for (int row = 0; row < OutputSize; row++)
         {
-            let x = dthis.p[i];
+            let rowOffset = Storage.getOffset(address, row * N);
+            T.Differential dy = doutput[row];
             [ForceUnroll]
-            for (int j = 0; j < OutputSize; j++)
+            for (int col = 0; col < N; col++)
             {
-                T.Differential dy = doutput[j];
-                let elementOffset = Storage.getOffset(address, i * OutputSize + j);
+                let x = dthis.p[col];
+                let elementOffset = Storage.getOffset(rowOffset, col);
                 T.Differential prod = T.Differential.dmul(x, dy);
-                Storage.Differential diffStorage = dstorage.d;
-                diffStorage.atomicAdd(elementOffset, prod);
+                dstorage.d.atomicAdd(elementOffset, prod);
             }
         }
 
@@ -267,8 +267,8 @@ public struct InlineVector<T, int N> : IVector<T, N>
     }
 
     // Apply from bindless storage
-    [BackwardDerivative(madBwd)]
-    public OutputVector mad<int OutputSize, BindlessStorage, OutputVector>(
+    [BackwardDerivative(matmulBwd)]
+    public OutputVector matmul<int OutputSize, bool Bias, BindlessStorage, OutputVector>(
         BindlessStorage.Address parameters)
             where BindlessStorage : IStorage<T>
             where BindlessStorage.Address : IPointerLikeAddress<T>
@@ -277,11 +277,14 @@ public struct InlineVector<T, int N> : IVector<T, N>
     {
         var output = OutputVector();
 
-        let biases = parameters.getOffset(N * OutputSize);
+        if (Bias)
+        {
+            let biases = parameters.getOffset(N * OutputSize);
 
-        [ForceUnroll]
-        for (int i = 0; i < OutputSize; i++)
-            output[i] = biases[i];
+            [ForceUnroll]
+            for (int i = 0; i < OutputSize; i++)
+                output[i] = biases[i];
+        }
 
         [MaxIters(N)]
         for (int j = 0; j < N; j++)
@@ -295,7 +298,7 @@ public struct InlineVector<T, int N> : IVector<T, N>
         return output;
     }
 
-    static public void madBwd<int OutputSize, BindlessStorage, OutputVector>(
+    static public void matmulBwd<int OutputSize, bool Bias, BindlessStorage, OutputVector>(
         inout DifferentialPair<This> dthis,
         DifferentialPtrPair<BindlessStorage.Address> dparameters,
         OutputVector.Differential doutput)
@@ -334,11 +337,14 @@ public struct InlineVector<T, int N> : IVector<T, N>
             }
         }
 
-        let biasAddress = dparameters.d.getOffset(N * OutputSize);
-        [ForceUnroll]
-        for (int j = 0; j < OutputSize; j++)
+        if (Bias)
         {
-            biasAddress.atomicAdd(j, doutput[j]);
+            let biasAddress = dparameters.d.getOffset(N * OutputSize);
+            [ForceUnroll]
+            for (int j = 0; j < OutputSize; j++)
+            {
+                biasAddress.atomicAdd(j, doutput[j]);
+            }
         }
 
         dthis = DifferentialPair<This>(dthis.p, d);
