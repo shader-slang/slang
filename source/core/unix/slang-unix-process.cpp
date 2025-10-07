@@ -300,6 +300,12 @@ SlangResult UnixPipeStream::read(void* buffer, size_t length, size_t& outReadByt
         {
             return SLANG_OK;
         }
+
+        // End of file.
+        if (count == 0)
+        {
+            close();
+        }
     }
 
     if (pollInfo.revents & POLLHUP)
