@@ -84,16 +84,16 @@ slang::IModule* mainModule = slangSession->loadModule("main.slang", diagnosticsB
 
 // Load the specialization constant module from string.
 const char* sampleCountSrc = R"(export static const int kSampleCount = 2;)";
-auto sampleCountModuleSrcBlob = UnownedRawBlob::create(sampleCountSrc, strlen(sampleCountSrc));
-slang::IModule* sampleCountModule = slangSession->loadModuleFromSource(
+slang::IModule* sampleCountModule = slangSession->loadModuleFromSourceString(
     "sample-count",  // module name
     "sample-count.slang", // synthetic module path
-    sampleCountModuleSrcBlob);  // module source content
+    sampleCountSrc,  // module source content
+    diagnosticsBlob.writeRef());
 
 // Compose the modules and entry points.
 ComPtr<slang::IEntryPoint> computeEntryPoint;
 SLANG_RETURN_ON_FAIL(
-    module->findEntryPointByName(entryPointName, computeEntryPoint.writeRef()));
+    mainModule->findEntryPointByName(entryPointName, computeEntryPoint.writeRef()));
 
 std::vector<slang::IComponentType*> componentTypes;
 componentTypes.push_back(mainModule);
@@ -113,7 +113,7 @@ composedProgram->link(linkedProgram.writeRef(), diagnosticsBlob.writeRef());
 
 // Get compiled code.
 ComPtr<slang::IBlob> compiledCode;
-linkedProgram->getEntryPointCode(0, 0, compiledCode.writeRef(), diagnosticBlob.writeRef());
+linkedProgram->getEntryPointCode(0, 0, compiledCode.writeRef(), diagnosticsBlob.writeRef());
 
 ```
 
