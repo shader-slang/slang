@@ -10732,7 +10732,9 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
     decl->errorType = errorType;
 
     if (doesTypeHaveNoDiffModifier(decl->returnType.type)) {
-        addModifier(decl, m_astBuilder->create<NoDiffModifier>());
+        auto noDiffMod = m_astBuilder->create<NoDiffModifier>();
+        noDiffMod->loc = decl->loc;
+        addModifier(decl, noDiffMod);
     }
 
     checkDifferentiableCallableCommon(decl);
