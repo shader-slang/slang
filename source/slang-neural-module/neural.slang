@@ -1,8 +1,9 @@
 /**
 Neural network primitives for Slang.
-This module provides differentiable data structures and operations for implementing
-neural networks in Slang shaders. It includes vector types, storage abstractions, and
-automatic differentiation support for training neural networks on the GPU.
+This module provides differentiable primitive data structures and operations for implementing
+inline MLP (Multilayer Perceptron) in Slang shaders. It includes vector types, storage abstractions,
+activation functions, optimizers, and automatic differentiation support for training small inline
+neural networks on the GPU.
 
 @remarks EXPERIMENTAL: This module is under active design and may change significantly
 or be removed in future versions. DO NOT USE IN PRODUCTION.

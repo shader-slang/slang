@@ -49,7 +49,7 @@ public interface IVector<T, int N> : IDifferentiable
     @param[in] index The element index (0-based).
     @return Reference to the element at the given index.
     */
-    __subscript(int index)->T
+    public __subscript(int index)->T
     {
         get;
         set;
@@ -73,7 +73,7 @@ public interface IVector<T, int N> : IDifferentiable
     - `OutputVector` must conform to `IVector<T, OutputSize>`
     */
     [BackwardDifferentiable]
-    public OutputVector eval<int OutputSize, bool Bias, Storage, OutputVector>(
+    public OutputVector mad<int OutputSize, bool Bias, Storage, OutputVector>(
         Storage storage,
         no_diff Storage.Address address)
             where Storage : IStorage<T>
@@ -96,7 +96,7 @@ public interface IVector<T, int N> : IDifferentiable
     - `OutputVector` must conform to `IVector<T, OutputSize>`
     */
     [BackwardDifferentiable]
-    public OutputVector eval<int OutputSize, BindlessStorage, OutputVector>(
+    public OutputVector mad<int OutputSize, BindlessStorage, OutputVector>(
         BindlessStorage.Address parameters)
             where BindlessStorage : IStorage<T>
             where BindlessStorage.Address : IPointerLikeAddress<T>
@@ -169,8 +169,8 @@ public struct InlineVector<T, int N> : IVector<T, N>
         set() { this.m_data[index] = newValue; }
     }
 
-    [BackwardDerivative(evalBwd)]
-    public OutputVector eval<int OutputSize, bool Bias, Storage, OutputVector>(
+    [BackwardDerivative(madbwd)]
+    public OutputVector mad<int OutputSize, bool Bias, Storage, OutputVector>(
         Storage storage,
         no_diff Storage.Address address)
         where Storage : IStorage<T>
@@ -209,7 +209,7 @@ public struct InlineVector<T, int N> : IVector<T, N>
         return output;
     }
 
-    static void evalBwd<int OutputSize, bool Bias, Storage, OutputVector>(
+    static void madbwd<int OutputSize, bool Bias, Storage, OutputVector>(
         inout DifferentialPair<This> dthis,
         DifferentialPtrPair<Storage> dstorage,
         no_diff Storage.Address address,
@@ -267,8 +267,8 @@ public struct InlineVector<T, int N> : IVector<T, N>
     }
 
     // Apply from bindless storage
-    [BackwardDerivative(evalBwd)]
-    public OutputVector eval<int OutputSize, BindlessStorage, OutputVector>(
+    [BackwardDerivative(madBwd)]
+    public OutputVector mad<int OutputSize, BindlessStorage, OutputVector>(
         BindlessStorage.Address parameters)
             where BindlessStorage : IStorage<T>
             where BindlessStorage.Address : IPointerLikeAddress<T>
@@ -295,7 +295,7 @@ public struct InlineVector<T, int N> : IVector<T, N>
         return output;
     }
 
-    static public void evalBwd<int OutputSize, BindlessStorage, OutputVector>(
+    static public void madBwd<int OutputSize, BindlessStorage, OutputVector>(
         inout DifferentialPair<This> dthis,
         DifferentialPtrPair<BindlessStorage.Address> dparameters,
         OutputVector.Differential doutput)

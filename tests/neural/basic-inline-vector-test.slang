@@ -25,12 +25,11 @@ RWStructuredBuffer<float> dParameters;
 typealias BufferStorage = StructuredBufferStorage<float>;
 typealias BindlessStorage = BindlessBufferStorage<float>;
 
+#if TEST_BINDLESS_STORAGE
 RWStructuredBuffer<float>.Handle parametersHandle;
 RWStructuredBuffer<float>.Handle dParametersHandle;
-
-// set up a 2x1 matrix for output
-//TEST_INPUT: ubuffer(data=[0 0], stride=4):out,name=output2
 RWStructuredBuffer<float> output2;
+#endif
 
 [Differentiable]
 OutputVector TestInlineVectorMatMulAdd<InputVector, OutputVector>(
@@ -40,7 +39,7 @@ OutputVector TestInlineVectorMatMulAdd<InputVector, OutputVector>(
     where InputVector : IVector<float, 4>
     where OutputVector : IVector<float, 2>
 {
-    var outputVec = input.eval<2, false, BufferStorage, OutputVector>(storage, address);
+    var outputVec = input.mad<2, false, BufferStorage, OutputVector>(storage, address);
     return outputVec;
 }
 
@@ -50,7 +49,7 @@ OutputVector TestInlineVectorMatMulAddForBindlessStorage<InputVector, OutputVect
     where InputVector : IVector<float, 4>
     where OutputVector : IVector<float, 2>
 {
-    var outputVec = input.eval<2, BindlessStorage, OutputVector>(address);
+    var outputVec = input.mad<2, BindlessStorage, OutputVector>(address);
     return outputVec;
 }
 
