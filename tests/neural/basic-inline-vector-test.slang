@@ -1,7 +1,7 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -output-using-type -xslang -DTEST_BINDLESS_STORAGE=0
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -DTEST_BINDLESS_STORAGE=0
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-dx12 -compute -shaderobj -profile cs_6_6 -output-using-type -xslang -DTEST_BINDLESS_STORAGE=0
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xslang -DTEST_BINDLESS_STORAGE=0
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-dx12 -compute -shaderobj -profile cs_6_6 -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type
 import neural;
 
 // set up a 2x4 matrix for input parameters, the last 2 elements are for bias
@@ -24,12 +24,6 @@ RWStructuredBuffer<float> dParameters;
 
 typealias BufferStorage = StructuredBufferStorage<float>;
 typealias BindlessStorage = BindlessBufferStorage<float>;
-
-#if TEST_BINDLESS_STORAGE
-RWStructuredBuffer<float>.Handle parametersHandle;
-RWStructuredBuffer<float>.Handle dParametersHandle;
-RWStructuredBuffer<float> output2;
-#endif
 
 [Differentiable]
 OutputVector TestInlineVectorMatMulAdd<InputVector, OutputVector, bool Bias>(
@@ -143,29 +137,6 @@ void cleanupDParameters()
         dParameters[i] = 0.0f;
     }
 }
-// TODO: Currently, our test framework doesn't support bindless storage setup. So we have to
-// disable the bindless storage test for now.
-#if TEST_BINDLESS_STORAGE
-void BasicTestForBindlessStorage()
-{
-    float[4] inputData = {1.0f, 2.0f, 3.0f, 4.0f};
-    let input = InlineVector<float, 4>(inputData);
-    BindlessStorage.Address parametersAddress = BindlessStorage.Address(parametersHandle);
-
-    for (int i = 0; i < 8; i++)
-    {
-        parametersAddress[i] = i + 1.0f;
-    }
-
-    // Run the forward pass
-    let outputVec = TestInlineVectorMatMulAddForBindlessStorage<InlineVector<float, 4>, InlineVector<float, 2>>
-                        (input, parametersAddress);
-
-    output2[0] = outputVec[0];
-    output2[1] = outputVec[1];
-}
-#endif
-
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
@@ -174,10 +145,6 @@ void computeMain()
     testResult[0] = BasicTest();
     cleanupDParameters();
     testResult[1] = BasicTestWithBias();
-
-#if TEST_BINDLESS_STORAGE
-    BasicTestForBindlessStorage();
-#endif
 
     // BUFFER: 1
     // BUFFER: 1
