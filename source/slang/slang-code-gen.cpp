@@ -1012,12 +1012,16 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
     // Compile
     ComPtr<IArtifact> artifact;
     auto downstreamStartTime = std::chrono::high_resolution_clock::now();
-    SLANG_RETURN_ON_FAIL(compiler->compile(options, artifact.writeRef()));
+    SlangResult compileRes = compiler->compile(options, artifact.writeRef());
     auto downstreamElapsedTime =
         (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() * 0.000000001;
     getSession()->addDownstreamCompileTime(downstreamElapsedTime);
 
+    // Always report diagnostics, even if compilation failed
     SLANG_RETURN_ON_FAIL(passthroughDownstreamDiagnostics(getSink(), compiler, artifact));
+
+    // Now check if compilation succeeded
+    SLANG_RETURN_ON_FAIL(compileRes);
 
     // Copy over all of the information associated with the source into the output
     if (sourceArtifact)

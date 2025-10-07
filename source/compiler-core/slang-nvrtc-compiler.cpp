@@ -133,8 +133,8 @@ protected:
     SlangResult _findOptixIncludePath(String& outIncludePath);
     SlangResult _getOptixIncludePath(String& outIncludePath);
 
-    SlangResult _maybeAddHalfSupport(const CompileOptions& options, CommandLine& ioCmdLine);
-    SlangResult _maybeAddOptixSupport(const CompileOptions& options, CommandLine& ioCmdLine);
+    SlangResult _maybeAddHalfSupport(const CompileOptions& options, CommandLine& ioCmdLine, IArtifactDiagnostics* diagnostics);
+    SlangResult _maybeAddOptixSupport(const CompileOptions& options, CommandLine& ioCmdLine, IArtifactDiagnostics* diagnostics);
 
 #define SLANG_NVTRC_MEMBER_FUNCS(ret, name, params) ret(*m_##name) params;
 
@@ -880,7 +880,8 @@ SlangResult NVRTCDownstreamCompiler::_getOptixIncludePath(String& outPath)
 
 SlangResult NVRTCDownstreamCompiler::_maybeAddHalfSupport(
     const DownstreamCompileOptions& options,
-    CommandLine& ioCmdLine)
+    CommandLine& ioCmdLine,
+    IArtifactDiagnostics* diagnostics)
 {
     if ((options.flags & DownstreamCompileOptions::Flag::EnableFloat16) == 0)
     {
@@ -914,7 +915,51 @@ SlangResult NVRTCDownstreamCompiler::_maybeAddHalfSupport(
     }
 
     String includePath;
-    SLANG_RETURN_ON_FAIL(_getCUDAIncludePath(includePath));
+    SlangResult res = _getCUDAIncludePath(includePath);
+    if (SLANG_FAILED(res))
+    {
+        // Add diagnostic error message with proper lifetime management
+        SliceAllocator allocator;
+        ArtifactDiagnostic diagnostic;
+        diagnostic.severity = ArtifactDiagnostic::Severity::Error;
+        diagnostic.stage = ArtifactDiagnostic::Stage::Compile;
+
+        StringBuilder errorMsg;
+        errorMsg << "Failed to locate CUDA headers (cuda_fp16.h) required for half/float16 support.\n";
+        errorMsg << "Searched locations:\n";
+
+        // List the locations we searched
+        String libPath = SharedLibraryUtils::getSharedLibraryFileName((void*)m_nvrtcCreateProgram);
+        if (libPath.getLength())
+        {
+            errorMsg << "  - Near NVRTC library: " << Path::getParentDirectory(libPath) << "\n";
+        }
+
+        StringBuilder cudaPathBuf;
+        if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
+                UnownedStringSlice::fromLiteral("CUDA_PATH"), cudaPathBuf)))
+        {
+            errorMsg << "  - CUDA_PATH environment variable: " << Path::combine(cudaPathBuf, "include") << "\n";
+        }
+        else
+        {
+            errorMsg << "  - CUDA_PATH environment variable: (not set)\n";
+        }
+
+#if SLANG_LINUX_FAMILY
+        errorMsg << "  - /usr/local/include\n";
+        errorMsg << "  - /usr/local/cuda/include\n";
+        errorMsg << "  - /usr/include\n";
+#endif
+
+        errorMsg << "\nPlease install CUDA Toolkit or set CUDA_PATH environment variable.";
+
+        // Use allocator to ensure proper lifetime management
+        diagnostic.text = allocator.allocate(errorMsg.getUnownedSlice());
+        diagnostics->add(diagnostic);
+
+        return res;
+    }
 
     // Add the found include path
     ioCmdLine.addArg("-I");
@@ -927,7 +972,8 @@ SlangResult NVRTCDownstreamCompiler::_maybeAddHalfSupport(
 
 SlangResult NVRTCDownstreamCompiler::_maybeAddOptixSupport(
     const DownstreamCompileOptions& options,
-    CommandLine& ioCmdLine)
+    CommandLine& ioCmdLine,
+    IArtifactDiagnostics* diagnostics)
 {
     // First check if we know if one of the include paths contains optix.h
     for (const auto& includePath : options.includePaths)
@@ -956,7 +1002,51 @@ SlangResult NVRTCDownstreamCompiler::_maybeAddOptixSupport(
     }
 
     String includePath;
-    SLANG_RETURN_ON_FAIL(_getOptixIncludePath(includePath));
+    SlangResult res = _getOptixIncludePath(includePath);
+    if (SLANG_FAILED(res))
+    {
+        // Add diagnostic error message with proper lifetime management
+        SliceAllocator allocator;
+        ArtifactDiagnostic diagnostic;
+        diagnostic.severity = ArtifactDiagnostic::Severity::Error;
+        diagnostic.stage = ArtifactDiagnostic::Stage::Compile;
+
+        StringBuilder errorMsg;
+        errorMsg << "Failed to locate OptiX headers (optix.h) required for OptiX ray tracing support.\n";
+        errorMsg << "Please install OptiX SDK. Typical installation locations:\n";
+
+#if SLANG_WINDOWS_FAMILY
+        StringBuilder programDataBuf;
+        if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
+                UnownedStringSlice::fromLiteral("PROGRAMDATA"), programDataBuf)))
+        {
+            errorMsg << "  - " << Path::combine(programDataBuf, "NVIDIA Corporation\\OptiX SDK *") << "\n";
+        }
+#else
+        StringBuilder homeBuf;
+        if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
+                UnownedStringSlice::fromLiteral("HOME"), homeBuf)))
+        {
+            errorMsg << "  - " << Path::combine(homeBuf, "NVIDIA-OptiX-SDK-*") << "\n";
+        }
+#endif
+
+        // Also check for local external/optix-dev
+        StringBuilder instancePathBuilder;
+        if (SLANG_SUCCEEDED(PlatformUtil::getInstancePath(instancePathBuilder)))
+        {
+            String projectRoot = Path::getParentDirectory(
+                Path::getParentDirectory(
+                    Path::getParentDirectory(instancePathBuilder)));
+            errorMsg << "  - " << Path::combine(projectRoot, "external/optix-dev/include") << "\n";
+        }
+
+        // Use allocator to ensure proper lifetime management
+        diagnostic.text = allocator.allocate(errorMsg.getUnownedSlice());
+        diagnostics->add(diagnostic);
+
+        return res;
+    }
 
     // Add the found include path
     ioCmdLine.addArg("-I");
@@ -986,6 +1076,11 @@ SlangResult NVRTCDownstreamCompiler::compile(
     }
 
     IArtifact* sourceArtifact = options.sourceArtifacts[0];
+
+    // Create artifact and diagnostics early so we can report errors from any stage
+    auto artifact = ArtifactUtil::createArtifactForCompileTarget(options.targetType);
+    auto diagnostics = ArtifactDiagnostics::create();
+    ArtifactUtil::addAssociated(artifact, diagnostics);
 
     CommandLine cmdLine;
 
@@ -1061,7 +1156,15 @@ SlangResult NVRTCDownstreamCompiler::compile(
         cmdLine.addArg(asString(include));
     }
 
-    SLANG_RETURN_ON_FAIL(_maybeAddHalfSupport(options, cmdLine));
+    {
+        SlangResult halfRes = _maybeAddHalfSupport(options, cmdLine, diagnostics);
+        if (SLANG_FAILED(halfRes))
+        {
+            diagnostics->setResult(halfRes);
+            *outArtifact = artifact.detach();
+            return halfRes;
+        }
+    }
 
     // Neither of these options are strictly required, for general use of nvrtc,
     // but are enabled to make use withing Slang work more smoothly
@@ -1139,7 +1242,13 @@ SlangResult NVRTCDownstreamCompiler::compile(
     //
     if (options.pipelineType == PipelineType::RayTracing)
     {
-        SLANG_RETURN_ON_FAIL(_maybeAddOptixSupport(options, cmdLine));
+        SlangResult optixRes = _maybeAddOptixSupport(options, cmdLine, diagnostics);
+        if (SLANG_FAILED(optixRes))
+        {
+            diagnostics->setResult(optixRes);
+            *outArtifact = artifact.detach();
+            return optixRes;
+        }
     }
 
     // Add any compiler specific options
@@ -1186,11 +1295,6 @@ SlangResult NVRTCDownstreamCompiler::compile(
     }
 
     res = m_nvrtcCompileProgram(program, int(dstOptions.getCount()), dstOptions.getBuffer());
-
-    auto artifact = ArtifactUtil::createArtifactForCompileTarget(options.targetType);
-    auto diagnostics = ArtifactDiagnostics::create();
-
-    ArtifactUtil::addAssociated(artifact, diagnostics);
 
     ComPtr<ISlangBlob> blob;
 

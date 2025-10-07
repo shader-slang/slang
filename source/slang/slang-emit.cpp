@@ -2671,7 +2671,17 @@ static SlangResult createArtifactFromIR(
             break;
         }
         auto downstreamStartTime = std::chrono::high_resolution_clock::now();
-        if (SLANG_SUCCEEDED(compiler->compile(downstreamOptions, optimizedArtifact.writeRef())))
+        SlangResult compileRes = compiler->compile(downstreamOptions, optimizedArtifact.writeRef());
+        auto downstreamElapsedTime =
+            (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() * 0.000000001;
+        codeGenContext->getSession()->addDownstreamCompileTime(downstreamElapsedTime);
+
+        // Always report diagnostics from the compilation, even if it failed
+        SLANG_RETURN_ON_FAIL(
+            passthroughDownstreamDiagnostics(codeGenContext->getSink(), compiler, optimizedArtifact));
+
+        // Now check if compilation succeeded
+        if (SLANG_SUCCEEDED(compileRes))
         {
             // Check if we need to output a separate SPIRV file containing debug info. If so
             // then strip all debug instructions from the artifact. The dbgArtifact will still
@@ -2687,12 +2697,11 @@ static SlangResult createArtifactFromIR(
             else
                 artifact = _Move(optimizedArtifact);
         }
-        auto downstreamElapsedTime =
-            (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() * 0.000000001;
-        codeGenContext->getSession()->addDownstreamCompileTime(downstreamElapsedTime);
-
-        SLANG_RETURN_ON_FAIL(
-            passthroughDownstreamDiagnostics(codeGenContext->getSink(), compiler, artifact));
+        else
+        {
+            // Compilation failed, propagate the error
+            return compileRes;
+        }
     }
 
     return SLANG_OK;
