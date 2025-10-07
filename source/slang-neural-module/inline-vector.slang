@@ -236,7 +236,6 @@ public struct InlineVector<T, int N> : IVector<T, N>
 
         // Derivative of the weights is the outer product of the input and the output differential
         // dW = dOutput * dInput^T
-
         [MaxIters(OutputSize)]
         for (int row = 0; row < OutputSize; row++)
         {
@@ -286,15 +285,17 @@ public struct InlineVector<T, int N> : IVector<T, N>
                 output[i] = biases[i];
         }
 
-        [MaxIters(N)]
-        for (int j = 0; j < N; j++)
+        [MaxIters(OutputSize)]
+        for (int row = 0; row < OutputSize; row++)
         {
-            let x = m_data[j];
+            // get the address of each row of the weight matrix
+            let rowAddr = parameters.getOffset(row * N);
             [ForceUnroll]
-            for (int i = 0; i < OutputSize; i++)
-                output[i] += x * parameters[j * OutputSize + i];
+            for (int col = 0; col < N; col++)
+            {
+                output[row] += m_data[col] * rowAddr[col];
+            }
         }
-
         return output;
     }
 
@@ -323,17 +324,18 @@ public struct InlineVector<T, int N> : IVector<T, N>
         }
 
         // Derivative of the weights is the outer product of the input and the output differential
-        [MaxIters(N)]
-        for (int i = 0; i < N; i++)
+        // dW = dOutput * dInput^T
+        [MaxIters(OutputSize)]
+        for (int row = 0; row < OutputSize; row++)
         {
-            let x = dthis.p[i];
-            let weightSlice = dparameters.d.getOffset(i * OutputSize);
+            let rowAddr = dparameters.d.getOffset(row * N);
+            T.Differential dy = doutput[row];
             [ForceUnroll]
-            for (int j = 0; j < OutputSize; j++)
+            for (int col = 0; col < N; col++)
             {
-                let dy = doutput[j];
+                let x = dthis.p[col];
                 T.Differential prod = T.Differential.dmul(x, dy);
-                weightSlice.atomicAdd(j, prod);
+                rowAddr.atomicAdd(col, prod);
             }
         }
 

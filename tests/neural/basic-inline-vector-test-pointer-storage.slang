@@ -1,10 +1,8 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -output-using-type -xslang -DTEST_HALF=0
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-dx12 -compute -shaderobj -profile cs_6_6 -output-using-type -xslang -DTEST_HALF=0
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xslang -DTEST_HALF=0
-
-// Currently, only CUDA supports atomicAdd on half. So we can only test fp16 on CUDA.
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -DTEST_HALF=0
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -DTEST_HALF=1
+
 import neural;
 
 #if TEST_HALF
@@ -14,37 +12,36 @@ typealias ElementType = float;
 #endif
 
 // set up a 2x4 matrix for input parameters, the last 2 elements are for bias
-//TEST_INPUT: ubuffer(data=[1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0 10.0], stride=4):name=parametersFloat
+//TEST_INPUT: set parametersFloat = ubuffer(data=[1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0 10.0], stride=4)
 // 1 2 3 4
 // 5 6 7 8
 // bias = {9.0, 10.0}
-RWStructuredBuffer<float> parametersFloat;
+uniform float* parametersFloat;
 
-//TEST_INPUT: ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=2):name=parameters
-RWStructuredBuffer<ElementType> parameters;
+//TEST_INPUT: set parameters = ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=2)
+uniform ElementType* parameters;
 
 // Create a buffer to store the test result
 //TEST_INPUT: ubuffer(data=[0 0], stride=4):out,name=testResult
 RWStructuredBuffer<uint> testResult;
 
 //TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):name=dInput
-RWStructuredBuffer<ElementType> dInput;
+uniform ElementType* dInput;
 
 // set up a 2x4 matrix for derivative of parameters, the last 2 elements are for derivative of bias
-//TEST_INPUT: ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):name=dParameters
-RWStructuredBuffer<ElementType> dParameters;
+//TEST_INPUT: set dParameters = ubuffer(data=[0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0], stride=4)
+uniform ElementType* dParameters;
 
-typealias BufferStorage = StructuredBufferStorage<ElementType>;
+typealias PtrStorage = PointerStorage<ElementType>;
 
 [Differentiable]
 OutputVector TestInlineVectorMatMulAdd<InputVector, OutputVector, bool Bias>(
     InputVector input,
-    BufferStorage storage,
-    BufferStorage.Address address)
+    PtrStorage.Address address)
     where InputVector : IVector<ElementType, 4>
     where OutputVector : IVector<ElementType, 2>
 {
-    var outputVec = input.matmul<2, Bias, BufferStorage, OutputVector>(storage, address);
+    var outputVec = input.matmul<2, Bias, PtrStorage, OutputVector>(address);
     return outputVec;
 }
 
@@ -53,18 +50,17 @@ bool BasicTest()
 {
     ElementType[4] inputData = {ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0)};
     let input = InlineVector<ElementType, 4>(inputData);
-    BufferStorage storage = BufferStorage(parameters);
-    BufferStorage dstorage = BufferStorage(dParameters);
-    BufferStorage.Address address = 0;
+    PtrStorage.Address paramAddr = PtrStorage.Address(parameters);
+    PtrStorage.Address dParamAddr = PtrStorage.Address(dParameters);
 
     // Run the forward pass
-    let outputVec = TestInlineVectorMatMulAdd<InlineVector<ElementType, 4>, InlineVector<ElementType, 2>, false>(input, storage, address);
+    let outputVec = TestInlineVectorMatMulAdd<InlineVector<ElementType, 4>, InlineVector<ElementType, 2>, false>(input, paramAddr);
 
     // (1*1 + 2*2 + 3*3 + 4*4) = 30.0
     // (5*1 + 6*2 + 7*3 + 8*4) = 70.0
     bool isPassed = (outputVec[0] == 30.0 && outputVec[1] == 70.0);
 
-    var parameterDiffPair = DifferentialPtrPair<BufferStorage>(storage, dstorage);
+    var parameterDiffPair = DifferentialPtrPair<PtrStorage.Address>(paramAddr, dParamAddr);
     let dRes = InlineVector<ElementType, 2>(1.0f);
     var dPair = diffPair(input);
 
@@ -72,7 +68,7 @@ bool BasicTest()
     // dInput = W^T * dOutput
     // dInput = {3, 7, 11, 15}
     bwd_diff(TestInlineVectorMatMulAdd<InlineVector<ElementType, 4>, InlineVector<ElementType, 2>, false>)
-                (dPair, parameterDiffPair, address, dRes);
+                (dPair, parameterDiffPair, dRes);
 
     isPassed = isPassed &&
         dPair.d[0] == 3.0 && dPair.d[1] == 7.0 && dPair.d[2] == 11.0 && dPair.d[3] == 15.0;
@@ -92,18 +88,17 @@ bool BasicTestWithBias()
 {
     ElementType[4] inputData = {ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0)};
     let input = InlineVector<ElementType, 4>(inputData);
-    BufferStorage storage = BufferStorage(parameters);
-    BufferStorage dstorage = BufferStorage(dParameters);
-    BufferStorage.Address address = 0;
+    PtrStorage.Address paramAddr = PtrStorage.Address(parameters);
+    PtrStorage.Address dParamAddr = PtrStorage.Address(dParameters);
 
     // Run the forward pass
-    let outputVec = TestInlineVectorMatMulAdd<InlineVector<ElementType, 4>, InlineVector<ElementType, 2>, true>(input, storage, address);
+    let outputVec = TestInlineVectorMatMulAdd<InlineVector<ElementType, 4>, InlineVector<ElementType, 2>, true>(input, paramAddr);
 
     // (1*1 + 2*2 + 3*3 + 4*4) + 9.0 = 39.0
     // (5*1 + 6*2 + 7*3 + 8*4) + 10.0 = 80.0
     bool isPassed = (outputVec[0] == 39.0 && outputVec[1] == 80.0);
 
-    var parameterDiffPair = DifferentialPtrPair<BufferStorage>(storage, dstorage);
+    var parameterDiffPair = DifferentialPtrPair<PtrStorage.Address>(paramAddr, dParamAddr);
     let dOutput = InlineVector<ElementType, 2>(1.0);
     var dPair = diffPair(input);
 
@@ -111,7 +106,7 @@ bool BasicTestWithBias()
     // dInput = W^T * dOutput
     // dInput = {3, 7, 11, 15}
     bwd_diff(TestInlineVectorMatMulAdd<InlineVector<ElementType, 4>, InlineVector<ElementType, 2>, true>)
-                (dPair, parameterDiffPair, address, dOutput);
+                (dPair, parameterDiffPair, dOutput);
 
     isPassed = isPassed &&
         dPair.d[0] == 3.0 && dPair.d[1] == 7.0 && dPair.d[2] == 11.0 && dPair.d[3] == 15.0;
