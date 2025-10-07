@@ -12,7 +12,7 @@ struct FunctionParameterSpecializationCondition : FunctionCallSpecializeConditio
 {
     TargetRequest* targetRequest = nullptr;
 
-    bool doesParamWantSpecialization(IRParam* param, IRInst* /*arg*/)
+    bool doesParamWantSpecialization(IRParam* param, IRInst* /*arg*/, IRCall* /*callInst*/)
     {
         IRType* type = param->getDataType();
         return as<IRFuncType>(type);

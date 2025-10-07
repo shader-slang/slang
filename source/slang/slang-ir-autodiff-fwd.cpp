@@ -79,7 +79,7 @@ void ForwardDiffTranscriber::generateTrivialFwdDiffFunc(IRFunc* primalFunc, IRFu
     };
     for (auto param : diffParams)
     {
-        if (auto outType = as<IROutTypeBase>(param->getFullType()))
+        if (auto outType = as<IROutParamTypeBase>(param->getFullType()))
         {
             if (isRelevantDifferentialPair(outType))
             {
@@ -794,7 +794,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
                     markDiffPairTypeInst(&argBuilder, srcVar, pairValType);
 
                     auto diffArg = findOrTranscribeDiffInst(&argBuilder, origArg);
-                    if (ptrParamType->getOp() == kIROp_InOutType)
+                    if (ptrParamType->getOp() == kIROp_BorrowInOutParamType)
                     {
                         // Set initial value.
                         auto primalVal = argBuilder.emitLoad(primalArg);
@@ -814,7 +814,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
                         auto store = argBuilder.emitStore(srcVar, initVal);
                         markDiffPairTypeInst(&argBuilder, store, pairValType);
                     }
-                    if (as<IROutTypeBase>(ptrParamType))
+                    if (as<IROutParamTypeBase>(ptrParamType))
                     {
                         // Read back new value.
                         auto newVal = afterBuilder.emitLoad(srcVar);
@@ -1814,7 +1814,7 @@ void insertTempVarForMutableParams(IRModule* module, IRFunc* func)
     List<IRParam*> params;
     for (auto param : firstBlock->getParams())
     {
-        if (const auto ptrType = as<IROutTypeBase>(param->getDataType()))
+        if (const auto ptrType = as<IROutParamTypeBase>(param->getDataType()))
         {
             params.add(param);
         }
@@ -1826,7 +1826,7 @@ void insertTempVarForMutableParams(IRModule* module, IRFunc* func)
         auto tempVar = builder.emitVar(ptrType->getValueType());
         param->replaceUsesWith(tempVar);
         mapParamToTempVar[param] = tempVar;
-        if (ptrType->getOp() != kIROp_OutType)
+        if (ptrType->getOp() != kIROp_OutParamType)
         {
             builder.emitStore(tempVar, builder.emitLoad(param));
         }
@@ -2323,7 +2323,7 @@ InstPair ForwardDiffTranscriber::transcribeFuncParam(
 
             IRInst* primalInitVal = nullptr;
             IRInst* diffInitVal = nullptr;
-            if (as<IROutType>(diffPairType))
+            if (as<IROutParamType>(diffPairType))
             {
                 primalInitVal = builder->emitDefaultConstruct(ptrInnerPairType->getValueType());
                 diffInitVal = builder->emitDefaultConstructRaw(diffType);

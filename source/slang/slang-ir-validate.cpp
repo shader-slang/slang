@@ -1,6 +1,7 @@
 // slang-ir-validate.cpp
 #include "slang-ir-validate.h"
 
+#include "slang-compiler.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
@@ -23,6 +24,31 @@ struct IRValidateContext
     // A set of instructions we've seen, to help confirm that
     // values are defined before they are used in a given block.
     HashSet<IRInst*> seenInsts;
+};
+
+// Context class for structured buffer validation
+class StructuredBufferValidationContext
+{
+public:
+    StructuredBufferValidationContext(DiagnosticSink* sink, TargetRequest* targetRequest)
+        : m_sink(sink), m_targetRequest(targetRequest), m_hasErrors(false)
+    {
+    }
+
+    bool validate(IRModule* module);
+
+private:
+    DiagnosticSink* m_sink;
+    TargetRequest* m_targetRequest;
+    bool m_hasErrors;
+
+    // Cache of types we've already checked for containing opaque handles
+    HashSet<IRType*> m_checkedTypes;
+    HashSet<IRType*> m_typesWithOpaqueHandles;
+
+    bool containsOpaqueHandleTypeCached(IRType* type);
+    bool containsOpaqueHandleTypeInternal(IRType* type, HashSet<IRType*>& visitedInCurrentCheck);
+    void validateStructuredBufferVariable(IRInst* inst);
 };
 
 void validateIRInst(IRValidateContext* context, IRInst* inst);
@@ -175,9 +201,13 @@ void validateIRInstOperand(IRValidateContext* context, IRInst* inst, IRUse* oper
                 // in order.
                 if (context)
                 {
+                    // There is exception that the use of an inst is defined before the inst,
+                    // e.g. generic parameter can be defined before its data type in some cases.
+                    // In those cases we allow relaxing the rule.
                     validate(
                         context,
-                        context->seenInsts.contains(operandValue),
+                        context->seenInsts.contains(operandValue) ||
+                            canRelaxInstOrderRule(operandValue, inst),
                         inst,
                         "def must come before use in same block");
                 }
@@ -458,7 +488,7 @@ static bool isValidAtomicDest(bool skipFuncParamValidation, IRInst* dst)
     if (auto param = as<IRParam>(dst))
     {
         auto paramType = param->getDataType();
-        if (auto outType = as<IROutTypeBase>(paramType))
+        if (auto outType = as<IROutParamTypeBase>(paramType))
         {
             if (outType->getAddressSpace() == AddressSpace::GroupShared)
             {
@@ -622,6 +652,125 @@ void validateVectorsAndMatrices(
             validateVectorElementCount(sink, vectorType);
         }
     }
+}
+
+//
+// Structure buffer resource types
+//
+
+bool StructuredBufferValidationContext::containsOpaqueHandleTypeCached(IRType* type)
+{
+    // Check cache first
+    if (m_checkedTypes.contains(type))
+    {
+        return m_typesWithOpaqueHandles.contains(type);
+    }
+
+    // Not in cache, need to check
+    HashSet<IRType*> visitedInCurrentCheck;
+    bool result = containsOpaqueHandleTypeInternal(type, visitedInCurrentCheck);
+
+    // Cache the result
+    m_checkedTypes.add(type);
+    if (result)
+    {
+        m_typesWithOpaqueHandles.add(type);
+    }
+
+    return result;
+}
+
+bool StructuredBufferValidationContext::containsOpaqueHandleTypeInternal(
+    IRType* type,
+    HashSet<IRType*>& visitedInCurrentCheck)
+{
+    // Prevent infinite recursion in current check
+    if (!visitedInCurrentCheck.add(type))
+        return false;
+
+    // Check if the type itself is an opaque handle
+    if (isResourceType(type))
+        return true;
+
+    // Check struct types
+    if (auto structType = as<IRStructType>(type))
+    {
+        for (auto field : structType->getFields())
+        {
+            if (containsOpaqueHandleTypeInternal(field->getFieldType(), visitedInCurrentCheck))
+                return true;
+        }
+    }
+    else if (auto arrayType = as<IRArrayTypeBase>(type))
+    {
+        return containsOpaqueHandleTypeInternal(arrayType->getElementType(), visitedInCurrentCheck);
+    }
+    else if (auto ptrType = as<IRPtrTypeBase>(type))
+    {
+        return containsOpaqueHandleTypeInternal(ptrType->getValueType(), visitedInCurrentCheck);
+    }
+
+    return false;
+}
+
+void StructuredBufferValidationContext::validateStructuredBufferVariable(IRInst* inst)
+{
+    IRType* type = inst->getDataType();
+
+    // Unwrap arrays if present
+    type = unwrapArrayAndPointers(type);
+
+    // Check if this is a structured buffer type
+    auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type);
+    if (!structuredBufferType)
+        return;
+
+    // Get the element type
+    auto elementType = structuredBufferType->getElementType();
+
+    // Check if the element type contains any resource/opaque handle types
+    if (containsOpaqueHandleTypeCached(elementType))
+    {
+        m_sink->diagnose(
+            inst->sourceLoc,
+            Diagnostics::cannotUseResourceTypeInStructuredBuffer,
+            elementType);
+        m_hasErrors = true;
+    }
+}
+
+bool StructuredBufferValidationContext::validate(IRModule* module)
+{
+    // Skip validation if bindless is enabled for this target
+    if (m_targetRequest && areResourceTypesBindlessOnTarget(m_targetRequest))
+        return true;
+
+    // Iterate through all global instructions
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (auto globalVar = as<IRGlobalParam>(globalInst))
+        {
+            validateStructuredBufferVariable(globalVar);
+        }
+        else if (auto func = as<IRFunc>(globalInst))
+        {
+            for (auto param : func->getParams())
+            {
+                validateStructuredBufferVariable(param);
+            }
+        }
+    }
+
+    return !m_hasErrors;
+}
+
+bool validateStructuredBufferResourceTypes(
+    IRModule* module,
+    DiagnosticSink* sink,
+    TargetRequest* targetRequest)
+{
+    StructuredBufferValidationContext context(sink, targetRequest);
+    return context.validate(module);
 }
 
 } // namespace Slang

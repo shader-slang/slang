@@ -941,6 +941,19 @@ struct ByteAddressBufferLegalizationContext
         {
             return getEquivalentStructuredBufferParam(elementType, byteAddressBufferParam);
         }
+        else if (auto castDynamicResource = as<IRCastDynamicResource>(byteAddressBuffer))
+        {
+            // If the underlying structured buffer is a CastDynamicResource,
+            // we can simply cast the dynamic resource into the byte address buffer type instead.
+            auto arg = castDynamicResource->getOperand(0);
+            return m_builder.emitIntrinsicInst(
+                getEquivalentStructuredBufferParamType(
+                    elementType,
+                    byteAddressBuffer->getDataType()),
+                kIROp_CastDynamicResource,
+                1,
+                &arg);
+        }
 
         if (byteAddressBuffer->getOp() == kIROp_GetElement)
         {

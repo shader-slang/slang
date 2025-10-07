@@ -849,7 +849,15 @@ struct SpecializationContext
         // the result of a `specialize` instruction or other
         // operation that will yield such a table.
         //
+        // Since we unify the frontend such that all LookupDeclRef node
+        // on a interface requirement will always be lowered to lookup
+        // witness, it creats an exception that IRThisTypeWitness, a non-concrete
+        // witness table, also need to be specialized. Otherwise, there is
+        // no logic in the later passes can handle it. However, we know for
+        // sure that the IRThisTypeWitness is only used to wrap an interface
+        // type, therefore, it must be only used to exact the interface requirement.
         auto witnessTable = as<IRWitnessTable>(lookupInst->getWitnessTable());
+        IRInterfaceType* interfaceType = nullptr;
         if (!witnessTable)
         {
             if (auto collection = as<IRTableCollection>(lookupInst->getWitnessTable()))
@@ -887,6 +895,17 @@ struct SpecializationContext
                 else
                     return false;
             }
+            else if (auto thisTypeWitness = as<IRThisTypeWitness>(lookupInst->getWitnessTable()))
+            {
+                if (auto witnessTableType =
+                        as<IRWitnessTableTypeBase>(thisTypeWitness->getDataType()))
+                {
+                    if (!areAllOperandsFullySpecialized(witnessTableType))
+                        return false;
+
+                    interfaceType = as<IRInterfaceType>(witnessTableType->getConformanceType());
+                }
+            }
             else
             {
                 return false;
@@ -898,7 +917,26 @@ struct SpecializationContext
         // the given interface requirement.
         //
         auto requirementKey = lookupInst->getRequirementKey();
-        auto satisfyingVal = findWitnessVal(witnessTable, requirementKey);
+        IRInst* satisfyingVal = nullptr;
+
+        if (witnessTable)
+            satisfyingVal = findWitnessVal(witnessTable, requirementKey);
+        else
+        {
+            // If we are specializing ThisTypeWitness, the result of the specialization
+            // could be a WitnessTabelType, in such case, in order to not break the generality
+            // the specialziation (we don't specialize WitnessTableType here), we will wrap it
+            // into another ThisTypeWitnes and handle it later.
+            satisfyingVal = findInterfaceRequirement(interfaceType, requirementKey);
+            if (auto witnessTableType = as<IRWitnessTableType>(satisfyingVal))
+            {
+                auto newInterfaceType = as<IRInterfaceType>(witnessTableType->getConformanceType());
+                IRBuilder builderStorage(module);
+                IRBuilder* builder = &builderStorage;
+                builder->setInsertBefore(lookupInst);
+                satisfyingVal = builder->createThisTypeWitness(newInterfaceType);
+            }
+        }
 
         // We expect to always find a satisfying value, but
         // we will go ahead and code defensively so that
@@ -957,6 +995,7 @@ struct SpecializationContext
         }
         return nullptr;
     }
+
     template<typename TDict>
     void _readSpecializationDictionaryImpl(TDict& dict, IRInst* dictInst)
     {
@@ -3093,6 +3132,7 @@ void finalizeSpecialization(IRModule* module)
     }
 }
 
+/*
 // DUPLICATE: merge.
 static bool isDynamicGeneric(IRInst* callee)
 {
@@ -3118,6 +3158,7 @@ static bool isDynamicGeneric(IRInst* callee)
 
     return false;
 }
+*/
 
 static IRInst* specializeDynamicGeneric(IRSpecialize* specializeInst)
 {
@@ -3152,7 +3193,6 @@ static IRInst* specializeDynamicGeneric(IRSpecialize* specializeInst)
             // We're dealing with a set of types.
             if (as<IRTypeType>(param->getDataType()))
             {
-                // auto unionType = createAnyValueTypeFromInsts(collectionSet);
                 cloneEnv.mapOldValToNew[param] = collection;
             }
             else if (as<IRWitnessTableType>(param->getDataType()))
@@ -3187,7 +3227,6 @@ static IRInst* specializeDynamicGeneric(IRSpecialize* specializeInst)
             auto returnedFunc = cast<IRFunc>(inst);
             auto funcFirstBlock = returnedFunc->getFirstBlock();
 
-            // cloneEnv.mapOldValToNew[funcFirstBlock] = loweredFunc->getFirstBlock();
             builder.setInsertInto(loweredFunc);
             for (auto block : returnedFunc->getBlocks())
             {

@@ -1683,13 +1683,14 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
         bool optional = AdvanceIf(parser, "optional", &whereToken);
 
         auto subType = parser->ParseTypeExp();
-        if (AdvanceIf(parser, TokenType::Colon))
+        Token constraintToken;
+        if (AdvanceIf(parser, TokenType::Colon, &constraintToken))
         {
             for (;;)
             {
                 auto constraint = parser->astBuilder->create<GenericTypeConstraintDecl>();
                 constraint->whereTokenLoc = whereToken.loc;
-                parser->FillPosition(constraint);
+                constraint->loc = constraintToken.loc;
                 constraint->sub = subType;
                 constraint->sup = parser->ParseTypeExp();
                 if (optional)
@@ -1703,12 +1704,12 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
                     break;
             }
         }
-        else if (AdvanceIf(parser, TokenType::OpEql))
+        else if (AdvanceIf(parser, TokenType::OpEql, &constraintToken))
         {
             auto constraint = parser->astBuilder->create<GenericTypeConstraintDecl>();
             constraint->whereTokenLoc = whereToken.loc;
             constraint->isEqualityConstraint = true;
-            parser->FillPosition(constraint);
+            constraint->loc = constraintToken.loc;
             constraint->sub = subType;
             constraint->sup = parser->ParseTypeExp();
             if (optional)
@@ -4249,6 +4250,9 @@ static void parseModernVarDeclBaseCommon(Parser* parser, VarDeclBase* decl)
         decl->type = parser->ParseTypeExp();
     }
 
+    auto modifiers = _parseOptSemantics(parser);
+    _addModifiers(decl, modifiers);
+
     if (AdvanceIf(parser, TokenType::OpAssign))
     {
         decl->initExpr = parser->ParseInitExpr();
@@ -4350,6 +4354,8 @@ static NodeBase* parseFuncDecl(Parser* parser, void* /*userData*/)
         {
             parser->PushScope(decl);
             parseModernParamList(parser, decl);
+            auto funcScope = parser->currentScope;
+            parser->PopScope();
             if (AdvanceIf(parser, "throws"))
             {
                 decl->errorType = parser->ParseTypeExp();
@@ -4358,8 +4364,6 @@ static NodeBase* parseFuncDecl(Parser* parser, void* /*userData*/)
             {
                 decl->returnType = parser->ParseTypeExp();
             }
-            auto funcScope = parser->currentScope;
-            parser->PopScope();
             maybeParseGenericConstraints(parser, genericParent);
             parser->PushScope(funcScope);
             decl->body = parseOptBody(parser);
@@ -5508,10 +5512,16 @@ Decl* Parser::ParseStruct()
                 rs->wrappedType = ParseTypeExp();
                 PushScope(rs);
                 PopScope();
-                ReadToken(TokenType::Semicolon);
+                if (!LookAheadToken(TokenType::Semicolon))
+                {
+                    this->diagnose(
+                        this->tokenReader.peekToken().loc,
+                        Diagnostics::unexpectedTokenExpectedTokenType,
+                        "';'");
+                }
                 return rs;
             }
-            if (AdvanceIf(this, TokenType::Semicolon))
+            if (LookAheadToken(TokenType::Semicolon))
             {
                 rs->hasBody = false;
                 return rs;
@@ -7249,7 +7259,7 @@ static IntegerLiteralValue _fixIntegerLiteral(
         // If the masked value is 0 or equal to the mask, we 'assume' no information is
         // lost
         // This allows for example -1u, to give 0xffffffff
-        // It also means 0xfffffffffffffffffu will give 0xffffffff, without a warning.
+        // It also means 0xffffffffffffffffu will give 0xffffffff, without a warning.
         if ((!(maskedValue == 0 || maskedValue == mask)) && sink && token)
         {
             // Output a warning that number has been altered
@@ -7306,20 +7316,19 @@ static BaseType _determineNonSuffixedIntegerLiteralType(
     {
         baseType = BaseType::UInt64;
 
-        if (isDecimalBase)
-        {
-            // There is an edge case here where 9223372036854775808 or INT64_MAX + 1
-            // brings us here, but the complete literal is -9223372036854775808 or INT64_MIN and is
-            // valid. Unfortunately because the lexer handles the negative(-) part of the literal
-            // separately it is impossible to know whether the literal has a negative sign or not.
-            // We emit the warning and initially process it as a uint64 anyways, and the negative
-            // sign will be properly parsed and the value will still be properly stored as a
-            // negative INT64_MIN.
+        // Emit warning if the value is too large for signed 64-bit, regardless of base
 
-            // Decimal integer is too large to be represented as signed.
-            // Output warning that it is represented as unsigned instead.
-            sink->diagnose(*token, Diagnostics::integerLiteralTooLarge);
-        }
+        // There is an edge case here where 9223372036854775808 or INT64_MAX + 1
+        // brings us here, but the complete literal is -9223372036854775808 or INT64_MIN and is
+        // valid. Unfortunately because the lexer handles the negative(-) part of the literal
+        // separately it is impossible to know whether the literal has a negative sign or not.
+        // We emit the warning and initially process it as a uint64 anyways, and the negative
+        // sign will be properly parsed and the value will still be properly stored as a
+        // negative INT64_MIN.
+
+        // Decimal integer is too large to be represented as signed.
+        // Output warning that it is represented as unsigned instead.
+        sink->diagnose(*token, Diagnostics::integerLiteralTooLarge);
     }
 
     return baseType;
@@ -9389,7 +9398,16 @@ static NodeBase* parseBuiltinRequirementModifier(Parser* parser, void* /*userDat
     return modifier;
 }
 
-static NodeBase* parseMagicTypeModifier(Parser* parser, void* /*userData*/)
+enum class MagicTypeModifierKind
+{
+    Type,
+    Enum,
+};
+
+static NodeBase* parseMagicTypeModifierImpl(
+    Parser* parser,
+    void* /*userData*/,
+    MagicTypeModifierKind kind)
 {
     MagicTypeModifier* modifier = parser->astBuilder->create<MagicTypeModifier>();
     parser->ReadToken(TokenType::LParent);
@@ -9399,8 +9417,14 @@ static NodeBase* parseMagicTypeModifier(Parser* parser, void* /*userData*/)
         modifier->tag =
             uint32_t(stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
     }
-    auto syntaxClass = parser->astBuilder->findSyntaxClass(getName(parser, modifier->magicName));
-    if (syntaxClass)
+
+    if (kind == MagicTypeModifierKind::Enum)
+    {
+        modifier->magicNodeType = getSyntaxClass<EnumTypeType>();
+    }
+    else if (
+        auto syntaxClass =
+            parser->astBuilder->findSyntaxClass(getName(parser, modifier->magicName)))
     {
         modifier->magicNodeType = syntaxClass;
     }
@@ -9409,6 +9433,16 @@ static NodeBase* parseMagicTypeModifier(Parser* parser, void* /*userData*/)
     parser->ReadToken(TokenType::RParent);
 
     return modifier;
+}
+
+static NodeBase* parseMagicTypeModifier(Parser* parser, void* userData)
+{
+    return parseMagicTypeModifierImpl(parser, userData, MagicTypeModifierKind::Type);
+}
+
+static NodeBase* parseMagicEnumModifier(Parser* parser, void* userData)
+{
+    return parseMagicTypeModifierImpl(parser, userData, MagicTypeModifierKind::Enum);
 }
 
 static NodeBase* parseIntrinsicTypeModifier(Parser* parser, void* /*userData*/)
@@ -9555,7 +9589,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseModifier("out", getSyntaxClass<OutModifier>()),
     _makeParseModifier("inout", getSyntaxClass<InOutModifier>()),
     _makeParseModifier("__ref", getSyntaxClass<RefModifier>()),
-    _makeParseModifier("__constref", getSyntaxClass<ConstRefModifier>()),
+    _makeParseModifier("__constref", getSyntaxClass<BorrowModifier>()),
     _makeParseModifier("const", getSyntaxClass<ConstModifier>()),
     _makeParseModifier("__builtin", getSyntaxClass<BuiltinModifier>()),
     _makeParseModifier("highp", getSyntaxClass<GLSLPrecisionModifier>()),
@@ -9635,6 +9669,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseModifier("__builtin_requirement", parseBuiltinRequirementModifier),
 
     _makeParseModifier("__magic_type", parseMagicTypeModifier),
+    _makeParseModifier("__magic_enum", parseMagicEnumModifier),
     _makeParseModifier("__intrinsic_type", parseIntrinsicTypeModifier),
     _makeParseModifier("__implicit_conversion", parseImplicitConversionModifier),
 
