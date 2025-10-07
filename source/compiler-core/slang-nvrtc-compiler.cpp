@@ -133,8 +133,14 @@ protected:
     SlangResult _findOptixIncludePath(String& outIncludePath);
     SlangResult _getOptixIncludePath(String& outIncludePath);
 
-    SlangResult _maybeAddHalfSupport(const CompileOptions& options, CommandLine& ioCmdLine, IArtifactDiagnostics* diagnostics);
-    SlangResult _maybeAddOptixSupport(const CompileOptions& options, CommandLine& ioCmdLine, IArtifactDiagnostics* diagnostics);
+    SlangResult _maybeAddHalfSupport(
+        const CompileOptions& options,
+        CommandLine& ioCmdLine,
+        IArtifactDiagnostics* diagnostics);
+    SlangResult _maybeAddOptixSupport(
+        const CompileOptions& options,
+        CommandLine& ioCmdLine,
+        IArtifactDiagnostics* diagnostics);
 
 #define SLANG_NVTRC_MEMBER_FUNCS(ret, name, params) ret(*m_##name) params;
 
@@ -917,7 +923,8 @@ SlangResult NVRTCDownstreamCompiler::_maybeAddHalfSupport(
     String includePath;
     if (SLANG_FAILED(_getCUDAIncludePath(includePath)))
     {
-        String msg = "Failed to locate CUDA headers (cuda_fp16.h) required for half/float16 support. Please install CUDA Toolkit or set CUDA_PATH environment variable.";
+        String msg = "Failed to locate CUDA headers (cuda_fp16.h) required for half/float16 "
+                     "support. Please install CUDA Toolkit or set CUDA_PATH environment variable.";
         diagnostics->setRaw(SliceUtil::asCharSlice(msg));
         diagnostics->requireErrorDiagnostic();
         return SLANG_E_NOT_FOUND;
@@ -966,7 +973,8 @@ SlangResult NVRTCDownstreamCompiler::_maybeAddOptixSupport(
     String includePath;
     if (SLANG_FAILED(_getOptixIncludePath(includePath)))
     {
-        String msg = "Failed to locate OptiX headers (optix.h) required for OptiX ray tracing support. Please install OptiX SDK.";
+        String msg = "Failed to locate OptiX headers (optix.h) required for OptiX ray tracing "
+                     "support. Please install OptiX SDK.";
         diagnostics->setRaw(SliceUtil::asCharSlice(msg));
         diagnostics->requireErrorDiagnostic();
         return SLANG_E_NOT_FOUND;
