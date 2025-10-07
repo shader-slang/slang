@@ -816,13 +816,14 @@ IRInst* getRootBufferOrAddr(IRInst* addr, List<IRInst*>& outAccessChain, List<IR
                 outTypes->add(addr->getFullType());
             addr = addr->getOperand(0);
             if (op == kIROp_RWStructuredBufferGetElementPtr)
-                break;
+                goto endOfLoop;
             continue;
         default:
             break;
         }
         break;
     }
+endOfLoop:;
     outAccessChain.reverse();
     if (outTypes)
         outTypes->reverse();
