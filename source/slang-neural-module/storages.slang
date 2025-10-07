@@ -60,6 +60,8 @@ Provides array-like access patterns for storage backends that support pointer ar
 @category neural
 */
 public interface IPointerLikeAddress<T> : IDifferentiablePtrType
+    where T : __BuiltinFloatingPointType
+    where T.Differential : __BuiltinFloatingPointType
 {
     /**
     Array-style element access.
@@ -80,6 +82,8 @@ public interface IPointerLikeAddress<T> : IDifferentiablePtrType
     @param[in] index The element index.
     @param[in] value The value to add.
     */
+    [require(cuda_glsl_hlsl_metal_spirv, sm_6_6)]
+    [require(spvBindlessTextureNV)]
     public void atomicAdd(uint index, T value);
 }
 
@@ -211,9 +215,6 @@ public struct StructuredBufferStorage<T> : IStorage<T>
     }
 }
 
-/////////////////////////////
-// Bindless buffer storage //
-/////////////////////////////
 
 /**
 Bindless buffer storage implementation using buffer handles.
@@ -256,6 +257,8 @@ public struct BindlessBufferStorage<T> : IStorage<T>
             set { m_handle[m_baseIndex + index] = newValue; }
         }
 
+        [require(cuda_glsl_hlsl_metal_spirv, sm_6_6)]
+        [require(spvBindlessTextureNV)]
         public void atomicAdd(uint index, T value)
         {
             __atomic_add(m_handle[m_baseIndex + index], value);
@@ -290,7 +293,7 @@ public struct PointerStorage<T> : IStorage<T>
         T* m_ptr;
         uint m_baseIndex;
 
-        __init(T* ptr, uint baseIndex = 0U)
+        public __init(T* ptr, uint baseIndex = 0U)
         {
             this.m_ptr = ptr;
             this.m_baseIndex = baseIndex;
@@ -311,6 +314,7 @@ public struct PointerStorage<T> : IStorage<T>
             return Address(m_ptr, newBaseIndex);
         }
 
+        [require(cuda_glsl_hlsl_metal_spirv, sm_6_6)]
         public void atomicAdd(uint index, T value)
         {
             __atomic_add(m_ptr[m_baseIndex + index], value);
