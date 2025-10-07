@@ -804,16 +804,18 @@ IRInst* getRootBufferOrAddr(IRInst* addr, List<IRInst*>& outAccessChain, List<IR
 {
     for (;;)
     {
-        switch (addr->getOp())
+        auto op = addr->getOp();
+        switch (op)
         {
         case kIROp_GetElementPtr:
         case kIROp_FieldAddress:
         case kIROp_RWStructuredBufferGetElementPtr:
+
             outAccessChain.add(addr->getOperand(1));
             if (outTypes)
                 outTypes->add(addr->getFullType());
             addr = addr->getOperand(0);
-            if (addr->getOp() == kIROp_RWStructuredBufferGetElementPtr)
+            if (op == kIROp_RWStructuredBufferGetElementPtr)
                 break;
             continue;
         default:
