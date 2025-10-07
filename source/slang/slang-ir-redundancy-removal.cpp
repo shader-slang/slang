@@ -437,9 +437,6 @@ static int getMemoryScopeOrder(MemoryScope scope)
         return 2;
     case MemoryScope::Invocation:
         return 1;
-    default:
-        SLANG_ASSERT(false);
-        return 1;
     }
 }
 
