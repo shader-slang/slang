@@ -800,35 +800,6 @@ IRInst* getRootAddr(IRInst* addr, List<IRInst*>& outAccessChain, List<IRInst*>* 
     return addr;
 }
 
-IRInst* getRootBufferOrAddr(IRInst* addr, List<IRInst*>& outAccessChain, List<IRInst*>* outTypes)
-{
-    for (;;)
-    {
-        auto op = addr->getOp();
-        switch (op)
-        {
-        case kIROp_GetElementPtr:
-        case kIROp_FieldAddress:
-        case kIROp_RWStructuredBufferGetElementPtr:
-
-            outAccessChain.add(addr->getOperand(1));
-            if (outTypes)
-                outTypes->add(addr->getFullType());
-            addr = addr->getOperand(0);
-            if (op == kIROp_RWStructuredBufferGetElementPtr)
-                goto endOfLoop;
-            continue;
-        default:
-            break;
-        }
-        break;
-    }
-endOfLoop:;
-    outAccessChain.reverse();
-    if (outTypes)
-        outTypes->reverse();
-    return addr;
-}
 
 IRInst* getRootBufferOrAddr(IRInst* addr)
 {
@@ -1035,8 +1006,17 @@ bool canAddressesPotentiallyAlias(
     {
         List<IRInst*> accessChain1;
         List<IRInst*> accessChain2;
-        getRootBufferOrAddr(addr1, accessChain1, nullptr);
-        getRootBufferOrAddr(addr2, accessChain2, nullptr);
+
+        // Since getRootBufferOrAddr has a different behavior around
+        // RWStructuredBufferGetElementPtr compared to getRootAddr,
+        // we need to call getRootAddr here again to get a simpler access chain
+        // that we can handle here, so that we don't need to handle the nuance
+        // of whether or not to trace past any RWStructuredBufferGetElementPtr.
+        //
+        root1 = getRootAddr(addr1, accessChain1, nullptr);
+        root2 = getRootAddr(addr2, accessChain2, nullptr);
+        if (root1 != root2)
+            return true;
         for (Index i = 0; i < Math::Min(accessChain1.getCount(), accessChain2.getCount()); i++)
         {
             auto node1 = accessChain1[i];

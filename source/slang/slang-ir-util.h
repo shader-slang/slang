@@ -204,7 +204,6 @@ IRInst* getRootAddr(
     IRInst* addrInst,
     List<IRInst*>& outAccessChain,
     List<IRInst*>* outTypes = nullptr);
-IRInst* getRootBufferOrAddr(IRInst* addr, List<IRInst*>& outAccessChain, List<IRInst*>* outTypes);
 
 bool canAddressesPotentiallyAlias(IRGlobalValueWithCode* func, IRInst* addr1, IRInst* addr2);
 
