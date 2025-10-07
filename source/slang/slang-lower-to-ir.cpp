@@ -8593,12 +8593,48 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitInheritanceDecl(InheritanceDecl* inheritanceDecl)
     {
+        // If the inheritance decl is nested inside a link-time type alias declaration,
+        // e.g. in `export struct Foo:IFoo = FooImpl`,
+        // then we need to emit a symbo alias to the `FooImpl:IFoo`.
+        //
+        auto parentDecl = inheritanceDecl->parentDecl;
+        auto aggTypeParentDecl = as<AggTypeDecl>(parentDecl);
+        if (aggTypeParentDecl && aggTypeParentDecl->aliasedType.type && inheritanceDecl->witnessVal)
+        {
+            NestedContext nested(this);
+            auto subBuilder = nested.getBuilder();
+            auto subContext = nested.getContext();
+            auto outerGeneric = emitOuterGenerics(subContext, inheritanceDecl, inheritanceDecl);
+
+            auto wrappedWitness = lowerVal(subContext, inheritanceDecl->witnessVal);
+            IRInst* alias = nullptr;
+            if (outerGeneric)
+            {
+                alias = finishOuterGenerics(subBuilder, wrappedWitness.val, outerGeneric);
+            }
+            else
+            {
+                alias = getBuilder()->emitSymbolAlias(wrappedWitness.val);
+            }
+            auto mangledName = getMangledNameForConformanceWitness(
+                context->astBuilder,
+                parentDecl,
+                inheritanceDecl->base.type);
+            bool explicitExtern = false;
+            if (isImportedDecl(context, parentDecl, explicitExtern))
+                getBuilder()->addImportDecoration(alias, mangledName.getUnownedSlice());
+            else
+                getBuilder()->addExportDecoration(alias, mangledName.getUnownedSlice());
+
+            context->setGlobalValue(inheritanceDecl, LoweredValInfo::simple(alias));
+            return LoweredValInfo::simple(alias);
+        }
+
         // An inheritance clause inside of an `interface`
         // declaration should not give rise to a witness
         // table, because it represents something the
         // interface requires, and not what it provides.
         //
-        auto parentDecl = inheritanceDecl->parentDecl;
         if (const auto parentInterfaceDecl = as<InterfaceDecl>(parentDecl))
         {
             return LoweredValInfo::simple(getInterfaceRequirementKey(inheritanceDecl));
@@ -9724,10 +9760,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             SLANG_UNREACHABLE("associatedtype should have been handled by visitAssocTypeDecl.");
         }
 
-        // TODO(JS):
-        // Not clear what to do around HLSLExportModifier.
-        // The HLSL spec says it only applies to functions, so we ignore for now.
-
         // We are going to create nested IR building state
         // to use when emitting the members of the type.
         //
@@ -9737,6 +9769,35 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // Emit any generics that should wrap the actual type.
         auto outerGeneric = emitOuterGenerics(subContext, decl, decl);
+
+        if (decl->aliasedType)
+        {
+            // If the type decl is an alias of another type, then we lower it into
+            // a IRSymbolAlias.
+            auto loweredType = lowerType(subContext, decl->aliasedType);
+            if (loweredType)
+            {
+                IRInst* alias = nullptr;
+                if (outerGeneric)
+                {
+                    alias = finishOuterGenerics(subBuilder, loweredType, outerGeneric);
+                }
+                else
+                {
+                    alias = subBuilder->emitSymbolAlias(loweredType);
+                }
+                addLinkageDecoration(subContext, alias, decl);
+
+                // Enumerate all witnesses and lower IRSymbolAlias for them as well.
+                for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
+                {
+                    if (!inheritanceDecl->witnessVal)
+                        continue;
+                    ensureDecl(subContext, inheritanceDecl);
+                }
+                return LoweredValInfo::simple(alias);
+            }
+        }
 
         IRType* irAggType = nullptr;
         if (as<StructDecl>(decl))
