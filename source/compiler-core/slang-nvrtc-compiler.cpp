@@ -133,8 +133,14 @@ protected:
     SlangResult _findOptixIncludePath(String& outIncludePath);
     SlangResult _getOptixIncludePath(String& outIncludePath);
 
-    SlangResult _maybeAddHalfSupport(const CompileOptions& options, CommandLine& ioCmdLine, IArtifactDiagnostics* diagnostics);
-    SlangResult _maybeAddOptixSupport(const CompileOptions& options, CommandLine& ioCmdLine, IArtifactDiagnostics* diagnostics);
+    SlangResult _maybeAddHalfSupport(
+        const CompileOptions& options,
+        CommandLine& ioCmdLine,
+        IArtifactDiagnostics* diagnostics);
+    SlangResult _maybeAddOptixSupport(
+        const CompileOptions& options,
+        CommandLine& ioCmdLine,
+        IArtifactDiagnostics* diagnostics);
 
 #define SLANG_NVTRC_MEMBER_FUNCS(ret, name, params) ret(*m_##name) params;
 
@@ -925,7 +931,8 @@ SlangResult NVRTCDownstreamCompiler::_maybeAddHalfSupport(
         diagnostic.stage = ArtifactDiagnostic::Stage::Compile;
 
         StringBuilder errorMsg;
-        errorMsg << "Failed to locate CUDA headers (cuda_fp16.h) required for half/float16 support.\n";
+        errorMsg
+            << "Failed to locate CUDA headers (cuda_fp16.h) required for half/float16 support.\n";
         errorMsg << "Searched locations:\n";
 
         // List the locations we searched
@@ -937,9 +944,11 @@ SlangResult NVRTCDownstreamCompiler::_maybeAddHalfSupport(
 
         StringBuilder cudaPathBuf;
         if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
-                UnownedStringSlice::fromLiteral("CUDA_PATH"), cudaPathBuf)))
+                UnownedStringSlice::fromLiteral("CUDA_PATH"),
+                cudaPathBuf)))
         {
-            errorMsg << "  - CUDA_PATH environment variable: " << Path::combine(cudaPathBuf, "include") << "\n";
+            errorMsg << "  - CUDA_PATH environment variable: "
+                     << Path::combine(cudaPathBuf, "include") << "\n";
         }
         else
         {
@@ -1012,20 +1021,24 @@ SlangResult NVRTCDownstreamCompiler::_maybeAddOptixSupport(
         diagnostic.stage = ArtifactDiagnostic::Stage::Compile;
 
         StringBuilder errorMsg;
-        errorMsg << "Failed to locate OptiX headers (optix.h) required for OptiX ray tracing support.\n";
+        errorMsg
+            << "Failed to locate OptiX headers (optix.h) required for OptiX ray tracing support.\n";
         errorMsg << "Please install OptiX SDK. Typical installation locations:\n";
 
 #if SLANG_WINDOWS_FAMILY
         StringBuilder programDataBuf;
         if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
-                UnownedStringSlice::fromLiteral("PROGRAMDATA"), programDataBuf)))
+                UnownedStringSlice::fromLiteral("PROGRAMDATA"),
+                programDataBuf)))
         {
-            errorMsg << "  - " << Path::combine(programDataBuf, "NVIDIA Corporation\\OptiX SDK *") << "\n";
+            errorMsg << "  - " << Path::combine(programDataBuf, "NVIDIA Corporation\\OptiX SDK *")
+                     << "\n";
         }
 #else
         StringBuilder homeBuf;
         if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
-                UnownedStringSlice::fromLiteral("HOME"), homeBuf)))
+                UnownedStringSlice::fromLiteral("HOME"),
+                homeBuf)))
         {
             errorMsg << "  - " << Path::combine(homeBuf, "NVIDIA-OptiX-SDK-*") << "\n";
         }
@@ -1036,8 +1049,7 @@ SlangResult NVRTCDownstreamCompiler::_maybeAddOptixSupport(
         if (SLANG_SUCCEEDED(PlatformUtil::getInstancePath(instancePathBuilder)))
         {
             String projectRoot = Path::getParentDirectory(
-                Path::getParentDirectory(
-                    Path::getParentDirectory(instancePathBuilder)));
+                Path::getParentDirectory(Path::getParentDirectory(instancePathBuilder)));
             errorMsg << "  - " << Path::combine(projectRoot, "external/optix-dev/include") << "\n";
         }
 

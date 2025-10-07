@@ -2677,8 +2677,10 @@ static SlangResult createArtifactFromIR(
         codeGenContext->getSession()->addDownstreamCompileTime(downstreamElapsedTime);
 
         // Always report diagnostics from the compilation, even if it failed
-        SLANG_RETURN_ON_FAIL(
-            passthroughDownstreamDiagnostics(codeGenContext->getSink(), compiler, optimizedArtifact));
+        SLANG_RETURN_ON_FAIL(passthroughDownstreamDiagnostics(
+            codeGenContext->getSink(),
+            compiler,
+            optimizedArtifact));
 
         // Now check if compilation succeeded
         if (SLANG_SUCCEEDED(compileRes))
