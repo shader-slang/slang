@@ -10702,6 +10702,17 @@ void SemanticsDeclHeaderVisitor::checkInterfaceRequirement(Decl* decl)
     }
 }
 
+bool doesTypeHaveNoDiffModifier(Type* type)
+{
+      if (auto modifiedType = as<ModifiedType>(type))
+      {
+           if (modifiedType->findModifier<NoDiffModifierVal>() != nullptr)
+               return true;
+           return doesTypeHaveNoDiffModifier(modifiedType->getBase());
+      }
+      return false;
+}
+
 void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
 {
     for (auto paramDecl : decl->getParameters())
@@ -10719,6 +10730,10 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
         errorType = TypeExp(m_astBuilder->getBottomType());
     }
     decl->errorType = errorType;
+
+    if (doesTypeHaveNoDiffModifier(decl->returnType.type)) {
+        addModifier(decl, m_astBuilder->create<NoDiffModifier>());
+    }
 
     checkDifferentiableCallableCommon(decl);
 
