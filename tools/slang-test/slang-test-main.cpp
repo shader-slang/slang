@@ -1058,9 +1058,35 @@ static Result _executeRPC(
     // Execute
     if (SLANG_FAILED(rpcConnection->sendCall(method, rttiInfo, args)))
     {
+        // Try to get diagnostic information from the crashed test-server process
+        String errorDetail = "JSON RPC failure: sendCall()";
+        Process* process = rpcConnection->getProcess();
+        if (process && process->isTerminated())
+        {
+            // The test-server process crashed. Try to read its stderr for diagnostics.
+            Stream* stderrStream = process->getStream(StdStreamType::ErrorOut);
+            if (stderrStream)
+            {
+                List<uint8_t> stderrData;
+                // Try to read up to 4KB of stderr
+                const size_t maxRead = 4096;
+                stderrData.setCount(maxRead);
+                size_t bytesRead = 0;
+                if (SLANG_SUCCEEDED(stderrStream->read(stderrData.getBuffer(), maxRead, bytesRead)) && bytesRead > 0)
+                {
+                    const char* begin = (const char*)stderrData.getBuffer();
+                    const char* end = begin + bytesRead;
+                    String stderrContent(begin, end);
+                    errorDetail = errorDetail + "\nTest server stderr: " + stderrContent;
+                }
+            }
+            errorDetail = errorDetail + String("\nTest server process terminated with code: ") + String(process->getReturnValue());
+        }
+        
         context->getTestReporter()->messageFormat(
             TestMessageType::RunError,
-            "JSON RPC failure: sendCall()");
+            "%s",
+            errorDetail.getBuffer());
 
         context->destroyRPCConnection();
         return SLANG_FAIL;
@@ -4839,6 +4865,15 @@ void runTestsInParallel(TestContext* context, int count, const F& f)
         TestReporter::SuiteScope suiteScope(&reporter, "tests");
         context->setThreadIndex(threadId);
         context->setTestReporter(&reporter);
+        
+        // Stagger server startup to avoid simultaneous GPU initialization across all threads.
+        // This prevents race conditions and resource contention when 8+ test-server processes
+        // all try to initialize Vulkan/GPU contexts at the exact same instant.
+        if (threadId > 0)
+        {
+            Process::sleepCurrentThread(threadId * 200);
+        }
+        
         do
         {
             int index = consumePtr.fetch_add(1);
