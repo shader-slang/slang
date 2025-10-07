@@ -1465,7 +1465,6 @@ struct CPUEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalize
     IRInst* groupThreadID = nullptr;
     IRInst* groupExtents = nullptr;
     IRInst* dispatchThreadID = nullptr;
-    IRInst* dispatchThreadID1D = nullptr;
     IRInst* groupThreadIndex = nullptr;
 
     void beginEntryPointImpl() SLANG_OVERRIDE
@@ -1473,7 +1472,6 @@ struct CPUEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalize
         groupID = nullptr;
         groupThreadID = nullptr;
         dispatchThreadID = nullptr;
-        dispatchThreadID1D = nullptr;
 
         IRBuilder builder(m_module);
 
@@ -1514,19 +1512,8 @@ struct CPUEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalize
 
         dispatchThreadID =
             emitCalcDispatchThreadID(builder, uint3Type, groupID, groupThreadID, groupExtents);
-        UInt idx = 0;
-        dispatchThreadID1D = builder.emitSwizzle(uintType, dispatchThreadID, 1, &idx);
 
         groupThreadIndex = emitCalcGroupIndex(builder, groupThreadID, groupExtents);
-    }
-
-    static bool isVectorParam(IRType* type)
-    {
-        if (as<IRVectorType>(type))
-            return true;
-        else if (auto ptr = as<IRPtrTypeBase>(type))
-            return isVectorParam(ptr->getValueType());
-        return false;
     }
 
     LegalizedVaryingVal createLegalSystemVaryingValImpl(VaryingParamInfo const& info) SLANG_OVERRIDE
