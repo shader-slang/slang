@@ -800,6 +800,33 @@ IRInst* getRootAddr(IRInst* addr, List<IRInst*>& outAccessChain, List<IRInst*>* 
     return addr;
 }
 
+IRInst* getRootBufferOrAddr(IRInst* addr, List<IRInst*>& outAccessChain, List<IRInst*>* outTypes)
+{
+    for (;;)
+    {
+        switch (addr->getOp())
+        {
+        case kIROp_GetElementPtr:
+        case kIROp_FieldAddress:
+        case kIROp_RWStructuredBufferGetElementPtr:
+            outAccessChain.add(addr->getOperand(1));
+            if (outTypes)
+                outTypes->add(addr->getFullType());
+            addr = addr->getOperand(0);
+            if (addr->getOp() == kIROp_RWStructuredBufferGetElementPtr)
+                break;
+            continue;
+        default:
+            break;
+        }
+        break;
+    }
+    outAccessChain.reverse();
+    if (outTypes)
+        outTypes->reverse();
+    return addr;
+}
+
 IRInst* getRootBufferOrAddr(IRInst* addr)
 {
     auto rootAddr = getRootAddr(addr);
@@ -953,11 +980,11 @@ bool canAddressesPotentiallyAlias(
     if (addr1 == addr2)
         return true;
 
-    addr1 = getRootBufferOrAddr(addr1);
-    addr2 = getRootBufferOrAddr(addr2);
+    auto root1 = getRootBufferOrAddr(addr1);
+    auto root2 = getRootBufferOrAddr(addr2);
 
-    auto addr1Class = getAliasingClass(addr1);
-    auto addr2Class = getAliasingClass(addr2);
+    auto addr1Class = getAliasingClass(root1);
+    auto addr2Class = getAliasingClass(root2);
 
     if (!canAddrClassesAlias(addr1Class, addr2Class))
         return false;
@@ -974,17 +1001,17 @@ bool canAddressesPotentiallyAlias(
         case AddressAliasingClass::BoundBuffer:
         case AddressAliasingClass::BoundTexture:
         case AddressAliasingClass::ConstantBuffer:
-            if (addr1 != addr2)
+            if (root1 != root2)
                 return false;
             break;
         }
     }
 
     // A param and a var can never alias.
-    if (addr1->getOp() == kIROp_Param && addr1->getParent() == func->getFirstBlock() &&
-            addr2->getOp() == kIROp_Var ||
-        addr1->getOp() == kIROp_Var && addr2->getOp() == kIROp_Param &&
-            addr2->getParent() == func->getFirstBlock())
+    if (root1->getOp() == kIROp_Param && root1->getParent() == func->getFirstBlock() &&
+            root2->getOp() == kIROp_Var ||
+        root1->getOp() == kIROp_Var && root2->getOp() == kIROp_Param &&
+            root2->getParent() == func->getFirstBlock())
         return false;
 
     // If one addr is user pointer and one addr is a var,
@@ -992,11 +1019,44 @@ bool canAddressesPotentiallyAlias(
     // the var.
     if (addr1Class == AddressAliasingClass::Var && addr2Class == AddressAliasingClass::UserPointer)
     {
-        return canVarAliasWithUserPointer(target, addr1);
+        return canVarAliasWithUserPointer(target, root1);
     }
     if (addr2Class == AddressAliasingClass::Var && addr1Class == AddressAliasingClass::UserPointer)
     {
-        return canVarAliasWithUserPointer(target, addr2);
+        return canVarAliasWithUserPointer(target, root2);
+    }
+
+    // If two addrs are rooted from the same object but found to statically differ in access chain,
+    // then they cannot alias.
+    if (root1 == root2)
+    {
+        List<IRInst*> accessChain1;
+        List<IRInst*> accessChain2;
+        getRootBufferOrAddr(addr1, accessChain1, nullptr);
+        getRootBufferOrAddr(addr2, accessChain2, nullptr);
+        for (Index i = 0; i < Math::Min(accessChain1.getCount(), accessChain2.getCount()); i++)
+        {
+            auto node1 = accessChain1[i];
+            auto node2 = accessChain2[i];
+            if (as<IRStructKey>(node1) && as<IRStructKey>(node2))
+            {
+                // Two different field keys means the two addresses cannot alias.
+                // TODO: If we are going to support union types, we need to exclude that
+                // here.
+                if (node1 != node2)
+                    return false;
+                // If the keys are the same, continue looking further down the access chain.
+                continue;
+            }
+            // Two different constant indices means the two addresses cannot alias.
+            auto index1 = as<IRIntLit>(node1->getOperand(1));
+            auto index2 = as<IRIntLit>(node2->getOperand(1));
+            if (index1 && index2 && index1->getValue() != index2->getValue())
+                return false;
+            // In all other cases, such as when either one of the indices is
+            // a untime value, we treat the two indices as potentially being the same.
+            return true;
+        }
     }
     return true;
 }

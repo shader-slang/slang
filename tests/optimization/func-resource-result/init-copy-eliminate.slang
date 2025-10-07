@@ -3,8 +3,12 @@
 // Test on a regression that caused a field to be initialized twice in the ctor.
 
 // CHECK-COUNT-1: callOnce{{.*}}(int(1000))
-
-int callOnce(int x) { return 999; }
+// CHECK-COUNT-1: {{.*}}->origin_0 = 
+int callOnce(int x)
+{ 
+    *result += 1.0f;  // cause some side effect so the call is not eliminated
+     return 999;
+}
 
 public struct Ray
 {
