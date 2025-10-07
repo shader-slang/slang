@@ -238,16 +238,16 @@ public struct BindlessBufferStorage<T> : IStorage<T>
         public typealias Differential =
             BindlessBufferStorage<T.Differential>.BindlessAddress;
 
-        RWStructuredBuffer<T>.Handle m_handle;
-        uint m_baseIndex;
+        internal RWStructuredBuffer<T>.Handle m_handle;
+        internal uint m_baseIndex;
 
-        __init(RWStructuredBuffer<T>.Handle handle, uint baseIndex = 0U)
+        public __init(RWStructuredBuffer<T>.Handle handle, uint baseIndex = 0U)
         {
             this.m_handle = handle;
             this.m_baseIndex = baseIndex;
         }
 
-        __subscript(uint index)->T
+        public __subscript(uint index)->T
         {
             [nonmutating]
             get { return m_handle[m_baseIndex + index]; }
@@ -261,7 +261,7 @@ public struct BindlessBufferStorage<T> : IStorage<T>
             __atomic_add(m_handle[m_baseIndex + index], value);
         }
 
-        Address getOffset(int elements)
+        public Address getOffset(int elements)
         {
             uint newBaseIndex = m_baseIndex + elements;
             return Address(m_handle, newBaseIndex);
@@ -296,7 +296,7 @@ public struct PointerStorage<T> : IStorage<T>
             this.m_baseIndex = baseIndex;
         }
 
-        __subscript(uint index)->T
+        public __subscript(uint index)->T
         {
             [nonmutating]
             get { return m_ptr[m_baseIndex + index]; }
@@ -305,7 +305,7 @@ public struct PointerStorage<T> : IStorage<T>
             set { m_ptr[m_baseIndex + index] = newValue; }
         }
 
-        Address getOffset(uint elements)
+        public Address getOffset(uint elements)
         {
             uint newBaseIndex = m_baseIndex + elements;
             return Address(m_ptr, newBaseIndex);
