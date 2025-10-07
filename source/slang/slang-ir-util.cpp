@@ -1032,8 +1032,8 @@ bool canAddressesPotentiallyAlias(
                 continue;
             }
             // Two different constant indices means the two addresses cannot alias.
-            auto index1 = as<IRIntLit>(node1->getOperand(1));
-            auto index2 = as<IRIntLit>(node2->getOperand(1));
+            auto index1 = as<IRIntLit>(node1);
+            auto index2 = as<IRIntLit>(node2);
             if (index1 && index2 && index1->getValue() != index2->getValue())
                 return false;
             // In all other cases, such as when either one of the indices is
