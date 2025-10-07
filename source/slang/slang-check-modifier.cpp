@@ -2283,13 +2283,17 @@ private:
     List<NoDiffModifier*> m_extractedNoDiffModifiers;
 
 public:
-    NoDiffExtractorVisitor() {}
+    NoDiffExtractorVisitor()
+    {}
 
     List<NoDiffModifier*>& getExtractedModifiers() { return m_extractedNoDiffModifiers; }
 
     // Default case - for any Expr type we haven't specifically handled
     // We just return the expression unchanged since we don't know how to recurse into it
-    Expr* visitExpr(Expr* expr) { return expr; }
+    Expr* visitExpr(Expr* expr)
+    {
+        return expr;
+    }
 
     // === Type Expressions Used in Traditional Function Declarations ===
 
@@ -2314,9 +2318,7 @@ public:
                 modifier->next = nullptr; // Unlink
                 m_extractedNoDiffModifiers.add(noDiffModifier);
                 *modifierPtr = next;
-            }
-            else
-            {
+            } else {
                 modifierPtr = &modifier->next;
                 modifierCount++;
             }
