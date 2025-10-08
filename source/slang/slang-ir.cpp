@@ -835,8 +835,7 @@ void fixUpDebugFuncType(IRFunc* func)
             oldDebugFunc->getLine(),
             oldDebugFunc->getCol(),
             oldDebugFunc->getFile(),
-            funcType
-        );
+            funcType);
         debugFuncDecor->removeAndDeallocate();
         builder.addDecoration(funcType, kIROp_DebugFuncDecoration, newDebugFunc);
     }
