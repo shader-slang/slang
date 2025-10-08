@@ -4867,6 +4867,12 @@ void runTestsInParallel(TestContext* context, int count, const F& f)
         context->setThreadIndex(threadId);
         context->setTestReporter(&reporter);
 
+        // Stagger server startup to avoid simultaneous GPU initialization across all threads.
+        if (threadId > 0)
+        {
+            Process::sleepCurrentThread(threadId * 200);
+        }
+        
         do
         {
             int index = consumePtr.fetch_add(1);
