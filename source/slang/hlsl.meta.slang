@@ -26704,8 +26704,7 @@ static const struct {
 for(auto buffer : kByteAddressBufferCases_) {
 }}}}
 
-// Internal implementation without assertions (contains GenericAsm which prevents inlining)
-// TODO - https://github.com/shader-slang/slang/issues/8620
+// Internal implementation without static_assert; github issue 8620
 [ForceInline]
 [require(cooperative_vector)]
 [require(hlsl_coopvec_poc)]
@@ -26865,7 +26864,6 @@ CoopVec<T, M> __coopVecMatMulPacked_impl(
 /// values to use from the packed input.
 // TODO: Can we ForceInline for just hlsl? the other platforms don't really
 // need it
-// Public wrapper with assertions (can be inlined since it has no GenericAsm)
 [ForceInline]
 [require(cooperative_vector)]
 [require(hlsl_coopvec_poc)]
@@ -26953,6 +26951,7 @@ CoopVec<T, M> coopVecMatMul(
         matrixStride);
 }
 
+// Internal implementation without static_assert; github issue 8620
 [ForceInline]
 [require(cooperative_vector)]
 [require(hlsl_coopvec_poc)]
@@ -27383,6 +27382,8 @@ static const struct {
 for(auto buffer : kStructuredBufferCases_) {
 }}}}
 
+// Internal implementation without static_assert; github issue 8620
+[ForceInline]
 [require(spirv, cooperative_vector)]
 [require(optix_coopvec)]
 __generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType,IgnoredBufferElementType>
@@ -27480,6 +27481,8 @@ CoopVec<T, M> coopVecMatMul(
         matrixStride);
 }
 
+// Internal implementation without static_assert; github issue 8620
+[ForceInline]
 [require(spirv, cooperative_vector)]
 [require(optix_coopvec)]
 CoopVec<T, M> __coopVecMatMulAddPacked_impl<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType, IgnoredBufferElementType>(
@@ -27774,7 +27777,6 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
     constexpr uint matrixStride
 )
 {
-    // Common static assertions for all targets (moved before __target_switch)
     static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
                  , "for non-packed inputInterpretation values k must be equal to the input vector length");
     static_assert(!__isPackedInputInterpretation(inputInterpretation)
