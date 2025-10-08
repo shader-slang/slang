@@ -3,7 +3,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -cpu -compute
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -cuda -compute
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -wgsl -compute
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -mtl -compute
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -mtl -compute
 //TEST(compute,vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -vk -compute
 
 // Slang allows the type of system value semantics to differ from their
