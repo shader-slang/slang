@@ -1402,10 +1402,6 @@ Result linkAndOptimizeIR(
     // function parameters, reults, etc. is invalid.
     // We clean up the usages of resource values here.
     specializeResourceUsage(codeGenContext, irModule);
-    specializeFuncsForBufferLoadArgs(codeGenContext, irModule);
-
-    // Push `structuredBufferLoad` to the end of access chain to avoid loading unnecessary data.
-    deferBufferLoad(codeGenContext, irModule);
 
     // We also want to specialize calls to functions that
     // takes unsized array parameters if possible.
@@ -1766,6 +1762,14 @@ Result linkAndOptimizeIR(
         validateIRModuleIfEnabled(codeGenContext, irModule);
         break;
     }
+
+    // Specialize function calls that takes values loaded from immutable buffers to load
+    // directly from the buffers inside the callee.
+    specializeFuncsForBufferLoadArgs(codeGenContext, irModule);
+
+    // Push `structuredBufferLoad` to the end of access chain to avoid loading unnecessary data.
+    deferBufferLoad(codeGenContext, irModule);
+
 
     // TODO: our current dynamic dispatch pass will remove all uses of witness tables.
     // If we are going to support function-pointer based, "real" modular dynamic dispatch,
