@@ -1059,7 +1059,9 @@ protected:
         return LegalizedVaryingVal();
     }
 
-    LegalizedVaryingVal createLegalizedSystemVaryingValInst(VaryingParamInfo const& info, IRInst* id)
+    LegalizedVaryingVal createLegalizedSystemVaryingValInst(
+        VaryingParamInfo const& info,
+        IRInst* id)
     {
         IRType* paramType = info.type;
 
