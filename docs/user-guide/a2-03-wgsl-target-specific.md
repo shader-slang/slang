@@ -91,14 +91,6 @@ ConstantBuffer translates to the `uniform` address space with `read` access mode
 ByteAddressBuffer and RWByteAddressBuffer translate to `array<u32>` in the `storage` address space, with the `read` and `read_write` access modes in WGSL, respectively.
 StructuredBuffer and RWStructuredBuffer with struct type T translate to `array<T>` in the `storage` address space, with with the `read` and `read_write` access modes in WGSL, respectively.
 
-
-Specialization Constants
-------------------------
-
-Specialization constants are not supported when targeting WGSL, at the moment.
-They should map to 'override declarations' in WGSL, however this is not yet implemented.
-
-
 Interlocked operations
 ----------------------
 
