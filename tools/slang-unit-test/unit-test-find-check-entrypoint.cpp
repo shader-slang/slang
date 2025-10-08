@@ -78,6 +78,13 @@ SLANG_UNIT_TEST(findAndCheckEntryPoint)
 // tests/compute/simple.slang should cover the same issue.
 SLANG_UNIT_TEST(cudaCodeGenBug)
 {
+    // We need the CUDA backend for this test
+    if (!SLANG_SUCCEEDED(
+            unitTestContext->slangGlobalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
+    {
+        SLANG_IGNORE_TEST;
+    }
+
     // Source for a module that contains an undecorated entrypoint.
     const char* userSourceBody = R"(
         RWStructuredBuffer<float> outputBuffer;
