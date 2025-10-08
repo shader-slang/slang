@@ -1489,20 +1489,20 @@ static void addLinkageDecoration(IRGenContext* context, IRInst* inst, Decl* decl
 
 bool shouldDeclBeTreatedAsInterfaceRequirement(Decl* requirementDecl)
 {
-    if (const auto funcDecl = as<CallableDecl>(requirementDecl))
+    if (as<CallableDecl>(requirementDecl))
     {
         // Subscript decl itself won't have a witness table entry.
         // But its accessors will.
-        if (const auto subscriptDecl = as<SubscriptDecl>(requirementDecl))
+        if (as<SubscriptDecl>(requirementDecl))
             return false;
     }
-    else if (const auto assocTypeDecl = as<AssocTypeDecl>(requirementDecl))
+    else if (as<AssocTypeDecl>(requirementDecl))
     {
     }
-    else if (const auto typeConstraint = as<TypeConstraintDecl>(requirementDecl))
+    else if (as<TypeConstraintDecl>(requirementDecl))
     {
     }
-    else if (const auto varDecl = as<VarDeclBase>(requirementDecl))
+    else if (as<VarDeclBase>(requirementDecl))
     {
     }
     else if (as<AccessorDecl>(requirementDecl))
@@ -2593,7 +2593,7 @@ static String getNameForNameHint(IRGenContext* context, Decl* decl)
         return String();
 
 
-    if (const auto varDecl = as<VarDeclBase>(decl))
+    if (as<VarDeclBase>(decl))
     {
         // For an ordinary local variable, global variable,
         // parameter, or field, we will just use the name
@@ -3663,7 +3663,7 @@ struct ExprLoweringContext
         // In such a case we should be careful to not statically
         // resolve things.
         //
-        if (auto callableDecl = as<CallableDecl>(declRefExpr->declRef.getDecl()))
+        if (as<CallableDecl>(declRefExpr->declRef.getDecl()))
         {
             // Okay, the declaration is directly callable, so we can continue.
         }
@@ -3714,7 +3714,7 @@ struct ExprLoweringContext
                     continue;
                 }
             }
-            else if (auto andType = as<AndType>(e->type))
+            else if (as<AndType>(e->type))
             {
                 // TODO: We might eventually need to tell the difference
                 // between conjunctions of interfaces and conjunctions
@@ -4942,7 +4942,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         type = getOriginalTypeFromModifiedType(type);
 
         auto irType = lowerType(context, type);
-        if (auto basicType = as<BasicExpressionType>(type))
+        if (as<BasicExpressionType>(type))
         {
             return getSimpleDefaultVal(irType);
         }
@@ -4968,7 +4968,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             return LoweredValInfo::simple(
                 getBuilder()->emitMakeArrayFromElement(irType, irDefaultElement));
         }
-        else if (auto ptrType = as<PtrType>(type))
+        else if (as<PtrType>(type))
         {
             return LoweredValInfo::simple(getBuilder()->getNullPtrValue(irType));
         }
@@ -7104,11 +7104,11 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                 }
             }
         }
-        else if (const auto caseStmt = as<CaseStmt>(stmt))
+        else if (as<CaseStmt>(stmt))
         {
             return true;
         }
-        else if (const auto defaultStmt = as<DefaultStmt>(stmt))
+        else if (as<DefaultStmt>(stmt))
         {
             // A 'default:' is a kind of case.
             return true;
@@ -7185,7 +7185,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             info->cases.add(caseVal);
             info->cases.add(label);
         }
-        else if (const auto defaultStmt = as<DefaultStmt>(stmt))
+        else if (as<DefaultStmt>(stmt))
         {
             auto label = getLabelForCase(info);
 
@@ -7194,7 +7194,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
             info->defaultLabel = label;
         }
-        else if (const auto emptyStmt = as<EmptyStmt>(stmt))
+        else if (as<EmptyStmt>(stmt))
         {
             // Special-case empty statements so they don't
             // mess up our "trivial fall-through" optimization.
@@ -8420,7 +8420,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // generic associated types.
 
 
-            if (const auto interfaceDecl = as<InterfaceDecl>(assocTypeDecl->parentDecl))
+            if (as<InterfaceDecl>(assocTypeDecl->parentDecl))
             {
                 // Okay, this seems to be an interface rquirement, and
                 // we should lower it as such.
@@ -8428,7 +8428,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
         }
 
-        if (const auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->parentDecl))
+        if (as<GlobalGenericParamDecl>(decl->parentDecl))
         {
             // This is a constraint on a global generic type parameters,
             // and so it should lower as a parameter of its own.
@@ -8618,7 +8618,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // table, because it represents something the
         // interface requires, and not what it provides.
         //
-        if (const auto parentInterfaceDecl = as<InterfaceDecl>(parentDecl))
+        if (as<InterfaceDecl>(parentDecl))
         {
             return LoweredValInfo::simple(getInterfaceRequirementKey(inheritanceDecl));
         }
@@ -8872,7 +8872,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
         if (auto extDecl = as<ExtensionDecl>(parent))
         {
-            if (const auto declRefType = as<DeclRefType>(extDecl->targetType.type))
+            if (as<DeclRefType>(extDecl->targetType.type))
             {
                 return true;
             }
@@ -9647,7 +9647,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             subBuilder->addAnyValueSizeDecoration(irInterface, anyValueSizeAttr->size);
         }
-        if (const auto specializeAttr = decl->findModifier<SpecializeAttribute>())
+        if (decl->findModifier<SpecializeAttribute>())
         {
             subBuilder->addSpecializeDecoration(irInterface);
         }
@@ -9657,7 +9657,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 irInterface,
                 comInterfaceAttr->guid.getUnownedSlice());
         }
-        if (const auto builtinAttr = decl->findModifier<BuiltinAttribute>())
+        if (decl->findModifier<BuiltinAttribute>())
         {
             subBuilder->addBuiltinDecoration(irInterface);
         }
@@ -9833,7 +9833,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addLinkageDecoration(context, irAggType, decl);
 
 
-        if (const auto rayPayloadAttribute = decl->findModifier<RayPayloadAttribute>())
+        if (decl->findModifier<RayPayloadAttribute>())
         {
             subBuilder->addDecoration(irAggType, kIROp_RayPayloadDecoration);
         }
@@ -10574,7 +10574,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 scrutinee);
         }
 
-        if (const auto nvapiMod = decl->findModifier<NVAPIMagicModifier>())
+        if (decl->findModifier<NVAPIMagicModifier>())
         {
             builder->addNVAPIMagicDecoration(irInst, decl->getName()->text.getUnownedSlice());
         }
@@ -10752,7 +10752,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // have a name, but its parent should.
         //
         Decl* declForName = decl;
-        if (const auto accessorDecl = as<AccessorDecl>(decl))
+        if (as<AccessorDecl>(decl))
             declForName = decl->parentDecl;
 
         definition.append(getText(declForName->getName()));

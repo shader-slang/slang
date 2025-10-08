@@ -1268,7 +1268,7 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
         m_writer->emit(" device*");
         return;
     }
-    else if (const auto untypedBufferType = as<IRUntypedBufferResourceType>(type))
+    else if (as<IRUntypedBufferResourceType>(type))
     {
         switch (type->getOp())
         {
