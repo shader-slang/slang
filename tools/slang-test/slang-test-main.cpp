@@ -4865,15 +4865,7 @@ void runTestsInParallel(TestContext* context, int count, const F& f)
         TestReporter::SuiteScope suiteScope(&reporter, "tests");
         context->setThreadIndex(threadId);
         context->setTestReporter(&reporter);
-        
-        // Stagger server startup to avoid simultaneous GPU initialization across all threads.
-        // This prevents race conditions and resource contention when 8+ test-server processes
-        // all try to initialize Vulkan/GPU contexts at the exact same instant.
-        if (threadId > 0)
-        {
-            Process::sleepCurrentThread(threadId * 200);
-        }
-        
+
         do
         {
             int index = consumePtr.fetch_add(1);
