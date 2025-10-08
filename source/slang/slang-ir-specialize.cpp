@@ -2056,20 +2056,7 @@ struct SpecializationContext
             }
         }
 
-        if (auto debugFuncDecor = newFunc->findDecoration<IRDebugFuncDecoration>())
-        {
-            auto oldDebugFunc = cast<IRDebugFunction>(debugFuncDecor->getDebugFunc());
-            builder->setInsertInto(builder->getModule()->getModuleInst());
-            auto newDebugFunc = builder->emitDebugFunction(
-                oldDebugFunc->getName(),
-                oldDebugFunc->getLine(),
-                oldDebugFunc->getCol(),
-                oldDebugFunc->getFile(),
-                newFuncType);
-            debugFuncDecor->removeAndDeallocate();
-            builder->addDecoration(newFunc, kIROp_DebugFuncDecoration, newDebugFunc);
-        }
-
+        fixUpDebugFuncType(newFunc);
         return newFunc;
     }
 

@@ -815,6 +815,33 @@ IRType* IRFunc::getParamType(UInt index)
     return getDataType()->getParamType(index);
 }
 
+void fixUpDebugFuncType(IRFunc* func)
+{
+    SLANG_ASSERT(func);
+
+    auto irModule = func->getModule();
+    SLANG_ASSERT(irModule);
+
+    IRBuilder builder(irModule);
+    builder.setInsertBefore(func);
+
+    if (auto debugFuncDecor = func->findDecoration<IRDebugFuncDecoration>())
+    {
+        auto funcType = func->getDataType();
+        auto oldDebugFunc = cast<IRDebugFunction>(debugFuncDecor->getDebugFunc());
+        builder.setInsertInto(irModule->getModuleInst());
+        auto newDebugFunc = builder.emitDebugFunction(
+            oldDebugFunc->getName(),
+            oldDebugFunc->getLine(),
+            oldDebugFunc->getCol(),
+            oldDebugFunc->getFile(),
+            funcType
+        );
+        debugFuncDecor->removeAndDeallocate();
+        builder.addDecoration(funcType, kIROp_DebugFuncDecoration, newDebugFunc);
+    }
+}
+
 void fixUpFuncType(IRFunc* func, IRType* resultType)
 {
     SLANG_ASSERT(func);
