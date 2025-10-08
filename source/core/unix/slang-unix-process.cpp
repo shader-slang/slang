@@ -313,6 +313,11 @@ SlangResult UnixPipeStream::read(void* buffer, size_t length, size_t& outReadByt
         close();
     }
 
+    if (pollInfo.revents & POLLERR || pollInfo.revents & POLLNVAL)
+    {
+        return SLANG_FAIL;
+    }
+
     return SLANG_OK;
 }
 
