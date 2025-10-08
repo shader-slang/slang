@@ -1059,35 +1059,9 @@ static Result _executeRPC(
     // Execute
     if (SLANG_FAILED(rpcConnection->sendCall(method, rttiInfo, args)))
     {
-        // Try to get diagnostic information from the crashed test-server process
-        String errorDetail = "JSON RPC failure: sendCall()";
-        Process* process = rpcConnection->getProcess();
-        if (process && process->isTerminated())
-        {
-            // The test-server process crashed. Try to read its stderr for diagnostics.
-            Stream* stderrStream = process->getStream(StdStreamType::ErrorOut);
-            if (stderrStream)
-            {
-                List<uint8_t> stderrData;
-                // Try to read up to 4KB of stderr
-                const size_t maxRead = 4096;
-                stderrData.setCount(maxRead);
-                size_t bytesRead = 0;
-                if (SLANG_SUCCEEDED(stderrStream->read(stderrData.getBuffer(), maxRead, bytesRead)) && bytesRead > 0)
-                {
-                    const char* begin = (const char*)stderrData.getBuffer();
-                    const char* end = begin + bytesRead;
-                    String stderrContent(begin, end);
-                    errorDetail = errorDetail + "\nTest server stderr: " + stderrContent;
-                }
-            }
-            errorDetail = errorDetail + String("\nTest server process terminated with code: ") + String(process->getReturnValue());
-        }
-        
         context->getTestReporter()->messageFormat(
             TestMessageType::RunError,
-            "%s",
-            errorDetail.getBuffer());
+            "JSON RPC failure: sendCall()");
 
         context->destroyRPCConnection();
         return SLANG_FAIL;
