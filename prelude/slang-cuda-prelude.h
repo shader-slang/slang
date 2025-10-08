@@ -1323,419 +1323,237 @@ SLANG_SURFACE_READ_HALF_CONVERT(surf3Dread, (int x, int y, int z), (x, y, z))
 // For the _convert versions they are *not*. They don't need to be because sust.p does not require
 // it.
 
-template<typename T>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf1Dwrite_convert(
-    T,
-    cudaSurfaceObject_t surfObj,
-    int x,
-    cudaSurfaceBoundaryMode boundaryMode);
-template<typename T>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2Dwrite_convert(
-    T,
-    cudaSurfaceObject_t surfObj,
-    int x,
-    int y,
-    cudaSurfaceBoundaryMode boundaryMode);
-template<typename T>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf3Dwrite_convert(
-    T,
-    cudaSurfaceObject_t surfObj,
-    int x,
-    int y,
-    int z,
-    cudaSurfaceBoundaryMode boundaryMode);
-
 // https://docs.nvidia.com/cuda/inline-ptx-assembly/index.html
 // https://docs.nvidia.com/cuda/parallel-thread-execution/index.html#surface-instructions-sust
 
-// Float
 
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf1Dwrite_convert<float>(
-    float v,
+// surf1Dwrite_convert
+
+template<typename T>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf1Dwrite_convert(
+    T v,
     cudaSurfaceObject_t surfObj,
     int x,
+    cudaSurfaceBoundaryMode boundaryMode);
+
+#define SLANG_SURF1DWRITE_CONVERT_IMPL(T, c)                                                     \
+    template<>                                                                                   \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf1Dwrite_convert<T>(                              \
+        T v,                                                                                     \
+        cudaSurfaceObject_t surfObj,                                                             \
+        int x,                                                                                   \
+        cudaSurfaceBoundaryMode boundaryMode)                                                    \
+    {                                                                                            \
+        asm volatile(                                                                            \
+            "sust.p.1d.b32." SLANG_PTX_BOUNDARY_MODE " [%0, {%1}], {%2};" ::"l"(surfObj),        \
+            "r"(x),                                                                              \
+            c(v));                                                                               \
+    }                                                                                            \
+    template<>                                                                                   \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf1Dwrite_convert<T##2>(                           \
+        T##2 v,                                                                                  \
+        cudaSurfaceObject_t surfObj,                                                             \
+        int x,                                                                                   \
+        cudaSurfaceBoundaryMode boundaryMode)                                                    \
+    {                                                                                            \
+        const T vx = v.x, vy = v.y;                                                              \
+        asm volatile(                                                                            \
+            "sust.p.1d.v2.b32." SLANG_PTX_BOUNDARY_MODE " [%0, {%1}], {%2, %3};" ::"l"(surfObj), \
+            "r"(x),                                                                              \
+            c(vx),                                                                               \
+            c(vy));                                                                              \
+    }                                                                                            \
+    template<>                                                                                   \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf1Dwrite_convert<T##4>(                           \
+        T##4 v,                                                                                  \
+        cudaSurfaceObject_t surfObj,                                                             \
+        int x,                                                                                   \
+        cudaSurfaceBoundaryMode boundaryMode)                                                    \
+    {                                                                                            \
+        const T vx = v.x, vy = v.y, vz = v.z, vw = v.w;                                          \
+        asm volatile(                                                                            \
+            "sust.p.1d.v4.b32." SLANG_PTX_BOUNDARY_MODE                                          \
+            " [%0, {%1}], {%2, %3, %4, %5};" ::"l"(surfObj),                                     \
+            "r"(x),                                                                              \
+            c(vx),                                                                               \
+            c(vy),                                                                               \
+            c(vz),                                                                               \
+            c(vw));                                                                              \
+    }
+
+SLANG_SURF1DWRITE_CONVERT_IMPL(float, "f")
+SLANG_SURF1DWRITE_CONVERT_IMPL(uint, "r")
+SLANG_SURF1DWRITE_CONVERT_IMPL(int, "r")
+
+// surf1DLayeredwrite_convert (not supported)
+
+template<typename T>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf1DLayeredwrite_convert(
+    T v,
+    cudaSurfaceObject_t surfObj,
+    int x,
+    int layer,
     cudaSurfaceBoundaryMode boundaryMode)
 {
-    asm volatile(
-        "{sust.p.1d.b32." SLANG_PTX_BOUNDARY_MODE " [%0, {%1}], {%2};}\n\t" ::"l"(surfObj),
-        "r"(x),
-        "f"(v));
+    static_assert(false, "CUDA doesn't support formatted surface writes on 1D array surfaces");
 }
 
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2Dwrite_convert<float>(
-    float v,
+// surf2Dwrite_convert
+
+template<typename T>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2Dwrite_convert(
+    T v,
     cudaSurfaceObject_t surfObj,
     int x,
     int y,
+    cudaSurfaceBoundaryMode boundaryMode);
+
+#define SLANG_SURF2DWRITE_CONVERT_IMPL(T, c)                                                  \
+    template<>                                                                                \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2Dwrite_convert<T>(                           \
+        T v,                                                                                  \
+        cudaSurfaceObject_t surfObj,                                                          \
+        int x,                                                                                \
+        int y,                                                                                \
+        cudaSurfaceBoundaryMode boundaryMode)                                                 \
+    {                                                                                         \
+        asm volatile(                                                                         \
+            "sust.p.2d.b32." SLANG_PTX_BOUNDARY_MODE " [%0, {%1, %2}], {%3};" ::"l"(surfObj), \
+            "r"(x),                                                                           \
+            "r"(y),                                                                           \
+            c(v));                                                                            \
+    }                                                                                         \
+    template<>                                                                                \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2Dwrite_convert<T##2>(                        \
+        T##2 v,                                                                               \
+        cudaSurfaceObject_t surfObj,                                                          \
+        int x,                                                                                \
+        int y,                                                                                \
+        cudaSurfaceBoundaryMode boundaryMode)                                                 \
+    {                                                                                         \
+        const T vx = v.x, vy = v.y;                                                           \
+        asm volatile(                                                                         \
+            "sust.p.2d.v2.b32." SLANG_PTX_BOUNDARY_MODE                                       \
+            " [%0, {%1, %2}], {%3, %4};" ::"l"(surfObj),                                      \
+            "r"(x),                                                                           \
+            "r"(y),                                                                           \
+            c(vx),                                                                            \
+            c(vy));                                                                           \
+    }                                                                                         \
+    template<>                                                                                \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2Dwrite_convert<T##4>(                        \
+        T##4 v,                                                                               \
+        cudaSurfaceObject_t surfObj,                                                          \
+        int x,                                                                                \
+        int y,                                                                                \
+        cudaSurfaceBoundaryMode boundaryMode)                                                 \
+    {                                                                                         \
+        const T vx = v.x, vy = v.y, vz = v.z, vw = v.w;                                       \
+        asm volatile(                                                                         \
+            "sust.p.2d.v4.b32." SLANG_PTX_BOUNDARY_MODE                                       \
+            " [%0, {%1, %2}], {%3, %4, %5, %6};" ::"l"(surfObj),                              \
+            "r"(x),                                                                           \
+            "r"(y),                                                                           \
+            c(vx),                                                                            \
+            c(vy),                                                                            \
+            c(vz),                                                                            \
+            c(vw));                                                                           \
+    }
+
+SLANG_SURF2DWRITE_CONVERT_IMPL(float, "f")
+SLANG_SURF2DWRITE_CONVERT_IMPL(uint, "r")
+SLANG_SURF2DWRITE_CONVERT_IMPL(int, "r")
+
+// surf2DLayeredwrite_convert (not supported)
+
+template<typename T>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2DLayeredwrite_convert(
+    T v,
+    cudaSurfaceObject_t surfObj,
+    int x,
+    int y,
+    int layer,
     cudaSurfaceBoundaryMode boundaryMode)
 {
-    asm volatile(
-        "{sust.p.2d.b32." SLANG_PTX_BOUNDARY_MODE " [%0, {%1,%2}], {%3};}\n\t" ::"l"(surfObj),
-        "r"(x),
-        "r"(y),
-        "f"(v));
+    static_assert(false, "CUDA doesn't support formatted surface writes on 2D array surfaces");
 }
 
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf3Dwrite_convert<float>(
-    float v,
+// surf3Dwrite_convert
+
+template<typename T>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf3Dwrite_convert(
+    T v,
     cudaSurfaceObject_t surfObj,
     int x,
     int y,
     int z,
-    cudaSurfaceBoundaryMode boundaryMode)
-{
-    asm volatile(
-        "{sust.p.3d.b32." SLANG_PTX_BOUNDARY_MODE " [%0, {%1,%2,%3,%4}], {%5};}\n\t" ::"l"(surfObj),
-        "r"(x),
-        "r"(y),
-        "r"(z),
-        "r"(0),
-        "f"(v));
-}
+    cudaSurfaceBoundaryMode boundaryMode);
 
-// Float2
+#define SLANG_SURF3DWRITE_CONVERT_IMPL(T, c)                             \
+    template<>                                                           \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf3Dwrite_convert<T>(      \
+        T v,                                                             \
+        cudaSurfaceObject_t surfObj,                                     \
+        int x,                                                           \
+        int y,                                                           \
+        int z,                                                           \
+        cudaSurfaceBoundaryMode boundaryMode)                            \
+    {                                                                    \
+        asm volatile(                                                    \
+            "sust.p.3d.b32." SLANG_PTX_BOUNDARY_MODE                     \
+            " [%0, {%1, %2, %3, %4}], {%5};" ::"l"(surfObj),             \
+            "r"(x),                                                      \
+            "r"(y),                                                      \
+            "r"(z),                                                      \
+            "r"(0),                                                      \
+            c(v));                                                       \
+    }                                                                    \
+    template<>                                                           \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf3Dwrite_convert<T##2>(   \
+        T##2 v,                                                          \
+        cudaSurfaceObject_t surfObj,                                     \
+        int x,                                                           \
+        int y,                                                           \
+        int z,                                                           \
+        cudaSurfaceBoundaryMode boundaryMode)                            \
+    {                                                                    \
+        const T vx = v.x, vy = v.y;                                      \
+        asm volatile(                                                    \
+            "sust.p.3d.v2.b32." SLANG_PTX_BOUNDARY_MODE                  \
+            " [%0, {%1, %2, %3, %4}], {%5, %6};" ::"l"(surfObj),         \
+            "r"(x),                                                      \
+            "r"(y),                                                      \
+            "r"(z),                                                      \
+            "r"(0),                                                      \
+            c(vx),                                                       \
+            c(vy));                                                      \
+    }                                                                    \
+    template<>                                                           \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf3Dwrite_convert<T##4>(   \
+        T##4 v,                                                          \
+        cudaSurfaceObject_t surfObj,                                     \
+        int x,                                                           \
+        int y,                                                           \
+        int z,                                                           \
+        cudaSurfaceBoundaryMode boundaryMode)                            \
+    {                                                                    \
+        const T vx = v.x, vy = v.y, vz = v.z, vw = v.w;                  \
+        asm volatile(                                                    \
+            "sust.p.3d.v4.b32." SLANG_PTX_BOUNDARY_MODE                  \
+            " [%0, {%1, %2, %3, %4}], {%5, %6, %7, %8};" ::"l"(surfObj), \
+            "r"(x),                                                      \
+            "r"(y),                                                      \
+            "r"(z),                                                      \
+            "r"(0),                                                      \
+            c(vx),                                                       \
+            c(vy),                                                       \
+            c(vz),                                                       \
+            c(vw));                                                      \
+    }
 
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf1Dwrite_convert<float2>(
-    float2 v,
-    cudaSurfaceObject_t surfObj,
-    int x,
-    cudaSurfaceBoundaryMode boundaryMode)
-{
-    const float vx = v.x, vy = v.y;
-    asm volatile(
-        "{sust.p.1d.v2.b32." SLANG_PTX_BOUNDARY_MODE " [%0, {%1}], {%2,%3};}\n\t" ::"l"(surfObj),
-        "r"(x),
-        "f"(vx),
-        "f"(vy));
-}
-
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2Dwrite_convert<float2>(
-    float2 v,
-    cudaSurfaceObject_t surfObj,
-    int x,
-    int y,
-    cudaSurfaceBoundaryMode boundaryMode)
-{
-    const float vx = v.x, vy = v.y;
-    asm volatile(
-        "{sust.p.2d.v2.b32." SLANG_PTX_BOUNDARY_MODE " [%0, {%1,%2}], {%3,%4};}\n\t" ::"l"(surfObj),
-        "r"(x),
-        "r"(y),
-        "f"(vx),
-        "f"(vy));
-}
-
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf3Dwrite_convert<float2>(
-    float2 v,
-    cudaSurfaceObject_t surfObj,
-    int x,
-    int y,
-    int z,
-    cudaSurfaceBoundaryMode boundaryMode)
-{
-    const float vx = v.x, vy = v.y;
-    asm volatile(
-        "{sust.p.3d.v2.b32." SLANG_PTX_BOUNDARY_MODE
-        " [%0, {%1,%2,%3,%4}], {%5,%6};}\n\t" ::"l"(surfObj),
-        "r"(x),
-        "r"(y),
-        "r"(z),
-        "r"(0),
-        "f"(vx),
-        "f"(vy));
-}
-
-// Float4
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf1Dwrite_convert<float4>(
-    float4 v,
-    cudaSurfaceObject_t surfObj,
-    int x,
-    cudaSurfaceBoundaryMode boundaryMode)
-{
-    const float vx = v.x, vy = v.y, vz = v.z, vw = v.w;
-    asm volatile(
-        "{sust.p.1d.v4.b32." SLANG_PTX_BOUNDARY_MODE
-        " [%0, {%1}], {%2,%3,%4,%5};}\n\t" ::"l"(surfObj),
-        "r"(x),
-        "f"(vx),
-        "f"(vy),
-        "f"(vz),
-        "f"(vw));
-}
-
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2Dwrite_convert<float4>(
-    float4 v,
-    cudaSurfaceObject_t surfObj,
-    int x,
-    int y,
-    cudaSurfaceBoundaryMode boundaryMode)
-{
-    const float vx = v.x, vy = v.y, vz = v.z, vw = v.w;
-    asm volatile(
-        "{sust.p.2d.v4.b32." SLANG_PTX_BOUNDARY_MODE
-        " [%0, {%1,%2}], {%3,%4,%5,%6};}\n\t" ::"l"(surfObj),
-        "r"(x),
-        "r"(y),
-        "f"(vx),
-        "f"(vy),
-        "f"(vz),
-        "f"(vw));
-}
-
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf3Dwrite_convert<float4>(
-    float4 v,
-    cudaSurfaceObject_t surfObj,
-    int x,
-    int y,
-    int z,
-    cudaSurfaceBoundaryMode boundaryMode)
-{
-    const float vx = v.x, vy = v.y, vz = v.z, vw = v.w;
-    asm volatile(
-        "{sust.p.3d.v4.b32." SLANG_PTX_BOUNDARY_MODE
-        " [%0, {%1,%2,%3,%4}], {%5,%6,%7,%8};}\n\t" ::"l"(surfObj),
-        "r"(x),
-        "r"(y),
-        "r"(z),
-        "r"(0),
-        "f"(vx),
-        "f"(vy),
-        "f"(vz),
-        "f"(vw));
-}
-
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2Dwrite_convert<uint>(
-    uint v,
-    cudaSurfaceObject_t surfObj,
-    int x,
-    int y,
-    cudaSurfaceBoundaryMode boundaryMode)
-{
-    asm volatile(
-        "{sust.p.2d.b32." SLANG_PTX_BOUNDARY_MODE " [%0, {%1,%2}], {%3};}\n\t" ::"l"(surfObj),
-        "r"(x),
-        "r"(y),
-        "r"(v));
-}
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf3Dwrite_convert<uint>(
-    uint v,
-    cudaSurfaceObject_t surfObj,
-    int x,
-    int y,
-    int z,
-    cudaSurfaceBoundaryMode boundaryMode)
-{
-    asm volatile(
-        "{sust.p.3d.b32." SLANG_PTX_BOUNDARY_MODE " [%0, {%1,%2,%3,%4}], {%5};}\n\t" ::"l"(surfObj),
-        "r"(x),
-        "r"(y),
-        "r"(z),
-        "r"(0),
-        "r"(v));
-}
-
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2Dwrite_convert<uint2>(
-    uint2 v,
-    cudaSurfaceObject_t surfObj,
-    int x,
-    int y,
-    cudaSurfaceBoundaryMode boundaryMode)
-{
-    const uint vx = v.x, vy = v.y;
-    asm volatile(
-        "{sust.p.2d.v2.b32." SLANG_PTX_BOUNDARY_MODE " [%0, {%1,%2}], {%3,%4};}\n\t" ::"l"(surfObj),
-        "r"(x),
-        "r"(y),
-        "r"(vx),
-        "r"(vy));
-}
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf3Dwrite_convert<uint2>(
-    uint2 v,
-    cudaSurfaceObject_t surfObj,
-    int x,
-    int y,
-    int z,
-    cudaSurfaceBoundaryMode boundaryMode)
-{
-    const uint vx = v.x, vy = v.y;
-    asm volatile(
-        "{sust.p.3d.v2.b32." SLANG_PTX_BOUNDARY_MODE
-        " [%0, {%1,%2,%3,%4}], {%5,%6};}\n\t" ::"l"(surfObj),
-        "r"(x),
-        "r"(y),
-        "r"(z),
-        "r"(0),
-        "r"(vx),
-        "r"(vy));
-}
-
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2Dwrite_convert<uint4>(
-    uint4 v,
-    cudaSurfaceObject_t surfObj,
-    int x,
-    int y,
-    cudaSurfaceBoundaryMode boundaryMode)
-{
-    const uint vx = v.x, vy = v.y, vz = v.z, vw = v.w;
-    asm volatile(
-        "{sust.p.2d.v4.b32." SLANG_PTX_BOUNDARY_MODE
-        " [%0, {%1,%2}], {%3,%4,%5,%6};}\n\t" ::"l"(surfObj),
-        "r"(x),
-        "r"(y),
-        "r"(vx),
-        "r"(vy),
-        "r"(vz),
-        "r"(vw));
-}
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf3Dwrite_convert<uint4>(
-    uint4 v,
-    cudaSurfaceObject_t surfObj,
-    int x,
-    int y,
-    int z,
-    cudaSurfaceBoundaryMode boundaryMode)
-{
-    const uint vx = v.x, vy = v.y, vz = v.z, vw = v.w;
-    asm volatile(
-        "{sust.p.3d.v4.b32." SLANG_PTX_BOUNDARY_MODE
-        " [%0, {%1,%2,%3,%4}], {%5,%6,%7,%8};}\n\t" ::"l"(surfObj),
-        "r"(x),
-        "r"(y),
-        "r"(z),
-        "r"(0),
-        "r"(vx),
-        "r"(vy),
-        "r"(vz),
-        "r"(vw));
-}
-
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2Dwrite_convert<int>(
-    int v,
-    cudaSurfaceObject_t surfObj,
-    int x,
-    int y,
-    cudaSurfaceBoundaryMode boundaryMode)
-{
-    asm volatile(
-        "{sust.p.2d.b32." SLANG_PTX_BOUNDARY_MODE " [%0, {%1,%2}], {%3};}\n\t" ::"l"(surfObj),
-        "r"(x),
-        "r"(y),
-        "r"(v));
-}
-// Int2
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2Dwrite_convert<int2>(
-    int2 v,
-    cudaSurfaceObject_t surfObj,
-    int x,
-    int y,
-    cudaSurfaceBoundaryMode boundaryMode)
-{
-    const int vx = v.x, vy = v.y;
-    asm volatile(
-        "{sust.p.2d.v2.b32." SLANG_PTX_BOUNDARY_MODE " [%0, {%1,%2}], {%3,%4};}\n\t" ::"l"(surfObj),
-        "r"(x),
-        "r"(y),
-        "r"(vx),
-        "r"(vy));
-}
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2Dwrite_convert<int4>(
-    int4 v,
-    cudaSurfaceObject_t surfObj,
-    int x,
-    int y,
-    cudaSurfaceBoundaryMode boundaryMode)
-{
-    const int vx = v.x, vy = v.y, vz = v.z, vw = v.w;
-    asm volatile(
-        "{sust.p.2d.v4.b32." SLANG_PTX_BOUNDARY_MODE
-        " [%0, {%1,%2}], {%3,%4,%5,%6};}\n\t" ::"l"(surfObj),
-        "r"(x),
-        "r"(y),
-        "r"(vx),
-        "r"(vy),
-        "r"(vz),
-        "r"(vw));
-}
-
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf3Dwrite_convert<int>(
-    int v,
-    cudaSurfaceObject_t surfObj,
-    int x,
-    int y,
-    int z,
-    cudaSurfaceBoundaryMode boundaryMode)
-{
-    asm volatile(
-        "{sust.p.3d.b32." SLANG_PTX_BOUNDARY_MODE " [%0, {%1,%2,%3,%4}], {%5};}\n\t" ::"l"(surfObj),
-        "r"(x),
-        "r"(y),
-        "r"(z),
-        "r"(0),
-        "r"(v));
-}
-// Int2
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf3Dwrite_convert<int2>(
-    int2 v,
-    cudaSurfaceObject_t surfObj,
-    int x,
-    int y,
-    int z,
-    cudaSurfaceBoundaryMode boundaryMode)
-{
-    const int vx = v.x, vy = v.y;
-    asm volatile(
-        "{sust.p.3d.v2.b32." SLANG_PTX_BOUNDARY_MODE
-        " [%0, {%1,%2,%3,%4}], {%5,%6};}\n\t" ::"l"(surfObj),
-        "r"(x),
-        "r"(y),
-        "r"(z),
-        "r"(0),
-        "r"(vx),
-        "r"(vy));
-}
-// Int4
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf3Dwrite_convert<int4>(
-    int4 v,
-    cudaSurfaceObject_t surfObj,
-    int x,
-    int y,
-    int z,
-    cudaSurfaceBoundaryMode boundaryMode)
-{
-    const int vx = v.x, vy = v.y, vz = v.z, vw = v.w;
-    asm volatile(
-        "{sust.p.3d.v4.b32." SLANG_PTX_BOUNDARY_MODE
-        " [%0, {%1,%2,%3,%4}], {%5,%6,%7,%8};}\n\t" ::"l"(surfObj),
-        "r"(x),
-        "r"(y),
-        "r"(z),
-        "r"(0),
-        "r"(vx),
-        "r"(vy),
-        "r"(vz),
-        "r"(vw));
-}
+SLANG_SURF3DWRITE_CONVERT_IMPL(float, "f")
+SLANG_SURF3DWRITE_CONVERT_IMPL(uint, "r")
+SLANG_SURF3DWRITE_CONVERT_IMPL(int, "r")
 
 // ----------------------------- F32 -----------------------------------------
 
@@ -4413,337 +4231,218 @@ struct TensorView
 };
 
 // Implementations for texture fetch/load functions using tex PTX intrinsics
-// These are used for read-only texture access with integer coordinates
-// See #6781 for details.
+// These are used for read-only texture access with integer coordinates.
 
-// 1D is not supported via PTX. Keeping this placeholder in case it ever gets
-// supported.
+// 1D is not supported via PTX. Keeping the implementation below in case it ever gets supported.
 template<typename T>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex1Dfetch_int(CUtexObject texObj, int x)
+SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex1Dfetch_int(CUtexObject texObj, int x, int mip)
 {
-    T result;
-    float stub;
-    asm("tex.1d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5}];"
-        : "=f"(result), "=f"(stub), "=f"(stub), "=f"(stub)
-        : "l"(texObj), "r"(x));
-    return result;
+    static_assert(false, "CUDA does not support fetching from 1D textures");
 }
 
-template<typename T>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex2Dfetch_int(CUtexObject texObj, int x, int y)
-{
-    T result;
-    float stub;
-    asm("tex.2d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6}];"
-        : "=f"(result), "=f"(stub), "=f"(stub), "=f"(stub)
-        : "l"(texObj), "r"(x), "r"(y));
-    return result;
-}
+#if 0
+#define SLANG_TEX1DFETCH_INT_IMPL(T, dtype, c)                                                 \
+    template<>                                                                                 \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex1Dfetch_int(CUtexObject texObj, int x, int mip)    \
+    {                                                                                          \
+        T result;                                                                              \
+        T stub;                                                                                \
+        asm("tex.level.1d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5}], %6;"                  \
+            : c(result), c(stub), c(stub), c(stub)                                             \
+            : "l"(texObj), "r"(x), "r"(mip));                                                  \
+        return result;                                                                         \
+    }                                                                                          \
+    template<>                                                                                 \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T##2 tex1Dfetch_int(CUtexObject texObj, int x, int mip) \
+    {                                                                                          \
+        T result_x, result_y;                                                                  \
+        T stub;                                                                                \
+        asm("tex.level.1d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5}], %6;"                  \
+            : c(result_x), c(result_y), c(stub), c(stub)                                       \
+            : "l"(texObj), "r"(x), "r"(mip));                                                  \
+        return make_##T##2(result_x, result_y);                                                \
+    }                                                                                          \
+    template<>                                                                                 \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T##4 tex1Dfetch_int(CUtexObject texObj, int x, int mip) \
+    {                                                                                          \
+        T result_x, result_y, result_z, result_w;                                              \
+        asm("tex.level.1d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5}], %6;"                  \
+            : c(result_x), c(result_y), c(result_z), c(result_w)                               \
+            : "l"(texObj), "r"(x), "r"(mip));                                                  \
+        return make_##T##4(result_x, result_y, result_z, result_w);                            \
+    }
 
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL float2 tex2Dfetch_int(CUtexObject texObj, int x, int y)
-{
-    float result_x, result_y;
-    float stub;
-    asm("tex.2d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6}];"
-        : "=f"(result_x), "=f"(result_y), "=f"(stub), "=f"(stub)
-        : "l"(texObj), "r"(x), "r"(y));
-    return make_float2(result_x, result_y);
-}
-
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL float4 tex2Dfetch_int(CUtexObject texObj, int x, int y)
-{
-    float result_x, result_y, result_z, result_w;
-    asm("tex.2d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6}];"
-        : "=f"(result_x), "=f"(result_y), "=f"(result_z), "=f"(result_w)
-        : "l"(texObj), "r"(x), "r"(y));
-    return make_float4(result_x, result_y, result_z, result_w);
-}
-
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL uint tex2Dfetch_int(CUtexObject texObj, int x, int y)
-{
-    uint result;
-    uint stub;
-    asm("tex.2d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6}];"
-        : "=r"(result), "=r"(stub), "=r"(stub), "=r"(stub)
-        : "l"(texObj), "r"(x), "r"(y));
-    return result;
-}
-
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL uint2 tex2Dfetch_int(CUtexObject texObj, int x, int y)
-{
-    uint result_x, result_y;
-    uint stub;
-    asm("tex.2d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6}];"
-        : "=r"(result_x), "=r"(result_y), "=r"(stub), "=r"(stub)
-        : "l"(texObj), "r"(x), "r"(y));
-    return make_uint2(result_x, result_y);
-}
-
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL uint4 tex2Dfetch_int(CUtexObject texObj, int x, int y)
-{
-    uint result_x, result_y, result_z, result_w;
-    asm("tex.2d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6}];"
-        : "=r"(result_x), "=r"(result_y), "=r"(result_z), "=r"(result_w)
-        : "l"(texObj), "r"(x), "r"(y));
-    return make_uint4(result_x, result_y, result_z, result_w);
-}
-
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL int tex2Dfetch_int(CUtexObject texObj, int x, int y)
-{
-    int result;
-    int stub;
-    asm("tex.2d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6}];"
-        : "=r"(result), "=r"(stub), "=r"(stub), "=r"(stub)
-        : "l"(texObj), "r"(x), "r"(y));
-    return result;
-}
-
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL int2 tex2Dfetch_int(CUtexObject texObj, int x, int y)
-{
-    int result_x, result_y;
-    int stub;
-    asm("tex.2d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6}];"
-        : "=r"(result_x), "=r"(result_y), "=r"(stub), "=r"(stub)
-        : "l"(texObj), "r"(x), "r"(y));
-    return make_int2(result_x, result_y);
-}
-
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL int4 tex2Dfetch_int(CUtexObject texObj, int x, int y)
-{
-    int result_x, result_y, result_z, result_w;
-    asm("tex.2d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6}];"
-        : "=r"(result_x), "=r"(result_y), "=r"(result_z), "=r"(result_w)
-        : "l"(texObj), "r"(x), "r"(y));
-    return make_int4(result_x, result_y, result_z, result_w);
-}
+SLANG_TEX1DFETCH_INT_IMPL(float, "f32", "=f")
+SLANG_TEX1DFETCH_INT_IMPL(uint, "u32", "=r")
+SLANG_TEX1DFETCH_INT_IMPL(int, "s32", "=r")
+#endif
 
 template<typename T>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex3Dfetch_int(CUtexObject texObj, int x, int y, int z)
-{
-    T result;
-    float stub;
-    asm("tex.3d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}];"
-        : "=f"(result), "=f"(stub), "=f"(stub), "=f"(stub)
-        : "l"(texObj), "r"(x), "r"(y), "r"(z), "r"(z));
-    // Note: The repeated z is a stub used as the fourth operand in ptx.
-    // From the docs:
-    // https://docs.nvidia.com/cuda/parallel-thread-execution/index.html#texture-instructions-tex
-    // Operand c is a scalar or singleton tuple for 1d textures; is a two-element vector for 2d
-    // textures; and is a four-element vector for 3d textures.
-    return result;
-}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex2Dfetch_int(CUtexObject texObj, int x, int y, int mip);
 
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL float2 tex3Dfetch_int(CUtexObject texObj, int x, int y, int z)
-{
-    float result_x, result_y;
-    float stub;
-    asm("tex.3d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}];"
-        : "=f"(result_x), "=f"(result_y), "=f"(stub), "=f"(stub)
-        : "l"(texObj), "r"(x), "r"(y), "r"(z), "r"(z));
-    return make_float2(result_x, result_y);
-}
+#define SLANG_TEX2DFETCH_INT_IMPL(T, dtype, c)                                                     \
+    template<>                                                                                     \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex2Dfetch_int(CUtexObject texObj, int x, int y, int mip) \
+    {                                                                                              \
+        T result;                                                                                  \
+        T stub;                                                                                    \
+        asm("tex.level.2d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5, %6}], %7;"                  \
+            : c(result), c(stub), c(stub), c(stub)                                                 \
+            : "l"(texObj), "r"(x), "r"(y), "r"(mip));                                              \
+        return result;                                                                             \
+    }                                                                                              \
+    template<>                                                                                     \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL                                                             \
+        T##2 tex2Dfetch_int(CUtexObject texObj, int x, int y, int mip)                             \
+    {                                                                                              \
+        T result_x, result_y;                                                                      \
+        T stub;                                                                                    \
+        asm("tex.level.2d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5, %6}], %7;"                  \
+            : c(result_x), c(result_y), c(stub), c(stub)                                           \
+            : "l"(texObj), "r"(x), "r"(y), "r"(mip));                                              \
+        return make_##T##2(result_x, result_y);                                                    \
+    }                                                                                              \
+    template<>                                                                                     \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL                                                             \
+        T##4 tex2Dfetch_int(CUtexObject texObj, int x, int y, int mip)                             \
+    {                                                                                              \
+        T result_x, result_y, result_z, result_w;                                                  \
+        asm("tex.level.2d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5, %6}], %7;"                  \
+            : c(result_x), c(result_y), c(result_z), c(result_w)                                   \
+            : "l"(texObj), "r"(x), "r"(y), "r"(mip));                                              \
+        return make_##T##4(result_x, result_y, result_z, result_w);                                \
+    }
 
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL float4 tex3Dfetch_int(CUtexObject texObj, int x, int y, int z)
-{
-    float result_x, result_y, result_z, result_w;
-    asm("tex.3d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}];"
-        : "=f"(result_x), "=f"(result_y), "=f"(result_z), "=f"(result_w)
-        : "l"(texObj), "r"(x), "r"(y), "r"(z), "r"(z));
-    return make_float4(result_x, result_y, result_z, result_w);
-}
+SLANG_TEX2DFETCH_INT_IMPL(float, "f32", "=f")
+SLANG_TEX2DFETCH_INT_IMPL(uint, "u32", "=r")
+SLANG_TEX2DFETCH_INT_IMPL(int, "s32", "=r")
 
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL uint tex3Dfetch_int(CUtexObject texObj, int x, int y, int z)
-{
-    uint result;
-    uint stub;
-    asm("tex.3d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}];"
-        : "=r"(result), "=r"(stub), "=r"(stub), "=r"(stub)
-        : "l"(texObj), "r"(x), "r"(y), "r"(z), "r"(z));
-    return result;
-}
-
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL uint2 tex3Dfetch_int(CUtexObject texObj, int x, int y, int z)
-{
-    uint result_x, result_y;
-    uint stub;
-    asm("tex.3d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}];"
-        : "=r"(result_x), "=r"(result_y), "=r"(stub), "=r"(stub)
-        : "l"(texObj), "r"(x), "r"(y), "r"(z), "r"(z));
-    return make_uint2(result_x, result_y);
-}
-
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL uint4 tex3Dfetch_int(CUtexObject texObj, int x, int y, int z)
-{
-    uint result_x, result_y, result_z, result_w;
-    asm("tex.3d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}];"
-        : "=r"(result_x), "=r"(result_y), "=r"(result_z), "=r"(result_w)
-        : "l"(texObj), "r"(x), "r"(y), "r"(z), "r"(z));
-    return make_uint4(result_x, result_y, result_z, result_w);
-}
-
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL int tex3Dfetch_int(CUtexObject texObj, int x, int y, int z)
-{
-    int result;
-    int stub;
-    asm("tex.3d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}];"
-        : "=r"(result), "=r"(stub), "=r"(stub), "=r"(stub)
-        : "l"(texObj), "r"(x), "r"(y), "r"(z), "r"(z));
-    return result;
-}
-
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL int2 tex3Dfetch_int(CUtexObject texObj, int x, int y, int z)
-{
-    int result_x, result_y;
-    int stub;
-    asm("tex.3d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}];"
-        : "=r"(result_x), "=r"(result_y), "=r"(stub), "=r"(stub)
-        : "l"(texObj), "r"(x), "r"(y), "r"(z), "r"(z));
-    return make_int2(result_x, result_y);
-}
-
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL int4 tex3Dfetch_int(CUtexObject texObj, int x, int y, int z)
-{
-    int result_x, result_y, result_z, result_w;
-    asm("tex.3d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}];"
-        : "=r"(result_x), "=r"(result_y), "=r"(result_z), "=r"(result_w)
-        : "l"(texObj), "r"(x), "r"(y), "r"(z), "r"(z));
-    return make_int4(result_x, result_y, result_z, result_w);
-}
-
-template<typename T>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex1DArrayfetch_int(CUtexObject texObj, int x, int layer)
-{
-    T result;
-    float stub;
-    asm("tex.a1d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6}];"
-        : "=f"(result), "=f"(stub), "=f"(stub), "=f"(stub)
-        : "l"(texObj), "r"(x), "r"(layer));
-    return result;
-}
 
 template<typename T>
 SLANG_FORCE_INLINE SLANG_CUDA_CALL T
-tex2DArrayfetch_int(CUtexObject texObj, int x, int y, int layer)
-{
-    T result;
-    float stub;
-    asm("tex.a2d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}];"
-        : "=f"(result), "=f"(stub), "=f"(stub), "=f"(stub)
-        : "l"(texObj), "r"(x), "r"(y), "r"(layer), "r"(layer));
-    return result;
-}
+tex3Dfetch_int(CUtexObject texObj, int x, int y, int z, int mip);
 
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL float2
-tex2DArrayfetch_int(CUtexObject texObj, int x, int y, int layer)
-{
-    float result_x, result_y;
-    float stub;
-    asm("tex.a2d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}];"
-        : "=f"(result_x), "=f"(result_y), "=f"(stub), "=f"(stub)
-        : "l"(texObj), "r"(x), "r"(y), "r"(layer), "r"(layer));
-    return make_float2(result_x, result_y);
-}
+#define SLANG_TEX3DFETCH_INT_IMPL(T, dtype, c)                                            \
+    template<>                                                                            \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T                                                  \
+    tex3Dfetch_int(CUtexObject texObj, int x, int y, int z, int mip)                      \
+    {                                                                                     \
+        T result;                                                                         \
+        T stub;                                                                           \
+        asm("tex.level.3d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}], %9;" \
+            : c(result), c(stub), c(stub), c(stub)                                        \
+            : "l"(texObj), "r"(x), "r"(y), "r"(z), "r"(z) /* ignored */, "r"(mip));       \
+        return result;                                                                    \
+    }                                                                                     \
+    template<>                                                                            \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL                                                    \
+        T##2 tex3Dfetch_int(CUtexObject texObj, int x, int y, int z, int mip)             \
+    {                                                                                     \
+        T result_x, result_y;                                                             \
+        T stub;                                                                           \
+        asm("tex.level.3d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}], %9;" \
+            : c(result_x), c(result_y), c(stub), c(stub)                                  \
+            : "l"(texObj), "r"(x), "r"(y), "r"(z), "r"(z) /* ignored */, "r"(mip));       \
+        return make_##T##2(result_x, result_y);                                           \
+    }                                                                                     \
+    template<>                                                                            \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL                                                    \
+        T##4 tex3Dfetch_int(CUtexObject texObj, int x, int y, int z, int mip)             \
+    {                                                                                     \
+        T result_x, result_y, result_z, result_w;                                         \
+        asm("tex.level.3d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}], %9;" \
+            : c(result_x), c(result_y), c(result_z), c(result_w)                          \
+            : "l"(texObj), "r"(x), "r"(y), "r"(z), "r"(z) /* ignored */, "r"(mip));       \
+        return make_##T##4(result_x, result_y, result_z, result_w);                       \
+    }
 
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL float4
-tex2DArrayfetch_int(CUtexObject texObj, int x, int y, int layer)
-{
-    float result_x, result_y, result_z, result_w;
-    asm("tex.a2d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}];"
-        : "=f"(result_x), "=f"(result_y), "=f"(result_z), "=f"(result_w)
-        : "l"(texObj), "r"(x), "r"(y), "r"(layer), "r"(layer));
-    return make_float4(result_x, result_y, result_z, result_w);
-}
+SLANG_TEX3DFETCH_INT_IMPL(float, "f32", "=f")
+SLANG_TEX3DFETCH_INT_IMPL(uint, "u32", "=r")
+SLANG_TEX3DFETCH_INT_IMPL(int, "s32", "=r")
 
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL uint
-tex2DArrayfetch_int(CUtexObject texObj, int x, int y, int layer)
-{
-    uint result;
-    uint stub;
-    asm("tex.a2d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}];"
-        : "=r"(result), "=r"(stub), "=r"(stub), "=r"(stub)
-        : "l"(texObj), "r"(x), "r"(y), "r"(layer), "r"(layer));
-    return result;
-}
+template<typename T>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL T
+tex1DArrayfetch_int(CUtexObject texObj, int x, int layer, int mip);
 
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL uint2
-tex2DArrayfetch_int(CUtexObject texObj, int x, int y, int layer)
-{
-    uint result_x, result_y;
-    uint stub;
-    asm("tex.a2d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}];"
-        : "=r"(result_x), "=r"(result_y), "=r"(stub), "=r"(stub)
-        : "l"(texObj), "r"(x), "r"(y), "r"(layer), "r"(layer));
-    return make_uint2(result_x, result_y);
-}
+#define SLANG_TEX1DARRAYFETCH_INT_IMPL(T, dtype, c)                                \
+    template<>                                                                     \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T                                           \
+    tex1DArrayfetch_int(CUtexObject texObj, int x, int layer, int mip)             \
+    {                                                                              \
+        T result;                                                                  \
+        T stub;                                                                    \
+        asm("tex.level.a1d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5, %6}], %7;" \
+            : c(result), c(stub), c(stub), c(stub)                                 \
+            : "l"(texObj), "r"(layer), "r"(x), "r"(mip));                          \
+        return result;                                                             \
+    }                                                                              \
+    template<>                                                                     \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL                                             \
+        T##2 tex1DArrayfetch_int(CUtexObject texObj, int x, int layer, int mip)    \
+    {                                                                              \
+        T result_x, result_y;                                                      \
+        T stub;                                                                    \
+        asm("tex.level.a1d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5, %6}], %7;" \
+            : c(result_x), c(result_y), c(stub), c(stub)                           \
+            : "l"(texObj), "r"(layer), "r"(x), "r"(mip));                          \
+        return make_##T##2(result_x, result_y);                                    \
+    }                                                                              \
+    template<>                                                                     \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL                                             \
+        T##4 tex1DArrayfetch_int(CUtexObject texObj, int x, int layer, int mip)    \
+    {                                                                              \
+        T result_x, result_y, result_z, result_w;                                  \
+        asm("tex.level.a1d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5, %6}], %7;" \
+            : c(result_x), c(result_y), c(result_z), c(result_w)                   \
+            : "l"(texObj), "r"(layer), "r"(x), "r"(mip));                          \
+        return make_##T##4(result_x, result_y, result_z, result_w);                \
+    }
 
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL uint4
-tex2DArrayfetch_int(CUtexObject texObj, int x, int y, int layer)
-{
-    uint result_x, result_y, result_z, result_w;
-    asm("tex.a2d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}];"
-        : "=r"(result_x), "=r"(result_y), "=r"(result_z), "=r"(result_w)
-        : "l"(texObj), "r"(x), "r"(y), "r"(layer), "r"(layer));
-    return make_uint4(result_x, result_y, result_z, result_w);
-}
+SLANG_TEX1DARRAYFETCH_INT_IMPL(float, "f32", "=f")
+SLANG_TEX1DARRAYFETCH_INT_IMPL(uint, "u32", "=r")
+SLANG_TEX1DARRAYFETCH_INT_IMPL(int, "s32", "=r")
 
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL int tex2DArrayfetch_int(
-    CUtexObject texObj,
-    int x,
-    int y,
-    int layer)
-{
-    int result;
-    int stub;
-    asm("tex.a2d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}];"
-        : "=r"(result), "=r"(stub), "=r"(stub), "=r"(stub)
-        : "l"(texObj), "r"(x), "r"(y), "r"(layer), "r"(layer));
-    return result;
-}
+template<typename T>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL T
+tex2DArrayfetch_int(CUtexObject texObj, int x, int y, int layer, int mip);
 
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL int2
-tex2DArrayfetch_int(CUtexObject texObj, int x, int y, int layer)
-{
-    int result_x, result_y;
-    int stub;
-    asm("tex.a2d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}];"
-        : "=r"(result_x), "=r"(result_y), "=r"(stub), "=r"(stub)
-        : "l"(texObj), "r"(x), "r"(y), "r"(layer), "r"(layer));
-    return make_int2(result_x, result_y);
-}
+#define SLANG_TEX2DARRAYFETCH_INT_IMPL(T, dtype, c)                                         \
+    template<>                                                                              \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T                                                    \
+    tex2DArrayfetch_int(CUtexObject texObj, int x, int y, int layer, int mip)               \
+    {                                                                                       \
+        T result;                                                                           \
+        T stub;                                                                             \
+        asm("tex.level.a2d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}], %9;"  \
+            : c(result), c(stub), c(stub), c(stub)                                          \
+            : "l"(texObj), "r"(layer), "r"(x), "r"(y), "r"(layer) /* ignored */, "r"(mip)); \
+        return result;                                                                      \
+    }                                                                                       \
+    template<>                                                                              \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL                                                      \
+        T##2 tex2DArrayfetch_int(CUtexObject texObj, int x, int y, int layer, int mip)      \
+    {                                                                                       \
+        T result_x, result_y;                                                               \
+        T stub;                                                                             \
+        asm("tex.level.a2d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}], %9;"  \
+            : c(result_x), c(result_y), c(stub), c(stub)                                    \
+            : "l"(texObj), "r"(layer), "r"(x), "r"(y), "r"(layer) /* ignored */, "r"(mip)); \
+        return make_##T##2(result_x, result_y);                                             \
+    }                                                                                       \
+    template<>                                                                              \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL                                                      \
+        T##4 tex2DArrayfetch_int(CUtexObject texObj, int x, int y, int layer, int mip)      \
+    {                                                                                       \
+        T result_x, result_y, result_z, result_w;                                           \
+        asm("tex.level.a2d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}], %9;"  \
+            : c(result_x), c(result_y), c(result_z), c(result_w)                            \
+            : "l"(texObj), "r"(layer), "r"(x), "r"(y), "r"(layer) /* ignored */, "r"(mip)); \
+        return make_##T##4(result_x, result_y, result_z, result_w);                         \
+    }
 
-template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL int4
-tex2DArrayfetch_int(CUtexObject texObj, int x, int y, int layer)
-{
-    int result_x, result_y, result_z, result_w;
-    asm("tex.a2d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}];"
-        : "=r"(result_x), "=r"(result_y), "=r"(result_z), "=r"(result_w)
-        : "l"(texObj), "r"(x), "r"(y), "r"(layer), "r"(layer));
-    return make_int4(result_x, result_y, result_z, result_w);
-}
+SLANG_TEX2DARRAYFETCH_INT_IMPL(float, "f32", "=f")
+SLANG_TEX2DARRAYFETCH_INT_IMPL(uint, "u32", "=r")
+SLANG_TEX2DARRAYFETCH_INT_IMPL(int, "s32", "=r")
 
 // Wave rotate helper functions - templated approach
 #define SLANG_WARP_FULL_MASK 0xFFFFFFFF
