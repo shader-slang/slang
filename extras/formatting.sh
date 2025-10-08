@@ -2,9 +2,54 @@
 
 set -e
 
+# Check Bash version
+if [ "${BASH_VERSINFO[0]}" -lt 4 ]; then
+  echo "Error: Bash 4 or newer is required. Current version: $BASH_VERSION" >&2
+  if [[ "$(uname)" == "Darwin" ]]; then
+    echo "Please install a newer version of Bash using Homebrew:" >&2
+    echo "  brew install bash" >&2
+  fi
+  exit 1
+fi
+
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 source_dir="$(dirname "$script_dir")"
 since_rev=""
+
+# Detect macOS and set appropriate binary names
+if [[ "$(uname)" == "Darwin" ]]; then
+  # On macOS, check for GNU versions
+  # grep and xargs use g-prefix, diff is installed as /opt/homebrew/bin/diff
+  missing_tools=()
+
+  if ! command -v ggrep &>/dev/null; then
+    missing_tools+=("grep")
+  fi
+
+  if ! command -v gxargs &>/dev/null; then
+    missing_tools+=("findutils")
+  fi
+
+  if ! command -v /opt/homebrew/bin/diff &>/dev/null; then
+    missing_tools+=("diffutils")
+  fi
+
+  if [ ${#missing_tools[@]} -gt 0 ]; then
+    echo "Error: GNU versions of grep, xargs, and diff are required on macOS." >&2
+    echo "Please install them using Homebrew:" >&2
+    echo "  brew install ${missing_tools[*]}" >&2
+    exit 1
+  fi
+
+  GREP_BIN="ggrep"
+  XARGS_BIN="gxargs"
+  DIFF_BIN="/opt/homebrew/bin/diff"
+else
+  # On other systems, use standard binaries
+  GREP_BIN="grep"
+  XARGS_BIN="xargs"
+  DIFF_BIN="diff"
+fi
 
 check_only=0
 no_version_check=0
@@ -95,7 +140,7 @@ require_bin() {
   fi
 
   if [ "$no_version_check" -eq 0 ]; then
-    version=$("$name" --version | grep -oP "\d+\.\d+\.?\d*" | head -n1)
+    version=$("$name" --version | $GREP_BIN -oP "\d+\.\d+\.?\d*" | head -n1)
 
     # Debug output to stderr
     if [ -n "$max_version" ]; then
@@ -122,8 +167,8 @@ require_bin() {
 
 require_bin "git" "1.8"
 ((run_all || run_cmake)) && require_bin "gersemi" "0.21" "0.22"
-((run_all || run_cpp)) && require_bin "xargs" "3"
-require_bin "diff" "2"
+((run_all || run_cpp)) && require_bin "$XARGS_BIN" "3"
+require_bin "$DIFF_BIN" "2"
 ((run_all || run_cpp)) && require_bin "clang-format" "17" "18"
 ((run_all || run_yaml || run_markdown)) && require_bin "prettier" "3"
 ((run_all || run_sh)) && require_bin "shfmt" "3"
@@ -131,6 +176,18 @@ require_bin "diff" "2"
 if [ "$missing_bin" ]; then
   exit 1
 fi
+
+get_nproc() {
+  local nproc_count
+  if command -v nproc &>/dev/null; then
+    nproc_count=$(nproc)
+  elif [[ "$(uname)" == "Darwin" ]] && command -v sysctl &>/dev/null; then
+    nproc_count=$(sysctl -n hw.logicalcpu)
+  elif command -v getconf &>/dev/null; then
+    nproc_count=$(getconf _NPROCESSORS_ONLN 2>/dev/null)
+  fi
+  echo "${nproc_count:-1}"
+}
 
 exit_code=0
 
@@ -192,9 +249,9 @@ cpp_formatting() {
     tmpdir=$(mktemp -d)
     trap 'rm -rf "$tmpdir"' EXIT
 
-    printf '%s\n' "${files[@]}" | xargs --verbose -P "$(nproc)" -I{} bash -c "
+    printf '%s\n' "${files[@]}" | $XARGS_BIN --verbose -P "$(get_nproc)" -I{} bash -c "
       mkdir -p \"\$(dirname \"$tmpdir/{}\")\"
-      diff -u --color=always --label \"{}\" --label \"{}\" \"{}\" <(clang-format \"{}\") > \"$tmpdir/{}\"
+      $DIFF_BIN -u --color=always --label \"{}\" --label \"{}\" \"{}\" <(clang-format \"{}\") > \"$tmpdir/{}\"
       :
     " |& track_progress ${#files[@]}
 
@@ -206,7 +263,7 @@ cpp_formatting() {
       fi
     done
   else
-    printf '%s\n' "${files[@]}" | xargs --verbose -n1 -P "$(nproc)" clang-format -i |&
+    printf '%s\n' "${files[@]}" | $XARGS_BIN --verbose -n1 -P "$(get_nproc)" clang-format -i |&
       track_progress ${#files[@]}
   fi
 }
@@ -219,13 +276,13 @@ prettier_formatting() {
       if ! output=$(prettier "$file" 2>/dev/null); then
         continue
       fi
-      if ! diff -q "$file" <(echo "$output") >/dev/null 2>&1; then
-        diff --color -u --label "$file" --label "$file" "$file" <(echo "$output") || :
+      if ! $DIFF_BIN -q "$file" <(echo "$output") >/dev/null 2>&1; then
+        $DIFF_BIN --color -u --label "$file" --label "$file" "$file" <(echo "$output") || :
         exit_code=1
       fi
     done
   else
-    prettier --write "${files[@]}" | grep -v '(unchanged)' >&2 || :
+    prettier --write "${files[@]}" | $GREP_BIN -v '(unchanged)' >&2 || :
   fi
 }
 
