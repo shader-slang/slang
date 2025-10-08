@@ -53,6 +53,7 @@ fi
 
 check_only=0
 no_version_check=0
+modified_files=0
 run_cpp=0
 run_yaml=0
 run_markdown=0
@@ -88,6 +89,7 @@ while [[ "$#" -gt 0 ]]; do
     ;;
   --check-only) check_only=1 ;;
   --no-version-check) no_version_check=1 ;;
+  --modified) modified_files=1 ;;
   --cpp)
     run_cpp=1
     run_all=0
@@ -192,8 +194,17 @@ get_nproc() {
 exit_code=0
 
 function list_files() {
-  if [ "$since_rev" ]; then
-    git diff --name-only "$since_rev" HEAD $@
+  if [ "$since_rev" ] || [ "$modified_files" -eq 1 ]; then
+    command="git diff --name-only"
+    if [ "$since_rev" ]; then
+      command="$command $since_rev"
+    else
+      command="$command HEAD"
+    fi
+    if [ "$modified_files" -eq 0 ]; then
+      command="$command HEAD"
+    fi
+    $command "$@"
   else
     git ls-files $@
   fi
