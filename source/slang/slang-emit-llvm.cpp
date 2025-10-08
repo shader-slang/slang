@@ -439,6 +439,7 @@ public:
         case kIROp_PtrType:
         case kIROp_NativePtrType:
         case kIROp_NativeStringType:
+        case kIROp_RawPointerType:
         case kIROp_OutParamType:
         case kIROp_RefParamType:
         case kIROp_BorrowInOutParamType:
