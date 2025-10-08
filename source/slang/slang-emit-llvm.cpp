@@ -447,6 +447,7 @@ public:
         case kIROp_UnsizedArrayType:
         case kIROp_StructType: // Structs are passed as pointers in SSA values
         case kIROp_ConstantBufferType:
+        case kIROp_ParameterBlockType:
             // LLVM only has opaque pointers now, so everything that lowers as
             // a pointer is just that same opaque pointer.
             llvmType = builder->getPtrTy(0);
