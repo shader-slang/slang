@@ -4285,8 +4285,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
                     ensureExtensionDeclaration(
                         UnownedStringSlice("SPV_KHR_compute_shader_derivatives"));
-                    auto numThreadsDecor =
-                        entryPoint->findDecoration<IRNumThreadsDecoration>();
+                    auto numThreadsDecor = entryPoint->findDecoration<IRNumThreadsDecoration>();
                     if (isQuad)
                     {
                         verifyComputeDerivativeGroupModifiers(
