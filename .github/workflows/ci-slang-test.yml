@@ -74,8 +74,10 @@ jobs:
           # Add test server arguments only if server count > 1
           if [ "${{ inputs.server-count }}" -gt 1 ]; then
             slang_test_args+=("-use-test-server")
-            if [ "${{ inputs.os }}" == "linux" ]; then
-              slang_test_args+=("-server-count" "\$(nproc)")
+            if [ "${{ inputs.os }}" == "linux" ] && [ "${{ inputs.config }}" == "debug" ]; then
+              slang_test_args+=("-server-count" "$(nproc)")
+            elif [ "${{ inputs.os }}" == "linux" ]; then
+              slang_test_args+=("-server-count" "1")
             else
               slang_test_args+=("-server-count" "${{ inputs.server-count }}")
             fi
