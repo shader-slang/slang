@@ -2531,6 +2531,33 @@ struct LLVMEmitter
             }
             break;
 
+        case kIROp_SwizzledStore:
+            {
+                auto swizzledInst = static_cast<IRSwizzledStore*>(inst);
+
+                auto dst = swizzledInst->getDest();
+                auto src = swizzledInst->getSource();
+                auto llvmDst = findValue(dst);
+                auto llvmSrc = findValue(src);
+
+                auto dstType = as<IRPtrTypeBase>(dst->getDataType())->getValueType();
+
+                IRTypeLayoutRules* rules = getPtrLayoutRules(dst);
+
+                for (UInt i = 0; i < swizzledInst->getElementCount(); ++i)
+                {
+                    IRInst* irElementIndex = swizzledInst->getElementIndex(i);
+                    IRIntegerValue elementIndex = getIntVal(irElementIndex);
+
+                    IRType* elementType;
+                    auto llvmDstElement = types->emitGetElementPtr(
+                        llvmDst, llvmBuilder->getInt32(elementIndex), dstType, rules, elementType);
+                    auto llvmSrcElement = llvmBuilder->CreateExtractElement(llvmSrc, i);
+                    llvmInst = types->emitStore(llvmDstElement, llvmSrcElement, elementType, rules);
+                }
+            }
+            break;
+
         case kIROp_IntCast:
             {
                 auto llvmValue = findValue(inst->getOperand(0));
