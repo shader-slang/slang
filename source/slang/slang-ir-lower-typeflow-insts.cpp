@@ -653,7 +653,6 @@ struct SequentialIDTagLoweringContext : public InstPassBase
     }
 };
 
-// Lower `GetTagFromSequentialID` and `GetSequentialIDFromTag` instructions
 void lowerSequentialIDTagCasts(IRModule* module, DiagnosticSink* sink)
 {
     SLANG_UNUSED(sink);
@@ -661,7 +660,6 @@ void lowerSequentialIDTagCasts(IRModule* module, DiagnosticSink* sink)
     context.processModule();
 }
 
-// Lower `FuncCollection`, `GetTagForSuperCollection`, `GetTagForMappedCollection`
 void lowerTagInsts(IRModule* module, DiagnosticSink* sink)
 {
     SLANG_UNUSED(sink);
@@ -901,9 +899,6 @@ struct TaggedUnionLoweringContext : public InstPassBase
     }
 };
 
-// Lower `CollectionTaggedUnion`and `CastInterfaceToTaggedUnionPtr` instructions
-// May create new `Reinterpret` instructions.
-//
 bool lowerTaggedUnionTypes(IRModule* module, DiagnosticSink* sink)
 {
     SLANG_UNUSED(sink);
