@@ -4,6 +4,9 @@
 //TEST_INPUT: set scene = AccelerationStructure
 uniform RaytracingAccelerationStructure scene;
 
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
+RWStructuredBuffer<uint> outputBuffer;
+
 // Multi-level traversal intrinsics
 //CHECK-DAG: optixGetTransformTypeFromHandle
 //CHECK-DAG: optixGetInstanceTraversableFromIAS
@@ -32,26 +35,32 @@ struct TestPayload
 void rayGen()
 {
     TestPayload payload;
-    
+
     // Test all the new multi-level traversal intrinsics
     OptixTraversableHandle handle = OptixTraversableHandle(0);
-    
+
     // Test 1: Get transform type
     payload.transformType = (uint)optixGetTransformTypeFromHandle(handle);
-    
-    // Test 2: Get instance traversable from IAS  
+
+    // Test 2: Get instance traversable from IAS
     OptixTraversableHandle instanceHandle = optixGetInstanceTraversableFromIAS(handle, 0);
-    
+
     // Test 3: Get instance ID
     payload.instanceId = optixGetInstanceIdFromHandle(instanceHandle);
-    
+
     // Test 4: Get child handle
     OptixTraversableHandle childHandle = optixGetInstanceChildFromHandle(instanceHandle);
-    
+
     // Test 5 & 6: Get transforms (returned as pointers cast to uint64_t)
     payload.transformPtr = optixGetInstanceTransformFromHandle(instanceHandle);
     payload.inverseTransformPtr = optixGetInstanceInverseTransformFromHandle(instanceHandle);
-    
+
     // Use the child handle to make sure all intrinsics are called and not optimized out
     payload.instanceId += optixGetInstanceIdFromHandle(childHandle);
+
+    // Write results to output buffer to prevent optimization
+    outputBuffer[0] = payload.transformType;
+    outputBuffer[1] = payload.instanceId;
+    outputBuffer[2] = uint(payload.transformPtr & 0xFFFFFFFF);
+    outputBuffer[3] = uint(payload.inverseTransformPtr & 0xFFFFFFFF);
 }
