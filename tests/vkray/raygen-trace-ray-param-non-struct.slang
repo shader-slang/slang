@@ -85,7 +85,6 @@ void main()
     // CHECK: rayPayload{{.*}}.data{{.*}};
     HitObject hitObject_HitOrMiss;
     HitObject::Invoke(
-        as,
         hitObject_HitOrMiss,
         someInData1);
     outputBuffer1[0] = outputBuffer1[0]+someInData1;
