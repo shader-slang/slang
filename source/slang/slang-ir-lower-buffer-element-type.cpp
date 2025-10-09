@@ -12,13 +12,16 @@
 ///
 /// Many of our targets have special restrictions on what is allowed to be used as a
 /// buffer element. Examples are:
-/// - In HLSL and SPIRV, if you have ConstantBuffer<T>, T must be a struct.
 /// - In SPIRV, `bool` is considered a logical type, meaning it cannot appear inside
 ///   buffers. bool vectors and matrices needs to be lowered into arrays.
 /// - In SPIRV, if `T` is used to declare a buffer, then every member in `T` must have
 ///   explicit offset. But if it is used to declare a local variable, then it cannot
 ///   have explicit member offset. This means that we cannot use the same `Foo` struct
 ///   inside a `StructuredBuffer<Foo>` and also use it to declare a local variable.
+/// - In Metal, if we have a `struct Foo {Texture2D member; }` and
+///   `ParameterBlock<Foo>`, then we should translate it to
+///   `struct Foo_pb { Texture2D.Handle member; }` and `ParameterBlock<Foo_pb>`, so that
+///    the resource legalization pass won't hoist the texture out of the parameter block.
 ///
 /// We use the terms "physical", "storage", or "lowered" types to refer to types that
 /// are legal to use as buffer elements. In contrast, the terms "original" or "logical"
@@ -187,6 +190,11 @@
 ///       m_ptr = FieldAddr(ptr, member)
 ///       call f_1, m_ptr
 ///    ```
+///    Note that it is only correct to defer a load/CastStorageToLogicalDeref if the location
+///    being loaded from is immutable. Otherwise, we might be changing the order of memory
+///    operations and result in a change in application behavior. So this pass will also make sure
+///    that we only create `CastStorageToLogicalDeref(x)` such that `x` is an immutable location,
+///    such as an immutable temporary variable.
 ///
 /// # Trailing Pointer Rewrite
 ///
