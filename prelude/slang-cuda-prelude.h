@@ -4054,6 +4054,16 @@ slangOptixHitObjectSetSbtRecordIndex(OptixTraversableHandle* Obj, uint sbtRecord
 // Define OptixTraversableHandle even if OptiX is not enabled.
 // This allows RaytracingAccelerationStructure to be properly reflected in non-OptiX code.
 typedef unsigned long long OptixTraversableHandle;
+
+// Define OptixTransformType enum when OptiX is not enabled
+typedef enum OptixTransformType
+{
+    OPTIX_TRANSFORM_TYPE_NONE = 0,                    ///< Not a transformation
+    OPTIX_TRANSFORM_TYPE_STATIC_TRANSFORM = 1,        ///< OptixStaticTransform
+    OPTIX_TRANSFORM_TYPE_MATRIX_MOTION_TRANSFORM = 2, ///< OptixMatrixMotionTransform
+    OPTIX_TRANSFORM_TYPE_SRT_MOTION_TRANSFORM = 3,    ///< OptixSRTMotionTransform
+    OPTIX_TRANSFORM_TYPE_INSTANCE = 4,                ///< OptixInstance
+} OptixTransformType;
 #endif
 static const int kSlangTorchTensorMaxDim = 5;
 
@@ -4654,3 +4664,15 @@ _slang_waveClusteredRotate(bool4 value, unsigned int delta, unsigned int cluster
 }
 
 #undef SLANG_WAVE_CLUSTERED_ROTATE_IMPL
+
+// OptiX multi-level traversal wrappers
+// These wrappers cast pointer returns to uint64_t for type compatibility
+__device__ __forceinline__ ulonglong _slang_optixGetInstanceTransformFromHandle(ulonglong handle)
+{
+    return (ulonglong)optixGetInstanceTransformFromHandle(handle);
+}
+
+__device__ __forceinline__ ulonglong _slang_optixGetInstanceInverseTransformFromHandle(ulonglong handle)
+{
+    return (ulonglong)optixGetInstanceInverseTransformFromHandle(handle);
+}

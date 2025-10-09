@@ -1005,6 +1005,19 @@ local insts = {
 	-- Wrapper for OptiX intrinsics used to load shader binding table record data
 	-- using a pointer.
 	{ getOptiXSbtDataPointer = { struct_name = "GetOptiXSbtDataPtr" } },
+	-- OptiX multi-level traversal intrinsics
+	-- Get transform type from a traversable handle
+	{ getOptiXTransformTypeFromHandle = { min_operands = 1 } },
+	-- Get instance traversable from IAS by index
+	{ getOptiXInstanceTraversableFromIAS = { min_operands = 2 } },
+	-- Get instance ID from traversable handle
+	{ getOptiXInstanceIdFromHandle = { min_operands = 1 } },
+	-- Get child traversable handle from instance handle
+	{ getOptiXInstanceChildFromHandle = { min_operands = 1 } },
+	-- Get object-to-world transform from instance handle
+	{ getOptiXInstanceTransformFromHandle = { min_operands = 1 } },
+	-- Get world-to-object transform from instance handle
+	{ getOptiXInstanceInverseTransformFromHandle = { min_operands = 1 } },
 	{ GetVulkanRayTracingPayloadLocation = { min_operands = 1 } },
 	{ GetLegalizedSPIRVGlobalParamAddr = { min_operands = 1 } },
 	{

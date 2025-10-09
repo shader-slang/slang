@@ -921,6 +921,50 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit(")");
             return true;
         }
+    case kIROp_GetOptiXTransformTypeFromHandle:
+        {
+            m_writer->emit("optixGetTransformTypeFromHandle(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
+    case kIROp_GetOptiXInstanceTraversableFromIAS:
+        {
+            m_writer->emit("optixGetInstanceTraversableFromIAS(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
+    case kIROp_GetOptiXInstanceIdFromHandle:
+        {
+            m_writer->emit("optixGetInstanceIdFromHandle(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
+    case kIROp_GetOptiXInstanceChildFromHandle:
+        {
+            m_writer->emit("optixGetInstanceChildFromHandle(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
+    case kIROp_GetOptiXInstanceTransformFromHandle:
+        {
+            m_writer->emit("optixGetInstanceTransformFromHandle(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
+    case kIROp_GetOptiXInstanceInverseTransformFromHandle:
+        {
+            m_writer->emit("optixGetInstanceInverseTransformFromHandle(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
     default:
         break;
     }
