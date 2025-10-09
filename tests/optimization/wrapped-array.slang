@@ -1,7 +1,12 @@
 //TEST:SIMPLE(filecheck=CHECK):-target spirv
 
 // CHECK: OpEntryPoint
-// CHECK-NOT: OpCompositeExtract
+
+// Make sure we never load the entire TensorList struct to local registers,
+// instead, we should specialize the fetch function to directly load the
+// element tensor from gTensors.
+
+// CHECK-NOT: OpLoad %TensorList_std140
 
 struct RWTensor<T, let D : int>
 {
