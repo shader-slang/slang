@@ -1100,7 +1100,7 @@ SlangInt _getAnyValueSizeRaw(IRType* type, SlangInt offset)
 
         // treat CoopVec as an opaque handle type
     case kIROp_CoopVectorType:
-            return alignUp(offset, 4) + 8;
+        return alignUp(offset, 4) + 8;
 
     default:
         if (isResourceType(type))
