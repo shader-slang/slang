@@ -819,17 +819,22 @@ void fixUpDebugFuncType(IRFunc* func)
 {
     SLANG_ASSERT(func);
 
-    auto irModule = func->getModule();
-    SLANG_ASSERT(irModule);
-
-    IRBuilder builder(irModule);
-    builder.setInsertBefore(func);
-
     if (auto debugFuncDecor = func->findDecoration<IRDebugFuncDecoration>())
     {
         auto funcType = func->getDataType();
         auto oldDebugFunc = cast<IRDebugFunction>(debugFuncDecor->getDebugFunc());
+
+        // If the existing debug func type is already the same, there's no need
+        // to do anything.
+        if (isTypeEqual(funcType, as<IRType>(oldDebugFunc->getDebugType())))
+            return;
+
+        auto irModule = func->getModule();
+        SLANG_ASSERT(irModule);
+
+        IRBuilder builder(irModule);
         builder.setInsertInto(irModule->getModuleInst());
+
         auto newDebugFunc = builder.emitDebugFunction(
             oldDebugFunc->getName(),
             oldDebugFunc->getLine(),
