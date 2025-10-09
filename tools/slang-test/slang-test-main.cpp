@@ -4868,6 +4868,19 @@ void runTestsInDirectory(TestContext* context)
     List<String> files;
     getFilesInDirectory(context->options.testDir, files);
 
+    // Also add any test prefixes that point to actual files outside the test directory
+    for (const auto& testPrefix : context->options.testPrefixes)
+    {
+        if (File::exists(testPrefix))
+        {
+            // Avoid duplicates - only add if not already in the list
+            if (files.indexOf(testPrefix) == Index(-1))
+            {
+                files.add(testPrefix);
+            }
+        }
+    }
+
     // NTFS on Windows stores files in sorted order but not on Linux/Macos.
     // Because of that, the testing on Linux/Macos were randomly failing, which
     // is a good thing because it reveals problems. But it is useless
