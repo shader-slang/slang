@@ -4155,9 +4155,7 @@ static __forceinline__ __device__ void slangOptixMakeNopHitObject(OptixTraversab
 
 #if (OPTIX_VERSION >= 80100)
 template<typename T>
-static __forceinline__ __device__ void optixInvoke(
-    OptixTraversableHandle* HitOrMiss,
-    T Payload)
+static __forceinline__ __device__ void optixInvoke(OptixTraversableHandle* HitOrMiss, T Payload)
 {
     uint32_t r0, r1;
     packOptiXRayPayloadPointer((void*)Payload, r0, r1);
