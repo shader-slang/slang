@@ -1330,12 +1330,11 @@ struct PeepholeContext : InstPassBase
 
     bool isConcreteType(IRType* type)
     {
-        // The associatedtype is represented as a LookupWitnessMethod, so we will need to check the type
-        // after the lookupWitnessMethod is fully specialized.
-        // This is to make something like this to work:
-        // `if (IFoo.AssociatedType is int)`
+        // The associatedtype is represented as a LookupWitnessMethod, so we will need to check the
+        // type after the lookupWitnessMethod is fully specialized. This is to make something like
+        // this to work: `if (IFoo.AssociatedType is int)`
         return type->parent->getOp() == kIROp_ModuleInst && !as<IRGlobalGenericParam>(type) &&
-            !as<IRLookupWitnessMethod>(type);
+               !as<IRLookupWitnessMethod>(type);
     }
 
     bool processFunc(IRInst* func)
