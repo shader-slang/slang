@@ -4759,8 +4759,8 @@ ${{{{
 // Declare DepthTexture* and Sampler*Shadow type aliases.
 ${{{{
     for (int shape = 0; shape < 4; shape++)
-    for (int isArray = 0; isArray <= 1; isArray++)
-    for (int isMS = 0; isMS <= 1; isMS++)
+    for (int isArray : { 0, 1 })
+    for (int isMS : { 0, 1 })
     {
         if (isMS)
         {
