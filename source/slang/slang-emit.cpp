@@ -1875,6 +1875,10 @@ Result linkAndOptimizeIR(
     {
         specializeAddressSpaceForMetal(irModule);
     }
+    else if (isWGPUTarget(targetRequest))
+    {
+        specializeAddressSpaceForWGSL(irModule);
+    }
 
     performForceInlining(irModule);
 
