@@ -1,22 +1,30 @@
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -capability optix_coopvec
-//TEST:SIMPLE(filecheck=CHECK-PTX): -target ptx -Xnvrtc -I"./external/optix-dev/include/"
 
+// Note - Validated locally.Enable with latest optix and cuda SDK
+// TODO: GitHub issue #8556 needs to be resolved to enable the test when OptiX 9.0+ is released
+//DISABLE_TEST:SIMPLE(filecheck=CHECK-PTX): -target ptx -capability optix_coopvec
+
+// CHECK-PTX: _optix_vector_load_16xi32
+// CHECK-PTX: _optix_vector_op1_16xi32
+// CHECK-PTX: _optix_vector_op2_16xi32
+// CHECK-PTX: _optix_vector_op3_16xi32
+// CHECK-PTX: _optix_outer_product_accumulate_16xi32
+// CHECK-PTX: _optix_reduce_sum_accumulate_16xi32
 // CHECK-PTX: add.f32
-// CHECK: optixCoopVecLoad
-// CHECK: OptixCoopVec
-// CHECK: optixCoopVecTanh
-// CHECK: optixCoopVecAdd
-// CHECK: optixCoopVecCvt
-// CHECK: optixCoopVecFFMA
-// CHECK: optixCoopVecMax
-// CHECK: optixCoopVecMin
-// CHECK: optixCoopVecMul
-// CHECK: optixCoopVecOuterProductAccumulate
-// CHECK: optixCoopVecReduceSumAccumulate
-// CHECK: optixCoopVecStep
-// CHECK: optixCoopVecSub
-// CHECK: optixCoopVecLog2
-// CHECK: optixCoopVecExp2
+// CHECK: OptixCoopVec<float, 4>{{.*}} = (optixCoopVecLoad<OptixCoopVec<float, 4> >((CUdeviceptr)(&((globalParams_{{[0-9]+}}->input{{[0-9]+}}_{{[0-9]+}})))))
+// CHECK: OptixCoopVec<float, 4>{{.*}} = (optixCoopVecTanh((_S{{[0-9]+}})))
+// CHECK: OptixCoopVec<float, 4>{{.*}} = (optixCoopVecAdd((_S{{[0-9]+}}), (_S{{[0-9]+}})))
+// CHECK: optixCoopVecCvt<OptixCoopVec<float, int(4)>>(*((&resultCopy_{{[0-9]+}})))
+// CHECK: OptixCoopVec<float, 4>{{.*}} = (optixCoopVecFFMA((_S{{[0-9]+}}), (_S{{[0-9]+}}), (_S{{[0-9]+}})))
+// CHECK: OptixCoopVec<float, 4>{{.*}} = (optixCoopVecMax((_S{{[0-9]+}}), (_S{{[0-9]+}})))
+// CHECK: OptixCoopVec<float, 4>{{.*}} = (optixCoopVecMin((_S{{[0-9]+}}), (_S{{[0-9]+}})))
+// CHECK: OptixCoopVec<float, 4>{{.*}} = (optixCoopVecMul((_S{{[0-9]+}}), (_S{{[0-9]+}})))
+// CHECK: optixCoopVecOuterProductAccumulate((_S{{[0-9]+}}), (_S{{[0-9]+}}), (CUdeviceptr)(&(globalParams_{{[0-9]+}}->outputMat_{{[0-9]+}})), (int(0)), (32U))
+// CHECK: optixCoopVecReduceSumAccumulate((_S{{[0-9]+}}), (CUdeviceptr)(&(globalParams_{{[0-9]+}}->outputMat{{[0-9]+}}_{{[0-9]+}})), (int(0)))
+// CHECK: OptixCoopVec<float, 4>{{.*}} = (optixCoopVecStep((_S{{[0-9]+}}), (_S{{[0-9]+}})))
+// CHECK: OptixCoopVec<float, 4>{{.*}} = (optixCoopVecSub((_S{{[0-9]+}}), (_S{{[0-9]+}})))
+// CHECK: OptixCoopVec<float, 4>{{.*}} = (optixCoopVecLog2((_S{{[0-9]+}})))
+// CHECK: OptixCoopVec<float, 4>{{.*}} = (optixCoopVecExp2((_S{{[0-9]+}})))
 
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
