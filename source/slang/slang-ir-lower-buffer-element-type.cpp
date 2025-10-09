@@ -1192,10 +1192,7 @@ struct LoweredElementTypeContext
                                 // and push the cast to inside the callee.
                                 // We will process calls after other gep insts, so for now just add
                                 // it into a separate worklist.
-                                if (castInst->getOp() == kIROp_CastStorageToLogical)
-                                {
-                                    callWorkListSet.add((IRCall*)user);
-                                }
+                                callWorkListSet.add((IRCall*)user);
                                 break;
                             }
                         case kIROp_Load:
@@ -1261,7 +1258,8 @@ struct LoweredElementTypeContext
                                     castInst->getBufferType());
                                 user->replaceUsesWith(newCast);
                                 user->removeAndDeallocate();
-                                castInstWorkList.add(newCast);
+                                if (auto newCastStorage = as<IRCastStorageToLogicalBase>(newCast))
+                                    castInstWorkList.add(newCastStorage);
                                 break;
                             }
                         case kIROp_FieldExtract:
@@ -1353,6 +1351,16 @@ struct LoweredElementTypeContext
                         paramTypes.add(storagePtrType);
                         newArgs.add(castArg->getOperand(0));
                     }
+                    else if (auto castArgDeref = as<IRCastStorageToLogicalDeref>(arg))
+                    {
+                        auto storageValueType = tryGetPointedToOrBufferElementType(
+                            &builder,
+                            castArgDeref->getOperand(0)->getDataType());
+                        auto storagePtrType =
+                            builder.getBorrowInParamType(storageValueType, AddressSpace::Generic);
+                        paramTypes.add(storagePtrType);
+                        newArgs.add(castArgDeref->getOperand(0));
+                    }
                     else
                     {
                         paramTypes.add(arg->getDataType());
@@ -1422,7 +1430,7 @@ struct LoweredElementTypeContext
             auto param = params[i];
             SLANG_RELEASE_ASSERT(i < call->getArgCount());
             auto arg = call->getArg(i);
-            auto cast = as<IRCastStorageToLogical>(arg);
+            auto cast = as<IRCastStorageToLogicalBase>(arg);
             if (!cast)
                 continue;
             auto logicalParamType = param->getFullType();
@@ -1434,8 +1442,21 @@ struct LoweredElementTypeContext
             uses.clear();
             for (auto use = param->firstUse; use; use = use->nextUse)
                 uses.add(use);
-            auto castedParam =
-                builder.emitCastStorageToLogical(logicalParamType, param, cast->getBufferType());
+            IRInst* castedParam = nullptr;
+            if (arg->getOp() == kIROp_CastStorageToLogical)
+            {
+                castedParam = builder.emitCastStorageToLogical(
+                    logicalParamType,
+                    param,
+                    cast->getBufferType());
+            }
+            else
+            {
+                castedParam = builder.emitCastStorageToLogicalDeref(
+                    logicalParamType,
+                    param,
+                    cast->getBufferType());
+            }
             if (auto castStorage = as<IRCastStorageToLogicalBase>(castedParam))
                 outNewCasts.add(castStorage);
 
