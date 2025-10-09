@@ -1701,6 +1701,7 @@ struct LLVMEmitter
 
     llvm::DILocalScope* currentLocalScope = nullptr;
     bool debugInlinedScope = false;
+    UInt uniqueIDCounter = 0;
 
     // Used to add code in the entry block of a function
     using FuncPrologueCallback = Func<void>;
@@ -1938,6 +1939,13 @@ struct LLVMEmitter
             // than global vars.
             llvmValue = types->maybeEmitConstant(inst);
             break;
+        case kIROp_Specialize:
+            {
+                auto s = as<IRSpecialize>(inst);
+                auto g = s->getBase();
+                auto e = "Specialize instruction remains in IR for LLVM emit, is something undefined?\n" + dumpIRToString(g);
+                SLANG_UNEXPECTED(e.getBuffer());
+            }
         default:
             if (globalInstruction && inlineGlobalInstructions)
             {
@@ -2970,7 +2978,31 @@ struct LLVMEmitter
         case kIROp_Call:
             {
                 auto callInst = static_cast<IRCall*>(inst);
-                auto llvmFunc = llvm::cast<llvm::Function>(findValue(callInst->getCallee()));
+                auto funcValue = callInst->getCallee();
+
+                if (!mapInstToLLVM.containsKey(funcValue))
+                {
+                    // Function is missing - likely reason for this is that it's
+                    // a __target_intrinsic that hasn't been emitted yet.
+                    if (auto targetIntrinsic = Slang::findBestTargetIntrinsicDecoration(
+                            funcValue,
+                            codeGenContext->getTargetCaps()))
+                    {
+                        // 'irFunc' may have a template type, so we need to deduce
+                        // the actual type here :/
+                        auto func = createTargetIntrinsicFunc(callInst);
+                        auto llvmFunc = ensureFuncDecl(func);
+                        emitTargetIntrinsicFunction(
+                            func,
+                            llvmFunc,
+                            targetIntrinsic,
+                            targetIntrinsic->getDefinition());
+                        mapInstToLLVM[funcValue] = llvmFunc;
+                    }
+                }
+
+                auto llvmFuncInst = findValue(funcValue);
+                auto llvmFunc = llvm::cast<llvm::Function>(llvmFuncInst);
 
                 List<llvm::Value*> args;
 
@@ -3359,6 +3391,7 @@ struct LLVMEmitter
             return llvm::cast<llvm::Function>(mapInstToLLVM.getValue(func));
 
         auto funcType = static_cast<IRFuncType*>(func->getDataType());
+
         llvm::FunctionType* llvmFuncType = llvm::cast<llvm::FunctionType>(types->getValueType(funcType));
 
         llvm::Function* llvmFunc = llvm::Function::Create(
@@ -3371,6 +3404,9 @@ struct LLVMEmitter
         llvm::StringRef linkageName, prettyName;
         if (maybeGetName(&linkageName, &prettyName, func))
             llvmFunc->setName(linkageName);
+
+        if (llvmFunc->getName().size() == 0)
+            llvmFunc->setName("__slang_anonymous_func_" + std::to_string(uniqueIDCounter++));
 
         UInt i = 0;
         for (auto pp = func->getFirstParam(); pp; pp = pp->getNextParam(), ++i)
@@ -3533,7 +3569,7 @@ struct LLVMEmitter
         while (out.size() > 0 && out.back() != '{')
             out.pop_back();
 
-        expanded << "\n";
+        expanded << "\nentry:\n";
 
         while (cursor < end)
         {
@@ -3646,6 +3682,73 @@ struct LLVMEmitter
         return out;
     }
 
+    IRFunc* createTargetIntrinsicFunc(IRCall* callInst)
+    {
+        IRBuilder builder(callInst->getModule());
+
+        auto resultType = callInst->getDataType();
+        List<IRType*> paramTypes;
+
+        for(IRInst* arg : callInst->getArgsList())
+        {
+            paramTypes.add(arg->getDataType());
+        }
+
+        IRFuncType* funcType = builder.getFuncType(paramTypes.getCount(), paramTypes.begin(), resultType);
+        IRFunc* func = builder.createFunc();
+        func->setFullType(funcType);
+
+        builder.setInsertInto(func);
+        IRBlock* headerBlock = builder.emitBlock();
+        builder.setInsertInto(headerBlock);
+
+        for(IRInst* arg : callInst->getArgsList())
+        {
+            builder.emitParam(arg->getDataType());
+        }
+        return func;
+    }
+
+    void emitTargetIntrinsicFunction(
+        IRFunc* func,
+        llvm::Function*& llvmFunc,
+        IRInst* intrinsicInst,
+        UnownedStringSlice intrinsicDef
+    ){
+        llvm::BasicBlock* bb = llvm::BasicBlock::Create(*llvmContext, "", llvmFunc);
+
+        llvmFunc->setLinkage(llvm::Function::LinkageTypes::ExternalLinkage);
+
+        std::string funcName = llvmFunc->getName().str();
+        std::string llvmTextIR = expandIntrinsic(llvmFunc, intrinsicInst, func, intrinsicDef);
+
+        bb->eraseFromParent();
+
+        llvm::SMDiagnostic diag;
+        std::unique_ptr<llvm::Module> sourceModule = llvm::parseAssemblyString(
+            llvmTextIR, diag, *llvmContext);
+
+        if (!sourceModule)
+        {
+            auto msg = diag.getMessage();
+            printf("inline ir:\n%s\nerror: %s\n", llvmTextIR.c_str(), msg.str().c_str());
+            SLANG_UNEXPECTED("Failed to parse LLVM inline IR!");
+        }
+
+        sourceModule->setDataLayout(targetMachine->createDataLayout());
+        sourceModule->setTargetTriple(targetMachine->getTargetTriple());
+
+        llvmLinker->linkInModule(std::move(sourceModule), llvm::Linker::OverrideFromSrc);
+
+        llvmFunc = llvm::cast<llvm::Function>(llvmModule->getNamedValue(funcName));
+        llvmFunc->setLinkage(llvm::Function::LinkageTypes::PrivateLinkage);
+        // Intrinsic functions usually do nothing other than call a single
+        // instruction; we can just inline them by default.
+        llvmFunc->addFnAttr(llvm::Attribute::AttrKind::AlwaysInline);
+
+        mapInstToLLVM[func] = llvmFunc;
+    }
+
     void emitGlobalValueWithCode(
         IRGlobalValueWithCode* code,
         llvm::Function* llvmFunc,
@@ -3664,38 +3767,7 @@ struct LLVMEmitter
             intrinsic = Slang::findTargetIntrinsicDefinition(func, codeGenContext->getTargetReq()->getTargetCaps(), intrinsicDef, intrinsicInst);
             if (intrinsic)
             {
-                llvm::BasicBlock* bb = llvm::BasicBlock::Create(*llvmContext, "", llvmFunc);
-
-                llvmFunc->setLinkage(llvm::Function::LinkageTypes::ExternalLinkage);
-
-                std::string funcName = llvmFunc->getName().str();
-                std::string llvmTextIR = expandIntrinsic(llvmFunc, intrinsicInst, func, intrinsicDef);
-                std::string llvmFuncName = llvmFunc->getName().str();
-
-                bb->eraseFromParent();
-
-                llvm::SMDiagnostic diag;
-                std::unique_ptr<llvm::Module> sourceModule = llvm::parseAssemblyString(
-                    llvmTextIR, diag, *llvmContext);
-
-                if (!sourceModule)
-                {
-                    auto msg = diag.getMessage();
-                    printf("inline ir:\n%s\nerror: %s\n", llvmTextIR.c_str(), msg.str().c_str());
-                    SLANG_UNEXPECTED("Failed to parse LLVM inline IR!");
-                }
-
-                sourceModule->setDataLayout(targetMachine->createDataLayout());
-                sourceModule->setTargetTriple(targetMachine->getTargetTriple());
-
-                llvmLinker->linkInModule(std::move(sourceModule), llvm::Linker::OverrideFromSrc);
-
-                llvmFunc = llvm::cast<llvm::Function>(llvmModule->getNamedValue(funcName));
-                llvmFunc->setLinkage(llvm::Function::LinkageTypes::PrivateLinkage);
-                // Intrinsic functions usually do nothing other than call a single
-                // instruction; we can just inline them by default.
-                llvmFunc->addFnAttr(llvm::Attribute::AttrKind::AlwaysInline);
-                mapInstToLLVM[func] = llvmFunc;
+                emitTargetIntrinsicFunction(func, llvmFunc, intrinsicInst, intrinsicDef);
             }
         }
 
@@ -4080,7 +4152,15 @@ struct LLVMEmitter
 
     void emitGlobalFunctions(IRModule* irModule)
     {
+        // Use a separate worklist so that if new functions get added, they
+        // won't get iterated over.
+        List<IRInst*> workList;
         for (auto inst : irModule->getGlobalInsts())
+        {
+            workList.add(inst);
+        }
+
+        for (auto inst : workList)
         {
             if (auto func = as<IRFunc>(inst))
             {

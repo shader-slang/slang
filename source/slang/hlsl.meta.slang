@@ -7903,7 +7903,7 @@ matrix<T, N, M> ceil(matrix<T, N, M> x)
 /// @category math
 __generic<let N: int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 vector<half,N> copysign_half(vector<half,N> x, vector<half,N> y)
 {
     let ux = reinterpret<vector<uint16_t,N>>(x);
@@ -7920,7 +7920,7 @@ vector<half,N> copysign_half(vector<half,N> x, vector<half,N> y)
 /// @category math
 __generic<let N: int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 vector<float,N> copysign_float(vector<float,N> x, vector<float,N> y)
 {
     let ux = reinterpret<vector<uint32_t,N>>(x);
@@ -7937,7 +7937,7 @@ vector<float,N> copysign_float(vector<float,N> x, vector<float,N> y)
 /// @category math
 __generic<let N: int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 vector<double,N> copysign_double(vector<double,N> x, vector<double,N> y)
 {
     let ux = reinterpret<vector<uint64_t,N>>(x);
@@ -7958,7 +7958,7 @@ vector<T,N> __real_cast(vector<U,N> val);
 /// @category math
 __generic<T : __BuiltinFloatingPointType, let N: int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 vector<T,N> copysign(vector<T,N> x, vector<T,N> y)
 {
     __target_switch
@@ -7984,7 +7984,7 @@ vector<T,N> copysign(vector<T,N> x, vector<T,N> y)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 T copysign(T x, T y)
 {
     __target_switch
