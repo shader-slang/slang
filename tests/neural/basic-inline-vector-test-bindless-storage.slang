@@ -1,8 +1,12 @@
+// This test is to test InlineVector with Bindless Storage.
+
+// Both Pointer and DescriptorHandle are belong to this category. However, since there is issue on our test-infrasture on Vulkan for
+// the DescriptorHandle support, we can only test Pointer for Vulkan now. See issue #8631.
+
 // We don't want to enable the pointer test on glsl, because there is a bug in emitting glsl code. See issue #8630.
 
-// This test is to test InlineVector with Bindless Storage.
-// Both Pointer and DescriptorHandle are belong to this category. However, since there is issue on our test-infrasture on the DescriptorHandle support,
-// we can only test Pointer for Vulkan now.
+// Currently, only CUDA supports atomicAdd on half. So we can only test fp16 on CUDA.
+
 
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -DTEST_HALF=0 -xslang -DTEST_POINTER=1
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -DTEST_HALF=1 -xslang -DTEST_POINTER=0
@@ -10,7 +14,8 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -DTEST_HALF=0  -xslang -DTEST_POINTER=1
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -DTEST_HALF=1 -xslang -DTEST_POINTER=0
 
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -output-using-type -xslang -DTEST_HALF=0 -xslang -DTEST_POINTER=1
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=0 -xslang -DTEST_POINTER=1
+
 
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xslang -DTEST_HALF=0 -xslang -DTEST_POINTER=1
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xslang -DTEST_HALF=0 -xslang -DTEST_POINTER=0
