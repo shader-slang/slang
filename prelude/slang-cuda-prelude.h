@@ -4058,11 +4058,11 @@ typedef unsigned long long OptixTraversableHandle;
 // Define OptixTransformType enum when OptiX is not enabled
 typedef enum OptixTransformType
 {
-    OPTIX_TRANSFORM_TYPE_NONE                    = 0, ///< Not a transformation
-    OPTIX_TRANSFORM_TYPE_STATIC_TRANSFORM        = 1, ///< OptixStaticTransform
+    OPTIX_TRANSFORM_TYPE_NONE = 0,                    ///< Not a transformation
+    OPTIX_TRANSFORM_TYPE_STATIC_TRANSFORM = 1,        ///< OptixStaticTransform
     OPTIX_TRANSFORM_TYPE_MATRIX_MOTION_TRANSFORM = 2, ///< OptixMatrixMotionTransform
-    OPTIX_TRANSFORM_TYPE_SRT_MOTION_TRANSFORM    = 3, ///< OptixSRTMotionTransform
-    OPTIX_TRANSFORM_TYPE_INSTANCE                = 4, ///< OptixInstance
+    OPTIX_TRANSFORM_TYPE_SRT_MOTION_TRANSFORM = 3,    ///< OptixSRTMotionTransform
+    OPTIX_TRANSFORM_TYPE_INSTANCE = 4,                ///< OptixInstance
 } OptixTransformType;
 #endif
 static const int kSlangTorchTensorMaxDim = 5;
