@@ -4664,3 +4664,15 @@ _slang_waveClusteredRotate(bool4 value, unsigned int delta, unsigned int cluster
 }
 
 #undef SLANG_WAVE_CLUSTERED_ROTATE_IMPL
+
+// OptiX multi-level traversal wrappers
+// These wrappers cast pointer returns to uint64_t for type compatibility
+__device__ __forceinline__ ulonglong _slang_optixGetInstanceTransformFromHandle(ulonglong handle)
+{
+    return (ulonglong)optixGetInstanceTransformFromHandle(handle);
+}
+
+__device__ __forceinline__ ulonglong _slang_optixGetInstanceInverseTransformFromHandle(ulonglong handle)
+{
+    return (ulonglong)optixGetInstanceInverseTransformFromHandle(handle);
+}

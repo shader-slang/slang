@@ -18443,7 +18443,7 @@ uint64_t optixGetInstanceTransformFromHandle(OptixTraversableHandle handle)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "optixGetInstanceTransformFromHandle";
+    case cuda: __intrinsic_asm "_slang_optixGetInstanceTransformFromHandle";
     }
 }
 
@@ -18458,7 +18458,7 @@ uint64_t optixGetInstanceInverseTransformFromHandle(OptixTraversableHandle handl
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "optixGetInstanceInverseTransformFromHandle";
+    case cuda: __intrinsic_asm "_slang_optixGetInstanceInverseTransformFromHandle";
     }
 }
 
