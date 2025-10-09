@@ -28,11 +28,12 @@ IRAnyValueType* createAnyValueType(IRBuilder* builder, const HashSet<IRType*>& t
     return builder->getAnyValueType(size);
 }
 
+// Generate a single function that dispatches to each function in the collection.
+// The resulting function will have one additional parameter to accept the tag
+// indicating which function to call.
+//
 IRFunc* createDispatchFunc(IRFuncCollection* collection)
 {
-    // An effective func type should have been set during the dynamic-inst-lowering
-    // pass.
-    //
     IRFuncType* dispatchFuncType = cast<IRFuncType>(collection->getFullType());
 
     // Create a dispatch function with switch-case for each function
@@ -146,10 +147,11 @@ IRFunc* createDispatchFunc(IRFuncCollection* collection)
     return func;
 }
 
-
+// Create a function that maps input integers to output integers based on the provided mapping.
 IRFunc* createIntegerMappingFunc(IRModule* module, Dictionary<UInt, UInt>& mapping, UInt defaultVal)
 {
-    // Create a function that maps input IDs to output IDs
+    // Emit a switch statement with the inputs as case labels and outputs as return values.
+
     IRBuilder builder(module);
 
     auto funcType =
@@ -211,10 +213,9 @@ IRFunc* createIntegerMappingFunc(IRModule* module, Dictionary<UInt, UInt>& mappi
     return func;
 }
 
-// This context lowers `IRGetTagFromSequentialID`,
-// `IRGetTagForSuperCollection`, and `IRGetTagForMappedCollection` instructions,
+// This context lowers `GetTagForSpecializedCollection`,
+// `GetTagForSuperCollection`, and `GetTagForMappedCollection` instructions,
 //
-
 struct TagOpsLoweringContext : public InstPassBase
 {
     TagOpsLoweringContext(IRModule* module)
@@ -224,6 +225,25 @@ struct TagOpsLoweringContext : public InstPassBase
 
     void lowerGetTagForSuperCollection(IRGetTagForSuperCollection* inst)
     {
+        // We use the result type and the type of the operand
+        // to figure out the source and destination collections.
+        //
+        // We then replace this with an array access, where the i'th
+        // element of the array is the corresponding index in the super
+        // collection.
+        //
+        // e.g.
+        //      let a : TagType(TableCollection(B, C)) = /* ... */;
+        //      let b : TagType(TableCollection(A, B, C)) = GetTagForSuperCollection(a);
+        // becomes
+        //      let a : TagType(TableCollection(B, C)) = /* ... */;
+        //      let lookupArr : ArrayType<UInt, 2> = [1, 2]; // B is at index 1, C is at index 2
+        //      let b : TagType(TableCollection(A, B, C)) = ElementExtract(lookupArr, a);
+        //
+        // Note that we leave the tag-types of the output intact since we may need to lower
+        // later tag operations.
+        //
+
         auto srcCollection = cast<IRCollectionBase>(
             cast<IRCollectionTagType>(inst->getOperand(0)->getDataType())->getOperand(0));
         auto destCollection =
@@ -271,6 +291,26 @@ struct TagOpsLoweringContext : public InstPassBase
 
     void lowerGetTagForMappedCollection(IRGetTagForMappedCollection* inst)
     {
+        // We use the result type and the type of the operand
+        // to figure out the source and destination collections.
+        //
+        // We then replace this with an array access, where the i'th
+        // element of the array is the corresponding index in the mapped
+        // collection.
+        //
+        // e.g.
+        //      let a : TagType(TableCollection(B, C)) = /* ... */;
+        //      let b : TagType(FuncCollection(C_key, B_key)) =
+        //          GetTagForMappedCollection(a, key);
+        // becomes
+        //      let a : TagType(TableCollection(B, C)) = /* ... */;
+        //      let lookupArr : ArrayType<UInt, 2> = [1, 0]; // B is at index 1, C is at index 0
+        //      let b : TagType(FuncCollection(C_key, B_key)) = ElementExtract(lookupArr, a);
+        //
+        // Note that we leave the tag-types of the output intact since we may need to lower
+        // later tag operations.
+        //
+
         auto srcCollection = cast<IRTableCollection>(
             cast<IRCollectionTagType>(inst->getOperand(0)->getDataType())->getOperand(0));
         auto destCollection =
@@ -319,6 +359,28 @@ struct TagOpsLoweringContext : public InstPassBase
 
     void lowerGetTagForSpecializedCollection(IRGetTagForSpecializedCollection* inst)
     {
+        // We use the result type and the type of the operand
+        // to figure out the source and destination collections.
+        //
+        // We then replace this with an array access, where the i'th
+        // element of the array is the corresponding index in the mapped
+        // collection.
+        //
+        // The mapping between elements is provided as pairs of operands to the instruction.
+        //
+        // e.g.
+        //      let a : TagType(GenericCollection(B, C)) = /* ... */;
+        //      let b : TagType(FuncCollection(E, F)) =
+        //          GetTagForSpecializedCollection(a, B, F, C, E);
+        // becomes
+        //      let a : TagType(GenericCollection(B, C)) = /* ... */;
+        //      let lookupArr : ArrayType<UInt, 2> = [1, 0]; // B->F, C->E
+        //      let b : TagType(FuncCollection(E, F)) = ElementExtract(lookupArr, a);
+        //
+        // Note that we leave the tag-types of the output intact since we may need to lower
+        // later tag operations.
+        //
+
         auto srcCollection =
             cast<IRCollectionTagType>(inst->getOperand(0)->getDataType())->getCollection();
         auto destCollection = cast<IRCollectionTagType>(inst->getDataType())->getCollection();
@@ -369,7 +431,6 @@ struct TagOpsLoweringContext : public InstPassBase
         inst->removeAndDeallocate();
     }
 
-
     void processInst(IRInst* inst)
     {
         switch (inst->getOp())
@@ -390,6 +451,12 @@ struct TagOpsLoweringContext : public InstPassBase
 
     void lowerFuncCollection(IRFuncCollection* collection)
     {
+        // Replace the `IRFuncCollection` with a dispatch function,
+        // which takes an extra first parameter for the tag (i.e. ID)
+        //
+        // We'll also replace the callee in all 'call' insts.
+        //
+
         IRBuilder builder(collection->getModule());
         if (collection->hasUses() && collection->getDataType() != nullptr)
         {
@@ -422,7 +489,7 @@ struct TagOpsLoweringContext : public InstPassBase
     }
 };
 
-// This context lowers `IRTypeCollection` and `IRFuncCollection` instructions
+// This context lowers `TypeCollection` instructions.
 struct CollectionLoweringContext : public InstPassBase
 {
     CollectionLoweringContext(IRModule* module)
@@ -432,6 +499,10 @@ struct CollectionLoweringContext : public InstPassBase
 
     void lowerTypeCollection(IRTypeCollection* collection)
     {
+        // Type collections are replaced with `AnyValueType` large enough to hold
+        // any of the types in the collection.
+        //
+
         HashSet<IRType*> types;
         for (UInt i = 0; i < collection->getCount(); i++)
         {
@@ -454,6 +525,7 @@ struct CollectionLoweringContext : public InstPassBase
     }
 };
 
+// Lower `TypeCollection` instructions
 void lowerTypeCollections(IRModule* module, DiagnosticSink* sink)
 {
     SLANG_UNUSED(sink);
@@ -461,16 +533,30 @@ void lowerTypeCollections(IRModule* module, DiagnosticSink* sink)
     context.processModule();
 }
 
+// This context lowers `IRGetTagFromSequentialID` and `IRGetSequentialIDFromTag` instructions.
+// Note: This pass requires that sequential ID decorations have been created for all witness
+// tables.
+//
 struct SequentialIDTagLoweringContext : public InstPassBase
 {
     SequentialIDTagLoweringContext(IRModule* module)
         : InstPassBase(module)
     {
     }
-
     void lowerGetTagFromSequentialID(IRGetTagFromSequentialID* inst)
     {
-        SLANG_UNUSED(cast<IRInterfaceType>(inst->getOperand(0)));
+        // We use the result type to figure out the destination collection
+        // for which we need to generate the tag.
+        //
+        // We then replace this with call into an integer mapping function,
+        // which takes the sequential ID and returns the local ID (i.e. tag).
+        //
+        // To construct, the mapping, we lookup the sequential ID decorator on
+        // each element of the destination collection, and map it to the table's
+        // operand index in the collection.
+        //
+
+        // We use the result type and the type of the operand
         auto srcSeqID = inst->getOperand(1);
 
         Dictionary<UInt, UInt> mapping;
@@ -484,7 +570,6 @@ struct SequentialIDTagLoweringContext : public InstPassBase
             [&](IRInst* table)
             {
                 // Get unique ID for the witness table
-                SLANG_UNUSED(cast<IRWitnessTable>(table));
                 auto outputId = dstSeqID++;
                 auto seqDecoration = table->findDecoration<IRSequentialIDDecoration>();
                 if (seqDecoration)
@@ -497,7 +582,7 @@ struct SequentialIDTagLoweringContext : public InstPassBase
         IRBuilder builder(inst);
         builder.setInsertAfter(inst);
 
-        // Default to largest available sequential ID.
+        // By default, use the tag for the largest available sequential ID.
         UInt defaultSeqID = 0;
         for (auto [inputId, outputId] : mapping)
         {
@@ -517,6 +602,10 @@ struct SequentialIDTagLoweringContext : public InstPassBase
 
     void lowerGetSequentialIDFromTag(IRGetSequentialIDFromTag* inst)
     {
+        // Similar logic to the `GetTagFromSequentialID` case, except that
+        // we reverse the mapping.
+        //
+
         SLANG_UNUSED(cast<IRInterfaceType>(inst->getOperand(0)));
         auto srcTagInst = inst->getOperand(1);
 
@@ -564,6 +653,7 @@ struct SequentialIDTagLoweringContext : public InstPassBase
     }
 };
 
+// Lower `GetTagFromSequentialID` and `GetSequentialIDFromTag` instructions
 void lowerSequentialIDTagCasts(IRModule* module, DiagnosticSink* sink)
 {
     SLANG_UNUSED(sink);
@@ -571,6 +661,7 @@ void lowerSequentialIDTagCasts(IRModule* module, DiagnosticSink* sink)
     context.processModule();
 }
 
+// Lower `FuncCollection`, `GetTagForSuperCollection`, `GetTagForMappedCollection`
 void lowerTagInsts(IRModule* module, DiagnosticSink* sink)
 {
     SLANG_UNUSED(sink);
@@ -578,6 +669,8 @@ void lowerTagInsts(IRModule* module, DiagnosticSink* sink)
     tagContext.processModule();
 }
 
+// This context lowers `IRCollectionTagType` instructions, by replacing
+// them with a suitable integer type.
 struct TagTypeLoweringContext : public InstPassBase
 {
     TagTypeLoweringContext(IRModule* module)
@@ -648,7 +741,39 @@ struct TaggedUnionLoweringContext : public InstPassBase
 
     void lowerCastInterfaceToTaggedUnionPtr(IRCastInterfaceToTaggedUnionPtr* inst)
     {
-        // Find all uses of the inst
+        // `CastInterfaceToTaggedUnionPtr` is used to 'reinterpret' a pointer to an interface-typed
+        // location into a tagged union type. Usually this is to avoid changing the type of the
+        // base location because it is externally visible, and to avoid touching the external layout
+        // of the interface type.
+        //
+        // To lower this, we won't actually change the pointer or the base location, but instead
+        // rewrite all loads and stores out of this pointer by converting the existential into a
+        // tagged union tuple.
+        //
+        // e.g.
+        //
+        //   let basePtr : PtrType(InterfaceType(I)) = /* ... */;
+        //   let tuPtr : PtrType(CollectionTaggedUnionType(types, tables)) =
+        //       CastInterfaceToTaggedUnionPtr(basePtr);
+        //   let loadedVal : CollectionTaggedUnionType(...) = Load(tuPtr);
+        //
+        // becomes
+        //
+        //   let basePtr : PtrType(InterfaceType(I)) = /* ... */;
+        //   let intermediateVal : InterfaceType(I) = Load(basePtr);
+        //   let loadedTableID : TagType(tables) =
+        //      GetTagFromSequentialID(
+        //         InterfaceType(I),
+        //         GetSequentialID(
+        //           ExtractExistentialWitnessTable(intermediateVal)));
+        //   let loadedVal : types = ExtractExistentialValue(intermediateVal);
+        //   let loadedTuple : TupleType(TagType(tables), types) =
+        //      MakeTuple(loadedTableID, loadedVal);
+        //
+        // The logic is similar for StructuredBufferLoad and RWStructuredBufferLoad,
+        // but the operands structure is slightly different.
+        //
+
         traverseUses(
             inst,
             [&](IRUse* use)
@@ -721,15 +846,19 @@ struct TaggedUnionLoweringContext : public InstPassBase
         inst->removeAndDeallocate();
     }
 
-    void lowerCastTaggedUnionToInterfacePtr(IRCastTaggedUnionToInterfacePtr* inst)
-    {
-        SLANG_UNUSED(inst);
-        SLANG_UNEXPECTED("Unexpected inst of CastTaggedUnionToInterfacePtr");
-    }
-
     IRType* convertToTupleType(IRCollectionTaggedUnionType* taggedUnion)
     {
-        // Replace type with Tuple<CollectionTagType(collection), TypeCollection>
+        // Replace `CollectionTaggedUnionType(typeCollection, tableCollection)` with
+        // `TupleType(CollectionTagType(tableCollection), typeCollection)`
+        //
+        // Unless the collection has a single element, in which case we
+        // replace it with `TupleType(CollectionTagType(tableCollection), elementType)`
+        //
+        // We still maintain a tuple type (even though it's not really necesssary) to avoid
+        // breaking any operations that assumed this is a tuple.
+        // In the single element case, the tuple should be optimized away.
+        //
+
         IRBuilder builder(module);
         builder.setInsertInto(module);
 
@@ -758,6 +887,7 @@ struct TaggedUnionLoweringContext : public InstPassBase
                 inst->removeAndDeallocate();
             });
 
+        // Then, convert any loads/stores from reinterpreted pointers.
         bool hasCastInsts = false;
         processInstsOfType<IRCastInterfaceToTaggedUnionPtr>(
             kIROp_CastInterfaceToTaggedUnionPtr,
@@ -767,18 +897,13 @@ struct TaggedUnionLoweringContext : public InstPassBase
                 return lowerCastInterfaceToTaggedUnionPtr(inst);
             });
 
-        processInstsOfType<IRCastTaggedUnionToInterfacePtr>(
-            kIROp_CastTaggedUnionToInterfacePtr,
-            [&](IRCastTaggedUnionToInterfacePtr* inst)
-            {
-                hasCastInsts = true;
-                return lowerCastTaggedUnionToInterfacePtr(inst);
-            });
-
         return hasCastInsts;
     }
 };
 
+// Lower `CollectionTaggedUnion`and `CastInterfaceToTaggedUnionPtr` instructions
+// May create new `Reinterpret` instructions.
+//
 bool lowerTaggedUnionTypes(IRModule* module, DiagnosticSink* sink)
 {
     SLANG_UNUSED(sink);
