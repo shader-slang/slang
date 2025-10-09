@@ -3654,32 +3654,29 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
             __intrinsic_asm ".Load";
 		case cuda:
             if (isArray != 0)
+            {
+                switch(Shape.flavor)
                 {
-     				static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_3D),
-                              "Integer coordinates are supported for texture reads only for 2D and 3D textures and 2D array textures.");
-
-                    if (Shape.flavor == $(SLANG_TEXTURE_2D))
-                    {
-						__intrinsic_asm "tex2DArrayfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z)";
-				    }
-                    else
-					{
-                        __intrinsic_asm "<invalid intrinsic>";
-                    }
+                case $(SLANG_TEXTURE_1D):
+                    __intrinsic_asm "tex1DArrayfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z)";
+                case $(SLANG_TEXTURE_2D):
+                    __intrinsic_asm "tex2DArrayfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z, ($1).w)";
                 }
-                else
+            }
+            else
+            {
+                switch(Shape.flavor)
                 {
-                    switch(Shape.flavor)
-                    {
-                    case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "tex2Dfetch_int<$T0>($0, ($1).x, ($1).y)";
-                    case $(SLANG_TEXTURE_3D):
-                        __intrinsic_asm "tex3Dfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z)";
-					case $(SLANG_TEXTURE_CUBE):
-                    default:
-                        __intrinsic_asm "<invalid intrinsic>";
-                    }
+                case $(SLANG_TEXTURE_1D):
+                    __intrinsic_asm "tex1Dfetch_int<$T0>($0, ($1).x, ($1).y)";
+                case $(SLANG_TEXTURE_2D):
+                    __intrinsic_asm "tex2Dfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z)";
+                case $(SLANG_TEXTURE_3D):
+                    __intrinsic_asm "tex3Dfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z, ($1).w)";
                 }
+            }
+            static_assert(false, "Unsupported 'Load' of 'texture' for 'cuda' target");
+            __intrinsic_asm "<invalid intrinsic>";
         case metal:
             switch (Shape.flavor)
             {
@@ -12190,6 +12187,7 @@ vector<T, M> mul(vector<T, N> left, matrix<T, N, M> right)
 }
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [__readNone]
+[OverloadRank(-1)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 vector<T, M> mul(vector<T, N> left, matrix<T, N, M> right)
 {
@@ -12353,6 +12351,7 @@ matrix<T,R,C> mul(matrix<T,R,N> left, matrix<T,N,C> right)
 }
 __generic<T : __BuiltinLogicalType, let R : int, let N : int, let C : int>
 [__readNone]
+[OverloadRank(-1)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 matrix<T,R,C> mul(matrix<T,R,N> left, matrix<T,N,C> right)
 {

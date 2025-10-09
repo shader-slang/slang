@@ -156,6 +156,12 @@ struct Options
 
     /// Display help message
     static void showHelp(Slang::WriterHelper stdOut);
+
+    /// Whether to shuffle tests
+    bool shuffleTests = false;
+
+    /// Seed for shuffling deterministically
+    uint32_t shuffleSeed = 1;
 };
 
 #endif // OPTIONS_H_INCLUDED

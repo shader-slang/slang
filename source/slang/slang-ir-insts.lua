@@ -479,6 +479,12 @@ local insts = {
 		module = { struct_name = "ModuleInst", parent = true },
 	},
 	{ block = { parent = true } },
+
+	-- A global inst representing an alias of another symbol, under a different mangled name.
+	-- This inst should be completely eliminated after linking, with its references replaced
+	-- to use the canonical symbol being aliased.
+	{ SymbolAlias = { min_operands = 1 } },
+
 	-- IRConstant
 	{
 		Constant = {
