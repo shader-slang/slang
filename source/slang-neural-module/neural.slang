@@ -34,3 +34,5 @@ module neural;
 
 __include "inline-vector";
 __include "storages";
+__include "bindless-storage";
+__include "buffer-storage";

@@ -14,7 +14,7 @@ and linear algebra operations for neural network computations.
 */
 public interface IVector<T, int N> : IDifferentiable
     where T : __BuiltinFloatingPointType
-    where T.Differential : __BuiltinFloatingPointType
+    where T.Differential == T
 {
     /// The compile-time size of the vector.
     public static const int Size;
@@ -118,7 +118,7 @@ for gradient computation in neural networks.
 */
 public struct InlineVector<T, int N> : IVector<T, N>
     where T : __BuiltinFloatingPointType
-    where T.Differential : __BuiltinFloatingPointType
+    where T.Differential == T
 {
     /// The differential type for automatic differentiation.
     public typealias Differential = InlineVector<T.Differential, N>;
