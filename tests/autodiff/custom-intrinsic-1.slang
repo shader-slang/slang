@@ -19,6 +19,7 @@ namespace myintrinsiclib
     __target_intrinsic(spirv, "12 resultType resultId glsl450 27 _0")
     __target_intrinsic(metal, "exp($0)")
     __target_intrinsic(wgsl, "exp($0)")
+    __target_intrinsic(llvm, "%result = call $T0 @llvm.exp($0)")
     [ForwardDerivative(d_myexp<T>)]
     T myexp(T x);
 
@@ -40,6 +41,7 @@ namespace myintrinsiclib
     __target_intrinsic(cpp, "$P_sin($0)")
     __target_intrinsic(spirv, "12 resultType resultId glsl450 13 _0")
     __target_intrinsic(wgsl, "sin($0)")
+    __target_intrinsic(llvm, "%result = call $T0 @llvm.sin($0)")
     [ForwardDerivative(d_mysin<T>)]
     T mysin(T x);
 
@@ -60,6 +62,7 @@ namespace myintrinsiclib
     __target_intrinsic(cpp, "$P_cos($0)")
     __target_intrinsic(spirv, "12 resultType resultId glsl450 14 _0")
     __target_intrinsic(wgsl, "cos($0)")
+    __target_intrinsic(llvm, "%result = call $T0 @llvm.cos($0)")
     [ForwardDerivative(d_mycos<T>)]
     T mycos(T x);
 
