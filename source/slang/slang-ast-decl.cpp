@@ -493,7 +493,7 @@ InterfaceDecl* ThisTypeConstraintDecl::getInterfaceDecl()
 
 void AggTypeDecl::addTag(TypeTag tag)
 {
-    typeTags = (TypeTag)((int)tag | (int)tag);
+    typeTags = (TypeTag)((int)typeTags | (int)tag);
 }
 
 bool AggTypeDecl::hasTag(TypeTag tag)
