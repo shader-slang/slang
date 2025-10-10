@@ -4638,6 +4638,7 @@ void Preprocessor::popInputFile()
         auto lastSegment = sourceView->getLastSegment();
         absoluteSourceLocCounter +=
             SourceRange(lastSegment.begin, sourceView->getRange().end).getSize();
+        includedFiles.remove(sourceView->getSourceFile()->getPathInfo().getMostUniqueIdentity());
     }
 
     // We will update the current file to the parent of whatever
@@ -4661,7 +4662,6 @@ void Preprocessor::popInputFile()
         sourceView->addAbsoluteSegment(
             parentFile->getExpansionStream()->peekLoc(),
             absoluteSourceLocCounter);
-        includedFiles.remove(sourceView->getSourceFile()->getPathInfo().getMostUniqueIdentity());
     }
 
     delete inputFile;
