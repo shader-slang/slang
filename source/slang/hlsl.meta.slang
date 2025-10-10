@@ -4753,17 +4753,35 @@ ${{{{
 }
 }}}}
 
-// Declare Sampler*Shadow type aliases.
+// Declare DepthTexture* and Sampler*Shadow type aliases.
 ${{{{
     for (int shape = 0; shape < 4; shape++)
-    for (int isArray = 0; isArray<=1; isArray++)
+    for (int isArray : { 0, 1 })
+    for (int isMS : { 0, 1 })
     {
+        if (isMS)
+        {
+            // Only DepthTexture2DMS and Sampler2DMSShadow.
+            if (shape != kCoreModule_ShapeIndex2D)
+                continue;
+        }
+
+        // No 3D Array.
+        if (shape == kCoreModule_ShapeIndex3D && isArray == 1)
+            continue;
 }}}}
-/// Represents a handle to a $(shapeTypeNames[shape]) combined texture-sampler for shadow comparison.
+/// Represents a handle to a$(isMS?" multisampled": "") $(shapeTypeNames[shape]) depth texture$(isArray?" array":"").
 /// @param format The storage format of the texture.
 /// @see Please refer to `_Texture` for more information about texture types.
 /// @category texture_types
-typealias Sampler$(shapeTypeNames[shape])$(arrayPostFix[isArray])Shadow<int format=0> = _Texture<float, __Shape$(shapeTypeNames[shape]), $(isArray), 0, 0, 0, 1, 1, format>;
+typealias DepthTexture$(shapeTypeNames[shape])$(msPostFix[isMS])$(arrayPostFix[isArray])<int format=0> = _Texture<float, __Shape$(shapeTypeNames[shape]), $(isArray), $(isMS), 0, 0, 1, 0, format>;
+
+/// Represents a handle to a$(isMS?" multisampled": "") $(shapeTypeNames[shape]) combined texture-sampler$(isArray?" array":"") for shadow comparison.
+/// @param format The storage format of the texture.
+/// @see Please refer to `_Texture` for more information about texture types.
+/// @category texture_types
+typealias Sampler$(shapeTypeNames[shape])$(msPostFix[isMS])$(arrayPostFix[isArray])Shadow<int format=0> = _Texture<float, __Shape$(shapeTypeNames[shape]), $(isArray), $(isMS), 0, 0, 1, 1, format>;
+
 ${{{{
     }
 }}}}

@@ -44,37 +44,10 @@ Sampler2DArray<float4> st2DArray_f32v4;
 // Combined depth texture samplers.
 //
 
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
-typealias CombinedDepth2d = _Texture<
-    T,
-    __Shape2D,
-    0, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    1, // isCombined
-    format
->;
-
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
-typealias CombinedDepth2d_array = _Texture<
-    T,
-    __Shape2D,
-    1, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    1, // isCombined
-    format
->;
-
-
 //TEST_INPUT: TextureSampler2D(size=4, content = zero, format=D32Float):name cd2D
-CombinedDepth2d<float> cd2D;
+Sampler2DShadow cd2D;
 //TEST_INPUT: TextureSampler2D(size=4, content = zero, arrayLength=2, format=D32Float):name cd2DArray
-CombinedDepth2d_array<float> cd2DArray;
+Sampler2DArrayShadow cd2DArray;
 
 uint getNotMapped()
 {

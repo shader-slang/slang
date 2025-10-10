@@ -124,67 +124,14 @@ Texture2DArray<uint16_t4> t2DArray_u16;
 //TEST_INPUT: TextureCube(size=4, content = zero, arrayLength=2):name tCubeArray_u16
 TextureCubeArray<uint16_t4> tCubeArray_u16;
 
-// Metal doc says "For depth texture types, T must be float."
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
-typealias depth2d = _Texture<
-    T,
-    __Shape2D,
-    0, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    0, // isCombined
-    format
->;
-
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
-typealias depth2d_array = _Texture<
-    T,
-    __Shape2D,
-    1, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    0, // isCombined
-    format
->;
-
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
-typealias depthcube = _Texture<
-    T,
-    __ShapeCube,
-    0, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    0, // isCombined
-    format
->;
-
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
-typealias depthcube_array = _Texture<
-    T,
-    __ShapeCube,
-    1, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    0, // isCombined
-    format
->;
-
 //TEST_INPUT: Texture2D(size=4, format=D32Float, content = zero):name d2D
-depth2d<float> d2D;
+DepthTexture2D d2D;
 //TEST_INPUT: TextureCube(size=4, format=D32Float, content = zero):name dCube
-depthcube<float> dCube;
+DepthTextureCube dCube;
 //TEST_INPUT: Texture2D(size=4, format=D32Float, content = zero, arrayLength=2):name d2DArray
-depth2d_array<float> d2DArray;
+DepthTexture2DArray d2DArray;
 //TEST_INPUT: TextureCube(size=4, format=D32Float, content = zero, arrayLength=2):name dCubeArray
-depthcube_array<float> dCubeArray;
+DepthTextureCubeArray dCubeArray;
 
 //TEST_INPUT: Sampler(filteringMode=point):name samplerState
 SamplerState samplerState;
