@@ -1298,8 +1298,24 @@ struct PeepholeContext : InstPassBase
                 // instruction that represents a "panic" or similar exceptional
                 // situation.
                 //
-                if (as<IRUndefined>(as<IRStore>(inst)->getVal()))
+                auto storeInst = cast<IRStore>(inst);
+                auto srcVal = storeInst->getVal();
+                if (as<IRUndefined>(srcVal))
                 {
+                    // As a special case, we will *not* eliminate a store when
+                    // the undefined source value is an `IRDeliberatelyUninitialized`.
+                    // That instruction is used by the front-end to encode cases
+                    // where a programmer has used an `__undefined` literal to
+                    // initialize a variable, and some of the analysis passes
+                    // that provide validation and diagnose errors in just-emitted
+                    // Slang IR rely on seeing `store`s of those values in order
+                    // to encode the programmer's intent.
+                    //
+                    if (as<IRDeliberatelyUninitialized>(srcVal))
+                    {
+                        break;
+                    }
+
                     maybeRemoveOldInst(inst);
                     changed = true;
                 }

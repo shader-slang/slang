@@ -1193,6 +1193,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".Sample";
         case spirv:
+            status = __undefined;
             return spirv_asm
             {
                 OpCapability MinLod;
@@ -1285,6 +1286,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 , "HLSL supports only float and half type textures");
             return __getTexture().SampleBias(__getSampler(), location, bias, offset, clamp, status);
         case spirv:
+            status = __undefined;
             return spirv_asm
             {
                 OpCapability SparseResidency;
@@ -1427,6 +1429,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 , "HLSL supports only float and half type textures");
             return __getTexture().SampleCmp(__getComparisonSampler(), location, compareValue, offset, clamp, status);
         case spirv:
+            status = __undefined;
             return spirv_asm
             {
                 OpCapability MinLod;
@@ -1570,6 +1573,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 , "HLSL supports only float and half type textures");
             return __getTexture().SampleCmpLevel(__getComparisonSampler(), location, compareValue, level, offset, status);
         case spirv:
+            status = __undefined;
             return spirv_asm
             {
                 OpCapability SparseResidency;
@@ -1825,6 +1829,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 , "HLSL supports only float and half type textures");
             return __getTexture().SampleGrad(__getSampler(), location, gradX, gradY, offset, lodClamp, status);
         case spirv:
+            status = __undefined;
             return spirv_asm
             {
                 OpCapability MinLod;
@@ -1941,6 +1946,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 , "HLSL supports only float and half type textures");
             return __getTexture().SampleLevel(__getSampler(), location, level, offset, status);
         case spirv:
+            status = __undefined;
             return spirv_asm
             {
                 OpCapability SparseResidency;
@@ -2446,6 +2452,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".Sample";
         case spirv:
+            status = __undefined;
             return spirv_asm
             {
                 OpCapability MinLod;
@@ -2607,6 +2614,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".SampleBias";
         case spirv:
+            status = __undefined;
             return spirv_asm
             {
                 OpCapability MinLod;
@@ -2771,6 +2779,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".SampleCmp";
         case spirv:
+            status = __undefined;
             return spirv_asm
             {
                 OpCapability MinLod;
@@ -2912,6 +2921,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".SampleCmpLevel";
         case spirv:
+            status = __undefined;
             return spirv_asm
             {
                 OpCapability SparseResidency;
@@ -3268,6 +3278,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".SampleGrad";
         case spirv:
+            status = __undefined;
             return spirv_asm
             {
                 OpCapability MinLod;
@@ -3460,6 +3471,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".SampleLevel";
         case spirv:
+            status = __undefined;
             return spirv_asm
             {
                 OpCapability SparseResidency;
@@ -4357,6 +4369,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
              let lod = location[lodLoc];
              if (isCombined != 0)
              {
+                 status = __undefined;
                  return spirv_asm
                  {
                      OpCapability SparseResidency;
@@ -4373,6 +4386,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
              }
              else
              {
+                 status = __undefined;
                  return spirv_asm
                  {
                      OpCapability SparseResidency;
@@ -4567,6 +4581,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
         case spirv:
              if (isCombined != 0)
              {
+                 status = __undefined;
                  return spirv_asm
                  {
                      OpCapability SparseResidency;
@@ -4583,6 +4598,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
              }
              else
              {
+                 status = __undefined;
                  return spirv_asm
                  {
                      OpCapability SparseResidency;
@@ -6765,22 +6781,22 @@ struct TriangleStream
 };
 
 #define VECTOR_MAP_UNARY(TYPE, COUNT, FUNC, VALUE) \
-    vector<TYPE,COUNT> result; for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(VALUE[i]); } return result
+    vector<TYPE,COUNT> result = __undefined; for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(VALUE[i]); } return result
 
 #define MATRIX_MAP_UNARY(TYPE, ROWS, COLS, FUNC, VALUE) \
-    matrix<TYPE,ROWS,COLS> result; for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(VALUE[i]); } return result
+    matrix<TYPE,ROWS,COLS> result = __undefined; for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(VALUE[i]); } return result
 
 #define VECTOR_MAP_BINARY(TYPE, COUNT, FUNC, LEFT, RIGHT) \
-    vector<TYPE,COUNT> result; for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
+    vector<TYPE,COUNT> result = __undefined; for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
 
 #define MATRIX_MAP_BINARY(TYPE, ROWS, COLS, FUNC, LEFT, RIGHT) \
-    matrix<TYPE,ROWS,COLS> result; for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
+    matrix<TYPE,ROWS,COLS> result = __undefined; for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
 
 #define VECTOR_MAP_TRINARY(TYPE, COUNT, FUNC, A, B, C) \
-    vector<TYPE,COUNT> result; for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
+    vector<TYPE,COUNT> result = __undefined; for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
 
 #define MATRIX_MAP_TRINARY(TYPE, ROWS, COLS, FUNC, A, B, C) \
-    matrix<TYPE,ROWS,COLS> result; for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
+    matrix<TYPE,ROWS,COLS> result = __undefined; for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
 
 //@public:
 
@@ -8827,7 +8843,7 @@ vector<uint, N> countbits(vector<T, N> value)
         // wgsl only supports 32-bit integers
         if (T is int32_t)
         {
-            vector<uint32_t, N> ret;
+            vector<uint32_t, N> ret = __undefined;
             for (int i = 0; i < N; i++)
             {
                 ret[i] = countbits(__intCast<uint32_t>(value[i]));
@@ -9631,7 +9647,7 @@ matrix<T,N,M> EvaluateAttributeAtSample(__constref matrix<T,N,M> x, uint samplei
     case glsl:
         return __EvaluateAttributeAtSample(__ResolveVaryingInputRef(x), sampleindex);
     default:
-        matrix<T,N,M> result;
+        matrix<T,N,M> result = __undefined;
         for(int i = 0; i < N; ++i)
         {
             result[i] = EvaluateAttributeAtSample(x[i], sampleindex);
@@ -9734,7 +9750,7 @@ matrix<T,N,M> EvaluateAttributeSnapped(__constref matrix<T,N,M> x, int2 offset)
     case glsl:
         return __EvaluateAttributeSnapped(__ResolveVaryingInputRef(x), offset);
     default:
-        matrix<T,N,M> result;
+        matrix<T,N,M> result = __undefined;
         for(int i = 0; i < N; ++i)
         {
             result[i] = EvaluateAttributeSnapped(x[i], offset);
@@ -10646,9 +10662,11 @@ T frexp(T x, out int exp)
     case glsl: __intrinsic_asm "frexp";
     case hlsl: __intrinsic_asm "frexp";
     case metal: __intrinsic_asm "frexp($0, *($1))";
-    case spirv: return spirv_asm {
-        result:$$T = OpExtInst glsl450 Frexp $x &exp
-    };
+    case spirv:
+        exp = __undefined;
+        return spirv_asm {
+            result:$$T = OpExtInst glsl450 Frexp $x &exp
+        };
     case wgsl:
         T fract;
         __wgsl_frexp<T>(x, fract, exp);
@@ -10676,14 +10694,17 @@ vector<T, N> frexp(vector<T, N> x, out vector<int, N> exp)
     case glsl: __intrinsic_asm "frexp";
     case hlsl: __intrinsic_asm "frexp";
     case metal: __intrinsic_asm "frexp($0, *($1))";
-    case spirv: return spirv_asm {
-        result:$$vector<T, N> = OpExtInst glsl450 Frexp $x &exp
-    };
+    case spirv:
+        exp = __undefined;
+        return spirv_asm {
+            result:$$vector<T, N> = OpExtInst glsl450 Frexp $x &exp
+        };
     case wgsl:
         vector<T,N> fract;
         __wgsl_frexp<T>(x, fract, exp);
         return fract;
     default:
+        exp = __undefined;
         VECTOR_MAP_BINARY(T, N, frexp, x, exp);
     }
 }
@@ -10707,6 +10728,7 @@ matrix<T, N, M> frexp(matrix<T, N, M> x, out matrix<int, N, M, L> exp)
     {
     case hlsl: __intrinsic_asm "frexp";
     default:
+        exp = __undefined;
         MATRIX_MAP_BINARY(T, N, M, frexp, x, exp);
     }
 }
@@ -11539,7 +11561,7 @@ vector<T, N> ldexp(vector<T, N> x, vector<E, N> exp)
     };
     case wgsl: __intrinsic_asm "ldexp";
     default:
-        vector<T,N> temp;
+        vector<T,N> temp = __undefined;
         [ForceUnroll]
         for (int i = 0; i < N; ++i)
             temp[i] = __realCast<T>(exp[i]);
@@ -12516,9 +12538,11 @@ T modf(T x, out T ip)
     case hlsl: __intrinsic_asm "modf";
     case glsl: __intrinsic_asm "modf";
     case metal: __intrinsic_asm "modf($0, *($1))";
-    case spirv: return spirv_asm {
-        result:$$T = OpExtInst glsl450 Modf $x &ip
-    };
+    case spirv:
+        ip = __undefined;
+        return spirv_asm {
+            result:$$T = OpExtInst glsl450 Modf $x &ip
+        };
     case wgsl:
         T fract;
         __wgsl_modf<T>(x, fract, ip);
@@ -12546,14 +12570,17 @@ vector<T,N> modf(vector<T,N> x, out vector<T,N> ip)
     case hlsl: __intrinsic_asm "modf";
     case glsl: __intrinsic_asm "modf";
     case metal: __intrinsic_asm "modf($0, *($1))";
-    case spirv: return spirv_asm {
-        result:$$vector<T,N> = OpExtInst glsl450 Modf $x &ip
-    };
+    case spirv:
+        ip = __undefined;
+        return spirv_asm {
+            result:$$vector<T,N> = OpExtInst glsl450 Modf $x &ip
+        };
     case wgsl:
         vector<T,N> fract;
         __wgsl_modf<T>(x, fract, ip);
         return fract;
     default:
+        ip = __undefined;
         VECTOR_MAP_BINARY(T, N, modf, x, ip);
     }
 }
@@ -12577,6 +12604,7 @@ matrix<T,N,M> modf(matrix<T,N,M> x, out matrix<T,N,M,L> ip)
     {
     case hlsl: __intrinsic_asm "modf";
     default:
+        ip = __undefined;
         MATRIX_MAP_BINARY(T, N, M, modf, x, ip);
     }
 }
@@ -12698,7 +12726,7 @@ vector<T, M> mul(vector<T, N> left, matrix<T, N, M> right)
     };
     case wgsl: __intrinsic_asm "($1 * $0)";
     default:
-        vector<T,M> result;
+        vector<T,M> result = __undefined;
         for( int j = 0; j < M; ++j )
         {
             T sum = T(0);
@@ -12723,7 +12751,7 @@ vector<T, M> mul(vector<T, N> left, matrix<T, N, M> right)
     case hlsl: __intrinsic_asm "mul";
     case wgsl: __intrinsic_asm "($1 * $0)";
     default:
-        vector<T,M> result;
+        vector<T,M> result = __undefined;
         for( int j = 0; j < M; ++j )
         {
             T sum = T(0);
@@ -12749,7 +12777,7 @@ vector<T, M> mul(vector<T, N> left, matrix<T, N, M> right)
     case hlsl: __intrinsic_asm "mul";
     case wgsl: __intrinsic_asm "($1 * $0)";
     default:
-        vector<T,M> result;
+        vector<T,M> result = __undefined;
         for( int j = 0; j < M; ++j )
         {
             T sum = T(0);
@@ -12779,7 +12807,7 @@ vector<T,N> mul(matrix<T,N,M> left, vector<T,M> right)
     };
     case wgsl: __intrinsic_asm "($1 * $0)";
     default:
-        vector<T,N> result;
+        vector<T,N> result = __undefined;
         for( int i = 0; i < N; ++i )
         {
             T sum = T(0);
@@ -12804,7 +12832,7 @@ vector<T,N> mul(matrix<T,N,M> left, vector<T,M> right)
     case hlsl: __intrinsic_asm "mul";
     case wgsl: __intrinsic_asm "($1 * $0)";
     default:
-        vector<T,N> result;
+        vector<T,N> result = __undefined;
         for( int i = 0; i < N; ++i )
         {
             T sum = T(0);
@@ -12830,7 +12858,7 @@ vector<T,N> mul(matrix<T,N,M> left, vector<T,M> right)
     case hlsl: __intrinsic_asm "mul";
     case wgsl: __intrinsic_asm "($1 * $0)";
     default:
-        vector<T,N> result;
+        vector<T,N> result = __undefined;
         for( int i = 0; i < N; ++i )
         {
             T sum = T(0);
@@ -12860,7 +12888,7 @@ matrix<T,R,C> mul(matrix<T,R,N> left, matrix<T,N,C> right)
     };
     case wgsl: __intrinsic_asm "($1 * $0)";
     default:
-        matrix<T,R,C> result;
+        matrix<T,R,C> result = __undefined;
         for( int r = 0; r < R; ++r)
         for( int c = 0; c < C; ++c)
         {
@@ -12886,7 +12914,7 @@ matrix<T,R,C> mul(matrix<T,R,N> left, matrix<T,N,C> right)
     case hlsl: __intrinsic_asm "mul";
     case wgsl: __intrinsic_asm "($1 * $0)";
     default:
-        matrix<T,R,C> result;
+        matrix<T,R,C> result = __undefined;
         for( int r = 0; r < R; ++r)
         for( int c = 0; c < C; ++c)
         {
@@ -12913,7 +12941,7 @@ matrix<T,R,C> mul(matrix<T,R,N> left, matrix<T,N,C> right)
     case hlsl: __intrinsic_asm "mul";
     case wgsl: __intrinsic_asm "($1 * $0)";
     default:
-        matrix<T,R,C> result;
+        matrix<T,R,C> result = __undefined;
         for( int r = 0; r < R; ++r)
         for( int c = 0; c < C; ++c)
         {
@@ -14396,7 +14424,7 @@ matrix<T, M, N> transpose(matrix<T, N, M> x)
     };
     case wgsl: __intrinsic_asm "transpose";
     default:
-        matrix<T,M,N> result;
+        matrix<T,M,N> result = __undefined;
         for(int r = 0; r < M; ++r)
             for(int c = 0; c < N; ++c)
                 result[r][c] = x[c][r];
@@ -14414,7 +14442,7 @@ matrix<T, M, N> transpose(matrix<T, N, M> x)
     case hlsl: __intrinsic_asm "transpose";
     // GLSL, WGSL, SPIR-V, and Metal don't support integer matrices when lowered, so transpose it manually
     default:
-        matrix<T, M, N> result;
+        matrix<T, M, N> result = __undefined;
         for (int r = 0; r < M; ++r)
             for (int c = 0; c < N; ++c)
                 result[r][c] = x[c][r];
@@ -14436,7 +14464,7 @@ matrix<T, M, N> transpose(matrix<T, N, M> x)
     };
     // GLSL, WGSL, and Metal don't support bool matrices when lowered, so transpose it manually
     default:
-        matrix<T, M, N> result;
+        matrix<T, M, N> result = __undefined;
         for (int r = 0; r < M; ++r)
             for (int c = 0; c < N; ++c)
                 result[r][c] = x[c][r];
@@ -15762,7 +15790,7 @@ matrix<T, N, M> WaveActive$(opName.hlslName)(matrix<T, N, M> expr)
     case hlsl:
         __intrinsic_asm "WaveActive$(opName.hlslName)";
     default:
-        matrix<T,N,M> result;
+        matrix<T,N,M> result = __undefined;
         [ForceUnroll]
         for (int i = 0; i < N; ++i)
             result[i] = WaveActive$(opName.hlslName)(expr[i]);
@@ -15847,7 +15875,7 @@ matrix<T, N, M> WaveActive$(opName.name)(matrix<T, N, M> expr)
     case hlsl:
         __intrinsic_asm "WaveActive$(opName.name)";
     default:
-        matrix<T, N, M> result;
+        matrix<T, N, M> result = __undefined;
         [ForceUnroll]
         for (int i = 0; i < N; ++i)
             result[i] = WaveActive$(opName.name)(expr[i]);
@@ -15947,7 +15975,7 @@ matrix<T, N, M> WaveActive$(opName.hlslName)(matrix<T, N, M> expr)
     case hlsl:
         __intrinsic_asm "WaveActive$(opName.hlslName)";
     default:
-        matrix<T, N, M> result;
+        matrix<T, N, M> result = __undefined;
         [ForceUnroll]
         for (int i = 0; i < N; ++i)
             result[i] = WaveActive$(opName.hlslName)(expr[i]);
@@ -16319,7 +16347,7 @@ matrix<T, N, M> WavePrefixProduct(matrix<T, N, M> expr)
     case hlsl:
         __intrinsic_asm "WavePrefixProduct";
     default:
-        matrix<T, N, M> result;
+        matrix<T, N, M> result = __undefined;
         for (int i = 0; i < N; ++i)
             result[i] = WavePrefixProduct(expr[i]);
         return result;
@@ -16402,7 +16430,7 @@ matrix<T,N,M> WavePrefixSum(matrix<T,N,M> expr)
     case hlsl:
         __intrinsic_asm "WavePrefixSum";
     default:
-        matrix<T, N, M> result;
+        matrix<T, N, M> result = __undefined;
         for (int i = 0; i < N; ++i)
             result[i] = WavePrefixSum(expr[i]);
         return result;
@@ -16464,7 +16492,7 @@ matrix<T,N,M> WaveReadLaneFirst(matrix<T,N,M> expr)
         return WaveMaskReadLaneFirst(WaveGetActiveMask(), expr);
     case hlsl: __intrinsic_asm "WaveReadLaneFirst";
     default:
-        matrix<T, N, M> result;
+        matrix<T, N, M> result = __undefined;
         for (int i = 0; i < N; ++i)
             result[i] = WaveReadLaneFirst(expr[i]);
         return result;
@@ -16534,7 +16562,7 @@ matrix<T, N, M> WaveBroadcastLaneAt(matrix<T, N, M> value, constexpr int lane)
     case cuda: __intrinsic_asm "_waveShuffleMultiple(_getActiveMask(), $0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
     default:
-        matrix<T, N, M> result;
+        matrix<T, N, M> result = __undefined;
         for (int i = 0; i < N; ++i)
             result[i] = WaveBroadcastLaneAt(value[i], lane);
         return result;
@@ -16599,7 +16627,7 @@ matrix<T, N, M> WaveReadLaneAt(matrix<T, N, M> value, int lane)
     case cuda: __intrinsic_asm "_waveShuffleMultiple(_getActiveMask(), $0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
     default:
-        matrix<T,N,M> result;
+        matrix<T,N,M> result = __undefined;
         for (int i = 0; i < N; ++i)
             result[i] = WaveReadLaneAt(value[i], lane);
         return result;
@@ -17069,7 +17097,7 @@ matrix<T,N,M> WaveMulti$(opName.name)(matrix<T,N,M> value, uint4 mask)
     case cuda:
         __intrinsic_asm "_wave$(opName.name)Multiple($1.x, $0)";
     default:
-        matrix<T, N, M> result;
+        matrix<T, N, M> result = __undefined;
         for (int i = 0; i < N; ++i)
             result[i] = WaveMulti$(opName.name)(value[i], mask);
         return result;
@@ -17180,7 +17208,7 @@ matrix<T,N,M> WaveMultiPrefix$(opName.name)(matrix<T,N,M> value, uint4 mask)
         __intrinsic_asm "_wavePrefix$(opName.cudaName)Multiple($1.x, $0) $(opName.cudaExtraOperation)";
     ${{{{ } }}}}
     default:
-        matrix<T, N, M> result;
+        matrix<T, N, M> result = __undefined;
         for (int i = 0; i < N; ++i)
             result[i] = WaveMultiPrefix$(opName.name)(value[i], mask);
         return result;
@@ -17263,7 +17291,7 @@ matrix<T, N, M> WaveMulti$(opName.name)(matrix<T, N, M> value, uint4 mask)
     case cuda:
         __intrinsic_asm "_wave$(opName.name)Multiple($1.x, $0)";
     default:
-        matrix<T, N, M> result;
+        matrix<T, N, M> result = __undefined;
         [ForceUnroll]
         for (int i = 0; i < N; ++i)
             result[i] = WaveMulti$(opName.name)(value[i], mask);
@@ -17355,7 +17383,7 @@ __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [require(glsl_spirv, subgroup_partitioned)]
 matrix<T, N, M> WaveMultiPrefix$(opName.name)(matrix<T, N, M> value, uint4 mask)
 {
-    matrix<T, N, M> result;
+    matrix<T, N, M> result = __undefined;
     [ForceUnroll]
     for (int i = 0; i < N; ++i)
         result[i] = WaveMultiPrefix$(opName.name)(value[i], mask);
@@ -17429,7 +17457,7 @@ matrix<T, N, M> WaveMultiBit$(opName.name)(matrix<T, N, M> value, uint4 mask)
     case cuda:
         __intrinsic_asm "_wave$(opName.name)Multiple($1.x, $0)";
     default:
-        matrix<T,N,M> result;
+        matrix<T,N,M> result = __undefined;
         [ForceUnroll]
         for (int i = 0; i < N; ++i)
             result[i] = WaveMultiBit$(opName.name)(value[i], mask);
@@ -17540,7 +17568,7 @@ ${{{{
     }
 }}}}
     default:
-        matrix<T,N,M> result;
+        matrix<T,N,M> result = __undefined;
         [ForceUnroll]
         for (int i = 0; i < N; ++i)
             result[i] = WaveMultiPrefix$(opName.name)(value[i], mask);
@@ -20714,6 +20742,7 @@ struct HitObject
                 let direction = Ray.Direction;
                 let tmin = Ray.TMin;
                 let tmax = Ray.TMax;
+                __return_val = __undefined;
                 spirv_asm
                 {
                     OpExtension "SPV_NV_shader_invocation_reorder";
@@ -20757,6 +20786,7 @@ struct HitObject
         __target_switch
         {
         case hlsl:
+            __return_val = __undefined;
             __traceMotionRayHLSL(
                 AccelerationStructure,
                 RayFlags,
@@ -20806,6 +20836,7 @@ struct HitObject
                 let direction = Ray.Direction;
                 let tmin = Ray.TMin;
                 let tmax = Ray.TMax;
+                __return_val = __undefined;
                 spirv_asm
                 {
                     OpExtension "SPV_NV_shader_invocation_reorder";
@@ -20902,6 +20933,7 @@ struct HitObject
                 let direction = Ray.Direction;
                 let tmin = Ray.TMin;
                 let tmax = Ray.TMax;
+                __return_val = __undefined;
                 spirv_asm
                 {
                     OpExtension "SPV_NV_shader_invocation_reorder";
@@ -20977,6 +21009,7 @@ struct HitObject
             let direction = Ray.Direction;
             let tmin = Ray.TMin;
             let tmax = Ray.TMax;
+            __return_val = __undefined;
             spirv_asm
             {
                 OpExtension "SPV_NV_ray_tracing_motion_blur";
@@ -21066,6 +21099,7 @@ struct HitObject
             let direction = Ray.Direction;
             let tmin = Ray.TMin;
             let tmax = Ray.TMax;
+            __return_val = __undefined;
             spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
@@ -21134,6 +21168,7 @@ struct HitObject
             let direction = Ray.Direction;
             let tmin = Ray.TMin;
             let tmax = Ray.TMax;
+            __return_val = __undefined;
             spirv_asm
             {
                 OpExtension "SPV_NV_ray_tracing_motion_blur";
@@ -21179,6 +21214,7 @@ struct HitObject
                 let direction = Ray.Direction;
                 let tmin = Ray.TMin;
                 let tmax = Ray.TMax;
+                __return_val = __undefined;
                 spirv_asm
                 {
                     OpExtension "SPV_NV_shader_invocation_reorder";
@@ -21216,6 +21252,7 @@ struct HitObject
                 let direction = Ray.Direction;
                 let tmin = Ray.TMin;
                 let tmax = Ray.TMax;
+                __return_val = __undefined;
                 spirv_asm
                 {
                     OpExtension "SPV_NV_ray_tracing_motion_blur";
@@ -21253,6 +21290,7 @@ struct HitObject
             __glslMakeNop(__return_val);
         case cuda: __intrinsic_asm "slangOptixMakeNopHitObject";
         case spirv:
+            __return_val = __undefined;
             spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
@@ -22509,7 +22547,7 @@ func saturated_cooperation_using<A, B, C>(
         // The representative lanes for all lanes
         var allRepresentatives = WaveActiveBitOr(ourRepresentative);
 
-        C ret;
+        C ret = __undefined;
 
         // Iterate over set bits in mask from low to high.
         // In each iteration the lowest bit is cleared.
@@ -22798,6 +22836,7 @@ ${
         case glsl:
             __intrinsic_asm "textureFootprintNV($p, $*2)";
         case spirv:
+            footprint = __undefined;
             return spirv_asm {
                 OpCapability ImageFootprintNV;
                 OpExtension "SPV_NV_shader_image_footprint";
@@ -22826,6 +22865,7 @@ ${
         case glsl:
             __intrinsic_asm "textureFootprintNV($p, $*2)";
         case spirv:
+            footprint = __undefined;
             return spirv_asm {
                 OpCapability ImageFootprintNV;
                 OpExtension "SPV_NV_shader_image_footprint";
@@ -22855,6 +22895,7 @@ ${
         case glsl:
             __intrinsic_asm "textureFootprintClampNV($p, $*2)";
         case spirv:
+            footprint = __undefined;
             return spirv_asm {
                 OpCapability ImageFootprintNV;
                 OpCapability MinLod;
@@ -22886,6 +22927,7 @@ ${
         case glsl:
             __intrinsic_asm "textureFootprintClampNV($p, $*2)";
         case spirv:
+            footprint = __undefined;
             return spirv_asm {
                 OpCapability ImageFootprintNV;
                 OpCapability MinLod;
@@ -22916,6 +22958,7 @@ ${
         case glsl:
             __intrinsic_asm "textureFootprintLodNV($p, $*2)";
         case spirv:
+            footprint = __undefined;
             return spirv_asm {
                 OpCapability ImageFootprintNV;
                 OpExtension "SPV_NV_shader_image_footprint";
@@ -22950,6 +22993,7 @@ ${{{
         case glsl:
             __intrinsic_asm "textureFootprintGradNV($p, $*2)";
         case spirv:
+            footprint = __undefined;
             return spirv_asm {
                 OpCapability ImageFootprintNV;
                 OpExtension "SPV_NV_shader_image_footprint";
@@ -22981,6 +23025,7 @@ ${{{
         case glsl:
             __intrinsic_asm "textureFootprintGradClampNV($p, $*2)";
         case spirv:
+            footprint = __undefined;
             return spirv_asm {
                 OpCapability ImageFootprintNV;
                 OpCapability MinLod;
@@ -26294,7 +26339,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         case optix_coopvec:
             __intrinsic_asm "optixCoopVecLoad<$TR>((CUdeviceptr)(&($0)))";
         default:
-            CoopVec<T,N> result;
+            CoopVec<T,N> result = __undefined;
             for(int i = 0; i < N; ++i)
                 result[i] = data[i + __byteToElemOffset<T>(byteOffset16ByteAligned)];
             return result;

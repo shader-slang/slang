@@ -4,10 +4,10 @@
 #define lowp
 
 #define VECTOR_MAP_UNARY(TYPE, COUNT, FUNC, VALUE) \
-    vector<TYPE,COUNT> result; [ForceUnroll] for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(VALUE[i]); } return result
+    vector<TYPE,COUNT> result = __undefined; [ForceUnroll] for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(VALUE[i]); } return result
 
 #define VECTOR_MAP_TRINARY(TYPE, COUNT, FUNC, A, B, C) \
-    vector<TYPE,COUNT> result; [ForceUnroll] for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
+    vector<TYPE,COUNT> result = __undefined; [ForceUnroll] for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
 
 //
 // OpenGL 4.60 spec
@@ -597,7 +597,7 @@ public vector<T, N> mix(vector<T, N> x, vector<T, N> y, vector<bool, N> a)
         result:$$vector<T,N> = OpSelect $a $y $x
     };
     default:
-        vector<T, N> result;
+        vector<T, N> result = __undefined;
         [ForceUnroll]
         for (int i = 0; i < N; i++)
         {
@@ -890,7 +890,7 @@ public matrix<T, R, C> outerProduct(vector<T, C> c, vector<T, R> r)
         result:$$matrix<T,R,C> = OpOuterProduct $c $r
     };
     default:
-        matrix<T, R, C> result;
+        matrix<T, R, C> result = __undefined;
         for (int j = 0; j < R; ++j)
         {
             for (int i = 0; i < C; ++i)
@@ -927,13 +927,15 @@ public uint uaddCarry(highp uint x, highp uint y, out lowp uint carry)
     __target_switch
     {
     case glsl: __intrinsic_asm "uaddCarry";
-    case spirv: return spirv_asm {
-        %ResType = OpTypeStruct $$uint $$uint;
-        %temp:%ResType = OpIAddCarry $x $y;
-        %carry:$$uint = OpCompositeExtract %temp 1;
-        OpStore &carry %carry;
-        result:$$uint = OpCompositeExtract %temp 0
-    };
+    case spirv:
+        carry = __undefined;
+        return spirv_asm {
+            %ResType = OpTypeStruct $$uint $$uint;
+            %temp:%ResType = OpIAddCarry $x $y;
+            %carry:$$uint = OpCompositeExtract %temp 1;
+            OpStore &carry %carry;
+            result:$$uint = OpCompositeExtract %temp 0
+        };
     default:
         let result = x * y;
         carry = ((result < x || result < y) ? 1 : 0);
@@ -950,14 +952,17 @@ public vector<uint,N> uaddCarry(highp vector<uint,N> x, highp vector<uint,N> y, 
     __target_switch
     {
     case glsl: __intrinsic_asm "uaddCarry";
-    case spirv: return spirv_asm {
-        %ResType = OpTypeStruct $$vector<uint,N> $$vector<uint,N>;
-        %temp:%ResType = OpIAddCarry $x $y;
-        %carry:$$vector<uint,N> = OpCompositeExtract %temp 1;
-        OpStore &carry %carry;
-        result:$$vector<uint,N> = OpCompositeExtract %temp 0
-    };
+    case spirv:
+        carry = __undefined;
+        return spirv_asm {
+            %ResType = OpTypeStruct $$vector<uint,N> $$vector<uint,N>;
+            %temp:%ResType = OpIAddCarry $x $y;
+            %carry:$$vector<uint,N> = OpCompositeExtract %temp 1;
+            OpStore &carry %carry;
+            result:$$vector<uint,N> = OpCompositeExtract %temp 0
+        };
     default:
+        carry = __undefined;
         VECTOR_MAP_TRINARY(uint, N, uaddCarry, x, y, carry);
     }
 }
@@ -970,13 +975,15 @@ public uint usubBorrow(highp uint x, highp uint y, out lowp uint borrow)
     __target_switch
     {
     case glsl: __intrinsic_asm "usubBorrow";
-    case spirv: return spirv_asm {
-        %ResType = OpTypeStruct $$uint $$uint;
-        %temp:%ResType = OpISubBorrow $x $y;
-        %borrow:$$uint = OpCompositeExtract %temp 1;
-        OpStore &borrow %borrow;
-        result:$$uint = OpCompositeExtract %temp 0
-    };
+    case spirv:
+        borrow = __undefined;
+        return spirv_asm {
+            %ResType = OpTypeStruct $$uint $$uint;
+            %temp:%ResType = OpISubBorrow $x $y;
+            %borrow:$$uint = OpCompositeExtract %temp 1;
+            OpStore &borrow %borrow;
+            result:$$uint = OpCompositeExtract %temp 0
+        };
     default:
         borrow = (y > x) ? 1 : 0;
         return x - y;
@@ -992,14 +999,17 @@ public vector<uint,N> usubBorrow(highp vector<uint,N> x, highp vector<uint,N> y,
     __target_switch
     {
     case glsl: __intrinsic_asm "usubBorrow";
-    case spirv: return spirv_asm {
-        %ResType = OpTypeStruct $$vector<uint,N> $$vector<uint,N>;
-        %temp:%ResType = OpISubBorrow $x $y;
-        %borrow:$$vector<uint,N> = OpCompositeExtract %temp 1;
-        OpStore &borrow %borrow;
-        result:$$vector<uint,N> = OpCompositeExtract %temp 0
-    };
+    case spirv:
+        borrow = __undefined;
+        return spirv_asm {
+            %ResType = OpTypeStruct $$vector<uint,N> $$vector<uint,N>;
+            %temp:%ResType = OpISubBorrow $x $y;
+            %borrow:$$vector<uint,N> = OpCompositeExtract %temp 1;
+            OpStore &borrow %borrow;
+            result:$$vector<uint,N> = OpCompositeExtract %temp 0
+        };
     default:
+        borrow = __undefined;
         VECTOR_MAP_TRINARY(uint, N, usubBorrow, x, y, borrow);
     }
 }
@@ -1012,14 +1022,17 @@ public void umulExtended(highp uint x, highp uint y, out highp uint msb, out hig
     __target_switch
     {
     case glsl: __intrinsic_asm "umulExtended";
-    case spirv: spirv_asm {
-        %ResType = OpTypeStruct $$uint $$uint;
-        %temp:%ResType = OpUMulExtended $x $y;
-        %lsb:$$uint = OpCompositeExtract %temp 0;
-        %msb:$$uint = OpCompositeExtract %temp 1;
-        OpStore &lsb %lsb;
-        OpStore &msb %msb;
-    };
+    case spirv:
+        msb = __undefined;
+        lsb = __undefined;
+        spirv_asm {
+            %ResType = OpTypeStruct $$uint $$uint;
+            %temp:%ResType = OpUMulExtended $x $y;
+            %lsb:$$uint = OpCompositeExtract %temp 0;
+            %msb:$$uint = OpCompositeExtract %temp 1;
+            OpStore &lsb %lsb;
+            OpStore &msb %msb;
+        };
     default:
         uint64_t result = x * y;
         msb = uint(result >> 32);
@@ -1036,15 +1049,20 @@ public void umulExtended(highp vector<uint,N> x, highp vector<uint,N> y, out hig
     __target_switch
     {
     case glsl: __intrinsic_asm "umulExtended";
-    case spirv: spirv_asm {
-        %ResType = OpTypeStruct $$vector<uint,N> $$vector<uint,N>;
-        %temp:%ResType = OpUMulExtended $x $y;
-        %lsb:$$vector<uint,N> = OpCompositeExtract %temp 0;
-        %msb:$$vector<uint,N> = OpCompositeExtract %temp 1;
-        OpStore &lsb %lsb;
-        OpStore &msb %msb;
-    };
+    case spirv:
+        msb = __undefined;
+        lsb = __undefined;
+        spirv_asm {
+            %ResType = OpTypeStruct $$vector<uint,N> $$vector<uint,N>;
+            %temp:%ResType = OpUMulExtended $x $y;
+            %lsb:$$vector<uint,N> = OpCompositeExtract %temp 0;
+            %msb:$$vector<uint,N> = OpCompositeExtract %temp 1;
+            OpStore &lsb %lsb;
+            OpStore &msb %msb;
+        };
     default:
+        msb = __undefined;
+        lsb = __undefined;
         [ForceUnroll]
         for(int i = 0; i < N; ++i)
         {
@@ -1061,14 +1079,17 @@ public void imulExtended(highp int x, highp int y, out highp int msb, out highp 
     __target_switch
     {
     case glsl: __intrinsic_asm "imulExtended";
-    case spirv: spirv_asm {
-        %ResType = OpTypeStruct $$int $$int;
-        %temp:%ResType = OpSMulExtended $x $y;
-        %lsb:$$int = OpCompositeExtract %temp 0;
-        %msb:$$int = OpCompositeExtract %temp 1;
-        OpStore &lsb %lsb;
-        OpStore &msb %msb;
-    };
+    case spirv:
+        msb = __undefined;
+        lsb = __undefined;
+        spirv_asm {
+            %ResType = OpTypeStruct $$int $$int;
+            %temp:%ResType = OpSMulExtended $x $y;
+            %lsb:$$int = OpCompositeExtract %temp 0;
+            %msb:$$int = OpCompositeExtract %temp 1;
+            OpStore &lsb %lsb;
+            OpStore &msb %msb;
+        };
     default:
         int64_t result = x * y;
         msb = int(result >> 32);
@@ -1085,15 +1106,20 @@ public void imulExtended(highp vector<int,N> x, highp vector<int,N> y, out highp
     __target_switch
     {
     case glsl: __intrinsic_asm "imulExtended";
-    case spirv: spirv_asm {
-        %ResType = OpTypeStruct $$vector<int,N> $$vector<int,N>;
-        %temp:%ResType = OpSMulExtended $x $y;
-        %lsb:$$vector<int,N> = OpCompositeExtract %temp 0;
-        %msb:$$vector<int,N> = OpCompositeExtract %temp 1;
-        OpStore &lsb %lsb;
-        OpStore &msb %msb;
-    };
+    case spirv:
+        msb = __undefined;
+        lsb = __undefined;
+        spirv_asm {
+            %ResType = OpTypeStruct $$vector<int,N> $$vector<int,N>;
+            %temp:%ResType = OpSMulExtended $x $y;
+            %lsb:$$vector<int,N> = OpCompositeExtract %temp 0;
+            %msb:$$vector<int,N> = OpCompositeExtract %temp 1;
+            OpStore &lsb %lsb;
+            OpStore &msb %msb;
+        };
     default:
+        msb = __undefined;
+        lsb = __undefined;
         [ForceUnroll]
         for(int i = 0; i < N; ++i)
         {

@@ -2069,6 +2069,7 @@ static LegalVal legalizeInst(
         result = legalizePrintf(context, args);
         break;
     case kIROp_LoadFromUninitializedMemory:
+    case kIROp_DeliberatelyUninitialized:
     case kIROp_Poison:
         return legalizeUndefined(context, inst);
     case kIROp_GpuForeach:
