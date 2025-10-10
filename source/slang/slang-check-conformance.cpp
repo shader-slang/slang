@@ -350,7 +350,8 @@ TypeTag SemanticsVisitor::getTypeTags(Type* type)
         if (!sized)
         {
             // Unbounded arrays are both Unsized and NonAddressable
-            typeTag = (TypeTag)((int)typeTag | (int)TypeTag::Unsized | (int)TypeTag::NonAddressable);
+            typeTag =
+                (TypeTag)((int)typeTag | (int)TypeTag::Unsized | (int)TypeTag::NonAddressable);
         }
 
         return typeTag;
@@ -379,34 +380,9 @@ TypeTag SemanticsVisitor::getTypeTags(Type* type)
     }
     else if (auto declRefType = as<DeclRefType>(type))
     {
-        if (auto aggTypeDeclRef = as<AggTypeDecl>(declRefType->getDeclRef()))
+        if (auto aggTypeDecl = as<AggTypeDecl>(declRefType->getDeclRef()))
         {
-            auto aggTypeDecl = aggTypeDeclRef.getDecl();
-
-            // Start with the stored tags
-            TypeTag tags = aggTypeDecl->typeTags;
-
-            // Check if any member has NonAddressable tag
-            // We need to check members to propagate NonAddressable
-            for (auto member : aggTypeDecl->getMembersOfType<VarDeclBase>())
-            {
-                // Skip static members
-                if (member->hasModifier<HLSLStaticModifier>())
-                    continue;
-
-                // Get tags for the member type
-                TypeTag memberTags = getTypeTags(member->getType());
-
-                // If member is NonAddressable, the struct is also NonAddressable
-                if ((int)memberTags & (int)TypeTag::NonAddressable)
-                {
-                    tags = (TypeTag)((int)tags | (int)TypeTag::NonAddressable);
-                    // We found a NonAddressable member, no need to check further
-                    break;
-                }
-            }
-
-            return tags;
+            return aggTypeDecl.getDecl()->typeTags;
         }
     }
     return TypeTag::None;

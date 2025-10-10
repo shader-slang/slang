@@ -2706,6 +2706,9 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 {
     DiagnoseIsAllowedInitExpr(varDecl, getSink());
 
+    // Check for arrays of non-addressable types
+    validateArrayElementTypeForVariable(varDecl);
+
     // if zero initialize is true, set everything to a default
     if (getOptionSet().hasOption(CompilerOptionName::ZeroInitialize) && !varDecl->initExpr &&
         as<VarDecl>(varDecl))
