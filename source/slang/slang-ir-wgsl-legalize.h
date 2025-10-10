@@ -7,4 +7,7 @@ namespace Slang
 class DiagnosticSink;
 
 void legalizeIRForWGSL(IRModule* module, DiagnosticSink* sink);
+
+void specializeAddressSpaceForWGSL(IRModule* module);
+
 } // namespace Slang

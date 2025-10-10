@@ -2191,6 +2191,13 @@ struct IRAlignedAttr : IRAttr
 };
 
 FIDDLE()
+struct IRMemoryScopeAttr : IRAttr
+{
+    FIDDLE(leafInst())
+    IRInst* getMemoryScope() { return getOperand(0); }
+};
+
+FIDDLE()
 struct IRLoad : IRInst
 {
     FIDDLE(leafInst())
@@ -2232,6 +2239,17 @@ struct IRStore : IRInst
 
 FIDDLE()
 struct IRAtomicStore : IRAtomicOperation
+{
+    FIDDLE(leafInst())
+    IRUse ptr;
+    IRUse val;
+
+    IRInst* getPtr() { return ptr.get(); }
+    IRInst* getVal() { return val.get(); }
+};
+
+FIDDLE()
+struct IRAtomicExchange : IRAtomicOperation
 {
     FIDDLE(leafInst())
     IRUse ptr;
@@ -4413,7 +4431,7 @@ public:
 
     IRInst* emitLoad(IRType* type, IRInst* ptr);
     IRInst* emitLoad(IRType* type, IRInst* ptr, IRInst* align);
-    IRInst* emitLoad(IRType* type, IRInst* ptr, IRAlignedAttr* align);
+    IRInst* emitLoad(IRType* type, IRInst* ptr, ArrayView<IRInst*> attributes);
     IRInst* emitLoad(IRInst* ptr);
 
     IRInst* emitLoadReverseGradient(IRType* type, IRInst* diffValue);
@@ -4423,6 +4441,7 @@ public:
 
     IRInst* emitStore(IRInst* dstPtr, IRInst* srcVal);
     IRInst* emitStore(IRInst* dstPtr, IRInst* srcVal, IRInst* align);
+    IRInst* emitStore(IRInst* dstPtr, IRInst* srcVal, IRInst* align, IRInst* memoryScope);
 
     IRInst* emitAtomicStore(IRInst* dstPtr, IRInst* srcVal, IRInst* memoryOrder);
 
@@ -4632,10 +4651,7 @@ public:
     IRInst* emitCastIntToPtr(IRType* ptrType, IRInst* val);
 
     IRInst* emitCastStorageToLogical(IRType* type, IRInst* val, IRInst* bufferType);
-    IRCastStorageToLogicalDeref* emitCastStorageToLogicalDeref(
-        IRType* type,
-        IRInst* val,
-        IRInst* bufferType);
+    IRInst* emitCastStorageToLogicalDeref(IRType* type, IRInst* val, IRInst* bufferType);
 
     IRGlobalConstant* emitGlobalConstant(IRType* type);
 

@@ -1479,6 +1479,9 @@ local insts = {
 					struct_name = "RequireFullQuadsDecoration",
 				},
 			},
+			-- Marks a var as a temporary local variable to replace references to a `in` parameter from the function body
+			-- This is to support legacy code that modifies an `in` parameter as if it is copied to a local variable.
+			{ InParamProxyVar = { struct_name = "InParamProxyVarDecoration", min_operands = 1 } },
 			{ TempCallArgImmutableVar = { struct_name = "TempCallArgImmutableVarDecoration" } },
 			{ TempCallArgVar = { struct_name = "TempCallArgVarDecoration" } },
 			{
@@ -2015,6 +2018,7 @@ local insts = {
 				},
 			},
 			{ Aligned = { struct_name = "AlignedAttr", min_operands = 1 } },
+			{ MemoryScope = { struct_name = "MemoryScopeAttr", min_operands = 1 } },
 			{
 				SemanticAttr = {
 					{ userSemantic = { struct_name = "UserSemanticAttr", min_operands = 2 } },

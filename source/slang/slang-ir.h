@@ -2148,6 +2148,11 @@ void fixUpFuncType(IRFunc* func, IRType* resultType);
 ///
 void fixUpFuncType(IRFunc* func);
 
+/// If the function has a DebugFuncDecoration, replaces the function type in
+/// that decoration to match the current type of the function.
+///
+void fixUpDebugFuncType(IRFunc* func);
+
 // A generic is akin to a function, but is conceptually executed
 // before runtime, to specialize the code nested within.
 //

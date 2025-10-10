@@ -11068,6 +11068,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                             // of the function.
                             //
                             auto irLocal = subBuilder->emitVar(irParamType);
+                            subBuilder->addDecoration(
+                                irLocal,
+                                kIROp_InParamProxyVarDecoration,
+                                irParam);
                             auto localVal = LoweredValInfo::ptr(irLocal);
                             assign(subContext, localVal, paramVal);
                             //

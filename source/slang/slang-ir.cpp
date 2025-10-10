@@ -815,6 +815,37 @@ IRType* IRFunc::getParamType(UInt index)
     return getDataType()->getParamType(index);
 }
 
+void fixUpDebugFuncType(IRFunc* func)
+{
+    SLANG_ASSERT(func);
+
+    if (auto debugFuncDecor = func->findDecoration<IRDebugFuncDecoration>())
+    {
+        auto funcType = func->getDataType();
+        auto oldDebugFunc = cast<IRDebugFunction>(debugFuncDecor->getDebugFunc());
+
+        // If the existing debug func type is already the same, there's no need
+        // to do anything.
+        if (isTypeEqual(funcType, as<IRType>(oldDebugFunc->getDebugType())))
+            return;
+
+        auto irModule = func->getModule();
+        SLANG_ASSERT(irModule);
+
+        IRBuilder builder(irModule);
+        builder.setInsertInto(irModule->getModuleInst());
+
+        auto newDebugFunc = builder.emitDebugFunction(
+            oldDebugFunc->getName(),
+            oldDebugFunc->getLine(),
+            oldDebugFunc->getCol(),
+            oldDebugFunc->getFile(),
+            funcType);
+        debugFuncDecor->removeAndDeallocate();
+        builder.addDecoration(funcType, kIROp_DebugFuncDecoration, newDebugFunc);
+    }
+}
+
 void fixUpFuncType(IRFunc* func, IRType* resultType)
 {
     SLANG_ASSERT(func);
@@ -5181,18 +5212,20 @@ IRInst* IRBuilder::emitLoad(IRType* type, IRInst* ptr, IRInst* align)
     return inst;
 }
 
-IRInst* IRBuilder::emitLoad(IRType* type, IRInst* ptr, IRAlignedAttr* align)
+IRInst* IRBuilder::emitLoad(IRType* type, IRInst* ptr, ArrayView<IRInst*> attributes)
 {
-    if (align)
-    {
-        auto inst = createInst<IRLoad>(this, kIROp_Load, type, ptr, align);
-        addInst(inst);
-        return inst;
-    }
-    else
-    {
-        return emitLoad(type, ptr);
-    }
+    ShortList<IRInst*> params;
+    params.add(ptr);
+    params.addRange(attributes);
+    auto inst = createInst<IRLoad>(
+        this,
+        kIROp_Load,
+        type,
+        params.getCount(),
+        params.getArrayView().getBuffer());
+
+    addInst(inst);
+    return inst;
 }
 
 IRInst* IRBuilder::emitLoad(IRInst* ptr)
@@ -5243,6 +5276,21 @@ IRInst* IRBuilder::emitStore(IRInst* dstPtr, IRInst* srcVal, IRInst* align)
         dstPtr,
         srcVal,
         getAttr(kIROp_AlignedAttr, align));
+
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitStore(IRInst* dstPtr, IRInst* srcVal, IRInst* align, IRInst* memoryScope)
+{
+    auto inst = createInst<IRStore>(
+        this,
+        kIROp_Store,
+        nullptr,
+        dstPtr,
+        srcVal,
+        getAttr(kIROp_AlignedAttr, align),
+        getAttr(kIROp_MemoryScopeAttr, memoryScope));
 
     addInst(inst);
     return inst;
@@ -6187,14 +6235,12 @@ IRInst* IRBuilder::emitCastStorageToLogical(IRType* type, IRInst* val, IRInst* b
     return (IRCastStorageToLogical*)emitIntrinsicInst(type, kIROp_CastStorageToLogical, 2, args);
 }
 
-IRCastStorageToLogicalDeref* IRBuilder::emitCastStorageToLogicalDeref(
-    IRType* type,
-    IRInst* val,
-    IRInst* bufferType)
+IRInst* IRBuilder::emitCastStorageToLogicalDeref(IRType* type, IRInst* val, IRInst* bufferType)
 {
     IRInst* args[] = {val, bufferType};
-    return (IRCastStorageToLogicalDeref*)
-        emitIntrinsicInst(type, kIROp_CastStorageToLogicalDeref, 2, args);
+    if (type == tryGetPointedToType(this, val->getDataType()))
+        return emitLoad(type, val);
+    return emitIntrinsicInst(type, kIROp_CastStorageToLogicalDeref, 2, args);
 }
 
 IRGlobalConstant* IRBuilder::emitGlobalConstant(IRType* type)

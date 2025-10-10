@@ -50,6 +50,14 @@ struct GenericTypeLoweringContext
                 structField->setOperand(1, loweredFieldType);
             }
             break;
+        case kIROp_DebugFunction:
+            {
+                auto oldFuncType = as<IRDebugFunction>(inst)->getDebugType();
+                auto newFuncType = sharedContext->lowerType(builder, oldFuncType);
+                if (newFuncType != oldFuncType)
+                    inst = builder->replaceOperand(inst->getOperandUse(4), newFuncType);
+            }
+            break;
         }
         return inst;
     }

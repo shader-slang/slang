@@ -4753,17 +4753,35 @@ ${{{{
 }
 }}}}
 
-// Declare Sampler*Shadow type aliases.
+// Declare DepthTexture* and Sampler*Shadow type aliases.
 ${{{{
     for (int shape = 0; shape < 4; shape++)
-    for (int isArray = 0; isArray<=1; isArray++)
+    for (int isArray : { 0, 1 })
+    for (int isMS : { 0, 1 })
     {
+        if (isMS)
+        {
+            // Only DepthTexture2DMS and Sampler2DMSShadow.
+            if (shape != kCoreModule_ShapeIndex2D)
+                continue;
+        }
+
+        // No 3D Array.
+        if (shape == kCoreModule_ShapeIndex3D && isArray == 1)
+            continue;
 }}}}
-/// Represents a handle to a $(shapeTypeNames[shape]) combined texture-sampler for shadow comparison.
+/// Represents a handle to a$(isMS?" multisampled": "") $(shapeTypeNames[shape]) depth texture$(isArray?" array":"").
 /// @param format The storage format of the texture.
 /// @see Please refer to `_Texture` for more information about texture types.
 /// @category texture_types
-typealias Sampler$(shapeTypeNames[shape])$(arrayPostFix[isArray])Shadow<int format=0> = _Texture<float, __Shape$(shapeTypeNames[shape]), $(isArray), 0, 0, 0, 1, 1, format>;
+typealias DepthTexture$(shapeTypeNames[shape])$(msPostFix[isMS])$(arrayPostFix[isArray])<int format=0> = _Texture<float, __Shape$(shapeTypeNames[shape]), $(isArray), $(isMS), 0, 0, 1, 0, format>;
+
+/// Represents a handle to a$(isMS?" multisampled": "") $(shapeTypeNames[shape]) combined texture-sampler$(isArray?" array":"") for shadow comparison.
+/// @param format The storage format of the texture.
+/// @see Please refer to `_Texture` for more information about texture types.
+/// @category texture_types
+typealias Sampler$(shapeTypeNames[shape])$(msPostFix[isMS])$(arrayPostFix[isArray])Shadow<int format=0> = _Texture<float, __Shape$(shapeTypeNames[shape]), $(isArray), $(isMS), 0, 0, 1, 1, format>;
+
 ${{{{
     }
 }}}}
@@ -8866,6 +8884,12 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 T dot(vector<T, N> x, vector<T, N> y)
 {
+    // Handle 1-vector case explicitly since many backends don't support it natively
+    if (N == 1)
+    {
+        return x[0] * y[0];
+    }
+    
     __target_switch
     {
     case glsl: __intrinsic_asm "dot";
@@ -8888,6 +8912,12 @@ __generic<T : __BuiltinIntegerType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 T dot(vector<T, N> x, vector<T, N> y)
 {
+    // Handle 1-vector case explicitly since many backends don't support it natively
+    if (N == 1)
+    {
+        return x[0] * y[0];
+    }
+    
     __target_switch
     {
     case hlsl: __intrinsic_asm "dot";
@@ -23209,6 +23239,18 @@ extension<T, L : IBufferDataLayout> RasterizerOrderedStructuredBuffer<T, L> : IR
     int getCount() { uint count; uint stride; this.GetDimensions(count, stride); return count; }
 }
 
+[require(vk_mem_model)]
+internal void enableVMMDeviceScopeCapabilityIfNeeded(constexpr MemoryScope memoryScope)
+{
+    if (memoryScope == MemoryScope::Device)
+    {
+        spirv_asm
+        {
+            OpCapability VulkanMemoryModelDeviceScopeKHR;
+        };
+    }
+}
+
 namespace linalg
 {
 
@@ -23783,6 +23825,22 @@ struct CoopMat
         };
     }
 
+    // TODO: make this function an intrinsic and support all types via the single intrinsic
+    [require(cooperative_matrix, vk_mem_model)]
+    void StoreCoherent<
+        let matrixLayout : CoopMatMatrixLayout
+    >(T* buffer, uint element, uint stride, constexpr MemoryScope memoryScope)
+    {
+        enableVMMDeviceScopeCapabilityIfNeeded(memoryScope);
+        let alignment = 16U;
+        const int32_t scope = (int32_t)memoryScope;
+        return spirv_asm
+        {
+            %pointer:$$T* = OpPtrAccessChain $buffer $element;
+            OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned|MakePointerAvailable|NonPrivatePointer !alignment $scope;
+        };
+    }
+
     [ForceInline]
     [require(cooperative_matrix)]
     void Store<
@@ -23891,6 +23949,24 @@ ${{{{
         {
             %pointer:$$T* = OpPtrAccessChain $buffer $element;
             result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
+        };
+    }
+
+    // TODO: make this function an intrinsic and support all types via the single intrinsic
+    [ForceInline]
+    [__NoSideEffect]
+    [require(cooperative_matrix, vk_mem_model)]
+    static This LoadCoherent<
+        let matrixLayout : CoopMatMatrixLayout
+    >(T* buffer, uint element, uint stride, constexpr MemoryScope memoryScope)
+    {
+        enableVMMDeviceScopeCapabilityIfNeeded(memoryScope);
+        let alignment = 16U;
+        const int32_t scope = (int32_t)memoryScope;
+        return spirv_asm
+        {
+            %pointer:$$T* = OpPtrAccessChain $buffer $element;
+            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned|MakePointerVisible|NonPrivatePointer !alignment $scope;
         };
     }
 
@@ -24450,6 +24526,24 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 }
 
 [ForceInline]
+[require(cooperative_matrix, vk_mem_model)]
+CoopMat<T, S, M, N, R> coopMatLoadCoherent<
+    T : __BuiltinArithmeticType,
+    let S : MemoryScope,
+    let M : int,
+    let N : int,
+    let R : CoopMatMatrixUse,
+    let matrixLayout : CoopMatMatrixLayout
+>(
+    T* buffer,
+    uint element,
+    uint stride,
+    constexpr MemoryScope memoryScope)
+{
+    return CoopMat<T, S, M, N, R>.LoadCoherent<matrixLayout>(buffer, element, stride, memoryScope);
+}
+
+[ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
     T : __BuiltinArithmeticType,
@@ -24815,6 +24909,20 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         };
     }
 
+    // TODO: make this function an intrinsic and support all types via the single intrinsic
+    [require(cooperative_vector, vk_mem_model)]
+    void storeCoherent(T* buffer, int32_t byteOffset16ByteAligned = 0, constexpr MemoryScope memoryScope = MemoryScope::Device)
+    {
+        enableVMMDeviceScopeCapabilityIfNeeded(memoryScope);
+        let pointer = Ptr<T[]>(buffer);
+        let alignment = 16U;
+        const int32_t scope = (int32_t)memoryScope;
+        spirv_asm
+        {
+            OpCooperativeVectorStoreNV $pointer $byteOffset16ByteAligned $this Aligned|MakePointerAvailable|NonPrivatePointer !alignment $scope;
+        };
+    }
+
     [ForceInline]
     [require(cooperative_vector)]
     [require(hlsl_coopvec_poc)]
@@ -24984,6 +25092,20 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         return spirv_asm
         {
             result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV $pointer $byteOffset16ByteAligned Aligned !alignment;
+        };
+    }
+
+    // TODO: make this function an intrinsic and support all types via the single intrinsic
+    [require(cooperative_vector, vk_mem_model)]
+    static CoopVec<T, N> loadCoherent(T* buffer, int32_t byteOffset16ByteAligned = 0, constexpr MemoryScope memoryScope = MemoryScope::Device)
+    {
+        enableVMMDeviceScopeCapabilityIfNeeded(memoryScope);
+        let pointer = Ptr<T[]>(buffer);
+        let alignment = 16U;
+        const int32_t scope = (int32_t)memoryScope;
+        return spirv_asm
+        {
+            result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV $pointer $byteOffset16ByteAligned Aligned|MakePointerVisible|NonPrivatePointer !alignment $scope;
         };
     }
 
@@ -26425,6 +26547,13 @@ CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(RWStructured
 CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(T* buffer, int32_t byteOffset16ByteAligned = 0)
 {
     return CoopVec<T, N>.load(buffer, byteOffset16ByteAligned);
+}
+
+[ForceInline]
+[require(spirv, cooperative_vector, vk_mem_model)]
+CoopVec<T, N> coopVecLoadCoherent<let N : int, T : __BuiltinArithmeticType>(T* buffer, int32_t byteOffset16ByteAligned = 0, constexpr MemoryScope memoryScope = MemoryScope::Device)
+{
+    return CoopVec<T, N>.loadCoherent(buffer, byteOffset16ByteAligned, memoryScope);
 }
 
 // Groupshared
