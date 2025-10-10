@@ -3171,36 +3171,55 @@ void finalizeSpecialization(IRModule* module)
     }
 }
 
-/*
-// DUPLICATE: merge.
-static bool isDynamicGeneric(IRInst* callee)
-{
-    // If the callee is a specialization, and at least one of its arguments
-    // is a type-flow-collection, then it is a dynamic generic.
-    //
-    if (auto specialize = as<IRSpecialize>(callee))
-    {
-        auto generic = as<IRGeneric>(specialize->getBase());
-
-        // Only functions need dynamic-aware specialization.
-        if (getGenericReturnVal(generic)->getOp() != kIROp_Func)
-            return false;
-
-        for (UInt i = 0; i < specialize->getArgCount(); i++)
-        {
-            auto arg = specialize->getArg(i);
-            if (as<IRCollectionBase>(arg))
-                return true; // Found a type-flow-collection argument
-        }
-        return false; // No type-flow-collection arguments found
-    }
-
-    return false;
-}
-*/
-
+// Evaluate a `Specialize` inst where the arguments are collections rather than
+// concrete singleton types and the generic returns a function.
+//
+// This needs to be slightly different from the usual case because the function
+// needs dynamic information to select a specific element from each collection
+// at runtime.
+//
+// The resulting function will therefore have additional parameters at the beginning
+// to accept this information.
+//
 static IRInst* specializeDynamicGeneric(IRSpecialize* specializeInst)
 {
+    // The high-level logic for specializing a generic to operate over collections
+    // is similar to specializing a simple generic:
+    // We "evaluate" the instructions in the first block of the generic and return
+    // the function that is returned by the generic.
+    //
+    // The key difference is that in the static case, all generic parameters, and instructions
+    // in the generic's body are guaranteed to be "baked out" into concrete types or witness tables.
+    //
+    // In the dynamic case, some generic parameters may turn into function parameters that accept a
+    // tag, and any lookup instructions might then have to be cloned into the function body.
+    //
+    // This is a slightly complex transformation that proceeds as follows:
+    //
+    // - Create an empty function that represents the final product.
+    //
+    // - Add any dynamic parameters of the generic to the function's first block. Keep track of the
+    //   first block for later. For now, we only treat `WitnessTableType` parameters that have
+    //   `TableCollection` arguments (with atleast 2 distinct elements) as dynamic. Each such
+    //   parameter will get a corresponding parameter of `TagType(tableCollection)`
+    //
+    // - Clone in the rest of the generic's body into the first block of the function.
+    //   The tricky part here is that we may have parameter types that depend on other parameters.
+    //   This is a pattern that is allowed in the generic, but not in functions.
+    //
+    //   To handle this, we maintain two cloning environments, a regular `cloneEnv` that registers
+    //   the parameters, and a `staticCloneEnv` that is a child of `cloneEnv`, but overrides the
+    //   dynamic parameters with their static collection. The `staticCloneEnv` is used to clone in
+    //   the parameter and function types, while the `cloneEnv` is used for the rest.
+    //
+    // - When we reach the return value (i.e. the function inside the generic), we clone in the
+    // parameters
+    //   of the function into the first block, and place them _after_ the parameters derived from
+    //   the generic. Then the rest of the inner function's first block is cloned in.
+    //
+    // - All other blocks can be cloned in as usual.
+    //
+
     auto generic = cast<IRGeneric>(specializeInst->getBase());
     auto genericReturnVal = findGenericReturnVal(generic);
 

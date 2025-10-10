@@ -4,6 +4,8 @@
 namespace Slang
 {
 struct IRModule;
+struct IRInst;
+struct IRSpecialize;
 class DiagnosticSink;
 class TargetProgram;
 

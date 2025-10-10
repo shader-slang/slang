@@ -2646,8 +2646,6 @@ struct TypeFlowSpecializationContext
 
     IRType* updateType(IRType* currentType, IRType* newType)
     {
-        // TODO: This is feeling very similar to the unionCollection logic.
-        // Maybe unify?
         if (auto collection = as<IRCollectionBase>(currentType))
         {
             HashSet<IRInst*> collectionElements;
@@ -2902,49 +2900,6 @@ struct TypeFlowSpecializationContext
                 return builder.emitMakeTuple(
                     (IRType*)destTUType,
                     {reinterpretedTag, reinterpretedVal});
-            }
-        }
-        else if (as<IRTupleType>(argInfo) && as<IRTupleType>(destInfo))
-        {
-            // TODO: This case should not occur anymore since we replaced the bare tuple-type
-            // with collection-tagged-union-type.
-            //
-            SLANG_UNEXPECTED("Should not happen");
-
-            auto argTupleType = as<IRTupleType>(argInfo);
-            auto destTupleType = as<IRTupleType>(destInfo);
-
-            List<IRInst*> upcastedElements;
-            bool hasUpcastedElements = false;
-
-            IRBuilder builder(module);
-            setInsertAfterOrdinaryInst(&builder, arg);
-
-            // Upcast each element of the tuple
-            for (UInt i = 0; i < argTupleType->getOperandCount(); ++i)
-            {
-                auto argElementType = argTupleType->getOperand(i);
-                auto destElementType = destTupleType->getOperand(i);
-
-                // If the element types are different, we need to reinterpret
-                if (argElementType != destElementType)
-                {
-                    hasUpcastedElements = true;
-                    upcastedElements.add(upcastCollection(
-                        context,
-                        builder.emitGetTupleElement((IRType*)argElementType, arg, i),
-                        (IRType*)destElementType));
-                }
-                else
-                {
-                    upcastedElements.add(
-                        builder.emitGetTupleElement((IRType*)argElementType, arg, i));
-                }
-            }
-
-            if (hasUpcastedElements)
-            {
-                return builder.emitMakeTuple(upcastedElements);
             }
         }
         else if (as<IRCollectionTagType>(argInfo) && as<IRCollectionTagType>(destInfo))
