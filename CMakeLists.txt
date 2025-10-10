@@ -270,6 +270,12 @@ advanced_option(
     "Build using user defined path for lua"
     OFF
 )
+advanced_option(
+    SLANG_OVERRIDE_MIMALLOC_PATH
+    "Build using user defined path for mimalloc"
+    OFF
+)
+
 
 advanced_option(
     SLANG_EXCLUDE_DAWN
