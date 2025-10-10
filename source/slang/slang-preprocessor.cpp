@@ -1288,6 +1288,10 @@ struct Preprocessor
     /// stop them from being included again.
     HashSet<String> pragmaOnceUniqueIdentities;
 
+    /// The unique identities of any paths that have been included already.
+    /// This is used to detect cycles in #includes.
+    HashSet<String> includedFiles;
+
     WarningStateTracker* warningStateTracker = nullptr;
 
     /// Name pool to use when creating `Name`s from strings
@@ -3561,6 +3565,13 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     if (!filePathInfo.hasUniqueIdentity())
     {
         GetSink(context)->diagnose(pathToken.loc, Diagnostics::noUniqueIdentity, path);
+        return;
+    }
+
+    if (!context->m_preprocessor->includedFiles.add(filePathInfo.getMostUniqueIdentity()))
+    {
+        // This file has already been included, we should diagnose an error and return.
+        GetSink(context)->diagnose(pathToken.loc, Diagnostics::cyclicInclude, path);
         return;
     }
 
