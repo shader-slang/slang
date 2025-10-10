@@ -68,13 +68,15 @@ struct ExistentialLoweringContext
         auto witnessTableIdType = cast<IRWitnessTableIDType>(tupleType->getOperand(1));
         auto anyValueType = cast<IRAnyValueType>(tupleType->getOperand(2));
 
-        // Create a null value for `rttiObject` for now since it will not be used.
+        // Create a standin value for `rttiObject` for now since it will not be used
+        // other than test for null in the case of `Optional<IFoo>`.
         auto uint2Type = builder->getVectorType(
             builder->getUIntType(),
             builder->getIntValue(builder->getIntType(), 2));
+        IRInst* standinVal = builder->getIntValue(builder->getUIntType(), 0xFFFFFFFF);
         IRInst* zero = builder->getIntValue(builder->getUIntType(), 0);
-        IRInst* zeroVectorArgs[] = {zero, zero};
-        IRInst* rttiObject = builder->emitMakeVector(uint2Type, 2, zeroVectorArgs);
+        IRInst* standinRTTIVectorArgs[] = {standinVal, zero};
+        IRInst* rttiObject = builder->emitMakeVector(uint2Type, 2, standinRTTIVectorArgs);
 
         // Pack the user provided value into `AnyValue`.
         IRInst* packedValue = inst->getValue();
