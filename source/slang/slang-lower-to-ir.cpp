@@ -3357,8 +3357,6 @@ void collectParameterLists(
             auto thisType = getThisParamTypeForContainer(context, parentDeclRef);
             if (thisType)
             {
-                /*thisType = as<Type>(
-                    thisType->substitute(getCurrentASTBuilder(), SubstitutionSet(declRef)));*/
                 if (declRef.getDecl()->findModifier<NoDiffThisAttribute>())
                 {
                     auto noDiffAttr = context->astBuilder->getNoDiffModifierVal();

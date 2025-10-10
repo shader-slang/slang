@@ -1224,9 +1224,6 @@ struct SpecializationContext
                 this->changed = true;
                 eliminateDeadCode(module->getModuleInst());
                 applySparseConditionalConstantPropagationForGlobalScope(this->module, this->sink);
-
-                // Sync our local dictionary with the one in the IR.
-                // readSpecializationDictionaries();
             }
 
             // Once the work list has gone dry, we should have the invariant
@@ -1245,9 +1242,6 @@ struct SpecializationContext
                 if (iterChanged)
                 {
                     eliminateDeadCode(module->getModuleInst());
-
-                    // Sync our local dictionary with the one in the IR.
-                    // readSpecializationDictionaries();
                 }
             }
 
