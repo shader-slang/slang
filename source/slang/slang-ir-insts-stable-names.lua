@@ -679,4 +679,5 @@ return {
 	["CastResourceToDescriptorHandle"] = 675,
 	["SymbolAlias"] = 676,
 	["Decoration.InParamProxyVar"] = 677,
+	["Attr.MemoryScope"] = 678,
 }
