@@ -2326,12 +2326,17 @@ public:
         SpvWord* word = nullptr;
     };
 
-    SpirvInstructionHelper() {}
+    SpirvInstructionHelper()
+    {}
 
     // Load the SPIRV instructions from the artifact into a data blob that
     // we can read.
     SlangResult loadBlob(ComPtr<IArtifact>& artifact)
     {
+        m_nonSemanticDebugInfoExtSetId = 0;
+        m_words.clear();
+        m_headerWords.clear();
+
         ComPtr<ISlangBlob> spirvBlob;
         SlangResult res = artifact->loadBlob(ArtifactKeep::Yes, spirvBlob.writeRef());
         if (SLANG_FAILED(res) || !spirvBlob ||
@@ -2339,7 +2344,6 @@ public:
             return SLANG_FAIL;
 
         // Populate the full array of SPIR-V words.
-        m_words.clear();
         m_words.addRange(
             reinterpret_cast<const SpvWord*>(spirvBlob->getBufferPointer()),
             spirvBlob->getBufferSize() / sizeof(SpvWord));
@@ -2353,7 +2357,9 @@ public:
     }
 
     // Get the header words.
-    List<SpvWord> getHeaderWords() const { return m_headerWords; }
+    const List<SpvWord>& getHeaderWords() const { return m_headerWords; }
+
+    Index getWordCount() const { return m_words.getCount(); }
 
     // Visit all SPIRV instructions (excluding header words), invoking the callback for each
     // instruction. The callback should be a function or lambda with signature: void(const
@@ -2447,9 +2453,15 @@ static SlangResult stripDbgSpirvFromArtifact(
     SpirvInstructionHelper spirvInstructionHelper;
     SLANG_RETURN_ON_FAIL(spirvInstructionHelper.loadBlob(artifact));
 
-    auto headerWords = spirvInstructionHelper.getHeaderWords();
+    const auto& headerWords = spirvInstructionHelper.getHeaderWords();
 
     List<uint8_t> spirvWordsList;
+    if (auto totalWordCapacity = headerWords.getCount() + spirvInstructionHelper.getWordCount())
+    {
+        const Index byteCapacity = totalWordCapacity * sizeof(SpvWord);
+        spirvWordsList.reserve(byteCapacity);
+    }
+
     spirvWordsList.addRange(
         reinterpret_cast<const uint8_t*>(headerWords.getBuffer()),
         headerWords.getCount() * sizeof(SpvWord));
