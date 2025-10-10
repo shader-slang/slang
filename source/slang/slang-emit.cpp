@@ -2326,8 +2326,7 @@ public:
         SpvWord* word = nullptr;
     };
 
-    SpirvInstructionHelper()
-    {}
+    SpirvInstructionHelper() {}
 
     // Load the SPIRV instructions from the artifact into a data blob that
     // we can read.
