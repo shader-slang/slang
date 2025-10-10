@@ -29,20 +29,23 @@ struct ArrayParameterSpecializationCondition : FunctionCallSpecializeCondition
         if (auto outTypeBase = as<IROutParamTypeBase>(paramType))
         {
             paramType = outTypeBase->getValueType();
-            SLANG_ASSERT(as<IRPtrTypeBase>(argType));
-            argType = as<IRPtrTypeBase>(argType)->getValueType();
+            IRBuilder builder(paramType);
+            argType = tryGetPointedToType(&builder, argType);
+            SLANG_ASSERT(argType);
         }
         else if (auto refType = as<IRRefParamType>(paramType))
         {
             paramType = refType->getValueType();
-            SLANG_ASSERT(as<IRPtrTypeBase>(argType));
-            argType = as<IRPtrTypeBase>(argType)->getValueType();
+            IRBuilder builder(paramType);
+            argType = tryGetPointedToType(&builder, argType);
+            SLANG_ASSERT(argType);
         }
         else if (auto constRefType = as<IRBorrowInParamType>(paramType))
         {
             paramType = constRefType->getValueType();
-            SLANG_ASSERT(as<IRPtrTypeBase>(argType));
-            argType = as<IRPtrTypeBase>(argType)->getValueType();
+            IRBuilder builder(paramType);
+            argType = tryGetPointedToType(&builder, argType);
+            SLANG_ASSERT(argType);
         }
         auto arrayType = as<IRUnsizedArrayType>(paramType);
         if (!arrayType)

@@ -90,6 +90,8 @@ static bool _isSubCommand(const char* arg)
         "  -use-test-server               Run tests using test server\n"
         "  -use-fully-isolated-test-server  Run each test in isolated server\n"
         "  -capability <name>             Compile with the given capability\n"
+        "  -shuffle-tests                 Shuffle tests in directories\n"
+        "  -shuffle-seed <seed>           Set shuffle seed (default: 1)\n"
 
         // Recent Windows runtime versions started opening a dialog popup window when
         // `abort()` is called, which breaks the CI workflow and some scripts that
@@ -271,6 +273,24 @@ static bool _isSubCommand(const char* arg)
         else if (strcmp(arg, "-generate-hlsl-baselines") == 0)
         {
             optionsOut->generateHLSLBaselines = true;
+        }
+        else if (strcmp(arg, "-shuffle-tests") == 0)
+        {
+            optionsOut->shuffleTests = true;
+        }
+        else if (strcmp(arg, "-shuffle-seed") == 0)
+        {
+            if (argCursor == argEnd)
+            {
+                stdError.print("error: expected operand for '%s'\n", arg);
+                showHelp(stdError);
+                return SLANG_FAIL;
+            }
+            optionsOut->shuffleSeed = stringToInt(*argCursor++);
+            if (optionsOut->shuffleSeed <= 0)
+            {
+                optionsOut->shuffleSeed = 1;
+            }
         }
         else if (strcmp(arg, "-release") == 0)
         {
