@@ -276,7 +276,6 @@ advanced_option(
     OFF
 )
 
-
 advanced_option(
     SLANG_EXCLUDE_DAWN
     "Optionally exclude webgpu_dawn from the build"
