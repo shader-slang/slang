@@ -1402,6 +1402,12 @@ Result linkAndOptimizeIR(
     // function parameters, reults, etc. is invalid.
     // We clean up the usages of resource values here.
     specializeResourceUsage(codeGenContext, irModule);
+
+    // Specialize calls to functions with values loaded from an immutable location,
+    // so that we directly load the value inside the callee, instead of loading the
+    // value outside of the callee and copy it in. This is necessary to avoid copying
+    // large values (e.g. arrays) in registers, where most of the elements are not
+    // actually used.
     specializeFuncsForBufferLoadArgs(codeGenContext, irModule);
 
     // Push `structuredBufferLoad` to the end of access chain to avoid loading unnecessary data.
