@@ -24,13 +24,13 @@ UCount getCollectionCount(IRCollectionBase* collection)
 
 UCount getCollectionCount(IRCollectionTaggedUnionType* taggedUnion)
 {
-    auto typeCollection = taggedUnion->getOperand(0);
+    auto typeCollection = taggedUnion->getTypeCollection();
     return getCollectionCount(as<IRCollectionBase>(typeCollection));
 }
 
 UCount getCollectionCount(IRCollectionTagType* tagType)
 {
-    auto collection = tagType->getOperand(0);
+    auto collection = tagType->getCollection();
     return getCollectionCount(as<IRCollectionBase>(collection));
 }
 
@@ -43,8 +43,8 @@ IRInst* getCollectionElement(IRCollectionBase* collection, UInt index)
 
 IRInst* getCollectionElement(IRCollectionTagType* collectionTagType, UInt index)
 {
-    auto typeCollection = collectionTagType->getOperand(0);
-    return getCollectionElement(as<IRCollectionBase>(typeCollection), index);
+    auto collection = collectionTagType->getCollection();
+    return getCollectionElement(as<IRCollectionBase>(collection), index);
 }
 
 CollectionBuilder::CollectionBuilder(IRModule* module)
@@ -64,7 +64,7 @@ UInt CollectionBuilder::getUniqueID(IRInst* inst)
     return id;
 }
 
-// Helper methods for creating canonical collections
+// Helper method for creating canonical collections
 IRCollectionBase* CollectionBuilder::createCollection(IROp op, const HashSet<IRInst*>& elements)
 {
     SLANG_ASSERT(

@@ -2248,8 +2248,8 @@ local insts = {
 			{ CollectionTagType = {
 				-- Represents a tag-type for a collection.
 				--
-				-- An inst whose type is CollectionTagType(collection) is semantically carrying a run-time value that points to
-				-- one of the elements of the collection operand.
+				-- An inst whose type is CollectionTagType(collection) is semantically carrying a 
+				-- run-time value that "picks" one of the elements of the collection operand.
 				--
 				-- Only operand is a CollectionBase
 			} }, 
@@ -2263,7 +2263,7 @@ local insts = {
 				-- This is most commonly used to specialize the type of existential insts once the possibilities can be statically determined.
 				-- 
 				-- Operands are a TypeCollection and a TableCollection that represent the possibilities of the existential
-			}} 
+			} } 
 		},
 	},
 	{ CastInterfaceToTaggedUnionPtr = {
