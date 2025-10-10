@@ -2000,10 +2000,107 @@ struct LLVMEmitter
         isSigned = isSignedType(basicType);
     }
 
+    llvm::Value* _coerceNumeric(llvm::Value* val, llvm::Type* type, bool isSigned)
+    {
+        auto valType = val->getType();
+        auto valWidth = valType->getPrimitiveSizeInBits();
+        auto targetWidth = type->getPrimitiveSizeInBits();
+
+        if (type->isVectorTy() && !valType->isVectorTy())
+        {
+            auto vecType = llvm::cast<llvm::VectorType>(type);
+            // Splat into vector
+            return llvmBuilder->CreateVectorSplat(
+                vecType->getElementCount(),
+                _coerceNumeric(val, vecType->getElementType(), isSigned));
+        }
+        else if (type->getScalarType()->isFloatingPointTy())
+        {
+            // Extend or truncate float
+            if (valWidth < targetWidth)
+            {
+                return llvmBuilder->CreateFPExt(val, type);
+            }
+            else if (valWidth > targetWidth)
+            {
+                return llvmBuilder->CreateFPTrunc(val, type);
+            }
+        }
+        else if (type->getScalarType()->isIntegerTy())
+        {
+            // Extend or truncate int
+            if (valWidth != targetWidth)
+                return isSigned ? llvmBuilder->CreateSExtOrTrunc(val, type) : llvmBuilder->CreateZExtOrTrunc(val, type);
+        }
+
+        return val;
+    }
+
+    // Some operations in Slang IR may have mixed scalar and vector parameters,
+    // whereas LLVM IR requires only scalars or only vectors. This function
+    // helps you figure out which one it is.
+    void _promoteParams(
+        llvm::Value*& aValInOut, bool aIsSigned,
+        llvm::Value*& bValInOut, bool bIsSigned
+    ){
+        llvm::Type* aType = aValInOut->getType();
+        llvm::Type* bType = bValInOut->getType();
+        if (aType == bType)
+            return;
+
+        llvm::Type* aElementType = aType->getScalarType();
+        llvm::Type* bElementType = bType->getScalarType();
+        int aElementCount = 1;
+        int bElementCount = 1;
+        if (aType->isVectorTy())
+        {
+            auto vecType = llvm::cast<llvm::VectorType>(aType);
+            aElementCount = vecType->getElementCount().getFixedValue();
+        }
+        if (bType->isVectorTy())
+        {
+            auto vecType = llvm::cast<llvm::VectorType>(bType);
+            bElementCount = vecType->getElementCount().getFixedValue();
+        }
+
+        int aElementWidth = aElementType->getScalarSizeInBits();
+        int bElementWidth = bElementType->getScalarSizeInBits();
+        bool aFloat = aElementType->isFloatingPointTy();
+        bool bFloat = bElementType->isFloatingPointTy();
+        int maxElementCount = aElementCount > bElementCount ? aElementCount : bElementCount;
+
+        llvm::Type* promotedType = aType;
+        bool promotedSign = aIsSigned || bIsSigned;
+
+        if (!aFloat && bFloat)
+            promotedType = aElementType;
+        else if (aFloat && !bFloat)
+            promotedType = bElementType;
+        else
+            promotedType = aElementWidth > bElementWidth ? aElementType : bElementType;
+
+        if (maxElementCount != 1)
+            promotedType = llvm::VectorType::get(promotedType, llvm::ElementCount::getFixed(maxElementCount));
+
+        aValInOut = _coerceNumeric(aValInOut, promotedType, promotedSign);
+        bValInOut = _coerceNumeric(bValInOut, promotedType, promotedSign);
+    }
+
     llvm::Value* _emitCompare(IRInst* inst)
     {
-        bool isFloat, isSigned;
-        getUnderlyingTypeInfo(inst, isFloat, isSigned);
+        SLANG_ASSERT(inst->getOperandCount() == 2);
+
+        IRType* aElementType = getVectorOrCoopMatrixElementType(inst->getOperand(0)->getDataType());
+        IRType* bElementType = getVectorOrCoopMatrixElementType(inst->getOperand(1)->getDataType());
+        bool aSigned = isSignedType(aElementType);
+        bool bSigned = isSignedType(bElementType);
+
+        auto a = findValue(inst->getOperand(0));
+        auto b = findValue(inst->getOperand(1));
+        _promoteParams(a, aSigned, b, bSigned);
+
+        bool isFloat = a->getType()->getScalarType()->isFloatingPointTy();
+        bool isSigned = aSigned || bSigned;
 
         llvm::CmpInst::Predicate pred;
         switch (inst->getOp())
@@ -2035,54 +2132,14 @@ struct LLVMEmitter
             break;
         }
 
-        SLANG_ASSERT(inst->getOperandCount() == 2);
-
-        auto a = findValue(inst->getOperand(0));
-        auto b = findValue(inst->getOperand(1));
         return llvmBuilder->CreateCmp(pred, a, b);
-    }
-
-    llvm::Value* _coerceNumeric(llvm::Value* val, llvm::Type* type, bool isSigned)
-    {
-        auto valType = val->getType();
-        auto valWidth = valType->getPrimitiveSizeInBits();
-        auto targetWidth = type->getPrimitiveSizeInBits();
-
-        if (type->isVectorTy() && !valType->isVectorTy())
-        {
-            auto vecType = llvm::cast<llvm::VectorType>(type);
-            // Splat into vector
-            return llvmBuilder->CreateVectorSplat(
-                vecType->getElementCount(),
-                _coerceNumeric(val, vecType->getElementType(), isSigned));
-        }
-        else if (type->isFloatingPointTy())
-        {
-            // Extend or truncate float
-            if (valWidth < targetWidth)
-            {
-                return llvmBuilder->CreateFPExt(val, type);
-            }
-            else if (valWidth > targetWidth)
-            {
-                return llvmBuilder->CreateFPTrunc(val, type);
-            }
-        }
-        else if (type->isIntegerTy())
-        {
-            // Extend or truncate int
-            if (valWidth != targetWidth)
-                return isSigned ? llvmBuilder->CreateSExtOrTrunc(val, type) : llvmBuilder->CreateZExtOrTrunc(val, type);
-        }
-
-        return val;
     }
 
     llvm::Value* _emitArithmetic(IRInst* inst)
     {
-        bool isFloat, isSigned;
-        getUnderlyingTypeInfo(inst, isFloat, isSigned);
         auto resultType = types->getValueType(inst->getDataType());
+        bool isFloat = resultType->getScalarType()->isFloatingPointTy();
+        bool isSigned = isSignedType(inst->getDataType());
 
         if (inst->getOperandCount() == 1)
         {
