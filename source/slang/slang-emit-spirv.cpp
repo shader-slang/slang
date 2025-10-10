@@ -3114,6 +3114,18 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
+    void maybeEmitName(SpvInst* spvInst, IRInst* irInst, UnownedStringSlice prefix)
+    {
+        if (auto nameDecor = irInst->findDecoration<IRNameHintDecoration>())
+        {
+            emitOpName(
+                getSection(SpvLogicalSectionID::DebugNames),
+                nullptr,
+                spvInst,
+                (StringBuilder() << prefix << nameDecor->getName()).getUnownedSlice());
+        }
+    }
+
     /// Emit a specialization constant.
     SpvInst* emitSpecializationConstant(IRGlobalParam* param, IRVarOffsetAttr* offset)
     {
@@ -3961,6 +3973,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             auto debugVarPtrType = builder.getPtrType(varType, AddressSpace::Function);
             auto actualHelperVar =
                 emitOpVariable(parent, debugVar, debugVarPtrType, SpvStorageClassFunction);
+            maybeEmitName(actualHelperVar, debugVar, toSlice("_dbgvar_"));
             maybeEmitPointerDecoration(actualHelperVar, debugVar);
             return actualHelperVar;
         }

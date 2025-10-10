@@ -678,5 +678,6 @@ return {
 	["Decoration.TempCallArgImmutableVar"] = 674,
 	["CastResourceToDescriptorHandle"] = 675,
 	["SymbolAlias"] = 676,
-	["Attr.MemoryScope"] = 677,
+  ["Decoration.InParamProxyVar"] = 677,
+	["Attr.MemoryScope"] = 678,
 }
