@@ -2104,10 +2104,6 @@ struct TypeFlowSpecializationContext
     }
 
     // Default catch-all analysis method for any unhandled case.
-    //
-    // TODO: This technically shouldn't get invoked, since global
-    //      insts shouldn't enter analysis at all
-    //
     IRTypeFlowData* analyzeDefault(IRInst* context, IRInst* inst)
     {
         SLANG_UNUSED(context);
@@ -2287,7 +2283,7 @@ struct TypeFlowSpecializationContext
         return hasChanges;
     }
 
-    // Main entry point for the second phase of the type-flow analysis pass.
+    // Implements phase 2 of the type-flow specialization pass.
     //
     // This method is called after information propagation is complete and
     // stabilized, and it replaces dynamic insts and types with specialized versions
@@ -2296,9 +2292,9 @@ struct TypeFlowSpecializationContext
     // After this pass is run, there should be no dynamic insts or types remaining,
     // _except_ for those that are considered unbounded.
     //
-    // i.e. ExtractExistentialType, ExtractExistentialWitnessTable, ExtractExistentialValue,
-    //      MakeExistential, LookupWitness (and more) are rewritten to concrete tag translation
-    //      insts.
+    // i.e. `ExtractExistentialType`, `ExtractExistentialWitnessTable`, `ExtractExistentialValue`,
+    //      `MakeExistential`, `LookupWitness` (and more) are rewritten to concrete tag translation
+    //      insts (e.g. `GetTagForMappedCollection`, `GetTagForSpecializedCollection`, etc.)
     //
     bool performDynamicInstLowering()
     {
