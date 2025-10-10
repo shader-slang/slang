@@ -185,11 +185,10 @@ void assign(IRBuilder& builder, LegalizedVaryingVal const& dest, IRInst* src)
 
 IRInst* emitCalcGroupExtents(IRBuilder& builder, IRFunc* entryPoint, IRVectorType* type)
 {
+    static const int kAxisCount = 3;
+    IRInst* groupExtentAlongAxis[kAxisCount] = {};
     if (auto numThreadsDecor = entryPoint->findDecoration<IRNumThreadsDecoration>())
     {
-        static const int kAxisCount = 3;
-        IRInst* groupExtentAlongAxis[kAxisCount] = {};
-
         for (int axis = 0; axis < kAxisCount; axis++)
         {
             auto litValue = as<IRIntLit>(numThreadsDecor->getOperand(axis));
@@ -199,16 +198,14 @@ IRInst* emitCalcGroupExtents(IRBuilder& builder, IRFunc* entryPoint, IRVectorTyp
             groupExtentAlongAxis[axis] =
                 builder.getIntValue(type->getElementType(), litValue->getValue());
         }
-
-        return builder.emitMakeVector(type, kAxisCount, groupExtentAlongAxis);
+    }
+    else
+    {
+        for (int axis = 0; axis < kAxisCount; axis++)
+            groupExtentAlongAxis[axis] = builder.getIntValue(type->getElementType(), 1);
     }
 
-    // TODO: We may want to implement a backup option here,
-    // in case we ever want to support compute shaders with
-    // dynamic/flexible group size on targets that allow it.
-    //
-    SLANG_UNEXPECTED("Expected '[numthreads(...)]' attribute on compute entry point.");
-    UNREACHABLE_RETURN(nullptr);
+    return builder.emitMakeVector(type, kAxisCount, groupExtentAlongAxis);
 }
 
 // There are some cases of system-value inputs that can be derived
