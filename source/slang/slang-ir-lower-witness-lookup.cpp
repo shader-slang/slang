@@ -268,7 +268,7 @@ struct WitnessLookupLoweringContext
                 auto entry = findWitnessTableEntry(witnessTable, requirementKey);
                 SLANG_RELEASE_ASSERT(entry);
                 // If the entry is a generic, we need to specialize it.
-                if (const auto genericEntry = as<IRGeneric>(entry))
+                if (as<IRGeneric>(entry))
                 {
                     auto specializedFuncType = builder.emitSpecializeInst(
                         builder.getTypeKind(),

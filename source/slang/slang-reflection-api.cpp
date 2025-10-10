@@ -402,27 +402,27 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
 
     // TODO(tfoley): Don't emit the same type more than once...
 
-    if (const auto basicType = as<BasicExpressionType>(type))
+    if (as<BasicExpressionType>(type))
     {
         return SLANG_TYPE_KIND_SCALAR;
     }
-    else if (const auto vectorType = as<VectorExpressionType>(type))
+    else if (as<VectorExpressionType>(type))
     {
         return SLANG_TYPE_KIND_VECTOR;
     }
-    else if (const auto matrixType = as<MatrixExpressionType>(type))
+    else if (as<MatrixExpressionType>(type))
     {
         return SLANG_TYPE_KIND_MATRIX;
     }
-    else if (const auto parameterBlockType = as<ParameterBlockType>(type))
+    else if (as<ParameterBlockType>(type))
     {
         return SLANG_TYPE_KIND_PARAMETER_BLOCK;
     }
-    else if (const auto constantBufferType = as<ConstantBufferType>(type))
+    else if (as<ConstantBufferType>(type))
     {
         return SLANG_TYPE_KIND_CONSTANT_BUFFER;
     }
-    else if (const auto streamOutputType = as<HLSLStreamOutputType>(type))
+    else if (as<HLSLStreamOutputType>(type))
     {
         return SLANG_TYPE_KIND_OUTPUT_STREAM;
     }
@@ -438,23 +438,23 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
     {
         return SLANG_TYPE_KIND_SHADER_STORAGE_BUFFER;
     }
-    else if (const auto samplerStateType = as<SamplerStateType>(type))
+    else if (as<SamplerStateType>(type))
     {
         return SLANG_TYPE_KIND_SAMPLER_STATE;
     }
-    else if (const auto textureType = as<TextureTypeBase>(type))
+    else if (as<TextureTypeBase>(type))
     {
         return SLANG_TYPE_KIND_RESOURCE;
     }
-    else if (const auto feedbackType = as<FeedbackType>(type))
+    else if (as<FeedbackType>(type))
     {
         return SLANG_TYPE_KIND_FEEDBACK;
     }
-    else if (const auto ptrType = as<PtrType>(type))
+    else if (as<PtrType>(type))
     {
         return SLANG_TYPE_KIND_POINTER;
     }
-    else if (const auto dynamicResourceType = as<DynamicResourceType>(type))
+    else if (as<DynamicResourceType>(type))
     {
         return SLANG_TYPE_KIND_DYNAMIC_RESOURCE;
     }
@@ -478,7 +478,7 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
     CASE(GLSLShaderStorageBufferType);
 #undef CASE
 
-    else if (const auto arrayType = as<ArrayExpressionType>(type))
+    else if (as<ArrayExpressionType>(type))
     {
         return SLANG_TYPE_KIND_ARRAY;
     }
@@ -503,11 +503,11 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
             return SLANG_TYPE_KIND_STRUCT;
         }
     }
-    else if (const auto specializedType = as<ExistentialSpecializedType>(type))
+    else if (as<ExistentialSpecializedType>(type))
     {
         return SLANG_TYPE_KIND_SPECIALIZED;
     }
-    else if (const auto errorType = as<ErrorType>(type))
+    else if (as<ErrorType>(type))
     {
         // This means we saw a type we didn't understand in the user's code
         return SLANG_TYPE_KIND_NONE;
@@ -651,11 +651,11 @@ SLANG_API unsigned int spReflectionType_GetRowCount(SlangReflectionType* inType)
     {
         return (unsigned int)getIntVal(matrixType->getRowCount());
     }
-    else if (const auto vectorType = as<VectorExpressionType>(type))
+    else if (as<VectorExpressionType>(type))
     {
         return 1;
     }
-    else if (const auto basicType = as<BasicExpressionType>(type))
+    else if (as<BasicExpressionType>(type))
     {
         return 1;
     }
@@ -677,7 +677,7 @@ SLANG_API unsigned int spReflectionType_GetColumnCount(SlangReflectionType* inTy
     {
         return (unsigned int)getIntVal(vectorType->getElementCount());
     }
-    else if (const auto basicType = as<BasicExpressionType>(type))
+    else if (as<BasicExpressionType>(type))
     {
         return 1;
     }
@@ -1766,7 +1766,7 @@ SlangBindingType _calcResourceBindingType(Type* type)
             return SlangBindingType(SLANG_BINDING_TYPE_TYPED_BUFFER | mutableFlag);
         }
     }
-    else if (const auto structuredBufferType = as<HLSLStructuredBufferTypeBase>(type))
+    else if (as<HLSLStructuredBufferTypeBase>(type))
     {
         if (as<HLSLStructuredBufferType>(type))
         {
@@ -1781,7 +1781,7 @@ SlangBindingType _calcResourceBindingType(Type* type)
     {
         return SLANG_BINDING_TYPE_RAY_TRACING_ACCELERATION_STRUCTURE;
     }
-    else if (const auto untypedBufferType = as<UntypedBufferResourceType>(type))
+    else if (as<UntypedBufferResourceType>(type))
     {
         if (as<HLSLByteAddressBufferType>(type))
         {

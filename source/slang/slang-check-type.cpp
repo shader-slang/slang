@@ -115,11 +115,11 @@ Expr* SemanticsVisitor::ExpectATypeRepr(Expr* expr)
         expr = resolveOverloadedExpr(overloadedExpr, LookupMask::type);
     }
 
-    if (const auto typeType = as<TypeType>(expr->type))
+    if (as<TypeType>(expr->type))
     {
         return expr;
     }
-    else if (const auto errorType = as<ErrorType>(expr->type))
+    else if (as<ErrorType>(expr->type))
     {
         return expr;
     }
@@ -187,7 +187,7 @@ Val* SemanticsVisitor::ExtractGenericArgVal(Expr* exp)
     {
         return typeType->getType();
     }
-    else if (const auto errorType = as<ErrorType>(exp->type))
+    else if (as<ErrorType>(exp->type))
     {
         return exp->type.type;
     }
@@ -467,7 +467,7 @@ bool SemanticsVisitor::ValuesAreEqual(IntVal* left, IntVal* right)
         {
             return leftVar->getDeclRef().equals(rightVar->getDeclRef());
         }
-        else if (const auto rightPoly = as<PolynomialIntVal>(right))
+        else if (as<PolynomialIntVal>(right))
         {
             return right->equals(leftVar);
         }

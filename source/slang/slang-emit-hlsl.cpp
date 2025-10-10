@@ -1541,7 +1541,7 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
 
         return;
     }
-    else if (const auto untypedBufferType = as<IRUntypedBufferResourceType>(type))
+    else if (as<IRUntypedBufferResourceType>(type))
     {
         switch (type->getOp())
         {
@@ -1706,7 +1706,7 @@ void HLSLSourceEmitter::emitPostKeywordTypeAttributesImpl(IRInst* inst)
 
     if (enablePAQs)
     {
-        if (const auto payloadDecoration = inst->findDecoration<IRRayPayloadDecoration>())
+        if (inst->findDecoration<IRRayPayloadDecoration>())
         {
             m_writer->emit("[raypayload] ");
         }
@@ -1930,7 +1930,7 @@ void HLSLSourceEmitter::emitFrontMatterImpl(TargetRequest*)
 
 void HLSLSourceEmitter::emitGlobalInstImpl(IRInst* inst)
 {
-    if (const auto nvapiDecor = inst->findDecoration<IRNVAPIMagicDecoration>())
+    if (inst->findDecoration<IRNVAPIMagicDecoration>())
     {
         // When emitting one of the "magic" NVAPI declarations,
         // we will wrap it in a preprocessor conditional that

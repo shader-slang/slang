@@ -523,7 +523,7 @@ InstPair BackwardDiffTranscriber::transcribeFuncHeader(IRBuilder* inBuilder, IRF
                 {
                     primalArg = builder.emitLoad(param);
                 }
-                if (const auto diffPairType = as<IRDifferentialPairType>(primalArg->getDataType()))
+                if (as<IRDifferentialPairType>(primalArg->getDataType()))
                 {
                     primalArg = builder.emitDifferentialPairGetPrimal(primalArg);
                 }

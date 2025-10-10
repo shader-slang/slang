@@ -2766,7 +2766,7 @@ static bool shouldStoreInst(IRInst* inst)
 
 static bool shouldStoreVar(IRVar* var)
 {
-    if (const auto typeDecor = var->findDecoration<IRBackwardDerivativePrimalContextDecoration>())
+    if (var->findDecoration<IRBackwardDerivativePrimalContextDecoration>())
     {
         // If we are specializing a callee's intermediate context with types that can't be stored,
         // we can't store the entire context.

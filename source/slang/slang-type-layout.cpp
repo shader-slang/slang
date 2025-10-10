@@ -2473,7 +2473,7 @@ static LayoutSize GetElementCount(IntVal* val)
             return LayoutSize::infinite();
         return LayoutSize(LayoutSize::RawValue(constantVal->getValue()));
     }
-    else if (const auto varRefVal = as<DeclRefIntVal>(val))
+    else if (as<DeclRefIntVal>(val))
     {
         // TODO: We want to treat the case where the number of
         // elements in an array depends on a generic parameter
@@ -2485,7 +2485,7 @@ static LayoutSize GetElementCount(IntVal* val)
         //
         return 0;
     }
-    else if (const auto polyIntVal = as<PolynomialIntVal>(val))
+    else if (as<PolynomialIntVal>(val))
     {
         return 0;
     }
@@ -2890,7 +2890,7 @@ RefPtr<TypeLayout> applyOffsetToTypeLayout(
     bool anyHit = false;
     for (auto oldResInfo : oldTypeLayout->resourceInfos)
     {
-        if (const auto offsetResInfo = offsetVarLayout->FindResourceInfo(oldResInfo.kind))
+        if (offsetVarLayout->FindResourceInfo(oldResInfo.kind))
         {
             anyHit = true;
             break;
@@ -2902,8 +2902,7 @@ RefPtr<TypeLayout> applyOffsetToTypeLayout(
         {
             for (auto oldResInfo : oldPendingTypeLayout->resourceInfos)
             {
-                if (const auto offsetResInfo =
-                        pendingOffsetVarLayout->FindResourceInfo(oldResInfo.kind))
+                if (pendingOffsetVarLayout->FindResourceInfo(oldResInfo.kind))
                 {
                     anyHit = true;
                     break;
@@ -3038,8 +3037,7 @@ IRTypeLayout* applyOffsetToTypeLayout(
     bool anyHit = false;
     for (auto oldResInfo : oldTypeLayout->getSizeAttrs())
     {
-        if (const auto offsetResInfo =
-                offsetVarLayout->findOffsetAttr(oldResInfo->getResourceKind()))
+        if (offsetVarLayout->findOffsetAttr(oldResInfo->getResourceKind()))
         {
             anyHit = true;
             break;
@@ -4769,7 +4767,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
 
         return TypeLayoutResult(typeLayout, info);
     }
-    else if (const auto samplerStateType = as<SamplerStateType>(type))
+    else if (as<SamplerStateType>(type))
     {
         return createSimpleTypeLayout(
             rules->GetObjectLayout(ShaderParameterKind::SamplerState, context.objectLayoutOptions)
@@ -5225,8 +5223,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
                 // If the field has an explicit offset, then we will
                 // use that to place it.
                 //
-                if (const auto packOffsetModifier =
-                        field.getDecl()->findModifier<HLSLPackOffsetSemantic>())
+                if (field.getDecl()->findModifier<HLSLPackOffsetSemantic>())
                 {
                     TypeLayoutResult fieldResult = _createTypeLayout(
                         context,
@@ -5239,8 +5236,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             for (auto field :
                  getFields(context.astBuilder, structDeclRef, MemberFilterStyle::Instance))
             {
-                if (const auto packOffsetModifier =
-                        field.getDecl()->findModifier<HLSLPackOffsetSemantic>())
+                if (field.getDecl()->findModifier<HLSLPackOffsetSemantic>())
                     continue;
 
                 // The fields of a `struct` type may include existential (interface)

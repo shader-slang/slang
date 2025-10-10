@@ -617,7 +617,7 @@ protected:
         builder.addSimpleDecoration<IRTempCallArgVarDecoration>(localVar);
         auto localVal = LegalizedVaryingVal::makeAddress(localVar);
 
-        if (const auto inOutType = as<IRBorrowInOutParamType>(paramPtrType))
+        if (as<IRBorrowInOutParamType>(paramPtrType))
         {
             // If the parameter was an `inout` and not just an `out`
             // parameter, we will create one more more legal `in`
@@ -1197,7 +1197,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                 elementVals.getCount(),
                 elementVals.getBuffer());
         }
-        else if (const auto basicType = as<IRBasicType>(typeToFetch))
+        else if (as<IRBasicType>(typeToFetch))
         {
             IRIntegerValue idx = ioBaseAttributeIndex;
             auto idxInst = builder->getIntValue(builder->getIntType(), idx);

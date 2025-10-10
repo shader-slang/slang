@@ -132,7 +132,7 @@ InstPair ForwardDiffTranscriber::transcribeUndefined(IRBuilder* builder, IRInst*
 {
     auto primalVal = maybeCloneForPrimalInst(builder, origInst);
 
-    if (IRType* const diffType = differentiateType(builder, origInst->getFullType()))
+    if (differentiateType(builder, origInst->getFullType()))
     {
         auto dzero = getDifferentialZeroOfType(builder, origInst->getFullType());
         if (dzero)
@@ -515,7 +515,7 @@ InstPair ForwardDiffTranscriber::transcribeConstruct(IRBuilder* builder, IRInst*
             else
             {
                 auto operandDataType = origConstruct->getOperand(ii)->getDataType();
-                if (const auto diffOperandType = differentiateType(builder, operandDataType))
+                if (differentiateType(builder, operandDataType))
                 {
                     operandDataType = (IRType*)findOrTranscribePrimalInst(builder, operandDataType);
                     diffOperands.add(getDifferentialZeroOfType(builder, operandDataType));
@@ -1373,7 +1373,7 @@ InstPair ForwardDiffTranscriber::transcribeUpdateElement(IRBuilder* builder, IRI
             diffAccessChain.add(key);
         }
     }
-    if (const auto diffType = differentiateType(builder, originalInst->getDataType()))
+    if (differentiateType(builder, originalInst->getDataType()))
     {
         auto diffBase = findOrTranscribeDiffInst(builder, origBase);
         if (!diffBase)
@@ -1806,7 +1806,7 @@ void insertTempVarForMutableParams(IRModule* module, IRFunc* func)
     List<IRParam*> params;
     for (auto param : firstBlock->getParams())
     {
-        if (const auto ptrType = as<IROutParamTypeBase>(param->getDataType()))
+        if (as<IROutParamTypeBase>(param->getDataType()))
         {
             params.add(param);
         }
