@@ -3982,8 +3982,6 @@ struct LLVMEmitter
         IREntryPointDecoration* entryPointDecor)
     {
         llvmBuilder->SetCurrentDebugLocation(llvm::DebugLoc());
-        auto numThreadsDecor = entryPoint->findDecoration<IRNumThreadsDecoration>();
-        SLANG_ASSERT(numThreadsDecor);
 
         llvm::Type* uintType = llvmBuilder->getInt32Ty();
 
@@ -4028,10 +4026,12 @@ struct LLVMEmitter
         llvm::Value* endGroupID[3];
         llvm::Value* groupID[3];
         llvm::Value* threadID[3];
+
+        auto numThreadsDecor = entryPoint->findDecoration<IRNumThreadsDecoration>();
         llvm::Value* workGroupSize[3] = {
-            llvmBuilder->getInt32(getIntVal(numThreadsDecor->getX())),
-            llvmBuilder->getInt32(getIntVal(numThreadsDecor->getY())),
-            llvmBuilder->getInt32(getIntVal(numThreadsDecor->getZ()))
+            llvmBuilder->getInt32(numThreadsDecor ? getIntVal(numThreadsDecor->getX()) : 1),
+            llvmBuilder->getInt32(numThreadsDecor ? getIntVal(numThreadsDecor->getY()) : 1),
+            llvmBuilder->getInt32(numThreadsDecor ? getIntVal(numThreadsDecor->getZ()) : 1)
         };
 
         for(int i = 0; i < 3; ++i)
