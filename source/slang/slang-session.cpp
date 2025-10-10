@@ -1459,34 +1459,6 @@ RefPtr<Module> Linkage::findOrImportModule(
         return glslModule;
     }
 
-    // Special case for neural module - search for it relative to libslang.so location
-    if (moduleName->text == "neural")
-    {
-        String neuralModulePath = findNeuralModulePath();
-        if (neuralModulePath.getLength() > 0)
-        {
-            // Found neural module, load it directly
-            ComPtr<ISlangBlob> fileContents;
-            SlangResult result =
-                getFileSystemExt()->loadFile(neuralModulePath.getBuffer(), fileContents.writeRef());
-            if (SLANG_SUCCEEDED(result))
-            {
-                auto pathInfo = PathInfo::makeFromString(neuralModulePath);
-                RefPtr<Module> module = loadModuleImpl(
-                    moduleName,
-                    pathInfo,
-                    fileContents,
-                    requestingLoc,
-                    sink,
-                    nullptr,
-                    ModuleBlobType::IR);
-                if (module)
-                    return module;
-            }
-        }
-        // If neural module not found or failed to load, continue with normal search
-    }
-
     // We are going to use a loop to search for a suitable file to
     // load the module from, to account for a few key choices:
     //
@@ -1644,6 +1616,35 @@ RefPtr<Module> Linkage::findOrImportModule(
             //
             if (module)
                 return module;
+        }
+    }
+
+    // Fallback: If the normal search failed and this is the neural module,
+    // try to load the builtin neural module if the experimental feature is enabled.
+    if (moduleName == getSessionImpl()->neuralModuleName &&
+        m_optionSet.getBoolOption(CompilerOptionName::ExperimentalFeature))
+    {
+        String neuralModulePath = findNeuralModulePath();
+        if (neuralModulePath.getLength() > 0)
+        {
+            // Found neural module, load it directly
+            ComPtr<ISlangBlob> fileContents;
+            SlangResult result =
+                getFileSystemExt()->loadFile(neuralModulePath.getBuffer(), fileContents.writeRef());
+            if (SLANG_SUCCEEDED(result))
+            {
+                auto pathInfo = PathInfo::makeFromString(neuralModulePath);
+                RefPtr<Module> module = loadModuleImpl(
+                    moduleName,
+                    pathInfo,
+                    fileContents,
+                    requestingLoc,
+                    sink,
+                    nullptr,
+                    ModuleBlobType::IR);
+                if (module)
+                    return module;
+            }
         }
     }
 
