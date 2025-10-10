@@ -343,6 +343,7 @@ private:
 
     Dictionary<IRType*, llvm::Type*> valueTypeMap;
     Dictionary<IRTypeLayoutRules*, Dictionary<IRType*, StorageTypeInfo>> storageTypeMap;
+    Dictionary<IRType*, IRType*> legalizedResourceTypeMap;
 
     struct ConstantInfo
     {
@@ -849,6 +850,76 @@ public:
         return offset;
     }
 
+    // Swaps resource buffers in Slang IR to their legalized struct
+    // counterparts.
+    IRType* legalizeResourceTypes(IRType* type)
+    {
+        if (legalizedResourceTypeMap.containsKey(type))
+            return legalizedResourceTypeMap.getValue(type);
+
+        IRBuilder builder(type->getModule());
+
+        IRType* legalizedType = type;
+        switch (type->getOp())
+        {
+        case kIROp_ConstantBufferType:
+            legalizedType = builder.getRawPointerType();
+            break;
+        case kIROp_HLSLStructuredBufferType:
+        case kIROp_HLSLRWStructuredBufferType:
+        case kIROp_HLSLByteAddressBufferType:
+        case kIROp_HLSLRWByteAddressBufferType:
+            {
+                IRStructType* s = builder.createStructType();
+                auto ptrKey = builder.createStructKey();
+                auto sizeKey = builder.createStructKey();
+                builder.createStructField(s, ptrKey, builder.getRawPointerType());
+                builder.createStructField(s, sizeKey, builder.getType(kIROp_UIntPtrType));
+                legalizedType = s;
+            }
+            break;
+        case kIROp_StructType:
+            {
+                auto structType = static_cast<IRStructType*>(type);
+                bool illegal = false;
+                for (auto field : structType->getFields())
+                {
+                    auto fieldType = field->getFieldType();
+                    auto legalizedFieldType = legalizeResourceTypes(fieldType);
+                    if (legalizedFieldType != fieldType)
+                        illegal = true;
+                }
+
+                if (illegal)
+                {
+                    IRStructType* s = builder.createStructType();
+                    for (auto field : structType->getFields())
+                    {
+                        auto fieldType = field->getFieldType();
+                        auto legalizedFieldType = legalizeResourceTypes(fieldType);
+                        builder.createStructField(s, field->getKey(), legalizedFieldType);
+                    }
+                    legalizedType = s;
+                }
+            }
+            break;
+        case kIROp_ArrayType:
+            {
+                auto arrayType = as<IRArrayTypeBase>(type);
+                auto elemType = arrayType->getElementType();
+                auto legalizedElemType = legalizeResourceTypes(elemType);
+                if (elemType != legalizedElemType)
+                    legalizedType = builder.getArrayType(legalizedElemType, arrayType->getElementCount());
+            }
+            break;
+        default:
+            break;
+        }
+
+        legalizedResourceTypeMap[type] = legalizedType;
+        return legalizedType;
+    }
+
     // Use this instead of the regular Slang::getSizeAndAlignment(), it handles querying
     // LLVM's own layout as well if 'rules' is nullptr.
     IRSizeAndAlignment getSizeAndAlignment(IRType* type, IRTypeLayoutRules* rules)
@@ -860,7 +931,7 @@ public:
             Slang::getSizeAndAlignment(
                 *compilerOptions,
                 rules,
-                type,
+                legalizeResourceTypes(type),
                 &elementSizeAlignment);
         }
         else
@@ -1490,8 +1561,7 @@ private:
 
         UInt llvmSize = 0;
 
-        IRSizeAndAlignment sizeAndAlignment;
-        Slang::getSizeAndAlignment(*compilerOptions, rules, structType, &sizeAndAlignment);
+        IRSizeAndAlignment sizeAndAlignment = getSizeAndAlignment(structType, rules);
 
         for (auto field : structType->getFields())
         {
@@ -1604,8 +1674,7 @@ private:
 
         auto irElemCount = arrayType->getElementCount();
         auto elemCount = int(getIntVal(irElemCount));
-        IRSizeAndAlignment sizeAndAlignment;
-        Slang::getSizeAndAlignment(*compilerOptions, rules, arrayType->getElementType(), &sizeAndAlignment);
+        IRSizeAndAlignment sizeAndAlignment = getSizeAndAlignment(arrayType->getElementType(), rules);
 
         bool hasTrailingPadding = sizeAndAlignment.size != align(sizeAndAlignment.size, sizeAndAlignment.alignment);
         return elemCount != 0 && hasTrailingPadding;
