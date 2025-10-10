@@ -1114,7 +1114,6 @@ public:
             break;
         case kIROp_MakeVector:
             {
-                auto vectorType = cast<IRVectorType>(inst->getDataType());
                 List<llvm::Constant*> values;
                 for (UInt aa = 0; aa < inst->getOperandCount(); ++aa)
                 {
@@ -1132,6 +1131,16 @@ public:
                         }
                     }
                     else values.add(constVal);
+                }
+
+                auto vectorType = as<IRVectorType>(inst->getDataType());
+
+                // So apparently, at least autodiff can generate MakeVectors
+                // which actually just make a float. Interesting.
+                if (!vectorType)
+                {
+                    llvmConstant = values[0];
+                    break;
                 }
 
                 if (defaultPointerRules && storage)
@@ -2538,6 +2547,14 @@ struct LLVMEmitter
             if (!llvmInst)
             {
                 auto llvmType = types->getValueType(inst->getDataType());
+
+                // MakeVector of a scalar is a scalar.
+                if (!as<IRVectorType>(inst->getDataType()))
+                {
+                    llvmInst = findValue(inst->getOperand(0));
+                    break;
+                }
+
                 llvmInst = llvm::PoisonValue::get(llvmType);
                 UInt elemIndex = 0;
                 for (UInt aa = 0; aa < inst->getOperandCount(); ++aa)
@@ -3408,18 +3425,23 @@ struct LLVMEmitter
             return funcToDebugLLVM[func];
         }
 
-        IRType* funcType = nullptr;
+        IRType* funcType = as<IRType>(func->getDataType());
         llvm::DIFile* file = nullptr;
         int line = 0;
         if (debugFunc)
         {
-            funcType = as<IRType>(debugFunc->getDebugType());
+            auto debugFuncType = as<IRType>(debugFunc->getDebugType());
+
+            // TODO: Debug function types are in a bit of a poor state. Let's
+            // only use them if they at least have the right type.
+            if (as<IRFuncType>(debugFuncType))
+                funcType = debugFuncType;
+
             file = sourceDebugInfo.getValue(debugFunc->getFile());
             line = getIntVal(debugFunc->getLine());
         }
         else
         {
-            funcType = as<IRType>(func->getDataType());
             file = compileUnit->getFile();
         }
 
@@ -3427,13 +3449,14 @@ struct LLVMEmitter
 
         maybeGetName(&linkageName, &prettyName, func);
 
+        llvm::DIType* llvmFuncType = types->getDebugType(funcType, defaultPointerRules);
         auto sp = llvmDebugBuilder->createFunction(
             file,
             prettyName,
             linkageName,
             file,
             line,
-            llvm::cast<llvm::DISubroutineType>(types->getDebugType(funcType, defaultPointerRules)),
+            llvm::cast<llvm::DISubroutineType>(llvmFuncType),
             line,
             llvm::DINode::FlagPrototyped,
             llvm::DISubprogram::SPFlagDefinition
