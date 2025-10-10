@@ -36,7 +36,13 @@ void forEachInCollection(IRCollectionTagType* tagType, F func)
     forEachInCollection(as<IRCollectionBase>(tagType->getCollection()), func);
 }
 
-// Builder class that helps greatly with
+// Builder class that helps greatly with constructing `CollectionBase` instructions,
+// which conceptually represent sets, and maintain the property that the equal sets
+// should always be represented by the same instruction.
+//
+// Uses a unique ID assignment to keep stable ordering throughout the lifetime of the
+// module.
+//
 struct CollectionBuilder
 {
     // Get a collection builder for 'module'.
