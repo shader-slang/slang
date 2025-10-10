@@ -67,12 +67,39 @@ local insts = {
 			},
 			{ Func = { struct_name = "FuncType", hoistable = true } },
 			{ BasicBlock = { struct_name = "BasicBlockType", hoistable = true } },
-			{ Vec = { struct_name = "VectorType", operands = { { "elementType", "IRType" }, { "elementCount" } }, hoistable = true } },
-			{ Mat = { struct_name = "MatrixType", operands = { { "elementType", "IRType" }, { "rowCount" }, { "columnCount" }, { "layout" } }, hoistable = true } },
+			{
+				Vec = {
+					struct_name = "VectorType",
+					operands = { { "elementType", "IRType" }, { "elementCount" } },
+					hoistable = true,
+				},
+			},
+			{
+				Mat = {
+					struct_name = "MatrixType",
+					operands = { { "elementType", "IRType" }, { "rowCount" }, { "columnCount" }, { "layout" } },
+					hoistable = true,
+				},
+			},
 			{ Conjunction = { struct_name = "ConjunctionType", hoistable = true } },
-			{ Attributed = { struct_name = "AttributedType", operands =  { { "baseType", "IRType" }, { "attr" } }, hoistable = true } },
-			{ Result = { struct_name = "ResultType", operands = { { "valueType", "IRType" }, { "errorType", "IRType" } }, hoistable = true } },
+			{
+				Attributed = {
+					struct_name = "AttributedType",
+					operands = { { "baseType", "IRType" }, { "attr" } },
+					hoistable = true,
+				},
+			},
+			{
+				-- Represents an `Result<T,E>`, used by functions that throws error codes.
+				Result = {
+					struct_name = "ResultType",
+					operands = { { "valueType", "IRType" }, { "errorType", "IRType" } },
+					hoistable = true,
+				},
+			},
+			-- Represents an `Optional<T>`.
 			{ Optional = { struct_name = "OptionalType", operands = { { "valueType", "IRType" } }, hoistable = true } },
+			-- Represents an enum type
 			{ Enum = { struct_name = "EnumType", operands = { { "tagType", "IRType" } }, parent = true } },
 			{
 				DifferentialPairTypeBase = {
@@ -89,9 +116,21 @@ local insts = {
 					hoistable = true,
 				},
 			},
-			{ TensorView = { struct_name = "TensorViewType", operands = { { "elementType", "IRType" } }, hoistable = true } },
+			{
+				TensorView = {
+					struct_name = "TensorViewType",
+					operands = { { "elementType", "IRType" } },
+					hoistable = true,
+				},
+			},
 			{ TorchTensor = { struct_name = "TorchTensorType", hoistable = true } },
-			{ ArrayListVector = { struct_name = "ArrayListType", operands = { { "elementType", "IRType" } }, hoistable = true } },
+			{
+				ArrayListVector = {
+					struct_name = "ArrayListType",
+					operands = { { "elementType", "IRType" } },
+					hoistable = true,
+				},
+			},
 			{ Atomic = { struct_name = "AtomicType", operands = { { "elementType", "IRType" } }, hoistable = true } },
 			{
 				BindExistentialsTypeBase = {
@@ -127,7 +166,13 @@ local insts = {
 					{ ActualGlobalRate = {} },
 				},
 			},
-			{ RateQualified = { struct_name = "RateQualifiedType", operands = { { "rate", "IRRate" }, { "valueType", "IRType" } }, hoistable = true } },
+			{
+				RateQualified = {
+					struct_name = "RateQualifiedType",
+					operands = { { "rate", "IRRate" }, { "valueType", "IRType" } },
+					hoistable = true,
+				},
+			},
 			{
 				Kind = {
 					-- Kinds represent the "types of types."
@@ -207,7 +252,12 @@ local insts = {
 			{ Std430Layout = { struct_name = "Std430BufferLayoutType", hoistable = true } },
 			{ ScalarLayout = { struct_name = "ScalarBufferLayoutType", hoistable = true } },
 			{ CLayout = { struct_name = "CBufferLayoutType", hoistable = true } },
-			{ SubpassInputType = { operands = { { "elementType", "IRType" }, { "isMultisampleInst" } }, hoistable = true } },
+			{
+				SubpassInputType = {
+					operands = { { "elementType", "IRType" }, { "isMultisampleInst" } },
+					hoistable = true,
+				},
+			},
 			{ TextureFootprintType = { min_operands = 1, hoistable = true } },
 			{ TextureShape1DType = { hoistable = true } },
 			{ TextureShape2DType = { struct_name = "TextureShape2DType", hoistable = true } },
@@ -274,7 +324,18 @@ local insts = {
 							{ Primitives = { struct_name = "PrimitivesType", min_operands = 2 } },
 						},
 					},
-					{ ["metal::mesh"] = { struct_name = "MetalMeshType", operands = { { "verticesType", "IRType" }, { "primitivesType", "IRType" }, { "numVertices" }, { "numPrimitives" }, { "topology", "IRIntLit" } } } },
+					{
+						["metal::mesh"] = {
+							struct_name = "MetalMeshType",
+							operands = {
+								{ "verticesType", "IRType" },
+								{ "primitivesType", "IRType" },
+								{ "numVertices" },
+								{ "numPrimitives" },
+								{ "topology", "IRIntLit" },
+							},
+						},
+					},
 					{ mesh_grid_properties = { struct_name = "MetalMeshGridPropertiesType" } },
 					{
 						HLSLStructuredBufferTypeBase = {
@@ -350,10 +411,21 @@ local insts = {
 					hoistable = true,
 				},
 			},
-			{ CoopVectorType = { operands = { { "elementType", "IRType"}, { "elementCount" } }, hoistable = true } },
-			{ CoopMatrixType = { operands = { { "elementType", "IRType"}, { "scope" }, { "rowCount" }, { "columnCount" }, { "matrixUse" } }, hoistable = true } },
+			{ CoopVectorType = { operands = { { "elementType", "IRType" }, { "elementCount" } }, hoistable = true } },
 			{
-				TensorAddressingTensorLayoutType = { operands = { { "dimension"}, { "clampMode" } }, hoistable = true },
+				CoopMatrixType = {
+					operands = {
+						{ "elementType", "IRType" },
+						{ "scope" },
+						{ "rowCount" },
+						{ "columnCount" },
+						{ "matrixUse" },
+					},
+					hoistable = true,
+				},
+			},
+			{
+				TensorAddressingTensorLayoutType = { operands = { { "dimension" }, { "clampMode" } }, hoistable = true },
 			},
 			{
 				TensorAddressingTensorViewType = {
@@ -390,7 +462,10 @@ local insts = {
 			{ interface = { struct_name = "InterfaceType", global = true } },
 			{ associated_type = { hoistable = true } },
 			{ this_type = { hoistable = true } },
+			-- Represents the IR type for an `IRRTTIObject`.
 			{ rtti_type = { struct_name = "RTTIType", hoistable = true } },
+			-- Represents a handle to an RTTI object.
+			-- This is lowered as an integer number identifying a type.
 			{
 				rtti_handle_type = {
 					struct_name = "RTTIHandleType",
@@ -400,10 +475,16 @@ local insts = {
 			{
 				TupleTypeBase = {
 					hoistable = true,
+					--  Represents a tuple. Tuples are created by `IRMakeTuple` and its elements
+					--  are accessed via `GetTupleElement(tupleValue, IRIntLit)`.
 					{ tuple_type = {} },
+					-- Represents a type pack. Type packs behave like tuples, but they have a
+					-- "flattening" semantics, so that MakeTypePack(MakeTypePack(T1,T2), T3) is
+					-- MakeTypePack(T1,T2,T3).
 					{ TypePack = {} },
 				},
 			},
+			-- Represents a tuple in target language. TargetTupleType will not be lowered to structs.
 			{ TargetTuple = { struct_name = "TargetTupleType", hoistable = true } },
 			{ ExpandTypeOrVal = { min_operands = 1, hoistable = true } },
 			{
@@ -455,6 +536,12 @@ local insts = {
 					-- IRGlobalValueWithParams
 					parent = true,
 					{ func = {} },
+
+					-- A generic is akin to a function, but is conceptually executed
+					-- before runtime, to specialize the code nested within--.
+
+					-- In practice, a generic always holds only a single block, and ends
+					-- with a `return` instruction for the value that the generic yields.
 					{ generic = {} },
 				},
 			},
@@ -465,6 +552,15 @@ local insts = {
 	{
 		globalConstant = { global = true },
 	},
+	-- A structure type is represented as a parent instruction,
+	-- where the child instructions represent the fields of the
+	-- struct.
+	--
+	-- The space of fields that a given struct type supports
+	-- are defined as its "keys", which are global values
+	-- (that is, they have mangled names that can be used
+	-- for linkage).
+	--
 	{ key = { struct_name = "StructKey", global = true } },
 	{ global_generic_param = { global = true } },
 	{ witness_table = { hoistable = true } },
@@ -624,7 +720,13 @@ local insts = {
 	{ packAnyValue = { min_operands = 1 } },
 	{ unpackAnyValue = { min_operands = 1 } },
 	{ witness_table_entry = { min_operands = 2 } },
-	{ interface_req_entry = { struct_name = "InterfaceRequirementEntry", operands = { { "requirementKey" }, { "requirementVal" } }, global = true } },
+	{
+		interface_req_entry = {
+			struct_name = "InterfaceRequirementEntry",
+			operands = { { "requirementKey" }, { "requirementVal" } },
+			global = true,
+		},
+	},
 	-- An inst to represent the workgroup size of the calling entry point.
 	-- We will materialize this inst during `translateGlobalVaryingVar`.
 	{ GetWorkGroupSize = { hoistable = true } },
@@ -888,11 +990,9 @@ local insts = {
 				},
 			},
 			{
-				Unreachable = {
+				UnreachableBase = {
 					{
-						missingReturn = {
-							-- IRUnreachable
-						},
+						missingReturn = {},
 					},
 					{ unreachable = {} },
 				},
@@ -1905,12 +2005,12 @@ local insts = {
 	-- Represents a psuedo cast to convert between a logical type (user declared) and a storage Type
 	-- (valid in buffer locations). The operand can either be a value or an address.
 	{
-		CastStorageToLogicalBase =
-		{
-			min_operands = 2, struct_name = "CastStorageToLogicalBase",
+		CastStorageToLogicalBase = {
+			min_operands = 2,
+			struct_name = "CastStorageToLogicalBase",
 			{ CastStorageToLogical = { min_operands = 2, struct_name = "CastStorageToLogical" } },
 			{ CastStorageToLogicalDeref = { min_operands = 2, struct_name = "CastStorageToLogicalDeref" } },
-		}
+		},
 	},
 	{ CastUInt64ToDescriptorHandle = { min_operands = 1 } },
 	{ CastDescriptorHandleToUInt64 = { min_operands = 1 } },

@@ -50,7 +50,7 @@ end
 local leafInst = function(name, args)
 	args = args or {}
 	local result = args.noIsaImpl and ""
-			or [[static bool isaImpl(IROp op)
+		or [[static bool isaImpl(IROp op)
     {
         return (kIROpMask_OpMask & op) == kIROp_]]
 			.. name
@@ -63,16 +63,32 @@ local leafInst = function(name, args)
 	-- Add getter methods if operands are specified
 	if args.operands then
 		for i, operand in ipairs(args.operands) do
-                        local operandName = operand[1]
-                        local operandType = operand[2]
-                        local getterName = "get" .. operandName:sub(1,1):upper() .. operandName:sub(2)
-                        local returnType = "IRInst"
-                        if operandType then
-                                returnType = operandType
-                                result = result .. "\n    " .. returnType .. "* " .. getterName .. "() { return (" .. returnType .. "*)getOperand(" .. (i-1) .. "); }"
-                        else
-                                result = result .. "\n    " .. returnType .. "* " .. getterName .. "() { return getOperand(" .. (i-1) .. "); }"
-                        end
+			local operandName = operand[1]
+			local operandType = operand[2]
+			local getterName = "get" .. operandName:sub(1, 1):upper() .. operandName:sub(2)
+			local returnType = "IRInst"
+			if operandType then
+				returnType = operandType
+				result = result
+					.. "\n    "
+					.. returnType
+					.. "* "
+					.. getterName
+					.. "() { return ("
+					.. returnType
+					.. "*)getOperand("
+					.. (i - 1)
+					.. "); }"
+			else
+				result = result
+					.. "\n    "
+					.. returnType
+					.. "* "
+					.. getterName
+					.. "() { return getOperand("
+					.. (i - 1)
+					.. "); }"
+			end
 		end
 	end
 
@@ -83,7 +99,7 @@ end
 local baseInst = function(name, args)
 	args = args or {}
 	local result = args.noIsaImpl and ""
-			or [[static bool isaImpl(IROp opIn)
+		or [[static bool isaImpl(IROp opIn)
     {
         const int op = (kIROpMask_OpMask & opIn);
         return op >= kIROp_First]]
@@ -96,16 +112,32 @@ local baseInst = function(name, args)
 	-- Add getter methods if operands are specified
 	if args.operands then
 		for i, operand in ipairs(args.operands) do
-                        local operandName = operand[1]
-                        local operandType = operand[2]
-                        local getterName = "get" .. operandName:sub(1,1):upper() .. operandName:sub(2)
-                        local returnType = "IRInst"
-                        if operandType then
-                                returnType = operandType
-                                result = result .. "\n    " .. returnType .. "* " .. getterName .. "() { return (" .. returnType .. "*)getOperand(" .. (i-1) .. "); }"
-                        else
-                                result = result .. "\n    " .. returnType .. "* " .. getterName .. "() { return getOperand(" .. (i-1) .. "); }"
-                        end
+			local operandName = operand[1]
+			local operandType = operand[2]
+			local getterName = "get" .. operandName:sub(1, 1):upper() .. operandName:sub(2)
+			local returnType = "IRInst"
+			if operandType then
+				returnType = operandType
+				result = result
+					.. "\n    "
+					.. returnType
+					.. "* "
+					.. getterName
+					.. "() { return ("
+					.. returnType
+					.. "*)getOperand("
+					.. (i - 1)
+					.. "); }"
+			else
+				result = result
+					.. "\n    "
+					.. returnType
+					.. "* "
+					.. getterName
+					.. "() { return getOperand("
+					.. (i - 1)
+					.. "); }"
+			end
 		end
 	end
 
@@ -127,6 +159,41 @@ local function allOtherInstStructs()
 				output,
 				string.format("    %s", value.is_leaf and leafInst(struct_name) or baseInst(struct_name))
 			)
+			-- Add getter methods if operands are specified
+			if value.operands then
+				for i, operand in ipairs(value.operands) do
+					local operandName = operand[1]
+					local operandType = operand[2]
+					local getterName = "get" .. operandName:sub(1, 1):upper() .. operandName:sub(2)
+					local returnType = "IRInst"
+					if operandType then
+						returnType = operandType
+						table.insert(
+							output,
+							"\n    "
+								.. returnType
+								.. "* "
+								.. getterName
+								.. "() { return ("
+								.. returnType
+								.. "*)getOperand("
+								.. (i - 1)
+								.. "); }"
+						)
+					else
+						table.insert(
+							output,
+							"\n    "
+								.. returnType
+								.. "* "
+								.. getterName
+								.. "() { return getOperand("
+								.. (i - 1)
+								.. "); }"
+						)
+					end
+				end
+			end
 			table.insert(output, "};")
 			table.insert(output, "")
 		end
@@ -191,14 +258,14 @@ local function instInfoEntries()
 
 			RAW(
 				"{kIROp_"
-				.. struct_name
-				.. ', {"'
-				.. value.mnemonic
-				.. '", '
-				.. tostring(operand_count)
-				.. ", "
-				.. constructFlags(value)
-				.. "}},"
+					.. struct_name
+					.. ', {"'
+					.. value.mnemonic
+					.. '", '
+					.. tostring(operand_count)
+					.. ", "
+					.. constructFlags(value)
+					.. "}},"
 			)
 		end
 	end)

@@ -112,11 +112,6 @@ struct IRTargetSpecificDefinitionDecoration : IRTargetSpecificDecoration
     FIDDLE(baseInst())
 };
 
-FIDDLE()
-struct IRTargetDecoration : IRTargetSpecificDefinitionDecoration
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRTargetSystemValueDecoration : IRDecoration
@@ -249,17 +244,6 @@ struct IRDispatchFuncDecoration : IRDecoration
     IRInst* getFunc() { return getOperand(0); }
 };
 
-FIDDLE()
-struct IRSpecializeDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRComInterfaceDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRCOMWitnessDecoration : IRDecoration
@@ -591,23 +575,6 @@ struct IRTargetBuiltinVarDecoration : IRDecoration
     }
 };
 
-FIDDLE()
-struct IRUserExternDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRImportDecoration : IRLinkageDecoration
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRExportDecoration : IRLinkageDecoration
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRExternCppDecoration : IRDecoration
@@ -619,11 +586,6 @@ struct IRExternCppDecoration : IRDecoration
     UnownedStringSlice getName() { return getNameOperand()->getStringSlice(); }
 };
 
-FIDDLE()
-struct IRExternCDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRDllImportDecoration : IRDecoration
@@ -732,11 +694,6 @@ struct IROffsetDecoration : IRDecoration
     IRIntegerValue getOffset() { return getOffsetOperand()->getValue(); }
 };
 
-FIDDLE()
-struct IRBuiltinDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRSequentialIDDecoration : IRDecoration
@@ -755,11 +712,6 @@ struct IRResultWitnessDecoration : IRDecoration
     IRInst* getWitness() { return getOperand(0); }
 };
 
-FIDDLE()
-struct IRDynamicDispatchWitnessDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRAutoDiffOriginalValueDecoration : IRDecoration
@@ -768,11 +720,6 @@ struct IRAutoDiffOriginalValueDecoration : IRDecoration
     IRInst* getOriginalValue() { return getOperand(0); }
 };
 
-FIDDLE()
-struct IRForwardDifferentiableDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRForwardDerivativeDecoration : IRDecoration
@@ -847,17 +794,6 @@ struct IRCheckpointHintDecoration : public IRDecoration
     FIDDLE(baseInst())
 };
 
-FIDDLE()
-struct IRPreferRecomputeDecoration : IRCheckpointHintDecoration
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRPreferCheckpointDecoration : IRCheckpointHintDecoration
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRCheckpointIntermediateDecoration : IRCheckpointHintDecoration
@@ -865,18 +801,6 @@ struct IRCheckpointIntermediateDecoration : IRCheckpointHintDecoration
     FIDDLE(leafInst())
 
     IRInst* getSourceFunction() { return getOperand(0); }
-};
-
-FIDDLE()
-struct IRLoopCounterDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRLoopCounterUpdateDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
 };
 
 
@@ -909,11 +833,6 @@ struct IRDifferentialInstDecoration : IRAutodiffInstDecoration
     IRInst* getWitness() { return getOperand(2); }
 };
 
-FIDDLE()
-struct IRPrimalInstDecoration : IRAutodiffInstDecoration
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRMixedDifferentialInstDecoration : IRAutodiffInstDecoration
@@ -925,11 +844,6 @@ struct IRMixedDifferentialInstDecoration : IRAutodiffInstDecoration
     IRType* getPairType() { return (IRType*)(getOperand(0)); }
 };
 
-FIDDLE()
-struct IRRecomputeBlockDecoration : IRAutodiffInstDecoration
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRPrimalValueStructKeyDecoration : IRDecoration
@@ -958,11 +872,6 @@ struct IRIntermediateContextFieldDifferentialTypeDecoration : IRDecoration
     IRInst* getDifferentialWitness() { return getOperand(0); }
 };
 
-FIDDLE()
-struct IRBackwardDifferentiableDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRUserDefinedBackwardDerivativeDecoration : IRDecoration
@@ -971,45 +880,6 @@ struct IRUserDefinedBackwardDerivativeDecoration : IRDecoration
     IRInst* getBackwardDerivativeFunc() { return getOperand(0); }
 };
 
-FIDDLE()
-struct IRTreatAsDifferentiableDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
-
-// Mark a call as explicitly calling a differentiable function.
-FIDDLE()
-struct IRDifferentiableCallDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
-
-// Mark a type as being eligible for trimming if necessary. If
-// any fields don't have any effective loads from them, they can be
-// removed.
-//
-FIDDLE()
-struct IROptimizableTypeDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
-
-// Informs the DCE pass to ignore side-effects on this call for
-// the purposes of dead code elimination, even if the call does have
-// side-effects.
-//
-FIDDLE()
-struct IRIgnoreSideEffectsDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
-
-// Treat a call to a non-differentiable function as a differentiable call.
-FIDDLE()
-struct IRTreatCallAsDifferentiableDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRDerivativeMemberDecoration : IRDecoration
@@ -1127,11 +997,6 @@ struct IRDifferentiableTypeDictionaryItem : IRInst
     IRInst* getWitness() { return getOperand(1); }
 };
 
-FIDDLE()
-struct IRDifferentiableTypeDictionaryDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRFloatingPointModeOverrideDecoration : IRDecoration
@@ -1297,23 +1162,6 @@ struct IRStageAccessDecoration : public IRDecoration
     UnownedStringSlice getStageName(Int index) { return getStageOperand(index)->getStringSlice(); }
 };
 
-FIDDLE()
-struct IRStageReadAccessDecoration : public IRStageAccessDecoration
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRStageWriteAccessDecoration : public IRStageAccessDecoration
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRRayPayloadDecoration : public IRDecoration
-{
-    FIDDLE(leafInst())
-};
 
 // Mesh shader decorations
 
@@ -1324,41 +1172,6 @@ struct IRMeshOutputDecoration : public IRDecoration
     IRIntLit* getMaxSize() { return cast<IRIntLit>(getOperand(0)); }
 };
 
-FIDDLE()
-struct IRVerticesDecoration : public IRMeshOutputDecoration
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRIndicesDecoration : public IRMeshOutputDecoration
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRPrimitivesDecoration : public IRMeshOutputDecoration
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRGLSLPrimitivesRateDecoration : public IRDecoration
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRGLPositionOutputDecoration : public IRDecoration
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRGLPositionInputDecoration : public IRDecoration
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRMeshOutputRef : public IRInst
@@ -1475,11 +1288,6 @@ struct IRFuncThrowTypeAttr : IRAttr
     IRType* getErrorType() { return (IRType*)getOperand(0); }
 };
 
-FIDDLE()
-struct IRNoDiffAttr : IRAttr
-{
-    FIDDLE(leafInst())
-};
 
 /// An attribute that specifies size information for a single resource kind.
 FIDDLE()
@@ -2344,11 +2152,6 @@ struct IRStructuredBufferGetDimensions : IRInst
     IRInst* getBuffer() { return getOperand(0); }
 };
 
-FIDDLE()
-struct IRNonUniformResourceIndex : IRInst
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRLoadReverseGradient : IRInst
@@ -2393,11 +2196,6 @@ struct IRGetManagedPtrWriteRef : IRInst
     IRInst* getPtrToManagedPtr() { return getOperand(0); }
 };
 
-FIDDLE()
-struct IRGetAddress : IRInst
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRImageSubscript : IRInst
@@ -2468,11 +2266,6 @@ struct IRYield : IRTerminatorInst
     IRInst* getVal() { return getOperand(0); }
 };
 
-FIDDLE()
-struct IRDiscard : IRTerminatorInst
-{
-    FIDDLE(leafInst())
-};
 
 // Used for representing a distinct copy of an object.
 // This will get lowered into a no-op in the backend,
@@ -2503,17 +2296,7 @@ struct IRLoopExitValue : IRInst
 // We can/should emit a dataflow error if we can ever determine
 // that a block ending in one of these can actually be
 // executed.
-FIDDLE()
-struct IRUnreachable : IRTerminatorInst
-{
-    FIDDLE(leafInst())
-};
 
-FIDDLE()
-struct IRMissingReturn : IRUnreachable
-{
-    FIDDLE(leafInst())
-};
 
 struct IRBlock;
 
@@ -2849,43 +2632,6 @@ struct IREach : IRInst
     IRInst* getElement() { return getOperand(0); }
 };
 
-FIDDLE()
-struct IRMakeArray : IRInst
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRMakeArrayFromElement : IRInst
-{
-    FIDDLE(leafInst())
-};
-
-
-// An Instruction that creates a tuple value.
-FIDDLE()
-struct IRMakeTuple : IRInst
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRMakeValuePack : IRInst
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRMakeStruct : IRInst
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRMakeWitnessPack : IRInst
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRGetTupleElement : IRInst
@@ -2903,23 +2649,6 @@ struct IRGetTargetTupleElement : IRInst
     IRInst* getElementIndex() { return getOperand(1); }
 };
 
-FIDDLE()
-struct IRMakeVector : IRInst
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRMakeVectorFromScalar : IRInst
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRMakeCoopVector : IRInst
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRCoopMatMapElementIFunc : IRInst
@@ -2944,21 +2673,7 @@ struct IRMakeDifferentialPairBase : IRInst
     IRInst* getPrimalValue() { return getOperand(0); }
     IRInst* getDifferentialValue() { return getOperand(1); }
 };
-FIDDLE()
-struct IRMakeDifferentialPair : IRMakeDifferentialPairBase
-{
-    FIDDLE(leafInst())
-};
-FIDDLE()
-struct IRMakeDifferentialPairUserCode : IRMakeDifferentialPairBase
-{
-    FIDDLE(leafInst())
-};
-FIDDLE()
-struct IRMakeDifferentialPtrPair : IRMakeDifferentialPairBase
-{
-    FIDDLE(leafInst())
-};
+
 
 FIDDLE()
 struct IRDifferentialPairGetDifferentialBase : IRInst
@@ -2966,21 +2681,7 @@ struct IRDifferentialPairGetDifferentialBase : IRInst
     FIDDLE(baseInst())
     IRInst* getBase() { return getOperand(0); }
 };
-FIDDLE()
-struct IRDifferentialPairGetDifferential : IRDifferentialPairGetDifferentialBase
-{
-    FIDDLE(leafInst())
-};
-FIDDLE()
-struct IRDifferentialPairGetDifferentialUserCode : IRDifferentialPairGetDifferentialBase
-{
-    FIDDLE(leafInst())
-};
-FIDDLE()
-struct IRDifferentialPtrPairGetDifferential : IRDifferentialPairGetDifferentialBase
-{
-    FIDDLE(leafInst())
-};
+
 
 FIDDLE()
 struct IRDifferentialPairGetPrimalBase : IRInst
@@ -2988,16 +2689,7 @@ struct IRDifferentialPairGetPrimalBase : IRInst
     FIDDLE(baseInst())
     IRInst* getBase() { return getOperand(0); }
 };
-FIDDLE()
-struct IRDifferentialPairGetPrimal : IRDifferentialPairGetPrimalBase
-{
-    FIDDLE(leafInst())
-};
-FIDDLE()
-struct IRDifferentialPairGetPrimalUserCode : IRDifferentialPairGetPrimalBase
-{
-    FIDDLE(leafInst())
-};
+
 FIDDLE()
 struct IRDifferentialPtrPairGetPrimal : IRDifferentialPairGetPrimalBase
 {
