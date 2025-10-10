@@ -26,11 +26,7 @@ RWBuffer<float> outbuf;
 void main()
 {
 	float value = cb.x;
-#if 0
-	value = value > 10.0f ? value + 1.0f : value - 1.0f;
-	value = sqrt(value);
-	value = sin(value);
-#endif
+
 	value = Func(cb.x);
 
 	outbuf[0] = value;
