@@ -5,7 +5,7 @@
 #
 # Neural module configuration
 #
-set(SLANG_NEURAL_MODULE_DIR_NAME "slang-neural-module" CACHE STRING "Directory name for neural module")
+set(SLANG_NEURAL_MODULE_DIR_NAME "slang-prebuilt-module-${SLANG_VERSION_FULL}" CACHE STRING "Directory name for neural module")
 set(SLANG_NEURAL_MODULE_FILE_NAME "neural.slang-module" CACHE STRING "File name for neural module")
 
 # Determine the library directory based on platform
