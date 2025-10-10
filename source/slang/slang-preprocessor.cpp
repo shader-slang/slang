@@ -1320,7 +1320,7 @@ struct Preprocessor
     SourceLoc::RawValue absoluteSourceLocCounter = 0;
 
     /// Push a new input file onto the input stack of the preprocessor
-    void pushInputFile(InputFile* inputFile, SourceLoc location);
+    void pushInputFile(InputFile* inputFile, SourceLoc location, String fileIdentity);
 
     /// Pop the inner-most input file from the stack of input files
     void popInputFile();
@@ -3483,7 +3483,7 @@ static SlangResult readFile(
     return SLANG_OK;
 }
 
-void Preprocessor::pushInputFile(InputFile* inputFile, SourceLoc loc)
+void Preprocessor::pushInputFile(InputFile* inputFile, SourceLoc loc, String fileIdentity)
 {
     if (m_currentInputFile)
     {
@@ -3492,13 +3492,12 @@ void Preprocessor::pushInputFile(InputFile* inputFile, SourceLoc loc)
         absoluteSourceLocCounter += offset;
     }
 
-    {
-        SourceView* sourceView = inputFile->getLexer()->m_sourceView;
-        sourceView->setAbsoluteLocationBase(absoluteSourceLocCounter);
-    }
+    SourceView* sourceView = inputFile->getLexer()->m_sourceView;
+    sourceView->setAbsoluteLocationBase(absoluteSourceLocCounter);
 
     inputFile->m_parent = m_currentInputFile;
     m_currentInputFile = inputFile;
+    includedFiles.add(fileIdentity);
 }
 
 // Handle a `#include` directive
@@ -3568,13 +3567,6 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
         return;
     }
 
-    if (!context->m_preprocessor->includedFiles.add(filePathInfo.getMostUniqueIdentity()))
-    {
-        // This file has already been included, we should diagnose an error and return.
-        GetSink(context)->diagnose(pathToken.loc, Diagnostics::cyclicInclude, path);
-        return;
-    }
-
     reportIncludeFileForContentAssist(context->m_preprocessor, pathToken, filePathInfo.foundPath);
 
     // Do all checking related to the end of this directive before we push a new stream,
@@ -3611,6 +3603,17 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
         sourceManager->addSourceFile(filePathInfo.uniqueIdentity, sourceFile);
     }
 
+    auto fileIdentity = sourceFile->getPathInfo().getMostUniqueIdentity();
+    if (context->m_preprocessor->includedFiles.contains(fileIdentity))
+    {
+        // This file has already been included, we should diagnose an error and return.
+        GetSink(context)->diagnose(
+            pathToken.loc,
+            Diagnostics::cyclicInclude,
+            pathToken.getContent());
+        return;
+    }
+
     // If we are running the preprocessor as part of compiling a
     // specific module, then we must keep track of the file we've
     // read as yet another file that the module will depend on.
@@ -3626,7 +3629,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
 
     InputFile* inputFile = new InputFile(context->m_preprocessor, sourceView);
 
-    context->m_preprocessor->pushInputFile(inputFile, directiveLoc);
+    context->m_preprocessor->pushInputFile(inputFile, directiveLoc, fileIdentity);
 }
 
 static void _parseMacroOps(
@@ -4658,6 +4661,7 @@ void Preprocessor::popInputFile()
         sourceView->addAbsoluteSegment(
             parentFile->getExpansionStream()->peekLoc(),
             absoluteSourceLocCounter);
+        includedFiles.remove(sourceView->getSourceFile()->getPathInfo().getMostUniqueIdentity());
     }
 
     delete inputFile;
@@ -4968,7 +4972,10 @@ TokenList preprocessSource(
 
         // create an initial input stream based on the provided buffer
         InputFile* primaryInputFile = new InputFile(&preprocessor, sourceView);
-        preprocessor.pushInputFile(primaryInputFile, sourceView->getRange().begin);
+        preprocessor.pushInputFile(
+            primaryInputFile,
+            sourceView->getRange().begin,
+            file->getPathInfo().getMostUniqueIdentity());
     }
 
     TokenList tokens = ReadAllTokens(&preprocessor);
