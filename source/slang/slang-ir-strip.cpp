@@ -16,6 +16,7 @@ static bool _shouldStripInst(IRInst* inst, IRStripOptions const& options)
         return false;
 
     case kIROp_HighLevelDeclDecoration:
+    case kIROp_InParamProxyVarDecoration:
         return true;
 
     case kIROp_NameHintDecoration:
