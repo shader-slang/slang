@@ -9,6 +9,7 @@
 // focused on `[attributes]`.
 
 #include "slang-lookup.h"
+#include "slang-target.h"
 
 namespace Slang
 {
@@ -1674,6 +1675,25 @@ Modifier* SemanticsVisitor::checkModifier(
                 return nullptr;
             }
             return m;
+        }
+    }
+
+    // Check for layout qualifiers on incompatible targets
+    if (auto layoutMod = as<GLSLBufferDataLayoutModifier>(m))
+    {
+        for (auto target : getLinkage()->targets)
+        {
+            if (!isKhronosTarget(target->getTarget()) && !isWGPUTarget(target->getTarget()))
+            {
+                StringBuilder targetName;
+                printDiagnosticArg(targetName, target->getTarget());
+                getSink()->diagnose(
+                    m,
+                    Diagnostics::layoutQualifierUnsupportedForTarget,
+                    layoutMod->keywordName,
+                    targetName);
+                break;
+            }
         }
     }
 
