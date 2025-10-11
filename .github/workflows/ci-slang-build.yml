@@ -127,7 +127,7 @@ jobs:
               # is a problem on Windows, so make slang-llvm in release build and use
               # that as though it's a fetched binary via these presets.
               cmake --workflow --preset slang-llvm
-              
+
               # Configure, pointing to our just-generated slang-llvm archive
               cmake --preset default --fresh \
                 -DSLANG_SLANG_LLVM_FLAVOR=FETCH_BINARY \
@@ -170,35 +170,38 @@ jobs:
           # Copy artifacts from the specific configuration directory
           if [ -d "build/${cmake_config}" ]; then
             echo "Copying artifacts from build/${cmake_config} to github_artifact/${cmake_config}..."
-            
+
             # Copy bin directory excluding debug files
             if [ -d "build/${cmake_config}/bin" ]; then
               mkdir -p "artifacts-staging/${cmake_config}/bin"
               find "build/${cmake_config}/bin" -type f ! -name "*.pdb" ! -name "*.ilk" ! -name "*.dwarf" ! -name "*.debug" ! -name "*.dSYM" -exec cp {} "artifacts-staging/${cmake_config}/bin/" \; || echo "Failed to copy bin directory"
 
               cp -r "build/${cmake_config}/bin/D3D12" "artifacts-staging/${cmake_config}/bin/" || echo "Failed to copy bin/D3D12 directory"
+              if [[ "${{ inputs.os }}" == "windows" ]]; then
+                cp -r "build/${cmake_config}/bin/slang-neural-module" "artifacts-staging/${cmake_config}/bin/slang-neural-module" || echo "Failed to copy bin/slang-neural-module directory"
+              fi
             fi
-            
+
             # Copy everything from lib directory
             if [ -d "build/${cmake_config}/lib" ]; then
               cp -r "build/${cmake_config}/lib" "artifacts-staging/${cmake_config}/" || echo "Failed to copy lib directory"
             fi
-            
+
             # Copy share directory if it exists
             if [ -d "build/${cmake_config}/share" ]; then
               cp -r "build/${cmake_config}/share" "artifacts-staging/${cmake_config}/" || echo "Failed to copy share directory"
             fi
-            
+
             # Copy include directory if it exists
             if [ -d "build/${cmake_config}/include" ]; then
               cp -r "build/${cmake_config}/include" "artifacts-staging/${cmake_config}/" || echo "Failed to copy include directory"
             fi
-            
+
             # Copy examples directory if it exists (contains shader files for examples)
             if [ -d "build/examples" ]; then
               cp -r "build/examples" "artifacts-staging/" || echo "Failed to copy examples directory"
             fi
-            
+
           echo "Artifacts staging directory contents (recursive):"
           ls -laR artifacts-staging/
           else
