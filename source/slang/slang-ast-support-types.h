@@ -116,6 +116,9 @@ FIDDLE() namespace Slang
         // when two up-casts are comparable.
         kConversionCost_CastToInterface = 50,
 
+        // Conversion from Optional<T> to Optional<U> where T conforms to U interface.
+        kConversionCost_CastToOptionalInterface = 60,
+
         // Conversion that is lossless and keeps the "kind" of the value the same
         kConversionCost_BoolToInt = 120, // Converting bool to int has lower cost than other integer
                                          // types to prevent ambiguity.
