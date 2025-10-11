@@ -3,6 +3,7 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
+#include "slang-type-layout.h"
 
 namespace Slang
 {
@@ -78,19 +79,32 @@ void makeFuncReturnViaOutParam(IRBuilder& builder, IRFunc* func)
     }
 }
 
-void legalizeArrayReturnType(IRModule* module)
+void legalizeArrayReturnType(IRModule* module, TargetRequest* targetReq)
 {
     IRBuilder builder(module);
 
     for (auto inst : module->getGlobalInsts())
     {
-        if (auto func = as<IRFunc>(inst))
+        auto func = as<IRFunc>(inst);
+        if (!func)
+            continue;
+
+        auto resultType = func->getResultType();
+
+        // Only process array return types
+        if (resultType->getOp() != kIROp_ArrayType)
+            continue;
+
+        auto nameHint = resultType->findDecoration<IRNameHintDecoration>();
+        bool isCoopVecArray = nameHint && (nameHint->getName() == UnownedStringSlice("CoopVec"));
+        if (isCoopVecArray)
         {
-            if (func->getResultType()->getOp() == kIROp_ArrayType)
-            {
-                makeFuncReturnViaOutParam(builder, func);
-            }
+            // CUDA/D3D/CPU natively support returning coopvec, so skip out-parameter transformation
+            if (isCUDATarget(targetReq) || isD3DTarget(targetReq) || isCPUTarget(targetReq))
+                continue;
         }
+
+        makeFuncReturnViaOutParam(builder, func);
     }
 }
 } // namespace Slang
