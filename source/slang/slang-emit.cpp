@@ -2420,7 +2420,7 @@ static SlangResult stripDbgSpirvFromArtifact(
     spirvInstructionHelper.visitInstructions(
         [&](const SpirvInstructionHelper::SpvInstruction& inst)
         {
-            if (inst.getOpCode() == SpvOpExtInst)
+            if (inst.getOpCode() == SpvOpExtInst && inst.getWordCountForInst() >= 5)
             {
                 if (inst.getOperand(3) == NonSemanticShaderDebugInfo100DebugBuildIdentifier)
                 {
@@ -2428,7 +2428,7 @@ static SlangResult stripDbgSpirvFromArtifact(
                     return;
                 }
             }
-            else if (inst.getOpCode() == SpvOpExtInstImport)
+            else if (inst.getOpCode() == SpvOpExtInstImport && inst.getWordCountForInst() >= 2)
             {
                 auto importName = inst.getStringFromInst();
                 if (importName == "NonSemantic.Shader.DebugInfo.100")
@@ -2444,7 +2444,8 @@ static SlangResult stripDbgSpirvFromArtifact(
         spirvInstructionHelper.visitInstructions(
             [&](const SpirvInstructionHelper::SpvInstruction& inst)
             {
-                if (inst.getOpCode() == SpvOpString && inst.getOperand(0) == debugStringId)
+                if (inst.getOpCode() == SpvOpString && inst.getWordCountForInst() >= 2 &&
+                    inst.getOperand(0) == debugStringId)
                 {
                     debugBuildHash = inst.getStringFromInst();
                 }
