@@ -4,6 +4,8 @@
 namespace Slang
 {
 struct IRModule;
+struct IRInst;
+struct IRSpecialize;
 class DiagnosticSink;
 class TargetProgram;
 
@@ -23,5 +25,7 @@ bool specializeModule(
     SpecializationOptions options);
 
 void finalizeSpecialization(IRModule* module);
+
+IRInst* specializeGeneric(IRSpecialize* specInst);
 
 } // namespace Slang

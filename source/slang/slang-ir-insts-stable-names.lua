@@ -680,4 +680,18 @@ return {
 	["SymbolAlias"] = 676,
 	["Decoration.InParamProxyVar"] = 677,
 	["Attr.MemoryScope"] = 678,
+  	["TypeFlowData.CollectionBase.TypeCollection"] = 679,
+	["TypeFlowData.CollectionBase.FuncCollection"] = 680,
+	["TypeFlowData.CollectionBase.TableCollection"] = 681,
+	["TypeFlowData.CollectionBase.GenericCollection"] = 682,
+	["TypeFlowData.UnboundedCollection"] = 683,
+	["TypeFlowData.CollectionTagType"] = 684,
+	["TypeFlowData.CollectionTaggedUnionType"] = 685,
+	["CastInterfaceToTaggedUnionPtr"] = 686,
+	["CastTaggedUnionToInterfacePtr"] = 687,
+	["GetTagForSuperCollection"] = 688,
+	["GetTagForMappedCollection"] = 689,
+	["GetTagForSpecializedCollection"] = 690,
+	["GetTagFromSequentialID"] = 691,
+	["GetSequentialIDFromTag"] = 692
 }

@@ -14,6 +14,7 @@
 #include "slang-ir-lower-generic-function.h"
 #include "slang-ir-lower-generic-type.h"
 #include "slang-ir-lower-tuple-types.h"
+#include "slang-ir-lower-typeflow-insts.h"
 #include "slang-ir-specialize-dispatch.h"
 #include "slang-ir-specialize-dynamic-associatedtype-lookup.h"
 #include "slang-ir-ssa-simplification.h"
@@ -136,6 +137,9 @@ void specializeRTTIObjects(SharedGenericsLoweringContext* sharedContext, Diagnos
     specializeDispatchFunctions(sharedContext);
     if (sink->getErrorCount() != 0)
         return;
+
+    lowerSequentialIDTagCasts(sharedContext->module, sharedContext->sink);
+    lowerTagTypes(sharedContext->module);
 
     lowerIsTypeInsts(sharedContext);
 
