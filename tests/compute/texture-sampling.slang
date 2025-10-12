@@ -1,6 +1,8 @@
 //TEST(compute):COMPARE_RENDER_COMPUTE: -shaderobj -output-using-type
 //TEST(compute):COMPARE_RENDER_COMPUTE: -shaderobj -output-using-type -vk
 //TEST(compute):COMPARE_RENDER_COMPUTE: -shaderobj -output-using-type -mtl
+// Not supported in LLVM: textures are not currently available
+//DISABLE_TEST(compute):COMPARE_RENDER_COMPUTE: -shaderobj -output-using-type -llvm
 
 
 //TEST_INPUT: Texture1D(size=4, content = one):name=t1D

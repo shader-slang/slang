@@ -3020,6 +3020,10 @@ struct LLVMEmitter
                 {
                     baseType = ptrType->getValueType();
                 }
+                else if (auto ptrType = as<IRPointerLikeType>(baseInst->getDataType()))
+                {
+                    baseType = as<IRType>(ptrType->getOperand(0));
+                }
 
                 llvmInst = llvmBuilder->CreateGEP(
                     types->getStorageType(baseType, getPtrLayoutRules(baseInst)),
@@ -3043,6 +3047,10 @@ struct LLVMEmitter
                 if (auto ptrType = as<IRPtrTypeBase>(baseInst->getDataType()))
                 {
                     baseType = ptrType->getValueType();
+                }
+                else if (auto ptrType = as<IRPointerLikeType>(baseInst->getDataType()))
+                {
+                    baseType = as<IRType>(ptrType->getOperand(0));
                 }
 
                 IRType* elementType = nullptr;
