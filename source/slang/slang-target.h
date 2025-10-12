@@ -83,6 +83,9 @@ bool isCPUTarget(TargetRequest* targetReq);
 bool isWGPUTarget(TargetRequest* targetReq);
 bool isWGPUTarget(CodeGenTarget target);
 
+// Are we generating code for a Shader target (as opposed to host-style target)
+bool isShaderTarget(CodeGenTarget codeGenTarget);
+
 /// A request to generate output in some target format.
 class TargetRequest : public RefObject
 {

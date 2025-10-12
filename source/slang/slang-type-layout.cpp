@@ -2680,6 +2680,11 @@ bool isCPUTarget(TargetRequest* targetReq)
         ArtifactDescUtil::makeDescForCompileTarget(asExternal(targetReq->getTarget())));
 }
 
+bool isShaderTarget(CodeGenTarget codeGenTarget)
+{
+    return ArtifactDescUtil::makeDescForCompileTarget(asExternal(codeGenTarget)).style == ArtifactStyle::Kernel;
+}
+
 bool isCUDATarget(TargetRequest* targetReq)
 {
     switch (targetReq->getTarget())
