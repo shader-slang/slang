@@ -827,17 +827,30 @@ public:
     IRIntegerValue getOffset(IRStructField* field, IRTypeLayoutRules* rules)
     {
         IRIntegerValue offset = 0;
+        auto structType = as<IRStructType>(field->getParent());
         if (rules)
         {
+            auto legalStructType = as<IRStructType>(legalizeResourceTypes(structType));
+            auto legalField = field;
+            if (legalStructType != structType)
+            {
+                for (auto ff : legalStructType->getFields())
+                {
+                    if(ff->getKey() == field->getKey())
+                    {
+                        legalField = ff;
+                        break;
+                    }
+                }
+            }
             Slang::getOffset(
                 *compilerOptions,
                 rules,
-                field,
+                legalField,
                 &offset);
         }
         else
         {
-            auto structType = as<IRStructType>(field->getParent());
             UInt index = 0;
             for (auto ff : structType->getFields())
             {
@@ -865,6 +878,7 @@ public:
         switch (type->getOp())
         {
         case kIROp_ConstantBufferType:
+        case kIROp_ParameterBlockType:
             legalizedType = builder.getRawPointerType();
             break;
         case kIROp_HLSLStructuredBufferType:
@@ -1571,8 +1585,7 @@ private:
             if (as<IRVoidType>(fieldType))
                 continue;
 
-            IRIntegerValue offset = 0;
-            Slang::getOffset(*compilerOptions, rules, field, &offset);
+            IRIntegerValue offset = getOffset(field, rules);
 
             // Insert padding until we're at the requested offset.
             UInt padding = emitPadding(fieldTypes, llvmSize, offset);
