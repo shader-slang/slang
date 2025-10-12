@@ -524,6 +524,7 @@ enum class IRTypeLayoutRuleName
     Std430,
     Std140,
     D3DConstantBuffer,
+    MetalParameterBlock,
     C,
     _Count,
 };
@@ -2147,6 +2148,11 @@ void fixUpFuncType(IRFunc* func, IRType* resultType);
 ///
 void fixUpFuncType(IRFunc* func);
 
+/// If the function has a DebugFuncDecoration, replaces the function type in
+/// that decoration to match the current type of the function.
+///
+void fixUpDebugFuncType(IRFunc* func);
+
 // A generic is akin to a function, but is conceptually executed
 // before runtime, to specialize the code nested within.
 //
@@ -2425,7 +2431,7 @@ public:
     // anything to do with serialization format
     //
     const static UInt k_minSupportedModuleVersion = 1;
-    const static UInt k_maxSupportedModuleVersion = 1;
+    const static UInt k_maxSupportedModuleVersion = 2;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
 private:

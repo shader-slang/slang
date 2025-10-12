@@ -383,6 +383,7 @@ DIAGNOSTIC(-1, Note, seeOpeningToken, "see opening '$0'")
 // 153xx - #include
 DIAGNOSTIC(15300, Error, includeFailed, "failed to find include file '$0'")
 DIAGNOSTIC(15301, Error, importFailed, "failed to find imported file '$0'")
+DIAGNOSTIC(15302, Error, cyclicInclude, "cyclic `#include` of file '$0'")
 DIAGNOSTIC(-1, Error, noIncludeHandlerSpecified, "no `#include` handler was specified")
 DIAGNOSTIC(
     15302,
@@ -2224,8 +2225,8 @@ DIAGNOSTIC(
 DIAGNOSTIC(
     38034,
     Error,
-    cannotUseConstRefOnDifferentiableParameter,
-    "cannot use '__constref' on a differentiable parameter.")
+    cannotUseBorrowInOnDifferentiableParameter,
+    "cannot use 'borrow in' on a differentiable parameter.")
 DIAGNOSTIC(
     38034,
     Error,

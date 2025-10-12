@@ -1368,19 +1368,20 @@ struct Ptr<
 
         __intrinsic_op($(kIROp_GetOffsetPtr))
         [nonmutating]
+        [__NoSideEffect]
         ref;
     }
 };
 
 //@hidden:
 __intrinsic_op($(kIROp_AlignedAttr))
-void __align_attr(int alignment);
+internal int __align_attr(int alignment);
 
 __intrinsic_op($(kIROp_Load))
-T __load_aligned<T, U>(T* ptr, U alignmentAttr);
+internal T __load_aligned<T>(T* ptr, int alignmentAttr);
 
 __intrinsic_op($(kIROp_Store))
-void __store_aligned<T, U>(T* ptr, T value, U alignmentAttr);
+internal void __store_aligned<T>(T* ptr, T value, int alignmentAttr);
 
 //@public:
 
@@ -1411,6 +1412,42 @@ T loadAligned<int alignment, T>(T* ptr)
 void storeAligned<int alignment, T>(T* ptr, T value)
 {
     __store_aligned(ptr, value, __align_attr(alignment));
+}
+
+//@hidden:
+__intrinsic_op($(kIROp_MemoryScopeAttr))
+internal int __memoryscope_attr(MemoryScope scope);
+
+__intrinsic_op($(kIROp_Load))
+internal T __load_coherent<T, Access access, AddressSpace addrSpace>(Ptr<T, access, addrSpace> ptr, int alignmentAttr, int memoryScopeAttr);
+
+__intrinsic_op($(kIROp_Store))
+internal void __store_coherent<T, AddressSpace addrSpace>(Ptr<T, Access::ReadWrite, addrSpace> ptr, T value, int alignmentAttr, int memoryScopeAttr);
+
+/// Store a value coherently to a memoryscope.
+/// Tighter memory scopes may be faster to operate on.
+/// @param ptr The pointer to store value to.
+/// @param value The value to store.
+///
+[require(SPV_KHR_vulkan_memory_model)]
+[ForceInline]
+__generic<int alignment, MemoryScope scope, T, AddressSpace addrSpace> 
+void storeCoherent(Ptr<T, Access::ReadWrite, addrSpace> ptr, T value)
+{
+    __store_coherent<T, addrSpace>(ptr, value, __align_attr(alignment), __memoryscope_attr(scope));
+}
+
+/// Load a value coherently to a memoryscope.
+/// Tighter memory scopes may be faster to operate on.
+/// @param ptr The pointer to load from.
+///
+[require(SPV_KHR_vulkan_memory_model)]
+[ForceInline]
+[__NoSideEffect]
+__generic<int alignment, MemoryScope scope, T, Access access, AddressSpace addrSpace> 
+T loadCoherent(Ptr<T, access, addrSpace> ptr)
+{
+    return __load_coherent<T, access, addrSpace>(ptr, __align_attr(alignment), __memoryscope_attr(scope));
 }
 
 ${{{
@@ -1526,8 +1563,12 @@ extension uintptr_t : IRangedValue
 
 //@hidden:
 
+// TODO(tfoley): This should really map over to `kIROp_PtrType`,
+// but is currently still mapping to the IR opcode used for `ref`
+// parameters.
+//
 __magic_type(ExplicitRefType)
-__intrinsic_type($(kIROp_RefType))
+__intrinsic_type($(kIROp_RefParamType))
 struct Ref<
     T, 
     Access access = Access::ReadWrite, 
@@ -1535,23 +1576,23 @@ struct Ref<
 {};
 
 __magic_type(OutParamType)
-__intrinsic_type($(kIROp_OutType))
+__intrinsic_type($(kIROp_OutParamType))
 struct OutParam<T>
 {};
 
-__magic_type(InOutParamType)
-__intrinsic_type($(kIROp_InOutType))
-struct InOutParam<T>
+__magic_type(BorrowInOutParamType)
+__intrinsic_type($(kIROp_BorrowInOutParamType))
+struct BorrowInOutParam<T>
 {};
 
 __magic_type(RefParamType)
-__intrinsic_type($(kIROp_RefType))
+__intrinsic_type($(kIROp_RefParamType))
 struct RefParam<T>
 {};
 
-__magic_type(ConstRefParamType)
-__intrinsic_type($(kIROp_ConstRefType))
-struct ConstRefParam<T>
+__magic_type(BorrowInParamType)
+__intrinsic_type($(kIROp_BorrowInParamType))
+struct BorrowInParam<T>
 {};
 
 // __Addr<T> is AddressSpace::Generic since Slang will specalize & validate the address-space

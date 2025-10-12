@@ -3654,32 +3654,29 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
             __intrinsic_asm ".Load";
 		case cuda:
             if (isArray != 0)
+            {
+                switch(Shape.flavor)
                 {
-     				static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_3D),
-                              "Integer coordinates are supported for texture reads only for 2D and 3D textures and 2D array textures.");
-
-                    if (Shape.flavor == $(SLANG_TEXTURE_2D))
-                    {
-						__intrinsic_asm "tex2DArrayfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z)";
-				    }
-                    else
-					{
-                        __intrinsic_asm "<invalid intrinsic>";
-                    }
+                case $(SLANG_TEXTURE_1D):
+                    __intrinsic_asm "tex1DArrayfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z)";
+                case $(SLANG_TEXTURE_2D):
+                    __intrinsic_asm "tex2DArrayfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z, ($1).w)";
                 }
-                else
+            }
+            else
+            {
+                switch(Shape.flavor)
                 {
-                    switch(Shape.flavor)
-                    {
-                    case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "tex2Dfetch_int<$T0>($0, ($1).x, ($1).y)";
-                    case $(SLANG_TEXTURE_3D):
-                        __intrinsic_asm "tex3Dfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z)";
-					case $(SLANG_TEXTURE_CUBE):
-                    default:
-                        __intrinsic_asm "<invalid intrinsic>";
-                    }
+                case $(SLANG_TEXTURE_1D):
+                    __intrinsic_asm "tex1Dfetch_int<$T0>($0, ($1).x, ($1).y)";
+                case $(SLANG_TEXTURE_2D):
+                    __intrinsic_asm "tex2Dfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z)";
+                case $(SLANG_TEXTURE_3D):
+                    __intrinsic_asm "tex3Dfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z, ($1).w)";
                 }
+            }
+            static_assert(false, "Unsupported 'Load' of 'texture' for 'cuda' target");
+            __intrinsic_asm "<invalid intrinsic>";
         case metal:
             switch (Shape.flavor)
             {
@@ -4756,17 +4753,35 @@ ${{{{
 }
 }}}}
 
-// Declare Sampler*Shadow type aliases.
+// Declare DepthTexture* and Sampler*Shadow type aliases.
 ${{{{
     for (int shape = 0; shape < 4; shape++)
-    for (int isArray = 0; isArray<=1; isArray++)
+    for (int isArray : { 0, 1 })
+    for (int isMS : { 0, 1 })
     {
+        if (isMS)
+        {
+            // Only DepthTexture2DMS and Sampler2DMSShadow.
+            if (shape != kCoreModule_ShapeIndex2D)
+                continue;
+        }
+
+        // No 3D Array.
+        if (shape == kCoreModule_ShapeIndex3D && isArray == 1)
+            continue;
 }}}}
-/// Represents a handle to a $(shapeTypeNames[shape]) combined texture-sampler for shadow comparison.
+/// Represents a handle to a$(isMS?" multisampled": "") $(shapeTypeNames[shape]) depth texture$(isArray?" array":"").
 /// @param format The storage format of the texture.
 /// @see Please refer to `_Texture` for more information about texture types.
 /// @category texture_types
-typealias Sampler$(shapeTypeNames[shape])$(arrayPostFix[isArray])Shadow<int format=0> = _Texture<float, __Shape$(shapeTypeNames[shape]), $(isArray), 0, 0, 0, 1, 1, format>;
+typealias DepthTexture$(shapeTypeNames[shape])$(msPostFix[isMS])$(arrayPostFix[isArray])<int format=0> = _Texture<float, __Shape$(shapeTypeNames[shape]), $(isArray), $(isMS), 0, 0, 1, 0, format>;
+
+/// Represents a handle to a$(isMS?" multisampled": "") $(shapeTypeNames[shape]) combined texture-sampler$(isArray?" array":"") for shadow comparison.
+/// @param format The storage format of the texture.
+/// @see Please refer to `_Texture` for more information about texture types.
+/// @category texture_types
+typealias Sampler$(shapeTypeNames[shape])$(msPostFix[isMS])$(arrayPostFix[isArray])Shadow<int format=0> = _Texture<float, __Shape$(shapeTypeNames[shape]), $(isArray), $(isMS), 0, 0, 1, 1, format>;
+
 ${{{{
     }
 }}}}
@@ -8869,6 +8884,12 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 T dot(vector<T, N> x, vector<T, N> y)
 {
+    // Handle 1-vector case explicitly since many backends don't support it natively
+    if (N == 1)
+    {
+        return x[0] * y[0];
+    }
+    
     __target_switch
     {
     case glsl: __intrinsic_asm "dot";
@@ -8891,6 +8912,12 @@ __generic<T : __BuiltinIntegerType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 T dot(vector<T, N> x, vector<T, N> y)
 {
+    // Handle 1-vector case explicitly since many backends don't support it natively
+    if (N == 1)
+    {
+        return x[0] * y[0];
+    }
+    
     __target_switch
     {
     case hlsl: __intrinsic_asm "dot";
@@ -12190,6 +12217,7 @@ vector<T, M> mul(vector<T, N> left, matrix<T, N, M> right)
 }
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [__readNone]
+[OverloadRank(-1)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 vector<T, M> mul(vector<T, N> left, matrix<T, N, M> right)
 {
@@ -12353,6 +12381,7 @@ matrix<T,R,C> mul(matrix<T,R,N> left, matrix<T,N,C> right)
 }
 __generic<T : __BuiltinLogicalType, let R : int, let N : int, let C : int>
 [__readNone]
+[OverloadRank(-1)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 matrix<T,R,C> mul(matrix<T,R,N> left, matrix<T,N,C> right)
 {
@@ -22770,10 +22799,13 @@ enum DescriptorKind
     Unknown, /// Unknown descriptor kind.
     Texture, /// A texture descriptor.
     CombinedTextureSampler, /// A combined texture and sampler state descriptor.
-    Buffer, /// A buffer descriptor.
+    ConstantBuffer, /// A constant buffer descriptor.
+    StorageBuffer, /// A storage buffer descriptor.
+    Buffer = StorageBuffer, /// Deprecated. Use `StorageBuffer` instead.
     Sampler, /// A sampler state descriptor.
     AccelerationStructure, /// A ray tracing acceleration structure descriptor.
-    TexelBuffer /// A texel buffer descriptor.
+    UniformTexelBuffer, /// A uniform texel buffer descriptor (read-only).
+    StorageTexelBuffer /// A storage texel buffer descriptor (read-write).
 }
 
 enum DescriptorAccess
@@ -22827,7 +22859,7 @@ extension _Texture<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCom
     typealias Handle = DescriptorHandle<This>;
 
     static const DescriptorKind kind = (Shape.flavor == __ShapeBuffer.flavor ?
-        DescriptorKind.TexelBuffer : (isCombined != 0 ? DescriptorKind.CombinedTextureSampler : DescriptorKind.Texture)
+        (access == $(kCoreModule_ResourceAccessReadOnly) ? DescriptorKind.UniformTexelBuffer : DescriptorKind.StorageTexelBuffer) : (isCombined != 0 ? DescriptorKind.CombinedTextureSampler : DescriptorKind.Texture)
 );
     static const DescriptorAccess descriptorAccess = (DescriptorAccess)access;
 
@@ -22849,19 +22881,19 @@ struct DynamicResourceTypeInfo
 };
 
 const DynamicResourceTypeInfo kDynamicResourceCastableTypes[] = {
-    { "StructuredBuffer<T, L>", "Buffer", "General", "Read" },
-    { "RWStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite" },
-    { "AppendStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite" },
-    { "ConsumeStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite" },
-    { "RasterizerOrderedStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite" },
-    { "ByteAddressBuffer", "Buffer", "General", "Read" },
-    { "RWByteAddressBuffer", "Buffer", "General", "ReadWrite" },
-    { "RasterizerOrderedByteAddressBuffer", "Buffer", "General", "ReadWrite" },
+    { "StructuredBuffer<T, L>", "StorageBuffer", "General", "Read" },
+    { "RWStructuredBuffer<T, L>", "StorageBuffer", "General", "ReadWrite" },
+    { "AppendStructuredBuffer<T, L>", "StorageBuffer", "General", "ReadWrite" },
+    { "ConsumeStructuredBuffer<T, L>", "StorageBuffer", "General", "ReadWrite" },
+    { "RasterizerOrderedStructuredBuffer<T, L>", "StorageBuffer", "General", "ReadWrite" },
+    { "ByteAddressBuffer", "StorageBuffer", "General", "Read" },
+    { "RWByteAddressBuffer", "StorageBuffer", "General", "ReadWrite" },
+    { "RasterizerOrderedByteAddressBuffer", "StorageBuffer", "General", "ReadWrite" },
     { "SamplerState", "Sampler", "Sampler", "Unknown" },
     { "SamplerComparisonState", "Sampler", "Sampler", "Unknown" },
-    { "ConstantBuffer<T, L>", "Buffer", "General", "Read"},
-    { "TextureBuffer<T>", "Buffer", "General", "Read"},
-    { "RaytracingAccelerationStructure", "AccelerationStructure", "General", "Read"},
+    { "ConstantBuffer<T, L>", "ConstantBuffer", "General", "Read" },
+    { "TextureBuffer<T>", "UniformTexelBuffer", "General", "Read" },
+    { "RaytracingAccelerationStructure", "AccelerationStructure", "General", "Read" },
 };
 
 for (auto type : kDynamicResourceCastableTypes) {
@@ -22996,12 +23028,13 @@ enum DefaultVkBindlessBindings : uint
 {
     Sampler = 0, /// SAMPLER
     CombinedTextureSampler = 1, /// COMBINED_IMAGE_SAMPLER
-    Texture_Read = 2, /// SAMPLED_IMAGE
-    Texture_ReadWrite = 3, /// STORAGE_IMAGE
-    TexelBuffer_Read = 4, /// UNIFORM_TEXEL_BUFFER
-    TexelBuffer_ReadWrite = 5, /// STORAGE_TEXEL_BUFFER
-    Buffer_Read = 6, /// UNIFORM_BUFFER
-    Buffer_ReadWrite = 7, /// STORAGE_BUFFER
+    SampledImage = 2, /// SAMPLED_IMAGE
+    StorageImage = 3, /// STORAGE_IMAGE
+    UniformTexelBuffer = 4, /// UNIFORM_TEXEL_BUFFER
+    StorageTexelBuffer = 5, /// STORAGE_TEXEL_BUFFER
+    ConstantBuffer_Read = 6, /// UNIFORM_BUFFER
+    StorageBuffer_Read = 7, /// STORAGE_BUFFER
+    StorageBuffer_ReadWrite = 7, /// STORAGE_BUFFER
     Unknown = 8, /// Other
 }
 
@@ -23010,12 +23043,13 @@ enum VkMutableBindlessBindings : uint
 {
     Sampler = 0, /// SAMPLER
     CombinedTextureSampler = 1, /// COMBINED_IMAGE_SAMPLER
-    Texture_Read = 2, /// SAMPLED_IMAGE
-    Texture_ReadWrite = 2, /// STORAGE_IMAGE
-    TexelBuffer_Read = 2, /// UNIFORM_TEXEL_BUFFER
-    TexelBuffer_ReadWrite = 2, /// STORAGE_TEXEL_BUFFER
-    Buffer_Read = 2, /// UNIFORM_BUFFER
-    Buffer_ReadWrite = 2, /// STORAGE_BUFFER,
+    SampledImage = 2, /// SAMPLED_IMAGE
+    StorageImage = 2, /// STORAGE_IMAGE
+    UniformTexelBuffer = 2, /// UNIFORM_TEXEL_BUFFER
+    StorageTexelBuffer = 2, /// STORAGE_TEXEL_BUFFER
+    ConstantBuffer_Read = 2, /// UNIFORM_BUFFER
+    StorageBuffer_Read = 2, /// STORAGE_BUFFER
+    StorageBuffer_ReadWrite = 2, /// STORAGE_BUFFER,
     Unknown = 3, /// Other
 }
 
@@ -23096,23 +23130,28 @@ ${{{{
     case DescriptorKind.Texture:
     {
         if(DescriptorAccess.Read == T.descriptorAccess)
-            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Texture_Read)[((uint2)handleValue).x];
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).SampledImage)[((uint2)handleValue).x];
         else
-            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Texture_ReadWrite)[((uint2)handleValue).x];
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).StorageImage)[((uint2)handleValue).x];
     }
-    case DescriptorKind.TexelBuffer:
+    case DescriptorKind.UniformTexelBuffer:
+    {
+        return __getDynamicResourceHeap<T>($(bindlessOption.enumType).UniformTexelBuffer)[((uint2)handleValue).x];
+    }
+    case DescriptorKind.StorageTexelBuffer:
+    {
+        return __getDynamicResourceHeap<T>($(bindlessOption.enumType).StorageTexelBuffer)[((uint2)handleValue).x];
+    }
+    case DescriptorKind.ConstantBuffer:
+    {
+        return __getDynamicResourceHeap<T>($(bindlessOption.enumType).ConstantBuffer_Read)[((uint2)handleValue).x];
+    }
+    case DescriptorKind.StorageBuffer:
     {
         if(DescriptorAccess.Read == T.descriptorAccess)
-            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).TexelBuffer_Read)[((uint2)handleValue).x];
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).StorageBuffer_Read)[((uint2)handleValue).x];
         else
-            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).TexelBuffer_ReadWrite)[((uint2)handleValue).x];
-    }
-    case DescriptorKind.Buffer:
-    {
-        if(DescriptorAccess.Read == T.descriptorAccess)
-            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Buffer_Read)[((uint2)handleValue).x];
-        else
-            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Buffer_ReadWrite)[((uint2)handleValue).x];
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).StorageBuffer_ReadWrite)[((uint2)handleValue).x];
     }
     case DescriptorKind.AccelerationStructure:
         return __slang_noop_cast<T>(RaytracingAccelerationStructure(__asuint64((uint2)handleValue)));
@@ -23198,6 +23237,18 @@ extension<T, L : IBufferDataLayout> RWStructuredBuffer<T, L> : IRWArray<T>
 extension<T, L : IBufferDataLayout> RasterizerOrderedStructuredBuffer<T, L> : IRWArray<T>
 {
     int getCount() { uint count; uint stride; this.GetDimensions(count, stride); return count; }
+}
+
+[require(vk_mem_model)]
+internal void enableVMMDeviceScopeCapabilityIfNeeded(constexpr MemoryScope memoryScope)
+{
+    if (memoryScope == MemoryScope::Device)
+    {
+        spirv_asm
+        {
+            OpCapability VulkanMemoryModelDeviceScopeKHR;
+        };
+    }
 }
 
 namespace linalg
@@ -23774,6 +23825,22 @@ struct CoopMat
         };
     }
 
+    // TODO: make this function an intrinsic and support all types via the single intrinsic
+    [require(cooperative_matrix, vk_mem_model)]
+    void StoreCoherent<
+        let matrixLayout : CoopMatMatrixLayout
+    >(T* buffer, uint element, uint stride, constexpr MemoryScope memoryScope)
+    {
+        enableVMMDeviceScopeCapabilityIfNeeded(memoryScope);
+        let alignment = 16U;
+        const int32_t scope = (int32_t)memoryScope;
+        return spirv_asm
+        {
+            %pointer:$$T* = OpPtrAccessChain $buffer $element;
+            OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned|MakePointerAvailable|NonPrivatePointer !alignment $scope;
+        };
+    }
+
     [ForceInline]
     [require(cooperative_matrix)]
     void Store<
@@ -23882,6 +23949,24 @@ ${{{{
         {
             %pointer:$$T* = OpPtrAccessChain $buffer $element;
             result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
+        };
+    }
+
+    // TODO: make this function an intrinsic and support all types via the single intrinsic
+    [ForceInline]
+    [__NoSideEffect]
+    [require(cooperative_matrix, vk_mem_model)]
+    static This LoadCoherent<
+        let matrixLayout : CoopMatMatrixLayout
+    >(T* buffer, uint element, uint stride, constexpr MemoryScope memoryScope)
+    {
+        enableVMMDeviceScopeCapabilityIfNeeded(memoryScope);
+        let alignment = 16U;
+        const int32_t scope = (int32_t)memoryScope;
+        return spirv_asm
+        {
+            %pointer:$$T* = OpPtrAccessChain $buffer $element;
+            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned|MakePointerVisible|NonPrivatePointer !alignment $scope;
         };
     }
 
@@ -24441,6 +24526,24 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 }
 
 [ForceInline]
+[require(cooperative_matrix, vk_mem_model)]
+CoopMat<T, S, M, N, R> coopMatLoadCoherent<
+    T : __BuiltinArithmeticType,
+    let S : MemoryScope,
+    let M : int,
+    let N : int,
+    let R : CoopMatMatrixUse,
+    let matrixLayout : CoopMatMatrixLayout
+>(
+    T* buffer,
+    uint element,
+    uint stride,
+    constexpr MemoryScope memoryScope)
+{
+    return CoopMat<T, S, M, N, R>.LoadCoherent<matrixLayout>(buffer, element, stride, memoryScope);
+}
+
+[ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
     T : __BuiltinArithmeticType,
@@ -24806,6 +24909,20 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         };
     }
 
+    // TODO: make this function an intrinsic and support all types via the single intrinsic
+    [require(cooperative_vector, vk_mem_model)]
+    void storeCoherent(T* buffer, int32_t byteOffset16ByteAligned = 0, constexpr MemoryScope memoryScope = MemoryScope::Device)
+    {
+        enableVMMDeviceScopeCapabilityIfNeeded(memoryScope);
+        let pointer = Ptr<T[]>(buffer);
+        let alignment = 16U;
+        const int32_t scope = (int32_t)memoryScope;
+        spirv_asm
+        {
+            OpCooperativeVectorStoreNV $pointer $byteOffset16ByteAligned $this Aligned|MakePointerAvailable|NonPrivatePointer !alignment $scope;
+        };
+    }
+
     [ForceInline]
     [require(cooperative_vector)]
     [require(hlsl_coopvec_poc)]
@@ -24975,6 +25092,20 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         return spirv_asm
         {
             result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV $pointer $byteOffset16ByteAligned Aligned !alignment;
+        };
+    }
+
+    // TODO: make this function an intrinsic and support all types via the single intrinsic
+    [require(cooperative_vector, vk_mem_model)]
+    static CoopVec<T, N> loadCoherent(T* buffer, int32_t byteOffset16ByteAligned = 0, constexpr MemoryScope memoryScope = MemoryScope::Device)
+    {
+        enableVMMDeviceScopeCapabilityIfNeeded(memoryScope);
+        let pointer = Ptr<T[]>(buffer);
+        let alignment = 16U;
+        const int32_t scope = (int32_t)memoryScope;
+        return spirv_asm
+        {
+            result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV $pointer $byteOffset16ByteAligned Aligned|MakePointerVisible|NonPrivatePointer !alignment $scope;
         };
     }
 
@@ -26416,6 +26547,13 @@ CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(RWStructured
 CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(T* buffer, int32_t byteOffset16ByteAligned = 0)
 {
     return CoopVec<T, N>.load(buffer, byteOffset16ByteAligned);
+}
+
+[ForceInline]
+[require(spirv, cooperative_vector, vk_mem_model)]
+CoopVec<T, N> coopVecLoadCoherent<let N : int, T : __BuiltinArithmeticType>(T* buffer, int32_t byteOffset16ByteAligned = 0, constexpr MemoryScope memoryScope = MemoryScope::Device)
+{
+    return CoopVec<T, N>.loadCoherent(buffer, byteOffset16ByteAligned, memoryScope);
 }
 
 // Groupshared

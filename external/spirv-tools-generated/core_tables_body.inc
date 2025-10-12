@@ -4696,514 +4696,518 @@ static const std::array<NameIndex, 833> kInstructionNames{{
 //   operands, an IndexRange into kOperandSpans
 //   name, a character-counting IndexRange into kStrings
 //   capabilities, an IndexRange into kCapabilitySpans
-static const std::array<ExtInstDesc, 491> kExtInstByValue{{
-    {0,IR(0, 0),IR(45584, 14),IR(1, 0)}, // DebugInfoNone in debuginfo
-    {1,IR(52, 3),IR(45598, 21),IR(1, 0)}, // DebugCompilationUnit in debuginfo
-    {2,IR(770, 3),IR(45671, 15),IR(1, 0)}, // DebugTypeBasic in debuginfo
-    {3,IR(773, 3),IR(45720, 17),IR(1, 0)}, // DebugTypePointer in debuginfo
-    {4,IR(776, 2),IR(45775, 19),IR(1, 0)}, // DebugTypeQualifier in debuginfo
-    {5,IR(168, 2),IR(45794, 15),IR(1, 0)}, // DebugTypeArray in debuginfo
-    {6,IR(261, 2),IR(45809, 16),IR(1, 0)}, // DebugTypeVector in debuginfo
-    {7,IR(778, 6),IR(45825, 13),IR(1, 0)}, // DebugTypedef in debuginfo
-    {8,IR(168, 2),IR(45838, 18),IR(1, 0)}, // DebugTypeFunction in debuginfo
-    {9,IR(784, 9),IR(45856, 14),IR(1, 0)}, // DebugTypeEnum in debuginfo
-    {10,IR(793, 9),IR(45908, 19),IR(1, 0)}, // DebugTypeComposite in debuginfo
-    {11,IR(802, 10),IR(45927, 16),IR(1, 0)}, // DebugTypeMember in debuginfo
-    {12,IR(812, 5),IR(45943, 21),IR(1, 0)}, // DebugTypeInheritance in debuginfo
-    {13,IR(36, 2),IR(45964, 21),IR(1, 0)}, // DebugTypePtrToMember in debuginfo
-    {14,IR(168, 2),IR(45985, 18),IR(1, 0)}, // DebugTypeTemplate in debuginfo
-    {15,IR(817, 6),IR(46003, 27),IR(1, 0)}, // DebugTypeTemplateParameter in debuginfo
-    {16,IR(823, 5),IR(46030, 35),IR(1, 0)}, // DebugTypeTemplateTemplateParameter in debuginfo
-    {17,IR(828, 5),IR(46065, 31),IR(1, 0)}, // DebugTypeTemplateParameterPack in debuginfo
-    {18,IR(802, 10),IR(46096, 20),IR(1, 0)}, // DebugGlobalVariable in debuginfo
-    {19,IR(833, 8),IR(46116, 25),IR(1, 0)}, // DebugFunctionDeclaration in debuginfo
-    {20,IR(841, 11),IR(46141, 14),IR(1, 0)}, // DebugFunction in debuginfo
-    {21,IR(852, 5),IR(46155, 18),IR(1, 0)}, // DebugLexicalBlock in debuginfo
-    {22,IR(857, 3),IR(46173, 31),IR(1, 0)}, // DebugLexicalBlockDiscriminator in debuginfo
-    {23,IR(860, 2),IR(46204, 11),IR(1, 0)}, // DebugScope in debuginfo
-    {24,IR(0, 0),IR(46215, 13),IR(1, 0)}, // DebugNoScope in debuginfo
-    {25,IR(862, 3),IR(46228, 15),IR(1, 0)}, // DebugInlinedAt in debuginfo
-    {26,IR(865, 7),IR(46285, 19),IR(1, 0)}, // DebugLocalVariable in debuginfo
-    {27,IR(36, 2),IR(46304, 21),IR(1, 0)}, // DebugInlinedVariable in debuginfo
-    {28,IR(33, 3),IR(46325, 13),IR(1, 0)}, // DebugDeclare in debuginfo
-    {29,IR(375, 3),IR(46338, 11),IR(1, 0)}, // DebugValue in debuginfo
-    {30,IR(872, 2),IR(46382, 15),IR(1, 0)}, // DebugOperation in debuginfo
-    {31,IR(706, 1),IR(46397, 16),IR(1, 0)}, // DebugExpression in debuginfo
-    {32,IR(874, 4),IR(46413, 14),IR(1, 0)}, // DebugMacroDef in debuginfo
-    {33,IR(857, 3),IR(46427, 16),IR(1, 0)}, // DebugMacroUndef in debuginfo
-    {1,IR(10, 1),IR(46443, 6),IR(1, 0)}, // Round in glsl_std_450
-    {2,IR(10, 1),IR(46449, 10),IR(1, 0)}, // RoundEven in glsl_std_450
-    {3,IR(10, 1),IR(46459, 6),IR(1, 0)}, // Trunc in glsl_std_450
-    {4,IR(10, 1),IR(46465, 5),IR(1, 0)}, // FAbs in glsl_std_450
-    {5,IR(10, 1),IR(46470, 5),IR(1, 0)}, // SAbs in glsl_std_450
-    {6,IR(10, 1),IR(46475, 6),IR(1, 0)}, // FSign in glsl_std_450
-    {7,IR(10, 1),IR(46481, 6),IR(1, 0)}, // SSign in glsl_std_450
-    {8,IR(10, 1),IR(46487, 6),IR(1, 0)}, // Floor in glsl_std_450
-    {9,IR(10, 1),IR(46493, 5),IR(1, 0)}, // Ceil in glsl_std_450
-    {10,IR(10, 1),IR(46498, 6),IR(1, 0)}, // Fract in glsl_std_450
-    {11,IR(10, 1),IR(46504, 8),IR(1, 0)}, // Radians in glsl_std_450
-    {12,IR(10, 1),IR(46512, 8),IR(1, 0)}, // Degrees in glsl_std_450
-    {13,IR(10, 1),IR(46520, 4),IR(1, 0)}, // Sin in glsl_std_450
-    {14,IR(10, 1),IR(46524, 4),IR(1, 0)}, // Cos in glsl_std_450
-    {15,IR(10, 1),IR(46528, 4),IR(1, 0)}, // Tan in glsl_std_450
-    {16,IR(10, 1),IR(46532, 5),IR(1, 0)}, // Asin in glsl_std_450
-    {17,IR(10, 1),IR(46537, 5),IR(1, 0)}, // Acos in glsl_std_450
-    {18,IR(10, 1),IR(46542, 5),IR(1, 0)}, // Atan in glsl_std_450
-    {19,IR(10, 1),IR(46547, 5),IR(1, 0)}, // Sinh in glsl_std_450
-    {20,IR(10, 1),IR(46552, 5),IR(1, 0)}, // Cosh in glsl_std_450
-    {21,IR(10, 1),IR(46557, 5),IR(1, 0)}, // Tanh in glsl_std_450
-    {22,IR(10, 1),IR(46562, 6),IR(1, 0)}, // Asinh in glsl_std_450
-    {23,IR(10, 1),IR(46568, 6),IR(1, 0)}, // Acosh in glsl_std_450
-    {24,IR(10, 1),IR(46574, 6),IR(1, 0)}, // Atanh in glsl_std_450
-    {25,IR(36, 2),IR(46580, 6),IR(1, 0)}, // Atan2 in glsl_std_450
-    {26,IR(36, 2),IR(46586, 4),IR(1, 0)}, // Pow in glsl_std_450
-    {27,IR(10, 1),IR(46590, 4),IR(1, 0)}, // Exp in glsl_std_450
-    {28,IR(10, 1),IR(46594, 4),IR(1, 0)}, // Log in glsl_std_450
-    {29,IR(10, 1),IR(46598, 5),IR(1, 0)}, // Exp2 in glsl_std_450
-    {30,IR(10, 1),IR(46603, 5),IR(1, 0)}, // Log2 in glsl_std_450
-    {31,IR(10, 1),IR(46608, 5),IR(1, 0)}, // Sqrt in glsl_std_450
-    {32,IR(10, 1),IR(46613, 12),IR(1, 0)}, // InverseSqrt in glsl_std_450
-    {33,IR(10, 1),IR(46625, 12),IR(1, 0)}, // Determinant in glsl_std_450
-    {34,IR(10, 1),IR(46637, 14),IR(1, 0)}, // MatrixInverse in glsl_std_450
-    {35,IR(36, 2),IR(46651, 5),IR(1, 0)}, // Modf in glsl_std_450
-    {36,IR(10, 1),IR(46656, 11),IR(1, 0)}, // ModfStruct in glsl_std_450
-    {37,IR(36, 2),IR(46667, 5),IR(1, 0)}, // FMin in glsl_std_450
-    {38,IR(36, 2),IR(46672, 5),IR(1, 0)}, // UMin in glsl_std_450
-    {39,IR(36, 2),IR(46677, 5),IR(1, 0)}, // SMin in glsl_std_450
-    {40,IR(36, 2),IR(46682, 5),IR(1, 0)}, // FMax in glsl_std_450
-    {41,IR(36, 2),IR(46687, 5),IR(1, 0)}, // UMax in glsl_std_450
-    {42,IR(36, 2),IR(46692, 5),IR(1, 0)}, // SMax in glsl_std_450
-    {43,IR(33, 3),IR(46697, 7),IR(1, 0)}, // FClamp in glsl_std_450
-    {44,IR(33, 3),IR(46704, 7),IR(1, 0)}, // UClamp in glsl_std_450
-    {45,IR(33, 3),IR(46711, 7),IR(1, 0)}, // SClamp in glsl_std_450
-    {46,IR(33, 3),IR(46718, 5),IR(1, 0)}, // FMix in glsl_std_450
-    {47,IR(33, 3),IR(46723, 5),IR(1, 0)}, // IMix in glsl_std_450
-    {48,IR(36, 2),IR(46728, 5),IR(1, 0)}, // Step in glsl_std_450
-    {49,IR(33, 3),IR(46733, 11),IR(1, 0)}, // SmoothStep in glsl_std_450
-    {50,IR(33, 3),IR(46744, 4),IR(1, 0)}, // Fma in glsl_std_450
-    {51,IR(36, 2),IR(46748, 6),IR(1, 0)}, // Frexp in glsl_std_450
-    {52,IR(10, 1),IR(46754, 12),IR(1, 0)}, // FrexpStruct in glsl_std_450
-    {53,IR(36, 2),IR(46766, 6),IR(1, 0)}, // Ldexp in glsl_std_450
-    {54,IR(10, 1),IR(46772, 13),IR(1, 0)}, // PackSnorm4x8 in glsl_std_450
-    {55,IR(10, 1),IR(46785, 13),IR(1, 0)}, // PackUnorm4x8 in glsl_std_450
-    {56,IR(10, 1),IR(46798, 14),IR(1, 0)}, // PackSnorm2x16 in glsl_std_450
-    {57,IR(10, 1),IR(46812, 14),IR(1, 0)}, // PackUnorm2x16 in glsl_std_450
-    {58,IR(10, 1),IR(46826, 13),IR(1, 0)}, // PackHalf2x16 in glsl_std_450
-    {59,IR(10, 1),IR(46839, 15),IR(309, 1)}, // PackDouble2x32 in glsl_std_450
-    {60,IR(10, 1),IR(46854, 16),IR(1, 0)}, // UnpackSnorm2x16 in glsl_std_450
-    {61,IR(10, 1),IR(46870, 16),IR(1, 0)}, // UnpackUnorm2x16 in glsl_std_450
-    {62,IR(10, 1),IR(46886, 15),IR(1, 0)}, // UnpackHalf2x16 in glsl_std_450
-    {63,IR(10, 1),IR(46901, 15),IR(1, 0)}, // UnpackSnorm4x8 in glsl_std_450
-    {64,IR(10, 1),IR(46916, 15),IR(1, 0)}, // UnpackUnorm4x8 in glsl_std_450
-    {65,IR(10, 1),IR(46931, 17),IR(309, 1)}, // UnpackDouble2x32 in glsl_std_450
-    {66,IR(10, 1),IR(46948, 7),IR(1, 0)}, // Length in glsl_std_450
-    {67,IR(36, 2),IR(46955, 9),IR(1, 0)}, // Distance in glsl_std_450
-    {68,IR(36, 2),IR(46964, 6),IR(1, 0)}, // Cross in glsl_std_450
-    {69,IR(10, 1),IR(46970, 10),IR(1, 0)}, // Normalize in glsl_std_450
-    {70,IR(33, 3),IR(46980, 12),IR(1, 0)}, // FaceForward in glsl_std_450
-    {71,IR(36, 2),IR(46992, 8),IR(1, 0)}, // Reflect in glsl_std_450
-    {72,IR(33, 3),IR(47000, 8),IR(1, 0)}, // Refract in glsl_std_450
-    {73,IR(10, 1),IR(47008, 9),IR(1, 0)}, // FindILsb in glsl_std_450
-    {74,IR(10, 1),IR(47017, 9),IR(1, 0)}, // FindSMsb in glsl_std_450
-    {75,IR(10, 1),IR(47026, 9),IR(1, 0)}, // FindUMsb in glsl_std_450
-    {76,IR(10, 1),IR(47035, 22),IR(310, 1)}, // InterpolateAtCentroid in glsl_std_450
-    {77,IR(36, 2),IR(47057, 20),IR(310, 1)}, // InterpolateAtSample in glsl_std_450
-    {78,IR(36, 2),IR(47077, 20),IR(310, 1)}, // InterpolateAtOffset in glsl_std_450
-    {79,IR(36, 2),IR(47097, 5),IR(1, 0)}, // NMin in glsl_std_450
-    {80,IR(36, 2),IR(47102, 5),IR(1, 0)}, // NMax in glsl_std_450
-    {81,IR(33, 3),IR(47107, 7),IR(1, 0)}, // NClamp in glsl_std_450
+static const std::array<ExtInstDesc, 494> kExtInstByValue{{
+    {0,IR(724, 9),IR(45584, 8),IR(1, 0)}, // MIN_SAD in arm_motion_engine_100
+    {1,IR(724, 9),IR(45592, 13),IR(1, 0)}, // MIN_SAD_COST in arm_motion_engine_100
+    {2,IR(471, 8),IR(45605, 8),IR(1, 0)}, // RAW_SAD in arm_motion_engine_100
+    {0,IR(0, 0),IR(45613, 14),IR(1, 0)}, // DebugInfoNone in debuginfo
+    {1,IR(52, 3),IR(45627, 21),IR(1, 0)}, // DebugCompilationUnit in debuginfo
+    {2,IR(770, 3),IR(45700, 15),IR(1, 0)}, // DebugTypeBasic in debuginfo
+    {3,IR(773, 3),IR(45749, 17),IR(1, 0)}, // DebugTypePointer in debuginfo
+    {4,IR(776, 2),IR(45804, 19),IR(1, 0)}, // DebugTypeQualifier in debuginfo
+    {5,IR(168, 2),IR(45823, 15),IR(1, 0)}, // DebugTypeArray in debuginfo
+    {6,IR(261, 2),IR(45838, 16),IR(1, 0)}, // DebugTypeVector in debuginfo
+    {7,IR(778, 6),IR(45854, 13),IR(1, 0)}, // DebugTypedef in debuginfo
+    {8,IR(168, 2),IR(45867, 18),IR(1, 0)}, // DebugTypeFunction in debuginfo
+    {9,IR(784, 9),IR(45885, 14),IR(1, 0)}, // DebugTypeEnum in debuginfo
+    {10,IR(793, 9),IR(45937, 19),IR(1, 0)}, // DebugTypeComposite in debuginfo
+    {11,IR(802, 10),IR(45956, 16),IR(1, 0)}, // DebugTypeMember in debuginfo
+    {12,IR(812, 5),IR(45972, 21),IR(1, 0)}, // DebugTypeInheritance in debuginfo
+    {13,IR(36, 2),IR(45993, 21),IR(1, 0)}, // DebugTypePtrToMember in debuginfo
+    {14,IR(168, 2),IR(46014, 18),IR(1, 0)}, // DebugTypeTemplate in debuginfo
+    {15,IR(817, 6),IR(46032, 27),IR(1, 0)}, // DebugTypeTemplateParameter in debuginfo
+    {16,IR(823, 5),IR(46059, 35),IR(1, 0)}, // DebugTypeTemplateTemplateParameter in debuginfo
+    {17,IR(828, 5),IR(46094, 31),IR(1, 0)}, // DebugTypeTemplateParameterPack in debuginfo
+    {18,IR(802, 10),IR(46125, 20),IR(1, 0)}, // DebugGlobalVariable in debuginfo
+    {19,IR(833, 8),IR(46145, 25),IR(1, 0)}, // DebugFunctionDeclaration in debuginfo
+    {20,IR(841, 11),IR(46170, 14),IR(1, 0)}, // DebugFunction in debuginfo
+    {21,IR(852, 5),IR(46184, 18),IR(1, 0)}, // DebugLexicalBlock in debuginfo
+    {22,IR(857, 3),IR(46202, 31),IR(1, 0)}, // DebugLexicalBlockDiscriminator in debuginfo
+    {23,IR(860, 2),IR(46233, 11),IR(1, 0)}, // DebugScope in debuginfo
+    {24,IR(0, 0),IR(46244, 13),IR(1, 0)}, // DebugNoScope in debuginfo
+    {25,IR(862, 3),IR(46257, 15),IR(1, 0)}, // DebugInlinedAt in debuginfo
+    {26,IR(865, 7),IR(46314, 19),IR(1, 0)}, // DebugLocalVariable in debuginfo
+    {27,IR(36, 2),IR(46333, 21),IR(1, 0)}, // DebugInlinedVariable in debuginfo
+    {28,IR(33, 3),IR(46354, 13),IR(1, 0)}, // DebugDeclare in debuginfo
+    {29,IR(375, 3),IR(46367, 11),IR(1, 0)}, // DebugValue in debuginfo
+    {30,IR(872, 2),IR(46411, 15),IR(1, 0)}, // DebugOperation in debuginfo
+    {31,IR(706, 1),IR(46426, 16),IR(1, 0)}, // DebugExpression in debuginfo
+    {32,IR(874, 4),IR(46442, 14),IR(1, 0)}, // DebugMacroDef in debuginfo
+    {33,IR(857, 3),IR(46456, 16),IR(1, 0)}, // DebugMacroUndef in debuginfo
+    {1,IR(10, 1),IR(46472, 6),IR(1, 0)}, // Round in glsl_std_450
+    {2,IR(10, 1),IR(46478, 10),IR(1, 0)}, // RoundEven in glsl_std_450
+    {3,IR(10, 1),IR(46488, 6),IR(1, 0)}, // Trunc in glsl_std_450
+    {4,IR(10, 1),IR(46494, 5),IR(1, 0)}, // FAbs in glsl_std_450
+    {5,IR(10, 1),IR(46499, 5),IR(1, 0)}, // SAbs in glsl_std_450
+    {6,IR(10, 1),IR(46504, 6),IR(1, 0)}, // FSign in glsl_std_450
+    {7,IR(10, 1),IR(46510, 6),IR(1, 0)}, // SSign in glsl_std_450
+    {8,IR(10, 1),IR(46516, 6),IR(1, 0)}, // Floor in glsl_std_450
+    {9,IR(10, 1),IR(46522, 5),IR(1, 0)}, // Ceil in glsl_std_450
+    {10,IR(10, 1),IR(46527, 6),IR(1, 0)}, // Fract in glsl_std_450
+    {11,IR(10, 1),IR(46533, 8),IR(1, 0)}, // Radians in glsl_std_450
+    {12,IR(10, 1),IR(46541, 8),IR(1, 0)}, // Degrees in glsl_std_450
+    {13,IR(10, 1),IR(46549, 4),IR(1, 0)}, // Sin in glsl_std_450
+    {14,IR(10, 1),IR(46553, 4),IR(1, 0)}, // Cos in glsl_std_450
+    {15,IR(10, 1),IR(46557, 4),IR(1, 0)}, // Tan in glsl_std_450
+    {16,IR(10, 1),IR(46561, 5),IR(1, 0)}, // Asin in glsl_std_450
+    {17,IR(10, 1),IR(46566, 5),IR(1, 0)}, // Acos in glsl_std_450
+    {18,IR(10, 1),IR(46571, 5),IR(1, 0)}, // Atan in glsl_std_450
+    {19,IR(10, 1),IR(46576, 5),IR(1, 0)}, // Sinh in glsl_std_450
+    {20,IR(10, 1),IR(46581, 5),IR(1, 0)}, // Cosh in glsl_std_450
+    {21,IR(10, 1),IR(46586, 5),IR(1, 0)}, // Tanh in glsl_std_450
+    {22,IR(10, 1),IR(46591, 6),IR(1, 0)}, // Asinh in glsl_std_450
+    {23,IR(10, 1),IR(46597, 6),IR(1, 0)}, // Acosh in glsl_std_450
+    {24,IR(10, 1),IR(46603, 6),IR(1, 0)}, // Atanh in glsl_std_450
+    {25,IR(36, 2),IR(46609, 6),IR(1, 0)}, // Atan2 in glsl_std_450
+    {26,IR(36, 2),IR(46615, 4),IR(1, 0)}, // Pow in glsl_std_450
+    {27,IR(10, 1),IR(46619, 4),IR(1, 0)}, // Exp in glsl_std_450
+    {28,IR(10, 1),IR(46623, 4),IR(1, 0)}, // Log in glsl_std_450
+    {29,IR(10, 1),IR(46627, 5),IR(1, 0)}, // Exp2 in glsl_std_450
+    {30,IR(10, 1),IR(46632, 5),IR(1, 0)}, // Log2 in glsl_std_450
+    {31,IR(10, 1),IR(46637, 5),IR(1, 0)}, // Sqrt in glsl_std_450
+    {32,IR(10, 1),IR(46642, 12),IR(1, 0)}, // InverseSqrt in glsl_std_450
+    {33,IR(10, 1),IR(46654, 12),IR(1, 0)}, // Determinant in glsl_std_450
+    {34,IR(10, 1),IR(46666, 14),IR(1, 0)}, // MatrixInverse in glsl_std_450
+    {35,IR(36, 2),IR(46680, 5),IR(1, 0)}, // Modf in glsl_std_450
+    {36,IR(10, 1),IR(46685, 11),IR(1, 0)}, // ModfStruct in glsl_std_450
+    {37,IR(36, 2),IR(46696, 5),IR(1, 0)}, // FMin in glsl_std_450
+    {38,IR(36, 2),IR(46701, 5),IR(1, 0)}, // UMin in glsl_std_450
+    {39,IR(36, 2),IR(46706, 5),IR(1, 0)}, // SMin in glsl_std_450
+    {40,IR(36, 2),IR(46711, 5),IR(1, 0)}, // FMax in glsl_std_450
+    {41,IR(36, 2),IR(46716, 5),IR(1, 0)}, // UMax in glsl_std_450
+    {42,IR(36, 2),IR(46721, 5),IR(1, 0)}, // SMax in glsl_std_450
+    {43,IR(33, 3),IR(46726, 7),IR(1, 0)}, // FClamp in glsl_std_450
+    {44,IR(33, 3),IR(46733, 7),IR(1, 0)}, // UClamp in glsl_std_450
+    {45,IR(33, 3),IR(46740, 7),IR(1, 0)}, // SClamp in glsl_std_450
+    {46,IR(33, 3),IR(46747, 5),IR(1, 0)}, // FMix in glsl_std_450
+    {47,IR(33, 3),IR(46752, 5),IR(1, 0)}, // IMix in glsl_std_450
+    {48,IR(36, 2),IR(46757, 5),IR(1, 0)}, // Step in glsl_std_450
+    {49,IR(33, 3),IR(46762, 11),IR(1, 0)}, // SmoothStep in glsl_std_450
+    {50,IR(33, 3),IR(46773, 4),IR(1, 0)}, // Fma in glsl_std_450
+    {51,IR(36, 2),IR(46777, 6),IR(1, 0)}, // Frexp in glsl_std_450
+    {52,IR(10, 1),IR(46783, 12),IR(1, 0)}, // FrexpStruct in glsl_std_450
+    {53,IR(36, 2),IR(46795, 6),IR(1, 0)}, // Ldexp in glsl_std_450
+    {54,IR(10, 1),IR(46801, 13),IR(1, 0)}, // PackSnorm4x8 in glsl_std_450
+    {55,IR(10, 1),IR(46814, 13),IR(1, 0)}, // PackUnorm4x8 in glsl_std_450
+    {56,IR(10, 1),IR(46827, 14),IR(1, 0)}, // PackSnorm2x16 in glsl_std_450
+    {57,IR(10, 1),IR(46841, 14),IR(1, 0)}, // PackUnorm2x16 in glsl_std_450
+    {58,IR(10, 1),IR(46855, 13),IR(1, 0)}, // PackHalf2x16 in glsl_std_450
+    {59,IR(10, 1),IR(46868, 15),IR(309, 1)}, // PackDouble2x32 in glsl_std_450
+    {60,IR(10, 1),IR(46883, 16),IR(1, 0)}, // UnpackSnorm2x16 in glsl_std_450
+    {61,IR(10, 1),IR(46899, 16),IR(1, 0)}, // UnpackUnorm2x16 in glsl_std_450
+    {62,IR(10, 1),IR(46915, 15),IR(1, 0)}, // UnpackHalf2x16 in glsl_std_450
+    {63,IR(10, 1),IR(46930, 15),IR(1, 0)}, // UnpackSnorm4x8 in glsl_std_450
+    {64,IR(10, 1),IR(46945, 15),IR(1, 0)}, // UnpackUnorm4x8 in glsl_std_450
+    {65,IR(10, 1),IR(46960, 17),IR(309, 1)}, // UnpackDouble2x32 in glsl_std_450
+    {66,IR(10, 1),IR(46977, 7),IR(1, 0)}, // Length in glsl_std_450
+    {67,IR(36, 2),IR(46984, 9),IR(1, 0)}, // Distance in glsl_std_450
+    {68,IR(36, 2),IR(46993, 6),IR(1, 0)}, // Cross in glsl_std_450
+    {69,IR(10, 1),IR(46999, 10),IR(1, 0)}, // Normalize in glsl_std_450
+    {70,IR(33, 3),IR(47009, 12),IR(1, 0)}, // FaceForward in glsl_std_450
+    {71,IR(36, 2),IR(47021, 8),IR(1, 0)}, // Reflect in glsl_std_450
+    {72,IR(33, 3),IR(47029, 8),IR(1, 0)}, // Refract in glsl_std_450
+    {73,IR(10, 1),IR(47037, 9),IR(1, 0)}, // FindILsb in glsl_std_450
+    {74,IR(10, 1),IR(47046, 9),IR(1, 0)}, // FindSMsb in glsl_std_450
+    {75,IR(10, 1),IR(47055, 9),IR(1, 0)}, // FindUMsb in glsl_std_450
+    {76,IR(10, 1),IR(47064, 22),IR(310, 1)}, // InterpolateAtCentroid in glsl_std_450
+    {77,IR(36, 2),IR(47086, 20),IR(310, 1)}, // InterpolateAtSample in glsl_std_450
+    {78,IR(36, 2),IR(47106, 20),IR(310, 1)}, // InterpolateAtOffset in glsl_std_450
+    {79,IR(36, 2),IR(47126, 5),IR(1, 0)}, // NMin in glsl_std_450
+    {80,IR(36, 2),IR(47131, 5),IR(1, 0)}, // NMax in glsl_std_450
+    {81,IR(33, 3),IR(47136, 7),IR(1, 0)}, // NClamp in glsl_std_450
     {1,IR(399, 5),IR(4630, 7),IR(1, 0)}, // Kernel in nonsemantic_clspvreflection
-    {2,IR(878, 5),IR(47114, 13),IR(1, 0)}, // ArgumentInfo in nonsemantic_clspvreflection
-    {3,IR(883, 5),IR(47127, 22),IR(1, 0)}, // ArgumentStorageBuffer in nonsemantic_clspvreflection
-    {4,IR(883, 5),IR(47149, 16),IR(1, 0)}, // ArgumentUniform in nonsemantic_clspvreflection
-    {5,IR(554, 7),IR(47165, 25),IR(1, 0)}, // ArgumentPodStorageBuffer in nonsemantic_clspvreflection
-    {6,IR(554, 7),IR(47190, 19),IR(1, 0)}, // ArgumentPodUniform in nonsemantic_clspvreflection
-    {7,IR(883, 5),IR(47209, 24),IR(1, 0)}, // ArgumentPodPushConstant in nonsemantic_clspvreflection
-    {8,IR(883, 5),IR(47233, 21),IR(1, 0)}, // ArgumentSampledImage in nonsemantic_clspvreflection
-    {9,IR(883, 5),IR(47254, 21),IR(1, 0)}, // ArgumentStorageImage in nonsemantic_clspvreflection
-    {10,IR(883, 5),IR(47275, 16),IR(1, 0)}, // ArgumentSampler in nonsemantic_clspvreflection
-    {11,IR(883, 5),IR(47291, 18),IR(1, 0)}, // ArgumentWorkgroup in nonsemantic_clspvreflection
-    {12,IR(33, 3),IR(47309, 26),IR(1, 0)}, // SpecConstantWorkgroupSize in nonsemantic_clspvreflection
-    {13,IR(33, 3),IR(47335, 25),IR(1, 0)}, // SpecConstantGlobalOffset in nonsemantic_clspvreflection
-    {14,IR(10, 1),IR(47360, 20),IR(1, 0)}, // SpecConstantWorkDim in nonsemantic_clspvreflection
-    {15,IR(36, 2),IR(47380, 25),IR(1, 0)}, // PushConstantGlobalOffset in nonsemantic_clspvreflection
-    {16,IR(36, 2),IR(47405, 30),IR(1, 0)}, // PushConstantEnqueuedLocalSize in nonsemantic_clspvreflection
-    {17,IR(36, 2),IR(47435, 23),IR(1, 0)}, // PushConstantGlobalSize in nonsemantic_clspvreflection
-    {18,IR(36, 2),IR(47458, 25),IR(1, 0)}, // PushConstantRegionOffset in nonsemantic_clspvreflection
-    {19,IR(36, 2),IR(47483, 26),IR(1, 0)}, // PushConstantNumWorkgroups in nonsemantic_clspvreflection
-    {20,IR(36, 2),IR(47509, 30),IR(1, 0)}, // PushConstantRegionGroupOffset in nonsemantic_clspvreflection
-    {21,IR(33, 3),IR(47539, 26),IR(1, 0)}, // ConstantDataStorageBuffer in nonsemantic_clspvreflection
-    {22,IR(33, 3),IR(47565, 20),IR(1, 0)}, // ConstantDataUniform in nonsemantic_clspvreflection
+    {2,IR(878, 5),IR(47143, 13),IR(1, 0)}, // ArgumentInfo in nonsemantic_clspvreflection
+    {3,IR(883, 5),IR(47156, 22),IR(1, 0)}, // ArgumentStorageBuffer in nonsemantic_clspvreflection
+    {4,IR(883, 5),IR(47178, 16),IR(1, 0)}, // ArgumentUniform in nonsemantic_clspvreflection
+    {5,IR(554, 7),IR(47194, 25),IR(1, 0)}, // ArgumentPodStorageBuffer in nonsemantic_clspvreflection
+    {6,IR(554, 7),IR(47219, 19),IR(1, 0)}, // ArgumentPodUniform in nonsemantic_clspvreflection
+    {7,IR(883, 5),IR(47238, 24),IR(1, 0)}, // ArgumentPodPushConstant in nonsemantic_clspvreflection
+    {8,IR(883, 5),IR(47262, 21),IR(1, 0)}, // ArgumentSampledImage in nonsemantic_clspvreflection
+    {9,IR(883, 5),IR(47283, 21),IR(1, 0)}, // ArgumentStorageImage in nonsemantic_clspvreflection
+    {10,IR(883, 5),IR(47304, 16),IR(1, 0)}, // ArgumentSampler in nonsemantic_clspvreflection
+    {11,IR(883, 5),IR(47320, 18),IR(1, 0)}, // ArgumentWorkgroup in nonsemantic_clspvreflection
+    {12,IR(33, 3),IR(47338, 26),IR(1, 0)}, // SpecConstantWorkgroupSize in nonsemantic_clspvreflection
+    {13,IR(33, 3),IR(47364, 25),IR(1, 0)}, // SpecConstantGlobalOffset in nonsemantic_clspvreflection
+    {14,IR(10, 1),IR(47389, 20),IR(1, 0)}, // SpecConstantWorkDim in nonsemantic_clspvreflection
+    {15,IR(36, 2),IR(47409, 25),IR(1, 0)}, // PushConstantGlobalOffset in nonsemantic_clspvreflection
+    {16,IR(36, 2),IR(47434, 30),IR(1, 0)}, // PushConstantEnqueuedLocalSize in nonsemantic_clspvreflection
+    {17,IR(36, 2),IR(47464, 23),IR(1, 0)}, // PushConstantGlobalSize in nonsemantic_clspvreflection
+    {18,IR(36, 2),IR(47487, 25),IR(1, 0)}, // PushConstantRegionOffset in nonsemantic_clspvreflection
+    {19,IR(36, 2),IR(47512, 26),IR(1, 0)}, // PushConstantNumWorkgroups in nonsemantic_clspvreflection
+    {20,IR(36, 2),IR(47538, 30),IR(1, 0)}, // PushConstantRegionGroupOffset in nonsemantic_clspvreflection
+    {21,IR(33, 3),IR(47568, 26),IR(1, 0)}, // ConstantDataStorageBuffer in nonsemantic_clspvreflection
+    {22,IR(33, 3),IR(47594, 20),IR(1, 0)}, // ConstantDataUniform in nonsemantic_clspvreflection
     {23,IR(33, 3),IR(8055, 15),IR(1, 0)}, // LiteralSampler in nonsemantic_clspvreflection
-    {24,IR(296, 4),IR(47585, 30),IR(1, 0)}, // PropertyRequiredWorkgroupSize in nonsemantic_clspvreflection
-    {25,IR(10, 1),IR(47615, 28),IR(1, 0)}, // SpecConstantSubgroupMaxSize in nonsemantic_clspvreflection
-    {26,IR(883, 5),IR(47643, 28),IR(1, 0)}, // ArgumentPointerPushConstant in nonsemantic_clspvreflection
-    {27,IR(554, 7),IR(47671, 23),IR(1, 0)}, // ArgumentPointerUniform in nonsemantic_clspvreflection
-    {28,IR(33, 3),IR(47694, 35),IR(1, 0)}, // ProgramScopeVariablesStorageBuffer in nonsemantic_clspvreflection
-    {29,IR(33, 3),IR(47729, 38),IR(1, 0)}, // ProgramScopeVariablePointerRelocation in nonsemantic_clspvreflection
-    {30,IR(296, 4),IR(47767, 42),IR(1, 0)}, // ImageArgumentInfoChannelOrderPushConstant in nonsemantic_clspvreflection
-    {31,IR(296, 4),IR(47809, 45),IR(1, 0)}, // ImageArgumentInfoChannelDataTypePushConstant in nonsemantic_clspvreflection
-    {32,IR(525, 6),IR(47854, 37),IR(1, 0)}, // ImageArgumentInfoChannelOrderUniform in nonsemantic_clspvreflection
-    {33,IR(525, 6),IR(47891, 40),IR(1, 0)}, // ImageArgumentInfoChannelDataTypeUniform in nonsemantic_clspvreflection
-    {34,IR(883, 5),IR(47931, 27),IR(1, 0)}, // ArgumentStorageTexelBuffer in nonsemantic_clspvreflection
-    {35,IR(883, 5),IR(47958, 27),IR(1, 0)}, // ArgumentUniformTexelBuffer in nonsemantic_clspvreflection
-    {36,IR(33, 3),IR(47985, 32),IR(1, 0)}, // ConstantDataPointerPushConstant in nonsemantic_clspvreflection
-    {37,IR(33, 3),IR(48017, 40),IR(1, 0)}, // ProgramScopeVariablePointerPushConstant in nonsemantic_clspvreflection
-    {38,IR(375, 3),IR(48057, 11),IR(1, 0)}, // PrintfInfo in nonsemantic_clspvreflection
-    {39,IR(33, 3),IR(48068, 26),IR(1, 0)}, // PrintfBufferStorageBuffer in nonsemantic_clspvreflection
-    {40,IR(33, 3),IR(48094, 32),IR(1, 0)}, // PrintfBufferPointerPushConstant in nonsemantic_clspvreflection
-    {41,IR(296, 4),IR(48126, 34),IR(1, 0)}, // NormalizedSamplerMaskPushConstant in nonsemantic_clspvreflection
-    {42,IR(36, 2),IR(48160, 22),IR(1, 0)}, // WorkgroupVariableSize in nonsemantic_clspvreflection
-    {0,IR(0, 0),IR(45584, 14),IR(1, 0)}, // DebugInfoNone in nonsemantic_shader_debuginfo_100
-    {1,IR(296, 4),IR(45598, 21),IR(1, 0)}, // DebugCompilationUnit in nonsemantic_shader_debuginfo_100
-    {2,IR(296, 4),IR(45671, 15),IR(1, 0)}, // DebugTypeBasic in nonsemantic_shader_debuginfo_100
-    {3,IR(33, 3),IR(45720, 17),IR(1, 0)}, // DebugTypePointer in nonsemantic_shader_debuginfo_100
-    {4,IR(36, 2),IR(45775, 19),IR(1, 0)}, // DebugTypeQualifier in nonsemantic_shader_debuginfo_100
-    {5,IR(168, 2),IR(45794, 15),IR(1, 0)}, // DebugTypeArray in nonsemantic_shader_debuginfo_100
-    {6,IR(36, 2),IR(45809, 16),IR(1, 0)}, // DebugTypeVector in nonsemantic_shader_debuginfo_100
-    {7,IR(525, 6),IR(45825, 13),IR(1, 0)}, // DebugTypedef in nonsemantic_shader_debuginfo_100
-    {8,IR(375, 3),IR(45838, 18),IR(1, 0)}, // DebugTypeFunction in nonsemantic_shader_debuginfo_100
-    {9,IR(888, 9),IR(45856, 14),IR(1, 0)}, // DebugTypeEnum in nonsemantic_shader_debuginfo_100
-    {10,IR(897, 10),IR(45908, 19),IR(1, 0)}, // DebugTypeComposite in nonsemantic_shader_debuginfo_100
-    {11,IR(907, 9),IR(45927, 16),IR(1, 0)}, // DebugTypeMember in nonsemantic_shader_debuginfo_100
-    {12,IR(296, 4),IR(45943, 21),IR(1, 0)}, // DebugTypeInheritance in nonsemantic_shader_debuginfo_100
-    {13,IR(36, 2),IR(45964, 21),IR(1, 0)}, // DebugTypePtrToMember in nonsemantic_shader_debuginfo_100
-    {14,IR(168, 2),IR(45985, 18),IR(1, 0)}, // DebugTypeTemplate in nonsemantic_shader_debuginfo_100
-    {15,IR(525, 6),IR(46003, 27),IR(1, 0)}, // DebugTypeTemplateParameter in nonsemantic_shader_debuginfo_100
-    {16,IR(634, 5),IR(46030, 35),IR(1, 0)}, // DebugTypeTemplateTemplateParameter in nonsemantic_shader_debuginfo_100
-    {17,IR(916, 5),IR(46065, 31),IR(1, 0)}, // DebugTypeTemplateParameterPack in nonsemantic_shader_debuginfo_100
-    {18,IR(921, 10),IR(46096, 20),IR(1, 0)}, // DebugGlobalVariable in nonsemantic_shader_debuginfo_100
-    {19,IR(471, 8),IR(46116, 25),IR(1, 0)}, // DebugFunctionDeclaration in nonsemantic_shader_debuginfo_100
-    {20,IR(921, 10),IR(46141, 14),IR(1, 0)}, // DebugFunction in nonsemantic_shader_debuginfo_100
-    {21,IR(883, 5),IR(46155, 18),IR(1, 0)}, // DebugLexicalBlock in nonsemantic_shader_debuginfo_100
-    {22,IR(33, 3),IR(46173, 31),IR(1, 0)}, // DebugLexicalBlockDiscriminator in nonsemantic_shader_debuginfo_100
-    {23,IR(860, 2),IR(46204, 11),IR(1, 0)}, // DebugScope in nonsemantic_shader_debuginfo_100
-    {24,IR(0, 0),IR(46215, 13),IR(1, 0)}, // DebugNoScope in nonsemantic_shader_debuginfo_100
-    {25,IR(931, 3),IR(46228, 15),IR(1, 0)}, // DebugInlinedAt in nonsemantic_shader_debuginfo_100
-    {26,IR(934, 8),IR(46285, 19),IR(1, 0)}, // DebugLocalVariable in nonsemantic_shader_debuginfo_100
-    {27,IR(36, 2),IR(46304, 21),IR(1, 0)}, // DebugInlinedVariable in nonsemantic_shader_debuginfo_100
-    {28,IR(942, 4),IR(46325, 13),IR(1, 0)}, // DebugDeclare in nonsemantic_shader_debuginfo_100
-    {29,IR(942, 4),IR(46338, 11),IR(1, 0)}, // DebugValue in nonsemantic_shader_debuginfo_100
-    {30,IR(168, 2),IR(46382, 15),IR(1, 0)}, // DebugOperation in nonsemantic_shader_debuginfo_100
-    {31,IR(706, 1),IR(46397, 16),IR(1, 0)}, // DebugExpression in nonsemantic_shader_debuginfo_100
-    {32,IR(577, 4),IR(46413, 14),IR(1, 0)}, // DebugMacroDef in nonsemantic_shader_debuginfo_100
-    {33,IR(33, 3),IR(46427, 16),IR(1, 0)}, // DebugMacroUndef in nonsemantic_shader_debuginfo_100
-    {34,IR(506, 7),IR(48182, 20),IR(1, 0)}, // DebugImportedEntity in nonsemantic_shader_debuginfo_100
-    {35,IR(860, 2),IR(48202, 12),IR(1, 0)}, // DebugSource in nonsemantic_shader_debuginfo_100
-    {101,IR(36, 2),IR(48214, 24),IR(1, 0)}, // DebugFunctionDefinition in nonsemantic_shader_debuginfo_100
-    {102,IR(10, 1),IR(48238, 21),IR(1, 0)}, // DebugSourceContinued in nonsemantic_shader_debuginfo_100
-    {103,IR(634, 5),IR(48259, 10),IR(1, 0)}, // DebugLine in nonsemantic_shader_debuginfo_100
-    {104,IR(0, 0),IR(48269, 12),IR(1, 0)}, // DebugNoLine in nonsemantic_shader_debuginfo_100
-    {105,IR(36, 2),IR(48281, 21),IR(1, 0)}, // DebugBuildIdentifier in nonsemantic_shader_debuginfo_100
-    {106,IR(10, 1),IR(48302, 17),IR(1, 0)}, // DebugStoragePath in nonsemantic_shader_debuginfo_100
-    {107,IR(296, 4),IR(48319, 16),IR(1, 0)}, // DebugEntryPoint in nonsemantic_shader_debuginfo_100
-    {108,IR(33, 3),IR(48335, 16),IR(1, 0)}, // DebugTypeMatrix in nonsemantic_shader_debuginfo_100
-    {1,IR(724, 9),IR(48351, 14),IR(1, 0)}, // Configuration in nonsemantic_vkspreflection
-    {2,IR(10, 1),IR(48365, 13),IR(1, 0)}, // StartCounter in nonsemantic_vkspreflection
-    {3,IR(10, 1),IR(48378, 12),IR(1, 0)}, // StopCounter in nonsemantic_vkspreflection
-    {4,IR(296, 4),IR(48390, 14),IR(1, 0)}, // PushConstants in nonsemantic_vkspreflection
-    {5,IR(33, 3),IR(48404, 23),IR(1, 0)}, // SpecializationMapEntry in nonsemantic_vkspreflection
-    {6,IR(946, 15),IR(48427, 20),IR(1, 0)}, // DescriptorSetBuffer in nonsemantic_vkspreflection
-    {7,IR(961, 33),IR(48447, 19),IR(1, 0)}, // DescriptorSetImage in nonsemantic_vkspreflection
-    {8,IR(994, 19),IR(48466, 21),IR(1, 0)}, // DescriptorSetSampler in nonsemantic_vkspreflection
-    {0,IR(0, 0),IR(45584, 14),IR(1, 0)}, // DebugInfoNone in opencl_debuginfo_100
-    {1,IR(1013, 4),IR(45598, 21),IR(1, 0)}, // DebugCompilationUnit in opencl_debuginfo_100
-    {2,IR(1017, 3),IR(45671, 15),IR(1, 0)}, // DebugTypeBasic in opencl_debuginfo_100
-    {3,IR(1020, 3),IR(45720, 17),IR(1, 0)}, // DebugTypePointer in opencl_debuginfo_100
-    {4,IR(1023, 2),IR(45775, 19),IR(1, 0)}, // DebugTypeQualifier in opencl_debuginfo_100
-    {5,IR(168, 2),IR(45794, 15),IR(1, 0)}, // DebugTypeArray in opencl_debuginfo_100
-    {6,IR(261, 2),IR(45809, 16),IR(1, 0)}, // DebugTypeVector in opencl_debuginfo_100
-    {7,IR(778, 6),IR(45825, 13),IR(1, 0)}, // DebugTypedef in opencl_debuginfo_100
-    {8,IR(1025, 3),IR(45838, 18),IR(1, 0)}, // DebugTypeFunction in opencl_debuginfo_100
-    {9,IR(1028, 9),IR(45856, 14),IR(1, 0)}, // DebugTypeEnum in opencl_debuginfo_100
-    {10,IR(1037, 10),IR(45908, 19),IR(1, 0)}, // DebugTypeComposite in opencl_debuginfo_100
-    {11,IR(1047, 10),IR(45927, 16),IR(1, 0)}, // DebugTypeMember in opencl_debuginfo_100
-    {12,IR(1057, 5),IR(45943, 21),IR(1, 0)}, // DebugTypeInheritance in opencl_debuginfo_100
-    {13,IR(36, 2),IR(45964, 21),IR(1, 0)}, // DebugTypePtrToMember in opencl_debuginfo_100
-    {14,IR(168, 2),IR(45985, 18),IR(1, 0)}, // DebugTypeTemplate in opencl_debuginfo_100
-    {15,IR(817, 6),IR(46003, 27),IR(1, 0)}, // DebugTypeTemplateParameter in opencl_debuginfo_100
-    {16,IR(823, 5),IR(46030, 35),IR(1, 0)}, // DebugTypeTemplateTemplateParameter in opencl_debuginfo_100
-    {17,IR(828, 5),IR(46065, 31),IR(1, 0)}, // DebugTypeTemplateParameterPack in opencl_debuginfo_100
-    {18,IR(1047, 10),IR(46096, 20),IR(1, 0)}, // DebugGlobalVariable in opencl_debuginfo_100
-    {19,IR(1062, 8),IR(46116, 25),IR(1, 0)}, // DebugFunctionDeclaration in opencl_debuginfo_100
-    {20,IR(1070, 11),IR(46141, 14),IR(1, 0)}, // DebugFunction in opencl_debuginfo_100
-    {21,IR(852, 5),IR(46155, 18),IR(1, 0)}, // DebugLexicalBlock in opencl_debuginfo_100
-    {22,IR(857, 3),IR(46173, 31),IR(1, 0)}, // DebugLexicalBlockDiscriminator in opencl_debuginfo_100
-    {23,IR(860, 2),IR(46204, 11),IR(1, 0)}, // DebugScope in opencl_debuginfo_100
-    {24,IR(0, 0),IR(46215, 13),IR(1, 0)}, // DebugNoScope in opencl_debuginfo_100
-    {25,IR(862, 3),IR(46228, 15),IR(1, 0)}, // DebugInlinedAt in opencl_debuginfo_100
-    {26,IR(1081, 8),IR(46285, 19),IR(1, 0)}, // DebugLocalVariable in opencl_debuginfo_100
-    {27,IR(36, 2),IR(46304, 21),IR(1, 0)}, // DebugInlinedVariable in opencl_debuginfo_100
-    {28,IR(33, 3),IR(46325, 13),IR(1, 0)}, // DebugDeclare in opencl_debuginfo_100
-    {29,IR(942, 4),IR(46338, 11),IR(1, 0)}, // DebugValue in opencl_debuginfo_100
-    {30,IR(1089, 2),IR(46382, 15),IR(1, 0)}, // DebugOperation in opencl_debuginfo_100
-    {31,IR(706, 1),IR(46397, 16),IR(1, 0)}, // DebugExpression in opencl_debuginfo_100
-    {32,IR(874, 4),IR(46413, 14),IR(1, 0)}, // DebugMacroDef in opencl_debuginfo_100
-    {33,IR(857, 3),IR(46427, 16),IR(1, 0)}, // DebugMacroUndef in opencl_debuginfo_100
-    {34,IR(1091, 7),IR(48182, 20),IR(1, 0)}, // DebugImportedEntity in opencl_debuginfo_100
-    {35,IR(860, 2),IR(48202, 12),IR(1, 0)}, // DebugSource in opencl_debuginfo_100
-    {36,IR(1098, 8),IR(48787, 17),IR(1, 0)}, // DebugModuleINTEL in opencl_debuginfo_100
-    {0,IR(10, 1),IR(48804, 5),IR(1, 0)}, // acos in opencl_std_100
-    {1,IR(10, 1),IR(48809, 6),IR(1, 0)}, // acosh in opencl_std_100
-    {2,IR(10, 1),IR(48815, 7),IR(1, 0)}, // acospi in opencl_std_100
-    {3,IR(10, 1),IR(48822, 5),IR(1, 0)}, // asin in opencl_std_100
-    {4,IR(10, 1),IR(48827, 6),IR(1, 0)}, // asinh in opencl_std_100
-    {5,IR(10, 1),IR(48833, 7),IR(1, 0)}, // asinpi in opencl_std_100
-    {6,IR(10, 1),IR(48840, 5),IR(1, 0)}, // atan in opencl_std_100
-    {7,IR(36, 2),IR(48845, 6),IR(1, 0)}, // atan2 in opencl_std_100
-    {8,IR(10, 1),IR(48851, 6),IR(1, 0)}, // atanh in opencl_std_100
-    {9,IR(10, 1),IR(48857, 7),IR(1, 0)}, // atanpi in opencl_std_100
-    {10,IR(36, 2),IR(48864, 8),IR(1, 0)}, // atan2pi in opencl_std_100
-    {11,IR(10, 1),IR(48872, 5),IR(1, 0)}, // cbrt in opencl_std_100
-    {12,IR(10, 1),IR(48877, 5),IR(1, 0)}, // ceil in opencl_std_100
-    {13,IR(36, 2),IR(48882, 9),IR(1, 0)}, // copysign in opencl_std_100
-    {14,IR(10, 1),IR(48891, 4),IR(1, 0)}, // cos in opencl_std_100
-    {15,IR(10, 1),IR(48895, 5),IR(1, 0)}, // cosh in opencl_std_100
-    {16,IR(10, 1),IR(48900, 6),IR(1, 0)}, // cospi in opencl_std_100
-    {17,IR(10, 1),IR(48906, 5),IR(1, 0)}, // erfc in opencl_std_100
-    {18,IR(10, 1),IR(48911, 4),IR(1, 0)}, // erf in opencl_std_100
-    {19,IR(10, 1),IR(48915, 4),IR(1, 0)}, // exp in opencl_std_100
-    {20,IR(10, 1),IR(48919, 5),IR(1, 0)}, // exp2 in opencl_std_100
-    {21,IR(10, 1),IR(48924, 6),IR(1, 0)}, // exp10 in opencl_std_100
-    {22,IR(10, 1),IR(48930, 6),IR(1, 0)}, // expm1 in opencl_std_100
-    {23,IR(10, 1),IR(48936, 5),IR(1, 0)}, // fabs in opencl_std_100
-    {24,IR(36, 2),IR(48941, 5),IR(1, 0)}, // fdim in opencl_std_100
-    {25,IR(10, 1),IR(48946, 6),IR(1, 0)}, // floor in opencl_std_100
-    {26,IR(33, 3),IR(48952, 4),IR(1, 0)}, // fma in opencl_std_100
-    {27,IR(36, 2),IR(48956, 5),IR(1, 0)}, // fmax in opencl_std_100
-    {28,IR(36, 2),IR(48961, 5),IR(1, 0)}, // fmin in opencl_std_100
-    {29,IR(36, 2),IR(48966, 5),IR(1, 0)}, // fmod in opencl_std_100
-    {30,IR(36, 2),IR(48971, 6),IR(1, 0)}, // fract in opencl_std_100
-    {31,IR(36, 2),IR(48977, 6),IR(1, 0)}, // frexp in opencl_std_100
-    {32,IR(36, 2),IR(48983, 6),IR(1, 0)}, // hypot in opencl_std_100
-    {33,IR(10, 1),IR(48989, 6),IR(1, 0)}, // ilogb in opencl_std_100
-    {34,IR(36, 2),IR(48995, 6),IR(1, 0)}, // ldexp in opencl_std_100
-    {35,IR(10, 1),IR(49001, 7),IR(1, 0)}, // lgamma in opencl_std_100
-    {36,IR(36, 2),IR(49008, 9),IR(1, 0)}, // lgamma_r in opencl_std_100
-    {37,IR(10, 1),IR(49017, 4),IR(1, 0)}, // log in opencl_std_100
-    {38,IR(10, 1),IR(49021, 5),IR(1, 0)}, // log2 in opencl_std_100
-    {39,IR(10, 1),IR(49026, 6),IR(1, 0)}, // log10 in opencl_std_100
-    {40,IR(10, 1),IR(49032, 6),IR(1, 0)}, // log1p in opencl_std_100
-    {41,IR(10, 1),IR(49038, 5),IR(1, 0)}, // logb in opencl_std_100
-    {42,IR(33, 3),IR(49043, 4),IR(1, 0)}, // mad in opencl_std_100
-    {43,IR(36, 2),IR(49047, 7),IR(1, 0)}, // maxmag in opencl_std_100
-    {44,IR(36, 2),IR(49054, 7),IR(1, 0)}, // minmag in opencl_std_100
-    {45,IR(36, 2),IR(49061, 5),IR(1, 0)}, // modf in opencl_std_100
-    {46,IR(10, 1),IR(49066, 4),IR(1, 0)}, // nan in opencl_std_100
-    {47,IR(36, 2),IR(49070, 10),IR(1, 0)}, // nextafter in opencl_std_100
-    {48,IR(36, 2),IR(49080, 4),IR(1, 0)}, // pow in opencl_std_100
-    {49,IR(36, 2),IR(49084, 5),IR(1, 0)}, // pown in opencl_std_100
-    {50,IR(36, 2),IR(49089, 5),IR(1, 0)}, // powr in opencl_std_100
-    {51,IR(36, 2),IR(49094, 10),IR(1, 0)}, // remainder in opencl_std_100
-    {52,IR(33, 3),IR(49104, 7),IR(1, 0)}, // remquo in opencl_std_100
-    {53,IR(10, 1),IR(49111, 5),IR(1, 0)}, // rint in opencl_std_100
-    {54,IR(36, 2),IR(49116, 6),IR(1, 0)}, // rootn in opencl_std_100
-    {55,IR(10, 1),IR(49122, 6),IR(1, 0)}, // round in opencl_std_100
-    {56,IR(10, 1),IR(49128, 6),IR(1, 0)}, // rsqrt in opencl_std_100
-    {57,IR(10, 1),IR(49134, 4),IR(1, 0)}, // sin in opencl_std_100
-    {58,IR(36, 2),IR(49138, 7),IR(1, 0)}, // sincos in opencl_std_100
-    {59,IR(10, 1),IR(49145, 5),IR(1, 0)}, // sinh in opencl_std_100
-    {60,IR(10, 1),IR(49150, 6),IR(1, 0)}, // sinpi in opencl_std_100
-    {61,IR(10, 1),IR(49156, 5),IR(1, 0)}, // sqrt in opencl_std_100
-    {62,IR(10, 1),IR(49161, 4),IR(1, 0)}, // tan in opencl_std_100
-    {63,IR(10, 1),IR(49165, 5),IR(1, 0)}, // tanh in opencl_std_100
-    {64,IR(10, 1),IR(49170, 6),IR(1, 0)}, // tanpi in opencl_std_100
-    {65,IR(10, 1),IR(49176, 7),IR(1, 0)}, // tgamma in opencl_std_100
-    {66,IR(10, 1),IR(49183, 6),IR(1, 0)}, // trunc in opencl_std_100
-    {67,IR(10, 1),IR(49189, 9),IR(1, 0)}, // half_cos in opencl_std_100
-    {68,IR(36, 2),IR(49198, 12),IR(1, 0)}, // half_divide in opencl_std_100
-    {69,IR(10, 1),IR(49210, 9),IR(1, 0)}, // half_exp in opencl_std_100
-    {70,IR(10, 1),IR(49219, 10),IR(1, 0)}, // half_exp2 in opencl_std_100
-    {71,IR(10, 1),IR(49229, 11),IR(1, 0)}, // half_exp10 in opencl_std_100
-    {72,IR(10, 1),IR(49240, 9),IR(1, 0)}, // half_log in opencl_std_100
-    {73,IR(10, 1),IR(49249, 10),IR(1, 0)}, // half_log2 in opencl_std_100
-    {74,IR(10, 1),IR(49259, 11),IR(1, 0)}, // half_log10 in opencl_std_100
-    {75,IR(36, 2),IR(49270, 10),IR(1, 0)}, // half_powr in opencl_std_100
-    {76,IR(10, 1),IR(49280, 11),IR(1, 0)}, // half_recip in opencl_std_100
-    {77,IR(10, 1),IR(49291, 11),IR(1, 0)}, // half_rsqrt in opencl_std_100
-    {78,IR(10, 1),IR(49302, 9),IR(1, 0)}, // half_sin in opencl_std_100
-    {79,IR(10, 1),IR(49311, 10),IR(1, 0)}, // half_sqrt in opencl_std_100
-    {80,IR(10, 1),IR(49321, 9),IR(1, 0)}, // half_tan in opencl_std_100
-    {81,IR(10, 1),IR(49330, 11),IR(1, 0)}, // native_cos in opencl_std_100
-    {82,IR(36, 2),IR(49341, 14),IR(1, 0)}, // native_divide in opencl_std_100
-    {83,IR(10, 1),IR(49355, 11),IR(1, 0)}, // native_exp in opencl_std_100
-    {84,IR(10, 1),IR(49366, 12),IR(1, 0)}, // native_exp2 in opencl_std_100
-    {85,IR(10, 1),IR(49378, 13),IR(1, 0)}, // native_exp10 in opencl_std_100
-    {86,IR(10, 1),IR(49391, 11),IR(1, 0)}, // native_log in opencl_std_100
-    {87,IR(10, 1),IR(49402, 12),IR(1, 0)}, // native_log2 in opencl_std_100
-    {88,IR(10, 1),IR(49414, 13),IR(1, 0)}, // native_log10 in opencl_std_100
-    {89,IR(36, 2),IR(49427, 12),IR(1, 0)}, // native_powr in opencl_std_100
-    {90,IR(10, 1),IR(49439, 13),IR(1, 0)}, // native_recip in opencl_std_100
-    {91,IR(10, 1),IR(49452, 13),IR(1, 0)}, // native_rsqrt in opencl_std_100
-    {92,IR(10, 1),IR(49465, 11),IR(1, 0)}, // native_sin in opencl_std_100
-    {93,IR(10, 1),IR(49476, 12),IR(1, 0)}, // native_sqrt in opencl_std_100
-    {94,IR(10, 1),IR(49488, 11),IR(1, 0)}, // native_tan in opencl_std_100
-    {95,IR(33, 3),IR(49499, 7),IR(1, 0)}, // fclamp in opencl_std_100
-    {96,IR(10, 1),IR(49506, 8),IR(1, 0)}, // degrees in opencl_std_100
-    {97,IR(36, 2),IR(49514, 12),IR(1, 0)}, // fmax_common in opencl_std_100
-    {98,IR(36, 2),IR(49526, 12),IR(1, 0)}, // fmin_common in opencl_std_100
-    {99,IR(33, 3),IR(49538, 4),IR(1, 0)}, // mix in opencl_std_100
-    {100,IR(10, 1),IR(49542, 8),IR(1, 0)}, // radians in opencl_std_100
-    {101,IR(36, 2),IR(49550, 5),IR(1, 0)}, // step in opencl_std_100
-    {102,IR(33, 3),IR(49555, 11),IR(1, 0)}, // smoothstep in opencl_std_100
-    {103,IR(10, 1),IR(49566, 5),IR(1, 0)}, // sign in opencl_std_100
-    {104,IR(36, 2),IR(49571, 6),IR(1, 0)}, // cross in opencl_std_100
-    {105,IR(36, 2),IR(49577, 9),IR(1, 0)}, // distance in opencl_std_100
-    {106,IR(10, 1),IR(49586, 7),IR(1, 0)}, // length in opencl_std_100
-    {107,IR(10, 1),IR(49593, 10),IR(1, 0)}, // normalize in opencl_std_100
-    {108,IR(36, 2),IR(49603, 14),IR(1, 0)}, // fast_distance in opencl_std_100
-    {109,IR(10, 1),IR(49617, 12),IR(1, 0)}, // fast_length in opencl_std_100
-    {110,IR(10, 1),IR(49629, 15),IR(1, 0)}, // fast_normalize in opencl_std_100
-    {141,IR(10, 1),IR(49644, 6),IR(1, 0)}, // s_abs in opencl_std_100
-    {142,IR(36, 2),IR(49650, 11),IR(1, 0)}, // s_abs_diff in opencl_std_100
-    {143,IR(36, 2),IR(49661, 10),IR(1, 0)}, // s_add_sat in opencl_std_100
-    {144,IR(36, 2),IR(49671, 10),IR(1, 0)}, // u_add_sat in opencl_std_100
-    {145,IR(36, 2),IR(49681, 7),IR(1, 0)}, // s_hadd in opencl_std_100
-    {146,IR(36, 2),IR(49688, 7),IR(1, 0)}, // u_hadd in opencl_std_100
-    {147,IR(36, 2),IR(49695, 8),IR(1, 0)}, // s_rhadd in opencl_std_100
-    {148,IR(36, 2),IR(49703, 8),IR(1, 0)}, // u_rhadd in opencl_std_100
-    {149,IR(33, 3),IR(49711, 8),IR(1, 0)}, // s_clamp in opencl_std_100
-    {150,IR(33, 3),IR(49719, 8),IR(1, 0)}, // u_clamp in opencl_std_100
-    {151,IR(10, 1),IR(49727, 4),IR(1, 0)}, // clz in opencl_std_100
-    {152,IR(10, 1),IR(49731, 4),IR(1, 0)}, // ctz in opencl_std_100
-    {153,IR(33, 3),IR(49735, 9),IR(1, 0)}, // s_mad_hi in opencl_std_100
-    {154,IR(33, 3),IR(49744, 10),IR(1, 0)}, // u_mad_sat in opencl_std_100
-    {155,IR(33, 3),IR(49754, 10),IR(1, 0)}, // s_mad_sat in opencl_std_100
-    {156,IR(36, 2),IR(49764, 6),IR(1, 0)}, // s_max in opencl_std_100
-    {157,IR(36, 2),IR(49770, 6),IR(1, 0)}, // u_max in opencl_std_100
-    {158,IR(36, 2),IR(49776, 6),IR(1, 0)}, // s_min in opencl_std_100
-    {159,IR(36, 2),IR(49782, 6),IR(1, 0)}, // u_min in opencl_std_100
-    {160,IR(36, 2),IR(49788, 9),IR(1, 0)}, // s_mul_hi in opencl_std_100
-    {161,IR(36, 2),IR(49797, 7),IR(1, 0)}, // rotate in opencl_std_100
-    {162,IR(36, 2),IR(49804, 10),IR(1, 0)}, // s_sub_sat in opencl_std_100
-    {163,IR(36, 2),IR(49814, 10),IR(1, 0)}, // u_sub_sat in opencl_std_100
-    {164,IR(36, 2),IR(49824, 11),IR(1, 0)}, // u_upsample in opencl_std_100
-    {165,IR(36, 2),IR(49835, 11),IR(1, 0)}, // s_upsample in opencl_std_100
-    {166,IR(10, 1),IR(49846, 9),IR(1, 0)}, // popcount in opencl_std_100
-    {167,IR(33, 3),IR(49855, 8),IR(1, 0)}, // s_mad24 in opencl_std_100
-    {168,IR(33, 3),IR(49863, 8),IR(1, 0)}, // u_mad24 in opencl_std_100
-    {169,IR(36, 2),IR(49871, 8),IR(1, 0)}, // s_mul24 in opencl_std_100
-    {170,IR(36, 2),IR(49879, 8),IR(1, 0)}, // u_mul24 in opencl_std_100
-    {171,IR(1106, 3),IR(49887, 7),IR(1, 0)}, // vloadn in opencl_std_100
-    {172,IR(33, 3),IR(49894, 8),IR(1, 0)}, // vstoren in opencl_std_100
-    {173,IR(36, 2),IR(49902, 11),IR(1, 0)}, // vload_half in opencl_std_100
-    {174,IR(1106, 3),IR(49913, 12),IR(1, 0)}, // vload_halfn in opencl_std_100
-    {175,IR(33, 3),IR(49925, 12),IR(1, 0)}, // vstore_half in opencl_std_100
-    {176,IR(1109, 4),IR(49937, 14),IR(1, 0)}, // vstore_half_r in opencl_std_100
-    {177,IR(33, 3),IR(49951, 13),IR(1, 0)}, // vstore_halfn in opencl_std_100
-    {178,IR(1109, 4),IR(49964, 15),IR(1, 0)}, // vstore_halfn_r in opencl_std_100
-    {179,IR(1106, 3),IR(49979, 13),IR(1, 0)}, // vloada_halfn in opencl_std_100
-    {180,IR(33, 3),IR(49992, 14),IR(1, 0)}, // vstorea_halfn in opencl_std_100
-    {181,IR(1109, 4),IR(50006, 16),IR(1, 0)}, // vstorea_halfn_r in opencl_std_100
-    {182,IR(36, 2),IR(50022, 8),IR(1, 0)}, // shuffle in opencl_std_100
-    {183,IR(33, 3),IR(50030, 9),IR(1, 0)}, // shuffle2 in opencl_std_100
-    {184,IR(168, 2),IR(50039, 7),IR(1, 0)}, // printf in opencl_std_100
-    {185,IR(36, 2),IR(50046, 9),IR(1, 0)}, // prefetch in opencl_std_100
-    {186,IR(33, 3),IR(50055, 10),IR(1, 0)}, // bitselect in opencl_std_100
-    {187,IR(33, 3),IR(50065, 7),IR(1, 0)}, // select in opencl_std_100
-    {201,IR(10, 1),IR(50072, 6),IR(1, 0)}, // u_abs in opencl_std_100
-    {202,IR(36, 2),IR(50078, 11),IR(1, 0)}, // u_abs_diff in opencl_std_100
-    {203,IR(36, 2),IR(50089, 9),IR(1, 0)}, // u_mul_hi in opencl_std_100
-    {204,IR(33, 3),IR(50098, 9),IR(1, 0)}, // u_mad_hi in opencl_std_100
-    {1,IR(10, 1),IR(50107, 17),IR(1, 0)}, // CubeFaceIndexAMD in spv_amd_gcn_shader
-    {2,IR(10, 1),IR(50124, 17),IR(1, 0)}, // CubeFaceCoordAMD in spv_amd_gcn_shader
-    {3,IR(0, 0),IR(50141, 8),IR(1, 0)}, // TimeAMD in spv_amd_gcn_shader
-    {1,IR(36, 2),IR(50149, 22),IR(1, 0)}, // SwizzleInvocationsAMD in spv_amd_shader_ballot
-    {2,IR(36, 2),IR(50171, 28),IR(1, 0)}, // SwizzleInvocationsMaskedAMD in spv_amd_shader_ballot
-    {3,IR(33, 3),IR(50199, 19),IR(1, 0)}, // WriteInvocationAMD in spv_amd_shader_ballot
-    {4,IR(10, 1),IR(50218, 9),IR(1, 0)}, // MbcntAMD in spv_amd_shader_ballot
-    {1,IR(36, 2),IR(50227, 23),IR(1, 0)}, // InterpolateAtVertexAMD in spv_amd_shader_explicit_vertex_parameter
-    {1,IR(33, 3),IR(50250, 9),IR(1, 0)}, // FMin3AMD in spv_amd_shader_trinary_minmax
-    {2,IR(33, 3),IR(50259, 9),IR(1, 0)}, // UMin3AMD in spv_amd_shader_trinary_minmax
-    {3,IR(33, 3),IR(50268, 9),IR(1, 0)}, // SMin3AMD in spv_amd_shader_trinary_minmax
-    {4,IR(33, 3),IR(50277, 9),IR(1, 0)}, // FMax3AMD in spv_amd_shader_trinary_minmax
-    {5,IR(33, 3),IR(50286, 9),IR(1, 0)}, // UMax3AMD in spv_amd_shader_trinary_minmax
-    {6,IR(33, 3),IR(50295, 9),IR(1, 0)}, // SMax3AMD in spv_amd_shader_trinary_minmax
-    {7,IR(33, 3),IR(50304, 9),IR(1, 0)}, // FMid3AMD in spv_amd_shader_trinary_minmax
-    {8,IR(33, 3),IR(50313, 9),IR(1, 0)}, // UMid3AMD in spv_amd_shader_trinary_minmax
-    {9,IR(33, 3),IR(50322, 9),IR(1, 0)}, // SMid3AMD in spv_amd_shader_trinary_minmax
-    {0,IR(33, 3),IR(50331, 7),IR(1, 0)}, // ARGMAX in tosa_001000_1
-    {1,IR(506, 7),IR(50338, 11),IR(1, 0)}, // AVG_POOL2D in tosa_001000_1
-    {2,IR(714, 10),IR(50349, 7),IR(1, 0)}, // CONV2D in tosa_001000_1
-    {3,IR(714, 10),IR(50356, 7),IR(1, 0)}, // CONV3D in tosa_001000_1
-    {4,IR(714, 10),IR(50363, 17),IR(1, 0)}, // DEPTHWISE_CONV2D in tosa_001000_1
-    {5,IR(296, 4),IR(50380, 6),IR(1, 0)}, // FFT2D in tosa_001000_1
-    {6,IR(296, 4),IR(50386, 7),IR(1, 0)}, // MATMUL in tosa_001000_1
-    {7,IR(634, 5),IR(50393, 11),IR(1, 0)}, // MAX_POOL2D in tosa_001000_1
-    {8,IR(36, 2),IR(50404, 7),IR(1, 0)}, // RFFT2D in tosa_001000_1
-    {9,IR(724, 9),IR(50411, 17),IR(1, 0)}, // TRANSPOSE_CONV2D in tosa_001000_1
-    {10,IR(296, 4),IR(50428, 6),IR(1, 0)}, // CLAMP in tosa_001000_1
-    {11,IR(10, 1),IR(50434, 4),IR(1, 0)}, // ERF in tosa_001000_1
-    {12,IR(10, 1),IR(50438, 8),IR(1, 0)}, // SIGMOID in tosa_001000_1
-    {13,IR(10, 1),IR(50446, 5),IR(1, 0)}, // TANH in tosa_001000_1
-    {14,IR(36, 2),IR(50451, 4),IR(1, 0)}, // ADD in tosa_001000_1
-    {15,IR(33, 3),IR(50455, 23),IR(1, 0)}, // ARITHMETIC_RIGHT_SHIFT in tosa_001000_1
-    {16,IR(36, 2),IR(50478, 12),IR(1, 0)}, // BITWISE_AND in tosa_001000_1
-    {17,IR(36, 2),IR(50490, 11),IR(1, 0)}, // BITWISE_OR in tosa_001000_1
-    {18,IR(36, 2),IR(50501, 12),IR(1, 0)}, // BITWISE_XOR in tosa_001000_1
-    {19,IR(36, 2),IR(50513, 7),IR(1, 0)}, // INTDIV in tosa_001000_1
-    {20,IR(36, 2),IR(50520, 12),IR(1, 0)}, // LOGICAL_AND in tosa_001000_1
-    {21,IR(36, 2),IR(50532, 19),IR(1, 0)}, // LOGICAL_LEFT_SHIFT in tosa_001000_1
-    {22,IR(36, 2),IR(50551, 20),IR(1, 0)}, // LOGICAL_RIGHT_SHIFT in tosa_001000_1
-    {23,IR(36, 2),IR(50571, 11),IR(1, 0)}, // LOGICAL_OR in tosa_001000_1
-    {24,IR(36, 2),IR(50582, 12),IR(1, 0)}, // LOGICAL_XOR in tosa_001000_1
-    {25,IR(33, 3),IR(50594, 8),IR(1, 0)}, // MAXIMUM in tosa_001000_1
-    {26,IR(33, 3),IR(50602, 8),IR(1, 0)}, // MINIMUM in tosa_001000_1
-    {27,IR(33, 3),IR(50610, 4),IR(1, 0)}, // MUL in tosa_001000_1
-    {28,IR(36, 2),IR(50614, 4),IR(1, 0)}, // POW in tosa_001000_1
-    {29,IR(36, 2),IR(50618, 4),IR(1, 0)}, // SUB in tosa_001000_1
-    {30,IR(36, 2),IR(50622, 6),IR(1, 0)}, // TABLE in tosa_001000_1
-    {31,IR(10, 1),IR(50628, 4),IR(1, 0)}, // ABS in tosa_001000_1
-    {32,IR(10, 1),IR(50632, 12),IR(1, 0)}, // BITWISE_NOT in tosa_001000_1
-    {33,IR(10, 1),IR(50644, 5),IR(1, 0)}, // CEIL in tosa_001000_1
-    {34,IR(10, 1),IR(50649, 4),IR(1, 0)}, // CLZ in tosa_001000_1
-    {35,IR(10, 1),IR(50653, 4),IR(1, 0)}, // COS in tosa_001000_1
-    {36,IR(10, 1),IR(50657, 4),IR(1, 0)}, // EXP in tosa_001000_1
-    {37,IR(10, 1),IR(50661, 6),IR(1, 0)}, // FLOOR in tosa_001000_1
-    {38,IR(10, 1),IR(50667, 4),IR(1, 0)}, // LOG in tosa_001000_1
-    {39,IR(10, 1),IR(50671, 12),IR(1, 0)}, // LOGICAL_NOT in tosa_001000_1
-    {40,IR(33, 3),IR(50683, 7),IR(1, 0)}, // NEGATE in tosa_001000_1
-    {41,IR(10, 1),IR(50690, 11),IR(1, 0)}, // RECIPROCAL in tosa_001000_1
-    {42,IR(10, 1),IR(50701, 6),IR(1, 0)}, // RSQRT in tosa_001000_1
-    {43,IR(10, 1),IR(50707, 4),IR(1, 0)}, // SIN in tosa_001000_1
-    {44,IR(33, 3),IR(50711, 7),IR(1, 0)}, // SELECT in tosa_001000_1
-    {45,IR(36, 2),IR(50718, 6),IR(1, 0)}, // EQUAL in tosa_001000_1
-    {46,IR(36, 2),IR(50724, 8),IR(1, 0)}, // GREATER in tosa_001000_1
-    {47,IR(36, 2),IR(50732, 14),IR(1, 0)}, // GREATER_EQUAL in tosa_001000_1
-    {48,IR(36, 2),IR(50746, 11),IR(1, 0)}, // REDUCE_ALL in tosa_001000_1
-    {49,IR(36, 2),IR(50757, 11),IR(1, 0)}, // REDUCE_ANY in tosa_001000_1
-    {50,IR(33, 3),IR(50768, 11),IR(1, 0)}, // REDUCE_MAX in tosa_001000_1
-    {51,IR(33, 3),IR(50779, 11),IR(1, 0)}, // REDUCE_MIN in tosa_001000_1
-    {52,IR(36, 2),IR(50790, 15),IR(1, 0)}, // REDUCE_PRODUCT in tosa_001000_1
-    {53,IR(36, 2),IR(50805, 11),IR(1, 0)}, // REDUCE_SUM in tosa_001000_1
-    {54,IR(168, 2),IR(50816, 7),IR(1, 0)}, // CONCAT in tosa_001000_1
-    {55,IR(33, 3),IR(50823, 4),IR(1, 0)}, // PAD in tosa_001000_1
-    {56,IR(36, 2),IR(50827, 8),IR(1, 0)}, // RESHAPE in tosa_001000_1
-    {57,IR(36, 2),IR(50835, 8),IR(1, 0)}, // REVERSE in tosa_001000_1
-    {58,IR(33, 3),IR(50843, 6),IR(1, 0)}, // SLICE in tosa_001000_1
-    {59,IR(36, 2),IR(50849, 5),IR(1, 0)}, // TILE in tosa_001000_1
-    {60,IR(36, 2),IR(50854, 10),IR(1, 0)}, // TRANSPOSE in tosa_001000_1
-    {61,IR(36, 2),IR(50864, 7),IR(1, 0)}, // GATHER in tosa_001000_1
-    {62,IR(33, 3),IR(50871, 8),IR(1, 0)}, // SCATTER in tosa_001000_1
-    {63,IR(634, 5),IR(50879, 7),IR(1, 0)}, // RESIZE in tosa_001000_1
-    {64,IR(10, 1),IR(50886, 5),IR(1, 0)}, // CAST in tosa_001000_1
-    {65,IR(714, 10),IR(50891, 8),IR(1, 0)}, // RESCALE in tosa_001000_1
+    {24,IR(296, 4),IR(47614, 30),IR(1, 0)}, // PropertyRequiredWorkgroupSize in nonsemantic_clspvreflection
+    {25,IR(10, 1),IR(47644, 28),IR(1, 0)}, // SpecConstantSubgroupMaxSize in nonsemantic_clspvreflection
+    {26,IR(883, 5),IR(47672, 28),IR(1, 0)}, // ArgumentPointerPushConstant in nonsemantic_clspvreflection
+    {27,IR(554, 7),IR(47700, 23),IR(1, 0)}, // ArgumentPointerUniform in nonsemantic_clspvreflection
+    {28,IR(33, 3),IR(47723, 35),IR(1, 0)}, // ProgramScopeVariablesStorageBuffer in nonsemantic_clspvreflection
+    {29,IR(33, 3),IR(47758, 38),IR(1, 0)}, // ProgramScopeVariablePointerRelocation in nonsemantic_clspvreflection
+    {30,IR(296, 4),IR(47796, 42),IR(1, 0)}, // ImageArgumentInfoChannelOrderPushConstant in nonsemantic_clspvreflection
+    {31,IR(296, 4),IR(47838, 45),IR(1, 0)}, // ImageArgumentInfoChannelDataTypePushConstant in nonsemantic_clspvreflection
+    {32,IR(525, 6),IR(47883, 37),IR(1, 0)}, // ImageArgumentInfoChannelOrderUniform in nonsemantic_clspvreflection
+    {33,IR(525, 6),IR(47920, 40),IR(1, 0)}, // ImageArgumentInfoChannelDataTypeUniform in nonsemantic_clspvreflection
+    {34,IR(883, 5),IR(47960, 27),IR(1, 0)}, // ArgumentStorageTexelBuffer in nonsemantic_clspvreflection
+    {35,IR(883, 5),IR(47987, 27),IR(1, 0)}, // ArgumentUniformTexelBuffer in nonsemantic_clspvreflection
+    {36,IR(33, 3),IR(48014, 32),IR(1, 0)}, // ConstantDataPointerPushConstant in nonsemantic_clspvreflection
+    {37,IR(33, 3),IR(48046, 40),IR(1, 0)}, // ProgramScopeVariablePointerPushConstant in nonsemantic_clspvreflection
+    {38,IR(375, 3),IR(48086, 11),IR(1, 0)}, // PrintfInfo in nonsemantic_clspvreflection
+    {39,IR(33, 3),IR(48097, 26),IR(1, 0)}, // PrintfBufferStorageBuffer in nonsemantic_clspvreflection
+    {40,IR(33, 3),IR(48123, 32),IR(1, 0)}, // PrintfBufferPointerPushConstant in nonsemantic_clspvreflection
+    {41,IR(296, 4),IR(48155, 34),IR(1, 0)}, // NormalizedSamplerMaskPushConstant in nonsemantic_clspvreflection
+    {42,IR(36, 2),IR(48189, 22),IR(1, 0)}, // WorkgroupVariableSize in nonsemantic_clspvreflection
+    {0,IR(0, 0),IR(45613, 14),IR(1, 0)}, // DebugInfoNone in nonsemantic_shader_debuginfo_100
+    {1,IR(296, 4),IR(45627, 21),IR(1, 0)}, // DebugCompilationUnit in nonsemantic_shader_debuginfo_100
+    {2,IR(296, 4),IR(45700, 15),IR(1, 0)}, // DebugTypeBasic in nonsemantic_shader_debuginfo_100
+    {3,IR(33, 3),IR(45749, 17),IR(1, 0)}, // DebugTypePointer in nonsemantic_shader_debuginfo_100
+    {4,IR(36, 2),IR(45804, 19),IR(1, 0)}, // DebugTypeQualifier in nonsemantic_shader_debuginfo_100
+    {5,IR(168, 2),IR(45823, 15),IR(1, 0)}, // DebugTypeArray in nonsemantic_shader_debuginfo_100
+    {6,IR(36, 2),IR(45838, 16),IR(1, 0)}, // DebugTypeVector in nonsemantic_shader_debuginfo_100
+    {7,IR(525, 6),IR(45854, 13),IR(1, 0)}, // DebugTypedef in nonsemantic_shader_debuginfo_100
+    {8,IR(375, 3),IR(45867, 18),IR(1, 0)}, // DebugTypeFunction in nonsemantic_shader_debuginfo_100
+    {9,IR(888, 9),IR(45885, 14),IR(1, 0)}, // DebugTypeEnum in nonsemantic_shader_debuginfo_100
+    {10,IR(897, 10),IR(45937, 19),IR(1, 0)}, // DebugTypeComposite in nonsemantic_shader_debuginfo_100
+    {11,IR(907, 9),IR(45956, 16),IR(1, 0)}, // DebugTypeMember in nonsemantic_shader_debuginfo_100
+    {12,IR(296, 4),IR(45972, 21),IR(1, 0)}, // DebugTypeInheritance in nonsemantic_shader_debuginfo_100
+    {13,IR(36, 2),IR(45993, 21),IR(1, 0)}, // DebugTypePtrToMember in nonsemantic_shader_debuginfo_100
+    {14,IR(168, 2),IR(46014, 18),IR(1, 0)}, // DebugTypeTemplate in nonsemantic_shader_debuginfo_100
+    {15,IR(525, 6),IR(46032, 27),IR(1, 0)}, // DebugTypeTemplateParameter in nonsemantic_shader_debuginfo_100
+    {16,IR(634, 5),IR(46059, 35),IR(1, 0)}, // DebugTypeTemplateTemplateParameter in nonsemantic_shader_debuginfo_100
+    {17,IR(916, 5),IR(46094, 31),IR(1, 0)}, // DebugTypeTemplateParameterPack in nonsemantic_shader_debuginfo_100
+    {18,IR(921, 10),IR(46125, 20),IR(1, 0)}, // DebugGlobalVariable in nonsemantic_shader_debuginfo_100
+    {19,IR(471, 8),IR(46145, 25),IR(1, 0)}, // DebugFunctionDeclaration in nonsemantic_shader_debuginfo_100
+    {20,IR(921, 10),IR(46170, 14),IR(1, 0)}, // DebugFunction in nonsemantic_shader_debuginfo_100
+    {21,IR(883, 5),IR(46184, 18),IR(1, 0)}, // DebugLexicalBlock in nonsemantic_shader_debuginfo_100
+    {22,IR(33, 3),IR(46202, 31),IR(1, 0)}, // DebugLexicalBlockDiscriminator in nonsemantic_shader_debuginfo_100
+    {23,IR(860, 2),IR(46233, 11),IR(1, 0)}, // DebugScope in nonsemantic_shader_debuginfo_100
+    {24,IR(0, 0),IR(46244, 13),IR(1, 0)}, // DebugNoScope in nonsemantic_shader_debuginfo_100
+    {25,IR(931, 3),IR(46257, 15),IR(1, 0)}, // DebugInlinedAt in nonsemantic_shader_debuginfo_100
+    {26,IR(934, 8),IR(46314, 19),IR(1, 0)}, // DebugLocalVariable in nonsemantic_shader_debuginfo_100
+    {27,IR(36, 2),IR(46333, 21),IR(1, 0)}, // DebugInlinedVariable in nonsemantic_shader_debuginfo_100
+    {28,IR(942, 4),IR(46354, 13),IR(1, 0)}, // DebugDeclare in nonsemantic_shader_debuginfo_100
+    {29,IR(942, 4),IR(46367, 11),IR(1, 0)}, // DebugValue in nonsemantic_shader_debuginfo_100
+    {30,IR(168, 2),IR(46411, 15),IR(1, 0)}, // DebugOperation in nonsemantic_shader_debuginfo_100
+    {31,IR(706, 1),IR(46426, 16),IR(1, 0)}, // DebugExpression in nonsemantic_shader_debuginfo_100
+    {32,IR(577, 4),IR(46442, 14),IR(1, 0)}, // DebugMacroDef in nonsemantic_shader_debuginfo_100
+    {33,IR(33, 3),IR(46456, 16),IR(1, 0)}, // DebugMacroUndef in nonsemantic_shader_debuginfo_100
+    {34,IR(506, 7),IR(48211, 20),IR(1, 0)}, // DebugImportedEntity in nonsemantic_shader_debuginfo_100
+    {35,IR(860, 2),IR(48231, 12),IR(1, 0)}, // DebugSource in nonsemantic_shader_debuginfo_100
+    {101,IR(36, 2),IR(48243, 24),IR(1, 0)}, // DebugFunctionDefinition in nonsemantic_shader_debuginfo_100
+    {102,IR(10, 1),IR(48267, 21),IR(1, 0)}, // DebugSourceContinued in nonsemantic_shader_debuginfo_100
+    {103,IR(634, 5),IR(48288, 10),IR(1, 0)}, // DebugLine in nonsemantic_shader_debuginfo_100
+    {104,IR(0, 0),IR(48298, 12),IR(1, 0)}, // DebugNoLine in nonsemantic_shader_debuginfo_100
+    {105,IR(36, 2),IR(48310, 21),IR(1, 0)}, // DebugBuildIdentifier in nonsemantic_shader_debuginfo_100
+    {106,IR(10, 1),IR(48331, 17),IR(1, 0)}, // DebugStoragePath in nonsemantic_shader_debuginfo_100
+    {107,IR(296, 4),IR(48348, 16),IR(1, 0)}, // DebugEntryPoint in nonsemantic_shader_debuginfo_100
+    {108,IR(33, 3),IR(48364, 16),IR(1, 0)}, // DebugTypeMatrix in nonsemantic_shader_debuginfo_100
+    {1,IR(724, 9),IR(48380, 14),IR(1, 0)}, // Configuration in nonsemantic_vkspreflection
+    {2,IR(10, 1),IR(48394, 13),IR(1, 0)}, // StartCounter in nonsemantic_vkspreflection
+    {3,IR(10, 1),IR(48407, 12),IR(1, 0)}, // StopCounter in nonsemantic_vkspreflection
+    {4,IR(296, 4),IR(48419, 14),IR(1, 0)}, // PushConstants in nonsemantic_vkspreflection
+    {5,IR(33, 3),IR(48433, 23),IR(1, 0)}, // SpecializationMapEntry in nonsemantic_vkspreflection
+    {6,IR(946, 15),IR(48456, 20),IR(1, 0)}, // DescriptorSetBuffer in nonsemantic_vkspreflection
+    {7,IR(961, 33),IR(48476, 19),IR(1, 0)}, // DescriptorSetImage in nonsemantic_vkspreflection
+    {8,IR(994, 19),IR(48495, 21),IR(1, 0)}, // DescriptorSetSampler in nonsemantic_vkspreflection
+    {0,IR(0, 0),IR(45613, 14),IR(1, 0)}, // DebugInfoNone in opencl_debuginfo_100
+    {1,IR(1013, 4),IR(45627, 21),IR(1, 0)}, // DebugCompilationUnit in opencl_debuginfo_100
+    {2,IR(1017, 3),IR(45700, 15),IR(1, 0)}, // DebugTypeBasic in opencl_debuginfo_100
+    {3,IR(1020, 3),IR(45749, 17),IR(1, 0)}, // DebugTypePointer in opencl_debuginfo_100
+    {4,IR(1023, 2),IR(45804, 19),IR(1, 0)}, // DebugTypeQualifier in opencl_debuginfo_100
+    {5,IR(168, 2),IR(45823, 15),IR(1, 0)}, // DebugTypeArray in opencl_debuginfo_100
+    {6,IR(261, 2),IR(45838, 16),IR(1, 0)}, // DebugTypeVector in opencl_debuginfo_100
+    {7,IR(778, 6),IR(45854, 13),IR(1, 0)}, // DebugTypedef in opencl_debuginfo_100
+    {8,IR(1025, 3),IR(45867, 18),IR(1, 0)}, // DebugTypeFunction in opencl_debuginfo_100
+    {9,IR(1028, 9),IR(45885, 14),IR(1, 0)}, // DebugTypeEnum in opencl_debuginfo_100
+    {10,IR(1037, 10),IR(45937, 19),IR(1, 0)}, // DebugTypeComposite in opencl_debuginfo_100
+    {11,IR(1047, 10),IR(45956, 16),IR(1, 0)}, // DebugTypeMember in opencl_debuginfo_100
+    {12,IR(1057, 5),IR(45972, 21),IR(1, 0)}, // DebugTypeInheritance in opencl_debuginfo_100
+    {13,IR(36, 2),IR(45993, 21),IR(1, 0)}, // DebugTypePtrToMember in opencl_debuginfo_100
+    {14,IR(168, 2),IR(46014, 18),IR(1, 0)}, // DebugTypeTemplate in opencl_debuginfo_100
+    {15,IR(817, 6),IR(46032, 27),IR(1, 0)}, // DebugTypeTemplateParameter in opencl_debuginfo_100
+    {16,IR(823, 5),IR(46059, 35),IR(1, 0)}, // DebugTypeTemplateTemplateParameter in opencl_debuginfo_100
+    {17,IR(828, 5),IR(46094, 31),IR(1, 0)}, // DebugTypeTemplateParameterPack in opencl_debuginfo_100
+    {18,IR(1047, 10),IR(46125, 20),IR(1, 0)}, // DebugGlobalVariable in opencl_debuginfo_100
+    {19,IR(1062, 8),IR(46145, 25),IR(1, 0)}, // DebugFunctionDeclaration in opencl_debuginfo_100
+    {20,IR(1070, 11),IR(46170, 14),IR(1, 0)}, // DebugFunction in opencl_debuginfo_100
+    {21,IR(852, 5),IR(46184, 18),IR(1, 0)}, // DebugLexicalBlock in opencl_debuginfo_100
+    {22,IR(857, 3),IR(46202, 31),IR(1, 0)}, // DebugLexicalBlockDiscriminator in opencl_debuginfo_100
+    {23,IR(860, 2),IR(46233, 11),IR(1, 0)}, // DebugScope in opencl_debuginfo_100
+    {24,IR(0, 0),IR(46244, 13),IR(1, 0)}, // DebugNoScope in opencl_debuginfo_100
+    {25,IR(862, 3),IR(46257, 15),IR(1, 0)}, // DebugInlinedAt in opencl_debuginfo_100
+    {26,IR(1081, 8),IR(46314, 19),IR(1, 0)}, // DebugLocalVariable in opencl_debuginfo_100
+    {27,IR(36, 2),IR(46333, 21),IR(1, 0)}, // DebugInlinedVariable in opencl_debuginfo_100
+    {28,IR(33, 3),IR(46354, 13),IR(1, 0)}, // DebugDeclare in opencl_debuginfo_100
+    {29,IR(942, 4),IR(46367, 11),IR(1, 0)}, // DebugValue in opencl_debuginfo_100
+    {30,IR(1089, 2),IR(46411, 15),IR(1, 0)}, // DebugOperation in opencl_debuginfo_100
+    {31,IR(706, 1),IR(46426, 16),IR(1, 0)}, // DebugExpression in opencl_debuginfo_100
+    {32,IR(874, 4),IR(46442, 14),IR(1, 0)}, // DebugMacroDef in opencl_debuginfo_100
+    {33,IR(857, 3),IR(46456, 16),IR(1, 0)}, // DebugMacroUndef in opencl_debuginfo_100
+    {34,IR(1091, 7),IR(48211, 20),IR(1, 0)}, // DebugImportedEntity in opencl_debuginfo_100
+    {35,IR(860, 2),IR(48231, 12),IR(1, 0)}, // DebugSource in opencl_debuginfo_100
+    {36,IR(1098, 8),IR(48816, 17),IR(1, 0)}, // DebugModuleINTEL in opencl_debuginfo_100
+    {0,IR(10, 1),IR(48833, 5),IR(1, 0)}, // acos in opencl_std_100
+    {1,IR(10, 1),IR(48838, 6),IR(1, 0)}, // acosh in opencl_std_100
+    {2,IR(10, 1),IR(48844, 7),IR(1, 0)}, // acospi in opencl_std_100
+    {3,IR(10, 1),IR(48851, 5),IR(1, 0)}, // asin in opencl_std_100
+    {4,IR(10, 1),IR(48856, 6),IR(1, 0)}, // asinh in opencl_std_100
+    {5,IR(10, 1),IR(48862, 7),IR(1, 0)}, // asinpi in opencl_std_100
+    {6,IR(10, 1),IR(48869, 5),IR(1, 0)}, // atan in opencl_std_100
+    {7,IR(36, 2),IR(48874, 6),IR(1, 0)}, // atan2 in opencl_std_100
+    {8,IR(10, 1),IR(48880, 6),IR(1, 0)}, // atanh in opencl_std_100
+    {9,IR(10, 1),IR(48886, 7),IR(1, 0)}, // atanpi in opencl_std_100
+    {10,IR(36, 2),IR(48893, 8),IR(1, 0)}, // atan2pi in opencl_std_100
+    {11,IR(10, 1),IR(48901, 5),IR(1, 0)}, // cbrt in opencl_std_100
+    {12,IR(10, 1),IR(48906, 5),IR(1, 0)}, // ceil in opencl_std_100
+    {13,IR(36, 2),IR(48911, 9),IR(1, 0)}, // copysign in opencl_std_100
+    {14,IR(10, 1),IR(48920, 4),IR(1, 0)}, // cos in opencl_std_100
+    {15,IR(10, 1),IR(48924, 5),IR(1, 0)}, // cosh in opencl_std_100
+    {16,IR(10, 1),IR(48929, 6),IR(1, 0)}, // cospi in opencl_std_100
+    {17,IR(10, 1),IR(48935, 5),IR(1, 0)}, // erfc in opencl_std_100
+    {18,IR(10, 1),IR(48940, 4),IR(1, 0)}, // erf in opencl_std_100
+    {19,IR(10, 1),IR(48944, 4),IR(1, 0)}, // exp in opencl_std_100
+    {20,IR(10, 1),IR(48948, 5),IR(1, 0)}, // exp2 in opencl_std_100
+    {21,IR(10, 1),IR(48953, 6),IR(1, 0)}, // exp10 in opencl_std_100
+    {22,IR(10, 1),IR(48959, 6),IR(1, 0)}, // expm1 in opencl_std_100
+    {23,IR(10, 1),IR(48965, 5),IR(1, 0)}, // fabs in opencl_std_100
+    {24,IR(36, 2),IR(48970, 5),IR(1, 0)}, // fdim in opencl_std_100
+    {25,IR(10, 1),IR(48975, 6),IR(1, 0)}, // floor in opencl_std_100
+    {26,IR(33, 3),IR(48981, 4),IR(1, 0)}, // fma in opencl_std_100
+    {27,IR(36, 2),IR(48985, 5),IR(1, 0)}, // fmax in opencl_std_100
+    {28,IR(36, 2),IR(48990, 5),IR(1, 0)}, // fmin in opencl_std_100
+    {29,IR(36, 2),IR(48995, 5),IR(1, 0)}, // fmod in opencl_std_100
+    {30,IR(36, 2),IR(49000, 6),IR(1, 0)}, // fract in opencl_std_100
+    {31,IR(36, 2),IR(49006, 6),IR(1, 0)}, // frexp in opencl_std_100
+    {32,IR(36, 2),IR(49012, 6),IR(1, 0)}, // hypot in opencl_std_100
+    {33,IR(10, 1),IR(49018, 6),IR(1, 0)}, // ilogb in opencl_std_100
+    {34,IR(36, 2),IR(49024, 6),IR(1, 0)}, // ldexp in opencl_std_100
+    {35,IR(10, 1),IR(49030, 7),IR(1, 0)}, // lgamma in opencl_std_100
+    {36,IR(36, 2),IR(49037, 9),IR(1, 0)}, // lgamma_r in opencl_std_100
+    {37,IR(10, 1),IR(49046, 4),IR(1, 0)}, // log in opencl_std_100
+    {38,IR(10, 1),IR(49050, 5),IR(1, 0)}, // log2 in opencl_std_100
+    {39,IR(10, 1),IR(49055, 6),IR(1, 0)}, // log10 in opencl_std_100
+    {40,IR(10, 1),IR(49061, 6),IR(1, 0)}, // log1p in opencl_std_100
+    {41,IR(10, 1),IR(49067, 5),IR(1, 0)}, // logb in opencl_std_100
+    {42,IR(33, 3),IR(49072, 4),IR(1, 0)}, // mad in opencl_std_100
+    {43,IR(36, 2),IR(49076, 7),IR(1, 0)}, // maxmag in opencl_std_100
+    {44,IR(36, 2),IR(49083, 7),IR(1, 0)}, // minmag in opencl_std_100
+    {45,IR(36, 2),IR(49090, 5),IR(1, 0)}, // modf in opencl_std_100
+    {46,IR(10, 1),IR(49095, 4),IR(1, 0)}, // nan in opencl_std_100
+    {47,IR(36, 2),IR(49099, 10),IR(1, 0)}, // nextafter in opencl_std_100
+    {48,IR(36, 2),IR(49109, 4),IR(1, 0)}, // pow in opencl_std_100
+    {49,IR(36, 2),IR(49113, 5),IR(1, 0)}, // pown in opencl_std_100
+    {50,IR(36, 2),IR(49118, 5),IR(1, 0)}, // powr in opencl_std_100
+    {51,IR(36, 2),IR(49123, 10),IR(1, 0)}, // remainder in opencl_std_100
+    {52,IR(33, 3),IR(49133, 7),IR(1, 0)}, // remquo in opencl_std_100
+    {53,IR(10, 1),IR(49140, 5),IR(1, 0)}, // rint in opencl_std_100
+    {54,IR(36, 2),IR(49145, 6),IR(1, 0)}, // rootn in opencl_std_100
+    {55,IR(10, 1),IR(49151, 6),IR(1, 0)}, // round in opencl_std_100
+    {56,IR(10, 1),IR(49157, 6),IR(1, 0)}, // rsqrt in opencl_std_100
+    {57,IR(10, 1),IR(49163, 4),IR(1, 0)}, // sin in opencl_std_100
+    {58,IR(36, 2),IR(49167, 7),IR(1, 0)}, // sincos in opencl_std_100
+    {59,IR(10, 1),IR(49174, 5),IR(1, 0)}, // sinh in opencl_std_100
+    {60,IR(10, 1),IR(49179, 6),IR(1, 0)}, // sinpi in opencl_std_100
+    {61,IR(10, 1),IR(49185, 5),IR(1, 0)}, // sqrt in opencl_std_100
+    {62,IR(10, 1),IR(49190, 4),IR(1, 0)}, // tan in opencl_std_100
+    {63,IR(10, 1),IR(49194, 5),IR(1, 0)}, // tanh in opencl_std_100
+    {64,IR(10, 1),IR(49199, 6),IR(1, 0)}, // tanpi in opencl_std_100
+    {65,IR(10, 1),IR(49205, 7),IR(1, 0)}, // tgamma in opencl_std_100
+    {66,IR(10, 1),IR(49212, 6),IR(1, 0)}, // trunc in opencl_std_100
+    {67,IR(10, 1),IR(49218, 9),IR(1, 0)}, // half_cos in opencl_std_100
+    {68,IR(36, 2),IR(49227, 12),IR(1, 0)}, // half_divide in opencl_std_100
+    {69,IR(10, 1),IR(49239, 9),IR(1, 0)}, // half_exp in opencl_std_100
+    {70,IR(10, 1),IR(49248, 10),IR(1, 0)}, // half_exp2 in opencl_std_100
+    {71,IR(10, 1),IR(49258, 11),IR(1, 0)}, // half_exp10 in opencl_std_100
+    {72,IR(10, 1),IR(49269, 9),IR(1, 0)}, // half_log in opencl_std_100
+    {73,IR(10, 1),IR(49278, 10),IR(1, 0)}, // half_log2 in opencl_std_100
+    {74,IR(10, 1),IR(49288, 11),IR(1, 0)}, // half_log10 in opencl_std_100
+    {75,IR(36, 2),IR(49299, 10),IR(1, 0)}, // half_powr in opencl_std_100
+    {76,IR(10, 1),IR(49309, 11),IR(1, 0)}, // half_recip in opencl_std_100
+    {77,IR(10, 1),IR(49320, 11),IR(1, 0)}, // half_rsqrt in opencl_std_100
+    {78,IR(10, 1),IR(49331, 9),IR(1, 0)}, // half_sin in opencl_std_100
+    {79,IR(10, 1),IR(49340, 10),IR(1, 0)}, // half_sqrt in opencl_std_100
+    {80,IR(10, 1),IR(49350, 9),IR(1, 0)}, // half_tan in opencl_std_100
+    {81,IR(10, 1),IR(49359, 11),IR(1, 0)}, // native_cos in opencl_std_100
+    {82,IR(36, 2),IR(49370, 14),IR(1, 0)}, // native_divide in opencl_std_100
+    {83,IR(10, 1),IR(49384, 11),IR(1, 0)}, // native_exp in opencl_std_100
+    {84,IR(10, 1),IR(49395, 12),IR(1, 0)}, // native_exp2 in opencl_std_100
+    {85,IR(10, 1),IR(49407, 13),IR(1, 0)}, // native_exp10 in opencl_std_100
+    {86,IR(10, 1),IR(49420, 11),IR(1, 0)}, // native_log in opencl_std_100
+    {87,IR(10, 1),IR(49431, 12),IR(1, 0)}, // native_log2 in opencl_std_100
+    {88,IR(10, 1),IR(49443, 13),IR(1, 0)}, // native_log10 in opencl_std_100
+    {89,IR(36, 2),IR(49456, 12),IR(1, 0)}, // native_powr in opencl_std_100
+    {90,IR(10, 1),IR(49468, 13),IR(1, 0)}, // native_recip in opencl_std_100
+    {91,IR(10, 1),IR(49481, 13),IR(1, 0)}, // native_rsqrt in opencl_std_100
+    {92,IR(10, 1),IR(49494, 11),IR(1, 0)}, // native_sin in opencl_std_100
+    {93,IR(10, 1),IR(49505, 12),IR(1, 0)}, // native_sqrt in opencl_std_100
+    {94,IR(10, 1),IR(49517, 11),IR(1, 0)}, // native_tan in opencl_std_100
+    {95,IR(33, 3),IR(49528, 7),IR(1, 0)}, // fclamp in opencl_std_100
+    {96,IR(10, 1),IR(49535, 8),IR(1, 0)}, // degrees in opencl_std_100
+    {97,IR(36, 2),IR(49543, 12),IR(1, 0)}, // fmax_common in opencl_std_100
+    {98,IR(36, 2),IR(49555, 12),IR(1, 0)}, // fmin_common in opencl_std_100
+    {99,IR(33, 3),IR(49567, 4),IR(1, 0)}, // mix in opencl_std_100
+    {100,IR(10, 1),IR(49571, 8),IR(1, 0)}, // radians in opencl_std_100
+    {101,IR(36, 2),IR(49579, 5),IR(1, 0)}, // step in opencl_std_100
+    {102,IR(33, 3),IR(49584, 11),IR(1, 0)}, // smoothstep in opencl_std_100
+    {103,IR(10, 1),IR(49595, 5),IR(1, 0)}, // sign in opencl_std_100
+    {104,IR(36, 2),IR(49600, 6),IR(1, 0)}, // cross in opencl_std_100
+    {105,IR(36, 2),IR(49606, 9),IR(1, 0)}, // distance in opencl_std_100
+    {106,IR(10, 1),IR(49615, 7),IR(1, 0)}, // length in opencl_std_100
+    {107,IR(10, 1),IR(49622, 10),IR(1, 0)}, // normalize in opencl_std_100
+    {108,IR(36, 2),IR(49632, 14),IR(1, 0)}, // fast_distance in opencl_std_100
+    {109,IR(10, 1),IR(49646, 12),IR(1, 0)}, // fast_length in opencl_std_100
+    {110,IR(10, 1),IR(49658, 15),IR(1, 0)}, // fast_normalize in opencl_std_100
+    {141,IR(10, 1),IR(49673, 6),IR(1, 0)}, // s_abs in opencl_std_100
+    {142,IR(36, 2),IR(49679, 11),IR(1, 0)}, // s_abs_diff in opencl_std_100
+    {143,IR(36, 2),IR(49690, 10),IR(1, 0)}, // s_add_sat in opencl_std_100
+    {144,IR(36, 2),IR(49700, 10),IR(1, 0)}, // u_add_sat in opencl_std_100
+    {145,IR(36, 2),IR(49710, 7),IR(1, 0)}, // s_hadd in opencl_std_100
+    {146,IR(36, 2),IR(49717, 7),IR(1, 0)}, // u_hadd in opencl_std_100
+    {147,IR(36, 2),IR(49724, 8),IR(1, 0)}, // s_rhadd in opencl_std_100
+    {148,IR(36, 2),IR(49732, 8),IR(1, 0)}, // u_rhadd in opencl_std_100
+    {149,IR(33, 3),IR(49740, 8),IR(1, 0)}, // s_clamp in opencl_std_100
+    {150,IR(33, 3),IR(49748, 8),IR(1, 0)}, // u_clamp in opencl_std_100
+    {151,IR(10, 1),IR(49756, 4),IR(1, 0)}, // clz in opencl_std_100
+    {152,IR(10, 1),IR(49760, 4),IR(1, 0)}, // ctz in opencl_std_100
+    {153,IR(33, 3),IR(49764, 9),IR(1, 0)}, // s_mad_hi in opencl_std_100
+    {154,IR(33, 3),IR(49773, 10),IR(1, 0)}, // u_mad_sat in opencl_std_100
+    {155,IR(33, 3),IR(49783, 10),IR(1, 0)}, // s_mad_sat in opencl_std_100
+    {156,IR(36, 2),IR(49793, 6),IR(1, 0)}, // s_max in opencl_std_100
+    {157,IR(36, 2),IR(49799, 6),IR(1, 0)}, // u_max in opencl_std_100
+    {158,IR(36, 2),IR(49805, 6),IR(1, 0)}, // s_min in opencl_std_100
+    {159,IR(36, 2),IR(49811, 6),IR(1, 0)}, // u_min in opencl_std_100
+    {160,IR(36, 2),IR(49817, 9),IR(1, 0)}, // s_mul_hi in opencl_std_100
+    {161,IR(36, 2),IR(49826, 7),IR(1, 0)}, // rotate in opencl_std_100
+    {162,IR(36, 2),IR(49833, 10),IR(1, 0)}, // s_sub_sat in opencl_std_100
+    {163,IR(36, 2),IR(49843, 10),IR(1, 0)}, // u_sub_sat in opencl_std_100
+    {164,IR(36, 2),IR(49853, 11),IR(1, 0)}, // u_upsample in opencl_std_100
+    {165,IR(36, 2),IR(49864, 11),IR(1, 0)}, // s_upsample in opencl_std_100
+    {166,IR(10, 1),IR(49875, 9),IR(1, 0)}, // popcount in opencl_std_100
+    {167,IR(33, 3),IR(49884, 8),IR(1, 0)}, // s_mad24 in opencl_std_100
+    {168,IR(33, 3),IR(49892, 8),IR(1, 0)}, // u_mad24 in opencl_std_100
+    {169,IR(36, 2),IR(49900, 8),IR(1, 0)}, // s_mul24 in opencl_std_100
+    {170,IR(36, 2),IR(49908, 8),IR(1, 0)}, // u_mul24 in opencl_std_100
+    {171,IR(1106, 3),IR(49916, 7),IR(1, 0)}, // vloadn in opencl_std_100
+    {172,IR(33, 3),IR(49923, 8),IR(1, 0)}, // vstoren in opencl_std_100
+    {173,IR(36, 2),IR(49931, 11),IR(1, 0)}, // vload_half in opencl_std_100
+    {174,IR(1106, 3),IR(49942, 12),IR(1, 0)}, // vload_halfn in opencl_std_100
+    {175,IR(33, 3),IR(49954, 12),IR(1, 0)}, // vstore_half in opencl_std_100
+    {176,IR(1109, 4),IR(49966, 14),IR(1, 0)}, // vstore_half_r in opencl_std_100
+    {177,IR(33, 3),IR(49980, 13),IR(1, 0)}, // vstore_halfn in opencl_std_100
+    {178,IR(1109, 4),IR(49993, 15),IR(1, 0)}, // vstore_halfn_r in opencl_std_100
+    {179,IR(1106, 3),IR(50008, 13),IR(1, 0)}, // vloada_halfn in opencl_std_100
+    {180,IR(33, 3),IR(50021, 14),IR(1, 0)}, // vstorea_halfn in opencl_std_100
+    {181,IR(1109, 4),IR(50035, 16),IR(1, 0)}, // vstorea_halfn_r in opencl_std_100
+    {182,IR(36, 2),IR(50051, 8),IR(1, 0)}, // shuffle in opencl_std_100
+    {183,IR(33, 3),IR(50059, 9),IR(1, 0)}, // shuffle2 in opencl_std_100
+    {184,IR(168, 2),IR(50068, 7),IR(1, 0)}, // printf in opencl_std_100
+    {185,IR(36, 2),IR(50075, 9),IR(1, 0)}, // prefetch in opencl_std_100
+    {186,IR(33, 3),IR(50084, 10),IR(1, 0)}, // bitselect in opencl_std_100
+    {187,IR(33, 3),IR(50094, 7),IR(1, 0)}, // select in opencl_std_100
+    {201,IR(10, 1),IR(50101, 6),IR(1, 0)}, // u_abs in opencl_std_100
+    {202,IR(36, 2),IR(50107, 11),IR(1, 0)}, // u_abs_diff in opencl_std_100
+    {203,IR(36, 2),IR(50118, 9),IR(1, 0)}, // u_mul_hi in opencl_std_100
+    {204,IR(33, 3),IR(50127, 9),IR(1, 0)}, // u_mad_hi in opencl_std_100
+    {1,IR(10, 1),IR(50136, 17),IR(1, 0)}, // CubeFaceIndexAMD in spv_amd_gcn_shader
+    {2,IR(10, 1),IR(50153, 17),IR(1, 0)}, // CubeFaceCoordAMD in spv_amd_gcn_shader
+    {3,IR(0, 0),IR(50170, 8),IR(1, 0)}, // TimeAMD in spv_amd_gcn_shader
+    {1,IR(36, 2),IR(50178, 22),IR(1, 0)}, // SwizzleInvocationsAMD in spv_amd_shader_ballot
+    {2,IR(36, 2),IR(50200, 28),IR(1, 0)}, // SwizzleInvocationsMaskedAMD in spv_amd_shader_ballot
+    {3,IR(33, 3),IR(50228, 19),IR(1, 0)}, // WriteInvocationAMD in spv_amd_shader_ballot
+    {4,IR(10, 1),IR(50247, 9),IR(1, 0)}, // MbcntAMD in spv_amd_shader_ballot
+    {1,IR(36, 2),IR(50256, 23),IR(1, 0)}, // InterpolateAtVertexAMD in spv_amd_shader_explicit_vertex_parameter
+    {1,IR(33, 3),IR(50279, 9),IR(1, 0)}, // FMin3AMD in spv_amd_shader_trinary_minmax
+    {2,IR(33, 3),IR(50288, 9),IR(1, 0)}, // UMin3AMD in spv_amd_shader_trinary_minmax
+    {3,IR(33, 3),IR(50297, 9),IR(1, 0)}, // SMin3AMD in spv_amd_shader_trinary_minmax
+    {4,IR(33, 3),IR(50306, 9),IR(1, 0)}, // FMax3AMD in spv_amd_shader_trinary_minmax
+    {5,IR(33, 3),IR(50315, 9),IR(1, 0)}, // UMax3AMD in spv_amd_shader_trinary_minmax
+    {6,IR(33, 3),IR(50324, 9),IR(1, 0)}, // SMax3AMD in spv_amd_shader_trinary_minmax
+    {7,IR(33, 3),IR(50333, 9),IR(1, 0)}, // FMid3AMD in spv_amd_shader_trinary_minmax
+    {8,IR(33, 3),IR(50342, 9),IR(1, 0)}, // UMid3AMD in spv_amd_shader_trinary_minmax
+    {9,IR(33, 3),IR(50351, 9),IR(1, 0)}, // SMid3AMD in spv_amd_shader_trinary_minmax
+    {0,IR(33, 3),IR(50360, 7),IR(1, 0)}, // ARGMAX in tosa_001000_1
+    {1,IR(506, 7),IR(50367, 11),IR(1, 0)}, // AVG_POOL2D in tosa_001000_1
+    {2,IR(714, 10),IR(50378, 7),IR(1, 0)}, // CONV2D in tosa_001000_1
+    {3,IR(714, 10),IR(50385, 7),IR(1, 0)}, // CONV3D in tosa_001000_1
+    {4,IR(714, 10),IR(50392, 17),IR(1, 0)}, // DEPTHWISE_CONV2D in tosa_001000_1
+    {5,IR(296, 4),IR(50409, 6),IR(1, 0)}, // FFT2D in tosa_001000_1
+    {6,IR(296, 4),IR(50415, 7),IR(1, 0)}, // MATMUL in tosa_001000_1
+    {7,IR(634, 5),IR(50422, 11),IR(1, 0)}, // MAX_POOL2D in tosa_001000_1
+    {8,IR(36, 2),IR(50433, 7),IR(1, 0)}, // RFFT2D in tosa_001000_1
+    {9,IR(724, 9),IR(50440, 17),IR(1, 0)}, // TRANSPOSE_CONV2D in tosa_001000_1
+    {10,IR(296, 4),IR(50457, 6),IR(1, 0)}, // CLAMP in tosa_001000_1
+    {11,IR(10, 1),IR(50463, 4),IR(1, 0)}, // ERF in tosa_001000_1
+    {12,IR(10, 1),IR(50467, 8),IR(1, 0)}, // SIGMOID in tosa_001000_1
+    {13,IR(10, 1),IR(50475, 5),IR(1, 0)}, // TANH in tosa_001000_1
+    {14,IR(36, 2),IR(50480, 4),IR(1, 0)}, // ADD in tosa_001000_1
+    {15,IR(33, 3),IR(50484, 23),IR(1, 0)}, // ARITHMETIC_RIGHT_SHIFT in tosa_001000_1
+    {16,IR(36, 2),IR(50507, 12),IR(1, 0)}, // BITWISE_AND in tosa_001000_1
+    {17,IR(36, 2),IR(50519, 11),IR(1, 0)}, // BITWISE_OR in tosa_001000_1
+    {18,IR(36, 2),IR(50530, 12),IR(1, 0)}, // BITWISE_XOR in tosa_001000_1
+    {19,IR(36, 2),IR(50542, 7),IR(1, 0)}, // INTDIV in tosa_001000_1
+    {20,IR(36, 2),IR(50549, 12),IR(1, 0)}, // LOGICAL_AND in tosa_001000_1
+    {21,IR(36, 2),IR(50561, 19),IR(1, 0)}, // LOGICAL_LEFT_SHIFT in tosa_001000_1
+    {22,IR(36, 2),IR(50580, 20),IR(1, 0)}, // LOGICAL_RIGHT_SHIFT in tosa_001000_1
+    {23,IR(36, 2),IR(50600, 11),IR(1, 0)}, // LOGICAL_OR in tosa_001000_1
+    {24,IR(36, 2),IR(50611, 12),IR(1, 0)}, // LOGICAL_XOR in tosa_001000_1
+    {25,IR(33, 3),IR(50623, 8),IR(1, 0)}, // MAXIMUM in tosa_001000_1
+    {26,IR(33, 3),IR(50631, 8),IR(1, 0)}, // MINIMUM in tosa_001000_1
+    {27,IR(33, 3),IR(50639, 4),IR(1, 0)}, // MUL in tosa_001000_1
+    {28,IR(36, 2),IR(50643, 4),IR(1, 0)}, // POW in tosa_001000_1
+    {29,IR(36, 2),IR(50647, 4),IR(1, 0)}, // SUB in tosa_001000_1
+    {30,IR(36, 2),IR(50651, 6),IR(1, 0)}, // TABLE in tosa_001000_1
+    {31,IR(10, 1),IR(50657, 4),IR(1, 0)}, // ABS in tosa_001000_1
+    {32,IR(10, 1),IR(50661, 12),IR(1, 0)}, // BITWISE_NOT in tosa_001000_1
+    {33,IR(10, 1),IR(50673, 5),IR(1, 0)}, // CEIL in tosa_001000_1
+    {34,IR(10, 1),IR(50678, 4),IR(1, 0)}, // CLZ in tosa_001000_1
+    {35,IR(10, 1),IR(50682, 4),IR(1, 0)}, // COS in tosa_001000_1
+    {36,IR(10, 1),IR(50686, 4),IR(1, 0)}, // EXP in tosa_001000_1
+    {37,IR(10, 1),IR(50690, 6),IR(1, 0)}, // FLOOR in tosa_001000_1
+    {38,IR(10, 1),IR(50696, 4),IR(1, 0)}, // LOG in tosa_001000_1
+    {39,IR(10, 1),IR(50700, 12),IR(1, 0)}, // LOGICAL_NOT in tosa_001000_1
+    {40,IR(33, 3),IR(50712, 7),IR(1, 0)}, // NEGATE in tosa_001000_1
+    {41,IR(10, 1),IR(50719, 11),IR(1, 0)}, // RECIPROCAL in tosa_001000_1
+    {42,IR(10, 1),IR(50730, 6),IR(1, 0)}, // RSQRT in tosa_001000_1
+    {43,IR(10, 1),IR(50736, 4),IR(1, 0)}, // SIN in tosa_001000_1
+    {44,IR(33, 3),IR(50740, 7),IR(1, 0)}, // SELECT in tosa_001000_1
+    {45,IR(36, 2),IR(50747, 6),IR(1, 0)}, // EQUAL in tosa_001000_1
+    {46,IR(36, 2),IR(50753, 8),IR(1, 0)}, // GREATER in tosa_001000_1
+    {47,IR(36, 2),IR(50761, 14),IR(1, 0)}, // GREATER_EQUAL in tosa_001000_1
+    {48,IR(36, 2),IR(50775, 11),IR(1, 0)}, // REDUCE_ALL in tosa_001000_1
+    {49,IR(36, 2),IR(50786, 11),IR(1, 0)}, // REDUCE_ANY in tosa_001000_1
+    {50,IR(33, 3),IR(50797, 11),IR(1, 0)}, // REDUCE_MAX in tosa_001000_1
+    {51,IR(33, 3),IR(50808, 11),IR(1, 0)}, // REDUCE_MIN in tosa_001000_1
+    {52,IR(36, 2),IR(50819, 15),IR(1, 0)}, // REDUCE_PRODUCT in tosa_001000_1
+    {53,IR(36, 2),IR(50834, 11),IR(1, 0)}, // REDUCE_SUM in tosa_001000_1
+    {54,IR(168, 2),IR(50845, 7),IR(1, 0)}, // CONCAT in tosa_001000_1
+    {55,IR(33, 3),IR(50852, 4),IR(1, 0)}, // PAD in tosa_001000_1
+    {56,IR(36, 2),IR(50856, 8),IR(1, 0)}, // RESHAPE in tosa_001000_1
+    {57,IR(36, 2),IR(50864, 8),IR(1, 0)}, // REVERSE in tosa_001000_1
+    {58,IR(33, 3),IR(50872, 6),IR(1, 0)}, // SLICE in tosa_001000_1
+    {59,IR(36, 2),IR(50878, 5),IR(1, 0)}, // TILE in tosa_001000_1
+    {60,IR(36, 2),IR(50883, 10),IR(1, 0)}, // TRANSPOSE in tosa_001000_1
+    {61,IR(36, 2),IR(50893, 7),IR(1, 0)}, // GATHER in tosa_001000_1
+    {62,IR(33, 3),IR(50900, 8),IR(1, 0)}, // SCATTER in tosa_001000_1
+    {63,IR(634, 5),IR(50908, 7),IR(1, 0)}, // RESIZE in tosa_001000_1
+    {64,IR(10, 1),IR(50915, 5),IR(1, 0)}, // CAST in tosa_001000_1
+    {65,IR(714, 10),IR(50920, 8),IR(1, 0)}, // RESCALE in tosa_001000_1
 }};
 
 IndexRange ExtInstByValueRangeForKind(spv_ext_inst_type_t type) {
   switch(type) {
-    case SPV_EXT_INST_TYPE_DEBUGINFO: return IR(0, 34);
-    case SPV_EXT_INST_TYPE_GLSL_STD_450: return IR(34, 81);
-    case SPV_EXT_INST_TYPE_NONSEMANTIC_CLSPVREFLECTION: return IR(115, 42);
-    case SPV_EXT_INST_TYPE_NONSEMANTIC_SHADER_DEBUGINFO_100: return IR(157, 44);
-    case SPV_EXT_INST_TYPE_NONSEMANTIC_VKSPREFLECTION: return IR(201, 8);
-    case SPV_EXT_INST_TYPE_OPENCL_DEBUGINFO_100: return IR(209, 37);
-    case SPV_EXT_INST_TYPE_OPENCL_STD: return IR(246, 162);
-    case SPV_EXT_INST_TYPE_SPV_AMD_GCN_SHADER: return IR(408, 3);
-    case SPV_EXT_INST_TYPE_SPV_AMD_SHADER_BALLOT: return IR(411, 4);
-    case SPV_EXT_INST_TYPE_SPV_AMD_SHADER_EXPLICIT_VERTEX_PARAMETER: return IR(415, 1);
-    case SPV_EXT_INST_TYPE_SPV_AMD_SHADER_TRINARY_MINMAX: return IR(416, 9);
-    case SPV_EXT_INST_TYPE_TOSA_001000_1: return IR(425, 66);
+    case SPV_EXT_INST_TYPE_ARM_MOTION_ENGINE_100: return IR(0, 3);
+    case SPV_EXT_INST_TYPE_DEBUGINFO: return IR(3, 34);
+    case SPV_EXT_INST_TYPE_GLSL_STD_450: return IR(37, 81);
+    case SPV_EXT_INST_TYPE_NONSEMANTIC_CLSPVREFLECTION: return IR(118, 42);
+    case SPV_EXT_INST_TYPE_NONSEMANTIC_SHADER_DEBUGINFO_100: return IR(160, 44);
+    case SPV_EXT_INST_TYPE_NONSEMANTIC_VKSPREFLECTION: return IR(204, 8);
+    case SPV_EXT_INST_TYPE_OPENCL_DEBUGINFO_100: return IR(212, 37);
+    case SPV_EXT_INST_TYPE_OPENCL_STD: return IR(249, 162);
+    case SPV_EXT_INST_TYPE_SPV_AMD_GCN_SHADER: return IR(411, 3);
+    case SPV_EXT_INST_TYPE_SPV_AMD_SHADER_BALLOT: return IR(414, 4);
+    case SPV_EXT_INST_TYPE_SPV_AMD_SHADER_EXPLICIT_VERTEX_PARAMETER: return IR(418, 1);
+    case SPV_EXT_INST_TYPE_SPV_AMD_SHADER_TRINARY_MINMAX: return IR(419, 9);
+    case SPV_EXT_INST_TYPE_TOSA_001000_1: return IR(428, 66);
     default: break;
   }
   return IR(0,0);
@@ -5213,514 +5217,518 @@ IndexRange ExtInstByValueRangeForKind(spv_ext_inst_type_t type) {
 // The fields in order are:
 //   name
 //   index into kExtInstByValue
-static const std::array<NameIndex, 491> kExtInstNames{{
-    {IR(45598, 21), 1}, // DebugCompilationUnit in debuginfo
-    {IR(46325, 13), 28}, // DebugDeclare in debuginfo
-    {IR(46397, 16), 31}, // DebugExpression in debuginfo
-    {IR(46141, 14), 20}, // DebugFunction in debuginfo
-    {IR(46116, 25), 19}, // DebugFunctionDeclaration in debuginfo
-    {IR(46096, 20), 18}, // DebugGlobalVariable in debuginfo
-    {IR(45584, 14), 0}, // DebugInfoNone in debuginfo
-    {IR(46228, 15), 25}, // DebugInlinedAt in debuginfo
-    {IR(46304, 21), 27}, // DebugInlinedVariable in debuginfo
-    {IR(46155, 18), 21}, // DebugLexicalBlock in debuginfo
-    {IR(46173, 31), 22}, // DebugLexicalBlockDiscriminator in debuginfo
-    {IR(46285, 19), 26}, // DebugLocalVariable in debuginfo
-    {IR(46413, 14), 32}, // DebugMacroDef in debuginfo
-    {IR(46427, 16), 33}, // DebugMacroUndef in debuginfo
-    {IR(46215, 13), 24}, // DebugNoScope in debuginfo
-    {IR(46382, 15), 30}, // DebugOperation in debuginfo
-    {IR(46204, 11), 23}, // DebugScope in debuginfo
-    {IR(45794, 15), 5}, // DebugTypeArray in debuginfo
-    {IR(45671, 15), 2}, // DebugTypeBasic in debuginfo
-    {IR(45908, 19), 10}, // DebugTypeComposite in debuginfo
-    {IR(45856, 14), 9}, // DebugTypeEnum in debuginfo
-    {IR(45838, 18), 8}, // DebugTypeFunction in debuginfo
-    {IR(45943, 21), 12}, // DebugTypeInheritance in debuginfo
-    {IR(45927, 16), 11}, // DebugTypeMember in debuginfo
-    {IR(45720, 17), 3}, // DebugTypePointer in debuginfo
-    {IR(45964, 21), 13}, // DebugTypePtrToMember in debuginfo
-    {IR(45775, 19), 4}, // DebugTypeQualifier in debuginfo
-    {IR(45985, 18), 14}, // DebugTypeTemplate in debuginfo
-    {IR(46003, 27), 15}, // DebugTypeTemplateParameter in debuginfo
-    {IR(46065, 31), 17}, // DebugTypeTemplateParameterPack in debuginfo
-    {IR(46030, 35), 16}, // DebugTypeTemplateTemplateParameter in debuginfo
-    {IR(45809, 16), 6}, // DebugTypeVector in debuginfo
-    {IR(45825, 13), 7}, // DebugTypedef in debuginfo
-    {IR(46338, 11), 29}, // DebugValue in debuginfo
-    {IR(46537, 5), 50}, // Acos in glsl_std_450
-    {IR(46568, 6), 56}, // Acosh in glsl_std_450
-    {IR(46532, 5), 49}, // Asin in glsl_std_450
-    {IR(46562, 6), 55}, // Asinh in glsl_std_450
-    {IR(46542, 5), 51}, // Atan in glsl_std_450
-    {IR(46580, 6), 58}, // Atan2 in glsl_std_450
-    {IR(46574, 6), 57}, // Atanh in glsl_std_450
-    {IR(46493, 5), 42}, // Ceil in glsl_std_450
-    {IR(46524, 4), 47}, // Cos in glsl_std_450
-    {IR(46552, 5), 53}, // Cosh in glsl_std_450
-    {IR(46964, 6), 101}, // Cross in glsl_std_450
-    {IR(46512, 8), 45}, // Degrees in glsl_std_450
-    {IR(46625, 12), 66}, // Determinant in glsl_std_450
-    {IR(46955, 9), 100}, // Distance in glsl_std_450
-    {IR(46590, 4), 60}, // Exp in glsl_std_450
-    {IR(46598, 5), 62}, // Exp2 in glsl_std_450
-    {IR(46465, 5), 37}, // FAbs in glsl_std_450
-    {IR(46697, 7), 76}, // FClamp in glsl_std_450
-    {IR(46682, 5), 73}, // FMax in glsl_std_450
-    {IR(46667, 5), 70}, // FMin in glsl_std_450
-    {IR(46718, 5), 79}, // FMix in glsl_std_450
-    {IR(46475, 6), 39}, // FSign in glsl_std_450
-    {IR(46980, 12), 103}, // FaceForward in glsl_std_450
-    {IR(47008, 9), 106}, // FindILsb in glsl_std_450
-    {IR(47017, 9), 107}, // FindSMsb in glsl_std_450
-    {IR(47026, 9), 108}, // FindUMsb in glsl_std_450
-    {IR(46487, 6), 41}, // Floor in glsl_std_450
-    {IR(46744, 4), 83}, // Fma in glsl_std_450
-    {IR(46498, 6), 43}, // Fract in glsl_std_450
-    {IR(46748, 6), 84}, // Frexp in glsl_std_450
-    {IR(46754, 12), 85}, // FrexpStruct in glsl_std_450
-    {IR(46723, 5), 80}, // IMix in glsl_std_450
-    {IR(47035, 22), 109}, // InterpolateAtCentroid in glsl_std_450
-    {IR(47077, 20), 111}, // InterpolateAtOffset in glsl_std_450
-    {IR(47057, 20), 110}, // InterpolateAtSample in glsl_std_450
-    {IR(46613, 12), 65}, // InverseSqrt in glsl_std_450
-    {IR(46766, 6), 86}, // Ldexp in glsl_std_450
-    {IR(46948, 7), 99}, // Length in glsl_std_450
-    {IR(46594, 4), 61}, // Log in glsl_std_450
-    {IR(46603, 5), 63}, // Log2 in glsl_std_450
-    {IR(46637, 14), 67}, // MatrixInverse in glsl_std_450
-    {IR(46651, 5), 68}, // Modf in glsl_std_450
-    {IR(46656, 11), 69}, // ModfStruct in glsl_std_450
-    {IR(47107, 7), 114}, // NClamp in glsl_std_450
-    {IR(47102, 5), 113}, // NMax in glsl_std_450
-    {IR(47097, 5), 112}, // NMin in glsl_std_450
-    {IR(46970, 10), 102}, // Normalize in glsl_std_450
-    {IR(46839, 15), 92}, // PackDouble2x32 in glsl_std_450
-    {IR(46826, 13), 91}, // PackHalf2x16 in glsl_std_450
-    {IR(46798, 14), 89}, // PackSnorm2x16 in glsl_std_450
-    {IR(46772, 13), 87}, // PackSnorm4x8 in glsl_std_450
-    {IR(46812, 14), 90}, // PackUnorm2x16 in glsl_std_450
-    {IR(46785, 13), 88}, // PackUnorm4x8 in glsl_std_450
-    {IR(46586, 4), 59}, // Pow in glsl_std_450
-    {IR(46504, 8), 44}, // Radians in glsl_std_450
-    {IR(46992, 8), 104}, // Reflect in glsl_std_450
-    {IR(47000, 8), 105}, // Refract in glsl_std_450
-    {IR(46443, 6), 34}, // Round in glsl_std_450
-    {IR(46449, 10), 35}, // RoundEven in glsl_std_450
-    {IR(46470, 5), 38}, // SAbs in glsl_std_450
-    {IR(46711, 7), 78}, // SClamp in glsl_std_450
-    {IR(46692, 5), 75}, // SMax in glsl_std_450
-    {IR(46677, 5), 72}, // SMin in glsl_std_450
-    {IR(46481, 6), 40}, // SSign in glsl_std_450
-    {IR(46520, 4), 46}, // Sin in glsl_std_450
-    {IR(46547, 5), 52}, // Sinh in glsl_std_450
-    {IR(46733, 11), 82}, // SmoothStep in glsl_std_450
-    {IR(46608, 5), 64}, // Sqrt in glsl_std_450
-    {IR(46728, 5), 81}, // Step in glsl_std_450
-    {IR(46528, 4), 48}, // Tan in glsl_std_450
-    {IR(46557, 5), 54}, // Tanh in glsl_std_450
-    {IR(46459, 6), 36}, // Trunc in glsl_std_450
-    {IR(46704, 7), 77}, // UClamp in glsl_std_450
-    {IR(46687, 5), 74}, // UMax in glsl_std_450
-    {IR(46672, 5), 71}, // UMin in glsl_std_450
-    {IR(46931, 17), 98}, // UnpackDouble2x32 in glsl_std_450
-    {IR(46886, 15), 95}, // UnpackHalf2x16 in glsl_std_450
-    {IR(46854, 16), 93}, // UnpackSnorm2x16 in glsl_std_450
-    {IR(46901, 15), 96}, // UnpackSnorm4x8 in glsl_std_450
-    {IR(46870, 16), 94}, // UnpackUnorm2x16 in glsl_std_450
-    {IR(46916, 15), 97}, // UnpackUnorm4x8 in glsl_std_450
-    {IR(47114, 13), 116}, // ArgumentInfo in nonsemantic_clspvreflection
-    {IR(47209, 24), 121}, // ArgumentPodPushConstant in nonsemantic_clspvreflection
-    {IR(47165, 25), 119}, // ArgumentPodStorageBuffer in nonsemantic_clspvreflection
-    {IR(47190, 19), 120}, // ArgumentPodUniform in nonsemantic_clspvreflection
-    {IR(47643, 28), 140}, // ArgumentPointerPushConstant in nonsemantic_clspvreflection
-    {IR(47671, 23), 141}, // ArgumentPointerUniform in nonsemantic_clspvreflection
-    {IR(47233, 21), 122}, // ArgumentSampledImage in nonsemantic_clspvreflection
-    {IR(47275, 16), 124}, // ArgumentSampler in nonsemantic_clspvreflection
-    {IR(47127, 22), 117}, // ArgumentStorageBuffer in nonsemantic_clspvreflection
-    {IR(47254, 21), 123}, // ArgumentStorageImage in nonsemantic_clspvreflection
-    {IR(47931, 27), 148}, // ArgumentStorageTexelBuffer in nonsemantic_clspvreflection
-    {IR(47149, 16), 118}, // ArgumentUniform in nonsemantic_clspvreflection
-    {IR(47958, 27), 149}, // ArgumentUniformTexelBuffer in nonsemantic_clspvreflection
-    {IR(47291, 18), 125}, // ArgumentWorkgroup in nonsemantic_clspvreflection
-    {IR(47985, 32), 150}, // ConstantDataPointerPushConstant in nonsemantic_clspvreflection
-    {IR(47539, 26), 135}, // ConstantDataStorageBuffer in nonsemantic_clspvreflection
-    {IR(47565, 20), 136}, // ConstantDataUniform in nonsemantic_clspvreflection
-    {IR(47809, 45), 145}, // ImageArgumentInfoChannelDataTypePushConstant in nonsemantic_clspvreflection
-    {IR(47891, 40), 147}, // ImageArgumentInfoChannelDataTypeUniform in nonsemantic_clspvreflection
-    {IR(47767, 42), 144}, // ImageArgumentInfoChannelOrderPushConstant in nonsemantic_clspvreflection
-    {IR(47854, 37), 146}, // ImageArgumentInfoChannelOrderUniform in nonsemantic_clspvreflection
-    {IR(4630, 7), 115}, // Kernel in nonsemantic_clspvreflection
-    {IR(8055, 15), 137}, // LiteralSampler in nonsemantic_clspvreflection
-    {IR(48126, 34), 155}, // NormalizedSamplerMaskPushConstant in nonsemantic_clspvreflection
-    {IR(48094, 32), 154}, // PrintfBufferPointerPushConstant in nonsemantic_clspvreflection
-    {IR(48068, 26), 153}, // PrintfBufferStorageBuffer in nonsemantic_clspvreflection
-    {IR(48057, 11), 152}, // PrintfInfo in nonsemantic_clspvreflection
-    {IR(48017, 40), 151}, // ProgramScopeVariablePointerPushConstant in nonsemantic_clspvreflection
-    {IR(47729, 38), 143}, // ProgramScopeVariablePointerRelocation in nonsemantic_clspvreflection
-    {IR(47694, 35), 142}, // ProgramScopeVariablesStorageBuffer in nonsemantic_clspvreflection
-    {IR(47585, 30), 138}, // PropertyRequiredWorkgroupSize in nonsemantic_clspvreflection
-    {IR(47405, 30), 130}, // PushConstantEnqueuedLocalSize in nonsemantic_clspvreflection
-    {IR(47380, 25), 129}, // PushConstantGlobalOffset in nonsemantic_clspvreflection
-    {IR(47435, 23), 131}, // PushConstantGlobalSize in nonsemantic_clspvreflection
-    {IR(47483, 26), 133}, // PushConstantNumWorkgroups in nonsemantic_clspvreflection
-    {IR(47509, 30), 134}, // PushConstantRegionGroupOffset in nonsemantic_clspvreflection
-    {IR(47458, 25), 132}, // PushConstantRegionOffset in nonsemantic_clspvreflection
-    {IR(47335, 25), 127}, // SpecConstantGlobalOffset in nonsemantic_clspvreflection
-    {IR(47615, 28), 139}, // SpecConstantSubgroupMaxSize in nonsemantic_clspvreflection
-    {IR(47360, 20), 128}, // SpecConstantWorkDim in nonsemantic_clspvreflection
-    {IR(47309, 26), 126}, // SpecConstantWorkgroupSize in nonsemantic_clspvreflection
-    {IR(48160, 22), 156}, // WorkgroupVariableSize in nonsemantic_clspvreflection
-    {IR(48281, 21), 197}, // DebugBuildIdentifier in nonsemantic_shader_debuginfo_100
-    {IR(45598, 21), 158}, // DebugCompilationUnit in nonsemantic_shader_debuginfo_100
-    {IR(46325, 13), 185}, // DebugDeclare in nonsemantic_shader_debuginfo_100
-    {IR(48319, 16), 199}, // DebugEntryPoint in nonsemantic_shader_debuginfo_100
-    {IR(46397, 16), 188}, // DebugExpression in nonsemantic_shader_debuginfo_100
-    {IR(46141, 14), 177}, // DebugFunction in nonsemantic_shader_debuginfo_100
-    {IR(46116, 25), 176}, // DebugFunctionDeclaration in nonsemantic_shader_debuginfo_100
-    {IR(48214, 24), 193}, // DebugFunctionDefinition in nonsemantic_shader_debuginfo_100
-    {IR(46096, 20), 175}, // DebugGlobalVariable in nonsemantic_shader_debuginfo_100
-    {IR(48182, 20), 191}, // DebugImportedEntity in nonsemantic_shader_debuginfo_100
-    {IR(45584, 14), 157}, // DebugInfoNone in nonsemantic_shader_debuginfo_100
-    {IR(46228, 15), 182}, // DebugInlinedAt in nonsemantic_shader_debuginfo_100
-    {IR(46304, 21), 184}, // DebugInlinedVariable in nonsemantic_shader_debuginfo_100
-    {IR(46155, 18), 178}, // DebugLexicalBlock in nonsemantic_shader_debuginfo_100
-    {IR(46173, 31), 179}, // DebugLexicalBlockDiscriminator in nonsemantic_shader_debuginfo_100
-    {IR(48259, 10), 195}, // DebugLine in nonsemantic_shader_debuginfo_100
-    {IR(46285, 19), 183}, // DebugLocalVariable in nonsemantic_shader_debuginfo_100
-    {IR(46413, 14), 189}, // DebugMacroDef in nonsemantic_shader_debuginfo_100
-    {IR(46427, 16), 190}, // DebugMacroUndef in nonsemantic_shader_debuginfo_100
-    {IR(48269, 12), 196}, // DebugNoLine in nonsemantic_shader_debuginfo_100
-    {IR(46215, 13), 181}, // DebugNoScope in nonsemantic_shader_debuginfo_100
-    {IR(46382, 15), 187}, // DebugOperation in nonsemantic_shader_debuginfo_100
-    {IR(46204, 11), 180}, // DebugScope in nonsemantic_shader_debuginfo_100
-    {IR(48202, 12), 192}, // DebugSource in nonsemantic_shader_debuginfo_100
-    {IR(48238, 21), 194}, // DebugSourceContinued in nonsemantic_shader_debuginfo_100
-    {IR(48302, 17), 198}, // DebugStoragePath in nonsemantic_shader_debuginfo_100
-    {IR(45794, 15), 162}, // DebugTypeArray in nonsemantic_shader_debuginfo_100
-    {IR(45671, 15), 159}, // DebugTypeBasic in nonsemantic_shader_debuginfo_100
-    {IR(45908, 19), 167}, // DebugTypeComposite in nonsemantic_shader_debuginfo_100
-    {IR(45856, 14), 166}, // DebugTypeEnum in nonsemantic_shader_debuginfo_100
-    {IR(45838, 18), 165}, // DebugTypeFunction in nonsemantic_shader_debuginfo_100
-    {IR(45943, 21), 169}, // DebugTypeInheritance in nonsemantic_shader_debuginfo_100
-    {IR(48335, 16), 200}, // DebugTypeMatrix in nonsemantic_shader_debuginfo_100
-    {IR(45927, 16), 168}, // DebugTypeMember in nonsemantic_shader_debuginfo_100
-    {IR(45720, 17), 160}, // DebugTypePointer in nonsemantic_shader_debuginfo_100
-    {IR(45964, 21), 170}, // DebugTypePtrToMember in nonsemantic_shader_debuginfo_100
-    {IR(45775, 19), 161}, // DebugTypeQualifier in nonsemantic_shader_debuginfo_100
-    {IR(45985, 18), 171}, // DebugTypeTemplate in nonsemantic_shader_debuginfo_100
-    {IR(46003, 27), 172}, // DebugTypeTemplateParameter in nonsemantic_shader_debuginfo_100
-    {IR(46065, 31), 174}, // DebugTypeTemplateParameterPack in nonsemantic_shader_debuginfo_100
-    {IR(46030, 35), 173}, // DebugTypeTemplateTemplateParameter in nonsemantic_shader_debuginfo_100
-    {IR(45809, 16), 163}, // DebugTypeVector in nonsemantic_shader_debuginfo_100
-    {IR(45825, 13), 164}, // DebugTypedef in nonsemantic_shader_debuginfo_100
-    {IR(46338, 11), 186}, // DebugValue in nonsemantic_shader_debuginfo_100
-    {IR(48351, 14), 201}, // Configuration in nonsemantic_vkspreflection
-    {IR(48427, 20), 206}, // DescriptorSetBuffer in nonsemantic_vkspreflection
-    {IR(48447, 19), 207}, // DescriptorSetImage in nonsemantic_vkspreflection
-    {IR(48466, 21), 208}, // DescriptorSetSampler in nonsemantic_vkspreflection
-    {IR(48390, 14), 204}, // PushConstants in nonsemantic_vkspreflection
-    {IR(48404, 23), 205}, // SpecializationMapEntry in nonsemantic_vkspreflection
-    {IR(48365, 13), 202}, // StartCounter in nonsemantic_vkspreflection
-    {IR(48378, 12), 203}, // StopCounter in nonsemantic_vkspreflection
-    {IR(45598, 21), 210}, // DebugCompilationUnit in opencl_debuginfo_100
-    {IR(46325, 13), 237}, // DebugDeclare in opencl_debuginfo_100
-    {IR(46397, 16), 240}, // DebugExpression in opencl_debuginfo_100
-    {IR(46141, 14), 229}, // DebugFunction in opencl_debuginfo_100
-    {IR(46116, 25), 228}, // DebugFunctionDeclaration in opencl_debuginfo_100
-    {IR(46096, 20), 227}, // DebugGlobalVariable in opencl_debuginfo_100
-    {IR(48182, 20), 243}, // DebugImportedEntity in opencl_debuginfo_100
-    {IR(45584, 14), 209}, // DebugInfoNone in opencl_debuginfo_100
-    {IR(46228, 15), 234}, // DebugInlinedAt in opencl_debuginfo_100
-    {IR(46304, 21), 236}, // DebugInlinedVariable in opencl_debuginfo_100
-    {IR(46155, 18), 230}, // DebugLexicalBlock in opencl_debuginfo_100
-    {IR(46173, 31), 231}, // DebugLexicalBlockDiscriminator in opencl_debuginfo_100
-    {IR(46285, 19), 235}, // DebugLocalVariable in opencl_debuginfo_100
-    {IR(46413, 14), 241}, // DebugMacroDef in opencl_debuginfo_100
-    {IR(46427, 16), 242}, // DebugMacroUndef in opencl_debuginfo_100
-    {IR(48787, 17), 245}, // DebugModuleINTEL in opencl_debuginfo_100
-    {IR(46215, 13), 233}, // DebugNoScope in opencl_debuginfo_100
-    {IR(46382, 15), 239}, // DebugOperation in opencl_debuginfo_100
-    {IR(46204, 11), 232}, // DebugScope in opencl_debuginfo_100
-    {IR(48202, 12), 244}, // DebugSource in opencl_debuginfo_100
-    {IR(45794, 15), 214}, // DebugTypeArray in opencl_debuginfo_100
-    {IR(45671, 15), 211}, // DebugTypeBasic in opencl_debuginfo_100
-    {IR(45908, 19), 219}, // DebugTypeComposite in opencl_debuginfo_100
-    {IR(45856, 14), 218}, // DebugTypeEnum in opencl_debuginfo_100
-    {IR(45838, 18), 217}, // DebugTypeFunction in opencl_debuginfo_100
-    {IR(45943, 21), 221}, // DebugTypeInheritance in opencl_debuginfo_100
-    {IR(45927, 16), 220}, // DebugTypeMember in opencl_debuginfo_100
-    {IR(45720, 17), 212}, // DebugTypePointer in opencl_debuginfo_100
-    {IR(45964, 21), 222}, // DebugTypePtrToMember in opencl_debuginfo_100
-    {IR(45775, 19), 213}, // DebugTypeQualifier in opencl_debuginfo_100
-    {IR(45985, 18), 223}, // DebugTypeTemplate in opencl_debuginfo_100
-    {IR(46003, 27), 224}, // DebugTypeTemplateParameter in opencl_debuginfo_100
-    {IR(46065, 31), 226}, // DebugTypeTemplateParameterPack in opencl_debuginfo_100
-    {IR(46030, 35), 225}, // DebugTypeTemplateTemplateParameter in opencl_debuginfo_100
-    {IR(45809, 16), 215}, // DebugTypeVector in opencl_debuginfo_100
-    {IR(45825, 13), 216}, // DebugTypedef in opencl_debuginfo_100
-    {IR(46338, 11), 238}, // DebugValue in opencl_debuginfo_100
-    {IR(48804, 5), 246}, // acos in opencl_std_100
-    {IR(48809, 6), 247}, // acosh in opencl_std_100
-    {IR(48815, 7), 248}, // acospi in opencl_std_100
-    {IR(48822, 5), 249}, // asin in opencl_std_100
-    {IR(48827, 6), 250}, // asinh in opencl_std_100
-    {IR(48833, 7), 251}, // asinpi in opencl_std_100
-    {IR(48840, 5), 252}, // atan in opencl_std_100
-    {IR(48845, 6), 253}, // atan2 in opencl_std_100
-    {IR(48864, 8), 256}, // atan2pi in opencl_std_100
-    {IR(48851, 6), 254}, // atanh in opencl_std_100
-    {IR(48857, 7), 255}, // atanpi in opencl_std_100
-    {IR(50055, 10), 402}, // bitselect in opencl_std_100
-    {IR(48872, 5), 257}, // cbrt in opencl_std_100
-    {IR(48877, 5), 258}, // ceil in opencl_std_100
-    {IR(49727, 4), 367}, // clz in opencl_std_100
-    {IR(48882, 9), 259}, // copysign in opencl_std_100
-    {IR(48891, 4), 260}, // cos in opencl_std_100
-    {IR(48895, 5), 261}, // cosh in opencl_std_100
-    {IR(48900, 6), 262}, // cospi in opencl_std_100
-    {IR(49571, 6), 350}, // cross in opencl_std_100
-    {IR(49731, 4), 368}, // ctz in opencl_std_100
-    {IR(49506, 8), 342}, // degrees in opencl_std_100
-    {IR(49577, 9), 351}, // distance in opencl_std_100
-    {IR(48911, 4), 264}, // erf in opencl_std_100
-    {IR(48906, 5), 263}, // erfc in opencl_std_100
-    {IR(48915, 4), 265}, // exp in opencl_std_100
-    {IR(48924, 6), 267}, // exp10 in opencl_std_100
-    {IR(48919, 5), 266}, // exp2 in opencl_std_100
-    {IR(48930, 6), 268}, // expm1 in opencl_std_100
-    {IR(48936, 5), 269}, // fabs in opencl_std_100
-    {IR(49603, 14), 354}, // fast_distance in opencl_std_100
-    {IR(49617, 12), 355}, // fast_length in opencl_std_100
-    {IR(49629, 15), 356}, // fast_normalize in opencl_std_100
-    {IR(49499, 7), 341}, // fclamp in opencl_std_100
-    {IR(48941, 5), 270}, // fdim in opencl_std_100
-    {IR(48946, 6), 271}, // floor in opencl_std_100
-    {IR(48952, 4), 272}, // fma in opencl_std_100
-    {IR(48956, 5), 273}, // fmax in opencl_std_100
-    {IR(49514, 12), 343}, // fmax_common in opencl_std_100
-    {IR(48961, 5), 274}, // fmin in opencl_std_100
-    {IR(49526, 12), 344}, // fmin_common in opencl_std_100
-    {IR(48966, 5), 275}, // fmod in opencl_std_100
-    {IR(48971, 6), 276}, // fract in opencl_std_100
-    {IR(48977, 6), 277}, // frexp in opencl_std_100
-    {IR(49189, 9), 313}, // half_cos in opencl_std_100
-    {IR(49198, 12), 314}, // half_divide in opencl_std_100
-    {IR(49210, 9), 315}, // half_exp in opencl_std_100
-    {IR(49229, 11), 317}, // half_exp10 in opencl_std_100
-    {IR(49219, 10), 316}, // half_exp2 in opencl_std_100
-    {IR(49240, 9), 318}, // half_log in opencl_std_100
-    {IR(49259, 11), 320}, // half_log10 in opencl_std_100
-    {IR(49249, 10), 319}, // half_log2 in opencl_std_100
-    {IR(49270, 10), 321}, // half_powr in opencl_std_100
-    {IR(49280, 11), 322}, // half_recip in opencl_std_100
-    {IR(49291, 11), 323}, // half_rsqrt in opencl_std_100
-    {IR(49302, 9), 324}, // half_sin in opencl_std_100
-    {IR(49311, 10), 325}, // half_sqrt in opencl_std_100
-    {IR(49321, 9), 326}, // half_tan in opencl_std_100
-    {IR(48983, 6), 278}, // hypot in opencl_std_100
-    {IR(48989, 6), 279}, // ilogb in opencl_std_100
-    {IR(48995, 6), 280}, // ldexp in opencl_std_100
-    {IR(49586, 7), 352}, // length in opencl_std_100
-    {IR(49001, 7), 281}, // lgamma in opencl_std_100
-    {IR(49008, 9), 282}, // lgamma_r in opencl_std_100
-    {IR(49017, 4), 283}, // log in opencl_std_100
-    {IR(49026, 6), 285}, // log10 in opencl_std_100
-    {IR(49032, 6), 286}, // log1p in opencl_std_100
-    {IR(49021, 5), 284}, // log2 in opencl_std_100
-    {IR(49038, 5), 287}, // logb in opencl_std_100
-    {IR(49043, 4), 288}, // mad in opencl_std_100
-    {IR(49047, 7), 289}, // maxmag in opencl_std_100
-    {IR(49054, 7), 290}, // minmag in opencl_std_100
-    {IR(49538, 4), 345}, // mix in opencl_std_100
-    {IR(49061, 5), 291}, // modf in opencl_std_100
-    {IR(49066, 4), 292}, // nan in opencl_std_100
-    {IR(49330, 11), 327}, // native_cos in opencl_std_100
-    {IR(49341, 14), 328}, // native_divide in opencl_std_100
-    {IR(49355, 11), 329}, // native_exp in opencl_std_100
-    {IR(49378, 13), 331}, // native_exp10 in opencl_std_100
-    {IR(49366, 12), 330}, // native_exp2 in opencl_std_100
-    {IR(49391, 11), 332}, // native_log in opencl_std_100
-    {IR(49414, 13), 334}, // native_log10 in opencl_std_100
-    {IR(49402, 12), 333}, // native_log2 in opencl_std_100
-    {IR(49427, 12), 335}, // native_powr in opencl_std_100
-    {IR(49439, 13), 336}, // native_recip in opencl_std_100
-    {IR(49452, 13), 337}, // native_rsqrt in opencl_std_100
-    {IR(49465, 11), 338}, // native_sin in opencl_std_100
-    {IR(49476, 12), 339}, // native_sqrt in opencl_std_100
-    {IR(49488, 11), 340}, // native_tan in opencl_std_100
-    {IR(49070, 10), 293}, // nextafter in opencl_std_100
-    {IR(49593, 10), 353}, // normalize in opencl_std_100
-    {IR(49846, 9), 382}, // popcount in opencl_std_100
-    {IR(49080, 4), 294}, // pow in opencl_std_100
-    {IR(49084, 5), 295}, // pown in opencl_std_100
-    {IR(49089, 5), 296}, // powr in opencl_std_100
-    {IR(50046, 9), 401}, // prefetch in opencl_std_100
-    {IR(50039, 7), 400}, // printf in opencl_std_100
-    {IR(49542, 8), 346}, // radians in opencl_std_100
-    {IR(49094, 10), 297}, // remainder in opencl_std_100
-    {IR(49104, 7), 298}, // remquo in opencl_std_100
-    {IR(49111, 5), 299}, // rint in opencl_std_100
-    {IR(49116, 6), 300}, // rootn in opencl_std_100
-    {IR(49797, 7), 377}, // rotate in opencl_std_100
-    {IR(49122, 6), 301}, // round in opencl_std_100
-    {IR(49128, 6), 302}, // rsqrt in opencl_std_100
-    {IR(49644, 6), 357}, // s_abs in opencl_std_100
-    {IR(49650, 11), 358}, // s_abs_diff in opencl_std_100
-    {IR(49661, 10), 359}, // s_add_sat in opencl_std_100
-    {IR(49711, 8), 365}, // s_clamp in opencl_std_100
-    {IR(49681, 7), 361}, // s_hadd in opencl_std_100
-    {IR(49855, 8), 383}, // s_mad24 in opencl_std_100
-    {IR(49735, 9), 369}, // s_mad_hi in opencl_std_100
-    {IR(49754, 10), 371}, // s_mad_sat in opencl_std_100
-    {IR(49764, 6), 372}, // s_max in opencl_std_100
-    {IR(49776, 6), 374}, // s_min in opencl_std_100
-    {IR(49871, 8), 385}, // s_mul24 in opencl_std_100
-    {IR(49788, 9), 376}, // s_mul_hi in opencl_std_100
-    {IR(49695, 8), 363}, // s_rhadd in opencl_std_100
-    {IR(49804, 10), 378}, // s_sub_sat in opencl_std_100
-    {IR(49835, 11), 381}, // s_upsample in opencl_std_100
-    {IR(50065, 7), 403}, // select in opencl_std_100
-    {IR(50022, 8), 398}, // shuffle in opencl_std_100
-    {IR(50030, 9), 399}, // shuffle2 in opencl_std_100
-    {IR(49566, 5), 349}, // sign in opencl_std_100
-    {IR(49134, 4), 303}, // sin in opencl_std_100
-    {IR(49138, 7), 304}, // sincos in opencl_std_100
-    {IR(49145, 5), 305}, // sinh in opencl_std_100
-    {IR(49150, 6), 306}, // sinpi in opencl_std_100
-    {IR(49555, 11), 348}, // smoothstep in opencl_std_100
-    {IR(49156, 5), 307}, // sqrt in opencl_std_100
-    {IR(49550, 5), 347}, // step in opencl_std_100
-    {IR(49161, 4), 308}, // tan in opencl_std_100
-    {IR(49165, 5), 309}, // tanh in opencl_std_100
-    {IR(49170, 6), 310}, // tanpi in opencl_std_100
-    {IR(49176, 7), 311}, // tgamma in opencl_std_100
-    {IR(49183, 6), 312}, // trunc in opencl_std_100
-    {IR(50072, 6), 404}, // u_abs in opencl_std_100
-    {IR(50078, 11), 405}, // u_abs_diff in opencl_std_100
-    {IR(49671, 10), 360}, // u_add_sat in opencl_std_100
-    {IR(49719, 8), 366}, // u_clamp in opencl_std_100
-    {IR(49688, 7), 362}, // u_hadd in opencl_std_100
-    {IR(49863, 8), 384}, // u_mad24 in opencl_std_100
-    {IR(50098, 9), 407}, // u_mad_hi in opencl_std_100
-    {IR(49744, 10), 370}, // u_mad_sat in opencl_std_100
-    {IR(49770, 6), 373}, // u_max in opencl_std_100
-    {IR(49782, 6), 375}, // u_min in opencl_std_100
-    {IR(49879, 8), 386}, // u_mul24 in opencl_std_100
-    {IR(50089, 9), 406}, // u_mul_hi in opencl_std_100
-    {IR(49703, 8), 364}, // u_rhadd in opencl_std_100
-    {IR(49814, 10), 379}, // u_sub_sat in opencl_std_100
-    {IR(49824, 11), 380}, // u_upsample in opencl_std_100
-    {IR(49902, 11), 389}, // vload_half in opencl_std_100
-    {IR(49913, 12), 390}, // vload_halfn in opencl_std_100
-    {IR(49979, 13), 395}, // vloada_halfn in opencl_std_100
-    {IR(49887, 7), 387}, // vloadn in opencl_std_100
-    {IR(49925, 12), 391}, // vstore_half in opencl_std_100
-    {IR(49937, 14), 392}, // vstore_half_r in opencl_std_100
-    {IR(49951, 13), 393}, // vstore_halfn in opencl_std_100
-    {IR(49964, 15), 394}, // vstore_halfn_r in opencl_std_100
-    {IR(49992, 14), 396}, // vstorea_halfn in opencl_std_100
-    {IR(50006, 16), 397}, // vstorea_halfn_r in opencl_std_100
-    {IR(49894, 8), 388}, // vstoren in opencl_std_100
-    {IR(50124, 17), 409}, // CubeFaceCoordAMD in spv_amd_gcn_shader
-    {IR(50107, 17), 408}, // CubeFaceIndexAMD in spv_amd_gcn_shader
-    {IR(50141, 8), 410}, // TimeAMD in spv_amd_gcn_shader
-    {IR(50218, 9), 414}, // MbcntAMD in spv_amd_shader_ballot
-    {IR(50149, 22), 411}, // SwizzleInvocationsAMD in spv_amd_shader_ballot
-    {IR(50171, 28), 412}, // SwizzleInvocationsMaskedAMD in spv_amd_shader_ballot
-    {IR(50199, 19), 413}, // WriteInvocationAMD in spv_amd_shader_ballot
-    {IR(50227, 23), 415}, // InterpolateAtVertexAMD in spv_amd_shader_explicit_vertex_parameter
-    {IR(50277, 9), 419}, // FMax3AMD in spv_amd_shader_trinary_minmax
-    {IR(50304, 9), 422}, // FMid3AMD in spv_amd_shader_trinary_minmax
-    {IR(50250, 9), 416}, // FMin3AMD in spv_amd_shader_trinary_minmax
-    {IR(50295, 9), 421}, // SMax3AMD in spv_amd_shader_trinary_minmax
-    {IR(50322, 9), 424}, // SMid3AMD in spv_amd_shader_trinary_minmax
-    {IR(50268, 9), 418}, // SMin3AMD in spv_amd_shader_trinary_minmax
-    {IR(50286, 9), 420}, // UMax3AMD in spv_amd_shader_trinary_minmax
-    {IR(50313, 9), 423}, // UMid3AMD in spv_amd_shader_trinary_minmax
-    {IR(50259, 9), 417}, // UMin3AMD in spv_amd_shader_trinary_minmax
-    {IR(50628, 4), 456}, // ABS in tosa_001000_1
-    {IR(50451, 4), 439}, // ADD in tosa_001000_1
-    {IR(50331, 7), 425}, // ARGMAX in tosa_001000_1
-    {IR(50455, 23), 440}, // ARITHMETIC_RIGHT_SHIFT in tosa_001000_1
-    {IR(50338, 11), 426}, // AVG_POOL2D in tosa_001000_1
-    {IR(50478, 12), 441}, // BITWISE_AND in tosa_001000_1
-    {IR(50632, 12), 457}, // BITWISE_NOT in tosa_001000_1
-    {IR(50490, 11), 442}, // BITWISE_OR in tosa_001000_1
-    {IR(50501, 12), 443}, // BITWISE_XOR in tosa_001000_1
-    {IR(50886, 5), 489}, // CAST in tosa_001000_1
-    {IR(50644, 5), 458}, // CEIL in tosa_001000_1
-    {IR(50428, 6), 435}, // CLAMP in tosa_001000_1
-    {IR(50649, 4), 459}, // CLZ in tosa_001000_1
-    {IR(50816, 7), 479}, // CONCAT in tosa_001000_1
-    {IR(50349, 7), 427}, // CONV2D in tosa_001000_1
-    {IR(50356, 7), 428}, // CONV3D in tosa_001000_1
-    {IR(50653, 4), 460}, // COS in tosa_001000_1
-    {IR(50363, 17), 429}, // DEPTHWISE_CONV2D in tosa_001000_1
-    {IR(50718, 6), 470}, // EQUAL in tosa_001000_1
-    {IR(50434, 4), 436}, // ERF in tosa_001000_1
-    {IR(50657, 4), 461}, // EXP in tosa_001000_1
-    {IR(50380, 6), 430}, // FFT2D in tosa_001000_1
-    {IR(50661, 6), 462}, // FLOOR in tosa_001000_1
-    {IR(50864, 7), 486}, // GATHER in tosa_001000_1
-    {IR(50724, 8), 471}, // GREATER in tosa_001000_1
-    {IR(50732, 14), 472}, // GREATER_EQUAL in tosa_001000_1
-    {IR(50513, 7), 444}, // INTDIV in tosa_001000_1
-    {IR(50667, 4), 463}, // LOG in tosa_001000_1
-    {IR(50520, 12), 445}, // LOGICAL_AND in tosa_001000_1
-    {IR(50532, 19), 446}, // LOGICAL_LEFT_SHIFT in tosa_001000_1
-    {IR(50671, 12), 464}, // LOGICAL_NOT in tosa_001000_1
-    {IR(50571, 11), 448}, // LOGICAL_OR in tosa_001000_1
-    {IR(50551, 20), 447}, // LOGICAL_RIGHT_SHIFT in tosa_001000_1
-    {IR(50582, 12), 449}, // LOGICAL_XOR in tosa_001000_1
-    {IR(50386, 7), 431}, // MATMUL in tosa_001000_1
-    {IR(50594, 8), 450}, // MAXIMUM in tosa_001000_1
-    {IR(50393, 11), 432}, // MAX_POOL2D in tosa_001000_1
-    {IR(50602, 8), 451}, // MINIMUM in tosa_001000_1
-    {IR(50610, 4), 452}, // MUL in tosa_001000_1
-    {IR(50683, 7), 465}, // NEGATE in tosa_001000_1
-    {IR(50823, 4), 480}, // PAD in tosa_001000_1
-    {IR(50614, 4), 453}, // POW in tosa_001000_1
-    {IR(50690, 11), 466}, // RECIPROCAL in tosa_001000_1
-    {IR(50746, 11), 473}, // REDUCE_ALL in tosa_001000_1
-    {IR(50757, 11), 474}, // REDUCE_ANY in tosa_001000_1
-    {IR(50768, 11), 475}, // REDUCE_MAX in tosa_001000_1
-    {IR(50779, 11), 476}, // REDUCE_MIN in tosa_001000_1
-    {IR(50790, 15), 477}, // REDUCE_PRODUCT in tosa_001000_1
-    {IR(50805, 11), 478}, // REDUCE_SUM in tosa_001000_1
-    {IR(50891, 8), 490}, // RESCALE in tosa_001000_1
-    {IR(50827, 8), 481}, // RESHAPE in tosa_001000_1
-    {IR(50879, 7), 488}, // RESIZE in tosa_001000_1
-    {IR(50835, 8), 482}, // REVERSE in tosa_001000_1
-    {IR(50404, 7), 433}, // RFFT2D in tosa_001000_1
-    {IR(50701, 6), 467}, // RSQRT in tosa_001000_1
-    {IR(50871, 8), 487}, // SCATTER in tosa_001000_1
-    {IR(50711, 7), 469}, // SELECT in tosa_001000_1
-    {IR(50438, 8), 437}, // SIGMOID in tosa_001000_1
-    {IR(50707, 4), 468}, // SIN in tosa_001000_1
-    {IR(50843, 6), 483}, // SLICE in tosa_001000_1
-    {IR(50618, 4), 454}, // SUB in tosa_001000_1
-    {IR(50622, 6), 455}, // TABLE in tosa_001000_1
-    {IR(50446, 5), 438}, // TANH in tosa_001000_1
-    {IR(50849, 5), 484}, // TILE in tosa_001000_1
-    {IR(50854, 10), 485}, // TRANSPOSE in tosa_001000_1
-    {IR(50411, 17), 434}, // TRANSPOSE_CONV2D in tosa_001000_1
+static const std::array<NameIndex, 494> kExtInstNames{{
+    {IR(45584, 8), 0}, // MIN_SAD in arm_motion_engine_100
+    {IR(45592, 13), 1}, // MIN_SAD_COST in arm_motion_engine_100
+    {IR(45605, 8), 2}, // RAW_SAD in arm_motion_engine_100
+    {IR(45627, 21), 4}, // DebugCompilationUnit in debuginfo
+    {IR(46354, 13), 31}, // DebugDeclare in debuginfo
+    {IR(46426, 16), 34}, // DebugExpression in debuginfo
+    {IR(46170, 14), 23}, // DebugFunction in debuginfo
+    {IR(46145, 25), 22}, // DebugFunctionDeclaration in debuginfo
+    {IR(46125, 20), 21}, // DebugGlobalVariable in debuginfo
+    {IR(45613, 14), 3}, // DebugInfoNone in debuginfo
+    {IR(46257, 15), 28}, // DebugInlinedAt in debuginfo
+    {IR(46333, 21), 30}, // DebugInlinedVariable in debuginfo
+    {IR(46184, 18), 24}, // DebugLexicalBlock in debuginfo
+    {IR(46202, 31), 25}, // DebugLexicalBlockDiscriminator in debuginfo
+    {IR(46314, 19), 29}, // DebugLocalVariable in debuginfo
+    {IR(46442, 14), 35}, // DebugMacroDef in debuginfo
+    {IR(46456, 16), 36}, // DebugMacroUndef in debuginfo
+    {IR(46244, 13), 27}, // DebugNoScope in debuginfo
+    {IR(46411, 15), 33}, // DebugOperation in debuginfo
+    {IR(46233, 11), 26}, // DebugScope in debuginfo
+    {IR(45823, 15), 8}, // DebugTypeArray in debuginfo
+    {IR(45700, 15), 5}, // DebugTypeBasic in debuginfo
+    {IR(45937, 19), 13}, // DebugTypeComposite in debuginfo
+    {IR(45885, 14), 12}, // DebugTypeEnum in debuginfo
+    {IR(45867, 18), 11}, // DebugTypeFunction in debuginfo
+    {IR(45972, 21), 15}, // DebugTypeInheritance in debuginfo
+    {IR(45956, 16), 14}, // DebugTypeMember in debuginfo
+    {IR(45749, 17), 6}, // DebugTypePointer in debuginfo
+    {IR(45993, 21), 16}, // DebugTypePtrToMember in debuginfo
+    {IR(45804, 19), 7}, // DebugTypeQualifier in debuginfo
+    {IR(46014, 18), 17}, // DebugTypeTemplate in debuginfo
+    {IR(46032, 27), 18}, // DebugTypeTemplateParameter in debuginfo
+    {IR(46094, 31), 20}, // DebugTypeTemplateParameterPack in debuginfo
+    {IR(46059, 35), 19}, // DebugTypeTemplateTemplateParameter in debuginfo
+    {IR(45838, 16), 9}, // DebugTypeVector in debuginfo
+    {IR(45854, 13), 10}, // DebugTypedef in debuginfo
+    {IR(46367, 11), 32}, // DebugValue in debuginfo
+    {IR(46566, 5), 53}, // Acos in glsl_std_450
+    {IR(46597, 6), 59}, // Acosh in glsl_std_450
+    {IR(46561, 5), 52}, // Asin in glsl_std_450
+    {IR(46591, 6), 58}, // Asinh in glsl_std_450
+    {IR(46571, 5), 54}, // Atan in glsl_std_450
+    {IR(46609, 6), 61}, // Atan2 in glsl_std_450
+    {IR(46603, 6), 60}, // Atanh in glsl_std_450
+    {IR(46522, 5), 45}, // Ceil in glsl_std_450
+    {IR(46553, 4), 50}, // Cos in glsl_std_450
+    {IR(46581, 5), 56}, // Cosh in glsl_std_450
+    {IR(46993, 6), 104}, // Cross in glsl_std_450
+    {IR(46541, 8), 48}, // Degrees in glsl_std_450
+    {IR(46654, 12), 69}, // Determinant in glsl_std_450
+    {IR(46984, 9), 103}, // Distance in glsl_std_450
+    {IR(46619, 4), 63}, // Exp in glsl_std_450
+    {IR(46627, 5), 65}, // Exp2 in glsl_std_450
+    {IR(46494, 5), 40}, // FAbs in glsl_std_450
+    {IR(46726, 7), 79}, // FClamp in glsl_std_450
+    {IR(46711, 5), 76}, // FMax in glsl_std_450
+    {IR(46696, 5), 73}, // FMin in glsl_std_450
+    {IR(46747, 5), 82}, // FMix in glsl_std_450
+    {IR(46504, 6), 42}, // FSign in glsl_std_450
+    {IR(47009, 12), 106}, // FaceForward in glsl_std_450
+    {IR(47037, 9), 109}, // FindILsb in glsl_std_450
+    {IR(47046, 9), 110}, // FindSMsb in glsl_std_450
+    {IR(47055, 9), 111}, // FindUMsb in glsl_std_450
+    {IR(46516, 6), 44}, // Floor in glsl_std_450
+    {IR(46773, 4), 86}, // Fma in glsl_std_450
+    {IR(46527, 6), 46}, // Fract in glsl_std_450
+    {IR(46777, 6), 87}, // Frexp in glsl_std_450
+    {IR(46783, 12), 88}, // FrexpStruct in glsl_std_450
+    {IR(46752, 5), 83}, // IMix in glsl_std_450
+    {IR(47064, 22), 112}, // InterpolateAtCentroid in glsl_std_450
+    {IR(47106, 20), 114}, // InterpolateAtOffset in glsl_std_450
+    {IR(47086, 20), 113}, // InterpolateAtSample in glsl_std_450
+    {IR(46642, 12), 68}, // InverseSqrt in glsl_std_450
+    {IR(46795, 6), 89}, // Ldexp in glsl_std_450
+    {IR(46977, 7), 102}, // Length in glsl_std_450
+    {IR(46623, 4), 64}, // Log in glsl_std_450
+    {IR(46632, 5), 66}, // Log2 in glsl_std_450
+    {IR(46666, 14), 70}, // MatrixInverse in glsl_std_450
+    {IR(46680, 5), 71}, // Modf in glsl_std_450
+    {IR(46685, 11), 72}, // ModfStruct in glsl_std_450
+    {IR(47136, 7), 117}, // NClamp in glsl_std_450
+    {IR(47131, 5), 116}, // NMax in glsl_std_450
+    {IR(47126, 5), 115}, // NMin in glsl_std_450
+    {IR(46999, 10), 105}, // Normalize in glsl_std_450
+    {IR(46868, 15), 95}, // PackDouble2x32 in glsl_std_450
+    {IR(46855, 13), 94}, // PackHalf2x16 in glsl_std_450
+    {IR(46827, 14), 92}, // PackSnorm2x16 in glsl_std_450
+    {IR(46801, 13), 90}, // PackSnorm4x8 in glsl_std_450
+    {IR(46841, 14), 93}, // PackUnorm2x16 in glsl_std_450
+    {IR(46814, 13), 91}, // PackUnorm4x8 in glsl_std_450
+    {IR(46615, 4), 62}, // Pow in glsl_std_450
+    {IR(46533, 8), 47}, // Radians in glsl_std_450
+    {IR(47021, 8), 107}, // Reflect in glsl_std_450
+    {IR(47029, 8), 108}, // Refract in glsl_std_450
+    {IR(46472, 6), 37}, // Round in glsl_std_450
+    {IR(46478, 10), 38}, // RoundEven in glsl_std_450
+    {IR(46499, 5), 41}, // SAbs in glsl_std_450
+    {IR(46740, 7), 81}, // SClamp in glsl_std_450
+    {IR(46721, 5), 78}, // SMax in glsl_std_450
+    {IR(46706, 5), 75}, // SMin in glsl_std_450
+    {IR(46510, 6), 43}, // SSign in glsl_std_450
+    {IR(46549, 4), 49}, // Sin in glsl_std_450
+    {IR(46576, 5), 55}, // Sinh in glsl_std_450
+    {IR(46762, 11), 85}, // SmoothStep in glsl_std_450
+    {IR(46637, 5), 67}, // Sqrt in glsl_std_450
+    {IR(46757, 5), 84}, // Step in glsl_std_450
+    {IR(46557, 4), 51}, // Tan in glsl_std_450
+    {IR(46586, 5), 57}, // Tanh in glsl_std_450
+    {IR(46488, 6), 39}, // Trunc in glsl_std_450
+    {IR(46733, 7), 80}, // UClamp in glsl_std_450
+    {IR(46716, 5), 77}, // UMax in glsl_std_450
+    {IR(46701, 5), 74}, // UMin in glsl_std_450
+    {IR(46960, 17), 101}, // UnpackDouble2x32 in glsl_std_450
+    {IR(46915, 15), 98}, // UnpackHalf2x16 in glsl_std_450
+    {IR(46883, 16), 96}, // UnpackSnorm2x16 in glsl_std_450
+    {IR(46930, 15), 99}, // UnpackSnorm4x8 in glsl_std_450
+    {IR(46899, 16), 97}, // UnpackUnorm2x16 in glsl_std_450
+    {IR(46945, 15), 100}, // UnpackUnorm4x8 in glsl_std_450
+    {IR(47143, 13), 119}, // ArgumentInfo in nonsemantic_clspvreflection
+    {IR(47238, 24), 124}, // ArgumentPodPushConstant in nonsemantic_clspvreflection
+    {IR(47194, 25), 122}, // ArgumentPodStorageBuffer in nonsemantic_clspvreflection
+    {IR(47219, 19), 123}, // ArgumentPodUniform in nonsemantic_clspvreflection
+    {IR(47672, 28), 143}, // ArgumentPointerPushConstant in nonsemantic_clspvreflection
+    {IR(47700, 23), 144}, // ArgumentPointerUniform in nonsemantic_clspvreflection
+    {IR(47262, 21), 125}, // ArgumentSampledImage in nonsemantic_clspvreflection
+    {IR(47304, 16), 127}, // ArgumentSampler in nonsemantic_clspvreflection
+    {IR(47156, 22), 120}, // ArgumentStorageBuffer in nonsemantic_clspvreflection
+    {IR(47283, 21), 126}, // ArgumentStorageImage in nonsemantic_clspvreflection
+    {IR(47960, 27), 151}, // ArgumentStorageTexelBuffer in nonsemantic_clspvreflection
+    {IR(47178, 16), 121}, // ArgumentUniform in nonsemantic_clspvreflection
+    {IR(47987, 27), 152}, // ArgumentUniformTexelBuffer in nonsemantic_clspvreflection
+    {IR(47320, 18), 128}, // ArgumentWorkgroup in nonsemantic_clspvreflection
+    {IR(48014, 32), 153}, // ConstantDataPointerPushConstant in nonsemantic_clspvreflection
+    {IR(47568, 26), 138}, // ConstantDataStorageBuffer in nonsemantic_clspvreflection
+    {IR(47594, 20), 139}, // ConstantDataUniform in nonsemantic_clspvreflection
+    {IR(47838, 45), 148}, // ImageArgumentInfoChannelDataTypePushConstant in nonsemantic_clspvreflection
+    {IR(47920, 40), 150}, // ImageArgumentInfoChannelDataTypeUniform in nonsemantic_clspvreflection
+    {IR(47796, 42), 147}, // ImageArgumentInfoChannelOrderPushConstant in nonsemantic_clspvreflection
+    {IR(47883, 37), 149}, // ImageArgumentInfoChannelOrderUniform in nonsemantic_clspvreflection
+    {IR(4630, 7), 118}, // Kernel in nonsemantic_clspvreflection
+    {IR(8055, 15), 140}, // LiteralSampler in nonsemantic_clspvreflection
+    {IR(48155, 34), 158}, // NormalizedSamplerMaskPushConstant in nonsemantic_clspvreflection
+    {IR(48123, 32), 157}, // PrintfBufferPointerPushConstant in nonsemantic_clspvreflection
+    {IR(48097, 26), 156}, // PrintfBufferStorageBuffer in nonsemantic_clspvreflection
+    {IR(48086, 11), 155}, // PrintfInfo in nonsemantic_clspvreflection
+    {IR(48046, 40), 154}, // ProgramScopeVariablePointerPushConstant in nonsemantic_clspvreflection
+    {IR(47758, 38), 146}, // ProgramScopeVariablePointerRelocation in nonsemantic_clspvreflection
+    {IR(47723, 35), 145}, // ProgramScopeVariablesStorageBuffer in nonsemantic_clspvreflection
+    {IR(47614, 30), 141}, // PropertyRequiredWorkgroupSize in nonsemantic_clspvreflection
+    {IR(47434, 30), 133}, // PushConstantEnqueuedLocalSize in nonsemantic_clspvreflection
+    {IR(47409, 25), 132}, // PushConstantGlobalOffset in nonsemantic_clspvreflection
+    {IR(47464, 23), 134}, // PushConstantGlobalSize in nonsemantic_clspvreflection
+    {IR(47512, 26), 136}, // PushConstantNumWorkgroups in nonsemantic_clspvreflection
+    {IR(47538, 30), 137}, // PushConstantRegionGroupOffset in nonsemantic_clspvreflection
+    {IR(47487, 25), 135}, // PushConstantRegionOffset in nonsemantic_clspvreflection
+    {IR(47364, 25), 130}, // SpecConstantGlobalOffset in nonsemantic_clspvreflection
+    {IR(47644, 28), 142}, // SpecConstantSubgroupMaxSize in nonsemantic_clspvreflection
+    {IR(47389, 20), 131}, // SpecConstantWorkDim in nonsemantic_clspvreflection
+    {IR(47338, 26), 129}, // SpecConstantWorkgroupSize in nonsemantic_clspvreflection
+    {IR(48189, 22), 159}, // WorkgroupVariableSize in nonsemantic_clspvreflection
+    {IR(48310, 21), 200}, // DebugBuildIdentifier in nonsemantic_shader_debuginfo_100
+    {IR(45627, 21), 161}, // DebugCompilationUnit in nonsemantic_shader_debuginfo_100
+    {IR(46354, 13), 188}, // DebugDeclare in nonsemantic_shader_debuginfo_100
+    {IR(48348, 16), 202}, // DebugEntryPoint in nonsemantic_shader_debuginfo_100
+    {IR(46426, 16), 191}, // DebugExpression in nonsemantic_shader_debuginfo_100
+    {IR(46170, 14), 180}, // DebugFunction in nonsemantic_shader_debuginfo_100
+    {IR(46145, 25), 179}, // DebugFunctionDeclaration in nonsemantic_shader_debuginfo_100
+    {IR(48243, 24), 196}, // DebugFunctionDefinition in nonsemantic_shader_debuginfo_100
+    {IR(46125, 20), 178}, // DebugGlobalVariable in nonsemantic_shader_debuginfo_100
+    {IR(48211, 20), 194}, // DebugImportedEntity in nonsemantic_shader_debuginfo_100
+    {IR(45613, 14), 160}, // DebugInfoNone in nonsemantic_shader_debuginfo_100
+    {IR(46257, 15), 185}, // DebugInlinedAt in nonsemantic_shader_debuginfo_100
+    {IR(46333, 21), 187}, // DebugInlinedVariable in nonsemantic_shader_debuginfo_100
+    {IR(46184, 18), 181}, // DebugLexicalBlock in nonsemantic_shader_debuginfo_100
+    {IR(46202, 31), 182}, // DebugLexicalBlockDiscriminator in nonsemantic_shader_debuginfo_100
+    {IR(48288, 10), 198}, // DebugLine in nonsemantic_shader_debuginfo_100
+    {IR(46314, 19), 186}, // DebugLocalVariable in nonsemantic_shader_debuginfo_100
+    {IR(46442, 14), 192}, // DebugMacroDef in nonsemantic_shader_debuginfo_100
+    {IR(46456, 16), 193}, // DebugMacroUndef in nonsemantic_shader_debuginfo_100
+    {IR(48298, 12), 199}, // DebugNoLine in nonsemantic_shader_debuginfo_100
+    {IR(46244, 13), 184}, // DebugNoScope in nonsemantic_shader_debuginfo_100
+    {IR(46411, 15), 190}, // DebugOperation in nonsemantic_shader_debuginfo_100
+    {IR(46233, 11), 183}, // DebugScope in nonsemantic_shader_debuginfo_100
+    {IR(48231, 12), 195}, // DebugSource in nonsemantic_shader_debuginfo_100
+    {IR(48267, 21), 197}, // DebugSourceContinued in nonsemantic_shader_debuginfo_100
+    {IR(48331, 17), 201}, // DebugStoragePath in nonsemantic_shader_debuginfo_100
+    {IR(45823, 15), 165}, // DebugTypeArray in nonsemantic_shader_debuginfo_100
+    {IR(45700, 15), 162}, // DebugTypeBasic in nonsemantic_shader_debuginfo_100
+    {IR(45937, 19), 170}, // DebugTypeComposite in nonsemantic_shader_debuginfo_100
+    {IR(45885, 14), 169}, // DebugTypeEnum in nonsemantic_shader_debuginfo_100
+    {IR(45867, 18), 168}, // DebugTypeFunction in nonsemantic_shader_debuginfo_100
+    {IR(45972, 21), 172}, // DebugTypeInheritance in nonsemantic_shader_debuginfo_100
+    {IR(48364, 16), 203}, // DebugTypeMatrix in nonsemantic_shader_debuginfo_100
+    {IR(45956, 16), 171}, // DebugTypeMember in nonsemantic_shader_debuginfo_100
+    {IR(45749, 17), 163}, // DebugTypePointer in nonsemantic_shader_debuginfo_100
+    {IR(45993, 21), 173}, // DebugTypePtrToMember in nonsemantic_shader_debuginfo_100
+    {IR(45804, 19), 164}, // DebugTypeQualifier in nonsemantic_shader_debuginfo_100
+    {IR(46014, 18), 174}, // DebugTypeTemplate in nonsemantic_shader_debuginfo_100
+    {IR(46032, 27), 175}, // DebugTypeTemplateParameter in nonsemantic_shader_debuginfo_100
+    {IR(46094, 31), 177}, // DebugTypeTemplateParameterPack in nonsemantic_shader_debuginfo_100
+    {IR(46059, 35), 176}, // DebugTypeTemplateTemplateParameter in nonsemantic_shader_debuginfo_100
+    {IR(45838, 16), 166}, // DebugTypeVector in nonsemantic_shader_debuginfo_100
+    {IR(45854, 13), 167}, // DebugTypedef in nonsemantic_shader_debuginfo_100
+    {IR(46367, 11), 189}, // DebugValue in nonsemantic_shader_debuginfo_100
+    {IR(48380, 14), 204}, // Configuration in nonsemantic_vkspreflection
+    {IR(48456, 20), 209}, // DescriptorSetBuffer in nonsemantic_vkspreflection
+    {IR(48476, 19), 210}, // DescriptorSetImage in nonsemantic_vkspreflection
+    {IR(48495, 21), 211}, // DescriptorSetSampler in nonsemantic_vkspreflection
+    {IR(48419, 14), 207}, // PushConstants in nonsemantic_vkspreflection
+    {IR(48433, 23), 208}, // SpecializationMapEntry in nonsemantic_vkspreflection
+    {IR(48394, 13), 205}, // StartCounter in nonsemantic_vkspreflection
+    {IR(48407, 12), 206}, // StopCounter in nonsemantic_vkspreflection
+    {IR(45627, 21), 213}, // DebugCompilationUnit in opencl_debuginfo_100
+    {IR(46354, 13), 240}, // DebugDeclare in opencl_debuginfo_100
+    {IR(46426, 16), 243}, // DebugExpression in opencl_debuginfo_100
+    {IR(46170, 14), 232}, // DebugFunction in opencl_debuginfo_100
+    {IR(46145, 25), 231}, // DebugFunctionDeclaration in opencl_debuginfo_100
+    {IR(46125, 20), 230}, // DebugGlobalVariable in opencl_debuginfo_100
+    {IR(48211, 20), 246}, // DebugImportedEntity in opencl_debuginfo_100
+    {IR(45613, 14), 212}, // DebugInfoNone in opencl_debuginfo_100
+    {IR(46257, 15), 237}, // DebugInlinedAt in opencl_debuginfo_100
+    {IR(46333, 21), 239}, // DebugInlinedVariable in opencl_debuginfo_100
+    {IR(46184, 18), 233}, // DebugLexicalBlock in opencl_debuginfo_100
+    {IR(46202, 31), 234}, // DebugLexicalBlockDiscriminator in opencl_debuginfo_100
+    {IR(46314, 19), 238}, // DebugLocalVariable in opencl_debuginfo_100
+    {IR(46442, 14), 244}, // DebugMacroDef in opencl_debuginfo_100
+    {IR(46456, 16), 245}, // DebugMacroUndef in opencl_debuginfo_100
+    {IR(48816, 17), 248}, // DebugModuleINTEL in opencl_debuginfo_100
+    {IR(46244, 13), 236}, // DebugNoScope in opencl_debuginfo_100
+    {IR(46411, 15), 242}, // DebugOperation in opencl_debuginfo_100
+    {IR(46233, 11), 235}, // DebugScope in opencl_debuginfo_100
+    {IR(48231, 12), 247}, // DebugSource in opencl_debuginfo_100
+    {IR(45823, 15), 217}, // DebugTypeArray in opencl_debuginfo_100
+    {IR(45700, 15), 214}, // DebugTypeBasic in opencl_debuginfo_100
+    {IR(45937, 19), 222}, // DebugTypeComposite in opencl_debuginfo_100
+    {IR(45885, 14), 221}, // DebugTypeEnum in opencl_debuginfo_100
+    {IR(45867, 18), 220}, // DebugTypeFunction in opencl_debuginfo_100
+    {IR(45972, 21), 224}, // DebugTypeInheritance in opencl_debuginfo_100
+    {IR(45956, 16), 223}, // DebugTypeMember in opencl_debuginfo_100
+    {IR(45749, 17), 215}, // DebugTypePointer in opencl_debuginfo_100
+    {IR(45993, 21), 225}, // DebugTypePtrToMember in opencl_debuginfo_100
+    {IR(45804, 19), 216}, // DebugTypeQualifier in opencl_debuginfo_100
+    {IR(46014, 18), 226}, // DebugTypeTemplate in opencl_debuginfo_100
+    {IR(46032, 27), 227}, // DebugTypeTemplateParameter in opencl_debuginfo_100
+    {IR(46094, 31), 229}, // DebugTypeTemplateParameterPack in opencl_debuginfo_100
+    {IR(46059, 35), 228}, // DebugTypeTemplateTemplateParameter in opencl_debuginfo_100
+    {IR(45838, 16), 218}, // DebugTypeVector in opencl_debuginfo_100
+    {IR(45854, 13), 219}, // DebugTypedef in opencl_debuginfo_100
+    {IR(46367, 11), 241}, // DebugValue in opencl_debuginfo_100
+    {IR(48833, 5), 249}, // acos in opencl_std_100
+    {IR(48838, 6), 250}, // acosh in opencl_std_100
+    {IR(48844, 7), 251}, // acospi in opencl_std_100
+    {IR(48851, 5), 252}, // asin in opencl_std_100
+    {IR(48856, 6), 253}, // asinh in opencl_std_100
+    {IR(48862, 7), 254}, // asinpi in opencl_std_100
+    {IR(48869, 5), 255}, // atan in opencl_std_100
+    {IR(48874, 6), 256}, // atan2 in opencl_std_100
+    {IR(48893, 8), 259}, // atan2pi in opencl_std_100
+    {IR(48880, 6), 257}, // atanh in opencl_std_100
+    {IR(48886, 7), 258}, // atanpi in opencl_std_100
+    {IR(50084, 10), 405}, // bitselect in opencl_std_100
+    {IR(48901, 5), 260}, // cbrt in opencl_std_100
+    {IR(48906, 5), 261}, // ceil in opencl_std_100
+    {IR(49756, 4), 370}, // clz in opencl_std_100
+    {IR(48911, 9), 262}, // copysign in opencl_std_100
+    {IR(48920, 4), 263}, // cos in opencl_std_100
+    {IR(48924, 5), 264}, // cosh in opencl_std_100
+    {IR(48929, 6), 265}, // cospi in opencl_std_100
+    {IR(49600, 6), 353}, // cross in opencl_std_100
+    {IR(49760, 4), 371}, // ctz in opencl_std_100
+    {IR(49535, 8), 345}, // degrees in opencl_std_100
+    {IR(49606, 9), 354}, // distance in opencl_std_100
+    {IR(48940, 4), 267}, // erf in opencl_std_100
+    {IR(48935, 5), 266}, // erfc in opencl_std_100
+    {IR(48944, 4), 268}, // exp in opencl_std_100
+    {IR(48953, 6), 270}, // exp10 in opencl_std_100
+    {IR(48948, 5), 269}, // exp2 in opencl_std_100
+    {IR(48959, 6), 271}, // expm1 in opencl_std_100
+    {IR(48965, 5), 272}, // fabs in opencl_std_100
+    {IR(49632, 14), 357}, // fast_distance in opencl_std_100
+    {IR(49646, 12), 358}, // fast_length in opencl_std_100
+    {IR(49658, 15), 359}, // fast_normalize in opencl_std_100
+    {IR(49528, 7), 344}, // fclamp in opencl_std_100
+    {IR(48970, 5), 273}, // fdim in opencl_std_100
+    {IR(48975, 6), 274}, // floor in opencl_std_100
+    {IR(48981, 4), 275}, // fma in opencl_std_100
+    {IR(48985, 5), 276}, // fmax in opencl_std_100
+    {IR(49543, 12), 346}, // fmax_common in opencl_std_100
+    {IR(48990, 5), 277}, // fmin in opencl_std_100
+    {IR(49555, 12), 347}, // fmin_common in opencl_std_100
+    {IR(48995, 5), 278}, // fmod in opencl_std_100
+    {IR(49000, 6), 279}, // fract in opencl_std_100
+    {IR(49006, 6), 280}, // frexp in opencl_std_100
+    {IR(49218, 9), 316}, // half_cos in opencl_std_100
+    {IR(49227, 12), 317}, // half_divide in opencl_std_100
+    {IR(49239, 9), 318}, // half_exp in opencl_std_100
+    {IR(49258, 11), 320}, // half_exp10 in opencl_std_100
+    {IR(49248, 10), 319}, // half_exp2 in opencl_std_100
+    {IR(49269, 9), 321}, // half_log in opencl_std_100
+    {IR(49288, 11), 323}, // half_log10 in opencl_std_100
+    {IR(49278, 10), 322}, // half_log2 in opencl_std_100
+    {IR(49299, 10), 324}, // half_powr in opencl_std_100
+    {IR(49309, 11), 325}, // half_recip in opencl_std_100
+    {IR(49320, 11), 326}, // half_rsqrt in opencl_std_100
+    {IR(49331, 9), 327}, // half_sin in opencl_std_100
+    {IR(49340, 10), 328}, // half_sqrt in opencl_std_100
+    {IR(49350, 9), 329}, // half_tan in opencl_std_100
+    {IR(49012, 6), 281}, // hypot in opencl_std_100
+    {IR(49018, 6), 282}, // ilogb in opencl_std_100
+    {IR(49024, 6), 283}, // ldexp in opencl_std_100
+    {IR(49615, 7), 355}, // length in opencl_std_100
+    {IR(49030, 7), 284}, // lgamma in opencl_std_100
+    {IR(49037, 9), 285}, // lgamma_r in opencl_std_100
+    {IR(49046, 4), 286}, // log in opencl_std_100
+    {IR(49055, 6), 288}, // log10 in opencl_std_100
+    {IR(49061, 6), 289}, // log1p in opencl_std_100
+    {IR(49050, 5), 287}, // log2 in opencl_std_100
+    {IR(49067, 5), 290}, // logb in opencl_std_100
+    {IR(49072, 4), 291}, // mad in opencl_std_100
+    {IR(49076, 7), 292}, // maxmag in opencl_std_100
+    {IR(49083, 7), 293}, // minmag in opencl_std_100
+    {IR(49567, 4), 348}, // mix in opencl_std_100
+    {IR(49090, 5), 294}, // modf in opencl_std_100
+    {IR(49095, 4), 295}, // nan in opencl_std_100
+    {IR(49359, 11), 330}, // native_cos in opencl_std_100
+    {IR(49370, 14), 331}, // native_divide in opencl_std_100
+    {IR(49384, 11), 332}, // native_exp in opencl_std_100
+    {IR(49407, 13), 334}, // native_exp10 in opencl_std_100
+    {IR(49395, 12), 333}, // native_exp2 in opencl_std_100
+    {IR(49420, 11), 335}, // native_log in opencl_std_100
+    {IR(49443, 13), 337}, // native_log10 in opencl_std_100
+    {IR(49431, 12), 336}, // native_log2 in opencl_std_100
+    {IR(49456, 12), 338}, // native_powr in opencl_std_100
+    {IR(49468, 13), 339}, // native_recip in opencl_std_100
+    {IR(49481, 13), 340}, // native_rsqrt in opencl_std_100
+    {IR(49494, 11), 341}, // native_sin in opencl_std_100
+    {IR(49505, 12), 342}, // native_sqrt in opencl_std_100
+    {IR(49517, 11), 343}, // native_tan in opencl_std_100
+    {IR(49099, 10), 296}, // nextafter in opencl_std_100
+    {IR(49622, 10), 356}, // normalize in opencl_std_100
+    {IR(49875, 9), 385}, // popcount in opencl_std_100
+    {IR(49109, 4), 297}, // pow in opencl_std_100
+    {IR(49113, 5), 298}, // pown in opencl_std_100
+    {IR(49118, 5), 299}, // powr in opencl_std_100
+    {IR(50075, 9), 404}, // prefetch in opencl_std_100
+    {IR(50068, 7), 403}, // printf in opencl_std_100
+    {IR(49571, 8), 349}, // radians in opencl_std_100
+    {IR(49123, 10), 300}, // remainder in opencl_std_100
+    {IR(49133, 7), 301}, // remquo in opencl_std_100
+    {IR(49140, 5), 302}, // rint in opencl_std_100
+    {IR(49145, 6), 303}, // rootn in opencl_std_100
+    {IR(49826, 7), 380}, // rotate in opencl_std_100
+    {IR(49151, 6), 304}, // round in opencl_std_100
+    {IR(49157, 6), 305}, // rsqrt in opencl_std_100
+    {IR(49673, 6), 360}, // s_abs in opencl_std_100
+    {IR(49679, 11), 361}, // s_abs_diff in opencl_std_100
+    {IR(49690, 10), 362}, // s_add_sat in opencl_std_100
+    {IR(49740, 8), 368}, // s_clamp in opencl_std_100
+    {IR(49710, 7), 364}, // s_hadd in opencl_std_100
+    {IR(49884, 8), 386}, // s_mad24 in opencl_std_100
+    {IR(49764, 9), 372}, // s_mad_hi in opencl_std_100
+    {IR(49783, 10), 374}, // s_mad_sat in opencl_std_100
+    {IR(49793, 6), 375}, // s_max in opencl_std_100
+    {IR(49805, 6), 377}, // s_min in opencl_std_100
+    {IR(49900, 8), 388}, // s_mul24 in opencl_std_100
+    {IR(49817, 9), 379}, // s_mul_hi in opencl_std_100
+    {IR(49724, 8), 366}, // s_rhadd in opencl_std_100
+    {IR(49833, 10), 381}, // s_sub_sat in opencl_std_100
+    {IR(49864, 11), 384}, // s_upsample in opencl_std_100
+    {IR(50094, 7), 406}, // select in opencl_std_100
+    {IR(50051, 8), 401}, // shuffle in opencl_std_100
+    {IR(50059, 9), 402}, // shuffle2 in opencl_std_100
+    {IR(49595, 5), 352}, // sign in opencl_std_100
+    {IR(49163, 4), 306}, // sin in opencl_std_100
+    {IR(49167, 7), 307}, // sincos in opencl_std_100
+    {IR(49174, 5), 308}, // sinh in opencl_std_100
+    {IR(49179, 6), 309}, // sinpi in opencl_std_100
+    {IR(49584, 11), 351}, // smoothstep in opencl_std_100
+    {IR(49185, 5), 310}, // sqrt in opencl_std_100
+    {IR(49579, 5), 350}, // step in opencl_std_100
+    {IR(49190, 4), 311}, // tan in opencl_std_100
+    {IR(49194, 5), 312}, // tanh in opencl_std_100
+    {IR(49199, 6), 313}, // tanpi in opencl_std_100
+    {IR(49205, 7), 314}, // tgamma in opencl_std_100
+    {IR(49212, 6), 315}, // trunc in opencl_std_100
+    {IR(50101, 6), 407}, // u_abs in opencl_std_100
+    {IR(50107, 11), 408}, // u_abs_diff in opencl_std_100
+    {IR(49700, 10), 363}, // u_add_sat in opencl_std_100
+    {IR(49748, 8), 369}, // u_clamp in opencl_std_100
+    {IR(49717, 7), 365}, // u_hadd in opencl_std_100
+    {IR(49892, 8), 387}, // u_mad24 in opencl_std_100
+    {IR(50127, 9), 410}, // u_mad_hi in opencl_std_100
+    {IR(49773, 10), 373}, // u_mad_sat in opencl_std_100
+    {IR(49799, 6), 376}, // u_max in opencl_std_100
+    {IR(49811, 6), 378}, // u_min in opencl_std_100
+    {IR(49908, 8), 389}, // u_mul24 in opencl_std_100
+    {IR(50118, 9), 409}, // u_mul_hi in opencl_std_100
+    {IR(49732, 8), 367}, // u_rhadd in opencl_std_100
+    {IR(49843, 10), 382}, // u_sub_sat in opencl_std_100
+    {IR(49853, 11), 383}, // u_upsample in opencl_std_100
+    {IR(49931, 11), 392}, // vload_half in opencl_std_100
+    {IR(49942, 12), 393}, // vload_halfn in opencl_std_100
+    {IR(50008, 13), 398}, // vloada_halfn in opencl_std_100
+    {IR(49916, 7), 390}, // vloadn in opencl_std_100
+    {IR(49954, 12), 394}, // vstore_half in opencl_std_100
+    {IR(49966, 14), 395}, // vstore_half_r in opencl_std_100
+    {IR(49980, 13), 396}, // vstore_halfn in opencl_std_100
+    {IR(49993, 15), 397}, // vstore_halfn_r in opencl_std_100
+    {IR(50021, 14), 399}, // vstorea_halfn in opencl_std_100
+    {IR(50035, 16), 400}, // vstorea_halfn_r in opencl_std_100
+    {IR(49923, 8), 391}, // vstoren in opencl_std_100
+    {IR(50153, 17), 412}, // CubeFaceCoordAMD in spv_amd_gcn_shader
+    {IR(50136, 17), 411}, // CubeFaceIndexAMD in spv_amd_gcn_shader
+    {IR(50170, 8), 413}, // TimeAMD in spv_amd_gcn_shader
+    {IR(50247, 9), 417}, // MbcntAMD in spv_amd_shader_ballot
+    {IR(50178, 22), 414}, // SwizzleInvocationsAMD in spv_amd_shader_ballot
+    {IR(50200, 28), 415}, // SwizzleInvocationsMaskedAMD in spv_amd_shader_ballot
+    {IR(50228, 19), 416}, // WriteInvocationAMD in spv_amd_shader_ballot
+    {IR(50256, 23), 418}, // InterpolateAtVertexAMD in spv_amd_shader_explicit_vertex_parameter
+    {IR(50306, 9), 422}, // FMax3AMD in spv_amd_shader_trinary_minmax
+    {IR(50333, 9), 425}, // FMid3AMD in spv_amd_shader_trinary_minmax
+    {IR(50279, 9), 419}, // FMin3AMD in spv_amd_shader_trinary_minmax
+    {IR(50324, 9), 424}, // SMax3AMD in spv_amd_shader_trinary_minmax
+    {IR(50351, 9), 427}, // SMid3AMD in spv_amd_shader_trinary_minmax
+    {IR(50297, 9), 421}, // SMin3AMD in spv_amd_shader_trinary_minmax
+    {IR(50315, 9), 423}, // UMax3AMD in spv_amd_shader_trinary_minmax
+    {IR(50342, 9), 426}, // UMid3AMD in spv_amd_shader_trinary_minmax
+    {IR(50288, 9), 420}, // UMin3AMD in spv_amd_shader_trinary_minmax
+    {IR(50657, 4), 459}, // ABS in tosa_001000_1
+    {IR(50480, 4), 442}, // ADD in tosa_001000_1
+    {IR(50360, 7), 428}, // ARGMAX in tosa_001000_1
+    {IR(50484, 23), 443}, // ARITHMETIC_RIGHT_SHIFT in tosa_001000_1
+    {IR(50367, 11), 429}, // AVG_POOL2D in tosa_001000_1
+    {IR(50507, 12), 444}, // BITWISE_AND in tosa_001000_1
+    {IR(50661, 12), 460}, // BITWISE_NOT in tosa_001000_1
+    {IR(50519, 11), 445}, // BITWISE_OR in tosa_001000_1
+    {IR(50530, 12), 446}, // BITWISE_XOR in tosa_001000_1
+    {IR(50915, 5), 492}, // CAST in tosa_001000_1
+    {IR(50673, 5), 461}, // CEIL in tosa_001000_1
+    {IR(50457, 6), 438}, // CLAMP in tosa_001000_1
+    {IR(50678, 4), 462}, // CLZ in tosa_001000_1
+    {IR(50845, 7), 482}, // CONCAT in tosa_001000_1
+    {IR(50378, 7), 430}, // CONV2D in tosa_001000_1
+    {IR(50385, 7), 431}, // CONV3D in tosa_001000_1
+    {IR(50682, 4), 463}, // COS in tosa_001000_1
+    {IR(50392, 17), 432}, // DEPTHWISE_CONV2D in tosa_001000_1
+    {IR(50747, 6), 473}, // EQUAL in tosa_001000_1
+    {IR(50463, 4), 439}, // ERF in tosa_001000_1
+    {IR(50686, 4), 464}, // EXP in tosa_001000_1
+    {IR(50409, 6), 433}, // FFT2D in tosa_001000_1
+    {IR(50690, 6), 465}, // FLOOR in tosa_001000_1
+    {IR(50893, 7), 489}, // GATHER in tosa_001000_1
+    {IR(50753, 8), 474}, // GREATER in tosa_001000_1
+    {IR(50761, 14), 475}, // GREATER_EQUAL in tosa_001000_1
+    {IR(50542, 7), 447}, // INTDIV in tosa_001000_1
+    {IR(50696, 4), 466}, // LOG in tosa_001000_1
+    {IR(50549, 12), 448}, // LOGICAL_AND in tosa_001000_1
+    {IR(50561, 19), 449}, // LOGICAL_LEFT_SHIFT in tosa_001000_1
+    {IR(50700, 12), 467}, // LOGICAL_NOT in tosa_001000_1
+    {IR(50600, 11), 451}, // LOGICAL_OR in tosa_001000_1
+    {IR(50580, 20), 450}, // LOGICAL_RIGHT_SHIFT in tosa_001000_1
+    {IR(50611, 12), 452}, // LOGICAL_XOR in tosa_001000_1
+    {IR(50415, 7), 434}, // MATMUL in tosa_001000_1
+    {IR(50623, 8), 453}, // MAXIMUM in tosa_001000_1
+    {IR(50422, 11), 435}, // MAX_POOL2D in tosa_001000_1
+    {IR(50631, 8), 454}, // MINIMUM in tosa_001000_1
+    {IR(50639, 4), 455}, // MUL in tosa_001000_1
+    {IR(50712, 7), 468}, // NEGATE in tosa_001000_1
+    {IR(50852, 4), 483}, // PAD in tosa_001000_1
+    {IR(50643, 4), 456}, // POW in tosa_001000_1
+    {IR(50719, 11), 469}, // RECIPROCAL in tosa_001000_1
+    {IR(50775, 11), 476}, // REDUCE_ALL in tosa_001000_1
+    {IR(50786, 11), 477}, // REDUCE_ANY in tosa_001000_1
+    {IR(50797, 11), 478}, // REDUCE_MAX in tosa_001000_1
+    {IR(50808, 11), 479}, // REDUCE_MIN in tosa_001000_1
+    {IR(50819, 15), 480}, // REDUCE_PRODUCT in tosa_001000_1
+    {IR(50834, 11), 481}, // REDUCE_SUM in tosa_001000_1
+    {IR(50920, 8), 493}, // RESCALE in tosa_001000_1
+    {IR(50856, 8), 484}, // RESHAPE in tosa_001000_1
+    {IR(50908, 7), 491}, // RESIZE in tosa_001000_1
+    {IR(50864, 8), 485}, // REVERSE in tosa_001000_1
+    {IR(50433, 7), 436}, // RFFT2D in tosa_001000_1
+    {IR(50730, 6), 470}, // RSQRT in tosa_001000_1
+    {IR(50900, 8), 490}, // SCATTER in tosa_001000_1
+    {IR(50740, 7), 472}, // SELECT in tosa_001000_1
+    {IR(50467, 8), 440}, // SIGMOID in tosa_001000_1
+    {IR(50736, 4), 471}, // SIN in tosa_001000_1
+    {IR(50872, 6), 486}, // SLICE in tosa_001000_1
+    {IR(50647, 4), 457}, // SUB in tosa_001000_1
+    {IR(50651, 6), 458}, // TABLE in tosa_001000_1
+    {IR(50475, 5), 441}, // TANH in tosa_001000_1
+    {IR(50878, 5), 487}, // TILE in tosa_001000_1
+    {IR(50883, 10), 488}, // TRANSPOSE in tosa_001000_1
+    {IR(50440, 17), 437}, // TRANSPOSE_CONV2D in tosa_001000_1
 }};
 
 IndexRange ExtInstNameRangeForKind(spv_ext_inst_type_t type) {
   switch(type) {
-    case SPV_EXT_INST_TYPE_DEBUGINFO: return IR(0, 34);
-    case SPV_EXT_INST_TYPE_GLSL_STD_450: return IR(34, 81);
-    case SPV_EXT_INST_TYPE_NONSEMANTIC_CLSPVREFLECTION: return IR(115, 42);
-    case SPV_EXT_INST_TYPE_NONSEMANTIC_SHADER_DEBUGINFO_100: return IR(157, 44);
-    case SPV_EXT_INST_TYPE_NONSEMANTIC_VKSPREFLECTION: return IR(201, 8);
-    case SPV_EXT_INST_TYPE_OPENCL_DEBUGINFO_100: return IR(209, 37);
-    case SPV_EXT_INST_TYPE_OPENCL_STD: return IR(246, 162);
-    case SPV_EXT_INST_TYPE_SPV_AMD_GCN_SHADER: return IR(408, 3);
-    case SPV_EXT_INST_TYPE_SPV_AMD_SHADER_BALLOT: return IR(411, 4);
-    case SPV_EXT_INST_TYPE_SPV_AMD_SHADER_EXPLICIT_VERTEX_PARAMETER: return IR(415, 1);
-    case SPV_EXT_INST_TYPE_SPV_AMD_SHADER_TRINARY_MINMAX: return IR(416, 9);
-    case SPV_EXT_INST_TYPE_TOSA_001000_1: return IR(425, 66);
+    case SPV_EXT_INST_TYPE_ARM_MOTION_ENGINE_100: return IR(0, 3);
+    case SPV_EXT_INST_TYPE_DEBUGINFO: return IR(3, 34);
+    case SPV_EXT_INST_TYPE_GLSL_STD_450: return IR(37, 81);
+    case SPV_EXT_INST_TYPE_NONSEMANTIC_CLSPVREFLECTION: return IR(118, 42);
+    case SPV_EXT_INST_TYPE_NONSEMANTIC_SHADER_DEBUGINFO_100: return IR(160, 44);
+    case SPV_EXT_INST_TYPE_NONSEMANTIC_VKSPREFLECTION: return IR(204, 8);
+    case SPV_EXT_INST_TYPE_OPENCL_DEBUGINFO_100: return IR(212, 37);
+    case SPV_EXT_INST_TYPE_OPENCL_STD: return IR(249, 162);
+    case SPV_EXT_INST_TYPE_SPV_AMD_GCN_SHADER: return IR(411, 3);
+    case SPV_EXT_INST_TYPE_SPV_AMD_SHADER_BALLOT: return IR(414, 4);
+    case SPV_EXT_INST_TYPE_SPV_AMD_SHADER_EXPLICIT_VERTEX_PARAMETER: return IR(418, 1);
+    case SPV_EXT_INST_TYPE_SPV_AMD_SHADER_TRINARY_MINMAX: return IR(419, 9);
+    case SPV_EXT_INST_TYPE_TOSA_001000_1: return IR(428, 66);
     default: break;
   }
   return IR(0,0);
@@ -7915,437 +7923,440 @@ static const char kStrings[] =
   "ConvertHandleToImageINTEL\0" // IR(45497, 26)
   "ConvertHandleToSamplerINTEL\0" // IR(45523, 28)
   "ConvertHandleToSampledImageINTEL\0" // IR(45551, 33)
-  "DebugInfoNone\0" // IR(45584, 14)
-  "DebugCompilationUnit\0" // IR(45598, 21)
-  "SPV_OPERAND_TYPE_DEBUG_BASE_TYPE_ATTRIBUTE_ENCODING\0" // IR(45619, 52)
-  "DebugTypeBasic\0" // IR(45671, 15)
-  "SPV_OPERAND_TYPE_DEBUG_INFO_FLAGS\0" // IR(45686, 34)
-  "DebugTypePointer\0" // IR(45720, 17)
-  "SPV_OPERAND_TYPE_DEBUG_TYPE_QUALIFIER\0" // IR(45737, 38)
-  "DebugTypeQualifier\0" // IR(45775, 19)
-  "DebugTypeArray\0" // IR(45794, 15)
-  "DebugTypeVector\0" // IR(45809, 16)
-  "DebugTypedef\0" // IR(45825, 13)
-  "DebugTypeFunction\0" // IR(45838, 18)
-  "DebugTypeEnum\0" // IR(45856, 14)
-  "SPV_OPERAND_TYPE_DEBUG_COMPOSITE_TYPE\0" // IR(45870, 38)
-  "DebugTypeComposite\0" // IR(45908, 19)
-  "DebugTypeMember\0" // IR(45927, 16)
-  "DebugTypeInheritance\0" // IR(45943, 21)
-  "DebugTypePtrToMember\0" // IR(45964, 21)
-  "DebugTypeTemplate\0" // IR(45985, 18)
-  "DebugTypeTemplateParameter\0" // IR(46003, 27)
-  "DebugTypeTemplateTemplateParameter\0" // IR(46030, 35)
-  "DebugTypeTemplateParameterPack\0" // IR(46065, 31)
-  "DebugGlobalVariable\0" // IR(46096, 20)
-  "DebugFunctionDeclaration\0" // IR(46116, 25)
-  "DebugFunction\0" // IR(46141, 14)
-  "DebugLexicalBlock\0" // IR(46155, 18)
-  "DebugLexicalBlockDiscriminator\0" // IR(46173, 31)
-  "DebugScope\0" // IR(46204, 11)
-  "DebugNoScope\0" // IR(46215, 13)
-  "DebugInlinedAt\0" // IR(46228, 15)
-  "SPV_OPERAND_TYPE_OPTIONAL_LITERAL_INTEGER\0" // IR(46243, 42)
-  "DebugLocalVariable\0" // IR(46285, 19)
-  "DebugInlinedVariable\0" // IR(46304, 21)
-  "DebugDeclare\0" // IR(46325, 13)
-  "DebugValue\0" // IR(46338, 11)
-  "SPV_OPERAND_TYPE_DEBUG_OPERATION\0" // IR(46349, 33)
-  "DebugOperation\0" // IR(46382, 15)
-  "DebugExpression\0" // IR(46397, 16)
-  "DebugMacroDef\0" // IR(46413, 14)
-  "DebugMacroUndef\0" // IR(46427, 16)
-  "Round\0" // IR(46443, 6)
-  "RoundEven\0" // IR(46449, 10)
-  "Trunc\0" // IR(46459, 6)
-  "FAbs\0" // IR(46465, 5)
-  "SAbs\0" // IR(46470, 5)
-  "FSign\0" // IR(46475, 6)
-  "SSign\0" // IR(46481, 6)
-  "Floor\0" // IR(46487, 6)
-  "Ceil\0" // IR(46493, 5)
-  "Fract\0" // IR(46498, 6)
-  "Radians\0" // IR(46504, 8)
-  "Degrees\0" // IR(46512, 8)
-  "Sin\0" // IR(46520, 4)
-  "Cos\0" // IR(46524, 4)
-  "Tan\0" // IR(46528, 4)
-  "Asin\0" // IR(46532, 5)
-  "Acos\0" // IR(46537, 5)
-  "Atan\0" // IR(46542, 5)
-  "Sinh\0" // IR(46547, 5)
-  "Cosh\0" // IR(46552, 5)
-  "Tanh\0" // IR(46557, 5)
-  "Asinh\0" // IR(46562, 6)
-  "Acosh\0" // IR(46568, 6)
-  "Atanh\0" // IR(46574, 6)
-  "Atan2\0" // IR(46580, 6)
-  "Pow\0" // IR(46586, 4)
-  "Exp\0" // IR(46590, 4)
-  "Log\0" // IR(46594, 4)
-  "Exp2\0" // IR(46598, 5)
-  "Log2\0" // IR(46603, 5)
-  "Sqrt\0" // IR(46608, 5)
-  "InverseSqrt\0" // IR(46613, 12)
-  "Determinant\0" // IR(46625, 12)
-  "MatrixInverse\0" // IR(46637, 14)
-  "Modf\0" // IR(46651, 5)
-  "ModfStruct\0" // IR(46656, 11)
-  "FMin\0" // IR(46667, 5)
-  "UMin\0" // IR(46672, 5)
-  "SMin\0" // IR(46677, 5)
-  "FMax\0" // IR(46682, 5)
-  "UMax\0" // IR(46687, 5)
-  "SMax\0" // IR(46692, 5)
-  "FClamp\0" // IR(46697, 7)
-  "UClamp\0" // IR(46704, 7)
-  "SClamp\0" // IR(46711, 7)
-  "FMix\0" // IR(46718, 5)
-  "IMix\0" // IR(46723, 5)
-  "Step\0" // IR(46728, 5)
-  "SmoothStep\0" // IR(46733, 11)
-  "Fma\0" // IR(46744, 4)
-  "Frexp\0" // IR(46748, 6)
-  "FrexpStruct\0" // IR(46754, 12)
-  "Ldexp\0" // IR(46766, 6)
-  "PackSnorm4x8\0" // IR(46772, 13)
-  "PackUnorm4x8\0" // IR(46785, 13)
-  "PackSnorm2x16\0" // IR(46798, 14)
-  "PackUnorm2x16\0" // IR(46812, 14)
-  "PackHalf2x16\0" // IR(46826, 13)
-  "PackDouble2x32\0" // IR(46839, 15)
-  "UnpackSnorm2x16\0" // IR(46854, 16)
-  "UnpackUnorm2x16\0" // IR(46870, 16)
-  "UnpackHalf2x16\0" // IR(46886, 15)
-  "UnpackSnorm4x8\0" // IR(46901, 15)
-  "UnpackUnorm4x8\0" // IR(46916, 15)
-  "UnpackDouble2x32\0" // IR(46931, 17)
-  "Length\0" // IR(46948, 7)
-  "Distance\0" // IR(46955, 9)
-  "Cross\0" // IR(46964, 6)
-  "Normalize\0" // IR(46970, 10)
-  "FaceForward\0" // IR(46980, 12)
-  "Reflect\0" // IR(46992, 8)
-  "Refract\0" // IR(47000, 8)
-  "FindILsb\0" // IR(47008, 9)
-  "FindSMsb\0" // IR(47017, 9)
-  "FindUMsb\0" // IR(47026, 9)
-  "InterpolateAtCentroid\0" // IR(47035, 22)
-  "InterpolateAtSample\0" // IR(47057, 20)
-  "InterpolateAtOffset\0" // IR(47077, 20)
-  "NMin\0" // IR(47097, 5)
-  "NMax\0" // IR(47102, 5)
-  "NClamp\0" // IR(47107, 7)
-  "ArgumentInfo\0" // IR(47114, 13)
-  "ArgumentStorageBuffer\0" // IR(47127, 22)
-  "ArgumentUniform\0" // IR(47149, 16)
-  "ArgumentPodStorageBuffer\0" // IR(47165, 25)
-  "ArgumentPodUniform\0" // IR(47190, 19)
-  "ArgumentPodPushConstant\0" // IR(47209, 24)
-  "ArgumentSampledImage\0" // IR(47233, 21)
-  "ArgumentStorageImage\0" // IR(47254, 21)
-  "ArgumentSampler\0" // IR(47275, 16)
-  "ArgumentWorkgroup\0" // IR(47291, 18)
-  "SpecConstantWorkgroupSize\0" // IR(47309, 26)
-  "SpecConstantGlobalOffset\0" // IR(47335, 25)
-  "SpecConstantWorkDim\0" // IR(47360, 20)
-  "PushConstantGlobalOffset\0" // IR(47380, 25)
-  "PushConstantEnqueuedLocalSize\0" // IR(47405, 30)
-  "PushConstantGlobalSize\0" // IR(47435, 23)
-  "PushConstantRegionOffset\0" // IR(47458, 25)
-  "PushConstantNumWorkgroups\0" // IR(47483, 26)
-  "PushConstantRegionGroupOffset\0" // IR(47509, 30)
-  "ConstantDataStorageBuffer\0" // IR(47539, 26)
-  "ConstantDataUniform\0" // IR(47565, 20)
-  "PropertyRequiredWorkgroupSize\0" // IR(47585, 30)
-  "SpecConstantSubgroupMaxSize\0" // IR(47615, 28)
-  "ArgumentPointerPushConstant\0" // IR(47643, 28)
-  "ArgumentPointerUniform\0" // IR(47671, 23)
-  "ProgramScopeVariablesStorageBuffer\0" // IR(47694, 35)
-  "ProgramScopeVariablePointerRelocation\0" // IR(47729, 38)
-  "ImageArgumentInfoChannelOrderPushConstant\0" // IR(47767, 42)
-  "ImageArgumentInfoChannelDataTypePushConstant\0" // IR(47809, 45)
-  "ImageArgumentInfoChannelOrderUniform\0" // IR(47854, 37)
-  "ImageArgumentInfoChannelDataTypeUniform\0" // IR(47891, 40)
-  "ArgumentStorageTexelBuffer\0" // IR(47931, 27)
-  "ArgumentUniformTexelBuffer\0" // IR(47958, 27)
-  "ConstantDataPointerPushConstant\0" // IR(47985, 32)
-  "ProgramScopeVariablePointerPushConstant\0" // IR(48017, 40)
-  "PrintfInfo\0" // IR(48057, 11)
-  "PrintfBufferStorageBuffer\0" // IR(48068, 26)
-  "PrintfBufferPointerPushConstant\0" // IR(48094, 32)
-  "NormalizedSamplerMaskPushConstant\0" // IR(48126, 34)
-  "WorkgroupVariableSize\0" // IR(48160, 22)
-  "DebugImportedEntity\0" // IR(48182, 20)
-  "DebugSource\0" // IR(48202, 12)
-  "DebugFunctionDefinition\0" // IR(48214, 24)
-  "DebugSourceContinued\0" // IR(48238, 21)
-  "DebugLine\0" // IR(48259, 10)
-  "DebugNoLine\0" // IR(48269, 12)
-  "DebugBuildIdentifier\0" // IR(48281, 21)
-  "DebugStoragePath\0" // IR(48302, 17)
-  "DebugEntryPoint\0" // IR(48319, 16)
-  "DebugTypeMatrix\0" // IR(48335, 16)
-  "Configuration\0" // IR(48351, 14)
-  "StartCounter\0" // IR(48365, 13)
-  "StopCounter\0" // IR(48378, 12)
-  "PushConstants\0" // IR(48390, 14)
-  "SpecializationMapEntry\0" // IR(48404, 23)
-  "DescriptorSetBuffer\0" // IR(48427, 20)
-  "DescriptorSetImage\0" // IR(48447, 19)
-  "DescriptorSetSampler\0" // IR(48466, 21)
-  "SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_BASE_TYPE_ATTRIBUTE_ENCODING\0" // IR(48487, 63)
-  "SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_INFO_FLAGS\0" // IR(48550, 45)
-  "SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_TYPE_QUALIFIER\0" // IR(48595, 49)
-  "SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_COMPOSITE_TYPE\0" // IR(48644, 49)
-  "SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_OPERATION\0" // IR(48693, 44)
-  "SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_IMPORTED_ENTITY\0" // IR(48737, 50)
-  "DebugModuleINTEL\0" // IR(48787, 17)
-  "acos\0" // IR(48804, 5)
-  "acosh\0" // IR(48809, 6)
-  "acospi\0" // IR(48815, 7)
-  "asin\0" // IR(48822, 5)
-  "asinh\0" // IR(48827, 6)
-  "asinpi\0" // IR(48833, 7)
-  "atan\0" // IR(48840, 5)
-  "atan2\0" // IR(48845, 6)
-  "atanh\0" // IR(48851, 6)
-  "atanpi\0" // IR(48857, 7)
-  "atan2pi\0" // IR(48864, 8)
-  "cbrt\0" // IR(48872, 5)
-  "ceil\0" // IR(48877, 5)
-  "copysign\0" // IR(48882, 9)
-  "cos\0" // IR(48891, 4)
-  "cosh\0" // IR(48895, 5)
-  "cospi\0" // IR(48900, 6)
-  "erfc\0" // IR(48906, 5)
-  "erf\0" // IR(48911, 4)
-  "exp\0" // IR(48915, 4)
-  "exp2\0" // IR(48919, 5)
-  "exp10\0" // IR(48924, 6)
-  "expm1\0" // IR(48930, 6)
-  "fabs\0" // IR(48936, 5)
-  "fdim\0" // IR(48941, 5)
-  "floor\0" // IR(48946, 6)
-  "fma\0" // IR(48952, 4)
-  "fmax\0" // IR(48956, 5)
-  "fmin\0" // IR(48961, 5)
-  "fmod\0" // IR(48966, 5)
-  "fract\0" // IR(48971, 6)
-  "frexp\0" // IR(48977, 6)
-  "hypot\0" // IR(48983, 6)
-  "ilogb\0" // IR(48989, 6)
-  "ldexp\0" // IR(48995, 6)
-  "lgamma\0" // IR(49001, 7)
-  "lgamma_r\0" // IR(49008, 9)
-  "log\0" // IR(49017, 4)
-  "log2\0" // IR(49021, 5)
-  "log10\0" // IR(49026, 6)
-  "log1p\0" // IR(49032, 6)
-  "logb\0" // IR(49038, 5)
-  "mad\0" // IR(49043, 4)
-  "maxmag\0" // IR(49047, 7)
-  "minmag\0" // IR(49054, 7)
-  "modf\0" // IR(49061, 5)
-  "nan\0" // IR(49066, 4)
-  "nextafter\0" // IR(49070, 10)
-  "pow\0" // IR(49080, 4)
-  "pown\0" // IR(49084, 5)
-  "powr\0" // IR(49089, 5)
-  "remainder\0" // IR(49094, 10)
-  "remquo\0" // IR(49104, 7)
-  "rint\0" // IR(49111, 5)
-  "rootn\0" // IR(49116, 6)
-  "round\0" // IR(49122, 6)
-  "rsqrt\0" // IR(49128, 6)
-  "sin\0" // IR(49134, 4)
-  "sincos\0" // IR(49138, 7)
-  "sinh\0" // IR(49145, 5)
-  "sinpi\0" // IR(49150, 6)
-  "sqrt\0" // IR(49156, 5)
-  "tan\0" // IR(49161, 4)
-  "tanh\0" // IR(49165, 5)
-  "tanpi\0" // IR(49170, 6)
-  "tgamma\0" // IR(49176, 7)
-  "trunc\0" // IR(49183, 6)
-  "half_cos\0" // IR(49189, 9)
-  "half_divide\0" // IR(49198, 12)
-  "half_exp\0" // IR(49210, 9)
-  "half_exp2\0" // IR(49219, 10)
-  "half_exp10\0" // IR(49229, 11)
-  "half_log\0" // IR(49240, 9)
-  "half_log2\0" // IR(49249, 10)
-  "half_log10\0" // IR(49259, 11)
-  "half_powr\0" // IR(49270, 10)
-  "half_recip\0" // IR(49280, 11)
-  "half_rsqrt\0" // IR(49291, 11)
-  "half_sin\0" // IR(49302, 9)
-  "half_sqrt\0" // IR(49311, 10)
-  "half_tan\0" // IR(49321, 9)
-  "native_cos\0" // IR(49330, 11)
-  "native_divide\0" // IR(49341, 14)
-  "native_exp\0" // IR(49355, 11)
-  "native_exp2\0" // IR(49366, 12)
-  "native_exp10\0" // IR(49378, 13)
-  "native_log\0" // IR(49391, 11)
-  "native_log2\0" // IR(49402, 12)
-  "native_log10\0" // IR(49414, 13)
-  "native_powr\0" // IR(49427, 12)
-  "native_recip\0" // IR(49439, 13)
-  "native_rsqrt\0" // IR(49452, 13)
-  "native_sin\0" // IR(49465, 11)
-  "native_sqrt\0" // IR(49476, 12)
-  "native_tan\0" // IR(49488, 11)
-  "fclamp\0" // IR(49499, 7)
-  "degrees\0" // IR(49506, 8)
-  "fmax_common\0" // IR(49514, 12)
-  "fmin_common\0" // IR(49526, 12)
-  "mix\0" // IR(49538, 4)
-  "radians\0" // IR(49542, 8)
-  "step\0" // IR(49550, 5)
-  "smoothstep\0" // IR(49555, 11)
-  "sign\0" // IR(49566, 5)
-  "cross\0" // IR(49571, 6)
-  "distance\0" // IR(49577, 9)
-  "length\0" // IR(49586, 7)
-  "normalize\0" // IR(49593, 10)
-  "fast_distance\0" // IR(49603, 14)
-  "fast_length\0" // IR(49617, 12)
-  "fast_normalize\0" // IR(49629, 15)
-  "s_abs\0" // IR(49644, 6)
-  "s_abs_diff\0" // IR(49650, 11)
-  "s_add_sat\0" // IR(49661, 10)
-  "u_add_sat\0" // IR(49671, 10)
-  "s_hadd\0" // IR(49681, 7)
-  "u_hadd\0" // IR(49688, 7)
-  "s_rhadd\0" // IR(49695, 8)
-  "u_rhadd\0" // IR(49703, 8)
-  "s_clamp\0" // IR(49711, 8)
-  "u_clamp\0" // IR(49719, 8)
-  "clz\0" // IR(49727, 4)
-  "ctz\0" // IR(49731, 4)
-  "s_mad_hi\0" // IR(49735, 9)
-  "u_mad_sat\0" // IR(49744, 10)
-  "s_mad_sat\0" // IR(49754, 10)
-  "s_max\0" // IR(49764, 6)
-  "u_max\0" // IR(49770, 6)
-  "s_min\0" // IR(49776, 6)
-  "u_min\0" // IR(49782, 6)
-  "s_mul_hi\0" // IR(49788, 9)
-  "rotate\0" // IR(49797, 7)
-  "s_sub_sat\0" // IR(49804, 10)
-  "u_sub_sat\0" // IR(49814, 10)
-  "u_upsample\0" // IR(49824, 11)
-  "s_upsample\0" // IR(49835, 11)
-  "popcount\0" // IR(49846, 9)
-  "s_mad24\0" // IR(49855, 8)
-  "u_mad24\0" // IR(49863, 8)
-  "s_mul24\0" // IR(49871, 8)
-  "u_mul24\0" // IR(49879, 8)
-  "vloadn\0" // IR(49887, 7)
-  "vstoren\0" // IR(49894, 8)
-  "vload_half\0" // IR(49902, 11)
-  "vload_halfn\0" // IR(49913, 12)
-  "vstore_half\0" // IR(49925, 12)
-  "vstore_half_r\0" // IR(49937, 14)
-  "vstore_halfn\0" // IR(49951, 13)
-  "vstore_halfn_r\0" // IR(49964, 15)
-  "vloada_halfn\0" // IR(49979, 13)
-  "vstorea_halfn\0" // IR(49992, 14)
-  "vstorea_halfn_r\0" // IR(50006, 16)
-  "shuffle\0" // IR(50022, 8)
-  "shuffle2\0" // IR(50030, 9)
-  "printf\0" // IR(50039, 7)
-  "prefetch\0" // IR(50046, 9)
-  "bitselect\0" // IR(50055, 10)
-  "select\0" // IR(50065, 7)
-  "u_abs\0" // IR(50072, 6)
-  "u_abs_diff\0" // IR(50078, 11)
-  "u_mul_hi\0" // IR(50089, 9)
-  "u_mad_hi\0" // IR(50098, 9)
-  "CubeFaceIndexAMD\0" // IR(50107, 17)
-  "CubeFaceCoordAMD\0" // IR(50124, 17)
-  "TimeAMD\0" // IR(50141, 8)
-  "SwizzleInvocationsAMD\0" // IR(50149, 22)
-  "SwizzleInvocationsMaskedAMD\0" // IR(50171, 28)
-  "WriteInvocationAMD\0" // IR(50199, 19)
-  "MbcntAMD\0" // IR(50218, 9)
-  "InterpolateAtVertexAMD\0" // IR(50227, 23)
-  "FMin3AMD\0" // IR(50250, 9)
-  "UMin3AMD\0" // IR(50259, 9)
-  "SMin3AMD\0" // IR(50268, 9)
-  "FMax3AMD\0" // IR(50277, 9)
-  "UMax3AMD\0" // IR(50286, 9)
-  "SMax3AMD\0" // IR(50295, 9)
-  "FMid3AMD\0" // IR(50304, 9)
-  "UMid3AMD\0" // IR(50313, 9)
-  "SMid3AMD\0" // IR(50322, 9)
-  "ARGMAX\0" // IR(50331, 7)
-  "AVG_POOL2D\0" // IR(50338, 11)
-  "CONV2D\0" // IR(50349, 7)
-  "CONV3D\0" // IR(50356, 7)
-  "DEPTHWISE_CONV2D\0" // IR(50363, 17)
-  "FFT2D\0" // IR(50380, 6)
-  "MATMUL\0" // IR(50386, 7)
-  "MAX_POOL2D\0" // IR(50393, 11)
-  "RFFT2D\0" // IR(50404, 7)
-  "TRANSPOSE_CONV2D\0" // IR(50411, 17)
-  "CLAMP\0" // IR(50428, 6)
-  "ERF\0" // IR(50434, 4)
-  "SIGMOID\0" // IR(50438, 8)
-  "TANH\0" // IR(50446, 5)
-  "ADD\0" // IR(50451, 4)
-  "ARITHMETIC_RIGHT_SHIFT\0" // IR(50455, 23)
-  "BITWISE_AND\0" // IR(50478, 12)
-  "BITWISE_OR\0" // IR(50490, 11)
-  "BITWISE_XOR\0" // IR(50501, 12)
-  "INTDIV\0" // IR(50513, 7)
-  "LOGICAL_AND\0" // IR(50520, 12)
-  "LOGICAL_LEFT_SHIFT\0" // IR(50532, 19)
-  "LOGICAL_RIGHT_SHIFT\0" // IR(50551, 20)
-  "LOGICAL_OR\0" // IR(50571, 11)
-  "LOGICAL_XOR\0" // IR(50582, 12)
-  "MAXIMUM\0" // IR(50594, 8)
-  "MINIMUM\0" // IR(50602, 8)
-  "MUL\0" // IR(50610, 4)
-  "POW\0" // IR(50614, 4)
-  "SUB\0" // IR(50618, 4)
-  "TABLE\0" // IR(50622, 6)
-  "ABS\0" // IR(50628, 4)
-  "BITWISE_NOT\0" // IR(50632, 12)
-  "CEIL\0" // IR(50644, 5)
-  "CLZ\0" // IR(50649, 4)
-  "COS\0" // IR(50653, 4)
-  "EXP\0" // IR(50657, 4)
-  "FLOOR\0" // IR(50661, 6)
-  "LOG\0" // IR(50667, 4)
-  "LOGICAL_NOT\0" // IR(50671, 12)
-  "NEGATE\0" // IR(50683, 7)
-  "RECIPROCAL\0" // IR(50690, 11)
-  "RSQRT\0" // IR(50701, 6)
-  "SIN\0" // IR(50707, 4)
-  "SELECT\0" // IR(50711, 7)
-  "EQUAL\0" // IR(50718, 6)
-  "GREATER\0" // IR(50724, 8)
-  "GREATER_EQUAL\0" // IR(50732, 14)
-  "REDUCE_ALL\0" // IR(50746, 11)
-  "REDUCE_ANY\0" // IR(50757, 11)
-  "REDUCE_MAX\0" // IR(50768, 11)
-  "REDUCE_MIN\0" // IR(50779, 11)
-  "REDUCE_PRODUCT\0" // IR(50790, 15)
-  "REDUCE_SUM\0" // IR(50805, 11)
-  "CONCAT\0" // IR(50816, 7)
-  "PAD\0" // IR(50823, 4)
-  "RESHAPE\0" // IR(50827, 8)
-  "REVERSE\0" // IR(50835, 8)
-  "SLICE\0" // IR(50843, 6)
-  "TILE\0" // IR(50849, 5)
-  "TRANSPOSE\0" // IR(50854, 10)
-  "GATHER\0" // IR(50864, 7)
-  "SCATTER\0" // IR(50871, 8)
-  "RESIZE\0" // IR(50879, 7)
-  "CAST\0" // IR(50886, 5)
-  "RESCALE\0" // IR(50891, 8)
+  "MIN_SAD\0" // IR(45584, 8)
+  "MIN_SAD_COST\0" // IR(45592, 13)
+  "RAW_SAD\0" // IR(45605, 8)
+  "DebugInfoNone\0" // IR(45613, 14)
+  "DebugCompilationUnit\0" // IR(45627, 21)
+  "SPV_OPERAND_TYPE_DEBUG_BASE_TYPE_ATTRIBUTE_ENCODING\0" // IR(45648, 52)
+  "DebugTypeBasic\0" // IR(45700, 15)
+  "SPV_OPERAND_TYPE_DEBUG_INFO_FLAGS\0" // IR(45715, 34)
+  "DebugTypePointer\0" // IR(45749, 17)
+  "SPV_OPERAND_TYPE_DEBUG_TYPE_QUALIFIER\0" // IR(45766, 38)
+  "DebugTypeQualifier\0" // IR(45804, 19)
+  "DebugTypeArray\0" // IR(45823, 15)
+  "DebugTypeVector\0" // IR(45838, 16)
+  "DebugTypedef\0" // IR(45854, 13)
+  "DebugTypeFunction\0" // IR(45867, 18)
+  "DebugTypeEnum\0" // IR(45885, 14)
+  "SPV_OPERAND_TYPE_DEBUG_COMPOSITE_TYPE\0" // IR(45899, 38)
+  "DebugTypeComposite\0" // IR(45937, 19)
+  "DebugTypeMember\0" // IR(45956, 16)
+  "DebugTypeInheritance\0" // IR(45972, 21)
+  "DebugTypePtrToMember\0" // IR(45993, 21)
+  "DebugTypeTemplate\0" // IR(46014, 18)
+  "DebugTypeTemplateParameter\0" // IR(46032, 27)
+  "DebugTypeTemplateTemplateParameter\0" // IR(46059, 35)
+  "DebugTypeTemplateParameterPack\0" // IR(46094, 31)
+  "DebugGlobalVariable\0" // IR(46125, 20)
+  "DebugFunctionDeclaration\0" // IR(46145, 25)
+  "DebugFunction\0" // IR(46170, 14)
+  "DebugLexicalBlock\0" // IR(46184, 18)
+  "DebugLexicalBlockDiscriminator\0" // IR(46202, 31)
+  "DebugScope\0" // IR(46233, 11)
+  "DebugNoScope\0" // IR(46244, 13)
+  "DebugInlinedAt\0" // IR(46257, 15)
+  "SPV_OPERAND_TYPE_OPTIONAL_LITERAL_INTEGER\0" // IR(46272, 42)
+  "DebugLocalVariable\0" // IR(46314, 19)
+  "DebugInlinedVariable\0" // IR(46333, 21)
+  "DebugDeclare\0" // IR(46354, 13)
+  "DebugValue\0" // IR(46367, 11)
+  "SPV_OPERAND_TYPE_DEBUG_OPERATION\0" // IR(46378, 33)
+  "DebugOperation\0" // IR(46411, 15)
+  "DebugExpression\0" // IR(46426, 16)
+  "DebugMacroDef\0" // IR(46442, 14)
+  "DebugMacroUndef\0" // IR(46456, 16)
+  "Round\0" // IR(46472, 6)
+  "RoundEven\0" // IR(46478, 10)
+  "Trunc\0" // IR(46488, 6)
+  "FAbs\0" // IR(46494, 5)
+  "SAbs\0" // IR(46499, 5)
+  "FSign\0" // IR(46504, 6)
+  "SSign\0" // IR(46510, 6)
+  "Floor\0" // IR(46516, 6)
+  "Ceil\0" // IR(46522, 5)
+  "Fract\0" // IR(46527, 6)
+  "Radians\0" // IR(46533, 8)
+  "Degrees\0" // IR(46541, 8)
+  "Sin\0" // IR(46549, 4)
+  "Cos\0" // IR(46553, 4)
+  "Tan\0" // IR(46557, 4)
+  "Asin\0" // IR(46561, 5)
+  "Acos\0" // IR(46566, 5)
+  "Atan\0" // IR(46571, 5)
+  "Sinh\0" // IR(46576, 5)
+  "Cosh\0" // IR(46581, 5)
+  "Tanh\0" // IR(46586, 5)
+  "Asinh\0" // IR(46591, 6)
+  "Acosh\0" // IR(46597, 6)
+  "Atanh\0" // IR(46603, 6)
+  "Atan2\0" // IR(46609, 6)
+  "Pow\0" // IR(46615, 4)
+  "Exp\0" // IR(46619, 4)
+  "Log\0" // IR(46623, 4)
+  "Exp2\0" // IR(46627, 5)
+  "Log2\0" // IR(46632, 5)
+  "Sqrt\0" // IR(46637, 5)
+  "InverseSqrt\0" // IR(46642, 12)
+  "Determinant\0" // IR(46654, 12)
+  "MatrixInverse\0" // IR(46666, 14)
+  "Modf\0" // IR(46680, 5)
+  "ModfStruct\0" // IR(46685, 11)
+  "FMin\0" // IR(46696, 5)
+  "UMin\0" // IR(46701, 5)
+  "SMin\0" // IR(46706, 5)
+  "FMax\0" // IR(46711, 5)
+  "UMax\0" // IR(46716, 5)
+  "SMax\0" // IR(46721, 5)
+  "FClamp\0" // IR(46726, 7)
+  "UClamp\0" // IR(46733, 7)
+  "SClamp\0" // IR(46740, 7)
+  "FMix\0" // IR(46747, 5)
+  "IMix\0" // IR(46752, 5)
+  "Step\0" // IR(46757, 5)
+  "SmoothStep\0" // IR(46762, 11)
+  "Fma\0" // IR(46773, 4)
+  "Frexp\0" // IR(46777, 6)
+  "FrexpStruct\0" // IR(46783, 12)
+  "Ldexp\0" // IR(46795, 6)
+  "PackSnorm4x8\0" // IR(46801, 13)
+  "PackUnorm4x8\0" // IR(46814, 13)
+  "PackSnorm2x16\0" // IR(46827, 14)
+  "PackUnorm2x16\0" // IR(46841, 14)
+  "PackHalf2x16\0" // IR(46855, 13)
+  "PackDouble2x32\0" // IR(46868, 15)
+  "UnpackSnorm2x16\0" // IR(46883, 16)
+  "UnpackUnorm2x16\0" // IR(46899, 16)
+  "UnpackHalf2x16\0" // IR(46915, 15)
+  "UnpackSnorm4x8\0" // IR(46930, 15)
+  "UnpackUnorm4x8\0" // IR(46945, 15)
+  "UnpackDouble2x32\0" // IR(46960, 17)
+  "Length\0" // IR(46977, 7)
+  "Distance\0" // IR(46984, 9)
+  "Cross\0" // IR(46993, 6)
+  "Normalize\0" // IR(46999, 10)
+  "FaceForward\0" // IR(47009, 12)
+  "Reflect\0" // IR(47021, 8)
+  "Refract\0" // IR(47029, 8)
+  "FindILsb\0" // IR(47037, 9)
+  "FindSMsb\0" // IR(47046, 9)
+  "FindUMsb\0" // IR(47055, 9)
+  "InterpolateAtCentroid\0" // IR(47064, 22)
+  "InterpolateAtSample\0" // IR(47086, 20)
+  "InterpolateAtOffset\0" // IR(47106, 20)
+  "NMin\0" // IR(47126, 5)
+  "NMax\0" // IR(47131, 5)
+  "NClamp\0" // IR(47136, 7)
+  "ArgumentInfo\0" // IR(47143, 13)
+  "ArgumentStorageBuffer\0" // IR(47156, 22)
+  "ArgumentUniform\0" // IR(47178, 16)
+  "ArgumentPodStorageBuffer\0" // IR(47194, 25)
+  "ArgumentPodUniform\0" // IR(47219, 19)
+  "ArgumentPodPushConstant\0" // IR(47238, 24)
+  "ArgumentSampledImage\0" // IR(47262, 21)
+  "ArgumentStorageImage\0" // IR(47283, 21)
+  "ArgumentSampler\0" // IR(47304, 16)
+  "ArgumentWorkgroup\0" // IR(47320, 18)
+  "SpecConstantWorkgroupSize\0" // IR(47338, 26)
+  "SpecConstantGlobalOffset\0" // IR(47364, 25)
+  "SpecConstantWorkDim\0" // IR(47389, 20)
+  "PushConstantGlobalOffset\0" // IR(47409, 25)
+  "PushConstantEnqueuedLocalSize\0" // IR(47434, 30)
+  "PushConstantGlobalSize\0" // IR(47464, 23)
+  "PushConstantRegionOffset\0" // IR(47487, 25)
+  "PushConstantNumWorkgroups\0" // IR(47512, 26)
+  "PushConstantRegionGroupOffset\0" // IR(47538, 30)
+  "ConstantDataStorageBuffer\0" // IR(47568, 26)
+  "ConstantDataUniform\0" // IR(47594, 20)
+  "PropertyRequiredWorkgroupSize\0" // IR(47614, 30)
+  "SpecConstantSubgroupMaxSize\0" // IR(47644, 28)
+  "ArgumentPointerPushConstant\0" // IR(47672, 28)
+  "ArgumentPointerUniform\0" // IR(47700, 23)
+  "ProgramScopeVariablesStorageBuffer\0" // IR(47723, 35)
+  "ProgramScopeVariablePointerRelocation\0" // IR(47758, 38)
+  "ImageArgumentInfoChannelOrderPushConstant\0" // IR(47796, 42)
+  "ImageArgumentInfoChannelDataTypePushConstant\0" // IR(47838, 45)
+  "ImageArgumentInfoChannelOrderUniform\0" // IR(47883, 37)
+  "ImageArgumentInfoChannelDataTypeUniform\0" // IR(47920, 40)
+  "ArgumentStorageTexelBuffer\0" // IR(47960, 27)
+  "ArgumentUniformTexelBuffer\0" // IR(47987, 27)
+  "ConstantDataPointerPushConstant\0" // IR(48014, 32)
+  "ProgramScopeVariablePointerPushConstant\0" // IR(48046, 40)
+  "PrintfInfo\0" // IR(48086, 11)
+  "PrintfBufferStorageBuffer\0" // IR(48097, 26)
+  "PrintfBufferPointerPushConstant\0" // IR(48123, 32)
+  "NormalizedSamplerMaskPushConstant\0" // IR(48155, 34)
+  "WorkgroupVariableSize\0" // IR(48189, 22)
+  "DebugImportedEntity\0" // IR(48211, 20)
+  "DebugSource\0" // IR(48231, 12)
+  "DebugFunctionDefinition\0" // IR(48243, 24)
+  "DebugSourceContinued\0" // IR(48267, 21)
+  "DebugLine\0" // IR(48288, 10)
+  "DebugNoLine\0" // IR(48298, 12)
+  "DebugBuildIdentifier\0" // IR(48310, 21)
+  "DebugStoragePath\0" // IR(48331, 17)
+  "DebugEntryPoint\0" // IR(48348, 16)
+  "DebugTypeMatrix\0" // IR(48364, 16)
+  "Configuration\0" // IR(48380, 14)
+  "StartCounter\0" // IR(48394, 13)
+  "StopCounter\0" // IR(48407, 12)
+  "PushConstants\0" // IR(48419, 14)
+  "SpecializationMapEntry\0" // IR(48433, 23)
+  "DescriptorSetBuffer\0" // IR(48456, 20)
+  "DescriptorSetImage\0" // IR(48476, 19)
+  "DescriptorSetSampler\0" // IR(48495, 21)
+  "SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_BASE_TYPE_ATTRIBUTE_ENCODING\0" // IR(48516, 63)
+  "SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_INFO_FLAGS\0" // IR(48579, 45)
+  "SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_TYPE_QUALIFIER\0" // IR(48624, 49)
+  "SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_COMPOSITE_TYPE\0" // IR(48673, 49)
+  "SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_OPERATION\0" // IR(48722, 44)
+  "SPV_OPERAND_TYPE_CLDEBUG100_DEBUG_IMPORTED_ENTITY\0" // IR(48766, 50)
+  "DebugModuleINTEL\0" // IR(48816, 17)
+  "acos\0" // IR(48833, 5)
+  "acosh\0" // IR(48838, 6)
+  "acospi\0" // IR(48844, 7)
+  "asin\0" // IR(48851, 5)
+  "asinh\0" // IR(48856, 6)
+  "asinpi\0" // IR(48862, 7)
+  "atan\0" // IR(48869, 5)
+  "atan2\0" // IR(48874, 6)
+  "atanh\0" // IR(48880, 6)
+  "atanpi\0" // IR(48886, 7)
+  "atan2pi\0" // IR(48893, 8)
+  "cbrt\0" // IR(48901, 5)
+  "ceil\0" // IR(48906, 5)
+  "copysign\0" // IR(48911, 9)
+  "cos\0" // IR(48920, 4)
+  "cosh\0" // IR(48924, 5)
+  "cospi\0" // IR(48929, 6)
+  "erfc\0" // IR(48935, 5)
+  "erf\0" // IR(48940, 4)
+  "exp\0" // IR(48944, 4)
+  "exp2\0" // IR(48948, 5)
+  "exp10\0" // IR(48953, 6)
+  "expm1\0" // IR(48959, 6)
+  "fabs\0" // IR(48965, 5)
+  "fdim\0" // IR(48970, 5)
+  "floor\0" // IR(48975, 6)
+  "fma\0" // IR(48981, 4)
+  "fmax\0" // IR(48985, 5)
+  "fmin\0" // IR(48990, 5)
+  "fmod\0" // IR(48995, 5)
+  "fract\0" // IR(49000, 6)
+  "frexp\0" // IR(49006, 6)
+  "hypot\0" // IR(49012, 6)
+  "ilogb\0" // IR(49018, 6)
+  "ldexp\0" // IR(49024, 6)
+  "lgamma\0" // IR(49030, 7)
+  "lgamma_r\0" // IR(49037, 9)
+  "log\0" // IR(49046, 4)
+  "log2\0" // IR(49050, 5)
+  "log10\0" // IR(49055, 6)
+  "log1p\0" // IR(49061, 6)
+  "logb\0" // IR(49067, 5)
+  "mad\0" // IR(49072, 4)
+  "maxmag\0" // IR(49076, 7)
+  "minmag\0" // IR(49083, 7)
+  "modf\0" // IR(49090, 5)
+  "nan\0" // IR(49095, 4)
+  "nextafter\0" // IR(49099, 10)
+  "pow\0" // IR(49109, 4)
+  "pown\0" // IR(49113, 5)
+  "powr\0" // IR(49118, 5)
+  "remainder\0" // IR(49123, 10)
+  "remquo\0" // IR(49133, 7)
+  "rint\0" // IR(49140, 5)
+  "rootn\0" // IR(49145, 6)
+  "round\0" // IR(49151, 6)
+  "rsqrt\0" // IR(49157, 6)
+  "sin\0" // IR(49163, 4)
+  "sincos\0" // IR(49167, 7)
+  "sinh\0" // IR(49174, 5)
+  "sinpi\0" // IR(49179, 6)
+  "sqrt\0" // IR(49185, 5)
+  "tan\0" // IR(49190, 4)
+  "tanh\0" // IR(49194, 5)
+  "tanpi\0" // IR(49199, 6)
+  "tgamma\0" // IR(49205, 7)
+  "trunc\0" // IR(49212, 6)
+  "half_cos\0" // IR(49218, 9)
+  "half_divide\0" // IR(49227, 12)
+  "half_exp\0" // IR(49239, 9)
+  "half_exp2\0" // IR(49248, 10)
+  "half_exp10\0" // IR(49258, 11)
+  "half_log\0" // IR(49269, 9)
+  "half_log2\0" // IR(49278, 10)
+  "half_log10\0" // IR(49288, 11)
+  "half_powr\0" // IR(49299, 10)
+  "half_recip\0" // IR(49309, 11)
+  "half_rsqrt\0" // IR(49320, 11)
+  "half_sin\0" // IR(49331, 9)
+  "half_sqrt\0" // IR(49340, 10)
+  "half_tan\0" // IR(49350, 9)
+  "native_cos\0" // IR(49359, 11)
+  "native_divide\0" // IR(49370, 14)
+  "native_exp\0" // IR(49384, 11)
+  "native_exp2\0" // IR(49395, 12)
+  "native_exp10\0" // IR(49407, 13)
+  "native_log\0" // IR(49420, 11)
+  "native_log2\0" // IR(49431, 12)
+  "native_log10\0" // IR(49443, 13)
+  "native_powr\0" // IR(49456, 12)
+  "native_recip\0" // IR(49468, 13)
+  "native_rsqrt\0" // IR(49481, 13)
+  "native_sin\0" // IR(49494, 11)
+  "native_sqrt\0" // IR(49505, 12)
+  "native_tan\0" // IR(49517, 11)
+  "fclamp\0" // IR(49528, 7)
+  "degrees\0" // IR(49535, 8)
+  "fmax_common\0" // IR(49543, 12)
+  "fmin_common\0" // IR(49555, 12)
+  "mix\0" // IR(49567, 4)
+  "radians\0" // IR(49571, 8)
+  "step\0" // IR(49579, 5)
+  "smoothstep\0" // IR(49584, 11)
+  "sign\0" // IR(49595, 5)
+  "cross\0" // IR(49600, 6)
+  "distance\0" // IR(49606, 9)
+  "length\0" // IR(49615, 7)
+  "normalize\0" // IR(49622, 10)
+  "fast_distance\0" // IR(49632, 14)
+  "fast_length\0" // IR(49646, 12)
+  "fast_normalize\0" // IR(49658, 15)
+  "s_abs\0" // IR(49673, 6)
+  "s_abs_diff\0" // IR(49679, 11)
+  "s_add_sat\0" // IR(49690, 10)
+  "u_add_sat\0" // IR(49700, 10)
+  "s_hadd\0" // IR(49710, 7)
+  "u_hadd\0" // IR(49717, 7)
+  "s_rhadd\0" // IR(49724, 8)
+  "u_rhadd\0" // IR(49732, 8)
+  "s_clamp\0" // IR(49740, 8)
+  "u_clamp\0" // IR(49748, 8)
+  "clz\0" // IR(49756, 4)
+  "ctz\0" // IR(49760, 4)
+  "s_mad_hi\0" // IR(49764, 9)
+  "u_mad_sat\0" // IR(49773, 10)
+  "s_mad_sat\0" // IR(49783, 10)
+  "s_max\0" // IR(49793, 6)
+  "u_max\0" // IR(49799, 6)
+  "s_min\0" // IR(49805, 6)
+  "u_min\0" // IR(49811, 6)
+  "s_mul_hi\0" // IR(49817, 9)
+  "rotate\0" // IR(49826, 7)
+  "s_sub_sat\0" // IR(49833, 10)
+  "u_sub_sat\0" // IR(49843, 10)
+  "u_upsample\0" // IR(49853, 11)
+  "s_upsample\0" // IR(49864, 11)
+  "popcount\0" // IR(49875, 9)
+  "s_mad24\0" // IR(49884, 8)
+  "u_mad24\0" // IR(49892, 8)
+  "s_mul24\0" // IR(49900, 8)
+  "u_mul24\0" // IR(49908, 8)
+  "vloadn\0" // IR(49916, 7)
+  "vstoren\0" // IR(49923, 8)
+  "vload_half\0" // IR(49931, 11)
+  "vload_halfn\0" // IR(49942, 12)
+  "vstore_half\0" // IR(49954, 12)
+  "vstore_half_r\0" // IR(49966, 14)
+  "vstore_halfn\0" // IR(49980, 13)
+  "vstore_halfn_r\0" // IR(49993, 15)
+  "vloada_halfn\0" // IR(50008, 13)
+  "vstorea_halfn\0" // IR(50021, 14)
+  "vstorea_halfn_r\0" // IR(50035, 16)
+  "shuffle\0" // IR(50051, 8)
+  "shuffle2\0" // IR(50059, 9)
+  "printf\0" // IR(50068, 7)
+  "prefetch\0" // IR(50075, 9)
+  "bitselect\0" // IR(50084, 10)
+  "select\0" // IR(50094, 7)
+  "u_abs\0" // IR(50101, 6)
+  "u_abs_diff\0" // IR(50107, 11)
+  "u_mul_hi\0" // IR(50118, 9)
+  "u_mad_hi\0" // IR(50127, 9)
+  "CubeFaceIndexAMD\0" // IR(50136, 17)
+  "CubeFaceCoordAMD\0" // IR(50153, 17)
+  "TimeAMD\0" // IR(50170, 8)
+  "SwizzleInvocationsAMD\0" // IR(50178, 22)
+  "SwizzleInvocationsMaskedAMD\0" // IR(50200, 28)
+  "WriteInvocationAMD\0" // IR(50228, 19)
+  "MbcntAMD\0" // IR(50247, 9)
+  "InterpolateAtVertexAMD\0" // IR(50256, 23)
+  "FMin3AMD\0" // IR(50279, 9)
+  "UMin3AMD\0" // IR(50288, 9)
+  "SMin3AMD\0" // IR(50297, 9)
+  "FMax3AMD\0" // IR(50306, 9)
+  "UMax3AMD\0" // IR(50315, 9)
+  "SMax3AMD\0" // IR(50324, 9)
+  "FMid3AMD\0" // IR(50333, 9)
+  "UMid3AMD\0" // IR(50342, 9)
+  "SMid3AMD\0" // IR(50351, 9)
+  "ARGMAX\0" // IR(50360, 7)
+  "AVG_POOL2D\0" // IR(50367, 11)
+  "CONV2D\0" // IR(50378, 7)
+  "CONV3D\0" // IR(50385, 7)
+  "DEPTHWISE_CONV2D\0" // IR(50392, 17)
+  "FFT2D\0" // IR(50409, 6)
+  "MATMUL\0" // IR(50415, 7)
+  "MAX_POOL2D\0" // IR(50422, 11)
+  "RFFT2D\0" // IR(50433, 7)
+  "TRANSPOSE_CONV2D\0" // IR(50440, 17)
+  "CLAMP\0" // IR(50457, 6)
+  "ERF\0" // IR(50463, 4)
+  "SIGMOID\0" // IR(50467, 8)
+  "TANH\0" // IR(50475, 5)
+  "ADD\0" // IR(50480, 4)
+  "ARITHMETIC_RIGHT_SHIFT\0" // IR(50484, 23)
+  "BITWISE_AND\0" // IR(50507, 12)
+  "BITWISE_OR\0" // IR(50519, 11)
+  "BITWISE_XOR\0" // IR(50530, 12)
+  "INTDIV\0" // IR(50542, 7)
+  "LOGICAL_AND\0" // IR(50549, 12)
+  "LOGICAL_LEFT_SHIFT\0" // IR(50561, 19)
+  "LOGICAL_RIGHT_SHIFT\0" // IR(50580, 20)
+  "LOGICAL_OR\0" // IR(50600, 11)
+  "LOGICAL_XOR\0" // IR(50611, 12)
+  "MAXIMUM\0" // IR(50623, 8)
+  "MINIMUM\0" // IR(50631, 8)
+  "MUL\0" // IR(50639, 4)
+  "POW\0" // IR(50643, 4)
+  "SUB\0" // IR(50647, 4)
+  "TABLE\0" // IR(50651, 6)
+  "ABS\0" // IR(50657, 4)
+  "BITWISE_NOT\0" // IR(50661, 12)
+  "CEIL\0" // IR(50673, 5)
+  "CLZ\0" // IR(50678, 4)
+  "COS\0" // IR(50682, 4)
+  "EXP\0" // IR(50686, 4)
+  "FLOOR\0" // IR(50690, 6)
+  "LOG\0" // IR(50696, 4)
+  "LOGICAL_NOT\0" // IR(50700, 12)
+  "NEGATE\0" // IR(50712, 7)
+  "RECIPROCAL\0" // IR(50719, 11)
+  "RSQRT\0" // IR(50730, 6)
+  "SIN\0" // IR(50736, 4)
+  "SELECT\0" // IR(50740, 7)
+  "EQUAL\0" // IR(50747, 6)
+  "GREATER\0" // IR(50753, 8)
+  "GREATER_EQUAL\0" // IR(50761, 14)
+  "REDUCE_ALL\0" // IR(50775, 11)
+  "REDUCE_ANY\0" // IR(50786, 11)
+  "REDUCE_MAX\0" // IR(50797, 11)
+  "REDUCE_MIN\0" // IR(50808, 11)
+  "REDUCE_PRODUCT\0" // IR(50819, 15)
+  "REDUCE_SUM\0" // IR(50834, 11)
+  "CONCAT\0" // IR(50845, 7)
+  "PAD\0" // IR(50852, 4)
+  "RESHAPE\0" // IR(50856, 8)
+  "REVERSE\0" // IR(50864, 8)
+  "SLICE\0" // IR(50872, 6)
+  "TILE\0" // IR(50878, 5)
+  "TRANSPOSE\0" // IR(50883, 10)
+  "GATHER\0" // IR(50893, 7)
+  "SCATTER\0" // IR(50900, 8)
+  "RESIZE\0" // IR(50908, 7)
+  "CAST\0" // IR(50915, 5)
+  "RESCALE\0" // IR(50920, 8)
 ;
 
 // Array of IndexRanges, where each represents a string by referencing

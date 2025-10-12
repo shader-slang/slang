@@ -2191,6 +2191,13 @@ struct IRAlignedAttr : IRAttr
 };
 
 FIDDLE()
+struct IRMemoryScopeAttr : IRAttr
+{
+    FIDDLE(leafInst())
+    IRInst* getMemoryScope() { return getOperand(0); }
+};
+
+FIDDLE()
 struct IRLoad : IRInst
 {
     FIDDLE(leafInst())
@@ -2232,6 +2239,17 @@ struct IRStore : IRInst
 
 FIDDLE()
 struct IRAtomicStore : IRAtomicOperation
+{
+    FIDDLE(leafInst())
+    IRUse ptr;
+    IRUse val;
+
+    IRInst* getPtr() { return ptr.get(); }
+    IRInst* getVal() { return val.get(); }
+};
+
+FIDDLE()
+struct IRAtomicExchange : IRAtomicOperation
 {
     FIDDLE(leafInst())
     IRUse ptr;
@@ -3735,10 +3753,10 @@ public:
     // Form a ptr type to `valueType` using the same opcode and address space as `ptrWithAddrSpace`.
     IRPtrTypeBase* getPtrTypeWithAddressSpace(IRType* valueType, IRPtrTypeBase* ptrWithAddrSpace);
 
-    IROutType* getOutType(IRType* valueType);
-    IRInOutType* getInOutType(IRType* valueType);
-    IRRefType* getRefType(IRType* valueType, AddressSpace addrSpace);
-    IRConstRefType* getConstRefType(IRType* valueType, AddressSpace addrSpace);
+    IROutParamType* getOutParamType(IRType* valueType);
+    IRBorrowInOutParamType* getBorrowInOutParamType(IRType* valueType);
+    IRRefParamType* getRefParamType(IRType* valueType, AddressSpace addrSpace);
+    IRBorrowInParamType* getBorrowInParamType(IRType* valueType, AddressSpace addrSpace);
     IRPtrType* getPtrType(
         IROp op,
         IRType* valueType,
@@ -3902,6 +3920,8 @@ public:
         IRInst* ops[5] = {vertexType, primitiveType, numVertices, numPrimitives, topology};
         return (IRMetalMeshType*)getType(kIROp_MetalMeshType, 5, ops);
     }
+
+    IRInst* emitSymbolAlias(IRInst* aliasedSymbol);
 
     IRInst* emitDebugSource(
         UnownedStringSlice fileName,
@@ -4363,7 +4383,7 @@ public:
 
     IRInst* emitLoad(IRType* type, IRInst* ptr);
     IRInst* emitLoad(IRType* type, IRInst* ptr, IRInst* align);
-    IRInst* emitLoad(IRType* type, IRInst* ptr, IRAlignedAttr* align);
+    IRInst* emitLoad(IRType* type, IRInst* ptr, ArrayView<IRInst*> attributes);
     IRInst* emitLoad(IRInst* ptr);
 
     IRInst* emitLoadReverseGradient(IRType* type, IRInst* diffValue);
@@ -4373,6 +4393,7 @@ public:
 
     IRInst* emitStore(IRInst* dstPtr, IRInst* srcVal);
     IRInst* emitStore(IRInst* dstPtr, IRInst* srcVal, IRInst* align);
+    IRInst* emitStore(IRInst* dstPtr, IRInst* srcVal, IRInst* align, IRInst* memoryScope);
 
     IRInst* emitAtomicStore(IRInst* dstPtr, IRInst* srcVal, IRInst* memoryOrder);
 
@@ -4582,10 +4603,7 @@ public:
     IRInst* emitCastIntToPtr(IRType* ptrType, IRInst* val);
 
     IRInst* emitCastStorageToLogical(IRType* type, IRInst* val, IRInst* bufferType);
-    IRCastStorageToLogicalDeref* emitCastStorageToLogicalDeref(
-        IRType* type,
-        IRInst* val,
-        IRInst* bufferType);
+    IRInst* emitCastStorageToLogicalDeref(IRType* type, IRInst* val, IRInst* bufferType);
 
     IRGlobalConstant* emitGlobalConstant(IRType* type);
 

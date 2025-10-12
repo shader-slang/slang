@@ -37,6 +37,7 @@
 #include "stb_image.h"
 
 #include <math.h>
+#include <random>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -4870,11 +4871,17 @@ void runTestsInDirectory(TestContext* context)
     // NTFS on Windows stores files in sorted order but not on Linux/Macos.
     // Because of that, the testing on Linux/Macos were randomly failing, which
     // is a good thing because it reveals problems. But it is useless
-    // if we cannot reproduce the failures deterministrically.
+    // if we cannot reproduce the failures deterministically.
     // https://github.com/shader-slang/slang/issues/7388
-    //
-    // TODO: We need a way to shuffle the list in a deterministic manner.
+
     files.sort();
+
+    // If asked, shuffle the list using seed for deterministic behavior.
+    if (context->options.shuffleTests)
+    {
+        std::mt19937 mt(context->options.shuffleSeed);
+        std::shuffle(files.begin(), files.end(), mt);
+    }
 
     auto processFile = [&](String file)
     {

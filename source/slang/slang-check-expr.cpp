@@ -290,6 +290,13 @@ void addSiblingScopeForContainerDecl(ASTBuilder* builder, Scope* destScope, Cont
     destScope->nextSibling = subScope;
 }
 
+ContainerDecl* isStaticScopeDecl(Decl* decl)
+{
+    if (as<NamespaceDeclBase>(decl) || as<FileDecl>(decl))
+        return as<ContainerDecl>(decl);
+    return nullptr;
+}
+
 void SemanticsVisitor::diagnoseDeprecatedDeclRefUsage(
     DeclRef<Decl> declRef,
     SourceLoc loc,
@@ -2966,7 +2973,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 }
                 compareMemoryQualifierOfParamToArgument(paramDecl, argExpr);
 
-                if (as<OutTypeBase>(paramType) || as<RefParamType>(paramType))
+                if (as<OutParamTypeBase>(paramType) || as<RefParamType>(paramType))
                 {
                     // `out`, `inout`, and `ref` parameters currently require
                     // an *exact* match on the type of the argument.
@@ -2994,7 +3001,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                             //
                             // An argument can be made that transformation shouldn't apply to the
                             // ref scenario in general.
-                            if (implicitCastExpr && as<OutTypeBase>(paramType) &&
+                            if (implicitCastExpr && as<OutParamTypeBase>(paramType) &&
                                 _canLValueCoerce(
                                     implicitCastExpr->arguments[0]->type,
                                     implicitCastExpr->type))
@@ -3579,7 +3586,7 @@ Type* SemanticsVisitor::_toDifferentialParamType(Type* primalParamType)
     // mode, and are not a proper part of the Slang type system
     // (at least not at this time).
     //
-    if (auto primalParamWrapperType = as<ParamDirectionType>(primalParamType))
+    if (auto primalParamWrapperType = as<ParamPassingModeType>(primalParamType))
     {
         // Some parameter-passing modes do not naturally lend themselves
         // to being differentiated - most notably, `ref` parameters.
@@ -3609,13 +3616,13 @@ Type* SemanticsVisitor::_toDifferentialParamType(Type* primalParamType)
         //
         if (as<OutType>(primalParamWrapperType))
         {
-            return m_astBuilder->getOutType(diffValueType);
+            return m_astBuilder->getOutParamType(diffValueType);
         }
-        else if (as<InOutType>(primalParamWrapperType))
+        else if (as<BorrowInOutParamType>(primalParamWrapperType))
         {
-            return m_astBuilder->getInOutType(diffValueType);
+            return m_astBuilder->getBorrowInOutParamType(diffValueType);
         }
-        else if (as<ConstRefParamType>(primalParamWrapperType))
+        else if (as<BorrowInParamType>(primalParamWrapperType))
         {
             return m_astBuilder->getConstRefParamType(diffValueType);
         }
@@ -3753,9 +3760,9 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType)
             if (as<DifferentialPairType>(derivType))
             {
                 // An `in` differentiable parameter becomes an `inout` parameter.
-                derivType = m_astBuilder->getInOutType(derivType);
+                derivType = m_astBuilder->getBorrowInOutParamType(derivType);
             }
-            else if (auto inoutType = as<InOutType>(derivType))
+            else if (auto inoutType = as<BorrowInOutParamType>(derivType))
             {
                 if (!as<DifferentialPairType>(inoutType->getValueType()))
                 {
