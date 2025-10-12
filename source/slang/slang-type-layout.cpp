@@ -2680,11 +2680,6 @@ bool isCPUTarget(TargetRequest* targetReq)
         ArtifactDescUtil::makeDescForCompileTarget(asExternal(targetReq->getTarget())));
 }
 
-bool isShaderTarget(CodeGenTarget codeGenTarget)
-{
-    return ArtifactDescUtil::makeDescForCompileTarget(asExternal(codeGenTarget)).style == ArtifactStyle::Kernel;
-}
-
 bool isCUDATarget(TargetRequest* targetReq)
 {
     switch (targetReq->getTarget())
@@ -2715,6 +2710,12 @@ bool isWGPUTarget(CodeGenTarget target)
 bool isWGPUTarget(TargetRequest* targetReq)
 {
     return isWGPUTarget(targetReq->getTarget());
+}
+
+bool isShaderTarget(CodeGenTarget codeGenTarget)
+{
+    return ArtifactDescUtil::makeDescForCompileTarget(asExternal(codeGenTarget)).style ==
+           ArtifactStyle::Kernel;
 }
 
 SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgram)

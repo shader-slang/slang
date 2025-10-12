@@ -1273,7 +1273,8 @@ Result linkAndOptimizeIR(
     // We also need this pass on the CPU targets in shader mode, as global
     // constants may reference global parameters, which can't be emitted as
     // constants.
-    if (target == CodeGenTarget::CUDASource || (isCPUTarget(target) && isShaderTarget(target)) || options.shouldLegalizeExistentialAndResourceTypes)
+    if (target == CodeGenTarget::CUDASource || (isCPUTarget(targetRequest) && isShaderTarget(target)) ||
+        options.shouldLegalizeExistentialAndResourceTypes)
     {
         inlineGlobalConstantsForLegalization(irModule);
     }
