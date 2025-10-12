@@ -3224,7 +3224,40 @@ struct IREmbeddedDownstreamIR : IRInst
     IRBlobLit* getBlob() { return cast<IRBlobLit>(getOperand(1)); }
 };
 
-FIDDLE(allOtherInstStructs())
+// Generate struct definitions for all IR instructions not explicitly defined in this file
+#if 0 // FIDDLE TEMPLATE:
+% local lua_module = require("source/slang/slang-ir.h.lua")
+% local inst_structs = lua_module.getAllOtherInstStructsData()
+% for _, inst in ipairs(inst_structs) do
+struct IR$(inst.struct_name) : IR$(inst.parent_struct)
+{
+%   if inst.is_leaf then
+    static bool isaImpl(IROp op)
+    {
+        return (kIROpMask_OpMask & op) == kIROp_$(inst.struct_name);
+    }
+    enum { kOp = kIROp_$(inst.struct_name) };
+%   else
+    static bool isaImpl(IROp opIn)
+    {
+        const int op = (kIROpMask_OpMask & opIn);
+        return op >= kIROp_First$(inst.struct_name) && op <= kIROp_Last$(inst.struct_name);
+    }
+%   end
+%   for _, operand in ipairs(inst.operands) do
+%     if operand.has_type then
+    $(operand.type)* $(operand.getter_name)() { return ($(operand.type)*)getOperand($(operand.index)); }
+%     else
+    IRInst* $(operand.getter_name)() { return getOperand($(operand.index)); }
+%     end
+%   end
+};
+
+% end
+#else // FIDDLE OUTPUT:
+#define FIDDLE_GENERATED_OUTPUT_ID 0
+#include "slang-ir-insts.h.fiddle"
+#endif // FIDDLE END
 
 struct IRBuilderSourceLocRAII;
 

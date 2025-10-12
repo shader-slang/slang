@@ -144,62 +144,41 @@ local baseInst = function(name, args)
 	return result
 end
 
--- Generate struct definitions for instructions not defined by the user
-local function allOtherInstStructs()
+-- Prepare instruction data for template iteration
+local function getAllOtherInstStructsData()
 	local insts = require("source/slang/slang-ir-insts.lua").insts
-	local output = {}
+	local result = {}
 
 	walk_instructions(insts, function(key, value, struct_name, parent_struct)
 		-- If this type already has a definition, skip it
 		if not Slang["IR" .. struct_name] then
-			-- Generate struct definition
-			table.insert(output, string.format("struct IR%s : IR%s", struct_name, parent_struct))
-			table.insert(output, "{")
-			table.insert(
-				output,
-				string.format("    %s", value.is_leaf and leafInst(struct_name) or baseInst(struct_name))
-			)
-			-- Add getter methods if operands are specified
+			local inst_data = {
+				struct_name = struct_name,
+				parent_struct = parent_struct,
+				is_leaf = value.is_leaf,
+				operands = {},
+			}
+
+			-- Prepare operand data
 			if value.operands then
 				for i, operand in ipairs(value.operands) do
 					local operandName = operand[1]
 					local operandType = operand[2]
-					local getterName = "get" .. operandName:sub(1, 1):upper() .. operandName:sub(2)
-					local returnType = "IRInst"
-					if operandType then
-						returnType = operandType
-						table.insert(
-							output,
-							"\n    "
-								.. returnType
-								.. "* "
-								.. getterName
-								.. "() { return ("
-								.. returnType
-								.. "*)getOperand("
-								.. (i - 1)
-								.. "); }"
-						)
-					else
-						table.insert(
-							output,
-							"\n    "
-								.. returnType
-								.. "* "
-								.. getterName
-								.. "() { return getOperand("
-								.. (i - 1)
-								.. "); }"
-						)
-					end
+					table.insert(inst_data.operands, {
+						name = operandName,
+						type = operandType,
+						getter_name = "get" .. operandName:sub(1, 1):upper() .. operandName:sub(2),
+						index = i - 1,
+						has_type = operandType ~= nil,
+					})
 				end
 			end
-			table.insert(output, "};")
-			table.insert(output, "")
+
+			table.insert(result, inst_data)
 		end
 	end)
 
-	return table.concat(output, "\n")
+	return result
 end
 
 -- Forward declarations for everything
@@ -350,7 +329,7 @@ return {
 
 		return baseInst(current_name, merged_args)
 	end,
-	allOtherInstStructs = allOtherInstStructs,
+	getAllOtherInstStructsData = getAllOtherInstStructsData,
 	instStructForwardDecls = instStructForwardDecls,
 	instInfoEntries = instInfoEntries,
 	instEnums = instEnums,
