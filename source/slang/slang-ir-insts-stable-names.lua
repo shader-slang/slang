@@ -408,7 +408,7 @@ return {
 	["Decoration.maxTessFactor"] = 404,
 	["Decoration.outputControlPoints"] = 405,
 	["Decoration.outputTopology"] = 406,
-	["Decoration.partioning"] = 407,
+	["Decoration.partitioning"] = 407,
 	["Decoration.domain"] = 408,
 	["Decoration.maxVertexCount"] = 409,
 	["Decoration.instance"] = 410,

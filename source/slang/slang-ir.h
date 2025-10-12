@@ -1503,7 +1503,6 @@ FIDDLE()
 struct IRGLSLShaderStorageBufferType : IRPointerLikeType
 {
     FIDDLE(leafInst())
-    IRType* getDataLayout() { return (IRType*)getOperand(1); }
 };
 
 FIDDLE()
@@ -1617,13 +1616,20 @@ FIDDLE()
 struct IRTensorAddressingTensorViewType : IRType
 {
     FIDDLE(leafInst())
-    IRInst* getDimension() { return getOperand(0); }
-    IRInst* getHasDimension() { return getOperand(1); }
     IRInst* getPermutation(int index) { return getOperand(2 + index); }
 };
 
 bool isDefinition(IRInst* inVal);
 
+// A structure type is represented as a parent instruction,
+// where the child instructions repres ent the fields of the
+// struct.
+//
+// The space of fields that a given st ruct type supports
+// are defined as its "keys", which ar e global values
+// (that is, they have mangled names t hat can be used
+// for linkage).
+//
 FIDDLE()
 struct IRStructKey : IRInst
 {
@@ -1727,8 +1733,6 @@ FIDDLE()
 struct IRIndexedFieldKey : IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getBaseType() { return getOperand(0); }
-    IRInst* getIndex() { return getOperand(1); }
 };
 
 /// Represents a `expand T` type used in variadic generic decls in Slang. Expected to be substituted
