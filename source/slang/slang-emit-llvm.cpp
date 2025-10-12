@@ -439,6 +439,7 @@ public:
 
         case kIROp_PtrType:
         case kIROp_NativePtrType:
+        case kIROp_StringType:
         case kIROp_NativeStringType:
         case kIROp_RawPointerType:
         case kIROp_OutParamType:
@@ -671,6 +672,7 @@ public:
             llvmType = debugBuilder->createBasicType("NativeRef", ptrSize, llvm::dwarf::DW_ATE_address);
             break;
 
+        case kIROp_StringType:
         case kIROp_NativeStringType:
             {
                 llvmType = debugBuilder->createPointerType(
@@ -1797,8 +1799,6 @@ struct LLVMEmitter
         llvmLinker.reset(new llvm::Linker(*llvmModule));
         llvmDebugBuilder.reset(new llvm::DIBuilder(*llvmModule));
 
-        auto session = codeGenContext->getSession();
-
         llvm::InitializeAllTargetInfos();
         llvm::InitializeAllTargets();
         llvm::InitializeAllTargetMCs();
@@ -1953,6 +1953,7 @@ struct LLVMEmitter
             sourceDebugInfo,
             defaultPointerRules));
 
+        auto session = codeGenContext->getSession();
         String prelude = session->getPreludeForLanguage(SourceLanguage::LLVM);
         llvm::ModuleSummaryIndex llvmSummaryIndex(true);
         llvm::SMDiagnostic diag;
@@ -1971,6 +1972,11 @@ struct LLVMEmitter
     ~LLVMEmitter()
     {
         delete targetMachine;
+    }
+
+    DiagnosticSink* getSink()
+    {
+        return codeGenContext->getSink();
     }
 
     CompilerOptionSet& getOptions()
@@ -3320,6 +3326,28 @@ struct LLVMEmitter
         case kIROp_Unreachable:
             return llvmBuilder->CreateUnreachable();
 
+        case kIROp_GetStringHash:
+            {
+                auto getStringHashInst = cast<IRGetStringHash>(inst);
+                auto stringLit = getStringHashInst->getStringLit();
+
+                if (stringLit)
+                {
+                    auto slice = stringLit->getStringSlice();
+                    auto hash = getStableHashCode32(slice.begin(), slice.getLength()).hash;
+                    llvmInst = llvmBuilder->getInt32(hash);
+                }
+                else
+                {
+                    // TODO: Probably best implemented in an improved prelude,
+                    // slang-rt or in core module. Ideally, if built-in hashing
+                    // support in the core module becomes a thing, that can be
+                    // used for this too.
+                    getSink()->diagnose(inst, Diagnostics::unimplemented, "unexpected string hash for non-literal string");
+                }
+            }
+            break;
+
         case kIROp_DebugVar:
             debugInsts.add(inst);
             if (debug && currentLocalScope)
@@ -3858,21 +3886,11 @@ struct LLVMEmitter
         return func;
     }
 
-    void emitTargetIntrinsicFunction(
-        IRFunc* func,
-        llvm::Function*& llvmFunc,
-        IRInst* intrinsicInst,
-        UnownedStringSlice intrinsicDef
+    // This function inserts the given LLVM IR in the global scope.
+    // Uses std::string due to that being what LLVM emits and ingests.
+    void emitGlobalLLVMIR(
+        std::string& llvmTextIR
     ){
-        llvm::BasicBlock* bb = llvm::BasicBlock::Create(*llvmContext, "", llvmFunc);
-
-        llvmFunc->setLinkage(llvm::Function::LinkageTypes::ExternalLinkage);
-
-        std::string funcName = llvmFunc->getName().str();
-        std::string llvmTextIR = expandIntrinsic(llvmFunc, intrinsicInst, func, intrinsicDef);
-
-        bb->eraseFromParent();
-
         llvm::SMDiagnostic diag;
         std::unique_ptr<llvm::Module> sourceModule = llvm::parseAssemblyString(
             llvmTextIR, diag, *llvmContext);
@@ -3888,6 +3906,24 @@ struct LLVMEmitter
         sourceModule->setTargetTriple(targetMachine->getTargetTriple());
 
         llvmLinker->linkInModule(std::move(sourceModule), llvm::Linker::OverrideFromSrc);
+    }
+
+    void emitTargetIntrinsicFunction(
+        IRFunc* func,
+        llvm::Function*& llvmFunc,
+        IRInst* intrinsicInst,
+        UnownedStringSlice intrinsicDef
+    ){
+        llvm::BasicBlock* bb = llvm::BasicBlock::Create(*llvmContext, "", llvmFunc);
+
+        llvmFunc->setLinkage(llvm::Function::LinkageTypes::ExternalLinkage);
+
+        std::string funcName = llvmFunc->getName().str();
+        std::string llvmTextIR = expandIntrinsic(llvmFunc, intrinsicInst, func, intrinsicDef);
+
+        bb->eraseFromParent();
+
+        emitGlobalLLVMIR(llvmTextIR);
 
         llvmFunc = llvm::cast<llvm::Function>(llvmModule->getNamedValue(funcName));
         llvmFunc->setLinkage(llvm::Function::LinkageTypes::PrivateLinkage);
