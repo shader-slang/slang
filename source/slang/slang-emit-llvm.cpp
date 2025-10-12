@@ -2809,7 +2809,7 @@ struct LLVMEmitter
                     llvmInst = llvmBuilder->CreateCmp(
                         llvm::CmpInst::Predicate::FCMP_UNE,
                         llvmValue,
-                        llvm::ConstantInt::get(types->getValueType(fromType), 0)
+                        llvm::ConstantFP::getZero(types->getValueType(fromType))
                     );
                 }
                 else
