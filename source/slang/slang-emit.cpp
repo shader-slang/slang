@@ -1368,12 +1368,6 @@ Result linkAndOptimizeIR(
         legalizeEmptyTypes(targetProgram, irModule, sink);
     }
 
-    legalizeMatrixTypes(targetProgram, irModule, sink);
-    dumpIRIfEnabled(codeGenContext, irModule, "AFTER-MATRIX-LEGALIZATION");
-
-    legalizeVectorTypes(irModule, sink);
-    dumpIRIfEnabled(codeGenContext, irModule, "AFTER-VECTOR-LEGALIZATION");
-
     // Once specialization and type legalization have been performed,
     // we should perform some of our basic optimization steps again,
     // to see if we can clean up any temporaries created by legalization.
@@ -1868,6 +1862,12 @@ Result linkAndOptimizeIR(
         bufferElementTypeLoweringOptions.loweringPolicyKind =
             BufferElementTypeLoweringPolicyKind::Default;
     lowerBufferElementTypeToStorageType(targetProgram, irModule, bufferElementTypeLoweringOptions);
+
+    legalizeMatrixTypes(targetProgram, irModule, sink);
+    dumpIRIfEnabled(codeGenContext, irModule, "AFTER-MATRIX-LEGALIZATION");
+
+    legalizeVectorTypes(irModule, sink);
+    dumpIRIfEnabled(codeGenContext, irModule, "AFTER-VECTOR-LEGALIZATION");
 
     // If we are generating code for glsl or metal, perform address space propagation now.
     // For SPIRV, we will do that during spirv legalization that happens after
