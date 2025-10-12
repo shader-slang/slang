@@ -8,6 +8,8 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute  -shaderobj
 // Not supported in WGSL: 1D array texture not supported in WGSL
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -wgpu
+// Not supported in LLVM: textures are not currently available
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -llvm
 
 //TEST_INPUT: Texture1D(size=4, content = one):name t1D
 Texture1D<float> t1D;
