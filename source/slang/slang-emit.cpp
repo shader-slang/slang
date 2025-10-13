@@ -312,9 +312,10 @@ static bool canSPIRVBitcastType(IRType* type)
 {
     // If vector, check if element type is numerical and therefor supported by OpBitcast
     if (auto vectorType = as<IRVectorType>(type))
-        // SPIRV spec supports all numerical types, 
-        // but the SPIRV-Tools optimizer crashes during constant folding on 8-bit constants in bitcasts
-        return canSPIRVBitcastType(vectorType->getElementType()) && vectorType->getElementType()->getOp() != kIROp_UInt8Type;
+        // SPIRV spec supports all numerical types for OpBitcast, 
+        // but the SPIRV-Tools optimizer crashes during constant folding on uint8 constants
+        return canSPIRVBitcastType(vectorType->getElementType()) &&
+               vectorType->getElementType()->getOp() != kIROp_UInt8Type;
     // Numerical types (basic type but not bool or void) can be bitcast natively by OpBitcast
     auto basicType = as<IRBasicType>(type);
     return basicType && !(as<IRBoolType>(basicType) || as<IRVoidType>(basicType));
@@ -355,14 +356,15 @@ static bool shouldLowerBitCastForTarget(CodeGenContext* codeGenContext, IRInst* 
 
     // SPIRV OpBitcast requires operand and result to have same bit width
     IRSizeAndAlignment fromSize, toSize;
-    if (SLANG_FAILED(getNaturalSizeAndAlignment(targetProgram->getOptionSet(), fromType, &fromSize)) ||
+    if (SLANG_FAILED(
+            getNaturalSizeAndAlignment(targetProgram->getOptionSet(), fromType, &fromSize)) ||
         SLANG_FAILED(getNaturalSizeAndAlignment(targetProgram->getOptionSet(), toType, &toSize)))
         return true;
 
     if (fromSize.size != toSize.size)
         return true;
 
-   return !canSPIRVBitcastType(fromType) || !canSPIRVBitcastType(toType);
+    return !canSPIRVBitcastType(fromType) || !canSPIRVBitcastType(toType);
 }
 
 // Scan the IR module and determine which lowering/legalization passes are needed based
