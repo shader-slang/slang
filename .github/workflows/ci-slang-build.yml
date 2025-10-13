@@ -178,7 +178,8 @@ jobs:
 
               cp -r "build/${cmake_config}/bin/D3D12" "artifacts-staging/${cmake_config}/bin/" || echo "Failed to copy bin/D3D12 directory"
               if [[ "${{ inputs.os }}" == "windows" ]]; then
-                cp -r "build/${cmake_config}/bin/slang-neural-module" "artifacts-staging/${cmake_config}/bin/slang-neural-module" || echo "Failed to copy bin/slang-neural-module directory"
+                # Copy the prebuilt module directory (name includes version, e.g., slang-prebuilt-module-2025.15.1)
+                cp -r "build/${cmake_config}/bin"/slang-prebuilt-module-* "artifacts-staging/${cmake_config}/bin/" 2>/dev/null || echo "Failed to copy bin/slang-prebuilt-module directory"
               fi
             fi
 
