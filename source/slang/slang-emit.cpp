@@ -310,15 +310,14 @@ struct LinkingAndOptimizationOptions
 // Check if a type is natively supported by SPIRV OpBitcast instruction
 static bool canSPIRVBitcastType(IRType* type)
 {
-    if (auto basicType = as<IRBasicType>(type))
-    {
-        // SPIRV spec supports all numerical types, but SPIRV tools crash on 8-bit constants
-        auto op = basicType->getOp();
-        return op != kIROp_Int8Type && op != kIROp_UInt8Type;
-    }
+    // If vector, check if element type is numerical and therefor supported by OpBitcast
     if (auto vectorType = as<IRVectorType>(type))
-        return canSPIRVBitcastType(vectorType->getElementType());
-    return false;
+        // SPIRV spec supports all numerical types, 
+        // but the SPIRV-Tools optimizer crashes during constant folding on 8-bit constants in bitcasts
+        return canSPIRVBitcastType(vectorType->getElementType()) && vectorType->getElementType()->getOp() != kIROp_UInt8Type;
+    // Numerical types (basic type but not bool or void) can be bitcast natively by OpBitcast
+    auto basicType = as<IRBasicType>(type);
+    return basicType && !(as<IRBoolType>(basicType) || as<IRVoidType>(basicType));
 }
 
 // Check if a BitCast instruction requires lowering for the current target.
@@ -332,12 +331,16 @@ static bool shouldLowerBitCastForTarget(CodeGenContext* codeGenContext, IRInst* 
     if (!targetRequest)
         return true;
 
+    // Only skip lowering for SPIRV targets
     auto target = targetRequest->getTarget();
     if (target != CodeGenTarget::SPIRV && target != CodeGenTarget::SPIRVAssembly)
         return true;
 
-    // Only optimize for direct SPIRV emission, not SPIRV-via-GLSL
     auto targetProgram = codeGenContext->getTargetProgram();
+    if (!targetProgram)
+        return true;
+
+    // Only skip lowering for direct SPIRV emission, not SPIRV-via-GLSL
     if (!targetProgram->shouldEmitSPIRVDirectly())
         return true;
 
@@ -352,17 +355,14 @@ static bool shouldLowerBitCastForTarget(CodeGenContext* codeGenContext, IRInst* 
 
     // SPIRV OpBitcast requires operand and result to have same bit width
     IRSizeAndAlignment fromSize, toSize;
-    if (SLANG_SUCCEEDED(
-            getNaturalSizeAndAlignment(targetProgram->getOptionSet(), fromType, &fromSize)) &&
-        SLANG_SUCCEEDED(
-            getNaturalSizeAndAlignment(targetProgram->getOptionSet(), toType, &toSize)) &&
-        fromSize.size == toSize.size)
-    {
-        // For SPIRV targets, check if this bitcast can be handled natively
-        return !canSPIRVBitcastType(fromType) || !canSPIRVBitcastType(toType);
-    }
+    if (SLANG_FAILED(getNaturalSizeAndAlignment(targetProgram->getOptionSet(), fromType, &fromSize)) ||
+        SLANG_FAILED(getNaturalSizeAndAlignment(targetProgram->getOptionSet(), toType, &toSize)))
+        return true;
 
-    return true;
+    if (fromSize.size != toSize.size)
+        return true;
+
+   return !canSPIRVBitcastType(fromType) || !canSPIRVBitcastType(toType);
 }
 
 // Scan the IR module and determine which lowering/legalization passes are needed based
