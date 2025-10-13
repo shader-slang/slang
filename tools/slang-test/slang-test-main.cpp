@@ -37,6 +37,7 @@
 #include "stb_image.h"
 
 #include <math.h>
+#include <random>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -3643,6 +3644,16 @@ static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine
     {
         ioCmdLine.addArg("-enable-debug-layers");
     }
+
+    if (options.ignoreAbortMsg)
+    {
+        ioCmdLine.addArg("-ignore-abort-msg");
+    }
+
+    if (options.cacheRhiDevice)
+    {
+        ioCmdLine.addArg("-cache-rhi-device");
+    }
 }
 
 static SlangResult _extractProfileTime(const UnownedStringSlice& text, double& timeOut)
@@ -4766,6 +4777,23 @@ static bool shouldRunTest(TestContext* context, String filePath)
     if (!endsWithAllowedExtension(context, filePath))
         return false;
 
+    // Check exclude prefixes first - if any match, skip the test
+    for (auto& excludePrefix : context->options.excludePrefixes)
+    {
+        if (filePath.startsWith(excludePrefix))
+        {
+            if (context->options.verbosity == VerbosityLevel::Verbose)
+            {
+                context->getTestReporter()->messageFormat(
+                    TestMessageType::Info,
+                    "%s file is excluded from the test because it is found from the exclusion "
+                    "list\n",
+                    filePath.getBuffer());
+            }
+            return false;
+        }
+    }
+
     if (!context->options.testPrefixes.getCount())
     {
         return true;
@@ -4840,14 +4868,33 @@ void runTestsInDirectory(TestContext* context)
     List<String> files;
     getFilesInDirectory(context->options.testDir, files);
 
+    // Also add any test prefixes that point to actual files outside the test directory
+    for (const auto& testPrefix : context->options.testPrefixes)
+    {
+        if (File::exists(testPrefix))
+        {
+            // Avoid duplicates - only add if not already in the list
+            if (files.indexOf(testPrefix) == Index(-1))
+            {
+                files.add(testPrefix);
+            }
+        }
+    }
+
     // NTFS on Windows stores files in sorted order but not on Linux/Macos.
     // Because of that, the testing on Linux/Macos were randomly failing, which
     // is a good thing because it reveals problems. But it is useless
-    // if we cannot reproduce the failures deterministrically.
+    // if we cannot reproduce the failures deterministically.
     // https://github.com/shader-slang/slang/issues/7388
-    //
-    // TODO: We need a way to shuffle the list in a deterministic manner.
+
     files.sort();
+
+    // If asked, shuffle the list using seed for deterministic behavior.
+    if (context->options.shuffleTests)
+    {
+        std::mt19937 mt(context->options.shuffleSeed);
+        std::shuffle(files.begin(), files.end(), mt);
+    }
 
     auto processFile = [&](String file)
     {
@@ -5127,6 +5174,15 @@ static SlangResult runUnitTestModule(
 
     testModule->destroy();
     return SLANG_OK;
+}
+
+static void cleanupRenderTestDeviceCache(TestContext& context)
+{
+    auto cleanFunc = context.getCleanDeviceCacheFunc("render-test");
+    if (cleanFunc)
+    {
+        cleanFunc();
+    }
 }
 
 SlangResult innerMain(int argc, char** argv)
@@ -5420,12 +5476,15 @@ SlangResult innerMain(int argc, char** argv)
         }
 
         reporter.outputSummary();
+
+        cleanupRenderTestDeviceCache(context);
         return reporter.didAllSucceed() ? SLANG_OK : SLANG_FAIL;
     }
 }
 
 int main(int argc, char** argv)
 {
+    // Fallback: run without cleanup if context initialization fails
     SlangResult res = innerMain(argc, argv);
     slang::shutdown();
     Slang::RttiInfo::deallocateAll();

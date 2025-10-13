@@ -1017,7 +1017,7 @@ struct TypeInliningPass : InliningPassBase
         const auto op = type->getOp();
         switch (op)
         {
-        case kIROp_RefType:
+        case kIROp_RefParamType:
             {
                 if (callee->findDecoration<IRNoRefInlineDecoration>())
                     return false;
@@ -1230,7 +1230,7 @@ struct GLSLResourceReturnFunctionInliningPass : InliningPassBase
         {
             if (isIllegalGLSLParameterType(param->getDataType()))
                 return true;
-            auto outType = as<IROutTypeBase>(param->getDataType());
+            auto outType = as<IROutParamTypeBase>(param->getDataType());
             if (!outType)
                 continue;
             auto outValueType = outType->getValueType();

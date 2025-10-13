@@ -196,6 +196,11 @@ inline Type* getTargetType(ASTBuilder* astBuilder, DeclRef<ExtensionDecl> declRe
     return declRef.substitute(astBuilder, declRef.getDecl()->targetType.Ptr());
 }
 
+inline Type* getAliasedType(ASTBuilder* astBuilder, DeclRef<AggTypeDecl> declRef)
+{
+    return declRef.substitute(astBuilder, declRef.getDecl()->aliasedType.Ptr());
+}
+
 inline FilteredMemberRefList<VarDecl> getFields(
     ASTBuilder* astBuilder,
     DeclRef<StructDecl> declRef,
@@ -238,7 +243,7 @@ SubstitutionSet makeSubstitutionFromIncompleteSet(
 
 Val::OperandView<Val> findInnerMostGenericArgs(SubstitutionSet subst);
 
-ParameterDirection getParameterDirection(VarDeclBase* varDecl);
+ParamPassingMode getParameterDirection(VarDeclBase* varDecl);
 
 inline Type* getTagType(ASTBuilder* astBuilder, DeclRef<EnumDecl> declRef)
 {

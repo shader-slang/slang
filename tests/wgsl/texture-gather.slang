@@ -68,66 +68,14 @@ TextureCubeArray<uint4> tCubeArray_u32v4;
 
 // depth
 
-__generic<let sampleCount:int=0, let format:int=0>
-typealias Depth2D = _Texture<
-    float,
-    __Shape2D,
-    0, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    0, // isCombined
-    format
->;
-
-__generic<let sampleCount:int=0, let format:int=0>
-typealias Depth2DArray = _Texture<
-    float,
-    __Shape2D,
-    1, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    0, // isCombined
-    format
->;
-
-__generic<let sampleCount:int=0, let format:int=0>
-typealias DepthCube = _Texture<
-    float,
-    __ShapeCube,
-    0, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    0, // isCombined
-    format
->;
-
-__generic<let sampleCount:int=0, let format:int=0>
-typealias DepthCubeArray = _Texture<
-    float,
-    __ShapeCube,
-    1, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    0, // isCombined
-    format
->;
-
 //TEST_INPUT: Texture2D(size=4, content = zero):name d2D
-Depth2D d2D;
+DepthTexture2D d2D;
 //TEST_INPUT: TextureCube(size=4, content = zero):name dCube
-DepthCube dCube;
+DepthTextureCube dCube;
 //TEST_INPUT: Texture2D(size=4, content = zero, arrayLength=2):name d2DArray
-Depth2DArray d2DArray;
+DepthTexture2DArray d2DArray;
 //TEST_INPUT: TextureCube(size=4, content = zero, arrayLength=2):name dCubeArray
-DepthCubeArray dCubeArray;
+DepthTextureCubeArray dCubeArray;
 
 //TEST_INPUT: Sampler:name samplerState
 SamplerState samplerState;

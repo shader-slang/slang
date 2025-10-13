@@ -601,6 +601,9 @@ def SPV_NV_tensor_addressing : _spirv_1_6;
 /// [EXT]
 def SPV_NV_cooperative_matrix2 : SPV_NV_tensor_addressing + SPV_KHR_cooperative_matrix;
 
+/// Represents the SPIR-V extension for SPV_NV_bindless_texture.
+/// [EXT]
+def SPV_NV_bindless_texture: _spirv_1_0;
 
 // SPIRV Capabilities.
 
@@ -811,6 +814,10 @@ def spvVulkanMemoryModelKHR : SPV_KHR_vulkan_memory_model;
 /// Represents the SPIR-V capability for vulkan memory model.
 /// [EXT]
 def spvVulkanMemoryModelDeviceScopeKHR : SPV_KHR_vulkan_memory_model;
+
+/// Represents the SPIR-V capability for the bindless texture.
+/// [EXT]
+def spvBindlessTextureNV : SPV_NV_bindless_texture;
 
 // The following capabilities all pertain to how ray tracing shaders are translated
 // to GLSL, where there are two different extensions that can provide the core

@@ -76,6 +76,7 @@ static bool _isSubCommand(const char* arg)
         "  -verbose-paths                 Use verbose paths in output\n"
         "  -category <name>               Only run tests in specified category\n"
         "  -exclude <name>                Exclude tests in specified category\n"
+        "  -exclude-prefix <prefix>       Exclude tests with specified path prefix\n"
         "  -api <expr>                    Enable specific APIs (e.g., 'vk+dx12' or '+dx11')\n"
         "  -synthesizedTestApi <expr>     Set APIs for synthesized tests\n"
         "  -skip-api-detection            Skip API availability detection\n"
@@ -89,8 +90,18 @@ static bool _isSubCommand(const char* arg)
         "  -use-test-server               Run tests using test server\n"
         "  -use-fully-isolated-test-server  Run each test in isolated server\n"
         "  -capability <name>             Compile with the given capability\n"
+        "  -shuffle-tests                 Shuffle tests in directories\n"
+        "  -shuffle-seed <seed>           Set shuffle seed (default: 1)\n"
+
+        // Recent Windows runtime versions started opening a dialog popup window when
+        // `abort()` is called, which breaks the CI workflow and some scripts that
+        // expect a normal termination.
+        // It can be helpful for debugging but we should ignore it for CI.
+        "  -ignore-abort-msg              Ignore abort message dialog popup on Windows\n"
+
         "  -enable-debug-layers [true|false] Enable or disable Validation Layer for Vulkan\n"
         "                                 and Debug Device for DX\n"
+        "  -cache-rhi-device [true|false] Enable or disable RHI device caching (default: true)\n"
 #if _DEBUG
         "  -disable-debug-layers          Disable the debug layers (default enabled in debug "
         "build)\n"
@@ -263,6 +274,24 @@ static bool _isSubCommand(const char* arg)
         {
             optionsOut->generateHLSLBaselines = true;
         }
+        else if (strcmp(arg, "-shuffle-tests") == 0)
+        {
+            optionsOut->shuffleTests = true;
+        }
+        else if (strcmp(arg, "-shuffle-seed") == 0)
+        {
+            if (argCursor == argEnd)
+            {
+                stdError.print("error: expected operand for '%s'\n", arg);
+                showHelp(stdError);
+                return SLANG_FAIL;
+            }
+            optionsOut->shuffleSeed = stringToInt(*argCursor++);
+            if (optionsOut->shuffleSeed <= 0)
+            {
+                optionsOut->shuffleSeed = 1;
+            }
+        }
         else if (strcmp(arg, "-release") == 0)
         {
             // Assumed to be handle by .bat file that called us
@@ -357,6 +386,18 @@ static bool _isSubCommand(const char* arg)
                 optionsOut->excludeCategories.add(category, category);
             }
         }
+        else if (strcmp(arg, "-exclude-prefix") == 0)
+        {
+            if (argCursor == argEnd)
+            {
+                stdError.print("error: expected operand for '%s'\n", arg);
+                showHelp(stdError);
+                return SLANG_FAIL;
+            }
+            Slang::StringBuilder sb;
+            Slang::Path::simplify(*argCursor++, Slang::Path::SimplifyStyle::NoRoot, sb);
+            optionsOut->excludePrefixes.add(sb);
+        }
         else if (strcmp(arg, "-api") == 0)
         {
             if (argCursor == argEnd)
@@ -418,6 +459,13 @@ static bool _isSubCommand(const char* arg)
                 return SLANG_FAIL;
             }
             optionsOut->capabilities.add(*argCursor++);
+        }
+        else if (strcmp(arg, "-ignore-abort-msg") == 0)
+        {
+            optionsOut->ignoreAbortMsg = true;
+#ifdef _MSC_VER
+            _set_abort_behavior(0, _WRITE_ABORT_MSG);
+#endif
         }
         else if (strcmp(arg, "-expected-failure-list") == 0)
         {
@@ -486,6 +534,26 @@ static bool _isSubCommand(const char* arg)
                 ((value[0] == 'o' || value[0] == 'O') && (value[1] == 'f' || value[1] == 'F')))
             {
                 optionsOut->enableDebugLayers = false;
+            }
+        }
+        else if (strcmp(arg, "-cache-rhi-device") == 0)
+        {
+            optionsOut->cacheRhiDevice = true;
+
+            if (argCursor == argEnd)
+            {
+                stdError.print("error: expected operand for '%s'\n", arg);
+                showHelp(stdError);
+                return SLANG_FAIL;
+            }
+
+            // Check for false variants
+            const char* value = *argCursor++;
+            if (value[0] == 'f' || value[0] == 'F' || value[0] == 'n' || value[0] == 'N' ||
+                value[0] == '0' ||
+                ((value[0] == 'o' || value[0] == 'O') && (value[1] == 'f' || value[1] == 'F')))
+            {
+                optionsOut->cacheRhiDevice = false;
             }
         }
 #if _DEBUG
