@@ -32,7 +32,8 @@ InlineVector<float, 2> output = input.eval<2, false>(storage, 0);
 
 module neural;
 
+__include "ivector";
 __include "inline-vector";
-__include "storages";
+__include "istorages";
 __include "bindless-storage";
 __include "buffer-storage";
