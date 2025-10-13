@@ -12618,7 +12618,9 @@ void checkDerivativeAttributeImpl(
         {
             if (auto candidateDeclRefExpr = as<DeclRefExpr>(candidate))
             {
-                visitor->ensureDecl(candidateDeclRefExpr->declRef, DeclCheckState::TypesFullyResolved);
+                visitor->ensureDecl(
+                    candidateDeclRefExpr->declRef,
+                    DeclCheckState::TypesFullyResolved);
             }
         }
     }
