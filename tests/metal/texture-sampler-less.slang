@@ -28,63 +28,10 @@ Sampler1DArray<float> t1DArray;
 Sampler2DArray<float> t2DArray;
 SamplerCubeArray<float> tCubeArray;
 
-// Metal doc says "For depth texture types, T must be float."
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
-typealias depth2d = _Texture<
-    T,
-    __Shape2D,
-    0, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    1, // isCombined
-    format
->;
-
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
-typealias depth2d_array = _Texture<
-    T,
-    __Shape2D,
-    1, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    1, // isCombined
-    format
->;
-
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
-typealias depthcube = _Texture<
-    T,
-    __ShapeCube,
-    0, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    1, // isCombined
-    format
->;
-
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
-typealias depthcube_array = _Texture<
-    T,
-    __ShapeCube,
-    1, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    1, // isCombined
-    format
->;
-
-depth2d<float> d2D;
-depthcube<float> dCube;
-depth2d_array<float> d2DArray;
-depthcube_array<float> dCubeArray;
+Sampler2DShadow d2D;
+SamplerCubeShadow dCube;
+Sampler2DArrayShadow d2DArray;
+SamplerCubeArrayShadow dCubeArray;
 
 bool TEST_texture_float()
 {

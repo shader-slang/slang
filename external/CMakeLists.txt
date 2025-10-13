@@ -152,8 +152,12 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
         # Enable mimalloc for SPIRV-Tools to improve compilation performance
         # Based on SPIRV-Tools PR #6267: https://github.com/KhronosGroup/SPIRV-Tools/pull/6267
         if(SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC)
-            # Place mimalloc in slang/external instead of spirv-tools/external for better organization
-            set(MIMALLOC_PATH "${CMAKE_CURRENT_SOURCE_DIR}/mimalloc")
+            if(NOT SLANG_OVERRIDE_MIMALLOC_PATH)
+                # Place mimalloc in slang/external instead of spirv-tools/external for better organization
+                set(MIMALLOC_PATH "${CMAKE_CURRENT_SOURCE_DIR}/mimalloc")
+            else()
+                set(MIMALLOC_PATH "${SLANG_OVERRIDE_MIMALLOC_PATH}/mimalloc")
+            endif()
 
             # Download mimalloc if it's not available
             if(NOT EXISTS "${MIMALLOC_PATH}/CMakeLists.txt")

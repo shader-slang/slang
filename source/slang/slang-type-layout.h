@@ -1194,11 +1194,11 @@ struct TypeLayoutContext
     // Options passed to object layout
     ObjectLayoutRulesImpl::Options objectLayoutOptions;
 
-    // Mangled names to DeclRefType, this is used to match up 'extern' types to
+    // Mangled names to Type, this is used to match up 'extern' types to
     // their linked in definitions during layout generation
-    std::optional<Dictionary<String, DeclRefType*>> externTypeMap;
+    std::optional<Dictionary<String, Type*>> externTypeMap;
 
-    DeclRefType* lookupExternDeclRefType(DeclRefType* declRefType);
+    Type* lookupExternDeclRefType(DeclRefType* declRefType);
     void buildExternTypeMap();
 
     LayoutRulesImpl* getRules() { return rules; }

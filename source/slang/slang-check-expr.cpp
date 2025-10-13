@@ -290,6 +290,13 @@ void addSiblingScopeForContainerDecl(ASTBuilder* builder, Scope* destScope, Cont
     destScope->nextSibling = subScope;
 }
 
+ContainerDecl* isStaticScopeDecl(Decl* decl)
+{
+    if (as<NamespaceDeclBase>(decl) || as<FileDecl>(decl))
+        return as<ContainerDecl>(decl);
+    return nullptr;
+}
+
 void SemanticsVisitor::diagnoseDeprecatedDeclRefUsage(
     DeclRef<Decl> declRef,
     SourceLoc loc,

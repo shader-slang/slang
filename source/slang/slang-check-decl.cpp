@@ -614,7 +614,6 @@ private:
         Decl* member,
         Expr* rightHandSideExpr);
     Expr* createCtorParamExpr(ConstructorDecl* ctor, Index paramIndex);
-    void maybeInsertDefaultInitExpr(StructDecl* structDecl);
 };
 
 template<typename VisitorType>
@@ -2553,24 +2552,17 @@ void SemanticsDeclHeaderVisitor::visitStructDecl(StructDecl* structDecl)
         structDecl->addTag(TypeTag::Incomplete);
     }
 
-    // Slang supports a convenient syntax to create a wrapper type from
+    // Slang supports a convenient syntax to create a link-time aliased type from
     // an existing type that implements a given interface. For example,
     // the user can write: struct FooWrapper:IFoo = Foo;
-    // In this case we will synthesize the FooWrapper type with an inner
-    // member of type `Foo`, and use it to implement all requirements of
-    // IFoo.
-    // If this is a wrapper struct, synthesize the inner member now.
-    if (structDecl->wrappedType.exp)
+    // In this case we need to check the aliasedType expr.
+    if (structDecl->aliasedType.exp)
     {
-        structDecl->wrappedType = CheckProperType(structDecl->wrappedType);
-        auto member = m_astBuilder->create<VarDecl>();
-        member->type = structDecl->wrappedType;
-        member->nameAndLoc.name = getName("inner");
-        member->nameAndLoc.loc = structDecl->wrappedType.exp->loc;
-        member->loc = member->nameAndLoc.loc;
-        addModifier(member, m_astBuilder->create<SynthesizedModifier>());
-        structDecl->addMember(member);
+        SemanticsVisitor visitor(withDeclToExcludeFromLookup(structDecl));
+        structDecl->aliasedType = visitor.CheckProperType(structDecl->aliasedType);
+        structDecl->addTag(getTypeTags(structDecl->aliasedType));
     }
+
     checkVisibility(structDecl);
 }
 
@@ -2711,6 +2703,9 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 {
     DiagnoseIsAllowedInitExpr(varDecl, getSink());
 
+    // Check for arrays of non-addressable types
+    validateArrayElementTypeForVariable(varDecl);
+
     // if zero initialize is true, set everything to a default
     if (getOptionSet().hasOption(CompilerOptionName::ZeroInitialize) && !varDecl->initExpr &&
         as<VarDecl>(varDecl))
@@ -2848,6 +2843,7 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     }
 
     TypeTag varTypeTags = getTypeTags(varDecl->getType());
+
     auto parentDecl = as<AggTypeDecl>(getParentDecl(varDecl));
     if (parentDecl)
     {
@@ -5348,16 +5344,6 @@ void SemanticsVisitor::_addMethodWitness(
     witnessTable->add(requiredMemberDeclRef.getDecl(), RequirementWitness(satisfyingMemberDeclRef));
 }
 
-static bool isWrapperTypeDecl(Decl* decl)
-{
-    if (auto aggTypeDecl = as<AggTypeDecl>(decl))
-    {
-        if (aggTypeDecl->wrappedType)
-            return true;
-    }
-    return false;
-}
-
 // Is it allowed to have an interface method parameter whose direction is `reqDir`, and an
 // implementing method parameter whose direction is `implDir`?
 //
@@ -5487,16 +5473,14 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     // With the big picture spelled out, we can settle into
     // the work of constructing our synthesized method.
     //
-    bool isInWrapperType = isWrapperTypeDecl(context->parentDecl);
-
     // First, we check that the differentiabliity of the method matches the requirement,
     // and we don't attempt to synthesize a method if they don't match.
     if (lookupResult.isValid())
     {
-        if (!isInWrapperType && getShared()->getFuncDifferentiableLevel(
-                                    as<FunctionDeclBase>(lookupResult.item.declRef.getDecl())) <
-                                    getShared()->getFuncDifferentiableLevel(
-                                        as<FunctionDeclBase>(requiredMemberDeclRef.getDecl())))
+        if (getShared()->getFuncDifferentiableLevel(
+                as<FunctionDeclBase>(lookupResult.item.declRef.getDecl())) <
+            getShared()->getFuncDifferentiableLevel(
+                as<FunctionDeclBase>(requiredMemberDeclRef.getDecl())))
         {
             return false;
         }
@@ -5524,25 +5508,7 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     auto baseOverloadedExpr = m_astBuilder->create<OverloadedExpr>();
     baseOverloadedExpr->name = requiredMemberDeclRef.getDecl()->getName();
 
-    if (isInWrapperType)
-    {
-        auto aggTypeDecl = as<AggTypeDecl>(context->parentDecl);
-        baseOverloadedExpr->lookupResult2 = lookUpMember(
-            m_astBuilder,
-            this,
-            baseOverloadedExpr->name,
-            aggTypeDecl->wrappedType.type,
-            aggTypeDecl->ownedScope,
-            LookupMask::Default,
-            LookupOptions::IgnoreBaseInterfaces);
-        addModifier(synFuncDecl, m_astBuilder->create<ForceInlineAttribute>());
-
-        synFuncDecl->parentDecl = aggTypeDecl;
-    }
-    else
-    {
-        baseOverloadedExpr->lookupResult2 = lookupResult;
-    }
+    baseOverloadedExpr->lookupResult2 = lookupResult;
 
     // Non-static methods cannot implement static methods, remove them.
     if (requiredMemberDeclRef.getDecl()->hasModifier<HLSLStaticModifier>())
@@ -5557,24 +5523,7 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     //
     if (synThis)
     {
-        if (isInWrapperType)
-        {
-            // If this is a wrapper type, then use the inner
-            // object as the actual this parameter for the redirected
-            // call.
-            auto innerExpr = m_astBuilder->create<VarExpr>();
-            innerExpr->scope = synThis->scope;
-            innerExpr->name = getName("inner");
-            baseOverloadedExpr->base = CheckExpr(innerExpr);
-            SemanticsDeclBodyVisitor bodyVisitor(withParentFunc(synFuncDecl));
-            bodyVisitor.maybeRegisterDifferentiableType(
-                m_astBuilder,
-                baseOverloadedExpr->base->type);
-        }
-        else
-        {
-            baseOverloadedExpr->base = synThis;
-        }
+        baseOverloadedExpr->base = synThis;
     }
 
 
@@ -5823,8 +5772,7 @@ bool SemanticsVisitor::trySynthesizeConstructorRequirementWitness(
 
     bool isDefaultInitializableType = requiredMemberDeclRef.getParent() ==
                                       getASTBuilder()->getDefaultInitializableTypeInterfaceDecl();
-    bool isInWrapperType = isWrapperTypeDecl(context->parentDecl);
-    if (!isInWrapperType && !isDefaultInitializableType && !satisfyingMemberLookupResult.isValid())
+    if (!isDefaultInitializableType && !satisfyingMemberLookupResult.isValid())
     {
         return false;
     }
@@ -5846,53 +5794,7 @@ bool SemanticsVisitor::trySynthesizeConstructorRequirementWitness(
     auto seqStmt = m_astBuilder->create<SeqStmt>();
     ctorDecl->body = seqStmt;
 
-
-    if (isInWrapperType)
-    {
-        SemanticsDeclBodyVisitor bodyVisitor(withParentFunc(ctorDecl));
-        bodyVisitor.maybeRegisterDifferentiableType(m_astBuilder, context->conformingType);
-
-        if (auto varDecl = context->parentDecl->findFirstDirectMemberDeclOfType<VarDeclBase>())
-        {
-            auto varExpr = m_astBuilder->create<VarExpr>();
-            varExpr->scope = ctorDecl->ownedScope;
-            varExpr->name = varDecl->getName();
-            auto checkedVarExpr = CheckTerm(varExpr);
-            if (!checkedVarExpr)
-                return false;
-            if (as<ErrorType>(checkedVarExpr->type.type))
-                return false;
-            auto assign = m_astBuilder->create<AssignExpr>();
-            assign->left = checkedVarExpr;
-            auto temp = m_astBuilder->create<InvokeExpr>();
-            auto lookupResult = lookUpMember(
-                m_astBuilder,
-                this,
-                ctorName,
-                varDecl->type.type,
-                ctorDecl->ownedScope,
-                LookupMask::Function,
-                LookupOptions::IgnoreBaseInterfaces);
-            temp->functionExpr = createLookupResultExpr(
-                ctorName,
-                lookupResult,
-                nullptr,
-                context->parentDecl->loc,
-                nullptr);
-            temp->arguments.addRange(synArgs);
-            auto resolvedVar = ResolveInvoke(temp);
-            if (!resolvedVar)
-                return false;
-            assign->right = resolvedVar;
-            assign->type = m_astBuilder->getVoidType();
-            bodyVisitor.maybeRegisterDifferentiableType(m_astBuilder, varDecl->type.type);
-
-            auto stmt = m_astBuilder->create<ExpressionStmt>();
-            stmt->expression = assign;
-            seqStmt->stmts.add(stmt);
-        }
-    }
-    else if (synArgs.getCount())
+    if (synArgs.getCount())
     {
         // The body of our synthesized method is going to try to
         // make a ctor call with the specified arguments (e.g.,
@@ -5965,12 +5867,6 @@ bool SemanticsVisitor::trySynthesizePropertyRequirementWitness(
     DeclRef<PropertyDecl> requiredMemberDeclRef,
     RefPtr<WitnessTable> witnessTable)
 {
-    if (isWrapperTypeDecl(context->parentDecl))
-        return trySynthesizeWrapperTypePropertyRequirementWitness(
-            context,
-            requiredMemberDeclRef,
-            witnessTable);
-
     // The situation here is that the context of an inheritance
     // declaration didn't provide an exact match for a required
     // property. E.g.:
@@ -6127,244 +6023,6 @@ bool SemanticsVisitor::trySynthesizePropertyRequirementWitness(
         auto visibility = Math::Min(thisVisibility, requirementVisibility);
         addVisibilityModifier(synPropertyDecl, visibility);
     }
-    return true;
-}
-
-bool SemanticsVisitor::trySynthesizeWrapperTypePropertyRequirementWitness(
-    ConformanceCheckingContext* context,
-    DeclRef<PropertyDecl> requiredMemberDeclRef,
-    RefPtr<WitnessTable> witnessTable)
-{
-    // We are synthesizing a property requirement for a wrapper type:
-    //
-    //      interface IFoo { property value : int { get; set; } }
-    //      struct Foo : IFoo = FooImpl;
-    //
-    // We need to synthesize Foo to:
-    //
-    //      struct Foo : IFoo
-    //      {
-    //          FooImpl inner;
-    //          property value : int { get { return inner.value; }
-    //                                 set { inner.value = newValue; }
-    //                               }
-    //      }
-    //
-    // To do so, we need to grab the witness table of FooImpl:IFoo, and create
-    // wrapper property in Foo that forwards the accessors to the inner object.
-    //
-    // We get started by constructing a synthesized `PropertyDecl`.
-    //
-    auto synPropertyDecl = m_astBuilder->create<PropertyDecl>();
-    synPropertyDecl->parentDecl = context->parentDecl;
-
-    // Synthesize the property name with a prefix to avoid name clashing.
-    //
-    synPropertyDecl->nameAndLoc = requiredMemberDeclRef.getDecl()->nameAndLoc;
-    synPropertyDecl->nameAndLoc.name =
-        getName(String("$syn_property_") + getText(requiredMemberDeclRef.getName()));
-
-    // Find the witness that FooImpl : IFoo.
-    auto aggTypeDecl = as<AggTypeDecl>(context->parentDecl);
-    auto innerType = aggTypeDecl->wrappedType.type;
-    DeclRef<Decl> innerProperty;
-    auto innerWitness = tryGetSubtypeWitness(innerType, witnessTable->baseType);
-    if (!innerWitness)
-        return false;
-
-    for (auto requiredAccessorDeclRef :
-         getMembersOfType<AccessorDecl>(m_astBuilder, requiredMemberDeclRef))
-    {
-        auto innerEntry = tryLookUpRequirementWitness(
-            m_astBuilder,
-            innerWitness,
-            requiredAccessorDeclRef.getDecl());
-        if (innerEntry.getFlavor() != RequirementWitness::Flavor::declRef)
-            return false;
-        auto innerAccessorDeclRef = as<AccessorDecl>(innerEntry.getDeclRef());
-        if (!innerAccessorDeclRef)
-            return false;
-
-        // The synthesized accessor will be an AST node of the same class as
-        // the required accessor.
-        //
-        auto synAccessorDecl = (AccessorDecl*)m_astBuilder->createByNodeType(
-            requiredAccessorDeclRef.getDecl()->astNodeType);
-        synAccessorDecl->ownedScope = m_astBuilder->create<Scope>();
-        synAccessorDecl->ownedScope->containerDecl = synAccessorDecl;
-        synAccessorDecl->ownedScope->parent = getScope(context->parentDecl);
-
-        // The return type should be the same as the inner object's accessor return type.
-        //
-        synAccessorDecl->returnType.type = getResultType(m_astBuilder, innerAccessorDeclRef);
-
-        // Similarly, our synthesized accessor will have parameters matching those of the inner
-        // accessor.
-        //
-        List<Expr*> synArgs;
-        for (auto innerParamDeclRef : getParameters(m_astBuilder, innerAccessorDeclRef))
-        {
-            auto paramType = getType(m_astBuilder, innerParamDeclRef);
-
-            // The synthesized parameter will ahve the same name and
-            // type as the parameter of the requirement.
-            //
-            auto synParamDecl = m_astBuilder->create<ParamDecl>();
-            synParamDecl->nameAndLoc = innerParamDeclRef.getDecl()->nameAndLoc;
-            synParamDecl->type.type = paramType;
-
-            // We need to add the parameter as a child declaration of
-            // the accessor we are building.
-            //
-            synAccessorDecl->addMember(synParamDecl);
-
-            // For each paramter, we will create an argument expression
-            // to represent it in the body of the accessor.
-            //
-            auto synArg = m_astBuilder->create<VarExpr>();
-            synArg->declRef = makeDeclRef(synParamDecl);
-            synArg->type = paramType;
-            synArgs.add(synArg);
-        }
-
-        // Now synthesize the body of the property accessor.
-        // The body of the accessor will depend on the class of the accessor
-        // we are synthesizing (e.g., `get` vs. `set`).
-        //
-        Stmt* synBodyStmt = nullptr;
-        auto propertyRef = m_astBuilder->create<MemberExpr>();
-        propertyRef->scope = synAccessorDecl->ownedScope;
-        auto base = m_astBuilder->create<VarExpr>();
-        base->scope = propertyRef->scope;
-        base->name = getName("inner");
-        propertyRef->baseExpression = base;
-        innerProperty = innerAccessorDeclRef.getParent();
-        propertyRef->name = requiredMemberDeclRef.getName();
-        auto checkedPropertyRefExpr = CheckExpr(propertyRef);
-
-        if (as<GetterDecl>(requiredAccessorDeclRef))
-        {
-            auto synReturn = m_astBuilder->create<ReturnStmt>();
-            synReturn->expression = checkedPropertyRefExpr;
-
-            synBodyStmt = synReturn;
-        }
-        else if (as<SetterDecl>(requiredAccessorDeclRef))
-        {
-            auto synAssign = m_astBuilder->create<AssignExpr>();
-            synAssign->left = checkedPropertyRefExpr;
-            synAssign->right = synArgs[0];
-
-            auto synCheckedAssign = checkAssignWithCheckedOperands(synAssign);
-
-            auto synExprStmt = m_astBuilder->create<ExpressionStmt>();
-            synExprStmt->expression = synCheckedAssign;
-
-            synBodyStmt = synExprStmt;
-        }
-        else
-        {
-            // While there are other kinds of accessors than `get` and `set`,
-            // those are currently only reserved for the internal use in the core module.
-            // We will not bother with synthesis for those cases.
-            //
-            return false;
-        }
-
-        addModifier(synAccessorDecl, m_astBuilder->create<ForceInlineAttribute>());
-        synAccessorDecl->body = synBodyStmt;
-
-        synPropertyDecl->addMember(synAccessorDecl);
-
-        // Register the synthesized accessor.
-        //
-        witnessTable->add(
-            requiredAccessorDeclRef.getDecl(),
-            RequirementWitness(makeDeclRef(synAccessorDecl)));
-    }
-
-    // The type of our synthesized property will be the same as the inner property.
-    //
-    auto propertyType = getType(m_astBuilder, as<PropertyDecl>(innerProperty));
-    synPropertyDecl->type.type = propertyType;
-
-    // The visibility of synthesized decl should be the same as the inner requirement
-    if (innerProperty.getDecl()->findModifier<VisibilityModifier>())
-    {
-        auto vis = getDeclVisibility(innerProperty.getDecl());
-        addVisibilityModifier(synPropertyDecl, vis);
-    }
-
-    context->parentDecl->addMember(synPropertyDecl);
-    witnessTable->add(
-        requiredMemberDeclRef.getDecl(),
-        RequirementWitness(makeDeclRef(synPropertyDecl)));
-    return true;
-}
-
-bool SemanticsVisitor::trySynthesizeAssociatedTypeRequirementWitness(
-    ConformanceCheckingContext* context,
-    LookupResult const& inLookupResult,
-    DeclRef<AssocTypeDecl> requiredMemberDeclRef,
-    RefPtr<WitnessTable> witnessTable)
-{
-    SLANG_UNUSED(inLookupResult);
-
-    // The only case we can synthesize for now is when the conformant type
-    // is a wrapper type.
-    if (!isWrapperTypeDecl(context->parentDecl))
-        return false;
-    auto aggTypeDecl = as<AggTypeDecl>(context->parentDecl);
-    auto lookupResult = lookUpMember(
-        m_astBuilder,
-        this,
-        requiredMemberDeclRef.getName(),
-        aggTypeDecl->wrappedType.type,
-        aggTypeDecl->ownedScope,
-        LookupMask::Default,
-        LookupOptions::IgnoreBaseInterfaces);
-    if (!lookupResult.isValid() || lookupResult.isOverloaded())
-        return false;
-    auto assocType = DeclRefType::create(m_astBuilder, lookupResult.item.declRef);
-    witnessTable->add(requiredMemberDeclRef.getDecl(), assocType);
-    for (auto typeConstraintDecl :
-         getMembersOfType<TypeConstraintDecl>(m_astBuilder, requiredMemberDeclRef))
-    {
-        auto witness = tryGetSubtypeWitness(assocType, getSup(m_astBuilder, typeConstraintDecl));
-        if (!witness)
-            return false;
-        witnessTable->add(typeConstraintDecl.getDecl(), witness);
-    }
-    return true;
-}
-
-bool SemanticsVisitor::trySynthesizeAssociatedConstantRequirementWitness(
-    ConformanceCheckingContext* context,
-    LookupResult const& inLookupResult,
-    DeclRef<VarDeclBase> requiredMemberDeclRef,
-    RefPtr<WitnessTable> witnessTable)
-{
-    SLANG_UNUSED(inLookupResult);
-
-    // The only case we can synthesize for now is when the conformant type
-    // is a wrapper type, i.e.
-    // struct Foo:IFoo = FooImpl;
-    if (!isWrapperTypeDecl(context->parentDecl))
-        return false;
-
-    // Find the witness that FooImpl : IFoo.
-    auto aggTypeDecl = as<AggTypeDecl>(context->parentDecl);
-    auto innerType = aggTypeDecl->wrappedType.type;
-    DeclRef<Decl> innerProperty;
-    auto innerWitness = tryGetSubtypeWitness(innerType, witnessTable->baseType);
-    if (!innerWitness)
-        return false;
-
-    auto witness =
-        tryLookUpRequirementWitness(m_astBuilder, innerWitness, requiredMemberDeclRef.getDecl());
-    if (witness.getFlavor() != RequirementWitness::Flavor::val)
-        return false;
-    witnessTable->add(requiredMemberDeclRef.getDecl(), witness.getVal());
     return true;
 }
 
@@ -6609,92 +6267,12 @@ bool SemanticsVisitor::synthesizeAccessorRequirements(
     return true;
 }
 
-bool SemanticsVisitor::trySynthesizeWrapperTypeSubscriptRequirementWitness(
-    ConformanceCheckingContext* context,
-    DeclRef<SubscriptDecl> requiredMemberDeclRef,
-    RefPtr<WitnessTable> witnessTable)
-{
-    // We are synthesizing the subscript requirement for a wrapper type:
-    // struct Wrapper
-    // {
-    //      Inner inner;
-    //      subscript(int index)->int { get { return inner[index]; }
-    //                                  set { inner[index] = newValue; }
-    //                                }
-    // }
-    //
-    // // Find the witness that FooImpl : IFoo.
-    auto aggTypeDecl = as<AggTypeDecl>(context->parentDecl);
-    auto innerType = aggTypeDecl->wrappedType.type;
-    DeclRef<Decl> innerProperty;
-    auto innerWitness = tryGetSubtypeWitness(innerType, witnessTable->baseType);
-    if (!innerWitness)
-        return false;
-    //
-    List<Expr*> synArgs;
-    ThisExpr* synThis;
-    auto synSubscriptDecl = synthesizeMethodSignatureForRequirementWitness(
-        context,
-        requiredMemberDeclRef,
-        synArgs,
-        synThis);
-    auto declType = getType(m_astBuilder, getDefaultDeclRef(synSubscriptDecl).as<SubscriptDecl>());
-    synThis->checked = true;
-
-    // Form a `this[args...]` expression that we will use to coerce from
-    // in the synthesized subscript accessors.
-    //
-    DiagnosticSink tempSink(getSourceManager(), nullptr);
-    SemanticsVisitor subVisitor(withSink(&tempSink));
-    auto base = m_astBuilder->create<VarExpr>();
-    base->scope = synThis->scope;
-    base->name = getName("inner");
-
-    IndexExpr* indexExpr = m_astBuilder->create<IndexExpr>();
-    indexExpr->baseExpression = base;
-    indexExpr->indexExprs = _Move(synArgs);
-    auto synBaseStorageExpr = subVisitor.CheckTerm(indexExpr);
-
-    if (tempSink.getErrorCount() != 0)
-        return false;
-
-    // Our synthesized subscript will have an accessor declaration for
-    // each accessor of the requirement.
-    //
-    bool canSynAccessors = synthesizeAccessorRequirements(
-        context,
-        requiredMemberDeclRef,
-        declType,
-        synBaseStorageExpr,
-        synSubscriptDecl,
-        witnessTable);
-    if (!canSynAccessors)
-        return false;
-
-    // The visibility of synthesized decl should be the min of the parent decl and the requirement.
-    if (requiredMemberDeclRef.getDecl()->findModifier<VisibilityModifier>())
-    {
-        auto requirementVisibility = getDeclVisibility(requiredMemberDeclRef.getDecl());
-        auto thisVisibility = getDeclVisibility(context->parentDecl);
-        auto visibility = Math::Min(thisVisibility, requirementVisibility);
-        addVisibilityModifier(synSubscriptDecl, visibility);
-    }
-
-    return true;
-}
-
 bool SemanticsVisitor::trySynthesizeSubscriptRequirementWitness(
     ConformanceCheckingContext* context,
     const LookupResult& lookupResult,
     DeclRef<SubscriptDecl> requiredMemberDeclRef,
     RefPtr<WitnessTable> witnessTable)
 {
-    if (isWrapperTypeDecl(context->parentDecl))
-        return trySynthesizeWrapperTypeSubscriptRequirementWitness(
-            context,
-            requiredMemberDeclRef,
-            witnessTable);
-
     // The situation here is that the context of an inheritance
     // declaration didn't provide an exact match for a required
     // subscript. E.g.:
@@ -6926,21 +6504,13 @@ bool SemanticsVisitor::trySynthesizeRequirementWitness(
         }
         else
         {
-            return trySynthesizeAssociatedTypeRequirementWitness(
-                context,
-                lookupResult,
-                requiredAssocTypeDeclRef,
-                witnessTable);
+            return false;
         }
     }
 
     if (auto requiredConstantDeclRef = requiredMemberDeclRef.as<VarDeclBase>())
     {
-        return trySynthesizeAssociatedConstantRequirementWitness(
-            context,
-            lookupResult,
-            requiredConstantDeclRef,
-            witnessTable);
+        return false;
     }
 
     if (auto requiredCtor = requiredMemberDeclRef.as<ConstructorDecl>())
@@ -7543,54 +7113,51 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     // lookup results that might be usable, but not as-is.
     //
     LookupResult lookupResult;
-    if (!isWrapperTypeDecl(context->parentDecl))
+    lookupResult = lookUpMember(
+        m_astBuilder,
+        this,
+        name,
+        subType,
+        nullptr,
+        LookupMask::Default,
+        LookupOptions::IgnoreBaseInterfaces);
+
+    if (!lookupResult.isValid())
     {
-        lookupResult = lookUpMember(
-            m_astBuilder,
-            this,
-            name,
-            subType,
-            nullptr,
-            LookupMask::Default,
-            LookupOptions::IgnoreBaseInterfaces);
+        // If we failed to look up a member with the name of the
+        // requirement, it may be possible that we can still synthesis the
+        // implementation if this is one of the known builtin requirements,
+        // or if the interface method contains a default impl.
+        // Otherwise, report diagnostic now.
 
-        if (!lookupResult.isValid())
+        if (requiredMemberDeclRef.getDecl()->hasModifier<BuiltinRequirementModifier>() ||
+            (requiredMemberDeclRef.as<GenericDecl>() &&
+             getInner(requiredMemberDeclRef.as<GenericDecl>())
+                 ->hasModifier<BuiltinRequirementModifier>()))
         {
-            // If we failed to look up a member with the name of the
-            // requirement, it may be possible that we can still synthesis the
-            // implementation if this is one of the known builtin requirements,
-            // or if the interface method contains a default impl.
-            // Otherwise, report diagnostic now.
-
-            if (requiredMemberDeclRef.getDecl()->hasModifier<BuiltinRequirementModifier>() ||
-                (requiredMemberDeclRef.as<GenericDecl>() &&
-                 getInner(requiredMemberDeclRef.as<GenericDecl>())
-                     ->hasModifier<BuiltinRequirementModifier>()))
-            {
-            }
-            else if (
-                requiredMemberDeclRef.as<SubscriptDecl>() &&
-                (as<ArrayExpressionType>(context->conformingType) ||
-                 as<VectorExpressionType>(context->conformingType) ||
-                 as<MatrixExpressionType>(context->conformingType)))
-            {
-            }
-            else if (hasDefaultImpl(requiredMemberDeclRef))
-            {
-            }
-            else
-            {
-                getSink()->diagnose(
-                    inheritanceDecl,
-                    Diagnostics::typeDoesntImplementInterfaceRequirement,
-                    subType,
-                    requiredMemberDeclRef);
-                getSink()->diagnose(
-                    requiredMemberDeclRef,
-                    Diagnostics::seeDeclarationOf,
-                    requiredMemberDeclRef);
-                return false;
-            }
+        }
+        else if (
+            requiredMemberDeclRef.as<SubscriptDecl>() &&
+            (as<ArrayExpressionType>(context->conformingType) ||
+             as<VectorExpressionType>(context->conformingType) ||
+             as<MatrixExpressionType>(context->conformingType)))
+        {
+        }
+        else if (hasDefaultImpl(requiredMemberDeclRef))
+        {
+        }
+        else
+        {
+            getSink()->diagnose(
+                inheritanceDecl,
+                Diagnostics::typeDoesntImplementInterfaceRequirement,
+                subType,
+                requiredMemberDeclRef);
+            getSink()->diagnose(
+                requiredMemberDeclRef,
+                Diagnostics::seeDeclarationOf,
+                requiredMemberDeclRef);
+            return false;
         }
     }
     if (lookupResult.isOverloaded())
@@ -7648,10 +7215,6 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     // used to synthesize an exact-match witness, by generating the
     // code required to handle all the conversions that might be
     // required on `this`.
-    //
-    // Another situation that will get us here is that we are dealing with
-    // a wrapper type (struct Foo:IFoo=FooImpl), and we will synthesize
-    // wrappers that redirects the call into the inner element.
     //
     MethodWitnessSynthesisFailureDetails failureDetails = {};
     if (trySynthesizeRequirementWitness(
@@ -8055,6 +7618,32 @@ bool SemanticsVisitor::checkConformance(
             // but it is required for some of our current example
             // code to work.
             return true;
+        }
+
+        // If sub type is a link-time-resolved wrapper type (e.g. `extern struct Foo : IFoo =
+        // FooImpl;`), fill in `inheritanceDecl->witnessVal` with a Witness val that shows `FooImpl
+        // : IFoo`.
+        auto aggTypeDecl = as<AggTypeDecl>(declRef.getDecl());
+
+        if (aggTypeDecl && aggTypeDecl->aliasedType)
+        {
+            auto witness = tryGetSubtypeWitness(aggTypeDecl->aliasedType, superType);
+            if (witness)
+            {
+                inheritanceDecl->witnessVal = witness;
+            }
+            else
+            {
+                if (!as<ErrorType>(aggTypeDecl->aliasedType))
+                {
+                    getSink()->diagnose(
+                        inheritanceDecl,
+                        Diagnostics::typeArgumentDoesNotConformToInterface,
+                        aggTypeDecl->aliasedType,
+                        superType);
+                }
+            }
+            return witness != nullptr;
         }
     }
 
@@ -10332,51 +9921,6 @@ void SemanticsDeclBodyVisitor::synthesizeCtorBodyForMemberVar(
     seqStmtChild->stmts.add(stmt);
 }
 
-// This function inserts the default initialization expression for every member who
-// has init expression at beginning of the user-defined ctor. We don't need to do this
-// for synthesized ctor, because synthesized ctor already handle this at the function
-// parameters
-void SemanticsDeclBodyVisitor::maybeInsertDefaultInitExpr(StructDecl* structDecl)
-{
-    // If there is no explicit constructor, we don't need to do anything.
-    if (!_hasExplicitConstructor(structDecl, false))
-        return;
-
-    // traverse all the constructors and insert the default initialization expressions.
-    for (auto ctor : structDecl->getMembersOfType<ConstructorDecl>())
-    {
-        ThisExpr* thisExpr = m_astBuilder->create<ThisExpr>();
-        thisExpr->scope = ctor->ownedScope;
-        thisExpr->type = ctor->returnType.type;
-        auto seqStmtChild = m_astBuilder->create<SeqStmt>();
-
-        for (auto varDeclBase : structDecl->getDirectMemberDeclsOfType<VarDeclBase>())
-        {
-            if (varDeclBase->hasModifier<HLSLStaticModifier>() ||
-                varDeclBase->getName() == nullptr || varDeclBase->initExpr == nullptr)
-                continue;
-
-            auto assign = createMemberAssignmentExpr(
-                thisExpr,
-                ctor->ownedScope,
-                varDeclBase,
-                varDeclBase->initExpr);
-            if (!assign)
-                continue;
-
-            auto stmt = m_astBuilder->create<ExpressionStmt>();
-            stmt->expression = assign;
-            stmt->loc = varDeclBase->loc;
-            seqStmtChild->stmts.add(stmt);
-        }
-        if (seqStmtChild->stmts.getCount() != 0)
-        {
-            auto seqStmt = _ensureCtorBodyIsSeqStmt(m_astBuilder, ctor);
-            seqStmt->stmts.insert(0, seqStmtChild);
-        }
-    }
-}
-
 void SemanticsDeclBodyVisitor::synthesizeCtorBody(
     DeclAndCtorInfo& structDeclInfo,
     List<DeclAndCtorInfo>& inheritanceDefaultCtorList,
@@ -10477,7 +10021,6 @@ void SemanticsDeclBodyVisitor::visitAggTypeDecl(AggTypeDecl* aggTypeDecl)
     }
 
     synthesizeCtorBody(structDeclInfo, inheritanceDefaultCtorList, structDecl);
-    maybeInsertDefaultInitExpr(structDecl);
 
     if (structDeclInfo.defaultCtor)
     {
@@ -10702,6 +10245,17 @@ void SemanticsDeclHeaderVisitor::checkInterfaceRequirement(Decl* decl)
     }
 }
 
+bool doesTypeHaveNoDiffModifier(Type* type)
+{
+    if (auto modifiedType = as<ModifiedType>(type))
+    {
+        if (modifiedType->findModifier<NoDiffModifierVal>() != nullptr)
+            return true;
+        return doesTypeHaveNoDiffModifier(modifiedType->getBase());
+    }
+    return false;
+}
+
 void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
 {
     for (auto paramDecl : decl->getParameters())
@@ -10719,6 +10273,13 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
         errorType = TypeExp(m_astBuilder->getBottomType());
     }
     decl->errorType = errorType;
+
+    if (doesTypeHaveNoDiffModifier(decl->returnType.type))
+    {
+        auto noDiffMod = m_astBuilder->create<NoDiffModifier>();
+        noDiffMod->loc = decl->loc;
+        addModifier(decl, noDiffMod);
+    }
 
     checkDifferentiableCallableCommon(decl);
 
@@ -10832,9 +10393,12 @@ void SemanticsVisitor::validateArrayElementTypeForVariable(VarDeclBase* varDecl)
         return;
 
     const auto elementType = arrayType->getElementType();
-    if (as<ParameterBlockType>(elementType))
+
+    // Check if the element type has the NonAddressable tag
+    TypeTag elementTags = getTypeTags(elementType);
+    if ((int)elementTags & (int)TypeTag::NonAddressable)
     {
-        getSink()->diagnose(varDecl, Diagnostics::disallowedArrayOfParameterBlock);
+        getSink()->diagnose(varDecl, Diagnostics::disallowedArrayOfNonAddressableType, elementType);
         return;
     }
 }
@@ -15179,6 +14743,16 @@ void validateStructuredBufferElementType(SemanticsVisitor* visitor, VarDeclBase*
         visitor->getSink()->diagnose(
             varDecl->loc,
             Diagnostics::recursiveTypesFoundInStructuredBuffer,
+            elementType);
+    }
+
+    // Check if the element type is NonAddressable
+    TypeTag elementTags = visitor->getTypeTags(elementType);
+    if ((int)elementTags & (int)TypeTag::NonAddressable)
+    {
+        visitor->getSink()->diagnose(
+            varDecl->loc,
+            Diagnostics::nonAddressableTypeInStructuredBuffer,
             elementType);
     }
 }

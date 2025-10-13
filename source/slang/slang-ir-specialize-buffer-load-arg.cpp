@@ -89,7 +89,7 @@ struct FuncBufferLoadSpecializationCondition : FunctionCallSpecializeCondition
                 a = argLoad->getPtr();
 
                 // We can safely defer a load to the callee if the source dest is immutable.
-                if (isPointerToImmutableLocation(a))
+                if (isPointerToImmutableLocation(getRootAddr(a)))
                     continue;
 
                 // Otherwise, we check if there is no other instructions in between the load and the

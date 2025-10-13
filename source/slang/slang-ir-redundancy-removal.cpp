@@ -416,6 +416,47 @@ static IRInst* _getRootVar(IRInst* inst)
     return inst;
 }
 
+// 0 is the most broad scope
+static int getMemoryScopeOrder(MemoryScope scope)
+{
+    switch (scope)
+    {
+    case MemoryScope::CrossDevice:
+        return 7;
+    case MemoryScope::Device:
+        return 6;
+    case MemoryScope::QueueFamily:
+        // https://docs.vulkan.org/spec/latest/chapters/shaders.html#shaders-scope-queue-family
+        return 5;
+    case MemoryScope::ShaderCall:
+        // https://docs.vulkan.org/spec/latest/chapters/shaders.html#shaders-scope-shadercall
+        return 4;
+    case MemoryScope::Workgroup:
+        return 3;
+    case MemoryScope::Subgroup:
+        return 2;
+    case MemoryScope::Invocation:
+    default:
+        return 1;
+    }
+}
+
+// Returns if MemoryScope x is a sub-set of y
+static bool isMemoryScopeSubsetOf(MemoryScope x, MemoryScope y)
+{
+    return getMemoryScopeOrder(x) <= getMemoryScopeOrder(y);
+}
+
+// Inst's are relative to a memory scope, get that memory scope.
+static MemoryScope getMemoryScopeOfLoadStore(IRInst* inst)
+{
+    SLANG_ASSERT(as<IRLoad>(inst) || as<IRStore>(inst));
+    auto memoryScope = inst->findAttr<IRMemoryScopeAttr>();
+    if (!memoryScope)
+        return MemoryScope::Invocation;
+    return (MemoryScope)getIntVal(memoryScope->getMemoryScope());
+}
+
 bool tryRemoveRedundantStore(IRGlobalValueWithCode* func, IRStore* store)
 {
     // We perform a quick and conservative check:
@@ -473,15 +514,18 @@ bool tryRemoveRedundantStore(IRGlobalValueWithCode* func, IRStore* store)
         }
     }
 
-    // A store can be removed if there are subsequent stores to the same variable,
+    // This store can be removed if there are subsequent stores to the same variable,
     // and there are no insts in between the stores that can read the variable.
-
+    // Additionally, MemoryScope of the `store` must be a sub-set of `nextStore`,
+    // otherwise we can not be certain that `nextStore` completely overwrites `store`.
+    MemoryScope memoryScopeOfStore = getMemoryScopeOfLoadStore(store);
     HashSet<IRBlock*> visitedBlocks;
     for (auto next = store->getNextInst(); next;)
     {
         if (auto nextStore = as<IRStore>(next))
         {
-            if (nextStore->getPtr() == store->getPtr())
+            if (nextStore->getPtr() == store->getPtr() &&
+                isMemoryScopeSubsetOf(memoryScopeOfStore, getMemoryScopeOfLoadStore(nextStore)))
             {
                 hasOverridingStore = true;
                 break;
@@ -585,13 +629,21 @@ bool tryRemoveRedundantLoad(IRGlobalValueWithCode* func, IRLoad* load)
 {
     bool changed = false;
 
-    // If the load is preceeded by a store without any side-effect insts
-    // in-between, remove the load.
+    // Get the memory scope we are operating on.
+    MemoryScope memoryScopeOfLoad = getMemoryScopeOfLoadStore(load);
+
+    // We can replace a load with a `Store->getVal()` if that store is a super-set
+    // memory scope to our load.
+    // Ex 1: Store into Workgroup, load from Invocation. Load will be equal to the Store.
+    //
+    // Ex 2: Store into Invocation, load from Workgroup. Load may/may-not be equal to the Store
+    // since the cache managing the Workgroup scope may contain different data than the invocation.
     for (auto prev = load->getPrevInst(); prev; prev = prev->getPrevInst())
     {
         if (auto store = as<IRStore>(prev))
         {
-            if (store->getPtr() == load->getPtr())
+            if (store->getPtr() == load->getPtr() &&
+                isMemoryScopeSubsetOf(memoryScopeOfLoad, getMemoryScopeOfLoadStore(store)))
             {
                 auto value = store->getVal();
                 load->replaceUsesWith(value);

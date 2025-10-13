@@ -3,19 +3,6 @@
 
 // SPIRV: OpTypeImage %{{.*}} 2D 1 0 0 1 Unknown
 
-__generic<let sampleCount : int = 0, let format : int = 0>
-typealias DepthTexture2D = _Texture<
-    float,
-    __Shape2D,
-    0, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    0, // isCombined
-    format
->;
-
 [[vk::binding(0, 0)]] DepthTexture2D depthTexture : register(t0);
 [[vk::binding(1, 0)]] SamplerComparisonState comparisonSampler : register(s0);
 
