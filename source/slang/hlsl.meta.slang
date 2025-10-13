@@ -1961,6 +1961,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             case wgsl:
                 static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                     , "WGSL supports only f32 type textures");
+                static_assert(isShadow == 0 || T is float
+                    , "WGSL depth textures must be scalar f32");
                 if (isArray == 1)
                 {
                     switch (Shape.flavor)
@@ -2025,6 +2027,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             case wgsl:
                 static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                     , "WGSL supports only f32 type textures");
+                static_assert(isShadow == 0 || T is float
+                    , "WGSL depth textures must be scalar f32");
+                static_assert(Shape.flavor != $(SLANG_TEXTURE_CUBE)
+                    , "WGSL does not support sample offsets for cube textures");
+
                 if (isArray == 1)
                 {
                     switch (Shape.flavor)
@@ -2033,8 +2040,6 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                         __intrinsic_asm "textureSample($0, $1, ($2).x, i32(($2).y), $3)$z";
                     case $(SLANG_TEXTURE_2D):
                         __intrinsic_asm "textureSample($0, $1, ($2).xy, i32(($2).z), $3)$z";
-                    case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "textureSample($0, $1, ($2).xyz, i32(($2).w), $3)$z";
                     }
                 }
                 __intrinsic_asm "textureSample($0, $1, $2, $3)$z";
@@ -2173,6 +2178,9 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             case wgsl:
                 static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                     , "WGSL supports only f32 type textures");
+                static_assert(isShadow == 0 || T is float
+                    , "WGSL depth textures must be scalar f32");
+
                 if (isArray == 1)
                 {
                     switch (Shape.flavor)
@@ -2236,6 +2244,10 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             case wgsl:
                 static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                     , "WGSL supports only f32 type textures");
+                static_assert(isShadow == 0 || T is float
+                    , "WGSL depth textures must be scalar f32");
+                static_assert(Shape.flavor != $(SLANG_TEXTURE_CUBE)
+                    , "WGSL does not support sample offsets for cube textures");
                 if (isArray == 1)
                 {
                     switch (Shape.flavor)
@@ -2244,8 +2256,6 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                         __intrinsic_asm "textureSampleBias($0, $1, ($2).x, i32(($2).y), $3, $4)$z";
                     case $(SLANG_TEXTURE_2D):
                         __intrinsic_asm "textureSampleBias($0, $1, ($2).xy, i32(($2).z), $3, $4)$z";
-                    case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "textureSampleBias($0, $1, ($2).xyz, i32(($2).w), $3, $4)$z";
                     }
                 }
                 __intrinsic_asm "textureSampleBias($0, $1, $2, $3, $4)$z";
@@ -2320,6 +2330,9 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         case wgsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                 , "WGSL supports only f32 type textures");
+            static_assert(isShadow == 0 || T is float
+                , "WGSL depth textures must be scalar f32");
+
             if (isArray == 1)
             {
                 switch (Shape.flavor)
@@ -2351,6 +2364,9 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         case wgsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                 , "WGSL supports only f32 type textures");
+            static_assert(isShadow == 0 || T is float
+                , "WGSL depth textures must be scalar f32");
+
             if (isArray == 1)
             {
                 switch (Shape.flavor)
@@ -2402,6 +2418,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         case wgsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                 , "WGSL supports only f32 type textures");
+            static_assert(isShadow == 0 || T is float
+                , "WGSL depth textures must be scalar f32");
+            static_assert(Shape.flavor != $(SLANG_TEXTURE_CUBE)
+                , "WGSL does not support sample offsets for cube textures");
+
             if (isArray == 1)
             {
                 switch (Shape.flavor)
@@ -2410,8 +2431,6 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     __intrinsic_asm "textureSampleCompare($0, $1, ($2).x, i32(($2).y), $3, $4)";
                 case $(SLANG_TEXTURE_2D):
                     __intrinsic_asm "textureSampleCompare($0, $1, ($2).xy, i32(($2).z), $3, $4)";
-                case $(SLANG_TEXTURE_CUBE):
-                    __intrinsic_asm "textureSampleCompare($0, $1, ($2).xyz, i32(($2).w), $3, $4)";
                 }
             }
             __intrinsic_asm "textureSampleCompare($0, $1, $2, $3, $4)";
@@ -2463,6 +2482,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         case wgsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                 , "WGSL supports only f32 type textures");
+            static_assert(isShadow == 0 || T is float
+                , "WGSL depth textures must be scalar f32");
+            static_assert(Shape.flavor != $(SLANG_TEXTURE_CUBE)
+                , "WGSL does not support sample offsets for cube textures");
+
             if (isArray == 1)
             {
                 switch (Shape.flavor)
@@ -2471,8 +2495,6 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     __intrinsic_asm "textureSampleCompareLevel($0, $1, ($2).x, i32(($2).y), $3, $4)";
                 case $(SLANG_TEXTURE_2D):
                     __intrinsic_asm "textureSampleCompareLevel($0, $1, ($2).xy, i32(($2).z), $3, $4)";
-                case $(SLANG_TEXTURE_CUBE):
-                    __intrinsic_asm "textureSampleCompareLevel($0, $1, ($2).xyz, i32(($2).w), $3, $4)";
                 }
             }
             __intrinsic_asm "textureSampleCompareLevel($0, $1, $2, $3, $4)";
@@ -2641,6 +2663,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             case wgsl:
                 static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                     , "WGSL supports only f32 type textures");
+                static_assert(isShadow == 0
+                    , "WGSL does not support SampleGrad for depth textures");
                 if (isArray == 1)
                 {
                     switch (Shape.flavor)
@@ -2705,6 +2729,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             case wgsl:
                 static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                     , "WGSL supports only f32 type textures");
+                static_assert(isShadow == 0
+                    , "WGSL does not support SampleGrad for depth textures");
+                static_assert(Shape.flavor != $(SLANG_TEXTURE_CUBE)
+                    , "WGSL does not support sample offsets for cube textures");
+
                 if (isArray == 1)
                 {
                     switch (Shape.flavor)
@@ -2713,8 +2742,6 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                         __intrinsic_asm "textureSampleGrad($0, $1, ($2).x, i32(($2).y), $3, $4, $5)$z";
                     case $(SLANG_TEXTURE_2D):
                         __intrinsic_asm "textureSampleGrad($0, $1, ($2).xy, i32(($2).z), $3, $4, $5)$z";
-                    case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "textureSampleGrad($0, $1, ($2).xyz, i32(($2).w), $3, $4, $5)$z";
                     }
                 }
                 __intrinsic_asm "textureSampleGrad($0, $1, $2, $3, $4, $5)$z";
@@ -2884,6 +2911,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             case wgsl:
                 static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                     , "WGSL supports only f32 type textures");
+                static_assert(isShadow == 0 || T is float
+                    , "WGSL depth textures must be scalar f32");
                 if (isArray == 1)
                 {
                     switch (Shape.flavor)
@@ -2948,6 +2977,10 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             case wgsl:
                 static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                     , "WGSL supports only f32 type textures");
+                static_assert(isShadow == 0 || T is float
+                    , "WGSL depth textures must be scalar f32");
+                static_assert(Shape.flavor != $(SLANG_TEXTURE_CUBE)
+                    , "WGSL does not support sample offsets for cube textures");
                 if (isArray == 1)
                 {
                     switch (Shape.flavor)
@@ -2956,8 +2989,6 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                         __intrinsic_asm "textureSampleLevel($0, $1, ($2).x, i32(($2).y), $3, $4)$z";
                     case $(SLANG_TEXTURE_2D):
                         __intrinsic_asm "textureSampleLevel($0, $1, ($2).xy, i32(($2).z), $3, $4)$z";
-                    case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "textureSampleLevel($0, $1, ($2).xyz, i32(($2).w), $3, $4)$z";
                     }
                 }
                 __intrinsic_asm "textureSampleLevel($0, $1, $2, $3, $4)$z";
@@ -3079,6 +3110,8 @@ vector<T.Element,4> __texture_gather(
             result:$$vector<T.Element,4> = OpImageGather %sampledImage $location $component;
         };
     case wgsl:
+        static_assert(isShadow == 0 || T is float
+            , "WGSL depth textures must be scalar f32");
         if (isShadow == 1)
         {
             // If depth texture, `textureGather` doesn't take channel value, `$3`.
@@ -3160,6 +3193,10 @@ vector<T.Element,4> __texture_gather_offset(
             result:$$vector<T.Element,4> = OpImageGather %sampledImage $location $component Offset $offset;
         };
     case wgsl:
+        static_assert(isShadow == 0 || T is float
+            , "WGSL depth textures must be scalar f32");
+        static_assert(Shape.flavor != $(SLANG_TEXTURE_CUBE)
+            , "WGSL does not support sample offsets for cube textures");
         if (isShadow == 1)
         {
             // If depth texture, `textureGather` doesn't take channel value, `$4`.
@@ -3169,8 +3206,6 @@ vector<T.Element,4> __texture_gather_offset(
                 {
                 case $(SLANG_TEXTURE_2D):
                     __intrinsic_asm "textureGather($0, $1, ($2).xy, u32(($2).z), $3)";
-                case $(SLANG_TEXTURE_CUBE):
-                    __intrinsic_asm "textureGather($0, $1, ($2).xyz, u32(($2).w), $3)";
                 }
             }
             __intrinsic_asm "textureGather($0, $1, $2, $3)";
@@ -3182,8 +3217,6 @@ vector<T.Element,4> __texture_gather_offset(
             {
             case $(SLANG_TEXTURE_2D):
                 __intrinsic_asm "textureGather($4, $0, $1, ($2).xy, u32(($2).z), $3)";
-            case $(SLANG_TEXTURE_CUBE):
-                __intrinsic_asm "textureGather($4, $0, $1, ($2).xyz, u32(($2).w), $3)";
             }
         }
         __intrinsic_asm "textureGather($4, $0, $1, $2, $3)";
@@ -3298,6 +3331,8 @@ vector<T.Element,4> __texture_gatherCmp(
         };
     case wgsl:
         static_assert(isShadow == 1, "WGSL supports textureGatherCompare only for depth textures.");
+        static_assert(isShadow == 0 || T is float
+            , "WGSL depth textures must be scalar f32");
 
         if (isArray == 1)
         {
@@ -3364,6 +3399,10 @@ vector<T.Element,4> __texture_gatherCmp_offset(
         };
     case wgsl:
         static_assert(isShadow == 1, "WGSL supports textureGatherCompare only for depth textures.");
+        static_assert(isShadow == 0 || T is float
+            , "WGSL depth textures must be scalar f32");
+        static_assert(Shape.flavor != $(SLANG_TEXTURE_CUBE)
+            , "WGSL does not support sample offsets for cube textures");
 
         if (isArray == 1)
         {
@@ -3371,8 +3410,6 @@ vector<T.Element,4> __texture_gatherCmp_offset(
             {
             case $(SLANG_TEXTURE_2D):
                 __intrinsic_asm "textureGatherCompare($0, $1, ($2).xy, u32(($2).z), $3, $4)";
-            case $(SLANG_TEXTURE_CUBE):
-                __intrinsic_asm "textureGatherCompare($0, $1, ($2).xyz, u32(($2).w), $3, $4)";
             }
         }
         __intrinsic_asm "textureGatherCompare($0, $1, $2, $3, $4)";
@@ -3768,6 +3805,8 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                 || Shape.flavor == $(SLANG_TEXTURE_2D)
                 || Shape.flavor == $(SLANG_TEXTURE_3D)
                 , "WGSL doesn't supports textureLoad for Cube texture.");
+            static_assert(isShadow == 0 || T is float
+                , "WGSL depth textures must be scalar f32");
             static_assert(isArray == 0 || Shape.flavor == $(SLANG_TEXTURE_2D)
                 , "WGSL supports textureLoad for texture_2d_array but not for array of 1D, 3D or Cube.");
 
@@ -3996,6 +4035,8 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
             case wgsl:
                 static_assert(Shape.flavor == $(SLANG_TEXTURE_2D)
                     , "WGSL supports textureLoad for texture_multisampled_2d but not for multisampled of 1D, 3D or Cube.");
+                static_assert(isShadow == 0 || T is float
+                    , "WGSL depth textures must be scalar f32");
                 static_assert(isArray == 0
                     , "WGSL doesn't support array variants of multisampled textures for textureLoad.");
 
@@ -4536,6 +4577,8 @@ extension _Texture<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,format>
             case wgsl:
                 static_assert(Shape.flavor == $(SLANG_TEXTURE_2D)
                     , "WGSL supports textureLoad for texture_multisampled_2d but not for multisampled of 1D, 3D or Cube.");
+                static_assert(isShadow == 0 || T is float
+                    , "WGSL depth textures must be scalar f32");
                 static_assert(isArray == 0
                     , "WGSL doesn't support array variants of multisampled textures for textureLoad.");
 
