@@ -16,8 +16,8 @@
 
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -output-using-type -emit-spirv-directly -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_POINTER=1
 
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xlang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_POINTER=1
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xlang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_POINTER=0
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_POINTER=1
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_POINTER=0
 
 import neural;
 
