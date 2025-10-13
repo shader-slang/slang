@@ -12612,13 +12612,13 @@ void checkDerivativeAttributeImpl(
             visitor->ensureDecl(candidate.declRef, DeclCheckState::TypesFullyResolved);
         }
     }
-    else if (auto overloadedExpr = as<OverloadedExpr2>(checkedFuncExpr))
+    else if (auto overloadedExpr2 = as<OverloadedExpr2>(checkedFuncExpr))
     {
-        for (auto candidate : overloadedExpr->candidateExprs)
+        for (auto candidate : overloadedExpr2->candidateExprs)
         {
-            if (auto declRefExpr = as<DeclRefExpr>(candidate))
+            if (auto candidateDeclRefExpr = as<DeclRefExpr>(candidate))
             {
-                visitor->ensureDecl(declRefExpr->declRef, DeclCheckState::TypesFullyResolved);
+                visitor->ensureDecl(candidateDeclRefExpr->declRef, DeclCheckState::TypesFullyResolved);
             }
         }
     }
