@@ -4,7 +4,8 @@
 
 #
 # Neural module configuration
-#
+# SLANG_NEURAL_MODULE_DIR_NAME is the output directory name for all the prebuilt modules, currently there is only neural module
+# SLANG_NEURAL_MODULE_FILE_NAME is the file name for the neural module
 set(SLANG_NEURAL_MODULE_DIR_NAME "slang-prebuilt-module-${SLANG_VERSION_FULL}" CACHE STRING "Directory name for neural module")
 set(SLANG_NEURAL_MODULE_FILE_NAME "neural.slang-module" CACHE STRING "File name for neural module")
 
@@ -21,7 +22,7 @@ endif()
 set(SLANG_NEURAL_MODULE_INSTALL_DIR "${slang_library_dir}/${SLANG_NEURAL_MODULE_DIR_NAME}" CACHE STRING "Installation directory for neural module")
 
 #
-# Generate the neural module configuration header
+# Generate the neural module configuration header, this is used by the slang compiler to find the neural module
 #
 
 configure_file(
@@ -58,7 +59,7 @@ foreach(shader_file ${neural_shader_sources})
     list(APPEND neural_copied_files ${dest_file})
 endforeach()
 
-# Build neural.slang-module
+# Build neural.slang-module and output to the output directory
 add_custom_command(
     OUTPUT ${neural_module_file}
     COMMAND slangc neural.slang -o ${SLANG_NEURAL_MODULE_FILE_NAME}
@@ -67,6 +68,7 @@ add_custom_command(
     VERBATIM
 )
 
+# Create a target to ensure the neural module is built
 add_custom_target(
     slang-neural-module
     ALL
