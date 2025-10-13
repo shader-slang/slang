@@ -364,7 +364,26 @@ static bool shouldLowerBitCastForTarget(CodeGenContext* codeGenContext, IRInst* 
     if (fromSize.size != toSize.size)
         return true;
 
-    return !canSPIRVBitcastType(fromType) || !canSPIRVBitcastType(toType);
+    // Check if both types can use OpBitcast
+    if (!canSPIRVBitcastType(fromType) || !canSPIRVBitcastType(toType))
+        return true;
+    
+    // Per SPIR-V spec: when vector component counts differ,
+    // the larger count must be an integer multiple of the smaller count
+    int fromComponents = getIRVectorElementSize(fromType);
+    int toComponents = getIRVectorElementSize(toType);
+    
+    if (fromComponents != toComponents)
+    {
+        int larger = (fromComponents > toComponents) ? fromComponents : toComponents;
+        int smaller = (fromComponents < toComponents) ? fromComponents : toComponents;
+        
+        // If not an integer multiple, must lower
+        return (larger % smaller != 0);
+    }
+    
+    // Both types support OpBitcast and meet all SPIR-V requirements
+    return false;
 }
 
 // Scan the IR module and determine which lowering/legalization passes are needed based
