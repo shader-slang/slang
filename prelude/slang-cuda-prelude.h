@@ -1198,160 +1198,394 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL ushort4 __half_as_ushort(const __half4& i)
         __half_as_ushort(i.w));
 }
 
-// This is a little bit of a hack. Fortunately CUDA has the definitions of the templated types in
-// include/surface_indirect_functions.h
-// Here we find the template definition requires a specialization of __nv_isurf_trait to allow
-// a specialization of the surface write functions.
-// This *isn't* a problem on the read functions as they don't have a return type that uses this
-// mechanism
+#endif
+
+enum class SlangFormatKind
+{
+    Uint,
+    Sint,
+    Float,
+    Unorm,
+    Snorm,
+};
+
+#define SLANG_IMAGE_FORMAT(format, scalarType, componentCount, kind) \
+    struct _slang_image_format_##format                              \
+    {                                                                \
+        typedef scalarType ScalarType;                               \
+        typedef scalarType##componentCount StorageType;              \
+        static constexpr int ComponentCount = componentCount;        \
+        static constexpr SlangFormatKind Kind = kind;                \
+    };
+
+
+SLANG_IMAGE_FORMAT(r8ui, uchar, 1, SlangFormatKind::Uint)
+SLANG_IMAGE_FORMAT(r8, uchar, 1, SlangFormatKind::Unorm)
+SLANG_IMAGE_FORMAT(r8i, char, 1, SlangFormatKind::Sint)
+SLANG_IMAGE_FORMAT(r8_snorm, char, 1, SlangFormatKind::Snorm)
+SLANG_IMAGE_FORMAT(rg8ui, uchar, 2, SlangFormatKind::Uint)
+SLANG_IMAGE_FORMAT(rg8, uchar, 2, SlangFormatKind::Unorm)
+SLANG_IMAGE_FORMAT(rg8i, char, 2, SlangFormatKind::Sint)
+SLANG_IMAGE_FORMAT(rg8_snorm, char, 2, SlangFormatKind::Snorm)
+SLANG_IMAGE_FORMAT(rgba8ui, uchar, 4, SlangFormatKind::Uint)
+SLANG_IMAGE_FORMAT(rgba8, uchar, 4, SlangFormatKind::Unorm)
+SLANG_IMAGE_FORMAT(rgba8i, char, 4, SlangFormatKind::Sint)
+SLANG_IMAGE_FORMAT(rgba8_snorm, char, 4, SlangFormatKind::Snorm)
+
+SLANG_IMAGE_FORMAT(r16ui, ushort, 1, SlangFormatKind::Uint)
+SLANG_IMAGE_FORMAT(r16, ushort, 1, SlangFormatKind::Unorm)
+SLANG_IMAGE_FORMAT(r16i, short, 1, SlangFormatKind::Sint)
+SLANG_IMAGE_FORMAT(r16_snorm, short, 1, SlangFormatKind::Snorm)
+SLANG_IMAGE_FORMAT(r16f, ushort, 1, SlangFormatKind::Float)
+SLANG_IMAGE_FORMAT(rg16ui, ushort, 2, SlangFormatKind::Uint)
+SLANG_IMAGE_FORMAT(rg16, ushort, 2, SlangFormatKind::Unorm)
+SLANG_IMAGE_FORMAT(rg16i, short, 2, SlangFormatKind::Sint)
+SLANG_IMAGE_FORMAT(rg16_snorm, short, 2, SlangFormatKind::Snorm)
+SLANG_IMAGE_FORMAT(rg16f, ushort, 2, SlangFormatKind::Float)
+SLANG_IMAGE_FORMAT(rgba16ui, ushort, 4, SlangFormatKind::Uint)
+SLANG_IMAGE_FORMAT(rgba16, ushort, 4, SlangFormatKind::Unorm)
+SLANG_IMAGE_FORMAT(rgba16i, short, 4, SlangFormatKind::Sint)
+SLANG_IMAGE_FORMAT(rgba16_snorm, short, 4, SlangFormatKind::Snorm)
+SLANG_IMAGE_FORMAT(rgba16f, ushort, 4, SlangFormatKind::Float)
+
+template<typename T, typename Format>
+struct _slang_image_format_converter
+{
+    static SLANG_FORCE_INLINE SLANG_CUDA_CALL T unpack(const typename Format::StorageType& storage)
+    {
+        static_assert(false, "Invalid image format conversion");
+    }
+    static SLANG_FORCE_INLINE SLANG_CUDA_CALL typename Format::StorageType pack(const T& value)
+    {
+        static_assert(false, "Invalid image format conversion");
+    }
+};
+
+// float specializations
+
+template<typename T>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float _slang_unorm_to_float(T x);
 
 template<>
-struct __nv_isurf_trait<__half>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float _slang_unorm_to_float(uchar x)
 {
-    typedef void type;
-};
+    return static_cast<float>(x) / 255.0f;
+}
+
 template<>
-struct __nv_isurf_trait<__half2>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float _slang_unorm_to_float(ushort x)
 {
-    typedef void type;
-};
+    return static_cast<float>(x) / 65535.0f;
+}
+
+template<typename T>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float _slang_snorm_to_float(T x);
+
 template<>
-struct __nv_isurf_trait<__half4>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float _slang_snorm_to_float(char x)
 {
-    typedef void type;
+    if (x == -128)
+        return -1.0f;
+    return static_cast<float>(x) / 127.0f;
+}
+
+template<>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float _slang_snorm_to_float(short x)
+{
+    if (x == -32768)
+        return -1.0f;
+    return static_cast<float>(x) / 32767.0f;
+}
+
+template<typename T>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float _slang_float_to_float(T x);
+
+template<>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float _slang_float_to_float(ushort x)
+{
+#ifdef SLANG_CUDA_ENABLE_HALF
+    return __ushort_as_half(x);
+#else
+    return 0.f;
+#endif
+}
+
+
+template<typename Format>
+struct _slang_image_format_converter<float, Format>
+{
+    static SLANG_FORCE_INLINE SLANG_CUDA_CALL float
+    unpack(const typename Format::StorageType& storage)
+    {
+        static_assert(
+            Format::Kind == SlangFormatKind::Float || Format::Kind == SlangFormatKind::Unorm ||
+                Format::Kind == SlangFormatKind::Snorm,
+            "Invalid image format conversion");
+        float result = 0.f;
+        if constexpr (Format::Kind == SlangFormatKind::Float) {
+            result = _slang_float_to_float<typename Format::ScalarType>(storage.x);
+        } else if constexpr (Format::Kind == SlangFormatKind::Unorm) {
+            result = _slang_unorm_to_float<typename Format::ScalarType>(storage.x);
+        } else if constexpr (Format::Kind == SlangFormatKind::Snorm) {
+            result = _slang_snorm_to_float<typename Format::ScalarType>(storage.x);
+        }
+        return result;
+    }
+    static SLANG_FORCE_INLINE SLANG_CUDA_CALL typename Format::StorageType pack(const float& value)
+    {
+        static_assert(
+            Format::Kind == SlangFormatKind::Float || Format::Kind == SlangFormatKind::Unorm ||
+                Format::Kind == SlangFormatKind::Snorm,
+            "Invalid image format conversion");
+    }
 };
+
+template<typename Format>
+struct _slang_image_format_converter<float2, Format>
+{
+    static SLANG_FORCE_INLINE SLANG_CUDA_CALL float2
+    unpack(const typename Format::StorageType& storage)
+    {
+        static_assert(
+            Format::Kind == SlangFormatKind::Float || Format::Kind == SlangFormatKind::Unorm ||
+                Format::Kind == SlangFormatKind::Snorm,
+            "Invalid image format conversion");
+        float2 result = make_float2(0.f, 0.f);
+        if constexpr (Format::Kind == SlangFormatKind::Float) {
+            if constexpr (Format::ComponentCount >= 1)
+                result.x = _slang_float_to_float<typename Format::ScalarType>(storage.x);
+            if constexpr (Format::ComponentCount >= 2)
+                result.y = _slang_float_to_float<typename Format::ScalarType>(storage.y);
+        } else if constexpr (Format::Kind == SlangFormatKind::Unorm) {
+            if constexpr (Format::ComponentCount >= 1)
+                result.x = _slang_unorm_to_float<typename Format::ScalarType>(storage.x);
+            if constexpr (Format::ComponentCount >= 2)
+                result.y = _slang_unorm_to_float<typename Format::ScalarType>(storage.y);
+        } else if constexpr (Format::Kind == SlangFormatKind::Snorm) {
+            if constexpr (Format::ComponentCount >= 1)
+                result.x = _slang_snorm_to_float<typename Format::ScalarType>(storage.x);
+            if constexpr (Format::ComponentCount >= 2)
+                result.y = _slang_snorm_to_float<typename Format::ScalarType>(storage.y);
+        }
+        return result;
+    }
+    static SLANG_FORCE_INLINE SLANG_CUDA_CALL typename Format::StorageType pack(const float2& value)
+    {
+        static_assert(
+            Format::Kind == SlangFormatKind::Float || Format::Kind == SlangFormatKind::Unorm ||
+                Format::Kind == SlangFormatKind::Snorm,
+            "Invalid image format conversion");
+    }
+};
+
+template<typename Format>
+struct _slang_image_format_converter<float4, Format>
+{
+    static SLANG_FORCE_INLINE SLANG_CUDA_CALL float4
+    unpack(const typename Format::StorageType& storage)
+    {
+        static_assert(
+            Format::Kind == SlangFormatKind::Float || Format::Kind == SlangFormatKind::Unorm ||
+                Format::Kind == SlangFormatKind::Snorm,
+            "Invalid image format conversion");
+        float4 result = make_float4(0.f, 0.f, 0.f, 0.f);
+        if constexpr (Format::Kind == SlangFormatKind::Float) {
+            if constexpr (Format::ComponentCount >= 1)
+                result.x = _slang_float_to_float<typename Format::ScalarType>(storage.x);
+            if constexpr (Format::ComponentCount >= 2)
+                result.y = _slang_float_to_float<typename Format::ScalarType>(storage.y);
+            if constexpr (Format::ComponentCount >= 3)
+                result.z = _slang_float_to_float<typename Format::ScalarType>(storage.z);
+            if constexpr (Format::ComponentCount >= 4)
+                result.w = _slang_float_to_float<typename Format::ScalarType>(storage.w);
+        } else if constexpr (Format::Kind == SlangFormatKind::Unorm) {
+            if constexpr (Format::ComponentCount >= 1)
+                result.x = _slang_unorm_to_float<typename Format::ScalarType>(storage.x);
+            if constexpr (Format::ComponentCount >= 2)
+                result.y = _slang_unorm_to_float<typename Format::ScalarType>(storage.y);
+            if constexpr (Format::ComponentCount >= 3)
+                result.z = _slang_unorm_to_float<typename Format::ScalarType>(storage.z);
+            if constexpr (Format::ComponentCount >= 4)
+                result.w = _slang_unorm_to_float<typename Format::ScalarType>(storage.w);
+        } else if constexpr (Format::Kind == SlangFormatKind::Snorm) {
+            if constexpr (Format::ComponentCount >= 1)
+                result.x = _slang_snorm_to_float<typename Format::ScalarType>(storage.x);
+            if constexpr (Format::ComponentCount >= 2)
+                result.y = _slang_snorm_to_float<typename Format::ScalarType>(storage.y);
+            if constexpr (Format::ComponentCount >= 3)
+                result.z = _slang_snorm_to_float<typename Format::ScalarType>(storage.z);
+            if constexpr (Format::ComponentCount >= 4)
+                result.w = _slang_snorm_to_float<typename Format::ScalarType>(storage.w);
+        }
+        return result;
+    }
+    static SLANG_FORCE_INLINE SLANG_CUDA_CALL typename Format::StorageType pack(const float4& value)
+    {
+        static_assert(
+            Format::Kind == SlangFormatKind::Float || Format::Kind == SlangFormatKind::Unorm ||
+                Format::Kind == SlangFormatKind::Snorm,
+            "Invalid image format conversion");
+    }
+};
+
+// uint specializations
+
+template<typename Format>
+struct _slang_image_format_converter<uint, Format>
+{
+    static SLANG_FORCE_INLINE SLANG_CUDA_CALL uint
+    unpack(const typename Format::StorageType& storage)
+    {
+        static_assert(Format::Kind == SlangFormatKind::Uint, "Invalid image format conversion");
+        uint result = 0;
+        if constexpr (Format::ComponentCount >= 1)
+            result = static_cast<uint>(storage.x);
+        return result;
+    }
+    static SLANG_FORCE_INLINE SLANG_CUDA_CALL typename Format::StorageType pack(const uint& value)
+    {
+        static_assert(Format::Kind == SlangFormatKind::Uint, "Invalid image format conversion");
+    }
+};
+
+template<typename Format>
+struct _slang_image_format_converter<uint2, Format>
+{
+    static SLANG_FORCE_INLINE SLANG_CUDA_CALL uint2
+    unpack(const typename Format::StorageType& storage)
+    {
+        static_assert(Format::Kind == SlangFormatKind::Uint, "Invalid image format conversion");
+        uint2 result = make_uint2(0, 0);
+        if constexpr (Format::ComponentCount >= 1)
+            result.x = static_cast<uint>(storage.x);
+        if constexpr (Format::ComponentCount >= 2)
+            result.y = static_cast<uint>(storage.y);
+        return result;
+    }
+    static SLANG_FORCE_INLINE SLANG_CUDA_CALL typename Format::StorageType pack(const uint2& value)
+    {
+        static_assert(Format::Kind == SlangFormatKind::Uint, "Invalid image format conversion");
+    }
+};
+
+template<typename Format>
+struct _slang_image_format_converter<uint4, Format>
+{
+    static SLANG_FORCE_INLINE SLANG_CUDA_CALL uint4
+    unpack(const typename Format::StorageType& storage)
+    {
+        static_assert(Format::Kind == SlangFormatKind::Uint, "Invalid image format conversion");
+        uint4 result = make_uint4(0, 0, 0, 0);
+        if constexpr (Format::ComponentCount >= 1)
+            result.x = static_cast<uint>(storage.x);
+        if constexpr (Format::ComponentCount >= 2)
+            result.y = static_cast<uint>(storage.y);
+        if constexpr (Format::ComponentCount >= 3)
+            result.z = static_cast<uint>(storage.z);
+        if constexpr (Format::ComponentCount >= 4)
+            result.w = static_cast<uint>(storage.w);
+        return result;
+    }
+    static SLANG_FORCE_INLINE SLANG_CUDA_CALL typename Format::StorageType pack(const uint4& value)
+    {
+        static_assert(Format::Kind == SlangFormatKind::Uint, "Invalid image format conversion");
+    }
+};
+
+// int specializations
+
+template<typename Format>
+struct _slang_image_format_converter<int, Format>
+{
+    static SLANG_FORCE_INLINE SLANG_CUDA_CALL int unpack(
+        const typename Format::StorageType& storage)
+    {
+        static_assert(Format::Kind == SlangFormatKind::Sint, "Invalid image format conversion");
+        int result = 0;
+        if constexpr (Format::ComponentCount >= 1)
+            result = static_cast<int>(storage.x);
+        return result;
+    }
+    static SLANG_FORCE_INLINE SLANG_CUDA_CALL typename Format::StorageType pack(const int& value)
+    {
+        static_assert(Format::Kind == SlangFormatKind::Sint, "Invalid image format conversion");
+    }
+};
+
+template<typename Format>
+struct _slang_image_format_converter<int2, Format>
+{
+    static SLANG_FORCE_INLINE SLANG_CUDA_CALL int2
+    unpack(const typename Format::StorageType& storage)
+    {
+        static_assert(Format::Kind == SlangFormatKind::Sint, "Invalid image format conversion");
+        int2 result = make_int2(0, 0);
+        if constexpr (Format::ComponentCount >= 1)
+            result.x = static_cast<int>(storage.x);
+        if constexpr (Format::ComponentCount >= 2)
+            result.y = static_cast<int>(storage.y);
+        return result;
+    }
+    static SLANG_FORCE_INLINE SLANG_CUDA_CALL typename Format::StorageType pack(const int2& value)
+    {
+        static_assert(Format::Kind == SlangFormatKind::Sint, "Invalid image format conversion");
+    }
+};
+
+template<typename Format>
+struct _slang_image_format_converter<int4, Format>
+{
+    static SLANG_FORCE_INLINE SLANG_CUDA_CALL int4
+    unpack(const typename Format::StorageType& storage)
+    {
+        static_assert(Format::Kind == SlangFormatKind::Sint, "Invalid image format conversion");
+        int4 result = make_int4(0, 0, 0, 0);
+        if constexpr (Format::ComponentCount >= 1)
+            result.x = static_cast<int>(storage.x);
+        if constexpr (Format::ComponentCount >= 2)
+            result.y = static_cast<int>(storage.y);
+        if constexpr (Format::ComponentCount >= 3)
+            result.z = static_cast<int>(storage.z);
+        if constexpr (Format::ComponentCount >= 4)
+            result.w = static_cast<int>(storage.w);
+        return result;
+    }
+    static SLANG_FORCE_INLINE SLANG_CUDA_CALL typename Format::StorageType pack(const int4& value)
+    {
+        static_assert(Format::Kind == SlangFormatKind::Sint, "Invalid image format conversion");
+    }
+};
+
+template<typename T, typename Format>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL T
+_slang_image_format_unpack(const typename Format::StorageType& storage)
+{
+    return _slang_image_format_converter<T, Format>::unpack(storage);
+}
 
 #define SLANG_DROP_PARENS(...) __VA_ARGS__
 
-#define SLANG_SURFACE_READ(FUNC_NAME, TYPE_ARGS, ARGS)                                             \
-    template<>                                                                                     \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half FUNC_NAME<__half>(                                   \
-        cudaSurfaceObject_t surfObj,                                                               \
-        SLANG_DROP_PARENS TYPE_ARGS,                                                               \
-        cudaSurfaceBoundaryMode boundaryMode)                                                      \
-    {                                                                                              \
-        return __ushort_as_half(FUNC_NAME<ushort>(surfObj, SLANG_DROP_PARENS ARGS, boundaryMode)); \
-    }                                                                                              \
-                                                                                                   \
-    template<>                                                                                     \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 FUNC_NAME<__half2>(                                 \
-        cudaSurfaceObject_t surfObj,                                                               \
-        SLANG_DROP_PARENS TYPE_ARGS,                                                               \
-        cudaSurfaceBoundaryMode boundaryMode)                                                      \
-    {                                                                                              \
-        return __ushort_as_half(                                                                   \
-            FUNC_NAME<ushort2>(surfObj, SLANG_DROP_PARENS ARGS, boundaryMode));                    \
-    }                                                                                              \
-                                                                                                   \
-    template<>                                                                                     \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 FUNC_NAME<__half4>(                                 \
-        cudaSurfaceObject_t surfObj,                                                               \
-        SLANG_DROP_PARENS TYPE_ARGS,                                                               \
-        cudaSurfaceBoundaryMode boundaryMode)                                                      \
-    {                                                                                              \
-        return __ushort_as_half(                                                                   \
-            FUNC_NAME<ushort4>(surfObj, SLANG_DROP_PARENS ARGS, boundaryMode));                    \
+#define SLANG_SURFACE_READ_CONVERT_IMPL(name, params, args)                                     \
+    template<typename T, typename Format>                                                       \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T name##_convert(                                        \
+        cudaSurfaceObject_t surfObj,                                                            \
+        SLANG_DROP_PARENS params,                                                               \
+        cudaSurfaceBoundaryMode boundaryMode)                                                   \
+    {                                                                                           \
+        using StorageType = typename Format::StorageType;                                       \
+        StorageType storage = name<StorageType>(surfObj, SLANG_DROP_PARENS args, boundaryMode); \
+        return _slang_image_format_unpack<T, Format>(storage);                                  \
     }
 
-SLANG_SURFACE_READ(surf1Dread, (int x), (x))
-SLANG_SURFACE_READ(surf2Dread, (int x, int y), (x, y))
-SLANG_SURFACE_READ(surf3Dread, (int x, int y, int z), (x, y, z))
-SLANG_SURFACE_READ(surf1DLayeredread, (int x, int layer), (x, layer))
-SLANG_SURFACE_READ(surf2DLayeredread, (int x, int y, int layer), (x, y, layer))
-SLANG_SURFACE_READ(surfCubemapread, (int x, int y, int face), (x, y, face))
-SLANG_SURFACE_READ(surfCubemapLayeredread, (int x, int y, int layerFace), (x, y, layerFace))
-
-#define SLANG_SURFACE_WRITE(FUNC_NAME, TYPE_ARGS, ARGS)                                            \
-    template<>                                                                                     \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL void FUNC_NAME<__half>(                                     \
-        __half data,                                                                               \
-        cudaSurfaceObject_t surfObj,                                                               \
-        SLANG_DROP_PARENS TYPE_ARGS,                                                               \
-        cudaSurfaceBoundaryMode boundaryMode)                                                      \
-    {                                                                                              \
-        FUNC_NAME<ushort>(__half_as_ushort(data), surfObj, SLANG_DROP_PARENS ARGS, boundaryMode);  \
-    }                                                                                              \
-                                                                                                   \
-    template<>                                                                                     \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL void FUNC_NAME<__half2>(                                    \
-        __half2 data,                                                                              \
-        cudaSurfaceObject_t surfObj,                                                               \
-        SLANG_DROP_PARENS TYPE_ARGS,                                                               \
-        cudaSurfaceBoundaryMode boundaryMode)                                                      \
-    {                                                                                              \
-        FUNC_NAME<ushort2>(__half_as_ushort(data), surfObj, SLANG_DROP_PARENS ARGS, boundaryMode); \
-    }                                                                                              \
-                                                                                                   \
-    template<>                                                                                     \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL void FUNC_NAME<__half4>(                                    \
-        __half4 data,                                                                              \
-        cudaSurfaceObject_t surfObj,                                                               \
-        SLANG_DROP_PARENS TYPE_ARGS,                                                               \
-        cudaSurfaceBoundaryMode boundaryMode)                                                      \
-    {                                                                                              \
-        FUNC_NAME<ushort4>(__half_as_ushort(data), surfObj, SLANG_DROP_PARENS ARGS, boundaryMode); \
-    }
-
-SLANG_SURFACE_WRITE(surf1Dwrite, (int x), (x))
-SLANG_SURFACE_WRITE(surf2Dwrite, (int x, int y), (x, y))
-SLANG_SURFACE_WRITE(surf3Dwrite, (int x, int y, int z), (x, y, z))
-SLANG_SURFACE_WRITE(surf1DLayeredwrite, (int x, int layer), (x, layer))
-SLANG_SURFACE_WRITE(surf2DLayeredwrite, (int x, int y, int layer), (x, y, layer))
-SLANG_SURFACE_WRITE(surfCubemapwrite, (int x, int y, int face), (x, y, face))
-SLANG_SURFACE_WRITE(surfCubemapLayeredwrite, (int x, int y, int layerFace), (x, y, layerFace))
-
-// ! Hack to test out reading !!!
-// Only works converting *from* half
-
-// template <typename T>
-// SLANG_FORCE_INLINE SLANG_CUDA_CALL T surf2Dread_convert(cudaSurfaceObject_t surfObj, int x, int
-// y, cudaSurfaceBoundaryMode boundaryMode);
-
-#define SLANG_SURFACE_READ_HALF_CONVERT(FUNC_NAME, TYPE_ARGS, ARGS)                              \
-                                                                                                 \
-    template<typename T>                                                                         \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL T FUNC_NAME##_convert(                                    \
-        cudaSurfaceObject_t surfObj,                                                             \
-        SLANG_DROP_PARENS TYPE_ARGS,                                                             \
-        cudaSurfaceBoundaryMode boundaryMode);                                                   \
-                                                                                                 \
-    template<>                                                                                   \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL float FUNC_NAME##_convert<float>(                         \
-        cudaSurfaceObject_t surfObj,                                                             \
-        SLANG_DROP_PARENS TYPE_ARGS,                                                             \
-        cudaSurfaceBoundaryMode boundaryMode)                                                    \
-    {                                                                                            \
-        return __ushort_as_half(                                                                 \
-            FUNC_NAME<uint16_t>(surfObj, SLANG_DROP_PARENS ARGS, boundaryMode));                 \
-    }                                                                                            \
-                                                                                                 \
-    template<>                                                                                   \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL float2 FUNC_NAME##_convert<float2>(                       \
-        cudaSurfaceObject_t surfObj,                                                             \
-        SLANG_DROP_PARENS TYPE_ARGS,                                                             \
-        cudaSurfaceBoundaryMode boundaryMode)                                                    \
-    {                                                                                            \
-        const __half2 v =                                                                        \
-            __ushort_as_half(FUNC_NAME<ushort2>(surfObj, SLANG_DROP_PARENS ARGS, boundaryMode)); \
-        return float2{v.x, v.y};                                                                 \
-    }                                                                                            \
-                                                                                                 \
-    template<>                                                                                   \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL float4 FUNC_NAME##_convert<float4>(                       \
-        cudaSurfaceObject_t surfObj,                                                             \
-        SLANG_DROP_PARENS TYPE_ARGS,                                                             \
-        cudaSurfaceBoundaryMode boundaryMode)                                                    \
-    {                                                                                            \
-        const __half4 v =                                                                        \
-            __ushort_as_half(FUNC_NAME<ushort4>(surfObj, SLANG_DROP_PARENS ARGS, boundaryMode)); \
-        return float4{v.x, v.y, v.z, v.w};                                                       \
-    }
-
-SLANG_SURFACE_READ_HALF_CONVERT(surf1Dread, (int x), (x))
-SLANG_SURFACE_READ_HALF_CONVERT(surf2Dread, (int x, int y), (x, y))
-SLANG_SURFACE_READ_HALF_CONVERT(surf3Dread, (int x, int y, int z), (x, y, z))
-
-#endif
+// clang-format off
+SLANG_SURFACE_READ_CONVERT_IMPL(surf1Dread, (int x), (x * sizeof(StorageType)))
+SLANG_SURFACE_READ_CONVERT_IMPL(surf1DLayeredread, (int x, int layer), (x * sizeof(StorageType), layer))
+SLANG_SURFACE_READ_CONVERT_IMPL(surf2Dread, (int x, int y), (x * sizeof(StorageType), y))
+SLANG_SURFACE_READ_CONVERT_IMPL(surf2DLayeredread, (int x, int y, int layer), (x * sizeof(StorageType), y, layer))
+SLANG_SURFACE_READ_CONVERT_IMPL(surf3Dread, (int x, int y, int z), (x * sizeof(StorageType), y, z))
+SLANG_SURFACE_READ_CONVERT_IMPL(surfCubemapread, (int x, int y, int face), (x * sizeof(StorageType), y, face))
+SLANG_SURFACE_READ_CONVERT_IMPL(surfCubemapLayeredread, (int x, int y, int layerFace), (x * sizeof(StorageType), y, layerFace))
+// clang-format on
 
 // Support for doing format conversion when writing to a surface/RWTexture
 

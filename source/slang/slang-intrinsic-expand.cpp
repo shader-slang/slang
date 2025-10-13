@@ -454,33 +454,53 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
                     const ImageFormat imageFormat = formatDecoration->getFormat();
                     if (_isConvertRequired(imageFormat, resourceInst))
                     {
-                        // If the function returns something it's a reader so we may need to convert
-                        // and in doing so require half
-                        if (_isResourceRead(m_callInst))
+                        // If the source format if half derived, then we need to enable half
+                        switch (imageFormat)
                         {
-                            // If the source format if half derived, then we need to enable half
-                            switch (imageFormat)
+                        case ImageFormat::r16f:
+                        case ImageFormat::rg16f:
+                        case ImageFormat::rgba16f:
                             {
-                            case ImageFormat::r16f:
-                            case ImageFormat::rg16f:
-                            case ImageFormat::rgba16f:
+                                CUDAExtensionTracker* extensionTracker =
+                                    as<CUDAExtensionTracker>(m_emitter->getExtensionTracker());
+                                if (extensionTracker)
                                 {
-                                    CUDAExtensionTracker* extensionTracker =
-                                        as<CUDAExtensionTracker>(m_emitter->getExtensionTracker());
-                                    if (extensionTracker)
-                                    {
-                                        extensionTracker->requireBaseType(BaseType::Half);
-                                    }
-                                    break;
+                                    extensionTracker->requireBaseType(BaseType::Half);
                                 }
-                            default:
                                 break;
                             }
+                        default:
+                            break;
                         }
 
                         // Append _convert on the name to signify we need to use a code path, that
                         // will automatically do the format conversion.
                         m_writer->emit("_convert");
+                    }
+                }
+            }
+            break;
+        }
+
+    case 'f':
+        {
+            if (isCUDATarget(m_emitter->getTargetReq()))
+            {
+                IRInst* resourceInst = m_callInst->getArg(0);
+
+                if (IRFormatDecoration* formatDecoration = _findImageFormatDecoration(resourceInst))
+                {
+                    const ImageFormat imageFormat = formatDecoration->getFormat();
+                    if (_isConvertRequired(imageFormat, resourceInst))
+                    {
+static const char* kImageFormatNames[] = {
+#define SLANG_FORMAT(NAME, OTHER) \
+    #NAME,
+#include "slang-image-format-defs.h"
+#undef SLANG_FORMAT
+};
+                        m_writer->emit(", _slang_image_format_");
+                        m_writer->emit(kImageFormatNames[(int)imageFormat]);
                     }
                 }
             }
@@ -500,9 +520,9 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             if (IRFormatDecoration* formatDecoration = _findImageFormatDecoration(resourceInst))
             {
                 const ImageFormat imageFormat = formatDecoration->getFormat();
-                if (_isConvertRequired(imageFormat, resourceInst) && _isResourceWrite(m_callInst))
+                if (_isConvertRequired(imageFormat, resourceInst))
                 {
-                    // If there is a conversion *and* it's a write we don't need to scale.
+                    // If there is a conversion we don't need to scale.
                     elemSizeInBytes = 1;
                 }
             }
