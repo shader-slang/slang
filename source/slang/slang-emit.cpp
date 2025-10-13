@@ -312,7 +312,7 @@ static bool canSPIRVBitcastType(IRType* type)
 {
     // If vector, check if element type is numerical and therefor supported by OpBitcast
     if (auto vectorType = as<IRVectorType>(type))
-        // SPIRV spec supports all numerical types for OpBitcast, 
+        // SPIRV spec supports all numerical types for OpBitcast,
         // but the SPIRV-Tools optimizer crashes during constant folding on uint8 constants
         return canSPIRVBitcastType(vectorType->getElementType()) &&
                vectorType->getElementType()->getOp() != kIROp_UInt8Type;
@@ -367,21 +367,21 @@ static bool shouldLowerBitCastForTarget(CodeGenContext* codeGenContext, IRInst* 
     // Check if both types can use OpBitcast
     if (!canSPIRVBitcastType(fromType) || !canSPIRVBitcastType(toType))
         return true;
-    
+
     // Per SPIR-V spec: when vector component counts differ,
     // the larger count must be an integer multiple of the smaller count
     int fromComponents = getIRVectorElementSize(fromType);
     int toComponents = getIRVectorElementSize(toType);
-    
+
     if (fromComponents != toComponents)
     {
         int larger = (fromComponents > toComponents) ? fromComponents : toComponents;
         int smaller = (fromComponents < toComponents) ? fromComponents : toComponents;
-        
+
         // If not an integer multiple, must lower
         return (larger % smaller != 0);
     }
-    
+
     // Both types support OpBitcast and meet all SPIR-V requirements
     return false;
 }
