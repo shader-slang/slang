@@ -635,6 +635,7 @@ local insts = {
 	{ var = {} },
 	{ load = { min_operands = 1 } },
 	{ store = { min_operands = 2 } },
+	{ CUDA_LDG = {min_operands = 1 } },
 	-- Atomic Operations
 	{
 		AtomicOperation = {

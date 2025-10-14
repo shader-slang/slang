@@ -32,6 +32,7 @@
 #include "slang-ir-collect-global-uniforms.h"
 #include "slang-ir-com-interface.h"
 #include "slang-ir-composite-reg-to-mem.h"
+#include "slang-ir-cuda-immutable-load.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-defer-buffer-load.h"
 #include "slang-ir-defunctionalization.h"
@@ -1884,6 +1885,13 @@ Result linkAndOptimizeIR(
     else if (isWGPUTarget(targetRequest))
     {
         specializeAddressSpaceForWGSL(irModule);
+    }
+
+    // If we are generating code for CUDA, we should translate all immutable buffer loads to
+    // using `__ldg` intrinsic for improved performance.
+    if (isCUDATarget(targetRequest))
+    {
+        lowerImmutableBufferLoadForCUDA(targetProgram, irModule);
     }
 
     performForceInlining(irModule);

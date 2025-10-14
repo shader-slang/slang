@@ -680,4 +680,5 @@ return {
 	["SymbolAlias"] = 676,
 	["Decoration.InParamProxyVar"] = 677,
 	["Attr.MemoryScope"] = 678,
+	["CUDA_LDG"] = 679,
 }
