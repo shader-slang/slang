@@ -3037,18 +3037,18 @@ public:
     IRInst* getCapabilityValue(CapabilitySet const& caps);
 
     IRBasicType* getBasicType(BaseType baseType);
-    IRBasicType* getVoidType();
-    IRBasicType* getBoolType();
-    IRBasicType* getIntType();
-    IRBasicType* getInt64Type();
-    IRBasicType* getUIntType();
-    IRBasicType* getUInt64Type();
-    IRBasicType* getUInt16Type();
-    IRBasicType* getUInt8Type();
-    IRBasicType* getFloatType();
-    IRBasicType* getCharType();
-    IRStringType* getStringType();
-    IRNativeStringType* getNativeStringType();
+
+    // Generate basic type getter method declarations
+#if 0 // FIDDLE TEMPLATE:
+%local ir_lua = require("source/slang/slang-ir.h.lua")
+%local basic_types = ir_lua.getBasicTypesForBuilderMethods()
+%for _, type_info in ipairs(basic_types) do
+    $(type_info.return_type) get$(type_info.method_name)();
+%end
+#else // FIDDLE OUTPUT:
+#define FIDDLE_GENERATED_OUTPUT_ID 1
+#include "slang-ir-insts.h.fiddle"
+#endif // FIDDLE END
     IRNativePtrType* getNativePtrType(IRType* valueType);
 
     IRType* getCapabilitySetType();

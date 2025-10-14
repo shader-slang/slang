@@ -300,6 +300,53 @@ local function instEnums()
 	return table.concat(output, "\n")
 end
 
+-- Collect basic type instructions for template generation
+local function getBasicTypesForBuilderMethods()
+	-- Define the list of basic types we want to generate getters for
+	local basic_types = {
+		"VoidType",
+		"BoolType",
+		"Int8Type",
+		"Int16Type",
+		"IntType",
+		"Int64Type",
+		"UInt8Type",
+		"UInt16Type",
+		"UIntType",
+		"UInt64Type",
+		"HalfType",
+		"FloatType",
+		"DoubleType",
+		"CharType",
+		"IntPtrType",
+		"UIntPtrType",
+		"StringType",
+		"NativeStringType",
+	}
+
+	local result = {}
+
+	for _, type_name in ipairs(basic_types) do
+		-- Infer method name by removing "Type" suffix and adding it back
+		local method_name = type_name:gsub("Type$", "") .. "Type"
+
+		-- Infer return type - specific type pointer for the struct
+		local return_type = "IR" .. type_name .. "*"
+
+		-- Infer opcode
+		local opcode = "kIROp_" .. type_name
+
+		table.insert(result, {
+			struct_name = type_name,
+			method_name = method_name,
+			return_type = return_type,
+			opcode = opcode,
+		})
+	end
+
+	return result
+end
+
 return {
 	leafInst = function(args)
 		-- Get the current instruction definition from the Lua data
@@ -333,4 +380,5 @@ return {
 	instStructForwardDecls = instStructForwardDecls,
 	instInfoEntries = instInfoEntries,
 	instEnums = instEnums,
+	getBasicTypesForBuilderMethods = getBasicTypesForBuilderMethods,
 }

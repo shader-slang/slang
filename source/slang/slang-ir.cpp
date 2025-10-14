@@ -2770,65 +2770,21 @@ IRBasicType* IRBuilder::getBasicType(BaseType baseType)
     return (IRBasicType*)getType(IROp((UInt)kIROp_FirstBasicType + (UInt)baseType));
 }
 
-IRBasicType* IRBuilder::getVoidType()
-{
-    return (IRVoidType*)getType(kIROp_VoidType);
-}
+// Generate basic type getter method implementations
+#if 0 // FIDDLE TEMPLATE:
+%local ir_lua = require("source/slang/slang-ir.h.lua")
+%local basic_types = ir_lua.getBasicTypesForBuilderMethods()
+%for _, type_info in ipairs(basic_types) do
 
-IRBasicType* IRBuilder::getBoolType()
+$(type_info.return_type) IRBuilder::get$(type_info.method_name)()
 {
-    return (IRBoolType*)getType(kIROp_BoolType);
+    return ($(type_info.return_type))getType($(type_info.opcode));
 }
-
-IRBasicType* IRBuilder::getIntType()
-{
-    return (IRBasicType*)getType(kIROp_IntType);
-}
-
-IRBasicType* IRBuilder::getInt64Type()
-{
-    return (IRBasicType*)getType(kIROp_Int64Type);
-}
-
-IRBasicType* IRBuilder::getUIntType()
-{
-    return (IRBasicType*)getType(kIROp_UIntType);
-}
-
-IRBasicType* IRBuilder::getUInt64Type()
-{
-    return (IRBasicType*)getType(kIROp_UInt64Type);
-}
-
-IRBasicType* IRBuilder::getUInt16Type()
-{
-    return (IRBasicType*)getType(kIROp_UInt16Type);
-}
-
-IRBasicType* IRBuilder::getUInt8Type()
-{
-    return (IRBasicType*)getType(kIROp_UInt8Type);
-}
-
-IRBasicType* IRBuilder::getFloatType()
-{
-    return (IRBasicType*)getType(kIROp_FloatType);
-}
-
-IRBasicType* IRBuilder::getCharType()
-{
-    return (IRBasicType*)getType(kIROp_CharType);
-}
-
-IRStringType* IRBuilder::getStringType()
-{
-    return (IRStringType*)getType(kIROp_StringType);
-}
-
-IRNativeStringType* IRBuilder::getNativeStringType()
-{
-    return (IRNativeStringType*)getType(kIROp_NativeStringType);
-}
+%end
+#else // FIDDLE OUTPUT:
+#define FIDDLE_GENERATED_OUTPUT_ID 0
+#include "slang-ir.cpp.fiddle"
+#endif // FIDDLE END
 
 IRNativePtrType* IRBuilder::getNativePtrType(IRType* valueType)
 {
