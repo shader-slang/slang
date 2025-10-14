@@ -5658,33 +5658,33 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 }
                 break;
             }
-        case kIROp_DownstreamModuleExportDecoration:
+        case kIROp_SpirVExportDecoration:
             {
                 requireSPIRVCapability(SpvCapabilityLinkage);
-                auto name =
-                    decoration->getParent()->findDecoration<IRExportDecoration>()->getMangledName();
+                auto exportDecoration =
+                    decoration->getParent()->findDecoration<IRExportDecoration>();
                 emitInst(
                     getSection(SpvLogicalSectionID::Annotations),
                     decoration,
                     SpvOpDecorate,
                     dstID,
                     SpvDecorationLinkageAttributes,
-                    name,
+                    exportDecoration->getMangledName(),
                     SpvLinkageTypeExport);
                 break;
             }
-        case kIROp_DownstreamModuleImportDecoration:
+        case kIROp_SpirVExternDecoration:
             {
                 requireSPIRVCapability(SpvCapabilityLinkage);
-                auto name =
-                    decoration->getParent()->findDecoration<IRExportDecoration>()->getMangledName();
+                auto importDecoration =
+                    decoration->getParent()->findDecoration<IRImportDecoration>();
                 emitInst(
                     getSection(SpvLogicalSectionID::Annotations),
                     decoration,
                     SpvOpDecorate,
                     dstID,
                     SpvDecorationLinkageAttributes,
-                    name,
+                    importDecoration->getMangledName(),
                     SpvLinkageTypeImport);
                 break;
             }
@@ -9746,7 +9746,7 @@ SlangResult emitSPIRVFromIR(
         {
             if (auto func = as<IRFunc>(inst))
             {
-                if (func->findDecoration<IRDownstreamModuleExportDecoration>())
+                if (func->findDecoration<IRSpirVExportDecoration>())
                 {
                     context.ensureInst(inst);
                     symbolsEmitted = true;

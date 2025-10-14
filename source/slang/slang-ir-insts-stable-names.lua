@@ -680,4 +680,6 @@ return {
 	["SymbolAlias"] = 676,
 	["Decoration.InParamProxyVar"] = 677,
 	["Attr.MemoryScope"] = 678,
+	["Decoration.spirvExport"] = 679,
+	["Decoration.spirvExtern"] = 680,
 }
