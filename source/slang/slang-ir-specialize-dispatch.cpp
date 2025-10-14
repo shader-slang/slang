@@ -200,6 +200,13 @@ void ensureWitnessTableSequentialIDs(SharedGenericsLoweringContext* sharedContex
             else
             {
                 auto witnessTableType = as<IRWitnessTableType>(inst->getDataType());
+
+                if (witnessTableType && witnessTableType->getConformanceType() == nullptr)
+                {
+                    // Ignore witness tables that represent 'none' for optional witness table types.
+                    continue;
+                }
+
                 if (witnessTableType && witnessTableType->getConformanceType()
                                             ->findDecoration<IRSpecializeDecoration>())
                 {

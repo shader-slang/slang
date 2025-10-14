@@ -1403,7 +1403,7 @@ struct TypeFlowSpecializationContext
         IRBuilder builder(module);
         auto voidType = builder.getVoidType();
 
-        return builder.createWitnessTable(voidType, nullptr);
+        return builder.createWitnessTable(nullptr, voidType);
     }
 
     // Returns true if the inst is of the form OptionalType<InterfaceType>
@@ -3925,7 +3925,7 @@ struct TypeFlowSpecializationContext
 
     bool specializeMakeOptionalNone(IRInst* context, IRMakeOptionalNone* inst)
     {
-        if (auto taggedUnionType = as<IRCollectionTaggedUnionType>(inst->getDataType()))
+        if (auto taggedUnionType = as<IRCollectionTaggedUnionType>(tryGetInfo(context, inst)))
         {
             // If we're dealing with a `MakeOptionalNone` for an existential type, then
             // this just becomes a tagged union tuple where the set of tables is {none}
@@ -3947,7 +3947,7 @@ struct TypeFlowSpecializationContext
             tupleOperands.add(
                 builder.emitDefaultConstruct((IRType*)taggedUnionType->getTypeCollection()));
 
-            auto newTuple = builder.emitMakeTuple(tupleOperands);
+            auto newTuple = builder.emitMakeTuple((IRType*)taggedUnionType, tupleOperands);
             inst->replaceUsesWith(newTuple);
             propagationMap[InstWithContext(context, newTuple)] = taggedUnionType;
             inst->removeAndDeallocate();
@@ -4048,7 +4048,7 @@ struct TypeFlowSpecializationContext
                 // Otherwise, we'll extract the tag and compare against
                 // the value for 'none' (in the context of the tag's collection)
                 //
-
+                builder.setInsertBefore(inst);
                 auto dynTag = builder.emitGetTupleElement(
                     (IRType*)makeTagType(taggedUnionType->getTableCollection()),
                     inst->getOptionalOperand(),
