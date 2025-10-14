@@ -30,7 +30,7 @@ SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || realpath "${BASH_S
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 BUILD_DIR="${BUILD_DIR:-$REPO_ROOT/build}"
-CONFIG="${CONFIG:-Debug}"
+CONFIG="${CONFIG:-RelWithDebInfo}"
 
 # Coverage binary and library paths
 SLANG_TEST="$BUILD_DIR/$CONFIG/bin/slang-test"
