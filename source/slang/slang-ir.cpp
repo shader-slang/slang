@@ -2770,22 +2770,6 @@ IRBasicType* IRBuilder::getBasicType(BaseType baseType)
     return (IRBasicType*)getType(IROp((UInt)kIROp_FirstBasicType + (UInt)baseType));
 }
 
-// Generate basic type getter method implementations
-#if 0 // FIDDLE TEMPLATE:
-%local ir_lua = require("source/slang/slang-ir.h.lua")
-%local basic_types = ir_lua.getBasicTypesForBuilderMethods()
-%for _, type_info in ipairs(basic_types) do
-
-$(type_info.return_type) IRBuilder::get$(type_info.method_name)()
-{
-    return ($(type_info.return_type))getType($(type_info.opcode));
-}
-%end
-#else // FIDDLE OUTPUT:
-#define FIDDLE_GENERATED_OUTPUT_ID 0
-#include "slang-ir.cpp.fiddle"
-#endif // FIDDLE END
-
 IRNativePtrType* IRBuilder::getNativePtrType(IRType* valueType)
 {
     return (IRNativePtrType*)getType(kIROp_NativePtrType, (IRInst*)valueType);
@@ -2797,9 +2781,9 @@ IRNativePtrType* IRBuilder::getNativePtrType(IRType* valueType)
 %local basic_types = ir_lua.getBasicTypesForBuilderMethods()
 %for _, type_info in ipairs(basic_types) do
 
-$(type_info.return_type) IRBuilder::get$(type_info.method_name)(
+$(type_info.return_type) IRBuilder::$(type_info.method_name)(
 %  for i, operand in ipairs(type_info.operands) do
-    $(operand.type) $(operand.name)
+    $(operand.type)* $(operand.name)
 %    if i < #type_info.operands then
 ,
 %    end
@@ -2820,7 +2804,7 @@ $(type_info.return_type) IRBuilder::get$(type_info.method_name)(
 }
 %end
 #else // FIDDLE OUTPUT:
-#define FIDDLE_GENERATED_OUTPUT_ID 1
+#define FIDDLE_GENERATED_OUTPUT_ID 0
 #include "slang-ir.cpp.fiddle"
 #endif // FIDDLE END
 

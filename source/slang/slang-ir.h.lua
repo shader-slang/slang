@@ -334,8 +334,8 @@ local function getBasicTypesForBuilderMethods()
 		-- Batch 2 additions - types that use simple getType pattern
 		"OptionalType",
 		"BasicBlockType",
-		{"TypeKind", "getTypeKind"}, -- Custom method name to maintain compatibility
-		{"GenericKind", "getGenericKind"}, -- Custom method name to maintain compatibility
+		"TypeKind",
+		"GenericKind",
 	}
 
 	local result = {}
@@ -359,13 +359,12 @@ local function getBasicTypesForBuilderMethods()
 			end
 		end)
 
-		-- Determine method name
+		-- Determine method name - always add "get" prefix
 		local method_name
 		if custom_method_name then
-			method_name = custom_method_name
+			method_name = "get" .. custom_method_name
 		else
-			-- Infer method name by removing "Type" suffix and adding it back
-			method_name = type_name:gsub("Type$", "") .. "Type"
+			method_name = "get" .. type_name
 		end
 
 		-- Infer return type - specific type pointer for the struct
