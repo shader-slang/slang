@@ -4672,7 +4672,8 @@ __device__ __forceinline__ ulonglong _slang_optixGetInstanceTransformFromHandle(
     return (ulonglong)optixGetInstanceTransformFromHandle(handle);
 }
 
-__device__ __forceinline__ ulonglong _slang_optixGetInstanceInverseTransformFromHandle(ulonglong handle)
+__device__ __forceinline__ ulonglong
+_slang_optixGetInstanceInverseTransformFromHandle(ulonglong handle)
 {
     return (ulonglong)optixGetInstanceInverseTransformFromHandle(handle);
 }
