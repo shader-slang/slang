@@ -329,14 +329,8 @@ struct SpecializationContext
             // existing specialization that has been registered.
             // If one is found, our work is done.
             //
-            IRSpecializationDictionaryItem* specializationEntry = nullptr;
-            if (genericSpecializations.tryGetValue(key, specializationEntry))
-            {
-                if (specializationEntry->getOperand(0)->getOp() != kIROp_Undefined)
-                    return specializationEntry->getOperand(0);
-                else
-                    genericSpecializations.remove(key);
-            }
+            if (auto specializedVal = tryGetDictionaryEntry(genericSpecializations, key))
+                return specializedVal;
         }
 
         // If no existing specialization is found, we need
@@ -1109,6 +1103,30 @@ struct SpecializationContext
             args.getBuffer()));
     }
 
+    // Look up an entry in the given specialization dictionary.
+    //
+    // Takes care of cases where the entry is not longer valid
+    // by removing the entry in the dictionary and returning null.
+    //
+    IRInst* tryGetDictionaryEntry(
+        Dictionary<IRSimpleSpecializationKey, IRSpecializationDictionaryItem*>& dict,
+        const IRSimpleSpecializationKey& key)
+    {
+        IRSpecializationDictionaryItem* item = nullptr;
+        if (dict.tryGetValue(key, item))
+        {
+            if (item->getOperand(0)->getOp() != kIROp_Undefined)
+                return item->getOperand(0);
+            else
+            {
+                dict.remove(key);
+                return nullptr;
+            }
+        }
+
+        return nullptr;
+    }
+
     // All of the machinery for generic specialization
     // has been defined above, so we will now walk
     // through the flow of the overall specialization pass.
@@ -1565,18 +1583,8 @@ struct SpecializationContext
         // existing specialization of the callee that we can use.
         //
         IRSpecializationDictionaryItem* specializedCalleeEntry = nullptr;
-        IRFunc* specializedCallee = nullptr;
-        if (existentialSpecializedFuncs.tryGetValue(key, specializedCalleeEntry))
-        {
-            if (specializedCalleeEntry->getOperand(0)->getOp() != kIROp_Undefined)
-            {
-                specializedCallee = cast<IRFunc>(specializedCalleeEntry->getOperand(0));
-            }
-            else
-            {
-                existentialSpecializedFuncs.remove(key);
-            }
-        }
+        IRFunc* specializedCallee =
+            cast<IRFunc>(tryGetDictionaryEntry(existentialSpecializedFuncs, key));
 
         if (!specializedCallee)
         {
@@ -2718,18 +2726,8 @@ struct SpecializationContext
             IRSpecializationDictionaryItem* newStructTypeEntry = nullptr;
             addUsersToWorkList(type);
 
-            IRStructType* newStructType = nullptr;
-            if (existentialSpecializedStructs.tryGetValue(key, newStructTypeEntry))
-            {
-                if (newStructTypeEntry->getOperand(0)->getOp() != kIROp_Undefined)
-                {
-                    newStructType = cast<IRStructType>(newStructTypeEntry->getOperand(0));
-                }
-                else
-                {
-                    existentialSpecializedStructs.remove(key);
-                }
-            }
+            IRStructType* newStructType =
+                cast<IRStructType>(tryGetDictionaryEntry(existentialSpecializedStructs, key));
 
             if (!newStructType)
             {
