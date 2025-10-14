@@ -12,21 +12,21 @@
 // CHECK-PTX: _optix_outer_product_accumulate_16xi32
 // CHECK-PTX: _optix_reduce_sum_accumulate_16xi32
 // CHECK-PTX: add.f32
-// CHECK: OptixCoopVec<float, 4>{{.*}} = (optixCoopVecLoad<OptixCoopVec<float, 4> >((CUdeviceptr)(&((globalParams_{{[0-9]+}}->input{{[0-9]+}}_{{[0-9]+}})))))
-// CHECK: OptixCoopVec<float, 4>{{.*}} = (optixCoopVecTanh((_S{{[0-9]+}})))
-// CHECK: OptixCoopVec<float, 4>{{.*}} = (optixCoopVecAdd((_S{{[0-9]+}}), (_S{{[0-9]+}})))
+// CHECK: (optixCoopVecLoad<OptixCoopVec<float, 4>>((CUdeviceptr)(&((globalParams_{{[0-9]+}}->input{{[0-9]+}}_{{[0-9]+}})))))
+// CHECK: (optixCoopVecTanh((_S{{[0-9]+}})))
+// CHECK: (optixCoopVecAdd((_S{{[0-9]+}}), (_S{{[0-9]+}})))
 // CHECK: optixCoopVecCvt<OptixCoopVec<float, int(4)>>(*((&resultCopy_{{[0-9]+}})))
-// CHECK: OptixCoopVec<float, 4>{{.*}} = (optixCoopVecFFMA((_S{{[0-9]+}}), (_S{{[0-9]+}}), (_S{{[0-9]+}})))
-// CHECK: OptixCoopVec<float, 4>{{.*}} = (slangOptixCoopVecMatMul<{{.*}}>(({{.*}}), (CUdeviceptr)(&((globalParams_{{[0-9]+}}->{{.*}}))), {{.*}})
-// CHECK: OptixCoopVec<float, 4>{{.*}} = (optixCoopVecMax((_S{{[0-9]+}}), (_S{{[0-9]+}})))
-// CHECK: OptixCoopVec<float, 4>{{.*}} = (optixCoopVecMin((_S{{[0-9]+}}), (_S{{[0-9]+}})))
-// CHECK: OptixCoopVec<float, 4>{{.*}} = (optixCoopVecMul((_S{{[0-9]+}}), (_S{{[0-9]+}})))
+// CHECK: (optixCoopVecFFMA((_S{{[0-9]+}}), (_S{{[0-9]+}}), (_S{{[0-9]+}})))
+// CHECK: (slangOptixCoopVecMatMul<{{.*}}>(({{.*}}), (CUdeviceptr)(&((globalParams_{{[0-9]+}}->{{.*}}))), {{.*}})
+// CHECK: (optixCoopVecMax((_S{{[0-9]+}}), (_S{{[0-9]+}})))
+// CHECK: (optixCoopVecMin((_S{{[0-9]+}}), (_S{{[0-9]+}})))
+// CHECK: (optixCoopVecMul((_S{{[0-9]+}}), (_S{{[0-9]+}})))
 // CHECK: optixCoopVecOuterProductAccumulate((_S{{[0-9]+}}), (_S{{[0-9]+}}), (CUdeviceptr)(&(globalParams_{{[0-9]+}}->outputMat_{{[0-9]+}})), (int(0)), (32U))
 // CHECK: optixCoopVecReduceSumAccumulate((_S{{[0-9]+}}), (CUdeviceptr)(&(globalParams_{{[0-9]+}}->outputMat{{[0-9]+}}_{{[0-9]+}})), (int(0)))
-// CHECK: OptixCoopVec<float, 4>{{.*}} = (optixCoopVecStep((_S{{[0-9]+}}), (_S{{[0-9]+}})))
-// CHECK: OptixCoopVec<float, 4>{{.*}} = (optixCoopVecSub((_S{{[0-9]+}}), (_S{{[0-9]+}})))
-// CHECK: OptixCoopVec<float, 4>{{.*}} = (optixCoopVecLog2((_S{{[0-9]+}})))
-// CHECK: OptixCoopVec<float, 4>{{.*}} = (optixCoopVecExp2((_S{{[0-9]+}})))
+// CHECK: (optixCoopVecStep((_S{{[0-9]+}}), (_S{{[0-9]+}})))
+// CHECK: (optixCoopVecSub((_S{{[0-9]+}}), (_S{{[0-9]+}})))
+// CHECK: (optixCoopVecLog2((_S{{[0-9]+}})))
+// CHECK: (optixCoopVecExp2((_S{{[0-9]+}})))
 
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer

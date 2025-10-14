@@ -1212,6 +1212,13 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::SPIRVAssembly:
     case CodeGenTarget::HLSL:
         break;
+    case CodeGenTarget::CUDASource:
+        {
+            auto targetCaps = targetRequest->getTargetCaps();
+            if (!targetCaps.implies(CapabilityAtom::optix_coopvec))
+                lowerCooperativeVectors(irModule, sink);
+        }
+        break;
     default:
         lowerCooperativeVectors(irModule, sink);
     }
@@ -1840,7 +1847,7 @@ Result linkAndOptimizeIR(
     // Rewrite functions that return arrays to return them via `out` parameter,
     // since our target languages doesn't allow returning arrays.
     if (!isMetalTarget(targetRequest) && !isSPIRV(target))
-        legalizeArrayReturnType(irModule, targetRequest);
+        legalizeArrayReturnType(irModule);
 
     if (isKhronosTarget(targetRequest) || target == CodeGenTarget::HLSL)
     {

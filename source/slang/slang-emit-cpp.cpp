@@ -410,6 +410,21 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
         {
             return calcTypeName((IRType*)type->getOperand(0), target, out);
         }
+    case kIROp_CoopVectorType:
+        {
+            if (isOptixCoopVec)
+            {
+                auto coopVecType = static_cast<IRCoopVectorType*>(type);
+                auto elemCount = int(getIntVal(coopVecType->getElementCount()));
+                auto elemType = coopVecType->getElementType();
+
+                out << "OptixCoopVec<" << _getTypeName(elemType) << ", " << elemCount << ">";
+                return SLANG_OK;
+            }
+            // Cooperative vectors should have been lowered before reaching C++ emit for non-OptiX targets
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "cooperative vector types are only supported for OptiX targets");
+            return SLANG_FAIL;
+        }
     default:
         {
             if (isNominalOp(type->getOp()))
@@ -1172,16 +1187,7 @@ void CPPSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
             auto arrayType = static_cast<IRArrayType*>(type);
             auto elementType = arrayType->getElementType();
             int elementCount = int(getIntVal(arrayType->getElementCount()));
-            auto nameHint = arrayType->findDecoration<IRNameHintDecoration>();
-            bool isCoopVec = nameHint && (nameHint->getName() == UnownedStringSlice("CoopVec"));
-            if (isCoopVec && isOptixCoopVec)
-            {
-                m_writer->emit("OptixCoopVec<");
-            }
-            else
-            {
-                m_writer->emit("FixedArray<");
-            }
+            m_writer->emit("FixedArray<");
             _emitType(elementType, nullptr);
             m_writer->emit(", ");
             m_writer->emit(elementCount);
