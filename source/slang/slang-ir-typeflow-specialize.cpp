@@ -905,6 +905,12 @@ struct TypeFlowSpecializationContext
         case kIROp_FieldExtract:
             info = analyzeFieldExtract(context, as<IRFieldExtract>(inst));
             break;
+        case kIROp_MakeOptionalNone:
+            info = analyzeMakeOptionalNone(context, as<IRMakeOptionalNone>(inst));
+            break;
+        case kIROp_MakeOptionalValue:
+            info = analyzeMakeOptionalValue(context, as<IRMakeOptionalValue>(inst));
+            break;
         default:
             info = analyzeDefault(context, inst);
             break;
@@ -1363,6 +1369,124 @@ struct TypeFlowSpecializationContext
             }
         }
         return none();
+    }
+
+    // Locate the 'none' witness table in the global scope
+    // of the module in context. This will be the table
+    // that conforms to 'nullptr' and has 'void' as the concrete type
+    //
+    IRWitnessTable* findNoneWitness()
+    {
+        IRBuilder builder(module);
+        auto voidType = builder.getVoidType();
+        for (auto inst : module->getGlobalInsts())
+        {
+            if (auto witnessTable = as<IRWitnessTable>(inst))
+            {
+                if (witnessTable->getConcreteType() == voidType &&
+                    witnessTable->getConformanceType() == nullptr)
+                    return witnessTable;
+            }
+        }
+
+        return nullptr;
+    }
+
+    // Get the witness table inst to be used for the 'none' case of
+    // an optional witness table.
+    //
+    IRWitnessTable* getNoneWitness()
+    {
+        if (auto table = findNoneWitness())
+            return table;
+
+        IRBuilder builder(module);
+        auto voidType = builder.getVoidType();
+
+        return builder.createWitnessTable(voidType, nullptr);
+    }
+
+    // Returns true if the inst is of the form OptionalType<InterfaceType>
+    bool isOptionalExistentialType(IRInst* inst)
+    {
+        if (auto optionalType = as<IROptionalType>(inst))
+            return as<IRInterfaceType>(optionalType->getValueType()) != nullptr;
+        return false;
+    }
+
+    IRInst* analyzeMakeOptionalNone(IRInst* context, IRMakeOptionalNone* inst)
+    {
+        // If the optional type we're dealing with is an optional concrete type, we won't
+        // touch this case, since there's nothing dynamic to specialize.
+        //
+        // If the type inside the optional is an interface type, then we will treat it slightly
+        // differently by including 'none' as one of the possible candidates of the existential
+        // value.
+        //
+        // The `MakeOptionalNone` case represents the creating of an existential out of the
+        // 'none' witness table and a void value, so we'll represent that using the tagged union
+        // type.
+        //
+        SLANG_UNUSED(context);
+        if (isOptionalExistentialType(inst->getDataType()))
+        {
+            IRBuilder builder(module);
+            auto noneTableSet = cast<IRTableCollection>(
+                cBuilder.createCollection(kIROp_TableCollection, getNoneWitness()));
+            return makeExistential(noneTableSet);
+        }
+
+        return none();
+    }
+
+    IRInst* analyzeMakeOptionalValue(IRInst* context, IRMakeOptionalValue* inst)
+    {
+        // If the optional type we're dealing with is an optional concrete type, we won't
+        // touch this case, since there's nothing dynamic to specialize.
+        //
+        // If the type inside the optional is an interface type, then we will treat it slightly
+        // differently, by conceptually treating it as an interface type that has all the possible
+        // elements of the interface type plus an additional 'none' element.
+        //
+        // The `MakeOptionalValue` case is then very similar to the `MakeExistential` case, only we
+        // already have an existential as input.
+        //
+        // Thus, we simply pass the input existential info as-is.
+        //
+        // Note: we don't actually have to add a new 'none' table to the collection, since that will
+        // automatically occur if this value ever merges with a value created using
+        // `MakeOptionalNone`
+        //
+        if (isOptionalExistentialType(inst->getDataType()))
+        {
+            if (auto info = tryGetInfo(context, inst->getValue()))
+            {
+                SLANG_ASSERT(as<IRCollectionTaggedUnionType>(info));
+                return info;
+            }
+        }
+
+        return none();
+    }
+
+    IRInst* analyzeGetOptionalValue(IRInst* context, IRGetOptionalValue* inst)
+    {
+        if (isOptionalExistentialType(inst->getDataType()))
+        {
+            // This is an interesting case.. technically, at this point we could go
+            // from a larger collection to a smaller one (without the none-type).
+            //
+            // However, for simplicitly reasons, we currently only allow up-casting,
+            // so for now we'll just passthrough all types (so the result will
+            // assume that 'none-type' is a possiblity even though we statically know
+            // that it isn't).
+            //
+            if (auto info = tryGetInfo(context, inst->getOperand(0)))
+            {
+                SLANG_ASSERT(as<IRCollectionTaggedUnionType>(info));
+                return info;
+            }
+        }
     }
 
     IRInst* analyzeLookupWitnessMethod(IRInst* context, IRLookupWitnessMethod* inst)
@@ -2464,6 +2588,14 @@ struct TypeFlowSpecializationContext
             return specializeGetSequentialID(context, as<IRGetSequentialID>(inst));
         case kIROp_IsType:
             return specializeIsType(context, as<IRIsType>(inst));
+        case kIROp_MakeOptionalNone:
+            return specializeMakeOptionalNone(context, as<IRMakeOptionalNone>(inst));
+        case kIROp_MakeOptionalValue:
+            return specializeMakeOptionalValue(context, as<IRMakeOptionalValue>(inst));
+        case kIROp_OptionalHasValue:
+            return specializeOptionalHasValue(context, as<IROptionalHasValue>(inst));
+        case kIROp_GetOptionalValue:
+            return specializeGetOptionalValue(context, as<IRGetOptionalValue>(inst));
         default:
             {
                 // Default case: replace inst type with specialized type (if available)
@@ -3788,6 +3920,150 @@ struct TypeFlowSpecializationContext
             return true;
         }
 
+        return false;
+    }
+
+    bool specializeMakeOptionalNone(IRInst* context, IRMakeOptionalNone* inst)
+    {
+        if (auto taggedUnionType = as<IRCollectionTaggedUnionType>(inst->getDataType()))
+        {
+            // If we're dealing with a `MakeOptionalNone` for an existential type, then
+            // this just becomes a tagged union tuple where the set of tables is {none}
+            // (i.e. singleton set of none witness)
+            //
+
+            IRBuilder builder(module);
+            builder.setInsertBefore(inst);
+
+            // Create a tuple for the empty type..
+            SLANG_ASSERT(taggedUnionType->getTableCollection()->isSingleton());
+            auto noneWitnessTable = taggedUnionType->getTableCollection()->getElement(0);
+
+            auto singletonTagType = makeTagType(cBuilder.makeSingletonSet(noneWitnessTable));
+            auto zeroValueOfTagType = builder.getIntValue((IRType*)singletonTagType, 0);
+
+            List<IRInst*> tupleOperands;
+            tupleOperands.add(zeroValueOfTagType);
+            tupleOperands.add(
+                builder.emitDefaultConstruct((IRType*)taggedUnionType->getTypeCollection()));
+
+            auto newTuple = builder.emitMakeTuple(tupleOperands);
+            inst->replaceUsesWith(newTuple);
+            propagationMap[InstWithContext(context, newTuple)] = taggedUnionType;
+            inst->removeAndDeallocate();
+
+            return true;
+        }
+
+        return false;
+    }
+
+    bool specializeMakeOptionalValue(IRInst* context, IRMakeOptionalValue* inst)
+    {
+        SLANG_UNUSED(context);
+        if (auto taggedUnionType = as<IRCollectionTaggedUnionType>(inst->getValue()->getDataType()))
+        {
+            // If we're dealing with a `MakeOptionalValue` for an existential type,
+            // we don't actually have to change anything, since logically, the input and output
+            // represent the same set of types and tables.
+            //
+            // We'll do a simple replace.
+            //
+
+            auto newInst = inst->getValue();
+            inst->replaceUsesWith(newInst);
+            inst->removeAndDeallocate();
+
+            return true;
+        }
+
+        return false;
+    }
+
+    bool specializeGetOptionalValue(IRInst* context, IRGetOptionalValue* inst)
+    {
+        SLANG_UNUSED(context);
+        if (auto taggedUnionType =
+                as<IRCollectionTaggedUnionType>(inst->getOptionalOperand()->getDataType()))
+        {
+            // Since `GetOptionalValue` is the reverse of `MakeOptionalValue`, and we treat
+            // the latter as a no-op, then `GetOptionalValue` is also a no-op (we simply pass
+            // the inner existential value as-is)
+            //
+
+            auto newInst = inst->getOptionalOperand();
+            inst->replaceUsesWith(newInst);
+            inst->removeAndDeallocate();
+            return true;
+        }
+        return false;
+    }
+
+    bool specializeOptionalHasValue(IRInst* context, IROptionalHasValue* inst)
+    {
+        SLANG_UNUSED(context);
+        if (auto taggedUnionType =
+                as<IRCollectionTaggedUnionType>(inst->getOptionalOperand()->getDataType()))
+        {
+            // The logic here is similar to specializing IsType, but we'll directly compare
+            // tags instead of trying to use sequential ID.
+            //
+            // There's two cases to handle here:
+            // 1. We statically know that it cannot be a 'none' because the
+            //    input's collection type doesn't have a 'none'. In this case
+            //    we just return a true.
+            //
+            // 2. 'none' is a possibility. In this case, we create a 0 value of
+            //    type TagType(TableCollection(NoneWitness)) and then upcast it
+            //    to TagType(inputTableCollection). This will convert the value
+            //    to the corresponding value of 'none' in the input's table collection
+            //    allowing us to directly compare it against the tag part of the
+            //    input tagged union.
+            //
+
+            IRBuilder builder(inst);
+
+            bool containsNone = false;
+            forEachInCollection(
+                taggedUnionType->getTableCollection(),
+                [&](IRInst* wt)
+                {
+                    if (wt == getNoneWitness())
+                        containsNone = true;
+                });
+
+            if (!containsNone)
+            {
+                auto trueVal = builder.getBoolValue(true);
+                inst->replaceUsesWith(trueVal);
+                inst->removeAndDeallocate();
+                return true;
+            }
+            else
+            {
+                auto dynTag = builder.emitGetTupleElement(
+                    (IRType*)makeTagType(taggedUnionType->getTableCollection()),
+                    inst->getOptionalOperand(),
+                    0);
+
+                IRInst* noneWitnessTagType =
+                    makeTagType(cBuilder.makeSingletonSet(getNoneWitness()));
+                IRInst* noneSingletonWitnessTag =
+                    builder.getIntValue((IRType*)noneWitnessTagType, 0);
+
+                // Cast tag to super collection
+                auto noneWitnessTag = builder.emitIntrinsicInst(
+                    (IRType*)makeTagType(taggedUnionType->getTableCollection()),
+                    kIROp_GetTagForSuperCollection,
+                    1,
+                    &noneSingletonWitnessTag);
+
+                auto newInst = builder.emitNeq(dynTag, noneWitnessTag);
+                inst->replaceUsesWith(newInst);
+                inst->removeAndDeallocate();
+                return true;
+            }
+        }
         return false;
     }
 
