@@ -240,7 +240,7 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
 /// Get a unit-type (aka `void`) value using the `poison` instruction,
 /// which indicates an undefined (and potentially unstable) value.
 ///
-IRInst* getUnitPoisionVal(IRBuilder builder, IRModule* module);
+IRInst* getUnitPoisonVal(IRBuilder builder, IRModule* module);
 
 // The the equivalent op of (a op b) in (b op' a). For example, a > b is equivalent to b < a. So (<)
 // ==> (>).

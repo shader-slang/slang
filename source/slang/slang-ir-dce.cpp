@@ -75,7 +75,7 @@ struct DeadCodeEliminationContext
         }
     }
 
-    IRInst* getUnitPoisionVal()
+    IRInst* getUnitPoisonVal()
     {
         if (!undefInst)
         {
@@ -84,7 +84,7 @@ struct DeadCodeEliminationContext
                 builder.setInsertBefore(firstChild);
             else
                 builder.setInsertInto(module->getModuleInst());
-            undefInst = Slang::getUnitPoisionVal(builder, module);
+            undefInst = Slang::getUnitPoisonVal(builder, module);
         }
         return undefInst;
     }
@@ -122,7 +122,7 @@ struct DeadCodeEliminationContext
             // to remove it and replace it with... a new instruction that
             // is exactly like it.
             //
-            markInstAsLive(getUnitPoisionVal());
+            markInstAsLive(getUnitPoisonVal());
 
             // Marking the module as live should have
             // seeded our work list, so we can now start
@@ -241,7 +241,7 @@ struct DeadCodeEliminationContext
             //
             if (inst->hasUses())
             {
-                inst->replaceUsesWith(getUnitPoisionVal());
+                inst->replaceUsesWith(getUnitPoisonVal());
             }
 
             if (inst->getOp() == kIROp_Param)

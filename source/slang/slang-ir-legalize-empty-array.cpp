@@ -50,9 +50,30 @@ struct EmptyArrayLoweringContext
         return ptr && isEmptyArray(ptr->getValueType());
     }
 
-    // Visit each instruction and replace it with legalized instructiosn if necessary.
+    // Visit each instruction and replace it with legalized instructions if necessary.
     void processInst(IRInst* inst)
     {
+        //
+        // This function is handling several different replacements at once:
+        //
+        // * Instructions that would create an empty array value are changed
+        //   to create a unit value (`void`) instead.
+        //
+        // * Instruction that would try to read an element from an empty array,
+        //   or form a pointer to such an element, instead yield a `poison`
+        //   (undefined) value. Note that they do not yield `LoadFromUninitializedMemory`
+        //   because there is no guarantee that there would be anything in the
+        //   memory corresponding to an index into an empty array.
+        //
+        // * Instructions that would try to read from an undefined pointer,
+        //   buffer, image, etc. yield `poison`.
+        //
+        // * Instructions that would try to write to an undefined pointer,
+        //   buffer, image, etc. are skipped (the behavior is undefined, so
+        //   "do nothing" is a valid choice for the behavior, which has the
+        //   nice side effect of potentially rendering other code redundant).
+        //
+
         IRInst* replacement = nullptr;
 
         IRBuilder builder(module);

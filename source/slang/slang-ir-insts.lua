@@ -131,7 +131,7 @@ local insts = {
 			{
 				Kind = {
 					-- Kinds represent the "types of types."
-					-- They should not really be nested undeunder `IRType`
+					-- They should not really be nested under `IRType`
 					-- in the overall hierarchy, but we can fix that later.
 					hoistable = true,
 					{ Type = { struct_name = "TypeKind" } },
