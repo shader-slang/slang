@@ -1,4 +1,8 @@
 //TEST:SIMPLE(filecheck=METAL): -entry meshMain -stage mesh -target metal
+//TEST:SIMPLE(filecheck=METALLIB): -entry meshMain -stage mesh -target metallib
+
+// METALLIB-NOT: error :
+// METALLIB: @meshMain
 
 //
 // Mesh shader
@@ -39,6 +43,7 @@ const static uint MAX_VERTS = 12;
 const static uint MAX_PRIMS = 4;
 
 [outputtopology("triangle")]
+[shader("mesh")]
 [numthreads(12, 1, 1)]
 void meshMain(
     in uint tig: SV_GroupIndex,

@@ -144,8 +144,8 @@ local insts = {
 				PtrTypeBase = {
 					hoistable = true,
 					{ Ptr = { struct_name = "PtrType", min_operands = 1 } },
-					{ Ref = { struct_name = "RefType", min_operands = 1 } },
-					{ ConstRef = { struct_name = "ConstRefType", min_operands = 1 } },
+					{ RefParam = { struct_name = "RefParamType", min_operands = 1 } },
+					{ BorrowInParam = { struct_name = "BorrowInParamType", min_operands = 1 } },
 					{
 						PseudoPtr = {
 							-- A `PsuedoPtr<T>` logically represents a pointer to a value of type
@@ -157,9 +157,9 @@ local insts = {
 						},
 					},
 					{
-						OutTypeBase = {
-							{ Out = { struct_name = "OutType", min_operands = 1 } },
-							{ InOut = { struct_name = "InOutType", min_operands = 1 } },
+						OutParamTypeBase = {
+							{ OutParam = { struct_name = "OutParamType", min_operands = 1 } },
+							{ BorrowInOutParam = { struct_name = "BorrowInOutParamType", min_operands = 1 } },
 						},
 					},
 				},
@@ -479,6 +479,12 @@ local insts = {
 		module = { struct_name = "ModuleInst", parent = true },
 	},
 	{ block = { parent = true } },
+
+	-- A global inst representing an alias of another symbol, under a different mangled name.
+	-- This inst should be completely eliminated after linking, with its references replaced
+	-- to use the canonical symbol being aliased.
+	{ SymbolAlias = { min_operands = 1 } },
+
 	-- IRConstant
 	{
 		Constant = {
@@ -1473,6 +1479,10 @@ local insts = {
 					struct_name = "RequireFullQuadsDecoration",
 				},
 			},
+			-- Marks a var as a temporary local variable to replace references to a `in` parameter from the function body
+			-- This is to support legacy code that modifies an `in` parameter as if it is copied to a local variable.
+			{ InParamProxyVar = { struct_name = "InParamProxyVarDecoration", min_operands = 1 } },
+			{ TempCallArgImmutableVar = { struct_name = "TempCallArgImmutableVarDecoration" } },
 			{ TempCallArgVar = { struct_name = "TempCallArgVarDecoration" } },
 			{
 				nonCopyable = {
@@ -1480,6 +1490,7 @@ local insts = {
 					struct_name = "NonCopyableTypeDecoration",
 				},
 			},
+			{ DisableCopyEliminationDecoration = {} },
 			{
 				DynamicUniform = {
 					-- Marks a value to be dynamically uniform.
@@ -1891,9 +1902,22 @@ local insts = {
 	{ EnumCast = { min_operands = 1 } },
 	{ CastUInt2ToDescriptorHandle = { min_operands = 1 } },
 	{ CastDescriptorHandleToUInt2 = { min_operands = 1 } },
+	-- Represents a psuedo cast to convert between a logical type (user declared) and a storage Type
+	-- (valid in buffer locations). The operand can either be a value or an address.
+	{
+		CastStorageToLogicalBase =
+		{
+			min_operands = 2, struct_name = "CastStorageToLogicalBase",
+			{ CastStorageToLogical = { min_operands = 2, struct_name = "CastStorageToLogical" } },
+			{ CastStorageToLogicalDeref = { min_operands = 2, struct_name = "CastStorageToLogicalDeref" } },
+		}
+	},
+	{ CastUInt64ToDescriptorHandle = { min_operands = 1 } },
+	{ CastDescriptorHandleToUInt64 = { min_operands = 1 } },
 	-- Represents a no-op cast to convert a resource pointer to a resource on targets where the resource handles are
 	-- already concrete types.
 	{ CastDescriptorHandleToResource = { min_operands = 1 } },
+	{ CastResourceToDescriptorHandle = { min_operands = 1 } },
 	{ TreatAsDynamicUniform = { min_operands = 1 } },
 	{ sizeOf = { min_operands = 1 } },
 	{ alignOf = { min_operands = 1 } },
@@ -1994,6 +2018,7 @@ local insts = {
 				},
 			},
 			{ Aligned = { struct_name = "AlignedAttr", min_operands = 1 } },
+			{ MemoryScope = { struct_name = "MemoryScopeAttr", min_operands = 1 } },
 			{
 				SemanticAttr = {
 					{ userSemantic = { struct_name = "UserSemanticAttr", min_operands = 2 } },
@@ -2027,7 +2052,7 @@ local insts = {
 		EndFragmentShaderInterlock = { struct_name = "EndFragmentShaderInterlock" },
 	},
 	-- DebugInfo
-	{ DebugSource = { min_operands = 2, hoistable = true } },
+	{ DebugSource = { min_operands = 3, hoistable = true } },
 	{
 		DebugLine = {
 			min_operands = 5,

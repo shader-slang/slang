@@ -185,6 +185,17 @@ advanced_option(
     "Build using system glslang library"
     OFF
 )
+if(WIN32)
+    set(SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC_DEFAULT ON)
+else()
+    set(SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC_DEFAULT OFF)
+endif()
+
+advanced_option(
+    SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC
+    "Enable mimalloc for SPIRV-Tools to improve compilation performance"
+    ${SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC_DEFAULT}
+)
 
 option(
     SLANG_SPIRV_HEADERS_INCLUDE_DIR
@@ -257,6 +268,11 @@ advanced_option(
 advanced_option(
     SLANG_OVERRIDE_LUA_PATH
     "Build using user defined path for lua"
+    OFF
+)
+advanced_option(
+    SLANG_OVERRIDE_MIMALLOC_PATH
+    "Build using user defined path for mimalloc"
     OFF
 )
 
@@ -519,14 +535,19 @@ write_basic_package_version_file(
     COMPATIBILITY SameMajorVersion
 )
 
-# Write SlangConfig.cmake which should allow find_pacakage(SLANG) to work correctly
+# Write SlangConfig.cmake which should allow find_package(SLANG) to work correctly
 # SlangConfig.cmake will define slang::slang target that can be linked with using
 # target_link_libraries. It will also define SLANG_EXECUTABLE export variable that
 # should point to slangc if SLANG_ENABLE_SLANGC is ON.
+if(WIN32)
+    set(SLANG_CMAKE_CONFIG_DIR cmake)
+else()
+    set(SLANG_CMAKE_CONFIG_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME})
+endif()
 configure_package_config_file(
     "${PROJECT_SOURCE_DIR}/cmake/SlangConfig.cmake.in"
     "${PROJECT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
-    INSTALL_DESTINATION cmake
+    INSTALL_DESTINATION ${SLANG_CMAKE_CONFIG_DIR}
 )
 
 # Conditionally handle the case for Emscripten where slang does not create
@@ -538,7 +559,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
             EXPORT SlangTargets
             FILE ${PROJECT_NAME}Targets.cmake
             NAMESPACE ${PROJECT_NAME}::
-            DESTINATION cmake
+            DESTINATION ${SLANG_CMAKE_CONFIG_DIR}
         )
     endif()
 endif()
@@ -547,5 +568,5 @@ install(
     FILES
         "${PROJECT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
         "${PROJECT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
-    DESTINATION cmake
+    DESTINATION ${SLANG_CMAKE_CONFIG_DIR}
 )

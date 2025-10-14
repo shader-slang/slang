@@ -524,6 +524,7 @@ enum class IRTypeLayoutRuleName
     Std430,
     Std140,
     D3DConstantBuffer,
+    MetalParameterBlock,
     C,
     _Count,
 };
@@ -694,6 +695,12 @@ struct IRInst
     // operands of the instruction.
 
     IRUse* getOperands();
+
+    IRUse* getOperandUse(UInt index)
+    {
+        SLANG_ASSERT(index < getOperandCount());
+        return getOperands() + index;
+    }
 
     IRInst* getOperand(UInt index)
     {
@@ -1533,7 +1540,7 @@ struct IRUniformParameterGroupType : IRParameterGroupType
 
 
 FIDDLE()
-struct IRGLSLShaderStorageBufferType : IRBuiltinGenericType
+struct IRGLSLShaderStorageBufferType : IRPointerLikeType
 {
     FIDDLE(leafInst())
     IRType* getDataLayout() { return (IRType*)getOperand(1); }
@@ -1759,6 +1766,8 @@ struct IRGetStringHash : IRInst
 ///
 /// The given IR `builder` will be used if new instructions need to be created.
 IRType* tryGetPointedToType(IRBuilder* builder, IRType* type);
+
+IRType* tryGetPointedToOrBufferElementType(IRBuilder* builder, IRType* type);
 
 FIDDLE()
 struct IRFuncType : IRType
@@ -2139,6 +2148,11 @@ void fixUpFuncType(IRFunc* func, IRType* resultType);
 ///
 void fixUpFuncType(IRFunc* func);
 
+/// If the function has a DebugFuncDecoration, replaces the function type in
+/// that decoration to match the current type of the function.
+///
+void fixUpDebugFuncType(IRFunc* func);
+
 // A generic is akin to a function, but is conceptually executed
 // before runtime, to specialize the code nested within.
 //
@@ -2417,7 +2431,7 @@ public:
     // anything to do with serialization format
     //
     const static UInt k_minSupportedModuleVersion = 1;
-    const static UInt k_maxSupportedModuleVersion = 1;
+    const static UInt k_maxSupportedModuleVersion = 2;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
 private:

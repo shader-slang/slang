@@ -450,15 +450,19 @@ Val* PtrTypeBase::getAddressSpace()
     return _getGenericTypeArg(this, 2);
 }
 
-AccessQualifier tryGetAccessQualifierValue(Val* val)
+std::optional<AccessQualifier> tryGetAccessQualifierValue(Val* val)
 {
-    AccessQualifier accessQualifier = AccessQualifier::ReadWrite;
-
     if (auto cintVal = as<ConstantIntVal>(val))
     {
-        accessQualifier = (AccessQualifier)(cintVal->getValue());
+        return AccessQualifier(cintVal->getValue());
     }
-    return accessQualifier;
+    return std::optional<AccessQualifier>();
+}
+
+std::optional<AccessQualifier> PtrTypeBase::tryGetAccessQualifierValue()
+{
+    auto accessQualifierArg = this->getAccessQualifier();
+    return Slang::tryGetAccessQualifierValue(accessQualifierArg);
 }
 
 AddressSpace tryGetAddressSpaceValue(Val* addrSpaceVal)
@@ -517,22 +521,42 @@ void maybePrintAccessQualifierOperand(StringBuilder& out, AccessQualifier access
 
 void PtrType::_toTextOverride(StringBuilder& out)
 {
-    auto accessQualifier = tryGetAccessQualifierValue(getAccessQualifier());
     auto addrSpace = tryGetAddressSpaceValue(getAddressSpace());
     out << toSlice("Ptr<") << getValueType();
-    maybePrintAccessQualifierOperand(out, accessQualifier);
+    if (auto optionalAccessQualifier = tryGetAccessQualifierValue())
+        maybePrintAccessQualifierOperand(out, *optionalAccessQualifier);
     maybePrintAddrSpaceOperand(out, addrSpace);
     out << toSlice(">");
 }
 
-void RefType::_toTextOverride(StringBuilder& out)
+void ExplicitRefType::_toTextOverride(StringBuilder& out)
 {
-    auto accessQualifier = tryGetAccessQualifierValue(getAccessQualifier());
     auto addrSpace = tryGetAddressSpaceValue(getAddressSpace());
     out << toSlice("Ref<") << getValueType();
-    maybePrintAccessQualifierOperand(out, accessQualifier);
+    if (auto optionalAccessQualifier = tryGetAccessQualifierValue())
+        maybePrintAccessQualifierOperand(out, *optionalAccessQualifier);
     maybePrintAddrSpaceOperand(out, addrSpace);
     out << toSlice(">");
+}
+
+void OutParamType::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("out ") << getValueType();
+}
+
+void BorrowInOutParamType::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("inout ") << getValueType();
+}
+
+void RefParamType::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("ref ") << getValueType();
+}
+
+void BorrowInParamType::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("borrow ") << getValueType();
 }
 
 
@@ -556,30 +580,44 @@ Type* NamedExpressionType::_createCanonicalTypeOverride()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FuncType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-ParameterDirection FuncType::getParamDirection(Index index)
+ParamPassingMode getParamPassingModeFromPossiblyWrappedParamType(Type* paramType)
 {
-    auto paramType = getParamType(index);
-    if (as<RefType>(paramType))
+    if (as<RefParamType>(paramType))
     {
-        return kParameterDirection_Ref;
+        return ParamPassingMode::Ref;
     }
-    else if (as<ConstRefType>(paramType))
+    else if (as<BorrowInParamType>(paramType))
     {
-        return kParameterDirection_ConstRef;
+        return ParamPassingMode::BorrowIn;
     }
-    else if (as<InOutType>(paramType))
+    else if (as<BorrowInOutParamType>(paramType))
     {
-        return kParameterDirection_InOut;
+        return ParamPassingMode::BorrowInOut;
     }
     else if (as<OutType>(paramType))
     {
-        return kParameterDirection_Out;
+        return ParamPassingMode::Out;
     }
     else
     {
-        return kParameterDirection_In;
+        return ParamPassingMode::In;
     }
 }
+
+ParamPassingMode FuncType::getParamDirection(Index index)
+{
+    auto paramType = getParamTypeWithDirectionWrapper(index);
+    return getParamPassingModeFromPossiblyWrappedParamType(paramType);
+}
+
+Type* FuncType::getParamValueType(Index index)
+{
+    auto paramType = getParamTypeWithDirectionWrapper(index);
+    if (auto wrappedParamType = as<ParamPassingModeType>(paramType))
+        return wrappedParamType->getValueType();
+    return paramType;
+}
+
 
 void FuncType::_toTextOverride(StringBuilder& out)
 {
@@ -591,7 +629,7 @@ void FuncType::_toTextOverride(StringBuilder& out)
         {
             out << toSlice(", ");
         }
-        out << getParamType(pp);
+        out << getParamTypeWithDirectionWrapper(pp);
     }
     out << ") -> " << getResultType();
 
@@ -615,7 +653,8 @@ Val* FuncType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet s
     List<Type*> substParamTypes;
     for (Index pp = 0; pp < getParamCount(); pp++)
     {
-        auto substParamType = as<Type>(getParamType(pp)->substituteImpl(astBuilder, subst, &diff));
+        auto substParamType = as<Type>(
+            getParamTypeWithDirectionWrapper(pp)->substituteImpl(astBuilder, subst, &diff));
         if (auto typePack = as<ConcreteTypePack>(substParamType))
         {
             // Unwrap the ConcreteTypePack and add each element as a parameter
@@ -650,7 +689,7 @@ Type* FuncType::_createCanonicalTypeOverride()
     List<Type*> canParamTypes;
     for (Index pp = 0; pp < getParamCount(); pp++)
     {
-        canParamTypes.add(getParamType(pp)->getCanonicalType());
+        canParamTypes.add(getParamTypeWithDirectionWrapper(pp)->getCanonicalType());
     }
 
     FuncType* canType = getCurrentASTBuilder()->getFuncType(
@@ -1363,10 +1402,10 @@ Val* TextureTypeBase::getFormat()
 
 Type* removeParamDirType(Type* type)
 {
-    for (auto paramDirType = as<ParamDirectionType>(type); paramDirType;)
+    for (auto paramDirType = as<ParamPassingModeType>(type); paramDirType;)
     {
         type = paramDirType->getValueType();
-        paramDirType = as<ParamDirectionType>(type);
+        paramDirType = as<ParamPassingModeType>(type);
     }
     return type;
 }

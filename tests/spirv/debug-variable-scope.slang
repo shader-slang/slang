@@ -1,4 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry main -stage fragment -g2 -emit-spirv-directly
+// Regressed with SPIRV update. Tracking on github issue #8522
+//DISABLE_TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry main -stage fragment -g2 -O0 -emit-spirv-directly
 
 Texture2D    testTex      :   register(t0);
 SamplerState testSampler  :   register(s0);

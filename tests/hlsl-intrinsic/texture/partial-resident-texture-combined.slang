@@ -44,37 +44,10 @@ Sampler2DArray<float4> st2DArray_f32v4;
 // Combined depth texture samplers.
 //
 
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
-typealias CombinedDepth2d = _Texture<
-    T,
-    __Shape2D,
-    0, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    1, // isCombined
-    format
->;
-
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
-typealias CombinedDepth2d_array = _Texture<
-    T,
-    __Shape2D,
-    1, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    1, // isCombined
-    format
->;
-
-
 //TEST_INPUT: TextureSampler2D(size=4, content = zero, format=D32Float):name cd2D
-CombinedDepth2d<float> cd2D;
+Sampler2DShadow cd2D;
 //TEST_INPUT: TextureSampler2D(size=4, content = zero, arrayLength=2, format=D32Float):name cd2DArray
-CombinedDepth2d_array<float> cd2DArray;
+Sampler2DArrayShadow cd2DArray;
 
 uint getNotMapped()
 {
@@ -188,18 +161,18 @@ bool TEST_sparse<T>(
      typealias TN = T;
      constexpr const int2 offset = int2(0, 0);
      uint status;
- 
+
      int sampleIndex = 0;
      int2 iuv = int2(1, 1);
      int3 iuvs = int3(iuv, sampleIndex);
- 
+
      return true
          && (status = getNotMapped(), all(TN(T(1)) == s2D.Load(iuvs, offset, status))) && CheckAccessFullyMapped(status)
          && (status = getNotMapped(), all(TN(T(1)) == s2DMS.Load(iuv, sampleIndex, offset, status))) && CheckAccessFullyMapped(status)
          ;
  }
 
-[numthreads(4, 1, 1)]
+[numthreads(2, 2, 1)]
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     bool result = true
