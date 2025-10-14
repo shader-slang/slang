@@ -3170,23 +3170,7 @@ IRGLSLOutputParameterGroupType* IRBuilder::getGLSLOutputParameterGroupType(IRTyp
         IRGLSLOutputParameterGroupType*)getType(kIROp_GLSLOutputParameterGroupType, 1, operands);
 }
 
-IRConstExprRate* IRBuilder::getConstExprRate()
-{
-    return (IRConstExprRate*)getType(kIROp_ConstExprRate);
-}
 
-IRGroupSharedRate* IRBuilder::getGroupSharedRate()
-{
-    return (IRGroupSharedRate*)getType(kIROp_GroupSharedRate);
-}
-IRActualGlobalRate* IRBuilder::getActualGlobalRate()
-{
-    return (IRActualGlobalRate*)getType(kIROp_ActualGlobalRate);
-}
-IRSpecConstRate* IRBuilder::getSpecConstRate()
-{
-    return (IRSpecConstRate*)getType(kIROp_SpecConstRate);
-}
 
 IRRateQualifiedType* IRBuilder::getRateQualifiedType(IRRate* rate, IRType* dataType)
 {

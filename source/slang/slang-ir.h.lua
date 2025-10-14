@@ -336,6 +336,25 @@ local function getBasicTypesForBuilderMethods()
 		"BasicBlockType",
 		"TypeKind",
 		"GenericKind",
+		-- Batch 3 additions - more simple no-operand types
+		"MetalMeshGridPropertiesType",
+		-- Batch 4 additions - rate types
+		"ConstExprRate",
+		"GroupSharedRate", 
+		"ActualGlobalRate",
+		"SpecConstRate",
+		-- Batch 5 additions - layout types and other simple types
+		"TorchTensorType",
+		"ConjunctionType",
+		"FuncType",
+		"DefaultBufferLayoutType",
+		"Std140BufferLayoutType",
+		-- Batch 6 additions - more layout and texture shape types
+		"Std430BufferLayoutType",
+		"ScalarBufferLayoutType", 
+		"CBufferLayoutType",
+		"TextureShape2DType",
+		"TextureShape3DType",
 	}
 
 	local result = {}

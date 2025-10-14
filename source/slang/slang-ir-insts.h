@@ -3210,10 +3210,6 @@ public:
 
     IRGLSLOutputParameterGroupType* getGLSLOutputParameterGroupType(IRType* valueType);
 
-    IRConstExprRate* getConstExprRate();
-    IRGroupSharedRate* getGroupSharedRate();
-    IRActualGlobalRate* getActualGlobalRate();
-    IRSpecConstRate* getSpecConstRate();
 
     IRRateQualifiedType* getRateQualifiedType(IRRate* rate, IRType* dataType);
 
@@ -3249,10 +3245,6 @@ public:
         return emitIntrinsicInst(getVoidType(), kIROp_IndexedFieldKey, 2, args);
     }
 
-    IRMetalMeshGridPropertiesType* getMetalMeshGridPropertiesType()
-    {
-        return (IRMetalMeshGridPropertiesType*)getType(kIROp_MetalMeshGridPropertiesType);
-    }
 
     IRMetalMeshType* getMetalMeshType(
         IRType* vertexType,
