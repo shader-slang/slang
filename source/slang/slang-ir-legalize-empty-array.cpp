@@ -72,7 +72,7 @@ struct EmptyArrayLoweringContext
             {
                 const auto base = gep->getBase();
                 return hasEmptyArrayPtrType(gep) || hasEmptyArrayPtrType(base) ||
-                    as<IRUndefined>(base)
+                               as<IRUndefined>(base)
                            ? builder.emitPoison(gep->getDataType())
                            : nullptr;
             },
@@ -91,7 +91,7 @@ struct EmptyArrayLoweringContext
             },
             [&](IRImageLoad* load)
             {
-            return as<IRUndefined>(load->getOperand(0))
+                return as<IRUndefined>(load->getOperand(0))
                            ? builder.emitPoison(load->getDataType())
                            : nullptr;
             },
