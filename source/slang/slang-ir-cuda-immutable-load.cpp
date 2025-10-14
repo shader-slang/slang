@@ -331,6 +331,26 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
                 }
             }
             break;
+        case kIROp_CUDALDG:
+            {
+                // Does the load needs lowering? If so insert lowered loads.
+                IRBuilder builder(inst);
+                builder.setInsertBefore(inst);
+                auto ptr = inst->getOperand(0);
+                auto valueType = tryGetPointedToType(&builder, ptr->getDataType());
+                if (!valueType)
+                    break;
+                auto loadFunc = getOrCreateLoadFuncForType(valueType);
+                if (!loadFunc)
+                    break;
+                // If the type doesn't need further lowering, we don't need to do anything.
+                if (loadFunc.kind == LoadMethodKind::Opcode && loadFunc.op == kIROp_CUDALDG)
+                    break;
+                auto newLoad = loadFunc.apply(builder, valueType, ptr);
+                inst->replaceUsesWith(newLoad);
+                inst->removeAndDeallocate();
+            }
+            break;
         }
     }
 

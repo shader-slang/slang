@@ -28749,3 +28749,7 @@ void InterlockedAddF16x2(half2* dest, half2 value, out half2 originalValue)
 {
     originalValue = __atomic_add(*dest, value);
 }
+
+[require(cuda)]
+__intrinsic_op($(kIROp_CUDALDG))
+T __cudaLdg<T>(T* ptr);
