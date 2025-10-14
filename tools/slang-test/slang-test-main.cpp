@@ -571,7 +571,7 @@ static SlangResult _gatherTestsForFile(
             if (testReporter)
             {
                 testReporter->messageFormat(
-                    TestMessageType::RunError,
+                    TestMessageType::Info,
                     "Retrying to read test file '%s' (attempt %d)",
                     filePath.getBuffer(),
                     retryCount + 1);
