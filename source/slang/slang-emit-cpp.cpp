@@ -421,8 +421,12 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
                 out << "OptixCoopVec<" << _getTypeName(elemType) << ", " << elemCount << ">";
                 return SLANG_OK;
             }
-            // Cooperative vectors should have been lowered before reaching C++ emit for non-OptiX targets
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "cooperative vector types are only supported for OptiX targets");
+            // Cooperative vectors should have been lowered before reaching C++ emit for non-OptiX
+            // targets
+            SLANG_DIAGNOSE_UNEXPECTED(
+                getSink(),
+                SourceLoc(),
+                "cooperative vector types are only supported for OptiX targets");
             return SLANG_FAIL;
         }
     default:
