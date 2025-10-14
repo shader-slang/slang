@@ -3051,17 +3051,11 @@ public:
 #endif // FIDDLE END
     IRNativePtrType* getNativePtrType(IRType* valueType);
 
-    IRType* getCapabilitySetType();
-
     IRAssociatedType* getAssociatedType(ArrayView<IRInterfaceType*> constraintTypes);
     IRThisType* getThisType(IRType* interfaceType);
-    IRRawPointerType* getRawPointerType();
     IRRTTIPointerType* getRTTIPointerType(IRInst* rttiPtr);
-    IRRTTIType* getRTTIType();
-    IRRTTIHandleType* getRTTIHandleType();
     IRAnyValueType* getAnyValueType(IRIntegerValue size);
     IRAnyValueType* getAnyValueType(IRInst* size);
-    IRDynamicType* getDynamicType();
 
     IRTargetTupleType* getTargetTupleType(UInt count, IRType* const* types);
 

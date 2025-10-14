@@ -2792,16 +2792,6 @@ IRNativePtrType* IRBuilder::getNativePtrType(IRType* valueType)
 }
 
 
-IRType* IRBuilder::getCapabilitySetType()
-{
-    return getType(kIROp_CapabilitySetType);
-}
-
-IRDynamicType* IRBuilder::getDynamicType()
-{
-    return (IRDynamicType*)getType(kIROp_DynamicType);
-}
-
 IRTargetTupleType* IRBuilder::getTargetTupleType(UInt count, IRType* const* types)
 {
     return (IRTargetTupleType*)getType(kIROp_TargetTupleType, count, (IRInst* const*)types);
@@ -2820,24 +2810,9 @@ IRThisType* IRBuilder::getThisType(IRType* interfaceType)
     return (IRThisType*)getType(kIROp_ThisType, interfaceType);
 }
 
-IRRawPointerType* IRBuilder::getRawPointerType()
-{
-    return (IRRawPointerType*)getType(kIROp_RawPointerType);
-}
-
 IRRTTIPointerType* IRBuilder::getRTTIPointerType(IRInst* rttiPtr)
 {
     return (IRRTTIPointerType*)getType(kIROp_RTTIPointerType, rttiPtr);
-}
-
-IRRTTIType* IRBuilder::getRTTIType()
-{
-    return (IRRTTIType*)getType(kIROp_RTTIType);
-}
-
-IRRTTIHandleType* IRBuilder::getRTTIHandleType()
-{
-    return (IRRTTIHandleType*)getType(kIROp_RTTIHandleType);
 }
 
 IRAnyValueType* IRBuilder::getAnyValueType(IRIntegerValue size)

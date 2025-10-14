@@ -322,6 +322,12 @@ local function getBasicTypesForBuilderMethods()
 		"UIntPtrType",
 		"StringType",
 		"NativeStringType",
+		-- Batch 1 additions - simple types with no operands
+		"CapabilitySetType",
+		"RawPointerType", 
+		"RTTIType",
+		"RTTIHandleType",
+		"DynamicType",
 	}
 
 	local result = {}
