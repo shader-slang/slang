@@ -512,6 +512,7 @@ void maybePrintAccessQualifierOperand(StringBuilder& out, AccessQualifier access
         out << toSlice(", Access::ReadWrite");
         break;
     case AccessQualifier::Read:
+    case AccessQualifier::Immutable:
         out << toSlice(", Access::Read");
         break;
     default:

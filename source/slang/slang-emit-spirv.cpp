@@ -6480,12 +6480,19 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             SpvStorageClassPhysicalStorageBuffer)
         {
             // If inst has a pointer type with PhysicalStorageBuffer address space,
-            // emit AliasedPointer decoration.
-            emitOpDecorate(
-                getSection(SpvLogicalSectionID::Annotations),
-                nullptr,
-                varInst,
-                (isVar ? SpvDecorationAliasedPointer : SpvDecorationAliased));
+            // emit AliasedPointer or RestrictPointer decoration.
+            SpvDecoration decor;
+            if (ptrType->getAccessQualifier() == AccessQualifier::Immutable)
+            {
+                // We can always safely use RestrictPointer for immutable pointers.
+                // This will allow better optimization.
+                decor = isVar ? SpvDecorationRestrictPointer : SpvDecorationRestrict;
+            }
+            else
+            {
+                decor = isVar ? SpvDecorationAliasedPointer : SpvDecorationAliased;
+            }
+            emitOpDecorate(getSection(SpvLogicalSectionID::Annotations), nullptr, varInst, decor);
         }
         else
         {

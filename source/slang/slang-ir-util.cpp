@@ -2785,6 +2785,8 @@ bool isPointerToImmutableLocation(IRInst* loc)
         case AddressSpace::UniformConstant:
             return true;
         }
+        if (ptrType->getAccessQualifier() == AccessQualifier::Immutable)
+            return true;
     }
     return false;
 }
