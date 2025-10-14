@@ -3254,7 +3254,6 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             {
                 // This will emit a separate debug file, containing all debug info in
                 // a .dbg.spv file. The main output SPIRV will have all debug info stripped.
-                m_compileRequest->setDebugInfoLevel(SLANG_DEBUG_INFO_LEVEL_MAXIMAL);
                 linkage->m_optionSet.set(OptionKind::EmitSeparateDebug, true);
                 break;
             }
