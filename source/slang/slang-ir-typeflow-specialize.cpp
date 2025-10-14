@@ -4034,6 +4034,10 @@ struct TypeFlowSpecializationContext
 
             if (!containsNone)
             {
+                // If 'none' isn't a part of the collection, statically set
+                // to true.
+                //
+
                 auto trueVal = builder.getBoolValue(true);
                 inst->replaceUsesWith(trueVal);
                 inst->removeAndDeallocate();
@@ -4041,6 +4045,10 @@ struct TypeFlowSpecializationContext
             }
             else
             {
+                // Otherwise, we'll extract the tag and compare against
+                // the value for 'none' (in the context of the tag's collection)
+                //
+
                 auto dynTag = builder.emitGetTupleElement(
                     (IRType*)makeTagType(taggedUnionType->getTableCollection()),
                     inst->getOptionalOperand(),
@@ -4051,7 +4059,9 @@ struct TypeFlowSpecializationContext
                 IRInst* noneSingletonWitnessTag =
                     builder.getIntValue((IRType*)noneWitnessTagType, 0);
 
-                // Cast tag to super collection
+                // Cast the singleton tag to the target collection tag (will convert the
+                // value to the corresponding value for the larger set)
+                //
                 auto noneWitnessTag = builder.emitIntrinsicInst(
                     (IRType*)makeTagType(taggedUnionType->getTableCollection()),
                     kIROp_GetTagForSuperCollection,
