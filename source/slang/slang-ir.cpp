@@ -3386,7 +3386,8 @@ IRInst* IRBuilder::emitGetValueFromBoundInterface(IRType* type, IRInst* boundInt
 
 IRLoadFromUninitializedMemory* IRBuilder::emitLoadFromUninitializedMemory(IRType* type)
 {
-    auto inst = createInst<IRLoadFromUninitializedMemory>(this, kIROp_LoadFromUninitializedMemory, type);
+    auto inst =
+        createInst<IRLoadFromUninitializedMemory>(this, kIROp_LoadFromUninitializedMemory, type);
     addInst(inst);
     return inst;
 }
