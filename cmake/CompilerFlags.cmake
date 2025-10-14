@@ -237,7 +237,7 @@ function(set_default_compile_options target)
         if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
             target_compile_options(
                 ${target}
-                PRIVATE -fprofile-instr-generate -fcoverage-mapping -Og
+                PRIVATE -fprofile-instr-generate -fcoverage-mapping
             )
             target_link_options(
                 ${target}

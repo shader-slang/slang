@@ -161,7 +161,7 @@
     {
       "name": "coverage",
       "configurePreset": "coverage",
-      "configuration": "Debug"
+      "configuration": "RelWithDebInfo"
     }
   ],
   "packagePresets": [

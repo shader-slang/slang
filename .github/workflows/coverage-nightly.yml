@@ -23,7 +23,7 @@ jobs:
       os: linux
       compiler: clang
       platform: x86_64
-      config: debug
+      config: relwithdebinfo
       runs-on: '["ubuntu-22.04"]'
       build-llvm: true
       enable-coverage: true
