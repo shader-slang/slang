@@ -39,7 +39,14 @@ COVERAGE_HTML=1 ./tools/coverage/run-coverage.sh slang-unit-test-tool/
 
 # Generate LCOV format (for CI/CD integration)
 COVERAGE_LCOV=1 ./tools/coverage/run-coverage.sh slang-unit-test-tool/
+
+# Regenerate reports from existing coverage data (without re-running tests)
+COVERAGE_HTML=1 ./tools/coverage/run-coverage.sh --report-only
 ```
+
+## Command-Line Options
+
+- `--report-only` - Generate reports from existing coverage data without re-running tests. Requires that coverage data was collected previously (i.e., `build/coverage-data/slang-test.profdata` exists).
 
 ## Environment Variables
 

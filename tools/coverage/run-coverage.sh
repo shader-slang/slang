@@ -12,6 +12,17 @@ fi
 
 set -e
 
+# Parse arguments
+REPORT_ONLY=false
+TEST_ARGS=()
+for arg in "$@"; do
+  if [[ "$arg" == "--report-only" ]]; then
+    REPORT_ONLY=true
+  else
+    TEST_ARGS+=("$arg")
+  fi
+done
+
 # Detect platform and set appropriate tools
 if [[ "$OSTYPE" == "darwin"* ]]; then
   # macOS - use xcrun to find the right tools
@@ -40,46 +51,64 @@ LIBSLANG="$BUILD_DIR/$CONFIG/lib/libslang.$LIB_EXT"
 COVERAGE_DIR="${COVERAGE_DIR:-$BUILD_DIR/coverage-data}"
 mkdir -p "$COVERAGE_DIR"
 
-# Check if binaries exist
-if [[ ! -f "$SLANG_TEST" ]]; then
-  echo "Error: slang-test not found at $SLANG_TEST"
-  echo "Please build with coverage enabled first:"
-  echo "  cmake --preset coverage"
-  echo "  cmake --build --preset coverage"
-  exit 1
-fi
+if [[ "$REPORT_ONLY" == "true" ]]; then
+  # Report-only mode: check that profdata exists
+  echo "Report-only mode: using existing coverage data"
 
-if [[ ! -f "$LIBSLANG" ]]; then
-  echo "Error: libslang not found at $LIBSLANG"
-  exit 1
-fi
+  if [[ ! -f "$COVERAGE_DIR/slang-test.profdata" ]]; then
+    echo "Error: No existing coverage data found at $COVERAGE_DIR/slang-test.profdata"
+    echo "Run without --report-only first to collect coverage data"
+    exit 1
+  fi
 
-# Clean up old coverage data
-echo "Cleaning up old coverage data..."
-rm -rf "$COVERAGE_DIR"/*.profraw "$COVERAGE_DIR"/*.profdata
+  if [[ ! -f "$LIBSLANG" ]]; then
+    echo "Error: libslang not found at $LIBSLANG"
+    exit 1
+  fi
+else
+  # Normal mode: run tests and collect coverage
 
-# Set up coverage output in temp directory
-export LLVM_PROFILE_FILE="$COVERAGE_DIR/slang-test-%p.profraw"
+  # Check if binaries exist
+  if [[ ! -f "$SLANG_TEST" ]]; then
+    echo "Error: slang-test not found at $SLANG_TEST"
+    echo "Please build with coverage enabled first:"
+    echo "  cmake --preset coverage"
+    echo "  cmake --build --preset coverage"
+    exit 1
+  fi
 
-# Run tests
-echo
-echo "Running tests with coverage instrumentation..."
-echo "Coverage data directory: $COVERAGE_DIR"
-cd "$REPO_ROOT"
-"$SLANG_TEST" "$@"
+  if [[ ! -f "$LIBSLANG" ]]; then
+    echo "Error: libslang not found at $LIBSLANG"
+    exit 1
+  fi
 
-# Check if any profraw files were generated
-if ! ls "$COVERAGE_DIR"/slang-test-*.profraw 1>/dev/null 2>&1; then
+  # Clean up old coverage data
+  echo "Cleaning up old coverage data..."
+  rm -rf "$COVERAGE_DIR"/*.profraw "$COVERAGE_DIR"/*.profdata
+
+  # Set up coverage output in temp directory
+  export LLVM_PROFILE_FILE="$COVERAGE_DIR/slang-test-%p.profraw"
+
+  # Run tests
   echo
-  echo "Warning: No coverage data was generated."
-  echo "Make sure the binaries were built with SLANG_ENABLE_COVERAGE=ON"
-  exit 1
-fi
+  echo "Running tests with coverage instrumentation..."
+  echo "Coverage data directory: $COVERAGE_DIR"
+  cd "$REPO_ROOT"
+  "$SLANG_TEST" "${TEST_ARGS[@]}"
 
-# Merge coverage data
-echo
-echo "Merging coverage data..."
-$LLVM_PROFDATA merge -sparse "$COVERAGE_DIR"/slang-test-*.profraw -o "$COVERAGE_DIR"/slang-test.profdata
+  # Check if any profraw files were generated
+  if ! ls "$COVERAGE_DIR"/slang-test-*.profraw &>/dev/null; then
+    echo
+    echo "Warning: No coverage data was generated."
+    echo "Make sure the binaries were built with SLANG_ENABLE_COVERAGE=ON"
+    exit 1
+  fi
+
+  # Merge coverage data
+  echo
+  echo "Merging coverage data..."
+  $LLVM_PROFDATA merge -sparse "$COVERAGE_DIR"/slang-test-*.profraw -o "$COVERAGE_DIR"/slang-test.profdata
+fi
 
 # Generate summary report
 echo
@@ -128,8 +157,10 @@ if [[ "$COVERAGE_LCOV" = "1" ]]; then
   echo "  - ${COVERAGE_LCOV_FILE:-$REPO_ROOT/coverage.lcov} (LCOV format for CI tools)"
 fi
 
-# Clean up raw profraw files to save space
-echo
-echo "Cleaning up raw profile data..."
-rm -f "$COVERAGE_DIR"/*.profraw
-echo "Kept merged profile data at: $COVERAGE_DIR/slang-test.profdata"
+# Clean up raw profraw files to save space (only in normal mode)
+if [[ "$REPORT_ONLY" != "true" ]]; then
+  echo
+  echo "Cleaning up raw profile data..."
+  rm -f "$COVERAGE_DIR"/*.profraw
+  echo "Kept merged profile data at: $COVERAGE_DIR/slang-test.profdata"
+fi
