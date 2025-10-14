@@ -2791,6 +2791,38 @@ IRNativePtrType* IRBuilder::getNativePtrType(IRType* valueType)
     return (IRNativePtrType*)getType(kIROp_NativePtrType, (IRInst*)valueType);
 }
 
+// Generate basic type getter method implementations
+#if 0 // FIDDLE TEMPLATE:
+%local ir_lua = require("source/slang/slang-ir.h.lua")
+%local basic_types = ir_lua.getBasicTypesForBuilderMethods()
+%for _, type_info in ipairs(basic_types) do
+
+$(type_info.return_type) IRBuilder::get$(type_info.method_name)(
+%  for i, operand in ipairs(type_info.operands) do
+    $(operand.type) $(operand.name)
+%    if i < #type_info.operands then
+,
+%    end
+%  end
+)
+{
+    return ($(type_info.return_type))getType($(type_info.opcode)
+%  if #type_info.operands > 0 then
+,
+%  end
+%  for i, operand in ipairs(type_info.operands) do
+        $(operand.name)
+%    if i < #type_info.operands then
+,
+%    end
+%  end
+    );
+}
+%end
+#else // FIDDLE OUTPUT:
+#define FIDDLE_GENERATED_OUTPUT_ID 1
+#include "slang-ir.cpp.fiddle"
+#endif // FIDDLE END
 
 IRTargetTupleType* IRBuilder::getTargetTupleType(UInt count, IRType* const* types)
 {
@@ -2874,25 +2906,6 @@ IRResultType* IRBuilder::getResultType(IRType* valueType, IRType* errorType)
     return (IRResultType*)getType(kIROp_ResultType, 2, operands);
 }
 
-IROptionalType* IRBuilder::getOptionalType(IRType* valueType)
-{
-    return (IROptionalType*)getType(kIROp_OptionalType, valueType);
-}
-
-IRBasicBlockType* IRBuilder::getBasicBlockType()
-{
-    return (IRBasicBlockType*)getType(kIROp_BasicBlockType);
-}
-
-IRTypeKind* IRBuilder::getTypeKind()
-{
-    return (IRTypeKind*)getType(kIROp_TypeKind);
-}
-
-IRGenericKind* IRBuilder::getGenericKind()
-{
-    return (IRGenericKind*)getType(kIROp_GenericKind);
-}
 
 IRPtrType* IRBuilder::getPtrType(IRType* valueType)
 {

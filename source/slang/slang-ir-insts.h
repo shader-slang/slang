@@ -3043,7 +3043,14 @@ public:
 %local ir_lua = require("source/slang/slang-ir.h.lua")
 %local basic_types = ir_lua.getBasicTypesForBuilderMethods()
 %for _, type_info in ipairs(basic_types) do
-    $(type_info.return_type) get$(type_info.method_name)();
+    $(type_info.return_type) get$(type_info.method_name)(
+%  for i, operand in ipairs(type_info.operands) do
+        $(operand.type)* $(operand.name)
+%    if i < #type_info.operands then
+        ,
+%    end
+%  end
+    );
 %end
 #else // FIDDLE OUTPUT:
 #define FIDDLE_GENERATED_OUTPUT_ID 1
@@ -3077,17 +3084,12 @@ public:
         ArrayView<IRInst*> capture);
 
     IRResultType* getResultType(IRType* valueType, IRType* errorType);
-    IROptionalType* getOptionalType(IRType* valueType);
 
-    IRBasicBlockType* getBasicBlockType();
     IRWitnessTableType* getWitnessTableType(IRType* baseType);
     IRWitnessTableIDType* getWitnessTableIDType(IRType* baseType);
     IRType* getTypeType() { return getType(IROp::kIROp_TypeType); }
     IRType* getTypeParameterPackKind() { return getType(IROp::kIROp_TypeParameterPackKind); }
     IRType* getKeyType() { return nullptr; }
-
-    IRTypeKind* getTypeKind();
-    IRGenericKind* getGenericKind();
 
     IRPtrType* getPtrType(IRType* valueType);
     IRPtrTypeBase* getPtrType(IROp op, IRType* valueType);

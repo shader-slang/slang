@@ -302,7 +302,10 @@ end
 
 -- Collect basic type instructions for template generation
 local function getBasicTypesForBuilderMethods()
+	local insts = require("source/slang/slang-ir-insts.lua").insts
+
 	-- Define the list of basic types we want to generate getters for
+	-- Each entry can be either a string (type name) or a table {type_name, method_name}
 	local basic_types = {
 		"VoidType",
 		"BoolType",
@@ -324,17 +327,46 @@ local function getBasicTypesForBuilderMethods()
 		"NativeStringType",
 		-- Batch 1 additions - simple types with no operands
 		"CapabilitySetType",
-		"RawPointerType", 
+		"RawPointerType",
 		"RTTIType",
 		"RTTIHandleType",
 		"DynamicType",
+		-- Batch 2 additions - types that use simple getType pattern
+		"OptionalType",
+		"BasicBlockType",
+		{"TypeKind", "getTypeKind"}, -- Custom method name to maintain compatibility
+		{"GenericKind", "getGenericKind"}, -- Custom method name to maintain compatibility
 	}
 
 	local result = {}
 
-	for _, type_name in ipairs(basic_types) do
-		-- Infer method name by removing "Type" suffix and adding it back
-		local method_name = type_name:gsub("Type$", "") .. "Type"
+	for _, entry in ipairs(basic_types) do
+		-- Handle both string entries and table entries {type_name, method_name}
+		local type_name, custom_method_name
+		if type(entry) == "string" then
+			type_name = entry
+			custom_method_name = nil
+		else
+			type_name = entry[1]
+			custom_method_name = entry[2]
+		end
+
+		-- Find the instruction data in the Lua definitions
+		local inst_data = nil
+		walk_instructions(insts, function(key, value, struct_name, parent_struct)
+			if struct_name == type_name then
+				inst_data = value
+			end
+		end)
+
+		-- Determine method name
+		local method_name
+		if custom_method_name then
+			method_name = custom_method_name
+		else
+			-- Infer method name by removing "Type" suffix and adding it back
+			method_name = type_name:gsub("Type$", "") .. "Type"
+		end
 
 		-- Infer return type - specific type pointer for the struct
 		local return_type = "IR" .. type_name .. "*"
@@ -342,11 +374,24 @@ local function getBasicTypesForBuilderMethods()
 		-- Infer opcode
 		local opcode = "kIROp_" .. type_name
 
+		-- Get operands info
+		local operands = {}
+		if inst_data and inst_data.operands then
+			for i, operand in ipairs(inst_data.operands) do
+				table.insert(operands, {
+					name = operand[1],
+					type = operand[2] or "IRInst",
+					index = i - 1,
+				})
+			end
+		end
+
 		table.insert(result, {
 			struct_name = type_name,
 			method_name = method_name,
 			return_type = return_type,
 			opcode = opcode,
+			operands = operands,
 		})
 	end
 
