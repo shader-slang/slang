@@ -563,9 +563,10 @@ static SlangResult _gatherTestsForFile(
         // Log file reading failure with details (thread-safe)
         if (context && context->getTestReporter())
         {
+            // THIS IS WHERE THERE ERROR COMES FROM
             context->getTestReporter()->messageFormat(
                 TestMessageType::RunError,
-                "Failed to read test file '%s' (error: 0x%08X)",
+                "DEBUGGING: Failed to read test file '%s' (error: 0x%08X)",
                 filePath.getBuffer(),
                 (unsigned int)readResult);
         }
