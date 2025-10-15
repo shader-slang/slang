@@ -1582,7 +1582,6 @@ struct SpecializationContext
         // Once we've constructed our key, we can try to look for an
         // existing specialization of the callee that we can use.
         //
-        IRSpecializationDictionaryItem* specializedCalleeEntry = nullptr;
         IRFunc* specializedCallee =
             cast<IRFunc>(tryGetDictionaryEntry(existentialSpecializedFuncs, key));
 
@@ -2723,7 +2722,6 @@ struct SpecializationContext
                 key.vals.add(type->getExistentialArg(ii));
             }
 
-            IRSpecializationDictionaryItem* newStructTypeEntry = nullptr;
             addUsersToWorkList(type);
 
             IRStructType* newStructType =
