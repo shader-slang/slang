@@ -156,7 +156,7 @@ return {
 	["Constant.blob_constant"] = 152,
 	["CapabilitySet.capabilityConjunction"] = 153,
 	["CapabilitySet.capabilityDisjunction"] = 154,
-	["undefined"] = 155,
+	["Undefined.Poison"] = 155,
 	["defaultConstruct"] = 156,
 	["MakeDifferentialPairBase.MakeDiffPair"] = 157,
 	["MakeDifferentialPairBase.MakeDiffPairUserCode"] = 158,
@@ -680,4 +680,5 @@ return {
 	["SymbolAlias"] = 676,
 	["Decoration.InParamProxyVar"] = 677,
 	["Attr.MemoryScope"] = 678,
+	["Undefined.LoadFromUninitializedMemory"] = 679,
 }

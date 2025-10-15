@@ -752,7 +752,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
     SLANG_RELEASE_ASSERT(diffCalleeType->getParamCount() == origCall->getArgCount());
 
     auto placeholderCall =
-        builder->emitCallInst(nullptr, builder->emitUndefined(builder->getTypeKind()), 0, nullptr);
+        builder->emitCallInst(nullptr, builder->emitPoison(builder->getTypeKind()), 0, nullptr);
     builder->setInsertBefore(placeholderCall);
     IRBuilder argBuilder = *builder;
     IRBuilder afterBuilder = argBuilder;
@@ -2143,7 +2143,8 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_DefaultConstruct:
         return transcribeDefaultConstruct(builder, origInst);
 
-    case kIROp_Undefined:
+    case kIROp_Poison:
+    case kIROp_LoadFromUninitializedMemory:
         return transcribeUndefined(builder, origInst);
 
     case kIROp_Reinterpret:
