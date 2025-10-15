@@ -2676,6 +2676,23 @@ struct WGSLBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPol
     }
 };
 
+struct LLVMBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPolicy
+{
+    LLVMBufferElementTypeLoweringPolicy(
+        TargetProgram* inTarget,
+        BufferElementTypeLoweringOptions inOptions)
+        : DefaultBufferElementTypeLoweringPolicy(inTarget, inOptions)
+    {
+    }
+
+    virtual bool shouldLowerMatrixType(IRMatrixType* matrixType, TypeLoweringConfig config) override
+    {
+        SLANG_UNUSED(matrixType);
+        SLANG_UNUSED(config);
+        return true;
+    }
+};
+
 BufferElementTypeLoweringPolicy* getBufferElementTypeLoweringPolicy(
     BufferElementTypeLoweringPolicyKind kind,
     TargetProgram* target,
@@ -2691,6 +2708,8 @@ BufferElementTypeLoweringPolicy* getBufferElementTypeLoweringPolicy(
         return new MetalParameterBlockElementTypeLoweringPolicy(target, options);
     case BufferElementTypeLoweringPolicyKind::WGSL:
         return new WGSLBufferElementTypeLoweringPolicy(target, options);
+    case BufferElementTypeLoweringPolicyKind::LLVM:
+        return new LLVMBufferElementTypeLoweringPolicy(target, options);
     }
     SLANG_UNREACHABLE("unknown buffer element type lowering policy");
 }

@@ -2746,6 +2746,23 @@ bool isKernelTarget(CodeGenTarget codeGenTarget)
            ArtifactStyle::Kernel;
 }
 
+bool isLLVMTarget(TargetRequest* targetReq)
+{
+    switch (targetReq->getTarget())
+    {
+    default:
+        return false;
+
+    case CodeGenTarget::LLVMHostAssembly:
+    case CodeGenTarget::LLVMHostObjectCode:
+    case CodeGenTarget::LLVMHostHostCallable:
+    case CodeGenTarget::LLVMShaderObjectCode:
+    case CodeGenTarget::LLVMShaderAssembly:
+    case CodeGenTarget::LLVMShaderHostCallable:
+        return true;
+    }
+}
+
 SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgram)
 {
     // If we are emitting directly, there is no intermediate source language
