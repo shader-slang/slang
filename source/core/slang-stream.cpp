@@ -9,6 +9,10 @@
 #include <thread>
 #include <atomic>
 
+#ifndef _WIN32
+#include <unistd.h>
+#endif
+
 namespace Slang
 {
 
