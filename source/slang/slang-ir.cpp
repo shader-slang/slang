@@ -2770,20 +2770,6 @@ IRBasicType* IRBuilder::getBasicType(BaseType baseType)
     return (IRBasicType*)getType(IROp((UInt)kIROp_FirstBasicType + (UInt)baseType));
 }
 
-IRTargetTupleType* IRBuilder::getTargetTupleType(UInt count, IRType* const* types)
-{
-    return (IRTargetTupleType*)getType(kIROp_TargetTupleType, count, (IRInst* const*)types);
-}
-
-IRAssociatedType* IRBuilder::getAssociatedType(ArrayView<IRInterfaceType*> constraintTypes)
-{
-    return (IRAssociatedType*)getType(
-        kIROp_AssociatedType,
-        constraintTypes.getCount(),
-        (IRInst**)constraintTypes.getBuffer());
-}
-
-
 IRAnyValueType* IRBuilder::getAnyValueType(IRIntegerValue size)
 {
     return (IRAnyValueType*)getType(kIROp_AnyValueType, getIntValue(getUIntType(), size));
@@ -2806,11 +2792,6 @@ IRTupleType* IRBuilder::getTupleType(IRType* type0, IRType* type1, IRType* type2
 {
     IRType* operands[] = {type0, type1, type2, type3};
     return getTupleType(SLANG_COUNT_OF(operands), operands);
-}
-
-IRTypePack* IRBuilder::getTypePack(UInt count, IRType* const* types)
-{
-    return (IRTypePack*)getType(kIROp_TypePack, count, (IRInst* const*)types);
 }
 
 IRExpandTypeOrVal* IRBuilder::getExpandTypeOrVal(
@@ -2959,19 +2940,6 @@ IRArrayTypeBase* IRBuilder::getArrayTypeBase(
     }
 }
 
-IRArrayType* IRBuilder::getArrayType(IRType* elementType, IRInst* elementCount)
-{
-    IRInst* operands[] = {elementType, elementCount};
-    return (IRArrayType*)getType(kIROp_ArrayType, sizeof(operands) / sizeof(operands[0]), operands);
-}
-
-IRUnsizedArrayType* IRBuilder::getUnsizedArrayType(IRType* elementType)
-{
-    IRInst* operands[] = {elementType};
-    return (IRUnsizedArrayType*)
-        getType(kIROp_UnsizedArrayType, sizeof(operands) / sizeof(operands[0]), operands);
-}
-
 IRArrayType* IRBuilder::getArrayType(IRType* elementType, IRInst* elementCount, IRInst* stride)
 {
     IRInst* operands[] = {elementType, elementCount, stride};
@@ -2985,36 +2953,10 @@ IRUnsizedArrayType* IRBuilder::getUnsizedArrayType(IRType* elementType, IRInst* 
         getType(kIROp_UnsizedArrayType, sizeof(operands) / sizeof(operands[0]), operands);
 }
 
-IRVectorType* IRBuilder::getVectorType(IRType* elementType, IRInst* elementCount)
-{
-    IRInst* operands[] = {elementType, elementCount};
-    return (
-        IRVectorType*)getType(kIROp_VectorType, sizeof(operands) / sizeof(operands[0]), operands);
-}
-
 IRVectorType* IRBuilder::getVectorType(IRType* elementType, IRIntegerValue elementCount)
 {
     return getVectorType(elementType, getIntValue(getIntType(), elementCount));
 }
-
-IRCoopVectorType* IRBuilder::getCoopVectorType(IRType* elementType, IRInst* elementCount)
-{
-    IRInst* operands[] = {elementType, elementCount};
-    return (IRCoopVectorType*)
-        getType(kIROp_CoopVectorType, sizeof(operands) / sizeof(operands[0]), operands);
-}
-
-IRMatrixType* IRBuilder::getMatrixType(
-    IRType* elementType,
-    IRInst* rowCount,
-    IRInst* columnCount,
-    IRInst* layout)
-{
-    IRInst* operands[] = {elementType, rowCount, columnCount, layout};
-    return (
-        IRMatrixType*)getType(kIROp_MatrixType, sizeof(operands) / sizeof(operands[0]), operands);
-}
-
 
 IRTorchTensorType* IRBuilder::getTorchTensorType(IRType* elementType)
 {
@@ -3076,18 +3018,6 @@ IRFuncType* IRBuilder::getFuncType(
     UInt counts[3] = {1, paramCount, 1};
     IRInst** lists[3] = {(IRInst**)&resultType, (IRInst**)paramTypes, (IRInst**)&attribute};
     return (IRFuncType*)createIntrinsicInst(nullptr, kIROp_FuncType, 3, counts, lists);
-}
-
-IRWitnessTableType* IRBuilder::getWitnessTableType(IRType* baseType)
-{
-    return (IRWitnessTableType*)
-        createIntrinsicInst(nullptr, kIROp_WitnessTableType, 1, (IRInst* const*)&baseType);
-}
-
-IRWitnessTableIDType* IRBuilder::getWitnessTableIDType(IRType* baseType)
-{
-    return (IRWitnessTableIDType*)
-        createIntrinsicInst(nullptr, kIROp_WitnessTableIDType, 1, (IRInst* const*)&baseType);
 }
 
 IRConstantBufferType* IRBuilder::getConstantBufferType(IRType* elementType, IRType* layoutType)

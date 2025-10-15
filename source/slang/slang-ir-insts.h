@@ -3177,18 +3177,14 @@ $(type_info.return_type) $(type_info.method_name)(
 #include "slang-ir-insts.h.fiddle"
 #endif // FIDDLE END
 
-    IRAssociatedType* getAssociatedType(ArrayView<IRInterfaceType*> constraintTypes);
 
     IRAnyValueType* getAnyValueType(IRIntegerValue size);
 
-    IRTargetTupleType* getTargetTupleType(UInt count, IRType* const* types);
 
     // Keep the 1,2,3,4 parameter helper methods as requested
     IRTupleType* getTupleType(IRType* type0, IRType* type1);
     IRTupleType* getTupleType(IRType* type0, IRType* type1, IRType* type2);
     IRTupleType* getTupleType(IRType* type0, IRType* type1, IRType* type2, IRType* type3);
-
-    IRTypePack* getTypePack(UInt count, IRType* const* types);
 
     IRExpandTypeOrVal* getExpandTypeOrVal(
         IRType* type,
@@ -3196,8 +3192,6 @@ $(type_info.return_type) $(type_info.method_name)(
         ArrayView<IRInst*> capture);
 
 
-    IRWitnessTableType* getWitnessTableType(IRType* baseType);
-    IRWitnessTableIDType* getWitnessTableIDType(IRType* baseType);
     IRType* getTypeType() { return getType(IROp::kIROp_TypeType); }
     IRType* getTypeParameterPackKind() { return getType(IROp::kIROp_TypeParameterPackKind); }
     IRType* getKeyType() { return nullptr; }
@@ -3272,25 +3266,10 @@ $(type_info.return_type) $(type_info.method_name)(
         IRInst* elementCount,
         IRInst* stride = nullptr);
 
-    IRArrayType* getArrayType(IRType* elementType, IRInst* elementCount);
-
-    IRUnsizedArrayType* getUnsizedArrayType(IRType* elementType);
-
+    // Keep the stride versions and IRIntegerValue version as they have different signatures
     IRArrayType* getArrayType(IRType* elementType, IRInst* elementCount, IRInst* stride);
-
     IRUnsizedArrayType* getUnsizedArrayType(IRType* elementType, IRInst* stride);
-
-    IRVectorType* getVectorType(IRType* elementType, IRInst* elementCount);
-
     IRVectorType* getVectorType(IRType* elementType, IRIntegerValue elementCount);
-
-    IRCoopVectorType* getCoopVectorType(IRType* elementType, IRInst* elementCount);
-
-    IRMatrixType* getMatrixType(
-        IRType* elementType,
-        IRInst* rowCount,
-        IRInst* columnCount,
-        IRInst* layout);
 
     IRTorchTensorType* getTorchTensorType(IRType* elementType);
 

@@ -392,6 +392,19 @@ local function getBasicTypesForBuilderMethods()
 		"ThisType",
 		-- Batch 11 additions - variadic types
 		"TupleType",
+		-- Batch 12 additions - more variadic and single operand types
+		"TypePack",
+		"TargetTupleType", 
+		"AssociatedType",
+		"WitnessTableType",
+		"WitnessTableIDType",
+		-- Note: TypeType already handled by getTypeType() inline
+		-- These types already have operand definitions and can be auto-generated
+		"ArrayType",
+		"UnsizedArrayType", 
+		"VectorType",
+		"MatrixType",
+		"CoopVectorType",
 	}
 
 	local result = {}

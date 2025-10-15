@@ -529,7 +529,7 @@ local insts = {
 				class = { struct_name = "ClassType", parent = true },
 			},
 			{ interface = { struct_name = "InterfaceType", global = true } },
-			{ associated_type = { hoistable = true } },
+			{ associated_type = { struct_name = "AssociatedType", operands = { "constraintTypes", "IRInterfaceType", variadic = true }, hoistable = true } },
 			{ this_type = { operands = { { "interfaceType", "IRType" } }, hoistable = true } },
 			-- Represents the IR type for an `IRRTTIObject`.
 			{ rtti_type = { struct_name = "RTTIType", hoistable = true } },
@@ -550,11 +550,11 @@ local insts = {
 					-- Represents a type pack. Type packs behave like tuples, but they have a
 					-- "flattening" semantics, so that MakeTypePack(MakeTypePack(T1,T2), T3) is
 					-- MakeTypePack(T1,T2,T3).
-					{ TypePack = {} },
+					{ TypePack = { operands = { "types", "IRType", variadic = true } } },
 				},
 			},
 			-- Represents a tuple in target language. TargetTupleType will not be lowered to structs.
-			{ TargetTuple = { struct_name = "TargetTupleType", hoistable = true } },
+			{ TargetTuple = { struct_name = "TargetTupleType", operands = { "types", "IRType", variadic = true }, hoistable = true } },
 			{ ExpandTypeOrVal = { operands = { { "type" } }, hoistable = true } },
 			{
 				spirvLiteralType = {
@@ -580,7 +580,7 @@ local insts = {
 						witness_table_t = {
 							-- An `IRWitnessTable` has type `WitnessTableType`.
 							struct_name = "WitnessTableType",
-							min_operands = 1,
+							operands = { { "baseType", "IRType" } },
 						},
 					},
 					{
@@ -590,7 +590,7 @@ local insts = {
 							-- during the lower-generics pass while generating dynamic dispatch
 							-- code and will eventually lower into an uint type.
 							struct_name = "WitnessTableIDType",
-							min_operands = 1,
+							operands = { { "baseType", "IRType" } },
 						},
 					},
 				},
