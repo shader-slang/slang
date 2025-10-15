@@ -1109,28 +1109,33 @@ static String _getExecutablePath()
 SlangResult File::readAllText(const Slang::String& fileName, String& outText)
 {
     RefPtr<FileStream> stream(new FileStream);
-    fprintf(
-        stderr,
-        "DEBUGGING: Initializing stream for file '%s'\n",
-        fileName.getBuffer());
-    SLANG_RETURN_ON_FAIL(
-        stream->init(fileName, FileMode::Open, FileAccess::Read, FileShare::ReadWrite));
+    if (SLANG_FAILED(
+        stream->init(fileName, FileMode::Open, FileAccess::Read, FileShare::ReadWrite)))
+    {
+        fprintf(
+            stderr,
+            "DEBUGGING: Failed to initialize stream for file '%s'\n",
+            fileName.getBuffer());
+        return SLANG_FAIL;
+    }
 
     StreamReader reader;
-    fprintf(
-        stderr,
-        "DEBUGGING: Initializing reader for file '%s'\n",
-        fileName.getBuffer());
-    SLANG_RETURN_ON_FAIL(reader.init(stream));
-    fprintf(
-        stderr,
-        "DEBUGGING: Reading to end of file '%s'\n",
-        fileName.getBuffer());
-    SLANG_RETURN_ON_FAIL(reader.readToEnd(outText));
-    fprintf(
-        stderr,
-        "DEBUGGING: Successfully read to end of file '%s'\n",
-        fileName.getBuffer());
+    if (SLANG_FAILED(reader.init(stream)))
+    {
+        fprintf(
+            stderr,
+            "DEBUGGING: Failed to initialize reader for file '%s'\n",
+            fileName.getBuffer());
+        return SLANG_FAIL;
+    }
+    if (SLANG_FAILED(reader.readToEnd(outText)))
+    {
+        fprintf(
+            stderr,
+            "DEBUGGING: Failed to read to end of file '%s'\n",
+            fileName.getBuffer());
+        return SLANG_FAIL;
+    }
 
     return SLANG_OK;
 }
