@@ -262,8 +262,16 @@ SlangResult FileStream::read(void* buffer, size_t length, size_t& outBytesRead)
                     // Only print first 10 occurrences to avoid log spam
                     if (count <= 10)
                     {
-                        fprintf(stderr, "DEBUGGING: ferror() #%d triggered during read, errno=%d (%s), fd=%d\n", 
-                                count, errno, strerror(errno), fileno(m_handle));
+                        int fd = fileno(m_handle);
+                        // Try to get the file path from /proc/self/fd (Linux/macOS)
+                        char linkpath[64];
+                        char filepath[1024] = "<unknown>";
+                        snprintf(linkpath, sizeof(linkpath), "/dev/fd/%d", fd);
+                        #ifndef _WIN32
+                        readlink(linkpath, filepath, sizeof(filepath)-1);
+                        #endif
+                        fprintf(stderr, "DEBUGGING: ferror() #%d triggered during read, errno=%d (%s), fd=%d, file='%s'\n", 
+                                count, errno, strerror(errno), fd, filepath);
                     }
                     else if (count == 11)
                     {
