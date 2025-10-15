@@ -2786,17 +2786,22 @@ $(type_info.return_type) IRBuilder::$(type_info.method_name)(
 %  end
 )
 {
-    return ($(type_info.return_type))getType($(type_info.opcode)
-%  if #type_info.operands > 0 then
-,
-%  end
-%  for i, operand in ipairs(type_info.operands) do
+%  if #type_info.operands == 0 then
+    return ($(type_info.return_type))getType($(type_info.opcode)    );
+%  elseif #type_info.operands == 1 then
+    return ($(type_info.return_type))getType($(type_info.opcode),
+$(type_info.operands[1].name)    );
+%  else
+    IRInst* operands[] = {
+%    for i, operand in ipairs(type_info.operands) do
         $(operand.name)
-%    if i < #type_info.operands then
+%      if i < #type_info.operands then
 ,
+%      end
 %    end
+    };
+    return ($(type_info.return_type))getType($(type_info.opcode), $(#type_info.operands), operands);
 %  end
-    );
 }
 %end
 #else // FIDDLE OUTPUT:
@@ -2816,7 +2821,6 @@ IRAssociatedType* IRBuilder::getAssociatedType(ArrayView<IRInterfaceType*> const
         constraintTypes.getCount(),
         (IRInst**)constraintTypes.getBuffer());
 }
-
 
 
 IRThisType* IRBuilder::getThisType(IRType* interfaceType)
@@ -2874,12 +2878,10 @@ IRExpandTypeOrVal* IRBuilder::getExpandTypeOrVal(
 }
 
 
-
 IRPtrType* IRBuilder::getPtrType(IRType* valueType)
 {
     return (IRPtrType*)getPtrType(kIROp_PtrType, valueType);
 }
-
 
 
 IRRefParamType* IRBuilder::getRefParamType(IRType* valueType, AddressSpace addrSpace)
@@ -2913,7 +2915,8 @@ IRSPIRVLiteralType* IRBuilder::getSPIRVLiteralType(IRType* type)
 IRGLSLOutputParameterGroupType* IRBuilder::getGLSLOutputParameterGroupType(IRType* elementType)
 {
     IRInst* operands[] = {elementType};
-    return (IRGLSLOutputParameterGroupType*)getType(kIROp_GLSLOutputParameterGroupType, 1, operands);
+    return (
+        IRGLSLOutputParameterGroupType*)getType(kIROp_GLSLOutputParameterGroupType, 1, operands);
 }
 
 IRPtrTypeBase* IRBuilder::getPtrType(IROp op, IRType* valueType)
@@ -3062,7 +3065,6 @@ IRMatrixType* IRBuilder::getMatrixType(
 }
 
 
-
 IRTorchTensorType* IRBuilder::getTorchTensorType(IRType* elementType)
 {
     return (IRTorchTensorType*)getType(kIROp_TorchTensorType, 1, (IRInst**)&elementType);
@@ -3142,9 +3144,6 @@ IRConstantBufferType* IRBuilder::getConstantBufferType(IRType* elementType, IRTy
     IRInst* operands[] = {elementType, layoutType};
     return (IRConstantBufferType*)getType(kIROp_ConstantBufferType, 2, operands);
 }
-
-
-
 
 
 IRType* IRBuilder::getBindExistentialsType(
