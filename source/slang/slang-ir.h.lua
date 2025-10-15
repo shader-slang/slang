@@ -355,6 +355,13 @@ local function getBasicTypesForBuilderMethods()
 		"CBufferLayoutType",
 		"TextureShape2DType",
 		"TextureShape3DType",
+		-- Batch 7 additions - types with single operands
+		"NativePtrType",
+		"RTTIPointerType", 
+		"AnyValueType",
+		"ComPtrType",
+		"ArrayListType",
+		"TensorViewType",
 	}
 
 	local result = {}

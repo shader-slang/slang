@@ -3056,13 +3056,10 @@ public:
 #define FIDDLE_GENERATED_OUTPUT_ID 1
 #include "slang-ir-insts.h.fiddle"
 #endif // FIDDLE END
-    IRNativePtrType* getNativePtrType(IRType* valueType);
 
     IRAssociatedType* getAssociatedType(ArrayView<IRInterfaceType*> constraintTypes);
     IRThisType* getThisType(IRType* interfaceType);
-    IRRTTIPointerType* getRTTIPointerType(IRInst* rttiPtr);
     IRAnyValueType* getAnyValueType(IRIntegerValue size);
-    IRAnyValueType* getAnyValueType(IRInst* size);
 
     IRTargetTupleType* getTargetTupleType(UInt count, IRType* const* types);
 
@@ -3097,10 +3094,10 @@ public:
     // Form a ptr type to `valueType` using the same opcode and address space as `ptrWithAddrSpace`.
     IRPtrTypeBase* getPtrTypeWithAddressSpace(IRType* valueType, IRPtrTypeBase* ptrWithAddrSpace);
 
-    IROutParamType* getOutParamType(IRType* valueType);
-    IRBorrowInOutParamType* getBorrowInOutParamType(IRType* valueType);
     IRRefParamType* getRefParamType(IRType* valueType, AddressSpace addrSpace);
     IRBorrowInParamType* getBorrowInParamType(IRType* valueType, AddressSpace addrSpace);
+    IROutParamType* getOutParamType(IRType* valueType);
+    IRBorrowInOutParamType* getBorrowInOutParamType(IRType* valueType);
     IRPtrType* getPtrType(
         IROp op,
         IRType* valueType,
@@ -3148,7 +3145,6 @@ public:
         IRInst* isCombined,
         IRInst* format);
 
-    IRComPtrType* getComPtrType(IRType* valueType);
 
     /// Get a 'SPIRV literal'
     IRSPIRVLiteralType* getSPIRVLiteralType(IRType* type);
@@ -3179,8 +3175,6 @@ public:
         IRInst* columnCount,
         IRInst* layout);
 
-    IRArrayListType* getArrayListType(IRType* elementType);
-    IRTensorViewType* getTensorViewType(IRType* elementType);
     IRTorchTensorType* getTorchTensorType(IRType* elementType);
 
     IRDifferentialPairType* getDifferentialPairType(IRType* valueType, IRInst* witnessTable);

@@ -2770,10 +2770,6 @@ IRBasicType* IRBuilder::getBasicType(BaseType baseType)
     return (IRBasicType*)getType(IROp((UInt)kIROp_FirstBasicType + (UInt)baseType));
 }
 
-IRNativePtrType* IRBuilder::getNativePtrType(IRType* valueType)
-{
-    return (IRNativePtrType*)getType(kIROp_NativePtrType, (IRInst*)valueType);
-}
 
 // Generate basic type getter method implementations
 #if 0 // FIDDLE TEMPLATE:
@@ -2821,14 +2817,11 @@ IRAssociatedType* IRBuilder::getAssociatedType(ArrayView<IRInterfaceType*> const
         (IRInst**)constraintTypes.getBuffer());
 }
 
+
+
 IRThisType* IRBuilder::getThisType(IRType* interfaceType)
 {
     return (IRThisType*)getType(kIROp_ThisType, interfaceType);
-}
-
-IRRTTIPointerType* IRBuilder::getRTTIPointerType(IRInst* rttiPtr)
-{
-    return (IRRTTIPointerType*)getType(kIROp_RTTIPointerType, rttiPtr);
 }
 
 IRAnyValueType* IRBuilder::getAnyValueType(IRIntegerValue size)
@@ -2836,10 +2829,6 @@ IRAnyValueType* IRBuilder::getAnyValueType(IRIntegerValue size)
     return (IRAnyValueType*)getType(kIROp_AnyValueType, getIntValue(getUIntType(), size));
 }
 
-IRAnyValueType* IRBuilder::getAnyValueType(IRInst* size)
-{
-    return (IRAnyValueType*)getType(kIROp_AnyValueType, size);
-}
 
 IRTupleType* IRBuilder::getTupleType(UInt count, IRType* const* types)
 {
@@ -2896,15 +2885,7 @@ IRPtrType* IRBuilder::getPtrType(IRType* valueType)
     return (IRPtrType*)getPtrType(kIROp_PtrType, valueType);
 }
 
-IROutParamType* IRBuilder::getOutParamType(IRType* valueType)
-{
-    return (IROutParamType*)getPtrType(kIROp_OutParamType, valueType);
-}
 
-IRBorrowInOutParamType* IRBuilder::getBorrowInOutParamType(IRType* valueType)
-{
-    return (IRBorrowInOutParamType*)getPtrType(kIROp_BorrowInOutParamType, valueType);
-}
 
 IRRefParamType* IRBuilder::getRefParamType(IRType* valueType, AddressSpace addrSpace)
 {
@@ -2916,6 +2897,16 @@ IRBorrowInParamType* IRBuilder::getBorrowInParamType(IRType* valueType, AddressS
 {
     return (IRBorrowInParamType*)
         getPtrType(kIROp_BorrowInParamType, valueType, AccessQualifier::Read, addrSpace);
+}
+
+IROutParamType* IRBuilder::getOutParamType(IRType* valueType)
+{
+    return (IROutParamType*)getPtrType(kIROp_OutParamType, valueType);
+}
+
+IRBorrowInOutParamType* IRBuilder::getBorrowInOutParamType(IRType* valueType)
+{
+    return (IRBorrowInOutParamType*)getPtrType(kIROp_BorrowInOutParamType, valueType);
 }
 
 IRSPIRVLiteralType* IRBuilder::getSPIRVLiteralType(IRType* type)
@@ -2994,10 +2985,6 @@ IRTextureTypeBase* IRBuilder::getTextureType(
         args));
 }
 
-IRComPtrType* IRBuilder::getComPtrType(IRType* valueType)
-{
-    return (IRComPtrType*)getType(kIROp_ComPtrType, valueType);
-}
 
 IRArrayTypeBase* IRBuilder::getArrayTypeBase(
     IROp op,
@@ -3073,15 +3060,7 @@ IRMatrixType* IRBuilder::getMatrixType(
         IRMatrixType*)getType(kIROp_MatrixType, sizeof(operands) / sizeof(operands[0]), operands);
 }
 
-IRArrayListType* IRBuilder::getArrayListType(IRType* elementType)
-{
-    return (IRArrayListType*)getType(kIROp_ArrayListType, 1, (IRInst**)&elementType);
-}
 
-IRTensorViewType* IRBuilder::getTensorViewType(IRType* elementType)
-{
-    return (IRTensorViewType*)getType(kIROp_TensorViewType, 1, (IRInst**)&elementType);
-}
 
 IRTorchTensorType* IRBuilder::getTorchTensorType(IRType* elementType)
 {
