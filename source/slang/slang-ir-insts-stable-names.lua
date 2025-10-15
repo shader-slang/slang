@@ -681,4 +681,18 @@ return {
 	["Decoration.InParamProxyVar"] = 677,
 	["Attr.MemoryScope"] = 678,
 	["Undefined.LoadFromUninitializedMemory"] = 679,
+  	["TypeFlowData.CollectionBase.TypeCollection"] = 680,
+	["TypeFlowData.CollectionBase.FuncCollection"] = 681,
+	["TypeFlowData.CollectionBase.TableCollection"] = 682,
+	["TypeFlowData.CollectionBase.GenericCollection"] = 683,
+	["TypeFlowData.UnboundedCollection"] = 684,
+	["TypeFlowData.CollectionTagType"] = 685,
+	["TypeFlowData.CollectionTaggedUnionType"] = 686,
+	["CastInterfaceToTaggedUnionPtr"] = 687,
+	["CastTaggedUnionToInterfacePtr"] = 688,
+	["GetTagForSuperCollection"] = 689,
+	["GetTagForMappedCollection"] = 690,
+	["GetTagForSpecializedCollection"] = 691,
+	["GetTagFromSequentialID"] = 692,
+	["GetSequentialIDFromTag"] = 693
 }

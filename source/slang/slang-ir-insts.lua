@@ -2236,6 +2236,106 @@ local insts = {
 			},
 		},
 	},
+	{
+		TypeFlowData = {
+			-- A collection of IR instructions used for propagation analysis.
+			hoistable = true,
+			{
+				CollectionBase = {
+					-- Base class for all collection types.
+					--
+					-- Semantically, collections model sets of concrete values, and use Slang's de-duplication infrastructure
+					-- to allow set-equality to be the same as inst identity.
+					--
+					-- - Collection ops have one or more operands that represent the elements of the collection
+					--
+					-- - Collection ops must have at least one operand. A zero-operand collection is illegal.
+					--   The type-flow pass will represent this case using nullptr, so that uniqueness is preserved.
+					--
+					-- - All operands of a collection _must_ be concrete, individual insts 
+					--      - Operands should NOT be an interface or abstract type.
+					--      - Operands should NOT be type parameters or existentail types (i.e. insts that appear in blocks)
+					--      - Operands should NOT be collections (i.e. collections should be flat and never heirarchical)
+					-- 
+					-- - Since collections are hositable, collection ops should (consequently) only appear in the global scope.
+					--
+					-- - Collection operands must be consistently sorted. i.e. a TypeCollection(A, B) and TypeCollection(B, A)
+					--   cannot exist at the same time, but either one is okay.
+					--
+					-- - To help with the implementation of collections, the CollectionBuilder class is provided
+					--   in slang-ir-typeflow-collection.h.
+					--   All collection insts must be built using the CollectionBuilder, which uses a persistent map on the module
+					--   inst to ensure stable ordering.
+					--
+					{ TypeCollection = {} },
+					{ FuncCollection = {} },
+					{ TableCollection = {} }, -- TODO: Rename to WitnessTableCollection
+					{ GenericCollection = {} },
+				},
+			},
+			{ UnboundedCollection = {
+				--
+				-- A catch-all opcode to represent unbounded collections during
+				-- the type-flow specialization pass.
+				-- 
+				-- This op is usually used to mark insts that can contain a dynamic type
+				-- whose information cannot be gleaned from the type-flow analysis.
+				--
+				-- E.g. COM interface objects, whose implementations can be fully external to
+				-- the linkage
+				-- 
+				-- This op is only used to denote that an inst is unbounded so the specialization
+				-- pass does not attempt to specialize it. It should not appear in the code after
+				-- the specialization pass.
+				--
+				-- TODO: Consider the scenario where we can combine the unbounded case with known cases.
+				--       unbounded collection should probably be an element and not a separate op.
+			} },
+			{ CollectionTagType = {
+				-- Represents a tag-type for a collection.
+				--
+				-- An inst whose type is CollectionTagType(collection) is semantically carrying a 
+				-- run-time value that "picks" one of the elements of the collection operand.
+				--
+				-- Only operand is a CollectionBase
+			} }, 
+			{ CollectionTaggedUnionType = {
+				-- Represents a tagged union type.
+				--
+				-- An inst whose type is a CollectionTaggedUnionType(typeCollection, tableCollection) is semantically carrying a tuple of 
+				-- two values: a value of CollectionTagType(tableCollection) to represent the tag, and a payload value of type 
+				-- typeCollection (which conceptually represents a union/"anyvalue" type)
+				--
+				-- This is most commonly used to specialize the type of existential insts once the possibilities can be statically determined.
+				-- 
+				-- Operands are a TypeCollection and a TableCollection that represent the possibilities of the existential
+			} } 
+		},
+	},
+	{ CastInterfaceToTaggedUnionPtr = {
+		-- Cast an interface-typed pointer to a tagged-union pointer with a known set.
+	} }, 
+	{ CastTaggedUnionToInterfacePtr = {
+		-- Cast a tagged-union pointer with a known set to a corresponding interface-typed pointer.
+	} }, 
+	{ GetTagForSuperCollection = {
+		-- Translate a tag from a set to its equivalent in a super-set
+	} }, 
+	{ GetTagForMappedCollection = {
+		-- Translate a tag from a set to its equivalent in a different set
+		-- based on a mapping induced by a lookup key
+	} },
+	{ GetTagForSpecializedCollection = { 
+		-- Translate a tag from a generic set to its equivalent in a specialized set
+		-- based on a mapping that is encoded in the operands of this tag instruction
+	} },
+	{ GetTagFromSequentialID = {
+		-- Translate an existing sequential ID (a 'global' ID) & and interface type into a tag
+	    -- the provided collection (a 'local' ID)
+	} }, 
+	{ GetSequentialIDFromTag = {
+		-- Translate a tag from the given collection (a 'local' ID) to a sequential ID (a 'global' ID)
+	} }
 }
 
 -- A function to calculate some useful properties and put it in the table,
