@@ -7,9 +7,13 @@
 
 #include <stdio.h>
 #include <thread>
+#include <atomic>
 
 namespace Slang
 {
+
+// DEBUG: Track ferror count to avoid log spam
+static std::atomic<int> g_ferrorCount(0);
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FileStream !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -254,8 +258,17 @@ SlangResult FileStream::read(void* buffer, size_t length, size_t& outBytesRead)
                 // DEBUG: Check for ferror to see what's wrong
                 if (ferror(m_handle))
                 {
-                    fprintf(stderr, "DEBUGGING: ferror() triggered during read, errno=%d (%s)\n", 
-                            errno, strerror(errno));
+                    int count = ++g_ferrorCount;
+                    // Only print first 10 occurrences to avoid log spam
+                    if (count <= 10)
+                    {
+                        fprintf(stderr, "DEBUGGING: ferror() #%d triggered during read, errno=%d (%s), fd=%d\n", 
+                                count, errno, strerror(errno), fileno(m_handle));
+                    }
+                    else if (count == 11)
+                    {
+                        fprintf(stderr, "DEBUGGING: ferror() suppressing further messages (count=%d)\n", count);
+                    }
                 }
                 return SLANG_FAIL;
             }
