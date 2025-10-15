@@ -3537,7 +3537,7 @@ __prefix T operator ~(T v0);
 // IR level type traits.
 
 __generic<T>
-__intrinsic_op($(kIROp_Undefined))
+__intrinsic_op($(kIROp_Poison)) // Note: attempting to actually *use* the result of `__declVal()` will always be invalid.
 T __declVal();
 
 __generic<T>

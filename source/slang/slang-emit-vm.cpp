@@ -492,8 +492,12 @@ public:
     {
         switch (inst->getOp())
         {
-        case kIROp_Undefined:
+        case kIROp_Poison:
+        case kIROp_LoadFromUninitializedMemory:
             {
+                // We basically handle an undefined value by allocating a
+                // temporary and then not initializing it.
+                //
                 ensureWorkingsetMemory(funcBuilder, inst);
             }
             break;
