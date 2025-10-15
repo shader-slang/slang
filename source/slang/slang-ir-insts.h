@@ -3239,16 +3239,6 @@ public:
     }
 
 
-    IRMetalMeshType* getMetalMeshType(
-        IRType* vertexType,
-        IRType* primitiveType,
-        IRInst* numVertices,
-        IRInst* numPrimitives,
-        IRInst* topology)
-    {
-        IRInst* ops[5] = {vertexType, primitiveType, numVertices, numPrimitives, topology};
-        return (IRMetalMeshType*)getType(kIROp_MetalMeshType, 5, ops);
-    }
 
     IRInst* emitSymbolAlias(IRInst* aliasedSymbol);
 
