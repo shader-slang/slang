@@ -356,7 +356,7 @@ local function getBasicTypesForBuilderMethods()
 		"MetalMeshGridPropertiesType",
 		-- Batch 4 additions - rate types
 		"ConstExprRate",
-		"GroupSharedRate", 
+		"GroupSharedRate",
 		"ActualGlobalRate",
 		"SpecConstRate",
 		-- Batch 5 additions - layout types and other simple types
@@ -367,25 +367,25 @@ local function getBasicTypesForBuilderMethods()
 		"Std140BufferLayoutType",
 		-- Batch 6 additions - more layout and texture shape types
 		"Std430BufferLayoutType",
-		"ScalarBufferLayoutType", 
+		"ScalarBufferLayoutType",
 		"CBufferLayoutType",
 		"TextureShape2DType",
 		"TextureShape3DType",
 		-- Batch 7 additions - types with single operands
 		"NativePtrType",
-		"RTTIPointerType", 
+		"RTTIPointerType",
 		"AnyValueType",
 		"ComPtrType",
 		"ArrayListType",
 		"TensorViewType",
-		-- Batch 8 additions - single operand types that currently use arrays  
+		-- Batch 8 additions - single operand types that currently use arrays
 		-- Note: GLSLOutputParameterGroupType has operand definition mismatch - reverted
 		"PseudoPtrType",
 		-- Batch 9 additions - multi-parameter types with proper operand definitions
 		"ResultType",
 		"RateQualifiedType",
 		"MetalMeshType",
-		-- Batch 10 additions - types with matching operand definitions  
+		-- Batch 10 additions - types with matching operand definitions
 		-- Note: AttributedType uses dynamic operand list - can't convert
 		-- Note: BackwardDiffIntermediateContextType has null->void conversion logic - can't convert
 		-- Note: RefParamType and BorrowInParamType use getPtrType() instead of getType() - can't convert
@@ -394,14 +394,15 @@ local function getBasicTypesForBuilderMethods()
 		"TupleType",
 		-- Batch 12 additions - more variadic and single operand types
 		"TypePack",
-		"TargetTupleType", 
+		"TargetTupleType",
 		"AssociatedType",
+		-- these don't have type type
 		"WitnessTableType",
 		"WitnessTableIDType",
 		-- Note: TypeType already handled by getTypeType() inline
 		-- These types already have operand definitions and can be auto-generated
 		"ArrayType",
-		"UnsizedArrayType", 
+		"UnsizedArrayType",
 		"VectorType",
 		"MatrixType",
 		"CoopVectorType",
@@ -463,7 +464,11 @@ local function getBasicTypesForBuilderMethods()
 						is_variadic = true
 						-- Variadic and optional operands together are not supported for now
 						if has_optional then
-							error("Type " .. type_name .. " has both variadic and optional operands, which is not supported")
+							error(
+								"Type "
+									.. type_name
+									.. " has both variadic and optional operands, which is not supported"
+							)
 						end
 					end
 					-- Check if this operand is optional
@@ -474,7 +479,13 @@ local function getBasicTypesForBuilderMethods()
 					else
 						-- Non-optional operand found after optional operands started
 						if optional_started then
-							error("Type " .. type_name .. " has non-optional operand '" .. operand[1] .. "' after optional operands. Optional operands must be at the end.")
+							error(
+								"Type "
+									.. type_name
+									.. " has non-optional operand '"
+									.. operand[1]
+									.. "' after optional operands. Optional operands must be at the end."
+							)
 						end
 					end
 					table.insert(operands, operand_info)

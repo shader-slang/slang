@@ -3077,7 +3077,7 @@ $(type_info.return_type) $(type_info.method_name)(
 {
 %      if #current_operands == 0 then
     return ($(type_info.return_type))createIntrinsicInst(
-        getTypeType(),
+        nullptr,
         $(type_info.opcode),
         0,
         nullptr,
@@ -3098,7 +3098,7 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* const* operandLists[] = { (IRInst* const*)operandArray };
 %        end
     return ($(type_info.return_type))createIntrinsicInst(
-        getTypeType(),
+        nullptr,
         $(type_info.opcode),
         1,
         operandCounts,
@@ -3158,7 +3158,7 @@ $(type_info.return_type) $(type_info.method_name)(
 %    end
     };
     return ($(type_info.return_type))createIntrinsicInst(
-        getTypeType(),
+        nullptr,
         $(type_info.opcode),
         $(#operand_lists),
         operandCounts,
@@ -3206,7 +3206,7 @@ $(type_info.return_type) $(type_info.method_name)(
 {
 %    if #type_info.operands == 0 then
     return ($(type_info.return_type))createIntrinsicInst(
-        getTypeType(),
+        nullptr,
         $(type_info.opcode),
         0,
         nullptr,
@@ -3227,7 +3227,7 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* const* operandLists[] = { (IRInst* const*)operandArray };
 %      end
     return ($(type_info.return_type))createIntrinsicInst(
-        getTypeType(),
+        nullptr,
         $(type_info.opcode),
         1,
         operandCounts,
