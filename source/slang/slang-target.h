@@ -93,6 +93,9 @@ bool isWGPUTarget(CodeGenTarget target);
 // Are we generating code for a Kernel-style target (as opposed to host-style target)
 bool isKernelTarget(CodeGenTarget codeGenTarget);
 
+// Are we generating code for LLVM IR
+bool isLLVMTarget(TargetRequest* targetReq);
+
 /// A request to generate output in some target format.
 class TargetRequest : public RefObject
 {
