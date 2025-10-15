@@ -449,12 +449,11 @@ static int pipeCLOEXEC(int pipefd[2])
 
     // Make sure that none of our pipes are going to be clobbered by dup2 to
     // 0,1,2 in the child.
-    // Use F_DUPFD_CLOEXEC to preserve close-on-exec flags.
     whatFailed = "fcntl";
     int next;
     if (stdinPipe[0] < 3)
     {
-        if (-1 == (next = fcntl(stdinPipe[0], F_DUPFD_CLOEXEC, 3)))
+        if (-1 == (next = fcntl(stdinPipe[0], F_DUPFD, 3)))
         {
             goto reportErr;
         }
@@ -463,7 +462,7 @@ static int pipeCLOEXEC(int pipefd[2])
     }
     if (stdoutPipe[1] < 3)
     {
-        if (-1 == (next = fcntl(stdoutPipe[1], F_DUPFD_CLOEXEC, 3)))
+        if (-1 == (next = fcntl(stdoutPipe[1], F_DUPFD, 3)))
         {
             goto reportErr;
         }
@@ -472,7 +471,7 @@ static int pipeCLOEXEC(int pipefd[2])
     }
     if (stderrPipe[1] < 3)
     {
-        if (-1 == (next = fcntl(stderrPipe[1], F_DUPFD_CLOEXEC, 3)))
+        if (-1 == (next = fcntl(stderrPipe[1], F_DUPFD, 3)))
         {
             goto reportErr;
         }

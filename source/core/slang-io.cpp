@@ -1109,12 +1109,28 @@ static String _getExecutablePath()
 SlangResult File::readAllText(const Slang::String& fileName, String& outText)
 {
     RefPtr<FileStream> stream(new FileStream);
+    fprintf(
+        stderr,
+        "DEBUGGING: Initializing stream for file '%s'\n",
+        fileName.getBuffer());
     SLANG_RETURN_ON_FAIL(
         stream->init(fileName, FileMode::Open, FileAccess::Read, FileShare::ReadWrite));
 
     StreamReader reader;
+    fprintf(
+        stderr,
+        "DEBUGGING: Initializing reader for file '%s'\n",
+        fileName.getBuffer());
     SLANG_RETURN_ON_FAIL(reader.init(stream));
+    fprintf(
+        stderr,
+        "DEBUGGING: Reading to end of file '%s'\n",
+        fileName.getBuffer());
     SLANG_RETURN_ON_FAIL(reader.readToEnd(outText));
+    fprintf(
+        stderr,
+        "DEBUGGING: Successfully read to end of file '%s'\n",
+        fileName.getBuffer());
 
     return SLANG_OK;
 }
