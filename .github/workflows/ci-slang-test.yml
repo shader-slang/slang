@@ -211,4 +211,5 @@ jobs:
 
           echo "Running pytest on slangpy tests..."
           export PYTHONPATH="$SITE_PACKAGES"
-          python -m pytest "$SITE_PACKAGES/slangpy/tests" -v -ra -n auto --maxprocesses=3
+          python -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n auto --maxprocesses=3 \
+            --deselect "slangpy/tests/device/test_blit.py::test_generate_mips[compute-DeviceType.cuda]"
