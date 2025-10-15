@@ -251,6 +251,12 @@ SlangResult FileStream::read(void* buffer, size_t length, size_t& outBytesRead)
             // If we are not at the end of the file we should be able to read some bytes
             if (!feof(m_handle))
             {
+                // DEBUG: Check for ferror to see what's wrong
+                if (ferror(m_handle))
+                {
+                    fprintf(stderr, "DEBUGGING: ferror() triggered during read, errno=%d (%s)\n", 
+                            errno, strerror(errno));
+                }
                 return SLANG_FAIL;
             }
             m_endReached = true;

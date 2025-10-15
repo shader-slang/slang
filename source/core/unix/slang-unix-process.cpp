@@ -572,6 +572,9 @@ static int pipeCLOEXEC(int pipefd[2])
         const int readRes = ::read(execWatchPipe[0], &execErrCode, sizeof(execErrCode));
         if (readRes < 0)
         {
+            fprintf(stderr, 
+                    "DEBUGGING: read() on execWatchPipe[0]=%d failed with readRes=%d, errno=%d (%s), childPid=%d, command='%s'\n",
+                    execWatchPipe[0], readRes, errno, strerror(errno), childPid, argPtrs[0]);
             whatFailed = "read from forked process";
             goto reportErr;
         }
