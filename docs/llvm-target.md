@@ -94,10 +94,13 @@ This limitation stems from the fact that work items / threads of a work group
 are currently run serially instead of actually being in parallel. This may be
 improved upon later.
 
-## Missing resource types
+## Missing types
 
 * No texture types.
 * No acceleration structures.
+
+These are missing purely due to limitation of scope for the initial
+implementation, and may be added later.
 
 # Gotchas
 
