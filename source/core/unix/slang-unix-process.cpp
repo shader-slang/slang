@@ -23,9 +23,17 @@
 #endif
 
 #include <time.h>
+#include <mutex>
 
 namespace Slang
 {
+
+// On macOS, pipe() + fcntl(FD_CLOEXEC) is not atomic, creating a race window
+// where concurrent forks can inherit pipes without CLOEXEC.
+// This mutex serializes Process::create() to prevent that race.
+#if SLANG_APPLE_FAMILY
+static std::mutex g_forkMutex;
+#endif
 
 class UnixProcess : public Process
 {
@@ -428,6 +436,13 @@ static int pipeCLOEXEC(int pipefd[2])
 
     // Terminate with a null
     argPtrs.add(nullptr);
+
+#if SLANG_APPLE_FAMILY
+    // Lock to prevent concurrent pipe creation + fork operations
+    // This prevents the race where pipe() creates FDs without CLOEXEC,
+    // and another thread forks before fcntl() can set CLOEXEC
+    std::lock_guard<std::mutex> forkLock(g_forkMutex);
+#endif
 
     //
     // Set up pipes
