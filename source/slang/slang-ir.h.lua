@@ -362,6 +362,12 @@ local function getBasicTypesForBuilderMethods()
 		"ComPtrType",
 		"ArrayListType",
 		"TensorViewType",
+		-- Batch 8 additions - single operand types that currently use arrays  
+		-- Note: GLSLOutputParameterGroupType has operand definition mismatch - reverted
+		"PseudoPtrType",
+		-- Batch 9 additions - multi-parameter types with proper operand definitions
+		"ResultType",
+		"RateQualifiedType",
 	}
 
 	local result = {}

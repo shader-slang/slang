@@ -2873,11 +2873,6 @@ IRExpandTypeOrVal* IRBuilder::getExpandTypeOrVal(
         args.getArrayView().getBuffer());
 }
 
-IRResultType* IRBuilder::getResultType(IRType* valueType, IRType* errorType)
-{
-    IRInst* operands[] = {valueType, errorType};
-    return (IRResultType*)getType(kIROp_ResultType, 2, operands);
-}
 
 
 IRPtrType* IRBuilder::getPtrType(IRType* valueType)
@@ -2913,6 +2908,12 @@ IRSPIRVLiteralType* IRBuilder::getSPIRVLiteralType(IRType* type)
 {
     IRInst* operands[] = {type};
     return (IRSPIRVLiteralType*)getType(kIROp_SPIRVLiteralType, 1, operands);
+}
+
+IRGLSLOutputParameterGroupType* IRBuilder::getGLSLOutputParameterGroupType(IRType* elementType)
+{
+    IRInst* operands[] = {elementType};
+    return (IRGLSLOutputParameterGroupType*)getType(kIROp_GLSLOutputParameterGroupType, 1, operands);
 }
 
 IRPtrTypeBase* IRBuilder::getPtrType(IROp op, IRType* valueType)
@@ -3142,21 +3143,9 @@ IRConstantBufferType* IRBuilder::getConstantBufferType(IRType* elementType, IRTy
     return (IRConstantBufferType*)getType(kIROp_ConstantBufferType, 2, operands);
 }
 
-IRGLSLOutputParameterGroupType* IRBuilder::getGLSLOutputParameterGroupType(IRType* elementType)
-{
-    IRInst* operands[] = {elementType};
-    return (
-        IRGLSLOutputParameterGroupType*)getType(kIROp_GLSLOutputParameterGroupType, 1, operands);
-}
 
 
 
-IRRateQualifiedType* IRBuilder::getRateQualifiedType(IRRate* rate, IRType* dataType)
-{
-    IRInst* operands[] = {rate, dataType};
-    return (IRRateQualifiedType*)
-        getType(kIROp_RateQualifiedType, sizeof(operands) / sizeof(operands[0]), operands);
-}
 
 IRType* IRBuilder::getBindExistentialsType(
     IRInst* baseType,
@@ -3221,11 +3210,6 @@ IRType* IRBuilder::getBoundInterfaceType(
     return getType(kIROp_BoundInterfaceType, SLANG_COUNT_OF(operands), operands);
 }
 
-IRType* IRBuilder::getPseudoPtrType(IRType* concreteType)
-{
-    IRInst* operands[] = {concreteType};
-    return getType(kIROp_PseudoPtrType, SLANG_COUNT_OF(operands), operands);
-}
 
 IRType* IRBuilder::getConjunctionType(UInt typeCount, IRType* const* types)
 {

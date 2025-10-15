@@ -3080,7 +3080,6 @@ public:
         IRInst* pattern,
         ArrayView<IRInst*> capture);
 
-    IRResultType* getResultType(IRType* valueType, IRType* errorType);
 
     IRWitnessTableType* getWitnessTableType(IRType* baseType);
     IRWitnessTableIDType* getWitnessTableIDType(IRType* baseType);
@@ -3149,6 +3148,9 @@ public:
     /// Get a 'SPIRV literal'
     IRSPIRVLiteralType* getSPIRVLiteralType(IRType* type);
 
+    /// Get a GLSL output parameter group type
+    IRGLSLOutputParameterGroupType* getGLSLOutputParameterGroupType(IRType* elementType);
+
     IRArrayTypeBase* getArrayTypeBase(
         IROp op,
         IRType* elementType,
@@ -3202,10 +3204,8 @@ public:
 
     IRConstantBufferType* getConstantBufferType(IRType* elementType, IRType* layout);
 
-    IRGLSLOutputParameterGroupType* getGLSLOutputParameterGroupType(IRType* valueType);
 
 
-    IRRateQualifiedType* getRateQualifiedType(IRRate* rate, IRType* dataType);
 
     IRType* getBindExistentialsType(IRInst* baseType, UInt slotArgCount, IRInst* const* slotArgs);
 
@@ -3216,7 +3216,6 @@ public:
         IRType* concreteType,
         IRInst* witnessTable);
 
-    IRType* getPseudoPtrType(IRType* concreteType);
 
     IRType* getConjunctionType(UInt typeCount, IRType* const* types);
 

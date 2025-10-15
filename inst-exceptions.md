@@ -98,9 +98,11 @@ IRThisType* getThisType(IRType* interfaceType)
 IRThisType* getThisType() // No parameters
 ```
 
-**Affected types**: ThisType
+**Affected types**: ThisType, GLSLOutputParameterGroupType
 
 **Action**: Verify operand definitions in slang-ir-insts.lua match expected method signatures.
+
+**Example**: `GLSLOutputParameterGroupType` expects `getGLSLOutputParameterGroupType(IRType* elementType)` but template generates no-parameter version.
 
 ## Notes
 - All other types in batches 1-7 successfully converted without issues  
