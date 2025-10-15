@@ -3087,16 +3087,15 @@ $(type_info.return_type) $(type_info.method_name)(
 %        if #current_operands == 1 then
     IRInst* const* operandLists[] = { (IRInst* const*)&$(current_operands[1].name) };
 %        else
-    IRInst* const* operandLists[] = { 
-        (IRInst* const*)(IRInst*[]){
+    IRInst* operandArray[] = {
 %          for i, operand in ipairs(current_operands) do
-            $(operand.name)
+        $(operand.name)
 %            if i < #current_operands then
 ,
 %            end
 %          end
-        } 
     };
+    IRInst* const* operandLists[] = { (IRInst* const*)operandArray };
 %        end
     return ($(type_info.return_type))createIntrinsicInst(
         getTypeType(),
@@ -3217,16 +3216,15 @@ $(type_info.return_type) $(type_info.method_name)(
 %      if #type_info.operands == 1 then
     IRInst* const* operandLists[] = { (IRInst* const*)&$(type_info.operands[1].name) };
 %      else
-    IRInst* const* operandLists[] = { 
-        (IRInst* const*)(IRInst*[]){
+    IRInst* operandArray[] = {
 %        for i, operand in ipairs(type_info.operands) do
-            $(operand.name)
+        $(operand.name)
 %          if i < #type_info.operands then
 ,
 %          end
 %        end
-        }
     };
+    IRInst* const* operandLists[] = { (IRInst* const*)operandArray };
 %      end
     return ($(type_info.return_type))createIntrinsicInst(
         getTypeType(),
