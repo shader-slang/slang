@@ -440,7 +440,7 @@ static int pipeCLOEXEC(int pipefd[2])
     // automatically if the child's exec succeeds
     int execWatchPipe[2] = {-1, -1};
 
-    if (pipeCLOEXEC(stdinPipe) == -1 || pipeCLOEXEC(stdoutPipe) == -1 || pipeCLOEXEC(stderrPipe) == -1 ||
+    if (pipe(stdinPipe) == -1 || pipe(stdoutPipe) == -1 || pipe(stderrPipe) == -1 ||
         pipeCLOEXEC(execWatchPipe) == -1)
     {
         whatFailed = "pipe";
