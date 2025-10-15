@@ -982,7 +982,7 @@ struct SpecializationContext
                     shouldSkip = true;
                     break;
                 }
-                if (item->getOperand(i)->getOp() == kIROp_Undefined)
+                if (as<IRUndefined>(item->getOperand(i)))
                 {
                     shouldSkip = true;
                     break;
