@@ -3044,18 +3044,34 @@ public:
 %local basic_types = ir_lua.getBasicTypesForBuilderMethods()
 %for _, type_info in ipairs(basic_types) do
 %  if type_info.is_variadic then
-%    -- Generate multiple declarations for variadic types
+%    -- For variadic types, generate declarations with mixed operands support
+%    local non_variadic_operands = {}
 %    local variadic_operand = nil
 %    for _, op in ipairs(type_info.operands) do
 %      if op.variadic then
 %        variadic_operand = op
-%        break
+%      else
+%        table.insert(non_variadic_operands, op)
 %      end
 %    end
 %    if variadic_operand then
-    $(type_info.return_type) $(type_info.method_name)(UInt count, $(variadic_operand.type)* const* $(variadic_operand.name));
-    $(type_info.return_type) $(type_info.method_name)(List<$(variadic_operand.type)*> const& $(variadic_operand.name));
-    $(type_info.return_type) $(type_info.method_name)(ArrayView<$(variadic_operand.type)*> $(variadic_operand.name));
+%      -- Main method with explicit parameters
+    $(type_info.return_type) $(type_info.method_name)(
+%      for i, operand in ipairs(non_variadic_operands) do
+        $(operand.type)* $(operand.name),
+%      end
+        UInt $(variadic_operand.name)Count, $(variadic_operand.type)* const* $(variadic_operand.name));
+%      -- List and ArrayView convenience overloads
+    $(type_info.return_type) $(type_info.method_name)(
+%      for i, operand in ipairs(non_variadic_operands) do
+        $(operand.type)* $(operand.name),
+%      end
+        List<$(variadic_operand.type)*> const& $(variadic_operand.name));
+    $(type_info.return_type) $(type_info.method_name)(
+%      for i, operand in ipairs(non_variadic_operands) do
+        $(operand.type)* $(operand.name),
+%      end
+        ArrayView<$(variadic_operand.type)*> $(variadic_operand.name));
 %    end
 %  else
 %    -- Generate regular non-variadic declaration

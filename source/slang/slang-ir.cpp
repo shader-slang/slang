@@ -2777,35 +2777,89 @@ IRBasicType* IRBuilder::getBasicType(BaseType baseType)
 %local basic_types = ir_lua.getBasicTypesForBuilderMethods()
 %for _, type_info in ipairs(basic_types) do
 %  if type_info.is_variadic then
-%    -- Generate multiple overloads for variadic types
+%    -- For variadic types, generate implementations with mixed operands support
+%    local non_variadic_operands = {}
 %    local variadic_operand = nil
 %    for _, op in ipairs(type_info.operands) do
 %      if op.variadic then
 %        variadic_operand = op
-%        break
+%      else
+%        table.insert(non_variadic_operands, op)
 %      end
 %    end
 %    if variadic_operand then
-
-$(type_info.return_type) IRBuilder::$(type_info.method_name)(UInt count, $(variadic_operand.type)* const* $(variadic_operand.name))
+%      -- Main method using createIntrinsicInst with operand lists
+$(type_info.return_type) IRBuilder::$(type_info.method_name)(
+%      for i, operand in ipairs(non_variadic_operands) do
+    $(operand.type)* $(operand.name),
+%      end
+    UInt $(variadic_operand.name)Count, $(variadic_operand.type)* const* $(variadic_operand.name))
 {
-    return ($(type_info.return_type))getType($(type_info.opcode), count, (IRInst* const*)$(variadic_operand.name));
+%      if #non_variadic_operands == 0 then
+    UInt operandCounts[] = { $(variadic_operand.name)Count };
+    IRInst* const* operandLists[] = { (IRInst* const*)$(variadic_operand.name) };
+    return ($(type_info.return_type))createIntrinsicInst(
+        getTypeType(),
+        $(type_info.opcode),
+        1,
+        operandCounts,
+        operandLists);
+%      else
+    UInt operandCounts[] = { $(#non_variadic_operands), $(variadic_operand.name)Count };
+    IRInst* const* operandLists[] = { 
+%        if #non_variadic_operands == 1 then
+        (IRInst* const*)&$(non_variadic_operands[1].name),
+%        else
+        (IRInst* const*)(IRInst*[]){
+%          for i, operand in ipairs(non_variadic_operands) do
+            $(operand.name)
+%            if i < #non_variadic_operands then
+,
+%            end
+%          end
+        },
+%        end
+        (IRInst* const*)$(variadic_operand.name) 
+    };
+    return ($(type_info.return_type))createIntrinsicInst(
+        getTypeType(),
+        $(type_info.opcode),
+        2,
+        operandCounts,
+        operandLists);
+%      end
 }
 
-$(type_info.return_type) IRBuilder::$(type_info.method_name)(List<$(variadic_operand.type)*> const& $(variadic_operand.name))
+%      -- List and ArrayView convenience overloads
+$(type_info.return_type) IRBuilder::$(type_info.method_name)(
+%      for i, operand in ipairs(non_variadic_operands) do
+    $(operand.type)* $(operand.name),
+%      end
+    List<$(variadic_operand.type)*> const& $(variadic_operand.name))
 {
-    return $(type_info.method_name)($(variadic_operand.name).getCount(), $(variadic_operand.name).getBuffer());
+    return $(type_info.method_name)(
+%      for i, operand in ipairs(non_variadic_operands) do
+        $(operand.name),
+%      end
+        $(variadic_operand.name).getCount(), $(variadic_operand.name).getBuffer());
 }
 
-$(type_info.return_type) IRBuilder::$(type_info.method_name)(ArrayView<$(variadic_operand.type)*> $(variadic_operand.name))
+$(type_info.return_type) IRBuilder::$(type_info.method_name)(
+%      for i, operand in ipairs(non_variadic_operands) do
+    $(operand.type)* $(operand.name),
+%      end
+    ArrayView<$(variadic_operand.type)*> $(variadic_operand.name))
 {
-    return $(type_info.method_name)($(variadic_operand.name).getCount(), $(variadic_operand.name).getBuffer());
+    return $(type_info.method_name)(
+%      for i, operand in ipairs(non_variadic_operands) do
+        $(operand.name),
+%      end
+        $(variadic_operand.name).getCount(), $(variadic_operand.name).getBuffer());
 }
 
 %    end
 %  else
-%    -- Generate regular non-variadic type
-
+%    -- Generate regular non-variadic type using createIntrinsicInst uniformly
 $(type_info.return_type) IRBuilder::$(type_info.method_name)(
 %    for i, operand in ipairs(type_info.operands) do
     $(operand.type)* $(operand.name)
@@ -2816,20 +2870,34 @@ $(type_info.return_type) IRBuilder::$(type_info.method_name)(
 )
 {
 %    if #type_info.operands == 0 then
-    return ($(type_info.return_type))getType($(type_info.opcode)    );
-%    elseif #type_info.operands == 1 then
-    return ($(type_info.return_type))getType($(type_info.opcode),
-$(type_info.operands[1].name)    );
+    return ($(type_info.return_type))createIntrinsicInst(
+        getTypeType(),
+        $(type_info.opcode),
+        0,
+        nullptr,
+        nullptr);
 %    else
-    IRInst* operands[] = {
-%      for i, operand in ipairs(type_info.operands) do
-        $(operand.name)
-%        if i < #type_info.operands then
+    UInt operandCounts[] = { $(#type_info.operands) };
+%      if #type_info.operands == 1 then
+    IRInst* const* operandLists[] = { (IRInst* const*)&$(type_info.operands[1].name) };
+%      else
+    IRInst* const* operandLists[] = { 
+        (IRInst* const*)(IRInst*[]){
+%        for i, operand in ipairs(type_info.operands) do
+            $(operand.name)
+%          if i < #type_info.operands then
 ,
+%          end
 %        end
-%      end
+        }
     };
-    return ($(type_info.return_type))getType($(type_info.opcode), $(#type_info.operands), operands);
+%      end
+    return ($(type_info.return_type))createIntrinsicInst(
+        getTypeType(),
+        $(type_info.opcode),
+        1,
+        operandCounts,
+        operandLists);
 %    end
 }
 %  end
