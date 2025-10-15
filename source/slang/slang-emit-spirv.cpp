@@ -4512,7 +4512,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_GetStringHash:
             result = emitGetStringHash(inst);
             break;
-        case kIROp_Undefined:
+        case kIROp_LoadFromUninitializedMemory:
+        case kIROp_Poison:
             result = emitOpUndef(parent, inst, inst->getDataType());
             break;
         case kIROp_SPIRVAsm:
