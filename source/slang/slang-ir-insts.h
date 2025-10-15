@@ -3038,13 +3038,12 @@ public:
 
     IRBasicType* getBasicType(BaseType baseType);
 
-    // Generate basic type getter method declarations
 #if 0 // FIDDLE TEMPLATE:
 %local ir_lua = require("source/slang/slang-ir.h.lua")
 %local basic_types = ir_lua.getBasicTypesForBuilderMethods()
 %for _, type_info in ipairs(basic_types) do
 %  if type_info.is_variadic then
-%    -- For variadic types, generate declarations with mixed operands support
+%    -- For variadic types, generate implementations with mixed operands support
 %    local non_variadic_operands = {}
 %    local variadic_operand = nil
 %    for _, op in ipairs(type_info.operands) do
@@ -3055,34 +3054,122 @@ public:
 %      end
 %    end
 %    if variadic_operand then
-%      -- Main method with explicit parameters
-    $(type_info.return_type) $(type_info.method_name)(
+%      -- Main method using createIntrinsicInst with a single operand list to preserve order
+$(type_info.return_type) $(type_info.method_name)(
 %      for i, operand in ipairs(non_variadic_operands) do
-        $(operand.type)* $(operand.name),
+    $(operand.type)* $(operand.name),
 %      end
-        UInt $(variadic_operand.name)Count, $(variadic_operand.type)* const* $(variadic_operand.name));
+    UInt $(variadic_operand.name)Count, $(variadic_operand.type)* const* $(variadic_operand.name))
+{
+%    -- Build operand lists statically - each parameter becomes its own list
+%    local operand_lists = {}
+%    local operand_counts = {}
+%    local non_variadic_index = 0
+%    for _, orig_operand in ipairs(type_info.operands) do
+%      if orig_operand.variadic then
+%        table.insert(operand_counts, variadic_operand.name .. "Count")
+%        table.insert(operand_lists, "(IRInst* const*)" .. variadic_operand.name)
+%      else
+%        non_variadic_index = non_variadic_index + 1
+%        local matching_operand = non_variadic_operands[non_variadic_index]
+%        table.insert(operand_counts, "1")
+%        table.insert(operand_lists, "(IRInst* const*)&" .. matching_operand.name)
+%      end
+%    end
+    UInt operandCounts[] = { 
+%    for i, count in ipairs(operand_counts) do
+        $(count)
+%      if i < #operand_counts then
+,
+%      end
+%    end
+    };
+    IRInst* const* operandLists[] = { 
+%    for i, list in ipairs(operand_lists) do
+        $(list)
+%      if i < #operand_lists then
+,
+%      end
+%    end
+    };
+    return ($(type_info.return_type))createIntrinsicInst(
+        getTypeType(),
+        $(type_info.opcode),
+        $(#operand_lists),
+        operandCounts,
+        operandLists);
+}
+
 %      -- List and ArrayView convenience overloads
-    $(type_info.return_type) $(type_info.method_name)(
+$(type_info.return_type) $(type_info.method_name)(
 %      for i, operand in ipairs(non_variadic_operands) do
-        $(operand.type)* $(operand.name),
+    $(operand.type)* $(operand.name),
 %      end
-        List<$(variadic_operand.type)*> const& $(variadic_operand.name));
-    $(type_info.return_type) $(type_info.method_name)(
+    List<$(variadic_operand.type)*> const& $(variadic_operand.name))
+{
+    return $(type_info.method_name)(
 %      for i, operand in ipairs(non_variadic_operands) do
-        $(operand.type)* $(operand.name),
+        $(operand.name),
 %      end
-        ArrayView<$(variadic_operand.type)*> $(variadic_operand.name));
+        $(variadic_operand.name).getCount(), $(variadic_operand.name).getBuffer());
+}
+
+$(type_info.return_type) $(type_info.method_name)(
+%      for i, operand in ipairs(non_variadic_operands) do
+    $(operand.type)* $(operand.name),
+%      end
+    ArrayView<$(variadic_operand.type)*> $(variadic_operand.name))
+{
+    return $(type_info.method_name)(
+%      for i, operand in ipairs(non_variadic_operands) do
+        $(operand.name),
+%      end
+        $(variadic_operand.name).getCount(), $(variadic_operand.name).getBuffer());
+}
+
 %    end
 %  else
-%    -- Generate regular non-variadic declaration
-    $(type_info.return_type) $(type_info.method_name)(
+%    -- Generate regular non-variadic type using createIntrinsicInst uniformly
+$(type_info.return_type) $(type_info.method_name)(
 %    for i, operand in ipairs(type_info.operands) do
-        $(operand.type)* $(operand.name)
+    $(operand.type)* $(operand.name)
 %      if i < #type_info.operands then
-        ,
+,
 %      end
 %    end
-    );
+)
+{
+%    if #type_info.operands == 0 then
+    return ($(type_info.return_type))createIntrinsicInst(
+        getTypeType(),
+        $(type_info.opcode),
+        0,
+        nullptr,
+        nullptr);
+%    else
+    UInt operandCounts[] = { $(#type_info.operands) };
+%      if #type_info.operands == 1 then
+    IRInst* const* operandLists[] = { (IRInst* const*)&$(type_info.operands[1].name) };
+%      else
+    IRInst* const* operandLists[] = { 
+        (IRInst* const*)(IRInst*[]){
+%        for i, operand in ipairs(type_info.operands) do
+            $(operand.name)
+%          if i < #type_info.operands then
+,
+%          end
+%        end
+        }
+    };
+%      end
+    return ($(type_info.return_type))createIntrinsicInst(
+        getTypeType(),
+        $(type_info.opcode),
+        1,
+        operandCounts,
+        operandLists);
+%    end
+}
 %  end
 %end
 #else // FIDDLE OUTPUT:
