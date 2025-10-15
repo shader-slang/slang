@@ -161,15 +161,31 @@ local function getAllOtherInstStructsData()
 
 			-- Prepare operand data
 			if value.operands then
-				for i, operand in ipairs(value.operands) do
-					local operandName = operand[1]
-					local operandType = operand[2]
+				-- Handle different operand formats for getAllOtherInstStructsData
+				if type(value.operands[1]) == "table" then
+					-- Format: { { "name", "type" }, { "name2", "type2" } }
+					for i, operand in ipairs(value.operands) do
+						local operandName = operand[1]
+						local operandType = operand[2]
+						table.insert(inst_data.operands, {
+							name = operandName,
+							type = operandType,
+							getter_name = "get" .. operandName:sub(1, 1):upper() .. operandName:sub(2),
+							index = i - 1,
+							has_type = operandType ~= nil,
+						})
+					end
+				elseif type(value.operands[1]) == "string" then
+					-- Format: { "name", "type", variadic = true } - single operand
+					local operandName = value.operands[1]
+					local operandType = value.operands[2]
 					table.insert(inst_data.operands, {
 						name = operandName,
 						type = operandType,
 						getter_name = "get" .. operandName:sub(1, 1):upper() .. operandName:sub(2),
-						index = i - 1,
+						index = 0,
 						has_type = operandType ~= nil,
+						variadic = value.operands.variadic,
 					})
 				end
 			end
@@ -374,6 +390,8 @@ local function getBasicTypesForBuilderMethods()
 		-- Note: BackwardDiffIntermediateContextType has null->void conversion logic - can't convert
 		-- Note: RefParamType and BorrowInParamType use getPtrType() instead of getType() - can't convert
 		"ThisType",
+		-- Batch 11 additions - variadic types
+		"TupleType",
 	}
 
 	local result = {}
@@ -413,13 +431,37 @@ local function getBasicTypesForBuilderMethods()
 
 		-- Get operands info
 		local operands = {}
+		local is_variadic = false
 		if inst_data and inst_data.operands then
-			for i, operand in ipairs(inst_data.operands) do
-				table.insert(operands, {
-					name = operand[1],
-					type = operand[2] or "IRInst",
-					index = i - 1,
-				})
+			-- Handle different operand formats
+			if type(inst_data.operands[1]) == "table" then
+				-- Format: { { "name", "type" }, { "name2", "type2" } }
+				for i, operand in ipairs(inst_data.operands) do
+					local operand_info = {
+						name = operand[1],
+						type = operand[2] or "IRInst",
+						index = i - 1,
+					}
+					-- Check if this operand is variadic
+					if operand.variadic then
+						operand_info.variadic = true
+						is_variadic = true
+					end
+					table.insert(operands, operand_info)
+				end
+			else
+				-- Format: { "name", "type", variadic = true }
+				local operand_info = {
+					name = inst_data.operands[1],
+					type = inst_data.operands[2] or "IRInst",
+					index = 0,
+				}
+				-- Check if this operand is variadic
+				if inst_data.operands.variadic then
+					operand_info.variadic = true
+					is_variadic = true
+				end
+				table.insert(operands, operand_info)
 			end
 		end
 
@@ -429,6 +471,7 @@ local function getBasicTypesForBuilderMethods()
 			return_type = return_type,
 			opcode = opcode,
 			operands = operands,
+			is_variadic = is_variadic,
 		})
 	end
 

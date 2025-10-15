@@ -2776,33 +2776,63 @@ IRBasicType* IRBuilder::getBasicType(BaseType baseType)
 %local ir_lua = require("source/slang/slang-ir.h.lua")
 %local basic_types = ir_lua.getBasicTypesForBuilderMethods()
 %for _, type_info in ipairs(basic_types) do
+%  if type_info.is_variadic then
+%    -- Generate multiple overloads for variadic types
+%    local variadic_operand = nil
+%    for _, op in ipairs(type_info.operands) do
+%      if op.variadic then
+%        variadic_operand = op
+%        break
+%      end
+%    end
+%    if variadic_operand then
+
+$(type_info.return_type) IRBuilder::$(type_info.method_name)(UInt count, $(variadic_operand.type)* const* $(variadic_operand.name))
+{
+    return ($(type_info.return_type))getType($(type_info.opcode), count, (IRInst* const*)$(variadic_operand.name));
+}
+
+$(type_info.return_type) IRBuilder::$(type_info.method_name)(List<$(variadic_operand.type)*> const& $(variadic_operand.name))
+{
+    return $(type_info.method_name)($(variadic_operand.name).getCount(), $(variadic_operand.name).getBuffer());
+}
+
+$(type_info.return_type) IRBuilder::$(type_info.method_name)(ArrayView<$(variadic_operand.type)*> $(variadic_operand.name))
+{
+    return $(type_info.method_name)($(variadic_operand.name).getCount(), $(variadic_operand.name).getBuffer());
+}
+
+%    end
+%  else
+%    -- Generate regular non-variadic type
 
 $(type_info.return_type) IRBuilder::$(type_info.method_name)(
-%  for i, operand in ipairs(type_info.operands) do
-    $(operand.type)* $(operand.name)
-%    if i < #type_info.operands then
-,
-%    end
-%  end
-)
-{
-%  if #type_info.operands == 0 then
-    return ($(type_info.return_type))getType($(type_info.opcode)    );
-%  elseif #type_info.operands == 1 then
-    return ($(type_info.return_type))getType($(type_info.opcode),
-$(type_info.operands[1].name)    );
-%  else
-    IRInst* operands[] = {
 %    for i, operand in ipairs(type_info.operands) do
-        $(operand.name)
+    $(operand.type)* $(operand.name)
 %      if i < #type_info.operands then
 ,
 %      end
 %    end
+)
+{
+%    if #type_info.operands == 0 then
+    return ($(type_info.return_type))getType($(type_info.opcode)    );
+%    elseif #type_info.operands == 1 then
+    return ($(type_info.return_type))getType($(type_info.opcode),
+$(type_info.operands[1].name)    );
+%    else
+    IRInst* operands[] = {
+%      for i, operand in ipairs(type_info.operands) do
+        $(operand.name)
+%        if i < #type_info.operands then
+,
+%        end
+%      end
     };
     return ($(type_info.return_type))getType($(type_info.opcode), $(#type_info.operands), operands);
-%  end
+%    end
 }
+%  end
 %end
 #else // FIDDLE OUTPUT:
 #define FIDDLE_GENERATED_OUTPUT_ID 0
@@ -2823,17 +2853,11 @@ IRAssociatedType* IRBuilder::getAssociatedType(ArrayView<IRInterfaceType*> const
 }
 
 
-
 IRAnyValueType* IRBuilder::getAnyValueType(IRIntegerValue size)
 {
     return (IRAnyValueType*)getType(kIROp_AnyValueType, getIntValue(getUIntType(), size));
 }
 
-
-IRTupleType* IRBuilder::getTupleType(UInt count, IRType* const* types)
-{
-    return (IRTupleType*)getType(kIROp_TupleType, count, (IRInst* const*)types);
-}
 
 IRTupleType* IRBuilder::getTupleType(IRType* type0, IRType* type1)
 {

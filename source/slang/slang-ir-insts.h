@@ -3039,20 +3039,37 @@ public:
     IRBasicType* getBasicType(BaseType baseType);
 
     // Generate basic type getter method declarations
-#if 0  // FIDDLE TEMPLATE:
+#if 0 // FIDDLE TEMPLATE:
 %local ir_lua = require("source/slang/slang-ir.h.lua")
 %local basic_types = ir_lua.getBasicTypesForBuilderMethods()
 %for _, type_info in ipairs(basic_types) do
-    $(type_info.return_type) $(type_info.method_name)(
-%  for i, operand in ipairs(type_info.operands) do
-        $(operand.type)* $(operand.name)
-%    if i < #type_info.operands then
-        ,
+%  if type_info.is_variadic then
+%    -- Generate multiple declarations for variadic types
+%    local variadic_operand = nil
+%    for _, op in ipairs(type_info.operands) do
+%      if op.variadic then
+%        variadic_operand = op
+%        break
+%      end
 %    end
-%  end
+%    if variadic_operand then
+    $(type_info.return_type) $(type_info.method_name)(UInt count, $(variadic_operand.type)* const* $(variadic_operand.name));
+    $(type_info.return_type) $(type_info.method_name)(List<$(variadic_operand.type)*> const& $(variadic_operand.name));
+    $(type_info.return_type) $(type_info.method_name)(ArrayView<$(variadic_operand.type)*> $(variadic_operand.name));
+%    end
+%  else
+%    -- Generate regular non-variadic declaration
+    $(type_info.return_type) $(type_info.method_name)(
+%    for i, operand in ipairs(type_info.operands) do
+        $(operand.type)* $(operand.name)
+%      if i < #type_info.operands then
+        ,
+%      end
+%    end
     );
+%  end
 %end
-#else  // FIDDLE OUTPUT:
+#else // FIDDLE OUTPUT:
 #define FIDDLE_GENERATED_OUTPUT_ID 1
 #include "slang-ir-insts.h.fiddle"
 #endif // FIDDLE END
@@ -3063,12 +3080,7 @@ public:
 
     IRTargetTupleType* getTargetTupleType(UInt count, IRType* const* types);
 
-    IRTupleType* getTupleType(UInt count, IRType* const* types);
-    IRTupleType* getTupleType(List<IRType*> const& types)
-    {
-        return getTupleType(types.getCount(), types.getBuffer());
-    }
-
+    // Keep the 1,2,3,4 parameter helper methods as requested
     IRTupleType* getTupleType(IRType* type0, IRType* type1);
     IRTupleType* getTupleType(IRType* type0, IRType* type1, IRType* type2);
     IRTupleType* getTupleType(IRType* type0, IRType* type1, IRType* type2, IRType* type3);
@@ -3205,8 +3217,6 @@ public:
     IRConstantBufferType* getConstantBufferType(IRType* elementType, IRType* layout);
 
 
-
-
     IRType* getBindExistentialsType(IRInst* baseType, UInt slotArgCount, IRInst* const* slotArgs);
 
     IRType* getBindExistentialsType(IRInst* baseType, UInt slotArgCount, IRUse const* slotArgs);
@@ -3237,7 +3247,6 @@ public:
         IRInst* args[] = {baseType, getIntValue(getIntType(), fieldIndex)};
         return emitIntrinsicInst(getVoidType(), kIROp_IndexedFieldKey, 2, args);
     }
-
 
 
     IRInst* emitSymbolAlias(IRInst* aliasedSymbol);
