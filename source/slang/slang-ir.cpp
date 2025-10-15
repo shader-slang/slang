@@ -2788,13 +2788,14 @@ IRBasicType* IRBuilder::getBasicType(BaseType baseType)
 %      end
 %    end
 %    if variadic_operand then
-%      -- Main method using createIntrinsicInst with operand lists
+%      -- Main method using createIntrinsicInst with a single operand list to preserve order
 $(type_info.return_type) IRBuilder::$(type_info.method_name)(
 %      for i, operand in ipairs(non_variadic_operands) do
     $(operand.type)* $(operand.name),
 %      end
     UInt $(variadic_operand.name)Count, $(variadic_operand.type)* const* $(variadic_operand.name))
 {
+%      -- Pure variadic case - single list
 %      if #non_variadic_operands == 0 then
     UInt operandCounts[] = { $(variadic_operand.name)Count };
     IRInst* const* operandLists[] = { (IRInst* const*)$(variadic_operand.name) };
@@ -2804,27 +2805,29 @@ $(type_info.return_type) IRBuilder::$(type_info.method_name)(
         1,
         operandCounts,
         operandLists);
+%      -- Mixed operands case - build single list preserving order
 %      else
-    UInt operandCounts[] = { $(#non_variadic_operands), $(variadic_operand.name)Count };
-    IRInst* const* operandLists[] = { 
-%        if #non_variadic_operands == 1 then
-        (IRInst* const*)&$(non_variadic_operands[1].name),
-%        else
-        (IRInst* const*)(IRInst*[]){
-%          for i, operand in ipairs(non_variadic_operands) do
-            $(operand.name)
-%            if i < #non_variadic_operands then
-,
-%            end
+    List<IRInst*> allOperands;
+%        -- Add operands in their original order from the instruction definition
+%        local operand_index = 0
+%        for _, orig_operand in ipairs(type_info.operands) do
+%          if orig_operand.variadic then
+    for (UInt i = 0; i < $(variadic_operand.name)Count; i++)
+        allOperands.add((IRInst*)$(variadic_operand.name)[i]);
+%          else
+%            operand_index = operand_index + 1
+%            -- Find the matching non-variadic operand by index
+%            local matching_operand = non_variadic_operands[operand_index]
+    allOperands.add((IRInst*)$(matching_operand.name));
 %          end
-        },
 %        end
-        (IRInst* const*)$(variadic_operand.name) 
-    };
+    UInt operandCount = allOperands.getCount();
+    UInt operandCounts[] = { operandCount };
+    IRInst* const* operandLists[] = { allOperands.getBuffer() };
     return ($(type_info.return_type))createIntrinsicInst(
         getTypeType(),
         $(type_info.opcode),
-        2,
+        1,
         operandCounts,
         operandLists);
 %      end
