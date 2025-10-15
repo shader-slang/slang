@@ -3,6 +3,8 @@
 //DISABLED://TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -gcompute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-mtl -gcompute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-wgpu -gcompute -shaderobj
+// Not supported in LLVM: textures are not currently available
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-llvm -gcompute -shaderobj
 
 //TEST_INPUT: Texture2D(size=4, content = one):name tex
 //TEST_INPUT: Sampler:name samp
