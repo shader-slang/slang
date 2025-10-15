@@ -64,10 +64,10 @@ local insts = {
 					{
 						Array = {
 							struct_name = "ArrayType",
-							operands = { { "elementType", "IRType" }, { "elementCount" } },
+							operands = { { "elementType", "IRType" }, { "elementCount" }, { "stride", optional = true } },
 						},
 					},
-					{ UnsizedArray = { struct_name = "UnsizedArrayType", operands = { { "elementType", "IRType" } } } },
+					{ UnsizedArray = { struct_name = "UnsizedArrayType", operands = { { "elementType", "IRType" }, { "stride", optional = true } } } },
 				},
 			},
 			{ Func = { struct_name = "FuncType", hoistable = true } },

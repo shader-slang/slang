@@ -445,6 +445,8 @@ local function getBasicTypesForBuilderMethods()
 		-- Get operands info
 		local operands = {}
 		local is_variadic = false
+		local has_optional = false
+		local optional_started = false
 		if inst_data and inst_data.operands then
 			-- Handle different operand formats
 			if type(inst_data.operands[1]) == "table" then
@@ -459,6 +461,21 @@ local function getBasicTypesForBuilderMethods()
 					if operand.variadic then
 						operand_info.variadic = true
 						is_variadic = true
+						-- Variadic and optional operands together are not supported for now
+						if has_optional then
+							error("Type " .. type_name .. " has both variadic and optional operands, which is not supported")
+						end
+					end
+					-- Check if this operand is optional
+					if operand.optional then
+						operand_info.optional = true
+						has_optional = true
+						optional_started = true
+					else
+						-- Non-optional operand found after optional operands started
+						if optional_started then
+							error("Type " .. type_name .. " has non-optional operand '" .. operand[1] .. "' after optional operands. Optional operands must be at the end.")
+						end
 					end
 					table.insert(operands, operand_info)
 				end
@@ -474,6 +491,11 @@ local function getBasicTypesForBuilderMethods()
 					operand_info.variadic = true
 					is_variadic = true
 				end
+				-- Check if this operand is optional
+				if inst_data.operands.optional then
+					operand_info.optional = true
+					has_optional = true
+				end
 				table.insert(operands, operand_info)
 			end
 		end
@@ -485,6 +507,7 @@ local function getBasicTypesForBuilderMethods()
 			opcode = opcode,
 			operands = operands,
 			is_variadic = is_variadic,
+			has_optional = has_optional,
 		})
 	end
 

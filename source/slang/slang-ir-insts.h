@@ -3042,7 +3042,73 @@ public:
 %local ir_lua = require("source/slang/slang-ir.h.lua")
 %local basic_types = ir_lua.getBasicTypesForBuilderMethods()
 %for _, type_info in ipairs(basic_types) do
-%  if type_info.is_variadic then
+%  if type_info.has_optional then
+%    -- For types with optional operands, generate multiple overloads
+%    -- Split operands into required and optional
+%    local required_operands = {}
+%    local optional_operands = {}
+%    for _, op in ipairs(type_info.operands) do
+%      if op.optional then
+%        table.insert(optional_operands, op)
+%      else
+%        table.insert(required_operands, op)
+%      end
+%    end
+%    -- Generate one overload for each prefix of optional operands
+%    for num_optional = 0, #optional_operands do
+%      local current_operands = {}
+%      -- Add all required operands
+%      for _, op in ipairs(required_operands) do
+%        table.insert(current_operands, op)
+%      end
+%      -- Add first num_optional optional operands
+%      for i = 1, num_optional do
+%        table.insert(current_operands, optional_operands[i])
+%      end
+%      -- Generate the function signature
+$(type_info.return_type) $(type_info.method_name)(
+%      for i, operand in ipairs(current_operands) do
+    $(operand.type)* $(operand.name)
+%        if i < #current_operands then
+,
+%        end
+%      end
+)
+{
+%      if #current_operands == 0 then
+    return ($(type_info.return_type))createIntrinsicInst(
+        getTypeType(),
+        $(type_info.opcode),
+        0,
+        nullptr,
+        nullptr);
+%      else
+    UInt operandCounts[] = { $(#current_operands) };
+%        if #current_operands == 1 then
+    IRInst* const* operandLists[] = { (IRInst* const*)&$(current_operands[1].name) };
+%        else
+    IRInst* const* operandLists[] = { 
+        (IRInst* const*)(IRInst*[]){
+%          for i, operand in ipairs(current_operands) do
+            $(operand.name)
+%            if i < #current_operands then
+,
+%            end
+%          end
+        } 
+    };
+%        end
+    return ($(type_info.return_type))createIntrinsicInst(
+        getTypeType(),
+        $(type_info.opcode),
+        1,
+        operandCounts,
+        operandLists);
+%      end
+}
+
+%    end
+%  elseif type_info.is_variadic then
 %    -- For variadic types, generate implementations with mixed operands support
 %    local non_variadic_operands = {}
 %    local variadic_operand = nil
@@ -3266,9 +3332,7 @@ $(type_info.return_type) $(type_info.method_name)(
         IRInst* elementCount,
         IRInst* stride = nullptr);
 
-    // Keep the stride versions and IRIntegerValue version as they have different signatures
-    IRArrayType* getArrayType(IRType* elementType, IRInst* elementCount, IRInst* stride);
-    IRUnsizedArrayType* getUnsizedArrayType(IRType* elementType, IRInst* stride);
+    // Keep the IRIntegerValue version as it has a different signature
     IRVectorType* getVectorType(IRType* elementType, IRIntegerValue elementCount);
 
     IRTorchTensorType* getTorchTensorType(IRType* elementType);
