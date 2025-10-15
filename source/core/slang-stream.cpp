@@ -11,6 +11,7 @@
 
 #ifndef _WIN32
 #include <unistd.h>
+#include <fcntl.h>
 #endif
 
 namespace Slang
@@ -186,6 +187,21 @@ SlangResult FileStream::_init(
     {
         return SLANG_E_CANNOT_OPEN;
     }
+
+#ifndef _WIN32
+    // Set FD_CLOEXEC to prevent file descriptor leakage to child processes
+    // This prevents EBADF errors when parent file descriptors get corrupted
+    // by child processes that inherit them during fork()
+    int fd = fileno(m_handle);
+    if (fd != -1)
+    {
+        int flags = fcntl(fd, F_GETFD);
+        if (flags != -1)
+        {
+            fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
+        }
+    }
+#endif
 
     // Just set the access specified
     m_fileAccess = access;
