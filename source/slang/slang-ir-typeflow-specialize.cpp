@@ -1410,7 +1410,8 @@ struct TypeFlowSpecializationContext
     bool isOptionalExistentialType(IRInst* inst)
     {
         if (auto optionalType = as<IROptionalType>(inst))
-            return as<IRInterfaceType>(optionalType->getValueType()) != nullptr;
+            if (auto interfaceType = as<IRInterfaceType>(optionalType->getValueType()))
+                return !isComInterfaceType(interfaceType) && !isBuiltin(interfaceType);
         return false;
     }
 
@@ -3061,7 +3062,23 @@ struct TypeFlowSpecializationContext
             if (getCollectionCount(as<IRCollectionBase>(argInfo)) !=
                 getCollectionCount(as<IRCollectionBase>(destInfo)))
             {
-                // If the sets of witness tables are not equal, reinterpret to the parameter type
+                auto argCollection = as<IRCollectionBase>(argInfo);
+                if (argCollection->isSingleton() && as<IRVoidType>(argCollection->getElement(0)))
+                {
+                    // There's a specific case where we're trying to reinterpret a value of 'void'
+                    // type. We'll avoid emitting a reinterpret in this case, and emit a
+                    // default-construct instead.
+                    //
+                    IRBuilder builder(module);
+                    setInsertAfterOrdinaryInst(&builder, arg);
+                    return builder.emitDefaultConstruct((IRType*)destInfo);
+                }
+
+                // General case:
+                //
+                // If the sets of witness tables are not equal, reinterpret to the
+                // parameter type
+                //
                 IRBuilder builder(module);
                 setInsertAfterOrdinaryInst(&builder, arg);
                 return builder.emitReinterpret((IRType*)destInfo, arg);
@@ -3081,20 +3098,6 @@ struct TypeFlowSpecializationContext
         }
 
         return arg; // Can use as-is.
-    }
-
-    // TODO: Is this required?
-    IRInst* getCalleeForContext(IRInst* context)
-    {
-        if (this->contextsToLower.contains(context))
-            return context; // Not specialized yet.
-
-        if (this->loweredContexts.containsKey(context))
-            return this->loweredContexts[context];
-        else
-            this->contextsToLower.add(context);
-
-        return context;
     }
 
     // Helper function for specializing calls.

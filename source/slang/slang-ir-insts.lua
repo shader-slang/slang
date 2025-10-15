@@ -2229,7 +2229,7 @@ local insts = {
 					--
 					{ TypeCollection = {} },
 					{ FuncCollection = {} },
-					{ TableCollection = {} },
+					{ TableCollection = {} }, -- TODO: Rename to WitnessTableCollection
 					{ GenericCollection = {} },
 				},
 			},
@@ -2248,6 +2248,8 @@ local insts = {
 				-- pass does not attempt to specialize it. It should not appear in the code after
 				-- the specialization pass.
 				--
+				-- TODO: Consider the scenario where we can combine the unbounded case with known cases.
+				--       unbounded collection should probably be an element and not a separate op.
 			} },
 			{ CollectionTagType = {
 				-- Represents a tag-type for a collection.
