@@ -3058,7 +3058,7 @@ public:
 #endif // FIDDLE END
 
     IRAssociatedType* getAssociatedType(ArrayView<IRInterfaceType*> constraintTypes);
-    IRThisType* getThisType(IRType* interfaceType);
+
     IRAnyValueType* getAnyValueType(IRIntegerValue size);
 
     IRTargetTupleType* getTargetTupleType(UInt count, IRType* const* types);

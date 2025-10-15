@@ -2823,10 +2823,6 @@ IRAssociatedType* IRBuilder::getAssociatedType(ArrayView<IRInterfaceType*> const
 }
 
 
-IRThisType* IRBuilder::getThisType(IRType* interfaceType)
-{
-    return (IRThisType*)getType(kIROp_ThisType, interfaceType);
-}
 
 IRAnyValueType* IRBuilder::getAnyValueType(IRIntegerValue size)
 {

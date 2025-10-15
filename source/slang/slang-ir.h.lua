@@ -373,6 +373,7 @@ local function getBasicTypesForBuilderMethods()
 		-- Note: AttributedType uses dynamic operand list - can't convert
 		-- Note: BackwardDiffIntermediateContextType has null->void conversion logic - can't convert
 		-- Note: RefParamType and BorrowInParamType use getPtrType() instead of getType() - can't convert
+		"ThisType",
 	}
 
 	local result = {}

@@ -530,7 +530,7 @@ local insts = {
 			},
 			{ interface = { struct_name = "InterfaceType", global = true } },
 			{ associated_type = { hoistable = true } },
-			{ this_type = { hoistable = true } },
+			{ this_type = { operands = { { "interfaceType", "IRType" } }, hoistable = true } },
 			-- Represents the IR type for an `IRRTTIObject`.
 			{ rtti_type = { struct_name = "RTTIType", hoistable = true } },
 			-- Represents a handle to an RTTI object.
@@ -546,7 +546,7 @@ local insts = {
 					hoistable = true,
 					--  Represents a tuple. Tuples are created by `IRMakeTuple` and its elements
 					--  are accessed via `GetTupleElement(tupleValue, IRIntLit)`.
-					{ tuple_type = {} },
+					{ tuple_type = { operands = { "types", "IRType", variadic = true } } },
 					-- Represents a type pack. Type packs behave like tuples, but they have a
 					-- "flattening" semantics, so that MakeTypePack(MakeTypePack(T1,T2), T3) is
 					-- MakeTypePack(T1,T2,T3).
