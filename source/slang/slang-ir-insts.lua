@@ -504,7 +504,47 @@ local insts = {
 		},
 	},
 	{ CapabilitySet = { hoistable = true, { capabilityConjunction = {} }, { capabilityDisjunction = {} } } },
-	{ undefined = {} },
+
+	-- Instructions that represent something with an undefined value.
+	{ Undefined = {
+
+		-- A load from a memory location that is known to be uninitialized.
+		--
+		-- Primarily used so that the compiler front-end can diagnose an error on such cases.
+		--
+		-- A given `LoadFromUninitializedMemory` might evaluate to an arbitrary value of its type,
+		-- and an optimization pass may freely decide on a particular value to use and replace
+		-- all uses of the instruction with that value.
+		--
+		-- If there are multiple distinct `LoadFromUninitializedMemory` instructions, then they
+		-- might each yield a different value, even if they all reference the same memory
+		-- location.
+		--
+		-- Akin to `freeze(undefined)` in LLVM.
+		--
+		{ LoadFromUninitializedMemory = {} },
+
+		-- An undefined value that is infectious.
+		--
+		-- Semantically, a poison value of some type T can be thought of as a
+		-- hypothetical out-of-band instance of type T, akin to a T-specific NaN
+		-- value (although a poison `float` is distinct from a `float` NaN value...).
+		-- The motivation for this interpretation is that it allows most optimizations
+		-- to ignore the possibility of poison/undefined values, while still being
+		-- semantically correct.
+		--
+		-- In most cases, an instruction that is executed with a poison value as one
+		-- of its operands yields a poison value as its result. The main exception
+		-- is instructions that only conditionally use an operand, such as `select`,
+		-- and block/function parameters (just because one branch passes a poison
+		-- argument for a parmeter, that doesn't mean the parameter would be poison
+		-- every time the block executes).
+		--
+		-- Corresponds to the LLVM `poison` instruction.
+		--
+		{ Poison = {} },
+	}},
+
 	-- A `defaultConstruct` operation creates an initialized
 	-- value of the result type, and can only be used for types
 	-- where default construction is a meaningful thing to do.

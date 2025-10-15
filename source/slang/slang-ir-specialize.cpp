@@ -1025,7 +1025,7 @@ struct SpecializationContext
                 {
                     isInvalid = true;
                 }
-                else if (item->getOperand(i)->getOp() == kIROp_Undefined)
+                if (as<IRUndefined>(item->getOperand(i)))
                 {
                     isInvalid = true;
                 }
@@ -1115,7 +1115,7 @@ struct SpecializationContext
         IRSpecializationDictionaryItem* item = nullptr;
         if (dict.tryGetValue(key, item))
         {
-            if (item->getOperand(0)->getOp() != kIROp_Undefined)
+            if (as<IRUndefined>(item->getOperand(0)))
                 return item->getOperand(0);
             else
             {

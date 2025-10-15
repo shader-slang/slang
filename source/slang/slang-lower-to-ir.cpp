@@ -2028,7 +2028,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                         operands.add(argVal);
                     });
 
-            auto undefined = getBuilder()->emitUndefined(operands[1]->getFullType());
+            auto undefined = getBuilder()->emitPoison(operands[1]->getFullType());
             return getBuilder()->getDifferentialPairUserCodeType(primalType, undefined);
         }
         else

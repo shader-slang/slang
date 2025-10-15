@@ -2794,17 +2794,6 @@ struct IRRTTIObject : IRInst
     FIDDLE(leafInst())
 };
 
-// An instruction that yields an undefined value.
-//
-// Note that we make this an instruction rather than a value,
-// so that we will be able to identify a variable that is
-// used when undefined.
-FIDDLE()
-struct IRUndefined : IRInst
-{
-    FIDDLE(leafInst())
-};
-
 // Special inst for targets that support default initialization,
 // like the braces '= {}' in C/HLSL
 FIDDLE()
@@ -4325,7 +4314,8 @@ public:
 
     IRInst* emitGpuForeach(List<IRInst*> args);
 
-    IRUndefined* emitUndefined(IRType* type);
+    IRLoadFromUninitializedMemory* emitLoadFromUninitializedMemory(IRType* type);
+    IRPoison* emitPoison(IRType* type);
 
     IRInst* emitReinterpret(IRInst* type, IRInst* value);
     IRInst* emitOutImplicitCast(IRInst* type, IRInst* value);
