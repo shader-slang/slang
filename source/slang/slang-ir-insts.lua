@@ -2699,8 +2699,18 @@ local function process(insts)
 		-- Start walking from the top-level insts
 		walk_insts(insts)
 	end
+	-- Extract type instructions from the main instruction list
+	local type_insts = nil
+	for _, inst in ipairs(insts) do
+		if inst.Type then
+			type_insts = inst.Type
+			break
+		end
+	end
+
 	return {
 		insts = insts,
+		type_insts = type_insts,
 		stable_name_to_inst = stable_name_to_inst,
 		max_stable_name = max_stable_name,
 		traverse = traverse,

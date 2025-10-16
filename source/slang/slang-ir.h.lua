@@ -316,269 +316,158 @@ local function instEnums()
 	return table.concat(output, "\n")
 end
 
--- Collect basic type instructions for template generation
+-- Collect type instructions for template generation (exception-based)
 local function getBasicTypesForBuilderMethods()
-	local insts = require("source/slang/slang-ir-insts.lua").insts
+	local lua_data = require("source/slang/slang-ir-insts.lua")
+	local type_insts = lua_data.type_insts
 
-	-- Define the list of basic types we want to generate getters for
-	-- Each entry can be either a string (type name) or a table {type_name, method_name}
-	local basic_types = {
-		"VoidType",
-		"BoolType",
-		"Int8Type",
-		"Int16Type",
-		"IntType",
-		"Int64Type",
-		"UInt8Type",
-		"UInt16Type",
-		"UIntType",
-		"UInt64Type",
-		"HalfType",
-		"FloatType",
-		"DoubleType",
-		"CharType",
-		"IntPtrType",
-		"UIntPtrType",
-		"StringType",
-		"NativeStringType",
-		-- Batch 1 additions - simple types with no operands
-		"CapabilitySetType",
-		"RawPointerType",
-		"RTTIType",
-		"RTTIHandleType",
-		"DynamicType",
-		-- Batch 2 additions - types that use simple getType pattern
-		"OptionalType",
-		"BasicBlockType",
-		"TypeKind",
-		"TypeParameterPackKind",
-		"RateKind", 
-		"GenericKind",
-		-- Batch 3 additions - more simple no-operand types
-		"MetalMeshGridPropertiesType",
-		-- Batch 4 additions - rate types
-		"ConstExprRate",
-		"GroupSharedRate",
-		"ActualGlobalRate",
-		"SpecConstRate",
-		-- Batch 5 additions - layout types and other simple types
-		"TorchTensorType",
-		"ConjunctionType",
-		"FuncType",
-		"DefaultBufferLayoutType",
-		"Std140BufferLayoutType",
-		-- Batch 6 additions - more layout and texture shape types
-		"Std430BufferLayoutType",
-		"ScalarBufferLayoutType",
-		"CBufferLayoutType",
-		"TextureShape1DType",
-		"TextureShape2DType", 
-		"TextureShape3DType",
-		"TextureShapeCubeType",
-		"TextureShapeBufferType",
-		-- Sampler types
-		"SamplerStateType",
-		"SamplerComparisonStateType", 
-		"GLSLAtomicUintType",
-		-- Batch 7 additions - types with single operands
-		"NativePtrType",
-		"RTTIPointerType",
-		"AnyValueType",
-		"ComPtrType",
-		"ArrayListType",
-		"TensorViewType",
-		"DescriptorHandleType",
-		"TextureFootprintType",
-		-- Batch 8 additions - single operand types that currently use arrays
-		-- Note: GLSLOutputParameterGroupType has operand definition mismatch - reverted
-		"PseudoPtrType",
-		-- Simple pointer types with single valueType operand
-		"PtrType",
-		"OutParamType", 
-		"BorrowInOutParamType",
-		-- Batch 9 additions - multi-parameter types with proper operand definitions
-		"ResultType",
-		"RateQualifiedType",
-		"MetalMeshType",
-		-- Differential pair types - 2 operands each
-		"DifferentialPairType",
-		"DifferentialPairUserCodeType", 
-		"DifferentialPtrPairType",
-		-- Batch 10 additions - types with matching operand definitions
-		-- Note: AttributedType uses dynamic operand list - can't convert
-		-- Note: BackwardDiffIntermediateContextType has null->void conversion logic - can't convert
-		-- Note: RefParamType and BorrowInParamType use getPtrType() instead of getType() - can't convert
-		"ThisType",
-		-- Batch 11 additions - variadic types
-		"TupleType",
-		-- Batch 12 additions - more variadic and single operand types
-		"TypePack",
-		"TargetTupleType",
-		"AssociatedType",
-		-- these don't have type type
-		"WitnessTableType",
-		"WitnessTableIDType",
-		-- Note: TypeType already handled by getTypeType() inline
-		-- These types already have operand definitions and can be auto-generated
-		"ArrayType",
-		"UnsizedArrayType",
-		"VectorType",
-		"MatrixType",
-		"CoopVectorType",
-		"ConstantBufferType",
-		-- Batch 13 additions - group from lines 300-540
-		-- TextureType has complex getAccess() logic - handled manually
-		"GLSLImageType",
-		"HLSLByteAddressBufferType",
-		"HLSLRWByteAddressBufferType", 
-		"HLSLRasterizerOrderedByteAddressBufferType",
-		"RaytracingAccelerationStructureType",
-		"HLSLInputPatchType",
-		"HLSLOutputPatchType",
-		"GLSLInputAttachmentType",
-		"HLSLPointStreamType",
-		"HLSLLineStreamType",
-		"HLSLTriangleStreamType",
-		"VerticesType",
-		"IndicesType", 
-		"PrimitivesType",
-		"HLSLStructuredBufferType",
-		"HLSLRWStructuredBufferType",
-		"HLSLRasterizerOrderedStructuredBufferType",
-		"HLSLAppendStructuredBufferType",
-		"HLSLConsumeStructuredBufferType",
-		"TextureBufferType",
-		"ParameterBlockType",
-		"GLSLInputParameterGroupType",
-		"GLSLOutputParameterGroupType",
-		"GLSLShaderStorageBufferType",
-		"RayQueryType",
-		"HitObjectType",
-		"CoopMatrixType",
-		"TensorAddressingTensorLayoutType",
-		"TensorAddressingTensorViewType", 
-		"DynamicResourceType",
-		-- StructType has identity semantics - uses createStructType, not getStructType
-		-- Batch 14 additions - final group from lines 540-622
-		"InterfaceType",
-		"ExpandTypeOrVal", 
-		"SPIRVLiteralType",
-		"TypeType",
-		-- ClassType has identity semantics - uses createClassType, not getClassType
+	-- Define the list of type instruction exceptions that should NOT have FIDDLE auto-generated methods
+	-- These types have complex logic or identity semantics that require manual implementation
+	local excluded_types = {
+		-- Complex logic/special cases
+		"BindExistentialsType", -- Complex variable-operand logic with special case handling
+		"BoundInterfaceType", -- Conditional logic that skips wrapping for __Dynamic types
+		"BackwardDiffIntermediateContextType", -- Has null->void conversion logic
+		"AttributedType", -- Uses dynamic operand list
+		"RefParamType", -- Has high-level helper that takes AddressSpace parameters
+		"BorrowInParamType", -- Has high-level helper that takes AddressSpace parameters
+		"TextureType", -- Has complex getAccess() method with IRIntLit->SlangResourceAccess conversion
+		-- Identity semantics - use createXxxType() instead of getXxxType()
+		"StructType", -- Uses createStructType(), not getStructType()
+		"ClassType", -- Uses createClassType(), not getClassType()
+		-- Base class types that should not be auto-generated (they don't have opcodes)
+		"HLSLPatchType", -- Base class for HLSLInputPatchType/HLSLOutputPatchType
+		"BuiltinGenericType", -- Base class for stream output types
+		"HLSLStreamOutputType", -- Base class for point/line/triangle streams
+		"MeshOutputType", -- Base class for mesh output types
+		"HLSLStructuredBufferTypeBase", -- Base class for structured buffer types
+		"PointerLikeType", -- Base class for pointer-like types
+		"ParameterGroupType", -- Base class for parameter group types
+		"UniformParameterGroupType", -- Base class for uniform parameter group types
+		"VaryingParameterGroupType", -- Base class for varying parameter group types
+		"TupleTypeBase", -- Base class for tuple types
+		"WitnessTableTypeBase", -- Base class for witness table types
+		-- Additional base class types found during build
+		"BindExistentialsTypeBase", -- Base class for bind existentials types
+		"Rate", -- Base class for rate types
+		"Kind", -- Base class for kind types
+		"PtrTypeBase", -- Base class for pointer types
+		"OutParamTypeBase", -- Base class for output parameter types
+		"SamplerStateTypeBase", -- Base class for sampler state types
+		"ResourceTypeBase", -- Base class for resource types
+		"ResourceType", -- Base class for resource types
+		"TextureTypeBase", -- Base class for texture types
+		"UntypedBufferResourceType", -- Base class for untyped buffer resource types
+		"ByteAddressBufferTypeBase", -- Base class for byte address buffer types
+		-- More base class types found during build
+		"BasicType", -- Base class for basic types like Int, Float, etc.
+		"StringTypeBase", -- Base class for string types
+		"RawPointerTypeBase", -- Base class for raw pointer types
+		"ArrayTypeBase", -- Base class for array types
+		"DifferentialPairTypeBase", -- Base class for differential pair types
 	}
+
+	-- Convert excluded_types to a lookup set for faster access
+	local excluded_set = {}
+	for _, type_name in ipairs(excluded_types) do
+		excluded_set[type_name] = true
+	end
 
 	local result = {}
 
-	for _, entry in ipairs(basic_types) do
-		-- Handle both string entries and table entries {type_name, method_name}
-		local type_name, custom_method_name
-		if type(entry) == "string" then
-			type_name = entry
-			custom_method_name = nil
-		else
-			type_name = entry[1]
-			custom_method_name = entry[2]
-		end
+	-- Use the proven walk_instructions function to collect all type instructions
+	if type_insts then
+		walk_instructions(type_insts, function(key, value, struct_name, parent_struct)
+			-- Only process instructions that are not excluded (base classes, complex logic, etc.)
+			if struct_name and not excluded_set[struct_name] then
+				-- Determine method name - always add "get" prefix
+				local method_name = "get" .. struct_name
 
-		-- Find the instruction data in the Lua definitions
-		local inst_data = nil
-		walk_instructions(insts, function(key, value, struct_name, parent_struct)
-			if struct_name == type_name then
-				inst_data = value
+				-- Infer return type - specific type pointer for the struct
+				local return_type = "IR" .. struct_name .. "*"
+
+				-- Infer opcode
+				local opcode = "kIROp_" .. struct_name
+
+				-- Get operands info from the instruction data
+				local operands = {}
+				local is_variadic = false
+				local has_optional = false
+				local optional_started = false
+				if value and value.operands then
+					-- Handle different operand formats
+					if type(value.operands[1]) == "table" then
+						-- Format: { { "name", "type" }, { "name2", "type2" } }
+						for i, operand in ipairs(value.operands) do
+							local operand_info = {
+								name = operand[1],
+								type = operand[2] or "IRInst",
+								index = i - 1,
+							}
+							-- Check if this operand is variadic
+							if operand.variadic then
+								operand_info.variadic = true
+								is_variadic = true
+								-- Variadic and optional operands together are not supported for now
+								if has_optional then
+									error(
+										"Type "
+											.. struct_name
+											.. " has both variadic and optional operands, which is not supported"
+									)
+								end
+							end
+							-- Check if this operand is optional
+							if operand.optional then
+								operand_info.optional = true
+								has_optional = true
+								optional_started = true
+							else
+								-- Non-optional operand found after optional operands started
+								if optional_started then
+									error(
+										"Type "
+											.. struct_name
+											.. " has non-optional operand '"
+											.. operand[1]
+											.. "' after optional operands. Optional operands must be at the end."
+									)
+								end
+							end
+							table.insert(operands, operand_info)
+						end
+					else
+						-- Format: { "name", "type", variadic = true }
+						local operand_info = {
+							name = value.operands[1],
+							type = value.operands[2] or "IRInst",
+							index = 0,
+						}
+						-- Check if this operand is variadic
+						if value.operands.variadic then
+							operand_info.variadic = true
+							is_variadic = true
+						end
+						-- Check if this operand is optional
+						if value.operands.optional then
+							operand_info.optional = true
+							has_optional = true
+						end
+						table.insert(operands, operand_info)
+					end
+				end
+
+				table.insert(result, {
+					struct_name = struct_name,
+					method_name = method_name,
+					return_type = return_type,
+					opcode = opcode,
+					operands = operands,
+					is_variadic = is_variadic,
+					has_optional = has_optional,
+				})
 			end
 		end)
-
-		-- Determine method name - always add "get" prefix
-		local method_name
-		if custom_method_name then
-			method_name = "get" .. custom_method_name
-		else
-			method_name = "get" .. type_name
-		end
-
-		-- Infer return type - specific type pointer for the struct
-		local return_type = "IR" .. type_name .. "*"
-
-		-- Infer opcode
-		local opcode = "kIROp_" .. type_name
-
-		-- Get operands info
-		local operands = {}
-		local is_variadic = false
-		local has_optional = false
-		local optional_started = false
-		if inst_data and inst_data.operands then
-			-- Handle different operand formats
-			if type(inst_data.operands[1]) == "table" then
-				-- Format: { { "name", "type" }, { "name2", "type2" } }
-				for i, operand in ipairs(inst_data.operands) do
-					local operand_info = {
-						name = operand[1],
-						type = operand[2] or "IRInst",
-						index = i - 1,
-					}
-					-- Check if this operand is variadic
-					if operand.variadic then
-						operand_info.variadic = true
-						is_variadic = true
-						-- Variadic and optional operands together are not supported for now
-						if has_optional then
-							error(
-								"Type "
-									.. type_name
-									.. " has both variadic and optional operands, which is not supported"
-							)
-						end
-					end
-					-- Check if this operand is optional
-					if operand.optional then
-						operand_info.optional = true
-						has_optional = true
-						optional_started = true
-					else
-						-- Non-optional operand found after optional operands started
-						if optional_started then
-							error(
-								"Type "
-									.. type_name
-									.. " has non-optional operand '"
-									.. operand[1]
-									.. "' after optional operands. Optional operands must be at the end."
-							)
-						end
-					end
-					table.insert(operands, operand_info)
-				end
-			else
-				-- Format: { "name", "type", variadic = true }
-				local operand_info = {
-					name = inst_data.operands[1],
-					type = inst_data.operands[2] or "IRInst",
-					index = 0,
-				}
-				-- Check if this operand is variadic
-				if inst_data.operands.variadic then
-					operand_info.variadic = true
-					is_variadic = true
-				end
-				-- Check if this operand is optional
-				if inst_data.operands.optional then
-					operand_info.optional = true
-					has_optional = true
-				end
-				table.insert(operands, operand_info)
-			end
-		end
-
-		table.insert(result, {
-			struct_name = type_name,
-			method_name = method_name,
-			return_type = return_type,
-			opcode = opcode,
-			operands = operands,
-			is_variadic = is_variadic,
-			has_optional = has_optional,
-		})
 	end
 
 	return result
