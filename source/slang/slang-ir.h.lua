@@ -335,36 +335,7 @@ local function getBasicTypesForBuilderMethods()
 		-- Identity semantics - use createXxxType() instead of getXxxType()
 		"StructType", -- Uses createStructType(), not getStructType()
 		"ClassType", -- Uses createClassType(), not getClassType()
-		-- Base class types that should not be auto-generated (they don't have opcodes)
-		"HLSLPatchType", -- Base class for HLSLInputPatchType/HLSLOutputPatchType
-		"BuiltinGenericType", -- Base class for stream output types
-		"HLSLStreamOutputType", -- Base class for point/line/triangle streams
-		"MeshOutputType", -- Base class for mesh output types
-		"HLSLStructuredBufferTypeBase", -- Base class for structured buffer types
-		"PointerLikeType", -- Base class for pointer-like types
-		"ParameterGroupType", -- Base class for parameter group types
-		"UniformParameterGroupType", -- Base class for uniform parameter group types
-		"VaryingParameterGroupType", -- Base class for varying parameter group types
-		"TupleTypeBase", -- Base class for tuple types
-		"WitnessTableTypeBase", -- Base class for witness table types
-		-- Additional base class types found during build
-		"BindExistentialsTypeBase", -- Base class for bind existentials types
-		"Rate", -- Base class for rate types
-		"Kind", -- Base class for kind types
-		"PtrTypeBase", -- Base class for pointer types
-		"OutParamTypeBase", -- Base class for output parameter types
-		"SamplerStateTypeBase", -- Base class for sampler state types
-		"ResourceTypeBase", -- Base class for resource types
-		"ResourceType", -- Base class for resource types
-		"TextureTypeBase", -- Base class for texture types
-		"UntypedBufferResourceType", -- Base class for untyped buffer resource types
-		"ByteAddressBufferTypeBase", -- Base class for byte address buffer types
-		-- More base class types found during build
-		"BasicType", -- Base class for basic types like Int, Float, etc.
-		"StringTypeBase", -- Base class for string types
-		"RawPointerTypeBase", -- Base class for raw pointer types
-		"ArrayTypeBase", -- Base class for array types
-		"DifferentialPairTypeBase", -- Base class for differential pair types
+		-- Note: Base classes are automatically filtered out using value.is_leaf
 	}
 
 	-- Convert excluded_types to a lookup set for faster access
@@ -378,8 +349,8 @@ local function getBasicTypesForBuilderMethods()
 	-- Use the proven walk_instructions function to collect all type instructions
 	if type_insts then
 		walk_instructions(type_insts, function(key, value, struct_name, parent_struct)
-			-- Only process instructions that are not excluded (base classes, complex logic, etc.)
-			if struct_name and not excluded_set[struct_name] then
+			-- Only process leaf instructions (not base classes) that are not excluded
+			if struct_name and value.is_leaf and not excluded_set[struct_name] then
 				-- Determine method name - always add "get" prefix
 				local method_name = "get" .. struct_name
 
