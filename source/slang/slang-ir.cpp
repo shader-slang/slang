@@ -2823,7 +2823,6 @@ IRBorrowInParamType* IRBuilder::getBorrowInParamType(IRType* valueType, AddressS
 }
 
 
-
 IRGLSLOutputParameterGroupType* IRBuilder::getGLSLOutputParameterGroupType(IRType* elementType)
 {
     IRInst* operands[] = {elementType};

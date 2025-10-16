@@ -302,7 +302,20 @@ local insts = {
 							{
 								TextureTypeBase = {
 									{
-										TextureType = { min_operands = 8, hoistable = true },
+										TextureType = { 
+											operands = { 
+												{ "elementType", "IRType" }, 
+												{ "shape", "IRInst" }, 
+												{ "isArray", "IRInst" }, 
+												{ "isMS", "IRInst" }, 
+												{ "sampleCount", "IRInst" }, 
+												{ "accessOperand", "IRInst" }, 
+												{ "isShadow", "IRInst" }, 
+												{ "isCombined", "IRInst" }, 
+												{ "format", "IRInst" } 
+											}, 
+											hoistable = true 
+										},
 									},
 									{ GLSLImageType = { use_other = true, hoistable = true } },
 								},
