@@ -1092,7 +1092,7 @@ SlangResult NVRTCDownstreamCompiler::compile(
     {
         diagnostics->setResult(SLANG_FAIL);
         *outArtifact = artifact.detach();
-        return SLANG_OK;
+        return SLANG_FAIL;
     }
 
     // Neither of these options are strictly required, for general use of nvrtc,
@@ -1175,7 +1175,7 @@ SlangResult NVRTCDownstreamCompiler::compile(
         {
             diagnostics->setResult(SLANG_FAIL);
             *outArtifact = artifact.detach();
-            return SLANG_OK;
+            return SLANG_FAIL;
         }
     }
 
