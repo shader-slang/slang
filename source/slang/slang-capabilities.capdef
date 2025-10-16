@@ -253,7 +253,7 @@ def _cuda_sm_9_0 : _cuda_sm_8_0;
 /// Represents capabilities required for optix cooperative vector support.
 def optix_coopvec : _cuda_sm_9_0;
 /// Represents capabilities required for optix multi-level traversal support.
-def optix_multilevel_traversal : cuda;
+def optix_multilevel_traversal : _cuda_sm_5_0;
 
 /// All code-gen targets
 /// [Compound]
