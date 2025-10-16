@@ -4267,23 +4267,17 @@ slangOptixHitObjectSetSbtRecordIndex(OptixTraversableHandle* Obj, uint sbtRecord
 __device__ __forceinline__ Matrix<float, 3, 4> _slang_optixGetInstanceTransformFromHandle(
     ulonglong handle)
 {
-    const float* m = optixGetInstanceTransformFromHandle(handle);
+    const float4* m = optixGetInstanceTransformFromHandle(handle);
     // OptiX stores matrix as 3 rows of float4 in the array
-    return makeMatrix<float, 3, 4>(
-        make_float4(m[0], m[1], m[2], m[3]),
-        make_float4(m[4], m[5], m[6], m[7]),
-        make_float4(m[8], m[9], m[10], m[11]));
+    return makeMatrix<float, 3, 4>(m[0], m[1], m[2]);
 }
 
 __device__ __forceinline__ Matrix<float, 3, 4> _slang_optixGetInstanceInverseTransformFromHandle(
     ulonglong handle)
 {
-    const float* m = optixGetInstanceInverseTransformFromHandle(handle);
+    const float4* m = optixGetInstanceInverseTransformFromHandle(handle);
     // OptiX stores matrix as 3 rows of float4 in the array
-    return makeMatrix<float, 3, 4>(
-        make_float4(m[0], m[1], m[2], m[3]),
-        make_float4(m[4], m[5], m[6], m[7]),
-        make_float4(m[8], m[9], m[10], m[11]));
+    return makeMatrix<float, 3, 4>(m[0], m[1], m[2]);
 }
 
 // OptiX transformation matrix wrappers
