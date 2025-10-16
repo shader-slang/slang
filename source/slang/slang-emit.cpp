@@ -1270,7 +1270,13 @@ Result linkAndOptimizeIR(
     // For CUDA targets, always inline global constants to avoid dynamic initialization
     // of __device__ variables rejected by NVRTC. This runs independently of the broader
     // resource/existential type legalization, which remains disabled for CUDA.
-    if (target == CodeGenTarget::CUDASource || options.shouldLegalizeExistentialAndResourceTypes)
+    //
+    // We also need this pass on the CPU targets in shader mode, as global
+    // constants may reference global parameters, which can't be emitted as
+    // constants.
+    if (target == CodeGenTarget::CUDASource ||
+        (isCPUTarget(targetRequest) && isKernelTarget(target)) ||
+        options.shouldLegalizeExistentialAndResourceTypes)
     {
         inlineGlobalConstantsForLegalization(irModule);
     }

@@ -4,6 +4,7 @@
 #include "slang-ast-builder.h"
 #include "slang-ast-dispatch.h"
 #include "slang-ast-modifier.h"
+#include "slang-check.h"
 #include "slang-syntax.h"
 
 #include <assert.h>
@@ -13,6 +14,7 @@ namespace Slang
 
 bool isAbstractTypePack(Type* type)
 {
+    type = unwrapModifiedType(type);
     if (as<ExpandType>(type))
         return true;
     if (isDeclRefTypeOf<GenericTypePackParamDecl>(type))
@@ -22,6 +24,7 @@ bool isAbstractTypePack(Type* type)
 
 bool isTypePack(Type* type)
 {
+    type = unwrapModifiedType(type);
     if (as<ConcreteTypePack>(type))
         return true;
     return isAbstractTypePack(type);
