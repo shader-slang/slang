@@ -256,6 +256,7 @@ if(NOT SLANG_EMBED_CORE_MODULE)
     slang_add_target(
         .
         ${SLANG_LIB_TYPE}
+        OUTPUT_NAME slang-compiler
         ${slang_build_args}
         ${slang_link_args}
         ${slang_interface_args}
@@ -296,6 +297,7 @@ else()
     slang_add_target(
         .
         ${SLANG_LIB_TYPE}
+        OUTPUT_NAME slang-compiler
         EXPORT_MACRO_PREFIX SLANG
         ${slang_link_args}
         ${slang_interface_args}

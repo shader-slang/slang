@@ -355,15 +355,15 @@ _MSVC_ 19 is tested in CI and is the recommended minimum version.
 
 _Clang_ 17.0 is tested in CI and is the recommended minimum version.
 
-## Static linking against libslang
+## Static linking against libslang-compiler
 
-If linking against a static `libslang.a` you will need to link against some
+If linking against a static `libslang-compiler.a` you will need to link against some
 dependencies also if you're not already incorporating them into your project.
 
 You will need to link against:
 
 ```
-${SLANG_DIR}/build/Release/lib/libslang.a
+${SLANG_DIR}/build/Release/lib/libslang-compiler.a
 ${SLANG_DIR}/build/Release/lib/libcompiler-core.a
 ${SLANG_DIR}/build/Release/lib/libcore.a
 ${SLANG_DIR}/build/external/miniz/libminiz.a
