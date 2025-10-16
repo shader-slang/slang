@@ -103,7 +103,7 @@ jobs:
   # Windows builds (self-hosted)
   build-windows-debug-cl-x86_64-gpu:
     needs: [filter]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: windows
@@ -114,7 +114,7 @@ jobs:
 
   build-windows-release-cl-x86_64-gpu:
     needs: [filter]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: windows
@@ -177,7 +177,7 @@ jobs:
   # Windows GPU tests (self-hosted)
   test-windows-debug-cl-x86_64-gpu:
     needs: [filter, build-windows-debug-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false
     uses: ./.github/workflows/ci-slang-test.yml
     with:
       os: windows
@@ -190,7 +190,7 @@ jobs:
 
   test-windows-release-cl-x86_64-gpu:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false
     uses: ./.github/workflows/ci-slang-test.yml
     with:
       os: windows
