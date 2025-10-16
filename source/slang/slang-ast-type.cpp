@@ -481,23 +481,23 @@ void maybePrintAddrSpaceOperand(StringBuilder& out, AddressSpace addrSpace)
     switch (addrSpace)
     {
     case AddressSpace::Generic:
-        out << toSlice(", AddressSpace::Generic");
+        out << toSlice(", AddressSpace.Generic");
         break;
     case AddressSpace::UserPointer:
         // We expose UserPointer as Device to users
-        out << toSlice(", AddressSpace::Device");
+        out << toSlice(", AddressSpace.Device");
         break;
     case AddressSpace::GroupShared:
-        out << toSlice(", AddressSpace::GroupShared");
+        out << toSlice(", AddressSpace.GroupShared");
         break;
     case AddressSpace::Global:
-        out << toSlice(", AddressSpace::Global");
+        out << toSlice(", AddressSpace.Global");
         break;
     case AddressSpace::ThreadLocal:
-        out << toSlice(", AddressSpace::ThreadLocal");
+        out << toSlice(", AddressSpace.ThreadLocal");
         break;
     case AddressSpace::Uniform:
-        out << toSlice(", AddressSpace::Uniform");
+        out << toSlice(", AddressSpace.Uniform");
         break;
     default:
         break;
