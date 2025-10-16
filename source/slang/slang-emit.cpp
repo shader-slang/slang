@@ -1274,7 +1274,7 @@ Result linkAndOptimizeIR(
     // constants may reference global parameters, which can't be emitted as
     // constants.
     if (target == CodeGenTarget::CUDASource ||
-        (isCPUTarget(targetRequest) && isShaderTarget(target)) ||
+        (isCPUTarget(targetRequest) && isKernelTarget(target)) ||
         options.shouldLegalizeExistentialAndResourceTypes)
     {
         inlineGlobalConstantsForLegalization(irModule);

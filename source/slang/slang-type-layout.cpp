@@ -2712,7 +2712,7 @@ bool isWGPUTarget(TargetRequest* targetReq)
     return isWGPUTarget(targetReq->getTarget());
 }
 
-bool isShaderTarget(CodeGenTarget codeGenTarget)
+bool isKernelTarget(CodeGenTarget codeGenTarget)
 {
     return ArtifactDescUtil::makeDescForCompileTarget(asExternal(codeGenTarget)).style ==
            ArtifactStyle::Kernel;
