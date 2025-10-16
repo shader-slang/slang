@@ -23,12 +23,19 @@ RWStructuredBuffer<uint> outputBuffer;
 //CHECK_PTX-DAG: _optix_get_instance_transform_from_handle
 //CHECK_PTX-DAG: _optix_get_instance_inverse_transform_from_handle
 
+// Transform list intrinsics (context-dependent, only in hit shaders)
+//CHECK-DAG: optixGetTransformListSize
+//CHECK-DAG: optixGetTransformListHandle
+
+//CHECK_PTX-DAG: _optix_get_transform_list_size
+//CHECK_PTX-DAG: _optix_get_transform_list_handle
+
 struct TestPayload
 {
     TRAVERSABLE_TRANSFORM_TYPE transformType;
     uint instanceId;
-    uint64_t transformPtr;
-    uint64_t inverseTransformPtr;
+    float3x4 transform;
+    float3x4 inverseTransform;
 };
 
 [shader("raygeneration")]
@@ -52,9 +59,9 @@ void rayGen()
     // Test 4: Get child handle
     uint64_t childHandle = GetTraversableChild(instanceHandle);
 
-    // Test 5 & 6: Get transforms (returned as pointers cast to uint64_t)
-    payload.transformPtr = GetTraversableObjectToWorld(instanceHandle);
-    payload.inverseTransformPtr = GetTraversableWorldToObject(instanceHandle);
+    // Test 5 & 6: Get transforms (returned as float3x4 matrices)
+    payload.transform = GetTraversableObjectToWorld(instanceHandle);
+    payload.inverseTransform = GetTraversableWorldToObject(instanceHandle);
 
     // Use the child handle to make sure all intrinsics are called and not optimized out
     payload.instanceId += GetTraversableInstanceId(childHandle);
@@ -62,6 +69,27 @@ void rayGen()
     // Write results to output buffer to prevent optimization
     outputBuffer[0] = payload.transformType;
     outputBuffer[1] = payload.instanceId;
-    outputBuffer[2] = uint(payload.transformPtr & 0xFFFFFFFF);
-    outputBuffer[3] = uint(payload.inverseTransformPtr & 0xFFFFFFFF);
+    // Write first element of each transform matrix
+    outputBuffer[2] = asuint(payload.transform[0][0]);
+    outputBuffer[3] = asuint(payload.inverseTransform[0][0]);
+}
+
+struct HitPayload
+{
+    uint transformListSize;
+    uint64_t firstHandle;
+};
+
+[shader("closesthit")]
+void closestHit(inout HitPayload payload, in BuiltInTriangleIntersectionAttributes attribs)
+{
+    // Test 7: Get transform list size (context-dependent, only valid in hit shaders)
+    payload.transformListSize = GetTransformListSize();
+
+    // Test 8: Get transform list handle (context-dependent, only valid in hit shaders)
+    // Get the root handle (index 0)
+    if (payload.transformListSize > 0)
+    {
+        payload.firstHandle = GetTransformListHandle(0);
+    }
 }
