@@ -509,11 +509,13 @@ void maybePrintAccessQualifierOperand(StringBuilder& out, AccessQualifier access
     switch (accessQualifier)
     {
     case AccessQualifier::ReadWrite:
-        out << toSlice(", Access::ReadWrite");
+        out << toSlice(", Access.ReadWrite");
         break;
     case AccessQualifier::Read:
+        out << toSlice(", Access.Read");
+        break;
     case AccessQualifier::Immutable:
-        out << toSlice(", Access::Read");
+        out << toSlice(", Access.Immutable");
         break;
     default:
         break;
