@@ -4264,27 +4264,26 @@ slangOptixHitObjectSetSbtRecordIndex(OptixTraversableHandle* Obj, uint sbtRecord
 
 // OptiX multi-level traversal wrappers
 // These wrappers convert OptiX's float[12] matrix pointer returns to Slang's Matrix type
-__device__ __forceinline__ Matrix<float, 3, 4> _slang_optixGetInstanceTransformFromHandle(ulonglong handle)
+__device__ __forceinline__ Matrix<float, 3, 4> _slang_optixGetInstanceTransformFromHandle(
+    ulonglong handle)
 {
     const float* m = optixGetInstanceTransformFromHandle(handle);
     // OptiX stores matrix as 3 rows of float4 in the array
     return makeMatrix<float, 3, 4>(
         make_float4(m[0], m[1], m[2], m[3]),
         make_float4(m[4], m[5], m[6], m[7]),
-        make_float4(m[8], m[9], m[10], m[11])
-    );
+        make_float4(m[8], m[9], m[10], m[11]));
 }
 
-__device__ __forceinline__ Matrix<float, 3, 4>
-_slang_optixGetInstanceInverseTransformFromHandle(ulonglong handle)
+__device__ __forceinline__ Matrix<float, 3, 4> _slang_optixGetInstanceInverseTransformFromHandle(
+    ulonglong handle)
 {
     const float* m = optixGetInstanceInverseTransformFromHandle(handle);
     // OptiX stores matrix as 3 rows of float4 in the array
     return makeMatrix<float, 3, 4>(
         make_float4(m[0], m[1], m[2], m[3]),
         make_float4(m[4], m[5], m[6], m[7]),
-        make_float4(m[8], m[9], m[10], m[11])
-    );
+        make_float4(m[8], m[9], m[10], m[11]));
 }
 
 // OptiX transformation matrix wrappers
@@ -4297,8 +4296,7 @@ __device__ __forceinline__ Matrix<float, 3, 4> slangOptixGetObjectToWorldTransfo
     return makeMatrix<float, 3, 4>(
         make_float4(m[0], m[1], m[2], m[3]),
         make_float4(m[4], m[5], m[6], m[7]),
-        make_float4(m[8], m[9], m[10], m[11])
-    );
+        make_float4(m[8], m[9], m[10], m[11]));
 }
 
 __device__ __forceinline__ Matrix<float, 3, 4> slangOptixGetWorldToObjectTransformMatrix()
@@ -4309,8 +4307,7 @@ __device__ __forceinline__ Matrix<float, 3, 4> slangOptixGetWorldToObjectTransfo
     return makeMatrix<float, 3, 4>(
         make_float4(m[0], m[1], m[2], m[3]),
         make_float4(m[4], m[5], m[6], m[7]),
-        make_float4(m[8], m[9], m[10], m[11])
-    );
+        make_float4(m[8], m[9], m[10], m[11]));
 }
 
 __device__ __forceinline__ Matrix<float, 4, 3> slangOptixGetObjectToWorldTransformMatrix4x3()
@@ -4322,8 +4319,7 @@ __device__ __forceinline__ Matrix<float, 4, 3> slangOptixGetObjectToWorldTransfo
         make_float3(m[0], m[4], m[8]),
         make_float3(m[1], m[5], m[9]),
         make_float3(m[2], m[6], m[10]),
-        make_float3(m[3], m[7], m[11])
-    );
+        make_float3(m[3], m[7], m[11]));
 }
 
 __device__ __forceinline__ Matrix<float, 4, 3> slangOptixGetWorldToObjectTransformMatrix4x3()
@@ -4335,8 +4331,7 @@ __device__ __forceinline__ Matrix<float, 4, 3> slangOptixGetWorldToObjectTransfo
         make_float3(m[0], m[4], m[8]),
         make_float3(m[1], m[5], m[9]),
         make_float3(m[2], m[6], m[10]),
-        make_float3(m[3], m[7], m[11])
-    );
+        make_float3(m[3], m[7], m[11]));
 }
 
 #else
