@@ -3256,7 +3256,6 @@ $(type_info.return_type) $(type_info.method_name)(
         ArrayView<IRInst*> capture);
 
 
-    IRType* getTypeType() { return getType(IROp::kIROp_TypeType); }
     IRType* getKeyType() { return nullptr; }
 
     IRPtrTypeBase* getPtrType(IROp op, IRType* valueType);
@@ -3313,9 +3312,6 @@ $(type_info.return_type) $(type_info.method_name)(
         IRInst* isCombined,
         IRInst* format);
 
-
-    /// Get a 'SPIRV literal'
-    IRSPIRVLiteralType* getSPIRVLiteralType(IRType* type);
 
     /// Get a GLSL output parameter group type
     IRGLSLOutputParameterGroupType* getGLSLOutputParameterGroupType(IRType* elementType);

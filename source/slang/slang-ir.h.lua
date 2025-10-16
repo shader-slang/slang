@@ -426,6 +426,45 @@ local function getBasicTypesForBuilderMethods()
 		"MatrixType",
 		"CoopVectorType",
 		"ConstantBufferType",
+		-- Batch 13 additions - group from lines 300-540
+		-- TextureType has complex getAccess() logic - handled manually
+		"GLSLImageType",
+		"HLSLByteAddressBufferType",
+		"HLSLRWByteAddressBufferType", 
+		"HLSLRasterizerOrderedByteAddressBufferType",
+		"RaytracingAccelerationStructureType",
+		"HLSLInputPatchType",
+		"HLSLOutputPatchType",
+		"GLSLInputAttachmentType",
+		"HLSLPointStreamType",
+		"HLSLLineStreamType",
+		"HLSLTriangleStreamType",
+		"VerticesType",
+		"IndicesType", 
+		"PrimitivesType",
+		"HLSLStructuredBufferType",
+		"HLSLRWStructuredBufferType",
+		"HLSLRasterizerOrderedStructuredBufferType",
+		"HLSLAppendStructuredBufferType",
+		"HLSLConsumeStructuredBufferType",
+		"TextureBufferType",
+		"ParameterBlockType",
+		"GLSLInputParameterGroupType",
+		"GLSLOutputParameterGroupType",
+		"GLSLShaderStorageBufferType",
+		"RayQueryType",
+		"HitObjectType",
+		"CoopMatrixType",
+		"TensorAddressingTensorLayoutType",
+		"TensorAddressingTensorViewType", 
+		"DynamicResourceType",
+		-- StructType has identity semantics - uses createStructType, not getStructType
+		-- Batch 14 additions - final group from lines 540-622
+		"InterfaceType",
+		"ExpandTypeOrVal", 
+		"SPIRVLiteralType",
+		"TypeType",
+		-- ClassType has identity semantics - uses createClassType, not getClassType
 	}
 
 	local result = {}

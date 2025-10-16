@@ -2823,11 +2823,6 @@ IRBorrowInParamType* IRBuilder::getBorrowInParamType(IRType* valueType, AddressS
 }
 
 
-IRSPIRVLiteralType* IRBuilder::getSPIRVLiteralType(IRType* type)
-{
-    IRInst* operands[] = {type};
-    return (IRSPIRVLiteralType*)getType(kIROp_SPIRVLiteralType, 1, operands);
-}
 
 IRGLSLOutputParameterGroupType* IRBuilder::getGLSLOutputParameterGroupType(IRType* elementType)
 {
@@ -2905,7 +2900,6 @@ IRTextureTypeBase* IRBuilder::getTextureType(
         (UInt)(sizeof(args) / sizeof(IRInst*)),
         args));
 }
-
 
 IRArrayTypeBase* IRBuilder::getArrayTypeBase(
     IROp op,

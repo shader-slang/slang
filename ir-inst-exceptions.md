@@ -11,3 +11,6 @@ This document lists IR instruction types that cannot use the FIDDLE template sys
 - **AttributedType**: Uses dynamic operand list
 - **RefParamType**: Has high-level helper that takes AddressSpace parameters (FIDDLE generates basic version)
 - **BorrowInParamType**: Has high-level helper that takes AddressSpace parameters (FIDDLE generates basic version)
+- **TextureType**: Has complex getAccess() method with IRIntLit->SlangResourceAccess conversion logic
+- **StructType**: Has identity semantics - uses createStructType(), not getStructType()
+- **ClassType**: Has identity semantics - uses createClassType(), not getClassType()
