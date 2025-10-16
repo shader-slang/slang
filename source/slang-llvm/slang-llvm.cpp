@@ -1032,17 +1032,27 @@ SlangResult LLVMDownstreamCompiler::compile(
 
                         for (auto& func : funcs)
                         {
-                            symbolMap[mangler(func.name)] = {ExecutorAddr::fromPtr(func.func), JITSymbolFlags::Callable};
+                            symbolMap[mangler(func.name)] = {
+                                ExecutorAddr::fromPtr(func.func),
+                                JITSymbolFlags::Callable};
                         }
                     }
 
 #if SLANG_PTR_IS_32 && SLANG_VC
                     {
                         // https://docs.microsoft.com/en-us/windows/win32/devnotes/-win32-alldiv
-                        symbolMap[mangler("_alldiv")] = {ExecutorAddr::fromPtr(WinSpecific::_alldiv), JITSymbolFlags::Callable};
-                        symbolMap[mangler("_allrem")] = {ExecutorAddr::fromPtr(WinSpecific::_allrem), JITSymbolFlags::Callable};
-                        symbolMap[mangler("_aulldiv")] = {ExecutorAddr::fromPtr(WinSpecific::_aulldiv), JITSymbolFlags::Callable};
-                        symbolMap[mangler("_aullrem")] = {ExecutorAddr::fromPtr(WinSpecific::_aullrem), JITSymbolFlags::Callable};
+                        symbolMap[mangler("_alldiv")] = {
+                            ExecutorAddr::fromPtr(WinSpecific::_alldiv),
+                            JITSymbolFlags::Callable};
+                        symbolMap[mangler("_allrem")] = {
+                            ExecutorAddr::fromPtr(WinSpecific::_allrem),
+                            JITSymbolFlags::Callable};
+                        symbolMap[mangler("_aulldiv")] = {
+                            ExecutorAddr::fromPtr(WinSpecific::_aulldiv),
+                            JITSymbolFlags::Callable};
+                        symbolMap[mangler("_aullrem")] = {
+                            ExecutorAddr::fromPtr(WinSpecific::_aullrem),
+                            JITSymbolFlags::Callable};
                     }
 #endif
 
@@ -1052,7 +1062,9 @@ SlangResult LLVMDownstreamCompiler::compile(
                     }
 
                     // Required or the symbols won't be found
-                    jit->getMainJITDylib().addToLinkOrder(stdcLib, JITDylibLookupFlags::MatchAllSymbols);
+                    jit->getMainJITDylib().addToLinkOrder(
+                        stdcLib,
+                        JITDylibLookupFlags::MatchAllSymbols);
                 }
             }
 
