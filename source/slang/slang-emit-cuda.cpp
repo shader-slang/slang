@@ -225,11 +225,10 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
                 out << "OptixCoopVec<" << getBuiltinTypeName(elemType->getOp()) << ", " << elemCount << ">";
                 return SLANG_OK;
             }
-            // Cooperative vectors should have been lowered before reaching CUDA emit for non-OptiX targets
             SLANG_DIAGNOSE_UNEXPECTED(
                 getSink(),
                 SourceLoc(),
-                "cooperative vector types are only supported for OptiX targets");
+                "Cooperative vectors should have been lowered before reaching CUDA emit for non-OptiX targets");
             return SLANG_FAIL;
         }
     case kIROp_RaytracingAccelerationStructureType:
