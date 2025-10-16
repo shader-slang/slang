@@ -41,6 +41,10 @@ function(fetch_or_build_slang_llvm)
         find_package(LLVM 21.1 REQUIRED CONFIG)
         find_package(Clang REQUIRED CONFIG)
 
+        if (LLVM_LINK_LLVM_DYLIB)
+            set(LLVM_LINK_TYPE USE_SHARED)
+        endif()
+
         clang_target_from_libs(
             clang-dep
             clangBasic
@@ -67,7 +71,8 @@ function(fetch_or_build_slang_llvm)
             INSTALL_COMPONENT slang-llvm
             EXPORT_SET_NAME SlangTargets
         )
-        llvm_config(slang-llvm USE_SHARED filecheck native orcjit)
+
+        llvm_config(slang-llvm ${LLVM_LINK_TYPE} filecheck native orcjit)
 
         # If we don't include this, then the symbols in the LLVM linked here may
         # conflict with those of other LLVMs linked at runtime, for instance in mesa.
