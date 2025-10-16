@@ -3007,13 +3007,6 @@ IRFuncType* IRBuilder::getFuncType(
     return (IRFuncType*)createIntrinsicInst(nullptr, kIROp_FuncType, 3, counts, lists);
 }
 
-IRConstantBufferType* IRBuilder::getConstantBufferType(IRType* elementType, IRType* layoutType)
-{
-    IRInst* operands[] = {elementType, layoutType};
-    return (IRConstantBufferType*)getType(kIROp_ConstantBufferType, 2, operands);
-}
-
-
 IRType* IRBuilder::getBindExistentialsType(
     IRInst* baseType,
     UInt slotArgCount,

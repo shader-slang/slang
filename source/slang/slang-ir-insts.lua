@@ -64,10 +64,19 @@ local insts = {
 					{
 						Array = {
 							struct_name = "ArrayType",
-							operands = { { "elementType", "IRType" }, { "elementCount" }, { "stride", optional = true } },
+							operands = {
+								{ "elementType", "IRType" },
+								{ "elementCount" },
+								{ "stride", optional = true },
+							},
 						},
 					},
-					{ UnsizedArray = { struct_name = "UnsizedArrayType", operands = { { "elementType", "IRType" }, { "stride", optional = true } } } },
+					{
+						UnsizedArray = {
+							struct_name = "UnsizedArrayType",
+							operands = { { "elementType", "IRType" }, { "stride", optional = true } },
+						},
+					},
 				},
 			},
 			{ Func = { struct_name = "FuncType", hoistable = true } },
@@ -419,7 +428,10 @@ local insts = {
 											{
 												ConstantBuffer = {
 													struct_name = "ConstantBufferType",
-													min_operands = 1,
+													operands = {
+														{ "elementType", "IRType" },
+														{ "layoutType", "IRType" },
+													},
 												},
 											},
 											{
@@ -529,7 +541,13 @@ local insts = {
 				class = { struct_name = "ClassType", parent = true },
 			},
 			{ interface = { struct_name = "InterfaceType", global = true } },
-			{ associated_type = { struct_name = "AssociatedType", operands = { "constraintTypes", "IRInterfaceType", variadic = true }, hoistable = true } },
+			{
+				associated_type = {
+					struct_name = "AssociatedType",
+					operands = { "constraintTypes", "IRInterfaceType", variadic = true },
+					hoistable = true,
+				},
+			},
 			{ this_type = { operands = { { "interfaceType", "IRType" } }, hoistable = true } },
 			-- Represents the IR type for an `IRRTTIObject`.
 			{ rtti_type = { struct_name = "RTTIType", hoistable = true } },
@@ -554,7 +572,13 @@ local insts = {
 				},
 			},
 			-- Represents a tuple in target language. TargetTupleType will not be lowered to structs.
-			{ TargetTuple = { struct_name = "TargetTupleType", operands = { "types", "IRType", variadic = true }, hoistable = true } },
+			{
+				TargetTuple = {
+					struct_name = "TargetTupleType",
+					operands = { "types", "IRType", variadic = true },
+					hoistable = true,
+				},
+			},
 			{ ExpandTypeOrVal = { operands = { { "type" } }, hoistable = true } },
 			{
 				spirvLiteralType = {

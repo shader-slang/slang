@@ -406,6 +406,7 @@ local function getBasicTypesForBuilderMethods()
 		"VectorType",
 		"MatrixType",
 		"CoopVectorType",
+		"ConstantBufferType",
 	}
 
 	local result = {}

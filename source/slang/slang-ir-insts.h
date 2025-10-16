@@ -3358,9 +3358,6 @@ $(type_info.return_type) $(type_info.method_name)(
         return getFuncType(paramTypes.getCount(), paramTypes.getBuffer(), resultType);
     }
 
-    IRConstantBufferType* getConstantBufferType(IRType* elementType, IRType* layout);
-
-
     IRType* getBindExistentialsType(IRInst* baseType, UInt slotArgCount, IRInst* const* slotArgs);
 
     IRType* getBindExistentialsType(IRInst* baseType, UInt slotArgCount, IRUse const* slotArgs);
