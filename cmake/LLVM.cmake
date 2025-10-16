@@ -41,7 +41,7 @@ function(fetch_or_build_slang_llvm)
         find_package(LLVM 21.1 REQUIRED CONFIG)
         find_package(Clang REQUIRED CONFIG)
 
-        if (LLVM_LINK_LLVM_DYLIB)
+        if(LLVM_LINK_LLVM_DYLIB)
             set(LLVM_LINK_TYPE USE_SHARED)
         endif()
 
