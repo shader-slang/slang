@@ -20450,7 +20450,7 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "($2=HitObject::MakeMiss($0,$1))";
+        case hlsl: __intrinsic_asm "($2=dx::HitObject::MakeMiss($0,$1))";
         case glsl:
             __glslMakeMiss(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
         case cuda: __intrinsic_asm "optixMakeMissHitObject";
@@ -20487,7 +20487,7 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "($3=HitObject::MakeMotionMiss($0,$1,$2))";
+        case hlsl: __intrinsic_asm "($3=dx::HitObject::MakeMotionMiss($0,$1,$2))";
         case glsl:
             __glslMakeMotionMiss(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax, CurrentTime);
         case cuda: __intrinsic_asm "optixMakeMissHitObject";
@@ -20529,7 +20529,7 @@ struct HitObject
         __target_switch
         {
         case hlsl:
-            __intrinsic_asm "($0 = HitObject::MakeNop())";
+            __intrinsic_asm "($0 = dx::HitObject::MakeNop())";
         case glsl:
             __glslMakeNop(__return_val);
         case cuda: __intrinsic_asm "slangOptixMakeNopHitObject";
@@ -20544,6 +20544,18 @@ struct HitObject
         }
     }
 
+    [require(hlsl, ser)]
+    __generic<payload_t>
+    static void __InvokeHLSL(
+        HitObject HitOrMiss,
+        inout payload_t Payload)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "dx::HitObject::Invoke";
+        }
+    }
+
         /// Invokes closesthit or miss shading for the specified hit object. In case of a NOP HitObject, no
         /// shader is invoked.
     [__requiresNVAPI]
@@ -20555,7 +20567,10 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "HitObject::Invoke";
+        case hlsl:
+            __InvokeHLSL(
+                HitOrMiss,
+                __forceVarIntoRayPayloadStructTemporarily(Payload));
         case glsl:
             {
                 [__vulkanRayPayload]
@@ -21140,7 +21155,7 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "HitObject::MakeHit";
+        case hlsl: __intrinsic_asm "dx::HitObject::MakeHit";
         }
     }
 
@@ -21159,7 +21174,7 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "HitObject::MakeHit";
+        case hlsl: __intrinsic_asm "dx::HitObject::MakeHit";
         }
     }
 
@@ -21178,7 +21193,7 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "HitObject::TraceRay";
+        case hlsl: __intrinsic_asm "dx::HitObject::TraceRay";
         }
     }
 
@@ -21481,7 +21496,7 @@ void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
 {
     __target_switch
     {
-    case hlsl: __intrinsic_asm "MaybeReorderThread";
+    case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
     case glsl: __intrinsic_asm "reorderThreadNV";
     case cuda: __intrinsic_asm "optixReorder";
     case spirv:
@@ -21519,7 +21534,7 @@ void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHi
 {
     __target_switch
     {
-    case hlsl: __intrinsic_asm "MaybeReorderThread";
+    case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
     case glsl: __intrinsic_asm "reorderThreadNV";
     case cuda: __intrinsic_asm "optixReorder($1, $2)";
     case spirv:
@@ -21547,7 +21562,7 @@ void ReorderThread( HitObject HitOrMiss )
 {
     __target_switch
     {
-    case hlsl: __intrinsic_asm "MaybeReorderThread";
+    case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
     case glsl: __intrinsic_asm "reorderThreadNV";
     case cuda: __intrinsic_asm "optixReorder()";
     case spirv:

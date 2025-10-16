@@ -1453,7 +1453,7 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         }
     case kIROp_HitObjectType:
         {
-            m_writer->emit("HitObject");
+            m_writer->emit("dx::HitObject");
             return;
         }
     case kIROp_TextureFootprintType:
