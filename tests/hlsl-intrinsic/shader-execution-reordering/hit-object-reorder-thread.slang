@@ -82,7 +82,7 @@ void rayGenerationMain()
 
     // Now Invoke to cast another ray, with the new payload
     // SPIRV: OpHitObjectExecuteShaderNV
-    HitObject::Invoke( scene, hit, otherValues );
+    HitObject::Invoke( hit, otherValues );
     
     r += calcValue(hit);
   
@@ -100,7 +100,7 @@ void rayGenerationMain()
 
     // Now Invoke to cast another ray, with the new payload
     // SPIRV: OpHitObjectExecuteShaderNV
-    HitObject::Invoke( scene, hit, otherValues );
+    HitObject::Invoke( hit, otherValues );
     
     r += calcValue(hit);
 
@@ -113,7 +113,7 @@ void rayGenerationMain()
 
     // Now Invoke to cast another ray, with the new payload
     // SPIRV: OpHitObjectExecuteShaderNV
-    HitObject::Invoke( scene, hit, otherValues );
+    HitObject::Invoke( hit, otherValues );
     
     r += calcValue(hit);
     

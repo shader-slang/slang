@@ -54,7 +54,7 @@ void main()
     outputBuffer1[0] = outputBuffer1[0]+someInData1;
 
     // CHECK: rayPayload{{_[0-9]}}.data{{_[0-9]}} = {{.*}}
-    // CHECK: NvTraceRayHitObject(
+    // CHECK: dx::HitObject::TraceRay(
     // CHECK: rayPayload{{.*}}.data{{.*}};
     HitObject::TraceRay(as,
              1,
@@ -81,11 +81,10 @@ void main()
     outputBuffer1[0] = outputBuffer1[0]+someInData1;
 
     // CHECK: rayPayload{{_[0-9]}}.data{{_[0-9]}} = {{.*}}
-    // CHECK: NvInvokeHitObject(
+    // CHECK: dx::HitObject::Invoke(
     // CHECK: rayPayload{{.*}}.data{{.*}};
     HitObject hitObject_HitOrMiss;
     HitObject::Invoke(
-        as,
         hitObject_HitOrMiss,
         someInData1);
     outputBuffer1[0] = outputBuffer1[0]+someInData1;

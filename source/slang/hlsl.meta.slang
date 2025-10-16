@@ -20480,7 +20480,7 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "($2=NvMakeMiss($0,$1))";
+        case hlsl: __intrinsic_asm "($2=dx::HitObject::MakeMiss($0,$1))";
         case glsl:
             __glslMakeMiss(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
         case cuda: __intrinsic_asm "optixMakeMissHitObject";
@@ -20517,7 +20517,7 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "($3=NvMakeMotionMiss($0,$1,$2))";
+        case hlsl: __intrinsic_asm "($3=dx::HitObject::MakeMotionMiss($0,$1,$2))";
         case glsl:
             __glslMakeMotionMiss(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax, CurrentTime);
         case cuda: __intrinsic_asm "optixMakeMissHitObject";
@@ -20559,7 +20559,7 @@ struct HitObject
         __target_switch
         {
         case hlsl:
-            __intrinsic_asm "($0 = NvMakeNop())";
+            __intrinsic_asm "($0 = dx::HitObject::MakeNop())";
         case glsl:
             __glslMakeNop(__return_val);
         case cuda: __intrinsic_asm "slangOptixMakeNopHitObject";
@@ -20577,13 +20577,12 @@ struct HitObject
     [require(hlsl, ser)]
     __generic<payload_t>
     static void __InvokeHLSL(
-        RaytracingAccelerationStructure AccelerationStructure,
         HitObject HitOrMiss,
         inout payload_t Payload)
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "NvInvokeHitObject";
+        case hlsl: __intrinsic_asm "dx::HitObject::Invoke";
         }
     }
 
@@ -20593,7 +20592,6 @@ struct HitObject
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     static void Invoke<payload_t>(
-        RaytracingAccelerationStructure AccelerationStructure,
         HitObject HitOrMiss,
         inout payload_t Payload)
     {
@@ -20601,7 +20599,6 @@ struct HitObject
         {
         case hlsl:
             __InvokeHLSL(
-                AccelerationStructure,
                 HitOrMiss,
                 __forceVarIntoRayPayloadStructTemporarily(Payload));
         case glsl:
@@ -21169,7 +21166,7 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "NvGetAttributesFromHitObject($0, $1)";
+        case hlsl: __intrinsic_asm "($1).GetAttributes<$0>()";
         }
     }
 
@@ -21188,7 +21185,7 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "NvMakeHitWithRecordIndex";
+        case hlsl: __intrinsic_asm "dx::HitObject::MakeHit";
         }
     }
 
@@ -21207,7 +21204,7 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "NvMakeHit";
+        case hlsl: __intrinsic_asm "dx::HitObject::MakeHit";
         }
     }
 
@@ -21226,7 +21223,7 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "NvTraceRayHitObject";
+        case hlsl: __intrinsic_asm "dx::HitObject::TraceRay";
         }
     }
 
@@ -21529,7 +21526,7 @@ void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
 {
     __target_switch
     {
-    case hlsl: __intrinsic_asm "NvReorderThread";
+    case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
     case glsl: __intrinsic_asm "reorderThreadNV";
     case cuda: __intrinsic_asm "optixReorder";
     case spirv:
@@ -21567,7 +21564,7 @@ void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHi
 {
     __target_switch
     {
-    case hlsl: __intrinsic_asm "NvReorderThread";
+    case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
     case glsl: __intrinsic_asm "reorderThreadNV";
     case cuda: __intrinsic_asm "optixReorder($1, $2)";
     case spirv:
@@ -21595,7 +21592,7 @@ void ReorderThread( HitObject HitOrMiss )
 {
     __target_switch
     {
-    case hlsl: __intrinsic_asm "NvReorderThread";
+    case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
     case glsl: __intrinsic_asm "reorderThreadNV";
     case cuda: __intrinsic_asm "optixReorder()";
     case spirv:
