@@ -1109,15 +1109,8 @@ static String _getExecutablePath()
 SlangResult File::readAllText(const Slang::String& fileName, String& outText)
 {
     RefPtr<FileStream> stream(new FileStream);
-    if (SLANG_FAILED(
-        stream->init(fileName, FileMode::Open, FileAccess::Read, FileShare::ReadWrite)))
-    {
-        fprintf(
-            stderr,
-            "DEBUGGING: Failed to initialize stream for file '%s'\n",
-            fileName.getBuffer());
-        return SLANG_FAIL;
-    }
+    SLANG_RETURN_ON_FAIL(
+        stream->init(fileName, FileMode::Open, FileAccess::Read, FileShare::ReadWrite));
 
     StreamReader reader;
     if (SLANG_FAILED(reader.init(stream)))
