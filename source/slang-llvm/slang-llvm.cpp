@@ -778,12 +778,7 @@ SlangResult LLVMDownstreamCompiler::compile(
             includes.push_back(includePath.begin());
         }
 
-        clang::LangOptions::setLangDefaults(
-            opts,
-            language,
-            targetTriple,
-            includes,
-            langStd);
+        clang::LangOptions::setLangDefaults(opts, language, targetTriple, includes, langStd);
 
         if (options.floatingPointMode == DownstreamCompileOptions::FloatingPointMode::Fast)
         {
@@ -1037,27 +1032,31 @@ SlangResult LLVMDownstreamCompiler::compile(
 
                         for (auto& func : funcs)
                         {
-                            symbolMap.insert({
-                                mangler(func.name),
-                                { ExecutorAddr::fromPtr(func.func), JITSymbolFlags::Callable }});
+                            symbolMap.insert(
+                                {mangler(func.name),
+                                 {ExecutorAddr::fromPtr(func.func), JITSymbolFlags::Callable}});
                         }
                     }
 
 #if SLANG_PTR_IS_32 && SLANG_VC
                     {
                         // https://docs.microsoft.com/en-us/windows/win32/devnotes/-win32-alldiv
-                        symbolMap.insert({
-                            mangler("_alldiv"),
-                            { ExecutorAddr::fromPtr(WinSpecific::_alldiv), JITSymbolFlags::Callable}});
-                        symbolMap.insert({
-                            mangler("_allrem"),
-                            { ExecutorAddr::fromPtr(WinSpecific::_allrem), JITSymbolFlags::Callable}});
-                        symbolMap.insert({
-                            mangler("_aullrem"),
-                            { ExecutorAddr::fromPtr(WinSpecific::_aullrem), JITSymbolFlags::Callable}});
-                        symbolMap.insert({
-                            mangler("_aulldiv"),
-                            { ExecutorAddr::fromPtr(WinSpecific::_aulldiv), JITSymbolFlags::Callable}});
+                        symbolMap.insert(
+                            {mangler("_alldiv"),
+                             {ExecutorAddr::fromPtr(WinSpecific::_alldiv),
+                              JITSymbolFlags::Callable}});
+                        symbolMap.insert(
+                            {mangler("_allrem"),
+                             {ExecutorAddr::fromPtr(WinSpecific::_allrem),
+                              JITSymbolFlags::Callable}});
+                        symbolMap.insert(
+                            {mangler("_aullrem"),
+                             {ExecutorAddr::fromPtr(WinSpecific::_aullrem),
+                              JITSymbolFlags::Callable}});
+                        symbolMap.insert(
+                            {mangler("_aulldiv"),
+                             {ExecutorAddr::fromPtr(WinSpecific::_aulldiv),
+                              JITSymbolFlags::Callable}});
                     }
 #endif
 
