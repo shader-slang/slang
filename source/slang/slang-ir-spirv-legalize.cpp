@@ -517,7 +517,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 // structured buffers in GLSL should be annotated as ReadOnly
                 if (as<IRHLSLStructuredBufferType>(structuredBufferType))
                 {
-                    access = AccessQualifier::Read;
+                    access = AccessQualifier::Immutable;
                     memoryFlags = MemoryQualifierSetModifier::Flags::kReadOnly;
                 }
                 if (as<IRHLSLRasterizerOrderedStructuredBufferType>(structuredBufferType))
@@ -2276,7 +2276,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
             AccessQualifier accessQualifier = AccessQualifier::ReadWrite;
             if (as<IRHLSLStructuredBufferType>(t))
-                accessQualifier = AccessQualifier::Read;
+                accessQualifier = AccessQualifier::Immutable;
 
             IRBuilder builder(t);
             builder.setInsertBefore(t);

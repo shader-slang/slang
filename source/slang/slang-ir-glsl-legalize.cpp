@@ -1477,7 +1477,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
 
             auto accessQualifier = AccessQualifier::ReadWrite;
             if (kind == LayoutResourceKind::VaryingInput)
-                accessQualifier = AccessQualifier::Read;
+                accessQualifier = AccessQualifier::Immutable;
             IRType* paramType =
                 builder->getPtrType(ptrOpCode, arrayType, accessQualifier, addrSpace);
 
@@ -3109,7 +3109,7 @@ IRInst* getOrCreatePerVertexInputArray(GLSLLegalizationContext* context, IRInst*
         tryGetPointedToType(&builder, inputVertexAttr->getDataType()),
         builder.getIntValue(builder.getIntType(), 3));
     arrayInst = builder.createGlobalParam(
-        builder.getPtrType(arrayType, AccessQualifier::Read, AddressSpace::Input));
+        builder.getPtrType(arrayType, AccessQualifier::Immutable, AddressSpace::Input));
     context->mapVertexInputToPerVertexArray[inputVertexAttr] = arrayInst;
     builder.addDecoration(arrayInst, kIROp_PerVertexDecoration);
 

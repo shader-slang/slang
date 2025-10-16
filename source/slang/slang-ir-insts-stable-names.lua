@@ -681,4 +681,5 @@ return {
 	["Decoration.InParamProxyVar"] = 677,
 	["Attr.MemoryScope"] = 678,
 	["Undefined.LoadFromUninitializedMemory"] = 679,
+	["CUDA_LDG"] = 680,
 }
