@@ -3,6 +3,8 @@
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -stage fragment -entry main -g
 //CHECK: main
+//CHECK: OpBranch
+//CHECK: OpUnreachable
 
 layout(location = 0) out float4 output_color;
 [shader("fragment")]
