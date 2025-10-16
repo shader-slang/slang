@@ -237,7 +237,10 @@ bool isPtrLikeOrHandleType(IRInst* type);
 
 bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, IRInst* addr);
 
-IRInst* getUndefInst(IRBuilder builder, IRModule* module);
+/// Get a unit-type (aka `void`) value using the `poison` instruction,
+/// which indicates an undefined (and potentially unstable) value.
+///
+IRInst* getUnitPoisonVal(IRBuilder builder, IRModule* module);
 
 // The the equivalent op of (a op b) in (b op' a). For example, a > b is equivalent to b < a. So (<)
 // ==> (>).

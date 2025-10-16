@@ -1300,11 +1300,29 @@ enum MemoryScope : int32_t
 }
 
 /// @category misc_types
+/// Describes the access permissions for a pointer type.
 __magic_enum(AccessQualifier)
 enum Access : uint64_t
 {
+    /// The data maybe read and modified through the pointer. This is the default access qualifier
+    /// for a pointer type.
     ReadWrite = $((uint64_t)AccessQualifier::ReadWrite),
+
+    /// The data being pointed to by a pointer can only be read through the pointer.
+    /// This is to be distinguished from `Immutable`, which means the data being pointed to
+    /// won't be changed by any means. In contrast, data pointed to by a `Read` pointer
+    /// may still be changed through another pointer that is not read-only.
+    /// This means that a pointer with `Read` access is meaningful only to the front-end
+    /// type system, and is not expected to provide any optimization opportunities to
+    /// the back-end.
     Read = $((uint64_t)AccessQualifier::Read),
+
+    /// The data being pointed to by a pointer is known to be immutable and won't
+    /// be changed by any means during the execution of the program. It is UB if
+    /// the data is changed during the program execution. This is a stronger
+    /// qualifier than `Read`, and may allow the backend to perform more aggressive
+    /// optimizations.
+    Immutable = $((uint64_t)AccessQualifier::Immutable),
 }
 
 //@public:
@@ -1314,8 +1332,8 @@ enum Access : uint64_t
 __magic_type(PtrType)
 struct Ptr<
     T, 
-    Access access = Access::ReadWrite, 
-    AddressSpace addrSpace = AddressSpace::Device>
+    Access access = Access.ReadWrite, 
+    AddressSpace addrSpace = AddressSpace.Device>
 {
     // A user is allowed to explicitly cast between any pointer type of
     // the same address space
@@ -1372,6 +1390,12 @@ struct Ptr<
         ref;
     }
 };
+
+/// Represents a pointer to immutable data. Immutable data is known at compile time to remain unchanged during the entire
+/// execution of the program. This knowledge allows the compiler to perform more aggressive optimizations around the memory
+/// accesses through such pointers. If the data is changed during the program execution, the behavior is undefined and loaded
+/// data through such pointers may be invalid.
+typealias ImmutablePtr<T, AddressSpace addrSpace = AddressSpace.Device> = Ptr<T, Access.Immutable, addrSpace>;
 
 //@hidden:
 __intrinsic_op($(kIROp_AlignedAttr))
@@ -3513,7 +3537,7 @@ __prefix T operator ~(T v0);
 // IR level type traits.
 
 __generic<T>
-__intrinsic_op($(kIROp_Undefined))
+__intrinsic_op($(kIROp_Poison)) // Note: attempting to actually *use* the result of `__declVal()` will always be invalid.
 T __declVal();
 
 __generic<T>

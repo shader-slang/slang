@@ -2667,7 +2667,8 @@ static bool shouldStoreInst(IRInst* inst)
     case kIROp_ExtractExistentialValue:
     case kIROp_ExtractExistentialType:
     case kIROp_ExtractExistentialWitnessTable:
-    case kIROp_Undefined:
+    case kIROp_LoadFromUninitializedMemory:
+    case kIROp_Poison:
     case kIROp_GetSequentialID:
     case kIROp_GetStringHash:
     case kIROp_Specialize:

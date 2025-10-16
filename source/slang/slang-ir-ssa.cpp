@@ -690,10 +690,11 @@ IRInst* readVarRec(ConstructSSAContext* context, SSABlockInfo* blockInfo, IRVar*
 
             // We would only reach this function (`readVarRec`) if
             // a local lookup in the block had already failed, so
-            // at this point we are dealing with an undefined value.
+            // at this point we are dealing with a read from a variable
+            // that has not yet been initialized.
 
             auto type = var->getDataType()->getValueType();
-            val = blockInfo->builder.emitUndefined(type);
+            val = blockInfo->builder.emitLoadFromUninitializedMemory(type);
             cloneRelevantDecorations(var, val);
         }
         else if (!multiplePreds)
@@ -775,8 +776,13 @@ IRInst* readVar(ConstructSSAContext* context, SSABlockInfo* blockInfo, IRVar* va
         // searching, because its value cannot have been
         // established in a predecessor block.
         //
+        // We already tried and failed to find a value set
+        // into the variable in this block, so we are left
+        // to conclude that the variable is uninitialized
+        // at this point.
+        //
         auto type = var->getDataType()->getValueType();
-        val = blockInfo->builder.emitUndefined(type);
+        val = blockInfo->builder.emitLoadFromUninitializedMemory(type);
         cloneRelevantDecorations(var, val);
         writeVar(context, blockInfo, var, val);
         return val;

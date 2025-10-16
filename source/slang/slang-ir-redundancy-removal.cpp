@@ -128,26 +128,8 @@ bool removeRedundancy(IRModule* module, bool hoistLoopInvariantInsts)
 
 bool isAddressMutable(IRInst* inst)
 {
-    auto rootType = getRootAddr(inst)->getDataType();
-    switch (rootType->getOp())
-    {
-    case kIROp_ParameterBlockType:
-    case kIROp_ConstantBufferType:
-    case kIROp_BorrowInParamType:
-        return false; // immutable
-
-    // We should consider StructuredBuffer as mutable by default, since the resources may alias.
-    // There could be anotherRWStructuredBuffer pointing to the same memory location as the
-    // structured buffer.
-    case kIROp_StructuredBufferLoad:
-    case kIROp_GetStructuredBufferPtr:
-        return true; // mutable
-    }
-
-    // Similarly, IRPtrTypeBase should also be considered writable always,
-    // because there can be aliasing.
-
-    return true; // mutable
+    auto rootAddr = getRootAddr(inst);
+    return !isPointerToImmutableLocation(rootAddr);
 }
 
 /// Eliminate redundant temporary variable copies in load-store patterns.
