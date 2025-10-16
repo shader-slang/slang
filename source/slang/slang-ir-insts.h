@@ -3301,18 +3301,6 @@ $(type_info.return_type) $(type_info.method_name)(
             oldPtrType->getAddressSpace());
     }
 
-    IRTextureTypeBase* getTextureType(
-        IRType* elementType,
-        IRInst* shape,
-        IRInst* isArray,
-        IRInst* isMS,
-        IRInst* sampleCount,
-        IRInst* access,
-        IRInst* isShadow,
-        IRInst* isCombined,
-        IRInst* format);
-
-
     /// Get a GLSL output parameter group type
     IRGLSLOutputParameterGroupType* getGLSLOutputParameterGroupType(IRType* elementType);
 

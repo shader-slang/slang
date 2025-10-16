@@ -2873,34 +2873,6 @@ IRPtrType* IRBuilder::getPtrType(
     return (IRPtrType*)getType(op, addressSpace ? 3 : 1, operands);
 }
 
-IRTextureTypeBase* IRBuilder::getTextureType(
-    IRType* elementType,
-    IRInst* shape,
-    IRInst* isArray,
-    IRInst* isMS,
-    IRInst* sampleCount,
-    IRInst* access,
-    IRInst* isShadow,
-    IRInst* isCombined,
-    IRInst* format)
-{
-    IRInst* args[] = {
-        (IRInst*)elementType,
-        shape,
-        isArray,
-        isMS,
-        sampleCount,
-        access,
-        isShadow,
-        isCombined,
-        format};
-    return as<IRTextureTypeBase>(emitIntrinsicInst(
-        getTypeKind(),
-        kIROp_TextureType,
-        (UInt)(sizeof(args) / sizeof(IRInst*)),
-        args));
-}
-
 IRArrayTypeBase* IRBuilder::getArrayTypeBase(
     IROp op,
     IRType* elementType,

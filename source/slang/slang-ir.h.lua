@@ -325,13 +325,12 @@ local function getBasicTypesForBuilderMethods()
 	-- These types have complex logic or identity semantics that require manual implementation
 	local excluded_types = {
 		-- Complex logic/special cases
-		"BindExistentialsType", -- Complex variable-operand logic with special case handling
+		"BindExistentialsType", -- Complex logic that simplifies interface types immediately
 		"BoundInterfaceType", -- Conditional logic that skips wrapping for __Dynamic types
 		"BackwardDiffIntermediateContextType", -- Has null->void conversion logic
 		"AttributedType", -- Uses dynamic operand list
 		"RefParamType", -- Has high-level helper that takes AddressSpace parameters
 		"BorrowInParamType", -- Has high-level helper that takes AddressSpace parameters
-		"TextureType", -- Has complex getAccess() method with IRIntLit->SlangResourceAccess conversion
 		-- Identity semantics - use createXxxType() instead of getXxxType()
 		"StructType", -- Uses createStructType(), not getStructType()
 		"ClassType", -- Uses createClassType(), not getClassType()
