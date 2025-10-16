@@ -3257,10 +3257,8 @@ $(type_info.return_type) $(type_info.method_name)(
 
 
     IRType* getTypeType() { return getType(IROp::kIROp_TypeType); }
-    IRType* getTypeParameterPackKind() { return getType(IROp::kIROp_TypeParameterPackKind); }
     IRType* getKeyType() { return nullptr; }
 
-    IRPtrType* getPtrType(IRType* valueType);
     IRPtrTypeBase* getPtrType(IROp op, IRType* valueType);
 
     // Form a ptr type to `valueType` using the same opcode and address space as `ptrWithAddrSpace`.
@@ -3268,8 +3266,6 @@ $(type_info.return_type) $(type_info.method_name)(
 
     IRRefParamType* getRefParamType(IRType* valueType, AddressSpace addrSpace);
     IRBorrowInParamType* getBorrowInParamType(IRType* valueType, AddressSpace addrSpace);
-    IROutParamType* getOutParamType(IRType* valueType);
-    IRBorrowInOutParamType* getBorrowInOutParamType(IRType* valueType);
     IRPtrType* getPtrType(
         IROp op,
         IRType* valueType,
@@ -3335,13 +3331,6 @@ $(type_info.return_type) $(type_info.method_name)(
 
     IRTorchTensorType* getTorchTensorType(IRType* elementType);
 
-    IRDifferentialPairType* getDifferentialPairType(IRType* valueType, IRInst* witnessTable);
-
-    IRDifferentialPtrPairType* getDifferentialPtrPairType(IRType* valueType, IRInst* witnessTable);
-
-    IRDifferentialPairUserCodeType* getDifferentialPairUserCodeType(
-        IRType* valueType,
-        IRInst* witnessTable);
 
     IRBackwardDiffIntermediateContextType* getBackwardDiffIntermediateContextType(IRInst* func);
 

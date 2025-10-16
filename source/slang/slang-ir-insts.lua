@@ -118,17 +118,17 @@ local insts = {
 			{
 				DifferentialPairTypeBase = {
 					hoistable = true,
-					{ DiffPair = { struct_name = "DifferentialPairType", operands = { { "valueType", "IRType" } } } },
+					{ DiffPair = { struct_name = "DifferentialPairType", operands = { { "valueType", "IRType" }, { "witnessTable" } } } },
 					{
 						DiffPairUserCode = {
 							struct_name = "DifferentialPairUserCodeType",
-							operands = { { "valueType", "IRType" } },
+							operands = { { "valueType", "IRType" }, { "witnessTable" } },
 						},
 					},
 					{
 						DiffRefPair = {
 							struct_name = "DifferentialPtrPairType",
-							operands = { { "valueType", "IRType" } },
+							operands = { { "valueType", "IRType" }, { "witnessTable" } },
 						},
 					},
 				},

@@ -2810,12 +2810,6 @@ IRExpandTypeOrVal* IRBuilder::getExpandTypeOrVal(
 }
 
 
-IRPtrType* IRBuilder::getPtrType(IRType* valueType)
-{
-    return (IRPtrType*)getPtrType(kIROp_PtrType, valueType);
-}
-
-
 IRRefParamType* IRBuilder::getRefParamType(IRType* valueType, AddressSpace addrSpace)
 {
     return (IRRefParamType*)
@@ -2828,15 +2822,6 @@ IRBorrowInParamType* IRBuilder::getBorrowInParamType(IRType* valueType, AddressS
         getPtrType(kIROp_BorrowInParamType, valueType, AccessQualifier::Read, addrSpace);
 }
 
-IROutParamType* IRBuilder::getOutParamType(IRType* valueType)
-{
-    return (IROutParamType*)getPtrType(kIROp_OutParamType, valueType);
-}
-
-IRBorrowInOutParamType* IRBuilder::getBorrowInOutParamType(IRType* valueType)
-{
-    return (IRBorrowInOutParamType*)getPtrType(kIROp_BorrowInOutParamType, valueType);
-}
 
 IRSPIRVLiteralType* IRBuilder::getSPIRVLiteralType(IRType* type)
 {
@@ -2950,32 +2935,6 @@ IRTorchTensorType* IRBuilder::getTorchTensorType(IRType* elementType)
     return (IRTorchTensorType*)getType(kIROp_TorchTensorType, 1, (IRInst**)&elementType);
 }
 
-IRDifferentialPairType* IRBuilder::getDifferentialPairType(IRType* valueType, IRInst* witnessTable)
-{
-    IRInst* operands[] = {valueType, witnessTable};
-    return (IRDifferentialPairType*)
-        getType(kIROp_DifferentialPairType, sizeof(operands) / sizeof(operands[0]), operands);
-}
-
-IRDifferentialPtrPairType* IRBuilder::getDifferentialPtrPairType(
-    IRType* valueType,
-    IRInst* witnessTable)
-{
-    IRInst* operands[] = {valueType, witnessTable};
-    return (IRDifferentialPtrPairType*)
-        getType(kIROp_DifferentialPtrPairType, sizeof(operands) / sizeof(operands[0]), operands);
-}
-
-IRDifferentialPairUserCodeType* IRBuilder::getDifferentialPairUserCodeType(
-    IRType* valueType,
-    IRInst* witnessTable)
-{
-    IRInst* operands[] = {valueType, witnessTable};
-    return (IRDifferentialPairUserCodeType*)getType(
-        kIROp_DifferentialPairUserCodeType,
-        sizeof(operands) / sizeof(operands[0]),
-        operands);
-}
 
 IRBackwardDiffIntermediateContextType* IRBuilder::getBackwardDiffIntermediateContextType(
     IRInst* func)

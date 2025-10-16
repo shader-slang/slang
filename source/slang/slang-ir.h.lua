@@ -351,6 +351,8 @@ local function getBasicTypesForBuilderMethods()
 		"OptionalType",
 		"BasicBlockType",
 		"TypeKind",
+		"TypeParameterPackKind",
+		"RateKind", 
 		"GenericKind",
 		-- Batch 3 additions - more simple no-operand types
 		"MetalMeshGridPropertiesType",
@@ -369,8 +371,15 @@ local function getBasicTypesForBuilderMethods()
 		"Std430BufferLayoutType",
 		"ScalarBufferLayoutType",
 		"CBufferLayoutType",
-		"TextureShape2DType",
+		"TextureShape1DType",
+		"TextureShape2DType", 
 		"TextureShape3DType",
+		"TextureShapeCubeType",
+		"TextureShapeBufferType",
+		-- Sampler types
+		"SamplerStateType",
+		"SamplerComparisonStateType", 
+		"GLSLAtomicUintType",
 		-- Batch 7 additions - types with single operands
 		"NativePtrType",
 		"RTTIPointerType",
@@ -378,13 +387,23 @@ local function getBasicTypesForBuilderMethods()
 		"ComPtrType",
 		"ArrayListType",
 		"TensorViewType",
+		"DescriptorHandleType",
+		"TextureFootprintType",
 		-- Batch 8 additions - single operand types that currently use arrays
 		-- Note: GLSLOutputParameterGroupType has operand definition mismatch - reverted
 		"PseudoPtrType",
+		-- Simple pointer types with single valueType operand
+		"PtrType",
+		"OutParamType", 
+		"BorrowInOutParamType",
 		-- Batch 9 additions - multi-parameter types with proper operand definitions
 		"ResultType",
 		"RateQualifiedType",
 		"MetalMeshType",
+		-- Differential pair types - 2 operands each
+		"DifferentialPairType",
+		"DifferentialPairUserCodeType", 
+		"DifferentialPtrPairType",
 		-- Batch 10 additions - types with matching operand definitions
 		-- Note: AttributedType uses dynamic operand list - can't convert
 		-- Note: BackwardDiffIntermediateContextType has null->void conversion logic - can't convert
