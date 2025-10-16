@@ -1,6 +1,6 @@
 {
   "source": [
-    "./bin/macosx-*/release/libslang.dylib",
+    "./bin/macosx-*/release/libslang-compiler.dylib",
     "./bin/macosx-*/release/slangc",
     "./bin/macosx-*/release/slangd"
   ],
