@@ -770,7 +770,7 @@ SlangResult LLVMDownstreamCompiler::compile(
     }
 
     {
-        auto opts = invocation.getLangOpts();
+        auto& opts = invocation.getLangOpts();
 
         std::vector<std::string> includes;
         for (const auto& includePath : options.includePaths)
@@ -842,7 +842,7 @@ SlangResult LLVMDownstreamCompiler::compile(
 #endif
 
     // Create the actual diagnostics engine.
-    clang->createDiagnostics(clang->getVirtualFileSystem());
+    clang->createDiagnostics(*llvm::vfs::getRealFileSystem());
     clang->setDiagnostics(diags.get());
 
     if (!clang->hasDiagnostics())
@@ -1032,31 +1032,17 @@ SlangResult LLVMDownstreamCompiler::compile(
 
                         for (auto& func : funcs)
                         {
-                            symbolMap.insert(
-                                {mangler(func.name),
-                                 {ExecutorAddr::fromPtr(func.func), JITSymbolFlags::Callable}});
+                            symbolMap[mangler(func.name)] = {ExecutorAddr::fromPtr(func.func), JITSymbolFlags::Callable};
                         }
                     }
 
 #if SLANG_PTR_IS_32 && SLANG_VC
                     {
                         // https://docs.microsoft.com/en-us/windows/win32/devnotes/-win32-alldiv
-                        symbolMap.insert(
-                            {mangler("_alldiv"),
-                             {ExecutorAddr::fromPtr(WinSpecific::_alldiv),
-                              JITSymbolFlags::Callable}});
-                        symbolMap.insert(
-                            {mangler("_allrem"),
-                             {ExecutorAddr::fromPtr(WinSpecific::_allrem),
-                              JITSymbolFlags::Callable}});
-                        symbolMap.insert(
-                            {mangler("_aullrem"),
-                             {ExecutorAddr::fromPtr(WinSpecific::_aullrem),
-                              JITSymbolFlags::Callable}});
-                        symbolMap.insert(
-                            {mangler("_aulldiv"),
-                             {ExecutorAddr::fromPtr(WinSpecific::_aulldiv),
-                              JITSymbolFlags::Callable}});
+                        symbolMap[mangler("_alldiv")] = {ExecutorAddr::fromPtr(WinSpecific::_alldiv), JITSymbolFlags::Callable};
+                        symbolMap[mangler("_allrem")] = {ExecutorAddr::fromPtr(WinSpecific::_allrem), JITSymbolFlags::Callable};
+                        symbolMap[mangler("_aulldiv")] = {ExecutorAddr::fromPtr(WinSpecific::_aulldiv), JITSymbolFlags::Callable};
+                        symbolMap[mangler("_aullrem")] = {ExecutorAddr::fromPtr(WinSpecific::_aullrem), JITSymbolFlags::Callable};
                     }
 #endif
 
@@ -1066,7 +1052,7 @@ SlangResult LLVMDownstreamCompiler::compile(
                     }
 
                     // Required or the symbols won't be found
-                    jit->getMainJITDylib().addToLinkOrder(stdcLib);
+                    jit->getMainJITDylib().addToLinkOrder(stdcLib, JITDylibLookupFlags::MatchAllSymbols);
                 }
             }
 
