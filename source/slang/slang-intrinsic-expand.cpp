@@ -174,7 +174,6 @@ static bool _isImageFormatCompatible(ImageFormat imageFormat, IRType* dataType)
 
     if (numElems != imageFormatInfo.channelCount)
     {
-        SLANG_ASSERT(!"Format doesn't match channel count");
         return false;
     }
 
