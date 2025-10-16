@@ -186,10 +186,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     void addToWorkList(IRInst* inst)
     {
-        if (workList.add(inst))
-        {
-            addUsersToWorkList(inst);
-        }
+        workList.add(inst);
     }
 
     void addUsersToWorkList(IRInst* inst)
@@ -1692,8 +1689,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     };
 
-    void processBranch(IRInst* branch) { addToWorkList(branch->getOperand(0)); }
-
     void processPtrLit(IRInst* inst)
     {
         IRBuilder builder(inst);
@@ -1844,9 +1839,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_PtrLit:
                 processPtrLit(inst);
                 break;
-            case kIROp_UnconditionalBranch:
-                processBranch(inst);
-                break;
+            // kIROp_UnconditionalBranch is handled in default case that only
+            // adds children inst and not target inst to work list.
+            // Branch target should be added to work list via its parent,
+            // to avoid cycle when branch target block has branch to the block
+            // that's parent of this branch inst.
             case kIROp_SPIRVAsm:
                 processSPIRVAsm(as<IRSPIRVAsm>(inst));
                 break;
