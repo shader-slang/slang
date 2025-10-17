@@ -306,3 +306,51 @@ else()
         NO_SOURCE
     )
 endif()
+
+#
+# Windows proxy DLL for backward compatibility
+# Creates slang.dll that forwards all calls to slang-compiler.dll
+#
+if(WIN32 AND SLANG_LIB_TYPE STREQUAL "SHARED")
+    # Create a minimal C++ source file (some linkers require at least one source)
+    set(SLANG_PROXY_STUB_CPP "${CMAKE_CURRENT_BINARY_DIR}/slang-proxy-stub.cpp")
+    file(WRITE "${SLANG_PROXY_STUB_CPP}" 
+        "// Minimal stub file for slang.dll proxy\n"
+        "// All exports are forwarded to slang-compiler.dll via the .def file\n"
+    )
+    
+    # Use the checked-in DEF file for backward compatibility
+    set(SLANG_PROXY_DEF "${CMAKE_CURRENT_SOURCE_DIR}/slang-proxy.def")
+    
+    # Create the proxy DLL target
+    add_library(slang-proxy SHARED
+        "${SLANG_PROXY_STUB_CPP}"
+        "${SLANG_PROXY_DEF}"
+    )
+    
+    # Link against the slang-compiler import library so symbols can be forwarded
+    target_link_libraries(slang-proxy PRIVATE slang)
+    
+    # Get the output directories from the main slang target
+    get_target_property(slang_runtime_dir slang RUNTIME_OUTPUT_DIRECTORY)
+    get_target_property(slang_archive_dir slang ARCHIVE_OUTPUT_DIRECTORY)
+    
+    # Set output name to slang (produces slang.dll) and match directories
+    set_target_properties(slang-proxy PROPERTIES
+        OUTPUT_NAME slang
+        FOLDER "libraries"
+        RUNTIME_OUTPUT_DIRECTORY "${slang_runtime_dir}"
+        ARCHIVE_OUTPUT_DIRECTORY "${slang_archive_dir}"
+    )
+    
+    # Install the proxy DLL alongside slang-compiler.dll
+    install(
+        TARGETS slang-proxy
+        RUNTIME DESTINATION bin
+        ARCHIVE DESTINATION lib
+        LIBRARY DESTINATION lib
+        COMPONENT runtime
+    )
+    
+    message(STATUS "Windows proxy DLL (slang.dll) will be generated to forward to slang-compiler.dll")
+endif()
