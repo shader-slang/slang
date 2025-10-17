@@ -240,7 +240,7 @@ jobs:
           done
 
           # Create backwards compatibility symlink (temporary)
-          ln -s "libslang.${lib_ext}" "libslang-compiler.${lib_ext}"
+          ln -s "libslang-compiler.${lib_ext}" "libslang.${lib_ext}"
           echo "Created: libslang.${lib_ext} -> libslang-compiler.${lib_ext}"
 
       - name: Package Slang
