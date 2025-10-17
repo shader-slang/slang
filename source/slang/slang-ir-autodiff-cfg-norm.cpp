@@ -123,7 +123,7 @@ struct CFGNormalizationPass
         builder->emitBranch(afterBlock);
 
         // Is after-block unreachable?
-        if (auto unreachInst = as<IRUnreachable>(afterBlock->getFirstOrdinaryInst()))
+        if (auto unreachInst = as<IRUnreachableBase>(afterBlock->getFirstOrdinaryInst()))
         {
             // Link it to the parentAfterBlock.
             builder->setInsertInto(afterBlock);
@@ -377,7 +377,7 @@ struct CFGNormalizationPass
                     // originally unreachable, all potential paths to it must have
                     // broken out of the region.
                     //
-                    if (auto unreachInst = as<IRUnreachable>(afterBlock->getTerminator()))
+                    if (auto unreachInst = as<IRUnreachableBase>(afterBlock->getTerminator()))
                     {
                         // Link it to the parentAfterBlock.
                         builder.setInsertInto(afterBlock);
