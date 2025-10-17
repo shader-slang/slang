@@ -353,4 +353,27 @@ if(WIN32 AND SLANG_LIB_TYPE STREQUAL "SHARED")
     )
     
     message(STATUS "Windows proxy DLL (slang.dll) will be generated to forward to slang-compiler.dll")
+    
+    # Add a custom target to regenerate the DEF file from slang-compiler.dll
+    # Usage: cmake --build build --target regenerate-proxy-def
+    # NOTE: This requires running from a Visual Studio Developer Command Prompt
+    # 
+    # Generate a wrapper script with the actual DLL path (since generator expressions
+    # don't work with -P script mode). Use per-config wrapper to avoid file(GENERATE) conflicts.
+    set(REGEN_WRAPPER "${CMAKE_CURRENT_BINARY_DIR}/regenerate-proxy-def-wrapper-$<CONFIG>.cmake")
+    file(GENERATE OUTPUT "${REGEN_WRAPPER}" CONTENT "
+set(DLL_PATH \"$<TARGET_FILE:slang>\")
+set(OUTPUT_DEF \"${CMAKE_CURRENT_SOURCE_DIR}/slang-proxy.def\")
+set(TARGET_DLL_NAME \"slang-compiler\")
+include(\"${slang_SOURCE_DIR}/cmake/RegenerateDllExports.cmake\")
+")
+    
+    add_custom_target(regenerate-proxy-def
+        COMMAND ${CMAKE_COMMAND} -E echo "Building slang-compiler.dll first (if needed)..."
+        COMMAND ${CMAKE_COMMAND} --build "${CMAKE_BINARY_DIR}" --target slang --config $<CONFIG>
+        COMMAND ${CMAKE_COMMAND} -E echo "Regenerating slang-proxy.def from slang-compiler.dll..."
+        COMMAND ${CMAKE_COMMAND} -P "${REGEN_WRAPPER}"
+        COMMENT "Regenerating slang-proxy.def from slang-compiler.dll exports"
+        VERBATIM
+    )
 endif()
