@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   coverage:
-    uses: ./.github/workflows/ci-slang-build.yml
+    uses: ./.github/workflows/ci-slang-coverage.yml
     with:
       os: linux
       compiler: clang
@@ -26,5 +26,4 @@ jobs:
       config: relwithdebinfo
       runs-on: '["ubuntu-22.04"]'
       build-llvm: true
-      enable-coverage: true
-      coverage-deploy-pages: true
+      deploy-pages: true

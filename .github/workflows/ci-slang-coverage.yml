@@ -1,0 +1,176 @@
+name: CI Coverage Workflow
+
+on:
+  workflow_call:
+    inputs:
+      os:
+        required: true
+        type: string
+      compiler:
+        required: true
+        type: string
+      platform:
+        required: true
+        type: string
+      config:
+        required: true
+        type: string
+      runs-on:
+        required: true
+        type: string
+      build-llvm:
+        required: false
+        type: boolean
+        default: true
+      server-count:
+        required: false
+        type: number
+        default: 8
+      deploy-pages:
+        required: false
+        type: boolean
+        default: false
+      pr-comment:
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  coverage:
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    timeout-minutes: 120
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          fetch-depth: "2"
+
+      - name: Setup
+        uses: ./.github/actions/common-setup
+        with:
+          os: ${{ inputs.os }}
+          compiler: ${{ inputs.compiler }}
+          platform: ${{ inputs.platform }}
+          config: ${{ inputs.config }}
+          build-llvm: ${{ inputs.build-llvm }}
+
+      - name: Build Slang with Coverage
+        run: |
+          echo "cmake version: $(cmake --version)"
+          echo "Building with coverage instrumentation (preset: coverage)"
+
+          # Show ccache status if available
+          if command -v ccache &> /dev/null; then
+            echo "🔧 ccache configuration:"
+            ccache --show-config | head -20 || true
+            echo "📊 ccache statistics (pre-build):"
+            ccache --show-stats || true
+          else
+            echo "ℹ️  ccache not available"
+          fi
+
+          # Prepare ccache launcher arguments if ccache is available
+          cmake_launcher_defines=()
+          if [[ -n "${ccache_symlinks_path:-}" ]]; then
+            echo "🔧 Using ccache with launcher: ${ccache_symlinks_path}"
+            echo "🔧 CCACHE_DIR is set to: ${CCACHE_DIR:-'not set'}"
+            cmake_launcher_defines+=("-DCMAKE_C_COMPILER_LAUNCHER=${ccache_symlinks_path}")
+            cmake_launcher_defines+=("-DCMAKE_CXX_COMPILER_LAUNCHER=${ccache_symlinks_path}")
+          else
+            echo "ℹ️  ccache_symlinks_path not set - building without ccache"
+          fi
+
+          if [[ "${{ inputs.os }}" =~ "windows" && "${{ inputs.config }}" == "debug" ]]; then
+            # Doing a debug build will try to link against a release built llvm, this
+            # is a problem on Windows, so make slang-llvm in release build and use
+            # that as though it's a fetched binary via these presets.
+            cmake --workflow --preset slang-llvm
+
+            # Configure, pointing to our just-generated slang-llvm archive
+            cmake --preset coverage --fresh \
+              -DSLANG_SLANG_LLVM_FLAVOR=FETCH_BINARY \
+              "-DSLANG_SLANG_LLVM_BINARY_URL=$(pwd)/build/dist-release/slang-llvm.zip" \
+              "${cmake_launcher_defines[@]}"
+            cmake --build --preset coverage
+          elif [[ "${{ inputs.build-llvm }}" = "false" ]]; then
+            # linux aarch64 cannot build llvm.
+            cmake --preset coverage --fresh \
+              -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
+              "${cmake_launcher_defines[@]}"
+            cmake --build --preset coverage
+          else
+            # Otherwise, use the "system" llvm we have just build or got from the
+            # cache in the setup phase
+            cmake --preset coverage --fresh \
+              -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
+              "${cmake_launcher_defines[@]}"
+            cmake --build --preset coverage
+          fi
+
+          # Show ccache statistics after build
+          if command -v ccache &> /dev/null; then
+            echo "📊 ccache statistics (post-build):"
+            ccache --show-stats || true
+          fi
+
+      - name: Run Tests with Coverage
+        run: |
+          # Generate both HTML and LCOV formats
+          export COVERAGE_HTML=1
+          export COVERAGE_LCOV=1
+          export COVERAGE_HTML_DIR="$PWD/coverage-html"
+          export COVERAGE_LCOV_FILE="$PWD/coverage.lcov"
+
+          # Run coverage with test servers
+          ./tools/coverage/run-coverage.sh -use-test-server -server-count ${{ inputs.server-count }}
+
+      - name: Generate Coverage Summary
+        id: coverage-summary
+        run: |
+          # Extract overall coverage percentage from LCOV file
+          if [[ -f coverage.lcov ]]; then
+            lines_found=$(grep -o "LF:[0-9]*" coverage.lcov | awk -F: '{sum+=$2} END {print sum}')
+            lines_hit=$(grep -o "LH:[0-9]*" coverage.lcov | awk -F: '{sum+=$2} END {print sum}')
+
+            if [[ $lines_found -gt 0 ]]; then
+              coverage=$(awk "BEGIN {printf \"%.2f\", ($lines_hit / $lines_found) * 100}")
+              echo "coverage=$coverage" >> $GITHUB_OUTPUT
+
+              cat >> $GITHUB_STEP_SUMMARY <<EOF
+          # Coverage Report
+          - **Total Coverage:** ${coverage}%
+          - **Lines Hit:** ${lines_hit} / ${lines_found}
+          EOF
+            fi
+          fi
+
+      - name: Deploy Coverage to GitHub Pages
+        if: ${{ inputs.deploy-pages }}
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./coverage-html
+          destination_dir: coverage
+          commit_message: "Update coverage report"
+
+      - name: Report Coverage in PR
+        if: ${{ inputs.pr-comment }}
+        uses: zgosalvez/github-actions-report-lcov@v4
+        with:
+          coverage-files: coverage.lcov
+          minimum-coverage: 0
+          artifact-name: coverage-report
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          update-comment: true
+
+      - name: Upload LCOV Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-lcov-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}
+          path: coverage.lcov
+          retention-days: 30
