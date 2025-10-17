@@ -50,6 +50,22 @@ jobs:
           submodules: "recursive"
           fetch-depth: "0"
 
+      - name: Install Clang 18
+        if: inputs.compiler == 'clang-18' && inputs.os == 'linux'
+        shell: bash
+        run: |
+          # Add LLVM APT repository
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-18 main"
+          sudo apt-get update
+
+          # Install clang-18
+          sudo apt-get install -y clang-18 clang++-18
+
+          # Verify installation
+          clang-18 --version
+          clang++-18 --version
+
       - name: Setup
         uses: ./.github/actions/common-setup
         with:
