@@ -63,31 +63,33 @@ local leafInst = function(name, args)
 	-- Add getter methods if operands are specified
 	if args.operands then
 		for i, operand in ipairs(args.operands) do
-			local operandName = operand[1]
-			local operandType = operand[2]
-			local getterName = "get" .. operandName:sub(1, 1):upper() .. operandName:sub(2)
-			local returnType = "IRInst"
-			if operandType then
-				returnType = operandType
-				result = result
-					.. "\n    "
-					.. returnType
-					.. "* "
-					.. getterName
-					.. "() { return ("
-					.. returnType
-					.. "*)getOperand("
-					.. (i - 1)
-					.. "); }"
-			else
-				result = result
-					.. "\n    "
-					.. returnType
-					.. "* "
-					.. getterName
-					.. "() { return getOperand("
-					.. (i - 1)
-					.. "); }"
+			if not operand.variadic then
+				local operandName = operand[1]
+				local operandType = operand[2]
+				local getterName = "get" .. operandName:sub(1, 1):upper() .. operandName:sub(2)
+				local returnType = "IRInst"
+				if operandType then
+					returnType = operandType
+					result = result
+						.. "\n    "
+						.. returnType
+						.. "* "
+						.. getterName
+						.. "() { return ("
+						.. returnType
+						.. "*)getOperand("
+						.. (i - 1)
+						.. "); }"
+				else
+					result = result
+						.. "\n    "
+						.. returnType
+						.. "* "
+						.. getterName
+						.. "() { return getOperand("
+						.. (i - 1)
+						.. "); }"
+				end
 			end
 		end
 	end
@@ -112,31 +114,33 @@ local baseInst = function(name, args)
 	-- Add getter methods if operands are specified
 	if args.operands then
 		for i, operand in ipairs(args.operands) do
-			local operandName = operand[1]
-			local operandType = operand[2]
-			local getterName = "get" .. operandName:sub(1, 1):upper() .. operandName:sub(2)
-			local returnType = "IRInst"
-			if operandType then
-				returnType = operandType
-				result = result
-					.. "\n    "
-					.. returnType
-					.. "* "
-					.. getterName
-					.. "() { return ("
-					.. returnType
-					.. "*)getOperand("
-					.. (i - 1)
-					.. "); }"
-			else
-				result = result
-					.. "\n    "
-					.. returnType
-					.. "* "
-					.. getterName
-					.. "() { return getOperand("
-					.. (i - 1)
-					.. "); }"
+			if not operand.variadic then
+				local operandName = operand[1]
+				local operandType = operand[2]
+				local getterName = "get" .. operandName:sub(1, 1):upper() .. operandName:sub(2)
+				local returnType = "IRInst"
+				if operandType then
+					returnType = operandType
+					result = result
+						.. "\n    "
+						.. returnType
+						.. "* "
+						.. getterName
+						.. "() { return ("
+						.. returnType
+						.. "*)getOperand("
+						.. (i - 1)
+						.. "); }"
+				else
+					result = result
+						.. "\n    "
+						.. returnType
+						.. "* "
+						.. getterName
+						.. "() { return getOperand("
+						.. (i - 1)
+						.. "); }"
+				end
 			end
 		end
 	end
@@ -316,7 +320,8 @@ local function instEnums()
 	return table.concat(output, "\n")
 end
 
--- Collect type instructions for template generation (exception-based)
+-- Collect type instructions for template generation, do it here rather than
+-- clutter the FIDDLE TEMPLATE code
 local function getBasicTypesForBuilderMethods()
 	local lua_data = require("source/slang/slang-ir-insts.lua")
 	local type_insts = lua_data.type_insts
@@ -324,20 +329,19 @@ local function getBasicTypesForBuilderMethods()
 	-- Define the list of type instruction exceptions that should NOT have FIDDLE auto-generated methods
 	-- These types have complex logic or identity semantics that require manual implementation
 	local excluded_types = {
-		-- Complex logic/special cases
+		-- special cases
 		"BindExistentialsType", -- Complex logic that simplifies interface types immediately
 		"BoundInterfaceType", -- Conditional logic that skips wrapping for __Dynamic types
 		"BackwardDiffIntermediateContextType", -- Has null->void conversion logic
 		"AttributedType", -- Uses dynamic operand list
 		"RefParamType", -- Has high-level helper that takes AddressSpace parameters
 		"BorrowInParamType", -- Has high-level helper that takes AddressSpace parameters
+		"FuncType", -- the result and params have always been given in the "wrong" order, and the IRAttr oddness at the end
 		-- Identity semantics - use createXxxType() instead of getXxxType()
-		"StructType", -- Uses createStructType(), not getStructType()
-		"ClassType", -- Uses createClassType(), not getClassType()
-		-- Note: Base classes are automatically filtered out using value.is_leaf
+		"StructType",
+		"ClassType",
 	}
 
-	-- Convert excluded_types to a lookup set for faster access
 	local excluded_set = {}
 	for _, type_name in ipairs(excluded_types) do
 		excluded_set[type_name] = true
@@ -345,7 +349,6 @@ local function getBasicTypesForBuilderMethods()
 
 	local result = {}
 
-	-- Use the proven walk_instructions function to collect all type instructions
 	if type_insts then
 		walk_instructions(type_insts, function(key, value, struct_name, parent_struct)
 			-- Only process leaf instructions (not base classes) that are not excluded
@@ -383,7 +386,7 @@ local function getBasicTypesForBuilderMethods()
 									error(
 										"Type "
 											.. struct_name
-											.. " has both variadic and optional operands, which is not supported"
+											.. " has both variadic and optional operands, which is not supported by the automatic IRBuilder method Fiddle generator"
 									)
 								end
 							end

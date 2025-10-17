@@ -79,7 +79,16 @@ local insts = {
 					},
 				},
 			},
-			{ Func = { struct_name = "FuncType", hoistable = true } },
+			{
+				Func = {
+					struct_name = "FuncType",
+					hoistable = true,
+					operands = {
+						{ "resultType", "IRType" },
+						{ "paramTypes", "IRType", variadic = true },
+					},
+				},
+			},
 			{ BasicBlock = { struct_name = "BasicBlockType", hoistable = true } },
 			{
 				Vec = {
@@ -118,7 +127,12 @@ local insts = {
 			{
 				DifferentialPairTypeBase = {
 					hoistable = true,
-					{ DiffPair = { struct_name = "DifferentialPairType", operands = { { "valueType", "IRType" }, { "witnessTable" } } } },
+					{
+						DiffPair = {
+							struct_name = "DifferentialPairType",
+							operands = { { "valueType", "IRType" }, { "witnessTable" } },
+						},
+					},
 					{
 						DiffPairUserCode = {
 							struct_name = "DifferentialPairUserCodeType",
@@ -212,9 +226,36 @@ local insts = {
 			{
 				PtrTypeBase = {
 					hoistable = true,
-					{ Ptr = { struct_name = "PtrType", operands = { { "valueType", "IRType" } } } },
-					{ RefParam = { struct_name = "RefParamType", operands = { { "valueType", "IRType" } } } },
-					{ BorrowInParam = { struct_name = "BorrowInParamType", operands = { { "valueType", "IRType" } } } },
+					{
+						Ptr = {
+							struct_name = "PtrType",
+							operands = {
+								{ "valueType", "IRType" },
+								{ "accessQualifierOperand", "IRIntLit", optional = true },
+								{ "addressSpaceOperand", "IRIntLit", optional = true },
+							},
+						},
+					},
+					{
+						RefParam = {
+							struct_name = "RefParamType",
+							operands = {
+								{ "valueType", "IRType" },
+								{ "accessQualifierOperand", "IRIntLit", optional = true },
+								{ "addressSpaceOperand", "IRIntLit", optional = true },
+							},
+						},
+					},
+					{
+						BorrowInParam = {
+							struct_name = "BorrowInParamType",
+							operands = {
+								{ "valueType", "IRType" },
+								{ "accessQualifierOperand", "IRIntLit", optional = true },
+								{ "addressSpaceOperand", "IRIntLit", optional = true },
+							},
+						},
+					},
 					{
 						PseudoPtr = {
 							-- A `PsuedoPtr<T>` logically represents a pointer to a value of type
@@ -222,7 +263,11 @@ local insts = {
 							-- is that the "pointer" will be legalized away by storing a value
 							-- of type `T` somewhere out-of-line.
 							struct_name = "PseudoPtrType",
-							operands = { { "valueType", "IRType" } },
+							operands = {
+								{ "valueType", "IRType" },
+								{ "accessQualifierOperand", "IRIntLit", optional = true },
+								{ "addressSpaceOperand", "IRIntLit", optional = true },
+							},
 						},
 					},
 					{
@@ -302,19 +347,19 @@ local insts = {
 							{
 								TextureTypeBase = {
 									{
-										TextureType = { 
-											operands = { 
-												{ "elementType", "IRType" }, 
-												{ "shape", "IRInst" }, 
-												{ "isArray", "IRInst" }, 
-												{ "isMS", "IRInst" }, 
-												{ "sampleCount", "IRInst" }, 
-												{ "accessOperand", "IRInst" }, 
-												{ "isShadow", "IRInst" }, 
-												{ "isCombined", "IRInst" }, 
-												{ "format", "IRInst" } 
-											}, 
-											hoistable = true 
+										TextureType = {
+											operands = {
+												{ "elementType", "IRType" },
+												{ "shape", "IRInst" },
+												{ "isArray", "IRInst" },
+												{ "isMS", "IRInst" },
+												{ "sampleCount", "IRInst" },
+												{ "accessOperand", "IRInst" },
+												{ "isShadow", "IRInst" },
+												{ "isCombined", "IRInst" },
+												{ "format", "IRInst" },
+											},
+											hoistable = true,
 										},
 									},
 									{ GLSLImageType = { use_other = true, hoistable = true } },

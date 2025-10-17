@@ -1603,7 +1603,6 @@ FIDDLE()
 struct IRFuncType : IRType
 {
     FIDDLE(leafInst())
-    IRType* getResultType() { return (IRType*)getOperand(0); }
     UInt getParamCount() { return getOperandCount() - 1; }
     IRType* getParamType(UInt index) { return (IRType*)getOperand(1 + index); }
     IROperandList<IRType> getParamTypes()
