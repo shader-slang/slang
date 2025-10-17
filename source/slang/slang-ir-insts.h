@@ -3042,72 +3042,7 @@ public:
 %local ir_lua = require("source/slang/slang-ir.h.lua")
 %local basic_types = ir_lua.getBasicTypesForBuilderMethods()
 %for _, type_info in ipairs(basic_types) do
-%  if type_info.has_optional then
-%    -- For types with optional operands, generate multiple overloads
-%    -- Split operands into required and optional
-%    local required_operands = {}
-%    local optional_operands = {}
-%    for _, op in ipairs(type_info.operands) do
-%      if op.optional then
-%        table.insert(optional_operands, op)
-%      else
-%        table.insert(required_operands, op)
-%      end
-%    end
-%    -- Generate one overload for each prefix of optional operands
-%    for num_optional = 0, #optional_operands do
-%      local current_operands = {}
-%      -- Add all required operands
-%      for _, op in ipairs(required_operands) do
-%        table.insert(current_operands, op)
-%      end
-%      -- Add first num_optional optional operands
-%      for i = 1, num_optional do
-%        table.insert(current_operands, optional_operands[i])
-%      end
-%      -- Generate the function signature
-$(type_info.return_type) $(type_info.method_name)(
-%      for i, operand in ipairs(current_operands) do
-    $(operand.type)* $(operand.name)
-%        if i < #current_operands then
-,
-%        end
-%      end
-)
-{
-%      if #current_operands == 0 then
-    return ($(type_info.return_type))createIntrinsicInst(
-        nullptr,
-        $(type_info.opcode),
-        0,
-        nullptr,
-        nullptr);
-%      else
-    UInt operandCounts[] = { $(#current_operands) };
-%        if #current_operands == 1 then
-    IRInst* const* operandLists[] = { (IRInst* const*)&$(current_operands[1].name) };
-%        else
-    IRInst* operandArray[] = {
-%          for i, operand in ipairs(current_operands) do
-        $(operand.name)
-%            if i < #current_operands then
-,
-%            end
-%          end
-    };
-    IRInst* const* operandLists[] = { (IRInst* const*)operandArray };
-%        end
-    return ($(type_info.return_type))createIntrinsicInst(
-        nullptr,
-        $(type_info.opcode),
-        1,
-        operandCounts,
-        operandLists);
-%      end
-}
-
-%    end
-%  elseif type_info.is_variadic then
+%  if type_info.is_variadic then
 %    -- For variadic types, generate implementations with mixed operands support
 %    local non_variadic_operands = {}
 %    local variadic_operand = nil
@@ -3188,10 +3123,12 @@ $(type_info.return_type) $(type_info.method_name)(
 
 %    end
 %  else
-%    -- Generate regular non-variadic type using createIntrinsicInst uniformly
+%    -- Unified approach: generate one overload with all operands, optionals get nullptr defaults
+%    -- Since optional operands are always at the end, we can statically generate operand arrays
+%    -- and use a simple nested ternary for the call
 $(type_info.return_type) $(type_info.method_name)(
 %    for i, operand in ipairs(type_info.operands) do
-    $(operand.type)* $(operand.name)
+    $(operand.type)* $(operand.name)$(operand.optional and " = nullptr" or "")
 %      if i < #type_info.operands then
 ,
 %      end
@@ -3206,26 +3143,72 @@ $(type_info.return_type) $(type_info.method_name)(
         nullptr,
         nullptr);
 %    else
-    UInt operandCounts[] = { $(#type_info.operands) };
-%      if #type_info.operands == 1 then
-    IRInst* const* operandLists[] = { (IRInst* const*)&$(type_info.operands[1].name) };
-%      else
-    IRInst* operandArray[] = {
-%        for i, operand in ipairs(type_info.operands) do
-        $(operand.name)
-%          if i < #type_info.operands then
-,
-%          end
+%      -- Find the first optional operand
+%      local first_optional_index = nil
+%      for i, operand in ipairs(type_info.operands) do
+%        if operand.optional and not first_optional_index then
+%          first_optional_index = i
+%          break
 %        end
+%      end
+%      
+%      if not first_optional_index then
+%        -- No optional operands - simple static case
+%        if #type_info.operands == 1 then
+    IRInst* const* operandLists[] = { (IRInst* const*)&$(type_info.operands[1].name) };
+%        else
+    IRInst* operandArray[] = {
+%          for i, operand in ipairs(type_info.operands) do
+        $(operand.name)$(i < #type_info.operands and ", " or "")
+%          end
     };
     IRInst* const* operandLists[] = { (IRInst* const*)operandArray };
-%      end
+%        end
+    UInt operandCounts[] = { $(#type_info.operands) };
     return ($(type_info.return_type))createIntrinsicInst(
         nullptr,
         $(type_info.opcode),
         1,
         operandCounts,
         operandLists);
+%      else
+%        -- Generate single operand array with all operands
+%        if #type_info.operands == 1 then
+    IRInst* const* operandLists[] = { (IRInst* const*)&$(type_info.operands[1].name) };
+%        else
+    IRInst* operandArray[] = {
+%          for i, operand in ipairs(type_info.operands) do
+        $(operand.name)$(i < #type_info.operands and ", " or "")
+%          end
+    };
+    IRInst* const* operandLists[] = { (IRInst* const*)operandArray };
+%        end
+
+    // Calculate operand count using left-tree ternary
+%        local required_count = first_optional_index - 1
+%        local function build_count_expr(current_index)
+%          if current_index > #type_info.operands then
+%            return tostring(required_count)
+%          end
+%          local operand = type_info.operands[current_index]
+%          if operand.optional then
+%            local with_count = tostring(current_index)
+%            local without_count = build_count_expr(current_index + 1)
+%            return operand.name .. " ? " .. with_count .. " : " .. without_count
+%          else
+%            return build_count_expr(current_index + 1)
+%          end
+%        end
+    UInt operandCount = $(build_count_expr(first_optional_index));
+    UInt operandCounts[] = { operandCount };
+    
+    return ($(type_info.return_type))createIntrinsicInst(
+        nullptr,
+        $(type_info.opcode),
+        1,
+        operandCounts,
+        operandLists);
+%      end
 %    end
 }
 %  end
