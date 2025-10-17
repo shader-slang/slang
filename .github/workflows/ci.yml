@@ -135,7 +135,6 @@ jobs:
       config: debug
       runs-on: '["ubuntu-22.04"]'
       test-category: smoke
-      server-count: 1
 
   test-linux-release-gcc-x86_64:
     needs: [filter, build-linux-release-gcc-x86_64]
@@ -148,7 +147,6 @@ jobs:
       config: release
       runs-on: '["ubuntu-22.04"]'
       test-category: full
-      server-count: 1
 
   # macOS tests
   test-macos-debug-clang-aarch64:
