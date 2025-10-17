@@ -274,4 +274,3 @@ EXPORTS
     spSetTypeNameForGlobalExistentialTypeParam = slang-compiler.spSetTypeNameForGlobalExistentialTypeParam
     spSetWriter = slang-compiler.spSetWriter
     spTranslationUnit_addPreprocessorDefine = slang-compiler.spTranslationUnit_addPreprocessorDefine
-
