@@ -880,6 +880,7 @@ __intrinsic_op($(kIROp_MetalCastToDepthTexture))
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
 _Texture<T,Shape,isArray,isMS,sampleCount,access,1,isCombined,format> __metal_asDepthTexture(_Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> tex);
 
+[require(wgsl)]
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
 void __wgsl_check_texture_type()
 {
