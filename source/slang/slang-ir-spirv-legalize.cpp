@@ -184,10 +184,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     //
     OrderedHashSet<IRInst*> workList;
 
-    void addToWorkList(IRInst* inst)
-    {
-        workList.add(inst);
-    }
+    void addToWorkList(IRInst* inst) { workList.add(inst); }
 
     void addUsersToWorkList(IRInst* inst)
     {
