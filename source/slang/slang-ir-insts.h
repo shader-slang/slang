@@ -3123,7 +3123,7 @@ $(type_info.return_type) $(type_info.method_name)(
 
 %    end
 %  else
-%    -- Unified approach: single operand list, works for all cases
+%    -- Unified approach: N lists with 1 operand each (same pattern as variadic)
 $(type_info.return_type) $(type_info.method_name)(
 %    for i, operand in ipairs(type_info.operands) do
     $(operand.type)* $(operand.name)$(operand.optional and " = nullptr" or "")
@@ -3149,38 +3149,41 @@ $(type_info.return_type) $(type_info.method_name)(
 %          break
 %        end
 %      end
-    IRInst* operandArray[] = {
+    UInt operandCounts[] = {
+%      for i = 1, #type_info.operands do
+        1,
+%      end
+    };
+    IRInst* const* operandLists[] = {
 %      for i, operand in ipairs(type_info.operands) do
-        $(operand.name)$(i < #type_info.operands and ", " or "")
+        (IRInst* const*)&$(operand.name),
 %      end
     };
 %      if first_optional_index then
-%        -- Build operand count expression for optional operands
+%        -- Count number of present lists using same ternary pattern
 %        local required_count = first_optional_index - 1
-%        local function build_count_expr(current_index)
+%        local function build_list_count_expr(current_index)
 %          if current_index > #type_info.operands then
 %            return tostring(required_count)
 %          end
 %          local operand = type_info.operands[current_index]
 %          if operand.optional then
 %            local with_count = tostring(current_index)
-%            local without_count = build_count_expr(current_index + 1)
+%            local without_count = build_list_count_expr(current_index + 1)
 %            return operand.name .. " ? " .. with_count .. " : " .. without_count
 %          else
-%            return build_count_expr(current_index + 1)
+%            return build_list_count_expr(current_index + 1)
 %          end
 %        end
-    UInt operandCount = $(build_count_expr(first_optional_index));
+    UInt listCount = $(build_list_count_expr(first_optional_index));
 %      else
-    UInt operandCount = $(#type_info.operands);
+    UInt listCount = $(#type_info.operands);
 %      end
-    UInt operandCounts[] = { operandCount };
-    IRInst* const* operandLists[] = { operandArray };
     
     return ($(type_info.return_type))createIntrinsicInst(
         nullptr,
         $(type_info.opcode),
-        1,
+        listCount,
         operandCounts,
         operandLists);
 %    end
