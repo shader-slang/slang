@@ -3143,18 +3143,12 @@ $(type_info.return_type) $(type_info.method_name)(
 %    end
     UInt operandCounts[] = { 
 %    for i, count in ipairs(operand_counts) do
-        $(count)
-%      if i < #operand_counts then
-,
-%      end
+        $(count),
 %    end
     };
     IRInst* const* operandLists[] = { 
 %    for i, list in ipairs(operand_lists) do
-        $(list)
-%      if i < #operand_lists then
-,
-%      end
+        $(list),
 %    end
     };
     return ($(type_info.return_type))createIntrinsicInst(
