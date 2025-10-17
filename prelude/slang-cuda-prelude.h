@@ -250,6 +250,23 @@ struct __align__(4) bool4
     }
 };
 
+SLANG_FORCE_INLINE SLANG_CUDA_CALL bool __ldg(const bool* ptr)
+{
+    return (bool)(__ldg((const char*)ptr));
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL bool2 __ldg(const bool2* ptr)
+{
+    auto val = __ldg((const char2*)ptr);
+    return {val.x != 0, val.y != 0};
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL bool4 __ldg(const bool4* ptr)
+{
+    auto val = __ldg((const char4*)ptr);
+    return {val.x != 0, val.y != 0, val.z != 0, val.w != 0};
+}
+
 #if SLANG_CUDA_RTC
 
 typedef signed char int8_t;

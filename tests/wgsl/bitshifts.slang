@@ -84,7 +84,7 @@ void computeMain()
     outputBuffer[41] = v3[1];
     outputBuffer[42] = v3[2];
 
-    v4 = int4(inputBuffer[0], inputBuffer[1], inputBuffer[2], inputBuffer[4]) >> int4(1, 2, 3, 4);
+    v4 = int4(inputBuffer[0], inputBuffer[1], inputBuffer[2], inputBuffer[3]) >> int4(1, 2, 3, 4);
     outputBuffer[43] = v4[0];
     outputBuffer[44] = v4[1];
     outputBuffer[45] = v4[2];

@@ -23,6 +23,7 @@ QualType::QualType(Type* type)
                 break;
 
             case AccessQualifier::Read:
+            case AccessQualifier::Immutable:
                 isLeftValue = false;
                 break;
 

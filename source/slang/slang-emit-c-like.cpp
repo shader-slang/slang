@@ -1679,7 +1679,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     // for GLSL), so we check this only after all those special cases are
     // considered.
     //
-    if (inst->getOp() == kIROp_Undefined)
+    if (as<IRUndefined>(inst))
         return false;
 
     // Okay, at this point we know our instruction must have a single use.
@@ -2388,7 +2388,8 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
     case kIROp_RTTIPointerType:
         break;
 
-    case kIROp_Undefined:
+    case kIROp_LoadFromUninitializedMemory:
+    case kIROp_Poison:
     case kIROp_DefaultConstruct:
         m_writer->emit(getName(inst));
         break;
@@ -3245,7 +3246,8 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     case kIROp_LiveRangeEnd:
         emitLiveness(inst);
         break;
-    case kIROp_Undefined:
+    case kIROp_LoadFromUninitializedMemory:
+    case kIROp_Poison:
     case kIROp_DefaultConstruct:
         {
             auto type = inst->getDataType();
