@@ -3123,9 +3123,7 @@ $(type_info.return_type) $(type_info.method_name)(
 
 %    end
 %  else
-%    -- Unified approach: generate one overload with all operands, optionals get nullptr defaults
-%    -- Since optional operands are always at the end, we can statically generate operand arrays
-%    -- and use a simple nested ternary for the call
+%    -- Unified approach: single operand list, works for all cases
 $(type_info.return_type) $(type_info.method_name)(
 %    for i, operand in ipairs(type_info.operands) do
     $(operand.type)* $(operand.name)$(operand.optional and " = nullptr" or "")
@@ -3143,7 +3141,7 @@ $(type_info.return_type) $(type_info.method_name)(
         nullptr,
         nullptr);
 %    else
-%      -- Find the first optional operand
+%      -- Find the first optional operand  
 %      local first_optional_index = nil
 %      for i, operand in ipairs(type_info.operands) do
 %        if operand.optional and not first_optional_index then
@@ -3151,18 +3149,11 @@ $(type_info.return_type) $(type_info.method_name)(
 %          break
 %        end
 %      end
-%      
-%      -- Generate single operand array with all operands (works for both optional and non-optional cases)
-%      if #type_info.operands == 1 then
-    IRInst* operandArray[] = { $(type_info.operands[1].name) };
-%      else
     IRInst* operandArray[] = {
-%        for i, operand in ipairs(type_info.operands) do
+%      for i, operand in ipairs(type_info.operands) do
         $(operand.name)$(i < #type_info.operands and ", " or "")
-%        end
-    };
 %      end
-
+    };
 %      if first_optional_index then
 %        -- Build operand count expression for optional operands
 %        local required_count = first_optional_index - 1
@@ -3183,13 +3174,15 @@ $(type_info.return_type) $(type_info.method_name)(
 %      else
     UInt operandCount = $(#type_info.operands);
 %      end
+    UInt operandCounts[] = { operandCount };
+    IRInst* const* operandLists[] = { operandArray };
     
     return ($(type_info.return_type))createIntrinsicInst(
         nullptr,
         $(type_info.opcode),
         1,
-        &operandCount,
-        (IRInst* const**)&operandArray);
+        operandCounts,
+        operandLists);
 %    end
 }
 %  end
