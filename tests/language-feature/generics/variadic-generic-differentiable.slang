@@ -46,14 +46,15 @@ void wrapper2<each T>(
     wrapper1(x, args);
 }
 
-
 void main()
 {
     // There was a bug that causes the compiler failing to treat a `no_diff TypePack` as
     // a type pack, and thus diagnose an error when resolving the following call.
     //
-    wrapper2(1, FloatParameterExtractor(), FloatParameterExtractor());
+    wrapper2(1, FloatParameterExtractor(), FloatParameterExtractor(), FloatParameterExtractor(), FloatParameterExtractor());
 }
 
+// CHECK: fff
+// CHECK: fff
 // CHECK: fff
 // CHECK: fff
