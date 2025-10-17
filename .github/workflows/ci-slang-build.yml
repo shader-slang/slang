@@ -30,6 +30,18 @@ on:
         required: false
         type: number
         default: 8
+      enable-coverage:
+        required: false
+        type: boolean
+        default: false
+      coverage-deploy-pages:
+        required: false
+        type: boolean
+        default: false
+      coverage-pr-comment:
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -81,6 +93,15 @@ jobs:
       - name: Build Slang
         run: |
           echo "cmake version: $(cmake --version)"
+
+          # Determine which preset to use
+          if [[ "${{ inputs.enable-coverage }}" == "true" ]]; then
+            build_preset="coverage"
+            echo "Building with coverage instrumentation (preset: coverage)"
+          else
+            build_preset="${{ inputs.config }}"
+            echo "Building with standard preset: $build_preset"
+          fi
 
           # Show ccache status if available
           if command -v ccache &> /dev/null; then
@@ -134,14 +155,14 @@ jobs:
                 "-DSLANG_SLANG_LLVM_BINARY_URL=$(pwd)/build/dist-release/slang-llvm.zip" \
                 "-DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }}" \
                 "${cmake_launcher_defines[@]}"
-              cmake --workflow --preset "${{ inputs.config }}"
+              cmake --workflow --preset "$build_preset"
             elif [[ "${{ inputs.build-llvm }}" = "false" ]]; then
               # linux aarch64 cannot build llvm.
               cmake --preset default --fresh \
                 -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
                 -DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }} \
                 "${cmake_launcher_defines[@]}"
-              cmake --workflow --preset "${{ inputs.config }}"
+              cmake --workflow --preset "$build_preset"
             else
               # Otherwise, use the "system" llvm we have just build or got from the
               # cache in the setup phase
@@ -149,7 +170,7 @@ jobs:
                 -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
                 -DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }} \
                 "${cmake_launcher_defines[@]}"
-              cmake --workflow --preset "${{ inputs.config }}"
+              cmake --workflow --preset "$build_preset"
             fi
           fi
 
@@ -161,6 +182,66 @@ jobs:
 
       - name: Check documented compiler versions
         run: bash extras/verify-documented-compiler-version.sh
+
+      - name: Run Tests with Coverage
+        if: ${{ inputs.enable-coverage }}
+        run: |
+          # Generate both HTML and LCOV formats
+          export COVERAGE_HTML=1
+          export COVERAGE_LCOV=1
+          export COVERAGE_HTML_DIR="$PWD/coverage-html"
+          export COVERAGE_LCOV_FILE="$PWD/coverage.lcov"
+
+          # Run coverage with test servers
+          ./tools/coverage/run-coverage.sh -use-test-server -server-count ${{ inputs.server-count }}
+
+      - name: Generate Coverage Summary
+        if: ${{ inputs.enable-coverage }}
+        id: coverage-summary
+        run: |
+          # Extract overall coverage percentage from LCOV file
+          if [[ -f coverage.lcov ]]; then
+            lines_found=$(grep -o "LF:[0-9]*" coverage.lcov | awk -F: '{sum+=$2} END {print sum}')
+            lines_hit=$(grep -o "LH:[0-9]*" coverage.lcov | awk -F: '{sum+=$2} END {print sum}')
+
+            if [[ $lines_found -gt 0 ]]; then
+              coverage=$(awk "BEGIN {printf \"%.2f\", ($lines_hit / $lines_found) * 100}")
+              echo "coverage=$coverage" >> $GITHUB_OUTPUT
+
+              cat >> $GITHUB_STEP_SUMMARY <<EOF
+          # Coverage Report
+          - **Total Coverage:** ${coverage}%
+          - **Lines Hit:** ${lines_hit} / ${lines_found}
+          EOF
+            fi
+          fi
+
+      - name: Deploy Coverage to GitHub Pages
+        if: ${{ inputs.enable-coverage && inputs.coverage-deploy-pages }}
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./coverage-html
+          destination_dir: coverage
+          commit_message: "Update coverage report"
+
+      - name: Report Coverage in PR
+        if: ${{ inputs.enable-coverage && inputs.coverage-pr-comment }}
+        uses: zgosalvez/github-actions-report-lcov@v4
+        with:
+          coverage-files: coverage.lcov
+          minimum-coverage: 0
+          artifact-name: coverage-report
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          update-comment: true
+
+      - name: Upload LCOV Report
+        if: ${{ inputs.enable-coverage }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-lcov-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}
+          path: coverage.lcov
+          retention-days: 30
 
       - name: Prepare artifacts for upload
         run: |

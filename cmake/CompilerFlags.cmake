@@ -229,4 +229,20 @@ function(set_default_compile_options target)
             -fsanitize=address
         )
     endif()
+
+    if(SLANG_ENABLE_COVERAGE)
+        # Coverage instrumentation for Clang/GCC
+        # Both flags must be used together for source mapping to work
+        if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+            target_compile_options(
+                ${target}
+                PRIVATE -fprofile-instr-generate -fcoverage-mapping
+            )
+            target_link_options(
+                ${target}
+                BEFORE
+                PUBLIC -fprofile-instr-generate
+            )
+        endif()
+    endif()
 endfunction()
