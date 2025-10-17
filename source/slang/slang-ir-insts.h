@@ -3042,10 +3042,12 @@ public:
 %local ir_lua = require("source/slang/slang-ir.h.lua")
 %local basic_types = ir_lua.getBasicTypesForBuilderMethods()
 %for _, type_info in ipairs(basic_types) do
+%  -- Declare variables for both variadic and non-variadic cases
+%  local non_variadic_operands = {}
+%  local variadic_operand = nil
+%  
+%  -- For variadic types, separate operands by type
 %  if type_info.is_variadic then
-%    -- For variadic types, generate implementations with mixed operands support
-%    local non_variadic_operands = {}
-%    local variadic_operand = nil
 %    for _, op in ipairs(type_info.operands) do
 %      if op.variadic then
 %        variadic_operand = op
@@ -3053,52 +3055,107 @@ public:
 %        table.insert(non_variadic_operands, op)
 %      end
 %    end
-%    if variadic_operand then
-%      -- Main method using createIntrinsicInst with a single operand list to preserve order
+%  end
+%
+%  -- Unified approach: N lists with specified counts (1 for single operands, paramCount for variadic)
+%  if type_info.is_variadic then
 $(type_info.return_type) $(type_info.method_name)(
-%      for i, operand in ipairs(non_variadic_operands) do
+%    for i, operand in ipairs(non_variadic_operands) do
     $(operand.type)* $(operand.name),
-%      end
+%    end
     UInt $(variadic_operand.name)Count, $(variadic_operand.type)* const* $(variadic_operand.name))
-{
-%    -- Build operand lists statically - each parameter becomes its own list
-%    local operand_lists = {}
-%    local operand_counts = {}
-%    local non_variadic_index = 0
-%    for _, orig_operand in ipairs(type_info.operands) do
-%      if orig_operand.variadic then
-%        table.insert(operand_counts, variadic_operand.name .. "Count")
-%        table.insert(operand_lists, "(IRInst* const*)" .. variadic_operand.name)
-%      else
-%        non_variadic_index = non_variadic_index + 1
-%        local matching_operand = non_variadic_operands[non_variadic_index]
-%        table.insert(operand_counts, "1")
-%        table.insert(operand_lists, "(IRInst* const*)&" .. matching_operand.name)
+%  else
+$(type_info.return_type) $(type_info.method_name)(
+%    for i, operand in ipairs(type_info.operands) do
+    $(operand.type)* $(operand.name)$(operand.optional and " = nullptr" or "")
+%      if i < #type_info.operands then
+,
 %      end
 %    end
-    UInt operandCounts[] = { 
-%    for i, count in ipairs(operand_counts) do
-        $(count),
-%    end
-    };
-    IRInst* const* operandLists[] = { 
-%    for i, list in ipairs(operand_lists) do
-        $(list),
-%    end
-    };
+)
+%  end
+{
+%  if #type_info.operands == 0 then
     return ($(type_info.return_type))createIntrinsicInst(
         nullptr,
         $(type_info.opcode),
-        $(#operand_lists),
+        0,
+        nullptr,
+        nullptr);
+%  else
+    UInt operandCounts[] = {
+%    if type_info.is_variadic then
+%      -- For variadic: 1 for each non-variadic, paramCount for variadic
+%      for _, orig_operand in ipairs(type_info.operands) do
+%        if orig_operand.variadic then
+        $(variadic_operand.name)Count,
+%        else
+        1,
+%        end
+%      end
+%    else
+%      -- For non-variadic: 1 for each operand
+%      for i = 1, #type_info.operands do
+        1,
+%      end
+%    end
+    };
+    IRInst* const* operandLists[] = {
+%    if type_info.is_variadic then
+%      -- For variadic: address of each non-variadic, cast variadic pointer for type compatibility
+%      local non_variadic_index = 0
+%      for _, orig_operand in ipairs(type_info.operands) do
+%        if orig_operand.variadic then
+        (IRInst* const*)$(variadic_operand.name),
+%        else
+%          non_variadic_index = non_variadic_index + 1
+%          local matching_operand = non_variadic_operands[non_variadic_index]
+        (IRInst* const*)&$(matching_operand.name),
+%        end
+%      end
+%    else
+%      -- For non-variadic: address of each operand
+%      for i, operand in ipairs(type_info.operands) do
+        (IRInst* const*)&$(operand.name),
+%      end
+%    end
+    };
+%    -- Count number of present lists using ternary pattern for optional operands
+%    -- This works for both variadic and non-variadic cases
+%    local first_optional_index = nil
+%    for i, operand in ipairs(type_info.operands) do
+%      if operand.optional and not first_optional_index then
+%        first_optional_index = i
+%        break
+%      end
+%    end
+%    if not first_optional_index then
+%      first_optional_index = #type_info.operands+1
+%    end
+%    -- Build left-to-right ternary expression - if operand N is present, then operands 1..N are all present
+%    local ternary_expr = ""
+%    for i = #type_info.operands, first_optional_index, -1 do
+%      local operand = type_info.operands[i]
+%      ternary_expr = ternary_expr .. operand.name .. " ? " .. tostring(i) .. " : "
+%    end
+%    ternary_expr = ternary_expr .. tostring(first_optional_index - 1)
+    UInt listCount = $(ternary_expr);
+    
+    return ($(type_info.return_type))createIntrinsicInst(
+        nullptr,
+        $(type_info.opcode),
+        listCount,
         operandCounts,
         operandLists);
+%  end
 }
 
-%      -- List and ArrayView convenience overloads
+%  -- Add List and ArrayView convenience overloads for variadic types
+%  if type_info.is_variadic then
 $(type_info.return_type) $(type_info.method_name)(
-%      for i, operand in ipairs(non_variadic_operands) do
+%    for i, operand in ipairs(non_variadic_operands) do
     $(operand.type)* $(operand.name),
-%      end
+%    end
     List<$(variadic_operand.type)*> const& $(variadic_operand.name))
 {
     return $(type_info.method_name)(
@@ -3109,9 +3166,9 @@ $(type_info.return_type) $(type_info.method_name)(
 }
 
 $(type_info.return_type) $(type_info.method_name)(
-%      for i, operand in ipairs(non_variadic_operands) do
+%    for i, operand in ipairs(non_variadic_operands) do
     $(operand.type)* $(operand.name),
-%      end
+%    end
     ArrayView<$(variadic_operand.type)*> $(variadic_operand.name))
 {
     return $(type_info.method_name)(
@@ -3119,74 +3176,6 @@ $(type_info.return_type) $(type_info.method_name)(
         $(operand.name),
 %      end
         $(variadic_operand.name).getCount(), $(variadic_operand.name).getBuffer());
-}
-
-%    end
-%  else
-%    -- Unified approach: N lists with 1 operand each (same pattern as variadic)
-$(type_info.return_type) $(type_info.method_name)(
-%    for i, operand in ipairs(type_info.operands) do
-    $(operand.type)* $(operand.name)$(operand.optional and " = nullptr" or "")
-%      if i < #type_info.operands then
-,
-%      end
-%    end
-)
-{
-%    if #type_info.operands == 0 then
-    return ($(type_info.return_type))createIntrinsicInst(
-        nullptr,
-        $(type_info.opcode),
-        0,
-        nullptr,
-        nullptr);
-%    else
-%      -- Find the first optional operand  
-%      local first_optional_index = nil
-%      for i, operand in ipairs(type_info.operands) do
-%        if operand.optional and not first_optional_index then
-%          first_optional_index = i
-%          break
-%        end
-%      end
-    UInt operandCounts[] = {
-%      for i = 1, #type_info.operands do
-        1,
-%      end
-    };
-    IRInst* const* operandLists[] = {
-%      for i, operand in ipairs(type_info.operands) do
-        (IRInst* const*)&$(operand.name),
-%      end
-    };
-%      if first_optional_index then
-%        -- Count number of present lists using same ternary pattern
-%        local required_count = first_optional_index - 1
-%        local function build_list_count_expr(current_index)
-%          if current_index > #type_info.operands then
-%            return tostring(required_count)
-%          end
-%          local operand = type_info.operands[current_index]
-%          if operand.optional then
-%            local with_count = tostring(current_index)
-%            local without_count = build_list_count_expr(current_index + 1)
-%            return operand.name .. " ? " .. with_count .. " : " .. without_count
-%          else
-%            return build_list_count_expr(current_index + 1)
-%          end
-%        end
-    UInt listCount = $(build_list_count_expr(first_optional_index));
-%      else
-    UInt listCount = $(#type_info.operands);
-%      end
-    
-    return ($(type_info.return_type))createIntrinsicInst(
-        nullptr,
-        $(type_info.opcode),
-        listCount,
-        operandCounts,
-        operandLists);
-%    end
 }
 %  end
 %end
