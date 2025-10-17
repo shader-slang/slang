@@ -2561,7 +2561,8 @@ struct LLVMEmitter
             }
             break;
 
-        case kIROp_Undefined:
+        case kIROp_LoadFromUninitializedMemory:
+        case kIROp_Poison:
             {
                 auto type = inst->getDataType();
                 if (types->isAggregateType(type))
