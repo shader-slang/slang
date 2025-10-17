@@ -1,5 +1,12 @@
 LIBRARY slang
 EXPORTS
+    ?getBuiltinModuleSource@Slang@@YAHAEBUUnownedStringSlice@1@PEAPEAUISlangBlob@@@Z = slang-compiler.?getBuiltinModuleSource@Slang@@YAHAEBUUnownedStringSlice@1@PEAPEAUISlangBlob@@@Z
+    ?parse@LanguageServerStartupOptions@Slang@@QEAAXHPEBQEBD@Z = slang-compiler.?parse@LanguageServerStartupOptions@Slang@@QEAAXHPEBQEBD@Z
+    ?runLanguageServer@Slang@@YAHULanguageServerStartupOptions@1@@Z = slang-compiler.?runLanguageServer@Slang@@YAHULanguageServerStartupOptions@1@@Z
+    ?slang_createGlobalSessionImpl@@YAHPEBUSlangGlobalSessionDesc@@PEBUGlobalSessionInternalDesc@Slang@@PEAPEAUIGlobalSession@slang@@@Z = slang-compiler.?slang_createGlobalSessionImpl@@YAHPEBUSlangGlobalSessionDesc@@PEBUGlobalSessionInternalDesc@Slang@@PEAPEAUIGlobalSession@slang@@@Z
+    ?slang_getEmbeddedCoreModule@@YAPEAUISlangBlob@@XZ = slang-compiler.?slang_getEmbeddedCoreModule@@YAPEAUISlangBlob@@XZ
+    ?spReflection_GetSession@@YAPEAUISession@slang@@PEAUSlangProgramLayout@@@Z = slang-compiler.?spReflection_GetSession@@YAPEAUISession@slang@@PEAUSlangProgramLayout@@@Z
+    ?spSetCommandLineCompilerMode@@YAXPEAUICompileRequest@slang@@@Z = slang-compiler.?spSetCommandLineCompilerMode@@YAXPEAUICompileRequest@slang@@@Z
     slang_createBlob = slang-compiler.slang_createBlob
     slang_createByteCodeRunner = slang-compiler.slang_createByteCodeRunner
     slang_createGlobalSession = slang-compiler.slang_createGlobalSession
@@ -234,14 +241,12 @@ EXPORTS
     spReflection_isSubType = slang-compiler.spReflection_isSubType
     spReflection_specializeGeneric = slang-compiler.spReflection_specializeGeneric
     spReflection_specializeType = slang-compiler.spReflection_specializeType
-    spReflection_GetSession = slang-compiler.spReflection_GetSession
     spSaveRepro = slang-compiler.spSaveRepro
     spSessionCheckCompileTargetSupport = slang-compiler.spSessionCheckCompileTargetSupport
     spSessionCheckPassThroughSupport = slang-compiler.spSessionCheckPassThroughSupport
     spSessionGetSharedLibraryLoader = slang-compiler.spSessionGetSharedLibraryLoader
     spSessionSetSharedLibraryLoader = slang-compiler.spSessionSetSharedLibraryLoader
     spSetCodeGenTarget = slang-compiler.spSetCodeGenTarget
-    spSetCommandLineCompilerMode = slang-compiler.spSetCommandLineCompilerMode
     spSetCompileFlags = slang-compiler.spSetCompileFlags
     spSetDebugInfoFormat = slang-compiler.spSetDebugInfoFormat
     spSetDebugInfoLevel = slang-compiler.spSetDebugInfoLevel
