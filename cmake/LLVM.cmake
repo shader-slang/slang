@@ -94,7 +94,7 @@ function(fetch_or_build_slang_llvm)
         if(NOT LLVM_ENABLE_RTTI)
             # Make sure that we don't disable rtti if this library wasn't compiled with
             # support
-            add_supported_cxx_flags(slang-llvm INTERFACE -fno-rtti /GR-)
+            add_supported_cxx_flags(slang-llvm PRIVATE -fno-rtti /GR-)
         endif()
 
         # TODO: Put a check here that libslang-llvm.so doesn't have a 'NEEDED'
