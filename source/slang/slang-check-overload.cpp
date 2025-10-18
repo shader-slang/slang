@@ -630,7 +630,7 @@ static QualType getParamQualType(ASTBuilder* astBuilder, DeclRef<ParamDecl> para
 {
     auto paramType = getType(astBuilder, param);
     bool isLVal = false;
-    switch (getParameterDirection(param.getDecl()))
+    switch (getActualParamPassingMode(param.getDecl()))
     {
     case ParamPassingMode::BorrowInOut:
     case ParamPassingMode::Out:
@@ -696,7 +696,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
             Count paramCount = funcType->getParamCount();
             for (Index i = 0; i < paramCount; ++i)
             {
-                auto paramType = getParamQualType(funcType->getParamTypeWithDirectionWrapper(i));
+                auto paramType = getParamQualType(funcType->getParamTypeWithModeWrapper(i));
                 paramTypes.add(paramType);
             }
         }
@@ -2690,7 +2690,7 @@ void SemanticsVisitor::AddHigherOrderOverloadCandidates(
 
             for (Index ii = 0; ii < diffFuncType->getParamCount(); ii++)
                 paramTypes.add(
-                    getParamQualType(diffFuncType->getParamTypeWithDirectionWrapper(ii)));
+                    getParamQualType(diffFuncType->getParamTypeWithModeWrapper(ii)));
 
             // Try to infer generic arguments, based on the updated context.
             OverloadResolveContext subContext = context;
@@ -3036,14 +3036,14 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
         {
             for (Index i = 0; i < funcType->getParamCount(); i++)
             {
-                paramDirections.add(funcType->getParamDirection(i));
+                paramDirections.add(funcType->getParamPassingMode(i));
             }
         }
         else if (auto callableDeclRef = context.bestCandidate->item.declRef.as<CallableDecl>())
         {
             for (auto param : callableDeclRef.getDecl()->getParameters())
             {
-                paramDirections.add(getParameterDirection(param));
+                paramDirections.add(getActualParamPassingMode(param));
             }
         }
         for (Index i = 0; i < expr->arguments.getCount(); i++)
