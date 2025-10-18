@@ -3617,9 +3617,19 @@ struct LLVMEmitter
             auto llvmArg = llvmFunc->getArg(i);
 
             if (as<IROutParamType>(funcType->getParamType(i)))
+            {
                 llvmArg->addAttr(llvm::Attribute::WriteOnly);
+                llvmArg->addAttr(llvm::Attribute::NoAlias);
+            }
             else if (as<IRBorrowInParamType>(funcType->getParamType(i)))
+            {
                 llvmArg->addAttr(llvm::Attribute::ReadOnly);
+                llvmArg->addAttr(llvm::Attribute::NoAlias);
+            }
+            else if (as<IRBorrowInOutParamType>(funcType->getParamType(i)))
+            {
+                llvmArg->addAttr(llvm::Attribute::NoAlias);
+            }
 
             llvm::StringRef linkageName, prettyName;
             if (maybeGetName(&linkageName, &prettyName, pp))
