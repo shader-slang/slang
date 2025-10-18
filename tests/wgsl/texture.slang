@@ -235,6 +235,29 @@ bool TEST_texture<T>(
         // WGSL: textureSampleLevel({{\(*}}t2DArray
         && all(Tvn(T.Element(0)) == t2DArray.SampleLevel(samplerState, float3(u, u, 0), 0, int2(1, 1)))
 
+        // Depth textures
+
+        // WGSL: textureSampleLevel({{\(*}}d2D
+        && float(0) == d2D.SampleLevel(samplerState, float2(u, u), 0)
+
+        // WGSL: textureSampleLevel({{\(*}}dCube
+        && float(0) == dCube.SampleLevel(samplerState, normalize(float3(u, 1 - u, u)), 0)
+
+        // WGSL: textureSampleLevel({{\(*}}d2DArray
+        && float(0) == d2DArray.SampleLevel(samplerState, float3(u, u, 0), 0)
+
+        // WGSL: textureSampleLevel({{\(*}}dCubeArray
+        && float(0) == dCubeArray.SampleLevel(samplerState, float4(normalize(float3(u, 1 - u, u)), 0), 0)
+
+        // Offset variant
+
+        // WGSL: textureSampleLevel({{\(*}}d2D
+        && float(0) == d2D.SampleLevel(samplerState, float2(u, u), 0, int2(1, 1))
+
+        // WGSL: textureSampleLevel({{\(*}}d2DArray
+        && float(0) == d2DArray.SampleLevel(samplerState, float3(u, u, 0), 0, int2(1, 1))
+
+
         // ==================
         // float SampleCmp()
         // https://www.w3.org/TR/WGSL/#texturesamplecompare
