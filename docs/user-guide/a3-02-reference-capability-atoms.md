@@ -1065,6 +1065,9 @@ Compound Capabilities
 `cuda_glsl_metal_spirv_wgsl`
 > CUDA, GLSL, Metal, SPIRV and WGSL code-gen targets
 
+`cuda_glsl_metal_spirv_wgsl_llvm`
+> CUDA, GLSL, Metal, SPIRV, WGSL and LLVM code-gen targets
+
 `cuda_glsl_spirv`
 > CUDA, GLSL, and SPIRV code-gen targets
 

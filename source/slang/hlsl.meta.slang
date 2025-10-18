@@ -5006,7 +5006,7 @@ struct StructuredBuffer
     {
         [__readNone]
         __intrinsic_op($(kIROp_StructuredBufferLoad))
-        [require(cpp_cuda_glsl_hlsl_spirv, structuredbuffer)]
+        [require(cpp_cuda_glsl_hlsl_spirv_llvm, structuredbuffer)]
         get;
     };
 };
@@ -6163,7 +6163,7 @@ struct $(item.name)
     /// @param stride The stride, in bytes, of each structure element.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv_wgsl, structuredbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_spirv_wgsl_llvm, structuredbuffer_rw)]
     void GetDimensions(
         out uint numStructs,
         out uint stride)
@@ -8951,7 +8951,7 @@ T distance(T x, T y)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 T fdim(T x, T y)
 {
     __target_switch
@@ -8964,7 +8964,7 @@ T fdim(T x, T y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 vector<T,N> fdim(vector<T,N> x, vector<T,N> y)
 {
     __target_switch
@@ -8982,7 +8982,7 @@ vector<T,N> fdim(vector<T,N> x, vector<T,N> y)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 T divide(T x, T y)
 {
     __target_switch
@@ -8995,7 +8995,7 @@ T divide(T x, T y)
 
 __generic<T : __BuiltinFloatingPointType, let N: int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 vector<T,N> divide(vector<T,N> x, vector<T,N> y)
 {
     __target_switch
@@ -9664,7 +9664,7 @@ vector<uint, N> f32tof16(vector<float, N> value)
 
 __glsl_version(420)
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 float f16tof32(float16_t value)
 {
     __target_switch
@@ -9681,12 +9681,13 @@ float f16tof32(float16_t value)
         };
     }
     case wgsl: __intrinsic_asm "f32($0)";
+    case llvm: __intrinsic_asm "%result = fpext $0 to $TR";
     }
 }
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 vector<float, N> f16tof32(vector<float16_t, N> value)
 {
     __target_switch
@@ -9697,6 +9698,7 @@ vector<float, N> f16tof32(vector<float16_t, N> value)
     case spirv: return spirv_asm {
         OpFConvert $$vector<float, N> result $value
     };
+    case llvm: __intrinsic_asm "%result = fpext $0 to $TR";
     default:
         VECTOR_MAP_UNARY(float, N, f16tof32, value);
     }
@@ -9706,7 +9708,7 @@ vector<float, N> f16tof32(vector<float16_t, N> value)
 /// @category conversion
 __glsl_version(420)
 [__readNone]
-[require(cuda_glsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cuda_glsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 float16_t f32tof16_(float value)
 {
     __target_switch
@@ -9718,12 +9720,13 @@ float16_t f32tof16_(float value)
         OpFConvert $$float16_t result $value
     };
     case wgsl: __intrinsic_asm "f16($0)";
+    case llvm: __intrinsic_asm "%result = fptrunc $0 to $TR";
     }
 }
 
 __generic<let N : int>
 [__readNone]
-[require(cuda_glsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cuda_glsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 vector<float16_t, N> f32tof16_(vector<float, N> value)
 {
     __target_switch
@@ -9733,6 +9736,7 @@ vector<float16_t, N> f32tof16_(vector<float, N> value)
     case spirv: return spirv_asm {
         OpFConvert $$vector<float16_t, N> result $value
     };
+    case llvm: __intrinsic_asm "%result = fptrunc $0 to $TR";
     default:
         VECTOR_MAP_UNARY(float16_t, N, f32tof16_, value);
     }
