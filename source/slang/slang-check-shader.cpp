@@ -826,7 +826,7 @@ Name* getReflectionName(VarDeclBase* varDecl)
     return varDecl->getName();
 }
 
-Type* getParamType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> paramDeclRef)
+Type* getParamType(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef)
 {
     auto paramType = getType(astBuilder, paramDeclRef);
     if (paramDeclRef.getDecl()->findModifier<NoDiffModifier>())
@@ -837,10 +837,10 @@ Type* getParamType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> paramDeclRef)
     return paramType;
 }
 
-Type* getParamTypeWithDirectionWrapper(ASTBuilder* astBuilder, DeclRef<VarDeclBase> paramDeclRef)
+Type* getParamTypeWithModeWrapper(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef)
 {
     auto result = getParamType(astBuilder, paramDeclRef);
-    auto direction = getParameterDirection(paramDeclRef.getDecl());
+    auto direction = getActualParamPassingMode(paramDeclRef.getDecl());
     switch (direction)
     {
     case ParamPassingMode::In:

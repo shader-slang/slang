@@ -851,7 +851,7 @@ class FuncType : public Type
     /// the possibility of encountering these wrappers, and handle
     /// them accordingly.
     ///
-    Type* getParamTypeWithDirectionWrapper(Index index) { return as<Type>(getOperand(index)); }
+    Type* getParamTypeWithModeWrapper(Index index) { return as<Type>(getOperand(index)); }
 
     /// Get the type of one of the function's parameters, by index.
     ///
@@ -872,7 +872,7 @@ class FuncType : public Type
 
     /// Get the parameter-passing mode of one of the function's parameters, by index.
     ///
-    ParamPassingMode getParamDirection(Index index);
+    ParamPassingMode getParamPassingMode(Index index);
 
     /// Combined information on the type and parameter-passing mode of a parameter.
     ///
@@ -890,7 +890,7 @@ class FuncType : public Type
     ParamInfo getParamInfo(Index index)
     {
         ParamInfo info;
-        info.direction = getParamDirection(index);
+        info.direction = getParamPassingMode(index);
         info.type = getParamValueType(index);
         return info;
     }
@@ -1162,7 +1162,9 @@ class ModifiedType : public Type
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
-Type* removeParamDirType(Type* type);
+//Type* removeParamDirType(Type* type);
+
+bool isCopyableType(Type* type);
 bool isNonCopyableType(Type* type);
 
 } // namespace Slang

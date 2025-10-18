@@ -4187,8 +4187,8 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
     {
         auto requiredParam = requiredParams[paramIndex];
         auto satisfyingParam = satisfyingParams[paramIndex];
-        if (getParameterDirection(requiredParam.getDecl()) !=
-            getParameterDirection(satisfyingParam.getDecl()))
+        if (getActualParamPassingMode(requiredParam.getDecl()) !=
+            getActualParamPassingMode(satisfyingParam.getDecl()))
             return false;
         auto requiredParamType = getType(m_astBuilder, requiredParam);
         auto satisfyingParamType = getType(m_astBuilder, satisfyingParam);
@@ -5675,16 +5675,16 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                     auto synParam = *synParamIter;
                     auto calleeParam = *calleeParamIter;
                     if (!matchParamDirection(
-                            getParameterDirection(calleeParam),
-                            getParameterDirection(synParam)))
+                            getActualParamPassingMode(calleeParam),
+                            getActualParamPassingMode(synParam)))
                     {
                         if (outFailureDetails)
                         {
                             outFailureDetails->reason =
                                 WitnessSynthesisFailureReason::ParameterDirMismatch;
                             outFailureDetails->candidateMethod = declRefExpr->declRef;
-                            outFailureDetails->actualDir = getParameterDirection(calleeParam);
-                            outFailureDetails->expectedDir = getParameterDirection(synParam);
+                            outFailureDetails->actualDir = getActualParamPassingMode(calleeParam);
+                            outFailureDetails->expectedDir = getActualParamPassingMode(synParam);
                             outFailureDetails->paramDecl = calleeParam;
                         }
                         return false;
@@ -9531,6 +9531,13 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
         checkMeshOutputDecl(paramDecl);
     }
 
+    // Note(tfoley): Changing up the actual modifiers on parameters is a Bad Idea,
+    // because it could lead to us reporting parameters as something other than
+    // what they are in other parts of the code. The relevant distinctions in how
+    // parameters are *actually* passed based on copyability should be made during
+    // lowering.
+    //
+#if 0
     if (auto declRefType = as<DeclRefType>(paramDecl->type.type))
     {
         if (declRefType->getDeclRef().getDecl()->findModifier<NonCopyableTypeAttribute>())
@@ -9574,7 +9581,9 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
             }
         }
     }
-    else if (isTypePack(paramDecl->type.type))
+    else
+#endif
+    if (isTypePack(paramDecl->type.type))
     {
         // For now, we only allow parameter packs to be `const`.
         bool hasConstModifier = false;
@@ -9583,6 +9592,12 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
             if (as<OutModifier>(modifier) || as<InOutModifier>(modifier) ||
                 as<RefModifier>(modifier) || as<BorrowModifier>(modifier))
             {
+                // TODO(tfoley): The diagnostic in this case should probably not refer
+                // to the `const` modifier at all (since that is not actually what is
+                // required), and should instead node that a paraemter pack may only
+                // be declared as a pure input parameter to a function (`in` or
+                // `borrow`).
+                //
                 getSink()->diagnose(modifier, Diagnostics::parameterPackMustBeConst);
             }
             else if (as<ConstModifier>(modifier))
@@ -9590,6 +9605,13 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
                 hasConstModifier = true;
             }
         }
+
+        // TODO(tfoley): Rather than actually changing the modifiers
+        // on the parameter itself, this kind of logic should probably
+        // be folded into whatever logic computes the `QualType` for a
+        // parameter, and ensure that parameter packs are never treated
+        // as l-values.
+        //
         if (!hasConstModifier)
         {
             auto constModifier = this->getASTBuilder()->create<ConstModifier>();
@@ -12686,14 +12708,14 @@ void checkDerivativeAttributeImpl(
                 //
                 if (resolvedInvoke->arguments[ii]->type.type->equals(
                         ctx.getASTBuilder()->getErrorType()) ||
-                    funcType->getParamDirection(ii) != paramDirections[ii])
+                    funcType->getParamPassingMode(ii) != paramDirections[ii])
                 {
                     visitor->getSink()->diagnose(
                         attr,
                         Diagnostics::customDerivativeSignatureMismatchAtPosition,
                         ii,
                         qualTypeToString(argList[ii]->type),
-                        funcType->getParamTypeWithDirectionWrapper(ii)->toString());
+                        funcType->getParamTypeWithModeWrapper(ii)->toString());
                 }
             }
             // The `imaginaryArguments` list does not include the `this` parameter.
@@ -12848,7 +12870,7 @@ ArgsWithDirectionInfo getImaginaryArgsToFunc(
         arg->type.type = param->getType();
         arg->loc = loc;
         imaginaryArguments.add(arg);
-        directions.add(getParameterDirection(param));
+        directions.add(getActualParamPassingMode(param));
     }
     return {imaginaryArguments, directions, nullptr, ParamPassingMode::In};
 }
@@ -12904,7 +12926,7 @@ ArgsWithDirectionInfo getImaginaryArgsToForwardDerivative(
     List<ParamPassingMode> expectedParamDirections;
     for (auto param : originalFuncDecl->getParameters())
     {
-        expectedParamDirections.add(getParameterDirection(param));
+        expectedParamDirections.add(getActualParamPassingMode(param));
     }
 
     return {imaginaryArguments, expectedParamDirections, thisArgExpr, thisTypeDirection};
@@ -12961,7 +12983,7 @@ ArgsWithDirectionInfo getImaginaryArgsToBackwardDerivative(
         arg->type.type = param->getType();
         arg->loc = loc;
 
-        ParamPassingMode direction = getParameterDirection(param);
+        ParamPassingMode direction = getActualParamPassingMode(param);
 
         bool isDiffParam = (!param->findModifier<NoDiffModifier>());
         if (isDiffParam)
