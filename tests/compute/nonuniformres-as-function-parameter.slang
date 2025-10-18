@@ -35,7 +35,7 @@ MyStruct func(RWStructuredBuffer<uint> buffer)
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
-void main(uint2 pixelIndex : SV_DispatchThreadID)
+void main(uint3 pixelIndex : SV_DispatchThreadID)
 {
 
     // CHECK_SPV: OpDecorate %[[VAR1:[a-zA-Z0-9_]+]] NonUniform
@@ -110,10 +110,10 @@ void main(uint2 pixelIndex : SV_DispatchThreadID)
 
     // Test case 3: Test the case that we handle the uniformity correctly, the NonUniformResourceIndex will not propagate
     // to the function, so there should no NonUniform decoration appeared.
-    int bufferIdx3 = pixelIndex.y;
+    int bufferIdx3 = pixelIndex.z;
     RWStructuredBuffer<uint> buffer3 = globalBuffer[bufferIdx3];
 
-    // CHECK_SPV: %[[VAR4:[a-zA-Z0-9_]+]] = OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer{{.*}} %{{.*}} %bufferIdx2
+    // CHECK_SPV: %[[VAR4:[a-zA-Z0-9_]+]] = OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer{{.*}} %{{.*}} %bufferIdx3
 
     // Test to make sure this command is not decorated with NonUniform:
     // CHECK_SPV-NOT: OpDecorate %[[VAR4]] NonUniform

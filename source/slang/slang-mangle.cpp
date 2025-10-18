@@ -253,7 +253,7 @@ void emitType(ManglingContext* context, Type* type)
         auto n = funcType->getParamCount();
         emit(context, n);
         for (Index i = 0; i < n; ++i)
-            emitType(context, funcType->getParamTypeWithDirectionWrapper(i));
+            emitType(context, funcType->getParamTypeWithModeWrapper(i));
         emitType(context, funcType->getResultType());
         emitType(context, funcType->getErrorType());
     }
@@ -644,7 +644,7 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
             // parameter modifier makes big difference in the spirv code generation, for example
             // "out"/"inout" parameter will be passed by pointer. Therefore, we need to
             // distinguish them in the mangled name to avoid name collision.
-            ParamPassingMode paramDirection = getParameterDirection(paramDeclRef.getDecl());
+            ParamPassingMode paramDirection = getParamPassingMode(paramDeclRef.getDecl());
             switch (paramDirection)
             {
             case ParamPassingMode::Ref:

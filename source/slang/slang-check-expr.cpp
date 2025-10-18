@@ -2970,7 +2970,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
             Index paramCount = funcType->getParamCount();
             for (Index pp = 0; pp < paramCount; ++pp)
             {
-                auto paramType = funcType->getParamTypeWithDirectionWrapper(pp);
+                auto paramType = funcType->getParamTypeWithModeWrapper(pp);
                 Expr* argExpr = nullptr;
                 ParamDecl* paramDecl = nullptr;
                 if (pp < invoke->arguments.getCount())
@@ -3727,11 +3727,10 @@ Type* SemanticsVisitor::getForwardDiffFuncType(FuncType* originalType)
     for (Index i = 0; i < originalType->getParamCount(); i++)
     {
         if (auto jvpParamType =
-                _toDifferentialParamType(originalType->getParamTypeWithDirectionWrapper(i)))
+                _toDifferentialParamType(originalType->getParamTypeWithModeWrapper(i)))
             paramTypes.add(jvpParamType);
     }
-    FuncType* jvpType =
-        m_astBuilder->getOrCreate<FuncType>(paramTypes.getArrayView(), resultType, errorType);
+    FuncType* jvpType = m_astBuilder->getFuncType(paramTypes.getArrayView(), resultType, errorType);
 
     return jvpType;
 }
@@ -3753,7 +3752,7 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType)
 
     for (Index i = 0; i < originalType->getParamCount(); i++)
     {
-        auto originalParamType = originalType->getParamTypeWithDirectionWrapper(i);
+        auto originalParamType = originalType->getParamTypeWithModeWrapper(i);
 
         if (auto outType = as<OutType>(originalParamType))
         {
@@ -3792,7 +3791,7 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType)
     if (dOutType)
         paramTypes.add(dOutType);
 
-    return m_astBuilder->getOrCreate<FuncType>(paramTypes.getArrayView(), resultType, errorType);
+    return m_astBuilder->getFuncType(paramTypes.getArrayView(), resultType, errorType);
 }
 
 struct HigherOrderInvokeExprCheckingActions
@@ -4837,7 +4836,7 @@ Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
         genApp->arguments.add(returnTypeExp);
         for (auto param : getMembersOfType<ParamDecl>(m_astBuilder, lambdaExpr->paramScopeDecl))
         {
-            auto paramType = getParamTypeWithDirectionWrapper(m_astBuilder, param);
+            auto paramType = getParamTypeWithModeWrapper(m_astBuilder, param);
             auto paramTypeExp = synthesizer.emitStaticTypeExpr(paramType);
             genApp->arguments.add(paramTypeExp);
         }
