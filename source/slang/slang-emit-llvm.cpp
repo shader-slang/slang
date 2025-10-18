@@ -1796,9 +1796,6 @@ struct LLVMEmitter
     bool debugInlinedScope = false;
     UInt uniqueIDCounter = 0;
 
-    // Used to add code in the entry block of a function
-    using FuncPrologueCallback = Func<void>;
-
     // Used to add code in in front of return in a function. If it returns
     // nullptr, the LLVM return instruction is generated "normally". Otherwise,
     // it's expected that you generated it in this function.
@@ -3695,13 +3692,12 @@ struct LLVMEmitter
             ctorType, llvm::GlobalValue::InternalLinkage, ctorName, *llvmModule
         );
 
-        auto prologue = [](){};
         auto epilogue = [&](IRReturn* ret) -> llvm::Value* {
             auto val = ret->getVal();
             types->emitStore(llvmVar, findValue(val), val->getDataType(), defaultPointerRules);
             return llvmBuilder->CreateRetVoid();
         };
-        emitGlobalValueWithCode(var, llvmCtor, prologue, epilogue);
+        emitGlobalValueWithCode(var, llvmCtor, epilogue);
 
         llvm::Constant* ctorData[3] = {
             // Leave some room for other global constructors to run first.
@@ -3959,7 +3955,6 @@ struct LLVMEmitter
     void emitGlobalValueWithCode(
         IRGlobalValueWithCode* code,
         llvm::Function* llvmFunc,
-        FuncPrologueCallback prologueCallback,
         FuncEpilogueCallback epilogueCallback
     ){
         llvmBuilder->SetCurrentDebugLocation(llvm::DebugLoc());
@@ -4018,7 +4013,6 @@ struct LLVMEmitter
                             llvm::DILocation::get(*llvmContext, sp->getLine(), 0, sp)
                         );
                     }
-                    prologueCallback();
                 }
 
                 // Then, add the regular instructions.
@@ -4240,102 +4234,7 @@ struct LLVMEmitter
         if (types->isAggregateType(func->getResultType()))
             storeArg = llvmFunc->getArg(llvmFunc->arg_size()-1);
 
-        // The prologue and epilogue are needed to deal with out and inout - the
-        // correct semantics for them involve copy-in and copy-out, which we
-        // implement in the prologue (emitted before first instruction in entry
-        // block) and epilogue (emitted before return).
-        //
-        // This difference can be seen in this case:
-        //
-        // void evilFunction(out int a, out int b)
-        // {
-        //     a = 1;
-        //     b = 2;
-        //     // Must print "1, 2" even when a and b are given the same
-        //     // argument.
-        //     printf("%d, %d\n", a, b);
-        // }
-        //
-        // void entryPoint()
-        // {
-        //     int num;
-        //     evilFunction(num, num);
-        // }
-        //
-        // However, this can be optimized. If the function only takes one
-        // parameter that is 'out' or 'inout' and zero pointers, it cannot
-        // alias, and therefore it being backed by a pointer is unobservable.
-
-        int pointerCount = 0;
-        for (auto pp = func->getFirstParam(); pp; pp = pp->getNextParam())
-        {
-            if (as<IRPtrTypeBase>(pp->getDataType()))
-                pointerCount++;
-        }
-
-        auto prologue = [&](){
-            if(pointerCount <= 1)
-                return;
-            UInt i = 0;
-            for (auto pp = func->getFirstParam(); pp; pp = pp->getNextParam(), ++i)
-            {
-                llvm::Value* llvmArg = llvmFunc->getArg(i);
-                auto argType = pp->getDataType();
-
-                llvm::StringRef linkageName, prettyName;
-                maybeGetName(&linkageName, &prettyName, pp);
-
-                if (auto outType = as<IROutParamType>(argType))
-                {
-                    // Replace with uninitialized alloca, parameter is only for
-                    // copy-out!
-                    llvmArg = types->emitAlloca(outType->getValueType(), defaultPointerRules);
-                    declareAllocaDebugVar(prettyName, llvmArg, outType->getValueType());
-                }
-                else if (auto inOutType = as<IRBorrowInOutParamType>(argType))
-                {
-                    // Replace with initialized alloca.
-                    auto newArg = types->emitAlloca(inOutType->getValueType(), defaultPointerRules);
-                    IRSizeAndAlignment elementSizeAlignment = types->getSizeAndAlignment(inOutType->getValueType(), defaultPointerRules);
-                    llvmBuilder->CreateMemCpyInline(
-                        newArg,
-                        llvm::MaybeAlign(elementSizeAlignment.alignment),
-                        llvmArg,
-                        llvm::MaybeAlign(elementSizeAlignment.alignment),
-                        llvmBuilder->getInt32(elementSizeAlignment.size)
-                    );
-                    llvmArg = newArg;
-                    declareAllocaDebugVar(prettyName, llvmArg, inOutType->getValueType());
-                }
-                mapInstToLLVM[pp] = llvmArg;
-            }
-        };
-
         auto epilogue = [&](IRReturn* ret) -> llvm::Value* {
-            if (pointerCount > 1)
-            {
-                UInt i = 0;
-                for (auto pp = func->getFirstParam(); pp; pp = pp->getNextParam(), ++i)
-                {
-                    llvm::Value* llvmArg = llvmFunc->getArg(i);
-                    auto argType = pp->getDataType();
-
-                    if (as<IROutParamType>(argType) || as<IRBorrowInOutParamType>(argType))
-                    {
-                        auto ptrType = as<IRPtrTypeBase>(argType);
-                        // Copy-out!
-                        IRSizeAndAlignment elementSizeAlignment = types->getSizeAndAlignment(ptrType->getValueType(), defaultPointerRules);
-                        llvmBuilder->CreateMemCpyInline(
-                            llvmArg,
-                            llvm::MaybeAlign(elementSizeAlignment.alignment),
-                            mapInstToLLVM.getValue(pp),
-                            llvm::MaybeAlign(elementSizeAlignment.alignment),
-                            llvmBuilder->getInt32(elementSizeAlignment.size)
-                        );
-                    }
-                }
-            }
-
             if (storeArg)
             {
                 auto val = ret->getVal();
@@ -4346,7 +4245,7 @@ struct LLVMEmitter
             return nullptr;
         };
 
-        emitGlobalValueWithCode(func, llvmFunc, prologue, epilogue);
+        emitGlobalValueWithCode(func, llvmFunc, epilogue);
 
         // We need to emit the dispatching functions for entry points so that
         // they can be called.
