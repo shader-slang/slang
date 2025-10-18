@@ -30,7 +30,10 @@ endif()
 # Find dumpbin - should be available in Visual Studio environment
 find_program(DUMPBIN_EXECUTABLE dumpbin)
 if(NOT DUMPBIN_EXECUTABLE)
-    message(FATAL_ERROR "dumpbin not found. Make sure you are running in a Visual Studio Developer Command Prompt.")
+    message(
+        FATAL_ERROR
+        "dumpbin not found. Make sure you are running in a Visual Studio Developer Command Prompt."
+    )
 endif()
 
 message(STATUS "Extracting exports from: ${DLL_PATH}")
@@ -69,32 +72,36 @@ foreach(LINE ${DUMPBIN_LINES})
         set(IN_EXPORTS_SECTION TRUE)
         continue()
     endif()
-    
+
     # Skip until we're in the exports section
     if(NOT IN_EXPORTS_SECTION)
         continue()
     endif()
-    
+
     # Stop at the "Summary" section
     if(LINE MATCHES "Summary")
         break()
     endif()
-    
+
     # Skip empty lines
     string(STRIP "${LINE}" LINE_STRIPPED)
     if(LINE_STRIPPED STREQUAL "")
         continue()
     endif()
-    
+
     # Skip DATA exports
     if(LINE MATCHES "DATA")
         continue()
     endif()
-    
+
     # Parse the line to extract the function name
     # Match pattern: whitespace ordinal whitespace hint whitespace RVA whitespace name [= implementation]
     # We want the name (before the = sign if present, or the last token)
-    if(LINE_STRIPPED MATCHES "^[ \t]*[0-9]+[ \t]+[0-9A-Fa-f]+[ \t]+[0-9A-Fa-f]+[ \t]+(.+)$")
+    if(
+        LINE_STRIPPED
+            MATCHES
+            "^[ \t]*[0-9]+[ \t]+[0-9A-Fa-f]+[ \t]+[0-9A-Fa-f]+[ \t]+(.+)$"
+    )
         set(NAME_PART "${CMAKE_MATCH_1}")
         # If there's an = sign, take everything before it, otherwise take the whole thing
         if(NAME_PART MATCHES "^([^ \t]+)[ \t]*=")
@@ -102,9 +109,9 @@ foreach(LINE ${DUMPBIN_LINES})
         else()
             set(FUNCTION_NAME "${NAME_PART}")
         endif()
-        
+
         string(STRIP "${FUNCTION_NAME}" FUNCTION_NAME)
-        
+
         if(FUNCTION_NAME)
             list(APPEND EXPORT_FUNCTIONS "${FUNCTION_NAME}")
         endif()
@@ -132,4 +139,3 @@ message(STATUS "Generated DEF file: ${OUTPUT_DEF}")
 message(STATUS "")
 message(STATUS "IMPORTANT: Review the generated .def file before committing!")
 message(STATUS "Make sure all exports are appropriate for the public API.")
-
