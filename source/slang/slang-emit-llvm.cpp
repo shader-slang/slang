@@ -3784,7 +3784,8 @@ struct LLVMEmitter
                 switch (d)
                 {
                 case 'T':
-                    // Type of parameter
+                case 'S':
+                    // Value type of parameter
                     {
                         IRType* type = nullptr;
                         if (*cursor == 'R')
@@ -3800,7 +3801,9 @@ struct LLVMEmitter
                             type = parentFunc->getParamType(argIndex);
                         }
 
-                        auto llvmType = types->getValueType(type);
+                        auto llvmType = d == 'T' ?
+                            types->getValueType(type) :
+                            types->getStorageType(type, defaultPointerRules);
                         llvmType->print(expanded);
                     }
                     break;
@@ -3837,13 +3840,21 @@ struct LLVMEmitter
                     break;
                 case '[':
                     {
+                        bool storage = false;
+                        if (*cursor == 'S')
+                        {
+                            storage = true;
+                            cursor++;
+                        }
                         UInt argIndex = parseNumber(cursor, end)+1;
 
                         SLANG_RELEASE_ASSERT(argIndex < intrinsicInst->getOperandCount());
 
                         auto arg = intrinsicInst->getOperand(argIndex);
 
-                        auto llvmType = types->getValueType(as<IRType>(arg));
+                        auto llvmType = storage ?
+                            types->getStorageType(as<IRType>(arg), defaultPointerRules) :
+                            types->getValueType(as<IRType>(arg));
                         llvmType->print(expanded);
 
                         SLANG_ASSERT(*cursor == ']');
