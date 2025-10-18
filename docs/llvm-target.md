@@ -6,19 +6,17 @@ for arbitrary target triples (`<machine>-<vendor>-<os>`, e.g.
 `x86_64-unknown-linux`). The direct LLVM emitter allows for highly performant
 and debuggable Slang code on almost any platform.
 
-**LLVM support is disabled by default and has to be enabled in the CMake
-options.** The reason is that LLVM is a fairly large and hairy dependency, which
-most users of Slang currently do not need.
-
 # Targets
 
-* `-target llvm-ir` generates LLVM IR without tuning to a specific target machine.
+* `-target llvm-ir` generates LLVM IR in the text representation.
 * `-target llvm-obj` generates position-independent object code, which can be 
 linked into an executable or a static or dynamic library.
 * `-target llvm-shader-ir` is like `llvm-ir` but generates a dispatch function for compute shader entry points.
 * `-target llvm-shader-obj` is like `llvm-obj` but generates a dispatch function for compute shader entry points.
-* Other, direct-to-executable or library targets may be added later, once the
-  LLVM target has stabilized.
+
+Direct-to-executable or library targets may be added later, once the LLVM target
+has stabilized. To set the LLVM target triple, use
+`-llvm-target-triple <target-triple>`. The default is the host machine's triple.
 
 # Features
 
@@ -45,6 +43,17 @@ To cross-compile, you can use `-llvm-target-triple <target-triple>`.
 
 # Limitations
 
+The LLVM target support is work-in-progress, and there are currently many
+limitations.
+
+## CPU targets only
+
+Currently, support is limited to conventional CPU targets. The emitted LLVM IR
+is not compatible with LLVMs SPIR-V target, for example. At least resource
+bindings and pointer address spaces would have to be accounted for to expand
+support to GPU targets. Slang already has native emitters for GPU targets, so
+you can use those instead of going through LLVM.
+
 ## Pointer size
 
 Currently, the Slang compiler assumes that the size of pointers matches the
@@ -53,36 +62,71 @@ with 64-bit pointers generate correct code. This can be a difficulty if one
 wants to build Slang programs for a 32-bit microcontroller, and should
 hopefully be fixed eventually.
 
-## Dependency on C standard library
+## C standard library dependency
 
-This is currently required for printf and some math functions. It may also be
-needed for memory allocation in the future. While developing our own standalone
-standard library would be cool, maintaining platform support for all potential
-platforms like that is currently out of scope.
+The generated IR and object code currently require printf and some math
+functions to be linked from outside.
 
 Fully Slang-written implementations of math functions would be possible and
 nice to have as they don't need to communicate with the OS. Reducing the
 required amount of C standard library support would be useful for running Slang
 on bare metal.
 
-## Structures in `__extern_cpp` function parameters or return values
+## ABI issues
 
-For now, the LLVM target doesn't properly support `__extern_cpp` functions
-which take plain structures as parameters. Pointers to structures should work
-as expected. Partly because of the ambiguity and FFI difficulties with struct
-parameter passing rules, many high-profile C libraries also avoid non-pointer
-struct parameters in their public-facing APIs.
+All aggregates (structs and arrays) are always passed by reference in Slang's
+LLVM emitter. Other than that, the target platform's C calling conventions are
+followed. This limitation stems from [LLVM not handling aggregates correctly](https://discourse.llvm.org/t/passing-structs-to-c-functions/83938/8) in calling conventions, and requiring every frontend to painstakingly
+reimplement the same per-target logic.
 
-LLVM doesn't correctly deal with aggregates like arrays and structs when passed
-as parameters. This is unfortunately instead left up to the frontend to
-orchestrate, which means that the frontend needs to generate platform-specific
-IR according to complex rules. Clang contains thousands of lines of
-per-platform code to do this.
+This means that if you declare a function like this in Slang:
+```slang
+export __extern_cpp MyStruct func(MyStruct val);
+```
 
-Luckily, C requires that arrays are automatically casted into pointers during
-parameter passing, which we also do. However, we also pass structures as
-pointers to a stack-allocated copy. For some calling conventions, this is
-incorrect behavior (notably, SysV).
+It would have the following signature in C:
+```slang
+void func(const MyStruct *val, MyStruct *returnval);
+```
+
+In other words, aggregate parameters are turned into pointers and aggregate
+return values are turned into an additional pointer-typed parameter at the end
+of the parameter list.
+
+This unfortunately means that C FFI is complicated, and a hypothetical binding
+generator would need to generate calling convention adapters like this:
+
+```slang
+// Struct declarations can usually be the same between C and Slang.
+// Take care with bitfields and unions, though!
+struct MyStruct
+{
+    int a;
+    int b;
+}
+
+[ForceInline]
+void funcAdapter(MyStruct* val, MyStruct* returnval)
+{
+    __requirePrelude(R"(declare i64 @func(i64))");
+    __intrinsic_asm R"(
+      %0 = load i64, $0, align 4
+      %call = tail call i64 @func(i64 %0)
+      store i64 %call, $1, align 4
+      ret void
+    )";
+}
+
+// This 'func' name gets mangled because it's not marked as __extern_cpp,
+// which is good, since it isn't an external function but just calls into one.
+[ForceInline]
+public MyStruct func(MyStruct val)
+{
+    MyStruct returnval;
+    funcAdapter(&val, &returnval);
+    return returnval;
+}
+```
 
 ## Missing synchronization primitives
 
@@ -96,11 +140,15 @@ improved upon later.
 
 ## Missing types
 
-* No texture types.
+* No texture or sampler types.
 * No acceleration structures.
 
-These are missing purely due to limitation of scope for the initial
-implementation, and may be added later.
+These are missing due to limitation of scope for the initial implementation,
+and may be added later. That said, both require non-trivial code where there is
+no single obviously correct option:
+
+* Should we store pixels in a Z-order curve for cache benefits, or row-by-row for simplicity?
+* What kind of acceleration structure? Should CPU RT use an external library like Embree etc.?
 
 # Gotchas
 
@@ -108,11 +156,11 @@ implementation, and may be added later.
 
 By default, the LLVM target uses its native layout. This is basically the
 layout you'd expect in C, except vectors and matrices are automatically aligned
-for the widest applicable vector instructions.
+to the requirements of the widest applicable vector instructions.
 
 If you specify the `-fvk-use-c-layout` or `-fvk-use-scalar-layout` flags,
-all structure and array types will follow the specified layout. This may be
-inefficient, but ensures correct semantics.
+all structure and array types on the stack and heap will follow the specified
+layout.
 
 ## `sizeof`
 
