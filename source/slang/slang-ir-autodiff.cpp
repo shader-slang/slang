@@ -223,7 +223,7 @@ IRInst* DifferentialPairTypeBuilder::emitFieldAccessor(
         {
             auto genericType =
                 findInnerMostGenericReturnVal(as<IRGeneric>(ptrInnerSpecializedType->getBase()));
-            if (const auto genericBasePairStructType = as<IRStructType>(genericType))
+            if (as<IRStructType>(genericType))
             {
                 return as<IRFieldAddress>(builder->emitFieldAddress(
                     builder->getPtrType((IRType*)findSpecializationForParam(

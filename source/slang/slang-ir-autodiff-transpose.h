@@ -525,7 +525,7 @@ struct DiffTransposePass
         {
             return RegionEntryPoint(revBlockMap[currentBlock], branchInst->getTargetBlock(), false);
         }
-        else if (const auto returnInst = as<IRReturn>(currentBlock->getTerminator()))
+        else if (as<IRReturn>(currentBlock->getTerminator()))
         {
             return RegionEntryPoint(revBlockMap[currentBlock], nullptr, true);
         }
@@ -1836,7 +1836,7 @@ struct DiffTransposePass
         {
             auto argOperand = fwdMakeMatrix->getOperand(ii);
             IRInst* gradAtIndex = nullptr;
-            if (const auto vecType = as<IRVectorType>(argOperand->getDataType()))
+            if (as<IRVectorType>(argOperand->getDataType()))
             {
                 gradAtIndex = builder->emitElementExtract(
                     argOperand->getDataType(),

@@ -168,27 +168,27 @@ bool isResourceType(IRType* type)
         type = arrayType->getElementType();
     }
 
-    if (const auto resourceTypeBase = as<IRResourceTypeBase>(type))
+    if (as<IRResourceTypeBase>(type))
     {
         return true;
     }
-    else if (const auto builtinGenericType = as<IRBuiltinGenericType>(type))
+    else if (as<IRBuiltinGenericType>(type))
     {
         return true;
     }
-    else if (const auto pointerLikeType = as<IRPointerLikeType>(type))
+    else if (as<IRPointerLikeType>(type))
     {
         return true;
     }
-    else if (const auto samplerType = as<IRSamplerStateTypeBase>(type))
+    else if (as<IRSamplerStateTypeBase>(type))
     {
         return true;
     }
-    else if (const auto subpassInputType = as<IRSubpassInputType>(type))
+    else if (as<IRSubpassInputType>(type))
     {
         return true;
     }
-    else if (const auto untypedBufferType = as<IRUntypedBufferResourceType>(type))
+    else if (as<IRUntypedBufferResourceType>(type))
     {
         return true;
     }
@@ -1656,7 +1656,7 @@ IRVarLayout* createVarLayout(
     IRVarLayout::Builder varLayoutBuilder(irBuilder, typeLayout);
     buildSimpleVarLayout(&varLayoutBuilder, varChain.primaryChain, typeLayout);
 
-    if (const auto pendingDataTypeLayout = typeLayout->getPendingDataTypeLayout())
+    if (typeLayout->getPendingDataTypeLayout())
     {
         varLayoutBuilder.setPendingVarLayout(
             createSimpleVarLayout(irBuilder, varChain.pendingChain, typeLayout));

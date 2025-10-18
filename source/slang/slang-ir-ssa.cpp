@@ -809,7 +809,7 @@ void collectInstsToRemove(ConstructSSAContext* context, IRBlock* block)
         case kIROp_FieldAddress:
             {
                 auto ptrArg = ii->getOperand(0);
-                if (const auto var = asPromotableVarAccessChain(context, ptrArg))
+                if (asPromotableVarAccessChain(context, ptrArg))
                 {
                     context->instsToRemove.add(ii);
                 }

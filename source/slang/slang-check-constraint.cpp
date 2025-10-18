@@ -1437,10 +1437,10 @@ bool SemanticsVisitor::TryUnifyTypes(
 
     // An error type can unify with anything, just so we avoid cascading errors.
 
-    if (const auto fstErrorType = as<ErrorType>(fst))
+    if (as<ErrorType>(fst))
         return true;
 
-    if (const auto sndErrorType = as<ErrorType>(snd))
+    if (as<ErrorType>(snd))
         return true;
 
     // If one or the other of the types is a conjunction `X & Y`,

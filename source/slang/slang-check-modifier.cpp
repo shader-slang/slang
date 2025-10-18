@@ -769,7 +769,7 @@ Modifier* SemanticsVisitor::validateAttribute(
             return nullptr;
         }
     }
-    else if (const auto unrollAttr = as<UnrollAttribute>(attr))
+    else if (as<UnrollAttribute>(attr))
     {
         // Check has an argument. We need this because default behavior is to give an error
         // if an attribute has arguments, but not handled explicitly (and the default param will
@@ -797,7 +797,7 @@ Modifier* SemanticsVisitor::validateAttribute(
             maxItersAttrs->value = checkLinkTimeConstantIntVal(attr->args[0]);
         }
     }
-    else if (const auto userDefAttr = as<UserDefinedAttribute>(attr))
+    else if (as<UserDefinedAttribute>(attr))
     {
         // check arguments against attribute parameters defined in attribClassDecl
         Index paramIndex = 0;
@@ -1035,7 +1035,7 @@ Modifier* SemanticsVisitor::validateAttribute(
             return nullptr;
         }
     }
-    else if (const auto derivativeMemberAttr = as<DerivativeMemberAttribute>(attr))
+    else if (as<DerivativeMemberAttribute>(attr))
     {
         auto varDecl = as<VarDeclBase>(attrTarget);
         if (!varDecl)
@@ -1223,7 +1223,7 @@ AttributeBase* SemanticsVisitor::checkAttribute(
         {
             // We didn't have enough arguments for the
             // number of parameters declared.
-            if (const auto defaultArg = paramDecl->initExpr)
+            if (paramDecl->initExpr)
             {
                 // The attribute declaration provided a default,
                 // so we should use that.
@@ -1744,7 +1744,7 @@ Modifier* SemanticsVisitor::checkModifier(
         }
     }
 
-    if (const auto externModifier = as<ExternModifier>(m))
+    if (as<ExternModifier>(m))
     {
         if (auto varDecl = as<VarDeclBase>(syntaxNode))
         {

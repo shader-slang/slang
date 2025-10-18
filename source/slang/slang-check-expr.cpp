@@ -1802,7 +1802,7 @@ Expr* SemanticsVisitor::_CheckTerm(Expr* term)
     {
         binding->type = type;
 
-        if (const auto body = binding->body)
+        if (binding->body)
         {
             binding = as<LetExpr>(binding->body);
             SLANG_ASSERT(binding);
@@ -1832,7 +1832,7 @@ bool SemanticsVisitor::IsErrorExpr(Expr* expr)
 {
     // TODO: we may want other cases here...
 
-    if (const auto errorType = as<ErrorType>(expr->type))
+    if (as<ErrorType>(expr->type))
         return true;
 
     return false;
@@ -5761,7 +5761,7 @@ Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
     {
         return _lookupStaticMember(expr, expr->baseExpression);
     }
-    else if (const auto typeType = as<TypeType>(baseType))
+    else if (as<TypeType>(baseType))
     {
         return _lookupStaticMember(expr, expr->baseExpression);
     }
@@ -5827,11 +5827,11 @@ Expr* SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
     {
         auto containerDecl = scope->containerDecl;
 
-        if (const auto ctorDecl = as<ConstructorDecl>(containerDecl))
+        if (as<ConstructorDecl>(containerDecl))
         {
             expr->type.isLeftValue = true;
         }
-        else if (const auto setterDecl = as<SetterDecl>(containerDecl))
+        else if (as<SetterDecl>(containerDecl))
         {
             expr->type.isLeftValue = true;
         }
@@ -6088,17 +6088,17 @@ Val* SemanticsExprVisitor::checkTypeModifier(Modifier* modifier, Type* type)
 {
     SLANG_UNUSED(type);
 
-    if (const auto unormModifier = as<UNormModifier>(modifier))
+    if (as<UNormModifier>(modifier))
     {
         // TODO: validate that `type` is either `float` or a vector of `float`s
         return m_astBuilder->getUNormModifierVal();
     }
-    else if (const auto snormModifier = as<SNormModifier>(modifier))
+    else if (as<SNormModifier>(modifier))
     {
         // TODO: validate that `type` is either `float` or a vector of `float`s
         return m_astBuilder->getSNormModifierVal();
     }
-    else if (const auto noDiffModifier = as<NoDiffModifier>(modifier))
+    else if (as<NoDiffModifier>(modifier))
     {
         return m_astBuilder->getNoDiffModifierVal();
     }
