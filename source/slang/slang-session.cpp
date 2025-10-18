@@ -1,11 +1,13 @@
 // slang-session.cpp
 #include "slang-session.h"
 
+#include "../core/slang-shared-library.h"
 #include "compiler-core/slang-artifact-util.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
+#include "slang-neural-config.h"
 #include "slang-options.h"
 #include "slang-parser.h"
 #include "slang-preprocessor.h"
@@ -15,6 +17,31 @@
 
 namespace Slang
 {
+
+// Helper function to find the neural.slang module path
+static String findNeuralModulePath()
+{
+    // Get the path of the currently loaded libslang.so/slang.dll by using a known exported symbol
+    String libslangPath =
+        SharedLibraryUtils::getSharedLibraryFileName((void*)slang_createGlobalSession);
+    if (libslangPath.getLength() == 0)
+        return String();
+
+    // Get the directory containing libslang.so/slang.dll
+    String libslangDir = Path::getParentDirectory(libslangPath);
+    if (libslangDir.getLength() == 0)
+        return String();
+
+    // The neural module is always in the same directory as libslang.so/slang.dll
+    // e.g., bin/slang-neural-module/ on Windows, lib/slang-neural-module/ on Linux/Mac
+    String neuralModuleDir = Path::combine(libslangDir, SLANG_NEURAL_MODULE_DIR_NAME);
+    String neuralModulePath = Path::combine(neuralModuleDir, SLANG_NEURAL_MODULE_FILE_NAME);
+
+    if (File::exists(neuralModulePath))
+        return neuralModulePath;
+
+    return String();
+}
 
 Linkage::Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinkage)
     : m_session(session)
@@ -1589,6 +1616,35 @@ RefPtr<Module> Linkage::findOrImportModule(
             //
             if (module)
                 return module;
+        }
+    }
+
+    // Fallback: If the normal search failed and this is the neural module,
+    // try to load the builtin neural module if the experimental feature is enabled.
+    if (moduleName == getSessionImpl()->neuralModuleName &&
+        m_optionSet.getBoolOption(CompilerOptionName::ExperimentalFeature))
+    {
+        String neuralModulePath = findNeuralModulePath();
+        if (neuralModulePath.getLength() > 0)
+        {
+            // Found neural module, load it directly
+            ComPtr<ISlangBlob> fileContents;
+            SlangResult result =
+                getFileSystemExt()->loadFile(neuralModulePath.getBuffer(), fileContents.writeRef());
+            if (SLANG_SUCCEEDED(result))
+            {
+                auto pathInfo = PathInfo::makeFromString(neuralModulePath);
+                RefPtr<Module> module = loadModuleImpl(
+                    moduleName,
+                    pathInfo,
+                    fileContents,
+                    requestingLoc,
+                    sink,
+                    nullptr,
+                    ModuleBlobType::IR);
+                if (module)
+                    return module;
+            }
         }
     }
 

@@ -1067,6 +1067,8 @@ typedef uint32_t SlangSizeT;
 
         ForceCLayout, // bool
 
+        ExperimentalFeature, // bool, enable experimental features
+
         CountOf,
     };
 
