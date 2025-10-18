@@ -29,7 +29,7 @@ SemanticsVisitor::ParamCounts SemanticsVisitor::CountParameters(
     for (auto param : params)
     {
         Index allowedArgCountToAdd = 1;
-        auto paramType = getParamType(m_astBuilder, param);
+        auto paramType = unwrapModifiedType(getParamType(m_astBuilder, param));
         if (isTypePack(paramType))
         {
             if (auto typePack = as<ConcreteTypePack>(paramType))
