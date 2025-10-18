@@ -3235,7 +3235,7 @@ int __sizeOf()
     {
     case cpp: __intrinsic_asm "sizeof($[0])", T;
     case cuda: __intrinsic_asm "sizeof($[0])", T;
-    case llvm: __intrinsic_asm "%size = getelementptr $[0], ptr null, i32 1\n%result = ptrtoint ptr %size to i32", T;
+    case llvm: __intrinsic_asm "%size = getelementptr $[S0], ptr null, i32 1\n%result = ptrtoint ptr %size to i32", T;
     }
 }
 
@@ -3248,13 +3248,13 @@ int __sizeOf(T v)
     {
     case cpp: __intrinsic_asm "sizeof($T0)";
     case cuda: __intrinsic_asm "sizeof($T0)";
-    case llvm: __intrinsic_asm "%size = getelementptr $T0, ptr null, i32 1\n%result = ptrtoint ptr %size to i32";
+    case llvm: __intrinsic_asm "%size = getelementptr $S0, ptr null, i32 1\n%result = ptrtoint ptr %size to i32";
     }
 }
 
 __generic<T>
 [__readNone]
-[require(cpp_cuda)]
+[require(cpp_cuda_llvm)]
 int __alignOf()
 {
     __target_switch
@@ -3262,18 +3262,20 @@ int __alignOf()
     case cuda :
     case cpp :
         __intrinsic_asm "alignof($[0])", T;
+    case llvm: __intrinsic_asm "%size = getelementptr {i8, $[S0]}, ptr null, i32 0, i32 1\n%result = ptrtoint ptr %size to i32", T;
     }
 }
 
 __generic<T>
 [__readNone]
-[require(cpp_cuda)]
+[require(cpp_cuda_llvm)]
 int __alignOf(T v)
 {
     __target_switch
     {
     case cpp: __intrinsic_asm "alignof($T0)";
     case cuda: __intrinsic_asm "alignof($T0)";
+    case llvm: __intrinsic_asm "%size = getelementptr {i8, $S0}, ptr null, i32 0, i32 1\n%result = ptrtoint ptr %size to i32";
     }
 }
 

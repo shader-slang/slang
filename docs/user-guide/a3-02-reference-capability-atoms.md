@@ -1017,6 +1017,9 @@ Compound Capabilities
 `cpp_cuda_spirv`
 > CPP, CUDA and SPIRV code-gen targets
 
+`cpp_cuda_spirv_llvm`
+> CPP, CUDA, SPIRV and LLVM code-gen targets
+
 `cpp_glsl`
 > CPP, and GLSL code-gen targets
 
