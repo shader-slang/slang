@@ -748,7 +748,17 @@ void initCommandOptions(CommandOptions& options)
          "-llvm-target-triple",
          "-llvm-target-triple <target triple>",
          "Sets the target triple for the LLVM target, enabling cross "
-         "compilation. The default value is the host platform."}};
+         "compilation. The default value is the host platform."},
+        {OptionKind::LLVMCPU,
+         "-llvm-cpu",
+         "-llvm-cpu <cpu name>",
+         "Sets the target CPU for the LLVM target, enabling the extensions and "
+         "features of that CPU. The default value is \"generic\"."},
+        {OptionKind::LLVMFeatures,
+         "-llvm-features",
+         "-llvm-features <a1,+enable,-disable,...>",
+         "Sets a comma-separates list of architecture-specific features for the LLVM targets."},
+    };
 
     _addOptions(makeConstArrayView(targetOpts), options);
 
@@ -3272,6 +3282,20 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 CommandLineArg targetTriple;
                 SLANG_RETURN_ON_FAIL(m_reader.expectArg(targetTriple));
                 linkage->m_optionSet.set(CompilerOptionName::LLVMTargetTriple, targetTriple.value);
+                break;
+            }
+        case OptionKind::LLVMCPU:
+            {
+                CommandLineArg cpuName;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(cpuName));
+                linkage->m_optionSet.set(CompilerOptionName::LLVMCPU, cpuName.value);
+                break;
+            }
+        case OptionKind::LLVMFeatures:
+            {
+                CommandLineArg features;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(features));
+                linkage->m_optionSet.set(CompilerOptionName::LLVMFeatures, features.value);
                 break;
             }
         default:
