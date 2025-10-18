@@ -13416,7 +13416,7 @@ T refract(T i, T n, T eta)
 /// @remarks For SPIR-V, this function maps to `OpBitReverse`.
 /// @category bitops
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 uint reversebits(uint value)
 {
     __target_switch
@@ -13433,12 +13433,13 @@ uint reversebits(uint value)
     case spirv:
         return spirv_asm {OpBitReverse $$uint result $value};
     case wgsl: __intrinsic_asm "reverseBits";
+    case llvm: __intrinsic_asm "%result = call $TR @llvm.bitreverse($0)";
     }
 }
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 vector<uint, N> reversebits(vector<uint, N> value)
 {
     __target_switch
@@ -13452,6 +13453,7 @@ vector<uint, N> reversebits(vector<uint, N> value)
     case spirv:
         return spirv_asm {OpBitReverse $$vector<uint, N> result $value};
     case wgsl: __intrinsic_asm "reverseBits";
+    case llvm: __intrinsic_asm "%result = call $TR @llvm.bitreverse($0)";
     }
 }
 
