@@ -3807,6 +3807,7 @@ struct LLVMEmitter
                         llvmType->print(expanded);
                     }
                     break;
+                case '_': // Hides type name
                 case '0':
                 case '1':
                 case '2':
@@ -3819,7 +3820,8 @@ struct LLVMEmitter
                 case '9':
                     // Function parameter.
                     {
-                        --cursor;
+                        if (d != '_')
+                            --cursor;
                         UInt argIndex = parseNumber(cursor, end);
                         SLANG_RELEASE_ASSERT(argIndex < parentFunc->getParamCount());
                         IRParam* param = nullptr;
@@ -3835,7 +3837,7 @@ struct LLVMEmitter
                         }
 
                         auto llvmParam = findValue(param);
-                        llvmParam->print(expanded);
+                        llvmParam->printAsOperand(expanded, d != '_');
                     }
                     break;
                 case '[':
