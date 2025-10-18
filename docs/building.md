@@ -370,6 +370,25 @@ ${SLANG_DIR}/build/external/miniz/libminiz.a
 ${SLANG_DIR}/build/external/lz4/build/cmake/liblz4.a
 ```
 
+## Deprecation of libslang and slang.dll filenames
+
+In November 2025, the primary library for Slang was renamed, from `libslang.so` and `slang.dll` to `libslang-compiler.so` and `slang-compiler.dll`. (A similar change was made for macOS.) The reason behind this change was to address a conflict on the Linux target, where the S-Lang library of the same name is commonly preinstalled on Linux distributions. The same issue affected macOS, to a lesser extent, where the S-Lang library could be installed via `brew`. To make the Slang library name predictable and simplify downstream build logic, the Slang library name was thus changed on all platforms.
+
+A change like this requires a period of transition, so on a temporary basis: Linux and macOS packages now include symlinks from the old filename to the new one. For Windows, a proxy library is provided with the old name, that redirects all functions to the new `slang-compiler.dll`. The rationale here is that applications with a complex dependency graph may have some components still temporarily using `slang.dll`, while others have been updated to use `slang-compiler.dll`. Using a proxy library for `slang.dll` ensures that all components are using the same library, and avoids any potential state or heap-related issues from an executable sharing data structures between the two libraries.
+
+These affordances **will be removed at the end of 2026**. Until that time, they will be present in the github release packages for downstream use. Downstream packaging may or may not choose to distribute these components, at their discretion. **We strongly encourage downstream users of Slang to move to the new library names as soon as they are able.**
+
+## Updating the backwards compatibility slang.dll
+
+The `slang.dll` pass-through/proxy library uses a checked-in .def file to avoid the Windows build having a dependency on `dumpbin.exe`. In the event that this file ever needs to be updated, a custom target is provided for updating the .def file from a prebuilt `slang-compiler.dll`. To update the .def file, run:
+
+```
+cmake --build build --target regenerate-proxy-def
+```
+
+This target will be removed from Slang at the end of 2026 along with the `slang.dll` library.
+
+
 ## Notes
 
 [^1] below 3.25, CMake lacks the ability to mark directories as being
