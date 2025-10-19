@@ -3398,13 +3398,18 @@ IRInst* IRBuilder::emitGetValueFromBoundInterface(IRType* type, IRInst* boundInt
     return inst;
 }
 
-
-IRUndefined* IRBuilder::emitUndefined(IRType* type)
+IRLoadFromUninitializedMemory* IRBuilder::emitLoadFromUninitializedMemory(IRType* type)
 {
-    auto inst = createInst<IRUndefined>(this, kIROp_Undefined, type);
-
+    auto inst =
+        createInst<IRLoadFromUninitializedMemory>(this, kIROp_LoadFromUninitializedMemory, type);
     addInst(inst);
+    return inst;
+}
 
+IRPoison* IRBuilder::emitPoison(IRType* type)
+{
+    auto inst = createInst<IRPoison>(this, kIROp_Poison, type);
+    addInst(inst);
     return inst;
 }
 
@@ -8695,8 +8700,11 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_LiveRangeStart:
     case kIROp_LiveRangeEnd:
 
+        // Undefined values are treated as having no side effects.
+    case kIROp_LoadFromUninitializedMemory:
+    case kIROp_Poison:
+
     case kIROp_Nop:
-    case kIROp_Undefined:
     case kIROp_DefaultConstruct:
     case kIROp_Specialize:
     case kIROp_LookupWitnessMethod:

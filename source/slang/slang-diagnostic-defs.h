@@ -661,8 +661,14 @@ DIAGNOSTIC(30025, Error, invalidArraySize, "array size must be non-negative.")
 DIAGNOSTIC(
     30027,
     Error,
-    disallowedArrayOfParameterBlock,
-    "Arrays of ParameterBlock are not allowed")
+    disallowedArrayOfNonAddressableType,
+    "Arrays of non-addressable type '$0' are not allowed")
+
+DIAGNOSTIC(
+    30028,
+    Error,
+    nonAddressableTypeInStructuredBuffer,
+    "'$0' is non-addressable and cannot be used in StructuredBuffer")
 DIAGNOSTIC(
     30029,
     Error,

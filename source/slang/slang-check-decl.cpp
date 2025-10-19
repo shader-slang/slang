@@ -2703,6 +2703,9 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 {
     DiagnoseIsAllowedInitExpr(varDecl, getSink());
 
+    // Check for arrays of non-addressable types
+    validateArrayElementTypeForVariable(varDecl);
+
     // if zero initialize is true, set everything to a default
     if (getOptionSet().hasOption(CompilerOptionName::ZeroInitialize) && !varDecl->initExpr &&
         as<VarDecl>(varDecl))
@@ -2840,6 +2843,7 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     }
 
     TypeTag varTypeTags = getTypeTags(varDecl->getType());
+
     auto parentDecl = as<AggTypeDecl>(getParentDecl(varDecl));
     if (parentDecl)
     {
@@ -10389,9 +10393,12 @@ void SemanticsVisitor::validateArrayElementTypeForVariable(VarDeclBase* varDecl)
         return;
 
     const auto elementType = arrayType->getElementType();
-    if (as<ParameterBlockType>(elementType))
+
+    // Check if the element type has the NonAddressable tag
+    TypeTag elementTags = getTypeTags(elementType);
+    if ((int)elementTags & (int)TypeTag::NonAddressable)
     {
-        getSink()->diagnose(varDecl, Diagnostics::disallowedArrayOfParameterBlock);
+        getSink()->diagnose(varDecl, Diagnostics::disallowedArrayOfNonAddressableType, elementType);
         return;
     }
 }
@@ -14736,6 +14743,16 @@ void validateStructuredBufferElementType(SemanticsVisitor* visitor, VarDeclBase*
         visitor->getSink()->diagnose(
             varDecl->loc,
             Diagnostics::recursiveTypesFoundInStructuredBuffer,
+            elementType);
+    }
+
+    // Check if the element type is NonAddressable
+    TypeTag elementTags = visitor->getTypeTags(elementType);
+    if ((int)elementTags & (int)TypeTag::NonAddressable)
+    {
+        visitor->getSink()->diagnose(
+            varDecl->loc,
+            Diagnostics::nonAddressableTypeInStructuredBuffer,
             elementType);
     }
 }
