@@ -418,19 +418,16 @@ public:
             break;
         case kIROp_IntType:
         case kIROp_UIntType:
-#if SLANG_PTR_IS_32
-        case kIROp_IntPtrType:
-        case kIROp_UIntPtrType:
-#endif
             llvmType = builder->getInt32Ty();
             break;
         case kIROp_Int64Type:
         case kIROp_UInt64Type:
-#if SLANG_PTR_IS_64
+            llvmType = builder->getInt64Ty();
+            break;
+
         case kIROp_IntPtrType:
         case kIROp_UIntPtrType:
-#endif
-            llvmType = builder->getInt64Ty();
+            llvmType = builder->getIntPtrTy(targetDataLayout);
             break;
 
         case kIROp_RateQualifiedType:
@@ -608,11 +605,6 @@ public:
         }
 
         llvm::DIType* llvmType = nullptr;
-#if SLANG_PTR_IS_32
-        const int ptrSize = 32;
-#else
-        const int ptrSize = 64;
-#endif
         switch (type->getOp())
         {
         case kIROp_VoidType:
@@ -650,11 +642,11 @@ public:
             break;
 
         case kIROp_IntPtrType:
-            llvmType = debugBuilder->createBasicType("intptr", ptrSize, llvm::dwarf::DW_ATE_signed);
+            llvmType = debugBuilder->createBasicType("intptr", targetDataLayout.getPointerSizeInBits(), llvm::dwarf::DW_ATE_signed);
             break;
 
         case kIROp_UIntPtrType:
-            llvmType = debugBuilder->createBasicType("uintptr", ptrSize, llvm::dwarf::DW_ATE_unsigned);
+            llvmType = debugBuilder->createBasicType("uintptr", targetDataLayout.getPointerSizeInBits(), llvm::dwarf::DW_ATE_unsigned);
             break;
 
         case kIROp_Int64Type:
@@ -668,12 +660,12 @@ public:
         case kIROp_PtrType:
             {
                 auto ptr = as<IRPtrType>(type);
-                llvmType = debugBuilder->createPointerType(getDebugType(ptr->getValueType(), rules), ptrSize);
+                llvmType = debugBuilder->createPointerType(getDebugType(ptr->getValueType(), rules), targetDataLayout.getPointerSizeInBits());
             }
             break;
 
         case kIROp_NativePtrType:
-            llvmType = debugBuilder->createBasicType("NativeRef", ptrSize, llvm::dwarf::DW_ATE_address);
+            llvmType = debugBuilder->createBasicType("NativeRef", targetDataLayout.getPointerSizeInBits(), llvm::dwarf::DW_ATE_address);
             break;
 
         case kIROp_StringType:
@@ -681,7 +673,7 @@ public:
             {
                 llvmType = debugBuilder->createPointerType(
                     debugBuilder->createBasicType("char", 8, llvm::dwarf::DW_ATE_signed_char),
-                    ptrSize);
+                    targetDataLayout.getPointerSizeInBits());
             }
             break;
 
@@ -691,7 +683,10 @@ public:
         case kIROp_BorrowInParamType:
             {
                 auto ptr = as<IRPtrTypeBase>(type);
-                llvmType = debugBuilder->createReferenceType(llvm::dwarf::DW_TAG_reference_type, getDebugType(ptr->getValueType(), rules), ptrSize);
+                llvmType = debugBuilder->createReferenceType(
+                    llvm::dwarf::DW_TAG_reference_type,
+                    getDebugType(ptr->getValueType(), rules),
+                    targetDataLayout.getPointerSizeInBits());
             }
             break;
 
@@ -1192,11 +1187,7 @@ public:
                 {
                     llvmConstant = llvm::ConstantExpr::getIntToPtr(
                         llvm::ConstantInt::get(
-#if SLANG_PTR_IS_64
-                            builder->getInt64Ty(),
-#else
-                            builder->getInt32Ty(),
-#endif
+                            builder->getIntPtrTy(targetDataLayout),
                             ((uintptr_t)ptrLit->getValue())),
                         llvmType
                     );
@@ -2916,11 +2907,7 @@ struct LLVMEmitter
                     llvmFromValue = llvmBuilder->CreateCast(
                         llvm::Instruction::CastOps::PtrToInt,
                         llvmFromValue,
-#if SLANG_PTR_IS_64
-                        llvmBuilder->getInt64Ty()
-#else
-                        llvmBuilder->getInt32Ty()
-#endif
+                        llvmBuilder->getIntPtrTy(targetDataLayout)
                     );
                 }
                 else if (!llvmFromType->isPointerTy() && llvmToType->isPointerTy())
@@ -2928,11 +2915,7 @@ struct LLVMEmitter
                     // Cast from ??? to pointer, so first bitcast to equally
                     // sized int type and then do IntToPtr cast.
                     llvmFromValue = llvmBuilder->CreateCast(llvm::Instruction::CastOps::BitCast, llvmFromValue,
-#if SLANG_PTR_IS_64
-                        llvmBuilder->getInt64Ty()
-#else
-                        llvmBuilder->getInt32Ty()
-#endif
+                        llvmBuilder->getIntPtrTy(targetDataLayout)
                     );
                     op = llvm::Instruction::CastOps::IntToPtr;
                 }
