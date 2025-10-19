@@ -2703,6 +2703,23 @@ struct LLVMEmitter
             }
             break;
 
+        case kIROp_SwizzleSet:
+            {
+                auto swizzledInst = static_cast<IRSwizzleSet*>(inst);
+
+                llvmInst = findValue(swizzledInst->getBase());
+                auto llvmSrc = findValue(swizzledInst->getSource());
+
+                for (UInt i = 0; i < swizzledInst->getElementCount(); ++i)
+                {
+                    IRInst* irElementIndex = swizzledInst->getElementIndex(i);
+                    IRIntegerValue elementIndex = getIntVal(irElementIndex);
+                    auto llvmSrcElement = llvmBuilder->CreateExtractElement(llvmSrc, i);
+                    llvmInst = llvmBuilder->CreateInsertElement(llvmInst, llvmSrcElement, elementIndex);
+                }
+            }
+            break;
+
         case kIROp_SwizzledStore:
             {
                 auto swizzledInst = static_cast<IRSwizzledStore*>(inst);
@@ -3377,6 +3394,10 @@ struct LLVMEmitter
 
         case kIROp_Unreachable:
             return llvmBuilder->CreateUnreachable();
+
+        case kIROp_GlobalValueRef:
+            llvmInst = findValue(inst->getOperand(0));
+            break;
 
         case kIROp_GetStringHash:
             {
