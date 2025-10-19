@@ -1051,13 +1051,13 @@ public:
         case kIROp_StructType:
             if (rules != defaultPointerRules)
             {
-                llvm::Value* llvmVar = emitAlloca(valType, rules);
+                llvm::Value* llvmVar = emitAlloca(valType, defaultPointerRules);
                 crossLayoutMemCpy(llvmVar, llvmPtr, valType, defaultPointerRules, rules, isVolatile);
                 return llvmVar;
             }
             else
             {
-                llvm::Value* llvmVar = emitAlloca(valType, rules);
+                llvm::Value* llvmVar = emitAlloca(valType, defaultPointerRules);
 
                 // Pointer-to-pointer copy, so generate inline memcpy.
                 builder->CreateMemCpyInline(
@@ -1486,10 +1486,8 @@ private:
                         continue;
 
                     IRType* dummy;
-                    UInt dstFieldIndex = mapFieldIndexToLLVM(structType, dstLayout, fieldIndex);
-                    UInt srcFieldIndex = mapFieldIndexToLLVM(structType, srcLayout, fieldIndex);
-                    auto dstElemPtr = emitGetElementPtr(dstPtr, builder->getInt32(dstFieldIndex), type, dstLayout, dummy);
-                    auto srcElemPtr = emitGetElementPtr(srcPtr, builder->getInt32(srcFieldIndex), type, srcLayout, dummy);
+                    auto dstElemPtr = emitGetElementPtr(dstPtr, builder->getInt32(fieldIndex), type, dstLayout, dummy);
+                    auto srcElemPtr = emitGetElementPtr(srcPtr, builder->getInt32(fieldIndex), type, srcLayout, dummy);
 
                     last = crossLayoutMemCpy(
                         dstElemPtr,
@@ -2351,8 +2349,8 @@ struct LLVMEmitter
 
     IRTypeLayoutRules* getPtrLayoutRules(IRInst* ptr)
     {
-        // Check if this store is actually into an RWStructuredBuffer.
-        // If so, we need to take its layout into account.
+        // Check if the pointer is actually based on an buffer with an explicit
+        // layout. If so, we need to take that layout into account.
         if (auto structuredBufferInst = as<IRRWStructuredBufferGetElementPtr>(ptr))
         {
             auto baseType = cast<IRHLSLStructuredBufferTypeBase>(
@@ -3000,10 +2998,7 @@ struct LLVMEmitter
                 auto rules = getPtrLayoutRules(base);
 
                 auto llvmBase = findValue(base);
-                unsigned idx = types->mapFieldIndexToLLVM(
-                    structType,
-                    rules,
-                    getStructIndexByKey(structType, as<IRStructKey>(fieldExtractInst->getField())));
+                unsigned idx = getStructIndexByKey(structType, as<IRStructKey>(fieldExtractInst->getField()));
 
                 IRType* elementType = nullptr;
                 llvm::Value* ptr = types->emitGetElementPtr(
