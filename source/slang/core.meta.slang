@@ -2777,7 +2777,7 @@ __prefix Ref<T, access, addrSpace> operator*(Ptr<T, access, addrSpace> value);
 __generic<T>
 __intrinsic_op(0)
 [KnownBuiltin( $((int)KnownBuiltinDeclName::OperatorAddressOf))]
-[require(cpp_cuda_spirv)]
+[require(cpp_cuda_spirv_llvm)]
 __prefix Ptr<T, Access::ReadWrite, AddressSpace::Device> operator&(__ref T value);
 
 __generic<$(ptrTypeParameterList), TInt : __BuiltinIntegerType>

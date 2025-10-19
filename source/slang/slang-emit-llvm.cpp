@@ -3992,9 +3992,15 @@ struct LLVMEmitter
 
         if (!sourceModule)
         {
-            auto msg = diag.getMessage();
-            printf("inline ir:\n%s\nerror: %s\n", llvmTextIR.c_str(), msg.str().c_str());
-            SLANG_UNEXPECTED("Failed to parse LLVM inline IR!");
+            std::string msgStr;
+            llvm::raw_string_ostream diagOut(msgStr);
+            diag.print("", diagOut, false);
+
+            msgStr = "\n" + llvmTextIR + "\n" + msgStr;
+            UnownedStringSlice msgSlice(msgStr.data(), msgStr.size());
+
+            codeGenContext->getSink()->diagnose(SourceLoc(), Diagnostics::snippetParsingFailed, msgSlice);
+            return;
         }
 
         sourceModule->setDataLayout(targetMachine->createDataLayout());
