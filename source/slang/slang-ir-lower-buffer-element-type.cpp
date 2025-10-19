@@ -2184,7 +2184,8 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
     {
         return IRTypeLayoutRuleName::MetalParameterBlock;
     }
-    if (target->getTargetReq()->getTarget() != CodeGenTarget::WGSL)
+    auto targetReq = target->getTargetReq();
+    if (targetReq->getTarget() != CodeGenTarget::WGSL && !isLLVMTarget(targetReq))
     {
         if (!isKhronosTarget(target->getTargetReq()))
             return IRTypeLayoutRuleName::Natural;
