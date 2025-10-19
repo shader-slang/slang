@@ -499,7 +499,11 @@ public:
                 builder->getIntPtrTy(targetDataLayout)
             );
             break;
+        // TODO: Textures, samplers, atomics, TLASes, etc.
         default:
+            // Matrices and CoopVectors & CoopMatrices are already lowered into
+            // something else before this LLVM emitter runs, and won't be
+            // present.
             SLANG_UNEXPECTED("Unsupported type for LLVM target!");
             break;
         }
@@ -1755,6 +1759,7 @@ struct LLVMEmitter
     llvm::DICompileUnit* compileUnit;
     llvm::TargetMachine* targetMachine;
     CodeGenContext* codeGenContext;
+    llvm::DataLayout targetDataLayout;
 
     bool debug = false;
     bool inlineGlobalInstructions = false;
@@ -1961,11 +1966,12 @@ struct LLVMEmitter
         else if (getOptions().shouldUseDXLayout())
             defaultPointerRules = IRTypeLayoutRules::get(IRTypeLayoutRuleName::D3DConstantBuffer);
 
+        targetDataLayout = targetMachine->createDataLayout();
         types.reset(new LLVMTypeTranslator(
             *llvmBuilder,
             *llvmDebugBuilder,
             getOptions(),
-            targetMachine->createDataLayout(),
+            targetDataLayout,
             compileUnit,
             sourceDebugInfo,
             defaultPointerRules));
@@ -3346,6 +3352,43 @@ struct LLVMEmitter
                     findValue(val),
                     val->getDataType(),
                     defaultPointerRules);
+            }
+            break;
+
+        case kIROp_StructuredBufferGetDimensions:
+            {
+                auto getDimensionsInst = cast<IRStructuredBufferGetDimensions>(inst);
+                auto buffer = getDimensionsInst->getBuffer();
+                auto bufferType = as<IRHLSLStructuredBufferTypeBase>(buffer->getDataType());
+                auto llvmBuffer = findValue(buffer);
+
+                IRTypeLayoutRules* layout = getTypeLayoutRuleForBuffer(codeGenContext->getTargetProgram(), bufferType);
+
+                auto llvmUintType = llvmBuilder->getInt32Ty();
+                auto llvmBaseCount = llvmBuilder->CreateExtractValue(llvmBuffer, 1);
+                llvmBaseCount = llvmBuilder->CreateZExtOrTrunc(llvmBaseCount, llvmUintType);
+
+                auto returnType = llvm::VectorType::get(llvmUintType, llvm::ElementCount::getFixed(2));
+                llvmInst = llvm::PoisonValue::get(returnType);
+                llvmInst = llvmBuilder->CreateInsertElement(llvmInst, llvmBaseCount, uint64_t(0));
+
+                auto stride = types->getSizeAndAlignment(bufferType->getElementType(), layout).size;
+                llvmInst = llvmBuilder->CreateInsertElement(
+                    llvmInst, llvmBuilder->getInt32(stride), uint64_t(1));
+            }
+            break;
+
+        case kIROp_GetEquivalentStructuredBuffer:
+            {
+                auto bufferType = as<IRHLSLStructuredBufferTypeBase>(inst->getDataType());
+                auto llvmByteBuffer = findValue(inst->getOperand(0));
+                auto llvmByteCount = llvmBuilder->CreateExtractValue(llvmByteBuffer, 1);
+
+                IRTypeLayoutRules* layout = getTypeLayoutRuleForBuffer(codeGenContext->getTargetProgram(), bufferType);
+                auto stride = types->getSizeAndAlignment(bufferType->getElementType(), layout).size;
+                auto llvmElementCount = llvmBuilder->CreateUDiv(
+                    llvmByteCount, llvm::ConstantInt::get(llvmBuilder->getIntPtrTy(targetDataLayout), stride));
+                llvmInst = llvmBuilder->CreateInsertValue(llvmByteBuffer, llvmElementCount, 1);
             }
             break;
 
