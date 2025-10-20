@@ -985,9 +985,22 @@ void __wgsl_check_texture_type()
     static_assert(isShadow == 0 || Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE)
         , "WGSL depth texture shape must be either 2D or Cube");
 
-    // Multisampled texture shapes
+    // Multisampled textures
     static_assert(isMS == 0 || Shape.flavor == $(SLANG_TEXTURE_2D)
         , "WGSL multisampled texture shape must be 2D");
+    static_assert(isMS == 0 ||
+                 (access != $(kCoreModule_ResourceAccessWriteOnly) &&
+                  access != $(kCoreModule_ResourceAccessReadWrite))
+        , "WGSL does not support multisampled texture storage");
+
+
+    // access
+    static_assert(access != $(kCoreModule_ResourceAccessRasterizerOrdered)
+        , "WGSL does not support RasterizerOrderedTexture types");
+    static_assert(access != $(kCoreModule_ResourceAccessFeedback)
+        , "WGSL does not support FeedbackTexture types");
+    static_assert(access <= $(kCoreModule_ResourceAccessFeedback)
+        , "WGSL: unhandled texture access type");
 }
 
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
