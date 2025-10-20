@@ -2748,7 +2748,12 @@ bool isKernelTarget(CodeGenTarget codeGenTarget)
 
 bool isLLVMTarget(TargetRequest* targetReq)
 {
-    switch (targetReq->getTarget())
+    return isLLVMTarget(targetReq->getTarget());
+}
+
+bool isLLVMTarget(CodeGenTarget target)
+{
+    switch (target)
     {
     default:
         return false;

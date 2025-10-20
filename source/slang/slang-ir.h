@@ -1454,7 +1454,7 @@ FIDDLE()
 struct IRHLSLStructuredBufferTypeBase : IRBuiltinGenericType
 {
     FIDDLE(baseInst())
-    IRType* getDataLayout() { return (IRType*)getOperand(1); }
+    IRType* getDataLayout() { return getOperandCount() > 1 ? (IRType*)getOperand(1) : nullptr; }
 };
 
 
