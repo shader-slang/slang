@@ -2998,6 +2998,26 @@ static void _addFieldsToWrappedBufferElementTypeLayout(
             // corresponding to the payload type, which are stored as
             // the pending type layout on `elementTypeLayout`.
             //
+            if (isSpecial)
+            {
+                if (auto existentialTypeLayout = as<IRExistentialTypeLayout>(elementTypeLayout))
+                {
+                    SLANG_ASSERT(tupleInfo->elements.getCount() == 1);
+
+                    for (auto ee : tupleInfo->elements)
+                    {
+                        _addFieldsToWrappedBufferElementTypeLayout(
+                            irBuilder,
+                            existentialTypeLayout,
+                            newTypeLayout,
+                            ee.field,
+                            varChain,
+                            true);
+                    }
+
+                    return;
+                }
+            }
 
             // A tuple comes up when we've turned an aggregate
             // with one or more interface-type fields into
