@@ -95,6 +95,7 @@ bool isKernelTarget(CodeGenTarget codeGenTarget);
 
 // Are we generating code for LLVM IR
 bool isLLVMTarget(TargetRequest* targetReq);
+bool isLLVMTarget(CodeGenTarget target);
 
 /// A request to generate output in some target format.
 class TargetRequest : public RefObject
