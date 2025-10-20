@@ -50,7 +50,7 @@ jobs:
           submodules: "recursive"
           fetch-depth: "0"
 
-      - name: Install Clang 18
+      - name: Install Clang 18 and LLVM Tools
         if: inputs.compiler == 'clang-18' && inputs.os == 'linux'
         shell: bash
         run: |
@@ -59,12 +59,18 @@ jobs:
           sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-18 main"
           sudo apt-get update
 
-          # Install clang-18
-          sudo apt-get install -y clang-18 clang++-18
+          # Install clang-18 and LLVM coverage tools
+          sudo apt-get install -y clang-18 clang++-18 llvm-18
+
+          # Create symlinks for coverage tools (llvm-profdata, llvm-cov)
+          sudo update-alternatives --install /usr/bin/llvm-profdata llvm-profdata /usr/bin/llvm-profdata-18 100
+          sudo update-alternatives --install /usr/bin/llvm-cov llvm-cov /usr/bin/llvm-cov-18 100
 
           # Verify installation
           clang-18 --version
           clang++-18 --version
+          llvm-profdata --version
+          llvm-cov --version
 
       - name: Setup
         uses: ./.github/actions/common-setup
