@@ -3053,19 +3053,7 @@ static void _addOffsetVarLayoutEntry(
     //
     auto resultResInfo = resultVarLayout->findOrAddResourceInfo(kind);
 
-    // Add in any contributions from the "pending" var chain, since
-    // that chain of offsets will accumulate to get the leaf offset
-    // within the pending data, which in this case we assume amounts
-    // to an *absolute* offset.
-    //
-    for (auto vv = varChain.pendingChain; vv; vv = vv->next)
-    {
-        if (auto chainResInfo = vv->varLayout->findOffsetAttr(kind))
-        {
-            resultResInfo->offset += chainResInfo->getOffset();
-            resultResInfo->space += chainResInfo->getSpace();
-        }
-    }
+    // Pending data layout functionality has been removed.
 
     // Subtract any contributions from the primary var chain, since
     // we want the resulting offset to be relative to the same
@@ -3278,14 +3266,10 @@ static IRTypeLayout* _createWrappedBufferTypeLayout(
     // determines how we got to each leaf field, and is
     // used to add up the offsets that will be stored
     // in the new `VarLayout`s that get created.
-    // We know we need to add in some offsets (usually
-    // negative) to any fields that were pending data,
-    // so we will account for that in the initial
-    // chain of outer variables that we pass in.
+    // Initialize the variable chain for element type processing.
     //
     LegalVarChain varChainForElementType;
     varChainForElementType.primaryChain = nullptr;
-    varChainForElementType.pendingChain = offsetVarChain.primaryChain;
 
     _addFieldsToWrappedBufferElementTypeLayout(
         irBuilder,
@@ -3341,11 +3325,7 @@ static LegalVal declareVars(
     IRTypeLayout* typeLayout = inTypeLayout;
     if (isSpecial)
     {
-        if (varChain.pendingChain)
-        {
-            varChain.primaryChain = varChain.pendingChain;
-            varChain.pendingChain = nullptr;
-        }
+        // Pending data layout functionality has been removed.
         if (typeLayout)
         {
         }

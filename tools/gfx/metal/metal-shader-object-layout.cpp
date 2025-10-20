@@ -170,14 +170,7 @@ Result ShaderObjectLayoutImpl::Builder::setElementTypeLayout(
             }
             break;
         case slang::BindingType::ExistentialValue:
-            // In the case of an interface-type sub-object range, we can only
-            // construct a layout if we have static specialization information
-            // that tells us what type we expect to find in that range.
-            //
-            // The static specialization information is expected to take the
-            // form of a "pending" type layotu attached to the interface type
-            // of the leaf type layout.
-            //
+            break;
         }
         subObjectRange.layout = subObjectLayout;
 
