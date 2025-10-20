@@ -1139,7 +1139,7 @@ Result linkAndOptimizeIR(
     {
         // We could fail because
         // 1) It's not inlinable for some reason (for example if it's recursive)
-        SLANG_RETURN_ON_FAIL(performTypeInlining(irModule, sink));
+        SLANG_RETURN_ON_FAIL(performTypeInlining(irModule, targetProgram, sink));
     }
 
     if (requiredLoweringPassSet.reinterpret)
@@ -1893,6 +1893,18 @@ Result linkAndOptimizeIR(
         specializeAddressSpaceForWGSL(irModule);
     }
 
+    bool emitSpirvDirectly = targetProgram->shouldEmitSPIRVDirectly();
+
+    if (isKhronosTarget(targetRequest) && emitSpirvDirectly)
+    {
+        // If we are emitting SPIR-V directly, we should try to specialize function calls
+        // whose argument is an access chain into a global variable/buffer directly after
+        // lowerBufferElementTypeToStorageType, so that we can be more SPIRV conformant by
+        // eliminating the case where an access chain is passed as function argument.
+        // This is disallowed by SPIRV rule 2.16.1 when VariablePointer is not declared.
+        specializeFuncsForBufferLoadArgs(codeGenContext, irModule);
+    }
+
     // If we are generating code for CUDA, we should translate all immutable buffer loads to
     // using `__ldg` intrinsic for improved performance.
     if (isCUDATarget(targetRequest))
@@ -1902,7 +1914,6 @@ Result linkAndOptimizeIR(
 
     performForceInlining(irModule);
 
-    bool emitSpirvDirectly = targetProgram->shouldEmitSPIRVDirectly();
     if (emitSpirvDirectly)
     {
         performIntrinsicFunctionInlining(irModule);
