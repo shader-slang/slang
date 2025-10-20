@@ -2902,27 +2902,9 @@ static void _addFieldsToWrappedBufferElementTypeLayout(
             // cases. We will be computing layout information
             // for a field of the new/wrapped buffer element type.
             //
-            IRVarLayout* newFieldLayout = nullptr;
-            if (isSpecial)
-            {
-                // In the special case, that field will be laid out
-                // based on the "pending" var chain, and the type
-                // of the pending data for the element.
-                //
-                newFieldLayout = createSimpleVarLayout(
-                    irBuilder,
-                    varChain.pendingChain,
-                    elementTypeLayout->getPendingDataTypeLayout());
-            }
-            else
-            {
-                // The ordinary case just uses the primary layout
-                // information and the primary/nominal type of
-                // the field.
-                //
-                newFieldLayout =
-                    createSimpleVarLayout(irBuilder, varChain.primaryChain, elementTypeLayout);
-            }
+            // Use the primary layout information and the primary/nominal type of the field.
+            IRVarLayout* newFieldLayout =
+                createSimpleVarLayout(irBuilder, varChain.primaryChain, elementTypeLayout);
 
             // Either way, we add the new field to the struct type
             // layout we are building, and also update the mapping
@@ -3016,30 +2998,6 @@ static void _addFieldsToWrappedBufferElementTypeLayout(
             // corresponding to the payload type, which are stored as
             // the pending type layout on `elementTypeLayout`.
             //
-            if (isSpecial)
-            {
-                if (auto existentialTypeLayout = as<IRExistentialTypeLayout>(elementTypeLayout))
-                {
-                    if (const auto pendingTypeLayout =
-                            existentialTypeLayout->getPendingDataTypeLayout())
-                    {
-                        SLANG_ASSERT(tupleInfo->elements.getCount() == 1);
-
-                        for (auto ee : tupleInfo->elements)
-                        {
-                            _addFieldsToWrappedBufferElementTypeLayout(
-                                irBuilder,
-                                existentialTypeLayout,
-                                newTypeLayout,
-                                ee.field,
-                                varChain,
-                                true);
-                        }
-
-                        return;
-                    }
-                }
-            }
 
             // A tuple comes up when we've turned an aggregate
             // with one or more interface-type fields into
@@ -3231,7 +3189,7 @@ static IRTypeLayout* _createWrappedBufferTypeLayout(
     // of the buffer).
     //
     auto offsetVarLayout =
-        _createOffsetVarLayout(irBuilder, outerVarChain, oldTypeLayout->getPendingDataTypeLayout());
+        _createOffsetVarLayout(irBuilder, outerVarChain, nullptr);
     LegalVarChainLink offsetVarChain(LegalVarChain(), offsetVarLayout);
 
     // We will start our construction of the pieces of the output
@@ -3391,10 +3349,6 @@ static LegalVal declareVars(
         }
         if (typeLayout)
         {
-            if (auto pendingTypeLayout = typeLayout->getPendingDataTypeLayout())
-            {
-                typeLayout = pendingTypeLayout;
-            }
         }
     }
 

@@ -465,8 +465,8 @@ Result ShaderObjectImpl::bindAsValue(
                 // As a result, the offset for the first object in the range
                 // will come from the `pending` part of the range's offset.
                 //
-                SimpleBindingOffset objOffset = rangeOffset.pending;
-                SimpleBindingOffset objStride = rangeStride.pending;
+                SimpleBindingOffset objOffset = {};
+                SimpleBindingOffset objStride = {};
 
                 for (Index i = 0; i < count; ++i)
                 {
@@ -548,7 +548,6 @@ Result RootShaderObjectImpl::bindAsRoot(
     // for pending data.
     //
     BindingOffset offset;
-    offset.pending = specializedLayout->getPendingDataOffset();
 
     // Note: We could *almost* call `bindAsConstantBuffer()` here to bind
     // the state of the root object itself, but there is an important

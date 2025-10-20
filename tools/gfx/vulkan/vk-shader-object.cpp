@@ -843,8 +843,8 @@ Result ShaderObjectImpl::bindAsValue(
                 // For the purposes of nested binding, what used to be the pending offset
                 // will now be used as the primary offset.
                 //
-                SimpleBindingOffset objOffset = rangeOffset.pending;
-                SimpleBindingOffset objStride = rangeStride.pending;
+                SimpleBindingOffset objOffset = {};
+                SimpleBindingOffset objStride = {};
                 for (Index i = 0; i < count; ++i)
                 {
                     // An existential-type sub-object is always bound just as a value,
@@ -1143,7 +1143,6 @@ Result RootShaderObjectImpl::bindAsRoot(
     RootShaderObjectLayout* layout)
 {
     BindingOffset offset = {};
-    offset.pending = layout->getPendingDataOffset();
 
     // Note: the operations here are quite similar to what `bindAsParameterBlock` does.
     // The key difference in practice is that we do *not* make use of the adjustment

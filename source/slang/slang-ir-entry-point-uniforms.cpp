@@ -481,8 +481,6 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
                 // Because this is where we store the offset of the default constant buffer itself.
                 paramGroupTypeLayoutBuilder.setContainerVarLayout(
                     originalParamGroupLayout->getContainerVarLayout());
-                paramGroupTypeLayoutBuilder.setPendingTypeLayout(
-                    originalParamGroupLayout->getPendingDataTypeLayout());
                 // The "elementVarLayout" part should be the new one we just created.
                 paramGroupTypeLayoutBuilder.setElementVarLayout(newElementVarLayout);
                 // The "offsetElementTypeLayout" part is just redundant convenient info that

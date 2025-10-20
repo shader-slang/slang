@@ -757,13 +757,6 @@ static RefPtr<VarLayout> _createVarLayout(TypeLayout* typeLayout, DeclRef<VarDec
     varLayout->typeLayout = typeLayout;
     varLayout->varDecl = varDeclRef;
 
-    if (auto pendingDataTypeLayout = typeLayout->pendingDataTypeLayout)
-    {
-        RefPtr<VarLayout> pendingVarLayout = new VarLayout();
-        pendingVarLayout->varDecl = varDeclRef;
-        pendingVarLayout->typeLayout = pendingDataTypeLayout;
-        varLayout->pendingVarLayout = pendingVarLayout;
-    }
 
     return varLayout;
 }
@@ -1658,20 +1651,6 @@ static void completeBindingsForParameter(
 /// need to allocate space for them after all other shader parameters have
 /// been laid out.
 ///
-/// This function should be called on the `pendingVarLayout` field of an
-/// existing `VarLayout` to ensure that its pending data has been properly
-/// assigned storage. It handles the case where the `pendingVarLayout`
-/// field is null.
-///
-static void _allocateBindingsForPendingData(
-    ParameterBindingContext* context,
-    RefPtr<VarLayout> pendingVarLayout)
-{
-    if (!pendingVarLayout)
-        return;
-
-    completeBindingsForParameter(context, pendingVarLayout);
-}
 
 struct SimpleSemanticInfo
 {
@@ -2711,7 +2690,6 @@ struct ScopeLayoutBuilder
     // later allocating space for all the pending parameters after
     // the primary shader parameters.
     //
-    StructTypeLayoutBuilder m_pendingDataTypeLayoutBuilder;
 
     void beginLayout(ParameterBindingContext* context, TypeLayoutContext layoutContext)
     {
@@ -2765,20 +2743,6 @@ struct ScopeLayoutBuilder
         // `struct` layout logic in `type-layout.cpp`. If this gets any
         // more complicated we should see if there is a way to share it.
         //
-        if (auto fieldPendingDataTypeLayout = varLayout->typeLayout->pendingDataTypeLayout)
-        {
-            auto rules = m_layoutContext.rules;
-            m_pendingDataTypeLayoutBuilder.beginLayoutIfNeeded(nullptr, rules);
-            auto varDeclBase = varLayout->varDecl.as<VarDeclBase>();
-            if (!varDeclBase)
-                return;
-            auto fieldPendingDataVarLayout =
-                m_pendingDataTypeLayoutBuilder.addField(varDeclBase, fieldPendingDataTypeLayout);
-
-            m_structLayout->pendingDataTypeLayout = m_pendingDataTypeLayoutBuilder.getTypeLayout();
-
-            varLayout->pendingVarLayout = fieldPendingDataVarLayout;
-        }
     }
 
     void addParameter(ParameterInfo* parameterInfo)
@@ -2793,36 +2757,6 @@ struct ScopeLayoutBuilder
         // logic, but we still need to construct a layout
         // that includes any pending data.
         //
-        if (auto fieldPendingVarLayout = varLayout->pendingVarLayout)
-        {
-            auto fieldPendingTypeLayout = fieldPendingVarLayout->typeLayout;
-
-            auto rules = m_layoutContext.rules;
-            m_pendingDataTypeLayoutBuilder.beginLayoutIfNeeded(nullptr, rules);
-            m_structLayout->pendingDataTypeLayout = m_pendingDataTypeLayoutBuilder.getTypeLayout();
-
-            auto fieldUniformLayoutInfo =
-                fieldPendingTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform);
-            LayoutSize fieldUniformSize =
-                fieldUniformLayoutInfo ? fieldUniformLayoutInfo->count : 0;
-            if (fieldUniformSize != 0)
-            {
-                // Make sure uniform fields get laid out properly...
-
-                UniformLayoutInfo fieldInfo(
-                    fieldUniformSize,
-                    fieldPendingTypeLayout->uniformAlignment);
-
-                LayoutSize uniformOffset = rules->AddStructField(
-                    m_pendingDataTypeLayoutBuilder.getStructLayoutInfo(),
-                    fieldInfo);
-
-                fieldPendingVarLayout->findOrAddResourceInfo(LayoutResourceKind::Uniform)->index =
-                    uniformOffset.getFiniteValue();
-            }
-
-            m_pendingDataTypeLayoutBuilder.getTypeLayout()->fields.add(fieldPendingVarLayout);
-        }
     }
 
     RefPtr<VarLayout> endLayout(VarLayout* inVarLayout = nullptr)
@@ -2831,7 +2765,6 @@ struct ScopeLayoutBuilder
         //
         auto rules = m_layoutContext.rules;
         rules->EndStructLayout(&m_structLayoutInfo);
-        m_pendingDataTypeLayoutBuilder.endLayout();
 
         // Copy the final layout information computed for ordinary data
         // over to the struct type layout for the scope.
@@ -2857,12 +2790,6 @@ struct ScopeLayoutBuilder
 
         scopeVarLayout->typeLayout = scopeTypeLayout;
 
-        if (auto pendingTypeLayout = scopeTypeLayout->pendingDataTypeLayout)
-        {
-            RefPtr<VarLayout> pendingVarLayout = new VarLayout();
-            pendingVarLayout->typeLayout = pendingTypeLayout;
-            scopeVarLayout->pendingVarLayout = pendingVarLayout;
-        }
 
         return scopeVarLayout;
     }
@@ -3860,12 +3787,6 @@ struct FlushPendingDataVisitor : ComponentTypeVisitor
         auto globalEntryPointInfo =
             m_context->shared->programLayout->entryPoints[globalEntryPointIndex];
 
-        // We need to allocate space for any "pending" data that
-        // appeared in the entry-point parameter list.
-        //
-        _allocateBindingsForPendingData(
-            m_context,
-            globalEntryPointInfo->parametersLayout->pendingVarLayout);
     }
 
     void visitRenamedEntryPoint(
@@ -3894,7 +3815,6 @@ struct FlushPendingDataVisitor : ComponentTypeVisitor
             auto globalParamInfo = m_context->shared->parameters[globalParamIndex];
             auto varLayout = globalParamInfo->varLayout;
 
-            _allocateBindingsForPendingData(m_context, varLayout->pendingVarLayout);
         }
     }
 

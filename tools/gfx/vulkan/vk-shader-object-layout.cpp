@@ -194,11 +194,6 @@ void ShaderObjectLayoutImpl::Builder::_addDescriptorRangesAsValue(
             // specialied, which is precisely the case where the Slang reflection
             // information will tell us about its "pending" layout.
             //
-            if (auto pendingTypeLayout = subObjectTypeLayout->getPendingDataTypeLayout())
-            {
-                BindingOffset pendingOffset = BindingOffset(subObjectRangeOffset.pending);
-                _addDescriptorRangesAsValue(pendingTypeLayout, pendingOffset);
-            }
             break;
 
         case slang::BindingType::ConstantBuffer:
@@ -466,14 +461,6 @@ void ShaderObjectLayoutImpl::Builder::addBindingRanges(slang::TypeLayoutReflecti
             break;
 
         case slang::BindingType::ExistentialValue:
-            if (auto pendingTypeLayout = slangLeafTypeLayout->getPendingDataTypeLayout())
-            {
-                ShaderObjectLayoutImpl::createForElementType(
-                    m_renderer,
-                    m_session,
-                    pendingTypeLayout,
-                    subObjectLayout.writeRef());
-            }
             break;
         }
 

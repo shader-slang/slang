@@ -13,19 +13,13 @@ using namespace Slang;
 ShaderObjectLayoutImpl::SubObjectRangeOffset::SubObjectRangeOffset(
     slang::VariableLayoutReflection* varLayout)
 {
-    if (auto pendingLayout = varLayout->getPendingDataLayout())
-    {
-        pendingOrdinaryData = (uint32_t)pendingLayout->getOffset(SLANG_PARAMETER_CATEGORY_UNIFORM);
-    }
+    // Pending layout APIs have been removed - no additional offset needed
 }
 
 ShaderObjectLayoutImpl::SubObjectRangeStride::SubObjectRangeStride(
     slang::TypeLayoutReflection* typeLayout)
 {
-    if (auto pendingLayout = typeLayout->getPendingDataTypeLayout())
-    {
-        pendingOrdinaryData = (uint32_t)pendingLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM);
-    }
+    // Pending layout APIs have been removed - no stride needed
 }
 
 bool ShaderObjectLayoutImpl::isBindingRangeRootParameter(
@@ -238,14 +232,9 @@ Result ShaderObjectLayoutImpl::Builder::setElementTypeLayout(
         RefPtr<ShaderObjectLayoutImpl> subObjectLayout;
         if (slangBindingType == slang::BindingType::ExistentialValue)
         {
-            if (auto pendingTypeLayout = slangLeafTypeLayout->getPendingDataTypeLayout())
-            {
-                createForElementType(
-                    m_renderer,
-                    m_session,
-                    pendingTypeLayout,
-                    subObjectLayout.writeRef());
-            }
+            // Pending data layout APIs have been removed.
+            // Interface-type ranges now have no additional layout information.
+            // Sub-object layout remains nullptr for interface types.
         }
         else
         {
@@ -861,18 +850,8 @@ void RootShaderObjectLayoutImpl::RootSignatureDescBuilder::addAsValue(
                 // Any nested binding ranges in the sub-object will "leak" into the
                 // binding ranges for the surrounding context.
                 //
-                auto specializedTypeLayout = subObjectTypeLayout->getPendingDataTypeLayout();
-                if (specializedTypeLayout)
-                {
-                    BindingRegisterOffsetPair pendingOffset;
-                    pendingOffset.primary = subObjectRangeElementOffset.pending;
-
-                    addAsValue(
-                        specializedTypeLayout,
-                        physicalDescriptorSetIndex,
-                        pendingOffset,
-                        pendingOffset);
-                }
+                // Pending data layout APIs have been removed.
+                // Interface-type ranges no longer contribute additional binding ranges.
             }
             break;
         }

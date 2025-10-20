@@ -1509,20 +1509,6 @@ struct IRLayout : IRInst
 
 struct IRVarLayout;
 
-/// An attribute to specify that a layout has another layout attached for "pending" data.
-///
-/// "Pending" data refers to the parts of a type or variable that
-/// couldn't be laid out until the concrete types for existential
-/// type slots were filled in. The layout of pending data may not
-/// be contiguous with the layout of the original type/variable.
-///
-FIDDLE()
-struct IRPendingLayoutAttr : IRAttr
-{
-    FIDDLE(leafInst())
-
-    IRLayout* getLayout() { return cast<IRLayout>(getOperand(0)); }
-};
 
 /// Layout information for a type.
 ///
@@ -1552,8 +1538,6 @@ struct IRTypeLayout : IRLayout
     /// Unwrap any layers of array-ness and return the outer-most non-array type.
     IRTypeLayout* unwrapArray();
 
-    /// Get the layout for pending data, if present.
-    IRTypeLayout* getPendingDataTypeLayout();
 
     /// A builder for constructing `IRTypeLayout`s
     struct Builder
@@ -1574,8 +1558,6 @@ struct IRTypeLayout : IRLayout
         /// Add all resource usage from `typeLayout`.
         void addResourceUsageFrom(IRTypeLayout* typeLayout);
 
-        /// Set the (optional) layout for pending data.
-        void setPendingTypeLayout(IRTypeLayout* typeLayout) { m_pendingTypeLayout = typeLayout; }
 
         /// Build a type layout according to the information specified so far.
         IRTypeLayout* build();
@@ -1603,7 +1585,6 @@ struct IRTypeLayout : IRLayout
         void addAttrs(List<IRInst*>& ioOperands);
 
         IRBuilder* m_irBuilder = nullptr;
-        IRTypeLayout* m_pendingTypeLayout = nullptr;
 
         struct ResInfo
         {
@@ -4746,7 +4727,6 @@ public:
 
     IRTypeSizeAttr* getTypeSizeAttr(LayoutResourceKind kind, LayoutSize size);
     IRVarOffsetAttr* getVarOffsetAttr(LayoutResourceKind kind, UInt offset, UInt space = 0);
-    IRPendingLayoutAttr* getPendingLayoutAttr(IRLayout* pendingLayout);
     IRStructFieldLayoutAttr* getFieldLayoutAttr(IRInst* key, IRVarLayout* layout);
     IRTupleFieldLayoutAttr* getTupleFieldLayoutAttr(IRTypeLayout* layout);
     IRCaseTypeLayoutAttr* getCaseTypeLayoutAttr(IRTypeLayout* layout);
