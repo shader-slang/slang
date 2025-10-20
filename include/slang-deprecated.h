@@ -797,7 +797,6 @@ extern "C"
     SLANG_API SlangStage spReflectionVariableLayout_getStage(SlangReflectionVariableLayout* var);
 
 
-
     // Shader Parameter Reflection
 
     SLANG_API unsigned spReflectionParameter_GetBindingIndex(SlangReflectionParameter* parameter);

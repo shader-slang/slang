@@ -287,8 +287,8 @@ Result ShaderObjectImpl::_writeOrdinaryData(
         // layout logic does for complex cases with multiple layers of nested arrays and
         // structures.
         //
-        Offset subObjectRangePendingDataOffset = subObjectRangeInfo.offset.pendingOrdinaryData;
-        Size subObjectRangePendingDataStride = subObjectRangeInfo.stride.pendingOrdinaryData;
+        Offset subObjectRangePendingDataOffset = 0;
+        Size subObjectRangePendingDataStride = 0;
 
         // If the range doesn't actually need/use the "pending" allocation at all, then
         // we need to detect that case and skip such ranges.

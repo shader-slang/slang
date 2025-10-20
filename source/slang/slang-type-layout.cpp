@@ -5043,7 +5043,6 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
                 auto fieldTypeLayout = fieldResult.layout;
 
                 auto fieldVarLayout = typeLayoutBuilder.addField(field, fieldResult);
-
             }
 
             typeLayoutBuilder.endLayout();

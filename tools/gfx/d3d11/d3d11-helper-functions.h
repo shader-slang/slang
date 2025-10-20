@@ -237,10 +237,7 @@ struct BindingOffset : SimpleBindingOffset
     void operator+=(SimpleBindingOffset const& offset) { SimpleBindingOffset::operator+=(offset); }
 
     /// Add any values in the given `offset`
-    void operator+=(BindingOffset const& offset)
-    {
-        SimpleBindingOffset::operator+=(offset);
-    }
+    void operator+=(BindingOffset const& offset) { SimpleBindingOffset::operator+=(offset); }
 };
 
 bool isSupportedNVAPIOp(IUnknown* dev, uint32_t op);

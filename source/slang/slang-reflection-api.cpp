@@ -1576,7 +1576,6 @@ SLANG_API int spReflectionTypeLayout_getGenericParamIndex(SlangReflectionTypeLay
 }
 
 
-
 SLANG_API SlangInt spReflectionType_getSpecializedTypeArgCount(SlangReflectionType* inType)
 {
     auto type = convert(inType);

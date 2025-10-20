@@ -415,7 +415,6 @@ public:
     UInt uniformAlignment = 1;
 
 
-
     ResourceInfo* FindResourceInfo(LayoutResourceKind kind)
     {
         for (auto& rr : resourceInfos)

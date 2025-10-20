@@ -81,7 +81,6 @@ public:
             : BindingOffset(varLayout)
         {
         }
-
     };
 
     /// Stride information for a sub-object range
@@ -89,10 +88,7 @@ public:
     {
         SubObjectRangeStride() {}
 
-        SubObjectRangeStride(slang::TypeLayoutReflection* typeLayout)
-        {
-        }
-
+        SubObjectRangeStride(slang::TypeLayoutReflection* typeLayout) {}
     };
 
     /// Information about a logical binding range as reported by Slang reflection
@@ -376,7 +372,6 @@ public:
         List<EntryPointInfo> m_entryPoints;
 
         /// Offset to apply to "pending" data from this object, sub-objects, and entry points
-        SimpleBindingOffset m_pendingDataOffset;
     };
 
     Index findEntryPointIndex(VkShaderStageFlags stage);
@@ -391,7 +386,6 @@ public:
         slang::ProgramLayout* programLayout,
         RootShaderObjectLayout** outLayout);
 
-    SimpleBindingOffset const& getPendingDataOffset() const { return m_pendingDataOffset; }
 
     slang::IComponentType* getSlangProgram() const { return m_program; }
     slang::ProgramLayout* getSlangProgramLayout() const { return m_programLayout; }
@@ -430,7 +424,6 @@ public:
     List<VkPushConstantRange> m_allPushConstantRanges;
     uint32_t m_totalPushConstantSize = 0;
 
-    SimpleBindingOffset m_pendingDataOffset;
     DeviceImpl* m_renderer = nullptr;
 };
 

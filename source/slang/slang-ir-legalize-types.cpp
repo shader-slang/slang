@@ -3188,8 +3188,7 @@ static IRTypeLayout* _createWrappedBufferTypeLayout(
     // itself, and so the offsets already *are* relative to the start
     // of the buffer).
     //
-    auto offsetVarLayout =
-        _createOffsetVarLayout(irBuilder, outerVarChain, nullptr);
+    auto offsetVarLayout = _createOffsetVarLayout(irBuilder, outerVarChain, nullptr);
     LegalVarChainLink offsetVarChain(LegalVarChain(), offsetVarLayout);
 
     // We will start our construction of the pieces of the output

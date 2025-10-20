@@ -742,7 +742,6 @@ Result RootShaderObjectImpl::bindAsRoot(BindingContext* context, RootShaderObjec
     //
     BindingOffset offset;
 #if 0
-    offset.pending = layout->getPendingDataOffset();
 #endif
 
     // Note: We could *almost* call `bindAsConstantBuffer()` here to bind

@@ -3786,7 +3786,6 @@ struct FlushPendingDataVisitor : ComponentTypeVisitor
         auto globalEntryPointIndex = m_counters->entryPointCounter++;
         auto globalEntryPointInfo =
             m_context->shared->programLayout->entryPoints[globalEntryPointIndex];
-
     }
 
     void visitRenamedEntryPoint(
@@ -3814,7 +3813,6 @@ struct FlushPendingDataVisitor : ComponentTypeVisitor
             auto globalParamIndex = m_counters->globalParamCounter++;
             auto globalParamInfo = m_context->shared->parameters[globalParamIndex];
             auto varLayout = globalParamInfo->varLayout;
-
         }
     }
 

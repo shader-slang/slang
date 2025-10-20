@@ -2645,7 +2645,6 @@ struct TypeLayoutReflection
     }
 
 
-
     SlangInt getBindingRangeCount()
     {
         return spReflectionTypeLayout_getBindingRangeCount((SlangReflectionTypeLayout*)this);
@@ -2988,7 +2987,6 @@ struct VariableLayoutReflection
     {
         return spReflectionVariableLayout_getStage((SlangReflectionVariableLayout*)this);
     }
-
 };
 
 struct FunctionReflection

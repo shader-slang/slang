@@ -422,7 +422,6 @@ struct LegalVarChainLink : LegalVarChain
             primaryLink.next = parent.primaryChain;
             primaryLink.varLayout = varLayout;
             primaryChain = &primaryLink;
-
         }
     }
 
