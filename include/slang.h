@@ -2644,6 +2644,11 @@ struct TypeLayoutReflection
         return spReflectionTypeLayout_getGenericParamIndex((SlangReflectionTypeLayout*)this);
     }
 
+    // Removed
+    TypeLayoutReflection* getPendingDataTypeLayout() { return nullptr; }
+
+    // Removed
+    VariableLayoutReflection* getSpecializedTypePendingDataVarLayout() { return nullptr; }
 
     SlangInt getBindingRangeCount()
     {
@@ -2987,6 +2992,9 @@ struct VariableLayoutReflection
     {
         return spReflectionVariableLayout_getStage((SlangReflectionVariableLayout*)this);
     }
+
+    // removed
+    VariableLayoutReflection* getPendingDataLayout() { return nullptr; }
 };
 
 struct FunctionReflection
