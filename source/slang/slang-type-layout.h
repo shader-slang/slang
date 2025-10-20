@@ -777,7 +777,6 @@ class ExistentialSpecializedTypeLayout : public TypeLayout
 {
 public:
     RefPtr<TypeLayout> baseTypeLayout;
-    RefPtr<VarLayout> pendingDataVarLayout;
 };
 
 /// Layout for a scoped entity like a program, module, or entry point

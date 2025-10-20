@@ -1576,23 +1576,6 @@ SLANG_API int spReflectionTypeLayout_getGenericParamIndex(SlangReflectionTypeLay
 }
 
 
-SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_getSpecializedTypePendingDataVarLayout(
-    SlangReflectionTypeLayout* inTypeLayout)
-{
-    auto typeLayout = convert(inTypeLayout);
-    if (!typeLayout)
-        return nullptr;
-
-    if (auto specializedTypeLayout = as<ExistentialSpecializedTypeLayout>(typeLayout))
-    {
-        auto pendingDataVarLayout = specializedTypeLayout->pendingDataVarLayout.Ptr();
-        return convert(pendingDataVarLayout);
-    }
-    else
-    {
-        return nullptr;
-    }
-}
 
 SLANG_API SlangInt spReflectionType_getSpecializedTypeArgCount(SlangReflectionType* inType)
 {

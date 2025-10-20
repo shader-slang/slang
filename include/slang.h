@@ -2645,12 +2645,6 @@ struct TypeLayoutReflection
     }
 
 
-    VariableLayoutReflection* getSpecializedTypePendingDataVarLayout()
-    {
-        return (VariableLayoutReflection*)
-            spReflectionTypeLayout_getSpecializedTypePendingDataVarLayout(
-                (SlangReflectionTypeLayout*)this);
-    }
 
     SlangInt getBindingRangeCount()
     {

@@ -558,8 +558,6 @@ extern "C"
     SLANG_API int spReflectionTypeLayout_getGenericParamIndex(SlangReflectionTypeLayout* type);
 
 
-    SLANG_API SlangReflectionVariableLayout*
-    spReflectionTypeLayout_getSpecializedTypePendingDataVarLayout(SlangReflectionTypeLayout* type);
     SLANG_API SlangInt spReflectionType_getSpecializedTypeArgCount(SlangReflectionType* type);
     SLANG_API SlangReflectionType* spReflectionType_getSpecializedTypeArgType(
         SlangReflectionType* type,
