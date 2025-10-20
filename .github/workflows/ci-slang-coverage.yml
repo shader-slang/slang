@@ -142,9 +142,8 @@ jobs:
           export COVERAGE_HTML_DIR="$PWD/coverage-html"
           export COVERAGE_LCOV_FILE="$PWD/coverage.lcov"
 
-          # Run coverage with test servers
-          #./tools/coverage/run-coverage.sh -use-test-server -server-count ${{ inputs.server-count }}
-          ./tools/coverage/run-coverage.sh
+          # Run coverage with test servers and expected failure list for no-GPU environment
+          ./tools/coverage/run-coverage.sh -use-test-server -server-count ${{ inputs.server-count }} -expected-failure-list tests/expected-failure-no-gpu.txt
 
       - name: Generate Coverage Summary
         id: coverage-summary
