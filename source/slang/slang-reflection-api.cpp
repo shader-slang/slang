@@ -1630,15 +1630,11 @@ struct BindingRangePathLink
     BindingRangePathLink* parent = nullptr;
 };
 
-/// A path leading to some nested field, with both parimary and "pending" data offsets
+/// A path leading to some nested field with primary data offsets
 struct BindingRangePath
 {
-
     /// The chain of variables that defines the "primary" offset of a nested field
     BindingRangePathLink* primary = nullptr;
-
-    /// The chain of variables that defines the offset for "pending" data of a nested field
-    BindingRangePathLink* pending = nullptr;
 };
 
 /// A helper type to construct a `BindingRangePath` that extends an existing path
@@ -1653,20 +1649,10 @@ struct ExtendedBindingRangePath : BindingRangePath
         //
         primaryLink = BindingRangePathLink(parent.primary, varLayout);
         primary = &primaryLink;
-
-        // If the `varLayout` provided has any offset information
-        // for pending data, then we also add a link to the pending
-        // chain, but otherwise we re-use the pending chain from
-        // the parent path.
-        //
-        pending = parent.pending;
     }
 
     /// Storage for a link in the primary chain, if needed
     BindingRangePathLink primaryLink;
-
-    /// Storage for a link in the pending chain, if needed
-    BindingRangePathLink pendingLink;
 };
 
 /// Calculate the offset for resources of the given `kind` in the `path`.

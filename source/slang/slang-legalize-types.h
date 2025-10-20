@@ -378,9 +378,8 @@ struct LegalVarChain
 /// RAII type for adding a link to a `LegalVarChain` as needed.
 ///
 /// This type handles the bookkeeping for creating a `LegalVarChain`
-/// that links in one more variable. It will add a link to each of
-/// the primary and pending sub-chains if and only if there is non-null
-/// layout information for the primary/pending case.
+/// that links in one more variable. It will add a link to the primary
+/// sub-chain if there is non-null layout information.
 ///
 /// Typical usage in a recursive function is:
 ///
@@ -418,7 +417,6 @@ struct LegalVarChainLink : LegalVarChain
     }
 
     SimpleLegalVarChain primaryLink;
-    SimpleLegalVarChain pendingLink;
 };
 
 IRVarLayout* createVarLayout(

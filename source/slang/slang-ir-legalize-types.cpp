@@ -3032,70 +3032,6 @@ static void _addFieldsToWrappedBufferElementTypeLayout(
     }
 }
 
-/// Add offset information for `kind` to `resultVarLayout`,
-/// if it doesn't already exist, and adjust the offset so
-/// that it will represent an offset relative to the
-/// "primary" data for the surrounding type, rather than
-/// being relative to the "pending" data.
-///
-static void _addOffsetVarLayoutEntry(
-    IRVarLayout::Builder* resultVarLayout,
-    LegalVarChain const& varChain,
-    LayoutResourceKind kind)
-{
-    // If the target already has an offset for this kind, bail out.
-    //
-    if (resultVarLayout->usesResourceKind(kind))
-        return;
-
-    // Add the `ResourceInfo` that will represent the offset for
-    // this resource kind (it will be initialized to zero by default)
-    //
-    auto resultResInfo = resultVarLayout->findOrAddResourceInfo(kind);
-
-    // Pending data layout functionality has been removed.
-
-    // Subtract any contributions from the primary var chain, since
-    // we want the resulting offset to be relative to the same
-    // base as that chain.
-    //
-    for (auto vv = varChain.primaryChain; vv; vv = vv->next)
-    {
-        if (auto chainResInfo = vv->varLayout->findOffsetAttr(kind))
-        {
-            resultResInfo->offset -= chainResInfo->getOffset();
-            resultResInfo->space -= chainResInfo->getSpace();
-        }
-    }
-}
-
-/// Create a variable layout for an field with "pending" type.
-///
-/// The given `typeLayout` should represent the type of a field
-/// that is being stored in "pending" data, but that now needs
-/// to be made relative to the "primary" data, because we are
-/// legalizing the pending data out of the code.
-///
-static IRVarLayout* _createOffsetVarLayout(
-    IRBuilder* irBuilder,
-    LegalVarChain const& varChain,
-    IRTypeLayout* typeLayout)
-{
-    IRVarLayout::Builder resultVarLayoutBuilder(irBuilder, typeLayout);
-
-    // For every resource kind the type consumes, we will
-    // compute an adjusted offset for the variable that
-    // encodes the (absolute) offset of the pending data
-    // in `varChain` relative to its primary data.
-    //
-    for (auto resInfo : typeLayout->getSizeAttrs())
-    {
-        _addOffsetVarLayoutEntry(&resultVarLayoutBuilder, varChain, resInfo->getResourceKind());
-    }
-
-    return resultVarLayoutBuilder.build();
-}
-
 /// Place offset information from `srcResInfo` onto `dstLayout`,
 /// offset by whatever is in `offsetVarLayout`
 
@@ -3130,8 +3066,7 @@ static IRVarLayout* _createOffsetVarLayout(
 static IRTypeLayout* _createWrappedBufferTypeLayout(
     IRBuilder* irBuilder,
     IRTypeLayout* oldTypeLayout,
-    WrappedBufferPseudoType* wrappedBufferTypeInfo,
-    LegalVarChain const& outerVarChain)
+    WrappedBufferPseudoType* wrappedBufferTypeInfo)
 {
     // We shouldn't get invoked unless there was a parameter group type,
     // so we will sanity check for that just to be sure.
@@ -3157,27 +3092,6 @@ static IRTypeLayout* _createWrappedBufferTypeLayout(
 
     IRParameterGroupTypeLayout::Builder newTypeLayoutBuilder(irBuilder);
     newTypeLayoutBuilder.addResourceUsageFrom(oldTypeLayout);
-
-    // Any fields in the "pending" data will have offset information
-    // that is relative to the pending data for their parent, and so on.
-    // We need to compute layout information that only includes primary
-    // data, so any offset information that is relative to the pending data
-    // needs to instead be relative to the primary data. That amounts to
-    // computing the absolute offset of each pending field, and then
-    // subtracting off the absolute offset of the primary data.
-    //
-    // We will compute the offset that needs to be added up front,
-    // and store it in the form of a `VarLayout`. The offsets we need
-    // can be computed from the `outerVarChain`, and we only need to
-    // store offset information for resource kinds actually consumed
-    // by the pending data type for the buffer as a whole (e.g., we
-    // don't need to apply offsetting to uniform bytes, because
-    // those don't show up in the resource usage of a constant buffer
-    // itself, and so the offsets already *are* relative to the start
-    // of the buffer).
-    //
-    auto offsetVarLayout = _createOffsetVarLayout(irBuilder, outerVarChain, nullptr);
-    LegalVarChainLink offsetVarChain(LegalVarChain(), offsetVarLayout);
 
     // We will start our construction of the pieces of the output
     // type layout by looking at the "container" type/variable.
@@ -3480,11 +3394,8 @@ static LegalVal declareVars(
         {
             auto wrappedBuffer = type.getWrappedBuffer();
 
-            auto wrappedTypeLayout = _createWrappedBufferTypeLayout(
-                context->builder,
-                typeLayout,
-                wrappedBuffer,
-                varChain);
+            auto wrappedTypeLayout =
+                _createWrappedBufferTypeLayout(context->builder, typeLayout, wrappedBuffer);
 
             auto innerVal = declareSimpleVar(
                 context,
