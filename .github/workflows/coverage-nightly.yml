@@ -21,7 +21,7 @@ jobs:
     uses: ./.github/workflows/ci-slang-coverage.yml
     with:
       os: linux
-      compiler: clang
+      compiler: clang-18
       platform: x86_64
       config: relwithdebinfo
       runs-on: '["ubuntu-22.04"]'
