@@ -557,7 +557,11 @@ extern "C"
 
     SLANG_API int spReflectionTypeLayout_getGenericParamIndex(SlangReflectionTypeLayout* type);
 
+    SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_getPendingDataTypeLayout(
+        SlangReflectionTypeLayout* type);
 
+    SLANG_API SlangReflectionVariableLayout*
+    spReflectionTypeLayout_getSpecializedTypePendingDataVarLayout(SlangReflectionTypeLayout* type);
     SLANG_API SlangInt spReflectionType_getSpecializedTypeArgCount(SlangReflectionType* type);
     SLANG_API SlangReflectionType* spReflectionType_getSpecializedTypeArgType(
         SlangReflectionType* type,
@@ -796,6 +800,9 @@ extern "C"
     */
     SLANG_API SlangStage spReflectionVariableLayout_getStage(SlangReflectionVariableLayout* var);
 
+
+    SLANG_API SlangReflectionVariableLayout* spReflectionVariableLayout_getPendingDataLayout(
+        SlangReflectionVariableLayout* var);
 
     // Shader Parameter Reflection
 

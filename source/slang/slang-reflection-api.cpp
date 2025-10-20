@@ -1575,6 +1575,23 @@ SLANG_API int spReflectionTypeLayout_getGenericParamIndex(SlangReflectionTypeLay
     }
 }
 
+SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_getPendingDataTypeLayout(
+    SlangReflectionTypeLayout*)
+{
+    return nullptr;
+}
+
+SLANG_API SlangReflectionVariableLayout* spReflectionVariableLayout_getPendingDataLayout(
+    SlangReflectionVariableLayout*)
+{
+    return nullptr;
+}
+
+SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_getSpecializedTypePendingDataVarLayout(
+    SlangReflectionTypeLayout*)
+{
+    return nullptr;
+}
 
 SLANG_API SlangInt spReflectionType_getSpecializedTypeArgCount(SlangReflectionType* inType)
 {
