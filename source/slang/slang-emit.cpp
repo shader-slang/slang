@@ -313,9 +313,6 @@ static bool canSPIRVBitcastType(IRType* type)
 {
     // If vector, check if element type is numerical and therefor supported by OpBitcast
     if (auto vectorType = as<IRVectorType>(type))
-        // SPIRV spec supports all numerical types for OpBitcast,
-        // but the SPIRV-Tools optimizer crashes during constant folding on sub-32-bit
-        // constants, and will require an update to get the fix
         return canSPIRVBitcastType(vectorType->getElementType());
     // Numerical types (basic type but not bool or void) can be bitcast natively by OpBitcast
     auto basicType = as<IRBasicType>(type);
