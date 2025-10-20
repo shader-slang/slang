@@ -190,9 +190,17 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           update-comment: true
 
+      - name: Compress and Upload LCOV Report
+        run: |
+          # Compress LCOV file to save space
+          gzip -9 coverage.lcov
+          echo "Compressed LCOV file:"
+          ls -lh coverage.lcov.gz
+
       - name: Upload LCOV Report
         uses: actions/upload-artifact@v4
         with:
           name: coverage-lcov-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}
-          path: coverage.lcov
-          retention-days: 30
+          path: coverage.lcov.gz
+          retention-days: 7
+          compression-level: 0  # Already compressed, no need to compress again
