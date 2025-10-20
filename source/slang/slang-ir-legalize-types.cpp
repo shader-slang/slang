@@ -3152,23 +3152,6 @@ static IRVarLayout* _createOffsetVarLayout(
 
 /// Place offset information from `srcResInfo` onto `dstLayout`,
 /// offset by whatever is in `offsetVarLayout`
-static void addOffsetResInfo(
-    IRVarLayout::Builder* dstLayout,
-    IRVarOffsetAttr* srcResInfo,
-    IRVarLayout* offsetVarLayout)
-{
-    auto kind = srcResInfo->getResourceKind();
-    auto dstResInfo = dstLayout->findOrAddResourceInfo(kind);
-
-    dstResInfo->offset = srcResInfo->getOffset();
-    dstResInfo->space = srcResInfo->getSpace();
-
-    if (auto offsetResInfo = offsetVarLayout->findOffsetAttr(kind))
-    {
-        dstResInfo->offset += offsetResInfo->getOffset();
-        dstResInfo->space += offsetResInfo->getSpace();
-    }
-}
 
 /// Create layout information for a wrapped buffer type.
 ///
@@ -3279,18 +3262,6 @@ static IRTypeLayout* _createWrappedBufferTypeLayout(
         IRTypeLayout::Builder newContainerTypeLayoutBuilder(irBuilder);
         newContainerTypeLayoutBuilder.addResourceUsageFrom(oldPrimaryContainerTypeLayout);
 
-        if (auto oldPendingContainerVarLayout = oldPrimaryContainerVarLayout->getPendingVarLayout())
-        {
-            // Whatever resources were allocated for the pending data type,
-            // our new combined container type needs to account for them
-            // (e.g., if we didn't have a constant buffer in the primary
-            // data, but one got allocated in the pending data, we need
-            // to end up with type layout information that includes a
-            // constnat buffer).
-            //
-            auto oldPendingContainerTypeLayout = oldPendingContainerVarLayout->getTypeLayout();
-            newContainerTypeLayoutBuilder.addResourceUsageFrom(oldPendingContainerTypeLayout);
-        }
         auto newContainerTypeLayout = newContainerTypeLayoutBuilder.build();
 
 
@@ -3316,22 +3287,6 @@ static IRTypeLayout* _createWrappedBufferTypeLayout(
         // we need to account for that case and copy over the relevant
         // resource usage from the pending data, if there is any.
         //
-        if (auto oldPendingContainerVarLayout = oldPrimaryContainerVarLayout->getPendingVarLayout())
-        {
-            // We also need to add offset information based on the "pending"
-            // var layout, but we need to deal with the fact that this information
-            // is currently stored relative to the pending var layout for the surrounding
-            // context (passed in as `outerVarChain.pendingChain`), but we need it to be
-            // relative to the primary layout for the surrounding context
-            // (`outerVarChain.primaryChain`). This is where the `offsetVarLayout` we computed above
-            // comes in handy, because it represents the value(s) we need to add to each of the
-            // per-resource-kind offsets.
-            //
-            for (auto resInfo : oldPendingContainerVarLayout->getOffsetAttrs())
-            {
-                addOffsetResInfo(&newContainerVarLayoutBuilder, resInfo, offsetVarLayout);
-            }
-        }
 
         auto newContainerVarLayout = newContainerVarLayoutBuilder.build();
         newTypeLayoutBuilder.setContainerVarLayout(newContainerVarLayout);

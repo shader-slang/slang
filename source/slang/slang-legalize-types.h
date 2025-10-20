@@ -423,12 +423,6 @@ struct LegalVarChainLink : LegalVarChain
             primaryLink.varLayout = varLayout;
             primaryChain = &primaryLink;
 
-            if (auto pendingVarLayout = varLayout->getPendingVarLayout())
-            {
-                pendingLink.next = parent.pendingChain;
-                pendingLink.varLayout = pendingVarLayout;
-                pendingChain = &pendingLink;
-            }
         }
     }
 

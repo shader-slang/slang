@@ -2644,11 +2644,6 @@ struct TypeLayoutReflection
         return spReflectionTypeLayout_getGenericParamIndex((SlangReflectionTypeLayout*)this);
     }
 
-    TypeLayoutReflection* getPendingDataTypeLayout()
-    {
-        return (TypeLayoutReflection*)spReflectionTypeLayout_getPendingDataTypeLayout(
-            (SlangReflectionTypeLayout*)this);
-    }
 
     VariableLayoutReflection* getSpecializedTypePendingDataVarLayout()
     {
@@ -3000,11 +2995,6 @@ struct VariableLayoutReflection
         return spReflectionVariableLayout_getStage((SlangReflectionVariableLayout*)this);
     }
 
-    VariableLayoutReflection* getPendingDataLayout()
-    {
-        return (VariableLayoutReflection*)spReflectionVariableLayout_getPendingDataLayout(
-            (SlangReflectionVariableLayout*)this);
-    }
 };
 
 struct FunctionReflection

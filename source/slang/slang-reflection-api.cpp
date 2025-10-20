@@ -1575,27 +1575,6 @@ SLANG_API int spReflectionTypeLayout_getGenericParamIndex(SlangReflectionTypeLay
     }
 }
 
-SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_getPendingDataTypeLayout(
-    SlangReflectionTypeLayout* inTypeLayout)
-{
-    auto typeLayout = convert(inTypeLayout);
-    if (!typeLayout)
-        return nullptr;
-
-    auto pendingDataTypeLayout = typeLayout->pendingDataTypeLayout.Ptr();
-    return convert(pendingDataTypeLayout);
-}
-
-SLANG_API SlangReflectionVariableLayout* spReflectionVariableLayout_getPendingDataLayout(
-    SlangReflectionVariableLayout* inVarLayout)
-{
-    auto varLayout = convert(inVarLayout);
-    if (!varLayout)
-        return nullptr;
-
-    auto pendingDataLayout = varLayout->pendingVarLayout.Ptr();
-    return convert(pendingDataLayout);
-}
 
 SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_getSpecializedTypePendingDataVarLayout(
     SlangReflectionTypeLayout* inTypeLayout)
@@ -1698,15 +1677,7 @@ struct ExtendedBindingRangePath : BindingRangePath
         // chain, but otherwise we re-use the pending chain from
         // the parent path.
         //
-        if (auto pendingLayout = varLayout->pendingVarLayout)
-        {
-            pendingLink = BindingRangePathLink(parent.pending, pendingLayout);
-            pending = &pendingLink;
-        }
-        else
-        {
-            pending = parent.pending;
-        }
+        pending = parent.pending;
     }
 
     /// Storage for a link in the primary chain, if needed
@@ -1966,11 +1937,6 @@ struct ExtendedTypeLayoutContext
         auto primaryVarLayout = _createSimpleOffsetVarLayout(typeLayout, path.primary);
         SLANG_ASSERT(primaryVarLayout);
 
-        if (auto pendingDataTypeLayout = typeLayout->pendingDataTypeLayout)
-        {
-            primaryVarLayout->pendingVarLayout =
-                _createSimpleOffsetVarLayout(pendingDataTypeLayout, path.pending);
-        }
 
         return primaryVarLayout;
     }

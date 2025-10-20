@@ -12805,10 +12805,6 @@ static IRTypeLayout* _lowerTypeLayoutCommon(
         builder->addResourceUsage(resInfo.kind, resInfo.count);
     }
 
-    if (auto pendingTypeLayout = typeLayout->pendingDataTypeLayout)
-    {
-        builder->setPendingTypeLayout(lowerTypeLayout(context, pendingTypeLayout));
-    }
 
     return builder->build();
 }
@@ -12985,10 +12981,6 @@ IRVarLayout* lowerVarLayout(
         irResInfo->space = resInfo.space;
     }
 
-    if (auto pendingVarLayout = varLayout->pendingVarLayout)
-    {
-        irLayoutBuilder.setPendingVarLayout(lowerVarLayout(context, pendingVarLayout));
-    }
 
     // We will only generate layout information with *either* a system-value
     // semantic or a user-defined semantic, and we will always check for

@@ -1159,14 +1159,6 @@ Stage IRVarLayout::getStage()
     return Stage::Unknown;
 }
 
-IRVarLayout* IRVarLayout::getPendingVarLayout()
-{
-    if (auto pendingLayoutAttr = findAttr<IRPendingLayoutAttr>())
-    {
-        return cast<IRVarLayout>(pendingLayoutAttr->getLayout());
-    }
-    return nullptr;
-}
 
 IRVarLayout::Builder::Builder(IRBuilder* irBuilder, IRTypeLayout* typeLayout)
     : m_irBuilder(irBuilder), m_typeLayout(typeLayout)
@@ -1241,11 +1233,6 @@ IRVarLayout* IRVarLayout::Builder::build()
     if (auto stageAttr = m_stageAttr)
         operands.add(stageAttr);
 
-    if (auto pendingVarLayout = m_pendingVarLayout)
-    {
-        IRInst* pendingLayoutAttr = irBuilder->getPendingLayoutAttr(pendingVarLayout);
-        operands.add(pendingLayoutAttr);
-    }
 
     return irBuilder->getVarLayout(operands);
 }

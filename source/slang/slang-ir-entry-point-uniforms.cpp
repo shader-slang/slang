@@ -459,8 +459,6 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
                 // We assume everything in "pendingLayout" will appear as uniform parameters at
                 // the moment. This means that we can just copy them as is through the pass right
                 // now.
-                elementVarLayoutBuilder.setPendingVarLayout(
-                    originalElementVarLayout->getPendingVarLayout());
 
                 IRParameterGroupTypeLayout::Builder paramGroupTypeLayoutBuilder(builder);
                 // Filter offsets for the `elementVarLayout` part of the new parameter group layout.
@@ -523,7 +521,6 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
                 resInfo->offset = offset->getOffset();
                 resInfo->space = offset->getSpace();
             }
-            varLayoutBuilder.setPendingVarLayout(entryPointParamsLayout->getPendingVarLayout());
             auto entryPointUniformsVarLayout = varLayoutBuilder.build();
             builder->addLayoutDecoration(collectedParam, entryPointUniformsVarLayout);
         }

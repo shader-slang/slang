@@ -2073,8 +2073,6 @@ struct IRVarLayout : IRLayout
     /// Find the system-value semantic attribute for this variable, if any.
     IRSystemValueSemanticAttr* findSystemValueSemanticAttr();
 
-    /// Get the (optional) layout for any "pending" data assocaited with this variable.
-    IRVarLayout* getPendingVarLayout();
 
     /// Builder for construction `IRVarLayout`s in a stateful fashion
     struct Builder
@@ -2100,8 +2098,6 @@ struct IRVarLayout : IRLayout
         /// Either fetch or add a `ResInfo` record for `kind` and return it
         ResInfo* findOrAddResourceInfo(LayoutResourceKind kind);
 
-        /// Set the (optional) variable layout for pending data.
-        void setPendingVarLayout(IRVarLayout* varLayout) { m_pendingVarLayout = varLayout; }
 
         /// Set the (optional) system-valeu semantic for this variable.
         void setSystemValueSemantic(String const& name, UInt index);
@@ -2126,7 +2122,6 @@ struct IRVarLayout : IRLayout
         IRBuilder* getIRBuilder() { return m_irBuilder; };
 
         IRTypeLayout* m_typeLayout = nullptr;
-        IRVarLayout* m_pendingVarLayout = nullptr;
 
         IRSystemValueSemanticAttr* m_systemValueSemantic = nullptr;
         IRUserSemanticAttr* m_userSemantic = nullptr;
