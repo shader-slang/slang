@@ -12796,7 +12796,7 @@ IRVarLayout* lowerVarLayout(IRLayoutGenContext* context, VarLayout* varLayout);
 /// from the AST `typeLayout` to the specified `builder`.
 ///
 static IRTypeLayout* _lowerTypeLayoutCommon(
-    IRLayoutGenContext* context,
+    [[maybe_unused]] IRLayoutGenContext* context,
     IRTypeLayout::Builder* builder,
     TypeLayout* typeLayout)
 {
