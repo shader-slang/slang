@@ -1742,7 +1742,12 @@ struct LLVMEmitter
     std::unique_ptr<llvm::LLVMContext> llvmContext;
     std::unique_ptr<llvm::Module> llvmModule;
     std::unique_ptr<llvm::Linker> llvmLinker;
-    std::unique_ptr<llvm::IRBuilderBase> llvmBuilder;
+    // These need to be stored separately. IRBuilderBase does not have a virtual
+    // destructor :/
+    std::unique_ptr<llvm::IRBuilder<>> llvmBuilderOpt;
+    std::unique_ptr<llvm::IRBuilder<llvm::NoFolder>> llvmBuilderNoOpt;
+    llvm::IRBuilderBase* llvmBuilder;
+
     std::unique_ptr<llvm::DIBuilder> llvmDebugBuilder;
     std::unique_ptr<LLVMTypeTranslator> types;
     llvm::DICompileUnit* compileUnit;
@@ -1813,11 +1818,13 @@ struct LLVMEmitter
         {
             // The default IR builder has a built-in constant folder; for
             // absolutely zero optimization, we need to disable it like this.
-            llvmBuilder.reset(new llvm::IRBuilder<llvm::NoFolder>(*llvmContext));
+            llvmBuilderNoOpt.reset(new llvm::IRBuilder<llvm::NoFolder>(*llvmContext));
+            llvmBuilder = llvmBuilderNoOpt.get();
         }
         else
         {
-            llvmBuilder.reset(new llvm::IRBuilder<>(*llvmContext));
+            llvmBuilderOpt.reset(new llvm::IRBuilder<>(*llvmContext));
+            llvmBuilder = llvmBuilderOpt.get();
         }
 
         // Functions that initialize global variables are "constructors" in
@@ -2347,6 +2354,11 @@ struct LLVMEmitter
         return nullptr;
     }
 
+    IRTypeLayoutRules* getBufferLayoutRules(IRType* bufferType)
+    {
+        return getTypeLayoutRuleForBuffer(codeGenContext->getTargetProgram(), bufferType);
+    }
+
     IRTypeLayoutRules* getPtrLayoutRules(IRInst* ptr)
     {
         // Check if the pointer is actually based on an buffer with an explicit
@@ -2355,11 +2367,11 @@ struct LLVMEmitter
         {
             auto baseType = cast<IRHLSLStructuredBufferTypeBase>(
                 structuredBufferInst->getBase()->getDataType());
-            return getTypeLayoutRuleForBuffer(codeGenContext->getTargetProgram(), baseType);
+            return getBufferLayoutRules(baseType);
         }
         else if (auto cbufType = as<IRConstantBufferType>(ptr->getDataType()))
         {
-            return getTypeLayoutRuleForBuffer(codeGenContext->getTargetProgram(), cbufType);
+            return getBufferLayoutRules(cbufType);
         }
         else if (auto gep = as<IRGetElementPtr>(ptr))
         {
@@ -3258,7 +3270,7 @@ struct LLVMEmitter
                 auto llvmPtr = llvmBuilder->CreateExtractValue(llvmBase, 0);
 
                 llvm::Value* indices[] = {llvmIndex};
-                IRTypeLayoutRules* layout = getTypeLayoutRuleForBuffer(codeGenContext->getTargetProgram(), baseType);
+                IRTypeLayoutRules* layout = getBufferLayoutRules(baseType);
                 llvmInst = llvmBuilder->CreateGEP(
                     types->getStorageType(baseType->getElementType(), layout),
                     llvmPtr, indices);
@@ -3275,7 +3287,7 @@ struct LLVMEmitter
                 auto baseType = cast<IRHLSLStructuredBufferTypeBase>(base->getDataType());
 
                 auto llvmBasePtr = llvmBuilder->CreateExtractValue(llvmBase, 0);
-                IRTypeLayoutRules* layout = getTypeLayoutRuleForBuffer(codeGenContext->getTargetProgram(), baseType);
+                IRTypeLayoutRules* layout = getBufferLayoutRules(baseType);
 
                 llvm::Value* indices[] = {llvmIndex};
                 auto llvmPtr = llvmBuilder->CreateGEP(
@@ -3298,7 +3310,7 @@ struct LLVMEmitter
                 auto baseType = cast<IRHLSLStructuredBufferTypeBase>(base->getDataType());
 
                 auto llvmBasePtr = llvmBuilder->CreateExtractValue(llvmBase, 0);
-                IRTypeLayoutRules* layout = getTypeLayoutRuleForBuffer(codeGenContext->getTargetProgram(), baseType);
+                IRTypeLayoutRules* layout = getBufferLayoutRules(baseType);
 
                 llvm::Value* indices[] = {llvmIndex};
                 auto llvmPtr = llvmBuilder->CreateGEP(
@@ -3357,7 +3369,7 @@ struct LLVMEmitter
                 auto bufferType = as<IRHLSLStructuredBufferTypeBase>(buffer->getDataType());
                 auto llvmBuffer = findValue(buffer);
 
-                IRTypeLayoutRules* layout = getTypeLayoutRuleForBuffer(codeGenContext->getTargetProgram(), bufferType);
+                IRTypeLayoutRules* layout = getBufferLayoutRules(bufferType);
 
                 auto llvmUintType = llvmBuilder->getInt32Ty();
                 auto llvmBaseCount = llvmBuilder->CreateExtractValue(llvmBuffer, 1);
@@ -3379,7 +3391,7 @@ struct LLVMEmitter
                 auto llvmByteBuffer = findValue(inst->getOperand(0));
                 auto llvmByteCount = llvmBuilder->CreateExtractValue(llvmByteBuffer, 1);
 
-                IRTypeLayoutRules* layout = getTypeLayoutRuleForBuffer(codeGenContext->getTargetProgram(), bufferType);
+                IRTypeLayoutRules* layout = getBufferLayoutRules(bufferType);
                 auto stride = types->getSizeAndAlignment(bufferType->getElementType(), layout).size;
                 auto llvmElementCount = llvmBuilder->CreateUDiv(
                     llvmByteCount, llvm::ConstantInt::get(llvmBuilder->getIntPtrTy(targetDataLayout), stride));

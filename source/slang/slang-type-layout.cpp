@@ -1090,6 +1090,29 @@ struct CPULayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     LayoutRulesImpl* getStructuredBufferRules(CompilerOptionSet& compilerOptions) override;
 };
 
+struct LLVMLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
+{
+    virtual LayoutRulesImpl* getAnyValueRules() override;
+    virtual LayoutRulesImpl* getConstantBufferRules(
+        CompilerOptionSet& compilerOptions,
+        Type* containerType) override;
+    virtual LayoutRulesImpl* getPushConstantBufferRules() override;
+    virtual LayoutRulesImpl* getTextureBufferRules(CompilerOptionSet& compilerOptions) override;
+    virtual LayoutRulesImpl* getVaryingInputRules() override;
+    virtual LayoutRulesImpl* getVaryingOutputRules() override;
+    virtual LayoutRulesImpl* getSpecializationConstantRules() override;
+    virtual LayoutRulesImpl* getShaderStorageBufferRules(
+        CompilerOptionSet& compilerOptions) override;
+    virtual LayoutRulesImpl* getParameterBlockRules(CompilerOptionSet& compilerOptions) override;
+
+    LayoutRulesImpl* getRayPayloadParameterRules() override;
+    LayoutRulesImpl* getCallablePayloadParameterRules() override;
+    LayoutRulesImpl* getHitAttributesParameterRules() override;
+
+    LayoutRulesImpl* getShaderRecordConstantBufferRules() override;
+    LayoutRulesImpl* getStructuredBufferRules(CompilerOptionSet& compilerOptions) override;
+};
+
 struct CLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
 {
     virtual LayoutRulesImpl* getAnyValueRules() override;
@@ -1193,6 +1216,7 @@ struct WGSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
 GLSLLayoutRulesFamilyImpl kGLSLLayoutRulesFamilyImpl;
 HLSLLayoutRulesFamilyImpl kHLSLLayoutRulesFamilyImpl;
 CPULayoutRulesFamilyImpl kCPULayoutRulesFamilyImpl;
+LLVMLayoutRulesFamilyImpl kLLVMLayoutRulesFamilyImpl;
 CLayoutRulesFamilyImpl kCLayoutRulesFamilyImpl;
 CUDALayoutRulesFamilyImpl kCUDALayoutRulesFamilyImpl;
 MetalLayoutRulesFamilyImpl kMetalLayoutRulesFamilyImpl;
@@ -1608,6 +1632,44 @@ LayoutRulesImpl kHLSLHitAttributesParameterLayoutRulesImpl_ = {
     &kHLSLObjectLayoutRulesImpl,
 };
 
+// LLVM cases
+
+LayoutRulesImpl kLLVMLayoutRulesImpl_ = {
+    &kLLVMLayoutRulesFamilyImpl,
+    &kCPULayoutRulesImpl,
+    &kCPUObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kLLVMAnyValueLayoutRulesImpl_ = {
+    &kLLVMLayoutRulesFamilyImpl,
+    &kDefaultLayoutRulesImpl,
+    &kCPUObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kLLVMStd140LayoutRulesImpl_ = {
+    &kLLVMLayoutRulesFamilyImpl,
+    &kStd140LayoutRulesImpl,
+    &kCPUObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kLLVMStd430LayoutRulesImpl_ = {
+    &kLLVMLayoutRulesFamilyImpl,
+    &kStd430LayoutRulesImpl,
+    &kCPUObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kLLVMScalarLayoutRulesImpl_ = {
+    &kLLVMLayoutRulesFamilyImpl,
+    &kDefaultLayoutRulesImpl,
+    &kCPUObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kLLVMCLayoutRulesImpl_ = {
+    &kLLVMLayoutRulesFamilyImpl,
+    &kCPULayoutRulesImpl,
+    &kCPUObjectLayoutRulesImpl,
+};
+
 // GLSL Family
 
 LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getAnyValueRules()
@@ -1876,6 +1938,121 @@ LayoutRulesImpl* CPULayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getStructuredBufferRules(CompilerOptionSet&)
 {
     return &kCPULayoutRulesImpl_;
+}
+
+// LLVM Family
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getAnyValueRules()
+{
+    return &kLLVMAnyValueLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getConstantBufferRules(CompilerOptionSet& compilerOptions, Type* containerType)
+{
+    if (compilerOptions.shouldUseScalarLayout())
+        return &kLLVMScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseCLayout())
+        return &kLLVMCLayoutRulesImpl_;
+    if (auto cbufferType = as<ConstantBufferType>(containerType))
+    {
+        switch (cbufferType->getLayoutType()->astNodeType)
+        {
+        default:
+        case ASTNodeType::DefaultDataLayoutType:
+        case ASTNodeType::Std140DataLayoutType:
+            return &kLLVMStd140LayoutRulesImpl_;
+        case ASTNodeType::DefaultPushConstantDataLayoutType:
+        case ASTNodeType::Std430DataLayoutType:
+            return &kLLVMStd430LayoutRulesImpl_;
+        case ASTNodeType::ScalarDataLayoutType:
+            return &kLLVMScalarLayoutRulesImpl_;
+        case ASTNodeType::CDataLayoutType:
+            return &kLLVMCLayoutRulesImpl_;
+        }
+    }
+    else if (containerType == nullptr)
+        return &kLLVMStd140LayoutRulesImpl_;
+
+    // If we're here, containerType is probably a uniform parameter.
+
+    // It'd be nice if this could be Std140 to match GLSL. However, that can't
+    // be: the LLVM target needs to collect its uniforms into one top-level
+    // ConstantBuffer, which in turn enforces that all uniforms must use the
+    // same layout :/
+    return &kLLVMCLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getPushConstantBufferRules()
+{
+    return &kLLVMLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getTextureBufferRules(CompilerOptionSet&)
+{
+    return &kLLVMLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getVaryingInputRules()
+{
+    return &kLLVMLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getVaryingOutputRules()
+{
+    return &kLLVMLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getSpecializationConstantRules()
+{
+    return &kLLVMLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getShaderStorageBufferRules(CompilerOptionSet& compilerOptions)
+{
+    if (compilerOptions.shouldUseScalarLayout())
+        return &kLLVMScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseCLayout())
+        return &kLLVMCLayoutRulesImpl_;
+
+    return &kLLVMStd430LayoutRulesImpl_;
+}
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getParameterBlockRules(CompilerOptionSet& compilerOptions)
+{
+    if (compilerOptions.shouldUseScalarLayout())
+        return &kLLVMScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseCLayout())
+        return &kLLVMCLayoutRulesImpl_;
+
+    return &kLLVMStd140LayoutRulesImpl_;
+}
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getRayPayloadParameterRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getCallablePayloadParameterRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getHitAttributesParameterRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
+{
+    return nullptr;
+}
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getStructuredBufferRules(
+    CompilerOptionSet& compilerOptions)
+{
+    if (compilerOptions.shouldUseScalarLayout())
+        return &kLLVMScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseCLayout())
+        return &kLLVMCLayoutRulesImpl_;
+
+    return &kLLVMStd430LayoutRulesImpl_;
 }
 
 // C compatible layout family
@@ -2392,12 +2569,6 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CSource:
     case CodeGenTarget::HostVM:
-    case CodeGenTarget::LLVMHostAssembly:
-    case CodeGenTarget::LLVMHostObjectCode:
-    case CodeGenTarget::LLVMHostHostCallable:
-    case CodeGenTarget::LLVMShaderAssembly:
-    case CodeGenTarget::LLVMShaderObjectCode:
-    case CodeGenTarget::LLVMShaderHostCallable:
         {
             // For now lets use some fairly simple CPU binding rules
 
@@ -2409,6 +2580,15 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
 
             return &kCPULayoutRulesFamilyImpl;
         }
+
+    case CodeGenTarget::LLVMHostAssembly:
+    case CodeGenTarget::LLVMHostObjectCode:
+    case CodeGenTarget::LLVMHostHostCallable:
+    case CodeGenTarget::LLVMShaderAssembly:
+    case CodeGenTarget::LLVMShaderObjectCode:
+    case CodeGenTarget::LLVMShaderHostCallable:
+        return &kLLVMLayoutRulesFamilyImpl;
+
     case CodeGenTarget::Metal:
     case CodeGenTarget::MetalLib:
     case CodeGenTarget::MetalLibAssembly:
