@@ -4220,8 +4220,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
                 auto targetCaps = m_targetProgram->getTargetReq()->getTargetCaps();
 
-                if (targetCaps.implies(CapabilityAtom::spvBindlessTextureNV) ||
-                    targetCaps.implies(CapabilityAtom::spvBindlessTextureNV2))
+                if (targetCaps.implies(CapabilityAtom::spvBindlessTextureNV))
                 {
                     requireSPIRVCapability((SpvCapability)SpvCapabilityBindlessTextureNV);
                     ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_bindless_texture"));

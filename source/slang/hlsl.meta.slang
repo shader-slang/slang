@@ -23035,6 +23035,7 @@ struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
         __target_switch
         {
         case spvBindlessTextureNV:
+        case spvBindlessTextureNV2:
             return (uint64_t)this == (uint64_t)other;
         default:
             return all(__vectorEql((uint2)this, (uint2)other));
@@ -23047,6 +23048,7 @@ struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
         __target_switch
         {
         case spvBindlessTextureNV:
+        case spvBindlessTextureNV2:
             return (uint64_t)this < (uint64_t)other;
         default:
             let vthis = ((uint2)this);
@@ -23061,6 +23063,7 @@ struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
         __target_switch
         {
         case spvBindlessTextureNV:
+        case spvBindlessTextureNV2:
             return (uint64_t)this <= (uint64_t)other;
         default:
             let vthis = ((uint2)this);

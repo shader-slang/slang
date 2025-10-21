@@ -2365,7 +2365,7 @@ alias ser_motion_raygen = raygen + ser_motion;
 /// Collection of capabilities for SPV_NV_bindless_texture + raytracing. This alias exists because in `defaultGetDescriptorFromHandle`, we need a
 /// capability that is a sub-set of the capability in spirv case, where it also requires raytracing capability.
 /// [Compound]
-def spvBindlessTextureNV2 : SPV_NV_bindless_texture + raytracing;
+def spvBindlessTextureNV2 : spvBindlessTextureNV + raytracing;
 
 /// User should not use this capability
 /// [Other]
