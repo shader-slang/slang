@@ -11,6 +11,7 @@
 #include "slang-compiler.h"
 #include "slang-internal.h"
 #include "slang-repro.h"
+#include "slang-tag-version.h"
 
 // implementation of C interface
 
@@ -65,13 +66,24 @@ SlangResult tryLoadBuiltinModuleFromCache(
     return SLANG_OK;
 }
 
-// Attempt to load a precompiled builtin module from slang-xxx-module.dll.
+// Attempt to load a precompiled builtin module from slang-xxx-module.
+// The module name is versioned on Mac and Linux platforms, but not on Windows.
 SlangResult tryLoadBuiltinModuleFromDLL(
     slang::IGlobalSession* globalSession,
     slang::BuiltinModuleName builtinModuleName)
 {
+    // Construct the versioned module name: slang-{module}-module[-{version}]
+    // e.g., "slang-glsl-module-2025.19.1" which becomes:
+    //   - Linux: libslang-glsl-module-2025.19.1.so
+    //   - macOS: libslang-glsl-module-2025.19.1.dylib
+    //   - Windows: slang-glsl-module.dll
+    // Modules are runtime-loaded libraries. We need to version these because
+    // they end up deployed on Mac and Linux platforms in a directory that ends
+    // up in the library path.
+    Slang::String versionString = (SLANG_WINDOWS_FAMILY) ? "" : Slang::String("-") + SLANG_TAG_VERSION;
     Slang::String moduleFileName =
-        Slang::String("slang-") + Slang::getBuiltinModuleNameStr(builtinModuleName) + "-module";
+        Slang::String("slang-") + Slang::getBuiltinModuleNameStr(builtinModuleName) +
+        "-module" + versionString;
 
     Slang::SharedLibrary::Handle libHandle = nullptr;
 
