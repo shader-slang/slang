@@ -1026,12 +1026,12 @@ void printNumbers<each T>(expand each T args) where T == int
 void compute<each T>(expand each T args) where T == int
 {
     // Maps every element in `args` to `elementValue + 1`, and forwards the
-    // new values as arguments to `printNumber`.
-    printNumber(expand (each args) + 1);
+    // new values as arguments to `printNumbers`.
+    printNumbers(expand (each args) + 1);
 
     // The above statement is equivalent to:
     // ```
-    // printNumber(args[0] + 1, args[1] + 1, ..., args[n-1] + 1);
+    // printNumbers(args[0] + 1, args[1] + 1, ..., args[n-1] + 1);
     // ```
 }
 void test()

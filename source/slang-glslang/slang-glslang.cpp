@@ -2,7 +2,6 @@
 #include "slang-glslang.h"
 
 #include "SPIRV/GlslangToSpv.h"
-#include "glslang/MachineIndependent/localintermediate.h"
 #include "glslang/Public/ShaderLang.h"
 #include "slang.h"
 #include "spirv-tools/libspirv.h"
@@ -241,7 +240,12 @@ extern "C"
 #endif
         bool glslang_disassembleSPIRV(const uint32_t* contents, int contentsSize)
 {
-    return glslang_disassembleSPIRVWithResult(contents, contentsSize, nullptr);
+    char* result = nullptr;
+    auto succ = glslang_disassembleSPIRVWithResult(contents, contentsSize, &result);
+    if (result)
+        fprintf(stdout, "%s\n", result);
+    delete result;
+    return succ;
 }
 
 // Apply the SPIRV-Tools optimizer to generated SPIR-V based on the desired optimization level
@@ -805,7 +809,7 @@ static int glslang_compileGLSLToSPIRV(glslang_CompileRequest_1_2 request)
             continue;
         if (debugLevel == SLANG_DEBUG_INFO_LEVEL_MAXIMAL)
         {
-            stageIntermediate->addSourceText(sourceText, sourceTextLength);
+            shader->addSourceText(sourceText, sourceTextLength);
         }
 
         std::vector<unsigned int> spirv;

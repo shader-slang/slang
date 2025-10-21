@@ -20,6 +20,7 @@
 #endif
 
 #if SLANG_LINUX_FAMILY
+#include <limits.h>
 #include <unistd.h>
 #endif
 
@@ -122,23 +123,30 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
     handleOut = nullptr;
     if (!platformFileName || strlen(platformFileName) == 0)
     {
-        if (!GetModuleHandleExA(0, nullptr, (HMODULE*)&handleOut))
+        if (!GetModuleHandleExW(0, nullptr, (HMODULE*)&handleOut))
             return SLANG_FAIL;
         return SLANG_OK;
     }
 
     // We try to search the DLL in two different attempts.
-    // First attempt tries on the directories explicitly specified with AddDllDirectory(),
-    // If it failed to find one, we will search over all PATH.
-    // Windows API made two approaches mutually exclusive and we need to try two times.
-    // https://learn.microsoft.com/en-us/windows/win32/api/libloaderapi/nf-libloaderapi-loadlibraryexa
-    HMODULE h = LoadLibraryExA(platformFileName, nullptr, LOAD_LIBRARY_SEARCH_USER_DIRS);
-    // If LoadLibraryExA failed, try again with LoadLibraryA.
-    // https://docs.microsoft.com/en-us/windows/desktop/api/libloaderapi/nf-libloaderapi-loadlibrarya
-    if (!h)
-        h = LoadLibraryA(platformFileName);
+    // First attempt - LoadLibraryExW()
+    // If it failed to find one, we will use LoadLibraryW() to search over all PATH.
+    // Search order: 1) The directory that contains the DLL (LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR).
+    //                  This directory is searched only for dependencies of the DLL being loaded.
+    //               2) Application directory
+    //               3) User directories (AddDllDirectory/SetDllDirectory)
+    //               4) System32
+    //               5) PATH environment variable (by the 2nd attempt with LoadLibraryW())
+    // https://learn.microsoft.com/en-us/windows/win32/api/libloaderapi/nf-libloaderapi-loadlibraryexw
+    // https://docs.microsoft.com/en-us/windows/desktop/api/libloaderapi/nf-libloaderapi-loadlibraryw
+    String platformFileNameStr(platformFileName);
+    OSString wideFileName = platformFileNameStr.toWString();
+    HMODULE handle = LoadLibraryExW(wideFileName, nullptr, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
+
+    if (!handle)
+        handle = LoadLibraryW(wideFileName);
     // If still not found, return an error.
-    if (!h)
+    if (!handle)
     {
         const DWORD lastError = GetLastError();
         switch (lastError)
@@ -161,7 +169,7 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
         // Turn to Result, if not one of the well known errors
         return HRESULT_FROM_WIN32(lastError);
     }
-    handleOut = (Handle)h;
+    handleOut = (Handle)handle;
     return SLANG_OK;
 }
 
@@ -356,7 +364,8 @@ static const PlatformFlags s_familyFlags[int(PlatformFamily::CountOf)] = {
 /* static */ SlangResult PlatformUtil::outputDebugMessage([[maybe_unused]] const char* text)
 {
 #ifdef _WIN32
-    OutputDebugStringA(text);
+    String textStr(text);
+    OutputDebugStringW(textStr.toWString());
     return SLANG_OK;
 #else
     return SLANG_E_NOT_AVAILABLE;

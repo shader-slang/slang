@@ -678,6 +678,9 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     }
     else if (semanticName == "sv_drawindex")
     {
+        context->requireGLSLVersion(ProfileVersion::GLSL_460);
+        context->requireGLSLExtension(toSlice("GL_ARB_shader_draw_parameters"));
+
         name = "gl_DrawID";
         requiredType = builder->getBasicType(BaseType::Int);
     }
@@ -1079,6 +1082,12 @@ IRInst* getOrCreateBuiltinParamForHullShader(
             if (sysAttr->getName().caseInsensitiveEquals(builtinSemantic))
             {
                 outputControlPointIdParam = param;
+                if (as<IRPtrTypeBase>(outputControlPointIdParam->getDataType()))
+                {
+                    IRBuilder builder(param);
+                    setInsertAfterOrdinaryInst(&builder, param);
+                    outputControlPointIdParam = builder.emitLoad(param);
+                }
                 break;
             }
         }
@@ -1423,7 +1432,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         break;
     case LayoutResourceKind::VaryingOutput:
         addrSpace = systemValueInfo ? AddressSpace::BuiltinOutput : AddressSpace::Output;
-        ptrOpCode = kIROp_OutType;
+        ptrOpCode = kIROp_OutParamType;
         break;
     default:
         break;
@@ -1468,7 +1477,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
 
             auto accessQualifier = AccessQualifier::ReadWrite;
             if (kind == LayoutResourceKind::VaryingInput)
-                accessQualifier = AccessQualifier::Read;
+                accessQualifier = AccessQualifier::Immutable;
             IRType* paramType =
                 builder->getPtrType(ptrOpCode, arrayType, accessQualifier, addrSpace);
 
@@ -2348,11 +2357,11 @@ ScalarizedVal getSubscriptVal(
             auto inputAdapter = val.impl.as<ScalarizedTypeAdapterValImpl>();
             RefPtr<ScalarizedTypeAdapterValImpl> resultAdapter = new ScalarizedTypeAdapterValImpl();
 
-            resultAdapter->pretendType = inputAdapter->pretendType;
-            resultAdapter->actualType = inputAdapter->actualType;
+            resultAdapter->pretendType = elementType;
+            resultAdapter->actualType = getElementType(*builder, inputAdapter->actualType);
 
             resultAdapter->val =
-                getSubscriptVal(builder, inputAdapter->actualType, inputAdapter->val, indexVal);
+                getSubscriptVal(builder, resultAdapter->actualType, inputAdapter->val, indexVal);
             return ScalarizedVal::typeAdapter(resultAdapter);
         }
 
@@ -2549,8 +2558,8 @@ static void consolidateParameters(GLSLLegalizationContext* context, List<IRParam
         auto _paramType = _param->getDataType();
         IRType* valueType = _paramType;
 
-        if (as<IROutTypeBase>(_paramType))
-            valueType = as<IROutTypeBase>(_paramType)->getValueType();
+        if (as<IROutParamTypeBase>(_paramType))
+            valueType = as<IROutParamTypeBase>(_paramType)->getValueType();
 
         auto key = builder->createStructKey();
         if (auto nameDecor = _param->findDecoration<IRNameHintDecoration>())
@@ -2594,13 +2603,13 @@ static void consolidateParameters(GLSLLegalizationContext* context, List<IRParam
 
         // If the parameter is an out/inout type, we need to create a pointer type
         IRType* fieldPtrType = nullptr;
-        if (as<IROutType>(_paramType))
+        if (as<IROutParamType>(_paramType))
         {
-            fieldPtrType = builder->getPtrType(kIROp_OutType, fieldType);
+            fieldPtrType = builder->getPtrType(kIROp_OutParamType, fieldType);
         }
-        else if (as<IRInOutType>(_paramType))
+        else if (as<IRBorrowInOutParamType>(_paramType))
         {
-            fieldPtrType = builder->getPtrType(kIROp_InOutType, fieldType);
+            fieldPtrType = builder->getPtrType(kIROp_BorrowInOutParamType, fieldType);
         }
 
         auto fieldAddr =
@@ -2630,7 +2639,8 @@ void consolidateRayTracingParameters(GLSLLegalizationContext* context, IRFunc* f
         if (!isVaryingParameter(paramLayout))
             continue;
         builder->setInsertBefore(firstBlock->getFirstOrdinaryInst());
-        if (as<IROutType>(param->getDataType()) || as<IRInOutType>(param->getDataType()))
+        if (as<IROutParamType>(param->getDataType()) ||
+            as<IRBorrowInOutParamType>(param->getDataType()))
         {
             outParams.add(param);
         }
@@ -2688,7 +2698,10 @@ static void legalizeMeshPayloadInputParam(
     pp->replaceUsesWith(g);
     struct MeshPayloadInputSpecializationCondition : FunctionCallSpecializeCondition
     {
-        bool doesParamWantSpecialization(IRParam*, IRInst* arg) { return arg == g; }
+        bool doesParamWantSpecialization(IRParam*, IRInst* arg, IRCall* /*call*/)
+        {
+            return arg == g;
+        }
         IRInst* g;
     } condition;
     condition.g = g;
@@ -2788,7 +2801,10 @@ static void legalizeMeshOutputParam(
     // pp is only removed later on, so sadly we have to keep it around for now
     struct MeshOutputSpecializationCondition : FunctionCallSpecializeCondition
     {
-        bool doesParamWantSpecialization(IRParam*, IRInst* arg) { return arg == g; }
+        bool doesParamWantSpecialization(IRParam*, IRInst* arg, IRCall* /*call*/)
+        {
+            return arg == g;
+        }
         IRInst* g;
     } condition;
     condition.g = g;
@@ -3007,7 +3023,7 @@ static void legalizeMeshOutputParam(
                 auto t = composeGetters<IRType>(
                     builtin.param,
                     &IRInst::getFullType,
-                    &IROutTypeBase::getValueType,
+                    &IROutParamTypeBase::getValueType,
                     &IRArrayTypeBase::getElementType);
                 auto key = builder->createStructKey();
                 auto n = builtin.nameDecoration->getStringSlice();
@@ -3093,7 +3109,7 @@ IRInst* getOrCreatePerVertexInputArray(GLSLLegalizationContext* context, IRInst*
         tryGetPointedToType(&builder, inputVertexAttr->getDataType()),
         builder.getIntValue(builder.getIntType(), 3));
     arrayInst = builder.createGlobalParam(
-        builder.getPtrType(arrayType, AccessQualifier::Read, AddressSpace::Input));
+        builder.getPtrType(arrayType, AccessQualifier::Immutable, AddressSpace::Input));
     context->mapVertexInputToPerVertexArray[inputVertexAttr] = arrayInst;
     builder.addDecoration(arrayInst, kIROp_PerVertexDecoration);
 
@@ -3127,7 +3143,7 @@ void tryReplaceUsesOfStageInput(
                 {
                     auto user = use->getUser();
                     IRBuilder builder(user);
-                    builder.setInsertBefore(user);
+                    setInsertBeforeOrdinaryInst(&builder, user);
                     builder.replaceOperand(use, val.irValue);
                 });
         }
@@ -3155,7 +3171,7 @@ void tryReplaceUsesOfStageInput(
                         return;
                     }
                     IRBuilder builder(user);
-                    builder.setInsertBefore(user);
+                    setInsertBeforeOrdinaryInst(&builder, user);
                     if (needMaterialize)
                     {
                         auto materializedVal = materializeValue(&builder, val);
@@ -3176,22 +3192,50 @@ void tryReplaceUsesOfStageInput(
                 {
                     auto user = use->getUser();
                     IRBuilder builder(user);
-                    builder.setInsertBefore(user);
+                    setInsertBeforeOrdinaryInst(&builder, user);
                     auto typeAdapter = as<ScalarizedTypeAdapterValImpl>(val.impl);
-                    auto materializedInner = materializeValue(&builder, typeAdapter->val);
-                    auto adapted = adaptType(
-                        &builder,
-                        materializedInner,
-                        typeAdapter->pretendType,
-                        typeAdapter->actualType);
-                    if (user->getOp() == kIROp_Load)
+                    switch (user->getOp())
                     {
-                        user->replaceUsesWith(adapted.irValue);
-                        user->removeAndDeallocate();
-                    }
-                    else
-                    {
-                        use->set(adapted.irValue);
+                    case kIROp_Load:
+                        {
+                            auto materialized = materializeValue(&builder, val);
+                            user->replaceUsesWith(materialized);
+                            user->removeAndDeallocate();
+                        }
+                        break;
+                    case kIROp_GetElementPtr:
+                        {
+                            auto targetType = typeAdapter->pretendType;
+                            auto elementType = getElementType(builder, targetType);
+                            SLANG_ASSERT(elementType);
+                            auto subscriptVal = getSubscriptVal(
+                                &builder,
+                                (IRType*)elementType,
+                                val,
+                                user->getOperand(1));
+                            tryReplaceUsesOfStageInput(context, subscriptVal, user);
+                        }
+                        break;
+                    case kIROp_FieldAddress:
+                        {
+                            auto targetType = as<IRStructType>(typeAdapter->pretendType);
+                            SLANG_ASSERT(targetType);
+                            auto subscriptVal = extractField(
+                                &builder,
+                                val,
+                                kMaxUInt,
+                                (IRStructKey*)user->getOperand(1));
+                            tryReplaceUsesOfStageInput(context, subscriptVal, user);
+                        }
+                        break;
+                    default:
+                        {
+                            auto materialized = materializeValue(&builder, val);
+                            auto tmpVar = builder.emitVar(materialized->getDataType());
+                            builder.emitStore(tmpVar, materialized);
+                            use->set(tmpVar);
+                        }
+                        break;
                     }
                 });
         }
@@ -3205,13 +3249,13 @@ void tryReplaceUsesOfStageInput(
                     auto arrayIndexImpl = as<ScalarizedArrayIndexValImpl>(val.impl);
                     auto user = use->getUser();
                     IRBuilder builder(user);
-                    builder.setInsertBefore(user);
+                    setInsertBeforeOrdinaryInst(&builder, user);
                     auto subscriptVal = getSubscriptVal(
                         &builder,
                         arrayIndexImpl->elementType,
                         arrayIndexImpl->arrayVal,
                         arrayIndexImpl->index);
-                    builder.setInsertBefore(user);
+                    setInsertBeforeOrdinaryInst(&builder, user);
                     auto materializedInner = materializeValue(&builder, subscriptVal);
                     if (user->getOp() == kIROp_Load)
                     {
@@ -3220,7 +3264,9 @@ void tryReplaceUsesOfStageInput(
                     }
                     else
                     {
-                        use->set(materializedInner);
+                        auto tmpVar = builder.emitVar(materializedInner->getDataType());
+                        builder.emitStore(tmpVar, materializedInner);
+                        use->set(tmpVar);
                     }
                 });
             break;
@@ -3233,6 +3279,9 @@ void tryReplaceUsesOfStageInput(
                 [&](IRUse* use)
                 {
                     auto user = use->getUser();
+                    IRBuilder builder(user);
+                    setInsertBeforeOrdinaryInst(&builder, user);
+
                     switch (user->getOp())
                     {
                     case kIROp_FieldExtract:
@@ -3270,10 +3319,20 @@ void tryReplaceUsesOfStageInput(
                             }
                         }
                         break;
+                    case kIROp_GetElementPtr:
+                        {
+                            auto arrayType = as<IRArrayTypeBase>(tupleVal->type);
+                            SLANG_ASSERT(arrayType);
+                            auto subscriptVal = getSubscriptVal(
+                                &builder,
+                                (IRType*)arrayType->getElementType(),
+                                val,
+                                user->getOperand(1));
+                            tryReplaceUsesOfStageInput(context, subscriptVal, user);
+                        }
+                        break;
                     case kIROp_Load:
                         {
-                            IRBuilder builder(user);
-                            builder.setInsertBefore(user);
                             auto materializedVal = materializeTupleValue(&builder, val);
                             user->replaceUsesWith(materializedVal);
                             user->removeAndDeallocate();
@@ -3331,7 +3390,7 @@ void legalizeEntryPointParameterForGLSL(
     {
         IRType* type = pp->getFullType();
         // Strip out type
-        if (auto outType = as<IROutTypeBase>(type))
+        if (auto outType = as<IROutParamTypeBase>(type))
         {
             type = outType->getValueType();
         }
@@ -3449,7 +3508,7 @@ void legalizeEntryPointParameterForGLSL(
 
                     // Okay, we have a declaration, and we want to modify it!
 
-                    builder->setInsertBefore(ii);
+                    setInsertBeforeOrdinaryInst(builder, ii);
 
                     assign(builder, globalOutputVal, ScalarizedVal::value(ii->getOperand(2)));
                 }
@@ -3470,7 +3529,7 @@ void legalizeEntryPointParameterForGLSL(
         // operations like `TraceRay` are handled.
         //
         builder->setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
-        auto undefinedVal = builder->emitUndefined(pp->getFullType());
+        auto undefinedVal = builder->emitPoison(pp->getFullType());
         pp->replaceUsesWith(undefinedVal);
 
         return;
@@ -3526,7 +3585,7 @@ void legalizeEntryPointParameterForGLSL(
     // Is the parameter type a special pointer type
     // that indicates the parameter is used for `out`
     // or `inout` access?
-    if (as<IROutTypeBase>(paramType))
+    if (as<IROutParamTypeBase>(paramType))
     {
         // Okay, we have the more interesting case here,
         // where the parameter was being passed by reference.
@@ -3537,7 +3596,7 @@ void legalizeEntryPointParameterForGLSL(
         auto localVariable = builder->emitVar(valueType);
         auto localVal = ScalarizedVal::address(localVariable);
 
-        if (const auto inOutType = as<IRInOutType>(paramType))
+        if (const auto inOutType = as<IRBorrowInOutParamType>(paramType))
         {
             // In the `in out` case we need to declare two
             // sets of global variables: one for the `in`
@@ -3608,7 +3667,7 @@ void legalizeEntryPointParameterForGLSL(
         // reference. We simply replace existing uses of the parameter
         // with the real global variable.
         SLANG_ASSERT(
-            ptrType->getOp() == kIROp_ConstRefType ||
+            ptrType->getOp() == kIROp_BorrowInParamType ||
             ptrType->getAddressSpace() == AddressSpace::Input ||
             ptrType->getAddressSpace() == AddressSpace::BuiltinInput);
 
@@ -3768,12 +3827,13 @@ void legalizeEntryPointParameterForGLSL(
                                 blockToMaterialized.tryGetValue(callingBlock, materialized);
                             if (!found)
                             {
-                                replaceBuilder.setInsertBefore(callingBlock->getFirstInst());
+                                replaceBuilder.setInsertBefore(
+                                    callingBlock->getFirstOrdinaryInst());
                                 materialized = materializeValue(&replaceBuilder, globalValue);
                                 blockToMaterialized.set(callingBlock, materialized);
                             }
 
-                            replaceBuilder.setInsertBefore(user);
+                            setInsertBeforeOrdinaryInst(builder, user);
                             auto field =
                                 replaceBuilder.emitFieldExtract(globalVarType, materialized, key);
                             replaceBuilder.replaceOperand(operandUse, field);
@@ -3888,7 +3948,7 @@ void assignRayPayloadHitObjectAttributeLocations(IRModule* module)
                 {
                     rayPayloadCounter++;
                 }
-                builder.setInsertBefore(inst);
+                setInsertBeforeOrdinaryInst(&builder, inst);
                 location = builder.getIntValue(builder.getIntType(), rayPayloadCounter);
                 decor->setOperand(0, location);
                 rayPayloadCounter++;
@@ -3902,7 +3962,7 @@ void assignRayPayloadHitObjectAttributeLocations(IRModule* module)
                 {
                     callablePayloadCounter++;
                 }
-                builder.setInsertBefore(inst);
+                setInsertBeforeOrdinaryInst(&builder, inst);
                 location = builder.getIntValue(builder.getIntType(), callablePayloadCounter);
                 decor->setOperand(0, location);
                 callablePayloadCounter++;
@@ -3915,7 +3975,7 @@ void assignRayPayloadHitObjectAttributeLocations(IRModule* module)
                 {
                     hitObjectAttributeCounter++;
                 }
-                builder.setInsertBefore(inst);
+                setInsertBeforeOrdinaryInst(&builder, inst);
                 location = builder.getIntValue(builder.getIntType(), hitObjectAttributeCounter);
                 decor->setOperand(0, location);
                 hitObjectAttributeCounter++;
@@ -4210,7 +4270,6 @@ void legalizeEntryPointForGLSL(
     }
 
     // Special handling for ray tracing shaders
-    bool isRayTracingShader = false;
     switch (stage)
     {
     case Stage::AnyHit:
@@ -4219,7 +4278,6 @@ void legalizeEntryPointForGLSL(
     case Stage::Intersection:
     case Stage::Miss:
     case Stage::RayGeneration:
-        isRayTracingShader = true;
         consolidateRayTracingParameters(&context, func);
         break;
     default:

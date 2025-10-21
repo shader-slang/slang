@@ -32,6 +32,7 @@
 #include "slang-ir-collect-global-uniforms.h"
 #include "slang-ir-com-interface.h"
 #include "slang-ir-composite-reg-to-mem.h"
+#include "slang-ir-cuda-immutable-load.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-defer-buffer-load.h"
 #include "slang-ir-defunctionalization.h"
@@ -97,6 +98,7 @@
 #include "slang-ir-restructure.h"
 #include "slang-ir-sccp.h"
 #include "slang-ir-simplify-for-emit.h"
+#include "slang-ir-specialize-address-space.h"
 #include "slang-ir-specialize-arrays.h"
 #include "slang-ir-specialize-buffer-load-arg.h"
 #include "slang-ir-specialize-matrix-layout.h"
@@ -119,6 +121,7 @@
 #include "slang-ir-variable-scope-correction.h"
 #include "slang-ir-vk-invert-y.h"
 #include "slang-ir-wgsl-legalize.h"
+#include "slang-ir-wrap-cbuffer-element.h"
 #include "slang-ir-wrap-structured-buffers.h"
 #include "slang-legalize-types.h"
 #include "slang-lower-to-ir.h"
@@ -802,7 +805,7 @@ Result linkAndOptimizeIR(
     // can assume that all ordinary/uniform data is strictly
     // passed using constant buffers.
     //
-    collectGlobalUniformParameters(irModule, outLinkedIR.globalScopeVarLayout);
+    collectGlobalUniformParameters(irModule, outLinkedIR.globalScopeVarLayout, target);
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "GLOBAL UNIFORMS COLLECTED");
 #endif
@@ -1264,10 +1267,40 @@ Result linkAndOptimizeIR(
 
     legalizeEmptyArray(irModule, sink);
 
+    // For CUDA targets, always inline global constants to avoid dynamic initialization
+    // of __device__ variables rejected by NVRTC. This runs independently of the broader
+    // resource/existential type legalization, which remains disabled for CUDA.
+    //
+    // We also need this pass on the CPU targets in shader mode, as global
+    // constants may reference global parameters, which can't be emitted as
+    // constants.
+    if (target == CodeGenTarget::CUDASource ||
+        (isCPUTarget(targetRequest) && isKernelTarget(target)) ||
+        options.shouldLegalizeExistentialAndResourceTypes)
+    {
+        inlineGlobalConstantsForLegalization(irModule);
+    }
+
     // We don't need the legalize pass for C/C++ based types
     if (options.shouldLegalizeExistentialAndResourceTypes)
     {
-        inlineGlobalConstantsForLegalization(irModule);
+        if (isMetalTarget(targetRequest))
+        {
+            // Metal is a special target in that we want to legalize constant buffer
+            // types as if it is a bindful target, and skip legalizing parameter block
+            // types as if it is a bindless target.
+            // To achieve this, we want to ensure that all resource typed fields in parameter blocks
+            // are translated into descriptor handles first before running the resource type
+            // legalization pass for metal, so that type legalization pass won't mess around with
+            // them.
+            BufferElementTypeLoweringOptions bufferElementTypeLoweringOptions = {};
+            bufferElementTypeLoweringOptions.loweringPolicyKind =
+                BufferElementTypeLoweringPolicyKind::MetalParameterBlock;
+            lowerBufferElementTypeToStorageType(
+                targetProgram,
+                irModule,
+                bufferElementTypeLoweringOptions);
+        }
 
         // The Slang language allows interfaces to be used like
         // ordinary types (including placing them in constant
@@ -1376,19 +1409,19 @@ Result linkAndOptimizeIR(
     // function parameters, reults, etc. is invalid.
     // We clean up the usages of resource values here.
     specializeResourceUsage(codeGenContext, irModule);
+
+    // Specialize calls to functions with values loaded from an immutable location,
+    // so that we directly load the value inside the callee, instead of loading the
+    // value outside of the callee and copy it in. This is necessary to avoid copying
+    // large values (e.g. arrays) in registers, where most of the elements are not
+    // actually used.
     specializeFuncsForBufferLoadArgs(codeGenContext, irModule);
 
     // Push `structuredBufferLoad` to the end of access chain to avoid loading unnecessary data.
-    if (isKhronosTarget(targetRequest) || isMetalTarget(targetRequest) ||
-        isWGPUTarget(targetRequest))
-        deferBufferLoad(irModule);
+    deferBufferLoad(codeGenContext, irModule);
 
     // We also want to specialize calls to functions that
     // takes unsized array parameters if possible.
-    // Moreover, for Khronos targets, we also want to specialize calls to functions
-    // that takes arrays/structs containing arrays as parameters with the actual
-    // global array object to avoid loading big arrays into SSA registers, which seems
-    // to cause performance issues.
     specializeArrayParameters(codeGenContext, irModule);
 
 #if 0
@@ -1401,17 +1434,17 @@ Result linkAndOptimizeIR(
     // Some information for `static_assert` is available only after the specialization.
     checkStaticAssert(irModule->getModuleInst(), sink);
 
-    // For HLSL (and fxc/dxc) only, we need to "wrap" any
-    // structured buffers defined over matrix types so
-    // that they instead use an intermediate `struct`.
-    // This is required to get those targets to respect
-    // the options for matrix layout set via `#pragma`
-    // or command-line options.
-    //
     switch (target)
     {
     case CodeGenTarget::HLSL:
         {
+            // For HLSL(fxc) only, we need to "wrap" any
+            // structured buffers defined over matrix types so
+            // that they instead use an intermediate `struct`.
+            // This is required to get those targets to respect
+            // the options for matrix layout set via `#pragma`
+            // or command-line options.
+            //
             wrapStructuredBuffersOfMatrices(irModule);
 #if 0
             dumpIRIfEnabled(codeGenContext, irModule, "STRUCTURED BUFFERS WRAPPED");
@@ -1419,7 +1452,12 @@ Result linkAndOptimizeIR(
             validateIRModuleIfEnabled(codeGenContext, irModule);
         }
         break;
-
+    case CodeGenTarget::Metal:
+    case CodeGenTarget::MetalLib:
+        // Metal does not allow `ConstantBuffer<StructuredBuffer<T>>`, so we need to create
+        // a wrapper struct for the `StructuredBuffer<T>`.
+        wrapCBufferElementsForMetal(irModule);
+        break;
     default:
         break;
     }
@@ -1708,6 +1746,7 @@ Result linkAndOptimizeIR(
         if (targetProgram->getOptionSet().getBoolOption(
                 CompilerOptionName::EnableExperimentalPasses))
             introduceExplicitGlobalContext(irModule, target);
+        transformParamsToConstRef(irModule, codeGenContext->getSink());
 #if 0
         dumpIRIfEnabled(codeGenContext, irModule, "EXPLICIT GLOBAL CONTEXT INTRODUCED");
 #endif
@@ -1805,11 +1844,11 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.meshOutput)
         legalizeMeshOutputTypes(irModule);
 
-    BufferElementTypeLoweringOptions bufferElementTypeLoweringOptions;
-    bufferElementTypeLoweringOptions.use16ByteArrayElementForConstantBuffer =
-        isWGPUTarget(targetRequest);
-    lowerBufferElementTypeToStorageType(targetProgram, irModule, bufferElementTypeLoweringOptions);
-    performForceInlining(irModule);
+
+    // Lower all bit_cast operations on complex types into leaf-level
+    // bit_cast on basic types.
+    if (requiredLoweringPassSet.bitcast)
+        lowerBitCast(targetProgram, irModule, sink);
 
     // Rewrite functions that return arrays to return them via `out` parameter,
     // since our target languages doesn't allow returning arrays.
@@ -1825,13 +1864,45 @@ Result linkAndOptimizeIR(
             rcpWOfPositionInput(irModule);
     }
 
-    // Lower all bit_cast operations on complex types into leaf-level
-    // bit_cast on basic types.
-    if (requiredLoweringPassSet.bitcast)
-        lowerBitCast(targetProgram, irModule, sink);
+    BufferElementTypeLoweringOptions bufferElementTypeLoweringOptions = {};
+    if (isWGPUTarget(targetRequest))
+        bufferElementTypeLoweringOptions.loweringPolicyKind =
+            BufferElementTypeLoweringPolicyKind::WGSL;
+    else if (isKhronosTarget(targetRequest))
+        bufferElementTypeLoweringOptions.loweringPolicyKind =
+            BufferElementTypeLoweringPolicyKind::KhronosTarget;
+    else
+        bufferElementTypeLoweringOptions.loweringPolicyKind =
+            BufferElementTypeLoweringPolicyKind::Default;
+    lowerBufferElementTypeToStorageType(targetProgram, irModule, bufferElementTypeLoweringOptions);
+
+    // If we are generating code for glsl or metal, perform address space propagation now.
+    // For SPIRV, we will do that during spirv legalization that happens after
+    // `linkAndOptimizeIR`.
+    if (target == CodeGenTarget::GLSL)
+    {
+        NoOpInitialAddressSpaceAssigner addrSpaceAssigner;
+        specializeAddressSpace(irModule, &addrSpaceAssigner);
+    }
+    else if (isMetalTarget(targetRequest))
+    {
+        specializeAddressSpaceForMetal(irModule);
+    }
+    else if (isWGPUTarget(targetRequest))
+    {
+        specializeAddressSpaceForWGSL(irModule);
+    }
+
+    // If we are generating code for CUDA, we should translate all immutable buffer loads to
+    // using `__ldg` intrinsic for improved performance.
+    if (isCUDATarget(targetRequest))
+    {
+        lowerImmutableBufferLoadForCUDA(targetProgram, irModule);
+    }
+
+    performForceInlining(irModule);
 
     bool emitSpirvDirectly = targetProgram->shouldEmitSPIRVDirectly();
-
     if (emitSpirvDirectly)
     {
         performIntrinsicFunctionInlining(irModule);
@@ -2285,13 +2356,17 @@ public:
     // we can read.
     SlangResult loadBlob(ComPtr<IArtifact>& artifact)
     {
+        m_nonSemanticDebugInfoExtSetId = 0;
+        m_words.clear();
+        m_headerWords.clear();
+
         ComPtr<ISlangBlob> spirvBlob;
         SlangResult res = artifact->loadBlob(ArtifactKeep::Yes, spirvBlob.writeRef());
-        if (SLANG_FAILED(res) || !spirvBlob)
+        if (SLANG_FAILED(res) || !spirvBlob ||
+            spirvBlob->getBufferSize() < SPV_INDEX_INSTRUCTION_START * sizeof(SpvWord))
             return SLANG_FAIL;
 
         // Populate the full array of SPIR-V words.
-        m_words.clear();
         m_words.addRange(
             reinterpret_cast<const SpvWord*>(spirvBlob->getBufferPointer()),
             spirvBlob->getBufferSize() / sizeof(SpvWord));
@@ -2305,7 +2380,9 @@ public:
     }
 
     // Get the header words.
-    List<SpvWord> getHeaderWords() const { return m_headerWords; }
+    const List<SpvWord>& getHeaderWords() const { return m_headerWords; }
+
+    Index getWordCount() const { return m_words.getCount(); }
 
     // Visit all SPIRV instructions (excluding header words), invoking the callback for each
     // instruction. The callback should be a function or lambda with signature: void(const
@@ -2399,9 +2476,15 @@ static SlangResult stripDbgSpirvFromArtifact(
     SpirvInstructionHelper spirvInstructionHelper;
     SLANG_RETURN_ON_FAIL(spirvInstructionHelper.loadBlob(artifact));
 
-    auto headerWords = spirvInstructionHelper.getHeaderWords();
+    const auto& headerWords = spirvInstructionHelper.getHeaderWords();
 
     List<uint8_t> spirvWordsList;
+    if (auto totalWordCapacity = headerWords.getCount() + spirvInstructionHelper.getWordCount())
+    {
+        const Index byteCapacity = totalWordCapacity * sizeof(SpvWord);
+        spirvWordsList.reserve(byteCapacity);
+    }
+
     spirvWordsList.addRange(
         reinterpret_cast<const uint8_t*>(headerWords.getBuffer()),
         headerWords.getCount() * sizeof(SpvWord));

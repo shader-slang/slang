@@ -461,6 +461,18 @@ Type* ASTBuilder::getSpecializedBuiltinType(ArrayView<Val*> genericArgs, const c
     return rsType;
 }
 
+Type* ASTBuilder::getMagicEnumType(const char* magicEnumName)
+{
+    auto& cache = getSharedASTBuilder()->m_magicEnumTypes;
+    Type* res = nullptr;
+    if (!cache.tryGetValue(magicEnumName, res))
+    {
+        res = getSpecializedBuiltinType({}, magicEnumName);
+        cache.add(magicEnumName, res);
+    }
+    return res;
+}
+
 PtrType* ASTBuilder::getPtrType(Type* valueType, Val* accessQualifier, Val* addrSpace)
 {
     return dynamicCast<PtrType>(getPtrType(valueType, accessQualifier, addrSpace, "PtrType"));
@@ -498,24 +510,29 @@ Type* ASTBuilder::getScalarLayoutType()
 }
 
 // Construct the type `Out<valueType>`
-OutType* ASTBuilder::getOutType(Type* valueType)
+OutType* ASTBuilder::getOutParamType(Type* valueType)
 {
-    return dynamicCast<OutType>(getPtrType(valueType, "OutType"));
+    return dynamicCast<OutType>(getPtrType(valueType, "OutParamType"));
 }
 
-InOutType* ASTBuilder::getInOutType(Type* valueType)
+BorrowInOutParamType* ASTBuilder::getBorrowInOutParamType(Type* valueType)
 {
-    return dynamicCast<InOutType>(getPtrType(valueType, "InOutType"));
+    return dynamicCast<BorrowInOutParamType>(getPtrType(valueType, "BorrowInOutParamType"));
 }
 
-RefType* ASTBuilder::getRefType(Type* valueType)
+RefParamType* ASTBuilder::getRefParamType(Type* valueType)
 {
-    return dynamicCast<RefType>(getPtrType(valueType, "RefType"));
+    return dynamicCast<RefParamType>(getPtrType(valueType, "RefParamType"));
 }
 
-ConstRefType* ASTBuilder::getConstRefType(Type* valueType)
+BorrowInParamType* ASTBuilder::getConstRefParamType(Type* valueType)
 {
-    return dynamicCast<ConstRefType>(getPtrType(valueType, "ConstRefType"));
+    return dynamicCast<BorrowInParamType>(getPtrType(valueType, "BorrowInParamType"));
+}
+
+ExplicitRefType* ASTBuilder::getExplicitRefType(Type* valueType)
+{
+    return dynamicCast<ExplicitRefType>(getPtrType(valueType, "ExplicitRefType"));
 }
 
 OptionalType* ASTBuilder::getOptionalType(Type* valueType)
@@ -545,10 +562,12 @@ PtrTypeBase* ASTBuilder::getPtrType(
     AddressSpace addrSpace,
     char const* ptrTypeName)
 {
+    Type* typeOfAccessQualifier = getMagicEnumType("AccessQualifier");
+    Type* typeOfAddressSpace = getMagicEnumType("AddressSpace");
     return as<PtrTypeBase>(getPtrType(
         valueType,
-        getIntVal(getBuiltinType(BaseType::AccessQualifier), (IntegerLiteralValue)accessQualifier),
-        getIntVal(getBuiltinType(BaseType::AddressSpace), (IntegerLiteralValue)addrSpace),
+        getIntVal(typeOfAccessQualifier, (IntegerLiteralValue)accessQualifier),
+        getIntVal(typeOfAddressSpace, (IntegerLiteralValue)addrSpace),
         ptrTypeName));
 }
 
@@ -917,12 +936,22 @@ top:
     {
         return bIsSubtypeOfCWitness;
     }
+    else if (auto declAIsSubtypeOfBWitness = as<DeclaredSubtypeWitness>(aIsSubtypeOfBWitness))
+    {
+        if (declAIsSubtypeOfBWitness->isEquality())
+            return bIsSubtypeOfCWitness;
+    }
 
     // Similarly, if `b == c`, then the `a <: b` witness is a witness for `a <: c`
     //
     if (as<TypeEqualityWitness>(bIsSubtypeOfCWitness))
     {
         return aIsSubtypeOfBWitness;
+    }
+    else if (auto declBIsSubtypeOfCWitness = as<DeclaredSubtypeWitness>(bIsSubtypeOfCWitness))
+    {
+        if (declBIsSubtypeOfCWitness->isEquality())
+            return declBIsSubtypeOfCWitness;
     }
 
     // HACK: There is downstream code generation logic that assumes that

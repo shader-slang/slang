@@ -30,6 +30,22 @@ TextureCube<float> tCube_RGBA;
 //TEST_INPUT: TextureCube(size=4, content = one, arrayLength=2):name tCubeArray_RGBA
 TextureCubeArray<float> tCubeArray_RGBA;
 
+//TEST_INPUT: Texture1D(size=4, format=D32Float, content = one):name d1D
+DepthTexture1D d1D;
+//TEST_INPUT: Texture2D(size=4, format=D32Float, content = one):name d2D
+DepthTexture2D d2D;
+//TEST_INPUT: Texture3D(size=4, format=D32Float, content = one):name d3D
+DepthTexture3D d3D;
+//TEST_INPUT: TextureCube(size=4, format=D32Float, content = one):name dCube
+DepthTextureCube dCube;
+
+//TEST_INPUT: Texture1D(size=4, format=D32Float, content = one, arrayLength=2):name d1DArray
+DepthTexture1DArray d1DArray;
+//TEST_INPUT: Texture2D(size=4, format=D32Float, content = one, arrayLength=2):name d2DArray
+DepthTexture2DArray d2DArray;
+//TEST_INPUT: TextureCube(size=4, format=D32Float, content = one, arrayLength=2):name dCubeArray
+DepthTextureCubeArray dCubeArray;
+
 //TEST_INPUT: Sampler:name samplerState
 SamplerState samplerState;
 //TEST_INPUT: Sampler(depthCompare):name shadowSampler
@@ -39,10 +55,19 @@ SamplerComparisonState shadowSampler;
 //TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-[numthreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
+// note: the RGBA texture types are not parameterized, since the depth
+// texture element is always 'float'
+float testOperations<let isShadow : int>(
+    int idx,
+     _Texture<float, __Shape1D,   0, 0, 0, 0, isShadow, 0, 0> x1D,
+     _Texture<float, __Shape2D,   0, 0, 0, 0, isShadow, 0, 0> x2D,
+     _Texture<float, __Shape3D,   0, 0, 0, 0, isShadow, 0, 0> x3D,
+     _Texture<float, __ShapeCube, 0, 0, 0, 0, isShadow, 0, 0> xCube,
+     _Texture<float, __Shape1D,   1, 0, 0, 0, isShadow, 0, 0> x1DArray,
+     _Texture<float, __Shape2D,   1, 0, 0, 0, isShadow, 0, 0> x2DArray,
+     _Texture<float, __ShapeCube, 1, 0, 0, 0, isShadow, 0, 0> xCubeArray
+)
 {
-    int idx = dispatchThreadID.x;
     float u = idx * (1.0f / 4);
 
     float val = 0.0f;
@@ -60,32 +85,32 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     /*
         <Template Type> Object.SampleLevel()
     */
-    val += t1D.SampleLevel(samplerState, u, 0);
-    val += t2D.SampleLevel(samplerState, float2(u, u), 0);
-    val += t3D.SampleLevel(samplerState, float3(u, u, u), 0);
-    val += tCube.SampleLevel(samplerState, normalize(float3(u, 1 - u, u)), 0);
+    val += x1D.SampleLevel(samplerState, u, 0);
+    val += x2D.SampleLevel(samplerState, float2(u, u), 0);
+    val += x3D.SampleLevel(samplerState, float3(u, u, u), 0);
+    val += xCube.SampleLevel(samplerState, normalize(float3(u, 1 - u, u)), 0);
 
-    val += t1DArray.SampleLevel(samplerState, float2(u, 0), 0);
-    val += t2DArray.SampleLevel(samplerState, float3(u, u, 0), 0);
-    val += tCubeArray.SampleLevel(samplerState, float4(u, u, u, 0), 0);
+    val += x1DArray.SampleLevel(samplerState, float2(u, 0), 0);
+    val += x2DArray.SampleLevel(samplerState, float3(u, u, 0), 0);
+    val += xCubeArray.SampleLevel(samplerState, float4(u, u, u, 0), 0);
 
     // Offset variant
     //  NOTE: The "cpu" profile does not like these, so it's disabled for now
-    val += t1D.SampleLevel(samplerState, u, 0, 1);
-    val += t2D.SampleLevel(samplerState, float2(u, u), 0, int2(1, 1));
-    val += t3D.SampleLevel(samplerState, float3(u, u, u), 0, int3(1, 1, 1));
+    val += x1D.SampleLevel(samplerState, u, 0, 1);
+    val += x2D.SampleLevel(samplerState, float2(u, u), 0, int2(1, 1));
+    val += x3D.SampleLevel(samplerState, float3(u, u, u), 0, int3(1, 1, 1));
 
-    val += t1DArray.SampleLevel(samplerState, float2(u, 0), 0, 1);
-    val += t2DArray.SampleLevel(samplerState, float3(u, u, 0), 0, int2(1, 1));
+    val += x1DArray.SampleLevel(samplerState, float2(u, 0), 0, 1);
+    val += x2DArray.SampleLevel(samplerState, float3(u, u, 0), 0, int2(1, 1));
 
     // Status variant
 #if !defined(VK)
-    val += t1D.SampleLevel(samplerState, u, 0, 1, status);
-    val += t2D.SampleLevel(samplerState, float2(u, u), 0, int2(1, 1), status);
-    val += t3D.SampleLevel(samplerState, float3(u, u, u), 0, int3(1, 1, 1), status);
+    val += x1D.SampleLevel(samplerState, u, 0, 1, status);
+    val += x2D.SampleLevel(samplerState, float2(u, u), 0, int2(1, 1), status);
+    val += x3D.SampleLevel(samplerState, float3(u, u, u), 0, int3(1, 1, 1), status);
 
-    val += t1DArray.SampleLevel(samplerState, float2(u, 0), 0, 1, status);
-    val += t2DArray.SampleLevel(samplerState, float3(u, u, 0), 0, int2(1, 1), status);
+    val += x1DArray.SampleLevel(samplerState, float2(u, 0), 0, 1, status);
+    val += x2DArray.SampleLevel(samplerState, float3(u, u, 0), 0, int2(1, 1), status);
 #endif
 
     /*
@@ -93,26 +118,26 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     */
     // NOTE: These are having issues with vulkan (glsl)
     // SampleCmpLevelZero() requires format with VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT.
-    val += t1D.SampleCmpLevelZero(shadowSampler, u, 0);
-    val += t2D.SampleCmpLevelZero(shadowSampler, float2(u, u), 0);
-    val += t1DArray.SampleCmpLevelZero(shadowSampler, float2(u, u), 0);
-    val += tCube.SampleCmpLevelZero(shadowSampler, normalize(float3(u, 1 - u, u)), 0);
-    val += t2DArray.SampleCmpLevelZero(shadowSampler, normalize(float3(u, 1 - u, u)), 0);
-    val += tCubeArray.SampleCmpLevelZero(shadowSampler, normalize(float4(u, 1-u, u, u)), 0);
+    val += x1D.SampleCmpLevelZero(shadowSampler, u, 0);
+    val += x2D.SampleCmpLevelZero(shadowSampler, float2(u, u), 0);
+    val += x1DArray.SampleCmpLevelZero(shadowSampler, float2(u, u), 0);
+    val += xCube.SampleCmpLevelZero(shadowSampler, normalize(float3(u, 1 - u, u)), 0);
+    val += x2DArray.SampleCmpLevelZero(shadowSampler, normalize(float3(u, 1 - u, u)), 0);
+    val += xCubeArray.SampleCmpLevelZero(shadowSampler, normalize(float4(u, 1-u, u, u)), 0);
 
     // Offset variant
-    val += t1D.SampleCmpLevelZero(shadowSampler, u, 0, 0);
-    val += t2D.SampleCmpLevelZero(shadowSampler, float2(u, u), 0, int2(0, 0));
+    val += x1D.SampleCmpLevelZero(shadowSampler, u, 0, 0);
+    val += x2D.SampleCmpLevelZero(shadowSampler, float2(u, u), 0, int2(0, 0));
     // TextureCube does not have an offset version of this
 
     // Status variant
     #if !defined(VK)
 
-    val += t1D.SampleCmpLevelZero(shadowSampler, u, 0, 0, status);
-    val += t2D.SampleCmpLevelZero(shadowSampler, float2(u, u), 0, int2(0, 0), status);
+    val += x1D.SampleCmpLevelZero(shadowSampler, u, 0, 0, status);
+    val += x2D.SampleCmpLevelZero(shadowSampler, float2(u, u), 0, int2(0, 0), status);
 
-    val += t1DArray.SampleCmpLevelZero(shadowSampler, float2(u, u), 0, 0, status);
-    val += t2DArray.SampleCmpLevelZero(shadowSampler, normalize(float3(u, 1 - u, u)), 0, int2(0, 0), status);
+    val += x1DArray.SampleCmpLevelZero(shadowSampler, float2(u, u), 0, 0, status);
+    val += x2DArray.SampleCmpLevelZero(shadowSampler, normalize(float3(u, 1 - u, u)), 0, int2(0, 0), status);
 #endif
 
     /*
@@ -122,154 +147,154 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     */
 #if defined(VK)
     float level = 1.0;
-    val += t1D.SampleCmpLevel(shadowSampler, u, 0, level);
-    val += t2D.SampleCmpLevel(shadowSampler, float2(u, u), 0, level);
-    val += t1DArray.SampleCmpLevel(shadowSampler, float2(u, u), 0, level);
-    val += tCube.SampleCmpLevel(shadowSampler, normalize(float3(u, 1 - u, u)), 0, level);
-    val += t2DArray.SampleCmpLevel(shadowSampler, normalize(float3(u, 1 - u, u)), 0, level);
-    val += tCubeArray.SampleCmpLevel(shadowSampler, normalize(float4(u, 1-u, u, u)), 0, level);
+    val += x1D.SampleCmpLevel(shadowSampler, u, 0, level);
+    val += x2D.SampleCmpLevel(shadowSampler, float2(u, u), 0, level);
+    val += x1DArray.SampleCmpLevel(shadowSampler, float2(u, u), 0, level);
+    val += xCube.SampleCmpLevel(shadowSampler, normalize(float3(u, 1 - u, u)), 0, level);
+    val += x2DArray.SampleCmpLevel(shadowSampler, normalize(float3(u, 1 - u, u)), 0, level);
+    val += xCubeArray.SampleCmpLevel(shadowSampler, normalize(float4(u, 1-u, u, u)), 0, level);
 
     // Offset variant
-    val += t1D.SampleCmpLevel(shadowSampler, u, 0, level, 0);
-    val += t2D.SampleCmpLevel(shadowSampler, float2(u, u), 0, level, int2(0, 0));
+    val += x1D.SampleCmpLevel(shadowSampler, u, 0, level, 0);
+    val += x2D.SampleCmpLevel(shadowSampler, float2(u, u), 0, level, int2(0, 0));
 #endif
 
     /*
         void Object.GetDimensions()
     */
-    t1D.GetDimensions(width);
+    x1D.GetDimensions(width);
     val += width;
 
-    t1D.GetDimensions(fwidth);
+    x1D.GetDimensions(fwidth);
     val += fwidth;
 
-    t1D.GetDimensions(0, width, numLevels);
+    x1D.GetDimensions(0, width, numLevels);
     val += width;
     val += numLevels;
 
-    t1D.GetDimensions(0, fwidth, fnumLevels);
+    x1D.GetDimensions(0, fwidth, fnumLevels);
     val += fwidth;
     val += fnumLevels;
 
-    t2D.GetDimensions(width, height);
+    x2D.GetDimensions(width, height);
     val += width;
     val += height;
 
-    t2D.GetDimensions(fwidth, fheight);
+    x2D.GetDimensions(fwidth, fheight);
     val += fwidth;
     val += fheight;
 
-    t2D.GetDimensions(0, width, height, numLevels);
+    x2D.GetDimensions(0, width, height, numLevels);
     val += width;
     val += height;
     val += numLevels;
 
-    t2D.GetDimensions(0, fwidth, fheight, fnumLevels);
+    x2D.GetDimensions(0, fwidth, fheight, fnumLevels);
     val += fwidth;
     val += fheight;
     val += fnumLevels;
 
-    t3D.GetDimensions(width, height, depth);
+    x3D.GetDimensions(width, height, depth);
     val += width;
     val += height;
     val += depth;
 
-    t3D.GetDimensions(fwidth, fheight, fdepth);
+    x3D.GetDimensions(fwidth, fheight, fdepth);
     val += fwidth;
     val += fheight;
     val += fdepth;
 
-    t3D.GetDimensions(0, width, height, depth, numLevels);
+    x3D.GetDimensions(0, width, height, depth, numLevels);
     val += width;
     val += height;
     val += depth;
     val += numLevels;
 
-    t3D.GetDimensions(0, fwidth, fheight, fdepth, fnumLevels);
+    x3D.GetDimensions(0, fwidth, fheight, fdepth, fnumLevels);
     val += fwidth;
     val += fheight;
     val += fdepth;
     val += fnumLevels;
 
-    tCube.GetDimensions(width, height);
+    xCube.GetDimensions(width, height);
     val += width;
     val += height;
 
-    tCube.GetDimensions(fwidth, fheight);
+    xCube.GetDimensions(fwidth, fheight);
     val += fwidth;
     val += fheight;
 
-    tCube.GetDimensions(0, width, height, numLevels);
+    xCube.GetDimensions(0, width, height, numLevels);
     val += width;
     val += height;
     val += numLevels;
 
-    tCube.GetDimensions(0, fwidth, fheight, fnumLevels);
+    xCube.GetDimensions(0, fwidth, fheight, fnumLevels);
     val += fwidth;
     val += fheight;
     val += fnumLevels;
 
-    t1DArray.GetDimensions(width, elements);
+    x1DArray.GetDimensions(width, elements);
     val += width;
     val += elements;
 
-    t1DArray.GetDimensions(fwidth, felements);
+    x1DArray.GetDimensions(fwidth, felements);
     val += fwidth;
     val += felements;
 
-    t1DArray.GetDimensions(0, width, elements, numLevels);
+    x1DArray.GetDimensions(0, width, elements, numLevels);
     val += width;
     val += elements;
     val += numLevels;
 
-    t1DArray.GetDimensions(0, fwidth, felements, fnumLevels);
+    x1DArray.GetDimensions(0, fwidth, felements, fnumLevels);
     val += fwidth;
     val += felements;
     val += fnumLevels;
 
-    t2DArray.GetDimensions(width, height, elements);
+    x2DArray.GetDimensions(width, height, elements);
     val += width;
     val += height;
     val += elements;
 
-    t2DArray.GetDimensions(fwidth, fheight, felements);
+    x2DArray.GetDimensions(fwidth, fheight, felements);
     val += fwidth;
     val += fheight;
     val += felements;
 
-    t2DArray.GetDimensions(0, width, height, elements, numLevels);
+    x2DArray.GetDimensions(0, width, height, elements, numLevels);
     val += width;
     val += height;
     val += elements;
     val += numLevels;
 
-    t2DArray.GetDimensions(0, fwidth, fheight, felements, fnumLevels);
+    x2DArray.GetDimensions(0, fwidth, fheight, felements, fnumLevels);
     val += fwidth;
     val += fheight;
     val += felements;
     val += fnumLevels;
 
-    tCubeArray.GetDimensions(width, height, elements);
+    xCubeArray.GetDimensions(width, height, elements);
     val += width;
     val += height;
     val += elements;
 
     // fxc 47.0: (95): error X4598:  The array element count of GetDimensions on TextureCubeArray objects is unavailable on cs_5_0
 #if defined(CS60) || defined(VK)
-    tCubeArray.GetDimensions(fwidth, fheight, felements);
+    xCubeArray.GetDimensions(fwidth, fheight, felements);
     val += fwidth;
     val += fheight;
     val += felements;
 #endif
 
-    tCubeArray.GetDimensions(0, width, height, elements, numLevels);
+    xCubeArray.GetDimensions(0, width, height, elements, numLevels);
     val += width;
     val += height;
     val += elements;
     val += numLevels;
 
 #if defined(CS60) || defined(VK)
-    tCubeArray.GetDimensions(0, fwidth, fheight, felements, fnumLevels);
+    xCubeArray.GetDimensions(0, fwidth, fheight, felements, fnumLevels);
     val += fwidth;
     val += fheight;
     val += felements;
@@ -323,68 +348,80 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     /*
         ret Object.Load()
     */
-    val += t1D.Load(int2(0, 0));
-    val += t2D.Load(int3(0, 0, 0));
-    val += t3D.Load(int4(0, 0, 0, 0));
+    val += x1D.Load(int2(0, 0));
+    val += x2D.Load(int3(0, 0, 0));
+    val += x3D.Load(int4(0, 0, 0, 0));
 
-    val += t1DArray.Load(int3(0, 0, 0));
-    val += t2DArray.Load(int4(0, 0, 0, 0));
+    val += x1DArray.Load(int3(0, 0, 0));
+    val += x2DArray.Load(int4(0, 0, 0, 0));
 
     // Offset variant
-    val += t1D.Load(int2(0, 0), 0);
-    val += t2D.Load(int3(0, 0, 0), int2(0,0));
-    val += t3D.Load(int4(0, 0, 0, 0), int3(0, 0, 0));
+    val += x1D.Load(int2(0, 0), 0);
+    val += x2D.Load(int3(0, 0, 0), int2(0,0));
+    val += x3D.Load(int4(0, 0, 0, 0), int3(0, 0, 0));
 
-    val += t1DArray.Load(int3(0, 0, 0), 0);
-    val += t2DArray.Load(int4(0, 0, 0, 0), int2(0, 0));
+    val += x1DArray.Load(int3(0, 0, 0), 0);
+    val += x2DArray.Load(int4(0, 0, 0, 0), int2(0, 0));
 
     /*
         <Template Type> Object.SampleGrad()
     */
     float _ddx = 0.0f, _ddy = 0.0f;
 
-    val += t1D.SampleGrad(samplerState, 0.0f, _ddx, _ddy);
-    val += t2D.SampleGrad(samplerState, float2(u, u), float2(_ddx, _ddx), float2(_ddy, _ddy));
-    val += t3D.SampleGrad(samplerState, float3(u, u, u), float3(_ddx, _ddx, _ddx), float3(_ddy, _ddy, _ddy));
-    val += tCube.SampleGrad(samplerState, normalize(float3(u, 1 - u, u)), float3(_ddx, _ddx, _ddx), float3(_ddy, _ddy, _ddy));
+    val += x1D.SampleGrad(samplerState, 0.0f, _ddx, _ddy);
+    val += x2D.SampleGrad(samplerState, float2(u, u), float2(_ddx, _ddx), float2(_ddy, _ddy));
+    val += x3D.SampleGrad(samplerState, float3(u, u, u), float3(_ddx, _ddx, _ddx), float3(_ddy, _ddy, _ddy));
+    val += xCube.SampleGrad(samplerState, normalize(float3(u, 1 - u, u)), float3(_ddx, _ddx, _ddx), float3(_ddy, _ddy, _ddy));
 
-    val += t1DArray.SampleGrad(samplerState, float2(0.0f, 0.0f), _ddx, _ddy);
-    val += t2DArray.SampleGrad(samplerState, float3(u, u, 0.0f), float2(_ddx, _ddx), float2(_ddy, _ddy));
+    val += x1DArray.SampleGrad(samplerState, float2(0.0f, 0.0f), _ddx, _ddy);
+    val += x2DArray.SampleGrad(samplerState, float3(u, u, 0.0f), float2(_ddx, _ddx), float2(_ddy, _ddy));
 
     // Offset variant
-    val += t1D.SampleGrad(samplerState, 0.0f, _ddx, _ddy, 0);
-    val += t2D.SampleGrad(samplerState, float2(u, u), float2(_ddx, _ddx), float2(_ddy, _ddy), int2(0, 0));
-    val += t3D.SampleGrad(samplerState, float3(u, u, u), float3(_ddx, _ddx, _ddx), float3(_ddy, _ddy, _ddy), int3(0, 0, 0));
+    val += x1D.SampleGrad(samplerState, 0.0f, _ddx, _ddy, 0);
+    val += x2D.SampleGrad(samplerState, float2(u, u), float2(_ddx, _ddx), float2(_ddy, _ddy), int2(0, 0));
+    val += x3D.SampleGrad(samplerState, float3(u, u, u), float3(_ddx, _ddx, _ddx), float3(_ddy, _ddy, _ddy), int3(0, 0, 0));
 
-    val += t1DArray.SampleGrad(samplerState, float2(0.0f, 0.0f), _ddx, _ddy, 0);
-    val += t2DArray.SampleGrad(samplerState, float3(u, u, 0.0f), float2(_ddx, _ddx), float2(_ddy, _ddy), int2(0, 0));
+    val += x1DArray.SampleGrad(samplerState, float2(0.0f, 0.0f), _ddx, _ddy, 0);
+    val += x2DArray.SampleGrad(samplerState, float3(u, u, 0.0f), float2(_ddx, _ddx), float2(_ddy, _ddy), int2(0, 0));
 
     // Status variant
 #if !defined(VK)
-    val += t1D.SampleGrad(samplerState, 0.0f, _ddx, _ddy, 0, clamp,  status);
-    val += t2D.SampleGrad(samplerState, float2(u, u), float2(_ddx, _ddx), float2(_ddy, _ddy), int2(0, 0), clamp, status);
-    val += t3D.SampleGrad(samplerState, float3(u, u, u), float3(_ddx, _ddx, _ddx), float3(_ddy, _ddy, _ddy), int3(0, 0, 0), clamp, status);
+    val += x1D.SampleGrad(samplerState, 0.0f, _ddx, _ddy, 0, clamp,  status);
+    val += x2D.SampleGrad(samplerState, float2(u, u), float2(_ddx, _ddx), float2(_ddy, _ddy), int2(0, 0), clamp, status);
+    val += x3D.SampleGrad(samplerState, float3(u, u, u), float3(_ddx, _ddx, _ddx), float3(_ddy, _ddy, _ddy), int3(0, 0, 0), clamp, status);
 
-    val += t1DArray.SampleGrad(samplerState, float2(0.0f, 0.0f), _ddx, _ddy, 0, clamp, status);
-    val += t2DArray.SampleGrad(samplerState, float3(u, u, 0.0f), float2(_ddx, _ddx), float2(_ddy, _ddy), int2(0, 0), clamp, status);
+    val += x1DArray.SampleGrad(samplerState, float2(0.0f, 0.0f), _ddx, _ddy, 0, clamp, status);
+    val += x2DArray.SampleGrad(samplerState, float3(u, u, 0.0f), float2(_ddx, _ddx), float2(_ddy, _ddy), int2(0, 0), clamp, status);
 #endif
+
+    return val;
+}
+
+[numthreads(4, 1, 1)]
+void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
+{
+    int idx = dispatchThreadID.x;
+    float val = 0.0f;
+
+    val += testOperations<0>(idx, t1D, t2D, t3D, tCube, t1DArray, t2DArray, tCubeArray);
+    val += testOperations<1>(idx, d1D, d2D, d3D, dCube, d1DArray, d2DArray, dCubeArray);
 
     outputBuffer[idx] = val;
 }
 
-// DX11: 354
-// DX11: 354
-// DX11: 354
-// DX11: 354
-// DX12: 354
-// DX12: 354
-// DX12: 354
-// DX12: 354
-// DX12CS6: 377
-// DX12CS6: 377
-// DX12CS6: 377
-// DX12CS6: 377
-// VK: 359
-// VK: 359
-// VK: 359
-// VK: 359
+// DX11: 708
+// DX11: 708
+// DX11: 708
+// DX11: 708
+// DX12: 708
+// DX12: 708
+// DX12: 708
+// DX12: 708
+// DX12CS6: 754
+// DX12CS6: 754
+// DX12CS6: 754
+// DX12CS6: 754
+// VK: 718
+// VK: 718
+// VK: 718
+// VK: 718

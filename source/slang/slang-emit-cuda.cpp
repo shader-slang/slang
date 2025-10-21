@@ -921,6 +921,13 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit(")");
             return true;
         }
+    case kIROp_CUDALDG:
+        {
+            m_writer->emit("__ldg(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(")");
+        }
+        return true;
     default:
         break;
     }

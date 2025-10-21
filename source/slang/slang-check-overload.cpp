@@ -29,7 +29,7 @@ SemanticsVisitor::ParamCounts SemanticsVisitor::CountParameters(
     for (auto param : params)
     {
         Index allowedArgCountToAdd = 1;
-        auto paramType = getParamType(m_astBuilder, param);
+        auto paramType = unwrapModifiedType(getParamType(m_astBuilder, param));
         if (isTypePack(paramType))
         {
             if (auto typePack = as<ConcreteTypePack>(paramType))
@@ -632,9 +632,9 @@ static QualType getParamQualType(ASTBuilder* astBuilder, DeclRef<ParamDecl> para
     bool isLVal = false;
     switch (getParameterDirection(param.getDecl()))
     {
-    case kParameterDirection_InOut:
-    case kParameterDirection_Out:
-    case kParameterDirection_Ref:
+    case ParamPassingMode::BorrowInOut:
+    case ParamPassingMode::Out:
+    case ParamPassingMode::Ref:
         isLVal = true;
         break;
     }
@@ -643,12 +643,35 @@ static QualType getParamQualType(ASTBuilder* astBuilder, DeclRef<ParamDecl> para
 
 static QualType getParamQualType(Type* paramType)
 {
-    if (auto paramDirType = as<ParamDirectionType>(paramType))
+    // TODO(tfoley): This function probably shouldn't exist, and instead
+    // the accessors for the parameters of a `FuncType` should
+    // directly return a `QualType` for each parameter rather than
+    // a plain `Type` that potentially includes a wrapping
+    // `ParamPassingModeType`.
+    //
+    // In addition, the determination of what value category a reference
+    // to a parameter should be (and thus what the `QualType` sould be)
+    // should be driven by computing the `ParamPassingMode` first,
+    // and then using the direction to determine the value category
+    // (so as to isolate the code that needs to care about the wrapper
+    // types to just the computation of the dirction).
+    //
+    // Note the large amount of duplication between this function and
+    // the other `getParamQualType()` above.
+    //
+    bool isLVal = false;
+    Type* valueType = paramType;
+    if (auto paramDirType = as<ParamPassingModeType>(paramType))
     {
-        if (as<OutTypeBase>(paramDirType) || as<RefType>(paramDirType))
-            return QualType(paramDirType->getValueType(), true);
+        valueType = paramDirType->getValueType();
+        if (as<BorrowInOutParamType>(paramDirType))
+            isLVal = true;
+        if (as<OutParamType>(paramDirType))
+            isLVal = true;
+        if (as<RefParamType>(paramDirType))
+            isLVal = true;
     }
-    return paramType;
+    return QualType(valueType, isLVal);
 }
 
 bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
@@ -673,7 +696,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
             Count paramCount = funcType->getParamCount();
             for (Index i = 0; i < paramCount; ++i)
             {
-                auto paramType = getParamQualType(funcType->getParamType(i));
+                auto paramType = getParamQualType(funcType->getParamTypeWithDirectionWrapper(i));
                 paramTypes.add(paramType);
             }
         }
@@ -2666,7 +2689,8 @@ void SemanticsVisitor::AddHigherOrderOverloadCandidates(
             List<QualType> paramTypes;
 
             for (Index ii = 0; ii < diffFuncType->getParamCount(); ii++)
-                paramTypes.add(getParamQualType(diffFuncType->getParamType(ii)));
+                paramTypes.add(
+                    getParamQualType(diffFuncType->getParamTypeWithDirectionWrapper(ii)));
 
             // Try to infer generic arguments, based on the updated context.
             OverloadResolveContext subContext = context;
@@ -3007,7 +3031,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
         // `openExistential` operation that was applied to `out` arguments.
         //
         auto funcType = context.bestCandidate->funcType;
-        ShortList<ParameterDirection> paramDirections;
+        ShortList<ParamPassingMode> paramDirections;
         if (funcType)
         {
             for (Index i = 0; i < funcType->getParamCount(); i++)
@@ -3029,10 +3053,10 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
             {
                 switch (paramDirections[i])
                 {
-                case kParameterDirection_Out:
-                case kParameterDirection_InOut:
-                case kParameterDirection_Ref:
-                case kParameterDirection_ConstRef:
+                case ParamPassingMode::Out:
+                case ParamPassingMode::BorrowInOut:
+                case ParamPassingMode::Ref:
+                case ParamPassingMode::BorrowIn:
                     break;
                 default:
                     continue;

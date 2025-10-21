@@ -1,4 +1,6 @@
-//TEST:SIMPLE(filecheck=CUDA): -stage compute -entry computeMain -target cuda
+//TEST:SIMPLE(filecheck=CUDA): -stage compute -entry computeMain -target cuda -line-directive-mode none
+//TEST:SIMPLE(filecheck=PTX): -stage compute -entry computeMain -target cuda
+
 struct Data {
     StructuredBuffer<float> input[2];
     RWStructuredBuffer<float> output;
@@ -6,7 +8,9 @@ struct Data {
     StructuredBuffer<uint> index_buffer;
     uint index_count;
 
-    // CUDA: fetch{{.*}}Data{{.*}}*{{.*}}this
+    // CUDA: __device__ float Data_fetch{{.*}}(int {{.*}}, int {{.*}})
+    // CUDA-NEXT: {
+    // CUDA-NEXT: globalParams{{.*}}->data{{.*}}->input{{.*}}[{{.*}}]
     float fetch(int buffer, int index)
     {
         return input[buffer][index];
@@ -14,6 +18,8 @@ struct Data {
 };
 
 ParameterBlock<Data> data;
+
+// PTX: computeMain
 
 [shader("compute")]
 [numthreads(8, 8, 1)]
