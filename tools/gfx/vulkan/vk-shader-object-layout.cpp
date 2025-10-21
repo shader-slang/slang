@@ -188,14 +188,6 @@ void ShaderObjectLayoutImpl::Builder::_addDescriptorRangesAsValue(
         default:
             break;
 
-        case slang::BindingType::ExistentialValue:
-            // An interest/existential-typed sub-object range will only contribute
-            // descriptor ranges to a parent object in the case where it has been
-            // specialied, which is precisely the case where the Slang reflection
-            // information will tell us about its "pending" layout.
-            //
-            break;
-
         case slang::BindingType::ConstantBuffer:
             {
                 // A `ConstantBuffer<X>` range will contribute any nested descriptor
@@ -458,9 +450,6 @@ void ShaderObjectLayoutImpl::Builder::addBindingRanges(slang::TypeLayoutReflecti
                     subTypeLayout,
                     subObjectLayout.writeRef());
             }
-            break;
-
-        case slang::BindingType::ExistentialValue:
             break;
         }
 

@@ -70,9 +70,6 @@ public:
         SubObjectRangeOffset() {}
 
         SubObjectRangeOffset(slang::VariableLayoutReflection* varLayout);
-
-        /// The offset for "pending" ordinary data related to this range
-        uint32_t pendingOrdinaryData = 0;
     };
 
     /// Stride information for a sub-object range
@@ -81,9 +78,6 @@ public:
         SubObjectRangeStride() {}
 
         SubObjectRangeStride(slang::TypeLayoutReflection* typeLayout);
-
-        /// The strid for "pending" ordinary data related to this range
-        uint32_t pendingOrdinaryData = 0;
     };
 
     /// Information about a logical binding range as reported by Slang reflection
@@ -245,8 +239,6 @@ public:
 
     slang::IComponentType* getSlangProgram() const { return m_program; }
     slang::ProgramLayout* getSlangProgramLayout() const { return m_programLayout; }
-
-    /// Get the offset at which "pending" shader parameters for this program start
 
 protected:
     Result _init(Builder const* builder);

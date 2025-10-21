@@ -13,14 +13,12 @@ ShaderObjectLayoutImpl::SubObjectRangeOffset::SubObjectRangeOffset(
     slang::VariableLayoutReflection* varLayout)
     : BindingOffset(varLayout)
 {
-    // Pending layout APIs have been removed - no additional offset needed
 }
 
 ShaderObjectLayoutImpl::SubObjectRangeStride::SubObjectRangeStride(
     slang::TypeLayoutReflection* typeLayout)
     : BindingOffset(typeLayout)
 {
-    // Pending layout APIs have been removed - no stride needed
 }
 
 Result ShaderObjectLayoutImpl::Builder::setElementTypeLayout(
@@ -184,17 +182,6 @@ Result ShaderObjectLayoutImpl::Builder::setElementTypeLayout(
             break;
 
         case slang::BindingType::ExistentialValue:
-            // In the case of an interface-type sub-object range, we can only
-            // construct a layout if we have static specialization information
-            // that tells us what type we expect to find in that range.
-            //
-            // The static specialization information is expected to take the
-            // form of a "pending" type layotu attached to the interface type
-            // of the leaf type layout.
-            //
-            // Pending data layout APIs have been removed.
-            // Interface-type ranges now have no additional layout information.
-            // Sub-object layout remains nullptr for interface types.
             break;
         }
         subObjectRange.layout = subObjectLayout;

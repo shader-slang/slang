@@ -13,14 +13,12 @@ ShaderObjectLayoutImpl::SubObjectRangeOffset::SubObjectRangeOffset(
     slang::VariableLayoutReflection* varLayout)
     : BindingOffset(varLayout)
 {
-    // Pending layout APIs have been removed - no additional offset needed
 }
 
 ShaderObjectLayoutImpl::SubObjectRangeStride::SubObjectRangeStride(
     slang::TypeLayoutReflection* typeLayout)
     : BindingOffset(typeLayout)
 {
-    // Pending layout APIs have been removed - no stride needed
 }
 
 Result ShaderObjectLayoutImpl::Builder::setElementTypeLayout(
@@ -168,8 +166,6 @@ Result ShaderObjectLayoutImpl::Builder::setElementTypeLayout(
                     elementTypeLayout,
                     subObjectLayout.writeRef());
             }
-            break;
-        case slang::BindingType::ExistentialValue:
             break;
         }
         subObjectRange.layout = subObjectLayout;

@@ -4945,13 +4945,6 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             auto fieldTypeLayout = fieldResult.layout;
 
             auto fieldVarLayout = typeLayoutBuilder.addField(DeclRef<VarDeclBase>(), fieldResult);
-
-            // If any of the members of the `Tuple` type had existential/interface
-            // type, then we need to compute a second `StructTypeLayout` that
-            // represents the layout and resource using for the "pending data"
-            // that this type needs to have stored somewhere, but which can't
-            // be laid out in the layout of the type itself.
-            //
         }
 
         typeLayoutBuilder.endLayout();
@@ -5270,31 +5263,6 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
                         fits = false;
                         break;
                     }
-                }
-
-                // If the value does fit, then there is nothing else to be
-                // done; the layout that would have been computed without
-                // knowing the `concreteType` is sufficient.
-                //
-                // If the value does *not* fit, then we need to figure out
-                // where the excess data will go.
-                //
-                if (!fits)
-                {
-                    // If we were doing layout for a typical CPU target, then
-                    // we could just say that the fixed-size storage contains
-                    // a data pointer to a "payload" of the data that wouldn't fit.
-                    //
-                    // We will borrow intuition from the approach, by saying that
-                    // the payload is stored somewhere else, but we will *not*
-                    // lock down where precisely "somewhere else" is going to be
-                    // at this point.
-                    //
-                    // Instead, we will store information about the layout of
-                    // the data that needs to go somewhere else, and leave it
-                    // up to the parent type/context to find a suitable place
-                    // for the data.
-                    //
                 }
             }
             // Interface type occupies a uniform slot for the fixed size storage, with alignment of

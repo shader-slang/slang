@@ -13,13 +13,11 @@ using namespace Slang;
 ShaderObjectLayoutImpl::SubObjectRangeOffset::SubObjectRangeOffset(
     slang::VariableLayoutReflection* varLayout)
 {
-    // Pending layout APIs have been removed - no additional offset needed
 }
 
 ShaderObjectLayoutImpl::SubObjectRangeStride::SubObjectRangeStride(
     slang::TypeLayoutReflection* typeLayout)
 {
-    // Pending layout APIs have been removed - no stride needed
 }
 
 bool ShaderObjectLayoutImpl::isBindingRangeRootParameter(
@@ -222,28 +220,12 @@ Result ShaderObjectLayoutImpl::Builder::setElementTypeLayout(
         slang::TypeLayoutReflection* slangLeafTypeLayout =
             typeLayout->getBindingRangeLeafTypeLayout(bindingRangeIndex);
 
-        // A sub-object range can either represent a sub-object of a known
-        // type, like a `ConstantBuffer<Foo>` or `ParameterBlock<Foo>`
-        // (in which case we can pre-compute a layout to use, based on
-        // the type `Foo`) *or* it can represent a sub-object of some
-        // existential type (e.g., `IBar`) in which case we cannot
-        // know the appropraite type/layout of sub-object to allocate.
-        //
         RefPtr<ShaderObjectLayoutImpl> subObjectLayout;
-        if (slangBindingType == slang::BindingType::ExistentialValue)
-        {
-            // Pending data layout APIs have been removed.
-            // Interface-type ranges now have no additional layout information.
-            // Sub-object layout remains nullptr for interface types.
-        }
-        else
-        {
-            createForElementType(
-                m_renderer,
-                m_session,
-                slangLeafTypeLayout->getElementTypeLayout(),
-                subObjectLayout.writeRef());
-        }
+        createForElementType(
+            m_renderer,
+            m_session,
+            slangLeafTypeLayout->getElementTypeLayout(),
+            subObjectLayout.writeRef());
 
         SubObjectRangeInfo subObjectRange;
         subObjectRange.bindingRangeIndex = bindingRangeIndex;
@@ -842,16 +824,6 @@ void RootShaderObjectLayoutImpl::RootSignatureDescBuilder::addAsValue(
                     subPhysicalDescriptorSetIndex,
                     offsetForChildrenThatNeedNewSpace,
                     offsetForOrindaryChildren);
-            }
-            break;
-
-        case slang::BindingType::ExistentialValue:
-            {
-                // Any nested binding ranges in the sub-object will "leak" into the
-                // binding ranges for the surrounding context.
-                //
-                // Pending data layout APIs have been removed.
-                // Interface-type ranges no longer contribute additional binding ranges.
             }
             break;
         }
