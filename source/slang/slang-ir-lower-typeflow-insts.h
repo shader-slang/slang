@@ -5,10 +5,18 @@
 namespace Slang
 {
 
-// Lower `TypeCollection` instructions
+// Lower `ValueOfCollectionType` types.
 void lowerTypeCollections(IRModule* module, DiagnosticSink* sink);
 
-// Lower `FuncCollection`, `GetTagForSuperCollection`, `GetTagForMappedCollection` and
+// Lower `CollectionTaggedUnion` and `CastInterfaceToTaggedUnionPtr` instructions
+// May create new `Reinterpret` instructions.
+//
+bool lowerTaggedUnionTypes(IRModule* module, DiagnosticSink* sink);
+
+// Lower `CollectionTagType` types
+void lowerTagTypes(IRModule* module);
+
+// Lower `GetTagForSuperCollection`, `GetTagForMappedCollection` and
 // `GetTagForSpecializedCollection` instructions
 //
 void lowerTagInsts(IRModule* module, DiagnosticSink* sink);
@@ -16,12 +24,7 @@ void lowerTagInsts(IRModule* module, DiagnosticSink* sink);
 // Lower `GetTagFromSequentialID` and `GetSequentialIDFromTag` instructions
 void lowerSequentialIDTagCasts(IRModule* module, DiagnosticSink* sink);
 
-// Lower `CollectionTagType` instructions
-void lowerTagTypes(IRModule* module);
-
-// Lower `CollectionTaggedUnion`and `CastInterfaceToTaggedUnionPtr` instructions
-// May create new `Reinterpret` instructions.
-//
-bool lowerTaggedUnionTypes(IRModule* module, DiagnosticSink* sink);
+// Lower `GetDispatcher` and `GetSpecializedDispatcher` instructions
+bool lowerDispatchers(IRModule* module, DiagnosticSink* sink);
 
 } // namespace Slang

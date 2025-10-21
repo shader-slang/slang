@@ -3537,7 +3537,7 @@ struct IRCollectionBase : IRTypeFlowData
 };
 
 FIDDLE()
-struct IRTableCollection : IRCollectionBase
+struct IRWitnessTableCollection : IRCollectionBase
 {
     FIDDLE(leafInst())
 };
@@ -3550,7 +3550,7 @@ struct IRTypeCollection : IRCollectionBase
 };
 
 FIDDLE()
-struct IRCollectionTagType : IRTypeFlowData
+struct IRCollectionTagType : IRType
 {
     FIDDLE(leafInst())
     IRCollectionBase* getCollection() { return as<IRCollectionBase>(getOperand(0)); }
@@ -3558,15 +3558,32 @@ struct IRCollectionTagType : IRTypeFlowData
 };
 
 FIDDLE()
-struct IRCollectionTaggedUnionType : IRTypeFlowData
+struct IRCollectionTaggedUnionType : IRType
 {
     FIDDLE(leafInst())
-    IRTypeCollection* getTypeCollection() { return as<IRTypeCollection>(getOperand(0)); }
-    IRTableCollection* getTableCollection() { return as<IRTableCollection>(getOperand(1)); }
+    IRWitnessTableCollection* getWitnessTableCollection()
+    {
+        return as<IRWitnessTableCollection>(getOperand(0));
+    }
+    IRTypeCollection* getTypeCollection() { return as<IRTypeCollection>(getOperand(1)); }
     bool isSingleton()
     {
-        return getTypeCollection()->isSingleton() && getTableCollection()->isSingleton();
+        return getTypeCollection()->isSingleton() && getWitnessTableCollection()->isSingleton();
     }
+};
+
+FIDDLE()
+struct IRElementOfCollectionType : IRType
+{
+    FIDDLE(leafInst())
+    IRCollectionBase* getCollection() { return as<IRCollectionBase>(getOperand(0)); }
+};
+
+FIDDLE()
+struct IRValueOfCollectionType : IRType
+{
+    FIDDLE(leafInst())
+    IRCollectionBase* getCollection() { return as<IRCollectionBase>(getOperand(0)); }
 };
 
 FIDDLE(allOtherInstStructs())
@@ -4193,6 +4210,12 @@ public:
         return emitMakeTuple(SLANG_COUNT_OF(args), args);
     }
 
+    IRMakeTaggedUnion* emitMakeTaggedUnion(IRType* type, IRInst* tag, IRInst* value)
+    {
+        IRInst* args[] = {tag, value};
+        return cast<IRMakeTaggedUnion>(emitIntrinsicInst(type, kIROp_MakeTaggedUnion, 2, args));
+    }
+
     IRInst* emitMakeValuePack(IRType* type, UInt count, IRInst* const* args);
     IRInst* emitMakeValuePack(UInt count, IRInst* const* args);
 
@@ -4701,6 +4724,120 @@ public:
     IRMetalSetVertex* emitMetalSetVertex(IRInst* index, IRInst* vertex);
     IRMetalSetPrimitive* emitMetalSetPrimitive(IRInst* index, IRInst* primitive);
     IRMetalSetIndices* emitMetalSetIndices(IRInst* index, IRInst* indices);
+
+    // TODO: Move all the collection-based ops into the builder.
+    IRUnboundedCollection* emitUnboundedCollection()
+    {
+        return cast<IRUnboundedCollection>(
+            emitIntrinsicInst(nullptr, kIROp_UnboundedCollection, 0, nullptr));
+    }
+
+    IRGetElementFromTag* emitGetElementFromTag(IRInst* tag)
+    {
+        auto tagType = cast<IRCollectionTagType>(tag->getDataType());
+        IRInst* collection = tagType->getCollection();
+        auto elementType = cast<IRElementOfCollectionType>(
+            emitIntrinsicInst(nullptr, kIROp_ElementOfCollectionType, 1, &collection));
+        return cast<IRGetElementFromTag>(
+            emitIntrinsicInst(elementType, kIROp_GetElementFromTag, 1, &tag));
+    }
+
+    IRGetTagFromTaggedUnion* emitGetTagFromTaggedUnion(IRInst* tag)
+    {
+        auto taggedUnionType = cast<IRCollectionTaggedUnionType>(tag->getDataType());
+
+        IRInst* collection = taggedUnionType->getWitnessTableCollection();
+        auto tableTagType = cast<IRCollectionTagType>(
+            emitIntrinsicInst(nullptr, kIROp_CollectionTagType, 1, &collection));
+
+        return cast<IRGetTagFromTaggedUnion>(
+            emitIntrinsicInst(tableTagType, kIROp_GetTagFromTaggedUnion, 1, &tag));
+    }
+
+    IRGetTypeTagFromTaggedUnion* emitGetTypeTagFromTaggedUnion(IRInst* tag)
+    {
+        auto taggedUnionType = cast<IRCollectionTaggedUnionType>(tag->getDataType());
+
+        IRInst* collection = taggedUnionType->getTypeCollection();
+        auto typeTagType = cast<IRCollectionTagType>(
+            emitIntrinsicInst(nullptr, kIROp_CollectionTagType, 1, &collection));
+
+        return cast<IRGetTypeTagFromTaggedUnion>(
+            emitIntrinsicInst(typeTagType, kIROp_GetTypeTagFromTaggedUnion, 1, &tag));
+    }
+
+    IRGetValueFromTaggedUnion* emitGetValueFromTaggedUnion(IRInst* taggedUnion)
+    {
+        auto taggedUnionType = cast<IRCollectionTaggedUnionType>(taggedUnion->getDataType());
+
+        IRInst* typeCollection = taggedUnionType->getTypeCollection();
+        auto valueOfTypeCollectionType = cast<IRValueOfCollectionType>(
+            emitIntrinsicInst(nullptr, kIROp_ValueOfCollectionType, 1, &typeCollection));
+
+        return cast<IRGetValueFromTaggedUnion>(emitIntrinsicInst(
+            valueOfTypeCollectionType,
+            kIROp_GetValueFromTaggedUnion,
+            1,
+            &taggedUnion));
+    }
+
+    IRGetDispatcher* emitGetDispatcher(
+        IRFuncType* funcType,
+        IRWitnessTableCollection* witnessTableCollection,
+        IRStructKey* key)
+    {
+        IRInst* args[] = {witnessTableCollection, key};
+        return cast<IRGetDispatcher>(emitIntrinsicInst(funcType, kIROp_GetDispatcher, 2, args));
+    }
+
+    IRGetSpecializedDispatcher* emitGetSpecializedDispatcher(
+        IRFuncType* funcType,
+        IRWitnessTableCollection* witnessTableCollection,
+        IRStructKey* key,
+        List<IRInst*> const& specArgs)
+    {
+        List<IRInst*> args;
+        args.add(witnessTableCollection);
+        args.add(key);
+        for (auto specArg : specArgs)
+        {
+            args.add(specArg);
+        }
+        return cast<IRGetSpecializedDispatcher>(emitIntrinsicInst(
+            funcType,
+            kIROp_GetSpecializedDispatcher,
+            (UInt)args.getCount(),
+            args.getBuffer()));
+    }
+
+    IRValueOfCollectionType* getValueOfCollectionType(IRInst* operand)
+    {
+        return as<IRValueOfCollectionType>(
+            emitIntrinsicInst(nullptr, kIROp_ValueOfCollectionType, 1, &operand));
+    }
+
+    IRElementOfCollectionType* getElementOfCollectionType(IRInst* operand)
+    {
+        return as<IRElementOfCollectionType>(
+            emitIntrinsicInst(nullptr, kIROp_ElementOfCollectionType, 1, &operand));
+    }
+
+    IRGetTagOfElementInCollection* emitGetTagOfElementInCollection(
+        IRType* tagType,
+        IRInst* element,
+        IRInst* collection)
+    {
+        SLANG_ASSERT(tagType->getOp() == kIROp_CollectionTagType);
+        IRInst* args[] = {element, collection};
+        return cast<IRGetTagOfElementInCollection>(
+            emitIntrinsicInst(tagType, kIROp_GetTagOfElementInCollection, 2, args));
+    }
+
+    IRCollectionTagType* getCollectionTagType(IRInst* collection)
+    {
+        return cast<IRCollectionTagType>(
+            emitIntrinsicInst(nullptr, kIROp_CollectionTagType, 1, &collection));
+    }
 
     //
     // Decorations

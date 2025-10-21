@@ -36,6 +36,11 @@ void forEachInCollection(IRCollectionTagType* tagType, F func)
     forEachInCollection(as<IRCollectionBase>(tagType->getCollection()), func);
 }
 
+// Upcast the value in 'arg' to match the destInfo type. This method inserts
+// any necessary reinterprets or tag translation instructions.
+//
+IRInst* upcastCollection(IRBuilder* builder, IRInst* arg, IRType* destInfo);
+
 // Builder class that helps greatly with constructing `CollectionBase` instructions,
 // which conceptually represent sets, and maintain the property that the equal sets
 // should always be represented by the same instruction.

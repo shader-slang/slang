@@ -5,6 +5,7 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-lower-typeflow-insts.h"
 #include "slang-ir-lower-witness-lookup.h"
 #include "slang-ir-peephole.h"
 #include "slang-ir-sccp.h"
@@ -863,7 +864,7 @@ struct SpecializationContext
         IRInterfaceType* interfaceType = nullptr;
         if (!witnessTable)
         {
-            if (auto collection = as<IRTableCollection>(lookupInst->getWitnessTable()))
+            if (auto collection = as<IRWitnessTableCollection>(lookupInst->getWitnessTable()))
             {
                 auto requirementKey = lookupInst->getRequirementKey();
 
@@ -891,8 +892,24 @@ struct SpecializationContext
                     CollectionBuilder cBuilder(lookupInst->getModule());
                     auto newCollection = cBuilder.makeSet(satisfyingValSet);
                     addUsersToWorkList(lookupInst);
-                    lookupInst->replaceUsesWith(newCollection);
-                    lookupInst->removeAndDeallocate();
+                    if (as<IRTypeCollection>(newCollection))
+                    {
+                        IRBuilder builder(module);
+                        lookupInst->replaceUsesWith(
+                            builder.getValueOfCollectionType(newCollection));
+                        lookupInst->removeAndDeallocate();
+                    }
+                    else if (as<IRWitnessTableCollection>(newCollection))
+                    {
+                        lookupInst->replaceUsesWith(newCollection);
+                        lookupInst->removeAndDeallocate();
+                    }
+                    else
+                    {
+                        // Should not see any other case.
+                        SLANG_UNREACHABLE("unexpected collection type");
+                    }
+
                     return true;
                 }
                 else
@@ -1115,7 +1132,7 @@ struct SpecializationContext
         IRSpecializationDictionaryItem* item = nullptr;
         if (dict.tryGetValue(key, item))
         {
-            if (as<IRUndefined>(item->getOperand(0)))
+            if (!as<IRUndefined>(item->getOperand(0)))
                 return item->getOperand(0);
             else
             {
@@ -1260,6 +1277,7 @@ struct SpecializationContext
                 if (iterChanged)
                 {
                     eliminateDeadCode(module->getModuleInst());
+                    lowerDispatchers(module, sink);
                 }
             }
 
@@ -3173,7 +3191,7 @@ void finalizeSpecialization(IRModule* module)
 // The resulting function will therefore have additional parameters at the beginning
 // to accept this information.
 //
-static IRInst* specializeDynamicGeneric(IRSpecialize* specializeInst)
+IRInst* specializeDynamicGeneric(IRSpecialize* specializeInst)
 {
     // The high-level logic for specializing a generic to operate over collections
     // is similar to specializing a simple generic:
@@ -3192,7 +3210,7 @@ static IRInst* specializeDynamicGeneric(IRSpecialize* specializeInst)
     //
     // - Add any dynamic parameters of the generic to the function's first block. Keep track of the
     //   first block for later. For now, we only treat `WitnessTableType` parameters that have
-    //   `TableCollection` arguments (with atleast 2 distinct elements) as dynamic. Each such
+    //   `WitnessTableCollection` arguments (with atleast 2 distinct elements) as dynamic. Each such
     //   parameter will get a corresponding parameter of `TagType(tableCollection)`
     //
     // - Clone in the rest of the generic's body into the first block of the function.
@@ -3234,6 +3252,7 @@ static IRInst* specializeDynamicGeneric(IRSpecialize* specializeInst)
 
     Index argIndex = 0;
     List<IRType*> extraParamTypes;
+    OrderedDictionary<IRInst*, IRInst*> extraParamMap;
     // Map the generic's parameters to the specialized arguments.
     for (auto param : generic->getFirstBlock()->getParams())
     {
@@ -3243,7 +3262,8 @@ static IRInst* specializeDynamicGeneric(IRSpecialize* specializeInst)
             // We're dealing with a set of types.
             if (as<IRTypeType>(param->getDataType()))
             {
-                cloneEnv.mapOldValToNew[param] = collection;
+                SLANG_ASSERT("Should not happen");
+                cloneEnv.mapOldValToNew[param] = builder.getValueOfCollectionType(collection);
             }
             else if (as<IRWitnessTableType>(param->getDataType()))
             {
@@ -3256,7 +3276,8 @@ static IRInst* specializeDynamicGeneric(IRSpecialize* specializeInst)
                 // the insts which will may need the runtime tag.
                 //
                 auto tagType = (IRType*)makeTagType(collection);
-                cloneEnv.mapOldValToNew[param] = builder.emitParam(tagType);
+                // cloneEnv.mapOldValToNew[param] = builder.emitParam(tagType);
+                extraParamMap.add(param, builder.emitParam(tagType));
                 extraParamTypes.add(tagType);
             }
         }
@@ -3266,6 +3287,21 @@ static IRInst* specializeDynamicGeneric(IRSpecialize* specializeInst)
             SLANG_ASSERT(specArg->getParent()->getOp() == kIROp_ModuleInst);
             cloneEnv.mapOldValToNew[param] = specArg;
         }
+    }
+
+    // The parameters we've used so far are merely tags, we can't use them directly
+    // without turning them into elements.
+    //
+    // We'll emit a `GetElementFromTag` on the parameter and map that to the original generic
+    // parameter.
+    //
+    for (auto paramPair : extraParamMap)
+    {
+        auto originalParam = paramPair.key;
+        auto newTagParam = paramPair.value;
+
+        auto getElementInst = builder.emitGetElementFromTag(newTagParam);
+        cloneEnv.mapOldValToNew[originalParam] = getElementInst;
     }
 
     // Clone in the rest of the generic's body including the blocks of the returned func.

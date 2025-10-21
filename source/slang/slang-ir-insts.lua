@@ -445,6 +445,35 @@ local insts = {
 					},
 				},
 			},
+			{ ValueOfCollectionType = {
+				hoistable = true,
+				-- A type that represents that the value's _type_ is one of types in the collection operand.
+			} },
+			{ ElementOfCollectionType = {
+				hoistable = true,
+				-- A type that represents that the value must be an element of the collection operand.
+			} },
+			{ CollectionTagType = {
+				hoistable = true,
+				-- Represents a tag-type for a collection.
+				--
+				-- An inst whose type is CollectionTagType(collection) is semantically carrying a 
+				-- run-time value that "picks" one of the elements of the collection operand.
+				--
+				-- Only operand is a CollectionBase
+			} }, 
+			{ CollectionTaggedUnionType = {
+				hoistable = true,
+				-- Represents a tagged union type.
+				--
+				-- An inst whose type is a CollectionTaggedUnionType(typeCollection, witnessTableCollection) is semantically carrying a tuple of
+				-- two values: a value of CollectionTagType(witnessTableCollection) to represent the tag, and a payload value of type
+				-- ValueOfCollectionType(typeCollection), which conceptually represents a union/"anyvalue" type.
+				--
+				-- This is most commonly used to specialize the type of existential insts once the possibilities can be statically determined.
+				-- 
+				-- Operands are a TypeCollection and a WitnessTableCollection that represent the possibilities of the existential
+			} }
 		},
 	},
 	-- IRGlobalValueWithCode
@@ -2269,7 +2298,7 @@ local insts = {
 					--
 					{ TypeCollection = {} },
 					{ FuncCollection = {} },
-					{ TableCollection = {} }, -- TODO: Rename to WitnessTableCollection
+					{ WitnessTableCollection = {} },
 					{ GenericCollection = {} },
 				},
 			},
@@ -2291,25 +2320,6 @@ local insts = {
 				-- TODO: Consider the scenario where we can combine the unbounded case with known cases.
 				--       unbounded collection should probably be an element and not a separate op.
 			} },
-			{ CollectionTagType = {
-				-- Represents a tag-type for a collection.
-				--
-				-- An inst whose type is CollectionTagType(collection) is semantically carrying a 
-				-- run-time value that "picks" one of the elements of the collection operand.
-				--
-				-- Only operand is a CollectionBase
-			} }, 
-			{ CollectionTaggedUnionType = {
-				-- Represents a tagged union type.
-				--
-				-- An inst whose type is a CollectionTaggedUnionType(typeCollection, tableCollection) is semantically carrying a tuple of 
-				-- two values: a value of CollectionTagType(tableCollection) to represent the tag, and a payload value of type 
-				-- typeCollection (which conceptually represents a union/"anyvalue" type)
-				--
-				-- This is most commonly used to specialize the type of existential insts once the possibilities can be statically determined.
-				-- 
-				-- Operands are a TypeCollection and a TableCollection that represent the possibilities of the existential
-			} } 
 		},
 	},
 	{ CastInterfaceToTaggedUnionPtr = {
@@ -2320,6 +2330,7 @@ local insts = {
 	} }, 
 	{ GetTagForSuperCollection = {
 		-- Translate a tag from a set to its equivalent in a super-set
+		-- TODO: Lower using a global ID and not local IDs + mapping ops.
 	} }, 
 	{ GetTagForMappedCollection = {
 		-- Translate a tag from a set to its equivalent in a different set
@@ -2335,7 +2346,71 @@ local insts = {
 	} }, 
 	{ GetSequentialIDFromTag = {
 		-- Translate a tag from the given collection (a 'local' ID) to a sequential ID (a 'global' ID)
-	} }
+	} },
+	{ GetElementFromTag = { 
+	    -- Translate a tag to its corresponding element in the collection. 
+		-- Input's type: CollectionTagType(collection). 
+		-- Output's type: ElementOfCollectionType(collection)
+		--
+		operands = {{"tag"}}
+	} },
+	{ GetDispatcher = {
+		-- Get a dispatcher function for a given witness table set + key.
+		--
+		-- Inputs: set of witness tables to create a dispatched for and the key to use to identify the 
+		--         entry that needs to be dispatched to. All witness tables must have an entry for the given key.
+		--         or else this is a malformed inst.
+		--
+		-- Output: a value of 'FuncType' that can be called.
+		--         This func-type will take a `TagType(witnessTableCollection)` as the first parameter to 
+		--         discriminate which witness table to use, and the rest of the parameters.
+		--
+		hoistable = true,
+		operands = {{"witnessTableCollection", "IRWitnessTableCollection"}, {"lookupKey", "IRStructKey"}}
+	} },
+	{ GetSpecializedDispatcher = {
+		-- Get a specialized dispatcher function for a given witness table set + key, where
+		-- the key points to a generic function.
+		--
+		-- Inputs: set of witness tables to create a dispatched for and the key to use to identify the
+		--         entry that needs to be dispatched to. All witness tables must have an entry for the given key.
+		--         or else this is a malformed inst.
+		--         A set of specialization arguments (these must be concrete/global types or collections)
+		--
+		-- Output: a value of `FuncType` that can be called.
+		--         This func-type will take a `TagType(witnessTableCollection)` as the first parameter to 
+		--         discriminate which generic to use, and the rest of the parameters.
+		--
+		hoistable = true
+	} },
+	{ GetTagFromTaggedUnion = {
+		-- Translate a tagged-union value to its corresponding tag in the tagged-union's set.
+		-- Input's type: CollectionTaggedUnionType(typeCollection, tableCollection)
+		-- Output's type: CollectionTagType(tableCollection)
+		operands = {{"taggedUnionValue"}}
+	} },
+	{ GetTypeTagFromTaggedUnion = {
+		-- Translate a tagged-union value to its corresponding type tag in the tagged-union's set.
+		-- Input's type: CollectionTaggedUnionType(typeCollection, tableCollection)
+		-- Output's type: CollectionTagType(typeCollection)
+		operands = {{"taggedUnionValue"}}
+	} },
+	{ GetValueFromTaggedUnion = {
+		-- Translate a tagged-union value to its corresponding value in the tagged-union's set.
+		-- Input's type: CollectionTaggedUnionType(typeCollection, tableCollection)
+		-- Output's type: ValueOfCollectionType(typeCollection)
+		operands = {{"taggedUnionValue"}}
+	} },
+	{ MakeTaggedUnion = {
+		-- Create a tagged-union value from a tag and a value.
+		-- Input's type: CollectionTagType(tableCollection), ValueOfCollectionType(typeCollection)
+		-- Output's type: CollectionTaggedUnionType(typeCollection, tableCollection)
+		operands = { { "tag" }, { "value" } },
+	} },
+	{ GetTagOfElementInCollection = {
+		-- Get the tag corresponding to an element in a collection.
+		hoistable = true
+	} },
 }
 
 -- A function to calculate some useful properties and put it in the table,

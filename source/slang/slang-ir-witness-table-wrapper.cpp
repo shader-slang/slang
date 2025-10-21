@@ -4,6 +4,7 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-generics-lowering-context.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-typeflow-collection.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 
@@ -126,14 +127,12 @@ struct GenerateWitnessTableWrapperContext
 
 // DUPLICATES... put into common file.
 
+
 static bool isTaggedUnionType(IRInst* type)
 {
-    if (auto tupleType = as<IRTupleType>(type))
-        return as<IRCollectionTagType>(tupleType->getOperand(0)) != nullptr;
-
-    return false;
+    return as<IRCollectionTaggedUnionType>(type) != nullptr;
 }
-
+/*
 static UCount getCollectionCount(IRCollectionBase* collection)
 {
     if (!collection)
@@ -207,12 +206,13 @@ static IRInst* upcastCollection(IRBuilder* builder, IRInst* arg, IRType* destInf
     }
     else if (!as<IRCollectionBase>(argInfo) && as<IRCollectionBase>(destInfo))
     {
+        SLANG_UNEXPECTED("Raw collections should not appear");
         return builder->emitPackAnyValue((IRType*)destInfo, arg);
     }
 
     return arg; // Can use as-is.
 }
-
+*/
 
 // Represents a work item for packing `inout` or `out` arguments after a concrete call.
 struct ArgumentPackWorkItem
@@ -231,7 +231,7 @@ struct ArgumentPackWorkItem
 
 bool isAnyValueType(IRType* type)
 {
-    if (as<IRAnyValueType>(type) || as<IRTypeCollection>(type))
+    if (as<IRAnyValueType>(type) || as<IRValueOfCollectionType>(type))
         return true;
     return false;
 }
@@ -406,9 +406,7 @@ IRFunc* emitWitnessTableWrapper(IRModule* module, IRInst* funcInst, IRInst* inte
         auto pack = builder->emitPackAnyValue(funcTypeInInterface->getResultType(), call);
         builder->emitReturn(pack);
     }
-    else if (
-        isTaggedUnionType(call->getDataType()) &&
-        isTaggedUnionType(funcTypeInInterface->getResultType()))
+    else if (call->getDataType() != funcTypeInInterface->getResultType())
     {
         auto reinterpret = upcastCollection(builder, call, funcTypeInInterface->getResultType());
         builder->emitReturn(reinterpret);

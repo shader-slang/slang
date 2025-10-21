@@ -3,6 +3,7 @@
 #include "slang-ir-any-value-marshalling.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-specialize.h"
 #include "slang-ir-typeflow-collection.h"
 #include "slang-ir-util.h"
 #include "slang-ir-witness-table-wrapper.h"
@@ -32,12 +33,10 @@ IRAnyValueType* createAnyValueType(IRBuilder* builder, const HashSet<IRType*>& t
 // The resulting function will have one additional parameter to accept the tag
 // indicating which function to call.
 //
-IRFunc* createDispatchFunc(IRFuncCollection* collection)
+IRFunc* createDispatchFunc(IRFuncType* dispatchFuncType, Dictionary<IRInst*, IRInst*>& mapping)
 {
-    IRFuncType* dispatchFuncType = cast<IRFuncType>(collection->getFullType());
-
     // Create a dispatch function with switch-case for each function
-    IRBuilder builder(collection->getModule());
+    IRBuilder builder(dispatchFuncType->getModule());
 
     // Consume the first parameter of the expected function type
     List<IRType*> innerParamTypes;
@@ -85,42 +84,40 @@ IRFunc* createDispatchFunc(IRFuncCollection* collection)
     List<IRInst*> caseValues;
     List<IRBlock*> caseBlocks;
 
-    UIndex funcSeqID = 0;
-    forEachInCollection(
-        collection,
-        [&](IRInst* funcInst)
+    for (auto kvPair : mapping)
+    {
+        auto funcInst = kvPair.second;
+        auto funcTag = kvPair.first;
+
+        auto wrapperFunc = emitWitnessTableWrapper(funcInst->getModule(), funcInst, innerFuncType);
+
+        // Create case block
+        auto caseBlock = builder.emitBlock();
+        builder.setInsertInto(caseBlock);
+
+        List<IRInst*> callArgs;
+        auto wrappedFuncType = as<IRFuncType>(wrapperFunc->getDataType());
+        for (Index ii = 0; ii < originalParams.getCount(); ii++)
         {
-            auto funcId = funcSeqID++;
-            auto wrapperFunc =
-                emitWitnessTableWrapper(funcInst->getModule(), funcInst, innerFuncType);
+            callArgs.add(originalParams[ii]);
+        }
 
-            // Create case block
-            auto caseBlock = builder.emitBlock();
-            builder.setInsertInto(caseBlock);
+        // Call the specific function
+        auto callResult =
+            builder.emitCallInst(wrappedFuncType->getResultType(), wrapperFunc, callArgs);
 
-            List<IRInst*> callArgs;
-            auto wrappedFuncType = as<IRFuncType>(wrapperFunc->getDataType());
-            for (Index ii = 0; ii < originalParams.getCount(); ii++)
-            {
-                callArgs.add(originalParams[ii]);
-            }
+        if (resultType->getOp() == kIROp_VoidType)
+        {
+            builder.emitReturn();
+        }
+        else
+        {
+            builder.emitReturn(callResult);
+        }
 
-            // Call the specific function
-            auto callResult =
-                builder.emitCallInst(wrappedFuncType->getResultType(), wrapperFunc, callArgs);
-
-            if (resultType->getOp() == kIROp_VoidType)
-            {
-                builder.emitReturn();
-            }
-            else
-            {
-                builder.emitReturn(callResult);
-            }
-
-            caseValues.add(builder.getIntValue(builder.getUIntType(), funcId));
-            caseBlocks.add(caseBlock);
-        });
+        caseValues.add(funcTag);
+        caseBlocks.add(caseBlock);
+    }
 
     // Create flattened case arguments array
     List<IRInst*> flattenedCaseArgs;
@@ -233,12 +230,12 @@ struct TagOpsLoweringContext : public InstPassBase
         // collection.
         //
         // e.g.
-        //      let a : TagType(TableCollection(B, C)) = /* ... */;
-        //      let b : TagType(TableCollection(A, B, C)) = GetTagForSuperCollection(a);
+        //      let a : TagType(WitnessTableCollection(B, C)) = /* ... */;
+        //      let b : TagType(WitnessTableCollection(A, B, C)) = GetTagForSuperCollection(a);
         // becomes
-        //      let a : TagType(TableCollection(B, C)) = /* ... */;
+        //      let a : TagType(WitnessTableCollection(B, C)) = /* ... */;
         //      let lookupArr : ArrayType<UInt, 2> = [1, 2]; // B is at index 1, C is at index 2
-        //      let b : TagType(TableCollection(A, B, C)) = ElementExtract(lookupArr, a);
+        //      let b : TagType(WitnessTableCollection(A, B, C)) = ElementExtract(lookupArr, a);
         //
         // Note that we leave the tag-types of the output intact since we may need to lower
         // later tag operations.
@@ -299,11 +296,11 @@ struct TagOpsLoweringContext : public InstPassBase
         // collection.
         //
         // e.g.
-        //      let a : TagType(TableCollection(B, C)) = /* ... */;
+        //      let a : TagType(WitnessTableCollection(B, C)) = /* ... */;
         //      let b : TagType(FuncCollection(C_key, B_key)) =
         //          GetTagForMappedCollection(a, key);
         // becomes
-        //      let a : TagType(TableCollection(B, C)) = /* ... */;
+        //      let a : TagType(WitnessTableCollection(B, C)) = /* ... */;
         //      let lookupArr : ArrayType<UInt, 2> = [1, 0]; // B is at index 1, C is at index 0
         //      let b : TagType(FuncCollection(C_key, B_key)) = ElementExtract(lookupArr, a);
         //
@@ -311,7 +308,7 @@ struct TagOpsLoweringContext : public InstPassBase
         // later tag operations.
         //
 
-        auto srcCollection = cast<IRTableCollection>(
+        auto srcCollection = cast<IRWitnessTableCollection>(
             cast<IRCollectionTagType>(inst->getOperand(0)->getDataType())->getOperand(0));
         auto destCollection =
             cast<IRCollectionBase>(cast<IRCollectionTagType>(inst->getDataType())->getOperand(0));
@@ -431,6 +428,30 @@ struct TagOpsLoweringContext : public InstPassBase
         inst->removeAndDeallocate();
     }
 
+    void lowerGetTagOfElementInCollection(IRGetTagOfElementInCollection* inst)
+    {
+        IRBuilder builder(inst->getModule());
+        builder.setInsertAfter(inst);
+
+        // find the index of the element in the collection
+        auto collection = cast<IRCollectionBase>(inst->getOperand(1));
+        auto element = inst->getOperand(0);
+        UInt foundIndex = UInt(-1);
+        for (UInt i = 0; i < collection->getCount(); i++)
+        {
+            if (collection->getElement(i) == element)
+            {
+                foundIndex = i;
+                break;
+            }
+        }
+
+        SLANG_ASSERT(foundIndex != UInt(-1));
+        auto resultValue = builder.getIntValue(inst->getDataType(), foundIndex);
+        inst->replaceUsesWith(resultValue);
+        inst->removeAndDeallocate();
+    }
+
     void processInst(IRInst* inst)
     {
         switch (inst->getOp())
@@ -444,31 +465,138 @@ struct TagOpsLoweringContext : public InstPassBase
         case kIROp_GetTagForSpecializedCollection:
             lowerGetTagForSpecializedCollection(as<IRGetTagForSpecializedCollection>(inst));
             break;
+        case kIROp_GetTagOfElementInCollection:
+            lowerGetTagOfElementInCollection(as<IRGetTagOfElementInCollection>(inst));
+            break;
         default:
             break;
         }
     }
 
-    void lowerFuncCollection(IRFuncCollection* collection)
+
+    void processModule()
     {
-        // Replace the `IRFuncCollection` with a dispatch function,
+        processAllInsts([&](IRInst* inst) { return processInst(inst); });
+    }
+};
+
+struct DispatcherLoweringContext : public InstPassBase
+{
+    DispatcherLoweringContext(IRModule* module)
+        : InstPassBase(module)
+    {
+    }
+
+    void lowerGetSpecializedDispatcher(IRGetSpecializedDispatcher* dispatcher)
+    {
+        // Replace the `IRGetSpecializedDispatcher` with a dispatch function,
         // which takes an extra first parameter for the tag (i.e. ID)
         //
         // We'll also replace the callee in all 'call' insts.
         //
 
-        IRBuilder builder(collection->getModule());
-        if (collection->hasUses() && collection->getDataType() != nullptr)
+        auto witnessTableCollection = cast<IRWitnessTableCollection>(dispatcher->getOperand(0));
+        auto key = cast<IRStructKey>(dispatcher->getOperand(1));
+
+        List<IRInst*> specArgs;
+        for (UIndex i = 2; i < dispatcher->getOperandCount(); i++)
         {
-            auto dispatchFunc = createDispatchFunc(collection);
+            specArgs.add(dispatcher->getOperand(i));
+        }
+
+        Dictionary<IRInst*, IRInst*> elements;
+        UInt index = 0;
+        IRBuilder builder(dispatcher->getModule());
+        forEachInCollection(
+            witnessTableCollection,
+            [&](IRInst* table)
+            {
+                auto generic =
+                    cast<IRGeneric>(findWitnessTableEntry(cast<IRWitnessTable>(table), key));
+
+                auto specializedFuncType =
+                    (IRType*)specializeGeneric(cast<IRSpecialize>(builder.emitSpecializeInst(
+                        builder.getTypeKind(),
+                        generic->getDataType(),
+                        specArgs.getCount(),
+                        specArgs.getBuffer())));
+
+                auto specializedFunc = builder.emitSpecializeInst(
+                    specializedFuncType,
+                    generic,
+                    specArgs.getCount(),
+                    specArgs.getBuffer());
+
+                auto singletonTag = builder.emitGetTagOfElementInCollection(
+                    builder.getCollectionTagType(witnessTableCollection),
+                    table,
+                    witnessTableCollection);
+
+                elements.add(singletonTag, specializedFunc);
+            });
+
+        if (dispatcher->hasUses() && dispatcher->getDataType() != nullptr)
+        {
+            auto dispatchFunc =
+                createDispatchFunc(cast<IRFuncType>(dispatcher->getDataType()), elements);
             traverseUses(
-                collection,
+                dispatcher,
                 [&](IRUse* use)
                 {
                     if (auto callInst = as<IRCall>(use->getUser()))
                     {
-                        // If the call is a collection call, replace it with the dispatch function
-                        if (callInst->getCallee() == collection)
+                        // Replace callee with the generated dispatchFunc.
+                        if (callInst->getCallee() == dispatcher)
+                        {
+                            IRBuilder callBuilder(callInst);
+                            callBuilder.setInsertBefore(callInst);
+                            callBuilder.replaceOperand(callInst->getCalleeUse(), dispatchFunc);
+                        }
+                    }
+                });
+        }
+    }
+
+    void lowerGetDispatcher(IRGetDispatcher* dispatcher)
+    {
+        // Replace the `IRGetDispatcher` with a dispatch function,
+        // which takes an extra first parameter for the tag (i.e. ID)
+        //
+        // We'll also replace the callee in all 'call' insts.
+        //
+
+        auto witnessTableCollection = cast<IRWitnessTableCollection>(dispatcher->getOperand(0));
+        auto key = cast<IRStructKey>(dispatcher->getOperand(1));
+
+        IRBuilder builder(dispatcher->getModule());
+
+        Dictionary<IRInst*, IRInst*> elements;
+        UInt index = 0;
+        forEachInCollection(
+            witnessTableCollection,
+            [&](IRInst* table)
+            {
+                auto tag = builder.emitGetTagOfElementInCollection(
+                    builder.getCollectionTagType(witnessTableCollection),
+                    table,
+                    witnessTableCollection);
+                elements.add(
+                    tag,
+                    cast<IRFunc>(findWitnessTableEntry(cast<IRWitnessTable>(table), key)));
+            });
+
+        if (dispatcher->hasUses() && dispatcher->getDataType() != nullptr)
+        {
+            auto dispatchFunc =
+                createDispatchFunc(cast<IRFuncType>(dispatcher->getDataType()), elements);
+            traverseUses(
+                dispatcher,
+                [&](IRUse* use)
+                {
+                    if (auto callInst = as<IRCall>(use->getUser()))
+                    {
+                        // Replace callee with the generated dispatchFunc.
+                        if (callInst->getCallee() == dispatcher)
                         {
                             IRBuilder callBuilder(callInst);
                             callBuilder.setInsertBefore(callInst);
@@ -481,13 +609,23 @@ struct TagOpsLoweringContext : public InstPassBase
 
     void processModule()
     {
-        processInstsOfType<IRFuncCollection>(
-            kIROp_FuncCollection,
-            [&](IRFuncCollection* inst) { return lowerFuncCollection(inst); });
+        processInstsOfType<IRGetDispatcher>(
+            kIROp_GetDispatcher,
+            [&](IRGetDispatcher* inst) { return lowerGetDispatcher(inst); });
 
-        processAllInsts([&](IRInst* inst) { return processInst(inst); });
+        processInstsOfType<IRGetSpecializedDispatcher>(
+            kIROp_GetSpecializedDispatcher,
+            [&](IRGetSpecializedDispatcher* inst) { return lowerGetSpecializedDispatcher(inst); });
     }
 };
+
+bool lowerDispatchers(IRModule* module, DiagnosticSink* sink)
+{
+    SLANG_UNUSED(sink);
+    DispatcherLoweringContext context(module);
+    context.processModule();
+    return true;
+}
 
 // This context lowers `TypeCollection` instructions.
 struct CollectionLoweringContext : public InstPassBase
@@ -497,35 +635,37 @@ struct CollectionLoweringContext : public InstPassBase
     {
     }
 
-    void lowerTypeCollection(IRTypeCollection* collection)
+    void lowerValueOfCollectionType(IRValueOfCollectionType* valueOfCollectionType)
     {
         // Type collections are replaced with `AnyValueType` large enough to hold
         // any of the types in the collection.
         //
 
         HashSet<IRType*> types;
-        for (UInt i = 0; i < collection->getCount(); i++)
+        for (UInt i = 0; i < valueOfCollectionType->getCollection()->getCount(); i++)
         {
-            if (auto type = as<IRType>(collection->getElement(i)))
+            if (auto type = as<IRType>(valueOfCollectionType->getCollection()->getElement(i)))
             {
                 types.add(type);
             }
         }
 
-        IRBuilder builder(collection->getModule());
+        IRBuilder builder(module);
         auto anyValueType = createAnyValueType(&builder, types);
-        collection->replaceUsesWith(anyValueType);
+        valueOfCollectionType->replaceUsesWith(anyValueType);
     }
 
     void processModule()
     {
-        processInstsOfType<IRTypeCollection>(
-            kIROp_TypeCollection,
-            [&](IRTypeCollection* inst) { return lowerTypeCollection(inst); });
+        processInstsOfType<IRValueOfCollectionType>(
+            kIROp_ValueOfCollectionType,
+            [&](IRValueOfCollectionType* inst) { return lowerValueOfCollectionType(inst); });
     }
 };
 
-// Lower `TypeCollection` instructions
+// Lower `ValueOfCollectionType(TypeCollection(...))` instructions by replacing them with
+// appropriate `AnyValueType` instructions.
+//
 void lowerTypeCollections(IRModule* module, DiagnosticSink* sink)
 {
     SLANG_UNUSED(sink);
@@ -860,16 +1000,77 @@ struct TaggedUnionLoweringContext : public InstPassBase
         IRBuilder builder(module);
         builder.setInsertInto(module);
 
-        auto typeCollection = cast<IRTypeCollection>(taggedUnion->getOperand(0));
-        auto tableCollection = cast<IRTableCollection>(taggedUnion->getOperand(1));
+        auto typeCollection = builder.getValueOfCollectionType(taggedUnion->getTypeCollection());
+        auto tableCollection = taggedUnion->getWitnessTableCollection();
 
-        if (getCollectionCount(typeCollection) == 1)
+        if (taggedUnion->getTypeCollection()->isSingleton())
             return builder.getTupleType(List<IRType*>(
                 {(IRType*)makeTagType(tableCollection),
-                 (IRType*)getCollectionElement(typeCollection, 0)}));
+                 (IRType*)taggedUnion->getTypeCollection()->getElement(0)}));
 
         return builder.getTupleType(
             List<IRType*>({(IRType*)makeTagType(tableCollection), (IRType*)typeCollection}));
+    }
+
+    bool lowerGetValueFromTaggedUnion(IRGetValueFromTaggedUnion* inst)
+    {
+        // We replace `GetValueFromTaggedUnion(taggedUnionVal)` with
+        // `GetTupleElement(taggedUnionVal, 1)`
+        //
+
+        IRBuilder builder(module);
+        builder.setInsertAfter(inst);
+
+        auto tupleVal = inst->getOperand(0);
+        inst->replaceUsesWith(builder.emitGetTupleElement(
+            (IRType*)as<IRTupleType>(tupleVal->getDataType())->getOperand(1),
+            tupleVal,
+            1));
+        inst->removeAndDeallocate();
+        return true;
+    }
+
+    bool lowerGetTagFromTaggedUnion(IRGetTagFromTaggedUnion* inst)
+    {
+        // We replace `GetTagFromTaggedUnion(taggedUnionVal)` with
+        // `GetTupleElement(taggedUnionVal, 0)`
+        //
+
+        IRBuilder builder(module);
+        builder.setInsertAfter(inst);
+
+        auto tupleVal = inst->getOperand(0);
+        inst->replaceUsesWith(builder.emitGetTupleElement(
+            (IRType*)as<IRTupleType>(tupleVal->getDataType())->getOperand(0),
+            tupleVal,
+            0));
+        inst->removeAndDeallocate();
+        return true;
+    }
+
+    bool lowerGetTypeTagFromTaggedUnion(IRGetTypeTagFromTaggedUnion* inst)
+    {
+        // We don't use type tags anywhere, so this instruction should have no
+        // uses.
+        //
+        SLANG_ASSERT(inst->hasUses() == false);
+        inst->removeAndDeallocate();
+        return true;
+    }
+
+    bool lowerMakeTaggedUnion(IRMakeTaggedUnion* inst)
+    {
+        // We replace `MakeTaggedUnion(tag, val)` with `MakeTuple(tag, val)`
+        //
+
+        IRBuilder builder(module);
+        builder.setInsertAfter(inst);
+
+        auto tag = inst->getOperand(0);
+        auto val = inst->getOperand(1);
+        inst->replaceUsesWith(builder.emitMakeTuple((IRType*)inst->getDataType(), {tag, val}));
+        inst->removeAndDeallocate();
+        return true;
     }
 
     bool processModule()
@@ -884,6 +1085,27 @@ struct TaggedUnionLoweringContext : public InstPassBase
                 inst->replaceUsesWith(convertToTupleType(inst));
                 inst->removeAndDeallocate();
             });
+
+        // TODO: Is this repeated scanning of the module inefficient?
+        // It feels like this form could be very efficient if it's automatically
+        // 'fused' together.
+        //
+        processInstsOfType<IRGetTagFromTaggedUnion>(
+            kIROp_GetTagFromTaggedUnion,
+            [&](IRGetTagFromTaggedUnion* inst) { return lowerGetTagFromTaggedUnion(inst); });
+
+        processInstsOfType<IRGetTypeTagFromTaggedUnion>(
+            kIROp_GetTypeTagFromTaggedUnion,
+            [&](IRGetTypeTagFromTaggedUnion* inst)
+            { return lowerGetTypeTagFromTaggedUnion(inst); });
+
+        processInstsOfType<IRGetValueFromTaggedUnion>(
+            kIROp_GetValueFromTaggedUnion,
+            [&](IRGetValueFromTaggedUnion* inst) { return lowerGetValueFromTaggedUnion(inst); });
+
+        processInstsOfType<IRMakeTaggedUnion>(
+            kIROp_MakeTaggedUnion,
+            [&](IRMakeTaggedUnion* inst) { return lowerMakeTaggedUnion(inst); });
 
         // Then, convert any loads/stores from reinterpreted pointers.
         bool hasCastInsts = false;

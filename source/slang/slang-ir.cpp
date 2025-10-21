@@ -8816,6 +8816,21 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_GetPerVertexInputArray:
     case kIROp_MetalCastToDepthTexture:
     case kIROp_GetCurrentStage:
+    case kIROp_GetDispatcher:
+    case kIROp_GetSpecializedDispatcher:
+    case kIROp_GetTagForMappedCollection:
+    case kIROp_GetTagForSpecializedCollection:
+    case kIROp_GetTagForSuperCollection:
+    case kIROp_GetTagFromSequentialID:
+    case kIROp_GetSequentialIDFromTag:
+    case kIROp_CastInterfaceToTaggedUnionPtr:
+    case kIROp_CastTaggedUnionToInterfacePtr:
+    case kIROp_GetElementFromTag:
+    case kIROp_GetTagFromTaggedUnion:
+    case kIROp_GetTypeTagFromTaggedUnion:
+    case kIROp_GetValueFromTaggedUnion:
+    case kIROp_MakeTaggedUnion:
+    case kIROp_GetTagOfElementInCollection:
         return false;
 
     case kIROp_ForwardDifferentiate:
