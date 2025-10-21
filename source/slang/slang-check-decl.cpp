@@ -14126,7 +14126,7 @@ struct CapabilityDeclReferenceVisitor
                     oldCap);
                 handleParentDiagnosticFunc(DiagnosticCategory::Capability);
             }
-            addNewCapTargetSetInTargetSwitch(
+            addNewCapInTargetSwitch(
                 set,
                 targetCap,
                 stmt->targetCases[targetCaseIndex],
@@ -14141,7 +14141,7 @@ struct CapabilityDeclReferenceVisitor
     }
 
 private:
-    void addNewCapTargetSetInTargetSwitch(
+    void addNewCapInTargetSwitch(
         CapabilitySet& currentSet,
         const CapabilitySet& newTargets,
         const TargetCaseStmt* processingTargetCase,
@@ -14159,9 +14159,6 @@ private:
                 // a superset of the existing one, or the other way around. This is the validation
                 // check, because if this condition is not met, then we have conflicting capability
                 // requirements, and we will report a diagnostic.
-                // TODO: How to do this check? We seems don't have such infrastructure yet.
-                // We can form two CapabilitySet instances, and each will only contain one target,
-                // and use the existing `joinWithOtherWillChangeThis` method to do the check.
                 CapabilityTargetSet tmp = *currentTarget;
                 tmp.unionWith(targetToAdd.second);
                 if (tmp == *currentTarget)
@@ -14190,7 +14187,7 @@ private:
                         continue;
                     }
 
-                    // otherwise, we have conflicting capability requirements.
+                    // otherwise, we have conflicting capability requirements,
                     // report diagnostic.
                     CapabilitySet conflictCapSet1;
                     CapabilitySet conflictCapSet2;
