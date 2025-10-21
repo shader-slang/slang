@@ -307,6 +307,13 @@ else()
     )
 endif()
 
+set_target_properties(slang PROPERTIES
+    VERSION 0.${SLANG_VERSION_NUMERIC}
+    SOVERSION 0.${SLANG_VERSION_NUMERIC}
+    MACHO_COMPATIBILITY_VERSION 0.0.0
+    MACHO_CURRENT_VERSION ${SLANG_VERSION_NUMERIC}
+)
+
 #
 # Windows proxy DLL for backward compatibility
 # Creates slang.dll that forwards all calls to slang-compiler.dll
