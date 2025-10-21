@@ -69,7 +69,10 @@ public:
 
     using Layout = FossilizedPtrLikeLayout;
 
-    static bool isMatchingKind(FossilizedValKind kind) { return kind == FossilizedValKind::Ptr; }
+    SLANG_FORCE_INLINE static bool isMatchingKind(FossilizedValKind kind)
+    {
+        return kind == FossilizedValKind::Ptr;
+    }
 };
 
 static_assert(sizeof(FossilizedPtr<void>) == sizeof(uint32_t));
@@ -150,11 +153,11 @@ public:
     using Layout = FossilizedValLayout;
     static const FossilizedValKind kKind = Kind;
 
-    T const& get() const { return _value; }
+    SLANG_FORCE_INLINE T const& get() const { return _value; }
 
-    operator T const&() const { return _value; }
+    SLANG_FORCE_INLINE operator T const&() const { return _value; }
 
-    static bool isMatchingKind(FossilizedValKind kind) { return kind == kKind; }
+    SLANG_FORCE_INLINE static bool isMatchingKind(FossilizedValKind kind) { return kind == kKind; }
 
 private:
     T _value;
@@ -207,11 +210,11 @@ public:
     using Layout = FossilizedValLayout;
     static const FossilizedValKind kKind = FossilizedValKind::Bool;
 
-    bool get() const { return _value != 0; }
+    SLANG_FORCE_INLINE bool get() const { return _value != 0; }
 
-    operator bool() const { return get(); }
+    SLANG_FORCE_INLINE operator bool() const { return get(); }
 
-    static bool isMatchingKind(FossilizedValKind kind) { return kind == kKind; }
+    SLANG_FORCE_INLINE static bool isMatchingKind(FossilizedValKind kind) { return kind == kKind; }
 
 private:
     uint8_t _value;
@@ -231,9 +234,9 @@ template<typename LiveType, typename FossilizedAsType>
 struct FossilizedViaCastVal
 {
 public:
-    LiveType get() const { return LiveType(_value.get()); }
+    SLANG_FORCE_INLINE LiveType get() const { return LiveType(_value.get()); }
 
-    operator LiveType() const { return get(); }
+    SLANG_FORCE_INLINE operator LiveType() const { return get(); }
 
 
 private:
@@ -268,11 +271,11 @@ public:
     Size getSize() const;
     UnownedTerminatedStringSlice get() const;
 
-    operator UnownedTerminatedStringSlice() const { return get(); }
+    SLANG_FORCE_INLINE operator UnownedTerminatedStringSlice() const { return get(); }
 
     using Layout = FossilizedValLayout;
 
-    static bool isMatchingKind(FossilizedValKind kind)
+    SLANG_FORCE_INLINE static bool isMatchingKind(FossilizedValKind kind)
     {
         return kind == FossilizedValKind::StringObj;
     }
@@ -308,9 +311,9 @@ public:
 
     Count getElementCount() const;
 
-    void const* getBuffer() const { return this; }
+    SLANG_FORCE_INLINE void const* getBuffer() const { return this; }
 
-    static bool isMatchingKind(FossilizedValKind kind)
+    SLANG_FORCE_INLINE static bool isMatchingKind(FossilizedValKind kind)
     {
         switch (kind)
         {
@@ -342,7 +345,7 @@ public:
 struct FossilizedArrayObjBase : FossilizedContainerObjBase
 {
 public:
-    static bool isMatchingKind(FossilizedValKind kind)
+    SLANG_FORCE_INLINE static bool isMatchingKind(FossilizedValKind kind)
     {
         return kind == FossilizedValKind::ArrayObj;
     }
@@ -419,13 +422,13 @@ struct FossilizedPtrLikeLayout
 struct FossilizedOptionalObjBase
 {
 public:
-    void* getValue() { return this; }
+    SLANG_FORCE_INLINE void* getValue() { return this; }
 
-    void const* getValue() const { return this; }
+    SLANG_FORCE_INLINE void const* getValue() const { return this; }
 
     using Layout = FossilizedPtrLikeLayout;
 
-    static bool isMatchingKind(FossilizedValKind kind)
+    SLANG_FORCE_INLINE static bool isMatchingKind(FossilizedValKind kind)
     {
         return kind == FossilizedValKind::OptionalObj;
     }
@@ -440,17 +443,17 @@ private:
 template<typename T>
 struct FossilizedOptionalObj : FossilizedOptionalObjBase
 {
-    T* getValue() { return this; }
+    SLANG_FORCE_INLINE T* getValue() { return this; }
 
-    T const* getValue() const { return this; }
+    SLANG_FORCE_INLINE T const* getValue() const { return this; }
 };
 
 template<typename T>
 struct FossilizedOptional
 {
 public:
-    explicit operator bool() const { return _value.get() != nullptr; }
-    T const& operator*() const { return *_value.get(); }
+    SLANG_FORCE_INLINE explicit operator bool() const { return _value.get() != nullptr; }
+    SLANG_FORCE_INLINE T const& operator*() const { return *_value.get(); }
 
 private:
     FossilizedPtr<T> _value;
@@ -475,40 +478,40 @@ static_assert(sizeof(Fossilized<std::optional<double>>) == sizeof(FossilUInt));
 struct FossilizedString
 {
 public:
-    Size getSize() const { return _obj ? _obj->getSize() : 0; }
+    SLANG_FORCE_INLINE Size getSize() const { return _obj ? _obj->getSize() : 0; }
 
-    UnownedTerminatedStringSlice get() const
+    SLANG_FORCE_INLINE UnownedTerminatedStringSlice get() const
     {
         return _obj ? _obj->get() : UnownedTerminatedStringSlice();
     }
 
-    operator UnownedTerminatedStringSlice() const { return get(); }
+    SLANG_FORCE_INLINE operator UnownedTerminatedStringSlice() const { return get(); }
 
 private:
     FossilizedPtr<FossilizedStringObj> _obj;
 };
 
-inline int compare(FossilizedString const& lhs, UnownedStringSlice const& rhs)
+SLANG_FORCE_INLINE int compare(FossilizedString const& lhs, UnownedStringSlice const& rhs)
 {
     return compare(lhs.get(), rhs);
 }
 
-inline bool operator==(FossilizedString const& left, UnownedStringSlice const& right)
+SLANG_FORCE_INLINE bool operator==(FossilizedString const& left, UnownedStringSlice const& right)
 {
     return left.get() == right;
 }
 
-inline bool operator!=(FossilizedString const& left, UnownedStringSlice const& right)
+SLANG_FORCE_INLINE bool operator!=(FossilizedString const& left, UnownedStringSlice const& right)
 {
     return left.get() != right;
 }
 
-inline bool operator==(FossilizedStringObj const& left, UnownedStringSlice const& right)
+SLANG_FORCE_INLINE bool operator==(FossilizedStringObj const& left, UnownedStringSlice const& right)
 {
     return left.get() == right;
 }
 
-inline bool operator!=(FossilizedStringObj const& left, UnownedStringSlice const& right)
+SLANG_FORCE_INLINE bool operator!=(FossilizedStringObj const& left, UnownedStringSlice const& right)
 {
     return left.get() != right;
 }
@@ -531,21 +534,21 @@ template<typename T>
 struct FossilizedContainer
 {
 public:
-    Count getElementCount() const
+    SLANG_FORCE_INLINE Count getElementCount() const
     {
         if (!_obj)
             return 0;
         return _obj->getElementCount();
     }
-    T const* getBuffer() const
+    SLANG_FORCE_INLINE T const* getBuffer() const
     {
         if (!_obj)
             return nullptr;
         return (T const*)_obj.get()->getBuffer();
     }
 
-    T const* begin() const { return getBuffer(); }
-    T const* end() const { return getBuffer() + getElementCount(); }
+    SLANG_FORCE_INLINE T const* begin() const { return getBuffer(); }
+    SLANG_FORCE_INLINE T const* end() const { return getBuffer() + getElementCount(); }
 
 private:
     FossilizedPtr<FossilizedContainerObj<T>> _obj;
@@ -555,7 +558,7 @@ template<typename T>
 struct FossilizedArray : FossilizedContainer<T>
 {
 public:
-    T const& operator[](Index index) const
+    SLANG_FORCE_INLINE T const& operator[](Index index) const
     {
         SLANG_ASSERT(index >= 0 && index < this->getElementCount());
         return this->getBuffer()[index];
@@ -611,7 +614,7 @@ struct FossilizedTypeTraits<std::pair<K, V>>
 struct FossilizedDictionaryObjBase : FossilizedContainerObjBase
 {
 public:
-    static bool isMatchingKind(FossilizedValKind kind)
+    SLANG_FORCE_INLINE static bool isMatchingKind(FossilizedValKind kind)
     {
         return kind == FossilizedValKind::DictionaryObj;
     }
@@ -677,7 +680,7 @@ struct FossilizedRecordVal
 public:
     using Layout = FossilizedRecordLayout;
 
-    static bool isMatchingKind(FossilizedValKind kind)
+    SLANG_FORCE_INLINE static bool isMatchingKind(FossilizedValKind kind)
     {
         switch (kind)
         {
@@ -705,10 +708,10 @@ public:
 
     FossilizedValLayout* getContentLayout() const;
 
-    void* getContentDataPtr() { return this; }
-    void const* getContentDataPtr() const { return this; }
+    SLANG_FORCE_INLINE void* getContentDataPtr() { return this; }
+    SLANG_FORCE_INLINE void const* getContentDataPtr() const { return this; }
 
-    static bool isMatchingKind(FossilizedValKind kind)
+    SLANG_FORCE_INLINE static bool isMatchingKind(FossilizedValKind kind)
     {
         return kind == FossilizedValKind::VariantObj;
     }
@@ -802,11 +805,11 @@ public:
 
     /// Construct a null reference.
     ///
-    ValRefBase() {}
+    SLANG_FORCE_INLINE ValRefBase() {}
 
     /// Construct a reference to the given `data`, assuming it has the given `layout`.
     ///
-    ValRefBase(T* data, Layout const* layout)
+    SLANG_FORCE_INLINE ValRefBase(T* data, Layout const* layout)
         : _data(data), _layout(layout)
     {
     }
@@ -816,34 +819,36 @@ public:
     /// Only enabled if `U*` is convertible to `T*`.
     ///
     template<typename U>
-    ValRefBase(ValRefBase<U> ref, std::enable_if_t<std::is_convertible_v<U*, T*>, void>* = nullptr)
+    SLANG_FORCE_INLINE ValRefBase(
+        ValRefBase<U> ref,
+        std::enable_if_t<std::is_convertible_v<U*, T*>, void>* = nullptr)
         : _data(ref.getDataPtr()), _layout((Layout const*)ref.getLayout())
     {
     }
 
     /// Get a pointer to the value being referenced.
     ///
-    T* getDataPtr() const { return _data; }
+    SLANG_FORCE_INLINE T* getDataPtr() const { return _data; }
 
     /// Get a reference to the value being referenced.
     ///
     /// This accessor is disabled in the case where `T` is `void`.
     ///
     template<typename U = T>
-    std::enable_if_t<!std::is_same_v<U, void>, T>& getDataRef() const
+    SLANG_FORCE_INLINE std::enable_if_t<!std::is_same_v<U, void>, T>& getDataRef() const
     {
         return *_data;
     }
 
     /// Get the layout of the value being referenced.
     ///
-    Layout const* getLayout() const { return _layout; }
+    SLANG_FORCE_INLINE Layout const* getLayout() const { return _layout; }
 
     /// Get the kind of value being referenced.
     ///
     /// This reference must not be null.
     ///
-    FossilizedValKind getKind() const
+    SLANG_FORCE_INLINE FossilizedValKind getKind() const
     {
         SLANG_ASSERT(getLayout());
         return getLayout()->kind;
@@ -881,12 +886,12 @@ public:
 
     /// Construct a null pointer.
     ///
-    ValPtr() {}
-    ValPtr(std::nullptr_t) {}
+    SLANG_FORCE_INLINE ValPtr() {}
+    SLANG_FORCE_INLINE ValPtr(std::nullptr_t) {}
 
     /// Construct a pointer to the given `data`, assuming it has the given `layout`.
     ///
-    ValPtr(T* data, TargetLayout const* layout)
+    SLANG_FORCE_INLINE ValPtr(T* data, TargetLayout const* layout)
         : _ref(data, layout)
     {
     }
@@ -897,7 +902,7 @@ public:
     /// We define it as a constructor as a slightly more preferable alternative
     /// to overloading prefix `operator&` (which is almost always a Bad Idea)
     ///
-    explicit ValPtr(ValRef<T> ref)
+    SLANG_FORCE_INLINE explicit ValPtr(ValRef<T> ref)
         : _ref(ref)
     {
     }
@@ -907,25 +912,27 @@ public:
     /// Only enabled if `U*` is convertible to `T*`.
     ///
     template<typename U>
-    ValPtr(ValPtr<U> ptr, std::enable_if_t<std::is_convertible_v<U*, T*>, void>* = nullptr)
+    SLANG_FORCE_INLINE ValPtr(
+        ValPtr<U> ptr,
+        std::enable_if_t<std::is_convertible_v<U*, T*>, void>* = nullptr)
         : _ref(*ptr)
     {
     }
 
     /// Get a pointer to the value being referenced.
     ///
-    T* getDataPtr() const { return _ref.getDataPtr(); }
+    SLANG_FORCE_INLINE T* getDataPtr() const { return _ref.getDataPtr(); }
 
     /// Get the layout of the value being referenced.
     ///
-    TargetLayout* getLayout() const { return _ref.getLayout(); }
+    SLANG_FORCE_INLINE TargetLayout const* getLayout() const { return _ref.getLayout(); }
 
-    T* get() const { return _ref.getDataPtr(); }
-    operator T*() const { return get(); }
+    SLANG_FORCE_INLINE T* get() const { return _ref.getDataPtr(); }
+    SLANG_FORCE_INLINE operator T*() const { return get(); }
 
     /// Deference this `ValPtr` to get a `ValRef`.
     ///
-    ValRef<T> operator*() const { return _ref; }
+    SLANG_FORCE_INLINE ValRef<T> operator*() const { return _ref; }
 
     /// Deference this `ValPtr` for member access.
     ///
@@ -939,7 +946,7 @@ public:
     /// that behavior is for the `operator->` on `ValPtr`
     /// to return a pointer to a `ValRef`.
     ///
-    ValRef<T> const* operator->() const { return &_ref; }
+    SLANG_FORCE_INLINE ValRef<T> const* operator->() const { return &_ref; }
 
 private:
     ValRef<T> _ref;
@@ -948,7 +955,7 @@ private:
 /// Get a `ValPtr` pointing to the same value as the given `ref`.
 ///
 template<typename T>
-inline ValPtr<T> getAddress(ValRef<T> ref)
+SLANG_FORCE_INLINE ValPtr<T> getAddress(ValRef<T> ref)
 {
     return ValPtr<T>(ref);
 }
@@ -973,10 +980,10 @@ struct ValRef<FossilizedStringObj> : ValRefBase<FossilizedStringObj>
 public:
     using ValRefBase<FossilizedStringObj>::ValRefBase;
 
-    Size getSize() const { return getDataPtr()->getSize(); }
-    UnownedTerminatedStringSlice get() const { return getDataPtr()->get(); }
+    SLANG_FORCE_INLINE Size getSize() const { return getDataPtr()->getSize(); }
+    SLANG_FORCE_INLINE UnownedTerminatedStringSlice get() const { return getDataPtr()->get(); }
 
-    operator UnownedTerminatedStringSlice() const { return get(); }
+    SLANG_FORCE_INLINE operator UnownedTerminatedStringSlice() const { return get(); }
 };
 
 
@@ -986,7 +993,7 @@ struct ValRef<FossilizedContainerObjBase> : ValRefBase<FossilizedContainerObjBas
 public:
     using ValRefBase<FossilizedContainerObjBase>::ValRefBase;
 
-    Count getElementCount() const
+    SLANG_FORCE_INLINE Count getElementCount() const
     {
         auto data = this->getDataPtr();
         if (!data)
@@ -1004,7 +1011,7 @@ struct ValRef<FossilizedArrayObjBase> : ValRefBase<FossilizedArrayObjBase>
 public:
     using ValRefBase<FossilizedArrayObjBase>::ValRefBase;
 
-    Count getElementCount() const
+    SLANG_FORCE_INLINE Count getElementCount() const
     {
         auto data = this->getDataPtr();
         if (!data)
@@ -1022,7 +1029,7 @@ struct ValRef<FossilizedDictionaryObjBase> : ValRefBase<FossilizedDictionaryObjB
 public:
     using ValRefBase<FossilizedDictionaryObjBase>::ValRefBase;
 
-    Count getElementCount() const
+    SLANG_FORCE_INLINE Count getElementCount() const
     {
         auto data = this->getDataPtr();
         if (!data)
@@ -1038,9 +1045,9 @@ struct ValRef<FossilizedOptionalObjBase> : ValRefBase<FossilizedOptionalObjBase>
 public:
     using ValRefBase<FossilizedOptionalObjBase>::ValRefBase;
 
-    bool hasValue() const { return this->getDataPtr() != nullptr; }
+    SLANG_FORCE_INLINE bool hasValue() const { return this->getDataPtr() != nullptr; }
 
-    AnyValRef getValue() const
+    SLANG_FORCE_INLINE AnyValRef getValue() const
     {
         SLANG_ASSERT(hasValue());
         return AnyValRef(this->getDataPtr(), this->getLayout()->elementLayout.get());
@@ -1053,7 +1060,7 @@ struct ValRef<FossilizedRecordVal> : ValRefBase<FossilizedRecordVal>
 public:
     using ValRefBase<FossilizedRecordVal>::ValRefBase;
 
-    Count getFieldCount() const { return getLayout()->fieldCount; }
+    SLANG_FORCE_INLINE Count getFieldCount() const { return getLayout()->fieldCount; }
 
     AnyValRef getField(Index index) const;
 };
@@ -1064,13 +1071,13 @@ struct ValRef<FossilizedPtr<T>> : ValRefBase<FossilizedPtr<T>>
 public:
     using ValRefBase<FossilizedPtr<T>>::ValRefBase;
 
-    ValRef<T> getTargetValRef() const
+    SLANG_FORCE_INLINE ValRef<T> getTargetValRef() const
     {
         auto ptrPtr = this->getDataPtr();
         return ValRef<T>(*ptrPtr, this->getLayout()->elementLayout.get());
     }
 
-    ValPtr<T> getTargetValPtr() const { return ValPtr<T>(getTargetValRef()); }
+    SLANG_FORCE_INLINE ValPtr<T> getTargetValPtr() const { return ValPtr<T>(getTargetValRef()); }
 
     //    ValRef<T> operator*() const;
 };
@@ -1085,19 +1092,19 @@ public:
 /// Statically cast a pointer to a fossilized value.
 ///
 template<typename T>
-ValPtr<T> cast(AnyValPtr valPtr)
+SLANG_FORCE_INLINE ValPtr<T> cast(AnyValPtr valPtr)
 {
-    if (!valPtr)
-        return ValPtr<T>();
+    //    if (!valPtr)
+    //        return ValPtr<T>();
     return ValPtr<T>(
         static_cast<T*>(valPtr.getDataPtr()),
-        (typename T::Layout*)(valPtr->getLayout()));
+        (typename T::Layout*)(valPtr.getLayout()));
 }
 
 /// Dynamic cast of a pointer to a fossilized value.
 ///
 template<typename T>
-ValPtr<T> as(AnyValPtr valPtr)
+SLANG_FORCE_INLINE ValPtr<T> as(AnyValPtr valPtr)
 {
     if (!valPtr || !T::isMatchingKind(valPtr->getKind()))
     {
@@ -1173,6 +1180,36 @@ Fossil::AnyValPtr getRootValue(ISlangBlob* blob);
 ///
 Fossil::AnyValPtr getRootValue(void const* data, Size size);
 } // namespace Fossil
+
+SLANG_FORCE_INLINE Size FossilizedStringObj::getSize() const
+{
+    auto sizePtr = (FossilUInt*)this - 1;
+    return Size(*sizePtr);
+}
+
+SLANG_FORCE_INLINE UnownedTerminatedStringSlice FossilizedStringObj::get() const
+{
+    auto size = getSize();
+    return UnownedTerminatedStringSlice((char*)this, size);
+}
+
+SLANG_FORCE_INLINE Count FossilizedContainerObjBase::getElementCount() const
+{
+    auto countPtr = (FossilUInt*)this - 1;
+    return Size(*countPtr);
+}
+
+SLANG_FORCE_INLINE FossilizedValLayout* FossilizedVariantObj::getContentLayout() const
+{
+    auto layoutPtrPtr = (FossilizedPtr<FossilizedValLayout>*)this - 1;
+    return (*layoutPtrPtr).get();
+}
+
+SLANG_FORCE_INLINE Fossil::AnyValPtr getVariantContentPtr(FossilizedVariantObj* variantPtr)
+{
+    return Fossil::AnyValPtr(variantPtr->getContentDataPtr(), variantPtr->getContentLayout());
+}
+
 
 } // namespace Slang
 

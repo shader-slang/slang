@@ -26,6 +26,8 @@ The system-value semantics are translated to the following WGSL code.
 | SV_DepthLessEqual | *Not supported* |
 | SV_DispatchThreadID | `@builtin(global_invocation_id)` |
 | SV_DomainLocation | *Not supported* |
+| SV_FragInvocationCount | *Not supported* |
+| SV_FragSize | *Not supported* |
 | SV_GSInstanceID | *Not supported* |
 | SV_GroupID | `@builtin(workgroup_id)` |
 | SV_GroupIndex | `@builtin(local_invocation_index)` |
@@ -51,6 +53,7 @@ The system-value semantics are translated to the following WGSL code.
 | SV_ViewID | *Not supported* |
 | SV_ViewportArrayIndex | *Not supported* |
 | SV_VulkanInstanceID | `@builtin(instance_index)` |
+| SV_VulkanSamplePosition | *Not supported* |
 | SV_VulkanVertexID | `@builtin(vertex_index)` |
 
 
@@ -87,14 +90,6 @@ ConstantBuffer, (RW/RasterizerOrdered)StructuredBuffer, (RW/RasterizerOrdered)By
 ConstantBuffer translates to the `uniform` address space with `read` access mode in WGSL.
 ByteAddressBuffer and RWByteAddressBuffer translate to `array<u32>` in the `storage` address space, with the `read` and `read_write` access modes in WGSL, respectively.
 StructuredBuffer and RWStructuredBuffer with struct type T translate to `array<T>` in the `storage` address space, with with the `read` and `read_write` access modes in WGSL, respectively.
-
-
-Specialization Constants
-------------------------
-
-Specialization constants are not supported when targeting WGSL, at the moment.
-They should map to 'override declarations' in WGSL, however this is not yet implemented.
-
 
 Interlocked operations
 ----------------------

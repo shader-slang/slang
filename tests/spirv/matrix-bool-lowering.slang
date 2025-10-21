@@ -1,6 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -vk -shaderobj -xslang -emit-spirv-directly
 
-//TEST_INPUT:ubuffer(data=[1 0], stride=4):in,name inputBuffer
+//TEST_INPUT:ubuffer(data=[1 0], stride=4):name inputBuffer
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> inputBuffer;
 RWStructuredBuffer<int> outputBuffer;

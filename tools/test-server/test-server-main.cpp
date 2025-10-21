@@ -10,7 +10,10 @@
 #include "../../source/core/slang-string.h"
 #include "../../source/core/slang-test-tool-util.h"
 #include "../../source/core/slang-writer.h"
+#include "../render-test/slang-support.h"
+#include "gfx-unit-test/gfx-test-util.h"
 #include "slang-com-helper.h"
+#include "slang-rhi.h"
 #include "test-server-diagnostics.h"
 #include "unit-test/slang-unit-test.h"
 
@@ -187,6 +190,18 @@ SlangResult innerMain(
 SlangResult TestServer::init(int argc, const char* const* argv)
 {
     m_exePath = argv[0];
+
+    // Command-line argument parsing
+    for (int i = 1; i < argc; i++)
+    {
+        if (strcmp(argv[i], "-ignore-abort-msg") == 0)
+        {
+#ifdef _MSC_VER
+            _set_abort_behavior(0, _WRITE_ABORT_MSG);
+#endif
+        }
+        // Ignore unknown arguments for now
+    }
 
     String canonicalPath;
     if (SLANG_SUCCEEDED(Path::getCanonical(m_exePath, canonicalPath)))
@@ -422,6 +437,9 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
     }
 
     TestReporter testReporter;
+    renderer_test::CoreDebugCallback coreDebugCallback;
+    renderer_test::CoreToRHIDebugBridge rhiDebugCallback;
+    rhiDebugCallback.setCoreCallback(&coreDebugCallback);
 
     testModule->setTestReporter(&testReporter);
 
@@ -438,6 +456,7 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
     unitTestContext.enabledApis = RenderApiFlags(args.enabledApis);
     unitTestContext.executableDirectory = m_exeDirectory.getBuffer();
     unitTestContext.enableDebugLayers = args.enableDebugLayers;
+    unitTestContext.debugCallback = &rhiDebugCallback;
 
     auto testCount = testModule->getTestCount();
     SLANG_ASSERT(testIndex >= 0 && testIndex < testCount);
@@ -455,6 +474,7 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
 
     TestServerProtocol::ExecutionResult result;
     result.result = SLANG_OK;
+    result.debugLayer = coreDebugCallback.getString();
 
     if (testReporter.m_failCount > 0)
     {
@@ -508,6 +528,7 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
     StdWriters stdWriters;
     StringBuilder stdOut;
     StringBuilder stdError;
+    renderer_test::CoreDebugCallback debugCallback;
 
     // Make writer/s act as if they are the console.
     RefPtr<StringWriter> stdOutWriter(new StringWriter(&stdOut, WriterFlag::IsConsole));
@@ -515,6 +536,7 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
 
     stdWriters.setWriter(SLANG_WRITER_CHANNEL_STD_ERROR, stdErrorWriter);
     stdWriters.setWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT, stdOutWriter);
+    stdWriters.setDebugCallback(&debugCallback);
 
     // HACK, to make behavior the same as previously
     if (args.toolName == "slangc")
@@ -529,6 +551,7 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
     result.result = funcRes;
     result.stdError = stdError;
     result.stdOut = stdOut;
+    result.debugLayer = debugCallback.getString();
 
     result.returnCode = int32_t(TestToolUtil::getReturnCode(result.result));
     return m_connection->sendResult(&result, id);

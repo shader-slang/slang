@@ -51,6 +51,14 @@ bool DebugValueStoreContext::isDebuggableType(IRType* type)
             debuggable = isDebuggableType(arrayType->getElementType());
             break;
         }
+    case kIROp_HLSLInputPatchType:
+    case kIROp_HLSLOutputPatchType:
+    case kIROp_HLSLTriangleStreamType:
+        {
+            auto elementType = as<IRType>(type->getOperand(0));
+            debuggable = isDebuggableType(elementType);
+            break;
+        }
     case kIROp_VectorType:
     case kIROp_MatrixType:
     case kIROp_PtrType:
@@ -110,10 +118,15 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
         builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
         auto paramType = param->getDataType();
         bool isRefParam = false;
-        if (auto outType = as<IROutTypeBase>(paramType))
+        if (auto outType = as<IROutParamTypeBase>(paramType))
         {
             isRefParam = true;
             paramType = outType->getValueType();
+        }
+        else if (auto ptrType = as<IRBorrowInParamType>(param->getDataType()))
+        {
+            isRefParam = true;
+            paramType = ptrType->getValueType();
         }
         if (!isDebuggableType(paramType))
             continue;
@@ -127,13 +140,31 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
 
         mapVarToDebugVar[param] = debugVar;
 
+        // Map any in-param proxy vars to the debug var.
+        bool hasProxyVar = false;
+        for (auto use = param->firstUse; use; use = use->nextUse)
+        {
+            if (auto inParamProxyVarDecor = as<IRInParamProxyVarDecoration>(use->getUser()))
+            {
+                mapVarToDebugVar[inParamProxyVarDecor->parent] = debugVar;
+                hasProxyVar = true;
+            }
+        }
+
         // Store the initial value of the parameter into the debug var.
         IRInst* paramVal = nullptr;
         if (!isRefParam)
+        {
             paramVal = param;
-        else if (as<IRInOutType>(param->getDataType()))
+        }
+        else if (
+            as<IRBorrowInOutParamType>(param->getDataType()) ||
+            as<IRBorrowInParamType>(param->getDataType()))
+        {
             paramVal = builder.emitLoad(param);
-        if (paramVal)
+        }
+
+        if (paramVal && !hasProxyVar)
         {
             builder.emitDebugValue(debugVar, paramVal);
         }

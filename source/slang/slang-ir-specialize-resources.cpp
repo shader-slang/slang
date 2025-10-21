@@ -20,9 +20,10 @@ struct ResourceParameterSpecializationCondition : FunctionCallSpecializeConditio
     TargetRequest* targetRequest = nullptr;
     TargetProgram* targetProgram = nullptr;
 
-    bool doesParamWantSpecialization(IRParam* param, IRInst* arg)
+    bool doesParamWantSpecialization(IRParam* param, IRInst* arg, IRCall* callInst)
     {
         SLANG_UNUSED(arg);
+        SLANG_UNUSED(callInst);
 
         // Whether or not a parameter needs specialization is really
         // a function of its type:
@@ -348,7 +349,7 @@ struct ResourceOutputSpecializationPass
         for (auto param : func->getParams())
         {
             auto paramType = param->getDataType();
-            auto outType = as<IROutTypeBase>(paramType);
+            auto outType = as<IROutParamTypeBase>(paramType);
             if (!outType)
                 continue;
             auto valueType = outType->getValueType();
@@ -802,11 +803,11 @@ struct ResourceOutputSpecializationPass
         FuncInfo& ioFuncInfo)
     {
         // We only want to specialize in the case where the parameter
-        // is an `out` or `inout` (both inherit from `IROutTypeBase`),
+        // is an `out` or `inout` (both inherit from `IROutParamTypeBase`),
         // and the pointed-to type is a resource.
         //
         auto paramType = param->getDataType();
-        auto outType = as<IROutTypeBase>(paramType);
+        auto outType = as<IROutParamTypeBase>(paramType);
         if (!outType)
             return SpecializeFuncResult::Ok;
         auto valueType = outType->getValueType();
@@ -834,7 +835,7 @@ struct ResourceOutputSpecializationPass
         //
         IRVar* newVar = bodyBuilder.emitVar(valueType);
 
-        if (as<IRInOutType>(outType))
+        if (as<IRBorrowInOutParamType>(outType))
         {
             // If the parameter is an `inout` rather than just
             // an `out`, then we still need a parameter to

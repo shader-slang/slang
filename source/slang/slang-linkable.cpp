@@ -8,6 +8,7 @@
 #include "core/slang-memory-file-system.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
+#include "slang-lookup.h"
 #include "slang-mangle.h"
 
 namespace Slang
@@ -370,9 +371,19 @@ RefPtr<ComponentType> ComponentType::specialize(
     // (e.g., interface conformance witnesses) that doesn't get
     // passed explicitly through the API interface.
     //
-    RefPtr<SpecializationInfo> specializationInfo =
-        _validateSpecializationArgs(specializationArgs.getBuffer(), specializationArgCount, sink);
-
+    Index consumedArgCount = 0;
+    RefPtr<SpecializationInfo> specializationInfo = _validateSpecializationArgs(
+        specializationArgs.getBuffer(),
+        specializationArgCount,
+        consumedArgCount,
+        sink);
+    if (consumedArgCount != specializationArgCount)
+    {
+        sink->diagnose(
+            SourceLoc(),
+            Diagnostics::mismatchSpecializationArguments,
+            Math::Max(consumedArgCount, getSpecializationParamCount(), specializationArgCount));
+    }
     return new SpecializedComponentType(this, specializationInfo, specializationArgs, sink);
 }
 
@@ -383,21 +394,6 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::specialize(
     ISlangBlob** outDiagnostics)
 {
     DiagnosticSink sink(getLinkage()->getSourceManager(), Lexer::sourceLocationLexer);
-
-    // First let's check if the number of arguments given matches
-    // the number of parameters that are present on this component type.
-    //
-    auto specializationParamCount = getSpecializationParamCount();
-    if (specializationArgCount != specializationParamCount)
-    {
-        sink.diagnose(
-            SourceLoc(),
-            Diagnostics::mismatchSpecializationArguments,
-            specializationParamCount,
-            specializationArgCount);
-        sink.getBlobIfNeeded(outDiagnostics);
-        return SLANG_FAIL;
-    }
 
     List<SpecializationArg> expandedArgs;
     for (Int aa = 0; aa < specializationArgCount; ++aa)
@@ -410,7 +406,21 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::specialize(
         case slang::SpecializationArg::Kind::Type:
             expandedArg.val = asInternal(apiArg.type);
             break;
+        case slang::SpecializationArg::Kind::Expr:
+            {
+                auto parsedExpr = parseExprFromString(apiArg.expr, &sink);
+                if (!parsedExpr)
+                    return SLANG_FAIL;
 
+                SharedSemanticsContext sharedSemanticsContext(getLinkage(), nullptr, &sink);
+                SemanticsVisitor visitor(&sharedSemanticsContext);
+                auto checkedExpr = visitor.CheckTerm(parsedExpr);
+                if (auto typeType = as<TypeType>(checkedExpr->type.type))
+                    expandedArg.val = typeType->getType();
+                else
+                    expandedArg.expr = checkedExpr;
+            }
+            break;
         default:
             sink.getBlobIfNeeded(outDiagnostics);
             return SLANG_FAIL;
@@ -424,7 +434,8 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::specialize(
     sink.getBlobIfNeeded(outDiagnostics);
 
     *outSpecializedComponentType = specializedComponentType.detach();
-
+    if (sink.getErrorCount() != 0)
+        return SLANG_FAIL;
     return SLANG_OK;
 }
 
@@ -646,57 +657,75 @@ IArtifact* ComponentType::getTargetArtifact(Int targetIndex, slang::IBlob** outD
     {
         return artifact.get();
     }
-
-    // If the user hasn't specified any entry points, then we should
-    // discover all entrypoints that are defined in linked modules, and
-    // include all of them in the compile.
-    //
-    if (getEntryPointCount() == 0)
+    try
     {
-        List<Module*> modules;
-        this->enumerateModules([&](Module* module) { modules.add(module); });
-        List<RefPtr<ComponentType>> components;
-        components.add(this);
-        bool entryPointsDiscovered = false;
-        for (auto module : modules)
+        // If the user hasn't specified any entry points, then we should
+        // discover all entrypoints that are defined in linked modules, and
+        // include all of them in the compile.
+        //
+        if (getEntryPointCount() == 0)
         {
-            for (auto entryPoint : module->getEntryPoints())
+            List<Module*> modules;
+            this->enumerateModules([&](Module* module) { modules.add(module); });
+            List<RefPtr<ComponentType>> components;
+            components.add(this);
+            bool entryPointsDiscovered = false;
+            for (auto module : modules)
             {
-                components.add(entryPoint);
-                entryPointsDiscovered = true;
+                for (auto entryPoint : module->getEntryPoints())
+                {
+                    components.add(entryPoint);
+                    entryPointsDiscovered = true;
+                }
+            }
+
+            // If any entry points were discovered, then we should emit the program with entrypoints
+            // linked.
+            if (entryPointsDiscovered)
+            {
+                RefPtr<CompositeComponentType> composite =
+                    new CompositeComponentType(linkage, components);
+                ComPtr<IComponentType> linkedComponentType;
+                SLANG_RETURN_NULL_ON_FAIL(
+                    composite->link(linkedComponentType.writeRef(), outDiagnostics));
+                auto targetArtifact = static_cast<ComponentType*>(linkedComponentType.get())
+                                          ->getTargetArtifact(targetIndex, outDiagnostics);
+                if (targetArtifact)
+                {
+                    m_targetArtifacts[targetIndex] = targetArtifact;
+                }
+                return targetArtifact;
             }
         }
 
-        // If any entry points were discovered, then we should emit the program with entrypoints
-        // linked.
-        if (entryPointsDiscovered)
-        {
-            RefPtr<CompositeComponentType> composite =
-                new CompositeComponentType(linkage, components);
-            ComPtr<IComponentType> linkedComponentType;
-            SLANG_RETURN_NULL_ON_FAIL(
-                composite->link(linkedComponentType.writeRef(), outDiagnostics));
-            auto targetArtifact = static_cast<ComponentType*>(linkedComponentType.get())
-                                      ->getTargetArtifact(targetIndex, outDiagnostics);
-            if (targetArtifact)
-            {
-                m_targetArtifacts[targetIndex] = targetArtifact;
-            }
-            return targetArtifact;
-        }
+        auto target = linkage->targets[targetIndex];
+        auto targetProgram = getTargetProgram(target);
+
+        DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
+        applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
+        applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
+
+        IArtifact* targetArtifact = targetProgram->getOrCreateWholeProgramResult(&sink);
+        sink.getBlobIfNeeded(outDiagnostics);
+        m_targetArtifacts[targetIndex] = ComPtr<IArtifact>(targetArtifact);
+        return targetArtifact;
     }
-
-    auto target = linkage->targets[targetIndex];
-    auto targetProgram = getTargetProgram(target);
-
-    DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
-    applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
-    applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
-
-    IArtifact* targetArtifact = targetProgram->getOrCreateWholeProgramResult(&sink);
-    sink.getBlobIfNeeded(outDiagnostics);
-    m_targetArtifacts[targetIndex] = ComPtr<IArtifact>(targetArtifact);
-    return targetArtifact;
+    catch (const Exception& e)
+    {
+        if (outDiagnostics && !*outDiagnostics)
+        {
+            DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
+            applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
+            applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
+            sink.diagnose(
+                SourceLoc(),
+                Diagnostics::compilationAbortedDueToException,
+                typeid(e).name(),
+                e.Message);
+            sink.getBlobIfNeeded(outDiagnostics);
+        }
+        return nullptr;
+    }
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL
@@ -728,6 +757,18 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getTargetMetadata(
     return SLANG_OK;
 }
 
+Expr* ComponentType::parseExprFromString(String exprStr, DiagnosticSink* sink)
+{
+    auto linkage = getLinkage();
+    SLANG_AST_BUILDER_RAII(linkage->getASTBuilder());
+    auto astBuilder = linkage->getASTBuilder();
+    Scope* scope = _getOrCreateScopeForLegacyLookup(astBuilder);
+    Expr* expr = linkage->parseTermString(exprStr, scope);
+    if (!expr || as<IncompleteExpr>(expr))
+        sink->diagnose(SourceLoc(), Diagnostics::syntaxError);
+    return expr;
+}
+
 Type* ComponentType::getTypeFromString(String const& typeStr, DiagnosticSink* sink)
 {
     // If we've looked up this type name before,
@@ -737,14 +778,6 @@ Type* ComponentType::getTypeFromString(String const& typeStr, DiagnosticSink* si
     if (m_types.tryGetValue(typeStr, type))
         return type;
 
-
-    // TODO(JS): For now just used the linkages ASTBuilder to keep on scope
-    //
-    // The parseTermString uses the linkage ASTBuilder for it's parsing.
-    //
-    // It might be possible to just create a temporary ASTBuilder - the worry though is
-    // that the parsing sets a member variable in AST node to one of these scopes, and then
-    // it become a dangling pointer. So for now we go with the linkages.
     auto astBuilder = getLinkage()->getASTBuilder();
 
     // Otherwise, we need to start looking in
@@ -770,6 +803,14 @@ Type* ComponentType::getTypeFromString(String const& typeStr, DiagnosticSink* si
         m_types[typeStr] = type;
     }
     return type;
+}
+
+Expr* ComponentType::tryResolveOverloadedExpr(Expr* exprIn)
+{
+    auto linkage = getLinkage();
+    SemanticsContext context(linkage->getSemanticsForReflection());
+    SemanticsVisitor visitor(context);
+    return visitor.maybeResolveOverloadedExpr(exprIn, LookupMask::Function, nullptr);
 }
 
 Expr* ComponentType::findDeclFromString(String const& name, DiagnosticSink* sink)
@@ -905,39 +946,39 @@ Expr* ComponentType::findDeclFromStringInType(
 
     auto checkedTerm = visitor.CheckTerm(expr);
 
-    // Check if checkedTerm is overloaded functions and avoid resolving if so
-    // to preserve all function overloads with different signatures
-    Expr* resolvedTerm = checkedTerm;
     if (auto overloadedExpr = as<OverloadedExpr>(checkedTerm))
     {
-        // Check if all candidates are function references
-        bool allAreFunctions = true;
-        for (auto item : overloadedExpr->lookupResult2.items)
+        // For functions, since we don't know the argument list yet, we will have to defer
+        // non-parameter-related candidate comparison logic into its separate step.
+        if (mask != LookupMask::Function)
+            return visitor.maybeResolveOverloadedExpr(checkedTerm, mask, nullptr);
+        overloadedExpr->lookupResult2 = refineLookup(overloadedExpr->lookupResult2, mask);
+
+        // Filter out abstract base interface method implementations for reflection.
+        if (!isInterfaceType(type))
         {
-            if (!as<FunctionDeclBase>(item.declRef.getDecl()))
+            LookupResult filteredResult;
+            for (auto candidate : overloadedExpr->lookupResult2)
             {
-                allAreFunctions = false;
-                break;
+                if (as<InterfaceDecl>(getParentDecl(candidate.declRef.getDecl())))
+                {
+                    if (!candidate.declRef.getDecl()
+                             ->hasModifier<HasInterfaceDefaultImplModifier>())
+                        continue;
+                }
+                AddToLookupResult(filteredResult, candidate);
             }
+            if (filteredResult.isValid() && !filteredResult.isOverloaded())
+            {
+                // If there are exactly one candidate after filtering, we can
+                // safely return resolved expr.
+                return visitor.maybeResolveOverloadedExpr(checkedTerm, mask, nullptr);
+            }
+            overloadedExpr->lookupResult2 = filteredResult;
         }
-
-        // If not all are functions, resolve the overload as usual
-        if (!allAreFunctions)
-        {
-            resolvedTerm = visitor.maybeResolveOverloadedExpr(checkedTerm, mask, sink);
-        }
-    }
-    else
-    {
-        // Not overloaded, resolve as usual
-        resolvedTerm = visitor.maybeResolveOverloadedExpr(checkedTerm, mask, sink);
-    }
-
-    if (auto overloadedExpr = as<OverloadedExpr>(resolvedTerm))
-    {
         return overloadedExpr;
     }
-    if (auto declRefExpr = as<DeclRefExpr>(resolvedTerm))
+    if (auto declRefExpr = as<DeclRefExpr>(checkedTerm))
     {
         return declRefExpr;
     }

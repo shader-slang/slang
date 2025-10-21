@@ -48,8 +48,9 @@ namespace Slang
 /* static */ SlangResult File::remove(const String& fileName)
 {
 #ifdef _WIN32
-    // https://docs.microsoft.com/en-us/windows/desktop/api/fileapi/nf-fileapi-deletefilea
-    if (DeleteFileA(fileName.getBuffer()))
+
+    // https://docs.microsoft.com/en-us/windows/desktop/api/fileapi/nf-fileapi-deletefilew
+    if (DeleteFileW(fileName.toWString()))
     {
         return SLANG_OK;
     }
@@ -77,10 +78,10 @@ namespace Slang
         int count = MAX_PATH + 1;
         while (true)
         {
-            char* chars = tempPath.prepareForAppend(count);
+            wchar_t* wideChars = (wchar_t*)_alloca(count * sizeof(wchar_t));
             //  Gets the temp path env string (no guarantee it's a valid path).
-            // https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-gettemppatha
-            DWORD ret = ::GetTempPathA(count - 1, chars);
+            // https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-gettemppathw
+            DWORD ret = ::GetTempPathW(count - 1, wideChars);
             if (ret == 0)
             {
                 return SLANG_FAIL;
@@ -90,7 +91,7 @@ namespace Slang
                 count = ret + 1;
                 continue;
             }
-            tempPath.appendInPlace(chars, count);
+            tempPath = String::fromWString(wideChars);
             break;
         }
     }
@@ -104,19 +105,18 @@ namespace Slang
     String tempFileName;
 
     {
-        int count = MAX_PATH + 1;
-        char* chars = tempFileName.prepareForAppend(count);
+        wchar_t wideChars[MAX_PATH + 1];
 
-        // https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-gettempfilenamea
+        // https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-gettempfilenamew
         // Generates a temporary file name.
         // Will create a file with this name.
-        DWORD ret = ::GetTempFileNameA(tempPath.getBuffer(), prefix.getBuffer(), 0, chars);
+        DWORD ret = ::GetTempFileNameW(tempPath.toWString(), prefix.toWString(), 0, wideChars);
 
         if (ret == 0)
         {
             return SLANG_FAIL;
         }
-        tempFileName.appendInPlace(chars, ::strlen(chars));
+        tempFileName = String::fromWString(wideChars);
     }
 
     SLANG_ASSERT(File::exists(tempFileName));
@@ -768,8 +768,8 @@ SlangResult Path::remove(const String& path)
     {
     case SLANG_PATH_TYPE_FILE:
         {
-            // https://docs.microsoft.com/en-us/windows/desktop/api/fileapi/nf-fileapi-deletefilea
-            if (DeleteFileA(path.getBuffer()))
+            // https://docs.microsoft.com/en-us/windows/desktop/api/fileapi/nf-fileapi-deletefilew
+            if (DeleteFileW(path.toWString()))
             {
                 return SLANG_OK;
             }
@@ -777,8 +777,8 @@ SlangResult Path::remove(const String& path)
         }
     case SLANG_PATH_TYPE_DIRECTORY:
         {
-            // https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-removedirectorya
-            if (RemoveDirectoryA(path.getBuffer()))
+            // https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-removedirectoryw
+            if (RemoveDirectoryW(path.toWString()))
             {
                 return SLANG_OK;
             }
@@ -810,20 +810,26 @@ SlangResult Path::remove(const String& path)
     // Path::remove() doesn't support remove a non-empty directory, so we need to implement
     // a simple function to remove the directory recursively.
 #ifdef _WIN32
-    // https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shfileoperationa
+    // https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shfileoperationw
     // Note: the fromPath requires a double-null-terminated string.
-    String newPath = path;
-    newPath.append('\0');
-    SHFILEOPSTRUCTA file_op = {
+    // Convert to wide string first, then manually create double-null-terminated buffer
+    auto widePath = path.toWString();
+    Index widePathLen = wcslen(widePath);
+    wchar_t* doubleNullPath = (wchar_t*)_alloca((widePathLen + 2) * sizeof(wchar_t));
+    wcscpy(doubleNullPath, widePath);
+    doubleNullPath[widePathLen] = L'\0';     // First null terminator
+    doubleNullPath[widePathLen + 1] = L'\0'; // Second null terminator for SHFileOperationW
+
+    SHFILEOPSTRUCTW file_op = {
         NULL,
         FO_DELETE,
-        newPath.begin(),
+        doubleNullPath,
         nullptr,
         FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_SILENT,
         false,
         0,
         nullptr};
-    int ret = SHFileOperationA(&file_op);
+    int ret = SHFileOperationW(&file_op);
     if (ret)
     {
         return SLANG_FAIL;
@@ -973,13 +979,28 @@ static SlangResult _calcExectuablePath(char* outPath, size_t* ioSize)
     SLANG_ASSERT(bufferSize > 0);
 
 #if SLANG_WINDOWS_FAMILY
-    // https://docs.microsoft.com/en-us/windows/desktop/api/libloaderapi/nf-libloaderapi-getmodulefilenamea
+    // https://docs.microsoft.com/en-us/windows/desktop/api/libloaderapi/nf-libloaderapi-getmodulefilenamew
 
-    DWORD res = ::GetModuleFileNameA(::GetModuleHandle(nullptr), outPath, DWORD(bufferSize));
+    // Use wide character version and convert back to UTF-8
+    wchar_t* widePath = (wchar_t*)_alloca(bufferSize * sizeof(wchar_t));
+    DWORD res = ::GetModuleFileNameW(::GetModuleHandle(nullptr), widePath, DWORD(bufferSize));
     // If it fits it's the size not including terminator. So must be less than bufferSize
     if (res < bufferSize)
     {
-        return SLANG_OK;
+        // Convert back to UTF-8
+        int utf8Len = WideCharToMultiByte(
+            CP_UTF8,
+            0,
+            widePath,
+            -1,
+            outPath,
+            (int)bufferSize,
+            nullptr,
+            nullptr);
+        if (utf8Len > 0)
+        {
+            return SLANG_OK;
+        }
     }
     return SLANG_E_BUFFER_TOO_SMALL;
 #elif SLANG_LINUX_FAMILY
@@ -1316,9 +1337,17 @@ void LockFile::close()
         return;
 
 #if SLANG_WINDOWS_FAMILY
-    ::CloseHandle(m_fileHandle);
+    if (m_fileHandle != INVALID_HANDLE_VALUE)
+    {
+        ::CloseHandle(m_fileHandle);
+        m_fileHandle = INVALID_HANDLE_VALUE;
+    }
 #else
-    ::close(m_fileHandle);
+    if (m_fileHandle != -1)
+    {
+        ::close(m_fileHandle);
+        m_fileHandle = -1;
+    }
 #endif
 
     m_isOpen = false;
@@ -1409,6 +1438,11 @@ SlangResult LockFile::unlock()
 LockFile::LockFile()
     : m_isOpen(false)
 {
+#if SLANG_WINDOWS_FAMILY
+    m_fileHandle = INVALID_HANDLE_VALUE;
+#else
+    m_fileHandle = -1;
+#endif
 }
 
 LockFile::~LockFile()

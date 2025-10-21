@@ -1,4 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type -profile cs_5_1 -dx12
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type -profile cs_5_1 -dx12 -use-dxbc -compute-dispatch 4,1,1
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type -profile cs_5_1 -cuda -use-dxbc -compute-dispatch 4,1,1
 
 //TEST_INPUT:ubuffer(data=[0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0], stride=4):out,name=endpointDifferentialBuffer
 RWStructuredBuffer<float> endpointDifferentialBuffer;
@@ -256,7 +257,7 @@ float renderSample(inout PRNG prng)
     return shadeIntersection(isect) * isect.wt;
 }
 
-[numthreads(1000, 1, 1)]
+[numthreads(256, 1, 1)]
 void computeMain(uint3 threadIdx : SV_DispatchThreadID,)
 {
     uint seed = (threadIdx.x * threadIdx.x) * 30 + 3;
@@ -285,3 +286,14 @@ void computeMain(uint3 threadIdx : SV_DispatchThreadID,)
 // Expect: Approximately 0.0 in endpointDifferentialBuffer[3]
 //
 }
+// CHECK: type: float
+// CHECK-NEXT: -0.{{9[5-9][0-9]}}000
+// CHECK-NEXT: 0.{{9[5-9][0-9]}}000
+// CHECK-NEXT: 0.000000
+// CHECK-NEXT: 0.004000
+// CHECK-NEXT: 0.000000
+// CHECK-NEXT: 0.000000
+// CHECK-NEXT: 0.000000
+// CHECK-NEXT: 0.000000
+// CHECK-NEXT: 0.000000
+// CHECK-NEXT: 0.000000

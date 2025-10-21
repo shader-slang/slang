@@ -43,6 +43,7 @@ DIAGNOSTIC(
     "parameter type '$0'.")
 DIAGNOSTIC(-1, Note, noteShaderIsTargetingPipeine, "shader '$0' is targeting pipeline '$1'")
 DIAGNOSTIC(-1, Note, seeDefinitionOf, "see definition of '$0'")
+DIAGNOSTIC(-1, Note, seeDefinitionOfStruct, "see definition of struct '$0'")
 DIAGNOSTIC(-1, Note, seeConstantBufferDefinition, "see constant buffer definition.")
 DIAGNOSTIC(-1, Note, seeInterfaceDefinitionOf, "see interface definition of '$0'")
 DIAGNOSTIC(-1, Note, seeUsingOf, "see using of '$0'")
@@ -382,6 +383,7 @@ DIAGNOSTIC(-1, Note, seeOpeningToken, "see opening '$0'")
 // 153xx - #include
 DIAGNOSTIC(15300, Error, includeFailed, "failed to find include file '$0'")
 DIAGNOSTIC(15301, Error, importFailed, "failed to find imported file '$0'")
+DIAGNOSTIC(15302, Error, cyclicInclude, "cyclic `#include` of file '$0'")
 DIAGNOSTIC(-1, Error, noIncludeHandlerSpecified, "no `#include` handler was specified")
 DIAGNOSTIC(
     15302,
@@ -523,6 +525,14 @@ DIAGNOSTIC(
     Error,
     missingLayoutBindingModifier,
     "Expecting 'binding' modifier in the layout qualifier here")
+DIAGNOSTIC(
+    20017,
+    Error,
+    constNotAllowedOnCStylePtrDecl,
+    "'const' not allowed on pointer typed declarations using the C style '*' operator. "
+    "If the intent is to restrict the pointed-to value to read-only, use 'Ptr<T, Access.Read>'; "
+    "if the intent is to make the pointer itself immutable, use 'let' or 'const Ptr<...>'.")
+DIAGNOSTIC(20018, Error, constNotAllowedOnType, "cannot use 'const' as a type modifier")
 
 DIAGNOSTIC(
     20101,
@@ -649,6 +659,17 @@ DIAGNOSTIC(
     "Cannot convert array of size $0 to array of size $1 as this would truncate data")
 DIAGNOSTIC(30025, Error, invalidArraySize, "array size must be non-negative.")
 DIAGNOSTIC(
+    30027,
+    Error,
+    disallowedArrayOfNonAddressableType,
+    "Arrays of non-addressable type '$0' are not allowed")
+
+DIAGNOSTIC(
+    30028,
+    Error,
+    nonAddressableTypeInStructuredBuffer,
+    "'$0' is non-addressable and cannot be used in StructuredBuffer")
+DIAGNOSTIC(
     30029,
     Error,
     arrayIndexOutOfBounds,
@@ -695,11 +716,6 @@ DIAGNOSTIC(
     Error,
     argumentExpectedLValue,
     "argument passed to parameter '$0' must be l-value.")
-DIAGNOSTIC(
-    30078,
-    Error,
-    cannotTakeConstantPointers,
-    "Not allowed to take pointer of an immutable object")
 DIAGNOSTIC(
     30048,
     Error,
@@ -817,7 +833,17 @@ DIAGNOSTIC(
     "function, you can replace '$2 $0' with a generic 'T $0' and a 'where T : $2' constraint.")
 DIAGNOSTIC(-1, Note, doYouMeanStaticConst, "do you intend to define a `static const` instead?")
 DIAGNOSTIC(-1, Note, doYouMeanUniform, "do you intend to define a `uniform` parameter instead?")
-
+DIAGNOSTIC(
+    30078,
+    Error,
+    coherentKeywordOnAPointer,
+    "cannot have a `globallycoherent T*` or a `coherent T*`, use explicit methods for coherent "
+    "operations instead")
+DIAGNOSTIC(
+    30079,
+    Error,
+    cannotTakeConstantPointers,
+    "Not allowed to take the address of an immutable object")
 DIAGNOSTIC(
     30100,
     Error,
@@ -921,11 +947,7 @@ DIAGNOSTIC(
     Note,
     noteExplicitConversionPossible,
     "explicit conversion from '$0' to '$1' is possible")
-DIAGNOSTIC(
-    30080,
-    Error,
-    ambiguousConversion,
-    "more than one implicit conversion exists from '$0' to '$1'")
+DIAGNOSTIC(30080, Error, ambiguousConversion, "more than one conversion exists from '$0' to '$1'")
 DIAGNOSTIC(
     30081,
     Warning,
@@ -1151,24 +1173,30 @@ DIAGNOSTIC(
     missingCapabilityRequirementOnPublicDecl,
     "public symbol '$0' is missing capability requirement declaration, the symbol is assumed to "
     "require inferred capabilities '$1'.")
-DIAGNOSTIC(36104, Error, useOfUndeclaredCapability, "'$0' uses undeclared capability '$1'.")
+DIAGNOSTIC(36104, Error, useOfUndeclaredCapability, "'$0' uses undeclared capability '$1'")
 DIAGNOSTIC(
     36104,
     Error,
     useOfUndeclaredCapabilityOfInterfaceRequirement,
-    "'$0' uses capability '$1' that is missing from the interface requirement.")
+    "'$0' uses capability '$1' that is incompatable with the interface requirement")
+DIAGNOSTIC(
+    36104,
+    Error,
+    useOfUndeclaredCapabilityOfInheritanceDecl,
+    "'$0' uses capability '$1' that is incompatable with the supertype")
 DIAGNOSTIC(36105, Error, unknownCapability, "unknown capability name '$0'.")
 DIAGNOSTIC(36106, Error, expectCapability, "expect a capability name.")
 DIAGNOSTIC(
     36107,
     Error,
     entryPointUsesUnavailableCapability,
-    "entrypoint '$0' uses features that are not available in '$2' stage for '$1' target.")
+    "entrypoint '$0' uses features that are not available in '$2' stage for '$1' compilation "
+    "target.")
 DIAGNOSTIC(
     36108,
     Error,
     declHasDependenciesNotCompatibleOnTarget,
-    "'$0' has dependencies that are not compatible on the required target '$1'.")
+    "'$0' has dependencies that are not compatible on the required compilation target '$1'.")
 DIAGNOSTIC(36109, Error, invalidTargetSwitchCase, "'$0' cannot be used as a target_switch case.")
 DIAGNOSTIC(
     36110,
@@ -1205,7 +1233,18 @@ DIAGNOSTIC(
     36117,
     Error,
     declHasDependenciesNotCompatibleOnStage,
-    "'$0' uses features that are not available in '$1' stage.")
+    "'$0' requires support for stage '$1', but stage is unsupported.")
+DIAGNOSTIC(
+    36118,
+    Error,
+    subTypeHasSubsetOfAbstractAtomsToSuperType,
+    "subtype '$0' must have the same target/stage support as the supertype; '$0' is missing '$1'")
+DIAGNOSTIC(
+    36118,
+    Error,
+    requirmentHasSubsetOfAbstractAtomsToImplementation,
+    "requirement '$0' must have the same target/stage support as the implementation; '$0' is "
+    "missing '$1'")
 
 // Attributes
 DIAGNOSTIC(31000, Warning, unknownAttributeName, "unknown attribute '$0'")
@@ -1409,7 +1448,11 @@ DIAGNOSTIC(
     "If this is intended, consider using [NoDiffThis] on the function '$1' to suppress this "
     "warning. Alternatively, users can mark the parent struct as [Differentiable] to propagate "
     "derivatives.")
-
+DIAGNOSTIC(
+    31160,
+    Error,
+    invalidAddressOf,
+    "'__getAddress' only supports groupshared variables and members of groupshared/device memory.")
 DIAGNOSTIC(31200, Warning, deprecatedUsage, "$0 has been deprecated: $1")
 DIAGNOSTIC(31201, Error, modifierNotAllowed, "modifier '$0' is not allowed here.")
 DIAGNOSTIC(
@@ -1418,16 +1461,6 @@ DIAGNOSTIC(
     duplicateModifier,
     "modifier '$0' is redundant or conflicting with existing modifier '$1'")
 DIAGNOSTIC(31203, Error, cannotExportIncompleteType, "cannot export incomplete type '$0'")
-DIAGNOSTIC(
-    31204,
-    Error,
-    incompleteTypeCannotBeUsedInBuffer,
-    "incomplete type '$0' cannot be used in a buffer")
-DIAGNOSTIC(
-    31205,
-    Error,
-    incompleteTypeCannotBeUsedInUniformParameter,
-    "incomplete type '$0' cannot be used in a uniform parameter")
 DIAGNOSTIC(
     31206,
     Error,
@@ -1508,6 +1541,12 @@ DIAGNOSTIC(
     Error,
     constGlobalVarWithInitRequiresStatic,
     "global const variable with initializer must be declared static: '$0'")
+
+DIAGNOSTIC(
+    31225,
+    Error,
+    staticConstVariableRequiresInitializer,
+    "static const variable '$0' must have an initializer")
 
 // Enums
 
@@ -1659,6 +1698,22 @@ DIAGNOSTIC(
     Error,
     invalidEqualityConstraintSupType,
     "type '$0' is not a proper type to use in a generic equality constraint.")
+DIAGNOSTIC(
+    30405,
+    Error,
+    noValidEqualityConstraintSubType,
+    "generic equality constraint requires at least one operand to be dependant on the generic "
+    "declaration")
+DIAGNOSTIC(
+    30402,
+    Note,
+    invalidEqualityConstraintSubType,
+    "type '$0' cannot be constrained by a type equality")
+DIAGNOSTIC(
+    30407,
+    Warning,
+    failedEqualityConstraintCanonicalOrder,
+    "failed to resolve canonical order of generic equality constraint.")
 
 // 305xx: initializer lists
 DIAGNOSTIC(30500, Error, tooManyInitializers, "too many initializers (expected $0, got $1)")
@@ -1982,12 +2037,6 @@ DIAGNOSTIC(
 DIAGNOSTIC(
     39999,
     Error,
-    overloadedParameterToHigherOrderFunction,
-    "passing overloaded functions to higher order functions is not supported")
-
-DIAGNOSTIC(
-    39999,
-    Error,
     matrixColumnOrRowCountIsOne,
     "matrices with 1 column or row are not supported by the current code generation target")
 
@@ -2049,6 +2098,18 @@ DIAGNOSTIC(
     Error,
     expectedValueOfTypeForSpecializationArg,
     "expected a constant value of type '$0' as argument for specialization parameter '$1'")
+
+DIAGNOSTIC(
+    38010,
+    Warning,
+    unhandledModOnEntryPointParameter,
+    "$0 on parameter '$1' is unsupported on entry point parameters and will be ignored")
+
+DIAGNOSTIC(
+    38011,
+    Error,
+    entryPointCannotReturnResourceType,
+    "entry point '$0' cannot return type '$1' that contains resource types")
 
 DIAGNOSTIC(
     38100,
@@ -2170,8 +2231,8 @@ DIAGNOSTIC(
 DIAGNOSTIC(
     38034,
     Error,
-    cannotUseConstRefOnDifferentiableParameter,
-    "cannot use '__constref' on a differentiable parameter.")
+    cannotUseBorrowInOnDifferentiableParameter,
+    "cannot use 'borrow in' on a differentiable parameter.")
 DIAGNOSTIC(
     38034,
     Error,
@@ -2204,7 +2265,7 @@ DIAGNOSTIC(
     glslModuleNotAvailable,
     "'glsl' module is not available from the current global session. To enable GLSL compatibility "
     "mode, specify 'SlangGlobalSessionDesc::enableGLSL' when creating the global session.")
-DIAGNOSTIC(39999, Fatal, complationCeased, "compilation ceased")
+DIAGNOSTIC(39999, Fatal, compilationCeased, "compilation ceased")
 
 DIAGNOSTIC(
     38203,
@@ -2217,6 +2278,18 @@ DIAGNOSTIC(
     Error,
     vectorWithInvalidElementCountEncountered,
     "vector has invalid element count '$0', valid values are between '$1' and '$2' inclusive")
+
+DIAGNOSTIC(
+    38204,
+    Error,
+    cannotUseResourceTypeInStructuredBuffer,
+    "StructuredBuffer element type '$0' cannot contain resource or opaque handle types")
+
+DIAGNOSTIC(
+    38205,
+    Error,
+    recursiveTypesFoundInStructuredBuffer,
+    "structured buffer element type '$0' contains recursive type references")
 
 // 39xxx - Type layout and parameter binding.
 
@@ -2404,10 +2477,7 @@ DIAGNOSTIC(
     "\"index\"] attribute to provide a binding location.")
 DIAGNOSTIC(40006, Error, unimplementedSystemValueSemantic, "unknown system-value semantic '$0'")
 
-
 DIAGNOSTIC(49999, Error, unknownSystemValueSemantic, "unknown system-value semantic '$0'")
-
-DIAGNOSTIC(40006, Error, needCompileTimeConstant, "expected a compile-time constant")
 
 DIAGNOSTIC(40007, Internal, irValidationFailed, "IR validation failed: $0")
 
@@ -2431,6 +2501,9 @@ DIAGNOSTIC(
     unconstrainedGenericParameterNotAllowedInDynamicFunction,
     "unconstrained generic paramter '$0' is not allowed in a dynamic function.")
 
+DIAGNOSTIC(40012, Error, needCompileTimeConstant, "expected a compile-time constant")
+
+DIAGNOSTIC(40013, Error, argIsNotConstexpr, "arg $0 in '$1' is not a compile-time constant")
 
 DIAGNOSTIC(
     40020,
@@ -2505,6 +2578,29 @@ DIAGNOSTIC(
     Warning,
     methodNeverMutates,
     "method marked `[mutable]` but never modifies `this`")
+DIAGNOSTIC(
+    41024,
+    Warning,
+    commaOperatorUsedInExpression,
+    "comma operator used in expression (may be unintended)")
+
+DIAGNOSTIC(
+    41024,
+    Error,
+    cannotDefaultInitializeResource,
+    "cannot default-initialize $0 with '{}'. Resource types must be explicitly initialized")
+
+DIAGNOSTIC(
+    41024,
+    Error,
+    cannotDefaultInitializeStructWithUninitializedResource,
+    "cannot default-initialize struct '$0' with '{}' because it contains an uninitialized $1 field")
+
+DIAGNOSTIC(
+    41024,
+    Error,
+    cannotDefaultInitializeStructContainingResources,
+    "cannot default-initialize struct '$0' with '{}' because it contains resource fields")
 
 DIAGNOSTIC(
     41011,
@@ -2635,6 +2731,8 @@ DIAGNOSTIC(
     invalidAtomicDestinationPointer,
     "cannot perform atomic operation because destination is neither groupshared nor from a device "
     "buffer.")
+
+DIAGNOSTIC(41404, Error, cannotWriteToReadOnlyPointer, "cannot write to a read-only pointer")
 
 //
 // 5xxxx - Target code generation.
@@ -2897,12 +2995,16 @@ DIAGNOSTIC(
     Error,
     divisionByMatrixNotSupported,
     "division by matrix is not supported for Metal and WGSL targets.")
-
 DIAGNOSTIC(
     56103,
     Error,
     int16NotSupportedInWGSL,
     "16-bit integer type '$0' is not supported by the WGSL backend.")
+DIAGNOSTIC(
+    56104,
+    Error,
+    assignToRefNotSupported,
+    "whole struct must be assiged to mesh output at once for Metal target.")
 
 DIAGNOSTIC(57001, Warning, spirvOptFailed, "spirv-opt failed. $0")
 DIAGNOSTIC(57002, Error, unknownPatchConstantParameter, "unknown patch constant parameter '$0'.")
@@ -2974,15 +3076,43 @@ DIAGNOSTIC(
 
 // 99999 - Internal compiler errors, and not-yet-classified diagnostics.
 
-DIAGNOSTIC(99999, Internal, unimplemented, "unimplemented feature in Slang compiler: $0")
-DIAGNOSTIC(99999, Internal, unexpected, "unexpected condition encountered in Slang compiler: $0")
-DIAGNOSTIC(99999, Internal, internalCompilerError, "Slang internal compiler error")
-DIAGNOSTIC(99999, Error, compilationAborted, "Slang compilation aborted due to internal error")
+DIAGNOSTIC(
+    99999,
+    Internal,
+    unimplemented,
+    "unimplemented feature in Slang compiler: $0\nFor assistance, file an issue on GitHub "
+    "(https://github.com/shader-slang/slang/issues) or join the Slang Discord "
+    "(https://khr.io/slangdiscord)")
+DIAGNOSTIC(
+    99999,
+    Internal,
+    unexpected,
+    "unexpected condition encountered in Slang compiler: $0\nFor assistance, file an issue on "
+    "GitHub "
+    "(https://github.com/shader-slang/slang/issues) or join the Slang Discord "
+    "(https://khr.io/slangdiscord)")
+DIAGNOSTIC(
+    99999,
+    Internal,
+    internalCompilerError,
+    "Slang internal compiler error\nFor assistance, file an issue on GitHub "
+    "(https://github.com/shader-slang/slang/issues) or join the Slang Discord "
+    "(https://khr.io/slangdiscord)")
+DIAGNOSTIC(
+    99999,
+    Error,
+    compilationAborted,
+    "Slang compilation aborted due to internal error\nFor assistance, file an issue on GitHub "
+    "(https://github.com/shader-slang/slang/issues) or join the Slang Discord "
+    "(https://khr.io/slangdiscord)")
 DIAGNOSTIC(
     99999,
     Error,
     compilationAbortedDueToException,
-    "Slang compilation aborted due to an exception of $0: $1")
+    "Slang compilation aborted due to an exception of $0: $1\nFor assistance, file an issue on "
+    "GitHub "
+    "(https://github.com/shader-slang/slang/issues) or join the Slang Discord "
+    "(https://khr.io/slangdiscord)")
 DIAGNOSTIC(
     99999,
     Internal,

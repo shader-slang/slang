@@ -582,14 +582,6 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
         SimpleLayoutInfo elementInfo,
         size_t elementCount) override
     {
-        // Special case bool
-        if (elementType == BaseType::Bool)
-        {
-            SimpleLayoutInfo fixInfo(elementInfo);
-            fixInfo.size = sizeof(int32_t);
-            fixInfo.alignment = sizeof(int32_t);
-            return GetVectorLayout(BaseType::Int, fixInfo, elementCount);
-        }
 
         const auto elementSize = elementInfo.size.getFiniteValue();
 
@@ -1098,6 +1090,29 @@ struct CPULayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     LayoutRulesImpl* getStructuredBufferRules(CompilerOptionSet& compilerOptions) override;
 };
 
+struct CLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
+{
+    virtual LayoutRulesImpl* getAnyValueRules() override;
+    virtual LayoutRulesImpl* getConstantBufferRules(
+        CompilerOptionSet& compilerOptions,
+        Type* containerType) override;
+    virtual LayoutRulesImpl* getPushConstantBufferRules() override;
+    virtual LayoutRulesImpl* getTextureBufferRules(CompilerOptionSet& compilerOptions) override;
+    virtual LayoutRulesImpl* getVaryingInputRules() override;
+    virtual LayoutRulesImpl* getVaryingOutputRules() override;
+    virtual LayoutRulesImpl* getSpecializationConstantRules() override;
+    virtual LayoutRulesImpl* getShaderStorageBufferRules(
+        CompilerOptionSet& compilerOptions) override;
+    virtual LayoutRulesImpl* getParameterBlockRules(CompilerOptionSet& compilerOptions) override;
+
+    LayoutRulesImpl* getRayPayloadParameterRules() override;
+    LayoutRulesImpl* getCallablePayloadParameterRules() override;
+    LayoutRulesImpl* getHitAttributesParameterRules() override;
+
+    LayoutRulesImpl* getShaderRecordConstantBufferRules() override;
+    LayoutRulesImpl* getStructuredBufferRules(CompilerOptionSet& compilerOptions) override;
+};
+
 struct CUDALayoutRulesFamilyImpl : LayoutRulesFamilyImpl
 {
     virtual LayoutRulesImpl* getAnyValueRules() override;
@@ -1178,6 +1193,7 @@ struct WGSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
 GLSLLayoutRulesFamilyImpl kGLSLLayoutRulesFamilyImpl;
 HLSLLayoutRulesFamilyImpl kHLSLLayoutRulesFamilyImpl;
 CPULayoutRulesFamilyImpl kCPULayoutRulesFamilyImpl;
+CLayoutRulesFamilyImpl kCLayoutRulesFamilyImpl;
 CUDALayoutRulesFamilyImpl kCUDALayoutRulesFamilyImpl;
 MetalLayoutRulesFamilyImpl kMetalLayoutRulesFamilyImpl;
 MetalArgumentBufferTier2LayoutRulesFamilyImpl kMetalArgumentBufferTier2LayoutRulesFamilyImpl;
@@ -1348,6 +1364,69 @@ LayoutRulesImpl kCPUAnyValueLayoutRulesImpl_ = {
     &kDefaultLayoutRulesImpl,
     &kCPUObjectLayoutRulesImpl,
 };
+
+// C layout
+
+LayoutRulesImpl kCLayoutRulesImpl_ = {
+    &kCLayoutRulesFamilyImpl,
+    &kCPULayoutRulesImpl,
+    &kGLSLObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kCAnyValueLayoutRulesImpl_ = {
+    &kCLayoutRulesFamilyImpl,
+    &kDefaultLayoutRulesImpl,
+    &kCPUObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kCPushConstantRulesImpl_ = {
+    &kCLayoutRulesFamilyImpl,
+    &kCPULayoutRulesImpl,
+    &kGLSLPushConstantBufferObjectLayoutRulesImpl_,
+};
+
+LayoutRulesImpl kCVaryingInputLayoutRulesImpl_ = {
+    &kCLayoutRulesFamilyImpl,
+    &kGLSLVaryingInputLayoutRulesImpl,
+    &kGLSLObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kCVaryingOutputLayoutRulesImpl_ = {
+    &kCLayoutRulesFamilyImpl,
+    &kGLSLVaryingOutputLayoutRulesImpl,
+    &kGLSLObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kCSpecializationConstantLayoutRulesImpl_ = {
+    &kCLayoutRulesFamilyImpl,
+    &kGLSLSpecializationConstantLayoutRulesImpl,
+    &kGLSLObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kCShaderRecordLayoutRulesImpl_ = {
+    &kCLayoutRulesFamilyImpl,
+    &kCPULayoutRulesImpl,
+    &kGLSLShaderRecordConstantBufferObjectLayoutRulesImpl_,
+};
+
+LayoutRulesImpl kCRayPayloadParameterLayoutRulesImpl_ = {
+    &kCLayoutRulesFamilyImpl,
+    &kGLSLRayPayloadParameterLayoutRulesImpl,
+    &kGLSLObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kCCallablePayloadParameterLayoutRulesImpl_ = {
+    &kCLayoutRulesFamilyImpl,
+    &kGLSLCallablePayloadParameterLayoutRulesImpl,
+    &kGLSLObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kCHitAttributesParameterLayoutRulesImpl_ = {
+    &kCLayoutRulesFamilyImpl,
+    &kGLSLHitAttributesParameterLayoutRulesImpl,
+    &kGLSLObjectLayoutRulesImpl,
+};
+
 
 // CUDA
 
@@ -1542,6 +1621,8 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getConstantBufferRules(
 {
     if (compilerOptions.shouldUseScalarLayout())
         return &kScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseCLayout())
+        return &kCLayoutRulesImpl_;
     else if (compilerOptions.shouldUseDXLayout())
         return &kFXCConstantBufferLayoutRulesFamilyImpl;
     if (auto cbufferType = as<ConstantBufferType>(containerType))
@@ -1556,6 +1637,8 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getConstantBufferRules(
             return &kStd430LayoutRulesImpl_;
         case ASTNodeType::ScalarDataLayoutType:
             return &kScalarLayoutRulesImpl_;
+        case ASTNodeType::CDataLayoutType:
+            return &kCLayoutRulesImpl_;
         default:
             break;
         }
@@ -1568,6 +1651,8 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getParameterBlockRules(
 {
     if (compilerOptions.shouldUseScalarLayout())
         return &kScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseCLayout())
+        return &kCLayoutRulesImpl_;
     else if (compilerOptions.shouldUseDXLayout())
         return &kFXCConstantBufferLayoutRulesFamilyImpl;
 
@@ -1589,6 +1674,8 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getTextureBufferRules(
 {
     if (compilerOptions.shouldUseScalarLayout())
         return &kScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseCLayout())
+        return &kCLayoutRulesImpl_;
     else if (compilerOptions.shouldUseDXLayout())
         return &kFXCConstantBufferLayoutRulesFamilyImpl;
 
@@ -1615,6 +1702,8 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getShaderStorageBufferRules(
 {
     if (compilerOptions.shouldUseScalarLayout())
         return &kScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseCLayout())
+        return &kCLayoutRulesImpl_;
     else if (compilerOptions.shouldUseDXLayout())
         return &kFXCShaderResourceLayoutRulesFamilyImpl;
 
@@ -1641,6 +1730,8 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getStructuredBufferRules(
 {
     if (compilerOptions.shouldUseScalarLayout())
         return &kScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseCLayout())
+        return &kCLayoutRulesImpl_;
     else if (compilerOptions.shouldUseDXLayout())
         return &kFXCShaderResourceLayoutRulesFamilyImpl;
 
@@ -1785,6 +1876,70 @@ LayoutRulesImpl* CPULayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getStructuredBufferRules(CompilerOptionSet&)
 {
     return &kCPULayoutRulesImpl_;
+}
+
+// C compatible layout family
+
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getAnyValueRules()
+{
+    return &kCAnyValueLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getConstantBufferRules(CompilerOptionSet&, Type*)
+{
+    return &kCLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getPushConstantBufferRules()
+{
+    return &kCPushConstantRulesImpl_;
+}
+
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getTextureBufferRules(CompilerOptionSet&)
+{
+    return &kCLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getVaryingInputRules()
+{
+    return &kCVaryingInputLayoutRulesImpl_;
+}
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getVaryingOutputRules()
+{
+    return &kCVaryingOutputLayoutRulesImpl_;
+}
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getSpecializationConstantRules()
+{
+    return &kCSpecializationConstantLayoutRulesImpl_;
+}
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getShaderStorageBufferRules(CompilerOptionSet&)
+{
+    return &kCLayoutRulesImpl_;
+}
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getParameterBlockRules(CompilerOptionSet&)
+{
+    return &kCLayoutRulesImpl_;
+}
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getRayPayloadParameterRules()
+{
+    return &kCRayPayloadParameterLayoutRulesImpl_;
+}
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getCallablePayloadParameterRules()
+{
+    return &kCCallablePayloadParameterLayoutRulesImpl_;
+}
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getHitAttributesParameterRules()
+{
+    return &kCHitAttributesParameterLayoutRulesImpl_;
+}
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
+{
+    return &kCShaderRecordLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getStructuredBufferRules(CompilerOptionSet&)
+{
+    return &kCLayoutRulesImpl_;
 }
 
 // CUDA Family
@@ -2516,6 +2671,11 @@ bool isKhronosTarget(TargetRequest* targetReq)
     return isKhronosTarget(targetReq->getTarget());
 }
 
+bool isSPIRV(CodeGenTarget codeGenTarget)
+{
+    return codeGenTarget == CodeGenTarget::SPIRV || codeGenTarget == CodeGenTarget::SPIRVAssembly;
+}
+
 bool isCPUTarget(TargetRequest* targetReq)
 {
     return ArtifactDescUtil::isCpuLikeTarget(
@@ -2553,6 +2713,12 @@ bool isWGPUTarget(CodeGenTarget target)
 bool isWGPUTarget(TargetRequest* targetReq)
 {
     return isWGPUTarget(targetReq->getTarget());
+}
+
+bool isKernelTarget(CodeGenTarget codeGenTarget)
+{
+    return ArtifactDescUtil::makeDescForCompileTarget(asExternal(codeGenTarget)).style ==
+           ArtifactStyle::Kernel;
 }
 
 SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgram)
@@ -4763,7 +4929,8 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     else if (auto vecType = as<VectorExpressionType>(type))
     {
         auto elementType = vecType->getElementType();
-        size_t elementCount = (size_t)getIntVal(vecType->getElementCount());
+        size_t elementCount =
+            (size_t)getIntVal(context.tryResolveLinkTimeVal(vecType->getElementCount()));
 
         auto element = _createTypeLayout(context, elementType);
 
@@ -4789,8 +4956,9 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     }
     else if (auto matType = as<MatrixExpressionType>(type))
     {
-        size_t rowCount = (size_t)getIntVal(matType->getRowCount());
-        size_t colCount = (size_t)getIntVal(matType->getColumnCount());
+        size_t rowCount = (size_t)getIntVal(context.tryResolveLinkTimeVal(matType->getRowCount()));
+        size_t colCount =
+            (size_t)getIntVal(context.tryResolveLinkTimeVal(matType->getColumnCount()));
 
         auto elementType = matType->getElementType();
         auto elementResult = _createTypeLayout(context, elementType);
@@ -4876,7 +5044,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             context,
             arrayType,
             arrayType->getElementType(),
-            arrayType->getElementCount());
+            context.tryResolveLinkTimeVal(arrayType->getElementCount()));
     }
     else if (auto atomicType = as<AtomicType>(type))
     {
@@ -4931,9 +5099,26 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     }
     else if (auto optionalType = as<OptionalType>(type))
     {
-        // OptionalType should be laid out the same way as Tuple<T, bool>.
-        if (isNullableType(optionalType->getValueType()))
+        // Sometimes a type `T` has an unused bit pattern that
+        // can be used to represent the null/absent optional value,
+        // and for such types the size of an `Optional<T>` can be
+        // the same as a `T`, by making use of that unused pattern.
+        //
+        if (doesTypeHaveAnUnusedBitPatternThatCanBeUsedForOptionalRepresentation(
+                optionalType->getValueType()))
             return _createTypeLayout(context, optionalType->getValueType());
+
+        // For all other types, an `Optional<T>` is laid out more-or-less
+        // as tuple of a `T` and a `bool`.
+        //
+        // TODO(tfoley): This code implements the `(T,bool)` ordering,
+        // which provides more easy opportunities to generate compact
+        // layouts by using "tail padding" than the `(bool, T)` ordering.
+        // However the "natural layout" implementation does not match
+        // what is being done here (it uses the `(bool, T)` ordering).
+        // The discrepancy should probably be fixed, but doing so would
+        // technically be a breaking change.
+        //
         Array<Type*, 2> types =
             makeArray(optionalType->getValueType(), context.astBuilder->getBoolType());
         auto tupleType = context.astBuilder->getTupleType(types.getView());
@@ -5017,16 +5202,18 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         // If we are trying to get the layout of some extern type, do our best
         // to look it up in other loaded modules and generate the type layout
         // based on that.
-        declRefType = context.lookupExternDeclRefType(declRefType);
-        auto declRef = declRefType->getDeclRef();
+        auto resolvedType = context.lookupExternDeclRefType(declRefType);
+        if (resolvedType != type)
+            return _createTypeLayout(context, resolvedType);
 
+        auto declRef = declRefType->getDeclRef();
 
         if (auto structDeclRef = declRef.as<StructDecl>())
         {
             StructTypeLayoutBuilder typeLayoutBuilder;
             StructTypeLayoutBuilder pendingDataTypeLayoutBuilder;
 
-            typeLayoutBuilder.beginLayout(type, rules);
+            typeLayoutBuilder.beginLayout(declRefType, rules);
             auto typeLayout = typeLayoutBuilder.getTypeLayout();
 
             _addLayout(context, type, typeLayout);
@@ -5523,6 +5710,20 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
 
         return typeLayout;
     }
+    else if (as<PtrType>(type))
+    {
+        RefPtr<TypeLayout> typeLayout = new PointerTypeLayout();
+        typeLayout->type = type;
+        typeLayout->rules = rules;
+
+        for (int rr = 0; rr < varyingRulesCount; ++rr)
+        {
+            auto info = varyingRules[rr]->GetPointerLayout();
+            typeLayout->addResourceUsage(info.kind, info.size);
+        }
+
+        return typeLayout;
+    }
     else if (auto vecType = as<VectorExpressionType>(type))
     {
         auto elementType = vecType->getElementType();
@@ -5700,26 +5901,71 @@ GlobalGenericParamDecl* GenericParamTypeLayout::getGlobalGenericParamDecl()
     return rsDeclRef.getDecl();
 }
 
-DeclRefType* TypeLayoutContext::lookupExternDeclRefType(DeclRefType* declRefType)
+// Get the decl ref to the outer generic if the decl referenced by `declRef` is generic.
+DeclRef<GenericDecl> getOuterGeneric(DeclRef<Decl> declRef)
+{
+    if (auto directDeclRef = as<DirectDeclRef>(declRef.declRefBase))
+    {
+        if (as<GenericDecl>(directDeclRef->getDecl()))
+            return DeclRef<GenericDecl>(directDeclRef);
+        if (as<GenericDecl>(directDeclRef->getParent()->getDecl()))
+            return DeclRef<GenericDecl>(directDeclRef->getParent());
+    }
+    else if (auto genAppDeclRef = as<GenericAppDeclRef>(declRef.declRefBase))
+    {
+        return DeclRef<GenericDecl>(genAppDeclRef->getBase());
+    }
+    return DeclRef<GenericDecl>();
+}
+
+Type* TypeLayoutContext::lookupExternDeclRefType(DeclRefType* declRefType)
 {
     const auto declRef = declRefType->getDeclRef();
     const auto decl = declRef.getDecl();
     const auto isExtern =
         decl->hasModifier<ExternAttribute>() || decl->hasModifier<ExternModifier>();
+    Type* resultType = declRefType;
     if (isExtern)
     {
         if (!externTypeMap)
             buildExternTypeMap();
         const auto mangledName = getMangledName(targetReq->getLinkage()->getASTBuilder(), decl);
-        externTypeMap->tryGetValue(mangledName, declRefType);
+        externTypeMap->tryGetValue(mangledName, resultType);
+        if (auto resolvedDeclRef = isDeclRefTypeOf<Decl>(resultType))
+        {
+            if (resolvedDeclRef != declRef)
+            {
+                // If declRef is a GenericApp, we should replace the generic base to
+                // resolveDeclRef's base.
+                if (auto originalGenericApp = as<GenericAppDeclRef>(declRef.declRefBase))
+                {
+                    if (auto resolvedOuterGeneric = getOuterGeneric(resolvedDeclRef.getDecl()))
+                    {
+                        auto substGenericApp = astBuilder->getGenericAppDeclRef(
+                            resolvedOuterGeneric,
+                            originalGenericApp->getArgs());
+                        resultType = DeclRefType::create(astBuilder, substGenericApp);
+                    }
+                }
+            }
+        }
     }
-    return declRefType;
+
+    // If the type is an alias of another type, then we should create the type layout
+    // from the aliased type instead.
+    if (auto aggTypeDeclRef = isDeclRefTypeOf<AggTypeDecl>(resultType))
+    {
+        if (auto aliasedType = as<Type>(getAliasedType(astBuilder, aggTypeDeclRef)))
+        {
+            return aliasedType;
+        }
+    }
+    return resultType;
 }
 
 void TypeLayoutContext::buildExternTypeMap()
 {
     externTypeMap.emplace();
-    const auto linkage = targetReq->getLinkage();
 
     HashSet<String> externNames;
     Dictionary<String, DeclRefType*> allTypes;
@@ -5728,6 +5974,8 @@ void TypeLayoutContext::buildExternTypeMap()
     // We'll match them up later
     auto processDecl = [&](auto&& go, Decl* decl) -> void
     {
+        if (auto genericDecl = as<GenericDecl>(decl))
+            decl = genericDecl->inner;
         const auto isExtern =
             decl->hasModifier<ExternAttribute>() || decl->hasModifier<ExternModifier>();
 
@@ -5745,7 +5993,7 @@ void TypeLayoutContext::buildExternTypeMap()
             }
         }
 
-        if (auto scopeDecl = as<ScopeDecl>(decl))
+        if (auto scopeDecl = isStaticScopeDecl(decl))
         {
             for (auto member : scopeDecl->getDirectMemberDecls())
             {
@@ -5754,7 +6002,7 @@ void TypeLayoutContext::buildExternTypeMap()
         }
     };
 
-    for (const auto& m : linkage->loadedModulesList)
+    for (const auto& m : programLayout->getProgram()->getModuleDependencies())
     {
         const auto& ast = m->getModuleDecl();
         for (auto member : ast->getDirectMemberDecls())

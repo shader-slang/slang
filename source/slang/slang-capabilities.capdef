@@ -152,7 +152,7 @@ def glsl_spirv_1_6 : glsl_spirv_1_5;
 
 // We have multiple capabilities for the various SPIR-V versions,
 // arranged so that they inherit from one another to represent which versions
-// provide a super-set of the features of earlier ones (e.g., SPIR-V 1.4 is
+// provide a superset of the features of earlier ones (e.g., SPIR-V 1.4 is
 // expressed as inheriting from SPIR-V 1.3).
 
 def _spirv_1_0 : spirv;
@@ -270,6 +270,10 @@ alias cpp_cuda = cpp | cuda;
 /// CPP, CUDA and SPIRV code-gen targets
 /// [Compound]
 alias cpp_cuda_spirv = cpp | cuda | spirv;
+
+/// CPP, CUDA, Metal, and SPIRV code-gen targets
+/// [Compound]
+alias cpp_cuda_metal_spirv = cpp | cuda | metal | spirv;
 
 /// CUDA and SPIRV code-gen targets
 /// [Compound]
@@ -597,6 +601,9 @@ def SPV_NV_tensor_addressing : _spirv_1_6;
 /// [EXT]
 def SPV_NV_cooperative_matrix2 : SPV_NV_tensor_addressing + SPV_KHR_cooperative_matrix;
 
+/// Represents the SPIR-V extension for SPV_NV_bindless_texture.
+/// [EXT]
+def SPV_NV_bindless_texture: _spirv_1_0;
 
 // SPIRV Capabilities.
 
@@ -808,6 +815,10 @@ def spvVulkanMemoryModelKHR : SPV_KHR_vulkan_memory_model;
 /// [EXT]
 def spvVulkanMemoryModelDeviceScopeKHR : SPV_KHR_vulkan_memory_model;
 
+/// Represents the SPIR-V capability for the bindless texture.
+/// [EXT]
+def spvBindlessTextureNV : SPV_NV_bindless_texture;
+
 // The following capabilities all pertain to how ray tracing shaders are translated
 // to GLSL, where there are two different extensions that can provide the core
 // functionality of `TraceRay` and the related operations.
@@ -887,6 +898,7 @@ def _GL_NV_shader_invocation_reorder : _GLSL_460;
 def _GL_NV_shader_subgroup_partitioned : _GLSL_140;
 def _GL_NV_shader_texture_footprint : _GLSL_450;
 def _GL_NV_cluster_acceleration_structure : _GLSL_460;
+def _GL_NV_cooperative_vector : _GLSL_450;
 
 // GLSL extension and SPV extension associations.
 
@@ -1134,6 +1146,10 @@ alias GL_NV_shader_texture_footprint = _GL_NV_shader_texture_footprint | spvImag
 /// [EXT]
 alias GL_NV_cluster_acceleration_structure = _GL_NV_cluster_acceleration_structure | spvRayTracingClusterAccelerationStructureNV;
 
+/// Represents the GL_NV_cooperative_vector extension.
+/// [EXT]
+alias GL_NV_cooperative_vector = _GL_NV_cooperative_vector | spvCooperativeVectorNV + spvCooperativeVectorTrainingNV;
+
 // Define feature names not reliant on shader stages
 
 /// NVAPI capability for HLSL
@@ -1176,7 +1192,7 @@ alias atomicfloat = GL_EXT_shader_atomic_float | _sm_6_0 + hlsl_nvapi | cpp | cu
 alias atomicfloat2 = GL_EXT_shader_atomic_float2 | _sm_6_6 + hlsl_nvapi | cpp | cuda;
 /// Capabilities needed to use fragment-shader-barycentric's
 /// [Compound]
-alias fragmentshaderbarycentric = GL_EXT_fragment_shader_barycentric | _sm_6_1;
+alias fragmentshaderbarycentric = GL_EXT_fragment_shader_barycentric | _sm_6_1 | metal;
 ///  (gfx targets) Capabilities needed to use memory barriers
 /// [Compound]
 alias shadermemorycontrol = glsl | _spirv_1_0 | _sm_5_0;
@@ -1190,11 +1206,10 @@ alias bufferreference_int64 = bufferreference + GL_EXT_shader_explicit_arithmeti
 /// Note that cpp and cuda are supported via a fallback non-cooperative implementation
 /// No HLSL shader model bound yet
 /// [Compound]
-alias cooperative_vector = _sm_6_9 | cpp | _cuda_sm_9_0 | spvCooperativeVectorNV;
+alias cooperative_vector = _sm_6_9 | cpp | _cuda_sm_9_0 | spvCooperativeVectorNV | _GL_NV_cooperative_vector;
 /// Capabilities needed to train cooperative vectors
 /// [Compound]
-alias cooperative_vector_training = spvCooperativeVectorTrainingNV;
-
+alias cooperative_vector_training = spvCooperativeVectorTrainingNV | _GL_NV_cooperative_vector;
 /// Capabilities needed to use cooperative matrices
 /// [Compound]
 alias cooperative_matrix = spvCooperativeMatrixKHR;
@@ -2149,6 +2164,7 @@ alias subgroup_ballot_activemask = spirv_1_0 + GL_KHR_shader_subgroup_ballot
                       | glsl + GL_KHR_shader_subgroup_ballot
                       | _sm_6_0
                       | _cuda_sm_7_0
+                      | metal
                       ;
 /// Capabilities required to use GLSL-style subgroup operations 'subgroup_basic_ballot'
 /// [Compound]
@@ -2217,6 +2233,7 @@ alias subgroup_partitioned = _sm_6_5
 /// [Compound]
 alias subgroup_rotate = GL_KHR_shader_subgroup_rotate 
                        | metal
+                       | _cuda_sm_5_0
                        ;
 
 /// (All implemented targets) Capabilities required to use atomic operations of GLSL tier-1 float atomics
@@ -2251,6 +2268,7 @@ alias helper_lane = _sm_6_0 + fragment
 alias quad_control = _sm_6_7
                     | GL_EXT_shader_quad_control + GL_EXT_maximal_reconvergence + GL_KHR_shader_subgroup_vote
                     | metal
+                    | _cuda_sm_5_0
                     ;
 
 /// Capabilities required to enable shader breakpoints

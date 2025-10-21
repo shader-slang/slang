@@ -295,6 +295,11 @@ void WGSLSourceEmitter::emitStructFieldAttributes(
 {
     SLANG_UNUSED(allowOffsetLayout);
 
+    // If the struct type is not used for physical storage, then we don't need to
+    // emit any layout attributes.
+    if (!structType->findDecoration<IRPhysicalTypeDecoration>())
+        return;
+
     // Tint emits errors unless we explicitly spell out the layout in some cases, so emit
     // offset and align attribtues for all fields.
     IRSizeAndAlignmentDecoration* const sizeAndAlignmentDecoration =
@@ -331,10 +336,12 @@ void WGSLSourceEmitter::emit(const AddressSpace addressSpace)
         break;
 
     case AddressSpace::StorageBuffer:
+    case AddressSpace::Global:
         m_writer->emit("storage");
         break;
 
     case AddressSpace::Generic:
+    case AddressSpace::Function:
         m_writer->emit("function");
         break;
 
@@ -562,10 +569,10 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         }
 
     case kIROp_PtrType:
-    case kIROp_InOutType:
-    case kIROp_OutType:
-    case kIROp_RefType:
-    case kIROp_ConstRefType:
+    case kIROp_BorrowInOutParamType:
+    case kIROp_OutParamType:
+    case kIROp_RefParamType:
+    case kIROp_BorrowInParamType:
         {
             auto ptrType = cast<IRPtrTypeBase>(type);
             m_writer->emit("ptr<");
@@ -1306,7 +1313,7 @@ bool WGSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 
 void WGSLSourceEmitter::emitCallArg(IRInst* inst)
 {
-    if (as<IRPtrTypeBase>(inst->getDataType()))
+    if (as<IRPointerLikeType>(inst->getDataType()) || as<IRPtrTypeBase>(inst->getDataType()))
     {
         // If we are calling a function with a pointer-typed argument, we need to
         // explicitly prefix the argument with `&` to pass a pointer.
@@ -1623,6 +1630,22 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit(")");
             return true;
+        }
+    case kIROp_Neg:
+        {
+            auto opType = inst->getOperand(0)->getDataType();
+            if (as<IRMatrixType>(opType) || as<IRVectorType>(opType))
+            {
+                // WGSL does not support negate operator on matrices and vectors,
+                // we should emit "(type(0) - op0)" instead.
+                m_writer->emit("(");
+                emitType(inst->getDataType());
+                m_writer->emit("(0) - ");
+                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                m_writer->emit(")");
+                return true;
+            }
+            break;
         }
     }
 

@@ -41,7 +41,7 @@ struct ByteAddressBufferLegalizationContext
     Dictionary<IRInst*, IRType*> byteAddrBufferToReplace;
 
     // Everything starts with a request to process a module,
-    // which delegates to the central recrusive walk of the IR.
+    // which delegates to the central recursive walk of the IR.
     //
     void processModule(IRModule* module)
     {
@@ -178,6 +178,20 @@ struct ByteAddressBufferLegalizationContext
                 return false;
             }
 
+            // For Metal targets, 64-bit integer types need special handling
+            // because Metal doesn't support as_type casts from 64-bit to 32-bit.
+            // These types should be lowered to two 32-bit operations.
+            //
+            if (m_options.lowerBasicTypeOps)
+            {
+                // getSameSizeUIntBaseType should convert any 64-bit types to UInt64
+                auto unsignedBaseType = getSameSizeUIntBaseType(type->getOp());
+                if (unsignedBaseType == BaseType::UInt64)
+                {
+                    return false; // Force legalization for 64-bit integer types
+                }
+            }
+
             // Otherwise, scalar types are assumed
             // legal for load/store.
             //
@@ -190,7 +204,7 @@ struct ByteAddressBufferLegalizationContext
         {
             // If we've been asked to scalarize all
             // vector load/store, then we need to
-            // tread them as illegal.
+            // treat them as illegal.
             //
             if (m_options.scalarizeVectorLoadStore)
                 return false;
@@ -223,7 +237,7 @@ struct ByteAddressBufferLegalizationContext
         else if (auto alignInst = as<IRIntLit>(unknownOffsetAlignment))
         {
             // If the offset is not known during compile time, use the explicit align
-            // field of the overloaded `Load` or `Store` operation or vi `LoadAligned`
+            // field of the overloaded `Load` or `Store` operation or via `LoadAligned`
             // or `StoreAligned` function.
             //
             // Unaligned `Load`s or `Store`s are identified with 0 alignment, to prevent
@@ -348,8 +362,8 @@ struct ByteAddressBufferLegalizationContext
             }
 
             // Once all the field values have been loaded, we can bind
-            // then together to make a singel value of the `struct` type,
-            // representing the reuslt of the legalized load.
+            // then together to make a single value of the `struct` type,
+            // representing the result of the legalized load.
             //
             return m_builder.emitMakeStruct(type, fieldVals);
         }
@@ -358,7 +372,7 @@ struct ByteAddressBufferLegalizationContext
             // Loading a value of array type amounts to loading each
             // of its elements. There is shared logic between the
             // array, matrix, and vector cases, so we factor it into
-            // a subroutien that we will explain later.
+            // a subroutine that we will explain later.
             //
             // We need a known constant number of elements in an array
             // to be able to emit per-element loads, so we skip
@@ -739,7 +753,18 @@ struct ByteAddressBufferLegalizationContext
                     hi64,
                     m_builder.getIntValue(m_builder.getUInt64Type(), 32));
                 auto fullValue = m_builder.emitBitOr(m_builder.getUInt64Type(), lo64, shift);
-                return m_builder.emitBitCast(type, fullValue);
+                // For pointer types, Metal doesn't allow as_type casts from integers to pointers,
+                // so we use proper cast operations instead of bit casts.
+                if (type->getOp() == kIROp_PtrType || type->getOp() == kIROp_RawPointerType)
+                {
+                    // Use proper cast operation instead of bit cast for pointers
+                    return m_builder.emitCastIntToPtr(type, fullValue);
+                }
+                else
+                {
+                    // For non-pointer 64-bit types (including IntPtr/UIntPtr)
+                    return m_builder.emitBitCast(type, fullValue);
+                }
             }
             else if (sizeAlignment.size < 4)
             {
@@ -915,6 +940,19 @@ struct ByteAddressBufferLegalizationContext
         if (auto byteAddressBufferParam = as<IRGlobalParam>(byteAddressBuffer))
         {
             return getEquivalentStructuredBufferParam(elementType, byteAddressBufferParam);
+        }
+        else if (auto castDynamicResource = as<IRCastDynamicResource>(byteAddressBuffer))
+        {
+            // If the underlying structured buffer is a CastDynamicResource,
+            // we can simply cast the dynamic resource into the byte address buffer type instead.
+            auto arg = castDynamicResource->getOperand(0);
+            return m_builder.emitIntrinsicInst(
+                getEquivalentStructuredBufferParamType(
+                    elementType,
+                    byteAddressBuffer->getDataType()),
+                kIROp_CastDynamicResource,
+                1,
+                &arg);
         }
 
         if (byteAddressBuffer->getOp() == kIROp_GetElement)
@@ -1100,7 +1138,7 @@ struct ByteAddressBufferLegalizationContext
 
     void processStore(IRInst* store)
     {
-        // Just as for loads, the logic for stores is base don the type
+        // Just as for loads, the logic for stores is base on the type
         // being used, but unlike in the load case we don't care about
         // the type of the store operation, but instead the operand
         // that represents the value to be stored.
@@ -1384,16 +1422,30 @@ struct ByteAddressBufferLegalizationContext
         if (m_options.lowerBasicTypeOps)
         {
             // Some platforms e.g. Metal does not allow storing basic types that are not 4-byte
-            // sized. We need to lower such loads.
+            // sized. We need to lower such stores.
             IRSizeAndAlignment sizeAlignment;
             SLANG_RETURN_ON_FAIL(
                 getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), type, &sizeAlignment));
             if (sizeAlignment.size == 8)
             {
                 // We need to store the value as two 4-byte values.
-                auto uint64Val = m_builder.emitBitCast(m_builder.getUInt64Type(), value);
-                auto loVal = m_builder.emitCast(m_builder.getUIntType(), uint64Val);
-                auto hiVal = m_builder.emitCast(
+                // For pointer types, Metal doesn't allow as_type casts from pointers to integers,
+                // so we use proper cast operations instead of bit casts.
+                IRInst* loVal;
+                IRInst* hiVal;
+                IRInst* uint64Val;
+                if (type->getOp() == kIROp_PtrType || type->getOp() == kIROp_RawPointerType)
+                {
+                    // Use proper cast operation instead of bit cast for pointers
+                    uint64Val = m_builder.emitCastPtrToInt(value);
+                }
+                else
+                {
+                    // For non-pointer 64-bit types (including IntPtr/UIntPtr)
+                    uint64Val = m_builder.emitBitCast(m_builder.getUInt64Type(), value);
+                }
+                loVal = m_builder.emitCast(m_builder.getUIntType(), uint64Val);
+                hiVal = m_builder.emitCast(
                     m_builder.getUIntType(),
                     m_builder.emitShr(
                         m_builder.getUInt64Type(),

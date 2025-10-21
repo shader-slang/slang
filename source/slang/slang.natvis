@@ -1,30 +1,39 @@
-<?xml version="1.0" encoding="utf-8"?> 
+<?xml version="1.0" encoding="utf-8"?>
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
-
-  <Type Name="Slang::BCPtr&lt;*&gt;">
-    <SmartPointer Usage="Minimal">rawVal ? ($T1*)((char*)this + rawVal) : ($T1*)0</SmartPointer>
-    <DisplayString Condition="rawVal == 0">BCPtr nullptr</DisplayString>
-    <DisplayString Condition="rawVal != 0">BCPtr {*($T1*)((char*)this + rawVal)}</DisplayString>
-    <Expand>
-      <ExpandedItem>rawVal ? ($T1*)((char*)this + rawVal) : ($T1*)0</ExpandedItem>
-    </Expand>
-  </Type>
-  <Type Name="Slang::ValNodeOperand">
-    <DisplayString Condition="kind == Slang::ValNodeOperandKind::ConstantValue">Constant {intOperand}</DisplayString>
-    <DisplayString Condition="kind == Slang::ValNodeOperandKind::ValNode">{(Slang::Val*)nodeOperand}</DisplayString>
-    <DisplayString Condition="kind == Slang::ValNodeOperandKind::ASTNode">{nodeOperand}</DisplayString>
-    <Expand>
-        <ExpandedItem>*(Slang::Val*)nodeOperand</ExpandedItem>
-    </Expand>
-  </Type>
-  <Type Name="Slang::DeclRef&lt;*&gt;">
-    <DisplayString Condition="declRefBase == 0">DeclRef nullptr</DisplayString>
-
-    <DisplayString Condition="declRefBase != 0">{*declRefBase}</DisplayString>
-    <Expand>
-      <ExpandedItem>declRefBase</ExpandedItem>
-    </Expand>
-  </Type>
+    <Type Name="Slang::BCPtr&lt;*&gt;">
+        <SmartPointer Usage="Minimal">rawVal ? ($T1*)((char*)this + rawVal) : ($T1*)0</SmartPointer>
+        <DisplayString Condition="rawVal == 0">BCPtr nullptr</DisplayString>
+        <DisplayString Condition="rawVal != 0">BCPtr {*($T1*)((char*)this + rawVal)}</DisplayString>
+        <Expand>
+            <ExpandedItem>rawVal ? ($T1*)((char*)this + rawVal) : ($T1*)0</ExpandedItem>
+        </Expand>
+    </Type>
+    <Type Name="Slang::NodeBase" Inheritable="false">
+        <DisplayString>{astNodeType}</DisplayString>
+        <Expand>
+			<Item Condition="kAllSyntaxClasses[astNodeType]->debugVisType == Slang::SyntaxClassInfoDebugVisType::Decl" Name="Decl">(Slang::Decl*)this</Item>
+			<Item Condition="kAllSyntaxClasses[astNodeType]->debugVisType == Slang::SyntaxClassInfoDebugVisType::Expr" Name="Expr">(Slang::Expr*)this</Item>
+			<Item Condition="kAllSyntaxClasses[astNodeType]->debugVisType == Slang::SyntaxClassInfoDebugVisType::Modifier" Name="Modifier">(Slang::Modifier*)this</Item>
+			<Item Condition="kAllSyntaxClasses[astNodeType]->debugVisType == Slang::SyntaxClassInfoDebugVisType::Stmt" Name="Stmt">(Slang::Stmt*)this</Item>
+			<Item Condition="kAllSyntaxClasses[astNodeType]->debugVisType == Slang::SyntaxClassInfoDebugVisType::Val" Name="Val">(Slang::Val*)this</Item>
+			<Item Condition="kAllSyntaxClasses[astNodeType]->debugVisType == Slang::SyntaxClassInfoDebugVisType::Scope" Name="Scope">(Slang::Scope*)this</Item>
+        </Expand>
+    </Type>
+    <Type Name="Slang::ValNodeOperand">
+        <DisplayString Condition="kind == Slang::ValNodeOperandKind::ConstantValue">Constant {intOperand}</DisplayString>
+        <DisplayString Condition="kind == Slang::ValNodeOperandKind::ValNode">{(Slang::Val*)nodeOperand}</DisplayString>
+        <DisplayString Condition="kind == Slang::ValNodeOperandKind::ASTNode">{nodeOperand}</DisplayString>
+        <Expand>
+            <ExpandedItem>*(Slang::Val*)nodeOperand</ExpandedItem>
+        </Expand>
+    </Type>
+    <Type Name="Slang::DeclRef&lt;*&gt;">
+        <DisplayString Condition="declRefBase == 0">DeclRef nullptr</DisplayString>
+        <DisplayString Condition="declRefBase != 0">{*declRefBase}</DisplayString>
+        <Expand>
+            <ExpandedItem>declRefBase</ExpandedItem>
+        </Expand>
+    </Type>
     <Type Name="Slang::DeclRefBase">
         <DisplayString Optional="true" Condition="m_operands.m_buffer[0].values.nodeOperand != 0">{astNodeType,en}#{_debugUID}({(Decl*)m_operands.m_buffer[0].values.nodeOperand}) </DisplayString>
         <DisplayString Condition="m_operands.m_buffer[0].values.nodeOperand != 0">{astNodeType,en}({(Decl*)m_operands.m_buffer[0].values.nodeOperand})</DisplayString>
@@ -69,140 +78,138 @@
             </CustomListItems>
         </Expand>
     </Type>
-  <Type Name="Slang::DeclRefType">
-      <DisplayString Optional="true">{astNodeType,en}#{_debugUID} {*(DeclRefBase*)m_operands.m_buffer[0].values.nodeOperand} </DisplayString>
-
-      <DisplayString>{astNodeType,en} {*(DeclRefBase*)m_operands.m_buffer[0].values.nodeOperand}</DisplayString>
-    <Expand>
-        <Synthetic Name="DeclRefType">
-            <DisplayString Optional="true">{astNodeType,en}#{_debugUID} {m_operands.m_buffer[0].values.nodeOperand->astNodeType, en}#{m_operands.m_buffer[0].values.nodeOperand->_debugUID}</DisplayString>
-            <DisplayString>{astNodeType,en} {m_operands.m_buffer[0].values.nodeOperand->astNodeType, en}</DisplayString>
-        </Synthetic>
-      <ExpandedItem>*(DeclRefBase*)m_operands.m_buffer[0].values.nodeOperand</ExpandedItem>
-    </Expand>
-  </Type>
+    <Type Name="Slang::DeclRefType">
+        <DisplayString Optional="true">{astNodeType,en}#{_debugUID} {*(DeclRefBase*)m_operands.m_buffer[0].values.nodeOperand} </DisplayString>
+        <DisplayString>{astNodeType,en} {*(DeclRefBase*)m_operands.m_buffer[0].values.nodeOperand}</DisplayString>
+        <Expand>
+            <Synthetic Name="DeclRefType">
+                <DisplayString Optional="true">{astNodeType,en}#{_debugUID} {m_operands.m_buffer[0].values.nodeOperand->astNodeType, en}#{m_operands.m_buffer[0].values.nodeOperand->_debugUID}</DisplayString>
+                <DisplayString>{astNodeType,en} {m_operands.m_buffer[0].values.nodeOperand->astNodeType, en}</DisplayString>
+            </Synthetic>
+            <ExpandedItem>*(DeclRefBase*)m_operands.m_buffer[0].values.nodeOperand</ExpandedItem>
+        </Expand>
+    </Type>
     <Type Name="Slang::FuncDecl">
         <DisplayString>FuncDecl {nameAndLoc}</DisplayString>
     </Type>
-  <Type Name="Slang::Name">
-    <DisplayString>{{name={(char*)(text.m_buffer.pointer+1), s}}}</DisplayString>
-  </Type>
-  <Type Name="Slang::NameLoc">
-    <DisplayString>{{name={(char*)((*name).text.m_buffer.pointer+1), s} loc={loc.raw}}}</DisplayString>
-  </Type>
-  <Type Name="Slang::IRWitnessTableEntry">
-    <Expand>
-      <Item Name="[Key]">requirementKey</Item>
-      <Item Name="[Val]">satisfyingVal</Item>
-    </Expand>
-  </Type>
-  <Type Name="Slang::IRInst">
-      <DisplayString>{{{m_op} {(uint32_t)(void*)this, x}}}</DisplayString>
-      <DisplayString Optional="true">{{{m_op} #{_debugUID}}}</DisplayString>
-      <Expand>
-      <Item Name="[op]">m_op</Item>
-      <Item Name="[UID]"  Optional="true">_debugUID</Item>
-      <Item Name="[type]">typeUse.usedValue</Item>
-      <CustomListItems MaxItemsPerView="3">
-		  <Variable Name="child" InitialValue="m_decorationsAndChildren.first"/>
-		  <Loop>
-			  <If Condition="child == 0">
-				  <Break/>
-			  </If>
-			  <If Condition="child->m_op == kIROp_ExportDecoration">
-				  <Item Name="[exportName]">((Slang::IRStringLit*)(((Slang::IRUse*)(child + 1))->usedValue))->value.stringVal.chars,[((Slang::IRStringLit*)(((Slang::IRUse*)(child + 1))->usedValue))->value.stringVal.numChars]s8</Item>
-			  </If>
-			  <If Condition="child->m_op == kIROp_ImportDecoration">
-				  <Item Name="[importName]">((Slang::IRStringLit*)(((Slang::IRUse*)(child + 1))->usedValue))->value.stringVal.chars,[((Slang::IRStringLit*)(((Slang::IRUse*)(child + 1))->usedValue))->value.stringVal.numChars]s8</Item>
-			  </If>
-			  <If Condition="child->m_op == kIROp_NameHintDecoration">
-				  <Item Name="[name]">((Slang::IRStringLit*)(((Slang::IRUse*)(child + 1))->usedValue))->value.stringVal.chars,[((Slang::IRStringLit*)(((Slang::IRUse*)(child + 1))->usedValue))->value.stringVal.numChars]s8</Item>
-			  </If>
-			  <Exec>child = child->next</Exec>
-		  </Loop>
-      </CustomListItems>
-      <Item Name="[value]" Condition="m_op == kIROp_StringLit">((IRStringLit*)this)->value.stringVal.chars,[((IRStringLit*)this)->value.stringVal.numChars]s8</Item>
-      <Item Name="[value]" Condition="m_op == kIROp_IntLit">((IRIntLit*)this)->value.intVal</Item>
-      <CustomListItems MaxItemsPerView="10">
-	    <Variable Name="index" InitialValue="0"/>
-	    <Variable Name="nameDecoration" InitialValue="(IRInst*)nullptr"/>
-	    <Variable Name="child" InitialValue="(IRInst*)nullptr"/>
-		<Variable Name="pOperandInst" InitialValue="(IRInst*)nullptr"/>
-	    <Loop Condition="index &lt; operandCount">
-		    <Exec>pOperandInst = ((IRUse*)(&amp;(typeUse) + 1 + index))->usedValue </Exec>
-        <Item Condition="pOperandInst == 0" Name="[operand{index}]">pOperandInst</Item>
-        <If Condition="pOperandInst != 0">
-			<Exec>child = pOperandInst->m_decorationsAndChildren.first</Exec>
-		    <Exec>nameDecoration = 0</Exec>
-		    <Loop Condition="child != 0">
-			    <If Condition="child->m_op == kIROp_NameHintDecoration">
-				    <Exec>nameDecoration = child</Exec>
-				    <Break/>
-			    </If>
-			    <If Condition="child->m_op == kIROp_ExportDecoration &amp;&amp; (nameDecoration == 0 || nameDecoration->m_op != kIROp_NameHintDecoration)">
-				    <Exec>nameDecoration = child</Exec>
-			    </If>
-			    <If Condition="child->m_op == kIROp_ImportDecoration &amp;&amp; (nameDecoration == 0 || nameDecoration->m_op != kIROp_NameHintDecoration)">
-				    <Exec>nameDecoration = child</Exec>
-			    </If>
-			    <Exec>child = child->next</Exec>
-		    </Loop>
-		    <Item Condition="nameDecoration != 0" Name="[operand{index}] : {((Slang::IRStringLit*)(((Slang::IRUse*)(nameDecoration + 1))->usedValue))->value.stringVal.chars,[((Slang::IRStringLit*)(((Slang::IRUse*)(nameDecoration + 1))->usedValue))->value.stringVal.numChars]s8}">*pOperandInst</Item>
-		    <Item Condition="nameDecoration == 0" Name="[operand{index}]">*pOperandInst</Item>
-        </If>
-        <Exec>index = index + 1</Exec>
-	    </Loop>
-      </CustomListItems>
-      <Synthetic Name="[decorations/children]">
+    <Type Name="Slang::Name">
+        <DisplayString>{{name={(char*)(text.m_buffer.pointer+1), s}}}</DisplayString>
+    </Type>
+    <Type Name="Slang::NameLoc">
+        <DisplayString>{{name={(char*)((*name).text.m_buffer.pointer+1), s} loc={loc.raw}}}</DisplayString>
+    </Type>
+    <Type Name="Slang::IRWitnessTableEntry">
         <Expand>
-		  <CustomListItems MaxItemsPerView="5000">
-			  <Variable Name="pItem" InitialValue="m_decorationsAndChildren.first"/>
-			  <Variable Name="nameDecoration" InitialValue="(IRInst*)nullptr"/>
-			  <Variable Name="child" InitialValue="(IRInst*)nullptr"/>
-			  <Variable Name="index" InitialValue="0"/>
-			  <Loop Condition="pItem != 0">
-				  <Exec>child = pItem->m_decorationsAndChildren.first </Exec>
-			      <Exec>nameDecoration = 0</Exec>
-				  <Loop Condition="child != 0">
-				      <If Condition="child->m_op == kIROp_NameHintDecoration">
-						  <Exec>nameDecoration = child</Exec>
-						  <Break/>
-				      </If>
-				      <If Condition="child->m_op == kIROp_ExportDecoration &amp;&amp; (nameDecoration == 0 || nameDecoration->m_op != kIROp_NameHintDecoration)">
-						  <Exec>nameDecoration = child</Exec>
-				      </If>
-					  <If Condition="child->m_op == kIROp_ImportDecoration &amp;&amp; (nameDecoration == 0 || nameDecoration->m_op != kIROp_NameHintDecoration)">
-						  <Exec>nameDecoration = child</Exec>
-					  </If>
-				      <Exec>child = child->next</Exec>
-				  </Loop>      
-			      <Item Condition="nameDecoration != 0" Name="[{index}] : {((Slang::IRStringLit*)(((Slang::IRUse*)(nameDecoration + 1))->usedValue))->value.stringVal.chars,[((Slang::IRStringLit*)(((Slang::IRUse*)(nameDecoration + 1))->usedValue))->value.stringVal.numChars]s8}">*pItem</Item>
-			      <Item Condition="nameDecoration == 0">*pItem</Item>
-				  <Exec>pItem = pItem->next</Exec>
-				  <Exec>index = index + 1</Exec>
-			  </Loop>
-		  </CustomListItems>
+            <Item Name="[Key]">requirementKey</Item>
+            <Item Name="[Val]">satisfyingVal</Item>
         </Expand>
-      </Synthetic>
-      <Item Name="[parent]">parent</Item>
-      <Synthetic Name="[uses]">
+    </Type>
+    <Type Name="Slang::IRInst">
+        <DisplayString>{{{m_op} {(uint32_t)(void*)this, x}}}</DisplayString>
+        <DisplayString Optional="true">{{{m_op} #{_debugUID}}}</DisplayString>
         <Expand>
-          <LinkedListItems>
-            <HeadPointer>firstUse</HeadPointer>
-            <NextPointer>nextUse</NextPointer>
-            <ValueNode>user</ValueNode>
-          </LinkedListItems>
+            <Item Name="[op]">m_op</Item>
+            <Item Name="[UID]"  Optional="true">_debugUID</Item>
+            <Item Name="[type]">typeUse.usedValue</Item>
+            <CustomListItems MaxItemsPerView="3">
+                <Variable Name="child" InitialValue="m_decorationsAndChildren.first"/>
+                <Loop>
+                    <If Condition="child == 0">
+                        <Break/>
+                    </If>
+                    <If Condition="child->m_op == kIROp_ExportDecoration">
+                        <Item Name="[exportName]">((Slang::IRStringLit*)(((Slang::IRUse*)(child + 1))->usedValue))->value.stringVal.chars,[((Slang::IRStringLit*)(((Slang::IRUse*)(child + 1))->usedValue))->value.stringVal.numChars]s8</Item>
+                    </If>
+                    <If Condition="child->m_op == kIROp_ImportDecoration">
+                        <Item Name="[importName]">((Slang::IRStringLit*)(((Slang::IRUse*)(child + 1))->usedValue))->value.stringVal.chars,[((Slang::IRStringLit*)(((Slang::IRUse*)(child + 1))->usedValue))->value.stringVal.numChars]s8</Item>
+                    </If>
+                    <If Condition="child->m_op == kIROp_NameHintDecoration">
+                        <Item Name="[name]">((Slang::IRStringLit*)(((Slang::IRUse*)(child + 1))->usedValue))->value.stringVal.chars,[((Slang::IRStringLit*)(((Slang::IRUse*)(child + 1))->usedValue))->value.stringVal.numChars]s8</Item>
+                    </If>
+                    <Exec>child = child->next</Exec>
+                </Loop>
+            </CustomListItems>
+            <Item Name="[value]" Condition="m_op == kIROp_StringLit">((IRStringLit*)this)->value.stringVal.chars,[((IRStringLit*)this)->value.stringVal.numChars]s8</Item>
+            <Item Name="[value]" Condition="m_op == kIROp_IntLit">((IRIntLit*)this)->value.intVal</Item>
+            <CustomListItems MaxItemsPerView="10">
+                <Variable Name="index" InitialValue="0"/>
+                <Variable Name="nameDecoration" InitialValue="(IRInst*)nullptr"/>
+                <Variable Name="child" InitialValue="(IRInst*)nullptr"/>
+                <Variable Name="pOperandInst" InitialValue="(IRInst*)nullptr"/>
+                <Loop Condition="index &lt; operandCount">
+                    <Exec>pOperandInst = ((IRUse*)(&amp;(typeUse) + 1 + index))->usedValue </Exec>
+                    <Item Condition="pOperandInst == 0" Name="[operand{index}]">pOperandInst</Item>
+                    <If Condition="pOperandInst != 0">
+                        <Exec>child = pOperandInst->m_decorationsAndChildren.first</Exec>
+                        <Exec>nameDecoration = 0</Exec>
+                        <Loop Condition="child != 0">
+                            <If Condition="child->m_op == kIROp_NameHintDecoration">
+                                <Exec>nameDecoration = child</Exec>
+                                <Break/>
+                            </If>
+                            <If Condition="child->m_op == kIROp_ExportDecoration &amp;&amp; (nameDecoration == 0 || nameDecoration->m_op != kIROp_NameHintDecoration)">
+                                <Exec>nameDecoration = child</Exec>
+                            </If>
+                            <If Condition="child->m_op == kIROp_ImportDecoration &amp;&amp; (nameDecoration == 0 || nameDecoration->m_op != kIROp_NameHintDecoration)">
+                                <Exec>nameDecoration = child</Exec>
+                            </If>
+                            <Exec>child = child->next</Exec>
+                        </Loop>
+                        <Item Condition="nameDecoration != 0" Name="[operand{index}] : {((Slang::IRStringLit*)(((Slang::IRUse*)(nameDecoration + 1))->usedValue))->value.stringVal.chars,[((Slang::IRStringLit*)(((Slang::IRUse*)(nameDecoration + 1))->usedValue))->value.stringVal.numChars]s8}">*pOperandInst</Item>
+                        <Item Condition="nameDecoration == 0" Name="[operand{index}]">*pOperandInst</Item>
+                    </If>
+                    <Exec>index = index + 1</Exec>
+                </Loop>
+            </CustomListItems>
+            <Synthetic Name="[decorations/children]">
+                <Expand>
+                    <CustomListItems MaxItemsPerView="5000">
+                        <Variable Name="pItem" InitialValue="m_decorationsAndChildren.first"/>
+                        <Variable Name="nameDecoration" InitialValue="(IRInst*)nullptr"/>
+                        <Variable Name="child" InitialValue="(IRInst*)nullptr"/>
+                        <Variable Name="index" InitialValue="0"/>
+                        <Loop Condition="pItem != 0">
+                            <Exec>child = pItem->m_decorationsAndChildren.first </Exec>
+                            <Exec>nameDecoration = 0</Exec>
+                            <Loop Condition="child != 0">
+                                <If Condition="child->m_op == kIROp_NameHintDecoration">
+                                    <Exec>nameDecoration = child</Exec>
+                                    <Break/>
+                                </If>
+                                <If Condition="child->m_op == kIROp_ExportDecoration &amp;&amp; (nameDecoration == 0 || nameDecoration->m_op != kIROp_NameHintDecoration)">
+                                    <Exec>nameDecoration = child</Exec>
+                                </If>
+                                <If Condition="child->m_op == kIROp_ImportDecoration &amp;&amp; (nameDecoration == 0 || nameDecoration->m_op != kIROp_NameHintDecoration)">
+                                    <Exec>nameDecoration = child</Exec>
+                                </If>
+                                <Exec>child = child->next</Exec>
+                            </Loop>
+                            <Item Condition="nameDecoration != 0" Name="[{index}] : {((Slang::IRStringLit*)(((Slang::IRUse*)(nameDecoration + 1))->usedValue))->value.stringVal.chars,[((Slang::IRStringLit*)(((Slang::IRUse*)(nameDecoration + 1))->usedValue))->value.stringVal.numChars]s8}">*pItem</Item>
+                            <Item Condition="nameDecoration == 0">*pItem</Item>
+                            <Exec>pItem = pItem->next</Exec>
+                            <Exec>index = index + 1</Exec>
+                        </Loop>
+                    </CustomListItems>
+                </Expand>
+            </Synthetic>
+            <Item Name="[parent]">parent</Item>
+            <Synthetic Name="[uses]">
+                <Expand>
+                    <LinkedListItems>
+                        <HeadPointer>firstUse</HeadPointer>
+                        <NextPointer>nextUse</NextPointer>
+                        <ValueNode>user</ValueNode>
+                    </LinkedListItems>
+                </Expand>
+            </Synthetic>
         </Expand>
-      </Synthetic>
-  </Expand>
-  </Type>
-  <Type Name="Slang::IRUse">
-    <DisplayString>{{IRUse {usedValue}}}</DisplayString>
-    <Expand>
-      <ExpandedItem>usedValue</ExpandedItem>
-    </Expand>
-  </Type>
-
+    </Type>
+    <Type Name="Slang::IRUse">
+        <DisplayString>{{IRUse {usedValue}}}</DisplayString>
+        <Expand>
+            <ExpandedItem>usedValue</ExpandedItem>
+        </Expand>
+    </Type>
     <Type Name="Slang::Expr" Inheritable="false">
         <DisplayString>{astNodeType,en}</DisplayString>
         <Expand>
@@ -253,7 +260,8 @@
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::AndTypeExpr">(Slang::AndTypeExpr*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ModifiedTypeExpr">(Slang::ModifiedTypeExpr*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::PointerTypeExpr">(Slang::PointerTypeExpr*)&amp;astNodeType</ExpandedItem>
-            <Item Name="[type]">type</Item>
+			<ExpandedItem Condition="astNodeType == Slang::ASTNodeType::AddressOfExpr">(Slang::AddressOfExpr*)&amp;astNodeType</ExpandedItem>
+			<Item Name="[type]">type</Item>
             <Item Name="[Expr]">(Slang::Expr*)this,!</Item>
         </Expand>
     </Type>
@@ -286,6 +294,7 @@
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ContinueStmt">(Slang::ContinueStmt*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ReturnStmt">(Slang::ReturnStmt*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ExpressionStmt">(Slang::ExpressionStmt*)&amp;astNodeType</ExpandedItem>
+            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::TargetSwitchStmt">(Slang::TargetSwitchStmt*)&amp;astNodeType</ExpandedItem>
             <Item Name="[Stmt]">(Slang::Stmt*)this,!</Item>
         </Expand>
     </Type>
@@ -299,6 +308,7 @@
             <Item Name="[Name]" Condition="nameAndLoc.name!=0">nameAndLoc.name->text</Item>
             <Item Name="[Parent]">parentDecl</Item>
             <Item Name="[CheckState]">Slang::DeclCheckState(checkState.m_raw &amp; ~Slang::DeclCheckStateExt::kBeingCheckedBit)</Item>
+            <Item Name="[Capabilities]">inferredCapabilityRequirements</Item>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ContainerDecl">(Slang::ContainerDecl*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ExtensionDecl">(Slang::ExtensionDecl*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::StructDecl">(Slang::StructDecl*)&amp;astNodeType</ExpandedItem>
@@ -339,11 +349,9 @@
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::EmptyDecl">(Slang::EmptyDecl*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::SyntaxDecl">(Slang::SyntaxDecl*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::DeclGroup">(Slang::DeclGroup*)&amp;astNodeType</ExpandedItem>
-            
             <Item Name="Decl">(Slang::DeclBase*)this,!</Item>
         </Expand>
     </Type>
-
     <Type Name="Slang::DeclBase" Inheritable="false">
         <DisplayString>{astNodeType,en}</DisplayString>
         <Expand>
@@ -421,25 +429,21 @@
                 </Expand>
             </Synthetic>
         </Expand>
-
     </Type>
     <Type Name="Slang::Val" Inheritable="true">
-      <DisplayString Optional="true" Condition="astNodeType == Slang::ASTNodeType::DeclRefType">DeclRefType#{_debugUID} {*(Val*)(((Slang::DeclRefType*)this)->m_operands.m_buffer[0].values.nodeOperand)}</DisplayString>
-      <DisplayString Condition="astNodeType == Slang::ASTNodeType::DeclRefType">DeclRefType {*(Val*)(((Slang::DeclRefType*)this)->m_operands.m_buffer[0].values.nodeOperand)}</DisplayString>
-      <DisplayString Optional="true" Condition="astNodeType == Slang::ASTNodeType::DirectDeclRef">DirectRef#{_debugUID} {*(Decl*)m_operands.m_buffer[0].values.nodeOperand}</DisplayString>
-      <DisplayString Condition="astNodeType == Slang::ASTNodeType::DirectDeclRef">DirectRef {*(Decl*)m_operands.m_buffer[0].values.nodeOperand}</DisplayString>  
-      <DisplayString Optional="true">{astNodeType,en} #{_debugUID}</DisplayString>
-      <DisplayString>{astNodeType,en}</DisplayString>
-
+        <DisplayString Optional="true" Condition="astNodeType == Slang::ASTNodeType::DeclRefType">DeclRefType#{_debugUID} {*(Val*)(((Slang::DeclRefType*)this)->m_operands.m_buffer[0].values.nodeOperand)}</DisplayString>
+        <DisplayString Condition="astNodeType == Slang::ASTNodeType::DeclRefType">DeclRefType {*(Val*)(((Slang::DeclRefType*)this)->m_operands.m_buffer[0].values.nodeOperand)}</DisplayString>
+        <DisplayString Optional="true" Condition="astNodeType == Slang::ASTNodeType::DirectDeclRef">DirectRef#{_debugUID} {*(Decl*)m_operands.m_buffer[0].values.nodeOperand}</DisplayString>
+        <DisplayString Condition="astNodeType == Slang::ASTNodeType::DirectDeclRef">DirectRef {*(Decl*)m_operands.m_buffer[0].values.nodeOperand}</DisplayString>
+        <DisplayString Optional="true">{astNodeType,en} #{_debugUID}</DisplayString>
+        <DisplayString>{astNodeType,en}</DisplayString>
         <Expand>
             <Synthetic Name = "[Kind]">
                 <DisplayString>{astNodeType}</DisplayString>
             </Synthetic>
-            
             <ExpandedItem>m_operands</ExpandedItem>
         </Expand>
     </Type>
-
     <Type Name="Slang::SubstitutionSet">
         <DisplayString>SubstitutionSet{declRef,en}</DisplayString>
         <Expand>
@@ -451,7 +455,6 @@
                 <Loop Condition="subst != 0">
                     <Exec>substType = subst->astNodeType </Exec>
                     <Exec>shouldBreak = 1 </Exec>
-
                     <If Condition="substType == Slang::ASTNodeType::DirectDeclRef">
                         <Break/>
                     </If>
@@ -482,15 +485,15 @@
         </Expand>
     </Type>
     <Type Name="Slang::ValNodeOperand">
-        <DisplayString Optional="true" Condition="kind==Slang::ValNodeOperandKind::ConstantValue">Const({values.intOperand})#{_debugUID}</DisplayString>
+        <DisplayString Condition="kind==Slang::ValNodeOperandKind::ConstantValue">ConstantValue ({this->values.intOperand}) #{((Val*)this)->_debugUID}</DisplayString>
         <DisplayString Condition="kind==Slang::ValNodeOperandKind::ValNode">{*(Val*)values.nodeOperand}</DisplayString>
         <DisplayString>{values.nodeOperand}</DisplayString>
         <Expand>
-            <ExpandedItem Condition="kind==Slang::ValNodeOperandKind::ValNode">*(Val*)values.nodeOperand</ExpandedItem>
+			<ExpandedItem Condition="kind==Slang::ValNodeOperandKind::ConstantValue">values</ExpandedItem>
+			<ExpandedItem Condition="kind==Slang::ValNodeOperandKind::ValNode">*(Val*)values.nodeOperand</ExpandedItem>
             <ExpandedItem Condition="kind==Slang::ValNodeOperandKind::ASTNode">*(Decl*)values.nodeOperand</ExpandedItem>
         </Expand>
     </Type>
-
     <Type Name="Slang::Facet">
         <SmartPointer Usage="Minimal">_impl</SmartPointer>
         <DisplayString Condition="_impl == 0">nullptr</DisplayString>
@@ -506,21 +509,20 @@
             </LinkedListItems>
         </Expand>
     </Type>
-  <Type Name="Slang::SharedSemanticsContext::DirectBaseList">
-    <DisplayString Condition="_head == 0">empty</DisplayString>
-    <Expand>
-      <LinkedListItems>
-        <HeadPointer>_head != 0 ? _head : 0</HeadPointer>
-        <NextPointer>next != 0 ? next : 0</NextPointer>
-        <ValueNode>*this</ValueNode>
-      </LinkedListItems>
-    </Expand>
-  </Type>
-     <Type Name="Slang::ConstantIntVal">
+    <Type Name="Slang::SharedSemanticsContext::DirectBaseList">
+        <DisplayString Condition="_head == 0">empty</DisplayString>
+        <Expand>
+            <LinkedListItems>
+                <HeadPointer>_head != 0 ? _head : 0</HeadPointer>
+                <NextPointer>next != 0 ? next : 0</NextPointer>
+                <ValueNode>*this</ValueNode>
+            </LinkedListItems>
+        </Expand>
+    </Type>
+    <Type Name="Slang::ConstantIntVal">
         <DisplayString Optional="true">{astNodeType,en}#{_debugUID} ({m_operands.m_buffer[1].values.intOperand} : {*(Type*)m_operands.m_buffer[0].values.nodeOperand}) </DisplayString>
         <DisplayString>ConstantIntVal ({m_operands.m_buffer[1].values.intOperand} : {*(Type*)m_operands.m_buffer[0].values.nodeOperand})</DisplayString>
     </Type>
-
     <Type Name="Slang::PolynomialIntVal">
         <DisplayString Optional="true">{astNodeType,en}#{_debugUID} </DisplayString>
         <DisplayString>{astNodeType,en}</DisplayString>
@@ -531,7 +533,6 @@
             </ArrayItems>
         </Expand>
     </Type>
-
     <Type Name="Slang::PolynomialIntValTerm">
         <DisplayString Optional="true">{astNodeType,en}#{_debugUID} </DisplayString>
         <DisplayString>{astNodeType,en}</DisplayString>
@@ -542,7 +543,6 @@
             </ArrayItems>
         </Expand>
     </Type>
-
     <Type Name="Slang::PolynomialIntValFactor">
         <DisplayString Optional="true">{astNodeType,en}#{_debugUID} </DisplayString>
         <DisplayString>{astNodeType,en}</DisplayString>
@@ -553,11 +553,9 @@
             </ArrayItems>
         </Expand>
     </Type>
-
     <Type Name="Slang::BasicExpressionType">
         <DisplayString>BasicExpressionType ({*(DeclRefBase*)m_operands.m_buffer[0].values.nodeOperand})</DisplayString>
     </Type>
-
     <Type Name="Slang::CapabilitySet">
         <DisplayString>{m_targetSets.map.m_values}</DisplayString>
         <Expand>
@@ -586,7 +584,6 @@
             </CustomListItems>
         </Expand>
     </Type>
-
     <!--UIntSet-->
     <Type Name="Slang::UIntSet">
         <DisplayString>{{max_size={m_buffer.m_count*Slang::UIntSet::kElementSize}}}</DisplayString>
@@ -667,55 +664,49 @@
         </Expand>
     </Type>
     <!--~UIntSet-->
-
-	<Type Name="Slang::FossilizedPtr&lt;*&gt;">
-		<SmartPointer Usage="Minimal">_offset == 0 ? nullptr : ($T1*)((char*)this + _offset)</SmartPointer>
-		<DisplayString Condition="_offset == 0">{($T1*)0}</DisplayString>
-		<DisplayString Condition="_offset != 0">{($T1*)((char*)this + _offset)}</DisplayString>
-		<Expand>
-			<ExpandedItem>_offset == 0 ? nullptr : ($T1*)((char*)this + _offset)</ExpandedItem>
-		</Expand>
-	</Type>
-
-
-	<Type Name="Slang::FossilizedString">
-		<DisplayString Condition="_obj._offset == 0">""</DisplayString>
-		<DisplayString Condition="_obj._offset != 0">{((char*)this + _obj._offset),s8}</DisplayString>
-		<!--
+    <Type Name="Slang::FossilizedPtr&lt;*&gt;">
+        <SmartPointer Usage="Minimal">_offset == 0 ? nullptr : ($T1*)((char*)this + _offset)</SmartPointer>
+        <DisplayString Condition="_offset == 0">{($T1*)0}</DisplayString>
+        <DisplayString Condition="_offset != 0">{($T1*)((char*)this + _offset)}</DisplayString>
+        <Expand>
+            <ExpandedItem>_offset == 0 ? nullptr : ($T1*)((char*)this + _offset)</ExpandedItem>
+        </Expand>
+    </Type>
+    <Type Name="Slang::FossilizedString">
+        <DisplayString Condition="_obj._offset == 0">""</DisplayString>
+        <DisplayString Condition="_obj._offset != 0">{((char*)this + _obj._offset),s8}</DisplayString>
+        <!--
 	<Expand>
 		<ExpandedItem>(_text._offset == 0 ? "" : ((char*)this + _text._offset)),s8</ExpandedItem>
 	</Expand>
 	-->
-	</Type>
-
-	<Type Name="Slang::FossilizedArray&lt;*&gt;">
-		<DisplayString Condition="_obj._offset == 0">{{ count = 0 }}</DisplayString>
-		<DisplayString Condition="_obj._offset != 0">{{ count = {*((UInt32*)this - 1)} }}</DisplayString>
-		<Expand>
-			<Item Name="[count]">*((UInt32*)this - 1)</Item>
-			<ArrayItems>
-				<Size>*((UInt32*)this - 1)</Size>
-				<ValuePointer>($T1*)((char*)this + _obj._offset)</ValuePointer>
-			</ArrayItems>
-		</Expand>
-	</Type>
-
-	<Type Name="Slang::FossilizedDictionary&lt;*,*&gt;">
-		<DisplayString Condition="_obj._offset == 0">{{ count = 0 }}</DisplayString>
-		<DisplayString Condition="_obj._offset != 0">{{ count = {*((UInt32*)this - 1)} }}</DisplayString>
-		<Expand>
-			<Item Name="[count]">*((UInt32*)this - 1)</Item>
-			<ArrayItems>
-				<Size>*((UInt32*)this - 1)</Size>
-				<!--
+    </Type>
+    <Type Name="Slang::FossilizedArray&lt;*&gt;">
+        <DisplayString Condition="_obj._offset == 0">{{ count = 0 }}</DisplayString>
+        <DisplayString Condition="_obj._offset != 0">{{ count = {*((UInt32*)this - 1)} }}</DisplayString>
+        <Expand>
+            <Item Name="[count]">*((UInt32*)this - 1)</Item>
+            <ArrayItems>
+                <Size>*((UInt32*)this - 1)</Size>
+                <ValuePointer>($T1*)((char*)this + _obj._offset)</ValuePointer>
+            </ArrayItems>
+        </Expand>
+    </Type>
+    <Type Name="Slang::FossilizedDictionary&lt;*,*&gt;">
+        <DisplayString Condition="_obj._offset == 0">{{ count = 0 }}</DisplayString>
+        <DisplayString Condition="_obj._offset != 0">{{ count = {*((UInt32*)this - 1)} }}</DisplayString>
+        <Expand>
+            <Item Name="[count]">*((UInt32*)this - 1)</Item>
+            <ArrayItems>
+                <Size>*((UInt32*)this - 1)</Size>
+                <!--
 			<ValuePointer>($T1*)((char*)this + _elements._offset)</ValuePointer>
 			-->
-				<ValuePointer>(Slang::KeyValuePair&lt;$T1,$T2&gt; *) ((char*)this + _obj._offset)</ValuePointer>
-				<!--
+                <ValuePointer>(Slang::KeyValuePair&lt;$T1,$T2&gt; *) ((char*)this + _obj._offset)</ValuePointer>
+                <!--
 			<ValuePointer>(Slang::KeyValuePair&lt;$T1,$T2&gt;*)((char*)this + _elements._offset)</ValuePointer>
 			-->
-			</ArrayItems>
-		</Expand>
-	</Type>
-
+            </ArrayItems>
+        </Expand>
+    </Type>
 </AutoVisualizer>

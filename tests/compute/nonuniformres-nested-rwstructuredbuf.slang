@@ -2,6 +2,7 @@
 //TEST:SIMPLE(filecheck=CHECK1):-target hlsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=CHECK2):-target spirv -entry main -stage compute -emit-spirv-via-glsl
 //TEST:SIMPLE(filecheck=CHECK3):-target spirv -entry main -stage compute -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK4):-target cuda -entry main -stage compute -emit-spirv-directly
 
 RWStructuredBuffer<int> buffer[];
 
@@ -25,6 +26,10 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
     // CHECK3: %{{.*}} = OpAccessChain %_ptr_StorageBuffer_int %[[VAR1]]
     // CHECK3: %[[VAR2:[a-zA-Z0-9_]+]] = OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer %buffer %{{.*}}NonUniform
     // CHECK3: %{{.*}} = OpAccessChain %_ptr_StorageBuffer_int %[[VAR2]]
+    
+    // CHECK4: Array<RWStructuredBuffer<int>>  [[BUFFER:buffer[_0-9]*]];
+    // CHECK4: [[GLOBALPARAMS:globalParams[_0-9]*]]->[[BUFFER]][_S{{[0-9]+}}]
+    // CHECK4: [[GLOBALPARAMS]]->[[BUFFER]][int(_S{{[0-9]+}})]
     RWStructuredBuffer<int> buffer1 = buffer[NonUniformResourceIndex(NonUniformResourceIndex(NonUniformResourceIndex(dispatchThreadID.x)))];
     buffer1[0] = 1;
 

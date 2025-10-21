@@ -59,12 +59,12 @@ struct RWStructuredBuffer
 template<typename T>
 struct StructuredBuffer
 {
-    SLANG_FORCE_INLINE const T& operator[](size_t index) const
+    SLANG_FORCE_INLINE T& operator[](size_t index) const
     {
         SLANG_BOUND_CHECK(index, count);
         return data[index];
     }
-    const T& Load(size_t index) const
+    T& Load(size_t index) const
     {
         SLANG_BOUND_CHECK(index, count);
         return data[index];
@@ -440,7 +440,7 @@ struct Texture1D
         texture->Sample(samplerState, &loc, &out, sizeof(out));
         return out;
     }
-    T SampleLevel(SamplerState samplerState, float loc, float level)
+    T SampleLevel(SamplerState samplerState, float loc, float level) const
     {
         T out;
         texture->SampleLevel(samplerState, &loc, level, &out, sizeof(out));
@@ -500,7 +500,7 @@ struct Texture2D
         texture->Sample(samplerState, &loc.x, &out, sizeof(out));
         return out;
     }
-    T SampleLevel(SamplerState samplerState, const float2& loc, float level)
+    T SampleLevel(SamplerState samplerState, const float2& loc, float level) const
     {
         T out;
         texture->SampleLevel(samplerState, &loc.x, level, &out, sizeof(out));
@@ -566,7 +566,7 @@ struct Texture3D
         texture->Sample(samplerState, &loc.x, &out, sizeof(out));
         return out;
     }
-    T SampleLevel(SamplerState samplerState, const float3& loc, float level)
+    T SampleLevel(SamplerState samplerState, const float3& loc, float level) const
     {
         T out;
         texture->SampleLevel(samplerState, &loc.x, level, &out, sizeof(out));
@@ -620,7 +620,7 @@ struct TextureCube
         texture->Sample(samplerState, &loc.x, &out, sizeof(out));
         return out;
     }
-    T SampleLevel(SamplerState samplerState, const float3& loc, float level)
+    T SampleLevel(SamplerState samplerState, const float3& loc, float level) const
     {
         T out;
         texture->SampleLevel(samplerState, &loc.x, level, &out, sizeof(out));
@@ -680,7 +680,7 @@ struct Texture1DArray
         texture->Sample(samplerState, &loc.x, &out, sizeof(out));
         return out;
     }
-    T SampleLevel(SamplerState samplerState, const float2& loc, float level)
+    T SampleLevel(SamplerState samplerState, const float2& loc, float level) const
     {
         T out;
         texture->SampleLevel(samplerState, &loc.x, level, &out, sizeof(out));
@@ -747,7 +747,7 @@ struct Texture2DArray
         texture->Sample(samplerState, &loc.x, &out, sizeof(out));
         return out;
     }
-    T SampleLevel(SamplerState samplerState, const float3& loc, float level)
+    T SampleLevel(SamplerState samplerState, const float3& loc, float level) const
     {
         T out;
         texture->SampleLevel(samplerState, &loc.x, level, &out, sizeof(out));
@@ -808,7 +808,7 @@ struct TextureCubeArray
         texture->Sample(samplerState, &loc.x, &out, sizeof(out));
         return out;
     }
-    T SampleLevel(SamplerState samplerState, const float4& loc, float level)
+    T SampleLevel(SamplerState samplerState, const float4& loc, float level) const
     {
         T out;
         texture->SampleLevel(samplerState, &loc.x, level, &out, sizeof(out));

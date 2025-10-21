@@ -1,6 +1,7 @@
 // slang-serialize-ast.cpp
 #include "slang-serialize-ast.h"
 
+#include "core/slang-performance-profiler.h"
 #include "slang-ast-dispatch.h"
 #include "slang-check.h"
 #include "slang-compiler.h"
@@ -13,8 +14,49 @@
 //
 #include "slang-serialize-ast.cpp.fiddle"
 
+// By default, the declarations in a serialized AST module will be
+// deserialized on-demand, in order to improve startup times.
+//
+// The on-demand loading logic understandably introduces more
+// complexity, and it is possible that there will be debugging
+// (or even deployment reasons) scenarios where it is desirable
+// to be sure that all the AST nodes for a given module are
+// fully deserialized by the time `readSerailizedModuleAST()`
+// returns. For those cases, we provide a macro that can be
+// used to force up-front loading.
+//
+// Note: this macro does *not* disable most of the infrastructure
+// code related to on-demand loading; things like lookup on
+// a `ContainerDecl` will still check for the on-demand loading
+// case at runtime. All that setting this flag to `1` does is
+// extend the "fixup" logic that runs when an AST node has been
+// deserialized to also force deserialization of any direct
+// member declarations of a `ContainerDecl` that has just been
+// deserialized.
+//
+// The macro is being defined conditionally here, so that we
+// have the option of introducing an option to control its
+// value as part of configuration for the build of the compiler
+// itself (if that ever becomes relevant).
+//
+#ifndef SLANG_DISABLE_ON_DEMAND_AST_DESERIALIZATION
+#define SLANG_DISABLE_ON_DEMAND_AST_DESERIALIZATION 0
+#endif
+
+// In the case where on-demand deserialization is enabled, it
+// can be helpful to know what fraction of the declarations
+// from any given module end up getting deserialized (e.g.,
+// at the time this comment was written, compiling a small
+// `.slang` file typically causes about 17-20% of the
+// top-level declarations in the core module to get deserialized.
+//
+// Enabling this flag causes a message to be emitted every
+// time a new top-level declaration gets deserialized for *any*
+// module, so it generates a lot of output and is best seen
+// as just a debugging option for use when trying to reduce
+// the fraction of declarations that must be deserialized.
+//
 #define SLANG_ENABLE_AST_DESERIALIZATION_STATS 0
-#define SLANG_DISABLE_ON_DEMAND_AST_DESERIALIZATION 1
 
 FIDDLE()
 namespace Slang
@@ -43,7 +85,8 @@ namespace Slang
 // they are all just getting dumped here in the AST serialization logic, because
 // it is currenly the only place that cares about this stuff.
 //
-void serialize(Serializer const&, RefObject&)
+template<typename S>
+void serialize(S const&, RefObject&)
 {
     // There's actually no data stored in a `RefObject`, since it only exists
     // to make reference-counting possible for other types. This function is
@@ -95,7 +138,8 @@ struct FossilizedTypeTraits<RefObject>
 // While we could include this among the types we handle using fiddle,
 // let's implement it by hand here, starting with the `serialize()` function:
 //
-void serialize(Serializer const& serializer, MatrixCoord& value)
+template<typename S>
+void serialize(S const& serializer, MatrixCoord& value)
 {
     // We start with one of the `SLANG_SCOPED_SERIALIZER_*`
     // macros, which basically just handles calling
@@ -169,7 +213,8 @@ struct FossilizedTypeTraits<MatrixCoord>
 // as a single scalar value. We'll define our `serialize()` function
 // so that it serializes that "raw" value instead:
 //
-void serialize(Serializer const& serializer, SemanticVersion& value)
+template<typename S>
+void serialize(S const& serializer, SemanticVersion& value)
 {
     // This function is doing something a little "clever"
     // handle the fact that it might be used to either
@@ -332,33 +377,17 @@ struct ContainerDeclDirectMemberDeclsInfo
 };
 
 //
-// Okay, that's enough examples for now. Let's move on to the next big
-// topic...
-//
 // Many types in the AST need additional context information to be able to
-// read or write them properly, so instead of passing around the basic
-// `Serializer` type (which wraps an `ISerializerImpl`), for those types
-// that need extra context we will be passing around an `ASTSerializer`
-// (which wraps an `IASTSerializerImpl`, with the latter interface providing
-// the callbacks to handle the data types that need special-case behavior.
+// read or write them properly, so the concrete serializer type being passed
+// around will include an additional "context" type, that will be either
+// `ASTSerialReadContext` or `ASTSerialWriteContext`, depending on the mode
+// in which serialization is being performed.
 //
-
-struct ASTSerialContext;
-using ASTSerializer = Serializer_<ISerializerImpl, ASTSerialContext>;
-
-/// Context interface for AST serialization
-struct ASTSerialContext : SourceLocSerialContext
-{
-public:
-    virtual void handleASTNode(ASTSerializer const& serializer, NodeBase*& value) = 0;
-    virtual void handleASTNodeContents(ASTSerializer const& serializer, NodeBase* value) = 0;
-    virtual void handleName(ASTSerializer const& serializer, Name*& value) = 0;
-    virtual void handleToken(ASTSerializer const& serializer, Token& value) = 0;
-    virtual void handleContainerDeclDirectMemberDecls(
-        ASTSerializer const& serializer,
-        ContainerDeclDirectMemberDecls& value) = 0;
-};
-
+// We could define a base class or interface with `virtual` functions for
+// accessing all of the relevant context, but because we are already
+// using template specialization, it is easier to just ensure that the
+// relevant context types both provide the required operations.
+//
 
 //
 // Now that we've covered some of the big-picture structure, and shown
@@ -398,7 +427,8 @@ public:
 %for _,T in ipairs(enumTypeNames) do
 
 /// Serialize a `value` of type `$T`.
-void serialize(Serializer const& serializer, $T& value)
+template<typename S>
+void serialize(S const& serializer, $T& value)
 {
     serializeEnum(serializer, value);
 }
@@ -477,7 +507,8 @@ struct Fossilized_$T;
 SLANG_DECLARE_FOSSILIZED_TYPE($T, Fossilized_$T);
 
 /// Serialize a `$T`
-void serialize(ASTSerializer const& serializer, $T& value);
+template<typename S>
+void serialize(S const& serializer, $T& value);
 %end
 #else // FIDDLE OUTPUT:
 #define FIDDLE_GENERATED_OUTPUT_ID 1
@@ -504,7 +535,8 @@ struct Fossilized_$T;
 SLANG_DECLARE_FOSSILIZED_TYPE($T, Fossilized_$T);
 
 /// Serialize the content of a `$T`
-void _serializeASTNodeContents(ASTSerializer const& serializer, $T* value);
+template<typename S>
+void _serializeASTNodeContents(S const& serializer, $T* value);
 %end
 #else // FIDDLE OUTPUT:
 #define FIDDLE_GENERATED_OUTPUT_ID 2
@@ -525,9 +557,11 @@ void _serializeASTNodeContents(ASTSerializer const& serializer, $T* value);
 /// lower-level serialization operations to an underlying
 /// `ISerializerImpl`.
 ///
-struct ASTSerialWriteContext : ASTSerialContext
+struct ASTSerialWriteContext : SourceLocSerialContext
 {
 public:
+    using ASTSerializer = Serializer<Fossil::SerialWriter, ASTSerialWriteContext>;
+
     /// Construct a context for writing a serialized AST.
     ///
     /// * `module` is the module that is being serialized, and will be
@@ -546,21 +580,23 @@ private:
     ModuleDecl* _module = nullptr;
     SerialSourceLocWriter* _sourceLocWriter = nullptr;
 
+public:
     //
     // For the most part, this type just implements the methods
     // of the `IASTSerializerImpl` interface, and then has some
     // support routines needed by those implementations.
     //
 
-    virtual void handleName(ASTSerializer const& serializer, Name*& value) override;
-    virtual void handleToken(ASTSerializer const& serializer, Token& value) override;
-    virtual void handleASTNode(ASTSerializer const& serializer, NodeBase*& node) override;
-    virtual void handleASTNodeContents(ASTSerializer const& serializer, NodeBase* node) override;
-    virtual void handleContainerDeclDirectMemberDecls(
+    void handleName(ASTSerializer const& serializer, Name*& value);
+    void handleToken(ASTSerializer const& serializer, Token& value);
+    void handleASTNode(ASTSerializer const& serializer, NodeBase*& node);
+    void handleASTNodeContents(ASTSerializer const& serializer, NodeBase* node);
+    void handleContainerDeclDirectMemberDecls(
         ASTSerializer const& serializer,
-        ContainerDeclDirectMemberDecls& value) override;
-    virtual SerialSourceLocWriter* getSourceLocWriter() override { return _sourceLocWriter; }
+        ContainerDeclDirectMemberDecls& value);
+    SerialSourceLocWriter* getSourceLocWriter() { return _sourceLocWriter; }
 
+private:
     void _writeImportedModule(ASTSerializer const& serializer, ModuleDecl* moduleDecl);
     void _writeImportedDecl(
         ASTSerializer const& serializer,
@@ -612,9 +648,11 @@ private:
 /// contexts could result in the same declaration getting turned
 /// into multiple distinct `Decl*`s.
 ///
-struct ASTSerialReadContext : public ASTSerialContext, public RefObject
+struct ASTSerialReadContext : public SourceLocSerialContext, public RefObject
 {
 public:
+    using ASTSerializer = Serializer<Fossil::SerialReader, ASTSerialReadContext>;
+
     /// Construct an AST deserialization context.
     ///
     /// The `linkage`, `astBuilder`, and `sink` arguments must
@@ -688,6 +726,7 @@ private:
     Count _deserializedTopLevelDeclCount = 0;
 #endif
 
+public:
     //
     // Much like the `ASTSerialWriter`, for the most part this
     // type just implements the `IASTSerializer` interface,
@@ -695,15 +734,16 @@ private:
     // implementations.
     //
 
-    virtual void handleName(ASTSerializer const& serializer, Name*& value) override;
-    virtual void handleToken(ASTSerializer const& serializer, Token& value) override;
-    virtual void handleASTNode(ASTSerializer const& serializer, NodeBase*& outNode) override;
-    virtual void handleASTNodeContents(ASTSerializer const& serializer, NodeBase* node) override;
-    virtual void handleContainerDeclDirectMemberDecls(
+    void handleName(ASTSerializer const& serializer, Name*& value);
+    void handleToken(ASTSerializer const& serializer, Token& value);
+    void handleASTNode(ASTSerializer const& serializer, NodeBase*& outNode);
+    void handleASTNodeContents(ASTSerializer const& serializer, NodeBase* node);
+    void handleContainerDeclDirectMemberDecls(
         ASTSerializer const& serializer,
-        ContainerDeclDirectMemberDecls& value) override;
-    virtual SerialSourceLocReader* getSourceLocReader() override { return _sourceLocReader; }
+        ContainerDeclDirectMemberDecls& value);
+    SerialSourceLocReader* getSourceLocReader() { return _sourceLocReader; }
 
+private:
     ModuleDecl* _readImportedModule(ASTSerializer const& serializer);
     NodeBase* _readImportedDecl(ASTSerializer const& serializer);
 
@@ -729,7 +769,8 @@ private:
 
 SLANG_DECLARE_FOSSILIZED_AS(Name, String);
 
-void serializeObject(ASTSerializer const& serializer, Name*& value, Name*)
+template<typename S>
+void serializeObject(S const& serializer, Name*& value, Name*)
 {
     serializer.getContext()->handleName(serializer, value);
 }
@@ -766,7 +807,8 @@ struct FossilizedTypeTraits<Token>
     };
 };
 
-void serialize(ASTSerializer const& serializer, Token& value)
+template<typename S>
+void serialize(S const& serializer, Token& value)
 {
     serializer.getContext()->handleToken(serializer, value);
 }
@@ -842,8 +884,8 @@ void ASTSerialReadContext::handleToken(ASTSerializer const& serializer, Token& v
 // serialize any pointers to AST nodes.
 //
 
-template<typename T>
-void serializeObject(ASTSerializer const& serializer, T*& value, NodeBase*)
+template<typename S, typename T>
+SLANG_FORCE_INLINE void serializeObject(S const& serializer, T*& value, NodeBase*)
 {
     // The general-purpose serialization layer defines
     // a variant as akin to a struct, but where the
@@ -871,7 +913,8 @@ void serializeObject(ASTSerializer const& serializer, T*& value, NodeBase*)
 // object in the reading direction.
 //
 
-void serializeObjectContents(ASTSerializer const& serializer, NodeBase* value, NodeBase*)
+template<typename S>
+SLANG_FORCE_INLINE void serializeObjectContents(S const& serializer, NodeBase* value, NodeBase*)
 {
     serializer.getContext()->handleASTNodeContents(serializer, value);
 }
@@ -889,7 +932,8 @@ void serializeObjectContents(ASTSerializer const& serializer, NodeBase* value, N
 
 SLANG_DECLARE_FOSSILIZED_AS(ContainerDeclDirectMemberDecls, ContainerDeclDirectMemberDeclsInfo);
 
-void serialize(ASTSerializer const& serializer, ContainerDeclDirectMemberDecls& value)
+template<typename S>
+SLANG_FORCE_INLINE void serialize(S const& serializer, ContainerDeclDirectMemberDecls& value)
 {
     serializer.getContext()->handleContainerDeclDirectMemberDecls(serializer, value);
 }
@@ -902,7 +946,8 @@ void serialize(ASTSerializer const& serializer, ContainerDeclDirectMemberDecls& 
 
 SLANG_DECLARE_FOSSILIZED_AS(DiagnosticInfo const*, Int32);
 
-void serializePtr(Serializer const& serializer, DiagnosticInfo const*& value, DiagnosticInfo const*)
+template<typename S>
+void serializePtr(S const& serializer, DiagnosticInfo const*& value, DiagnosticInfo const*)
 {
     Int32 id = 0;
     if (isWriting(serializer))
@@ -923,8 +968,8 @@ void serializePtr(Serializer const& serializer, DiagnosticInfo const*& value, Di
 // and we'll serialize it as such.
 //
 
-template<typename T>
-void serialize(ASTSerializer const& serializer, DeclRef<T>& value)
+template<typename S, typename T>
+void serialize(S const& serializer, DeclRef<T>& value)
 {
     serialize(serializer, value.declRefBase);
 }
@@ -946,7 +991,8 @@ struct FossilizedTypeTraits<DeclRef<T>>
 
 SLANG_DECLARE_FOSSILIZED_AS(SyntaxClass<NodeBase>, ASTNodeType);
 
-void serialize(Serializer const& serializer, SyntaxClass<NodeBase>& value)
+template<typename S>
+void serialize(S const& serializer, SyntaxClass<NodeBase>& value)
 {
     ASTNodeType raw = ASTNodeType(0);
     if (isWriting(serializer))
@@ -970,7 +1016,8 @@ void serialize(Serializer const& serializer, SyntaxClass<NodeBase>& value)
 
 SLANG_DECLARE_FOSSILIZED_AS(Modifiers, List<Modifier*>);
 
-void serialize(ASTSerializer const& serializer, Modifiers& value)
+template<typename S>
+void serialize(S const& serializer, Modifiers& value)
 {
     SLANG_SCOPED_SERIALIZER_ARRAY(serializer);
 
@@ -1018,7 +1065,8 @@ void serialize(ASTSerializer const& serializer, Modifiers& value)
 //
 SLANG_DECLARE_FOSSILIZED_AS_MEMBER(TypeExp, type);
 
-void serialize(ASTSerializer const& serializer, TypeExp& value)
+template<typename S>
+void serialize(S const& serializer, TypeExp& value)
 {
     serialize(serializer, value.type);
 }
@@ -1030,7 +1078,8 @@ void serialize(ASTSerializer const& serializer, TypeExp& value)
 
 SLANG_DECLARE_FOSSILIZED_AS_MEMBER(CandidateExtensionList, candidateExtensions);
 
-void serialize(ASTSerializer const& serializer, CandidateExtensionList& value)
+template<typename S>
+void serialize(S const& serializer, CandidateExtensionList& value)
 {
     serialize(serializer, value.candidateExtensions);
 }
@@ -1038,96 +1087,180 @@ void serialize(ASTSerializer const& serializer, CandidateExtensionList& value)
 
 SLANG_DECLARE_FOSSILIZED_AS_MEMBER(DeclAssociationList, associations);
 
-void serialize(ASTSerializer const& serializer, DeclAssociationList& value)
+template<typename S>
+void serialize(S const& serializer, DeclAssociationList& value)
 {
     serialize(serializer, value.associations);
 }
 
+// Intermediate type for CapabilitySet serialization.
 //
-// The various types used to store capabilities on declarations
-// are all semantically equivalent to simpler types.
+// This essentially flattens the hierarchy found in CapabilitySet, making it
+// about twice as fast to deserialize. Deserializing capability sets was taking
+// up a significant part of AST deserialization time.
 //
-
-// A `CapabilityAtomSet` is an optimized representation of a
-// set of a `CapabilityAtom`s (which we can encode as just
-// a sequence).
-//
-SLANG_DECLARE_FOSSILIZED_AS(CapabilityAtomSet, List<CapabilityAtom>);
-
-// A `CapabilityStateSet` can simply be encoded using its `atomSet` member.
-//
-SLANG_DECLARE_FOSSILIZED_AS_MEMBER(CapabilityStageSet, atomSet);
-
-// A `CapabilityStageSet` is really just a wrapper around a `CapabilityStageSets`
-// (which is itself just a dictionary of `CapabilityStateSet`s).
-//
-SLANG_DECLARE_FOSSILIZED_AS(CapabilityTargetSet, CapabilityStageSets);
-
-// A `CapabilitySet` is really just a wrapper around a `CapabilityTargetSets`
-// (which is itself just a dictionary of `CapabilityTargetSet`s).
-//
-SLANG_DECLARE_FOSSILIZED_AS(CapabilitySet, CapabilityTargetSets);
-
-void serialize(Serializer const& serializer, CapabilityAtomSet& value)
+// This follows the same pattern as ASTModuleInfo and ContainerDeclDirectMemberDeclsInfo
+FIDDLE()
+struct CapabilitySetInfo
 {
-    SLANG_SCOPED_SERIALIZER_ARRAY(serializer);
+    FIDDLE(...)
+
+    // Store the capability data as a list of entries
+    // Each entry contains: target, stage, and buffer data
+    struct Entry
+    {
+        CapabilityAtom target;
+        CapabilityAtom stage;
+        List<UInt64> bufferData;
+    };
+
+    FIDDLE() List<Entry> entries;
+};
+
+// Forward declare the intermediate type
+template<typename S>
+void serialize(S const& serializer, CapabilitySetInfo::Entry& value);
+
+template<typename S>
+void serialize(S const& serializer, CapabilitySetInfo& value);
+
+// Declare fossilized representation for CapabilitySetInfo::Entry
+template<>
+struct FossilizedTypeTraits<CapabilitySetInfo::Entry>
+{
+    struct FossilizedType
+    {
+        Fossilized<CapabilityAtom> target;
+        Fossilized<CapabilityAtom> stage;
+        Fossilized<List<UInt64>> bufferData;
+    };
+};
+
+// Serialize a CapabilitySetInfo::Entry
+template<typename S>
+void serialize(S const& serializer, CapabilitySetInfo::Entry& value)
+{
+    SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
+    serialize(serializer, value.target);
+    serialize(serializer, value.stage);
+    serialize(serializer, value.bufferData);
+}
+
+// Declare fossilized representation for CapabilitySetInfo
+template<>
+struct FossilizedTypeTraits<CapabilitySetInfo>
+{
+    struct FossilizedType
+    {
+        Fossilized<List<CapabilitySetInfo::Entry>> entries;
+    };
+};
+
+// Serialize a CapabilitySetInfo
+template<typename S>
+void serialize(S const& serializer, CapabilitySetInfo& value)
+{
+    SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
+    serialize(serializer, value.entries);
+}
+
+// A `CapabilitySet` is serialized via the intermediate `CapabilitySetInfo` type
+SLANG_DECLARE_FOSSILIZED_AS(CapabilitySet, CapabilitySetInfo);
+
+// Helper function to collect CapabilitySetInfo from a CapabilitySet
+static CapabilitySetInfo _collectCapabilitySetInfo(const CapabilitySet& capSet)
+{
+    CapabilitySetInfo info;
+
+    // Collect all non-empty entries
+    for (const auto& targetPair : capSet.getCapabilityTargetSets())
+    {
+        CapabilityAtom target = targetPair.first;
+        const auto& targetSet = targetPair.second;
+
+        for (const auto& stagePair : targetSet.shaderStageSets)
+        {
+            CapabilityAtom stage = stagePair.first;
+            const auto& stageSet = stagePair.second;
+
+            if (stageSet.atomSet && !stageSet.atomSet->isEmpty())
+            {
+                CapabilitySetInfo::Entry entry;
+                entry.target = target;
+                entry.stage = stage;
+
+                // Copy buffer data
+                const auto& buffer = stageSet.atomSet->getBuffer();
+                for (Index i = 0; i < buffer.getCount(); i++)
+                {
+                    entry.bufferData.add(UInt64(buffer[i]));
+                }
+
+                info.entries.add(entry);
+            }
+        }
+    }
+
+    return info;
+}
+
+// Helper function to reconstruct a CapabilitySet from CapabilitySetInfo
+static void _reconstructCapabilitySet(CapabilitySet& capSet, const CapabilitySetInfo& info)
+{
+    // Clear existing data
+    capSet.getCapabilityTargetSets().clear();
+
+    // Reconstruct from entries
+    for (const auto& entry : info.entries)
+    {
+        // Get references to target structures and populate directly
+        auto& targetSet = capSet.getCapabilityTargetSets()[entry.target];
+        targetSet.target = entry.target;
+
+        auto& stageSet = targetSet.shaderStageSets[entry.stage];
+        stageSet.stage = entry.stage;
+
+        // Create CapabilityAtomSet and reconstruct from buffer data
+        CapabilityAtomSet atomSet;
+        if (entry.bufferData.getCount() > 0)
+        {
+            atomSet.resizeBackingBufferDirectly(entry.bufferData.getCount());
+
+            for (Index i = 0; i < entry.bufferData.getCount(); i++)
+            {
+                if (entry.bufferData[i] != 0)
+                {
+                    atomSet.addRawElement(UIntSet::Element(entry.bufferData[i]), i);
+                }
+            }
+        }
+
+        stageSet.atomSet = atomSet;
+    }
+}
+
+// Simplified CapabilitySet serialization using intermediate data structure
+template<typename S>
+void serialize(S const& serializer, CapabilitySet& value)
+{
+    SLANG_PROFILE_SECTION(serialize_CapabilitySet);
+
     if (isWriting(serializer))
     {
-        for (auto rawAtom : value)
-        {
-            auto atom = CapabilityAtom(rawAtom);
-            serialize(serializer, atom);
-        }
+        // Collect intermediate representation
+        CapabilitySetInfo info = _collectCapabilitySetInfo(value);
+
+        // Serialize the intermediate representation
+        serialize(serializer, info);
     }
     else
     {
-        while (hasElements(serializer))
-        {
-            CapabilityAtom atom = CapabilityAtom(0);
-            serialize(serializer, atom);
-            value.add(UInt(atom));
-        }
-    }
-}
+        // Deserialize the intermediate representation
+        CapabilitySetInfo info;
+        serialize(serializer, info);
 
-void serialize(Serializer const& serializer, CapabilityStageSet& value)
-{
-    serialize(serializer, value.atomSet);
-}
-
-void serialize(Serializer const& serializer, CapabilityTargetSet& value)
-{
-    serialize(serializer, value.shaderStageSets);
-
-    // The value for each entry in `shaderStageSets` have
-    // a `stage` field that is redundant with the key for
-    // that entry. Rather than serialize the key as part
-    // of the `CapabilityStageSet` type, we instead copy
-    // it over from the key to the value in the case where
-    // we are reading.
-    //
-    if (isReading(serializer))
-    {
-        for (auto& p : value.shaderStageSets)
-            p.second.stage = p.first;
-    }
-}
-
-void serialize(Serializer const& serializer, CapabilitySet& value)
-{
-    serialize(serializer, value.getCapabilityTargetSets());
-
-    // The value for each entry in `getCapabilityTargetSets()` have
-    // a `target` field that is redundant with the key for
-    // that entry. Rather than serialize the key as part
-    // of the `CapabilityTargetSet` type, we instead copy
-    // it over from the key to the value in the case where
-    // we are reading.
-    //
-    if (isReading(serializer))
-    {
-        for (auto& p : value.getCapabilityTargetSets())
-            p.second.target = p.first;
+        // Reconstruct the CapabilitySet
+        _reconstructCapabilitySet(value, info);
     }
 }
 
@@ -1149,7 +1282,8 @@ struct FossilizedTypeTraits<RequirementWitness>
     };
 };
 
-void serialize(ASTSerializer const& serializer, RequirementWitness& value)
+template<typename S>
+void serialize(S const& serializer, RequirementWitness& value)
 {
     SLANG_SCOPED_SERIALIZER_VARIANT(serializer);
     serialize(serializer, value.m_flavor);
@@ -1187,7 +1321,8 @@ struct FossilizedTypeTraits<ValNodeOperand>
     };
 };
 
-void serialize(ASTSerializer const& serializer, ValNodeOperand& value)
+template<typename S>
+void serialize(S const& serializer, ValNodeOperand& value)
 {
     SLANG_SCOPED_SERIALIZER_VARIANT(serializer);
     serialize(serializer, value.kind);
@@ -1248,7 +1383,8 @@ struct Fossilized_$T
 };
 
 /// Serialize a `value` of type `$T`
-void serialize(ASTSerializer const& serializer, $T& value)
+template<typename S>
+void serialize(S const& serializer, $T& value)
 {
     SLANG_UNUSED(value);
     SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
@@ -1305,7 +1441,8 @@ struct Fossilized_$T
 };
 
 /// Serialize the contents of an AST node of type `$T`
-void _serializeASTNodeContents(ASTSerializer const& serializer, $T* value)
+template<typename S>
+void _serializeASTNodeContents(S const& serializer, $T* value)
 {
     SLANG_UNUSED(serializer);
     SLANG_UNUSED(value);
@@ -1331,7 +1468,8 @@ void _serializeASTNodeContents(ASTSerializer const& serializer, $T* value)
 // functions, and dispatches to the correct one based on the type of the given node.
 //
 
-void serializeASTNodeContents(ASTSerializer const& serializer, NodeBase* node)
+template<typename S>
+void serializeASTNodeContents(S const& serializer, NodeBase* node)
 {
     ASTNodeDispatcher<NodeBase, void>::dispatch(
         node,
@@ -1645,7 +1783,7 @@ void ASTSerialReadContext::_cleanUpASTNode(NodeBase* node)
 #if SLANG_ENABLE_AST_DESERIALIZATION_STATS
         if (auto moduleDecl = as<ModuleDecl>(decl->parentDecl))
         {
-            auto& deserializedCount = _sharedContext->_deserializedTopLevelDeclCount;
+            auto& deserializedCount = _deserializedTopLevelDeclCount;
             deserializedCount++;
 
             Count totalCount = moduleDecl->getDirectMemberDeclCount();
@@ -1853,7 +1991,7 @@ void ASTSerialReadContext::handleContainerDeclDirectMemberDecls(
     // `ISerializerImpl`, whereas we *know* it has a more
     // specific type, which we want to make use of.
     //
-    ISerializerImpl* readerImpl = serializer.getImpl();
+    auto readerImpl = serializer.getImpl();
     auto fossilReader = static_cast<Fossil::SerialReader*>(readerImpl);
     //
     auto fossilizedInfo =
@@ -1886,6 +2024,8 @@ void writeSerializedModuleAST(
     ModuleDecl* moduleDecl,
     SerialSourceLocWriter* sourceLocWriter)
 {
+    SLANG_PROFILE;
+
     // TODO: we might want to have a more careful pass here,
     // where we only encode the public declarations.
 
@@ -1924,7 +2064,7 @@ void writeSerializedModuleAST(
         //
         Fossil::SerialWriter writer(blobBuilder);
         ASTSerialWriteContext context(moduleDecl, sourceLocWriter);
-        ASTSerializer serializer(&writer, &context);
+        ASTSerialWriteContext::ASTSerializer serializer(&writer, &context);
 
         // Once we have our `serializer`, we can finally invoke
         // `serialize()` on the `ASTModuleInfo` to cause everything
@@ -1989,6 +2129,8 @@ ModuleDecl* readSerializedModuleAST(
     SerialSourceLocReader* sourceLocReader,
     SourceLoc requestingSourceLoc)
 {
+    SLANG_PROFILE;
+
     // We expect the `chunk` that was passed in to be a RIFF
     // data chunk (matching what was written in `writeSerializedModuleAST()`,
     // and to be proper fossil-format data.

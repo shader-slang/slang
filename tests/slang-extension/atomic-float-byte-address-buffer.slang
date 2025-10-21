@@ -4,8 +4,9 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-dx11 -slang -compute -render-features atomic-float -output-using-type -nvapi-slot u0 -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -render-features atomic-float -output-using-type -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -render-features atomic-float -output-using-type -compile-arg -O2 -nvapi-slot u0 -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -use-dxil -render-features atomic-float -output-using-type -compile-arg -O2 -nvapi-slot u0 -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -render-features atomic-float -output-using-type -compile-arg -O2 -nvapi-slot u0 -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-mtl -compute -output-using-type -shaderobj
 
 // The test doesn't directly use this, but having this defined makes the 0 slot available if NVAPI is going to be used
 // Only strictly necessary on the D3D11/D3D12 paths

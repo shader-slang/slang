@@ -10,21 +10,16 @@ namespace Slang
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SharedASTBuilder !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-SharedASTBuilder::SharedASTBuilder() {}
-
-void SharedASTBuilder::init(Session* session)
+SharedASTBuilder::SharedASTBuilder(Session* session, RootASTBuilder* rootASTBuilder)
 {
     m_namePool = session->getNamePool();
 
     // Save the associated session
     m_session = session;
 
-    // We just want as a place to store allocations of shared types
-    {
-        RefPtr<ASTBuilder> astBuilder(new ASTBuilder);
-        astBuilder->m_sharedASTBuilder = this;
-        m_astBuilder = astBuilder.detach();
-    }
+    // The root AST builder is the one that owns this `SharedASTBuilder`.
+    //
+    m_astBuilder = rootASTBuilder;
 
     // Clear the built in types
     memset(m_builtinTypes, 0, sizeof(m_builtinTypes));
@@ -169,20 +164,6 @@ Type* SharedASTBuilder::getOverloadedType()
     return m_overloadedType;
 }
 
-SharedASTBuilder::~SharedASTBuilder()
-{
-    // Release built in types..
-    for (Index i = 0; i < SLANG_COUNT_OF(m_builtinTypes); ++i)
-    {
-        m_builtinTypes[i] = nullptr;
-    }
-
-    if (m_astBuilder)
-    {
-        m_astBuilder->releaseReference();
-    }
-}
-
 void SharedASTBuilder::registerBuiltinDecl(Decl* decl, BuiltinTypeModifier* modifier)
 {
     auto type = DeclRefType::create(m_astBuilder, makeDeclRef<Decl>(decl));
@@ -222,22 +203,32 @@ Decl* SharedASTBuilder::tryFindMagicDecl(const String& name)
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ASTBuilder !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-ASTBuilder::ASTBuilder(SharedASTBuilder* sharedASTBuilder, const String& name)
-    : m_sharedASTBuilder(sharedASTBuilder)
-    , m_name(name)
-    , m_id(sharedASTBuilder->m_id++)
-    , m_arena(2097152)
+/// Default block size of 2MB.
+static const size_t kASTBuilderMemoryArenaBlockSize = 2 * 1024 * 1024;
+
+ASTBuilder::ASTBuilder(ASTBuilder* parent, String const& debugName)
+    : m_parent(parent), m_name(debugName), m_arena(kASTBuilderMemoryArenaBlockSize)
 {
+    SLANG_ASSERT(parent);
+    auto sharedASTBuilder = parent->getSharedASTBuilder();
     SLANG_ASSERT(sharedASTBuilder);
-    // Copy Val deduplication map over so we don't create duplicate Vals that are already
-    // existent in the core module.
-    m_cachedNodes = sharedASTBuilder->getInnerASTBuilder()->m_cachedNodes;
+
+    m_depth = parent->m_depth + 1;
+
+    m_sharedASTBuilder = sharedASTBuilder;
+    m_id = sharedASTBuilder->m_id++;
 }
 
 ASTBuilder::ASTBuilder()
-    : m_sharedASTBuilder(nullptr), m_id(-1), m_arena(2097152)
+    : m_arena(kASTBuilderMemoryArenaBlockSize)
 {
-    m_name = "SharedASTBuilder::m_astBuilder";
+}
+
+RootASTBuilder::RootASTBuilder(Session* globalSession)
+    : m_sharedASTBuilderStorage(globalSession, this)
+{
+    m_sharedASTBuilder = &m_sharedASTBuilderStorage;
+    m_name = "RootASTBuilder";
 }
 
 ASTBuilder::~ASTBuilder()
@@ -248,6 +239,196 @@ ASTBuilder::~ASTBuilder()
         nodeClass.destructInstance(node);
     }
     incrementEpoch();
+}
+
+Val* ASTBuilder::_getOrCreateImplSlowPath(ValNodeDesc&& desc)
+{
+    // The most important thing we need to determine here
+    // is whether the node described by `desc` would be
+    // created using the arena of this `ASTBuilder`, or
+    // one of its ancestors (and if so, which one...).
+    //
+    ASTBuilder* astBuilderToUse = _findAppropriateASTBuilderForVal(desc);
+
+    // Once we've identified the right level of the hierarchy,
+    // we can check the cache at that level and create
+    // the node if it doesn't already exist.
+    //
+    Val* valNode = astBuilderToUse->_getOrCreateValDirectly(std::move(desc));
+
+    // If the chosen `astBuilderToUse` was `this`, then the
+    // call to `_getOrCreateValDirectly` will have updated
+    // `m_cachedNodes` already.
+    //
+    // If the node was created using a different builder,
+    // which is an ancestor than this one (which would mean
+    // its depth is lower), then we can also update our
+    // own cache to match.
+    //
+    if (astBuilderToUse->m_depth < this->m_depth)
+    {
+        // Our approach to caching assumes that we cannot
+        // mix-and-match AST nodes from builders that aren't
+        // in some kind of ancestor/descendent relationship.
+        // Thus, if the builder that was chosen is less deep
+        // than `this`, we expect that to be because it is
+        // an ancestor.
+        //
+        SLANG_ASSERT(this->isDescendentOf(astBuilderToUse));
+
+        m_cachedNodes.add(ValKey(valNode), valNode);
+    }
+    //
+    // Note that we do *not* want to update our cache in
+    // the case where the chosen builder has higher depth
+    // then `this`, because `this` could outlive the chosen
+    // builder, and we don't want to be left with
+    // garbage pointers sitting in the cache.
+    //
+    // We also don't consider that case to be an error,
+    // because it is reasonable for code to do things like
+    // construct a specialized decl-ref for `Foo<Bar>` using
+    // the builder associated with declaration `Foo`, even
+    // when specializing to a type `Bar` that comes from a
+    // deeper/child builder.
+
+    return valNode;
+}
+
+ASTBuilder* ASTBuilder::_findAppropriateASTBuilderForVal(ValNodeDesc const& desc)
+{
+    // AST builders are arranged in a hierarchy, where a child builder
+    // can see nodes cached in its ancestors, but not vice versa.
+    //
+    // We basically want to allocate a given `Val` as far down
+    // the hierarchy as we can (away from the root), so that the
+    // lifetime of those allocations can be narrowly scoped. However,
+    // we also need to ensure that `Val`s are cached far enough
+    // *up* the hierarchy that deduplication is possible, and that
+    // we can be sure a `Val` lives at least as long as each of
+    // its operands.
+    //
+    // Our approach to the caching problem relies on a key
+    // constraint, that the `ASTBuilder` used for a `_getOrCreateImpl()`
+    // operation and all of the `ASTBuilder`s used to create the
+    // nodes referenced as operands in the `desc` must be part
+    // of a single path of parent links in the hierarchy.
+    // Put another way: for any two `ASTBuilder`s involved in the
+    // creation of the node or its operands, they must be in some
+    // kind of ancestor/descendent relationship.
+    //
+    // Given this constraint, we can determine that the `Val` should
+    // be allocated and cached on the *deepest* AST builder
+    // from among the operands (or on the root AST builder in the
+    // case where there are no operands).
+    //
+    // We thus initialize our variable to the *shallowest* builder,
+    // which is the one we'll use if there are no operands.
+    //
+    ASTBuilder* deepestBuilder = getSharedASTBuilder()->getInnerASTBuilder();
+    for (auto const& operand : desc.operands)
+    {
+        // We are only interested in operands that reference
+        // an AST node, so we will skip over all others.
+        //
+        switch (operand.kind)
+        {
+        default:
+            continue;
+
+        case ValNodeOperandKind::ASTNode:
+        case ValNodeOperandKind::ValNode:
+            break;
+        }
+
+        // We now know that the operand is represented
+        // as an AST node, but we need to skip over
+        // null operands because they aren't relevant
+        // to picking the right AST builder to use.
+        //
+        NodeBase* node = operand.values.nodeOperand;
+        if (!node)
+            continue;
+
+        // Once we have an AST node worth looking at,
+        // we find the AST builder responsible for
+        // allocating that node.
+        //
+        ASTBuilder* nodeBuilder = node->getASTBuilder();
+        SLANG_ASSERT(nodeBuilder);
+
+        // The approach we are taking here relies on all
+        // the AST builders involved being part of a single
+        // path in the hierarchy, so we will do a minimal
+        // amount of validation in debug builds to ensure
+        // that each of the node builders for the operands
+        // is in some kind of ancestor/descendent relationship
+        // with the builder being used to make the request.
+        //
+        SLANG_ASSERT(nodeBuilder->isDescendentOf(this) || this->isDescendentOf(nodeBuilder));
+
+        // If the builder we are looking at is deeper than the
+        // deepest builder we've seen previously, then we update
+        // our candiate for the deepest builder.
+        //
+        if (nodeBuilder->m_depth > deepestBuilder->m_depth)
+            deepestBuilder = nodeBuilder;
+    }
+
+    //
+    // At the end of that loop, we have a maximally-deep builder,
+    // and because we require all the builders to come from
+    // a single path in the hierarchy, that builder is also
+    // uniquely determined (a maximum rather than just maximal).
+    //
+
+    return deepestBuilder;
+}
+
+bool ASTBuilder::isDescendentOf(ASTBuilder* ancestor)
+{
+    SLANG_ASSERT(ancestor);
+
+    auto builder = this;
+    while (builder)
+    {
+        if (builder == ancestor)
+            return true;
+        builder = builder->m_parent;
+    }
+    return false;
+}
+
+
+Val* ASTBuilder::_getOrCreateValDirectly(ValNodeDesc&& desc)
+{
+    // This operation should only be called if `this`
+    // was determined to be the appropriate AST builder
+    // to use when allocating/caching a `Val` based on `desc`.
+    //
+    SLANG_ASSERT(this == _findAppropriateASTBuilderForVal(desc));
+
+    // We start by checking the cache. This might have
+    // already been done as part of `_getOrCreateImpl()`,
+    // but it is also possible that the `_getOrCreateImpl()`
+    // call was made on a descendent `ASTBuilder` and its
+    // cache might not (yet) contain the given node.
+    //
+    if (auto found = m_cachedNodes.tryGetValue(desc))
+        return *found;
+
+    // If we don't have a cache hit at this level,
+    // then we just need to create the node and
+    // update our cache.
+    //
+    auto node = as<Val>(desc.type.createInstance(this));
+    SLANG_ASSERT(node);
+    for (auto& operand : desc.operands)
+        node->m_operands.add(operand);
+
+    m_cachedNodes.add(ValKey(node), _Move(node));
+
+    return node;
 }
 
 Index ASTBuilder::getEpoch()
@@ -280,9 +461,29 @@ Type* ASTBuilder::getSpecializedBuiltinType(ArrayView<Val*> genericArgs, const c
     return rsType;
 }
 
-PtrType* ASTBuilder::getPtrType(Type* valueType, AddressSpace addrSpace)
+Type* ASTBuilder::getMagicEnumType(const char* magicEnumName)
 {
-    return dynamicCast<PtrType>(getPtrType(valueType, addrSpace, "PtrType"));
+    auto& cache = getSharedASTBuilder()->m_magicEnumTypes;
+    Type* res = nullptr;
+    if (!cache.tryGetValue(magicEnumName, res))
+    {
+        res = getSpecializedBuiltinType({}, magicEnumName);
+        cache.add(magicEnumName, res);
+    }
+    return res;
+}
+
+PtrType* ASTBuilder::getPtrType(Type* valueType, Val* accessQualifier, Val* addrSpace)
+{
+    return dynamicCast<PtrType>(getPtrType(valueType, accessQualifier, addrSpace, "PtrType"));
+}
+
+PtrType* ASTBuilder::getPtrType(
+    Type* valueType,
+    AccessQualifier accessQualifier,
+    AddressSpace addrSpace)
+{
+    return dynamicCast<PtrType>(getPtrType(valueType, accessQualifier, addrSpace, "PtrType"));
 }
 
 Type* ASTBuilder::getDefaultLayoutType()
@@ -309,24 +510,29 @@ Type* ASTBuilder::getScalarLayoutType()
 }
 
 // Construct the type `Out<valueType>`
-OutType* ASTBuilder::getOutType(Type* valueType)
+OutType* ASTBuilder::getOutParamType(Type* valueType)
 {
-    return dynamicCast<OutType>(getPtrType(valueType, "OutType"));
+    return dynamicCast<OutType>(getPtrType(valueType, "OutParamType"));
 }
 
-InOutType* ASTBuilder::getInOutType(Type* valueType)
+BorrowInOutParamType* ASTBuilder::getBorrowInOutParamType(Type* valueType)
 {
-    return dynamicCast<InOutType>(getPtrType(valueType, "InOutType"));
+    return dynamicCast<BorrowInOutParamType>(getPtrType(valueType, "BorrowInOutParamType"));
 }
 
-RefType* ASTBuilder::getRefType(Type* valueType, AddressSpace addrSpace)
+RefParamType* ASTBuilder::getRefParamType(Type* valueType)
 {
-    return dynamicCast<RefType>(getPtrType(valueType, addrSpace, "RefType"));
+    return dynamicCast<RefParamType>(getPtrType(valueType, "RefParamType"));
 }
 
-ConstRefType* ASTBuilder::getConstRefType(Type* valueType)
+BorrowInParamType* ASTBuilder::getConstRefParamType(Type* valueType)
 {
-    return dynamicCast<ConstRefType>(getPtrType(valueType, "ConstRefType"));
+    return dynamicCast<BorrowInParamType>(getPtrType(valueType, "BorrowInParamType"));
+}
+
+ExplicitRefType* ASTBuilder::getExplicitRefType(Type* valueType)
+{
+    return dynamicCast<ExplicitRefType>(getPtrType(valueType, "ExplicitRefType"));
 }
 
 OptionalType* ASTBuilder::getOptionalType(Type* valueType)
@@ -342,11 +548,27 @@ PtrTypeBase* ASTBuilder::getPtrType(Type* valueType, char const* ptrTypeName)
 
 PtrTypeBase* ASTBuilder::getPtrType(
     Type* valueType,
+    Val* accessQualifier,
+    Val* addrSpace,
+    char const* ptrTypeName)
+{
+    Val* args[] = {valueType, accessQualifier, addrSpace};
+    return as<PtrTypeBase>(getSpecializedBuiltinType(makeArrayView(args), ptrTypeName));
+}
+
+PtrTypeBase* ASTBuilder::getPtrType(
+    Type* valueType,
+    AccessQualifier accessQualifier,
     AddressSpace addrSpace,
     char const* ptrTypeName)
 {
-    Val* args[] = {valueType, getIntVal(getUInt64Type(), (IntegerLiteralValue)addrSpace)};
-    return as<PtrTypeBase>(getSpecializedBuiltinType(makeArrayView(args), ptrTypeName));
+    Type* typeOfAccessQualifier = getMagicEnumType("AccessQualifier");
+    Type* typeOfAddressSpace = getMagicEnumType("AddressSpace");
+    return as<PtrTypeBase>(getPtrType(
+        valueType,
+        getIntVal(typeOfAccessQualifier, (IntegerLiteralValue)accessQualifier),
+        getIntVal(typeOfAddressSpace, (IntegerLiteralValue)addrSpace),
+        ptrTypeName));
 }
 
 ArrayExpressionType* ASTBuilder::getArrayType(Type* elementType, IntVal* elementCount)
@@ -714,12 +936,22 @@ top:
     {
         return bIsSubtypeOfCWitness;
     }
+    else if (auto declAIsSubtypeOfBWitness = as<DeclaredSubtypeWitness>(aIsSubtypeOfBWitness))
+    {
+        if (declAIsSubtypeOfBWitness->isEquality())
+            return bIsSubtypeOfCWitness;
+    }
 
     // Similarly, if `b == c`, then the `a <: b` witness is a witness for `a <: c`
     //
     if (as<TypeEqualityWitness>(bIsSubtypeOfCWitness))
     {
         return aIsSubtypeOfBWitness;
+    }
+    else if (auto declBIsSubtypeOfCWitness = as<DeclaredSubtypeWitness>(bIsSubtypeOfCWitness))
+    {
+        if (declBIsSubtypeOfCWitness->isEquality())
+            return declBIsSubtypeOfCWitness;
     }
 
     // HACK: There is downstream code generation logic that assumes that

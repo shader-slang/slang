@@ -22,6 +22,7 @@ namespace Slang
     X(Char)                  \
     X(IntPtr)                \
     X(UIntPtr)               \
+    X(CountOfPrimitives)     \
     /* end */
 
 enum class BaseType
@@ -114,6 +115,42 @@ enum class AddressSpace : uint64_t
     // Default address space for a user-defined pointer
     UserPointer = 0x100000001ULL,
 };
+
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#_scope_id
+// must be 32 bit to match SPIR-V
+enum class MemoryScope : int32_t
+{
+    CrossDevice = 0,
+    Device = 1,
+    Workgroup = 2,
+    Subgroup = 3,
+    Invocation = 4,
+    QueueFamily = 5,
+    ShaderCall = 6,
+};
+
+// Represents the access qualifier of a pointer type.
+enum class AccessQualifier : uint64_t
+{
+    ReadWrite = 0,
+
+    // The data being pointed to by a pointer can only be read through the pointer.
+    // This is to be distinguished from `Immutable`, which means the data being pointed to
+    // won't be changed by any means. In contrast, data pointed to by a `Read` pointer
+    // may still be changed through another pointer that is not read-only.
+    // This means that a pointer with `Read` access is meaningful only to the front-end
+    // type system, and is not expected to provide any optimization opportunities to
+    // the back-end.
+    Read = 1,
+
+    // The data being pointed to by a pointer is known to be immutable and won't
+    // be changed by any means during the execution of the program. It is UB if
+    // the data is changed during the program execution. This is a stronger
+    // qualifier than `Read`, and may allow the backend to perform more aggresive
+    // optimizations.
+    Immutable = 2,
+};
+
 } // namespace Slang
 
 #endif

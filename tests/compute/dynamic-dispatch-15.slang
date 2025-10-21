@@ -2,8 +2,9 @@
 
 //dTEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cpu -output-using-type
 //dTEST(compute):COMPARE_COMPUTE_EX:-slang -compute -vk -output-using-type
-//dTEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -use-dxil -output-using-type
+//dTEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx11 -profile sm_5_0 -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
 
 [anyValueSize(16)]
 interface IInterface

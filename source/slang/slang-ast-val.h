@@ -3,6 +3,8 @@
 
 #include "slang-ast-base.h"
 #include "slang-ast-decl.h"
+
+//
 #include "slang-ast-val.h.fiddle"
 
 FIDDLE()
@@ -54,8 +56,8 @@ public:
 };
 
 
-// Represent a lookup of SuperType::`m_decl` from `lookupSourceType` type that we know conforms to
-// SuperType.
+// Represent a lookup of witness of SuperType::`m_decl` from `lookupSource` type that we know
+// conforms to SuperType.
 FIDDLE()
 class LookupDeclRef : public DeclRefBase
 {
@@ -66,7 +68,7 @@ public:
     // The source type that we are looking up from.
     Type* getLookupSource() { return as<Type>(getOperand(1)); }
 
-    // Witness that `lookupSourceType`:SuperType.
+    // Witness that `lookupSource`:SuperType.
     SubtypeWitness* getWitness() { return as<SubtypeWitness>(getOperand(2)); }
 
     LookupDeclRef(Decl* declToLookup, Type* lookupSource, SubtypeWitness* witness)
@@ -1011,6 +1013,10 @@ inline bool isTypeEqualityWitness(Val* witness)
                 return false;
         }
         return true;
+    }
+    else if (auto expandWitness = as<ExpandSubtypeWitness>(witness))
+    {
+        return isTypeEqualityWitness(expandWitness->getPatternTypeWitness());
     }
     return false;
 }

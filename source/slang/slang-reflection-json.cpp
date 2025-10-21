@@ -64,6 +64,7 @@ static void emitReflectionVarBindingInfoJSON(
     SlangParameterCategory category,
     SlangUInt index,
     SlangUInt count,
+    SlangUInt stride,
     SlangUInt space = 0)
 {
     if (category == SLANG_PARAMETER_CATEGORY_UNIFORM)
@@ -73,6 +74,8 @@ static void emitReflectionVarBindingInfoJSON(
         writer << "\"offset\": " << index;
         writer << ", ";
         writer << "\"size\": " << count;
+        writer << ", ";
+        writer << "\"elementStride\": " << stride;
     }
     else
     {
@@ -197,6 +200,7 @@ static void emitReflectionVarBindingInfoJSON(
             auto index = var->getOffset(category);
             auto space = var->getBindingSpace(category);
             auto count = typeLayout->getSize(category);
+            auto elementStride = typeLayout->getElementStride(category);
 
             // Query the paramater usage for the specified entry point.
             // Note: both `request` and `entryPointIndex` may be invalid here, but that should just
@@ -216,7 +220,7 @@ static void emitReflectionVarBindingInfoJSON(
 
             writer << "{";
 
-            emitReflectionVarBindingInfoJSON(writer, category, index, count, space);
+            emitReflectionVarBindingInfoJSON(writer, category, index, count, elementStride, space);
 
             if (usedAvailable)
             {
@@ -416,8 +420,6 @@ static void emitReflectionVarLayoutJSON(PrettyWriter& writer, slang::VariableLay
     emitReflectionModifierInfoJSON(writer, var->getVariable());
 
     emitReflectionVarBindingInfoJSON(writer, var);
-
-    emitUserAttributes(writer, var->getVariable());
     writer.dedent();
     writer << "\n}";
 }

@@ -1218,8 +1218,10 @@ void GLSLSourceEmitter::_maybeEmitGLSLBuiltin(IRGlobalParam* var, UnownedStringS
         // GLSL has some specific requirements about how these are declared,
         // Do it manually here to avoid `emitGlobalParam` emitting
         // decorations/layout we are not allowed to output.
-        auto varType =
-            composeGetters<IRType>(var, &IRGlobalParam::getDataType, &IROutTypeBase::getValueType);
+        auto varType = composeGetters<IRType>(
+            var,
+            &IRGlobalParam::getDataType,
+            &IROutParamTypeBase::getValueType);
         SLANG_ASSERT(varType && "Indices mesh output dind't have an 'out' type");
 
         m_writer->emit("out ");
@@ -1230,7 +1232,7 @@ void GLSLSourceEmitter::_maybeEmitGLSLBuiltin(IRGlobalParam* var, UnownedStringS
     {
         // Is this an output? We do not need to define input.
         auto varType = var->getDataType();
-        if (auto outType = as<IROutType>(varType))
+        if (auto outType = as<IROutParamType>(varType))
         {
             varType = outType->getValueType();
             m_writer->emit("out ");
@@ -1245,6 +1247,14 @@ void GLSLSourceEmitter::_maybeEmitGLSLBuiltin(IRGlobalParam* var, UnownedStringS
     else if (name == "gl_PrimitiveShadingRateEXT")
     {
         _requireGLSLExtension(toSlice("GL_EXT_fragment_shading_rate_primitive"));
+    }
+    else if (name == "gl_FragSizeEXT")
+    {
+        _requireGLSLExtension(toSlice("GL_EXT_fragment_invocation_density"));
+    }
+    else if (name == "gl_FragInvocationCountEXT")
+    {
+        _requireGLSLExtension(toSlice("GL_EXT_fragment_invocation_density"));
     }
     else if (name == "gl_DrawID")
     {
@@ -3221,7 +3231,7 @@ void GLSLSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerVal
 
 void GLSLSourceEmitter::emitTypeImpl(IRType* type, const StringSliceLoc* nameAndLoc)
 {
-    if (auto refType = as<IRRefType>(type))
+    if (auto refType = as<IRRefParamType>(type))
     {
         _requireGLSLExtension(UnownedStringSlice("GL_EXT_spirv_intrinsics"));
         m_writer->emit("spirv_by_reference ");
@@ -3232,7 +3242,7 @@ void GLSLSourceEmitter::emitTypeImpl(IRType* type, const StringSliceLoc* nameAnd
 
 void GLSLSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
 {
-    if (auto refType = as<IRRefType>(type))
+    if (auto refType = as<IRRefParamType>(type))
     {
         type = refType->getValueType();
 
@@ -3463,9 +3473,9 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             emitSimpleTypeImpl(cast<IRAtomicType>(type)->getElementType());
             return;
         }
-    case kIROp_ConstRefType:
+    case kIROp_BorrowInParamType:
         {
-            emitSimpleTypeImpl(as<IRConstRefType>(type)->getValueType());
+            emitSimpleTypeImpl(as<IRBorrowInParamType>(type)->getValueType());
             return;
         }
     default:

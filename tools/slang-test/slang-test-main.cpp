@@ -24,6 +24,7 @@
 #include "../../source/compiler-core/slang-downstream-compiler.h"
 #include "../../source/compiler-core/slang-language-server-protocol.h"
 #include "../../source/compiler-core/slang-nvrtc-compiler.h"
+#include "../render-test/slang-support.h"
 #include "directory-util.h"
 #include "options.h"
 #include "parse-diagnostic-util.h"
@@ -36,6 +37,7 @@
 #include "stb_image.h"
 
 #include <math.h>
+#include <random>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -52,6 +54,9 @@ SLANG_RHI_EXPORT_AGILITY_SDK
 #endif
 
 using namespace Slang;
+
+// Constants for slang-test specific options
+static const char* kPreserveEmbeddedSourceOption = "-preserve-embedded-source";
 
 // Options for a particular test
 struct TestOptions
@@ -545,13 +550,66 @@ static void applyMacroSubstitution(String filePath, TestDetails& details)
 static SlangResult _gatherTestsForFile(
     TestCategorySet* categorySet,
     String filePath,
-    FileTestList* outTestList)
+    FileTestList* outTestList,
+    TestContext* context = nullptr)
 {
     outTestList->tests.clear();
 
     String fileContents;
 
-    SLANG_RETURN_ON_FAIL(Slang::File::readAllText(filePath, fileContents));
+    TestReporter* testReporter = nullptr;
+    if (context)
+        testReporter = context->getTestReporter();
+
+    // Try reading the file with retries on failure to handle intermittent I/O errors
+    // (commonly seen on macOS in CI environments)
+    SlangResult readResult = SLANG_FAIL;
+    for (int retryCount = 0; retryCount < 3 && SLANG_FAILED(readResult); ++retryCount)
+    {
+        if (retryCount)
+        {
+            if (testReporter)
+            {
+                testReporter->messageFormat(
+                    TestMessageType::Info,
+                    "Retrying to read test file '%s' (attempt %d)",
+                    filePath.getBuffer(),
+                    retryCount + 1);
+            }
+            else
+            {
+                fprintf(
+                    stderr,
+                    "Retrying to read test file '%s' (attempt %d)\n",
+                    filePath.getBuffer(),
+                    retryCount + 1);
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(retryCount * 100));
+        }
+        readResult = Slang::File::readAllText(filePath, fileContents);
+    }
+    if (SLANG_FAILED(readResult))
+    {
+        // Log file reading failure with details (thread-safe)
+        if (testReporter)
+        {
+            testReporter->messageFormat(
+                TestMessageType::RunError,
+                "Failed to read test file '%s' (error: 0x%08X)",
+                filePath.getBuffer(),
+                (unsigned int)readResult);
+        }
+        else
+        {
+            // Fallback to stderr if no context available
+            fprintf(
+                stderr,
+                "Failed to read test file '%s' (error: 0x%08X)\n",
+                filePath.getBuffer(),
+                (unsigned int)readResult);
+        }
+        return readResult;
+    }
 
     // Walk through the lines of the file, looking for test commands
     char const* cursor = fileContents.begin();
@@ -570,6 +628,13 @@ static SlangResult _gatherTestsForFile(
             skipToEndOfLine(&cursor);
             continue;
         }
+
+        // Skip any extra slashes and spaces to handle malformed directives like ///TEST or // TEST
+        while (*cursor == '/')
+        {
+            cursor++;
+        }
+        skipHorizontalSpace(&cursor);
 
         UnownedStringSlice command;
 
@@ -603,9 +668,27 @@ static SlangResult _gatherTestsForFile(
         {
             SlangResult res = _parseCategories(categorySet, &cursor, fileOptions);
 
-            // If if failed we are done, unless it was just 'not available'
+            // If it failed we are done, unless it was just 'not available'
             if (SLANG_FAILED(res) && res != SLANG_E_NOT_AVAILABLE)
+            {
+                if (context && context->getTestReporter())
+                {
+                    context->getTestReporter()->messageFormat(
+                        TestMessageType::RunError,
+                        "Failed to parse TEST_CATEGORY in file '%s' (error: 0x%08X)",
+                        filePath.getBuffer(),
+                        (unsigned int)res);
+                }
+                else
+                {
+                    fprintf(
+                        stderr,
+                        "Failed to parse TEST_CATEGORY in file '%s' (error: 0x%08X)\n",
+                        filePath.getBuffer(),
+                        (unsigned int)res);
+                }
                 return res;
+            }
 
             skipToEndOfLine(&cursor);
             continue;
@@ -613,7 +696,27 @@ static SlangResult _gatherTestsForFile(
 
         if (command == "TEST")
         {
-            SLANG_RETURN_ON_FAIL(_gatherTestOptions(categorySet, &cursor, testDetails.options));
+            SlangResult testRes = _gatherTestOptions(categorySet, &cursor, testDetails.options);
+            if (SLANG_FAILED(testRes))
+            {
+                if (context && context->getTestReporter())
+                {
+                    context->getTestReporter()->messageFormat(
+                        TestMessageType::RunError,
+                        "Failed to parse TEST directive in file '%s' (error: 0x%08X)",
+                        filePath.getBuffer(),
+                        (unsigned int)testRes);
+                }
+                else
+                {
+                    fprintf(
+                        stderr,
+                        "Failed to parse TEST directive in file '%s' (error: 0x%08X)\n",
+                        filePath.getBuffer(),
+                        (unsigned int)testRes);
+                }
+                return testRes;
+            }
             applyMacroSubstitution(filePath, testDetails);
 
             // See if the type of test needs certain APIs available
@@ -628,7 +731,27 @@ static SlangResult _gatherTestsForFile(
         }
         else if (command == "DIAGNOSTIC_TEST")
         {
-            SLANG_RETURN_ON_FAIL(_gatherTestOptions(categorySet, &cursor, testDetails.options));
+            SlangResult diagRes = _gatherTestOptions(categorySet, &cursor, testDetails.options);
+            if (SLANG_FAILED(diagRes))
+            {
+                if (context && context->getTestReporter())
+                {
+                    context->getTestReporter()->messageFormat(
+                        TestMessageType::RunError,
+                        "Failed to parse DIAGNOSTIC_TEST directive in file '%s' (error: 0x%08X)",
+                        filePath.getBuffer(),
+                        (unsigned int)diagRes);
+                }
+                else
+                {
+                    fprintf(
+                        stderr,
+                        "Failed to parse DIAGNOSTIC_TEST directive in file '%s' (error: 0x%08X)\n",
+                        filePath.getBuffer(),
+                        (unsigned int)diagRes);
+                }
+                return diagRes;
+            }
             applyMacroSubstitution(filePath, testDetails);
 
             // Apply the file wide options
@@ -844,6 +967,9 @@ Result spawnAndWaitSharedLibrary(
     {
         StringBuilder stdErrorString;
         StringBuilder stdOutString;
+        renderer_test::CoreDebugCallback coreDebugCallback;
+        renderer_test::CoreToRHIDebugBridge rhiDebugBridge;
+        rhiDebugBridge.setCoreCallback(&coreDebugCallback);
 
         // Say static so not released
         StringWriter stdError(&stdErrorString, WriterFlag::IsConsole | WriterFlag::IsStatic);
@@ -854,6 +980,7 @@ Result spawnAndWaitSharedLibrary(
         StdWriters stdWriters;
         stdWriters.setWriter(SLANG_WRITER_CHANNEL_STD_ERROR, &stdError);
         stdWriters.setWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT, &stdOut);
+        stdWriters.setDebugCallback(&coreDebugCallback);
 
         if (exeName == "slangc" || exeName == "slangi")
         {
@@ -876,6 +1003,7 @@ Result spawnAndWaitSharedLibrary(
 
         outRes.standardError = stdErrorString;
         outRes.standardOutput = stdOutString;
+        outRes.debugLayer = coreDebugCallback.getString();
 
         outRes.resultCode = (int)TestToolUtil::getReturnCode(res);
 
@@ -1013,6 +1141,7 @@ static Result _executeRPC(
     outRes.resultCode = exeRes.returnCode;
     outRes.standardError = exeRes.stdError;
     outRes.standardOutput = exeRes.stdOut;
+    outRes.debugLayer = exeRes.debugLayer;
 
     return SLANG_OK;
 }
@@ -1151,7 +1280,7 @@ static SlangResult _extractRenderTestRequirements(
     // That a similar logic has to be kept inside the implementation of render-test and both this
     // and render-test will have to be kept in sync.
 
-    bool useDxil = cmdLine.findArgIndex(UnownedStringSlice::fromLiteral("-use-dxil")) >= 0;
+    bool useDxbc = cmdLine.findArgIndex(UnownedStringSlice::fromLiteral("-use-dxbc")) >= 0;
 
     bool usePassthru = false;
 
@@ -1218,13 +1347,13 @@ static SlangResult _extractRenderTestRequirements(
         passThru = SLANG_PASS_THROUGH_FXC;
         break;
     case RenderApiType::D3D12:
-        target = SLANG_DXBC;
+        target = SLANG_DXIL;
         nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
-        passThru = SLANG_PASS_THROUGH_FXC;
-        if (useDxil)
+        passThru = SLANG_PASS_THROUGH_DXC;
+        if (useDxbc)
         {
-            target = SLANG_DXIL;
-            passThru = SLANG_PASS_THROUGH_DXC;
+            target = SLANG_DXBC;
+            passThru = SLANG_PASS_THROUGH_FXC;
         }
         break;
     case RenderApiType::Vulkan:
@@ -1526,12 +1655,106 @@ ToolReturnCode spawnAndWait(
     return getReturnCode(outExeRes);
 }
 
-String getOutput(const ExecuteResult& exeRes)
+// Remove embedded source code from SPIR-V assembly output to prevent filecheck from matching
+// against embedded source instead of actual SPIR-V instructions
+String removeEmbeddedSourceFromSPIRV(const String& spirvOutput)
+{
+    StringBuilder filteredOutput;
+    List<UnownedStringSlice> lines;
+    StringUtil::calcLines(spirvOutput.getUnownedSlice(), lines);
+
+    if (spirvOutput.endsWith("\n"))
+    {
+        // The last empty line should be removed,
+        // because `StringUtil::calcLines()` turns "A\nB\n" into three lines; not two.
+        SLANG_ASSERT(lines[lines.getCount() - 1] == "");
+        lines.setCount(lines.getCount() - 1);
+    }
+
+    // First pass: Find OpString IDs that are referenced by DebugSource
+    List<String> sourceStringIds;
+    for (const auto& line : lines)
+    {
+        UnownedStringSlice trimmedLine = line.trim();
+
+        if (trimmedLine.indexOf(UnownedStringSlice(" DebugSource ")) == Index(-1))
+            continue;
+
+        // Extract the last parameter which is the source string ID
+        // Pattern: %4 = OpExtInst %void %2 DebugSource %5 %1
+        List<UnownedStringSlice> tokens;
+        StringUtil::split(trimmedLine, ' ', tokens);
+
+        // The last token should be the source string ID
+        UnownedStringSlice lastToken = tokens.getLast();
+        if (lastToken.startsWith(UnownedStringSlice("%")))
+        {
+            sourceStringIds.add(String(lastToken));
+        }
+    }
+
+    // Second pass: Process embedded source strings to replace content with informative message
+    bool insideSourceString = false;
+    for (const auto& line : lines)
+    {
+        UnownedStringSlice trimmedLine = line.trim();
+
+        if (!insideSourceString)
+        {
+            Index equalPos = trimmedLine.indexOf(UnownedStringSlice(" = OpString"));
+            if (equalPos != Index(-1) && trimmedLine.startsWith(UnownedStringSlice("%")))
+            {
+                String currentStringId = String(trimmedLine.head(equalPos));
+                if (sourceStringIds.contains(currentStringId))
+                {
+                    insideSourceString = true;
+                    Index quotePos = line.indexOf('\"');
+                    if (quotePos != Index(-1))
+                    {
+                        filteredOutput.append(String(line.head(quotePos + 1)));
+                        filteredOutput.append("// slang-test removed the embedded source\n");
+                        filteredOutput.append("// Use `");
+                        filteredOutput.append(kPreserveEmbeddedSourceOption);
+                        filteredOutput.append("` to keep it explicitly\n\"\n");
+                    }
+                    continue;
+                }
+            }
+        }
+
+        if (insideSourceString)
+        {
+            if (trimmedLine.endsWith("\"") &&
+                (trimmedLine.getLength() < 2 || trimmedLine[trimmedLine.getLength() - 2] != '\\'))
+            {
+                insideSourceString = false;
+            }
+
+            // skip the embedded source lines
+            continue;
+        }
+
+        // Add this line to the filtered output
+        filteredOutput.append(line);
+        filteredOutput.append("\n");
+    }
+
+    return filteredOutput.produceString();
+}
+
+String getOutput(const ExecuteResult& exeRes, bool removeEmbeddedSource = false)
 {
     ExecuteResult::ResultCode resultCode = exeRes.resultCode;
 
     String standardOuptut = exeRes.standardOutput;
     String standardError = exeRes.standardError;
+    String debugLayer = exeRes.debugLayer;
+
+    // Apply embedded source removal to standard output if requested
+    if (removeEmbeddedSource && standardOuptut.getLength() > 0)
+    {
+        standardOuptut = removeEmbeddedSourceFromSPIRV(standardOuptut);
+    }
 
     // We construct a single output string that captures the results
     StringBuilder actualOutputBuilder;
@@ -1542,6 +1765,12 @@ String getOutput(const ExecuteResult& exeRes)
     actualOutputBuilder.append("}\nstandard output = {\n");
     actualOutputBuilder.append(standardOuptut);
     actualOutputBuilder.append("}\n");
+    if (debugLayer.getLength() > 0)
+    {
+        actualOutputBuilder.append("debug layer = {\n");
+        actualOutputBuilder.append(debugLayer);
+        actualOutputBuilder.append("}\n");
+    }
 
     return actualOutputBuilder.produceString();
 }
@@ -2313,6 +2542,9 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
 
     for (auto arg : input.testOptions->args)
     {
+        // Filter out slang-test specific options that shouldn't be passed to slangc
+        if (arg == kPreserveEmbeddedSourceOption)
+            continue;
         cmdLine.addArg(arg);
     }
 
@@ -2354,7 +2586,11 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
         exeRes = runExeRes;
     }
 
-    String actualOutput = getOutput(exeRes);
+    bool needToRemoveEmbeddedSource =
+        ((target == SLANG_SPIRV || target == SLANG_SPIRV_ASM) &&
+         input.testOptions->args.indexOf(kPreserveEmbeddedSourceOption) == Index(-1));
+
+    String actualOutput = getOutput(exeRes, needToRemoveEmbeddedSource);
 
     return _validateOutput(
         context,
@@ -3264,6 +3500,7 @@ static TestResult _runHLSLComparisonTest(
 
     String standardOutput = exeRes.standardOutput;
     String standardError = exeRes.standardError;
+    String debugLayer = exeRes.debugLayer;
 
     // We construct a single output string that captures the results
     StringBuilder actualOutputBuilder;
@@ -3274,6 +3511,12 @@ static TestResult _runHLSLComparisonTest(
     actualOutputBuilder.append("}\nstandard output = {\n");
     actualOutputBuilder.append(standardOutput);
     actualOutputBuilder.append("}\n");
+    if (debugLayer.getLength() > 0)
+    {
+        actualOutputBuilder.append("debug layer = {\n");
+        actualOutputBuilder.append(debugLayer);
+        actualOutputBuilder.append("}\n");
+    }
 
     String actualOutput = actualOutputBuilder.produceString();
 
@@ -3341,6 +3584,7 @@ TestResult doGLSLComparisonTestRun(
 
     String standardOuptut = exeRes.standardOutput;
     String standardError = exeRes.standardError;
+    String debugLayer = exeRes.debugLayer;
 
     // We construct a single output string that captures the results
     StringBuilder outputBuilder;
@@ -3351,6 +3595,12 @@ TestResult doGLSLComparisonTestRun(
     outputBuilder.append("}\nstandard output = {\n");
     outputBuilder.append(standardOuptut);
     outputBuilder.append("}\n");
+    if (debugLayer.getLength() > 0)
+    {
+        outputBuilder.append("debug layer = {\n");
+        outputBuilder.append(debugLayer);
+        outputBuilder.append("}\n");
+    }
 
     String outputPath = outputStem + outputKind;
     String output = outputBuilder.produceString();
@@ -3425,6 +3675,16 @@ static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine
     if (options.enableDebugLayers)
     {
         ioCmdLine.addArg("-enable-debug-layers");
+    }
+
+    if (options.ignoreAbortMsg)
+    {
+        ioCmdLine.addArg("-ignore-abort-msg");
+    }
+
+    if (options.cacheRhiDevice)
+    {
+        ioCmdLine.addArg("-cache-rhi-device");
     }
 }
 
@@ -3750,6 +4010,7 @@ TestResult doRenderComparisonTestRun(
 
     String standardOutput = exeRes.standardOutput;
     String standardError = exeRes.standardError;
+    String debugLayer = exeRes.debugLayer;
 
     // We construct a single output string that captures the results
     StringBuilder outputBuilder;
@@ -3760,6 +4021,12 @@ TestResult doRenderComparisonTestRun(
     outputBuilder.append("}\nstandard output = {\n");
     outputBuilder.append(standardOutput);
     outputBuilder.append("}\n");
+    if (debugLayer.getLength() > 0)
+    {
+        outputBuilder.append("debug layer = {\n");
+        outputBuilder.append(debugLayer);
+        outputBuilder.append("}\n");
+    }
 
     String outputPath = outputStem + outputKind;
     String output = outputBuilder.produceString();
@@ -4339,7 +4606,7 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
     // Gather a list of tests to run
     FileTestList testList;
 
-    SLANG_RETURN_ON_FAIL(_gatherTestsForFile(&context->categorySet, filePath, &testList));
+    SLANG_RETURN_ON_FAIL(_gatherTestsForFile(&context->categorySet, filePath, &testList, context));
 
     if (testList.tests.getCount() == 0)
     {
@@ -4542,6 +4809,23 @@ static bool shouldRunTest(TestContext* context, String filePath)
     if (!endsWithAllowedExtension(context, filePath))
         return false;
 
+    // Check exclude prefixes first - if any match, skip the test
+    for (auto& excludePrefix : context->options.excludePrefixes)
+    {
+        if (filePath.startsWith(excludePrefix))
+        {
+            if (context->options.verbosity == VerbosityLevel::Verbose)
+            {
+                context->getTestReporter()->messageFormat(
+                    TestMessageType::Info,
+                    "%s file is excluded from the test because it is found from the exclusion "
+                    "list\n",
+                    filePath.getBuffer());
+            }
+            return false;
+        }
+    }
+
     if (!context->options.testPrefixes.getCount())
     {
         return true;
@@ -4616,30 +4900,47 @@ void runTestsInDirectory(TestContext* context)
     List<String> files;
     getFilesInDirectory(context->options.testDir, files);
 
+    // Also add any test prefixes that point to actual files outside the test directory
+    for (const auto& testPrefix : context->options.testPrefixes)
+    {
+        if (File::exists(testPrefix))
+        {
+            // Avoid duplicates - only add if not already in the list
+            if (files.indexOf(testPrefix) == Index(-1))
+            {
+                files.add(testPrefix);
+            }
+        }
+    }
+
     // NTFS on Windows stores files in sorted order but not on Linux/Macos.
     // Because of that, the testing on Linux/Macos were randomly failing, which
     // is a good thing because it reveals problems. But it is useless
-    // if we cannot reproduce the failures deterministrically.
+    // if we cannot reproduce the failures deterministically.
     // https://github.com/shader-slang/slang/issues/7388
-    //
-    // TODO: We need a way to shuffle the list in a deterministic manner.
+
     files.sort();
+
+    // If asked, shuffle the list using seed for deterministic behavior.
+    if (context->options.shuffleTests)
+    {
+        std::mt19937 mt(context->options.shuffleSeed);
+        std::shuffle(files.begin(), files.end(), mt);
+    }
 
     auto processFile = [&](String file)
     {
         if (shouldRunTest(context, file))
         {
-            if (context->options.verbosity >= VerbosityLevel::Info)
-            {
-                printf("found test: '%s'\n", file.getBuffer());
-            }
-            if (SLANG_FAILED(_runTestsOnFile(context, file)))
+            SlangResult result = _runTestsOnFile(context, file);
+            if (SLANG_FAILED(result))
             {
                 {
                     TestReporter::TestScope scope(context->getTestReporter(), file);
-                    context->getTestReporter()->message(
+                    context->getTestReporter()->messageFormat(
                         TestMessageType::RunError,
-                        "slang-test: unable to parse test");
+                        "slang-test: unable to parse test (error code: 0x%08X)",
+                        (unsigned int)result);
 
                     context->getTestReporter()->addResult(TestResult::Fail);
                 }
@@ -4735,12 +5036,17 @@ static SlangResult runUnitTestModule(
     if (!testModule)
         return SLANG_FAIL;
 
+    renderer_test::CoreDebugCallback coreDebugCallback;
+    renderer_test::CoreToRHIDebugBridge rhiDebugBridge;
+    rhiDebugBridge.setCoreCallback(&coreDebugCallback);
+
     UnitTestContext unitTestContext;
     unitTestContext.slangGlobalSession = context->getSession();
     unitTestContext.workDirectory = "";
     unitTestContext.enabledApis = context->options.enabledApis;
     unitTestContext.enableDebugLayers = context->options.enableDebugLayers;
     unitTestContext.executableDirectory = context->exeDirectoryPath.getBuffer();
+    unitTestContext.debugCallback = &rhiDebugBridge;
 
     auto testCount = testModule->getTestCount();
 
@@ -4810,6 +5116,13 @@ static SlangResult runUnitTestModule(
                     reporter->message(TestMessageType::RunError, "rpc failed");
                 }
 
+                // Check for VVL errors in unit tests
+                if (exeRes.debugLayer.getLength() > 0)
+                {
+                    testResult = TestResult::Fail;
+                    reporter->message(TestMessageType::TestFailure, exeRes.debugLayer);
+                }
+
                 // If the test fails, output any output - which might give information about
                 // individual tests that have failed.
                 if (testResult == TestResult::Fail)
@@ -4839,9 +5152,21 @@ static SlangResult runUnitTestModule(
             // TODO(JS): Problem here could be exception not handled properly across
             // shared library boundary.
             testModule->setTestReporter(reporter);
+
+            // Clear any previous debug messages
+            coreDebugCallback.clear();
+
             try
             {
                 test.testFunc(&unitTestContext);
+
+                // Check for VVL errors after test completion
+                String debugMessages = coreDebugCallback.getString();
+                if (debugMessages.getLength() > 0)
+                {
+                    reporter->message(TestMessageType::TestFailure, debugMessages);
+                    reporter->addResult(TestResult::Fail);
+                }
             }
             catch (...)
             {
@@ -4881,6 +5206,15 @@ static SlangResult runUnitTestModule(
 
     testModule->destroy();
     return SLANG_OK;
+}
+
+static void cleanupRenderTestDeviceCache(TestContext& context)
+{
+    auto cleanFunc = context.getCleanDeviceCacheFunc("render-test");
+    if (cleanFunc)
+    {
+        cleanFunc();
+    }
 }
 
 SlangResult innerMain(int argc, char** argv)
@@ -5174,12 +5508,15 @@ SlangResult innerMain(int argc, char** argv)
         }
 
         reporter.outputSummary();
+
+        cleanupRenderTestDeviceCache(context);
         return reporter.didAllSucceed() ? SLANG_OK : SLANG_FAIL;
     }
 }
 
 int main(int argc, char** argv)
 {
+    // Fallback: run without cleanup if context initialization fails
     SlangResult res = innerMain(argc, argv);
     slang::shutdown();
     Slang::RttiInfo::deallocateAll();

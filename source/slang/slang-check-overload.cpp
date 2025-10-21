@@ -29,7 +29,7 @@ SemanticsVisitor::ParamCounts SemanticsVisitor::CountParameters(
     for (auto param : params)
     {
         Index allowedArgCountToAdd = 1;
-        auto paramType = getParamType(m_astBuilder, param);
+        auto paramType = unwrapModifiedType(getParamType(m_astBuilder, param));
         if (isTypePack(paramType))
         {
             if (auto typePack = as<ConcreteTypePack>(paramType))
@@ -632,9 +632,9 @@ static QualType getParamQualType(ASTBuilder* astBuilder, DeclRef<ParamDecl> para
     bool isLVal = false;
     switch (getParameterDirection(param.getDecl()))
     {
-    case kParameterDirection_InOut:
-    case kParameterDirection_Out:
-    case kParameterDirection_Ref:
+    case ParamPassingMode::BorrowInOut:
+    case ParamPassingMode::Out:
+    case ParamPassingMode::Ref:
         isLVal = true;
         break;
     }
@@ -643,12 +643,35 @@ static QualType getParamQualType(ASTBuilder* astBuilder, DeclRef<ParamDecl> para
 
 static QualType getParamQualType(Type* paramType)
 {
-    if (auto paramDirType = as<ParamDirectionType>(paramType))
+    // TODO(tfoley): This function probably shouldn't exist, and instead
+    // the accessors for the parameters of a `FuncType` should
+    // directly return a `QualType` for each parameter rather than
+    // a plain `Type` that potentially includes a wrapping
+    // `ParamPassingModeType`.
+    //
+    // In addition, the determination of what value category a reference
+    // to a parameter should be (and thus what the `QualType` sould be)
+    // should be driven by computing the `ParamPassingMode` first,
+    // and then using the direction to determine the value category
+    // (so as to isolate the code that needs to care about the wrapper
+    // types to just the computation of the dirction).
+    //
+    // Note the large amount of duplication between this function and
+    // the other `getParamQualType()` above.
+    //
+    bool isLVal = false;
+    Type* valueType = paramType;
+    if (auto paramDirType = as<ParamPassingModeType>(paramType))
     {
-        if (as<OutTypeBase>(paramDirType) || as<RefType>(paramDirType))
-            return QualType(paramDirType->getValueType(), true);
+        valueType = paramDirType->getValueType();
+        if (as<BorrowInOutParamType>(paramDirType))
+            isLVal = true;
+        if (as<OutParamType>(paramDirType))
+            isLVal = true;
+        if (as<RefParamType>(paramDirType))
+            isLVal = true;
     }
-    return paramType;
+    return QualType(valueType, isLVal);
 }
 
 bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
@@ -673,7 +696,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
             Count paramCount = funcType->getParamCount();
             for (Index i = 0; i < paramCount; ++i)
             {
-                auto paramType = getParamQualType(funcType->getParamType(i));
+                auto paramType = getParamQualType(funcType->getParamTypeWithDirectionWrapper(i));
                 paramTypes.add(paramType);
             }
         }
@@ -1196,8 +1219,25 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                         {
                             // If the subscript decl has a setter,
                             // then the call is an l-value if base is l-value.
+                            //
+                            // If Ptr<T, Access> we only need to check for ReadWrite
+                            // Access (if ReadWrite result is an LValue. By default a
+                            // Ptr<...> is Read-only (unresolved generic argument & Access::Read).
                             if (auto base = GetBaseExpr(baseExpr))
                             {
+                                if (auto ptrTypeBase = as<PtrTypeBase>(base->type))
+                                {
+                                    auto accessQualifier =
+                                        as<ConstantIntVal>(ptrTypeBase->getAccessQualifier());
+                                    if (!accessQualifier ||
+                                        AccessQualifier(accessQualifier->getValue()) ==
+                                            AccessQualifier::ReadWrite)
+                                    {
+                                        callExpr->type.isLeftValue = true;
+                                    }
+                                    break;
+                                }
+
                                 if (base->type.isLeftValue)
                                 {
                                     callExpr->type.isLeftValue = true;
@@ -1250,7 +1290,8 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
             {
                 auto expr = m_astBuilder->create<PartiallyAppliedGenericExpr>();
                 expr->loc = context.loc;
-                expr->originalExpr = baseExpr;
+                expr->originalExpr = context.originalExpr;
+                expr->baseExpr = baseExpr;
                 expr->baseGenericDeclRef = as<DeclRefExpr>(baseExpr)->declRef.as<GenericDecl>();
                 auto args =
                     tryGetGenericArguments(candidate.subst, expr->baseGenericDeclRef.getDecl());
@@ -1367,18 +1408,6 @@ int SemanticsVisitor::CompareLookupResultItems(
     bool leftIsExtern = left.declRef.getDecl()->hasModifier<ExternModifier>();
     bool rigthIsExtern = right.declRef.getDecl()->hasModifier<ExternModifier>();
 
-    // If both left and right are extern, then they are equal.
-    // If only one of them is extern, then the other one is preferred.
-    // If neither is extern, then we continue with the rest of the checks.
-    if (leftIsExtern)
-    {
-        return (rigthIsExtern ? 0 : 1);
-    }
-    if (rigthIsExtern)
-    {
-        return (leftIsExtern ? -1 : 0);
-    }
-
     // Prefer declarations that are not in free-form generic extensions, i.e.
     // `extension<T:IFoo> T { /* declaration here should have lower precedence. */ }
     if (auto leftExt = as<ExtensionDecl>(leftDeclRefParent.getDecl()))
@@ -1393,11 +1422,6 @@ int SemanticsVisitor::CompareLookupResultItems(
         if (isDeclRefTypeOf<GenericTypeParamDeclBase>(rightExt->targetType))
             rightIsFreeFormExtension = true;
     }
-
-    // If one of the candidates is a free-form extension, it is always worse than
-    // a non-free-form extension.
-    if (leftIsFreeFormExtension != rightIsFreeFormExtension)
-        return int(leftIsFreeFormExtension) - int(rightIsFreeFormExtension);
 
     // It is possible for lookup to return both an interface requirement
     // and the concrete function that satisfies that requirement.
@@ -1415,7 +1439,42 @@ int SemanticsVisitor::CompareLookupResultItems(
     bool leftIsInterfaceRequirement = isInterfaceRequirement(left.declRef.getDecl());
     bool rightIsInterfaceRequirement = isInterfaceRequirement(right.declRef.getDecl());
     if (leftIsInterfaceRequirement != rightIsInterfaceRequirement)
-        return int(leftIsInterfaceRequirement) - int(rightIsInterfaceRequirement);
+    {
+        // Normally we should always choose the non-Interface candidate, but if one
+        // of the candidate is a free-form extension, this rule doesn't apply, and we
+        // will let free-form extension rule to decide which one is better later.
+        if (!leftIsFreeFormExtension && !rightIsFreeFormExtension)
+        {
+            return (int)(leftIsInterfaceRequirement) - int(rightIsInterfaceRequirement);
+        }
+    }
+
+    // If both candidates are generic functions, we cannot decide which one is better if
+    // above two rules cannot resolve them.
+    auto genericsLeft = as<GenericDecl>(left.declRef.getDecl());
+    auto genericsRight = as<GenericDecl>(right.declRef.getDecl());
+    if ((genericsLeft && as<CallableDecl>(genericsLeft->inner)) ||
+        (genericsRight && as<CallableDecl>(genericsRight->inner)))
+    {
+        return 0;
+    }
+
+    // If both left and right are extern, then they are equal.
+    // If only one of them is extern, then the other one is preferred.
+    // If neither is extern, then we continue with the rest of the checks.
+    if (leftIsExtern)
+    {
+        return (rigthIsExtern ? 0 : 1);
+    }
+    if (rigthIsExtern)
+    {
+        return (leftIsExtern ? -1 : 0);
+    }
+
+    // If one of the candidates is a free-form extension, it is always worse than
+    // a non-free-form extension.
+    if (leftIsFreeFormExtension != rightIsFreeFormExtension)
+        return int(leftIsFreeFormExtension) - int(rightIsFreeFormExtension);
 
     // Prefer non-extension declarations over extension declarations.
     if (leftIsExtension != rightIsExtension)
@@ -2046,6 +2105,94 @@ void SemanticsVisitor::AddCtorOverloadCandidate(
     AddOverloadCandidate(context, candidate, baseCost);
 }
 
+void SemanticsVisitor::maybeExpandArgList(List<Expr*>& args)
+{
+    bool needExpansion = false;
+    for (auto expr : args)
+    {
+        while (auto paren = as<ParenExpr>(expr))
+            expr = paren->base;
+
+        if (auto expand = as<ExpandExpr>(expr))
+        {
+            auto exprType = expand->type.type;
+            if (auto typeType = as<TypeType>(exprType))
+                exprType = typeType->getType();
+            if (as<ConcreteTypePack>(exprType))
+            {
+                needExpansion = true;
+            }
+        }
+    }
+    // Fast path without creating list copies.
+    if (!needExpansion)
+        return;
+    List<Expr*> result;
+    for (auto expr : args)
+    {
+        while (auto paren = as<ParenExpr>(expr))
+            expr = paren->base;
+        auto processExpr = [&]()
+        {
+            auto expand = as<ExpandExpr>(expr);
+            if (!expand)
+                return false;
+            auto type = expand->type.type;
+            if (auto typeType = as<TypeType>(type))
+            {
+                auto typePack = as<ConcreteTypePack>(typeType->getType());
+                if (!typePack)
+                    return false;
+                for (Index i = 0; i < typePack->getTypeCount(); i++)
+                {
+                    auto expandArg = m_astBuilder->create<SharedTypeExpr>();
+                    expandArg->loc = expr->loc;
+                    expandArg->type = m_astBuilder->getTypeType(typePack->getElementType(i));
+                    result.add(expandArg);
+                }
+                return true;
+            }
+            else if (auto typePack = as<ConcreteTypePack>(type))
+            {
+                auto localScope = getExprLocalScope();
+                SLANG_ASSERT(localScope);
+
+                VarDecl* varDecl = m_astBuilder->create<VarDecl>();
+                varDecl->parentDecl = nullptr;
+                if (m_outerScope && m_outerScope->containerDecl)
+                    m_outerScope->containerDecl->addMember(varDecl);
+                addModifier(varDecl, m_astBuilder->create<LocalTempVarModifier>());
+                varDecl->checkState = DeclCheckState::DefinitionChecked;
+                varDecl->nameAndLoc.loc = expr->loc;
+                varDecl->initExpr = expr;
+                varDecl->type.type = expr->type.type;
+                LetExpr* letExpr = m_astBuilder->create<LetExpr>();
+                letExpr->decl = varDecl;
+                localScope->addBinding(letExpr);
+                auto varExpr = m_astBuilder->create<VarExpr>();
+                varExpr->declRef = varDecl;
+                varExpr->type = expr->type.type;
+                varExpr->type.isLeftValue = false;
+                for (Index i = 0; i < typePack->getTypeCount(); i++)
+                {
+                    auto expandedArg = m_astBuilder->create<SwizzleExpr>();
+                    expandedArg->base = varExpr;
+                    expandedArg->type = typePack->getElementType(i);
+                    expandedArg->type.isLeftValue = false;
+                    expandedArg->elementIndices.add((uint32_t)i);
+                    result.add(expandedArg);
+                }
+                return true;
+            }
+            return false;
+        };
+
+        if (!processExpr())
+            result.add(expr);
+    }
+    args.swapWith(result);
+}
+
 bool SemanticsVisitor::OverloadResolveContext::matchArgumentsToParams(
     SemanticsVisitor* semantics,
     const List<QualType>& params,
@@ -2083,7 +2230,8 @@ bool SemanticsVisitor::OverloadResolveContext::matchArgumentsToParams(
     }
 
     // Try to match the variadic part.
-    // Is the corresponding argument a expand expr? If so it will map 1:1 to the type pack param.
+    // Is the corresponding argument a expand expr? If so it will map 1:1 to the type pack
+    // param.
     auto astBuilder = semantics->getASTBuilder();
 
     if (remainingArgCount <= 0)
@@ -2473,7 +2621,7 @@ void SemanticsVisitor::AddOverloadCandidates(Expr* funcExpr, OverloadResolveCont
     }
     else if (auto overloadedExpr2 = as<OverloadedExpr2>(funcExpr))
     {
-        for (auto item : overloadedExpr2->candidiateExprs)
+        for (auto item : overloadedExpr2->candidateExprs)
         {
             AddOverloadCandidates(item, context);
         }
@@ -2541,7 +2689,8 @@ void SemanticsVisitor::AddHigherOrderOverloadCandidates(
             List<QualType> paramTypes;
 
             for (Index ii = 0; ii < diffFuncType->getParamCount(); ii++)
-                paramTypes.add(getParamQualType(diffFuncType->getParamType(ii)));
+                paramTypes.add(
+                    getParamQualType(diffFuncType->getParamTypeWithDirectionWrapper(ii)));
 
             // Try to infer generic arguments, based on the updated context.
             OverloadResolveContext subContext = context;
@@ -2636,22 +2785,8 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
     {
         return CreateErrorExpr(expr);
     }
-    // If any of the arguments is an error, then we should bail out, to avoid
-    // cascading errors where we successfully pick an overload, but not the one
-    // the user meant.
-    for (auto arg : expr->arguments)
-    {
-        if (IsErrorExpr(arg))
-            return CreateErrorExpr(expr);
 
-        // If this argument is itself an overloaded value without a type
-        // then we can't sensibly continue
-        if (!arg->type && (as<OverloadedExpr>(arg) || as<OverloadedExpr2>(arg)))
-        {
-            getSink()->diagnose(expr->loc, Diagnostics::overloadedParameterToHigherOrderFunction);
-            return CreateErrorExpr(expr);
-        }
-    }
+    maybeExpandArgList(expr->arguments);
 
     for (auto& arg : expr->arguments)
     {
@@ -2681,7 +2816,8 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
             if (typeCheckingCache->resolvedOperatorOverloadCache.tryGetValue(key, candidate))
             {
                 // We should only use the cached candidate if it is persistent direct declref
-                // created from GlobalSession's ASTBuilder, or it is created in the current Linkage.
+                // created from GlobalSession's ASTBuilder, or it is created in the current
+                // Linkage.
                 if (candidate.cacheVersion == typeCheckingCache->version ||
                     findNextOuterGeneric(candidate.decl) == nullptr)
                 {
@@ -2726,6 +2862,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
     //
     bool typeOverloadChecked = false;
 
+    DiagnosticSink collectedErrorsSink(getSourceManager(), nullptr);
     if (expr->arguments.getCount() == 1 && !as<ExplicitCtorInvokeExpr>(expr) &&
         !as<InitializerListExpr>(expr->arguments[0]))
     {
@@ -2734,16 +2871,15 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
             if (isDeclRefTypeOf<AggTypeDeclBase>(typeType->getType()))
             {
                 Expr* resultExpr = nullptr;
-                DiagnosticSink tempSink(getSourceManager(), nullptr);
                 ConversionCost conversionCost = kConversionCost_None;
-                auto coerceResult = SemanticsVisitor(withSink(&tempSink))
+                auto coerceResult = SemanticsVisitor(withSink(&collectedErrorsSink))
                                         ._coerce(
                                             CoercionSite::ExplicitCoercion,
                                             typeType->getType(),
                                             &resultExpr,
                                             expr->arguments[0]->type,
                                             expr->arguments[0],
-                                            &tempSink,
+                                            &collectedErrorsSink,
                                             &conversionCost);
                 if (auto resultInvokeExpr = as<InvokeExpr>(resultExpr))
                 {
@@ -2891,11 +3027,11 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
             }
         }
 
-        // Now that we have resolved the overload candidate, we need to undo an `openExistential`
-        // operation that was applied to `out` arguments.
+        // Now that we have resolved the overload candidate, we need to undo an
+        // `openExistential` operation that was applied to `out` arguments.
         //
         auto funcType = context.bestCandidate->funcType;
-        ShortList<ParameterDirection> paramDirections;
+        ShortList<ParamPassingMode> paramDirections;
         if (funcType)
         {
             for (Index i = 0; i < funcType->getParamCount(); i++)
@@ -2917,10 +3053,10 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
             {
                 switch (paramDirections[i])
                 {
-                case kParameterDirection_Out:
-                case kParameterDirection_InOut:
-                case kParameterDirection_Ref:
-                case kParameterDirection_ConstRef:
+                case ParamPassingMode::Out:
+                case ParamPassingMode::BorrowInOut:
+                case ParamPassingMode::Ref:
+                case ParamPassingMode::BorrowIn:
                     break;
                 default:
                     continue;
@@ -2962,6 +3098,16 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
             // for language server to use.
             if (IsErrorExpr(outExpr))
             {
+                // Drain our error sink of "saved errors"
+                if (collectedErrorsSink.getErrorCount())
+                {
+                    Slang::ComPtr<ISlangBlob> blob;
+                    collectedErrorsSink.getBlobIfNeeded(blob.writeRef());
+                    getSink()->diagnoseRaw(
+                        Severity::Error,
+                        static_cast<char const*>(blob->getBufferPointer()));
+                }
+
                 if (auto invokeExpr = as<InvokeExpr>(outExpr))
                 {
                     invokeExpr->originalFunctionExpr = typeExpr;
@@ -2975,6 +3121,14 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
 
     // Nothing at all was found that we could even consider invoking.
     // In all other cases, this is an error.
+    if (auto overloadExpr = as<OverloadedExpr>(funcExpr))
+    {
+        if (overloadExpr->lookupResult2.isValid())
+        {
+            diagnoseAmbiguousReference(funcExpr);
+            return CreateErrorExpr(expr);
+        }
+    }
     getSink()->diagnose(expr->functionExpr, Diagnostics::expectedFunction, funcExpr->type);
     expr->type = QualType(m_astBuilder->getErrorType());
     return expr;
@@ -3050,6 +3204,7 @@ Expr* SemanticsVisitor::checkGenericAppWithCheckedArgs(GenericAppExpr* genericAp
 
     auto& baseExpr = genericAppExpr->functionExpr;
     auto& args = genericAppExpr->arguments;
+    maybeExpandArgList(args);
 
     // If there was an error in the base expression,  or in any of
     // the arguments, then just bail.
@@ -3101,11 +3256,12 @@ Expr* SemanticsVisitor::checkGenericAppWithCheckedArgs(GenericAppExpr* genericAp
             // to complete all of them and create an overloaded expression as a result.
 
             auto overloadedExpr = m_astBuilder->create<OverloadedExpr2>();
+            overloadedExpr->type = m_astBuilder->getOverloadedType();
             overloadedExpr->base = context.baseExpr;
             for (auto candidate : context.bestCandidates)
             {
                 auto candidateExpr = CompleteOverloadCandidate(context, candidate);
-                overloadedExpr->candidiateExprs.add(candidateExpr);
+                overloadedExpr->candidateExprs.add(candidateExpr);
             }
             return overloadedExpr;
         }

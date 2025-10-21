@@ -2,6 +2,10 @@
 //TEST:SIMPLE(filecheck=METAL_FLOAT): -target metal -stage compute -entry computeMain -DFLOAT
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 
+// Test framework does not support RWBuffer
+// TODO: github issue #8456
+
+
 // METAL_FLOAT: floating point atomic operation
 
 //METALLIB: @computeMain
@@ -30,37 +34,37 @@ void test()
 #endif //FLOAT
  
     // buffer
-// METAL: .atomic_fetch_add
-// METAL: .atomic_fetch_and
-// METAL: .atomic_fetch_max
-// METAL: .atomic_fetch_min
-// METAL: .atomic_fetch_or
-// METAL: .atomic_fetch_xor
-// METAL: .atomic_fetch_add
-// METAL: .atomic_fetch_and
-// METAL: .atomic_fetch_max
-// METAL: .atomic_fetch_min
-// METAL: .atomic_fetch_or
-// METAL: .atomic_fetch_xor
-// METAL: .atomic_exchange
-// METAL: .atomic_compare_exchange_weak
-// METAL: .atomic_compare_exchange_weak
+// METAL: ->atomic_fetch_add
+// METAL: ->atomic_fetch_and
+// METAL: ->atomic_fetch_max
+// METAL: ->atomic_fetch_min
+// METAL: ->atomic_fetch_or
+// METAL: ->atomic_fetch_xor
+// METAL: ->atomic_fetch_add
+// METAL: ->atomic_fetch_and
+// METAL: ->atomic_fetch_max
+// METAL: ->atomic_fetch_min
+// METAL: ->atomic_fetch_or
+// METAL: ->atomic_fetch_xor
+// METAL: ->atomic_exchange
+// METAL: ->atomic_compare_exchange_weak
+// METAL: ->atomic_compare_exchange_weak
 
-// METAL: .atomic_fetch_add
-// METAL: .atomic_fetch_and
-// METAL: .atomic_fetch_max
-// METAL: .atomic_fetch_min
-// METAL: .atomic_fetch_or
-// METAL: .atomic_fetch_xor
-// METAL: .atomic_fetch_add
-// METAL: .atomic_fetch_and
-// METAL: .atomic_fetch_max
-// METAL: .atomic_fetch_min
-// METAL: .atomic_fetch_or
-// METAL: .atomic_fetch_xor
-// METAL: .atomic_exchange
-// METAL: .atomic_compare_exchange_weak
-// METAL: .atomic_compare_exchange_weak
+// METAL: ->atomic_fetch_add
+// METAL: ->atomic_fetch_and
+// METAL: ->atomic_fetch_max
+// METAL: ->atomic_fetch_min
+// METAL: ->atomic_fetch_or
+// METAL: ->atomic_fetch_xor
+// METAL: ->atomic_fetch_add
+// METAL: ->atomic_fetch_and
+// METAL: ->atomic_fetch_max
+// METAL: ->atomic_fetch_min
+// METAL: ->atomic_fetch_or
+// METAL: ->atomic_fetch_xor
+// METAL: ->atomic_exchange
+// METAL: ->atomic_compare_exchange_weak
+// METAL: ->atomic_compare_exchange_weak
 	InterlockedAdd(intBuffer[0], valInt);
 	InterlockedAnd(intBuffer[0], valInt);
 	InterlockedMax(intBuffer[0], valInt);
@@ -75,7 +79,7 @@ void test()
 	InterlockedXor(intBuffer[0], valInt, originalValueInt);
 	InterlockedExchange(intBuffer[0], valInt, originalValueInt);
 	InterlockedCompareExchange(intBuffer[0], valInt, compareValueInt, originalValueInt);
-	InterlockedCompareStore(intBuffer[0], valUInt, compareValueUInt);
+	InterlockedCompareStore(intBuffer[0], valInt, compareValueUInt);
 
 	InterlockedAdd(uintBuffer[0], valUInt);
 	InterlockedAnd(uintBuffer[0], valUInt);

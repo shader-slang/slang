@@ -55,19 +55,19 @@ void Session::init()
     // Set up the command line options
     initCommandOptions(m_commandOptions);
 
-    // Set up shared AST builder
-    m_sharedASTBuilder = new SharedASTBuilder;
-    m_sharedASTBuilder->init(this);
-
-    // And the global ASTBuilder
-    auto builtinAstBuilder = m_sharedASTBuilder->getInnerASTBuilder();
-    globalAstBuilder = builtinAstBuilder;
+    // Create the root AST builder that will be used when
+    // loading the builtin modules, and which will serve as
+    // the parent for the the AST builder of any linkages
+    // created from this global session.
+    //
+    auto rootASTBuilder = new RootASTBuilder(this);
+    m_rootASTBuilder = rootASTBuilder;
 
     // Make sure our source manager is initialized
     builtinSourceManager.initialize(nullptr, nullptr);
 
     // Built in linkage uses the built in builder
-    m_builtinLinkage = new Linkage(this, builtinAstBuilder, nullptr);
+    m_builtinLinkage = new Linkage(this, rootASTBuilder, nullptr);
     m_builtinLinkage->m_optionSet.set(CompilerOptionName::DebugInformation, DebugInfoLevel::None);
 
     // Because the `Session` retains the builtin `Linkage`,
@@ -85,22 +85,22 @@ void Session::init()
     // TODO: load these on-demand to avoid parsing
     // the core module code for languages the user won't use.
 
-    baseLanguageScope = builtinAstBuilder->create<Scope>();
+    baseLanguageScope = rootASTBuilder->create<Scope>();
 
     // Will stay in scope as long as ASTBuilder
     baseModuleDecl =
         populateBaseLanguageModule(m_builtinLinkage->getASTBuilder(), baseLanguageScope);
 
-    coreLanguageScope = builtinAstBuilder->create<Scope>();
+    coreLanguageScope = rootASTBuilder->create<Scope>();
     coreLanguageScope->nextSibling = baseLanguageScope;
 
-    hlslLanguageScope = builtinAstBuilder->create<Scope>();
+    hlslLanguageScope = rootASTBuilder->create<Scope>();
     hlslLanguageScope->nextSibling = coreLanguageScope;
 
-    slangLanguageScope = builtinAstBuilder->create<Scope>();
+    slangLanguageScope = rootASTBuilder->create<Scope>();
     slangLanguageScope->nextSibling = hlslLanguageScope;
 
-    glslLanguageScope = builtinAstBuilder->create<Scope>();
+    glslLanguageScope = rootASTBuilder->create<Scope>();
     glslLanguageScope->nextSibling = slangLanguageScope;
 
     glslModuleName = getNameObj("glsl");
@@ -126,17 +126,24 @@ void Session::init()
 
 Session::~Session()
 {
-    // This is necessary because this ASTBuilder uses the SharedASTBuilder also owned by the
-    // session. If the SharedASTBuilder gets dtored before the globalASTBuilder it has a dangling
-    // pointer, which is referenced in the ASTBuilder dtor (likely) causing a crash.
+    // Destroy the array of core (automatically-included) modules.
     //
-    // By destroying first we know it is destroyed, before the SharedASTBuilder.
-    globalAstBuilder.setNull();
-
-    // destroy modules next
+    // TODO(tfoley): This code didn't have a comment clearly explaining
+    // why this step is necessary, but the other line that used to be
+    // here had a comment that expressed concern about the `SharedASTBuilder`
+    // gettng destruted before things that refer to it. It is possible
+    // that the underlying problem here is that the modules in the
+    // `coreModules` array are owned by the builtin linkage, and Bad Things
+    // would happen if the linkage gets destroyed while these modules
+    // are still alive.
+    //
     coreModules = decltype(coreModules)();
 }
 
+SharedASTBuilder* Session::getSharedASTBuilder()
+{
+    return getASTBuilder()->getSharedASTBuilder();
+}
 
 Module* Session::getBuiltinModule(slang::BuiltinModuleName name)
 {
@@ -404,8 +411,6 @@ SlangResult Session::compileBuiltinModule(
         }
     }
 
-    finalizeSharedASTBuilder();
-
 #ifdef _DEBUG
     if (moduleName == slang::BuiltinModuleName::Core)
     {
@@ -459,7 +464,6 @@ SlangResult Session::loadBuiltinModule(
         coreModules.add(module);
     }
 
-    finalizeSharedASTBuilder();
     return SLANG_OK;
 }
 
@@ -758,7 +762,7 @@ static T makeFromSizeVersioned(const uint8_t* src)
 SLANG_NO_THROW SlangResult SLANG_MCALL
 Session::createSession(slang::SessionDesc const& inDesc, slang::ISession** outSession)
 {
-    RefPtr<ASTBuilder> astBuilder(new ASTBuilder(m_sharedASTBuilder, "Session::astBuilder"));
+    auto astBuilder = RefPtr(new ASTBuilder(m_rootASTBuilder, "Session::astBuilder"));
     slang::SessionDesc desc = makeFromSizeVersioned<slang::SessionDesc>((uint8_t*)&inDesc);
 
     RefPtr<Linkage> linkage = new Linkage(this, astBuilder, getBuiltinLinkage());

@@ -12,8 +12,11 @@
 
 namespace Slang
 {
+class RootASTBuilder;
 
-class SharedASTBuilder : public RefObject
+/// Data shared by multiple `ASTBuilder`s that belong to the same hierarchy.
+///
+class SharedASTBuilder
 {
     friend class ASTBuilder;
 
@@ -64,14 +67,7 @@ public:
     /// Session.
     NamePool* getNamePool() { return m_namePool; }
 
-    /// Must be called before used
-    void init(Session* session);
-
-    SharedASTBuilder();
-
-    ~SharedASTBuilder();
-
-    ASTBuilder* getInnerASTBuilder() { return m_astBuilder; }
+    RootASTBuilder* getInnerASTBuilder() { return m_astBuilder; }
 
     Name* getThisTypeName()
     {
@@ -81,6 +77,12 @@ public:
         }
         return m_thisTypeName;
     }
+
+private:
+    friend class RootASTBuilder;
+
+    /// Initialize a shared AST builder owned by the given `rootASTBuilder`.
+    SharedASTBuilder(Session* globalSession, RootASTBuilder* rootASTBuilder);
 
 protected:
     // State shared between ASTBuilders
@@ -107,6 +109,7 @@ protected:
     Type* m_noneType = nullptr;
     Type* m_diffInterfaceType = nullptr;
     Type* m_builtinTypes[Index(BaseType::CountOf)];
+    Dictionary<String, Type*> m_magicEnumTypes;
 
     Dictionary<String, Decl*> m_magicDecls;
     Dictionary<BuiltinRequirementKind, Decl*> m_builtinRequirementDecls;
@@ -118,8 +121,15 @@ protected:
 
     Name* m_thisTypeName = nullptr;
 
-    // This is a private builder used for these shared types
-    ASTBuilder* m_astBuilder = nullptr;
+    /// The root AST builder that owns this shared storage.
+    ///
+    /// This field exists to support older code that passes around
+    /// the `SharedASTBuilder` state directly, rather than just
+    /// pass around the root AST builder. Once all the relevant
+    /// code is cleaned up, this field should be removed.
+    ///
+    RootASTBuilder* m_astBuilder = nullptr;
+
     Session* m_session = nullptr;
 
     Index m_id = 1;
@@ -192,25 +202,23 @@ class ASTBuilder : public RefObject
     friend class SharedASTBuilder;
 
 public:
+    /// Get a `Val` that has the AST node class and operands described by `desc`.
+    ///
+    /// If such a `Val` has already been created, it will be re-used.
+    /// Otherwise, an appropriate one will be created.
+    ///
     Val* _getOrCreateImpl(ValNodeDesc&& desc)
     {
         if (auto found = m_cachedNodes.tryGetValue(desc))
             return *found;
 
-        auto node = as<Val>(desc.type.createInstance(this));
-        SLANG_ASSERT(node);
-        for (auto& operand : desc.operands)
-            node->m_operands.add(operand);
-        auto result = node;
-        m_cachedNodes.add(ValKey(node), _Move(node));
-        return result;
+        return _getOrCreateImplSlowPath(_Move(desc));
     }
 
     /// A cache for AST nodes that are entirely defined by their node type, with
     /// no need for additional state.
+    ///
     Dictionary<ValKey, Val*, Hash<ValKey>, ValKeyEqual> m_cachedNodes;
-
-    Dictionary<GenericDecl*, List<Val*>> m_cachedGenericDefaultArgs;
 
     /// Create AST types
     template<typename T>
@@ -447,6 +455,14 @@ public:
     {
         return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Double)];
     }
+    SLANG_FORCE_INLINE Type* getInt8Type()
+    {
+        return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Int8)];
+    }
+    SLANG_FORCE_INLINE Type* getInt16Type()
+    {
+        return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Int16)];
+    }
     SLANG_FORCE_INLINE Type* getIntType()
     {
         return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Int)];
@@ -459,6 +475,14 @@ public:
     {
         return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::IntPtr)];
     }
+    SLANG_FORCE_INLINE Type* getUInt8Type()
+    {
+        return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::UInt8)];
+    }
+    SLANG_FORCE_INLINE Type* getUInt16Type()
+    {
+        return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::UInt16)];
+    }
     SLANG_FORCE_INLINE Type* getUIntType()
     {
         return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::UInt)];
@@ -470,6 +494,10 @@ public:
     SLANG_FORCE_INLINE Type* getUIntPtrType()
     {
         return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::UIntPtr)];
+    }
+    SLANG_FORCE_INLINE Type* getCharType()
+    {
+        return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Char)];
     }
     SLANG_FORCE_INLINE Type* getVoidType()
     {
@@ -485,11 +513,14 @@ public:
     Type* getSpecializedBuiltinType(Type* typeParam, const char* magicTypeName);
     Type* getSpecializedBuiltinType(ArrayView<Val*> genericArgs, const char* magicTypeName);
 
+    Type* getMagicEnumType(const char* magicEnumName);
+
     Type* getDefaultLayoutType();
     Type* getDefaultPushConstantLayoutType();
     Type* getStd140LayoutType();
     Type* getStd430LayoutType();
     Type* getScalarLayoutType();
+    Type* getCLayoutType();
 
     Type* getInitializerListType() { return m_sharedASTBuilder->getInitializerListType(); }
     Type* getOverloadedType() { return m_sharedASTBuilder->getOverloadedType(); }
@@ -502,19 +533,26 @@ public:
     Type* getDiffInterfaceType() { return m_sharedASTBuilder->getDiffInterfaceType(); }
     // Construct the type `Ptr<valueType>`, where `Ptr`
     // is looked up as a builtin type.
-    PtrType* getPtrType(Type* valueType, AddressSpace addrSpace);
+    PtrType* getPtrType(Type* valueType, AccessQualifier accessQualifier, AddressSpace addrSpace);
+    PtrType* getPtrType(Type* valueType, Val* accessQualifier, Val* addrSpace);
 
-    // Construct the type `Out<valueType>`
-    OutType* getOutType(Type* valueType);
+    // Construct the type `OutParam<valueType>`
+    OutParamType* getOutParamType(Type* valueType);
 
-    // Construct the type `InOut<valueType>`
-    InOutType* getInOutType(Type* valueType);
+    // Construct the type `InOutParam<valueType>`
+    BorrowInOutParamType* getBorrowInOutParamType(Type* valueType);
+
+    // Construct the type `RefParam<valueType>`
+    RefParamType* getRefParamType(Type* valueType);
+
+    // Construct the type `ImmutableBorrowParam<valueType>`
+    BorrowInParamType* getConstRefParamType(Type* valueType);
 
     // Construct the type `Ref<valueType>`
-    RefType* getRefType(Type* valueType, AddressSpace addrSpace);
+    ExplicitRefType* getExplicitRefType(Type* valueType);
 
-    // Construct the type `ConstRef<valueType>`
-    ConstRefType* getConstRefType(Type* valueType);
+    // Construct the type `Ref<valueType, .Read>`
+    ExplicitRefType* getExplicitConstRefType(Type* valueType);
 
     // Construct the type `Optional<valueType>`
     OptionalType* getOptionalType(Type* valueType);
@@ -522,7 +560,16 @@ public:
     // Construct a pointer type like `Ptr<valueType>`, but where
     // the actual type name for the pointer type is given by `ptrTypeName`
     PtrTypeBase* getPtrType(Type* valueType, char const* ptrTypeName);
-    PtrTypeBase* getPtrType(Type* valueType, AddressSpace addrSpace, char const* ptrTypeName);
+    PtrTypeBase* getPtrType(
+        Type* valueType,
+        Val* accessQualifier,
+        Val* addrSpace,
+        char const* ptrTypeName);
+    PtrTypeBase* getPtrType(
+        Type* valueType,
+        AccessQualifier accessQualifier,
+        AddressSpace addrSpace,
+        char const* ptrTypeName);
 
     ArrayExpressionType* getArrayType(Type* elementType, IntVal* elementCount);
 
@@ -665,16 +712,34 @@ public:
 
     BreakableStmt::UniqueID generateUniqueIDForStmt() { return create<UniqueStmtIDNode>(); }
 
-    /// Ctor
-    ASTBuilder(SharedASTBuilder* sharedASTBuilder, const String& name);
+    /// Construct an `ASTBuilder` as a child of the given `parent` builder
+    ///
+    /// The `debugName` is helpful to distinguish between different AST
+    /// builders when there are multiple active builders.
+    ///
+    ASTBuilder(ASTBuilder* parent, String const& debugName);
 
-    /// Dtor
+    /// Destructor.
     ~ASTBuilder();
 
-protected:
-    // Special default Ctor that can only be used by SharedASTBuilder
-    ASTBuilder();
+    /// Is this AST builder a direct or indirect descendent of `ancestor`?
+    ///
+    /// Note that this returns `true` if `this == ancestor`.
+    ///
+    bool isDescendentOf(ASTBuilder* ancestor);
 
+private:
+    Val* _getOrCreateImplSlowPath(ValNodeDesc&& desc);
+    ASTBuilder* _findAppropriateASTBuilderForVal(ValNodeDesc const& desc);
+    Val* _getOrCreateValDirectly(ValNodeDesc&& desc);
+
+protected:
+    /// Default constructor.
+    ///
+    /// Should not be used outside of the implementation of
+    /// `ASTBuilder` and `RootASTBuilder`.
+    ///
+    ASTBuilder();
 
     template<typename T>
     SLANG_FORCE_INLINE T* _initAndAdd(T* node)
@@ -700,15 +765,63 @@ protected:
         return node;
     }
 
+    /// The parent of this AST builder.
+    ///
+    /// AST nodes allocated using the parent builder are
+    /// guaranteed to outlive nodes allocated using this builder.
+    /// Because of the lifetime guarantees, it is safe for
+    /// nodes created on a child/descendent builder to contain
+    /// pointers to nodes created on a parent/ancestor builder,
+    /// but not vice versa.
+    ///
+    RefPtr<ASTBuilder> m_parent;
+
+    /// Nesting depth of this AST builder.
+    ///
+    /// If this builder has no parent, then the depth is zero.
+    /// Otherwise, the depth is one more than the depth of
+    /// the parent.
+    ///
+    Int m_depth = 0;
+
+    /// Shared state for all AST builders in the same hierarchy.
+    ///
+    /// All `ASTBuilder`s that share the same root via their
+    /// `m_parent` fields should be associated with the same
+    /// `SharedASTBuilder`. The shared builder caches information
+    /// that logically belongs at the root of the hierarchy,
+    /// such as builtin types.
+    ///
+    SharedASTBuilder* m_sharedASTBuilder = nullptr;
+
     String m_name;
-    Index m_id;
+    Index m_id = -1;
 
     /// List of all nodes that require being dtored when ASTBuilder is dtored
     List<NodeBase*> m_dtorNodes;
 
-    SharedASTBuilder* m_sharedASTBuilder;
-
     MemoryArena m_arena;
+};
+
+/// An `ASTBuilder` that is at the root of its own hierarchy.
+///
+/// Every AST builder that is not a `RootASTBuilder` must have
+/// a parent AST builder.
+///
+/// This class owns the storage for the `SharedASTBuilder` that
+/// is used for caching information about things like builtin
+/// declarations/types, which would be redundant to cache at
+/// every level of the hierarchy.
+///
+class RootASTBuilder : public ASTBuilder
+{
+public:
+    /// Construct a root AST builder for the given `globalSession`.
+    ///
+    RootASTBuilder(Session* globalSession);
+
+private:
+    SharedASTBuilder m_sharedASTBuilderStorage;
 };
 
 // Retrieves the ASTBuilder for the current compilation session.

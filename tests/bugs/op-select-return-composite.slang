@@ -1,6 +1,6 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-d3d12 -output-using-type -use-dxil
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-d3d12 -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type -profile spirv_1_3
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type -profile sm_6_0
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;

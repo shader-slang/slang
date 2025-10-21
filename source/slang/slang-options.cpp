@@ -282,7 +282,8 @@ void initCommandOptions(CommandOptions& options)
 
         for (auto name : names)
         {
-            if (name.startsWith("__") || name.startsWith("spirv_1_") || name.startsWith("_"))
+            if (name.startsWith("__") || name.startsWith("spirv_1_") || name.startsWith("_") ||
+                name == "Invalid")
             {
                 continue;
             }
@@ -568,7 +569,12 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::EmitReflectionJSON,
          "-reflection-json",
          "-reflection-json <path>",
-         "Emit reflection data in JSON format to a file."}};
+         "Emit reflection data in JSON format to a file."},
+        {OptionKind::UseMSVCStyleBitfieldPacking,
+         "-msvc-style-bitfield-packing",
+         nullptr,
+         "Pack bitfields according to MSVC rules (msb first, new field when underlying type size "
+         "changes) rather than gcc-style (lsb first)"}};
 
     _addOptions(makeConstArrayView(generalOpts), options);
 
@@ -659,6 +665,12 @@ void initCommandOptions(CommandOptions& options)
          "-fvk-use-dx-layout",
          nullptr,
          "Pack members using FXCs member packing rules when targeting GLSL or SPIRV."},
+        {OptionKind::ForceCLayout,
+         "-fvk-use-c-layout",
+         nullptr,
+         "Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, "
+         "ByteAddressBuffer and general pointers follow the C/C++ structure layout rules "
+         "when targeting SPIRV."},
         {OptionKind::VulkanBindShift,
          vkShiftNames.getBuffer(),
          "-fvk-<vulkan-shift>-shift <N> <space>",
@@ -2005,8 +2017,14 @@ SlangResult OptionsParser::_parseHelp(const CommandLineArg& arg)
     {
         auto catArg = m_reader.getArgAndAdvance();
 
-        categoryIndex =
-            m_cmdOptions->findCategoryByCaseInsensitiveName(catArg.value.getUnownedSlice());
+        categoryIndex = m_cmdOptions->findCategoryByName(catArg.value.getUnownedSlice());
+
+        if (categoryIndex < 0)
+        {
+            categoryIndex =
+                m_cmdOptions->findCategoryByCaseInsensitiveName(catArg.value.getUnownedSlice());
+        }
+
         if (categoryIndex < 0)
         {
             m_sink->diagnose(catArg.loc, Diagnostics::unknownHelpCategory);
@@ -2266,6 +2284,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::LoopInversion:
         case OptionKind::UnscopedEnum:
         case OptionKind::PreserveParameters:
+        case OptionKind::UseMSVCStyleBitfieldPacking:
             linkage->m_optionSet.set(optionKind, true);
             break;
         case OptionKind::MatrixLayoutRow:
@@ -2289,11 +2308,6 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 SLANG_RETURN_ON_FAIL(File::readAllBytes(fileName.value, contents));
                 SLANG_RETURN_ON_FAIL(
                     m_session->loadCoreModule(contents.getData(), contents.getSizeInBytes()));
-
-                // Ensure that the linkage's AST builder is up-to-date.
-                linkage->getASTBuilder()->m_cachedNodes =
-                    asInternal(m_session)->getGlobalASTBuilder()->m_cachedNodes;
-
                 break;
             }
         case OptionKind::CompileCoreModule:
@@ -2662,6 +2676,11 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::ForceDXLayout:
             {
                 getCurrentTarget()->optionSet.add(CompilerOptionName::ForceDXLayout, true);
+                break;
+            }
+        case OptionKind::ForceCLayout:
+            {
+                getCurrentTarget()->optionSet.add(CompilerOptionName::ForceCLayout, true);
                 break;
             }
         case OptionKind::EnableEffectAnnotations:
@@ -3237,7 +3256,6 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             {
                 // This will emit a separate debug file, containing all debug info in
                 // a .dbg.spv file. The main output SPIRV will have all debug info stripped.
-                m_compileRequest->setDebugInfoLevel(SLANG_DEBUG_INFO_LEVEL_MAXIMAL);
                 linkage->m_optionSet.set(OptionKind::EmitSeparateDebug, true);
                 break;
             }
@@ -3699,6 +3717,11 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             if (rawTarget.optionSet.shouldUseDXLayout())
             {
                 m_compileRequest->setTargetForceDXLayout(targetID, true);
+            }
+
+            if (rawTarget.optionSet.shouldUseCLayout())
+            {
+                m_compileRequest->setTargetForceCLayout(targetID, true);
             }
 
             if (rawTarget.optionSet.getBoolOption(CompilerOptionName::GenerateWholeProgram))

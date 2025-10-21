@@ -12,7 +12,7 @@ void computeMain(uint tid: SV_DispatchThreadID, StructuredBuffer<uint> src, RWSt
 {
     dst[tid.x] = src[tid.x];
 }
-// CHECK: uint _S1 = (blockIdx * blockDim + threadIdx).x;
+// CHECK: uint {{.*}} = (blockIdx * blockDim + threadIdx).x;
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
@@ -20,7 +20,7 @@ void computeMain2(uint2 tid: SV_DispatchThreadID, StructuredBuffer<uint> src, RW
 {
     dst[tid.x] = src[tid.y];
 }
-// CHECK: uint2  _S2 = uint2 {(blockIdx * blockDim + threadIdx).x, (blockIdx * blockDim + threadIdx).y};
+// CHECK: uint2 {{.*}} = uint2 {(blockIdx * blockDim + threadIdx).x, (blockIdx * blockDim + threadIdx).y};
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
@@ -28,8 +28,7 @@ void computeMain3(int2 tid: SV_DispatchThreadID, StructuredBuffer<uint> src, RWS
 {
     dst[tid.x] = src[tid.x];
 }
-// CHECK: int _S3 = (slang_bit_cast<int2 >(uint2 {(blockIdx * blockDim + threadIdx).x, (blockIdx * blockDim + threadIdx).y})).x;
-
+// CHECK: uint2 {{.*}} = uint2 {(blockIdx * blockDim + threadIdx).x, (blockIdx * blockDim + threadIdx).y};
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
@@ -37,7 +36,7 @@ void computeMain4(int tid: SV_DispatchThreadID, StructuredBuffer<uint> src, RWSt
 {
     dst[tid.x] = src[tid.x];
 }
-// CHECK: int _S4 = (slang_bit_cast<int>((blockIdx * blockDim + threadIdx).x));
+// CHECK: int {{.*}} = int((blockIdx * blockDim + threadIdx).x);
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
@@ -45,4 +44,4 @@ void computeMain5(int tid: SV_GroupIndex, StructuredBuffer<uint> src, RWStructur
 {
     dst[tid.x] = src[tid.x];
 }
-// CHECK: int _S5 = (slang_bit_cast<int>((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x));
+// CHECK: int {{.*}} = int((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x);

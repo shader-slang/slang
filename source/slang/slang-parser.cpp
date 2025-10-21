@@ -118,10 +118,6 @@ public:
 
     bool hasSeenCompletionToken = false;
 
-    // Track whether or not we are inside a generics that has variadic parameters.
-    // If so we will enable the new `expand` and `each` keyword.
-    bool isInVariadicGenerics = false;
-
     TokenReader tokenReader;
     DiagnosticSink* sink;
     SourceLoc lastErrorLoc;
@@ -1619,9 +1615,6 @@ static void ParseGenericDeclImpl(Parser* parser, GenericDecl* decl, const TFunc&
 {
     parser->ReadToken(TokenType::OpLess);
     parser->genericDepth++;
-    bool oldIsInVariadicGenerics = parser->isInVariadicGenerics;
-    SLANG_DEFER(parser->isInVariadicGenerics = oldIsInVariadicGenerics);
-
     for (;;)
     {
         const TokenType tokenType = parser->tokenReader.peekTokenType();
@@ -1634,11 +1627,6 @@ static void ParseGenericDeclImpl(Parser* parser, GenericDecl* decl, const TFunc&
 
         auto genericParam = ParseGenericParamDecl(parser, decl);
         AddMember(decl, genericParam);
-
-        if (as<GenericTypePackParamDecl>(genericParam))
-        {
-            parser->isInVariadicGenerics = true;
-        }
 
         // Make sure we make forward progress.
         if (parser->tokenReader.getCursor() == currentCursor)
@@ -1695,13 +1683,14 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
         bool optional = AdvanceIf(parser, "optional", &whereToken);
 
         auto subType = parser->ParseTypeExp();
-        if (AdvanceIf(parser, TokenType::Colon))
+        Token constraintToken;
+        if (AdvanceIf(parser, TokenType::Colon, &constraintToken))
         {
             for (;;)
             {
                 auto constraint = parser->astBuilder->create<GenericTypeConstraintDecl>();
                 constraint->whereTokenLoc = whereToken.loc;
-                parser->FillPosition(constraint);
+                constraint->loc = constraintToken.loc;
                 constraint->sub = subType;
                 constraint->sup = parser->ParseTypeExp();
                 if (optional)
@@ -1715,12 +1704,12 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
                     break;
             }
         }
-        else if (AdvanceIf(parser, TokenType::OpEql))
+        else if (AdvanceIf(parser, TokenType::OpEql, &constraintToken))
         {
             auto constraint = parser->astBuilder->create<GenericTypeConstraintDecl>();
             constraint->whereTokenLoc = whereToken.loc;
             constraint->isEqualityConstraint = true;
-            parser->FillPosition(constraint);
+            constraint->loc = constraintToken.loc;
             constraint->sub = subType;
             constraint->sup = parser->ParseTypeExp();
             if (optional)
@@ -1869,7 +1858,6 @@ static Stmt* parseOptBody(Parser* parser)
     unparsedStmt->currentScope = parser->currentScope;
     unparsedStmt->outerScope = parser->outerScope;
     unparsedStmt->sourceLanguage = parser->getSourceLanguage();
-    unparsedStmt->isInVariadicGenerics = parser->isInVariadicGenerics;
     parser->FillPosition(unparsedStmt);
     List<Token>& tokens = unparsedStmt->tokens;
     int braceDepth = 0;
@@ -2356,14 +2344,27 @@ static Expr* parseGenericApp(Parser* parser, Expr* base)
 
     genericApp->loc = base->loc;
     genericApp->functionExpr = base;
-    parser->ReadToken(TokenType::OpLess);
+    auto opLess = parser->ReadToken(TokenType::OpLess);
+    genericApp->argumentDelimeterLocs.add(opLess.loc);
     parser->genericDepth++;
-    // For now assume all generics have at least one argument
-    genericApp->arguments.add(_parseGenericArg(parser));
-    while (AdvanceIf(parser, TokenType::Comma))
+
+    for (;;)
     {
+        if (parser->LookAheadToken(TokenType::OpGreater) ||
+            parser->LookAheadToken(TokenType::OpRsh))
+            break;
         genericApp->arguments.add(_parseGenericArg(parser));
+        if (parser->LookAheadToken(TokenType::Comma))
+        {
+            auto commaToken = parser->ReadToken(TokenType::Comma);
+            genericApp->argumentDelimeterLocs.add(commaToken.loc);
+        }
+        else
+        {
+            break;
+        }
     }
+    genericApp->argumentDelimeterLocs.add(parser->tokenReader.peekLoc());
     parser->genericDepth--;
 
     if (parser->tokenReader.peekToken().type == TokenType::OpRsh)
@@ -2707,14 +2708,14 @@ static Expr* _applyModifiersToTypeExpr(Parser* parser, Expr* typeExpr, Modifiers
     }
 }
 
-/// Apply any type modifier in `ioBaseModifiers` to the given `typeExpr`.
+/// Move any type modifier in `ioBaseModifiers` to the given `typeExpr`.
 ///
 /// If any type modifiers were present, `ioBaseModifiers` will be updated
 /// to only include those modifiers that were not type modifiers (if any).
 ///
 /// If no type modifiers were present, `ioBaseModifiers` will remain unchanged.
 ///
-static Expr* _applyTypeModifiersToTypeExpr(
+static Expr* _moveTypeModifiersToTypeExpr(
     Parser* parser,
     Expr* typeExpr,
     Modifiers& ioBaseModifiers)
@@ -2762,7 +2763,7 @@ static Expr* _applyTypeModifiersToTypeExpr(
             // a pointer to the type modifier into the "link" for
             // the type modifier list, and updating the link to point
             // to the `next` field of the current modifier (since that
-            // fill be the location any further type modifiers need
+            // will be the location any further type modifiers need
             // to be linked).
             //
             *typeModifierLink = typeModifier;
@@ -2791,10 +2792,7 @@ static Expr* _applyTypeModifiersToTypeExpr(
     return _applyModifiersToTypeExpr(parser, typeExpr, typeModifiers);
 }
 
-static TypeSpec _applyModifiersToTypeSpec(
-    Parser* parser,
-    TypeSpec typeSpec,
-    Modifiers const& inModifiers)
+static TypeSpec _applyModifiersToTypeSpec(Parser* parser, TypeSpec typeSpec, Modifiers& modifiers)
 {
     // It is possible that the form of the type specifier will have
     // included a declaration directly (e.g., using `struct { ... }`
@@ -2808,8 +2806,7 @@ static TypeSpec _applyModifiersToTypeSpec(
         // and any modifiers that logically belong to the declaration to
         // the declaration.
         //
-        Modifiers modifiers = inModifiers;
-        typeSpec.expr = _applyTypeModifiersToTypeExpr(parser, typeSpec.expr, modifiers);
+        typeSpec.expr = _moveTypeModifiersToTypeExpr(parser, typeSpec.expr, modifiers);
 
         // Any remaining modifiers should instead be applied to the declaration.
         _addModifiers(decl, modifiers);
@@ -2820,7 +2817,7 @@ static TypeSpec _applyModifiersToTypeSpec(
         // This may result in modifiers being applied that do not belong on a type;
         // in that case we rely on downstream semantic checking to diagnose any error.
         //
-        typeSpec.expr = _applyModifiersToTypeExpr(parser, typeSpec.expr, inModifiers);
+        typeSpec.expr = _applyModifiersToTypeExpr(parser, typeSpec.expr, modifiers);
     }
 
     return typeSpec;
@@ -2961,7 +2958,7 @@ static TypeSpec _parseTypeSpec(Parser* parser, Modifiers& ioModifiers)
     // or which of them might be type modifiers, so we will delegate
     // figuring that out to a subroutine.
     //
-    typeSpec.expr = _applyTypeModifiersToTypeExpr(parser, typeSpec.expr, ioModifiers);
+    typeSpec.expr = _moveTypeModifiersToTypeExpr(parser, typeSpec.expr, ioModifiers);
 
     return typeSpec;
 }
@@ -2991,11 +2988,10 @@ static TypeSpec _parseTypeSpec(Parser* parser)
 static DeclBase* ParseDeclaratorDecl(
     Parser* parser,
     ContainerDecl* containerDecl,
-    Modifiers const& inModifiers)
+    Modifiers& modifiers)
 {
     SourceLoc startPosition = parser->tokenReader.peekLoc();
 
-    Modifiers modifiers = inModifiers;
     auto typeSpec = _parseTypeSpec(parser, modifiers);
 
     if (typeSpec.expr == nullptr && typeSpec.decl == nullptr)
@@ -4249,6 +4245,9 @@ static void parseModernVarDeclBaseCommon(Parser* parser, VarDeclBase* decl)
         decl->type = parser->ParseTypeExp();
     }
 
+    auto modifiers = _parseOptSemantics(parser);
+    _addModifiers(decl, modifiers);
+
     if (AdvanceIf(parser, TokenType::OpAssign))
     {
         decl->initExpr = parser->ParseInitExpr();
@@ -4350,6 +4349,8 @@ static NodeBase* parseFuncDecl(Parser* parser, void* /*userData*/)
         {
             parser->PushScope(decl);
             parseModernParamList(parser, decl);
+            auto funcScope = parser->currentScope;
+            parser->PopScope();
             if (AdvanceIf(parser, "throws"))
             {
                 decl->errorType = parser->ParseTypeExp();
@@ -4358,8 +4359,6 @@ static NodeBase* parseFuncDecl(Parser* parser, void* /*userData*/)
             {
                 decl->returnType = parser->ParseTypeExp();
             }
-            auto funcScope = parser->currentScope;
-            parser->PopScope();
             maybeParseGenericConstraints(parser, genericParent);
             parser->PushScope(funcScope);
             decl->body = parseOptBody(parser);
@@ -5505,13 +5504,19 @@ Decl* Parser::ParseStruct()
             parseOptionalInheritanceClause(this, rs);
             if (AdvanceIf(this, TokenType::OpAssign))
             {
-                rs->wrappedType = ParseTypeExp();
+                rs->aliasedType = ParseTypeExp();
                 PushScope(rs);
                 PopScope();
-                ReadToken(TokenType::Semicolon);
+                if (!LookAheadToken(TokenType::Semicolon))
+                {
+                    this->diagnose(
+                        this->tokenReader.peekToken().loc,
+                        Diagnostics::unexpectedTokenExpectedTokenType,
+                        "';'");
+                }
                 return rs;
             }
-            if (AdvanceIf(this, TokenType::Semicolon))
+            if (LookAheadToken(TokenType::Semicolon))
             {
                 rs->hasBody = false;
                 return rs;
@@ -5754,7 +5759,7 @@ static Stmt* parseTargetSwitchStmtImpl(Parser* parser, TargetSwitchStmt* stmt)
                         Diagnostics::unknownTargetName,
                         caseName.getContent());
                 }
-                targetCase->capability = int32_t(cap);
+                targetCase->capability = (int32_t)cap;
                 targetCase->capabilityToken = caseName;
                 targetCase->loc = caseName.loc;
                 targetCase->body = bodyStmt;
@@ -7026,7 +7031,6 @@ static NodeBase* parseSizeOfExpr(Parser* parser, void* /*userData*/)
 
 static NodeBase* parseAlignOfExpr(Parser* parser, void* /*userData*/)
 {
-    // We could have a type or a variable or an expression
     AlignOfExpr* alignOfExpr = parser->astBuilder->create<AlignOfExpr>();
 
     parser->ReadMatchingToken(TokenType::LParent);
@@ -7056,6 +7060,17 @@ static NodeBase* parseCountOfExpr(Parser* parser, void* /*userData*/)
     parser->ReadMatchingToken(TokenType::RParent);
 
     return countOfExpr;
+}
+
+static NodeBase* parseAddressOfExpr(Parser* parser, void* /*userData*/)
+{
+    // We could have a type or a variable or an expression
+    AddressOfExpr* addressOfExpr = parser->astBuilder->create<AddressOfExpr>();
+
+    parser->ReadMatchingToken(TokenType::LParent);
+    addressOfExpr->arg = parser->ParseExpression();
+    parser->ReadMatchingToken(TokenType::RParent);
+    return addressOfExpr;
 }
 
 static NodeBase* parseTryExpr(Parser* parser, void* /*userData*/)
@@ -7239,7 +7254,7 @@ static IntegerLiteralValue _fixIntegerLiteral(
         // If the masked value is 0 or equal to the mask, we 'assume' no information is
         // lost
         // This allows for example -1u, to give 0xffffffff
-        // It also means 0xfffffffffffffffffu will give 0xffffffff, without a warning.
+        // It also means 0xffffffffffffffffu will give 0xffffffff, without a warning.
         if ((!(maskedValue == 0 || maskedValue == mask)) && sink && token)
         {
             // Output a warning that number has been altered
@@ -7296,20 +7311,19 @@ static BaseType _determineNonSuffixedIntegerLiteralType(
     {
         baseType = BaseType::UInt64;
 
-        if (isDecimalBase)
-        {
-            // There is an edge case here where 9223372036854775808 or INT64_MAX + 1
-            // brings us here, but the complete literal is -9223372036854775808 or INT64_MIN and is
-            // valid. Unfortunately because the lexer handles the negative(-) part of the literal
-            // separately it is impossible to know whether the literal has a negative sign or not.
-            // We emit the warning and initially process it as a uint64 anyways, and the negative
-            // sign will be properly parsed and the value will still be properly stored as a
-            // negative INT64_MIN.
+        // Emit warning if the value is too large for signed 64-bit, regardless of base
 
-            // Decimal integer is too large to be represented as signed.
-            // Output warning that it is represented as unsigned instead.
-            sink->diagnose(*token, Diagnostics::integerLiteralTooLarge);
-        }
+        // There is an edge case here where 9223372036854775808 or INT64_MAX + 1
+        // brings us here, but the complete literal is -9223372036854775808 or INT64_MIN and is
+        // valid. Unfortunately because the lexer handles the negative(-) part of the literal
+        // separately it is impossible to know whether the literal has a negative sign or not.
+        // We emit the warning and initially process it as a uint64 anyways, and the negative
+        // sign will be properly parsed and the value will still be properly stored as a
+        // negative INT64_MIN.
+
+        // Decimal integer is too large to be represented as signed.
+        // Output warning that it is represented as unsigned instead.
+        sink->diagnose(*token, Diagnostics::integerLiteralTooLarge);
     }
 
     return baseType;
@@ -8603,6 +8617,32 @@ static Expr* parseEachExpr(Parser* parser, SourceLoc loc)
     return eachExpr;
 }
 
+// Check if a specific contextual keyword is available and not shadowed by user-defined decls.
+static bool isKeywordAvailable(Parser* parser, const char* keyword)
+{
+    if (!parser->semanticsVisitor || !parser->currentLookupScope)
+        return true;
+    if (lookUp(
+            parser->astBuilder,
+            parser->semanticsVisitor,
+            parser->semanticsVisitor->getName(keyword),
+            parser->currentLookupScope)
+            .isValid())
+        return false;
+    return true;
+}
+
+// Advance the token reader if the next token is a keyword and the keyword is not shadowed.
+static bool advanceIfAvailableKeyword(Parser* parser, const char* keyword)
+{
+    if (parser->LookAheadToken(keyword) && isKeywordAvailable(parser, keyword))
+    {
+        parser->ReadToken();
+        return true;
+    }
+    return false;
+}
+
 static Expr* parsePrefixExpr(Parser* parser)
 {
     auto tokenType = peekTokenType(parser);
@@ -8637,18 +8677,13 @@ static Expr* parsePrefixExpr(Parser* parser)
             {
                 return parseSPIRVAsmExpr(parser, tokenLoc);
             }
-            else if (parser->isInVariadicGenerics)
+            else if (advanceIfAvailableKeyword(parser, "expand"))
             {
-                // If we are inside a variadic generic, we also need to recognize
-                // the new `expand` and `each` keyword for dealing with variadic packs.
-                if (AdvanceIf(parser, "expand"))
-                {
-                    return parseExpandExpr(parser, tokenLoc);
-                }
-                else if (AdvanceIf(parser, "each"))
-                {
-                    return parseEachExpr(parser, tokenLoc);
-                }
+                return parseExpandExpr(parser, tokenLoc);
+            }
+            else if (advanceIfAvailableKeyword(parser, "each"))
+            {
+                return parseEachExpr(parser, tokenLoc);
             }
             return parsePostfixExpr(parser);
         }
@@ -8722,7 +8757,7 @@ Expr* Parser::ParseLeafExpression()
 /// Parse an argument to an application of a generic
 static Expr* _parseGenericArg(Parser* parser)
 {
-    // The grammar for generic arguments needs to be a super-set of the
+    // The grammar for generic arguments needs to be a superset of the
     // grammar for types and for expressions, because we do not know
     // which to expect at each argument position during parsing.
     //
@@ -8782,7 +8817,6 @@ Stmt* parseUnparsedStmt(
     SemanticsVisitor* semanticsVisitor,
     TranslationUnitRequest* translationUnit,
     SourceLanguage sourceLanguage,
-    bool isInVariadicGenerics,
     TokenSpan const& tokens,
     DiagnosticSink* sink,
     Scope* currentScope,
@@ -8806,7 +8840,6 @@ Stmt* parseUnparsedStmt(
     parser.semanticsVisitor = semanticsVisitor;
     parser.currentScope = parser.currentLookupScope = currentScope;
     parser.currentModule = semanticsVisitor->getShared()->getModule()->getModuleDecl();
-    parser.isInVariadicGenerics = isInVariadicGenerics;
     return parser.parseBlockStatement();
 }
 
@@ -9360,7 +9393,16 @@ static NodeBase* parseBuiltinRequirementModifier(Parser* parser, void* /*userDat
     return modifier;
 }
 
-static NodeBase* parseMagicTypeModifier(Parser* parser, void* /*userData*/)
+enum class MagicTypeModifierKind
+{
+    Type,
+    Enum,
+};
+
+static NodeBase* parseMagicTypeModifierImpl(
+    Parser* parser,
+    void* /*userData*/,
+    MagicTypeModifierKind kind)
 {
     MagicTypeModifier* modifier = parser->astBuilder->create<MagicTypeModifier>();
     parser->ReadToken(TokenType::LParent);
@@ -9370,15 +9412,32 @@ static NodeBase* parseMagicTypeModifier(Parser* parser, void* /*userData*/)
         modifier->tag =
             uint32_t(stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
     }
-    auto syntaxClass = parser->astBuilder->findSyntaxClass(getName(parser, modifier->magicName));
-    if (syntaxClass)
+
+    if (kind == MagicTypeModifierKind::Enum)
+    {
+        modifier->magicNodeType = getSyntaxClass<EnumTypeType>();
+    }
+    else if (
+        auto syntaxClass =
+            parser->astBuilder->findSyntaxClass(getName(parser, modifier->magicName)))
     {
         modifier->magicNodeType = syntaxClass;
     }
-    // TODO: print diagnostic if the magic type name doesn't correspond to an actual ASTNodeType.
+    // TODO: print diagnostic if the magic type name doesn't correspond to an actual
+    // ASTNodeType.
     parser->ReadToken(TokenType::RParent);
 
     return modifier;
+}
+
+static NodeBase* parseMagicTypeModifier(Parser* parser, void* userData)
+{
+    return parseMagicTypeModifierImpl(parser, userData, MagicTypeModifierKind::Type);
+}
+
+static NodeBase* parseMagicEnumModifier(Parser* parser, void* userData)
+{
+    return parseMagicTypeModifierImpl(parser, userData, MagicTypeModifierKind::Enum);
 }
 
 static NodeBase* parseIntrinsicTypeModifier(Parser* parser, void* /*userData*/)
@@ -9525,7 +9584,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseModifier("out", getSyntaxClass<OutModifier>()),
     _makeParseModifier("inout", getSyntaxClass<InOutModifier>()),
     _makeParseModifier("__ref", getSyntaxClass<RefModifier>()),
-    _makeParseModifier("__constref", getSyntaxClass<ConstRefModifier>()),
+    _makeParseModifier("__constref", getSyntaxClass<BorrowModifier>()),
     _makeParseModifier("const", getSyntaxClass<ConstModifier>()),
     _makeParseModifier("__builtin", getSyntaxClass<BuiltinModifier>()),
     _makeParseModifier("highp", getSyntaxClass<GLSLPrecisionModifier>()),
@@ -9605,6 +9664,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseModifier("__builtin_requirement", parseBuiltinRequirementModifier),
 
     _makeParseModifier("__magic_type", parseMagicTypeModifier),
+    _makeParseModifier("__magic_enum", parseMagicEnumModifier),
     _makeParseModifier("__intrinsic_type", parseIntrinsicTypeModifier),
     _makeParseModifier("__implicit_conversion", parseImplicitConversionModifier),
 
@@ -9628,6 +9688,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseExpr("sizeof", parseSizeOfExpr),
     _makeParseExpr("alignof", parseAlignOfExpr),
     _makeParseExpr("countof", parseCountOfExpr),
+    _makeParseExpr("__getAddress", parseAddressOfExpr),
 };
 
 ConstArrayView<SyntaxParseInfo> getSyntaxParseInfos()

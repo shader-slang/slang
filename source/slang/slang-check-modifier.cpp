@@ -1306,7 +1306,7 @@ ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
         return modifierType;
     case ASTNodeType::OutModifier:
     case ASTNodeType::RefModifier:
-    case ASTNodeType::ConstRefModifier:
+    case ASTNodeType::BorrowModifier:
     case ASTNodeType::InOutModifier:
         return ASTNodeType::OutModifier;
 
@@ -1415,7 +1415,7 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
         [[fallthrough]];
 
     case ASTNodeType::RefModifier:
-    case ASTNodeType::ConstRefModifier:
+    case ASTNodeType::BorrowModifier:
     case ASTNodeType::GLSLBufferModifier:
     case ASTNodeType::GLSLPatchModifier:
         return (as<VarDeclBase>(decl) && isGlobalDecl(decl)) || as<ParamDecl>(decl) ||
@@ -1677,6 +1677,18 @@ Modifier* SemanticsVisitor::checkModifier(
         }
     }
 
+    if (as<ConstModifier>(m))
+    {
+        if (auto varDeclBase = as<VarDeclBase>(syntaxNode))
+        {
+            if (as<PointerTypeExpr>(varDeclBase->type.exp))
+            {
+                // Disallow `const T*` syntax.
+                getSink()->diagnose(m, Diagnostics::constNotAllowedOnCStylePtrDecl);
+                return nullptr;
+            }
+        }
+    }
     if (auto glslLayoutAttribute = as<UncheckedGLSLLayoutAttribute>(m))
     {
         return checkGLSLLayoutAttribute(glslLayoutAttribute, syntaxNode);

@@ -166,29 +166,8 @@ public:
         return dispatchIfNotNull(expr->right);
     }
 
-    bool visitGenericAppExpr(GenericAppExpr* genericAppExpr)
+    bool visitAppExprCommon(AppExprBase* expr)
     {
-        PushNode pushNodeRAII(context, genericAppExpr);
-        if (dispatchIfNotNull(genericAppExpr->functionExpr))
-            return true;
-        for (auto arg : genericAppExpr->arguments)
-            if (dispatchIfNotNull(arg))
-                return true;
-        return false;
-    }
-
-    bool visitSharedTypeExpr(SharedTypeExpr* expr) { return dispatchIfNotNull(expr->base.exp); }
-
-    bool visitInvokeExpr(InvokeExpr* expr)
-    {
-        PushNode pushNodeRAII(context, expr);
-        if (dispatchIfNotNull(expr->functionExpr))
-            return true;
-        if (dispatchIfNotNull(expr->originalFunctionExpr))
-            return true;
-        for (auto arg : expr->arguments)
-            if (dispatchIfNotNull(arg))
-                return true;
         if (context->findType == ASTLookupType::Invoke && expr->argumentDelimeterLocs.getCount())
         {
             String fileName;
@@ -204,6 +183,36 @@ public:
                 return true;
             }
         }
+        return false;
+    }
+
+    bool visitGenericAppExpr(GenericAppExpr* genericAppExpr)
+    {
+        PushNode pushNodeRAII(context, genericAppExpr);
+        if (dispatchIfNotNull(genericAppExpr->functionExpr))
+            return true;
+        for (auto arg : genericAppExpr->arguments)
+            if (dispatchIfNotNull(arg))
+                return true;
+        if (visitAppExprCommon(genericAppExpr))
+            return true;
+        return false;
+    }
+
+    bool visitSharedTypeExpr(SharedTypeExpr* expr) { return dispatchIfNotNull(expr->base.exp); }
+
+    bool visitInvokeExpr(InvokeExpr* expr)
+    {
+        PushNode pushNodeRAII(context, expr);
+        if (dispatchIfNotNull(expr->functionExpr))
+            return true;
+        if (dispatchIfNotNull(expr->originalFunctionExpr))
+            return true;
+        for (auto arg : expr->arguments)
+            if (dispatchIfNotNull(arg))
+                return true;
+        if (visitAppExprCommon(expr))
+            return true;
         return false;
     }
 
@@ -302,7 +311,7 @@ public:
             return true;
         bool result = false;
         PushNode pushNode(context, expr);
-        for (auto candidate : expr->candidiateExprs)
+        for (auto candidate : expr->candidateExprs)
         {
             result |= dispatchIfNotNull(candidate);
         }
@@ -846,7 +855,7 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
             if (auto aggTypeDecl = as<AggTypeDecl>(container))
             {
                 ASTLookupExprVisitor visitor(&context);
-                if (visitor.dispatchIfNotNull(aggTypeDecl->wrappedType.exp))
+                if (visitor.dispatchIfNotNull(aggTypeDecl->aliasedType.exp))
                     return true;
             }
         }
