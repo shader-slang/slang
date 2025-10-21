@@ -1520,7 +1520,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         {
             IRBuilder builder(inst);
             builder.setInsertBefore(inst);
-            IRType* intType = i.isSigned ? builder.getIntType() : builder.getUIntType();
+            IRType* intType = i.isSigned ? static_cast<IRType*>(builder.getIntType())
+                                         : static_cast<IRType*>(builder.getUIntType());
             auto targetType = vectorType
                                   ? builder.getVectorType(intType, vectorType->getElementCount())
                                   : intType;
