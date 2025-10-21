@@ -338,14 +338,13 @@ if(WIN32 AND SLANG_LIB_TYPE STREQUAL "SHARED")
     # Link against the slang-compiler import library so symbols can be forwarded
     target_link_libraries(slang-proxy PRIVATE slang)
     
-    # Get the output directories from the main slang target
+    # Get the output directories from the main slang target to match build locations
     get_target_property(slang_runtime_dir slang RUNTIME_OUTPUT_DIRECTORY)
     get_target_property(slang_archive_dir slang ARCHIVE_OUTPUT_DIRECTORY)
     
     # Set output name to slang (produces slang.dll) and match directories
     set_target_properties(slang-proxy PROPERTIES
         OUTPUT_NAME slang
-        FOLDER "libraries"
         RUNTIME_OUTPUT_DIRECTORY "${slang_runtime_dir}"
         ARCHIVE_OUTPUT_DIRECTORY "${slang_archive_dir}"
     )
@@ -360,4 +359,28 @@ if(WIN32 AND SLANG_LIB_TYPE STREQUAL "SHARED")
     )
     
     message(STATUS "Windows proxy DLL (slang.dll) will be generated to forward to slang-compiler.dll")
+endif()
+
+#
+# Unix backward compatibility symlink (libslang -> libslang-compiler)
+#
+if(UNIX AND SLANG_LIB_TYPE STREQUAL "SHARED")
+    # Create symlink in build directory
+    add_custom_command(
+        TARGET slang POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E create_symlink
+            $<TARGET_FILE_NAME:slang>
+            $<TARGET_FILE_DIR:slang>/libslang.$<IF:$<PLATFORM_ID:Darwin>,dylib,so>
+        COMMENT "Creating backward compatibility symlink: libslang -> libslang-compiler"
+        VERBATIM
+    )
+
+    # Install the symlink by copying it from the build directory
+    install(
+        FILES $<TARGET_FILE_DIR:slang>/libslang.$<IF:$<PLATFORM_ID:Darwin>,dylib,so>
+        DESTINATION lib
+        COMPONENT runtime
+    )
+
+    message(STATUS "Unix backward compatibility symlink (libslang -> libslang-compiler) will be created during build and installation")
 endif()
