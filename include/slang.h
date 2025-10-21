@@ -2644,10 +2644,10 @@ struct TypeLayoutReflection
         return spReflectionTypeLayout_getGenericParamIndex((SlangReflectionTypeLayout*)this);
     }
 
-    // Removed
+    // Pending Type Layout functionality has been removed
     TypeLayoutReflection* getPendingDataTypeLayout() { return nullptr; }
 
-    // Removed
+    // Pending Type Layout functionality has been removed
     VariableLayoutReflection* getSpecializedTypePendingDataVarLayout() { return nullptr; }
 
     SlangInt getBindingRangeCount()
@@ -2993,7 +2993,7 @@ struct VariableLayoutReflection
         return spReflectionVariableLayout_getStage((SlangReflectionVariableLayout*)this);
     }
 
-    // removed
+    // Pending Type Layout functionality has been removed
     VariableLayoutReflection* getPendingDataLayout() { return nullptr; }
 };
 

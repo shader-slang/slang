@@ -456,9 +456,6 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
                     builder,
                     entryPointUniformStructTypeLayout);
                 elementVarLayoutBuilder.cloneEverythingButOffsetsFrom(originalElementVarLayout);
-                // We assume everything in "pendingLayout" will appear as uniform parameters at
-                // the moment. This means that we can just copy them as is through the pass right
-                // now.
 
                 IRParameterGroupTypeLayout::Builder paramGroupTypeLayoutBuilder(builder);
                 // Filter offsets for the `elementVarLayout` part of the new parameter group layout.
