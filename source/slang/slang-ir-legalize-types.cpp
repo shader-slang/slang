@@ -2883,30 +2883,18 @@ static void _addFieldsToWrappedBufferElementTypeLayout(
             //
             // We've been tracking a `varChain` that
             // remembers all the parent `struct` fields
-            // we've navigated through to get here, and
-            // that information has been tracking two
-            // different pieces of layout:
+            // we've navigated through to get here
             //
-            // * The "primary" layout represents the storage
+            // * The layout represents the storage
             // of the buffer element type as we usually
             // think of its (e.g., the bytes starting at offset zero).
             //
-            // * The "pending" layout tells us where all the
-            // fields representing concrete types plugged in
-            // for interface-type slots got placed.
-            //
-            // We have tunneled down info to tell us which case
-            // we should use (`isSpecial`).
-            //
-            // Most of the logic is the same between the two
-            // cases. We will be computing layout information
+            // We will be computing layout information
             // for a field of the new/wrapped buffer element type.
-            //
-            // Use the primary layout information and the primary/nominal type of the field.
             IRVarLayout* newFieldLayout =
                 createSimpleVarLayout(irBuilder, varChain.primaryChain, elementTypeLayout);
 
-            // Either way, we add the new field to the struct type
+            // We add the new field to the struct type
             // layout we are building, and also update the mapping
             // information so that we can find the field layout
             // based on the IR key for the struct field.
@@ -3096,18 +3084,11 @@ static IRTypeLayout* _createWrappedBufferTypeLayout(
     if (!oldParameterGroupTypeLayout)
         return oldTypeLayout;
 
-    // The original type must have been split between the direct/primary
-    // data and some amount of "pending" data to deal with interface-type
-    // data in the element type of the parameter group.
-    //
     // The legalization step will have already flattened the data inside of
-    // the group to a single `struct` type, which places the primary data first,
-    // and then any pending data into additional fields.
+    // the group to a single `struct` type.
     //
     // Our job is to compute a type layout that we can apply to that new
-    // element type, and to a parameter group surrounding it, that will
-    // re-create the original intention of the split layout (both primary
-    // and pending data) for a type that now only has the "primary" data.
+    // element type, and to a parameter group surrounding it.
     //
 
     IRParameterGroupTypeLayout::Builder newTypeLayoutBuilder(irBuilder);
@@ -3158,15 +3139,6 @@ static IRTypeLayout* _createWrappedBufferTypeLayout(
             newResInfo->space = resInfo->getSpace();
         }
 
-        // It is possible that a constant buffer and/or space didn't get
-        // allocated for the "primary" data, but ended up being required for
-        // the "pending" data (this would happen if, e.g., a constant buffer
-        // didn't appear to have any uniform data in it, but then once we
-        // plugged in concrete types for interface fields it did...), so
-        // we need to account for that case and copy over the relevant
-        // resource usage from the pending data, if there is any.
-        //
-
         auto newContainerVarLayout = newContainerVarLayoutBuilder.build();
         newTypeLayoutBuilder.setContainerVarLayout(newContainerVarLayout);
     }
@@ -3174,8 +3146,7 @@ static IRTypeLayout* _createWrappedBufferTypeLayout(
     // Now that we've dealt with the container variable, we can turn
     // our attention to the element type. This is the part that
     // actually got legalized and required us to create a "wrapped"
-    // buffer type in the first place, so we know that it will
-    // have both primary and "pending" parts.
+    // buffer type in the first place.
     //
     // Let's start by extracting the fields we care about from
     // the original element type/var layout, and constructing
@@ -3257,13 +3228,6 @@ static LegalVal declareVars(
 {
     LegalVarChain varChain = inVarChain;
     IRTypeLayout* typeLayout = inTypeLayout;
-    if (isSpecial)
-    {
-        // Pending data layout functionality has been removed.
-        if (typeLayout)
-        {
-        }
-    }
 
     switch (type.flavor)
     {

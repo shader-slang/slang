@@ -357,7 +357,7 @@ struct SimpleLegalVarChain
     IRVarLayout* varLayout = nullptr;
 };
 
-/// A "chain" of variable declarations that can handle both primary and "pending" data.
+/// A "chain" of variable declarations
 ///
 /// In the presence of interface-type fields, a single variable may
 /// have data that sits in two distinct allocations, and may have

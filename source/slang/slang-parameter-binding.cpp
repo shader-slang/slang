@@ -1644,14 +1644,6 @@ static void completeBindingsForParameter(
     applyBindingInfoToParameter(varLayout, bindingInfos);
 }
 
-/// Allocate binding location for any "pending" data in a shader parameter.
-///
-/// When a parameter contains interface-type fields (recursively), we might
-/// not have included them in the base layout for the parameter, and instead
-/// need to allocate space for them after all other shader parameters have
-/// been laid out.
-///
-
 struct SimpleSemanticInfo
 {
     String name;
@@ -2685,12 +2677,6 @@ struct ScopeLayoutBuilder
     RefPtr<StructTypeLayout> m_structLayout;
     UniformLayoutInfo m_structLayoutInfo;
 
-    // We need to compute a layout for any "pending" data inside
-    // of the parameters being added to the scope, to facilitate
-    // later allocating space for all the pending parameters after
-    // the primary shader parameters.
-    //
-
     void beginLayout(ParameterBindingContext* context, TypeLayoutContext layoutContext)
     {
         m_context = context;
@@ -2732,18 +2718,7 @@ struct ScopeLayoutBuilder
         m_structLayout->mapVarToLayout.add(varLayout->varDecl.getDecl(), varLayout);
     }
 
-    void addParameter(RefPtr<VarLayout> varLayout)
-    {
-        _addParameter(varLayout);
-
-        // Any "pending" items on a field type become "pending" items
-        // on the overall `struct` type layout.
-        //
-        // TODO: This logic ends up duplicated between here and the main
-        // `struct` layout logic in `type-layout.cpp`. If this gets any
-        // more complicated we should see if there is a way to share it.
-        //
-    }
+    void addParameter(RefPtr<VarLayout> varLayout) { _addParameter(varLayout); }
 
     void addParameter(ParameterInfo* parameterInfo)
     {
@@ -2751,12 +2726,6 @@ struct ScopeLayoutBuilder
         SLANG_RELEASE_ASSERT(varLayout);
 
         _addParameter(varLayout);
-
-        // Global parameters will have their non-orindary/uniform
-        // pending data handled by the main parameter binding
-        // logic, but we still need to construct a layout
-        // that includes any pending data.
-        //
     }
 
     RefPtr<VarLayout> endLayout(VarLayout* inVarLayout = nullptr)
@@ -2809,7 +2778,6 @@ struct SimpleScopeLayoutBuilder : ScopeLayoutBuilder
     void addSimpleParameter(RefPtr<VarLayout> varLayout)
     {
         // The main `addParameter` logic will deal with any ordinary/uniform data,
-        // and with the "pending" part of the layout.
         //
         addParameter(varLayout);
 
@@ -3595,8 +3563,7 @@ struct ParameterBindingVisitorCounters
 ///
 /// This includes allocation of as-yet-unused register/binding ranges to parameters (which
 /// will then affect the ranges of registers/bindings that are available to subsequent
-/// parameters), and imporantly *also* includes allocate of space to any "pending"
-/// data for interface/existential type parameters/fields.
+/// parameters)
 ///
 static void _completeBindings(
     ParameterBindingContext* context,
@@ -3714,164 +3681,19 @@ struct CompleteBindingsVisitor : ComponentTypeVisitor
     }
 };
 
-/// A visitor used by `_completeBindings`.
-///
-/// This visitor is used to follow up after the `CompleteBindingsVisitor`
-/// any ensure that any "pending" data required by the parameters that
-/// got laid out now gets a location.
-///
-/// To make a concrete example:
-///
-///     Texture2D a;
-///     IThing    b;
-///     Texture2D c;
-///
-/// If these parameters were laid out with `b` specialized to a type
-/// that contains a single `Texture2D`, then the `CompleteBindingsVisitor`
-/// would visit `a`, `b`, and then `c` in order. It would give `a` the
-/// first register/binding available (say, `t0`). It would then make
-/// a note that due to specialization, `b`, needs a `t` register as well,
-/// but it *cannot* be allocated just yet, because doing so would change
-/// the location of `c`, so it is marked as "pending." Then `c` would
-/// be visited and get `t1`. As a result the registers given to `a`
-/// and `c` are independent of how `b` gets specialized.
-///
-/// Next, the `FlushPendingDataVisitor` comes through and applies to
-/// the parameters again. For `a` there is no pending data, but for
-/// `b` there is a pending request for a `t` register, so it gets allocated
-/// now (getting `t2`). The `c` parameter then has no pending data, so
-/// we are done.
-///
-/// *When* the pending data gets flushed is then significant. In general,
-/// the order in which modules get composed an specialized is signficaint.
-/// The module above (let's call it `M`) has one specialization parameter
-/// (for `b`), and if we want to compose it with another module `N` that
-/// has no specialization parameters, we could compute either:
-///
-///     compose(specialize(M, SomeType), N)
-///
-/// or:
-///
-///     specialize(compose(M,N), SomeType)
-///
-/// In the first case, the "pending" data for `M` gets flushed right after `M`,
-/// so that `specialize(M,SomeType)` can have a consistent layout
-/// regardless of how it is used. In the second case, the pending data for
-/// `M` only gets flushed after `N`'s parameters are allocated, thus guaranteeing
-/// that the `compose(M,N)` part has a consistent layout regardless of what
-/// type gets plugged in during specialization.
-///
-/// There are trade-offs to be made by an application about which approach
-/// to prefer, and the compiler supports either policy choice.
-///
-struct FlushPendingDataVisitor : ComponentTypeVisitor
-{
-    FlushPendingDataVisitor(
-        ParameterBindingContext* context,
-        ParameterBindingVisitorCounters* counters)
-        : m_context(context), m_counters(counters)
-    {
-    }
-
-    ParameterBindingContext* m_context;
-    ParameterBindingVisitorCounters* m_counters;
-
-    void visitEntryPoint(
-        EntryPoint* entryPoint,
-        EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
-    {
-        SLANG_UNUSED(entryPoint);
-        SLANG_UNUSED(specializationInfo);
-
-        auto globalEntryPointIndex = m_counters->entryPointCounter++;
-        auto globalEntryPointInfo =
-            m_context->shared->programLayout->entryPoints[globalEntryPointIndex];
-    }
-
-    void visitRenamedEntryPoint(
-        RenamedEntryPointComponentType* entryPoint,
-        EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
-    {
-        entryPoint->getBase()->acceptVisitor(this, specializationInfo);
-    }
-
-    void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo)
-        SLANG_OVERRIDE
-    {
-        SLANG_UNUSED(specializationInfo);
-        visitLeafParams(module);
-    }
-
-    void visitLeafParams(ComponentType* componentType)
-    {
-        // In the "leaf" case we just allocate space for any
-        // pending data in the parameters, in order.
-        //
-        auto paramCount = componentType->getShaderParamCount();
-        for (Index ii = 0; ii < paramCount; ++ii)
-        {
-            auto globalParamIndex = m_counters->globalParamCounter++;
-            auto globalParamInfo = m_context->shared->parameters[globalParamIndex];
-            auto varLayout = globalParamInfo->varLayout;
-        }
-    }
-
-    void visitComposite(
-        CompositeComponentType* composite,
-        CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
-    {
-        visitChildren(composite, specializationInfo);
-    }
-
-    void visitSpecialized(SpecializedComponentType* specialized) SLANG_OVERRIDE
-    {
-        // Because `SpecializedComponentType` was a special case for `CompleteBindingsVisitor`,
-        // it ends up being a special case here too.
-        //
-        // The `CompleteBindings...` pass treated a `SpecializedComponentType`
-        // as an atomic unit. Any "pending" data that came from its parameters
-        // will already have been dealt with, so it would be incorrect for
-        // us to recurse into `specialized`.
-        //
-        // Instead, we just need to *skip* `specialized`, since it was
-        // completely handled already. This isn't quite as simple
-        // as just doing nothing, because our passes are using
-        // some global counters to find the absolute/linear index
-        // of each parameter and entry point as it is encountered.
-        // We will simply bump those counters by the number of
-        // parameters and entry points contained under `specialized`,
-        // which is luckily provided by the `ComponentType` API.
-        //
-        m_counters->globalParamCounter += specialized->getShaderParamCount();
-        m_counters->entryPointCounter += specialized->getEntryPointCount();
-    }
-
-    void visitTypeConformance(TypeConformance* conformance) SLANG_OVERRIDE
-    {
-        SLANG_UNUSED(conformance);
-    }
-};
-
 static void _completeBindings(
     ParameterBindingContext* context,
     ComponentType* componentType,
     ParameterBindingVisitorCounters* ioCounters)
 {
-    ParameterBindingVisitorCounters savedCounters = *ioCounters;
-
     CompleteBindingsVisitor completeBindingsVisitor(context, ioCounters);
     componentType->acceptVisitor(&completeBindingsVisitor, nullptr);
-
-    FlushPendingDataVisitor flushVisitor(context, &savedCounters);
-    componentType->acceptVisitor(&flushVisitor, nullptr);
 }
 
 /// "Complete" binding of parametesr in the given `program`.
 ///
 /// Completing binding involves both assigning registers/bindings
-/// to an parameters that didn't get explicit locations, and then
-/// also providing locations to any "pending" data that needed
-/// space allocated (used for existential/interface type parameters).
+/// to an parameters that didn't get explicit locations
 ///
 static void _completeBindings(ParameterBindingContext* context, ComponentType* program)
 {
