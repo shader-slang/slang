@@ -774,6 +774,20 @@ bool CapabilityTargetSet::tryJoin(const CapabilityTargetSets& other)
     return true;
 }
 
+/// Are the two CapabilityTargetSet equal?
+bool CapabilityTargetSet::operator==(CapabilityTargetSet const& that) const
+{
+    for (auto stageSet : shaderStageSets)
+    {
+        auto thatStageSet = that.shaderStageSets.tryGetValue(stageSet.first);
+        if (!thatStageSet)
+            return false;
+        if (stageSet.second.atomSet != thatStageSet->atomSet)
+            return false;
+    }
+    return true;
+}
+
 CapabilitySet& CapabilitySet::join(const CapabilitySet& other)
 {
     if (this->isEmpty() || other.isInvalid())

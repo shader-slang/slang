@@ -14030,6 +14030,8 @@ struct CapabilityDeclReferenceVisitor
     {
         CapabilitySet set;
         auto targetCaseCount = stmt->targetCases.getCount();
+        bool isStageSwitch = as<StageSwitchStmt>(stmt) != nullptr;
+
         for (Index targetCaseIndex = 0; targetCaseIndex < targetCaseCount; targetCaseIndex++)
         {
             // The logic here is to collect a list of `case` statment capabilities
@@ -14124,7 +14126,7 @@ struct CapabilityDeclReferenceVisitor
                     oldCap);
                 handleParentDiagnosticFunc(DiagnosticCategory::Capability);
             }
-            set.unionWith(targetCap);
+            addNewCapTargetSetInTargetSwitch(set, targetCap, stmt->targetCases[targetCaseIndex], isStageSwitch);
         }
         handleProcessFunc(stmt, set, stmt->loc);
     }
@@ -14132,6 +14134,113 @@ struct CapabilityDeclReferenceVisitor
     void visitRequireCapabilityDecl(RequireCapabilityDecl* decl)
     {
         handleProcessFunc(decl, decl->inferredCapabilityRequirements, decl->loc);
+    }
+
+private:
+    void addNewCapTargetSetInTargetSwitch(CapabilitySet& currentSet, const CapabilitySet& newTargets, const TargetCaseStmt* processingTargetCase, bool isStageSwitch)
+    {
+        // traverse all the targets in new target set
+        for (auto targetToAdd : newTargets.getCapabilityTargetSets())
+        {
+            auto targetName = targetToAdd.first;
+            auto& currentCapTargetSets = currentSet.getCapabilityTargetSets();
+            // first, we need to find if this target already exists in the current set
+            CapabilityTargetSet currentTarget;
+            if (auto* currentTarget = currentCapTargetSets.tryGetValue(targetName))
+            {
+                // if the target already exists, we need to check whether this new target is
+                // a superset of the existing one, or the other way around. This is the validation
+                // check, because if this condition is not met, then we have conflicting capability
+                // requirements, and we will report a diagnostic.
+                // TODO: How to do this check? We seems don't have such infrastructure yet.
+                // We can form two CapabilitySet instances, and each will only contain one target,
+                // and use the existing `joinWithOtherWillChangeThis` method to do the check.
+                CapabilityTargetSet tmp = *currentTarget;
+                tmp.unionWith(targetToAdd.second);
+                if (tmp == *currentTarget)
+                {
+                    // if currentTarget U targetToAdd == currentTarget, then targetToAdd is a subset of currentTarget.
+                    // we will need to replace the existing target with the 'targetToAdd'
+                    currentCapTargetSets.remove(targetName);
+                    currentCapTargetSets.add(targetName, targetToAdd.second);
+                }
+                else if (tmp == targetToAdd.second) {}
+                else
+                {
+                    // If we are seeing stage switch, then the conflicting is supposed to happen, because each case is a different stage
+                    // the capability for different stage is supposed to be different, therefore, we will have to look one level deeper
+                    // to check the each stage for this target
+                    if (isStageSwitch)
+                    {
+                        addNewCapInStageSwitch(*currentTarget, targetToAdd.second, processingTargetCase);
+                        continue;
+                    }
+
+                    // otherwise, we have conflicting capability requirements.
+                    // report diagnostic.
+                    CapabilitySet conflictCapSet1;
+                    CapabilitySet conflictCapSet2;
+
+                    conflictCapSet1.getCapabilityTargetSets().add(targetName, targetToAdd.second);
+                    conflictCapSet2.getCapabilityTargetSets().add(targetName, *currentTarget);
+
+                    maybeDiagnose(
+                        Base::getSink(),
+                        outerContext.getOptionSet(),
+                        DiagnosticCategory::Capability,
+                        processingTargetCase->loc,
+                        Diagnostics::targetSwitchCapCasesConflict,
+                        CapabilityName(processingTargetCase->capability),   // arg0
+                        conflictCapSet1,                                    // arg1
+                        conflictCapSet2);                                   // arg2
+                    handleParentDiagnosticFunc(DiagnosticCategory::Capability);
+                }
+            }
+            else
+            {
+                // if the target does not exist, we can just add it to the current set
+                currentCapTargetSets.add(targetName, targetToAdd.second);
+            }
+        }
+    }
+
+    void addNewCapInStageSwitch(CapabilityTargetSet& currentTarget, const CapabilityTargetSet& newTarget, const TargetCaseStmt* processingTargetCase)
+    {
+        for (auto stageToAdd : newTarget.getShaderStageSets())
+        {
+            auto stageName = stageToAdd.first;
+            auto& currentStages = currentTarget.getShaderStageSets();
+
+            CapabilityStageSet currentStage;
+            if (currentStages.tryGetValue(stageName, currentStage))
+            {
+                CapabilityStageSet tmp = currentStage;
+                tmp.atomSet.value().unionWith(stageToAdd.second.atomSet.value());
+                if (tmp.atomSet == currentStage.atomSet)
+                {
+                    currentStages.remove(stageName);
+                    currentStages.add(stageName, stageToAdd.second);
+                }
+                else if (tmp.atomSet == stageToAdd.second.atomSet) {}
+                else
+                {
+                    maybeDiagnose(
+                        Base::getSink(),
+                        outerContext.getOptionSet(),
+                        DiagnosticCategory::Capability,
+                        processingTargetCase->loc,
+                        Diagnostics::targetSwitchCapCasesConflict,
+                        CapabilityName(processingTargetCase->capability),   // arg0
+                        stageToAdd.second.atomSet.value(),                  // arg1
+                        currentStage.atomSet.value());                      // arg2
+                    handleParentDiagnosticFunc(DiagnosticCategory::Capability);
+                }
+            }
+            else
+            {
+                currentStages.add(stageName, stageToAdd.second);
+            }
+        }
     }
 };
 

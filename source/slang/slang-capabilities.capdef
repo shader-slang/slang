@@ -226,7 +226,7 @@ def hlsl_2018 : _sm_5_1;
 
 /// Represent compatibility support for the deprecated POC DXC
 /// [Version]
-def hlsl_coopvec_poc : _sm_6_8;
+def hlsl_coopvec_poc : _sm_6_9;
 
 /// Represents capabilities required for DXIL Library compilation.
 /// [Version]
@@ -818,6 +818,7 @@ def spvVulkanMemoryModelDeviceScopeKHR : SPV_KHR_vulkan_memory_model;
 /// Represents the SPIR-V capability for the bindless texture.
 /// [EXT]
 def spvBindlessTextureNV : SPV_NV_bindless_texture;
+
 
 // The following capabilities all pertain to how ray tracing shaders are translated
 // to GLSL, where there are two different extensions that can provide the core
@@ -2370,3 +2371,5 @@ alias all = _sm_6_9 + hlsl_nvapi
           | spirv_1_5 + sm_6_9
              + ser + shaderclock + texturefootprint + fragmentshaderinterlock + spvGroupNonUniformPartitionedNV
              + spvRayTracingMotionBlurNV + spvRayTracingMotionBlurNV;
+
+alias spvBindlessTextureNV_rayTracing = SPV_NV_bindless_texture + raytracing;

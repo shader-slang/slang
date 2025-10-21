@@ -23163,7 +23163,7 @@ T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handle
             return __makeCombinedTextureSamplerFromHandle<T>((uint2)handleValue);
         else
             return __loadResourceDescriptorFromHeap<T>(((uint2)handleValue).x);
-    case spvBindlessTextureNV:
+    case spvBindlessTextureNV_rayTracing:
         return __castDescriptorHandleToResource<T>(handleValue);
     case spirv:
     case glsl:

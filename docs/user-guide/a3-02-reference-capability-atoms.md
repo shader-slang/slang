@@ -1443,3 +1443,5 @@ Other
 
 `optix_coopvec`
 > Represents capabilities required for optix cooperative vector support.
+
+`spvBindlessTextureNV_rayTracing`

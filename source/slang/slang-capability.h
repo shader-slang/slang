@@ -100,6 +100,10 @@ struct CapabilityTargetSet
     void unionWith(const CapabilityTargetSet& other);
 
     const CapabilityStageSets& getShaderStageSets() const { return shaderStageSets; }
+    CapabilityStageSets& getShaderStageSets() { return shaderStageSets; }
+
+    /// Are the two CapabilityTargetSet equal?
+    bool operator==(CapabilityTargetSet const& that) const;
 };
 
 enum class CheckCapabilityRequirementOptions
