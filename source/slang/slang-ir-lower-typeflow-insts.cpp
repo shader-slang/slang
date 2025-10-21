@@ -210,104 +210,24 @@ IRFunc* createIntegerMappingFunc(IRModule* module, Dictionary<UInt, UInt>& mappi
     return func;
 }
 
-// This context lowers `GetTagForSpecializedCollection`,
+// This context lowers `GetTagOfElementInCollection`,
 // `GetTagForSuperCollection`, and `GetTagForMappedCollection` instructions,
 //
 struct TagOpsLoweringContext : public InstPassBase
 {
     TagOpsLoweringContext(IRModule* module)
-        : InstPassBase(module)
+        : InstPassBase(module), cBuilder(module)
     {
     }
 
     void lowerGetTagForSuperCollection(IRGetTagForSuperCollection* inst)
     {
-        // We use the result type and the type of the operand
-        // to figure out the source and destination collections.
-        //
-        // We then replace this with an array access, where the i'th
-        // element of the array is the corresponding index in the super
-        // collection.
-        //
-        // e.g.
-        //      let a : TagType(WitnessTableCollection(B, C)) = /* ... */;
-        //      let b : TagType(WitnessTableCollection(A, B, C)) = GetTagForSuperCollection(a);
-        // becomes
-        //      let a : TagType(WitnessTableCollection(B, C)) = /* ... */;
-        //      let lookupArr : ArrayType<UInt, 2> = [1, 2]; // B is at index 1, C is at index 2
-        //      let b : TagType(WitnessTableCollection(A, B, C)) = ElementExtract(lookupArr, a);
-        //
-        // Note that we leave the tag-types of the output intact since we may need to lower
-        // later tag operations.
-        //
-
-        auto srcCollection = cast<IRCollectionBase>(
-            cast<IRCollectionTagType>(inst->getOperand(0)->getDataType())->getOperand(0));
-        auto destCollection =
-            cast<IRCollectionBase>(cast<IRCollectionTagType>(inst->getDataType())->getOperand(0));
-
-        IRBuilder builder(inst->getModule());
-        builder.setInsertAfter(inst);
-
-        List<IRInst*> indices;
-        for (UInt i = 0; i < srcCollection->getCount(); i++)
-        {
-            // Find in destCollection
-            auto srcElement = srcCollection->getElement(i);
-
-            bool found = false;
-            for (UInt j = 0; j < destCollection->getCount(); j++)
-            {
-                auto destElement = destCollection->getElement(j);
-                if (srcElement == destElement)
-                {
-                    found = true;
-                    indices.add(builder.getIntValue(builder.getUIntType(), j));
-                    break; // Found the index
-                }
-            }
-
-            if (!found)
-            {
-                // destCollection must be a super-set
-                SLANG_UNEXPECTED("Element not found in destination collection");
-            }
-        }
-
-        // Create an array for the lookup
-        auto lookupArrayType = builder.getArrayType(
-            builder.getUIntType(),
-            builder.getIntValue(builder.getUIntType(), indices.getCount()));
-        auto lookupArray =
-            builder.emitMakeArray(lookupArrayType, indices.getCount(), indices.getBuffer());
-        auto resultID =
-            builder.emitElementExtract(inst->getDataType(), lookupArray, inst->getOperand(0));
-        inst->replaceUsesWith(resultID);
+        inst->replaceUsesWith(inst->getOperand(0));
         inst->removeAndDeallocate();
     }
 
     void lowerGetTagForMappedCollection(IRGetTagForMappedCollection* inst)
     {
-        // We use the result type and the type of the operand
-        // to figure out the source and destination collections.
-        //
-        // We then replace this with an array access, where the i'th
-        // element of the array is the corresponding index in the mapped
-        // collection.
-        //
-        // e.g.
-        //      let a : TagType(WitnessTableCollection(B, C)) = /* ... */;
-        //      let b : TagType(FuncCollection(C_key, B_key)) =
-        //          GetTagForMappedCollection(a, key);
-        // becomes
-        //      let a : TagType(WitnessTableCollection(B, C)) = /* ... */;
-        //      let lookupArr : ArrayType<UInt, 2> = [1, 0]; // B is at index 1, C is at index 0
-        //      let b : TagType(FuncCollection(C_key, B_key)) = ElementExtract(lookupArr, a);
-        //
-        // Note that we leave the tag-types of the output intact since we may need to lower
-        // later tag operations.
-        //
-
         auto srcCollection = cast<IRWitnessTableCollection>(
             cast<IRCollectionTagType>(inst->getOperand(0)->getDataType())->getOperand(0));
         auto destCollection =
@@ -317,20 +237,25 @@ struct TagOpsLoweringContext : public InstPassBase
         IRBuilder builder(inst->getModule());
         builder.setInsertAfter(inst);
 
-        List<IRInst*> indices;
+        Dictionary<UInt, UInt> mapping;
         for (UInt i = 0; i < srcCollection->getCount(); i++)
         {
             // Find in destCollection
             bool found = false;
-            auto srcElement =
+            auto srcMappedElement =
                 findWitnessTableEntry(cast<IRWitnessTable>(srcCollection->getElement(i)), key);
             for (UInt j = 0; j < destCollection->getCount(); j++)
             {
                 auto destElement = destCollection->getElement(j);
-                if (srcElement == destElement)
+                if (srcMappedElement == destElement)
                 {
                     found = true;
-                    indices.add(builder.getIntValue(builder.getUIntType(), j));
+                    // We rely on the fact that if the element ever appeared in a collection,
+                    // it must have been assigned a unique ID.
+                    //
+                    mapping.add(
+                        cBuilder.getUniqueID(srcCollection->getElement(i)),
+                        cBuilder.getUniqueID(destElement));
                     break; // Found the index
                 }
             }
@@ -342,88 +267,13 @@ struct TagOpsLoweringContext : public InstPassBase
             }
         }
 
-        // Create an array for the lookup
-        auto lookupArrayType = builder.getArrayType(
-            builder.getUIntType(),
-            builder.getIntValue(builder.getUIntType(), indices.getCount()));
-        auto lookupArray =
-            builder.emitMakeArray(lookupArrayType, indices.getCount(), indices.getBuffer());
-        auto resultID =
-            builder.emitElementExtract(inst->getDataType(), lookupArray, inst->getOperand(0));
-        inst->replaceUsesWith(resultID);
-        inst->removeAndDeallocate();
-    }
+        // Create an index mapping func and call that
+        auto mappingFunc = createIntegerMappingFunc(inst->getModule(), mapping, 0);
 
-    void lowerGetTagForSpecializedCollection(IRGetTagForSpecializedCollection* inst)
-    {
-        // We use the result type and the type of the operand
-        // to figure out the source and destination collections.
-        //
-        // We then replace this with an array access, where the i'th
-        // element of the array is the corresponding index in the mapped
-        // collection.
-        //
-        // The mapping between elements is provided as pairs of operands to the instruction.
-        //
-        // e.g.
-        //      let a : TagType(GenericCollection(B, C)) = /* ... */;
-        //      let b : TagType(FuncCollection(E, F)) =
-        //          GetTagForSpecializedCollection(a, B, F, C, E);
-        // becomes
-        //      let a : TagType(GenericCollection(B, C)) = /* ... */;
-        //      let lookupArr : ArrayType<UInt, 2> = [1, 0]; // B->F, C->E
-        //      let b : TagType(FuncCollection(E, F)) = ElementExtract(lookupArr, a);
-        //
-        // Note that we leave the tag-types of the output intact since we may need to lower
-        // later tag operations.
-        //
-
-        auto srcCollection =
-            cast<IRCollectionTagType>(inst->getOperand(0)->getDataType())->getCollection();
-        auto destCollection = cast<IRCollectionTagType>(inst->getDataType())->getCollection();
-        Dictionary<IRInst*, IRInst*> mapping;
-
-        for (UInt i = 1; i < inst->getOperandCount(); i += 2)
-        {
-            auto srcElement = inst->getOperand(i);
-            auto destElement = inst->getOperand(i + 1);
-            mapping[srcElement] = destElement;
-        }
-
-        IRBuilder builder(inst->getModule());
-        builder.setInsertAfter(inst);
-
-        List<IRInst*> indices;
-        for (UInt i = 0; i < srcCollection->getCount(); i++)
-        {
-            // Find in destCollection
-            bool found = false;
-            auto mappedElement = mapping[srcCollection->getElement(i)];
-            for (UInt j = 0; j < destCollection->getCount(); j++)
-            {
-                auto destElement = destCollection->getElement(j);
-                if (mappedElement == destElement)
-                {
-                    found = true;
-                    indices.add(builder.getIntValue(builder.getUIntType(), j));
-                    break; // Found the index
-                }
-            }
-
-            if (!found)
-            {
-                SLANG_UNEXPECTED("Element not found in specialized collection");
-            }
-        }
-
-        // Create an array for the lookup
-        auto lookupArrayType = builder.getArrayType(
-            builder.getUIntType(),
-            builder.getIntValue(builder.getUIntType(), indices.getCount()));
-        auto lookupArray =
-            builder.emitMakeArray(lookupArrayType, indices.getCount(), indices.getBuffer());
-        auto resultID =
-            builder.emitElementExtract(inst->getDataType(), lookupArray, inst->getOperand(0));
+        auto resultID = builder.emitCallInst(
+            inst->getDataType(),
+            mappingFunc,
+            List<IRInst*>({inst->getOperand(0)}));
         inst->replaceUsesWith(resultID);
         inst->removeAndDeallocate();
     }
@@ -433,21 +283,8 @@ struct TagOpsLoweringContext : public InstPassBase
         IRBuilder builder(inst->getModule());
         builder.setInsertAfter(inst);
 
-        // find the index of the element in the collection
-        auto collection = cast<IRCollectionBase>(inst->getOperand(1));
-        auto element = inst->getOperand(0);
-        UInt foundIndex = UInt(-1);
-        for (UInt i = 0; i < collection->getCount(); i++)
-        {
-            if (collection->getElement(i) == element)
-            {
-                foundIndex = i;
-                break;
-            }
-        }
-
-        SLANG_ASSERT(foundIndex != UInt(-1));
-        auto resultValue = builder.getIntValue(inst->getDataType(), foundIndex);
+        auto uniqueId = cBuilder.getUniqueID(inst->getOperand(0));
+        auto resultValue = builder.getIntValue(inst->getDataType(), uniqueId);
         inst->replaceUsesWith(resultValue);
         inst->removeAndDeallocate();
     }
@@ -462,9 +299,6 @@ struct TagOpsLoweringContext : public InstPassBase
         case kIROp_GetTagForMappedCollection:
             lowerGetTagForMappedCollection(as<IRGetTagForMappedCollection>(inst));
             break;
-        case kIROp_GetTagForSpecializedCollection:
-            lowerGetTagForSpecializedCollection(as<IRGetTagForSpecializedCollection>(inst));
-            break;
         case kIROp_GetTagOfElementInCollection:
             lowerGetTagOfElementInCollection(as<IRGetTagOfElementInCollection>(inst));
             break;
@@ -473,11 +307,12 @@ struct TagOpsLoweringContext : public InstPassBase
         }
     }
 
-
     void processModule()
     {
         processAllInsts([&](IRInst* inst) { return processInst(inst); });
     }
+
+    CollectionBuilder cBuilder;
 };
 
 struct DispatcherLoweringContext : public InstPassBase
@@ -505,7 +340,6 @@ struct DispatcherLoweringContext : public InstPassBase
         }
 
         Dictionary<IRInst*, IRInst*> elements;
-        UInt index = 0;
         IRBuilder builder(dispatcher->getModule());
         forEachInCollection(
             witnessTableCollection,
@@ -571,7 +405,6 @@ struct DispatcherLoweringContext : public InstPassBase
         IRBuilder builder(dispatcher->getModule());
 
         Dictionary<IRInst*, IRInst*> elements;
-        UInt index = 0;
         forEachInCollection(
             witnessTableCollection,
             [&](IRInst* table)
@@ -680,7 +513,7 @@ void lowerTypeCollections(IRModule* module, DiagnosticSink* sink)
 struct SequentialIDTagLoweringContext : public InstPassBase
 {
     SequentialIDTagLoweringContext(IRModule* module)
-        : InstPassBase(module)
+        : InstPassBase(module), cBuilder(module)
     {
     }
     void lowerGetTagFromSequentialID(IRGetTagFromSequentialID* inst)
@@ -704,13 +537,12 @@ struct SequentialIDTagLoweringContext : public InstPassBase
         // Map from sequential ID to unique ID
         auto destCollection = cast<IRCollectionTagType>(inst->getDataType())->getCollection();
 
-        UIndex dstSeqID = 0;
         forEachInCollection(
             destCollection,
             [&](IRInst* table)
             {
                 // Get unique ID for the witness table
-                auto outputId = dstSeqID++;
+                auto outputId = cBuilder.getUniqueID(table);
                 auto seqDecoration = table->findDecoration<IRSequentialIDDecoration>();
                 if (seqDecoration)
                 {
@@ -754,14 +586,13 @@ struct SequentialIDTagLoweringContext : public InstPassBase
         // Map from sequential ID to unique ID
         auto destCollection = cast<IRCollectionTagType>(srcTagInst->getDataType())->getCollection();
 
-        UIndex dstSeqID = 0;
         forEachInCollection(
             destCollection,
             [&](IRInst* table)
             {
                 // Get unique ID for the witness table
                 SLANG_UNUSED(cast<IRWitnessTable>(table));
-                auto outputId = dstSeqID++;
+                auto outputId = cBuilder.getUniqueID(table);
                 auto seqDecoration = table->findDecoration<IRSequentialIDDecoration>();
                 if (seqDecoration)
                 {
@@ -791,6 +622,8 @@ struct SequentialIDTagLoweringContext : public InstPassBase
             kIROp_GetSequentialIDFromTag,
             [&](IRGetSequentialIDFromTag* inst) { return lowerGetSequentialIDFromTag(inst); });
     }
+
+    CollectionBuilder cBuilder;
 };
 
 void lowerSequentialIDTagCasts(IRModule* module, DiagnosticSink* sink)

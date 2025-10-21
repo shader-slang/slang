@@ -76,12 +76,12 @@ struct CollectionBuilder
     //
     IRCollectionBase* makeSet(const HashSet<IRInst*>& values);
 
-private:
     // Return a unique ID for the inst. Assuming the module pointer
     // is consistent, this should always be the same for a given inst.
     //
     UInt getUniqueID(IRInst* inst);
 
+private:
     // Reference to parent module
     IRModule* module;
 

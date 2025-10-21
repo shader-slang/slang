@@ -16,8 +16,8 @@ bool lowerTaggedUnionTypes(IRModule* module, DiagnosticSink* sink);
 // Lower `CollectionTagType` types
 void lowerTagTypes(IRModule* module);
 
-// Lower `GetTagForSuperCollection`, `GetTagForMappedCollection` and
-// `GetTagForSpecializedCollection` instructions
+// Lower `GetTagOfElementInCollection`,
+// `GetTagForSuperCollection`, and `GetTagForMappedCollection` instructions,
 //
 void lowerTagInsts(IRModule* module, DiagnosticSink* sink);
 
