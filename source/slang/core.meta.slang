@@ -124,6 +124,9 @@ interface IRangedValue
     static const This minValue;
 }
 
+__attributeTarget(ModuleDecl)
+attribute_syntax [ExperimentalModule] : ExperimentalModuleAttribute;
+
 __attributeTarget(DeclBase)
 attribute_syntax [TreatAsDifferentiable] : TreatAsDifferentiableAttribute;
 

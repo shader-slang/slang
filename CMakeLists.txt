@@ -502,7 +502,7 @@ add_subdirectory(source/slang-core-module)
 add_subdirectory(source/slang-glsl-module)
 add_subdirectory(source/slang)
 add_subdirectory(source/slangc)
-add_subdirectory(source/slang-neural-module)
+add_subdirectory(source/standard-modules)
 add_subdirectory(examples)
 
 #

@@ -682,4 +682,5 @@ return {
 	["Attr.MemoryScope"] = 678,
 	["Undefined.LoadFromUninitializedMemory"] = 679,
 	["CUDA_LDG"] = 680,
+	["Decoration.experimentalModule"] = 681,
 }
