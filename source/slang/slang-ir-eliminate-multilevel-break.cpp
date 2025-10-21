@@ -501,7 +501,7 @@ struct EliminateMultiLevelBreakContext
             builder.setInsertInto(newBreakBlock);
             auto targetLevelParam = builder.emitParam(builder.getIntType());
 
-            if (as<IRUnreachable>(breakBlock->getTerminator()))
+            if (as<IRUnreachableBase>(breakBlock->getTerminator()))
             {
                 builder.setInsertInto(newBreakBlock);
                 builder.emitBranch(jumpToOuterBlock);
