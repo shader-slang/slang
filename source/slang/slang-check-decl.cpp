@@ -14126,7 +14126,11 @@ struct CapabilityDeclReferenceVisitor
                     oldCap);
                 handleParentDiagnosticFunc(DiagnosticCategory::Capability);
             }
-            addNewCapTargetSetInTargetSwitch(set, targetCap, stmt->targetCases[targetCaseIndex], isStageSwitch);
+            addNewCapTargetSetInTargetSwitch(
+                set,
+                targetCap,
+                stmt->targetCases[targetCaseIndex],
+                isStageSwitch);
         }
         handleProcessFunc(stmt, set, stmt->loc);
     }
@@ -14137,7 +14141,11 @@ struct CapabilityDeclReferenceVisitor
     }
 
 private:
-    void addNewCapTargetSetInTargetSwitch(CapabilitySet& currentSet, const CapabilitySet& newTargets, const TargetCaseStmt* processingTargetCase, bool isStageSwitch)
+    void addNewCapTargetSetInTargetSwitch(
+        CapabilitySet& currentSet,
+        const CapabilitySet& newTargets,
+        const TargetCaseStmt* processingTargetCase,
+        bool isStageSwitch)
     {
         // traverse all the targets in new target set
         for (auto targetToAdd : newTargets.getCapabilityTargetSets())
@@ -14159,20 +14167,27 @@ private:
                 tmp.unionWith(targetToAdd.second);
                 if (tmp == *currentTarget)
                 {
-                    // if currentTarget U targetToAdd == currentTarget, then targetToAdd is a subset of currentTarget.
-                    // we will need to replace the existing target with the 'targetToAdd'
+                    // if currentTarget U targetToAdd == currentTarget, then targetToAdd is a subset
+                    // of currentTarget. we will need to replace the existing target with the
+                    // 'targetToAdd'
                     currentCapTargetSets.remove(targetName);
                     currentCapTargetSets.add(targetName, targetToAdd.second);
                 }
-                else if (tmp == targetToAdd.second) {}
+                else if (tmp == targetToAdd.second)
+                {
+                }
                 else
                 {
-                    // If we are seeing stage switch, then the conflicting is supposed to happen, because each case is a different stage
-                    // the capability for different stage is supposed to be different, therefore, we will have to look one level deeper
-                    // to check the each stage for this target
+                    // If we are seeing stage switch, then the conflicting is supposed to happen,
+                    // because each case is a different stage the capability for different stage is
+                    // supposed to be different, therefore, we will have to look one level deeper to
+                    // check the each stage for this target
                     if (isStageSwitch)
                     {
-                        addNewCapInStageSwitch(*currentTarget, targetToAdd.second, processingTargetCase);
+                        addNewCapInStageSwitch(
+                            *currentTarget,
+                            targetToAdd.second,
+                            processingTargetCase);
                         continue;
                     }
 
@@ -14190,9 +14205,9 @@ private:
                         DiagnosticCategory::Capability,
                         processingTargetCase->loc,
                         Diagnostics::targetSwitchCapCasesConflict,
-                        CapabilityName(processingTargetCase->capability),   // arg0
-                        conflictCapSet1,                                    // arg1
-                        conflictCapSet2);                                   // arg2
+                        CapabilityName(processingTargetCase->capability), // arg0
+                        conflictCapSet1,                                  // arg1
+                        conflictCapSet2);                                 // arg2
                     handleParentDiagnosticFunc(DiagnosticCategory::Capability);
                 }
             }
@@ -14204,7 +14219,10 @@ private:
         }
     }
 
-    void addNewCapInStageSwitch(CapabilityTargetSet& currentTarget, const CapabilityTargetSet& newTarget, const TargetCaseStmt* processingTargetCase)
+    void addNewCapInStageSwitch(
+        CapabilityTargetSet& currentTarget,
+        const CapabilityTargetSet& newTarget,
+        const TargetCaseStmt* processingTargetCase)
     {
         for (auto stageToAdd : newTarget.getShaderStageSets())
         {
@@ -14221,7 +14239,9 @@ private:
                     currentStages.remove(stageName);
                     currentStages.add(stageName, stageToAdd.second);
                 }
-                else if (tmp.atomSet == stageToAdd.second.atomSet) {}
+                else if (tmp.atomSet == stageToAdd.second.atomSet)
+                {
+                }
                 else
                 {
                     maybeDiagnose(
@@ -14230,9 +14250,9 @@ private:
                         DiagnosticCategory::Capability,
                         processingTargetCase->loc,
                         Diagnostics::targetSwitchCapCasesConflict,
-                        CapabilityName(processingTargetCase->capability),   // arg0
-                        stageToAdd.second.atomSet.value(),                  // arg1
-                        currentStage.atomSet.value());                      // arg2
+                        CapabilityName(processingTargetCase->capability), // arg0
+                        stageToAdd.second.atomSet.value(),                // arg1
+                        currentStage.atomSet.value());                    // arg2
                     handleParentDiagnosticFunc(DiagnosticCategory::Capability);
                 }
             }
