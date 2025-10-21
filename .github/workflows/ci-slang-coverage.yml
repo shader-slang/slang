@@ -203,4 +203,4 @@ jobs:
           name: coverage-lcov-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}
           path: coverage.lcov.gz
           retention-days: 7
-          compression-level: 0  # Already compressed, no need to compress again
+          compression-level: 0 # Already compressed, no need to compress again
