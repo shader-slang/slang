@@ -7,7 +7,7 @@
 #include "slang-compiler.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
-#include "slang-neural-config.h"
+#include "slang-standard-module-config.h"
 #include "slang-options.h"
 #include "slang-parser.h"
 #include "slang-preprocessor.h"
@@ -19,7 +19,7 @@ namespace Slang
 {
 
 // Helper function to find the neural.slang module path
-static String findNeuralModulePath()
+static String getStandardModuleDirPath()
 {
     // Get the path of the currently loaded libslang.so/slang.dll by using a known exported symbol
     String libslangPath =
@@ -32,13 +32,19 @@ static String findNeuralModulePath()
     if (libslangDir.getLength() == 0)
         return String();
 
-    // The neural module is always in the same directory as libslang.so/slang.dll
-    // e.g., bin/slang-neural-module/ on Windows, lib/slang-neural-module/ on Linux/Mac
-    String neuralModuleDir = Path::combine(libslangDir, SLANG_NEURAL_MODULE_DIR_NAME);
-    String neuralModulePath = Path::combine(neuralModuleDir, SLANG_NEURAL_MODULE_FILE_NAME);
+    // TODO: Change this to SLANG_STANDARD_MODULE_DIR_NAME directory if we add more standard modules
+    String stdModuleDirPath = Path::combine(libslangDir, SLANG_STANDARD_MODULE_DIR_NAME);
+    return stdModuleDirPath;
+}
 
-    if (File::exists(neuralModulePath))
-        return neuralModulePath;
+static String findStandardModulePath(String const& stdModuleDirPath, String const& moduleName)
+{
+    // The neural module is always in the same directory as libslang.so/slang.dll
+    // e.g., bin/slang-standard-module/ on Windows, lib/slang-standard-module/ on Linux/Mac
+    String stdModulePath = Path::combine(stdModuleDirPath, moduleName + ".slang-module");
+
+    if (File::exists(stdModulePath))
+        return stdModulePath;
 
     return String();
 }
@@ -1619,21 +1625,21 @@ RefPtr<Module> Linkage::findOrImportModule(
         }
     }
 
-    // Fallback: If the normal search failed and this is the neural module,
-    // try to load the builtin neural module if the experimental feature is enabled.
-    if (moduleName == getSessionImpl()->neuralModuleName &&
-        m_optionSet.getBoolOption(CompilerOptionName::ExperimentalFeature))
+    // Fallback: If the normal search failed, we will just search the whatever modules
+    // from our standard module search path
+    auto standardModuleDirPath = getStandardModuleDirPath();
+    if (standardModuleDirPath.getLength() > 0)
     {
-        String neuralModulePath = findNeuralModulePath();
-        if (neuralModulePath.getLength() > 0)
+        String standardModulePath = findStandardModulePath(standardModuleDirPath, moduleName->text);
+        if (standardModulePath.getLength() > 0)
         {
-            // Found neural module, load it directly
+            // Found standard module, load it directly
             ComPtr<ISlangBlob> fileContents;
             SlangResult result =
-                getFileSystemExt()->loadFile(neuralModulePath.getBuffer(), fileContents.writeRef());
+                getFileSystemExt()->loadFile(standardModulePath.getBuffer(), fileContents.writeRef());
             if (SLANG_SUCCEEDED(result))
             {
-                auto pathInfo = PathInfo::makeFromString(neuralModulePath);
+                auto pathInfo = PathInfo::makeFromString(standardModulePath);
                 RefPtr<Module> module = loadModuleImpl(
                     moduleName,
                     pathInfo,
@@ -1643,7 +1649,20 @@ RefPtr<Module> Linkage::findOrImportModule(
                     nullptr,
                     ModuleBlobType::IR);
                 if (module)
+                {
+                    if (auto irModule = module->getIRModule())
+                    {
+                        if (irModule->getModuleInst()->findDecoration<IRExperimentalModuleDecoration>()&&
+                            !m_optionSet.getBoolOption(CompilerOptionName::ExperimentalFeature))
+                        {
+                            sink->diagnose(
+                                requestingLoc,
+                                Diagnostics::needToEnableExperimentFeature,
+                                moduleName);
+                        }
+                    }
                     return module;
+                }
             }
         }
     }

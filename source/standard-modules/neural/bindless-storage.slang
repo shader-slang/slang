@@ -28,7 +28,7 @@ public struct BindlessBufferStorage<T> : IStorage<T>
 
         public __init(RWStructuredBuffer<T>.Handle handle, uint baseIndex = 0U)
         {
-            this.m_handle = handle;
+            this.m_handle = RWStructuredBuffer<T>.Handle(handle);
             this.m_baseIndex = baseIndex;
         }
 
@@ -58,9 +58,9 @@ public struct BindlessBufferStorage<T> : IStorage<T>
     public typealias Differential = BindlessBufferStorage<T.Differential>;
 
     // Following method will not be needed for bindless storage
-    public T read(Address address) {static_assert(false, "Not implemented"); return {}; }
-    public void atomicAdd(Address address, T value) {static_assert(false, "Not implemented");}
-    public void write(Address address, T value) {static_assert(false, "Not implemented");}
+    public T read(Address address) {return address[0];}
+    public void atomicAdd(Address address, T value) {}
+    public void write(Address address, T value) {address[0] = value;}
     public static Address getOffset(Address base, int elements) { return Address(base.m_handle, base.m_baseIndex + elements); }
 }
 
@@ -99,6 +99,7 @@ public struct PointerStorage<T> : IStorage<T>
         }
 
         [require(cuda_glsl_hlsl_metal_spirv, sm_6_6)]
+        [require(spvBindlessTextureNV)]
         public void atomicAdd(uint index, T value)
         {
             __atomic_add(m_ptr[m_baseIndex + index], value);
@@ -109,8 +110,8 @@ public struct PointerStorage<T> : IStorage<T>
     public typealias Differential = PointerStorage<T.Differential>;
 
     // Following method will not be needed for pointer storage
-    public T read(Address address) {static_assert(false, "Not implemented"); return {}; }
-    public void atomicAdd(Address address, T value) {static_assert(false, "Not implemented");}
-    public void write(Address address, T value) {static_assert(false, "Not implemented");}
+    public T read(Address address) {return address[0];}
+    public void atomicAdd(Address address, T value) {}
+    public void write(Address address, T value) {address[0] = value;}
     public static Address getOffset(Address base, int elements) {return Address(base.m_ptr, base.m_baseIndex + elements * sizeof(T));}
 }
