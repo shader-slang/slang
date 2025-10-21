@@ -1253,6 +1253,10 @@ Compound Capabilities
 `shadermemorycontrol_compute`
 > (gfx targets) Capabilities required to use memory barriers that only work for raytracing & compute shader stages
 
+`spvBindlessTextureNV2`
+> Collection of capabilities for SPV_NV_bindless_texture + raytracing. This alias exists because in `defaultGetDescriptorFromHandle`, we need a
+> capability that is a sub-set of the capability in spirv case, where it also requires raytracing capability.
+
 `structuredbuffer`
 > Capabilities required to use StructuredBuffer
 
@@ -1443,5 +1447,3 @@ Other
 
 `optix_coopvec`
 > Represents capabilities required for optix cooperative vector support.
-
-`spvBindlessTextureNV_rayTracing`
