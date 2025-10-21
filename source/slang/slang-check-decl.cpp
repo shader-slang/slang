@@ -14153,7 +14153,6 @@ private:
             auto targetName = targetToAdd.first;
             auto& currentCapTargetSets = currentSet.getCapabilityTargetSets();
             // first, we need to find if this target already exists in the current set
-            CapabilityTargetSet currentTarget;
             if (auto* currentTarget = currentCapTargetSets.tryGetValue(targetName))
             {
                 // if the target already exists, we need to check whether this new target is
