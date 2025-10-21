@@ -308,82 +308,6 @@ struct LinkingAndOptimizationOptions
     CLikeSourceEmitter* sourceEmitter = nullptr;
 };
 
-// Check if a type is natively supported by SPIRV OpBitcast instruction
-static bool canSPIRVBitcastType(IRType* type)
-{
-    // If vector, check if element type is numerical and therefor supported by OpBitcast
-    if (auto vectorType = as<IRVectorType>(type))
-        return canSPIRVBitcastType(vectorType->getElementType());
-    // Numerical types (basic type but not bool or void) can be bitcast natively by OpBitcast
-    auto basicType = as<IRBasicType>(type);
-    return basicType && !(as<IRBoolType>(basicType) || as<IRVoidType>(basicType));
-}
-
-// Check if a BitCast instruction requires lowering for the current target.
-// For SPIRV targets, many bitcasts can be handled natively by OpBitcast.
-static bool shouldLowerBitCastForTarget(CodeGenContext* codeGenContext, IRInst* inst)
-{
-    if (!codeGenContext || !inst)
-        return true;
-
-    auto targetRequest = codeGenContext->getTargetReq();
-    if (!targetRequest)
-        return true;
-
-    // Only skip lowering for SPIRV targets
-    auto target = targetRequest->getTarget();
-    if (target != CodeGenTarget::SPIRV && target != CodeGenTarget::SPIRVAssembly)
-        return true;
-
-    auto targetProgram = codeGenContext->getTargetProgram();
-    if (!targetProgram)
-        return true;
-
-    // Only skip lowering for direct SPIRV emission, not SPIRV-via-GLSL
-    if (!targetProgram->shouldEmitSPIRVDirectly())
-        return true;
-
-    auto operand = inst->getOperand(0);
-    if (!operand)
-        return true;
-
-    auto fromType = operand->getDataType();
-    auto toType = inst->getDataType();
-    if (!fromType || !toType)
-        return true;
-
-    // SPIRV OpBitcast requires operand and result to have same bit width
-    IRSizeAndAlignment fromSize, toSize;
-    if (SLANG_FAILED(
-            getNaturalSizeAndAlignment(targetProgram->getOptionSet(), fromType, &fromSize)) ||
-        SLANG_FAILED(getNaturalSizeAndAlignment(targetProgram->getOptionSet(), toType, &toSize)))
-        return true;
-
-    if (fromSize.size != toSize.size)
-        return true;
-
-    // Check if both types can use OpBitcast
-    if (!canSPIRVBitcastType(fromType) || !canSPIRVBitcastType(toType))
-        return true;
-
-    // Per SPIR-V spec: when vector component counts differ,
-    // the larger count must be an integer multiple of the smaller count
-    int fromComponents = getIRVectorElementSize(fromType);
-    int toComponents = getIRVectorElementSize(toType);
-
-    if (fromComponents != toComponents)
-    {
-        int larger = (fromComponents > toComponents) ? fromComponents : toComponents;
-        int smaller = (fromComponents < toComponents) ? fromComponents : toComponents;
-
-        // If not an integer multiple, must lower
-        return (larger % smaller != 0);
-    }
-
-    // Both types support OpBitcast and meet all SPIR-V requirements
-    return false;
-}
-
 // Scan the IR module and determine which lowering/legalization passes are needed based
 // on the instructions we see.
 //
@@ -475,7 +399,7 @@ void calcRequiredLoweringPassSet(
         result.reinterpret = true;
         break;
     case kIROp_BitCast:
-        result.bitcast = shouldLowerBitCastForTarget(codeGenContext, inst);
+        result.bitcast = true;
         break;
     case kIROp_AutoPyBindCudaDecoration:
         result.derivativePyBindWrapper = true;
