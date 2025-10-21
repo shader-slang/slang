@@ -48,9 +48,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: "recursive"
-<<<<<<< HEAD
-          fetch-depth: "2"
-=======
           fetch-depth: "0"
 
       - name: Install Clang 18 and LLVM Tools
@@ -74,7 +71,6 @@ jobs:
           clang++-18 --version
           llvm-profdata --version
           llvm-cov --version
->>>>>>> workflow-test
 
       - name: Setup
         uses: ./.github/actions/common-setup
@@ -152,13 +148,8 @@ jobs:
           export COVERAGE_HTML_DIR="$PWD/coverage-html"
           export COVERAGE_LCOV_FILE="$PWD/coverage.lcov"
 
-<<<<<<< HEAD
-          # Run coverage with test servers
-          ./tools/coverage/run-coverage.sh -use-test-server -server-count ${{ inputs.server-count }}
-=======
           # Run coverage with test servers and expected failure list for no-GPU environment
           ./tools/coverage/run-coverage.sh -use-test-server -server-count ${{ inputs.server-count }} -expected-failure-list tests/expected-failure-no-gpu.txt
->>>>>>> workflow-test
 
       - name: Generate Coverage Summary
         id: coverage-summary
