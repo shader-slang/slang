@@ -1456,14 +1456,14 @@ Result linkAndOptimizeIR(
         break;
     }
 
+    ByteAddressBufferLegalizationOptions byteAddressBufferOptions;
+
     // For all targets, we translate load/store operations
     // of aggregate types from/to byte-address buffers into
     // stores of individual scalar or vector values.
     //
     if (requiredLoweringPassSet.byteAddressBuffer)
     {
-        ByteAddressBufferLegalizationOptions byteAddressBufferOptions;
-
         // Depending on the target, we may decide to do
         // more aggressive translation that reduces the
         // load/store operations down to invididual scalars
@@ -1818,6 +1818,18 @@ Result linkAndOptimizeIR(
         // parameters, we will inline the functions in question to make sure we can produce valid
         // GLSL.
         performGLSLResourceReturnFunctionInlining(targetProgram, irModule);
+
+        if (requiredLoweringPassSet.byteAddressBuffer)
+        {
+            // There are cases where the legalization of ByteAddressBuffer works
+            // only after ByteAddressBuffers as kIROp_Param is inlined as kIROp_GlobalParam.
+            legalizeByteAddressBufferOps(
+            session,
+            targetProgram,
+            irModule,
+            codeGenContext->getSink(),
+            byteAddressBufferOptions);
+        }
     }
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER DCE");
