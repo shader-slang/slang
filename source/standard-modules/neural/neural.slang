@@ -29,7 +29,7 @@ StructuredBufferStorage<float> storage = StructuredBufferStorage<float>(weightsB
 InlineVector<float, 2> output = input.eval<2, false>(storage, 0);
 ```
 */
-
+[ExperimentalModule]
 module neural;
 
 __include "ivector";

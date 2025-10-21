@@ -208,7 +208,7 @@ set(slang_build_args
     $<$<CXX_COMPILER_ID:GNU>:-Wno-error=stringop-overflow>
     INCLUDE_DIRECTORIES_PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR}/slang-version-header
-    ${CMAKE_BINARY_DIR}/source/slang-neural-module/slang-neural-config-header
+    ${CMAKE_BINARY_DIR}/source/standard-modules/slang-standard-module-config-header
     EXPORT_MACRO_PREFIX
     SLANG
     EXPORT_TYPE_AS
@@ -217,7 +217,7 @@ set(slang_build_args
     ${SLANG_RECORD_REPLAY_SYSTEM}
     REQUIRES
     copy_slang_headers
-    generate_neural_config_header
+    generate_standard_module_config_header
 )
 set(slang_link_args
     LINK_WITH_PRIVATE
