@@ -900,15 +900,13 @@ public:
         return elementSizeAlignment;
     }
 
-    // Allocates stack memory for `getStorageType(type, rules)`. Returns a
-    // pointer to the start of that memory.
-    llvm::Value* emitAlloca(IRType* type, IRTypeLayoutRules* rules, size_t count = 1)
+    // Allocates stack memory for given type. Returns a pointer to the start of
+    // that memory.
+    llvm::Value* emitAlloca(IRType* type, IRTypeLayoutRules* rules)
     {
-        auto llvmType = getStorageType(type, rules);
         IRSizeAndAlignment sizeAlign = getSizeAndAlignment(type, rules);
-
         return builder->Insert(new llvm::AllocaInst(
-            llvmType, 0, builder->getInt32(count), llvm::Align(sizeAlign.alignment)
+            byteType, 0, builder->getInt32(sizeAlign.getStride()), llvm::Align(sizeAlign.alignment)
         ));
     }
 
@@ -1023,9 +1021,8 @@ public:
         }
     }
 
-    // Uses `getStorageType(valType, rules)` to compute an offset pointer with
-    // `indexInst` based on `llvmPtr`. This overload allows a dynamic index and
-    // works with vectors and arrays.
+    // Computes an offset with `indexInst` based on `llvmPtr`. This overload
+    // allows a dynamic index and works with vectors and arrays.
     llvm::Value* emitArrayGetElementPtr(
         llvm::Value* llvmPtr,
         llvm::Value* indexInst,
@@ -1039,26 +1036,14 @@ public:
             indexInst);
     }
 
-    // Uses `getStorageType(valType, rules)` to compute an offset pointer with
-    // `indexInst` based on `llvmPtr`. This overload is for structs, where
-    // dynamic indexing is not allowed.
+    // Computes a pointer to a struct field.
     llvm::Value* emitStructGetElementPtr(
         llvm::Value* llvmPtr,
         IRStructField* field,
-        IRStructType* structType,
         IRTypeLayoutRules* rules
     ){
-        llvm::Type* llvmType = getStorageType(structType, rules);
-        // 'index' must be constant for struct types.
-        auto& storageInfo = storageTypeMap.getValue(rules).getValue(structType);
-
-        UInt llvmIndex = storageInfo.llvmFieldIndex[field];
-
-        llvm::Value* indices[2] = {
-            builder->getInt32(0),
-            builder->getInt32(llvmIndex),
-        };
-        return builder->CreateGEP(llvmType, llvmPtr, indices);
+        IRIntegerValue offset = getOffset(field, rules);
+        return builder->CreateGEP(byteType, llvmPtr, builder->getInt32(offset));
     }
 
     // Tries to emit the given constant, in a way which is compatible with
@@ -1319,17 +1304,6 @@ public:
         }
     }
 
-    // Returns the index of the given struct field in the corresponding LLVM
-    // struct. There may be differences due to added padding fields.
-    UInt mapFieldToLLVM(IRStructType* irStruct, IRTypeLayoutRules* rules, IRStructField* field)
-    {
-        // `storageTypeMap` is filled out through getStorageType(), so we
-        // have to call it first even though we don't care about the result
-        // here.
-        getStorageType(irStruct, rules);
-        return storageTypeMap.getValue(rules).getValue(irStruct).llvmFieldIndex[field];
-    }
-
 private:
     // Copies data from a pointer to another, taking layout differences into
     // account.
@@ -1383,8 +1357,8 @@ private:
                     if (as<IRVoidType>(fieldType))
                         continue;
 
-                    auto dstElemPtr = emitStructGetElementPtr(dstPtr, field, structType, dstLayout);
-                    auto srcElemPtr = emitStructGetElementPtr(srcPtr, field, structType, srcLayout);
+                    auto dstElemPtr = emitStructGetElementPtr(dstPtr, field, dstLayout);
+                    auto srcElemPtr = emitStructGetElementPtr(srcPtr, field, srcLayout);
 
                     last = crossLayoutMemCpy(
                         dstElemPtr,
@@ -2487,7 +2461,7 @@ struct LLVMEmitter
                 for (UInt aa = 0; aa < inst->getOperandCount(); ++aa, ++field)
                 {
                     llvm::Value* ptr = types->emitStructGetElementPtr(
-                        llvmInst, *field, type, defaultPointerRules);
+                        llvmInst, *field, defaultPointerRules);
                     auto op = inst->getOperand(aa);
                     types->emitStore(ptr, findValue(op), op->getDataType(), defaultPointerRules);
                 }
@@ -2851,19 +2825,10 @@ struct LLVMEmitter
                 }
 
                 auto rules = getPtrLayoutRules(base);
-
                 auto field = findStructField(baseStructType, key);
-
-                UInt index = types->mapFieldToLLVM(baseStructType, rules, field);
-
-                auto llvmStructType = types->getStorageType(baseStructType, rules);
                 auto llvmBase = findValue(base);
-                llvm::Value* idx[2] = {
-                    llvmBuilder->getInt32(0),
-                    llvmBuilder->getInt32(index)
-                };
 
-                llvmInst = llvmBuilder->CreateGEP(llvmStructType, llvmBase, idx);
+                llvmInst = types->emitStructGetElementPtr(llvmBase, field, rules);
             }
             break;
 
@@ -2886,45 +2851,17 @@ struct LLVMEmitter
                 auto field = findStructField(structType, key);
 
                 llvm::Value* ptr = types->emitStructGetElementPtr(
-                    llvmBase, field, structType, rules);
+                    llvmBase, field, rules);
 
                 llvmInst = types->emitLoad(ptr, field->getFieldType(), rules);
             }
             break;
 
         case kIROp_GetOffsetPtr:
-            {
-                auto gopInst = static_cast<IRGetOffsetPtr*>(inst);
-                auto baseInst = gopInst->getBase();
-                auto offsetInst = gopInst->getOffset();
-
-                if (debugInsts.contains(baseInst))
-                {
-                    debugInsts.add(inst);
-                    return nullptr;
-                }
-
-                IRType* baseType = nullptr;
-                if (auto ptrType = as<IRPtrTypeBase>(baseInst->getDataType()))
-                {
-                    baseType = ptrType->getValueType();
-                }
-                else if (auto ptrType = as<IRPointerLikeType>(baseInst->getDataType()))
-                {
-                    baseType = as<IRType>(ptrType->getOperand(0));
-                }
-
-                llvmInst = llvmBuilder->CreateGEP(
-                    types->getStorageType(baseType, getPtrLayoutRules(baseInst)),
-                    findValue(baseInst), findValue(offsetInst));
-            }
-            break;
-
         case kIROp_GetElementPtr:
             {
-                auto gepInst = static_cast<IRGetElementPtr*>(inst);
-                auto baseInst = gepInst->getBase();
-                auto indexInst = gepInst->getIndex();
+                auto baseInst = inst->getOperand(0);
+                auto indexInst = inst->getOperand(1);
 
                 if (debugInsts.contains(baseInst))
                 {
@@ -3144,11 +3081,8 @@ struct LLVMEmitter
 
                 auto llvmPtr = llvmBuilder->CreateExtractValue(llvmBase, 0);
 
-                llvm::Value* indices[] = {llvmIndex};
-                IRTypeLayoutRules* layout = getBufferLayoutRules(baseType);
-                llvmInst = llvmBuilder->CreateGEP(
-                    types->getStorageType(baseType->getElementType(), layout),
-                    llvmPtr, indices);
+                IRTypeLayoutRules* rules = getBufferLayoutRules(baseType);
+                llvmInst = types->emitArrayGetElementPtr(llvmPtr, llvmIndex, baseType->getElementType(), rules);
             }
             break;
 
@@ -3162,16 +3096,10 @@ struct LLVMEmitter
                 auto baseType = cast<IRHLSLStructuredBufferTypeBase>(base->getDataType());
 
                 auto llvmBasePtr = llvmBuilder->CreateExtractValue(llvmBase, 0);
-                IRTypeLayoutRules* layout = getBufferLayoutRules(baseType);
+                IRTypeLayoutRules* rules = getBufferLayoutRules(baseType);
 
-                llvm::Value* indices[] = {llvmIndex};
-                auto llvmPtr = llvmBuilder->CreateGEP(
-                    types->getStorageType(baseType->getElementType(), layout),
-                    llvmBasePtr, indices);
-                llvmInst = types->emitLoad(
-                    llvmPtr,
-                    inst->getDataType(),
-                    layout);
+                auto llvmPtr = types->emitArrayGetElementPtr(llvmBasePtr, llvmIndex, baseType->getElementType(), rules);
+                llvmInst = types->emitLoad(llvmPtr, inst->getDataType(), rules);
             }
             break;
 
@@ -3185,17 +3113,10 @@ struct LLVMEmitter
                 auto baseType = cast<IRHLSLStructuredBufferTypeBase>(base->getDataType());
 
                 auto llvmBasePtr = llvmBuilder->CreateExtractValue(llvmBase, 0);
-                IRTypeLayoutRules* layout = getBufferLayoutRules(baseType);
+                IRTypeLayoutRules* rules = getBufferLayoutRules(baseType);
 
-                llvm::Value* indices[] = {llvmIndex};
-                auto llvmPtr = llvmBuilder->CreateGEP(
-                    types->getStorageType(baseType->getElementType(), layout),
-                    llvmBasePtr, indices);
-                llvmInst = types->emitStore(
-                    llvmPtr,
-                    findValue(val),
-                    val->getDataType(),
-                    layout);
+                auto llvmPtr = types->emitArrayGetElementPtr(llvmBasePtr, llvmIndex, baseType->getElementType(), rules);
+                llvmInst = types->emitStore(llvmPtr, findValue(val), val->getDataType(), rules);
             }
             break;
 
@@ -3204,12 +3125,12 @@ struct LLVMEmitter
                 auto llvmBase = findValue(inst->getOperand(0));
                 auto llvmIndex = findValue(inst->getOperand(1));
 
-                llvm::Value* indices[] = {llvmIndex};
                 auto llvmBasePtr = llvmBuilder->CreateExtractValue(llvmBase, 0);
                 auto llvmPtr = llvmBuilder->CreateGEP(
                     llvmBuilder->getInt8Ty(),
                     llvmBasePtr,
-                    indices);
+                    llvmIndex);
+
                 llvmInst = types->emitLoad(
                     llvmPtr,
                     inst->getDataType(),
