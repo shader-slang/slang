@@ -159,11 +159,11 @@ inline Type* getType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> declRef)
 
 /// same as getType, but take into account the additional type modifiers from the parameter's
 /// modifier list and return a ModifiedType if such modifiers exist.
-Type* getParamType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> paramDeclRef);
+Type* getParamType(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef);
 
 /// Get the parameter type, wrapped with `Out<>`, `InOut<>` or `Ref<>` if the parameter has
 /// an non-trivial direction.
-Type* getParamTypeWithDirectionWrapper(ASTBuilder* astBuilder, DeclRef<VarDeclBase> paramDeclRef);
+Type* getParamTypeWithModeWrapper(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef);
 
 
 inline SubstExpr<Expr> getInitExpr(ASTBuilder* astBuilder, DeclRef<VarDeclBase> declRef)
@@ -243,7 +243,12 @@ SubstitutionSet makeSubstitutionFromIncompleteSet(
 
 Val::OperandView<Val> findInnerMostGenericArgs(SubstitutionSet subst);
 
-ParamPassingMode getParameterDirection(VarDeclBase* varDecl);
+/// Get the parameter-passing mode that was declared for `paramDecl`,
+/// or that was implied by the declaration context itself.
+///
+/// This mode does not take the type of the parameter into account.
+///
+ParamPassingMode getActualParamPassingMode(ParamDecl* paramDecl);
 
 inline Type* getTagType(ASTBuilder* astBuilder, DeclRef<EnumDecl> declRef)
 {
