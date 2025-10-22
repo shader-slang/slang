@@ -2573,7 +2573,7 @@ static SlangResult stripDbgSpirvFromArtifact(
     return SLANG_OK;
 }
 
-static bool shouldRunPIRVValidation(CodeGenContext* codeGenContext)
+static bool shouldRunSPIRVValidation(CodeGenContext* codeGenContext)
 {
     auto& optionSet = codeGenContext->getTargetProgram()->getOptionSet();
 
@@ -2695,7 +2695,7 @@ static SlangResult createArtifactFromIR(
             }
         }
 
-        if (shouldRunPIRVValidation(codeGenContext))
+        if (shouldRunSPIRVValidation(codeGenContext))
         {
             if (SLANG_FAILED(
                     compiler->validate((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4))))
