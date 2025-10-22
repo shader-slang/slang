@@ -8352,7 +8352,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     if (as<IRSPIRVAsmOperand>(this))
         return false;
 
-    if (as<IRTypeFlowData>(this))
+    if (as<IRSetBase>(this))
         return false;
 
     switch (getOp())
@@ -8558,6 +8558,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_GetValueFromTaggedUnion:
     case kIROp_MakeTaggedUnion:
     case kIROp_GetTagOfElementInSet:
+    case kIROp_UnboundedSet:
         return false;
 
     case kIROp_ForwardDifferentiate:

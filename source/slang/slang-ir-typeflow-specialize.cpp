@@ -498,7 +498,7 @@ struct TypeFlowSpecializationContext
     //
     // From an order-theoretic perspective, 'none' is the bottom of the lattice.
     //
-    IRTypeFlowData* none() { return nullptr; }
+    IRInst* none() { return nullptr; }
 
     IRUntaggedUnionType* makeUntaggedUnionType(IRTypeSet* typeSet)
     {
@@ -1394,7 +1394,7 @@ struct TypeFlowSpecializationContext
         // the information from the stored value.
         //
         // Since the pointer can be an access chain, we have to recursively transfer
-        // the information down to the base. This logic is handled by `maybeUpdatePtr`
+        // the information down to the base. This logic is handled by `maybeUpdateInfoForAddress`
         //
         // If the value has "info", we construct an appropriate PtrType(info) and
         // update the ptr with it.
@@ -1409,7 +1409,7 @@ struct TypeFlowSpecializationContext
                 as<IRPtrTypeBase>(address->getDataType()));
 
             // Propagate the information up the access chain to the base location.
-            maybeUpdatePtr(context, address, ptrInfo, workQueue);
+            maybeUpdateInfoForAddress(context, address, ptrInfo, workQueue);
         }
 
         // The store inst itself doesn't produce anything, so it has no info
@@ -2083,7 +2083,11 @@ struct TypeFlowSpecializationContext
     }
 
     // Updates the information for an address.
-    void maybeUpdatePtr(IRInst* context, IRInst* inst, IRInst* info, WorkQueue& workQueue)
+    void maybeUpdateInfoForAddress(
+        IRInst* context,
+        IRInst* inst,
+        IRInst* info,
+        WorkQueue& workQueue)
     {
         // This method recursively walks up the access chain until it hits a location.
         //
@@ -2123,7 +2127,7 @@ struct TypeFlowSpecializationContext
                     as<IRPtrTypeBase>(getElementPtr->getBase()->getDataType()));
 
                 // Recursively try to update the base pointer.
-                maybeUpdatePtr(context, getElementPtr->getBase(), baseInfo, workQueue);
+                maybeUpdateInfoForAddress(context, getElementPtr->getBase(), baseInfo, workQueue);
             }
         }
         else if (auto fieldAddress = as<IRFieldAddress>(inst))
@@ -2369,38 +2373,6 @@ struct TypeFlowSpecializationContext
                 propagationMap[InstWithContext(context, param)] = none();
             }
         }
-    }
-
-    // Default catch-all analysis method for any unhandled case.
-    IRTypeFlowData* analyzeDefault(IRInst* context, IRInst* inst)
-    {
-        SLANG_UNUSED(context);
-        IRBuilder builder(module);
-
-        // Check if this is a global concrete type, witness table, or function.
-        // If so, it's a concrete element. We'll create a singleton set for it.
-        if (isGlobalInst(inst) &&
-            (!as<IRInterfaceType>(inst) &&
-             (as<IRType>(inst) || as<IRWitnessTable>(inst) || as<IRFunc>(inst))))
-            return builder.getSingletonSet(inst);
-
-        auto instType = inst->getDataType();
-        if (isGlobalInst(inst))
-        {
-            if (as<IRType>(instType) && !(as<IRInterfaceType>(instType)))
-                return none(); // We'll avoid storing propagation info for concrete insts. (can just
-                               // use the inst directly)
-
-            if (as<IRInterfaceType>(instType))
-            {
-                // As a general rule, if none of the non-default cases handled this inst that is
-                // producing an existential type, then we assume that we can't constrain it
-                //
-                return makeUnbounded();
-            }
-        }
-
-        return none(); // Default case, no propagation info
     }
 
     // Specialize the fields of a struct type based on the recorded field info (if we

@@ -2679,62 +2679,59 @@ local insts = {
 		},
 	},
 	{
-		TypeFlowData = {
-			-- A collection of IR instructions used for propagation analysis.
+		SetBase = {
+			-- Base class for all set representation.s
+			--
+			-- Semantically, `SetBase` types model sets of concrete values, and use Slang's de-duplication infrastructure
+			-- to allow set-equality to be the same as inst identity.
+			--
+			-- - Set ops have one or more operands that represent the elements of the set
+			--
+			-- - Set ops must have at least one operand. A zero-operand set is illegal.
+			--   The type-flow pass will represent this case using nullptr, so that uniqueness is preserved.
+			--
+			-- - All operands of a set _must_ be concrete, individual insts 
+			--      - Operands should NOT be an interface or abstract type.
+			--      - Operands should NOT be type parameters or existentail types (i.e. insts that appear in blocks)
+			--      - Operands should NOT be sets (i.e. sets should be flat and never heirarchical)
+			-- 
+			-- - Since sets are hositable, set ops should (consequently) only appear in the global scope.
+			--
+			-- - Set operands must be consistently sorted. i.e. a TypeSet(A, B) and TypeSet(B, A)
+			--   cannot exist at the same time, but either one is okay.
+			--
+			-- - To help with the implementation of sets, the IRBuilder class provides operations such as `getSet`
+			--   that will ensure the above invariants are maintained, and uses a persistent unique ID map to
+			--   ensure stable ordering of set elements.
+			-- 
+			--   Set representations should never be manually constructed to avoid breaking these invariants.
+			-- 
 			hoistable = true,
-			{
-				SetBase = {
-					-- Base class for all collection types.
-					--
-					-- Semantically, collections model sets of concrete values, and use Slang's de-duplication infrastructure
-					-- to allow set-equality to be the same as inst identity.
-					--
-					-- - Set ops have one or more operands that represent the elements of the collection
-					--
-					-- - Set ops must have at least one operand. A zero-operand collection is illegal.
-					--   The type-flow pass will represent this case using nullptr, so that uniqueness is preserved.
-					--
-					-- - All operands of a collection _must_ be concrete, individual insts 
-					--      - Operands should NOT be an interface or abstract type.
-					--      - Operands should NOT be type parameters or existentail types (i.e. insts that appear in blocks)
-					--      - Operands should NOT be collections (i.e. collections should be flat and never heirarchical)
-					-- 
-					-- - Since collections are hositable, collection ops should (consequently) only appear in the global scope.
-					--
-					-- - Set operands must be consistently sorted. i.e. a TypeSet(A, B) and TypeSet(B, A)
-					--   cannot exist at the same time, but either one is okay.
-					--
-					-- - To help with the implementation of collections, the SetBuilder class is provided
-					--   in slang-ir-typeflow-collection.h.
-					--   All collection insts must be built using the SetBuilder, which uses a persistent map on the module
-					--   inst to ensure stable ordering.
-					--
-					{ TypeSet = {} },
-					{ FuncSet = {} },
-					{ WitnessTableSet = {} },
-					{ GenericSet = {} },
-				},
-			},
-			{ UnboundedSet = {
-				--
-				-- A catch-all opcode to represent unbounded collections during
-				-- the type-flow specialization pass.
-				-- 
-				-- This op is usually used to mark insts that can contain a dynamic type
-				-- whose information cannot be gleaned from the type-flow analysis.
-				--
-				-- E.g. COM interface objects, whose implementations can be fully external to
-				-- the linkage
-				-- 
-				-- This op is only used to denote that an inst is unbounded so the specialization
-				-- pass does not attempt to specialize it. It should not appear in the code after
-				-- the specialization pass.
-				--
-				-- TODO: Consider the scenario where we can combine the unbounded case with known cases.
-				--       unbounded collection should probably be an element and not a separate op.
-			} },
+			{ TypeSet = {} },
+			{ FuncSet = {} },
+			{ WitnessTableSet = {} },
+			{ GenericSet = {} },
 		},
 	},
+	{ UnboundedSet = {
+		hoistable = true,
+		--
+		-- A catch-all opcode to represent unbounded collections during
+		-- the type-flow specialization pass.
+		-- 
+		-- This op is usually used to mark insts that can contain a dynamic type
+		-- whose information cannot be gleaned from the type-flow analysis.
+		--
+		-- E.g. COM interface objects, whose implementations can be fully external to
+		-- the linkage
+		-- 
+		-- This op is only used to denote that an inst is unbounded so the specialization
+		-- pass does not attempt to specialize it. It should not appear in the code after
+		-- the specialization pass.
+		--
+		-- TODO: Consider the scenario where we can combine the unbounded case with known cases.
+		--       unbounded collection should probably be an element and not a separate op.
+	} },
 	{ CastInterfaceToTaggedUnionPtr = {
 		-- Cast an interface-typed pointer to a tagged-union pointer with a known set.
 	} }, 

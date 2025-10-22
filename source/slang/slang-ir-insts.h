@@ -2837,13 +2837,7 @@ struct IREmbeddedDownstreamIR : IRInst
 };
 
 FIDDLE()
-struct IRTypeFlowData : IRInst
-{
-    FIDDLE(baseInst())
-};
-
-FIDDLE()
-struct IRSetBase : IRTypeFlowData
+struct IRSetBase : IRInst
 {
     FIDDLE(baseInst())
     UInt getCount() { return getOperandCount(); }
