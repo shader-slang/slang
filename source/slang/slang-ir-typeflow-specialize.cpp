@@ -410,6 +410,61 @@ IRType* fromDirectionAndType(IRBuilder* builder, ParameterDirectionInfo info, IR
     }
 }
 
+bool isConcreteType(IRInst* inst)
+{
+    bool isInstGlobal = isGlobalInst(inst);
+    if (!isInstGlobal)
+        return false;
+
+    switch (inst->getOp())
+    {
+    case kIROp_InterfaceType:
+        return false;
+    case kIROp_WitnessTableType:
+    case kIROp_FuncType:
+        return isInstGlobal;
+    case kIROp_ArrayType:
+        return isConcreteType(cast<IRArrayType>(inst)->getElementType()) &&
+               isGlobalInst(cast<IRArrayType>(inst)->getElementCount());
+    case kIROp_OptionalType:
+        return isConcreteType(cast<IROptionalType>(inst)->getValueType());
+    default:
+        break;
+    }
+
+    if (as<IRPtrTypeBase>(inst))
+    {
+        auto ptrType = as<IRPtrTypeBase>(inst);
+        return isConcreteType(ptrType->getValueType());
+    }
+
+    return true;
+}
+
+IRInst* makeInfoForConcreteType(IRModule* module, IRInst* inst)
+{
+    SLANG_ASSERT(isConcreteType(inst));
+    IRBuilder builder(module);
+    if (auto ptrType = as<IRPtrTypeBase>(inst->getDataType()))
+    {
+        return builder.getPtrTypeWithAddressSpace(
+            builder.getUntaggedUnionType(
+                cast<IRTypeSet>(builder.getSingletonSet(ptrType->getValueType()))),
+            ptrType);
+    }
+
+    if (auto arrayType = as<IRArrayType>(inst->getDataType()))
+    {
+        return builder.getArrayType(
+            builder.getUntaggedUnionType(
+                cast<IRTypeSet>(builder.getSingletonSet(arrayType->getElementType()))),
+            arrayType->getElementCount());
+    }
+
+    return builder.getUntaggedUnionType(
+        cast<IRTypeSet>(builder.getSingletonSet(inst->getDataType())));
+}
+
 // Helper to check if an IRParam is a function parameter (vs. a phi param or generic param)
 bool isFuncParam(IRParam* param)
 {
@@ -526,69 +581,20 @@ struct TypeFlowSpecializationContext
         return none(); // Default info for any inst that we haven't registered.
     }
 
-    bool isConcreteType(IRInst* inst)
-    {
-        if (!isGlobalInst(inst) || as<IRInterfaceType>(inst) ||
-            as<IRWitnessTableType>(inst) && as<IRFuncType>(inst))
-            return false;
-
-        if (as<IRPtrTypeBase>(inst))
-        {
-            auto ptrType = as<IRPtrTypeBase>(inst);
-            return isConcreteType(ptrType->getValueType());
-        }
-
-        if (as<IRArrayType>(inst))
-        {
-            auto arrayType = as<IRArrayType>(inst);
-            return isConcreteType(arrayType->getElementType()) &&
-                   isGlobalInst(arrayType->getElementCount());
-        }
-
-        if (as<IROptionalType>(inst))
-        {
-            auto optionalType = as<IROptionalType>(inst);
-            return isConcreteType(optionalType->getValueType());
-        }
-
-        return true;
-    }
-
     IRInst* tryGetArgInfo(IRInst* context, IRInst* inst)
     {
         if (auto info = tryGetInfo(context, inst))
             return info;
 
-        IRBuilder builder(module);
-        if (auto ptrType = as<IRPtrTypeBase>(inst->getDataType()))
-        {
-            if (isConcreteType(ptrType->getValueType()))
-                return builder.getPtrTypeWithAddressSpace(
-                    builder.getUntaggedUnionType(
-                        cast<IRTypeSet>(builder.getSingletonSet(ptrType->getValueType()))),
-                    ptrType);
-            else
-                return none();
-        }
-
-        if (auto arrayType = as<IRArrayType>(inst->getDataType()))
-        {
-            if (isConcreteType(arrayType))
-            {
-                return builder.getArrayType(
-                    builder.getUntaggedUnionType(
-                        cast<IRTypeSet>(builder.getSingletonSet(arrayType->getElementType()))),
-                    arrayType->getElementCount());
-            }
-            else
-                return none();
-        }
-
         if (isConcreteType(inst->getDataType()))
-            return builder.getUntaggedUnionType(
-                cast<IRTypeSet>(builder.getSingletonSet(inst->getDataType())));
-        else
-            return none();
+        {
+            // If the inst has a concrete type, we can make a default info for it,
+            // considering it as a singleton set. Note that this needs to be
+            // nested into any relevant type structure that we want to propagate through
+            // `makeInfoForConcreteType` handles this logic.
+            //
+            return makeInfoForConcreteType(module, inst->getDataType());
+        }
     }
 
     //
