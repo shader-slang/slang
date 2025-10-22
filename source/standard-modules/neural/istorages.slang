@@ -56,6 +56,9 @@ public interface IStorage<T> : IDifferentiablePtrType
 Interface for pointer-like addressing with direct subscript access.
 Provides array-like access patterns for storage backends that support pointer arithmetic.
 @param T The element type.
+@remarks Type constraints:
+- `T` must conform to `__BuiltinFloatingPointType` (float, double, half, etc.)
+- `T.Differential` must conform to `__BuiltinFloatingPointType` for automatic differentiation
 @see `BindlessBufferStorage.BindlessAddress`
 @category neural
 */
