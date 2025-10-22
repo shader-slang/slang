@@ -7,13 +7,13 @@
 #include "slang-compiler.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
-#include "slang-standard-module-config.h"
 #include "slang-options.h"
 #include "slang-parser.h"
 #include "slang-preprocessor.h"
 #include "slang-serialize-ast.h"
 #include "slang-serialize-container.h"
 #include "slang-serialize-ir.h"
+#include "slang-standard-module-config.h"
 
 namespace Slang
 {
@@ -1635,8 +1635,9 @@ RefPtr<Module> Linkage::findOrImportModule(
         {
             // Found standard module, load it directly
             ComPtr<ISlangBlob> fileContents;
-            SlangResult result =
-                getFileSystemExt()->loadFile(standardModulePath.getBuffer(), fileContents.writeRef());
+            SlangResult result = getFileSystemExt()->loadFile(
+                standardModulePath.getBuffer(),
+                fileContents.writeRef());
             if (SLANG_SUCCEEDED(result))
             {
                 auto pathInfo = PathInfo::makeFromString(standardModulePath);
@@ -1652,7 +1653,8 @@ RefPtr<Module> Linkage::findOrImportModule(
                 {
                     if (auto irModule = module->getIRModule())
                     {
-                        if (irModule->getModuleInst()->findDecoration<IRExperimentalModuleDecoration>()&&
+                        if (irModule->getModuleInst()
+                                ->findDecoration<IRExperimentalModuleDecoration>() &&
                             !m_optionSet.getBoolOption(CompilerOptionName::ExperimentalFeature))
                         {
                             sink->diagnose(
