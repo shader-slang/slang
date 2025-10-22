@@ -191,11 +191,13 @@ if(SLANG_ENABLE_GFX)
         FOLDER gfx
     )
 
-    set_target_properties(gfx PROPERTIES
-        VERSION 0.${SLANG_VERSION_NUMERIC}
-        SOVERSION 0.${SLANG_VERSION_NUMERIC}
-        MACHO_COMPATIBILITY_VERSION 0.0.0
-        MACHO_CURRENT_VERSION ${SLANG_VERSION_NUMERIC}
+    set_target_properties(
+        gfx
+        PROPERTIES
+            VERSION 0.${SLANG_VERSION_NUMERIC}
+            SOVERSION 0.${SLANG_VERSION_NUMERIC}
+            MACHO_COMPATIBILITY_VERSION 0.0.0
+            MACHO_CURRENT_VERSION ${SLANG_VERSION_NUMERIC}
     )
 
     # Since slang-test does not depend on gfx, we just copy the gfx modules to the slangc
