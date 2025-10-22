@@ -94,6 +94,14 @@
         "SLANG_ENABLE_SLANG_RHI": false,
         "SLANG_ENABLE_TESTS": false
       }
+    },
+    {
+      "name": "coverage",
+      "inherits": "default",
+      "description": "Build with code coverage instrumentation",
+      "cacheVariables": {
+        "SLANG_ENABLE_COVERAGE": true
+      }
     }
   ],
   "buildPresets": [
@@ -149,6 +157,11 @@
       "inherits": "release",
       "configurePreset": "slang-llvm",
       "targets": ["slang-llvm"]
+    },
+    {
+      "name": "coverage",
+      "configurePreset": "coverage",
+      "configuration": "RelWithDebInfo"
     }
   ],
   "packagePresets": [
