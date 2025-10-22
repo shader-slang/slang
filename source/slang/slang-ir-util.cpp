@@ -1990,7 +1990,7 @@ List<IRBlock*> collectBlocksInRegion(
                 continue;
             if (!dom->dominates(firstBlock, succ))
                 continue;
-            if (!as<IRUnreachable>(breakBlock->getTerminator()))
+            if (!as<IRUnreachableBase>(breakBlock->getTerminator()))
             {
                 if (dom->dominates(breakBlock, succ))
                     continue;
@@ -2770,6 +2770,7 @@ bool isPointerToImmutableLocation(IRInst* loc)
     switch (loc->getOp())
     {
     case kIROp_GetStructuredBufferPtr:
+    case kIROp_RWStructuredBufferGetElementPtr:
     case kIROp_ImageSubscript:
         return isPointerToImmutableLocation(loc->getOperand(0));
     default:
@@ -2805,6 +2806,8 @@ bool isPointerToImmutableLocation(IRInst* loc)
         case AddressSpace::UniformConstant:
             return true;
         }
+        if (ptrType->getAccessQualifier() == AccessQualifier::Immutable)
+            return true;
     }
     return false;
 }

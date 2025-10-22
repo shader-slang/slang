@@ -1014,6 +1014,10 @@ inline bool isTypeEqualityWitness(Val* witness)
         }
         return true;
     }
+    else if (auto expandWitness = as<ExpandSubtypeWitness>(witness))
+    {
+        return isTypeEqualityWitness(expandWitness->getPatternTypeWitness());
+    }
     return false;
 }
 

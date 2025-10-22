@@ -1,0 +1,29 @@
+name: Coverage (Nightly)
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: "0 2 * * *"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+  pull-requests: write
+
+jobs:
+  coverage:
+    uses: ./.github/workflows/ci-slang-coverage.yml
+    with:
+      os: linux
+      compiler: clang-18
+      platform: x86_64
+      config: relwithdebinfo
+      runs-on: '["ubuntu-22.04"]'
+      build-llvm: true
+      deploy-pages: true
