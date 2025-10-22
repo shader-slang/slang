@@ -1039,9 +1039,10 @@ struct TypeInliningPass : InliningPassBase
                     if (!arg)
                         return true;
 
-                    // If the argument is a direct refernece to a local variable "memory object",
+                    // If the argument is a refernece to a local variable "memory object",
                     // we don't need to inline.
-                    if (as<IRVar>(arg) || as<IRGlobalVar>(arg))
+                    auto rootAddr = getRootAddr(arg);
+                    if (as<IRVar>(rootAddr) || as<IRGlobalVar>(rootAddr))
                         return false;
 
                     // Otherwise, we should inline the function before emitting SPIR-V,
