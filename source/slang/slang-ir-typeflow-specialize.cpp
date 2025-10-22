@@ -131,7 +131,7 @@ bool isNoneCallee(IRInst* callee)
 {
     if (auto lookupWitness = as<IRLookupWitnessMethod>(callee))
     {
-        if (auto table = as<IRWitnessTable>(callee->getOperand(0)))
+        if (auto table = as<IRWitnessTable>(lookupWitness->getWitnessTable()))
         {
             return table->getConcreteType()->getOp() == kIROp_VoidType;
         }
@@ -1774,10 +1774,6 @@ struct TypeFlowSpecializationContext
         // Handle the 'many' or 'one' cases.
         if (as<IRElementOfCollectionType>(operandInfo) || isGlobalInst(operand))
         {
-            // If any of the specialization arguments need a tag (or the generic itself is a tag),
-            // we need the result to also be wrapped in a tag type.
-            bool needsElement = false;
-
             List<IRInst*> specializationArgs;
             for (UInt i = 0; i < inst->getArgCount(); ++i)
             {
@@ -1809,7 +1805,6 @@ struct TypeFlowSpecializationContext
                             elementOfCollectionType->getCollection()->getElement(0));
                     else
                     {
-                        needsElement = true;
                         if (auto typeCollection =
                                 as<IRTypeCollection>(elementOfCollectionType->getCollection()))
                         {
@@ -2794,21 +2789,8 @@ struct TypeFlowSpecializationContext
             return true;
         }
 
-        // If the collection is a type-collection, we'll still do a direct replacement
-        // effectively dropping the tag information
-        //
-        if (auto typeCollection = as<IRTypeCollection>(elementOfCollectionType->getCollection()))
-        {
-            // If this is a type collection, we can replace it with the collection type
-            // We don't currently care about the tag of a type.
-            //
-            inst->replaceUsesWith(typeCollection);
-            inst->removeAndDeallocate();
-            return true;
-        }
-
-        // If we reach here, we have a truly dynamic case. Multiple elements and not a type
-        // collection We need to emit a run-time inst to keep track of the tag.
+        // If we reach here, we have a truly dynamic case. Multiple elements.
+        // We need to emit a run-time inst to keep track of the tag.
         //
         // We use the GetTagForMappedCollection inst to do this, and set its data type to
         // the appropriate tag-type.
@@ -2817,7 +2799,7 @@ struct TypeFlowSpecializationContext
         auto witnessTableInst = inst->getWitnessTable();
         auto witnessTableInfo = witnessTableInst->getDataType();
 
-        if (auto witnessTableOperandTagType = as<IRCollectionTagType>(witnessTableInfo))
+        if (as<IRCollectionTagType>(witnessTableInfo))
         {
             auto thisInstInfo = cast<IRElementOfCollectionType>(tryGetInfo(context, inst));
             if (thisInstInfo->getCollection() != nullptr)
@@ -2846,8 +2828,9 @@ struct TypeFlowSpecializationContext
         // If we have a non-trivial info registered, it must of
         // CollectionTagType(WitnessTableCollection(...))
         //
-        // Futher, the operand must be an existential (CollectionTaggedUnionType), which is
-        // conceptually lowered to a TupleType(TagType(tableCollection), typeCollection)
+        // Further, the operand must be an existential (CollectionTaggedUnionType), which is
+        // conceptually a pair of TagType(tableCollection) and a
+        // ValueOfCollectionType(typeCollection)
         //
         // We will simply extract the first element of this tuple.
         //
@@ -3002,30 +2985,10 @@ struct TypeFlowSpecializationContext
         IRStructKey* key,
         IRFuncCollection* resultFuncCollection)
     {
-        List<IRInst*> specArgs;
-        return getEffectiveFuncTypeForDispatcher(
-            tableCollection,
-            key,
-            resultFuncCollection,
-            specArgs);
-    }
-
-    IRFuncType* getEffectiveFuncTypeForDispatcher(
-        IRWitnessTableCollection* tableCollection,
-        IRStructKey* key,
-        IRFuncCollection* resultFuncCollection,
-        List<IRInst*>& specArgs)
-    {
         SLANG_UNUSED(key);
 
         List<IRType*> extraParamTypes;
         extraParamTypes.add((IRType*)makeTagType(tableCollection));
-
-        /*
-        for (auto specArg : specArgs)
-            if (as<IRWitnessTableCollection>(specArg))
-                extraParamTypes.add((IRType*)makeTagType(as<IRWitnessTableCollection>(specArg)));
-        */
 
         auto innerFuncType = getEffectiveFuncTypeForCollection(resultFuncCollection);
         List<IRType*> allParamTypes;
@@ -3261,11 +3224,6 @@ struct TypeFlowSpecializationContext
 
         auto callee = inst->getCallee();
 
-        // TODO: Can remove this workaround since we're lowering these immediately.
-        if (as<IRGetDispatcher>(callee) ||
-            as<IRGetSpecializedDispatcher>(callee)) // Already specialized
-            return false;
-
         if (isNoneCallee(callee))
             return false;
 
@@ -3329,7 +3287,7 @@ struct TypeFlowSpecializationContext
                     auto lookupKey = cast<IRStructKey>(innerTagMapOperand->getOperand(1));
 
                     List<IRInst*> specArgs;
-                    for (auto argIdx = 1; argIdx < specializedTagMapOperand->getOperandCount();
+                    for (UInt argIdx = 1; argIdx < specializedTagMapOperand->getOperandCount();
                          ++argIdx)
                     {
                         auto arg = specializedTagMapOperand->getOperand(argIdx);
@@ -3359,8 +3317,7 @@ struct TypeFlowSpecializationContext
                         getEffectiveFuncTypeForDispatcher(
                             tableCollection,
                             lookupKey,
-                            cast<IRFuncCollection>(collectionTag->getCollection()),
-                            specArgs),
+                            cast<IRFuncCollection>(collectionTag->getCollection())),
                         tableCollection,
                         lookupKey,
                         specArgs);
@@ -3783,7 +3740,7 @@ struct TypeFlowSpecializationContext
                         List<IRInst*> specOperands;
                         specOperands.add(inst->getBase());
 
-                        for (auto ii = 0; ii < inst->getArgCount(); ii++)
+                        for (UInt ii = 0; ii < inst->getArgCount(); ii++)
                             specOperands.add(inst->getArg(ii));
 
                         auto newInst = builder.emitIntrinsicInst(
@@ -4133,8 +4090,7 @@ struct TypeFlowSpecializationContext
     bool specializeGetOptionalValue(IRInst* context, IRGetOptionalValue* inst)
     {
         SLANG_UNUSED(context);
-        if (auto taggedUnionType =
-                as<IRCollectionTaggedUnionType>(inst->getOptionalOperand()->getDataType()))
+        if (as<IRCollectionTaggedUnionType>(inst->getOptionalOperand()->getDataType()))
         {
             // Since `GetOptionalValue` is the reverse of `MakeOptionalValue`, and we treat
             // the latter as a no-op, then `GetOptionalValue` is also a no-op (we simply pass
