@@ -495,6 +495,70 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
     }
 };
 
+// The LLVM layout is similar to the CPU layout, except vectors are aligned to the
+// next power of two.
+//
+// TODO: The current implementation should be reasonably performant and reliable
+// on common targets. However, the layout rules should follow LLVM's DataLayout
+// for the given target triple. To know this triple, it either needs to be
+// passed as a parameter to all member functions or the struct needs to have a
+// constructor and be constructed dynamically.
+//
+// All of that implies a larger refactor touching lots of code around the
+// codebase.
+struct LLVMLayoutRulesImpl : DefaultLayoutRulesImpl
+{
+    typedef DefaultLayoutRulesImpl Super;
+
+    SimpleLayoutInfo GetScalarLayout(BaseType baseType) override
+    {
+        switch (baseType)
+        {
+        case BaseType::Bool:
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 1, 1);
+        case BaseType::IntPtr:
+        case BaseType::UIntPtr:
+            // TODO: Hardcoded size and alignment for 64 bit pointers. This is
+            // excessive if the target is 32-bit, but should work everywhere in
+            // practice. There will simply be unused bytes.
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
+
+        // This always returns a layout where the size is the same as the alignment.
+        default:
+            return Super::GetScalarLayout(baseType);
+        }
+    }
+
+    SimpleLayoutInfo GetPointerLayout() override
+    {
+        // TODO: Hardcoded size and alignment for 64 bit pointers. Leads to
+        // wasted bytes on 32-bit targets.
+        return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
+    }
+
+    SimpleLayoutInfo GetVectorLayout(
+        BaseType elementType,
+        SimpleLayoutInfo elementInfo,
+        size_t elementCount) override
+    {
+        SLANG_UNUSED(elementType);
+        SimpleLayoutInfo vectorInfo;
+        vectorInfo.kind = elementInfo.kind;
+        vectorInfo.size = elementInfo.size * elementCount;
+        // Align vector to next power of two.
+        vectorInfo.alignment = Slang::_roundUpToPowerOfTwo(vectorInfo.size.getFiniteValue());
+        return vectorInfo;
+    }
+
+    UniformLayoutInfo BeginStructLayout() override { return Super::BeginStructLayout(); }
+
+    void EndStructLayout(UniformLayoutInfo* ioStructInfo) override
+    {
+        // Insert tailing padding.
+        ioStructInfo->size = _roundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
+    }
+};
+
 // The CUDA compiler NVRTC only works on 64 bit operating systems.
 // So instead of using native host type sizes we use these types instead
 //
@@ -1634,9 +1698,11 @@ LayoutRulesImpl kHLSLHitAttributesParameterLayoutRulesImpl_ = {
 
 // LLVM cases
 
+static LLVMLayoutRulesImpl kLLVMLayoutRulesImpl;
+
 LayoutRulesImpl kLLVMLayoutRulesImpl_ = {
     &kLLVMLayoutRulesFamilyImpl,
-    &kCPULayoutRulesImpl,
+    &kLLVMLayoutRulesImpl,
     &kCPUObjectLayoutRulesImpl,
 };
 
@@ -1979,6 +2045,9 @@ LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getConstantBufferRules(CompilerOptio
     // be: the LLVM target needs to collect its uniforms into one top-level
     // ConstantBuffer, which in turn enforces that all uniforms must use the
     // same layout :/
+    //
+    // The top-level ConstantBuffer uses the C layout for compatibility with the
+    // C++ target, so uniforms within it cannot be Std140.
     return &kLLVMCLayoutRulesImpl_;
 }
 
