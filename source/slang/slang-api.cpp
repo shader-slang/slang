@@ -90,11 +90,32 @@ SlangResult tryLoadBuiltinModuleFromDLL(
     SLANG_RETURN_ON_FAIL(Slang::SharedLibrary::load(moduleFileName.getBuffer(), libHandle));
     if (!libHandle)
         return SLANG_FAIL;
-    void* ptr = Slang::SharedLibrary::findSymbolAddressByName(libHandle, "slang_getEmbeddedModule");
-    if (!ptr)
+
+    // Check if the module is the same version as the slang dll.
+    void* emBuildTagPtr = Slang::SharedLibrary::findSymbolAddressByName(libHandle, "slang_getEmbeddedModuleBuildTagString");
+    if (!emBuildTagPtr)
+    {
+        Slang::SharedLibrary::unload(libHandle);
         return SLANG_FAIL;
+    }
+    typedef const char*(GetEmbeddedModuleBuildTagStringFunc)();
+    auto getEmbeddedModuleBuildTagString = (GetEmbeddedModuleBuildTagStringFunc*)emBuildTagPtr;
+    const char* buildTagString = getEmbeddedModuleBuildTagString();
+    if (strcmp(buildTagString, SLANG_TAG_VERSION) != 0)
+    {
+        Slang::SharedLibrary::unload(libHandle);
+        return SLANG_FAIL;
+    }
+
+    // Load the embedded module.
+    void* emPtr = Slang::SharedLibrary::findSymbolAddressByName(libHandle, "slang_getEmbeddedModule");
+    if (!emPtr)
+    {
+        Slang::SharedLibrary::unload(libHandle);
+        return SLANG_FAIL;
+    }
     typedef ISlangBlob*(GetEmbeddedModuleFunc)();
-    auto getEmbeddedModule = (GetEmbeddedModuleFunc*)ptr;
+    auto getEmbeddedModule = (GetEmbeddedModuleFunc*)emPtr;
     auto blob = getEmbeddedModule();
     SLANG_RETURN_ON_FAIL(globalSession->loadBuiltinModule(
         builtinModuleName,

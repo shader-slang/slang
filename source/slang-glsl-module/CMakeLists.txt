@@ -23,7 +23,9 @@ slang_add_target(
     EXCLUDE_FROM_ALL
     EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
     EXPORT_SET_NAME SlangTargets
-    INCLUDE_DIRECTORIES_PRIVATE ${glsl_module_generated_header_dir}
+    INCLUDE_DIRECTORIES_PRIVATE
+        ${glsl_module_generated_header_dir}
+        ${CMAKE_CURRENT_BINARY_DIR}/../slang/slang-version-header
     INSTALL
 )
 set_target_properties(
