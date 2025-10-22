@@ -1655,6 +1655,36 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
             typeAdapter->pretendType = fullPretendType;
             typeAdapter->val = val;
 
+            // If the variable is a system value, and the required (system-provided) array size
+            // is smaller than the user-declared array size, we need to issue an error, since
+            // we don't have a way to fill in the additional elements.
+            //
+            if (auto requiredArrayType = as<IRArrayTypeBase>(requiredType))
+            {
+                // Find first array declarator and handle size mismatch
+                for (auto dd = declarator; dd; dd = dd->next)
+                {
+                    if (dd->flavor != GlobalVaryingDeclarator::Flavor::array)
+                        continue;
+
+                    // Compare the array size
+                    auto declaredArraySize = dd->elementCount;
+                    auto requiredArraySize = requiredArrayType->getElementCount();
+                    if (declaredArraySize == requiredArraySize)
+                        break;
+
+                    auto toSize = getIntVal(requiredArraySize);
+                    auto fromSize = getIntVal(declaredArraySize);
+                    if (toSize < fromSize)
+                    {
+                        context->getSink()->diagnose(
+                            inVarLayout,
+                            Diagnostics::cannotConvertArrayOfSmallerToLargerSize,
+                            fromSize,
+                            toSize);
+                    }
+                }
+            }
             val = ScalarizedVal::typeAdapter(typeAdapter);
         }
     }
@@ -2235,12 +2265,6 @@ void assign(
                     builder->emitStore(address, right.irValue);
                     break;
                 }
-            case ScalarizedVal::Flavor::address:
-                {
-                    auto val = builder->emitLoad(right.irValue);
-                    builder->emitStore(left.irValue, val);
-                    break;
-                }
             case ScalarizedVal::Flavor::tuple:
                 {
                     // We are assigning from a tuple to a destination
@@ -2259,7 +2283,10 @@ void assign(
                 }
 
             default:
-                SLANG_UNEXPECTED("unimplemented");
+                {
+                    auto materializedVal = materializeValue(builder, right);
+                    assign(builder, left, ScalarizedVal::value(materializedVal), index);
+                }
                 break;
             }
             break;
@@ -2350,14 +2377,19 @@ ScalarizedVal getSubscriptVal(
     case ScalarizedVal::Flavor::typeAdapter:
         {
             auto inputAdapter = val.impl.as<ScalarizedTypeAdapterValImpl>();
-            RefPtr<ScalarizedTypeAdapterValImpl> resultAdapter = new ScalarizedTypeAdapterValImpl();
-
-            resultAdapter->pretendType = elementType;
-            resultAdapter->actualType = getElementType(*builder, inputAdapter->actualType);
-
-            resultAdapter->val =
-                getSubscriptVal(builder, resultAdapter->actualType, inputAdapter->val, indexVal);
-            return ScalarizedVal::typeAdapter(resultAdapter);
+            auto pretendType = elementType;
+            auto actualType = getElementType(*builder, inputAdapter->actualType);
+            auto subscriptVal = getSubscriptVal(builder, actualType, inputAdapter->val, indexVal);
+            if (pretendType != actualType)
+            {
+                RefPtr<ScalarizedTypeAdapterValImpl> resultAdapter =
+                    new ScalarizedTypeAdapterValImpl();
+                resultAdapter->pretendType = pretendType;
+                resultAdapter->actualType = actualType;
+                resultAdapter->val = subscriptVal;
+                subscriptVal = ScalarizedVal::typeAdapter(resultAdapter);
+            }
+            return subscriptVal;
         }
 
     default:
@@ -3210,12 +3242,15 @@ void tryReplaceUsesOfStageInput(
                                 (IRType*)actualElementType,
                                 typeAdapter->val,
                                 user->getOperand(1));
-                            auto elementTypeAdaptor = adaptType(
-                                &builder,
-                                subscriptVal,
-                                pretendElementType,
-                                actualElementType);
-                            tryReplaceUsesOfStageInput(context, elementTypeAdaptor, user);
+                            if (actualElementType != pretendElementType)
+                            {
+                                subscriptVal = adaptType(
+                                    &builder,
+                                    subscriptVal,
+                                    pretendElementType,
+                                    actualElementType);
+                            }
+                            tryReplaceUsesOfStageInput(context, subscriptVal, user);
                         }
                         break;
                     case kIROp_FieldAddress:
@@ -3226,14 +3261,17 @@ void tryReplaceUsesOfStageInput(
                             auto actualFieldType =
                                 getFieldType(builder, typeAdapter->actualType, key);
                             SLANG_ASSERT(pretendFieldType && actualFieldType);
-                            auto subscriptVal =
+                            auto newFieldVal =
                                 extractField(&builder, typeAdapter->val, kMaxUInt, key);
-                            auto fieldTypeAdaptor = adaptType(
-                                &builder,
-                                subscriptVal,
-                                pretendFieldType,
-                                actualFieldType);
-                            tryReplaceUsesOfStageInput(context, fieldTypeAdaptor, user);
+                            if (pretendFieldType != actualFieldType)
+                            {
+                                newFieldVal = adaptType(
+                                    &builder,
+                                    newFieldVal,
+                                    pretendFieldType,
+                                    actualFieldType);
+                            }
+                            tryReplaceUsesOfStageInput(context, newFieldVal, user);
                         }
                         break;
                     default:
