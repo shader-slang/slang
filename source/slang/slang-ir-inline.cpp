@@ -1052,6 +1052,12 @@ struct TypeInliningPass : InliningPassBase
                     // 2) SPIRV does not allow passing a pointer-typed argument that isn't a direct
                     // reference to a variable "memory object". For example, you cannot pass the
                     // result of an access chain to a pointer-typed parameter.
+                    //
+                    // Note that despite restriction rule (2) above, we still allow passing
+                    // an access chain to a local variable to a function in the Slang IR, and we
+                    // will introduce an additional copy when we emit SPIR-V. We do this to minimize
+                    // inlining in the Slang IR, and introducing additional copy for things already
+                    // in Function address space is generally less harmful.
                     return true;
                 }
                 return false;
