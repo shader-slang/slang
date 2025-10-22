@@ -32,23 +32,6 @@ void moveValueBefore(IRInst* valueToMove, IRInst* placeBefore)
     valueToMove->insertBefore(placeBefore);
 }
 
-IRType* getFieldType(IRType* baseType, IRStructKey* fieldKey)
-{
-    if (auto structType = as<IRStructType>(baseType))
-    {
-        for (auto ff : structType->getFields())
-        {
-            if (ff->getKey() == fieldKey)
-                return ff->getFieldType();
-        }
-        SLANG_UNEXPECTED("no such field");
-        UNREACHABLE_RETURN(nullptr);
-    }
-    SLANG_UNEXPECTED("not a struct");
-    UNREACHABLE_RETURN(nullptr);
-}
-
-
 // When scalarizing shader inputs/outputs for GLSL, we need a way
 // to refer to a conceptual "value" that might comprise multiple
 // IR-level values. We could in principle introduce tuple types
@@ -3256,10 +3239,8 @@ void tryReplaceUsesOfStageInput(
                     case kIROp_FieldAddress:
                         {
                             auto key = (IRStructKey*)user->getOperand(1);
-                            auto pretendFieldType =
-                                getFieldType(builder, typeAdapter->pretendType, key);
-                            auto actualFieldType =
-                                getFieldType(builder, typeAdapter->actualType, key);
+                            auto pretendFieldType = getFieldType(typeAdapter->pretendType, key);
+                            auto actualFieldType = getFieldType(typeAdapter->actualType, key);
                             SLANG_ASSERT(pretendFieldType && actualFieldType);
                             auto newFieldVal =
                                 extractField(&builder, typeAdapter->val, kMaxUInt, key);

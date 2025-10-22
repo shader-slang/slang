@@ -2390,7 +2390,7 @@ IRType* getElementType(IRBuilder& builder, IRType* valueType)
     return nullptr;
 }
 
-IRType* getFieldType(IRBuilder& builder, IRType* valueType, IRStructKey* key)
+IRType* getFieldType(IRType* valueType, IRStructKey* key)
 {
     valueType = (IRType*)unwrapAttributedType(valueType);
     if (auto structType = as<IRStructType>(valueType))

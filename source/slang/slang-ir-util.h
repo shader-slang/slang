@@ -392,7 +392,7 @@ IRType* getIRVectorBaseType(IRType* type);
 IRType* getElementType(IRBuilder& builder, IRType* type);
 
 // Find the struct field with `key` and return its type. Return nullptr if not found.
-IRType* getFieldType(IRBuilder& builder, IRType* type, IRStructKey* key);
+IRType* getFieldType(IRType* type, IRStructKey* key);
 
 Int getSpecializationConstantId(IRGlobalParam* param);
 
