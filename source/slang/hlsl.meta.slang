@@ -23233,7 +23233,7 @@ ${{{{
         __target_switch
         {
             case spvRayTracingKHR:
-            case _GL_EXT_ray_tracing:
+            case glsl:
                 return __slang_noop_cast<T>(RaytracingAccelerationStructure(__asuint64((uint2)handleValue)));
             case spirv:
                 static_assert(false, "Please request spvRayTracingKHR or _GL_EXT_ray_tracing for the support the bindless RaytracingAccelerationStructure");
