@@ -170,7 +170,7 @@ static llvm::StringRef getStringLitAsLLVMString(IRInst* inst)
     return llvm::StringRef(source.begin(), source.getLength());
 }
 
-static bool isVolatile(IRInst* value)
+static bool isPtrVolatile(IRInst* value)
 {
     if (auto memoryQualifier = value->findDecoration<IRMemoryQualifierSetDecoration>())
     {
@@ -182,6 +182,9 @@ static bool isVolatile(IRInst* value)
     return false;
 }
 
+// Tries to determine a debug location for a given inst. E.g. if given a struct,
+// it'll first try to check if it has explicit debug location information, and
+// if not, it'll give the module's beginning at least.
 static void findDebugLocation(
     llvm::DICompileUnit* compileUnit,
     const Dictionary<IRInst*, llvm::DIFile*>& sourceDebugInfo,
@@ -199,7 +202,6 @@ static void findDebugLocation(
     else if (auto debugLocation = inst->findDecoration<IRDebugLocationDecoration>())
     {
         file = sourceDebugInfo.getValue(debugLocation->getSource());
-        // TODO: More detailed scope info.
         scope = file;
         line = getIntVal(debugLocation->getLine());
     }
@@ -216,47 +218,21 @@ static llvm::Instruction::CastOps getLLVMIntExtensionOp(IRType* type)
     case kIROp_UInt64Type:
     case kIROp_UIntPtrType:
     case kIROp_PtrType:
+        // Zero-extend unsigned types
         return llvm::Instruction::CastOps::ZExt;
     default:
+        // Sign-extend the rest
         return llvm::Instruction::CastOps::SExt;
     }
 }
 
-static UInt parseNumber(const char*& cursor, const char* end)
-{
-    char d = *cursor;
-    SLANG_RELEASE_ASSERT(CharUtil::isDigit(d));
-    UInt n = 0;
-    while (CharUtil::isDigit(d))
-    {
-        n = n * 10 + (d - '0');
-        cursor++;
-        if (cursor == end)
-            break;
-        d = *cursor;
-    }
-    return n;
-}
-
-// Converting types from Slang IR to LLVM is non-trivial. This is because LLVM
-// doesn't provide good tools for enforcing specific layout rules - the layout
-// is target-specific. And that is for a good reason: performance.
-//
-// The only way to get predictable layouts is to use packed structs and lower
-// vectors as arrays, inserting padding manually as needed.
-//
-// Another complication is that creating values of aggregate types in LLVM is 
-// not recommended:
-// https://llvm.org/docs/Frontend/PerformanceTips.html#avoid-creating-values-of-aggregate-type
-// Instead, they must be created with alloca and passed around as pointers in
-// the IR. However, we still need to be able to create value instances of
-// aggregate types to encode constant structs in the global scope!
-//
-// This class can translate Slang IR types to LLVM in three different contexts:
+// This class helps with converting types from Slang IR to LLVM IR. There are
+// several different kinds of contexts for the translation:
 //
 // * Value
 // * Storage (with trailing padding)
 // * Storage (without trailing padding)
+// * Debug
 //
 // _Value_ types are not observable through memory, and they essentially map to
 // "registers" (SSA values). Hence, they can always use the fastest
@@ -273,7 +249,11 @@ static UInt parseNumber(const char*& cursor, const char* end)
 // copying a 'alloca' struct into a StructuredBuffer with a different layout
 // than what is used for general pointers.
 //
-// This class implements caching for types and instructions.
+// One interesting detail here is that value types for aggregates shouldn't be 
+// used: https://llvm.org/docs/Frontend/PerformanceTips.html#avoid-creating-values-of-aggregate-type
+// Instead, they must be created with alloca and passed around as pointers in
+// the IR. However, we still need to be able to create value instances of
+// aggregate types to encode constant structs in the global scope!
 class LLVMTypeTranslator
 {
 private:
@@ -2518,7 +2498,7 @@ struct LLVMEmitter
                     findValue(val),
                     val->getDataType(),
                     getPtrLayoutRules(ptr),
-                    isVolatile(ptr)
+                    isPtrVolatile(ptr)
                 );
             }
             break;
@@ -2532,7 +2512,7 @@ struct LLVMEmitter
                     findValue(ptr),
                     loadInst->getDataType(),
                     getPtrLayoutRules(ptr),
-                    isVolatile(ptr)
+                    isPtrVolatile(ptr)
                 );
             }
             break;
@@ -3805,6 +3785,22 @@ struct LLVMEmitter
 
         expanded << "\nentry:\n";
 
+        auto parseNumber = [&]()
+        {
+            char d = *cursor;
+            SLANG_RELEASE_ASSERT(CharUtil::isDigit(d));
+            UInt n = 0;
+            while (CharUtil::isDigit(d))
+            {
+                n = n * 10 + (d - '0');
+                cursor++;
+                if (cursor == end)
+                    break;
+                d = *cursor;
+            }
+            return n;
+        };
+
         while (cursor < end)
         {
             // Indicates the start of a 'special' sequence
@@ -3828,7 +3824,7 @@ struct LLVMEmitter
                         }
                         else
                         {
-                            UInt argIndex = parseNumber(cursor, end);
+                            UInt argIndex = parseNumber();
                             SLANG_RELEASE_ASSERT(argIndex < parentFunc->getParamCount());
                             type = parentFunc->getParamType(argIndex);
                         }
@@ -3854,7 +3850,7 @@ struct LLVMEmitter
                     {
                         if (d != '_')
                             --cursor;
-                        UInt argIndex = parseNumber(cursor, end);
+                        UInt argIndex = parseNumber();
                         SLANG_RELEASE_ASSERT(argIndex < parentFunc->getParamCount());
                         IRParam* param = nullptr;
 
@@ -3880,7 +3876,7 @@ struct LLVMEmitter
                             storage = true;
                             cursor++;
                         }
-                        UInt argIndex = parseNumber(cursor, end)+1;
+                        UInt argIndex = parseNumber()+1;
 
                         SLANG_RELEASE_ASSERT(argIndex < intrinsicInst->getOperandCount());
 
