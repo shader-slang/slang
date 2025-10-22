@@ -145,7 +145,12 @@ void TestReporter::endTest()
 
     m_currentInfo.message = m_currentMessage;
 
-    _addResult(m_currentInfo);
+    // Only add the result if addResult() was explicitly called at least once.
+    // This prevents tests that are deferred for retry from being counted as "ignored".
+    if (m_numCurrentResults > 0)
+    {
+        _addResult(m_currentInfo);
+    }
 
     m_inTest = false;
 }
