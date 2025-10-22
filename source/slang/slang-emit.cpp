@@ -2923,23 +2923,17 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
     case CodeGenTarget::LLVMHostObjectCode:
     case CodeGenTarget::LLVMShaderObjectCode:
         {
-            List<uint8_t> object;
-            emitLLVMObjectFromIR(codeGenContext, irModule, object);
-            blob = RawBlob::create(object.getBuffer(), object.getCount());
-            auto artifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(codeGenContext->getTargetFormat()));
-            artifact->addRepresentationUnknown(blob);
-            outArtifact.swap(artifact);
+            IArtifact* artifact = nullptr;
+            emitLLVMObjectFromIR(codeGenContext, irModule, &artifact);
+            outArtifact = ComPtr<IArtifact>(artifact);
         }
         break;
     case CodeGenTarget::LLVMHostAssembly:
     case CodeGenTarget::LLVMShaderAssembly:
         {
-            String irString;
-            emitLLVMAssemblyFromIR(codeGenContext, irModule, irString);
-            blob = StringBlob::create(irString);
-            auto artifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(codeGenContext->getTargetFormat()));
-            artifact->addRepresentationUnknown(blob);
-            outArtifact.swap(artifact);
+            IArtifact* artifact = nullptr;
+            emitLLVMAssemblyFromIR(codeGenContext, irModule, &artifact);
+            outArtifact = ComPtr<IArtifact>(artifact);
         }
         break;
     case CodeGenTarget::LLVMHostHostCallable:

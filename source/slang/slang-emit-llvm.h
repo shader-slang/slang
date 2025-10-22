@@ -8,15 +8,17 @@
 namespace Slang
 {
 
+// Generates a string blob for the given target triple
 SlangResult emitLLVMAssemblyFromIR(
     CodeGenContext* codeGenContext,
     IRModule* irModule,
-    String& assemblyOut);
+    IArtifact** outArtifact);
 
+// Generates an object code blob for the given target triple
 SlangResult emitLLVMObjectFromIR(
     CodeGenContext* codeGenContext,
     IRModule* irModule,
-    List<uint8_t>& objectOut);
+    IArtifact** outArtifact);
 
 // Generates an ISlangSharedLibrary or an error.
 SlangResult emitLLVMJITFromIR(
