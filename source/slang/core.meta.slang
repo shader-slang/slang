@@ -3262,7 +3262,8 @@ int __alignOf()
     case cuda :
     case cpp :
         __intrinsic_asm "alignof($[0])", T;
-    case llvm: __intrinsic_asm "%size = getelementptr {i8, $[S0]}, ptr null, i32 0, i32 1\n%result = ptrtoint ptr %size to i32", T;
+    case llvm:
+        return __sizeOf<Tuple<int8_t, T> >() - __sizeOf<T>();
     }
 }
 
@@ -3275,7 +3276,8 @@ int __alignOf(T v)
     {
     case cpp: __intrinsic_asm "alignof($T0)";
     case cuda: __intrinsic_asm "alignof($T0)";
-    case llvm: __intrinsic_asm "%size = getelementptr {i8, $S0}, ptr null, i32 0, i32 1\n%result = ptrtoint ptr %size to i32";
+    case llvm:
+        return __sizeOf<Tuple<int8_t, T> >() - __sizeOf<T>();
     }
 }
 
