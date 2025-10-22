@@ -2483,6 +2483,16 @@ IRVoidLit* IRBuilder::getVoidValue()
     return (IRVoidLit*)_findOrEmitConstant(keyInst);
 }
 
+IRVoidLit* IRBuilder::getVoidValue(IRType* type)
+{
+    IRConstant keyInst;
+    memset(&keyInst, 0, sizeof(keyInst));
+    keyInst.m_op = kIROp_VoidLit;
+    keyInst.typeUse.usedValue = type;
+    keyInst.value.intVal = 0;
+    return (IRVoidLit*)_findOrEmitConstant(keyInst);
+}
+
 IRInst* IRBuilder::getCapabilityValue(CapabilitySet const& caps)
 {
     IRType* capabilityAtomType = getIntType();
@@ -6618,6 +6628,8 @@ IROp IRBuilder::getSetTypeForInst(IRInst* inst)
         return kIROp_TypeSet;
     else if (as<IRWitnessTableType>(inst->getDataType()))
         return kIROp_WitnessTableSet;
+    else if (as<IRVoidLit>(inst))
+        return kIROp_TypeSet; // TODO: this feels wrong...
     else
         return kIROp_Invalid; // Return invalid IROp when not supported
 }

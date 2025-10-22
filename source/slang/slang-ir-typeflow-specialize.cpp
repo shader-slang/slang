@@ -410,6 +410,27 @@ IRType* fromDirectionAndType(IRBuilder* builder, ParameterDirectionInfo info, IR
     }
 }
 
+IRInst* lookupWitnessTableEntry(IRWitnessTable* table, IRInst* key)
+{
+    if (auto entry = findWitnessTableEntry(table, key))
+    {
+        return entry;
+    }
+    else if (as<IRVoidType>(table->getConcreteType()))
+    {
+        IRBuilder builder(table->getModule());
+        return builder.getVoidValue();
+    }
+
+    return nullptr;
+}
+
+// Helper to test if an inst is in the global scope.
+bool isGlobalInst(IRInst* inst)
+{
+    return inst->getParent()->getOp() == kIROp_ModuleInst;
+}
+
 bool isConcreteType(IRInst* inst)
 {
     bool isInstGlobal = isGlobalInst(inst);
@@ -441,28 +462,25 @@ bool isConcreteType(IRInst* inst)
     return true;
 }
 
-IRInst* makeInfoForConcreteType(IRModule* module, IRInst* inst)
+IRInst* makeInfoForConcreteType(IRModule* module, IRInst* type)
 {
-    SLANG_ASSERT(isConcreteType(inst));
+    SLANG_ASSERT(isConcreteType(type));
     IRBuilder builder(module);
-    if (auto ptrType = as<IRPtrTypeBase>(inst->getDataType()))
+    if (auto ptrType = as<IRPtrTypeBase>(type))
     {
         return builder.getPtrTypeWithAddressSpace(
-            builder.getUntaggedUnionType(
-                cast<IRTypeSet>(builder.getSingletonSet(ptrType->getValueType()))),
+            (IRType*)makeInfoForConcreteType(module, ptrType->getValueType()),
             ptrType);
     }
 
-    if (auto arrayType = as<IRArrayType>(inst->getDataType()))
+    if (auto arrayType = as<IRArrayType>(type))
     {
         return builder.getArrayType(
-            builder.getUntaggedUnionType(
-                cast<IRTypeSet>(builder.getSingletonSet(arrayType->getElementType()))),
+            (IRType*)makeInfoForConcreteType(module, arrayType->getElementType()),
             arrayType->getElementCount());
     }
 
-    return builder.getUntaggedUnionType(
-        cast<IRTypeSet>(builder.getSingletonSet(inst->getDataType())));
+    return builder.getUntaggedUnionType(cast<IRTypeSet>(builder.getSingletonSet(type)));
 }
 
 // Helper to check if an IRParam is a function parameter (vs. a phi param or generic param)
@@ -471,12 +489,6 @@ bool isFuncParam(IRParam* param)
     auto paramBlock = as<IRBlock>(param->getParent());
     auto paramFunc = as<IRFunc>(paramBlock->getParent());
     return (paramFunc && paramFunc->getFirstBlock() == paramBlock);
-}
-
-// Helper to test if an inst is in the global scope.
-bool isGlobalInst(IRInst* inst)
-{
-    return inst->getParent()->getOp() == kIROp_ModuleInst;
 }
 
 // Helper to test if a function or generic contains a body (i.e. is intrinsic/external)
@@ -595,6 +607,8 @@ struct TypeFlowSpecializationContext
             //
             return makeInfoForConcreteType(module, inst->getDataType());
         }
+
+        return none();
     }
 
     //
@@ -1037,7 +1051,8 @@ struct TypeFlowSpecializationContext
         if (auto returnInfo = as<IRReturn>(block->getTerminator()))
         {
             auto val = returnInfo->getVal();
-            updateFuncReturnInfo(context, tryGetArgInfo(context, val), workQueue);
+            if (!as<IRVoidType>(val->getDataType()))
+                updateFuncReturnInfo(context, tryGetArgInfo(context, val), workQueue);
         }
     };
 
@@ -1071,7 +1086,8 @@ struct TypeFlowSpecializationContext
                 if (auto argInfo = tryGetArgInfo(context, arg))
                 {
                     // Use centralized update method
-                    updateInfo(context, param, argInfo, true, workQueue);
+                    if (!isConcreteType(param->getDataType()))
+                        updateInfo(context, param, argInfo, true, workQueue);
                 }
             }
             paramIndex++;
@@ -1139,12 +1155,14 @@ struct TypeFlowSpecializationContext
                                     &builder,
                                     paramDirection,
                                     as<IRPtrTypeBase>(argInfo)->getValueType());
-                                updateInfo(edge.targetContext, param, newInfo, true, workQueue);
+                                if (!isConcreteType(param->getDataType()))
+                                    updateInfo(edge.targetContext, param, newInfo, true, workQueue);
                                 break;
                             }
                         case ParameterDirectionInfo::Kind::In:
                             {
-                                updateInfo(edge.targetContext, param, argInfo, true, workQueue);
+                                if (!isConcreteType(param->getDataType()))
+                                    updateInfo(edge.targetContext, param, argInfo, true, workQueue);
                                 break;
                             }
                         default:
@@ -1206,14 +1224,15 @@ struct TypeFlowSpecializationContext
                             auto argPtrType = as<IRPtrTypeBase>(arg->getDataType());
 
                             IRBuilder builder(module);
-                            updateInfo(
-                                edge.callerContext,
-                                arg,
-                                builder.getPtrTypeWithAddressSpace(
-                                    (IRType*)as<IRPtrTypeBase>(paramInfo)->getValueType(),
-                                    argPtrType),
-                                true,
-                                workQueue);
+                            if (!isConcreteType(arg->getDataType()))
+                                updateInfo(
+                                    edge.callerContext,
+                                    arg,
+                                    builder.getPtrTypeWithAddressSpace(
+                                        (IRType*)as<IRPtrTypeBase>(paramInfo)->getValueType(),
+                                        argPtrType),
+                                    true,
+                                    workQueue);
                         }
                     }
                     argIndex++;
@@ -1647,7 +1666,7 @@ struct TypeFlowSpecializationContext
             forEachInSet(
                 cast<IRWitnessTableSet>(elementOfSetType->getSet()),
                 [&](IRInst* table)
-                { results.add(findWitnessTableEntry(cast<IRWitnessTable>(table), key)); });
+                { results.add(lookupWitnessTableEntry(cast<IRWitnessTable>(table), key)); });
             return makeElementOfSetType(builder.getSet(results));
         }
 
@@ -2049,6 +2068,9 @@ struct TypeFlowSpecializationContext
 
         auto propagateToCallSite = [&](IRInst* callee)
         {
+            if (as<IRVoidLit>(callee))
+                return;
+
             // Register the call site in the map to allow for the
             // return-edge to be created.
             //
@@ -2198,7 +2220,8 @@ struct TypeFlowSpecializationContext
             //
             // This is one of the base cases for the recursion.
             //
-            updateInfo(context, var, info, true, workQueue);
+            if (!isConcreteType(var->getDataType()))
+                updateInfo(context, var, info, true, workQueue);
         }
         else if (auto param = as<IRParam>(inst))
         {
@@ -2215,7 +2238,9 @@ struct TypeFlowSpecializationContext
             auto newInfo = builder.getPtrTypeWithAddressSpace(
                 (IRType*)as<IRPtrTypeBase>(info)->getValueType(),
                 as<IRPtrTypeBase>(param->getDataType()));
-            updateInfo(context, param, newInfo, true, workQueue);
+
+            if (!isConcreteType(param->getDataType()))
+                updateInfo(context, param, newInfo, true, workQueue);
         }
         else
         {
@@ -2742,7 +2767,7 @@ struct TypeFlowSpecializationContext
         // Handle trivial case where inst's operand is a concrete table.
         if (auto witnessTable = as<IRWitnessTable>(inst->getWitnessTable()))
         {
-            inst->replaceUsesWith(findWitnessTableEntry(witnessTable, inst->getRequirementKey()));
+            inst->replaceUsesWith(lookupWitnessTableEntry(witnessTable, inst->getRequirementKey()));
             inst->removeAndDeallocate();
             return true;
         }
@@ -3324,6 +3349,23 @@ struct TypeFlowSpecializationContext
                     "Unexpected operand type for type-flow specialization of Call inst");
             }
         }
+        else if (as<IRVoidLit>(callee))
+        {
+            // Occasionally, we will determine that there are absolutely no possible callees
+            // for a call site. This typically happens to impossible branches.
+            //
+            // The correct way to handle such cases is to improve the analysis to avoid
+            // branches that are impossible. For now, we will just remove the callee and
+            // replace with a default value. The exact value doesn't matter since we've determined
+            // that this code is unreachable.
+            //
+            IRBuilder builder(context);
+            builder.setInsertBefore(inst);
+            auto defaultVal = builder.emitDefaultConstruct(inst->getDataType());
+            inst->replaceUsesWith(defaultVal);
+            inst->removeAndDeallocate();
+            return true;
+        }
         else if (isGlobalInst(callee) && !isIntrinsic(callee))
         {
             // If our callee is not a tag-type, then it is necessarily a simple concrete function.
@@ -3338,12 +3380,6 @@ struct TypeFlowSpecializationContext
         // either a collection or a single function), then we can't specialize it (likely unbounded)
         //
         if (!isGlobalInst(callee) || isIntrinsic(callee))
-            return false;
-
-        // One other case to avoid is if the function is a global LookupWitnessMethod
-        // which can be created when optional witnesses are specialized.
-        //
-        if (as<IRLookupWitnessMethod>(callee))
             return false;
 
         // First, we'll legalize all operands by upcasting if necessary.

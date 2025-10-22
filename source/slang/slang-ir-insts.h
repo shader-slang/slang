@@ -3079,6 +3079,7 @@ public:
     IRPtrLit* getNullPtrValue(IRType* type);
     IRPtrLit* getNullVoidPtrValue() { return getNullPtrValue(getPtrType(getVoidType())); }
     IRVoidLit* getVoidValue();
+    IRVoidLit* getVoidValue(IRType* type);
     IRInst* getCapabilityValue(CapabilitySet const& caps);
 
     IRBasicType* getBasicType(BaseType baseType);
