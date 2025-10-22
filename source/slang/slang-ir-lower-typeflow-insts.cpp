@@ -215,6 +215,16 @@ IRFunc* createIntegerMappingFunc(IRModule* module, Dictionary<UInt, UInt>& mappi
 //
 struct TagOpsLoweringContext : public InstPassBase
 {
+    // Our strategy for lowering tag operations is to
+    // assign each element to a unique integer ID that is stable
+    // across the same module. This is acheived via `getUniqueID`,
+    // on the IRBuilder, which uses a dicionary on the module inst
+    // to keep track of assignments.
+    //
+    // Then, tag operations can be lowered to mapping functions that
+    // take an integer in and return an integer out, based on the
+    // input and output sets (and any other operands)
+    //
     TagOpsLoweringContext(IRModule* module)
         : InstPassBase(module)
     {
@@ -222,12 +232,22 @@ struct TagOpsLoweringContext : public InstPassBase
 
     void lowerGetTagForSuperSet(IRGetTagForSuperSet* inst)
     {
+        // `GetTagForSuperSet` is a no-op since we want to translate the tag
+        // for an element in the sub-set to a tag for the same element in the super-set.
+        //
+        // Since all elements have a unique ID across the module, this is the identity operation.
+        //
+
         inst->replaceUsesWith(inst->getOperand(0));
         inst->removeAndDeallocate();
     }
 
     void lowerGetTagForMappedSet(IRGetTagForMappedSet* inst)
     {
+        // `GetTagForMappedSet` turns into a integer mapping from
+        // the unique ID of each input set element to the unique ID of the
+        // corresponding element (as determined by witness table lookup) in the destination set.
+        //
         auto srcSet = cast<IRWitnessTableSet>(
             cast<IRSetTagType>(inst->getOperand(0)->getDataType())->getOperand(0));
         auto destSet = cast<IRSetBase>(cast<IRSetTagType>(inst->getDataType())->getOperand(0));
@@ -266,7 +286,7 @@ struct TagOpsLoweringContext : public InstPassBase
             }
         }
 
-        // Create an index mapping func and call that
+        // Create an index mapping func and call that.
         auto mappingFunc = createIntegerMappingFunc(inst->getModule(), mapping, 0);
 
         auto resultID = builder.emitCallInst(
@@ -279,6 +299,12 @@ struct TagOpsLoweringContext : public InstPassBase
 
     void lowerGetTagOfElementInSet(IRGetTagOfElementInSet* inst)
     {
+        // `GetTagOfElementInSet` simply gets replaced by the element's
+        //  unique ID (as an integer literal value)
+        //
+        // Note: the element must be a concrete global inst (cannot by a
+        // dynamic value)
+        //
         IRBuilder builder(inst->getModule());
         builder.setInsertAfter(inst);
 
@@ -319,12 +345,76 @@ struct DispatcherLoweringContext : public InstPassBase
     {
     }
 
+    void lowerGetDispatcher(IRGetDispatcher* dispatcher)
+    {
+        // Replace the `IRGetDispatcher` with a dispatch function,
+        // which takes an extra first parameter for the tag (i.e. ID)
+        //
+        // We'll also replace the callee in all 'call' insts.
+        //
+        // The generated dispatch function uses a switch-case to call the
+        // appropriate function based on the integer tag. Since tags
+        // may not yet be lowered into actual integers, we use `GetTagOfElementInSet`
+        // as a placeholder literal.
+        //
+        // Note that before each function is called, it needs to be wrapped in a
+        // method (a 'witness table wrapper') that handles marshalling between the input types
+        // to the dispatcher and the actual function types (which may be different)
+        //
+
+        auto witnessTableSet = cast<IRWitnessTableSet>(dispatcher->getOperand(0));
+        auto key = cast<IRStructKey>(dispatcher->getOperand(1));
+
+        IRBuilder builder(dispatcher->getModule());
+
+        Dictionary<IRInst*, IRInst*> elements;
+        forEachInSet(
+            witnessTableSet,
+            [&](IRInst* table)
+            {
+                auto tag = builder.emitGetTagOfElementInSet(
+                    builder.getSetTagType(witnessTableSet),
+                    table,
+                    witnessTableSet);
+                elements.add(
+                    tag,
+                    cast<IRFunc>(findWitnessTableEntry(cast<IRWitnessTable>(table), key)));
+            });
+
+        if (dispatcher->hasUses() && dispatcher->getDataType() != nullptr)
+        {
+            auto dispatchFunc =
+                createDispatchFunc(cast<IRFuncType>(dispatcher->getDataType()), elements);
+            traverseUses(
+                dispatcher,
+                [&](IRUse* use)
+                {
+                    if (auto callInst = as<IRCall>(use->getUser()))
+                    {
+                        // Replace callee with the generated dispatchFunc.
+                        if (callInst->getCallee() == dispatcher)
+                        {
+                            IRBuilder callBuilder(callInst);
+                            callBuilder.setInsertBefore(callInst);
+                            callBuilder.replaceOperand(callInst->getCalleeUse(), dispatchFunc);
+                        }
+                    }
+                });
+        }
+    }
+
+
     void lowerGetSpecializedDispatcher(IRGetSpecializedDispatcher* dispatcher)
     {
         // Replace the `IRGetSpecializedDispatcher` with a dispatch function,
         // which takes an extra first parameter for the tag (i.e. ID)
         //
         // We'll also replace the callee in all 'call' insts.
+        //
+        // The logic here is very similar to `lowerGetDispatcher`, except that we need to
+        // account for the specialization arguments when creating the dispatch function.
+        // We construct an `IRSpecialize` inst around each generic function before dispatching
+        // to it.
         //
 
         auto witnessTableSet = cast<IRWitnessTableSet>(dispatcher->getOperand(0));
@@ -364,55 +454,6 @@ struct DispatcherLoweringContext : public InstPassBase
                     witnessTableSet);
 
                 elements.add(singletonTag, specializedFunc);
-            });
-
-        if (dispatcher->hasUses() && dispatcher->getDataType() != nullptr)
-        {
-            auto dispatchFunc =
-                createDispatchFunc(cast<IRFuncType>(dispatcher->getDataType()), elements);
-            traverseUses(
-                dispatcher,
-                [&](IRUse* use)
-                {
-                    if (auto callInst = as<IRCall>(use->getUser()))
-                    {
-                        // Replace callee with the generated dispatchFunc.
-                        if (callInst->getCallee() == dispatcher)
-                        {
-                            IRBuilder callBuilder(callInst);
-                            callBuilder.setInsertBefore(callInst);
-                            callBuilder.replaceOperand(callInst->getCalleeUse(), dispatchFunc);
-                        }
-                    }
-                });
-        }
-    }
-
-    void lowerGetDispatcher(IRGetDispatcher* dispatcher)
-    {
-        // Replace the `IRGetDispatcher` with a dispatch function,
-        // which takes an extra first parameter for the tag (i.e. ID)
-        //
-        // We'll also replace the callee in all 'call' insts.
-        //
-
-        auto witnessTableSet = cast<IRWitnessTableSet>(dispatcher->getOperand(0));
-        auto key = cast<IRStructKey>(dispatcher->getOperand(1));
-
-        IRBuilder builder(dispatcher->getModule());
-
-        Dictionary<IRInst*, IRInst*> elements;
-        forEachInSet(
-            witnessTableSet,
-            [&](IRInst* table)
-            {
-                auto tag = builder.emitGetTagOfElementInSet(
-                    builder.getSetTagType(witnessTableSet),
-                    table,
-                    witnessTableSet);
-                elements.add(
-                    tag,
-                    cast<IRFunc>(findWitnessTableEntry(cast<IRWitnessTable>(table), key)));
             });
 
         if (dispatcher->hasUses() && dispatcher->getDataType() != nullptr)
