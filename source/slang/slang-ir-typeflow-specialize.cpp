@@ -4068,7 +4068,7 @@ struct TypeFlowSpecializationContext
     bool specializeMakeOptionalValue(IRInst* context, IRMakeOptionalValue* inst)
     {
         SLANG_UNUSED(context);
-        if (auto taggedUnionType = as<IRCollectionTaggedUnionType>(inst->getValue()->getDataType()))
+        if (as<IRCollectionTaggedUnionType>(inst->getValue()->getDataType()))
         {
             // If we're dealing with a `MakeOptionalValue` for an existential type,
             // we don't actually have to change anything, since logically, the input and output
