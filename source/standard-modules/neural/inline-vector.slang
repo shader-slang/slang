@@ -66,8 +66,8 @@ public struct InlineVector<T, int N> : IVector<T, N>
     }
 
     // Linear transformation without bias
-    [BackwardDerivative(matmulBwd)]
-    public OutputVector matmul<int OutputSize, Storage, OutputVector>(
+    [BackwardDerivative(linearTransformBwd)]
+    public OutputVector linearTransform<int OutputSize, Storage, OutputVector>(
         Storage weightStorage,
         no_diff Storage.Address weightAddress)
             where Storage : IStorage<T>
@@ -94,8 +94,8 @@ public struct InlineVector<T, int N> : IVector<T, N>
     }
 
     // Linear transformation with bias
-    [BackwardDerivative(matmulBwd)]
-    public OutputVector matmul<int OutputSize, Storage, OutputVector>(
+    [BackwardDerivative(linearTransformBwd)]
+    public OutputVector linearTransform<int OutputSize, Storage, OutputVector>(
         Storage weightStorage,
         Storage biasStorage,
         no_diff Storage.Address weightAddress,
@@ -106,7 +106,7 @@ public struct InlineVector<T, int N> : IVector<T, N>
             where OutputVector : IVector<T, OutputSize>
     {
         // Reuse the unbias matmul method
-        OutputVector output = this.matmul<OutputSize, Storage, OutputVector>(weightStorage, weightAddress);
+        OutputVector output = this.linearTransform<OutputSize, Storage, OutputVector>(weightStorage, weightAddress);
 
         // apply the bias
         [ForceUnroll]
@@ -120,7 +120,7 @@ public struct InlineVector<T, int N> : IVector<T, N>
     }
 
     // Backward of linear transformation without bias
-    static void matmulBwd<int OutputSize, Storage, OutputVector>(
+    static void linearTransformBwd<int OutputSize, Storage, OutputVector>(
         inout DifferentialPair<This> dthis,
         DifferentialPtrPair<Storage> dWeightStorage,
         no_diff Storage.Address dWeightAddress,
@@ -168,7 +168,7 @@ public struct InlineVector<T, int N> : IVector<T, N>
     }
 
     // Backward of linear transformation with bias
-    static void matmulBwd<int OutputSize, Storage, OutputVector>(
+    static void linearTransformBwd<int OutputSize, Storage, OutputVector>(
         inout DifferentialPair<This> dthis,
         DifferentialPtrPair<Storage> dWeightStorage,
         DifferentialPtrPair<Storage> dBiasStorage,
@@ -181,7 +181,7 @@ public struct InlineVector<T, int N> : IVector<T, N>
             where OutputVector : IVector<T, OutputSize>
     {
         // Reuse the unbias backward method
-        matmulBwd<OutputSize, Storage, OutputVector>(dthis, dWeightStorage, dWeightAddress, doutput);
+        linearTransformBwd<OutputSize, Storage, OutputVector>(dthis, dWeightStorage, dWeightAddress, doutput);
 
         // Derivative of the bias is the same as the output differential
         [ForceUnroll]
@@ -193,8 +193,8 @@ public struct InlineVector<T, int N> : IVector<T, N>
     }
 
     // Linear transformation without bias (Bindless storage)
-    [BackwardDerivative(matmulBwd)]
-    public OutputVector matmul<int OutputSize, BindlessStorage, OutputVector>(
+    [BackwardDerivative(linearTransformBwd)]
+    public OutputVector linearTransform<int OutputSize, BindlessStorage, OutputVector>(
         BindlessStorage.Address weightAddress)
             where BindlessStorage : IStorage<T>
             where BindlessStorage.Address : IPointerLikeAddress<T>
@@ -219,8 +219,8 @@ public struct InlineVector<T, int N> : IVector<T, N>
     }
 
     // Linear transformation with bias (Bindless storage)
-    [BackwardDerivative(matmulBwd)]
-    public OutputVector matmul<int OutputSize, BindlessStorage, OutputVector>(
+    [BackwardDerivative(linearTransformBwd)]
+    public OutputVector linearTransform<int OutputSize, BindlessStorage, OutputVector>(
         BindlessStorage.Address weightAddress,
         BindlessStorage.Address biasAddress)
             where BindlessStorage : IStorage<T>
@@ -229,7 +229,7 @@ public struct InlineVector<T, int N> : IVector<T, N>
             where OutputVector : IVector<T, OutputSize>
     {
         // Reuse the unbias matmul method
-        OutputVector output = this.matmul<OutputSize, BindlessStorage, OutputVector>(weightAddress);
+        OutputVector output = this.linearTransform<OutputSize, BindlessStorage, OutputVector>(weightAddress);
 
         [ForceUnroll]
         for (int i = 0; i < OutputSize; i++)
@@ -239,7 +239,7 @@ public struct InlineVector<T, int N> : IVector<T, N>
     }
 
     // Backward of linear transformation without bias (Bindless storage)
-    static public void matmulBwd<int OutputSize, BindlessStorage, OutputVector>(
+    static public void linearTransformBwd<int OutputSize, BindlessStorage, OutputVector>(
         inout DifferentialPair<This> dthis,
         DifferentialPtrPair<BindlessStorage.Address> dparameters,
         OutputVector.Differential doutput)
@@ -283,7 +283,7 @@ public struct InlineVector<T, int N> : IVector<T, N>
     }
 
     // Backward of linear transformation with bias (Bindless storage)
-    static public void matmulBwd<int OutputSize, BindlessStorage, OutputVector>(
+    static public void linearTransformBwd<int OutputSize, BindlessStorage, OutputVector>(
         inout DifferentialPair<This> dthis,
         DifferentialPtrPair<BindlessStorage.Address> dWeightAddress,
         DifferentialPtrPair<BindlessStorage.Address> dBiasAddress,
@@ -294,7 +294,7 @@ public struct InlineVector<T, int N> : IVector<T, N>
         where OutputVector : IVector<T, OutputSize>
     {
         // Reuse the unbias backward method
-        matmulBwd<OutputSize, BindlessStorage, OutputVector>(dthis, dWeightAddress, doutput);
+        linearTransformBwd<OutputSize, BindlessStorage, OutputVector>(dthis, dWeightAddress, doutput);
 
         let biasOffset = dBiasAddress.d.getOffset(0);
         // dBias = dOutput
