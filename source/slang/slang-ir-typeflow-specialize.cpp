@@ -1612,6 +1612,8 @@ struct TypeFlowSpecializationContext
                 return info;
             }
         }
+
+        return none();
     }
 
     IRInst* analyzeLookupWitnessMethod(IRInst* context, IRLookupWitnessMethod* inst)
