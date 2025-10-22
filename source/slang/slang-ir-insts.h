@@ -4207,6 +4207,22 @@ $(type_info.return_type) $(type_info.method_name)(
             emitIntrinsicInst(nullptr, kIROp_ElementOfCollectionType, 1, &operand));
     }
 
+    IRCollectionTaggedUnionType* getCollectionTaggedUnionType(
+        IRWitnessTableCollection* tables,
+        IRTypeCollection* types)
+    {
+        IRInst* operands[] = {tables, types};
+        return as<IRCollectionTaggedUnionType>(
+            emitIntrinsicInst(nullptr, kIROp_CollectionTaggedUnionType, 2, operands));
+    }
+
+    IRCollectionTagType* getCollectionTagType(IRCollectionBase* collection)
+    {
+        IRInst* operands[] = {collection};
+        return cast<IRCollectionTagType>(
+            emitIntrinsicInst(nullptr, kIROp_CollectionTagType, 1, operands));
+    }
+
     IRGetTagOfElementInCollection* emitGetTagOfElementInCollection(
         IRType* tagType,
         IRInst* element,
@@ -5000,6 +5016,16 @@ $(type_info.return_type) $(type_info.method_name)(
     }
 
     void addRayPayloadDecoration(IRType* inst) { addDecoration(inst, kIROp_RayPayloadDecoration); }
+
+    IRCollectionBase* getCollection(IROp op, const HashSet<IRInst*>& elements);
+    IRCollectionBase* getCollection(const HashSet<IRInst*>& elements);
+
+    IRCollectionBase* getSingletonCollection(IROp op, IRInst* element);
+    IRCollectionBase* getSingletonCollection(IRInst* element);
+
+    UInt getUniqueID(IRInst* inst);
+
+    IROp getCollectionTypeForInst(IRInst* inst);
 };
 
 // Helper to establish the source location that will be used

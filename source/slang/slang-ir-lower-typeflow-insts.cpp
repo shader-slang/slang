@@ -216,7 +216,7 @@ IRFunc* createIntegerMappingFunc(IRModule* module, Dictionary<UInt, UInt>& mappi
 struct TagOpsLoweringContext : public InstPassBase
 {
     TagOpsLoweringContext(IRModule* module)
-        : InstPassBase(module), cBuilder(module)
+        : InstPassBase(module)
     {
     }
 
@@ -254,8 +254,8 @@ struct TagOpsLoweringContext : public InstPassBase
                     // it must have been assigned a unique ID.
                     //
                     mapping.add(
-                        cBuilder.getUniqueID(srcCollection->getElement(i)),
-                        cBuilder.getUniqueID(destElement));
+                        builder.getUniqueID(srcCollection->getElement(i)),
+                        builder.getUniqueID(destElement));
                     break; // Found the index
                 }
             }
@@ -283,7 +283,7 @@ struct TagOpsLoweringContext : public InstPassBase
         IRBuilder builder(inst->getModule());
         builder.setInsertAfter(inst);
 
-        auto uniqueId = cBuilder.getUniqueID(inst->getOperand(0));
+        auto uniqueId = builder.getUniqueID(inst->getOperand(0));
         auto resultValue = builder.getIntValue(inst->getDataType(), uniqueId);
         inst->replaceUsesWith(resultValue);
         inst->removeAndDeallocate();
@@ -311,8 +311,6 @@ struct TagOpsLoweringContext : public InstPassBase
     {
         processAllInsts([&](IRInst* inst) { return processInst(inst); });
     }
-
-    CollectionBuilder cBuilder;
 };
 
 struct DispatcherLoweringContext : public InstPassBase
@@ -513,7 +511,7 @@ void lowerTypeCollections(IRModule* module, DiagnosticSink* sink)
 struct SequentialIDTagLoweringContext : public InstPassBase
 {
     SequentialIDTagLoweringContext(IRModule* module)
-        : InstPassBase(module), cBuilder(module)
+        : InstPassBase(module)
     {
     }
     void lowerGetTagFromSequentialID(IRGetTagFromSequentialID* inst)
@@ -537,12 +535,15 @@ struct SequentialIDTagLoweringContext : public InstPassBase
         // Map from sequential ID to unique ID
         auto destCollection = cast<IRCollectionTagType>(inst->getDataType())->getCollection();
 
+        IRBuilder builder(inst);
+        builder.setInsertAfter(inst);
+
         forEachInCollection(
             destCollection,
             [&](IRInst* table)
             {
                 // Get unique ID for the witness table
-                auto outputId = cBuilder.getUniqueID(table);
+                auto outputId = builder.getUniqueID(table);
                 auto seqDecoration = table->findDecoration<IRSequentialIDDecoration>();
                 if (seqDecoration)
                 {
@@ -550,9 +551,6 @@ struct SequentialIDTagLoweringContext : public InstPassBase
                     mapping[inputId] = outputId; // Map ID to itself for now
                 }
             });
-
-        IRBuilder builder(inst);
-        builder.setInsertAfter(inst);
 
         // By default, use the tag for the largest available sequential ID.
         UInt defaultSeqID = 0;
@@ -586,13 +584,16 @@ struct SequentialIDTagLoweringContext : public InstPassBase
         // Map from sequential ID to unique ID
         auto destCollection = cast<IRCollectionTagType>(srcTagInst->getDataType())->getCollection();
 
+        IRBuilder builder(inst);
+        builder.setInsertAfter(inst);
+
         forEachInCollection(
             destCollection,
             [&](IRInst* table)
             {
                 // Get unique ID for the witness table
                 SLANG_UNUSED(cast<IRWitnessTable>(table));
-                auto outputId = cBuilder.getUniqueID(table);
+                auto outputId = builder.getUniqueID(table);
                 auto seqDecoration = table->findDecoration<IRSequentialIDDecoration>();
                 if (seqDecoration)
                 {
@@ -601,8 +602,6 @@ struct SequentialIDTagLoweringContext : public InstPassBase
                 }
             });
 
-        IRBuilder builder(inst);
-        builder.setInsertAfter(inst);
         auto translatedID = builder.emitCallInst(
             inst->getDataType(),
             createIntegerMappingFunc(builder.getModule(), mapping, 0),
@@ -622,8 +621,6 @@ struct SequentialIDTagLoweringContext : public InstPassBase
             kIROp_GetSequentialIDFromTag,
             [&](IRGetSequentialIDFromTag* inst) { return lowerGetSequentialIDFromTag(inst); });
     }
-
-    CollectionBuilder cBuilder;
 };
 
 void lowerSequentialIDTagCasts(IRModule* module, DiagnosticSink* sink)
@@ -838,11 +835,11 @@ struct TaggedUnionLoweringContext : public InstPassBase
 
         if (taggedUnion->getTypeCollection()->isSingleton())
             return builder.getTupleType(List<IRType*>(
-                {(IRType*)makeTagType(tableCollection),
+                {(IRType*)builder.getCollectionTagType(tableCollection),
                  (IRType*)taggedUnion->getTypeCollection()->getElement(0)}));
 
-        return builder.getTupleType(
-            List<IRType*>({(IRType*)makeTagType(tableCollection), (IRType*)typeCollection}));
+        return builder.getTupleType(List<IRType*>(
+            {(IRType*)builder.getCollectionTagType(tableCollection), (IRType*)typeCollection}));
     }
 
     bool lowerGetValueFromTaggedUnion(IRGetValueFromTaggedUnion* inst)

@@ -889,12 +889,11 @@ struct SpecializationContext
 
                 if (!skipSpecialization)
                 {
-                    CollectionBuilder cBuilder(lookupInst->getModule());
-                    auto newCollection = cBuilder.makeSet(satisfyingValSet);
+                    IRBuilder builder(module);
+                    auto newCollection = builder.getCollection(satisfyingValSet);
                     addUsersToWorkList(lookupInst);
                     if (as<IRTypeCollection>(newCollection))
                     {
-                        IRBuilder builder(module);
                         lookupInst->replaceUsesWith(
                             builder.getValueOfCollectionType(newCollection));
                         lookupInst->removeAndDeallocate();
@@ -3275,7 +3274,7 @@ IRInst* specializeDynamicGeneric(IRSpecialize* specializeInst)
                 // We'll create an integer parameter for all the rest of
                 // the insts which will may need the runtime tag.
                 //
-                auto tagType = (IRType*)makeTagType(collection);
+                auto tagType = (IRType*)builder.getCollectionTagType(collection);
                 // cloneEnv.mapOldValToNew[param] = builder.emitParam(tagType);
                 extraParamMap.add(param, builder.emitParam(tagType));
                 extraParamTypes.add(tagType);

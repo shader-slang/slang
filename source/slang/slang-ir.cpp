@@ -6554,6 +6554,74 @@ IREntryPointLayout* IRBuilder::getEntryPointLayout(
         operands));
 }
 
+IRCollectionBase* IRBuilder::getCollection(IROp op, const HashSet<IRInst*>& elements)
+{
+    if (elements.getCount() == 0)
+        return nullptr;
+
+    // Verify that all operands are global instructions
+    for (auto element : elements)
+        if (element->getParent()->getOp() != kIROp_ModuleInst)
+            SLANG_ASSERT_FAILURE("createCollection called with non-global operands");
+
+    List<IRInst*> sortedElements;
+    for (auto element : elements)
+        sortedElements.add(element);
+
+    // Sort elements by their unique IDs to ensure canonical ordering
+    sortedElements.sort(
+        [&](IRInst* a, IRInst* b) -> bool { return getUniqueID(a) < getUniqueID(b); });
+
+    return as<IRCollectionBase>(
+        emitIntrinsicInst(nullptr, op, sortedElements.getCount(), sortedElements.getBuffer()));
+}
+
+IRCollectionBase* IRBuilder::getCollection(const HashSet<IRInst*>& elements)
+{
+    SLANG_ASSERT(elements.getCount() > 0);
+    auto firstElement = *elements.begin();
+    return getCollection(getCollectionTypeForInst(firstElement), elements);
+}
+
+IRCollectionBase* IRBuilder::getSingletonCollection(IROp op, IRInst* element)
+{
+    return getCollection(op, {element});
+}
+
+IRCollectionBase* IRBuilder::getSingletonCollection(IRInst* element)
+{
+    return getCollection(getCollectionTypeForInst(element), {element});
+}
+
+UInt IRBuilder::getUniqueID(IRInst* inst)
+{
+    auto uniqueIDMap = getModule()->getUniqueIdMap();
+    auto existingId = uniqueIDMap->tryGetValue(inst);
+    if (existingId)
+        return *existingId;
+
+    auto id = uniqueIDMap->getCount();
+    uniqueIDMap->add(inst, id);
+    return id;
+}
+
+IROp IRBuilder::getCollectionTypeForInst(IRInst* inst)
+{
+    if (as<IRGeneric>(inst))
+        return kIROp_GenericCollection;
+
+    if (as<IRTypeKind>(inst->getDataType()))
+        return kIROp_TypeCollection;
+    else if (as<IRFuncType>(inst->getDataType()))
+        return kIROp_FuncCollection;
+    else if (as<IRType>(inst) && !as<IRInterfaceType>(inst))
+        return kIROp_TypeCollection;
+    else if (as<IRWitnessTableType>(inst->getDataType()))
+        return kIROp_WitnessTableCollection;
+    else
+        return kIROp_Invalid; // Return invalid IROp when not supported
+}
+
 //
 
 struct IRDumpContext
