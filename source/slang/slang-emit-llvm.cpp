@@ -330,6 +330,9 @@ private:
     };
     Dictionary<IRInst*, ConstantInfo> constantMap;
 
+    // This one is cached here, because we spam it constantly with every GEP.
+    llvm::Type* byteType;
+
 public:
     LLVMTypeTranslator(
         llvm::IRBuilderBase& builder,
@@ -347,6 +350,7 @@ public:
         sourceDebugInfo(&sourceDebugInfo),
         defaultPointerRules(rules)
     {
+        byteType = builder.getInt8Ty();
     }
 
     // Returns the type you must use for passing around SSA values.
@@ -883,8 +887,6 @@ public:
         return legalizedType;
     }
 
-    // Use this instead of the regular Slang::getSizeAndAlignment(), it handles querying
-    // LLVM's own layout as well if 'rules' is nullptr.
     IRSizeAndAlignment getSizeAndAlignment(IRType* type, IRTypeLayoutRules* rules)
     {
         IRSizeAndAlignment elementSizeAlignment;
@@ -1027,18 +1029,14 @@ public:
     llvm::Value* emitArrayGetElementPtr(
         llvm::Value* llvmPtr,
         llvm::Value* indexInst,
-        IRType* valType,
+        IRType* elemType,
         IRTypeLayoutRules* rules
     ){
-        // Should've called emitStructGetElementPtr instead!
-        SLANG_ASSERT(!as<IRStructType>(valType));
-
-        llvm::Type* llvmType = getStorageType(valType, rules);
-        llvm::Value* indices[2] = {
-            builder->getInt32(0),
-            indexInst
-        };
-        return builder->CreateGEP(llvmType, llvmPtr, indices);
+        IRSizeAndAlignment sizeAndAlignment = getSizeAndAlignment(elemType, rules);
+        return builder->CreateGEP(
+            llvm::ArrayType::get(byteType, sizeAndAlignment.getStride()),
+            llvmPtr,
+            indexInst);
     }
 
     // Uses `getStorageType(valType, rules)` to compute an offset pointer with
@@ -1360,8 +1358,8 @@ private:
                 llvm::Value* last = nullptr;
                 for (int elem = 0; elem < elemCount; ++elem)
                 {
-                    auto dstElemPtr = emitArrayGetElementPtr(dstPtr, builder->getInt32(elem), type, dstLayout);
-                    auto srcElemPtr = emitArrayGetElementPtr(srcPtr, builder->getInt32(elem), type, srcLayout);
+                    auto dstElemPtr = emitArrayGetElementPtr(dstPtr, builder->getInt32(elem), elemType, dstLayout);
+                    auto srcElemPtr = emitArrayGetElementPtr(srcPtr, builder->getInt32(elem), elemType, srcLayout);
                     last = crossLayoutMemCpy(
                         dstElemPtr,
                         srcElemPtr,
@@ -2474,9 +2472,9 @@ struct LLVMEmitter
             llvmInst = types->emitAlloca(inst->getDataType(), defaultPointerRules);
             for (UInt aa = 0; aa < inst->getOperandCount(); ++aa)
             {
-                llvm::Value* ptr = types->emitArrayGetElementPtr(
-                    llvmInst, llvmBuilder->getInt32(aa), inst->getDataType(), defaultPointerRules);
                 auto op = inst->getOperand(aa);
+                llvm::Value* ptr = types->emitArrayGetElementPtr(
+                    llvmInst, llvmBuilder->getInt32(aa), op->getDataType(), defaultPointerRules);
                 types->emitStore(ptr, findValue(op), op->getDataType(), defaultPointerRules);
             }
             break;
@@ -2508,7 +2506,7 @@ struct LLVMEmitter
                     llvm::Value* ptr = types->emitArrayGetElementPtr(
                         llvmInst,
                         llvmBuilder->getInt32(i),
-                        inst->getDataType(),
+                        element->getDataType(),
                         defaultPointerRules);
                     types->emitStore(ptr, llvmElement, element->getDataType(), defaultPointerRules);
                 }
@@ -2624,7 +2622,7 @@ struct LLVMEmitter
                     IRIntegerValue elementIndex = getIntVal(irElementIndex);
 
                     auto llvmDstElement = types->emitArrayGetElementPtr(
-                        llvmDst, llvmBuilder->getInt32(elementIndex), dstType, rules);
+                        llvmDst, llvmBuilder->getInt32(elementIndex), elementType, rules);
                     auto llvmSrcElement = llvmBuilder->CreateExtractElement(llvmSrc, i);
                     llvmInst = types->emitStore(llvmDstElement, llvmSrcElement, elementType, rules);
                 }
@@ -2945,10 +2943,15 @@ struct LLVMEmitter
                 }
                 else SLANG_ASSERT_FAILURE("Unknown pointer type for GetElementPtr!");
 
+                // I _REALLY_ dislike that this helper function needs an
+                // IRBuilder :/
+                IRBuilder builder(inst->getModule());
+                IRType* elemType = getElementType(builder, baseType);
+
                 llvmInst = types->emitArrayGetElementPtr(
                     findValue(baseInst),
                     findValue(indexInst),
-                    baseType,
+                    elemType,
                     getPtrLayoutRules(baseInst)
                 );
             }
@@ -2979,9 +2982,10 @@ struct LLVMEmitter
                     // emitGEP + emitLoad.
                     SLANG_ASSERT(llvmVal->getType()->isPointerTy());
                     auto rules = getPtrLayoutRules(baseInst);
+                    auto elemType = arrayType->getElementType();
                     llvm::Value* ptr = types->emitArrayGetElementPtr(
-                        llvmVal, findValue(indexInst), baseTy, rules);
-                    llvmInst = types->emitLoad(ptr, arrayType->getElementType(), rules);
+                        llvmVal, findValue(indexInst), elemType, rules);
+                    llvmInst = types->emitLoad(ptr, elemType, rules);
                 }
                 else SLANG_ASSERT_FAILURE("Unknown data type for GetElement!");
             }
@@ -4031,6 +4035,9 @@ struct LLVMEmitter
             llvm::StringRef(groupName.begin(), groupName.getLength()), *llvmModule
         );
 
+        for (auto& arg: dispatcher->args())
+            arg.addAttr(llvm::Attribute::NoAlias);
+
         llvm::BasicBlock* entryBlock = llvm::BasicBlock::Create(*llvmContext, "entry", dispatcher);
         llvmBuilder->SetInsertPoint(entryBlock);
 
@@ -4181,6 +4188,9 @@ struct LLVMEmitter
             dispatchFuncType, llvm::GlobalValue::ExternalLinkage,
             llvm::StringRef(entryPointName.begin(), entryPointName.getLength()), *llvmModule
         );
+
+        for (auto& arg: dispatcher->args())
+            arg.addAttr(llvm::Attribute::NoAlias);
 
         // This has to be ABI-compatible with the C++ target. So don't go
         // changing this without a good reason to.
