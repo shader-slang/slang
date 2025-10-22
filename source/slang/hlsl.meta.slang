@@ -23035,7 +23035,6 @@ struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
         __target_switch
         {
         case spvBindlessTextureNV:
-        case spvBindlessTextureNV2:
             return (uint64_t)this == (uint64_t)other;
         default:
             return all(__vectorEql((uint2)this, (uint2)other));
@@ -23048,7 +23047,6 @@ struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
         __target_switch
         {
         case spvBindlessTextureNV:
-        case spvBindlessTextureNV2:
             return (uint64_t)this < (uint64_t)other;
         default:
             let vthis = ((uint2)this);
@@ -23063,7 +23061,6 @@ struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
         __target_switch
         {
         case spvBindlessTextureNV:
-        case spvBindlessTextureNV2:
             return (uint64_t)this <= (uint64_t)other;
         default:
             let vthis = ((uint2)this);
@@ -23166,7 +23163,7 @@ T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handle
             return __makeCombinedTextureSamplerFromHandle<T>((uint2)handleValue);
         else
             return __loadResourceDescriptorFromHeap<T>(((uint2)handleValue).x);
-    case spvBindlessTextureNV2:
+    case spvBindlessTextureNV:
         return __castDescriptorHandleToResource<T>(handleValue);
     case spirv:
     case glsl:
@@ -23227,7 +23224,22 @@ ${{{{
             return __getDynamicResourceHeap<T>($(bindlessOption.enumType).StorageBuffer_ReadWrite)[((uint2)handleValue).x];
     }
     case DescriptorKind.AccelerationStructure:
-        return __slang_noop_cast<T>(RaytracingAccelerationStructure(__asuint64((uint2)handleValue)));
+    {
+        // HACK: This is a tricky to cheat our capability system to not require ray tracing capability on SPIRV target.
+        // Note (spvRayTracingKHR | spirv) == spirv, so this target_switch case will only introduce (spirv | _GL_EXT_ray_tracing)
+        // If user doesn't request spvRayTracingKHR, static_assert will be hit. The only reason we do this is to allow user to
+        // call this instrinsic without requiring ray tracing capability on getting other descriptor handles except ray tracing
+        // acceleration structure.
+        __target_switch
+        {
+            case spvRayTracingKHR:
+            case _GL_EXT_ray_tracing:
+                return __slang_noop_cast<T>(RaytracingAccelerationStructure(__asuint64((uint2)handleValue)));
+            case spirv:
+                static_assert(false, "Please request spvRayTracingKHR or _GL_EXT_ray_tracing for the support the bindless RaytracingAccelerationStructure");
+                return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Unknown)[((uint2)handleValue).x];
+        }
+    }
     default:
         return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Unknown)[((uint2)handleValue).x];
     }

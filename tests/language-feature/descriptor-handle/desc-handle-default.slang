@@ -6,9 +6,9 @@
 //TEST:SIMPLE(filecheck=STORAGE_TEXEL_BUFFER): -target spirv -stage compute -entry computeMain -DSTORAGE_TEXEL_BUFFER
 //TEST:SIMPLE(filecheck=UNIFORM_BUFFER): -target spirv -stage compute -entry computeMain -DUNIFORM_BUFFER
 //TEST:SIMPLE(filecheck=STORAGE_BUFFER): -target spirv -stage compute -entry computeMain -DSTORAGE_BUFFER
-//TEST:SIMPLE(filecheck=ACCELERATION_STRUCTURE): -target spirv -stage compute -entry computeMain -DACCELERATION_STRUCTURE
+//TEST:SIMPLE(filecheck=ACCELERATION_STRUCTURE): -target spirv -stage compute -entry computeMain -DACCELERATION_STRUCTURE -capability spvRayTracingKHR
 //TEST:SIMPLE(filecheck=SAMPLED_IMAGE): -target spirv -stage compute -entry computeMain -DSAMPLED_IMAGE
-//TEST:SIMPLE(filecheck=MIX): -target spirv -stage compute -entry computeMain -DSAMPLER -DSTORAGE_TEXEL_BUFFER -DUNIFORM_BUFFER -DACCELERATION_STRUCTURE
+//TEST:SIMPLE(filecheck=MIX): -target spirv -stage compute -entry computeMain -DSAMPLER -DSTORAGE_TEXEL_BUFFER -DUNIFORM_BUFFER -DACCELERATION_STRUCTURE -capability spvRayTracingKHR
 
 
 export T getDescriptorFromHandle<T : IOpaqueDescriptor>(DescriptorHandle<T> handleValue)

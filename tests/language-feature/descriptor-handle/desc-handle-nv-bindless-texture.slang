@@ -1,7 +1,7 @@
-//TEST:SIMPLE(filecheck=SAMPLER): -target spirv -capability spvBindlessTextureNV2 -stage compute -entry computeMain -DSAMPLER
-//TEST:SIMPLE(filecheck=COMBINED_IMAGE_SAMPLER): -target spirv -capability spvBindlessTextureNV2 -stage compute -entry computeMain -DCOMBINED_IMAGE_SAMPLER
-//TEST:SIMPLE(filecheck=SAMPLED_IMAGE): -target spirv -capability spvBindlessTextureNV2 -stage compute -entry computeMain -DSAMPLED_IMAGE
-//TEST:SIMPLE(filecheck=STORAGE_IMAGE): -target spirv -capability spvBindlessTextureNV2 -stage compute -entry computeMain -DSTORAGE_IMAGE
+//TEST:SIMPLE(filecheck=SAMPLER): -target spirv -capability spvBindlessTextureNV -stage compute -entry computeMain -DSAMPLER
+//TEST:SIMPLE(filecheck=COMBINED_IMAGE_SAMPLER): -target spirv -capability spvBindlessTextureNV -stage compute -entry computeMain -DCOMBINED_IMAGE_SAMPLER
+//TEST:SIMPLE(filecheck=SAMPLED_IMAGE): -target spirv -capability spvBindlessTextureNV -stage compute -entry computeMain -DSAMPLED_IMAGE
+//TEST:SIMPLE(filecheck=STORAGE_IMAGE): -target spirv -capability spvBindlessTextureNV -stage compute -entry computeMain -DSTORAGE_IMAGE
 
 [[vk::binding(0)]] RWTexture1D<float> t1;
 [[vk::binding(1)]] RWTexture1D<float> t2;
