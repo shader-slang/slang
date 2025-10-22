@@ -3573,7 +3573,8 @@ protected:
         }
 
         const auto topologyEnum = outputDeco->getTopologyType();
-        IRInst* topologyConst = builder.getIntValue(builder.getIntType(), topologyEnum);
+        IRIntLit* topologyConst =
+            (IRIntLit*)builder.getIntValue(builder.getIntType(), topologyEnum);
 
         IRType* vertexType = nullptr;
         IRType* indicesType = nullptr;
