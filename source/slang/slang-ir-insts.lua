@@ -677,34 +677,34 @@ local insts = {
 					},
 				},
 			},
-			{ ValueOfCollectionType = {
+			{ UntaggedUnionType = {
 				hoistable = true,
 				-- A type that represents that the value's _type_ is one of types in the collection operand.
 			} },
-			{ ElementOfCollectionType = {
+			{ ElementOfSetType = {
 				hoistable = true,
 				-- A type that represents that the value must be an element of the collection operand.
 			} },
-			{ CollectionTagType = {
+			{ SetTagType = {
 				hoistable = true,
 				-- Represents a tag-type for a collection.
 				--
-				-- An inst whose type is CollectionTagType(collection) is semantically carrying a 
+				-- An inst whose type is SetTagType(collection) is semantically carrying a 
 				-- run-time value that "picks" one of the elements of the collection operand.
 				--
-				-- Only operand is a CollectionBase
+				-- Only operand is a SetBase
 			} }, 
-			{ CollectionTaggedUnionType = {
+			{ TaggedUnionType = {
 				hoistable = true,
 				-- Represents a tagged union type.
 				--
-				-- An inst whose type is a CollectionTaggedUnionType(typeCollection, witnessTableCollection) is semantically carrying a tuple of
-				-- two values: a value of CollectionTagType(witnessTableCollection) to represent the tag, and a payload value of type
-				-- ValueOfCollectionType(typeCollection), which conceptually represents a union/"anyvalue" type.
+				-- An inst whose type is a TaggedUnionType(typeSet, witnessTableSet) is semantically carrying a tuple of
+				-- two values: a value of SetTagType(witnessTableSet) to represent the tag, and a payload value of type
+				-- UntaggedUnionType(typeSet), which conceptually represents a union/"anyvalue" type.
 				--
 				-- This is most commonly used to specialize the type of existential insts once the possibilities can be statically determined.
 				-- 
-				-- Operands are a TypeCollection and a WitnessTableCollection that represent the possibilities of the existential
+				-- Operands are a TypeSet and a WitnessTableSet that represent the possibilities of the existential
 			} }
 		},
 	},
@@ -2683,15 +2683,15 @@ local insts = {
 			-- A collection of IR instructions used for propagation analysis.
 			hoistable = true,
 			{
-				CollectionBase = {
+				SetBase = {
 					-- Base class for all collection types.
 					--
 					-- Semantically, collections model sets of concrete values, and use Slang's de-duplication infrastructure
 					-- to allow set-equality to be the same as inst identity.
 					--
-					-- - Collection ops have one or more operands that represent the elements of the collection
+					-- - Set ops have one or more operands that represent the elements of the collection
 					--
-					-- - Collection ops must have at least one operand. A zero-operand collection is illegal.
+					-- - Set ops must have at least one operand. A zero-operand collection is illegal.
 					--   The type-flow pass will represent this case using nullptr, so that uniqueness is preserved.
 					--
 					-- - All operands of a collection _must_ be concrete, individual insts 
@@ -2701,21 +2701,21 @@ local insts = {
 					-- 
 					-- - Since collections are hositable, collection ops should (consequently) only appear in the global scope.
 					--
-					-- - Collection operands must be consistently sorted. i.e. a TypeCollection(A, B) and TypeCollection(B, A)
+					-- - Set operands must be consistently sorted. i.e. a TypeSet(A, B) and TypeSet(B, A)
 					--   cannot exist at the same time, but either one is okay.
 					--
-					-- - To help with the implementation of collections, the CollectionBuilder class is provided
+					-- - To help with the implementation of collections, the SetBuilder class is provided
 					--   in slang-ir-typeflow-collection.h.
-					--   All collection insts must be built using the CollectionBuilder, which uses a persistent map on the module
+					--   All collection insts must be built using the SetBuilder, which uses a persistent map on the module
 					--   inst to ensure stable ordering.
 					--
-					{ TypeCollection = {} },
-					{ FuncCollection = {} },
-					{ WitnessTableCollection = {} },
-					{ GenericCollection = {} },
+					{ TypeSet = {} },
+					{ FuncSet = {} },
+					{ WitnessTableSet = {} },
+					{ GenericSet = {} },
 				},
 			},
-			{ UnboundedCollection = {
+			{ UnboundedSet = {
 				--
 				-- A catch-all opcode to represent unbounded collections during
 				-- the type-flow specialization pass.
@@ -2741,15 +2741,15 @@ local insts = {
 	{ CastTaggedUnionToInterfacePtr = {
 		-- Cast a tagged-union pointer with a known set to a corresponding interface-typed pointer.
 	} }, 
-	{ GetTagForSuperCollection = {
+	{ GetTagForSuperSet = {
 		-- Translate a tag from a set to its equivalent in a super-set
 		-- TODO: Lower using a global ID and not local IDs + mapping ops.
 	} }, 
-	{ GetTagForMappedCollection = {
+	{ GetTagForMappedSet = {
 		-- Translate a tag from a set to its equivalent in a different set
 		-- based on a mapping induced by a lookup key
 	} },
-	{ GetTagForSpecializedCollection = { 
+	{ GetTagForSpecializedSet = { 
 		-- Translate a tag from a generic set to its equivalent in a specialized set
 		-- based on a mapping that is encoded in the operands of this tag instruction
 	} },
@@ -2762,8 +2762,8 @@ local insts = {
 	} },
 	{ GetElementFromTag = { 
 	    -- Translate a tag to its corresponding element in the collection. 
-		-- Input's type: CollectionTagType(collection). 
-		-- Output's type: ElementOfCollectionType(collection)
+		-- Input's type: SetTagType(collection). 
+		-- Output's type: ElementOfSetType(collection)
 		--
 		operands = {{"tag"}}
 	} },
@@ -2775,11 +2775,11 @@ local insts = {
 		--         or else this is a malformed inst.
 		--
 		-- Output: a value of 'FuncType' that can be called.
-		--         This func-type will take a `TagType(witnessTableCollection)` as the first parameter to 
+		--         This func-type will take a `TagType(witnessTableSet)` as the first parameter to 
 		--         discriminate which witness table to use, and the rest of the parameters.
 		--
 		hoistable = true,
-		operands = {{"witnessTableCollection", "IRWitnessTableCollection"}, {"lookupKey", "IRStructKey"}}
+		operands = {{"witnessTableSet", "IRWitnessTableSet"}, {"lookupKey", "IRStructKey"}}
 	} },
 	{ GetSpecializedDispatcher = {
 		-- Get a specialized dispatcher function for a given witness table set + key, where
@@ -2791,36 +2791,36 @@ local insts = {
 		--         A set of specialization arguments (these must be concrete/global types or collections)
 		--
 		-- Output: a value of `FuncType` that can be called.
-		--         This func-type will take a `TagType(witnessTableCollection)` as the first parameter to 
+		--         This func-type will take a `TagType(witnessTableSet)` as the first parameter to 
 		--         discriminate which generic to use, and the rest of the parameters.
 		--
 		hoistable = true
 	} },
 	{ GetTagFromTaggedUnion = {
 		-- Translate a tagged-union value to its corresponding tag in the tagged-union's set.
-		-- Input's type: CollectionTaggedUnionType(typeCollection, tableCollection)
-		-- Output's type: CollectionTagType(tableCollection)
+		-- Input's type: TaggedUnionType(typeSet, tableSet)
+		-- Output's type: SetTagType(tableSet)
 		operands = {{"taggedUnionValue"}}
 	} },
 	{ GetTypeTagFromTaggedUnion = {
 		-- Translate a tagged-union value to its corresponding type tag in the tagged-union's set.
-		-- Input's type: CollectionTaggedUnionType(typeCollection, tableCollection)
-		-- Output's type: CollectionTagType(typeCollection)
+		-- Input's type: TaggedUnionType(typeSet, tableSet)
+		-- Output's type: SetTagType(typeSet)
 		operands = {{"taggedUnionValue"}}
 	} },
 	{ GetValueFromTaggedUnion = {
 		-- Translate a tagged-union value to its corresponding value in the tagged-union's set.
-		-- Input's type: CollectionTaggedUnionType(typeCollection, tableCollection)
-		-- Output's type: ValueOfCollectionType(typeCollection)
+		-- Input's type: TaggedUnionType(typeSet, tableSet)
+		-- Output's type: UntaggedUnionType(typeSet)
 		operands = {{"taggedUnionValue"}}
 	} },
 	{ MakeTaggedUnion = {
 		-- Create a tagged-union value from a tag and a value.
-		-- Input's type: CollectionTagType(tableCollection), ValueOfCollectionType(typeCollection)
-		-- Output's type: CollectionTaggedUnionType(typeCollection, tableCollection)
+		-- Input's type: SetTagType(tableSet), UntaggedUnionType(typeSet)
+		-- Output's type: TaggedUnionType(typeSet, tableSet)
 		operands = { { "tag" }, { "value" } },
 	} },
-	{ GetTagOfElementInCollection = {
+	{ GetTagOfElementInSet = {
 		-- Get the tag corresponding to an element in a collection.
 		hoistable = true
 	} },

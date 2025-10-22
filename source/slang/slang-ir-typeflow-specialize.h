@@ -18,5 +18,5 @@ namespace Slang
 //
 bool specializeDynamicInsts(IRModule* module, DiagnosticSink* sink);
 
-bool isDynamicGeneric(IRInst* callee);
+bool isSetSpecializedGeneric(IRInst* callee);
 } // namespace Slang

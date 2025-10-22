@@ -11,21 +11,15 @@ namespace Slang
 //
 
 template<typename F>
-void forEachInCollection(IRCollectionBase* info, F func)
+void forEachInSet(IRSetBase* info, F func)
 {
     for (UInt i = 0; i < info->getOperandCount(); ++i)
         func(info->getOperand(i));
 }
 
-template<typename F>
-void forEachInCollection(IRCollectionTagType* tagType, F func)
-{
-    forEachInCollection(as<IRCollectionBase>(tagType->getCollection()), func);
-}
-
 // Upcast the value in 'arg' to match the destInfo type. This method inserts
 // any necessary reinterprets or tag translation instructions.
 //
-IRInst* upcastCollection(IRBuilder* builder, IRInst* arg, IRType* destInfo);
+IRInst* upcastSet(IRBuilder* builder, IRInst* arg, IRType* destInfo);
 
 } // namespace Slang

@@ -5,19 +5,19 @@
 namespace Slang
 {
 
-// Lower `ValueOfCollectionType` types.
-void lowerTypeCollections(IRModule* module, DiagnosticSink* sink);
+// Lower `UntaggedUnionType` types.
+void lowerUntaggedUnionTypes(IRModule* module, DiagnosticSink* sink);
 
-// Lower `CollectionTaggedUnion` and `CastInterfaceToTaggedUnionPtr` instructions
+// Lower `SetTaggedUnion` and `CastInterfaceToTaggedUnionPtr` instructions
 // May create new `Reinterpret` instructions.
 //
 bool lowerTaggedUnionTypes(IRModule* module, DiagnosticSink* sink);
 
-// Lower `CollectionTagType` types
+// Lower `SetTagType` types
 void lowerTagTypes(IRModule* module);
 
-// Lower `GetTagOfElementInCollection`,
-// `GetTagForSuperCollection`, and `GetTagForMappedCollection` instructions,
+// Lower `GetTagOfElementInSet`,
+// `GetTagForSuperSet`, and `GetTagForMappedSet` instructions,
 //
 void lowerTagInsts(IRModule* module, DiagnosticSink* sink);
 

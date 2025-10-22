@@ -864,13 +864,13 @@ struct SpecializationContext
         IRInterfaceType* interfaceType = nullptr;
         if (!witnessTable)
         {
-            if (auto collection = as<IRWitnessTableCollection>(lookupInst->getWitnessTable()))
+            if (auto collection = as<IRWitnessTableSet>(lookupInst->getWitnessTable()))
             {
                 auto requirementKey = lookupInst->getRequirementKey();
 
                 HashSet<IRInst*> satisfyingValSet;
                 bool skipSpecialization = false;
-                forEachInCollection(
+                forEachInSet(
                     collection,
                     [&](IRInst* instElement)
                     {
@@ -890,17 +890,16 @@ struct SpecializationContext
                 if (!skipSpecialization)
                 {
                     IRBuilder builder(module);
-                    auto newCollection = builder.getCollection(satisfyingValSet);
+                    auto newSet = builder.getSet(satisfyingValSet);
                     addUsersToWorkList(lookupInst);
-                    if (as<IRTypeCollection>(newCollection))
+                    if (as<IRTypeSet>(newSet))
                     {
-                        lookupInst->replaceUsesWith(
-                            builder.getValueOfCollectionType(newCollection));
+                        lookupInst->replaceUsesWith(builder.getUntaggedUnionType(newSet));
                         lookupInst->removeAndDeallocate();
                     }
-                    else if (as<IRWitnessTableCollection>(newCollection))
+                    else if (as<IRWitnessTableSet>(newSet))
                     {
-                        lookupInst->replaceUsesWith(newCollection);
+                        lookupInst->replaceUsesWith(newSet);
                         lookupInst->removeAndDeallocate();
                     }
                     else
@@ -3180,8 +3179,8 @@ void finalizeSpecialization(IRModule* module)
     }
 }
 
-// Evaluate a `Specialize` inst where the arguments are collections rather than
-// concrete singleton types and the generic returns a function.
+// Evaluate a `Specialize` inst where the arguments are sets of types (or witness tables)
+// rather than concrete singleton types and the generic returns a function.
 //
 // This needs to be slightly different from the usual case because the function
 // needs dynamic information to select a specific element from each collection
@@ -3190,7 +3189,7 @@ void finalizeSpecialization(IRModule* module)
 // The resulting function will therefore have additional parameters at the beginning
 // to accept this information.
 //
-IRInst* specializeDynamicGeneric(IRSpecialize* specializeInst)
+IRInst* specializeGenericWithSetArgs(IRSpecialize* specializeInst)
 {
     // The high-level logic for specializing a generic to operate over collections
     // is similar to specializing a simple generic:
@@ -3209,8 +3208,8 @@ IRInst* specializeDynamicGeneric(IRSpecialize* specializeInst)
     //
     // - Add any dynamic parameters of the generic to the function's first block. Keep track of the
     //   first block for later. For now, we only treat `WitnessTableType` parameters that have
-    //   `WitnessTableCollection` arguments (with atleast 2 distinct elements) as dynamic. Each such
-    //   parameter will get a corresponding parameter of `TagType(tableCollection)`
+    //   `WitnessTableSet` arguments (with atleast 2 distinct elements) as dynamic. Each such
+    //   parameter will get a corresponding parameter of `TagType(tableSet)`
     //
     // - Clone in the rest of the generic's body into the first block of the function.
     //   The tricky part here is that we may have parameter types that depend on other parameters.
@@ -3256,13 +3255,13 @@ IRInst* specializeDynamicGeneric(IRSpecialize* specializeInst)
     for (auto param : generic->getFirstBlock()->getParams())
     {
         auto specArg = specializeInst->getArg(argIndex++);
-        if (auto collection = as<IRCollectionBase>(specArg))
+        if (auto collection = as<IRSetBase>(specArg))
         {
             // We're dealing with a set of types.
             if (as<IRTypeType>(param->getDataType()))
             {
                 SLANG_ASSERT("Should not happen");
-                cloneEnv.mapOldValToNew[param] = builder.getValueOfCollectionType(collection);
+                cloneEnv.mapOldValToNew[param] = builder.getUntaggedUnionType(collection);
             }
             else if (as<IRWitnessTableType>(param->getDataType()))
             {
@@ -3274,7 +3273,7 @@ IRInst* specializeDynamicGeneric(IRSpecialize* specializeInst)
                 // We'll create an integer parameter for all the rest of
                 // the insts which will may need the runtime tag.
                 //
-                auto tagType = (IRType*)builder.getCollectionTagType(collection);
+                auto tagType = (IRType*)builder.getSetTagType(collection);
                 // cloneEnv.mapOldValToNew[param] = builder.emitParam(tagType);
                 extraParamMap.add(param, builder.emitParam(tagType));
                 extraParamTypes.add(tagType);
@@ -3400,8 +3399,8 @@ IRInst* specializeGenericImpl(
     IRModule* module,
     SpecializationContext* context)
 {
-    if (isDynamicGeneric(specializeInst))
-        return specializeDynamicGeneric(specializeInst);
+    if (isSetSpecializedGeneric(specializeInst))
+        return specializeGenericWithSetArgs(specializeInst);
 
     // Effectively, specializing a generic amounts to "calling" the generic
     // on its concrete argument values and computing the
@@ -3540,8 +3539,8 @@ IRInst* specializeGeneric(IRSpecialize* specializeInst)
     if (!module)
         return specializeInst;
 
-    if (isDynamicGeneric(specializeInst))
-        return specializeDynamicGeneric(specializeInst);
+    if (isSetSpecializedGeneric(specializeInst))
+        return specializeGenericWithSetArgs(specializeInst);
 
     // Standard static specialization of generic.
     return specializeGenericImpl(baseGeneric, specializeInst, module, nullptr);

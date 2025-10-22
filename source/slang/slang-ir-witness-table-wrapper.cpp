@@ -124,96 +124,6 @@ struct GenerateWitnessTableWrapperContext
     }
 };
 
-
-// DUPLICATES... put into common file.
-
-
-static bool isTaggedUnionType(IRInst* type)
-{
-    return as<IRCollectionTaggedUnionType>(type) != nullptr;
-}
-/*
-static UCount getCollectionCount(IRCollectionBase* collection)
-{
-    if (!collection)
-        return 0;
-    return collection->getOperandCount();
-}
-
-static UCount getCollectionCount(IRCollectionTagType* tagType)
-{
-    auto collection = tagType->getOperand(0);
-    return getCollectionCount(as<IRCollectionBase>(collection));
-}
-
-static IRInst* upcastCollection(IRBuilder* builder, IRInst* arg, IRType* destInfo)
-{
-    auto argInfo = arg->getDataType();
-    if (!argInfo || !destInfo)
-        return arg;
-
-    if (isTaggedUnionType(argInfo) && isTaggedUnionType(destInfo))
-    {
-        auto argTupleType = as<IRTupleType>(argInfo);
-        auto destTupleType = as<IRTupleType>(destInfo);
-
-        List<IRInst*> upcastedElements;
-        bool hasUpcastedElements = false;
-
-        // Upcast each element of the tuple
-        for (UInt i = 0; i < argTupleType->getOperandCount(); ++i)
-        {
-            auto argElementType = argTupleType->getOperand(i);
-            auto destElementType = destTupleType->getOperand(i);
-
-            // If the element types are different, we need to reinterpret
-            if (argElementType != destElementType)
-            {
-                hasUpcastedElements = true;
-                upcastedElements.add(upcastCollection(
-                    builder,
-                    builder->emitGetTupleElement((IRType*)argElementType, arg, i),
-                    (IRType*)destElementType));
-            }
-            else
-            {
-                upcastedElements.add(builder->emitGetTupleElement((IRType*)argElementType, arg, i));
-            }
-        }
-
-        if (hasUpcastedElements)
-        {
-            return builder->emitMakeTuple(upcastedElements);
-        }
-    }
-    else if (as<IRCollectionTagType>(argInfo) && as<IRCollectionTagType>(destInfo))
-    {
-        if (getCollectionCount(as<IRCollectionTagType>(argInfo)) !=
-            getCollectionCount(as<IRCollectionTagType>(destInfo)))
-        {
-            return builder
-                ->emitIntrinsicInst((IRType*)destInfo, kIROp_GetTagForSuperCollection, 1, &arg);
-        }
-    }
-    else if (as<IRCollectionBase>(argInfo) && as<IRCollectionBase>(destInfo))
-    {
-        if (getCollectionCount(as<IRCollectionBase>(argInfo)) !=
-            getCollectionCount(as<IRCollectionBase>(destInfo)))
-        {
-            // If the sets of witness tables are not equal, reinterpret to the parameter type
-            return builder->emitReinterpret((IRType*)destInfo, arg);
-        }
-    }
-    else if (!as<IRCollectionBase>(argInfo) && as<IRCollectionBase>(destInfo))
-    {
-        SLANG_UNEXPECTED("Raw collections should not appear");
-        return builder->emitPackAnyValue((IRType*)destInfo, arg);
-    }
-
-    return arg; // Can use as-is.
-}
-*/
-
 // Represents a work item for packing `inout` or `out` arguments after a concrete call.
 struct ArgumentPackWorkItem
 {
@@ -231,7 +141,7 @@ struct ArgumentPackWorkItem
 
 bool isAnyValueType(IRType* type)
 {
-    if (as<IRAnyValueType>(type) || as<IRValueOfCollectionType>(type))
+    if (as<IRAnyValueType>(type) || as<IRUntaggedUnionType>(type))
         return true;
     return false;
 }
@@ -297,7 +207,7 @@ IRInst* maybeUnpackArg(
     // by checking if the types are different, but this should be
     // encoded in the types.
     //
-    if (isTaggedUnionType(paramValType) && isTaggedUnionType(argValType) &&
+    if (as<IRTaggedUnionType>(paramValType) && as<IRTaggedUnionType>(argValType) &&
         paramValType != argValType)
     {
         // if parameter expects an `out` pointer, store the unpacked val into a
@@ -395,7 +305,7 @@ IRFunc* emitWitnessTableWrapper(IRModule* module, IRInst* funcInst, IRInst* inte
         auto concreteVal = builder->emitLoad(item.concreteArg);
         auto packedVal = (item.kind == ArgumentPackWorkItem::Kind::Pack)
                              ? builder->emitPackAnyValue(anyValType, concreteVal)
-                             : upcastCollection(builder, concreteVal, anyValType);
+                             : upcastSet(builder, concreteVal, anyValType);
         builder->emitStore(item.dstArg, packedVal);
     }
 
@@ -408,7 +318,7 @@ IRFunc* emitWitnessTableWrapper(IRModule* module, IRInst* funcInst, IRInst* inte
     }
     else if (call->getDataType() != funcTypeInInterface->getResultType())
     {
-        auto reinterpret = upcastCollection(builder, call, funcTypeInInterface->getResultType());
+        auto reinterpret = upcastSet(builder, call, funcTypeInInterface->getResultType());
         builder->emitReturn(reinterpret);
     }
     else

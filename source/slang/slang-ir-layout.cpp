@@ -300,7 +300,7 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
             return SLANG_OK;
         }
         break;
-    case kIROp_CollectionTagType:
+    case kIROp_SetTagType:
         {
             outSizeAndAlignment->size = 4;
             outSizeAndAlignment->alignment = 4;

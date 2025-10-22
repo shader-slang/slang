@@ -1018,7 +1018,7 @@ SlangInt _getAnyValueSizeRaw(IRType* type, SlangInt offset)
         {
             return alignUp(offset, 4) + kRTTIHandleSize;
         }
-    case kIROp_CollectionTagType:
+    case kIROp_SetTagType:
         {
             return alignUp(offset, 4) + 4;
         }

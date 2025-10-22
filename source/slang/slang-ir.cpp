@@ -6554,7 +6554,7 @@ IREntryPointLayout* IRBuilder::getEntryPointLayout(
         operands));
 }
 
-IRCollectionBase* IRBuilder::getCollection(IROp op, const HashSet<IRInst*>& elements)
+IRSetBase* IRBuilder::getSet(IROp op, const HashSet<IRInst*>& elements)
 {
     if (elements.getCount() == 0)
         return nullptr;
@@ -6562,7 +6562,7 @@ IRCollectionBase* IRBuilder::getCollection(IROp op, const HashSet<IRInst*>& elem
     // Verify that all operands are global instructions
     for (auto element : elements)
         if (element->getParent()->getOp() != kIROp_ModuleInst)
-            SLANG_ASSERT_FAILURE("createCollection called with non-global operands");
+            SLANG_ASSERT_FAILURE("createSet called with non-global operands");
 
     List<IRInst*> sortedElements;
     for (auto element : elements)
@@ -6572,25 +6572,25 @@ IRCollectionBase* IRBuilder::getCollection(IROp op, const HashSet<IRInst*>& elem
     sortedElements.sort(
         [&](IRInst* a, IRInst* b) -> bool { return getUniqueID(a) < getUniqueID(b); });
 
-    return as<IRCollectionBase>(
+    return as<IRSetBase>(
         emitIntrinsicInst(nullptr, op, sortedElements.getCount(), sortedElements.getBuffer()));
 }
 
-IRCollectionBase* IRBuilder::getCollection(const HashSet<IRInst*>& elements)
+IRSetBase* IRBuilder::getSet(const HashSet<IRInst*>& elements)
 {
     SLANG_ASSERT(elements.getCount() > 0);
     auto firstElement = *elements.begin();
-    return getCollection(getCollectionTypeForInst(firstElement), elements);
+    return getSet(getSetTypeForInst(firstElement), elements);
 }
 
-IRCollectionBase* IRBuilder::getSingletonCollection(IROp op, IRInst* element)
+IRSetBase* IRBuilder::getSingletonSet(IROp op, IRInst* element)
 {
-    return getCollection(op, {element});
+    return getSet(op, {element});
 }
 
-IRCollectionBase* IRBuilder::getSingletonCollection(IRInst* element)
+IRSetBase* IRBuilder::getSingletonSet(IRInst* element)
 {
-    return getCollection(getCollectionTypeForInst(element), {element});
+    return getSet(getSetTypeForInst(element), {element});
 }
 
 UInt IRBuilder::getUniqueID(IRInst* inst)
@@ -6605,19 +6605,19 @@ UInt IRBuilder::getUniqueID(IRInst* inst)
     return id;
 }
 
-IROp IRBuilder::getCollectionTypeForInst(IRInst* inst)
+IROp IRBuilder::getSetTypeForInst(IRInst* inst)
 {
     if (as<IRGeneric>(inst))
-        return kIROp_GenericCollection;
+        return kIROp_GenericSet;
 
     if (as<IRTypeKind>(inst->getDataType()))
-        return kIROp_TypeCollection;
+        return kIROp_TypeSet;
     else if (as<IRFuncType>(inst->getDataType()))
-        return kIROp_FuncCollection;
+        return kIROp_FuncSet;
     else if (as<IRType>(inst) && !as<IRInterfaceType>(inst))
-        return kIROp_TypeCollection;
+        return kIROp_TypeSet;
     else if (as<IRWitnessTableType>(inst->getDataType()))
-        return kIROp_WitnessTableCollection;
+        return kIROp_WitnessTableSet;
     else
         return kIROp_Invalid; // Return invalid IROp when not supported
 }
@@ -8545,9 +8545,9 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_GetCurrentStage:
     case kIROp_GetDispatcher:
     case kIROp_GetSpecializedDispatcher:
-    case kIROp_GetTagForMappedCollection:
-    case kIROp_GetTagForSpecializedCollection:
-    case kIROp_GetTagForSuperCollection:
+    case kIROp_GetTagForMappedSet:
+    case kIROp_GetTagForSpecializedSet:
+    case kIROp_GetTagForSuperSet:
     case kIROp_GetTagFromSequentialID:
     case kIROp_GetSequentialIDFromTag:
     case kIROp_CastInterfaceToTaggedUnionPtr:
@@ -8557,7 +8557,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_GetTypeTagFromTaggedUnion:
     case kIROp_GetValueFromTaggedUnion:
     case kIROp_MakeTaggedUnion:
-    case kIROp_GetTagOfElementInCollection:
+    case kIROp_GetTagOfElementInSet:
         return false;
 
     case kIROp_ForwardDifferentiate:

@@ -1150,7 +1150,7 @@ Result linkAndOptimizeIR(
     if (lowerTaggedUnionTypes(irModule, sink))
         requiredLoweringPassSet.reinterpret = true;
 
-    lowerTypeCollections(irModule, sink);
+    lowerUntaggedUnionTypes(irModule, sink);
 
     if (requiredLoweringPassSet.reinterpret)
         lowerReinterpret(targetProgram, irModule, sink);
