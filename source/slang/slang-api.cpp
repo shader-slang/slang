@@ -80,7 +80,7 @@ SlangResult tryLoadBuiltinModuleFromDLL(
     // Modules are runtime-loaded libraries. We need to version these because
     // they end up deployed on Mac and Linux platforms in a directory that ends
     // up in the library path.
-    Slang::String versionString = (SLANG_WINDOWS_FAMILY) ? "" : Slang::String("-") + SLANG_TAG_VERSION;
+    Slang::String versionString = (SLANG_WINDOWS_FAMILY) ? "" : Slang::String("-") + SLANG_VERSION_NUMERIC;
     Slang::String moduleFileName =
         Slang::String("slang-") + Slang::getBuiltinModuleNameStr(builtinModuleName) +
         "-module" + versionString;
