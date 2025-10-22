@@ -2921,7 +2921,7 @@ static void legalizeMeshOutputParam(
                     s->replaceUsesWith(builder->emitLoad(tmp));
                     s->removeAndDeallocate();
                 }
-                else if (const auto swiz = as<IRSwizzledStore>(s))
+                else if (as<IRSwizzledStore>(s))
                 {
                     SLANG_UNEXPECTED("Swizzled store to a non-address ScalarizedVal");
                 }
@@ -3447,7 +3447,7 @@ void legalizeEntryPointParameterForGLSL(
     {
         valueType = paramPtrType->getValueType();
     }
-    if (const auto gsStreamType = as<IRHLSLStreamOutputType>(valueType))
+    if (as<IRHLSLStreamOutputType>(valueType))
     {
         // An output stream type like `TriangleStream<Foo>` should
         // more or less translate into `out Foo` (plus scalarization).
@@ -3596,7 +3596,7 @@ void legalizeEntryPointParameterForGLSL(
         auto localVariable = builder->emitVar(valueType);
         auto localVal = ScalarizedVal::address(localVariable);
 
-        if (const auto inOutType = as<IRBorrowInOutParamType>(paramType))
+        if (as<IRBorrowInOutParamType>(paramType))
         {
             // In the `in out` case we need to declare two
             // sets of global variables: one for the `in`

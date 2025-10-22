@@ -573,7 +573,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             elementType = dropNormAttributes(elementType);
 
             SLANG_ASSERT(elementType);
-            if (const auto basicType = as<IRBasicType>(elementType))
+            if (as<IRBasicType>(elementType))
             {
                 // A scalar result is expected
 
@@ -596,7 +596,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
                     m_writer->emit(swiz[elementCount]);
                 }
             }
-            else if (const auto attrType = as<IRAttributedType>(elementType))
+            else if (as<IRAttributedType>(elementType))
             {
                 SLANG_UNEXPECTED("unhandled attributed type in intrinsic definition");
             }

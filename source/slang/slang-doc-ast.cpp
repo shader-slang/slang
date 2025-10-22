@@ -13,15 +13,15 @@ namespace Slang
 {
     typedef Extractor::SearchStyle SearchStyle;
 
-    if (const auto enumCaseDecl = as<EnumCaseDecl>(decl))
+    if (as<EnumCaseDecl>(decl))
     {
         return SearchStyle::EnumCase;
     }
-    if (const auto paramDecl = as<ParamDecl>(decl))
+    if (as<ParamDecl>(decl))
     {
         return SearchStyle::Param;
     }
-    else if (const auto callableDecl = as<CallableDecl>(decl))
+    else if (as<CallableDecl>(decl))
     {
         return SearchStyle::Function;
     }

@@ -232,11 +232,11 @@ Val* maybeSubstituteGenericParam(Val* paramVal, Decl* paramDecl, SubstitutionSet
             (*ioDiff)++;
             return args[argIndex];
         }
-        else if (const auto typeParam = as<GenericTypeParamDeclBase>(m))
+        else if (as<GenericTypeParamDeclBase>(m))
         {
             argIndex++;
         }
-        else if (const auto valParam = as<GenericValueParamDecl>(m))
+        else if (as<GenericValueParamDecl>(m))
         {
             argIndex++;
         }
@@ -1360,7 +1360,7 @@ IntVal* PolynomialIntVal::mul(ASTBuilder* astBuilder, IntVal* op0, IntVal* op1)
     }
     else if (auto val0 = as<IntVal>(op0))
     {
-        if (const auto poly1 = as<PolynomialIntVal>(op1))
+        if (as<PolynomialIntVal>(op1))
         {
             return mul(astBuilder, op1, op0);
         }

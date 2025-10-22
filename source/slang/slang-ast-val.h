@@ -379,7 +379,7 @@ public:
         }
         else
         {
-            if (const auto thatGenParam = as<DeclRefIntVal>(other.getParam()))
+            if (as<DeclRefIntVal>(other.getParam()))
             {
                 return false;
             }

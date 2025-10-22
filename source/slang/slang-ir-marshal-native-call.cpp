@@ -250,7 +250,7 @@ IRFunc* NativeCallMarshallingContext::generateDLLExportWrapperFunc(
     }
     auto originalReturnType = originalFunc->getResultType();
     auto callInst = builder.emitCallInst(originalReturnType, originalFunc, args);
-    if (const auto resultType = as<IRResultType>(originalReturnType))
+    if (as<IRResultType>(originalReturnType))
     {
         auto isResultError = builder.emitIsResultError(callInst);
         IRBlock* trueBlock = nullptr;

@@ -53,26 +53,26 @@ bool DeclPassesLookupMask(Decl* decl, LookupMask mask)
         }
     }
     // type declarations
-    if (const auto aggTypeDecl = as<AggTypeDecl>(decl))
+    if (as<AggTypeDecl>(decl))
     {
         return int(mask) & int(LookupMask::type);
     }
-    else if (const auto simpleTypeDecl = as<SimpleTypeDecl>(decl))
+    else if (as<SimpleTypeDecl>(decl))
     {
         return int(mask) & int(LookupMask::type);
     }
     // function declarations
-    else if (const auto funcDecl = as<FunctionDeclBase>(decl))
+    else if (as<FunctionDeclBase>(decl))
     {
         return (int(mask) & int(LookupMask::Function)) != 0;
     }
     // attribute declaration
-    else if (const auto attrDecl = as<AttributeDecl>(decl))
+    else if (as<AttributeDecl>(decl))
     {
         return (int(mask) & int(LookupMask::Attribute)) != 0;
     }
     // syntax declaration
-    else if (const auto syntaxDecl = as<SyntaxDecl>(decl))
+    else if (as<SyntaxDecl>(decl))
     {
         return (int(mask) & int(LookupMask::SyntaxDecl)) != 0;
     }
