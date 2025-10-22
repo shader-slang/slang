@@ -36,6 +36,8 @@ using namespace slang;
 namespace Slang
 {
 
+// TODO: Merge this with LLVMJITSharedLibrary from slang-llvm, there's nothing
+// unique here.
 class LLVMJITSharedLibrary2 : public ComBaseObject, public ISlangSharedLibrary
 {
 public:
@@ -83,6 +85,9 @@ protected:
     std::unique_ptr<llvm::orc::LLJIT> jit;
 };
 
+// There doesn't appear to be an LLVM output stream for writing into a memory
+// buffer. This implementation saves all written data directly into Slang's List
+// type.
 struct BinaryLLVMOutputStream: public llvm::raw_pwrite_stream
 {
     List<uint8_t>& output;
@@ -117,6 +122,9 @@ struct BinaryLLVMOutputStream: public llvm::raw_pwrite_stream
     }
 };
 
+// This function attempts to find names associated with a variable or function.
+// `linkageName` is the name actually used as a symbol in object code and LLVM
+// IR, while `prettyName` is shown to the user in a debugger.
 static bool maybeGetName(
     llvm::StringRef* linkageNameOut,
     llvm::StringRef* prettyNameOut,
@@ -141,6 +149,8 @@ static bool maybeGetName(
         prettyName = nameDecor->getName();
     }
 
+    // If we don't have a pretty name or a linkage name, use the other one for
+    // both.
     if (prettyName.getLength() == 0)
         prettyName = linkageName;
     else if (linkageName.getLength() == 0)
@@ -158,30 +168,6 @@ static llvm::StringRef getStringLitAsLLVMString(IRInst* inst)
 {
     auto source = as<IRStringLit>(inst)->getStringSlice();
     return llvm::StringRef(source.begin(), source.getLength());
-}
-
-static IRStructField* findStructField(IRStructType* irStruct, UInt irIndex)
-{
-    UInt i = 0;
-    for (auto field : irStruct->getFields())
-    {
-        if (i == irIndex)
-            return field;
-        i++;
-    }
-    return nullptr;
-}
-
-static UInt getStructIndexByKey(IRStructType* irStruct, IRStructKey* irKey)
-{
-    UInt i = 0;
-    for (auto field : irStruct->getFields())
-    {
-        if(field->getKey() == irKey)
-            return i;
-        i++;
-    }
-    SLANG_UNEXPECTED("Requested key that doesn't exist in struct!");
 }
 
 static bool isVolatile(IRInst* value)
@@ -315,16 +301,18 @@ private:
         // doesn't need trailing padding.
         llvm::Type* unpadded = nullptr;
 
+        // LLVM field indices do not necessarily match Slang IR; additional
+        // padding entries may have been generated. This is only populated for
+        // structs.
+        Dictionary<IRStructField*, UInt> llvmFieldIndex;
+
+        // Excludes trailing padding. The index is the LLVM field index, not
+        // Slang index.
+        List<UInt> sizePerLLVMField;
+
         // The amount of trailing padding is stored here separately, due to the
         // padded / unpadded type split.
         UInt trailingPadding = 0;
-
-        // Populated for structs, maps a given Slang IR field index to the LLVM
-        // struct type field index. This is needed to skip over padding.
-        List<UInt> fieldIndexToLLVM;
-
-        // Excludes trailing padding.
-        List<UInt> sizePerLLVMField;
 
         // Filled in separately via getDebugType.
         llvm::DIType* debugType = nullptr;
@@ -1083,56 +1071,43 @@ public:
     }
 
     // Uses `getStorageType(valType, rules)` to compute an offset pointer with
-    // `indexInst` based on `llvmPtr`. `elementType` is set to the Slang IR type
-    // that corresponds to the selected element.
-    llvm::Value* emitGetElementPtr(
+    // `indexInst` based on `llvmPtr`. This overload allows a dynamic index and
+    // works with vectors and arrays.
+    llvm::Value* emitArrayGetElementPtr(
         llvm::Value* llvmPtr,
         llvm::Value* indexInst,
         IRType* valType,
-        IRTypeLayoutRules* rules,
-        IRType*& elementType
+        IRTypeLayoutRules* rules
     ){
+        // Should've called emitStructGetElementPtr instead!
+        SLANG_ASSERT(!as<IRStructType>(valType));
+
         llvm::Type* llvmType = getStorageType(valType, rules);
-        if(auto structType = as<IRStructType>(valType))
-        {
-            // 'index' must be constant for struct types.
-            int64_t index = 0;
-            if (auto intLit = llvm::cast<llvm::ConstantInt>(indexInst))
-            {
-                index = intLit->getValue().getLimitedValue();
-            }
-            else
-            {
-                SLANG_ASSERT_FAILURE("GetElement on structs only supports constant indices on LLVM");
-            }
-
-            auto& storageInfo = storageTypeMap.getValue(rules).getValue(structType);
-
-            elementType = findStructField(structType, index)->getFieldType();
-            UInt llvmIndex = storageInfo.fieldIndexToLLVM[index];
-
-            llvm::Value* indices[2] = {
-                builder->getInt32(0),
-                builder->getInt32(llvmIndex),
-            };
-            return builder->CreateGEP(llvmType, llvmPtr, indices);
-        }
-        else if(auto arrayType = as<IRArrayTypeBase>(valType))
-        {
-            elementType = arrayType->getElementType();
-        }
-        else if(auto vectorType = as<IRVectorType>(valType))
-        {
-            elementType = vectorType->getElementType();
-        }
-        else
-        {
-            SLANG_ASSERT_FAILURE("Unhandled type for GetElementPtr!");
-        }
-
         llvm::Value* indices[2] = {
             builder->getInt32(0),
             indexInst
+        };
+        return builder->CreateGEP(llvmType, llvmPtr, indices);
+    }
+
+    // Uses `getStorageType(valType, rules)` to compute an offset pointer with
+    // `indexInst` based on `llvmPtr`. This overload is for structs, where
+    // dynamic indexing is not allowed.
+    llvm::Value* emitStructGetElementPtr(
+        llvm::Value* llvmPtr,
+        IRStructField* field,
+        IRStructType* structType,
+        IRTypeLayoutRules* rules
+    ){
+        llvm::Type* llvmType = getStorageType(structType, rules);
+        // 'index' must be constant for struct types.
+        auto& storageInfo = storageTypeMap.getValue(rules).getValue(structType);
+
+        UInt llvmIndex = storageInfo.llvmFieldIndex[field];
+
+        llvm::Value* indices[2] = {
+            builder->getInt32(0),
+            builder->getInt32(llvmIndex),
         };
         return builder->CreateGEP(llvmType, llvmPtr, indices);
     }
@@ -1341,14 +1316,15 @@ public:
 
                 auto& storageInfo = storageTypeMap.getValue(defaultPointerRules).getValue(structType);
 
+                auto field = structType->getFields().begin();
                 List<llvm::Constant*> values;
-                for (UInt aa = 0; aa < inst->getOperandCount(); ++aa)
+                for (UInt aa = 0; aa < inst->getOperandCount(); ++aa, ++field)
                 {
                     auto constVal = maybeEmitConstant(inst->getOperand(aa), true, false);
                     if (!constVal)
                         return nullptr;
 
-                    UInt entryIndex = storageInfo.fieldIndexToLLVM[aa];
+                    UInt entryIndex = storageInfo.llvmFieldIndex[*field];
 
                     // Add padding entries until we get to the current field.
                     while (UInt(values.getCount()) < entryIndex)
@@ -1414,20 +1390,13 @@ public:
 
     // Returns the index of the given struct field in the corresponding LLVM
     // struct. There may be differences due to added padding fields.
-    UInt mapFieldIndexToLLVM(IRStructType* irStruct, IRTypeLayoutRules* rules, UInt irIndex)
+    UInt mapFieldToLLVM(IRStructType* irStruct, IRTypeLayoutRules* rules, IRStructField* field)
     {
-        if (rules)
-        {
-            // `storageTypeMap` is filled out through getStorageType(), so we
-            // have to call it first even though we don't care about the result
-            // here.
-            getStorageType(irStruct, rules);
-            return storageTypeMap.getValue(rules).getValue(irStruct).fieldIndexToLLVM[irIndex];
-        }
-        else
-        {
-            return irIndex;
-        }
+        // `storageTypeMap` is filled out through getStorageType(), so we
+        // have to call it first even though we don't care about the result
+        // here.
+        getStorageType(irStruct, rules);
+        return storageTypeMap.getValue(rules).getValue(irStruct).llvmFieldIndex[field];
     }
 
 private:
@@ -1458,9 +1427,8 @@ private:
                 llvm::Value* last = nullptr;
                 for (int elem = 0; elem < elemCount; ++elem)
                 {
-                    IRType* dummy;
-                    auto dstElemPtr = emitGetElementPtr(dstPtr, builder->getInt32(elem), type, dstLayout, dummy);
-                    auto srcElemPtr = emitGetElementPtr(srcPtr, builder->getInt32(elem), type, srcLayout, dummy);
+                    auto dstElemPtr = emitArrayGetElementPtr(dstPtr, builder->getInt32(elem), type, dstLayout);
+                    auto srcElemPtr = emitArrayGetElementPtr(srcPtr, builder->getInt32(elem), type, srcLayout);
                     last = crossLayoutMemCpy(
                         dstElemPtr,
                         srcElemPtr,
@@ -1478,16 +1446,14 @@ private:
                 auto structType = as<IRStructType>(type);
 
                 llvm::Value* last = nullptr;
-                UInt fieldIndex = 0;
                 for (auto field : structType->getFields())
                 {
                     auto fieldType = field->getFieldType();
                     if (as<IRVoidType>(fieldType))
                         continue;
 
-                    IRType* dummy;
-                    auto dstElemPtr = emitGetElementPtr(dstPtr, builder->getInt32(fieldIndex), type, dstLayout, dummy);
-                    auto srcElemPtr = emitGetElementPtr(srcPtr, builder->getInt32(fieldIndex), type, srcLayout, dummy);
+                    auto dstElemPtr = emitStructGetElementPtr(dstPtr, field, structType, dstLayout);
+                    auto srcElemPtr = emitStructGetElementPtr(srcPtr, field, structType, srcLayout);
 
                     last = crossLayoutMemCpy(
                         dstElemPtr,
@@ -1497,7 +1463,6 @@ private:
                         srcLayout,
                         isVolatile
                     );
-                    fieldIndex++;
                 }
                 return last;
             }
@@ -1586,7 +1551,7 @@ private:
                 llvmTypeInfo.sizePerLLVMField.add(padding);
 
             // Record the current llvm field index for the mapping. 
-            llvmTypeInfo.fieldIndexToLLVM.add(fieldTypes.getCount());
+            llvmTypeInfo.llvmFieldIndex[field] = fieldTypes.getCount();
 
             // We don't want structs or arrays padded up to their alignment,
             // because scalar layout may pack fields in their predecessor's
@@ -1646,7 +1611,7 @@ private:
             auto fieldType = field->getFieldType();
             if (as<IRVoidType>(fieldType))
                 continue;
-            llvmTypeInfo.fieldIndexToLLVM.add(fieldTypes.getCount());
+            llvmTypeInfo.llvmFieldIndex[field] = fieldTypes.getCount();
             llvm::Type* llvmFieldType = getStorageType(fieldType, nullptr);
             UInt fieldSize = targetDataLayout.getTypeStoreSize(llvmFieldType);
             llvmTypeInfo.sizePerLLVMField.add(fieldSize);
@@ -2603,18 +2568,25 @@ struct LLVMEmitter
             break;
 
         case kIROp_MakeArray:
+            llvmInst = types->emitAlloca(inst->getDataType(), defaultPointerRules);
+            for (UInt aa = 0; aa < inst->getOperandCount(); ++aa)
+            {
+                llvm::Value* ptr = types->emitArrayGetElementPtr(
+                    llvmInst, llvmBuilder->getInt32(aa), inst->getDataType(), defaultPointerRules);
+                auto op = inst->getOperand(aa);
+                types->emitStore(ptr, findValue(op), op->getDataType(), defaultPointerRules);
+            }
+            break;
+
         case kIROp_MakeStruct:
             {
-                llvmInst = types->emitAlloca(inst->getDataType(), defaultPointerRules);
-                for (UInt aa = 0; aa < inst->getOperandCount(); ++aa)
+                IRStructType* type = as<IRStructType>(inst->getDataType());
+                llvmInst = types->emitAlloca(type, defaultPointerRules);
+                auto field = type->getFields().begin();
+                for (UInt aa = 0; aa < inst->getOperandCount(); ++aa, ++field)
                 {
-                    IRType* elementType = nullptr;
-                    llvm::Value* ptr = types->emitGetElementPtr(
-                        llvmInst,
-                        llvmBuilder->getInt32(aa),
-                        inst->getDataType(),
-                        defaultPointerRules,
-                        elementType);
+                    llvm::Value* ptr = types->emitStructGetElementPtr(
+                        llvmInst, *field, type, defaultPointerRules);
                     auto op = inst->getOperand(aa);
                     types->emitStore(ptr, findValue(op), op->getDataType(), defaultPointerRules);
                 }
@@ -2630,13 +2602,11 @@ struct LLVMEmitter
                 auto llvmElement = findValue(element);
                 for (IRIntegerValue i = 0; i < elementCount; ++i)
                 {
-                    IRType* elementType = nullptr;
-                    llvm::Value* ptr = types->emitGetElementPtr(
+                    llvm::Value* ptr = types->emitArrayGetElementPtr(
                         llvmInst,
                         llvmBuilder->getInt32(i),
                         inst->getDataType(),
-                        defaultPointerRules,
-                        elementType);
+                        defaultPointerRules);
                     types->emitStore(ptr, llvmElement, element->getDataType(), defaultPointerRules);
                 }
             }
@@ -2743,14 +2713,15 @@ struct LLVMEmitter
 
                 IRTypeLayoutRules* rules = getPtrLayoutRules(dst);
 
+                IRType* elementType = as<IRVectorType>(dstType)->getElementType();
+
                 for (UInt i = 0; i < swizzledInst->getElementCount(); ++i)
                 {
                     IRInst* irElementIndex = swizzledInst->getElementIndex(i);
                     IRIntegerValue elementIndex = getIntVal(irElementIndex);
 
-                    IRType* elementType;
-                    auto llvmDstElement = types->emitGetElementPtr(
-                        llvmDst, llvmBuilder->getInt32(elementIndex), dstType, rules, elementType);
+                    auto llvmDstElement = types->emitArrayGetElementPtr(
+                        llvmDst, llvmBuilder->getInt32(elementIndex), dstType, rules);
                     auto llvmSrcElement = llvmBuilder->CreateExtractElement(llvmSrc, i);
                     llvmInst = types->emitStore(llvmDstElement, llvmSrcElement, elementType, rules);
                 }
@@ -2980,9 +2951,9 @@ struct LLVMEmitter
 
                 auto rules = getPtrLayoutRules(base);
 
-                UInt index = getStructIndexByKey(baseStructType, key);
+                auto field = findStructField(baseStructType, key);
 
-                index = types->mapFieldIndexToLLVM(baseStructType, rules, index);
+                UInt index = types->mapFieldToLLVM(baseStructType, rules, field);
 
                 auto llvmStructType = types->getStorageType(baseStructType, rules);
                 auto llvmBase = findValue(base);
@@ -2998,8 +2969,8 @@ struct LLVMEmitter
         case kIROp_FieldExtract:
             {
                 auto fieldExtractInst = static_cast<IRFieldExtract*>(inst);
-                auto structType = as<IRStructType>(fieldExtractInst->getBase()->getDataType());
                 auto base = fieldExtractInst->getBase();
+                auto structType = as<IRStructType>(base->getDataType());
 
                 if (debugInsts.contains(base))
                 {
@@ -3010,14 +2981,13 @@ struct LLVMEmitter
                 auto rules = getPtrLayoutRules(base);
 
                 auto llvmBase = findValue(base);
-                unsigned idx = getStructIndexByKey(structType, as<IRStructKey>(fieldExtractInst->getField()));
+                auto key = as<IRStructKey>(fieldExtractInst->getField());
+                auto field = findStructField(structType, key);
 
-                IRType* elementType = nullptr;
-                llvm::Value* ptr = types->emitGetElementPtr(
-                    llvmBase, llvmBuilder->getInt32(idx), structType,
-                    rules, elementType);
+                llvm::Value* ptr = types->emitStructGetElementPtr(
+                    llvmBase, field, structType, rules);
 
-                llvmInst = types->emitLoad(ptr, elementType, rules);
+                llvmInst = types->emitLoad(ptr, field->getFieldType(), rules);
             }
             break;
 
@@ -3070,14 +3040,13 @@ struct LLVMEmitter
                 {
                     baseType = as<IRType>(ptrType->getOperand(0));
                 }
+                else SLANG_ASSERT_FAILURE("Unknown pointer type for GetElementPtr!");
 
-                IRType* elementType = nullptr;
-                llvmInst = types->emitGetElementPtr(
+                llvmInst = types->emitArrayGetElementPtr(
                     findValue(baseInst),
                     findValue(indexInst),
                     baseType,
-                    getPtrLayoutRules(baseInst),
-                    elementType
+                    getPtrLayoutRules(baseInst)
                 );
             }
             break;
@@ -3102,17 +3071,16 @@ struct LLVMEmitter
                     // For vectors, we can use extractelement
                     llvmInst = llvmBuilder->CreateExtractElement(llvmVal, findValue(indexInst));
                 }
-                else if(as<IRArrayTypeBase>(baseTy) || as<IRStructType>(baseTy))
+                else if(auto arrayType = as<IRArrayTypeBase>(baseTy))
                 {
                     // emitGEP + emitLoad.
                     SLANG_ASSERT(llvmVal->getType()->isPointerTy());
-                    IRType* elementType = nullptr;
                     auto rules = getPtrLayoutRules(baseInst);
-                    llvm::Value* ptr = types->emitGetElementPtr(
-                        llvmVal, findValue(indexInst), baseTy,
-                        rules, elementType);
-                    llvmInst = types->emitLoad(ptr, elementType, rules);
+                    llvm::Value* ptr = types->emitArrayGetElementPtr(
+                        llvmVal, findValue(indexInst), baseTy, rules);
+                    llvmInst = types->emitLoad(ptr, arrayType->getElementType(), rules);
                 }
+                else SLANG_ASSERT_FAILURE("Unknown data type for GetElement!");
             }
             break;
 
@@ -4685,24 +4653,39 @@ struct LLVMEmitter
 SlangResult emitLLVMAssemblyFromIR(
     CodeGenContext* codeGenContext,
     IRModule* irModule,
-    String& assemblyOut)
+    IArtifact** outArtifact)
 {
     LLVMEmitter emitter(codeGenContext);
     emitter.processModule(irModule);
     emitter.finalize();
-    emitter.dumpAssembly(assemblyOut);
+
+    String assembly;
+    emitter.dumpAssembly(assembly);
+
+    ComPtr<ISlangBlob> blob = StringBlob::create(assembly);
+    auto artifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(codeGenContext->getTargetFormat()));
+    artifact->addRepresentationUnknown(blob);
+    *outArtifact = artifact.detach();
     return SLANG_OK;
 }
 
 SlangResult emitLLVMObjectFromIR(
     CodeGenContext* codeGenContext,
     IRModule* irModule,
-    List<uint8_t>& objectOut)
+    IArtifact** outArtifact)
 {
     LLVMEmitter emitter(codeGenContext);
     emitter.processModule(irModule);
     emitter.finalize();
-    emitter.generateObjectCode(objectOut);
+
+    List<uint8_t> object;
+    emitter.generateObjectCode(object);
+
+    ComPtr<ISlangBlob> blob = RawBlob::create(object.getBuffer(), object.getCount());
+    auto artifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(codeGenContext->getTargetFormat()));
+    artifact->addRepresentationUnknown(blob);
+    *outArtifact = artifact.detach();
+
     return SLANG_OK;
 }
 
