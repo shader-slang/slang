@@ -80,10 +80,11 @@ SlangResult tryLoadBuiltinModuleFromDLL(
     // Modules are runtime-loaded libraries. We need to version these because
     // they end up deployed on Mac and Linux platforms in a directory that ends
     // up in the library path.
-    Slang::String versionString = (SLANG_WINDOWS_FAMILY) ? "" : Slang::String("-") + SLANG_VERSION_NUMERIC;
-    Slang::String moduleFileName =
-        Slang::String("slang-") + Slang::getBuiltinModuleNameStr(builtinModuleName) +
-        "-module" + versionString;
+    Slang::String versionString =
+        (SLANG_WINDOWS_FAMILY) ? "" : Slang::String("-") + SLANG_VERSION_NUMERIC;
+    Slang::String moduleFileName = Slang::String("slang-") +
+                                   Slang::getBuiltinModuleNameStr(builtinModuleName) + "-module" +
+                                   versionString;
 
     Slang::SharedLibrary::Handle libHandle = nullptr;
 
@@ -92,7 +93,9 @@ SlangResult tryLoadBuiltinModuleFromDLL(
         return SLANG_FAIL;
 
     // Check if the module is the same version as the slang dll.
-    void* emBuildTagPtr = Slang::SharedLibrary::findSymbolAddressByName(libHandle, "slang_getEmbeddedModuleBuildTagString");
+    void* emBuildTagPtr = Slang::SharedLibrary::findSymbolAddressByName(
+        libHandle,
+        "slang_getEmbeddedModuleBuildTagString");
     if (!emBuildTagPtr)
     {
         Slang::SharedLibrary::unload(libHandle);
@@ -108,7 +111,8 @@ SlangResult tryLoadBuiltinModuleFromDLL(
     }
 
     // Load the embedded module.
-    void* emPtr = Slang::SharedLibrary::findSymbolAddressByName(libHandle, "slang_getEmbeddedModule");
+    void* emPtr =
+        Slang::SharedLibrary::findSymbolAddressByName(libHandle, "slang_getEmbeddedModule");
     if (!emPtr)
     {
         Slang::SharedLibrary::unload(libHandle);
