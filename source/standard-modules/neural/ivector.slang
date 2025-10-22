@@ -73,7 +73,7 @@ public interface IVector<T, int N> : IDifferentiable
     - `OutputVector` must conform to `IVector<T, OutputSize>`
     */
     [Differentiable]
-    public OutputVector matmul<int OutputSize, Storage, OutputVector>(
+    public OutputVector linearTransform<int OutputSize, Storage, OutputVector>(
         Storage weightStorage,
         no_diff Storage.Address weightAddress)
             where Storage : IStorage<T>
@@ -93,9 +93,14 @@ public interface IVector<T, int N> : IDifferentiable
     @param[in] weightAddress The starting address in storage for the weight matrix.
     @param[in] biasAddress The starting address in storage for the bias vector.
     @return The result of the linear transformation.
+    @remarks Type constraints:
+    - `Storage` must conform to `IStorage<T>`
+    - `Storage.Differential` must conform to `IStorage<T.Differential>`
+    - `Storage.Address` must equal `Storage.Differential.Address` (same address type)
+    - `OutputVector` must conform to `IVector<T, OutputSize>`
     */
     [Differentiable]
-    public OutputVector matmul<int OutputSize, Storage, OutputVector>(
+    public OutputVector linearTransform<int OutputSize, Storage, OutputVector>(
         Storage weightStorage,
         Storage biasStorage,
         no_diff Storage.Address weightAddress,
@@ -120,7 +125,7 @@ public interface IVector<T, int N> : IDifferentiable
     - `OutputVector` must conform to `IVector<T, OutputSize>`
     */
     [Differentiable]
-    public OutputVector matmul<int OutputSize, BindlessStorage, OutputVector>(
+    public OutputVector linearTransform<int OutputSize, BindlessStorage, OutputVector>(
         BindlessStorage.Address weightAddress)
             where BindlessStorage : IStorage<T>
             where BindlessStorage.Address : IPointerLikeAddress<T>
@@ -137,9 +142,14 @@ public interface IVector<T, int N> : IDifferentiable
     @param[in] weightAddress The address of weight matrix in bindless storage.
     @param[in] biasAddress The address of bias vector in bindless storage.
     @return The result of the linear transformation.
+    @remarks Type constraints:
+    - `BindlessStorage` must conform to `IStorage<T>`
+    - `BindlessStorage.Address` must conform to `IPointerLikeAddress<T>`
+    - `BindlessStorage.Address.Differential` must conform to `IPointerLikeAddress<T.Differential>`
+    - `OutputVector` must conform to `IVector<T, OutputSize>`
     */
     [Differentiable]
-    public OutputVector matmul<int OutputSize, BindlessStorage, OutputVector>(
+    public OutputVector linearTransform<int OutputSize, BindlessStorage, OutputVector>(
         BindlessStorage.Address weightAddress,
         BindlessStorage.Address biasAddress)
             where BindlessStorage : IStorage<T>
