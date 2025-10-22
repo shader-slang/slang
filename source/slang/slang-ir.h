@@ -526,6 +526,7 @@ enum class IRTypeLayoutRuleName
     D3DConstantBuffer,
     MetalParameterBlock,
     C,
+    LLVM,
     _Count,
 };
 
