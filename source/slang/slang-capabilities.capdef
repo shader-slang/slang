@@ -819,7 +819,6 @@ def spvVulkanMemoryModelDeviceScopeKHR : SPV_KHR_vulkan_memory_model;
 /// [EXT]
 def spvBindlessTextureNV : SPV_NV_bindless_texture;
 
-
 // The following capabilities all pertain to how ray tracing shaders are translated
 // to GLSL, where there are two different extensions that can provide the core
 // functionality of `TraceRay` and the related operations.

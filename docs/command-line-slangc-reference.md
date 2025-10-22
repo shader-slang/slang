@@ -1261,7 +1261,6 @@ A capability describes an optional feature that a target may or may not support.
 * `spvVulkanMemoryModelKHR` 
 * `spvVulkanMemoryModelDeviceScopeKHR` 
 * `spvBindlessTextureNV` 
-* `spvBindlessTextureNV2` 
 * `metallib_latest` 
 * `dxil_lib` 
 * `any_target` 
