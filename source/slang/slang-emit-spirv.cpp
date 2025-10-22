@@ -1406,13 +1406,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SpvInst* result = nullptr;
         if (m_extInstImports.tryGetValue(setName, result))
             return result;
-        
+
         // NonSemantic extension sets require SPV_KHR_non_semantic_info
         if (setName.startsWith(UnownedStringSlice::fromLiteral("NonSemantic.")))
         {
-            ensureExtensionDeclaration(UnownedStringSlice::fromLiteral("SPV_KHR_non_semantic_info"));
+            ensureExtensionDeclaration(
+                UnownedStringSlice::fromLiteral("SPV_KHR_non_semantic_info"));
         }
-        
+
         result = emitOpExtInstImport(
             getSection(SpvLogicalSectionID::ExtIntInstImports),
             nullptr,
@@ -6800,7 +6801,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         args);
                 }
             }
-            
+
             // Otherwise, treat as a raw SPIR-V opcode
             return emitInst(parent, inst, op, inst->getFullType(), kResultID, args);
         }
