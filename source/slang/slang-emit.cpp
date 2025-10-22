@@ -2573,6 +2573,31 @@ static SlangResult stripDbgSpirvFromArtifact(
     return SLANG_OK;
 }
 
+static bool shouldRunPIRVValidation(CodeGenContext* codeGenContext)
+{
+    auto& optionSet = codeGenContext->getTargetProgram()->getOptionSet();
+
+    // If the user requested to skip validation, or if we are generating an incomplete library
+    // containing linkage decorations (Vulkan validation rules doesn't allow this), we skip
+    // validation.
+    if (optionSet.getBoolOption(CompilerOptionName::SkipSPIRVValidation) ||
+        optionSet.getBoolOption(CompilerOptionName::IncompleteLibrary))
+        return false;
+
+    // Also check the environment variable SLANG_RUN_SPIRV_VALIDATION.
+    // If it is set to "1", we should run validation.
+    StringBuilder runSpirvValEnvVar;
+    PlatformUtil::getEnvironmentVariable(
+        UnownedStringSlice("SLANG_RUN_SPIRV_VALIDATION"),
+        runSpirvValEnvVar);
+    if (runSpirvValEnvVar.getUnownedSlice() == "1")
+    {
+        return true;
+    }
+
+    return false;
+}
+
 // Helper function to create an artifact from IR used internally by
 // emitSPIRVForEntryPointsDirectly.
 static SlangResult createArtifactFromIR(
@@ -2670,23 +2695,15 @@ static SlangResult createArtifactFromIR(
             }
         }
 
-        if (!codeGenContext->shouldSkipSPIRVValidation())
+        if (shouldRunPIRVValidation(codeGenContext))
         {
-            StringBuilder runSpirvValEnvVar;
-            PlatformUtil::getEnvironmentVariable(
-                UnownedStringSlice("SLANG_RUN_SPIRV_VALIDATION"),
-                runSpirvValEnvVar);
-            if (runSpirvValEnvVar.getUnownedSlice() == "1")
+            if (SLANG_FAILED(
+                    compiler->validate((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4))))
             {
-                if (SLANG_FAILED(compiler->validate(
-                        (uint32_t*)spirv.getBuffer(),
-                        int(spirv.getCount() / 4))))
-                {
-                    compiler->disassemble((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
-                    codeGenContext->getSink()->diagnoseWithoutSourceView(
-                        SourceLoc{},
-                        Diagnostics::spirvValidationFailed);
-                }
+                compiler->disassemble((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
+                codeGenContext->getSink()->diagnoseWithoutSourceView(
+                    SourceLoc{},
+                    Diagnostics::spirvValidationFailed);
             }
         }
 
