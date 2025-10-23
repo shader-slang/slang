@@ -1432,7 +1432,13 @@ Result linkAndOptimizeIR(
 
     // Process `static_assert` after the specialization is done.
     // Some information for `static_assert` is available only after the specialization.
-    checkStaticAssert(irModule->getModuleInst(), sink);
+    // However, with minimal optimization, dead branches are not eliminated, which can
+    // cause false positives for static_assert in unreachable code paths.
+    // Skip the check when minimal optimization is enabled.
+    if (!fastIRSimplificationOptions.minimalOptimization)
+    {
+        checkStaticAssert(irModule->getModuleInst(), sink);
+    }
 
     switch (target)
     {
