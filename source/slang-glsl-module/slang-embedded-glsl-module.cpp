@@ -1,6 +1,7 @@
 #include "../core/slang-array-view.h"
 #include "../core/slang-basic.h"
 #include "../core/slang-blob.h"
+#include "slang-tag-version.h"
 
 static const uint8_t g_glslModule[] = {
 #include "slang-glsl-module-generated.h"
@@ -13,5 +14,10 @@ extern "C"
     SLANG_DLL_EXPORT ISlangBlob* slang_getEmbeddedModule()
     {
         return &g_glslModuleBlob;
+    }
+
+    SLANG_DLL_EXPORT const char* slang_getEmbeddedModuleBuildTagString()
+    {
+        return SLANG_TAG_VERSION;
     }
 }
