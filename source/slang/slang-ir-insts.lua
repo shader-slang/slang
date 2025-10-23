@@ -679,18 +679,18 @@ local insts = {
 			},
 			{ UntaggedUnionType = {
 				hoistable = true,
-				-- A type that represents that the value's _type_ is one of types in the collection operand.
+				-- A type that represents that the value's _type_ is one of types in the set operand.
 			} },
 			{ ElementOfSetType = {
 				hoistable = true,
-				-- A type that represents that the value must be an element of the collection operand.
+				-- A type that represents that the value must be an element of the set operand.
 			} },
 			{ SetTagType = {
 				hoistable = true,
-				-- Represents a tag-type for a collection.
+				-- Represents a tag-type for a set.
 				--
-				-- An inst whose type is SetTagType(collection) is semantically carrying a 
-				-- run-time value that "picks" one of the elements of the collection operand.
+				-- An inst whose type is SetTagType(set) is semantically carrying a 
+				-- run-time value that "picks" one of the elements of the set operand.
 				--
 				-- Only operand is a SetBase
 			} }, 
@@ -2730,7 +2730,7 @@ local insts = {
 		-- the specialization pass.
 		--
 		-- TODO: Consider the scenario where we can combine the unbounded case with known cases.
-		--       unbounded collection should probably be an element and not a separate op.
+		--       unbounded set should probably be an element and not a separate op.
 	} },
 	{ CastInterfaceToTaggedUnionPtr = {
 		-- Cast an interface-typed pointer to a tagged-union pointer with a known set.
@@ -2740,27 +2740,34 @@ local insts = {
 	} }, 
 	{ GetTagForSuperSet = {
 		-- Translate a tag from a set to its equivalent in a super-set
-		-- TODO: Lower using a global ID and not local IDs + mapping ops.
+		--
+		-- Operands: (the tag for the source set)
+		-- The source and destination sets are implied by the type of the operand and the type of the result
 	} }, 
 	{ GetTagForMappedSet = {
 		-- Translate a tag from a set to its equivalent in a different set
 		-- based on a mapping induced by a lookup key
+		--
+		-- Operands: (the tag for the witness table set, the lookup key)
 	} },
 	{ GetTagForSpecializedSet = { 
-		-- Translate a tag from a generic set to its equivalent in a specialized set
-		-- based on a mapping that is encoded in the operands of this tag instruction
+		-- Translate a tag from a set of generics to its equivalent in a specialized set
+		-- according to the set of specialization arguments that are encoded in the 
+		-- operands of this instruction.
+		--
+		-- Operands: (the tag for the generic set, any number of specialization arguments....)
 	} },
 	{ GetTagFromSequentialID = {
 		-- Translate an existing sequential ID (a 'global' ID) & and interface type into a tag
-	    -- the provided collection (a 'local' ID)
+	    -- the provided set (a 'local' ID)
 	} }, 
 	{ GetSequentialIDFromTag = {
-		-- Translate a tag from the given collection (a 'local' ID) to a sequential ID (a 'global' ID)
+		-- Translate a tag from the given set (a 'local' ID) to a sequential ID (a 'global' ID)
 	} },
 	{ GetElementFromTag = { 
-	    -- Translate a tag to its corresponding element in the collection. 
-		-- Input's type: SetTagType(collection). 
-		-- Output's type: ElementOfSetType(collection)
+	    -- Translate a tag to its corresponding element in the set. 
+		-- Input's type: SetTagType(set). 
+		-- Output's type: ElementOfSetType(set)
 		--
 		operands = {{"tag"}}
 	} },
@@ -2782,10 +2789,8 @@ local insts = {
 		-- Get a specialized dispatcher function for a given witness table set + key, where
 		-- the key points to a generic function.
 		--
-		-- Inputs: set of witness tables to create a dispatched for and the key to use to identify the
-		--         entry that needs to be dispatched to. All witness tables must have an entry for the given key.
-		--         or else this is a malformed inst.
-		--         A set of specialization arguments (these must be concrete/global types or collections)
+		-- Operands: (set of witness tables, lookup key, specialization args...)
+		--
 		--
 		-- Output: a value of `FuncType` that can be called.
 		--         This func-type will take a `TagType(witnessTableSet)` as the first parameter to 
@@ -2795,30 +2800,49 @@ local insts = {
 	} },
 	{ GetTagFromTaggedUnion = {
 		-- Translate a tagged-union value to its corresponding tag in the tagged-union's set.
+		--
 		-- Input's type: TaggedUnionType(typeSet, tableSet)
+		--
 		-- Output's type: SetTagType(tableSet)
+		--
 		operands = {{"taggedUnionValue"}}
 	} },
 	{ GetTypeTagFromTaggedUnion = {
 		-- Translate a tagged-union value to its corresponding type tag in the tagged-union's set.
+		--
 		-- Input's type: TaggedUnionType(typeSet, tableSet)
+		--
 		-- Output's type: SetTagType(typeSet)
+		--
 		operands = {{"taggedUnionValue"}}
 	} },
 	{ GetValueFromTaggedUnion = {
 		-- Translate a tagged-union value to its corresponding value in the tagged-union's set.
+		--
 		-- Input's type: TaggedUnionType(typeSet, tableSet)
+		--
 		-- Output's type: UntaggedUnionType(typeSet)
+		--
 		operands = {{"taggedUnionValue"}}
 	} },
 	{ MakeTaggedUnion = {
 		-- Create a tagged-union value from a tag and a value.
+		--
 		-- Input's type: SetTagType(tableSet), UntaggedUnionType(typeSet)
+		--
 		-- Output's type: TaggedUnionType(typeSet, tableSet)
+		--
 		operands = { { "tag" }, { "value" } },
 	} },
 	{ GetTagOfElementInSet = {
-		-- Get the tag corresponding to an element in a collection.
+		-- Get the tag corresponding to an element in a set.
+		--
+		-- Operands: (element, set)
+		--    "element" must resolve into a concrete inst before lowering,
+		--    otherwise, this is an error.
+		--
+		-- Output's type: SetTagType(set)
+		--
 		hoistable = true
 	} },
 }
