@@ -171,14 +171,52 @@ jobs:
             fi
           fi
 
-      - name: Deploy Coverage to GitHub Pages
+      - name: Deploy Coverage to Separate Repository
         if: ${{ inputs.deploy-pages }}
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./coverage-html
-          destination_dir: coverage
-          commit_message: "Update coverage report"
+        env:
+          COVERAGE_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get current date and short commit hash
+          REPORT_DATE=$(date -u +"%Y-%m-%d")
+          COMMIT_SHORT=$(git rev-parse --short HEAD)
+          FULL_COMMIT=$(git rev-parse HEAD)
+          REPORT_DIR="reports/history/${REPORT_DATE}-${COMMIT_SHORT}"
+
+          # Clone the coverage reports repository
+          git clone https://x-access-token:${COVERAGE_REPO_TOKEN}@github.com/shader-slang/slang-coverage-reports.git coverage-repo
+          cd coverage-repo
+
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Create directory structure
+          mkdir -p "${REPORT_DIR}"
+          mkdir -p reports/latest
+
+          # Copy coverage HTML to historical location
+          cp -r ../coverage-html/* "${REPORT_DIR}/"
+
+          # Update latest (replace entire directory)
+          rm -rf reports/latest/*
+          cp -r ../coverage-html/* reports/latest/
+
+          # Create helper script to generate historical index
+          bash ../tools/coverage/generate-history-index.sh reports/history
+
+          # Commit and push if there are changes
+          git add reports/
+          if ! git diff --cached --quiet; then
+            TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+            git commit -m "Add coverage report for ${REPORT_DATE} (${COMMIT_SHORT})" \
+                       -m "Generated from shader-slang/slang@${FULL_COMMIT}" \
+                       -m "Date: ${TIMESTAMP}"
+
+            git push origin main
+            echo "Coverage report deployed successfully"
+          else
+            echo "No changes to coverage report"
+          fi
 
       - name: Report Coverage in PR
         if: ${{ inputs.pr-comment }}
