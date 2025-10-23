@@ -23,11 +23,28 @@ foreach(shader_file ${neural_shader_sources})
     list(APPEND neural_copied_files ${dest_file})
 endforeach()
 
+# Determine which compiler to use for building the module
+# For cross-compilation, use slang-bootstrap from SLANG_GENERATORS_PATH
+# (slang-bootstrap is a standalone tool with no external dependencies)
+# Otherwise, use the slangc built as part of this build
+if(SLANG_GENERATORS_PATH)
+    if(CMAKE_HOST_WIN32)
+        set(CMAKE_HOST_EXECUTABLE_SUFFIX ".exe")
+    else()
+        set(CMAKE_HOST_EXECUTABLE_SUFFIX "")
+    endif()
+    set(SLANG_COMPILER "${SLANG_GENERATORS_PATH}/slang-bootstrap${CMAKE_HOST_EXECUTABLE_SUFFIX}")
+    set(SLANG_COMPILER_DEPENDENCY)
+else()
+    set(SLANG_COMPILER slangc)
+    set(SLANG_COMPILER_DEPENDENCY slangc)
+endif()
+
 # Build neural.slang-module and output to the output directory
 add_custom_command(
     OUTPUT ${neural_module_file}
-    COMMAND slangc neural.slang -o ${SLANG_NEURAL_MODULE_FILE_NAME}
-    DEPENDS ${neural_copied_files} slangc
+    COMMAND ${SLANG_COMPILER} neural.slang -o ${SLANG_NEURAL_MODULE_FILE_NAME}
+    DEPENDS ${neural_copied_files} ${SLANG_COMPILER_DEPENDENCY}
     WORKING_DIRECTORY ${neural_output_dir}
     VERBATIM
 )
