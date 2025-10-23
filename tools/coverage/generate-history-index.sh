@@ -11,7 +11,7 @@ if [[ -z "$HISTORY_DIR" ]]; then
 fi
 
 # Generate HTML header
-cat > "${HISTORY_DIR}/index.html" << 'EOF'
+cat >"${HISTORY_DIR}/index.html" <<'EOF'
 <!DOCTYPE html>
 <html>
 <head>
@@ -86,13 +86,13 @@ EOF
 
 # List all reports in reverse chronological order
 for dir in $(ls -r "${HISTORY_DIR}/" | grep -E '^[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-f0-9]+$'); do
-    date_part=$(echo $dir | cut -d'-' -f1-3)
-    commit_part=$(echo $dir | cut -d'-' -f4)
-    echo "        <tr><td>$date_part</td><td><a href=\"https://github.com/shader-slang/slang/commit/$commit_part\">$commit_part</a></td><td><a href=\"$dir/index.html\">View Report</a></td></tr>" >> "${HISTORY_DIR}/index.html"
+  date_part=$(echo $dir | cut -d'-' -f1-3)
+  commit_part=$(echo $dir | cut -d'-' -f4)
+  echo "        <tr><td>$date_part</td><td><a href=\"https://github.com/shader-slang/slang/commit/$commit_part\">$commit_part</a></td><td><a href=\"$dir/index.html\">View Report</a></td></tr>" >>"${HISTORY_DIR}/index.html"
 done
 
 # Generate HTML footer
-cat >> "${HISTORY_DIR}/index.html" << 'EOF'
+cat >>"${HISTORY_DIR}/index.html" <<'EOF'
     </table>
 </body>
 </html>
