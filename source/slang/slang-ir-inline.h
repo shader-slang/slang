@@ -14,7 +14,7 @@ class TargetProgram;
 struct IRInst;
 
 /// Any call to a function that takes or returns a string/RefType parameter is inlined
-Result performTypeInlining(IRModule* module, DiagnosticSink* sink);
+Result performTypeInlining(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink);
 
 /// Inline any call sites to functions marked `[unsafeForceInlineEarly]`
 bool performMandatoryEarlyInlining(IRModule* module, HashSet<IRInst*>* modifiedFuncs = nullptr);

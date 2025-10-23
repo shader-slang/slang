@@ -310,6 +310,11 @@ struct BufferElementTypeLoweringPolicy : public RefObject
     {
         return false;
     }
+
+    /// Returns true if the target allows declaring a local var in Function address space with a
+    /// StorageType that may have explicit layout. This is currently true for all targets except
+    /// SPIRV.
+    virtual bool canUseStorageTypeInLocalVar() { return true; }
 };
 
 BufferElementTypeLoweringPolicy* getBufferElementTypeLoweringPolicy(
@@ -1254,6 +1259,17 @@ struct LoweredElementTypeContext
                                 }
                                 if (!tempVar)
                                 {
+                                    // If the load is not from an immutable location, we
+                                    // must preserve the load and keep the result in a local
+                                    // var.
+                                    // Unfortunately, SPIRV disallow a physical type (type with
+                                    // explicit layout) to be used to declare a local variable.
+                                    // Therefore for SPIRV target only, we have to disable this
+                                    // optimization altogether and run the
+                                    // storage-type-to-logical-type translation at the load instead
+                                    // of continue delaying the translation.
+                                    if (!leafTypeLoweringPolicy->canUseStorageTypeInLocalVar())
+                                        break;
                                     tempVar = builder.emitVar(elementStorageType);
                                     builder.addDecoration(
                                         tempVar,
@@ -2346,6 +2362,13 @@ struct KhronosTargetBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLo
         BufferElementTypeLoweringOptions inOptions)
         : DefaultBufferElementTypeLoweringPolicy(inTarget, inOptions)
     {
+    }
+
+    virtual bool canUseStorageTypeInLocalVar() override
+    {
+        // SPIRV (Vulkan) does not allow using an explicitly laid out type to declare a local
+        // variable.
+        return false;
     }
 
     virtual bool shouldLowerMatrixType(IRMatrixType* matrixType, TypeLoweringConfig config) override

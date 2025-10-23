@@ -171,7 +171,7 @@ extern "C"
 #endif
         bool glslang_validateSPIRV(const uint32_t* contents, int contentsSize)
 {
-    spv_target_env target_env = SPV_ENV_UNIVERSAL_1_6;
+    spv_target_env target_env = SPV_ENV_VULKAN_1_4;
 
     spvtools::ValidatorOptions options;
     options.SetScalarBlockLayout(true);

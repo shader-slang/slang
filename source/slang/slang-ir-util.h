@@ -391,6 +391,9 @@ IRType* getIRVectorBaseType(IRType* type);
 // This is the result type of a ElementExtract operation on a value of `type`.
 IRType* getElementType(IRBuilder& builder, IRType* type);
 
+// Find the struct field with `key` and return its type. Return nullptr if not found.
+IRType* getFieldType(IRType* type, IRStructKey* key);
+
 Int getSpecializationConstantId(IRGlobalParam* param);
 
 void legalizeDefUse(IRGlobalValueWithCode* func);
