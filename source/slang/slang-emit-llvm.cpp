@@ -227,33 +227,41 @@ static llvm::Instruction::CastOps getLLVMIntExtensionOp(IRType* type)
 }
 
 // This class helps with converting types from Slang IR to LLVM IR. There are
-// several different kinds of contexts for the translation:
+// three different kinds of types:
 //
-// * Value
-// * Storage (with trailing padding)
-// * Storage (without trailing padding)
-// * Debug
+// * _Value_ types are not observable through memory, and they essentially map
+//   to "registers" (SSA values). Hence, they can always use the fastest
+//   representation.
 //
-// _Value_ types are not observable through memory, and they essentially map to
-// "registers" (SSA values). Hence, they can always use the fastest
-// representation.
+// * _Storage_ types are used when storing the data in memory. It's usually the
+//   same as the value type, but for example booleans in LLVM IR are `i1` (1-bit
+//   integer) which we obviously can't directly store on the stack.
 //
-// _Storage_ types are used when the data is observable through a pointer, be
-// it via a stack allocation or an arbitrary pointer. There are two flavors,
-// with and without trailing padding. The unpadded versions are only ever used
-// inside structs, and are not directly accessed. They're interpreted as their
-// padded variants.
+// * _Debug_ types are "pretty" types with correct offset annotations so that
+//   debuggers can show the contents of variables.
 //
-// Storage types can be created for specific IRTypeLayoutRules, and a
-// layout-converting memcpy is available as well. This is needed e.g. when
-// copying a 'alloca' struct into a StructuredBuffer with a different layout
-// than what is used for general pointers.
+// One design choice here is that we don't lower struct or array types to LLVM
+// IR as LLVM aggregates. Instead, they're stored as opaque blobs of memory
+// (i8 arrays with alignment annotations). There are three reasons for this.
 //
-// One interesting detail here is that value types for aggregates shouldn't be 
-// used: https://llvm.org/docs/Frontend/PerformanceTips.html#avoid-creating-values-of-aggregate-type
-// Instead, they must be created with alloca and passed around as pointers in
-// the IR. However, we still need to be able to create value instances of
-// aggregate types to encode constant structs in the global scope!
+// 1. Using aggregate types in values is "officially" discouraged:
+//    https://llvm.org/docs/Frontend/PerformanceTips.html#avoid-creating-values-of-aggregate-type
+//    Instead, they are created with alloca and passed around as pointers in the IR.
+//
+// 2. LLVM is undergoing a transition to a more type-agnostic form:
+//    https://www.npopov.com/2025/01/05/This-year-in-LLVM-2024.html#ptradd
+//    In short, there is no longer any reason to specify the real type to
+//    getelementptr; LLVM already canonicalizes it to use `i8` and byte offsets
+//    anyway, and the type-based getelementptr itself may be removed in a
+//    future version.
+//
+// 3. This allows us to entirely ignore LLVM's ideas of how structs are laid
+//    out. We can fully control the memory layout of our own structs with no
+//    limitations from LLVM, which is great, because we have IRTypeLayoutRules.
+//
+// At this point, only global struct/array constants need to be annotated with
+// an actual aggregate type in LLVM. So they build the type on-demand in
+// `emitConstant`.
 class LLVMTypeTranslator
 {
 private:
@@ -265,56 +273,19 @@ private:
     const Dictionary<IRInst*, llvm::DIFile*>* sourceDebugInfo;
     IRTypeLayoutRules* defaultPointerRules;
 
-    struct StorageTypeInfo
-    {
-        // Including trailing padding, e.g.
-        //
-        // struct Type
-        // {
-        //     uint32_t a;
-        //     uint16_t b;
-        //     uint8_t PAD[2]; // <<< includes this
-        // };
-        llvm::Type* padded = nullptr;
-
-        // Excluding trailing padding. May be equal to 'padded' if the type
-        // doesn't need trailing padding.
-        llvm::Type* unpadded = nullptr;
-
-        // LLVM field indices do not necessarily match Slang IR; additional
-        // padding entries may have been generated. This is only populated for
-        // structs.
-        Dictionary<IRStructField*, UInt> llvmFieldIndex;
-
-        // Excludes trailing padding. The index is the LLVM field index, not
-        // Slang index.
-        List<UInt> sizePerLLVMField;
-
-        // The amount of trailing padding is stored here separately, due to the
-        // padded / unpadded type split.
-        UInt trailingPadding = 0;
-
-        llvm::Type* get(bool withTrailingPadding)
-        {
-            return withTrailingPadding ? padded : unpadded;
-        }
-
-        StorageTypeInfo& operator=(llvm::Type* type)
-        {
-            padded = unpadded = type;
-            return *this;
-        }
-    };
-
     Dictionary<IRType*, llvm::Type*> valueTypeMap;
-    Dictionary<IRTypeLayoutRules*, Dictionary<IRType*, StorageTypeInfo>> storageTypeMap;
+    Dictionary<IRTypeLayoutRules*, Dictionary<IRType*, llvm::Type*>> storageTypeMap;
     Dictionary<IRTypeLayoutRules*, Dictionary<IRType*, llvm::DIType*>> debugTypeMap;
     Dictionary<IRType*, IRType*> legalizedResourceTypeMap;
 
     struct ConstantInfo
     {
+        // Includes trailing padding
         llvm::Constant* padded = nullptr;
+
+        // Excludes trailing padding
         llvm::Constant* unpadded = nullptr;
+
         llvm::Constant* get(bool withTrailingPadding)
         {
             return withTrailingPadding ? padded : unpadded;
@@ -369,7 +340,8 @@ public:
             break;
         case kIROp_HalfType:
             // TODO: Should we use normal float types for these in SSA? Maybe
-            // depending on target triple?
+            // depending on target triple? If we do that, we need to update
+            // getStorageType to make halfs be stored as halfs still.
             llvmType = builder->getHalfTy();
             break;
         case kIROp_FloatType:
@@ -479,91 +451,45 @@ public:
         return llvmType;
     }
 
-    // The storage type must be used for Alloca, Load, Store, GetElementPtr,
-    // MemCpy and global variables.
-    llvm::Type* getStorageType(IRType* type, IRTypeLayoutRules* rules, bool withTrailingPadding = true)
+    // The storage type can be used to adjust how types are stored in memory
+    // as opposed to SSA values.
+    llvm::Type* getStorageType(IRType* type, IRTypeLayoutRules* rules)
     {
         {
-            Dictionary<IRType*, StorageTypeInfo>& types = storageTypeMap[rules];
+            auto& types = storageTypeMap[rules];
             if (types.containsKey(type))
-                return types.getValue(type).get(withTrailingPadding);
+                return types.getValue(type);
         }
 
-        StorageTypeInfo llvmTypeInfo;
+        llvm::Type* storageType = nullptr;
         switch (type->getOp())
         {
         case kIROp_BoolType:
             {
+                // Can't really store an i1, so let's use whatever size the
+                // layout rules want.
                 IRSizeAndAlignment sizeAlignment;
                 Slang::getSizeAndAlignment(*compilerOptions, rules, type, &sizeAlignment);
-                llvmTypeInfo = builder->getIntNTy(sizeAlignment.size * 8);
-            }
-            break;
-
-        case kIROp_StructType:
-            {
-                auto structType = static_cast<IRStructType*>(type);
-                llvmTypeInfo = getStructTypeInfo(structType, rules);
-            }
-            break;
-
-        case kIROp_UnsizedArrayType:
-        case kIROp_ArrayType:
-            {
-                auto arrayType = static_cast<IRArrayTypeBase*>(type);
-                llvmTypeInfo = getArrayTypeInfo(arrayType, rules);
-            }
-            break;
-
-        case kIROp_VectorType:
-            if (rules)
-            {
-                auto vecType = static_cast<IRVectorType*>(type);
-                // Vector elements should be simple scalar types.
-                llvm::Type* elemType = getValueType(vecType->getElementType());
-                int elemCount = getIntVal(vecType->getElementCount());
-
-                IRSizeAndAlignment elementAlignment;
-                Slang::getSizeAndAlignment(*compilerOptions, rules, vecType->getElementType(), &elementAlignment);
-
-                int alignedCount = getVectorAlignedCount(vecType, rules);
-
-                llvmTypeInfo = llvm::ArrayType::get(elemType, elemCount);
-                if (alignedCount != elemCount)
-                    llvmTypeInfo.padded = llvm::ArrayType::get(elemType, alignedCount);
-
-                llvmTypeInfo.trailingPadding = (alignedCount - elemCount) * elementAlignment.size;
-            }
-            else llvmTypeInfo = getValueType(type);
-            break;
-
-        case kIROp_RateQualifiedType:
-            {
-                auto rqt = as<IRRateQualifiedType>(type);
-                auto valType = rqt->getValueType();
-                llvmTypeInfo.padded = getStorageType(valType, rules, true);
-                llvmTypeInfo.unpadded = getStorageType(valType, rules, false);
+                storageType = builder->getIntNTy(sizeAlignment.size * 8);
             }
             break;
 
         default:
             // No special storage considerations, just use the same type as SSA
             // values.
-            llvmTypeInfo = getValueType(type);
+            storageType = getValueType(type);
             break;
         }
 
         {
-            Dictionary<IRType*, StorageTypeInfo>& types = storageTypeMap[rules];
-            types[type] = std::move(llvmTypeInfo);
+            auto& types = storageTypeMap[rules];
+            types[type] = storageType;
         }
-        return llvmTypeInfo.get(withTrailingPadding);
+        return storageType;
     }
 
     llvm::DIType* getDebugType(IRType* type, IRTypeLayoutRules* rules)
     {
-        // First, ensure we have storage info for this type!
-        getStorageType(type, rules);
         {
             Dictionary<IRType*, llvm::DIType*>& types = debugTypeMap[rules];
             if (types.containsKey(type))
@@ -787,8 +713,8 @@ public:
         return llvmType;
     }
 
-    // Use this instead of the regular Slang::getOffset(), it handles querying
-    // LLVM's own layout as well if 'rules' is nullptr.
+    // Use this instead of the regular Slang::getOffset(), it handles
+    // legalized resource types correctly.
     IRIntegerValue getOffset(IRStructField* field, IRTypeLayoutRules* rules)
     {
         IRIntegerValue offset = 0;
@@ -908,8 +834,8 @@ public:
         ));
     }
 
-    // llvmVal must be using `getValueType(valType)` and is stored using the
-    // specified `getStorageType(valType, rules)` into llvmPtr.
+    // llvmVal must be using `getValueType(valType)`. It will be stored in
+    // llvmPtr.
     //
     // Returns the store instruction.
     llvm::Value* emitStore(
@@ -956,8 +882,7 @@ public:
         }
     }
 
-    // Returns the loaded data using `getValueType(valType)` from llvmPtr, which
-    // is expected to be using `getStorageType(valType, rules)`.
+    // Returns the loaded data using `getValueType(valType)` from llvmPtr.
     //
     // Returns the load instruction (= loaded value)
     llvm::Value* emitLoad(
@@ -1019,8 +944,8 @@ public:
         }
     }
 
-    // Computes an offset with `indexInst` based on `llvmPtr`. This overload
-    // allows a dynamic index and works with vectors and arrays.
+    // Computes an offset with `indexInst` based on `llvmPtr`. `indexInst` need
+    // not be constant.
     llvm::Value* emitArrayGetElementPtr(
         llvm::Value* llvmPtr,
         llvm::Value* indexInst,
@@ -1044,8 +969,26 @@ public:
         return builder->CreateGEP(byteType, llvmPtr, builder->getInt32(offset));
     }
 
-    // Tries to emit the given constant, in a way which is compatible with
-    // `getStorageType(valType, defaultPointerRules)`.
+    UInt emitPaddingConstant(List<llvm::Constant*>& fields, UInt& curSize, UInt targetSize)
+    {
+        if(curSize < targetSize)
+        {
+            UInt bytes = targetSize - curSize;
+            curSize = targetSize;
+
+            auto byteType = builder->getInt8Ty();
+            auto type = llvm::ArrayType::get(byteType, bytes);
+            auto zero = llvm::ConstantInt::get(byteType, 0);
+            auto zeros = List<llvm::Constant*>::makeRepeated(zero, bytes);
+            fields.add(llvm::ConstantArray::get(type, llvm::ArrayRef(zeros.begin(), zeros.end())));
+
+            return bytes;
+        }
+        return 0;
+    }
+
+    // Tries to emit the given constant, but may return nullptr if that is not
+    // possible.
     llvm::Constant* maybeEmitConstant(IRInst* inst, bool storage = false, bool withTrailingPadding = true)
     {
         if (constantMap.containsKey(inst) && !storage)
@@ -1212,71 +1155,58 @@ public:
                     values.add(constVal);
                 }
 
-                auto llvmPaddedType = getStorageType(arrayType, defaultPointerRules, true);
+                auto elemCount = values.getCount();
+                auto llvmElemType = elemCount == 0 ? byteType : values[0]->getType();
+
                 llvmConstant = llvm::ConstantArray::get(
-                    llvm::cast<llvm::ArrayType>(llvmPaddedType),
+                    llvm::ArrayType::get(llvmElemType, elemCount),
                     llvm::ArrayRef(values.begin(), values.end()));
 
                 if (needsUnpaddedArrayTypeWorkaround(arrayType, defaultPointerRules))
                 {
-                    // This should be a struct for the workaround.
-                    auto llvmType = getStorageType(arrayType, defaultPointerRules, false);
-                    SLANG_ASSERT(llvmType->isStructTy());
-                    auto paddedElemType = getStorageType(arrayType->getElementType(), defaultPointerRules, true);
+                    auto lastPart = maybeEmitConstant(
+                        inst->getOperand(inst->getOperandCount()-1), true, false);
 
                     auto initPart = llvm::ConstantArray::get(
-                        llvm::ArrayType::get(paddedElemType, values.getCount()-1),
-                        llvm::ArrayRef(values.begin(), values.getCount()-1));
+                        llvm::ArrayType::get(llvmElemType, elemCount-1),
+                        llvm::ArrayRef(values.begin(), elemCount-1));
 
-                    auto lastPart = maybeEmitConstant(inst->getOperand(inst->getOperandCount()-1), true, false);
-
-                    llvm::Constant* parts[2] = {initPart, lastPart};
-
-                    llvmConstant.unpadded = llvm::ConstantStruct::get(
-                        llvm::cast<llvm::StructType>(llvmType), parts
-                    );
+                    // This should be a struct for the workaround.
+                    llvm::Constant* fields[2] = {initPart, lastPart};
+                    llvmConstant.unpadded = llvm::ConstantStruct::getAnon(fields, true);
                 }
             }
             break;
         case kIROp_MakeStruct:
             {
-                // The struct is packed, so we need to insert padding manually.
                 auto structType = cast<IRStructType>(inst->getDataType());
-                auto llvmPaddedType = getStorageType(structType, defaultPointerRules, true);
-                auto llvmUnpaddedType = getStorageType(structType, defaultPointerRules, false);
 
-                auto& storageInfo = storageTypeMap.getValue(defaultPointerRules).getValue(structType);
+                UInt llvmSize = 0;
+                IRSizeAndAlignment sizeAndAlignment = getSizeAndAlignment(structType, defaultPointerRules);
 
-                auto field = structType->getFields().begin();
                 List<llvm::Constant*> values;
+                auto field = structType->getFields().begin();
                 for (UInt aa = 0; aa < inst->getOperandCount(); ++aa, ++field)
                 {
                     auto constVal = maybeEmitConstant(inst->getOperand(aa), true, false);
                     if (!constVal)
                         return nullptr;
 
-                    UInt entryIndex = storageInfo.llvmFieldIndex[*field];
-
-                    // Add padding entries until we get to the current field.
-                    while (UInt(values.getCount()) < entryIndex)
-                    {
-                        UInt padSize = storageInfo.sizePerLLVMField[values.getCount()];
-                        values.add(getZeroPaddingConstant(padSize));
-                    }
+                    IRIntegerValue offset = getOffset(*field, defaultPointerRules);
+                    // Insert padding until we're at the requested offset.
+                    emitPaddingConstant(values, llvmSize, offset);
 
                     values.add(constVal);
+                    llvmSize += targetDataLayout.getTypeStoreSize(constVal->getType());
                 }
 
-                llvmConstant.unpadded = llvm::ConstantStruct::get(
-                    llvm::cast<llvm::StructType>(llvmUnpaddedType),
-                    llvm::ArrayRef(values.begin(), values.end()));
+                llvmConstant.unpadded = llvm::ConstantStruct::getAnon(
+                    llvm::ArrayRef(values.begin(), values.end()), true);
 
-                if (storageInfo.trailingPadding)
-                    values.add(getZeroPaddingConstant(storageInfo.trailingPadding));
+                emitPaddingConstant(values, llvmSize, sizeAndAlignment.getStride());
 
-                llvmConstant.padded = llvm::ConstantStruct::get(
-                    llvm::cast<llvm::StructType>(llvmPaddedType),
-                    llvm::ArrayRef(values.begin(), values.end()));
+                llvmConstant.padded = llvm::ConstantStruct::getAnon(
+                    llvm::ArrayRef(values.begin(), values.end()), true);
             }
             break;
         default:
@@ -1332,14 +1262,7 @@ private:
                 {
                     auto dstElemPtr = emitArrayGetElementPtr(dstPtr, builder->getInt32(elem), elemType, dstLayout);
                     auto srcElemPtr = emitArrayGetElementPtr(srcPtr, builder->getInt32(elem), elemType, srcLayout);
-                    last = crossLayoutMemCpy(
-                        dstElemPtr,
-                        srcElemPtr,
-                        elemType,
-                        dstLayout,
-                        srcLayout,
-                        isVolatile
-                    );
+                    last = crossLayoutMemCpy(dstElemPtr, srcElemPtr, elemType, dstLayout, srcLayout, isVolatile);
                 }
                 return last;
             }
@@ -1358,14 +1281,7 @@ private:
                     auto dstElemPtr = emitStructGetElementPtr(dstPtr, field, dstLayout);
                     auto srcElemPtr = emitStructGetElementPtr(srcPtr, field, srcLayout);
 
-                    last = crossLayoutMemCpy(
-                        dstElemPtr,
-                        srcElemPtr,
-                        fieldType,
-                        dstLayout,
-                        srcLayout,
-                        isVolatile
-                    );
+                    last = crossLayoutMemCpy(dstElemPtr, srcElemPtr, fieldType, dstLayout, srcLayout, isVolatile);
                 }
                 return last;
             }
@@ -1399,110 +1315,6 @@ private:
         return align(vectorAlignment.size, vectorAlignment.alignment) / elementAlignment.size;
     }
 
-    llvm::Constant* getZeroPaddingConstant(UInt size)
-    {
-        auto byteType = builder->getInt8Ty();
-        auto type = llvm::ArrayType::get(byteType, size);
-        auto zero = llvm::ConstantInt::get(byteType, 0);
-        auto zeros = List<llvm::Constant*>::makeRepeated(zero, size);
-        return llvm::ConstantArray::get(type, llvm::ArrayRef(zeros.begin(), zeros.end()));
-    }
-
-    UInt emitPadding(List<llvm::Type*>& fields, UInt& curSize, UInt targetSize)
-    {
-        if(curSize < targetSize)
-        {
-            UInt bytes = targetSize - curSize;
-            curSize = targetSize;
-            fields.add(llvm::ArrayType::get(builder->getInt8Ty(), bytes));
-            return bytes;
-        }
-        return 0;
-    }
-
-    // This layout is not native to LLVM, so we have to generate a packed
-    // struct with manual padding.
-    StorageTypeInfo getStructTypeInfo(IRStructType* structType, IRTypeLayoutRules* rules)
-    {
-        StorageTypeInfo llvmTypeInfo;
-
-        List<llvm::Type*> fieldTypes;
-
-        UInt llvmSize = 0;
-
-        IRSizeAndAlignment sizeAndAlignment = getSizeAndAlignment(structType, rules);
-
-        for (auto field : structType->getFields())
-        {
-            auto fieldType = field->getFieldType();
-            if (as<IRVoidType>(fieldType))
-                continue;
-
-            IRIntegerValue offset = getOffset(field, rules);
-
-            // Insert padding until we're at the requested offset.
-            UInt padding = emitPadding(fieldTypes, llvmSize, offset);
-            if (padding > 0)
-                llvmTypeInfo.sizePerLLVMField.add(padding);
-
-            // Record the current llvm field index for the mapping. 
-            llvmTypeInfo.llvmFieldIndex[field] = fieldTypes.getCount();
-
-            // We don't want structs or arrays padded up to their alignment,
-            // because scalar layout may pack fields in their predecessor's
-            // trailing padding.
-            auto llvmFieldType = getStorageType(fieldType, rules, false);
-            fieldTypes.add(llvmFieldType);
-
-            // Let's query the size from LLVM just to be safe, although I
-            // think we could use getSizeAndAlignment() too.
-            UInt fieldSize = targetDataLayout.getTypeStoreSize(llvmFieldType);
-            llvmSize += fieldSize;
-            llvmTypeInfo.sizePerLLVMField.add(fieldSize);
-        }
-
-        // Finally, make sure we're up to the size of the struct. This can be
-        // necessary if the layout rules include trailing padding in the base
-        // size of the struct. For our purposes, this doesn't count as "trailing
-        // padding", but part of the actual struct.
-        UInt padding = emitPadding(fieldTypes, llvmSize, sizeAndAlignment.size);
-        if (padding > 0)
-            llvmTypeInfo.sizePerLLVMField.add(padding);
-
-        UInt paddedSize = align(sizeAndAlignment.size, sizeAndAlignment.alignment);
-        llvmTypeInfo.trailingPadding = paddedSize - llvmSize;
-
-        llvm::StructType* llvmUnpaddedStructType = llvm::StructType::get(
-            builder->getContext(),
-            llvm::ArrayRef<llvm::Type*>(fieldTypes.getBuffer(), fieldTypes.getCount()),
-            true
-        );
-        llvm::StructType* llvmPaddedStructType = llvmUnpaddedStructType;
-
-        // If trailing padding is desired, insert it.
-        if (sizeAndAlignment.size != IRIntegerValue(paddedSize))
-        {
-            emitPadding(fieldTypes, llvmSize, paddedSize);
-            llvmPaddedStructType = llvm::StructType::get(
-                builder->getContext(),
-                llvm::ArrayRef<llvm::Type*>(fieldTypes.getBuffer(), fieldTypes.getCount()),
-                true
-            );
-        }
-
-        llvm::StringRef linkageName, prettyName;
-        if (maybeGetName(&linkageName, &prettyName, structType))
-        {
-            llvmPaddedStructType->setName(linkageName);
-            llvmUnpaddedStructType->setName(linkageName);
-        }
-
-        llvmTypeInfo.padded = llvmPaddedStructType;
-        llvmTypeInfo.unpadded = llvmUnpaddedStructType;
-
-        return llvmTypeInfo;
-    }
-
     // True for arrays that have trailing padding. Those arrays are split into
     // a struct:
     //
@@ -1520,63 +1332,19 @@ private:
         bool hasTrailingPadding = sizeAndAlignment.size != align(sizeAndAlignment.size, sizeAndAlignment.alignment);
         return elemCount != 0 && hasTrailingPadding;
     }
-
-    StorageTypeInfo getArrayTypeInfo(IRArrayTypeBase* arrayType, IRTypeLayoutRules* rules)
-    {
-        auto elemType = arrayType->getElementType();
-        llvm::Type* llvmPaddedElemType = getStorageType(elemType, rules, true);
-        llvm::Type* llvmUnpaddedElemType = getStorageType(elemType, rules, false);
-
-        auto irElemCount = arrayType->getElementCount();
-
-        StorageTypeInfo llvmTypeInfo;
-
-        if (irElemCount == nullptr)
-        {
-            // UnsizedArrayType. Lowers as a zero-sized array for LLVM, luckily.
-            llvmTypeInfo = llvm::ArrayType::get(llvmPaddedElemType, 0);
-            return llvmTypeInfo;
-        }
-
-        auto elemCount = int(getIntVal(irElemCount));
-
-        llvmTypeInfo = llvm::ArrayType::get(llvmPaddedElemType, elemCount);
-
-        // The stride of an array must be based on the element type with
-        // trailing padding included, but the last entry in that array may be
-        // missing trailing padding in some layouts. To allow that in LLVM when
-        // an unpadded array is needed, we pop the last element from the
-        // array and emit an unpadded instance separately after the array.
-        //
-        // Unpadded types are never accessed directly, they're only ever
-        // members in a struct that get interpreted as their padded versions
-        // when accessed. Their size must be correct so that GEP works correctly
-        // on that outer struct, but other than that, it doesn't matter what we
-        // emit. 
-        //
-        // We can therefore pick any representation that is convenient to
-        // fill in maybeEmitConstant, as that's the only context where these
-        // are used as value types.
-        if (needsUnpaddedArrayTypeWorkaround(arrayType, rules))
-        {
-            llvm::Type* fieldTypes[2] = {
-                llvm::ArrayType::get(llvmPaddedElemType, elemCount-1),
-                llvmUnpaddedElemType
-            };
-            llvmTypeInfo.unpadded = llvm::StructType::get(builder->getContext(), fieldTypes, true);
-            llvmTypeInfo.trailingPadding = storageTypeMap.getValue(rules).getValue(elemType).trailingPadding;
-        }
-        return llvmTypeInfo;
-    }
 };
 
 struct LLVMEmitter
 {
     std::unique_ptr<llvm::LLVMContext> llvmContext;
     std::unique_ptr<llvm::Module> llvmModule;
+    // This only links LLVM modules together, not object code. It's used for
+    // inline IR.
     std::unique_ptr<llvm::Linker> llvmLinker;
+
     // These need to be stored separately. IRBuilderBase does not have a virtual
-    // destructor :/
+    // destructor :/ Only one should exist at a time and the pointer is copied
+    // to llvmBuilder, which you should always use instead of these directly.
     std::unique_ptr<llvm::IRBuilder<>> llvmBuilderOpt;
     std::unique_ptr<llvm::IRBuilder<llvm::NoFolder>> llvmBuilderNoOpt;
     llvm::IRBuilderBase* llvmBuilder;
@@ -1896,16 +1664,20 @@ struct LLVMEmitter
                 // this incident.
                 llvm::GlobalVariable* llvmVar = nullptr;
                 auto type = inst->getDataType();
-                auto llvmType = types->getStorageType(type, defaultPointerRules);
                 if (promotedGlobalInsts.containsKey(inst))
                 {
                     llvmVar = promotedGlobalInsts.getValue(inst);
                 }
                 else
                 {
+                    IRSizeAndAlignment sizeAndAlignment = types->getSizeAndAlignment(
+                        type, defaultPointerRules);
+                    auto llvmType = llvm::ArrayType::get(llvmBuilder->getInt8Ty(), sizeAndAlignment.getStride());
+
                     llvmVar = new llvm::GlobalVariable(llvmType, false, llvm::GlobalValue::PrivateLinkage);
                     llvmModule->insertGlobalVariable(llvmVar);
                     llvmVar->setInitializer(llvm::PoisonValue::get(llvmType));
+                    llvmVar->setAlignment(llvm::Align(sizeAndAlignment.alignment));
                     promotedGlobalInsts[inst] = llvmVar;
                 }
 
@@ -3676,8 +3448,8 @@ struct LLVMEmitter
                 char d = *cursor++;
                 switch (d)
                 {
-                case 'T':
                 case 'S':
+                case 'T':
                     // Value type of parameter
                     {
                         IRType* type = nullptr;
@@ -3694,10 +3466,16 @@ struct LLVMEmitter
                             type = parentFunc->getParamType(argIndex);
                         }
 
-                        auto llvmType = d == 'T' ?
-                            types->getValueType(type) :
-                            types->getStorageType(type, defaultPointerRules);
-                        llvmType->print(expanded);
+                        if (d == 'S')
+                        {
+                            IRSizeAndAlignment sizeAndAlignment = types->getSizeAndAlignment(type, defaultPointerRules);
+                            expanded << sizeAndAlignment.getStride();
+                        }
+                        else
+                        {
+                            auto llvmType = types->getValueType(type);
+                            llvmType->print(expanded);
+                        }
                     }
                     break;
                 case '_': // Hides type name
@@ -3747,10 +3525,18 @@ struct LLVMEmitter
 
                         auto arg = intrinsicInst->getOperand(argIndex);
 
-                        auto llvmType = storage ?
-                            types->getStorageType(as<IRType>(arg), defaultPointerRules) :
-                            types->getValueType(as<IRType>(arg));
-                        llvmType->print(expanded);
+                        IRType* argType = as<IRType>(arg);
+
+                        if (storage)
+                        {
+                            IRSizeAndAlignment sizeAndAlignment = types->getSizeAndAlignment(argType, defaultPointerRules);
+                            expanded << sizeAndAlignment.getStride();
+                        }
+                        else
+                        {
+                            auto llvmType = types->getValueType(argType);
+                            llvmType->print(expanded);
+                        }
 
                         SLANG_ASSERT(*cursor == ']');
                         cursor++;
