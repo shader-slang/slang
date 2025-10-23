@@ -1226,6 +1226,12 @@ Result linkAndOptimizeIR(
     //
     if (fastIRSimplificationOptions.minimalOptimization)
     {
+        // Since we force-inlined functions, we need to clean up
+        // dead-branches that may have been revealed due to operations
+        // like inlining allowing us to find dead branches.
+        // These must be cleaned since otherwise static_assert's will falsely
+        // detect true due to dead branches with static_assert not being removed.
+        applySparseConditionalConstantPropagation(irModule, sink);
         eliminateDeadCode(irModule, deadCodeEliminationOptions);
     }
     else
