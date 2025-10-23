@@ -1213,6 +1213,13 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::SPIRVAssembly:
     case CodeGenTarget::HLSL:
         break;
+    case CodeGenTarget::CUDASource:
+        {
+            auto targetCaps = targetRequest->getTargetCaps();
+            if (!targetCaps.implies(CapabilityAtom::optix_coopvec))
+                lowerCooperativeVectors(irModule, sink);
+        }
+        break;
     default:
         lowerCooperativeVectors(irModule, sink);
     }
