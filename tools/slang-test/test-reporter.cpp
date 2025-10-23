@@ -91,6 +91,7 @@ TestReporter::TestReporter()
     m_maxFailTestResults = 10;
 
     m_inTest = false;
+    m_testResultAdded = false;
     m_dumpOutputOnFailure = false;
     m_verbosity = VerbosityLevel::Info;
 }
@@ -132,6 +133,7 @@ void TestReporter::startTest(const char* testName)
 
     m_numCurrentResults = 0;
     m_numFailResults = 0;
+    m_testResultAdded = false;
 
     m_currentInfo = TestInfo();
     m_currentInfo.name = testName;
@@ -145,12 +147,7 @@ void TestReporter::endTest()
 
     m_currentInfo.message = m_currentMessage;
 
-    // Only add the result if addResult() was explicitly called at least once.
-    // This prevents tests that are deferred for retry from being counted as "ignored".
-    if (m_numCurrentResults > 0)
-    {
-        _addResult(m_currentInfo);
-    }
+    _addResult(m_currentInfo);
 
     m_inTest = false;
 }
@@ -164,6 +161,7 @@ void TestReporter::addResult(TestResult result)
         result = TestResult::ExpectedFail;
     m_currentInfo.testResult = combine(m_currentInfo.testResult, result);
     m_numCurrentResults++;
+    m_testResultAdded = true;
 }
 
 TestResult TestReporter::getResult() const
@@ -190,6 +188,7 @@ void TestReporter::addResultWithLocation(
     result = adjustResult(m_currentInfo.name.getUnownedSlice(), result);
 
     m_numCurrentResults++;
+    m_testResultAdded = true;
 
     m_currentInfo.testResult = combine(m_currentInfo.testResult, result);
     if (result != TestResult::Fail)
@@ -349,6 +348,14 @@ void TestReporter::_addResult(TestInfo info)
     {
         return;
     }
+
+    // If no result was added for this test it is deferred for retry
+    // Skip updating test counters
+    if (!m_testResultAdded)
+    {
+        return;
+    }
+
     info.testResult = adjustResult(info.name.getUnownedSlice(), info.testResult);
 
     m_totalTestCount++;
