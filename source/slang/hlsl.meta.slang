@@ -17388,6 +17388,16 @@ __magic_type(RaytracingAccelerationStructureType)
 __intrinsic_type($(kIROp_RaytracingAccelerationStructureType))
 struct RaytracingAccelerationStructure
 {
+    // Here, we don't require 'raytracing' capability, instead, we add the
+    // extension directly in the generated code. The reason is that this
+    // struct is used in both raytracing and rayquery APIs, our current capability
+    // system cannot represent this struct with raytracing OR rayquery capability.
+    // So, we cannot add capability requirement on the struct itself.
+    // However, any use of this type will definitely require either raytracing or rayquery,
+    // so we have the guarantee that either raytracing or rayquery capability will be present.
+    // But if rayquery want to use this struct that is constructed from a descriptor handle,
+    // we need to make sure the raytracing extension is present.
+    __glsl_extension(GL_EXT_ray_tracing)
     [require(glsl_spirv)]
     [__readNone]
     __init(uint64_t address)
@@ -17396,6 +17406,7 @@ struct RaytracingAccelerationStructure
         {
         case spirv:
             return spirv_asm {
+                OpExtension "SPV_KHR_ray_tracing";
                 result: $$RaytracingAccelerationStructure = OpConvertUToAccelerationStructureKHR $address;
             };
         case glsl:
@@ -22966,7 +22977,8 @@ const DynamicResourceTypeInfo kDynamicResourceCastableTypes[] = {
     { "RaytracingAccelerationStructure", "AccelerationStructure", "General", "Read" },
 };
 
-for (auto type : kDynamicResourceCastableTypes) {
+for (uint32_t i = 0; i < sizeof(kDynamicResourceCastableTypes)/sizeof(DynamicResourceTypeInfo) - 1; i++) {
+    auto type = kDynamicResourceCastableTypes[i];
     auto dynamicKind = type.dynamicKind;
     auto kind = type.kind;
     auto typeName = type.name;
@@ -23000,6 +23012,25 @@ ${{{{
 }
 }}}}
 
+[require(raytracing, sm_6_6)]
+extension RaytracingAccelerationStructure : __IDynamicResourceCastable<__DynamicResourceKind.General>
+{
+    __intrinsic_op($(kIROp_CastDynamicResource))
+    __implicit_conversion($(kConversionCost_GenericParamUpcast))
+    __init(__DynamicResource res);
+
+    static const DescriptorKind kind = DescriptorKind.AccelerationStructure;
+    static const DescriptorAccess descriptorAccess = DescriptorAccess.Read;
+
+    typealias Handle = DescriptorHandle<RaytracingAccelerationStructure>;
+
+    __implicit_conversion($(kConversionCost_ImplicitDereference))
+    [ForceInline]
+    __init(DescriptorHandle<RaytracingAccelerationStructure> bindless)
+    {
+        return getDescriptorFromHandle(bindless);
+    }
+}
 
 /// Represents a bindless handle to a descriptor. A descriptor handle is always an ordinary data type and can be
 /// declared in any memory location.
