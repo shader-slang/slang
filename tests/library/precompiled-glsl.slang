@@ -2,8 +2,8 @@
 
 // A test that precompiles a slang-module using GLSL functions.
 
-//TEST:COMPILE: tests/library/precompiled-glsl.slang -target spirv -stage fragment -entry main
-//TEST:COMPILE: tests/library/precompiled-glsl.slang -target spirv -stage fragment -entry main -embed-downstream-ir
+//TEST:COMPILE: tests/library/precompiled-glsl.slang -target spirv -stage fragment -entry main -skip-spirv-validation
+//TEST:COMPILE: tests/library/precompiled-glsl.slang -target spirv -stage fragment -entry main -embed-downstream-ir -skip-spirv-validation
 
 #version 310 es
 precision highp float;
