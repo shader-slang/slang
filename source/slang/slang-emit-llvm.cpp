@@ -294,9 +294,6 @@ private:
         // padded / unpadded type split.
         UInt trailingPadding = 0;
 
-        // Filled in separately via getDebugType.
-        llvm::DIType* debugType = nullptr;
-
         llvm::Type* get(bool withTrailingPadding)
         {
             return withTrailingPadding ? padded : unpadded;
@@ -311,6 +308,7 @@ private:
 
     Dictionary<IRType*, llvm::Type*> valueTypeMap;
     Dictionary<IRTypeLayoutRules*, Dictionary<IRType*, StorageTypeInfo>> storageTypeMap;
+    Dictionary<IRTypeLayoutRules*, Dictionary<IRType*, llvm::DIType*>> debugTypeMap;
     Dictionary<IRType*, IRType*> legalizedResourceTypeMap;
 
     struct ConstantInfo
@@ -567,9 +565,9 @@ public:
         // First, ensure we have storage info for this type!
         getStorageType(type, rules);
         {
-            auto& storageInfo = storageTypeMap.getValue(rules).getValue(type);
-            if (storageInfo.debugType)
-                return storageInfo.debugType;
+            Dictionary<IRType*, llvm::DIType*>& types = debugTypeMap[rules];
+            if (types.containsKey(type))
+                return types.getValue(type);
         }
 
         llvm::DIType* llvmType = nullptr;
@@ -783,8 +781,8 @@ public:
         }
 
         {
-            auto& storageInfo = storageTypeMap.getValue(rules).getValue(type);
-            storageInfo.debugType = llvmType;
+            Dictionary<IRType*, llvm::DIType*>& types = debugTypeMap[rules];
+            types[type] = llvmType;
         }
         return llvmType;
     }
@@ -3506,10 +3504,38 @@ struct LLVMEmitter
             return mapInstToLLVM.getValue(var);
 
         IRPtrType* ptrType = var->getDataType();
-        auto varType = types->getStorageType(ptrType->getValueType(), defaultPointerRules);
-        // The global vars are never emitted as constant, constants are always
-        // inlined into where they're needed.
-        llvm::GlobalVariable* llvmVar = new llvm::GlobalVariable(varType, false, getLinkageType(var));
+
+        llvm::GlobalVariable* llvmVar = nullptr;
+        auto firstBlock = var->getFirstBlock();
+
+        if(firstBlock)
+        {
+            auto returnInst = as<IRReturn>(firstBlock->getTerminator());
+            if (returnInst)
+            {
+                // If the initializer is constant, we can emit that to the
+                // variable directly.
+                IRInst* val = returnInst->getVal();
+                if (auto constantValue = types->maybeEmitConstant(val))
+                {
+                    // Easy case, it's just a constant in LLVM.
+                    llvmVar = new llvm::GlobalVariable(constantValue->getType(), false, getLinkageType(var));
+                    llvmVar->setInitializer(constantValue);
+                }
+            }
+        }
+
+        IRSizeAndAlignment sizeAndAlignment = types->getSizeAndAlignment(
+            ptrType->getValueType(), defaultPointerRules);
+
+        if (!llvmVar)
+        {
+            // No initializer, let's just skip the type, no-one cares anyway :)
+            llvmVar = new llvm::GlobalVariable(
+                llvm::ArrayType::get(llvmBuilder->getInt8Ty(), sizeAndAlignment.getStride()),
+                false, getLinkageType(var));
+        }
+        llvmVar->setAlignment(llvm::Align(sizeAndAlignment.alignment));
 
         llvm::StringRef linkageName, prettyName;
         if (maybeGetName(&linkageName, &prettyName, var))
@@ -3524,23 +3550,14 @@ struct LLVMEmitter
     {
         llvm::GlobalVariable* llvmVar = llvm::cast<llvm::GlobalVariable>(mapInstToLLVM.getValue(var));
 
+        // If there's already an initializer, there's nothing more to do here.
+        if (llvmVar->hasInitializer())
+            return;
+
         auto firstBlock = var->getFirstBlock();
 
         if(!firstBlock)
             return;
-
-        if (auto returnInst = as<IRReturn>(firstBlock->getTerminator()))
-        {
-            // If the initializer is constant, we can emit that to the
-            // variable directly.
-            IRInst* val = returnInst->getVal();
-            if (auto constantValue = types->maybeEmitConstant(val))
-            {
-                // Easy case, it's just a constant in LLVM.
-                llvmVar->setInitializer(constantValue);
-                return;
-            }
-        }
 
         // Poison and add a global ctor.
         llvmVar->setInitializer(llvm::PoisonValue::get(llvmVar->getValueType()));
