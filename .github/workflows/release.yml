@@ -187,6 +187,7 @@ jobs:
             "${lib_dir}/libslang-glsl-module.dylib"
             "${lib_dir}/libslang-llvm.dylib"
             "${lib_dir}/libgfx.dylib"
+            "${lib_dir}/slang-standard-module-*/*.slang-module"
             "${bin_dir}/slangd"
             "${bin_dir}/slangc"
           )
