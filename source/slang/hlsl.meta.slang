@@ -17388,7 +17388,7 @@ __magic_type(RaytracingAccelerationStructureType)
 __intrinsic_type($(kIROp_RaytracingAccelerationStructureType))
 struct RaytracingAccelerationStructure
 {
-    [require(glsl_spirv, raytracing)]
+    [require(glsl_spirv)]
     [__readNone]
     __init(uint64_t address)
     {
@@ -23225,20 +23225,7 @@ ${{{{
     }
     case DescriptorKind.AccelerationStructure:
     {
-        // HACK: This is a tricky to cheat our capability system to not require ray tracing capability on SPIRV target.
-        // Note (spvRayTracingKHR | spirv) == spirv, so this target_switch case will only introduce (spirv | _GL_EXT_ray_tracing)
-        // If user doesn't request spvRayTracingKHR, static_assert will be hit. The only reason we do this is to allow user to
-        // call this instrinsic without requiring ray tracing capability on getting other descriptor handles except ray tracing
-        // acceleration structure.
-        __target_switch
-        {
-            case spvRayTracingKHR:
-            case glsl:
-                return __slang_noop_cast<T>(RaytracingAccelerationStructure(__asuint64((uint2)handleValue)));
-            case spirv:
-                static_assert(false, "Please request spvRayTracingKHR or _GL_EXT_ray_tracing for the support the bindless RaytracingAccelerationStructure");
-                return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Unknown)[((uint2)handleValue).x];
-        }
+        return __slang_noop_cast<T>(RaytracingAccelerationStructure(__asuint64((uint2)handleValue)));
     }
     default:
         return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Unknown)[((uint2)handleValue).x];
