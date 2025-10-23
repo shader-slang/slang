@@ -434,6 +434,25 @@ bool isGlobalInst(IRInst* inst)
     return inst->getParent()->getOp() == kIROp_ModuleInst;
 }
 
+// This is fairly fundamental check:
+// This method checks whether a inst's type cannot accept any further refinement.
+//
+// e.g. an inst of `UInt` type cannot be further refined (under the current scope
+// of the type-flow pass), since it has a concrete type, and we do not
+// track values.
+//
+// an inst of `InterfaceType` represents a tagged union of any type that implements
+// the interface, so it can be further refined by determining a smaller set of
+// possibilities (i.e. via `TaggedUnionType(tableSet, typeSet)`).
+//
+// Similarly, an inst of `WitnessTableType` represents any witness table,
+// so it can accept a further refinement into `ElementOfSetType(tableSet)`.
+//
+// In the future, we may want to extend this check to something more nuanced,
+// which takes in both the inst and the refined type to determine if we want to
+// accept the refinement (this is useful in cases like `UnsizedArrayType`, where
+// we only want to refine it if we can determine a concrete size).
+//
 bool isConcreteType(IRInst* inst)
 {
     bool isInstGlobal = isGlobalInst(inst);
@@ -442,11 +461,16 @@ bool isConcreteType(IRInst* inst)
 
     switch (inst->getOp())
     {
-    case kIROp_InterfaceType:
+    case kIROp_InterfaceType: // Can be refined to tagged unions
         return false;
-    case kIROp_WitnessTableType:
-    case kIROp_FuncType:
-        return isInstGlobal;
+    case kIROp_WitnessTableType: // Can be refined into set of concrete tables
+        return false;
+    case kIROp_FuncType: // Can be refined into set of concrete functions
+        return false;
+    case kIROp_GenericKind: // Can be refined into set of concrete generics
+        return false;
+    case kIROp_TypeKind: // Can be refined into set of concrete types
+        return false;
     case kIROp_ArrayType:
         return isConcreteType(cast<IRArrayType>(inst)->getElementType()) &&
                isGlobalInst(cast<IRArrayType>(inst)->getElementCount());
