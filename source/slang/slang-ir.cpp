@@ -7723,7 +7723,9 @@ bool isIntegralScalarOrCompositeType(IRType* t)
     {
     case kIROp_VectorType:
     case kIROp_MatrixType:
-        return isIntegralType((IRType*)t->getOperand(0));
+    case kIROp_ArrayType:
+    case kIROp_UnsizedArrayType:
+        return isIntegralScalarOrCompositeType((IRType*)t->getOperand(0));
     default:
         return isIntegralType(t);
     }

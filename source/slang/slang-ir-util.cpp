@@ -2390,6 +2390,22 @@ IRType* getElementType(IRBuilder& builder, IRType* valueType)
     return nullptr;
 }
 
+IRType* getFieldType(IRType* valueType, IRStructKey* key)
+{
+    valueType = (IRType*)unwrapAttributedType(valueType);
+    if (auto structType = as<IRStructType>(valueType))
+    {
+        for (auto field : structType->getFields())
+        {
+            if (field->getKey() == key)
+            {
+                return field->getFieldType();
+            }
+        }
+    }
+    return nullptr;
+}
+
 Int getSpecializationConstantId(IRGlobalParam* param)
 {
     auto layout = findVarLayout(param);

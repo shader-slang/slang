@@ -1139,7 +1139,7 @@ Result linkAndOptimizeIR(
     {
         // We could fail because
         // 1) It's not inlinable for some reason (for example if it's recursive)
-        SLANG_RETURN_ON_FAIL(performTypeInlining(irModule, sink));
+        SLANG_RETURN_ON_FAIL(performTypeInlining(irModule, targetProgram, sink));
     }
 
     if (requiredLoweringPassSet.reinterpret)
@@ -1893,6 +1893,18 @@ Result linkAndOptimizeIR(
         specializeAddressSpaceForWGSL(irModule);
     }
 
+    bool emitSpirvDirectly = targetProgram->shouldEmitSPIRVDirectly();
+
+    if (isKhronosTarget(targetRequest) && emitSpirvDirectly)
+    {
+        // If we are emitting SPIR-V directly, we should try to specialize function calls
+        // whose argument is an access chain into a global variable/buffer directly after
+        // lowerBufferElementTypeToStorageType, so that we can be more SPIRV conformant by
+        // eliminating the case where an access chain is passed as function argument.
+        // This is disallowed by SPIRV rule 2.16.1 when VariablePointer is not declared.
+        specializeFuncsForBufferLoadArgs(codeGenContext, irModule);
+    }
+
     // If we are generating code for CUDA, we should translate all immutable buffer loads to
     // using `__ldg` intrinsic for improved performance.
     if (isCUDATarget(targetRequest))
@@ -1902,7 +1914,6 @@ Result linkAndOptimizeIR(
 
     performForceInlining(irModule);
 
-    bool emitSpirvDirectly = targetProgram->shouldEmitSPIRVDirectly();
     if (emitSpirvDirectly)
     {
         performIntrinsicFunctionInlining(irModule);
@@ -2562,6 +2573,31 @@ static SlangResult stripDbgSpirvFromArtifact(
     return SLANG_OK;
 }
 
+static bool shouldRunSPIRVValidation(CodeGenContext* codeGenContext)
+{
+    auto& optionSet = codeGenContext->getTargetProgram()->getOptionSet();
+
+    // If the user requested to skip validation, or if we are generating an incomplete library
+    // containing linkage decorations (Vulkan validation rules doesn't allow this), we skip
+    // validation.
+    if (optionSet.getBoolOption(CompilerOptionName::SkipSPIRVValidation) ||
+        optionSet.getBoolOption(CompilerOptionName::IncompleteLibrary))
+        return false;
+
+    // Also check the environment variable SLANG_RUN_SPIRV_VALIDATION.
+    // If it is set to "1", we should run validation.
+    StringBuilder runSpirvValEnvVar;
+    PlatformUtil::getEnvironmentVariable(
+        UnownedStringSlice("SLANG_RUN_SPIRV_VALIDATION"),
+        runSpirvValEnvVar);
+    if (runSpirvValEnvVar.getUnownedSlice() == "1")
+    {
+        return true;
+    }
+
+    return false;
+}
+
 // Helper function to create an artifact from IR used internally by
 // emitSPIRVForEntryPointsDirectly.
 static SlangResult createArtifactFromIR(
@@ -2659,23 +2695,15 @@ static SlangResult createArtifactFromIR(
             }
         }
 
-        if (!codeGenContext->shouldSkipSPIRVValidation())
+        if (shouldRunSPIRVValidation(codeGenContext))
         {
-            StringBuilder runSpirvValEnvVar;
-            PlatformUtil::getEnvironmentVariable(
-                UnownedStringSlice("SLANG_RUN_SPIRV_VALIDATION"),
-                runSpirvValEnvVar);
-            if (runSpirvValEnvVar.getUnownedSlice() == "1")
+            if (SLANG_FAILED(
+                    compiler->validate((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4))))
             {
-                if (SLANG_FAILED(compiler->validate(
-                        (uint32_t*)spirv.getBuffer(),
-                        int(spirv.getCount() / 4))))
-                {
-                    compiler->disassemble((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
-                    codeGenContext->getSink()->diagnoseWithoutSourceView(
-                        SourceLoc{},
-                        Diagnostics::spirvValidationFailed);
-                }
+                compiler->disassemble((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
+                codeGenContext->getSink()->diagnoseWithoutSourceView(
+                    SourceLoc{},
+                    Diagnostics::spirvValidationFailed);
             }
         }
 
