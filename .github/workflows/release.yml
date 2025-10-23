@@ -180,6 +180,12 @@ jobs:
           security list-keychain -d user -s "$KEYCHAIN_PATH"
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${KEYCHAIN_PASSWORD}" "$KEYCHAIN_PATH"
 
+          # Set build directories (macOS uses lib/ for shared libraries)
+          config="${{matrix.config}}"
+          cmake_config="$(echo "${config}" | awk '{print toupper(substr($0,1,1)) tolower(substr($0,2))}')"
+          lib_dir="build/${cmake_config}/lib"
+          bin_dir="build/${cmake_config}/bin"
+
           binaries=(
             "${lib_dir}/libslang.dylib"
             "${lib_dir}/libslang-rt.dylib"
@@ -187,7 +193,6 @@ jobs:
             "${lib_dir}/libslang-glsl-module.dylib"
             "${lib_dir}/libslang-llvm.dylib"
             "${lib_dir}/libgfx.dylib"
-            "${lib_dir}/slang-standard-module-*/*.slang-module"
             "${bin_dir}/slangd"
             "${bin_dir}/slangc"
           )
@@ -199,6 +204,14 @@ jobs:
               /usr/bin/codesign --force --options runtime -s "${IDENTITY_ID}" "$b" -v
               7z a "slang-macos-dist.zip" "$b"
             fi
+          done
+
+          # Sign standard module files (.slang-module files)
+          echo "Signing standard module files..."
+          find "${lib_dir}" -name "*.slang-module" -type f | while read -r module_file; do
+            echo "Signing module '$module_file'..."
+            /usr/bin/codesign --force --options runtime -s "${IDENTITY_ID}" "$module_file" -v
+            7z a "slang-macos-dist.zip" "$module_file"
           done
 
           timeout 1000 gon --log-level=debug ./extras/macos-notarize.json

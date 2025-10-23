@@ -67,7 +67,8 @@ To change the standard module paths:
 2. The slang library includes the header directory privately (not exposed in public API)
 3. C++ code includes `slang-standard-module-config.h` and uses the constants internally
 4. Each module's CMakeLists.txt uses the same variables for consistent paths
-5. Standard modules are placed in the same directory as libslang.so/slang.dll:
+5. Standard modules are compiled using `slangc` at build time
+6. Standard modules are placed in the same directory as libslang.so/slang.dll:
    - **Build - Windows**: `build/Debug/bin/slang-standard-module-${SLANG_VERSION_FULL}/`
    - **Build - Linux/Mac**: `build/Debug/lib/slang-standard-module-${SLANG_VERSION_FULL}/`
    - **Install - Windows**: `<prefix>/bin/slang-standard-module-${SLANG_VERSION_FULL}/`
@@ -76,6 +77,40 @@ To change the standard module paths:
 This ensures that both the C++ runtime search logic and the CMake build logic use exactly the same path configuration, while keeping the implementation details internal to the slang library.
 
 The standard modules are automatically co-located with the slang library for easy discovery at runtime.
+
+## Cross-Compilation Support
+
+When cross-compiling (e.g., building ARM64 binaries on an x86_64 host), the standard modules need to be compiled using a host-platform compiler, since the target-platform `slangc` cannot run on the build host.
+
+The build system automatically uses `SLANG_GENERATORS_PATH` to locate `slang-bootstrap`, a standalone Slang compiler with no external dependencies:
+
+1. First, build the generators for the host platform and install them:
+   ```bash
+   cmake --workflow --preset generators --fresh
+   cmake --install build --config Release --component generators --prefix build-platform-generators
+   ```
+
+   This installs `slang-bootstrap` along with other generator tools.
+
+2. Then, configure the cross-compilation build with `SLANG_GENERATORS_PATH`:
+   ```bash
+   cmake --preset default --fresh \
+     -DSLANG_GENERATORS_PATH=build-platform-generators/bin \
+     -DCMAKE_C_COMPILER=your-cross-compiler \
+     -DCMAKE_CXX_COMPILER=your-cross-compiler++
+   ```
+
+3. Build normally - the standard modules will use the host-platform `slang-bootstrap`:
+   ```bash
+   cmake --build --preset release
+   ```
+
+The build system automatically:
+- Detects when `SLANG_GENERATORS_PATH` is set
+- Uses `slang-bootstrap` from that path (a standalone tool with no dependencies)
+- Falls back to `slangc` for normal (non-cross-compilation) builds
+
+This is the same pattern used in the release workflow for cross-compilation scenarios.
 
 ## Adding New Standard Modules
 
