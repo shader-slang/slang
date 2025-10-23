@@ -14,6 +14,7 @@ enum
     GLSLANG_ACTION_COMPILE_GLSL_TO_SPIRV,
     GLSLANG_ACTION_DISSASSEMBLE_SPIRV,
     GLSLANG_ACTION_OPTIMIZE_SPIRV,
+    GLSLANG_ACTION_STRIP_DEBUG_NONSEMANTIC,
 };
 
 struct glsl_SPIRVVersion
@@ -172,4 +173,5 @@ typedef bool (*glslang_DisassembleSPIRVWithResultFunc)(
     int contentsSize,
     char** outString);
 typedef bool (*glslang_LinkSPIRVFunc)(glslang_LinkRequest* request);
+typedef int (*glslang_StripDebugNonsemanticFunc)(glslang_CompileRequest_1_2* request);
 #endif
