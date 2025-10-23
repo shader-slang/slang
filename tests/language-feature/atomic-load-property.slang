@@ -1,29 +1,20 @@
-//TEST:SIMPLE(filecheck=CHECK):-target spirv -entry computeMain -stage compute
-
-// Test that Atomic<T>::load() is non-mutating and can be called in a property getter.
-// This is a regression test for GitHub issue where load() was incorrectly marked as [__ref]
-// instead of [constref], causing it to be considered mutating.
-
-groupshared Atomic<uint> sharedNumber;
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type
 
 struct AtomicCounter
 {
-    // This property getter should compile since load() is non-mutating
-    property uint value { get { return sharedNumber.load(); } }
+      Atomic<uint> sharedNumber;
+      property uint value { get { return sharedNumber.load(); } }
 }
 
+//TEST_INPUT: set gBuffer = ubuffer(data=[10 0 0 0], stride=4)
+StructuredBuffer<AtomicCounter> gBuffer;
+
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 RWStructuredBuffer<uint> outputBuffer;
 
 [numthreads(1,1,1)]
 void computeMain()
 {
-    AtomicCounter counter;
-    
-    // Access the value through the property getter
-    // This should compile without errors
-    uint val = counter.value;
-    
-    outputBuffer[0] = val;
+    // CHECK: 10
+    outputBuffer[0] = gBuffer[0].value;
 }
-
-// CHECK: OpAtomicLoad
