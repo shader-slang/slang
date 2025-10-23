@@ -179,7 +179,7 @@ jobs:
               cp -r "build/${cmake_config}/bin/D3D12" "artifacts-staging/${cmake_config}/bin/" || echo "Failed to copy bin/D3D12 directory"
               if [[ "${{ inputs.os }}" == "windows" ]]; then
                 # Copy the standard module directory (name includes version, e.g., slang-standard-module-2025.15.1)
-                cp -r "build/${cmake_config}/bin"/slang-standard-module-* "artifacts-staging/${cmake_config}/bin/" 2>/dev/null || echo "Failed to copy bin/slang-standard-module directory"
+                cp -r "build/${cmake_config}/bin/slang-standard-module-*" "artifacts-staging/${cmake_config}/bin/" 2>/dev/null || echo "Failed to copy bin/slang-standard-module directory"
               fi
             fi
 
