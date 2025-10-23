@@ -3235,7 +3235,7 @@ int __sizeOf()
     {
     case cpp: __intrinsic_asm "sizeof($[0])", T;
     case cuda: __intrinsic_asm "sizeof($[0])", T;
-    case llvm: __intrinsic_asm "%size = getelementptr $[S0], ptr null, i32 1\n%result = ptrtoint ptr %size to i32", T;
+    case llvm: __intrinsic_asm "ret i32 $[S0]", T;
     }
 }
 
@@ -3248,7 +3248,7 @@ int __sizeOf(T v)
     {
     case cpp: __intrinsic_asm "sizeof($T0)";
     case cuda: __intrinsic_asm "sizeof($T0)";
-    case llvm: __intrinsic_asm "%size = getelementptr $S0, ptr null, i32 1\n%result = ptrtoint ptr %size to i32";
+    case llvm: __intrinsic_asm "ret i32 $S0";
     }
 }
 
