@@ -2644,18 +2644,11 @@ struct TypeLayoutReflection
         return spReflectionTypeLayout_getGenericParamIndex((SlangReflectionTypeLayout*)this);
     }
 
-    TypeLayoutReflection* getPendingDataTypeLayout()
-    {
-        return (TypeLayoutReflection*)spReflectionTypeLayout_getPendingDataTypeLayout(
-            (SlangReflectionTypeLayout*)this);
-    }
+    // Pending Type Layout functionality has been removed
+    TypeLayoutReflection* getPendingDataTypeLayout() { return nullptr; }
 
-    VariableLayoutReflection* getSpecializedTypePendingDataVarLayout()
-    {
-        return (VariableLayoutReflection*)
-            spReflectionTypeLayout_getSpecializedTypePendingDataVarLayout(
-                (SlangReflectionTypeLayout*)this);
-    }
+    // Pending Type Layout functionality has been removed
+    VariableLayoutReflection* getSpecializedTypePendingDataVarLayout() { return nullptr; }
 
     SlangInt getBindingRangeCount()
     {
@@ -3000,11 +2993,8 @@ struct VariableLayoutReflection
         return spReflectionVariableLayout_getStage((SlangReflectionVariableLayout*)this);
     }
 
-    VariableLayoutReflection* getPendingDataLayout()
-    {
-        return (VariableLayoutReflection*)spReflectionVariableLayout_getPendingDataLayout(
-            (SlangReflectionVariableLayout*)this);
-    }
+    // Pending Type Layout functionality has been removed
+    VariableLayoutReflection* getPendingDataLayout() { return nullptr; }
 };
 
 struct FunctionReflection

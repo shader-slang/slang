@@ -231,7 +231,6 @@ public:
         slang::IComponentType* m_program;
         slang::ProgramLayout* m_programLayout;
         List<EntryPointInfo> m_entryPoints;
-        SimpleBindingOffset m_pendingDataOffset;
     };
 
     EntryPointInfo& getEntryPoint(Index index) { return m_entryPoints[index]; }
@@ -248,7 +247,6 @@ public:
     slang::ProgramLayout* getSlangProgramLayout() const { return m_programLayout; }
 
     /// Get the offset at which "pending" shader parameters for this program start
-    SimpleBindingOffset const& getPendingDataOffset() const { return m_pendingDataOffset; }
 
 protected:
     Result _init(Builder const* builder);
@@ -257,7 +255,6 @@ protected:
     slang::ProgramLayout* m_programLayout = nullptr;
 
     List<EntryPointInfo> m_entryPoints;
-    SimpleBindingOffset m_pendingDataOffset;
 };
 
 } // namespace d3d11

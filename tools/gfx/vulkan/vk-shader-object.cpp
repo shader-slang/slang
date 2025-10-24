@@ -287,8 +287,8 @@ Result ShaderObjectImpl::_writeOrdinaryData(
         // layout logic does for complex cases with multiple layers of nested arrays and
         // structures.
         //
-        Offset subObjectRangePendingDataOffset = subObjectRangeInfo.offset.pendingOrdinaryData;
-        Size subObjectRangePendingDataStride = subObjectRangeInfo.stride.pendingOrdinaryData;
+        Offset subObjectRangePendingDataOffset = 0;
+        Size subObjectRangePendingDataStride = 0;
 
         // If the range doesn't actually need/use the "pending" allocation at all, then
         // we need to detect that case and skip such ranges.
@@ -843,8 +843,8 @@ Result ShaderObjectImpl::bindAsValue(
                 // For the purposes of nested binding, what used to be the pending offset
                 // will now be used as the primary offset.
                 //
-                SimpleBindingOffset objOffset = rangeOffset.pending;
-                SimpleBindingOffset objStride = rangeStride.pending;
+                SimpleBindingOffset objOffset = {};
+                SimpleBindingOffset objStride = {};
                 for (Index i = 0; i < count; ++i)
                 {
                     // An existential-type sub-object is always bound just as a value,
@@ -1143,7 +1143,6 @@ Result RootShaderObjectImpl::bindAsRoot(
     RootShaderObjectLayout* layout)
 {
     BindingOffset offset = {};
-    offset.pending = layout->getPendingDataOffset();
 
     // Note: the operations here are quite similar to what `bindAsParameterBlock` does.
     // The key difference in practice is that we do *not* make use of the adjustment

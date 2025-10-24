@@ -363,7 +363,7 @@ public:
             BindingRegisterOffsetPair() {}
 
             BindingRegisterOffsetPair(slang::VariableLayoutReflection* varLayout)
-                : primary(varLayout), pending(varLayout->getPendingDataLayout())
+                : primary(varLayout), pending(nullptr)
             {
             }
 

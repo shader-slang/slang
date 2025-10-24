@@ -13,20 +13,14 @@ ShaderObjectLayoutImpl::SubObjectRangeOffset::SubObjectRangeOffset(
     slang::VariableLayoutReflection* varLayout)
     : BindingOffset(varLayout)
 {
-    if (auto pendingLayout = varLayout->getPendingDataLayout())
-    {
-        pendingOrdinaryData = (uint32_t)pendingLayout->getOffset(SLANG_PARAMETER_CATEGORY_UNIFORM);
-    }
+    // Pending layout APIs have been removed - no additional offset needed
 }
 
 ShaderObjectLayoutImpl::SubObjectRangeStride::SubObjectRangeStride(
     slang::TypeLayoutReflection* typeLayout)
     : BindingOffset(typeLayout)
 {
-    if (auto pendingLayout = typeLayout->getPendingDataTypeLayout())
-    {
-        pendingOrdinaryData = (uint32_t)typeLayout->getStride();
-    }
+    // Pending layout APIs have been removed - no stride needed
 }
 
 Result ShaderObjectLayoutImpl::Builder::setElementTypeLayout(
@@ -198,27 +192,10 @@ Result ShaderObjectLayoutImpl::Builder::setElementTypeLayout(
             // form of a "pending" type layotu attached to the interface type
             // of the leaf type layout.
             //
-            if (auto pendingTypeLayout = slangLeafTypeLayout->getPendingDataTypeLayout())
-            {
-                createForElementType(
-                    m_renderer,
-                    m_session,
-                    pendingTypeLayout,
-                    subObjectLayout.writeRef());
-
-                // An interface-type range that includes ordinary data can
-                // increase the size of the ordinary data buffer we need to
-                // allocate for the parent object.
-                //
-                uint32_t ordinaryDataEnd =
-                    subObjectRange.offset.pendingOrdinaryData +
-                    (uint32_t)bindingRange.count * subObjectRange.stride.pendingOrdinaryData;
-
-                if (ordinaryDataEnd > m_totalOrdinaryDataSize)
-                {
-                    m_totalOrdinaryDataSize = ordinaryDataEnd;
-                }
-            }
+            // Pending data layout APIs have been removed.
+            // Interface-type ranges now have no additional layout information.
+            // Sub-object layout remains nullptr for interface types.
+            break;
         }
         subObjectRange.layout = subObjectLayout;
 
@@ -283,7 +260,6 @@ void RootShaderObjectLayoutImpl::Builder::addGlobalParams(
     slang::VariableLayoutReflection* globalsLayout)
 {
     setElementTypeLayout(globalsLayout->getTypeLayout());
-    m_pendingDataOffset = BindingOffset(globalsLayout).pending;
 }
 
 void RootShaderObjectLayoutImpl::Builder::addEntryPoint(
@@ -333,7 +309,6 @@ Result RootShaderObjectLayoutImpl::_init(Builder const* builder)
     m_program = builder->m_program;
     m_programLayout = builder->m_programLayout;
     m_entryPoints = builder->m_entryPoints;
-    m_pendingDataOffset = builder->m_pendingDataOffset;
     m_slangSession = m_program->getSession();
 
     return SLANG_OK;

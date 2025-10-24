@@ -92,9 +92,6 @@ struct BindingOffset : SimpleBindingOffset
     // Offsets for "primary" data are stored directly in the `BindingOffset`
     // via the inheritance from `SimpleBindingOffset`.
 
-    /// Offset for any "pending" data
-    SimpleBindingOffset pending;
-
     /// Create a default (zero) offset
     BindingOffset() {}
 
@@ -106,7 +103,7 @@ struct BindingOffset : SimpleBindingOffset
 
     /// Create an offset based on offset information in the given Slang `varLayout`
     BindingOffset(slang::VariableLayoutReflection* varLayout)
-        : SimpleBindingOffset(varLayout), pending(varLayout->getPendingDataLayout())
+        : SimpleBindingOffset(varLayout)
     {
     }
 
@@ -114,11 +111,7 @@ struct BindingOffset : SimpleBindingOffset
     void operator+=(SimpleBindingOffset const& offset) { SimpleBindingOffset::operator+=(offset); }
 
     /// Add any values in the given `offset`
-    void operator+=(BindingOffset const& offset)
-    {
-        SimpleBindingOffset::operator+=(offset);
-        pending += offset.pending;
-    }
+    void operator+=(BindingOffset const& offset) { SimpleBindingOffset::operator+=(offset); }
 };
 
 /// Context information required when binding shader objects to the pipeline
