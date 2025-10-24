@@ -14139,7 +14139,7 @@ struct CapabilityDeclReferenceVisitor
                 set,
                 targetCap,
                 targetCase->loc,
-                targetCase->capability,
+                CapabilityName(targetCase->capability),
                 isStageSwitch);
         }
         handleProcessFunc(stmt, set, stmt->loc);
