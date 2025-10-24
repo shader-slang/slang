@@ -1984,6 +1984,7 @@ struct IRUnconditionalBranch : IRTerminatorInst
     IRUse block;
 
     IRBlock* getTargetBlock() { return (IRBlock*)block.get(); }
+    IRUse* getTargetBlockUse() { return &block; }
 
     UInt getArgCount();
     IRUse* getArgs();
@@ -3769,6 +3770,8 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* emitStore(IRInst* dstPtr, IRInst* srcVal);
     IRInst* emitStore(IRInst* dstPtr, IRInst* srcVal, IRInst* align);
     IRInst* emitStore(IRInst* dstPtr, IRInst* srcVal, IRInst* align, IRInst* memoryScope);
+
+    IRInst* emitCopyLogical(IRType* type, IRInst* dest, IRInst* srcPtr);
 
     IRInst* emitAtomicStore(IRInst* dstPtr, IRInst* srcVal, IRInst* memoryOrder);
 

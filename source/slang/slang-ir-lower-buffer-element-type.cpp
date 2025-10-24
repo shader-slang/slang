@@ -263,6 +263,17 @@ struct TypeLoweringConfig
     IRTypeLayoutRuleName layoutRuleName;
     IRTypeLayoutRules* getLayoutRule() const { return IRTypeLayoutRules::get(layoutRuleName); }
 
+    // Get the `TypeLoweringConfig` for "logical" layout that maps 1:1 to storage type, but without
+    // explicit layout so that the lowered type is usable in a Function/Private address space for
+    // SPIRV.
+    static TypeLoweringConfig getLogicalTypeLoweringConfig()
+    {
+        TypeLoweringConfig config;
+        config.addressSpace = AddressSpace::Generic;
+        config.layoutRuleName = IRTypeLayoutRuleName::Logical;
+        return config;
+    }
+
     bool operator==(const TypeLoweringConfig& other) const
     {
         return addressSpace == other.addressSpace && layoutRuleName == other.layoutRuleName;
@@ -384,11 +395,19 @@ const char* getLayoutName(IRTypeLayoutRuleName name)
         return "std430";
     case IRTypeLayoutRuleName::Natural:
         return "natural";
+    case IRTypeLayoutRuleName::Logical:
+        return "logical";
     case IRTypeLayoutRuleName::C:
         return "c";
     default:
         return "default";
     }
+}
+
+void maybeAddPhysicalTypeDecoration(IRBuilder& builder, IRInst* type, TypeLoweringConfig config)
+{
+    if (config.layoutRuleName != IRTypeLayoutRuleName::Logical)
+        builder.addPhysicalTypeDecoration(type);
 }
 
 struct LoweredElementTypeContext
@@ -651,11 +670,12 @@ struct LoweredElementTypeContext
                 }
             }
 
+            bool needExplicitLayout = config.layoutRuleName != IRTypeLayoutRuleName::Logical;
             auto arrayType = as<IRArrayType>(arrayTypeBase);
             if (arrayType)
             {
                 auto loweredType = builder.createStructType();
-                builder.addPhysicalTypeDecoration(loweredType);
+                maybeAddPhysicalTypeDecoration(builder, loweredType, config);
 
                 info.loweredType = loweredType;
                 StringBuilder nameSB;
@@ -679,7 +699,10 @@ struct LoweredElementTypeContext
                 auto innerArrayType = builder.getArrayType(
                     loweredInnerTypeInfo.loweredType,
                     arrayType->getElementCount(),
-                    builder.getIntValue(builder.getIntType(), elementSizeAlignment.getStride()));
+                    needExplicitLayout ? builder.getIntValue(
+                                             builder.getIntType(),
+                                             elementSizeAlignment.getStride())
+                                       : nullptr);
                 builder.createStructField(loweredType, structKey, innerArrayType);
                 info.loweredInnerArrayType = innerArrayType;
                 info.loweredInnerStructKey = structKey;
@@ -702,7 +725,11 @@ struct LoweredElementTypeContext
                     arrayTypeBase->getOp(),
                     loweredInnerTypeInfo.loweredType,
                     nullptr,
-                    builder.getIntValue(builder.getIntType(), elementSizeAlignment.getStride()));
+                    needExplicitLayout ? builder.getIntValue(
+                                             builder.getIntType(),
+                                             elementSizeAlignment.getStride())
+                                       : nullptr);
+                maybeAddPhysicalTypeDecoration(builder, innerArrayType, config);
                 info.loweredType = innerArrayType;
             }
             return info;
@@ -732,7 +759,7 @@ struct LoweredElementTypeContext
                 }
             }
             auto loweredType = builder.createStructType();
-            builder.addPhysicalTypeDecoration(loweredType);
+            maybeAddPhysicalTypeDecoration(builder, loweredType, config);
 
             StringBuilder nameSB;
             getTypeNameHint(nameSB, type);
@@ -1053,6 +1080,24 @@ struct LoweredElementTypeContext
         }
     }
 
+    IRInst* getSourceAddrFromLoadInst(IRBuilder& builder, IRInst* loadInst)
+    {
+        switch (loadInst->getOp())
+        {
+        case kIROp_Load:
+            return loadInst->getOperand(0);
+        case kIROp_StructuredBufferLoad:
+        case kIROp_StructuredBufferLoadStatus:
+        case kIROp_RWStructuredBufferLoad:
+        case kIROp_RWStructuredBufferLoadStatus:
+            return builder.emitRWStructuredBufferGetElementPtr(
+                loadInst->getOperand(0),
+                loadInst->getOperand(1));
+        default:
+            return nullptr;
+        }
+    }
+
     void deferStorageToLogicalCasts(
         IRModule* module,
         List<IRCastStorageToLogicalBase*> castInstWorkList)
@@ -1241,14 +1286,6 @@ struct LoweredElementTypeContext
                                 // a simple type.
                                 if (!isCompositeType(user->getDataType()))
                                     break;
-                                builder.setInsertBefore(user);
-                                IRCloneEnv cloneEnv;
-                                auto newLoad = cloneInst(&cloneEnv, &builder, user);
-                                newLoad->setOperand(0, ptrVal);
-                                auto elementStorageType = tryGetPointedToOrBufferElementType(
-                                    &builder,
-                                    ptrVal->getDataType());
-                                newLoad->setFullType(elementStorageType);
                                 IRInst* tempVar = nullptr;
                                 if (as<IRLoad>(user))
                                 {
@@ -1257,29 +1294,86 @@ struct LoweredElementTypeContext
                                             kIROp_TempCallArgImmutableVarDecoration))
                                         tempVar = ptrVal;
                                 }
+                                auto newBufferType = castInst->getBufferType();
                                 if (!tempVar)
                                 {
                                     // If the load is not from an immutable location, we
                                     // must preserve the load and keep the result in a local
                                     // var.
-                                    // Unfortunately, SPIRV disallow a physical type (type with
-                                    // explicit layout) to be used to declare a local variable.
-                                    // Therefore for SPIRV target only, we have to disable this
-                                    // optimization altogether and run the
-                                    // storage-type-to-logical-type translation at the load instead
-                                    // of continue delaying the translation.
+                                    builder.setInsertBefore(user);
+                                    auto elementStorageType = tryGetPointedToOrBufferElementType(
+                                        &builder,
+                                        ptrVal->getDataType());
+
                                     if (!leafTypeLoweringPolicy->canUseStorageTypeInLocalVar())
-                                        break;
-                                    tempVar = builder.emitVar(elementStorageType);
-                                    builder.addDecoration(
-                                        tempVar,
-                                        kIROp_TempCallArgImmutableVarDecoration);
-                                    builder.emitStore(tempVar, newLoad);
+                                    {
+                                        // Unfortunately, SPIRV disallow a physical type (type with
+                                        // explicit layout) to be used to declare a local variable.
+                                        // Therefore for SPIRV target only, we want to create a
+                                        // clone of the storage type such that it doesn't have SPIRV
+                                        // "explicit layout" decorations, but is otherwise the same
+                                        // as the lowered storage type. We will declare a temporary
+                                        // variable of this "logical storage" type to hold the
+                                        // loaded value in Function address space.
+                                        auto logicalStorageTypeInfo = getLoweredTypeInfo(
+                                            user->getDataType(),
+                                            TypeLoweringConfig::getLogicalTypeLoweringConfig());
+
+                                        // Try emit an inst that represent the address the load inst
+                                        // is loading from.
+                                        auto srcPtr = getSourceAddrFromLoadInst(builder, user);
+
+                                        // If there isn't a way to get a pointer to the source data
+                                        // from the load inst, there isn't anything we can do other
+                                        // than translate the loaded value to logical type now.
+                                        if (!srcPtr)
+                                            break;
+                                        tempVar =
+                                            builder.emitVar(logicalStorageTypeInfo.loweredType);
+
+                                        // `newLoad` currently has storage type, but `tempVar` has
+                                        // the "logical storage" type, so we need to convert the
+                                        // loaded value into the "logical storage" type using a
+                                        // `CopyLogical` inst, before storing it into `tempVar`.
+                                        if (logicalStorageTypeInfo.loweredType !=
+                                            elementStorageType)
+                                        {
+                                            builder.emitCopyLogical(
+                                                builder.getVoidType(),
+                                                tempVar,
+                                                srcPtr);
+                                        }
+                                        else
+                                        {
+                                            builder.emitStore(tempVar, builder.emitLoad(srcPtr));
+                                        }
+                                        newBufferType = nullptr;
+                                    }
+                                    else
+                                    {
+                                        // The normal case is easy, we simply need to declare a
+                                        // local var directly using the lowered storage type, and
+                                        // write `newLoad` into it.
+                                        tempVar = builder.emitVar(elementStorageType);
+                                        builder.addDecoration(
+                                            tempVar,
+                                            kIROp_TempCallArgImmutableVarDecoration);
+
+                                        // Emit `load_op(ptrVal, ...)`, where first operand is
+                                        // replaced from `castInst` to `ptrVal`, while the opcode
+                                        // and remaining operands remains the same as `user`.
+                                        IRCloneEnv cloneEnv;
+                                        cloneEnv.mapOldValToNew[castInst] = ptrVal;
+                                        auto newLoad = cloneInst(&cloneEnv, &builder, user);
+                                        newLoad->setFullType(elementStorageType);
+
+                                        builder.emitStore(tempVar, newLoad);
+                                    }
                                 }
                                 auto newCast = builder.emitCastStorageToLogicalDeref(
                                     user->getFullType(),
                                     tempVar,
-                                    castInst->getBufferType());
+                                    newBufferType);
                                 user->replaceUsesWith(newCast);
                                 user->removeAndDeallocate();
                                 if (auto newCastStorage = as<IRCastStorageToLogicalBase>(newCast))
@@ -2014,6 +2108,8 @@ IRTypeLayoutRuleName getTypeLayoutRulesFromOp(IROp layoutTypeOp, IRTypeLayoutRul
 
 IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRType* bufferType)
 {
+    if (!bufferType)
+        return IRTypeLayoutRuleName::Logical;
     if (bufferType->getOp() == kIROp_ParameterBlockType && isMetalTarget(target->getTargetReq()))
     {
         return IRTypeLayoutRuleName::MetalParameterBlock;
@@ -2288,6 +2384,8 @@ struct DefaultBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
         LoweredElementTypeInfo info;
         info.originalType = type;
 
+        bool needExplicitLayout = config.layoutRuleName != IRTypeLayoutRuleName::Logical;
+
         if (auto matrixType = as<IRMatrixType>(type))
         {
             if (!shouldLowerMatrixType(matrixType, config))
@@ -2297,7 +2395,7 @@ struct DefaultBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
             }
 
             auto loweredType = builder.createStructType();
-            builder.addPhysicalTypeDecoration(loweredType);
+            maybeAddPhysicalTypeDecoration(builder, loweredType, config);
 
             StringBuilder nameSB;
             bool isColMajor =
@@ -2337,7 +2435,9 @@ struct DefaultBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
             auto arrayType = builder.getArrayType(
                 vectorType,
                 isColMajor ? matrixType->getColumnCount() : matrixType->getRowCount(),
-                builder.getIntValue(builder.getIntType(), elementSizeAlignment.getStride()));
+                needExplicitLayout
+                    ? builder.getIntValue(builder.getIntType(), elementSizeAlignment.getStride())
+                    : nullptr);
             builder.createStructField(loweredType, structKey, arrayType);
 
             info.loweredType = loweredType;

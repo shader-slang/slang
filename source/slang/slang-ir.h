@@ -519,6 +519,7 @@ enum class SideEffectAnalysisOptions
 
 enum class IRTypeLayoutRuleName
 {
+    Logical, // No explicit layout
     Natural,
     Scalar = Natural,
     Std430,
