@@ -23,35 +23,35 @@ public struct BindlessBufferStorage<T> : IStorage<T>
         public typealias Differential =
             BindlessBufferStorage<T.Differential>.BindlessAddress;
 
-        internal RWStructuredBuffer<T>.Handle m_handle;
-        internal uint m_baseIndex;
+        internal RWStructuredBuffer<T>.Handle handle;
+        internal uint baseIndex;
 
         public __init(RWStructuredBuffer<T>.Handle handle, uint baseIndex = 0U)
         {
-            this.m_handle = RWStructuredBuffer<T>.Handle(handle);
-            this.m_baseIndex = baseIndex;
+            this.handle = handle;
+            this.baseIndex = baseIndex;
         }
 
         public __subscript(uint index)->T
         {
             [nonmutating]
-            get { return m_handle[m_baseIndex + index]; }
+            get { return handle[baseIndex + index]; }
 
             [mutating]
-            set { m_handle[m_baseIndex + index] = newValue; }
+            set { handle[baseIndex + index] = newValue; }
         }
 
         [require(cuda_glsl_hlsl_metal_spirv, sm_6_6)]
         [require(spvBindlessTextureNV)]
         public void atomicAdd(uint index, T value)
         {
-            __atomic_add(m_handle[m_baseIndex + index], value);
+            __atomic_add(handle[baseIndex + index], value);
         }
 
         public Address getOffset(int elements)
         {
-            uint newBaseIndex = m_baseIndex + elements;
-            return Address(m_handle, newBaseIndex);
+            uint newBaseIndex = baseIndex + elements;
+            return Address(handle, newBaseIndex);
         }
     }
     public typealias Address = BindlessAddress;
@@ -61,7 +61,7 @@ public struct BindlessBufferStorage<T> : IStorage<T>
     public T read(Address address) {return address[0];}
     public void atomicAdd(Address address, T value) {}
     public void write(Address address, T value) {address[0] = value;}
-    public static Address getOffset(Address base, int elements) { return Address(base.m_handle, base.m_baseIndex + elements); }
+    public static Address getOffset(Address base, int elements) { return Address(base.handle, base.baseIndex + elements); }
 }
 
 // [require(cpp_cuda_metal_spirv)]
@@ -74,35 +74,35 @@ public struct PointerStorage<T> : IStorage<T>
         public typealias Differential =
             PointerStorage<T.Differential>.PointerAddress;
 
-        T* m_ptr;
-        uint m_baseIndex;
+        T* ptr;
+        uint baseIndex;
 
         public __init(T* ptr, uint baseIndex = 0U)
         {
-            this.m_ptr = ptr;
-            this.m_baseIndex = baseIndex;
+            this.ptr = ptr;
+            this.baseIndex = baseIndex;
         }
 
         public __subscript(uint index)->T
         {
             [nonmutating]
-            get { return m_ptr[m_baseIndex + index]; }
+            get { return ptr[baseIndex + index]; }
 
             [mutating]
-            set { m_ptr[m_baseIndex + index] = newValue; }
+            set { ptr[baseIndex + index] = newValue; }
         }
 
         public Address getOffset(uint elements)
         {
-            uint newBaseIndex = m_baseIndex + elements;
-            return Address(m_ptr, newBaseIndex);
+            uint newBaseIndex = baseIndex + elements;
+            return Address(ptr, newBaseIndex);
         }
 
         [require(cuda_glsl_hlsl_metal_spirv, sm_6_6)]
         [require(spvBindlessTextureNV)]
         public void atomicAdd(uint index, T value)
         {
-            __atomic_add(m_ptr[m_baseIndex + index], value);
+            __atomic_add(ptr[baseIndex + index], value);
         }
     }
 
@@ -113,5 +113,5 @@ public struct PointerStorage<T> : IStorage<T>
     public T read(Address address) {return address[0];}
     public void atomicAdd(Address address, T value) {}
     public void write(Address address, T value) {address[0] = value;}
-    public static Address getOffset(Address base, int elements) {return Address(base.m_ptr, base.m_baseIndex + elements * sizeof(T));}
+    public static Address getOffset(Address base, int elements) {return Address(base.ptr, base.baseIndex + elements * sizeof(T));}
 }
