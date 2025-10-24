@@ -14166,7 +14166,7 @@ private:
             {
                 for (auto stage : target.second.getShaderStageSets())
                 {
-                    result &= newSet.compatibleMerge(target.first, stage.second);
+                    result &= currentSet.compatibleMerge(target.first, stage.second);
                     if (!result)
                         break;
                 }
@@ -14179,7 +14179,7 @@ private:
             // If this is target-switch, we can just merge the whole target set
             for (auto target : newSet.getCapabilityTargetSets())
             {
-                result &= newSet.compatibleMerge(target.second);
+                result &= currentSet.compatibleMerge(target.second);
                 if (!result)
                     break;
             }
