@@ -2483,6 +2483,16 @@ IRVoidLit* IRBuilder::getVoidValue()
     return (IRVoidLit*)_findOrEmitConstant(keyInst);
 }
 
+IRVoidLit* IRBuilder::getVoidValue(IRType* type)
+{
+    IRConstant keyInst;
+    memset(&keyInst, 0, sizeof(keyInst));
+    keyInst.m_op = kIROp_VoidLit;
+    keyInst.typeUse.usedValue = type;
+    keyInst.value.intVal = 0;
+    return (IRVoidLit*)_findOrEmitConstant(keyInst);
+}
+
 IRInst* IRBuilder::getCapabilityValue(CapabilitySet const& caps)
 {
     IRType* capabilityAtomType = getIntType();
@@ -3607,7 +3617,7 @@ IRInst* IRBuilder::emitPackAnyValue(IRType* type, IRInst* value)
 
 IRInst* IRBuilder::emitUnpackAnyValue(IRType* type, IRInst* value)
 {
-    auto inst = createInst<IRPackAnyValue>(this, kIROp_UnpackAnyValue, type, value);
+    auto inst = createInst<IRUnpackAnyValue>(this, kIROp_UnpackAnyValue, type, value);
 
     addInst(inst);
     return inst;
@@ -6554,6 +6564,76 @@ IREntryPointLayout* IRBuilder::getEntryPointLayout(
         operands));
 }
 
+IRSetBase* IRBuilder::getSet(IROp op, const HashSet<IRInst*>& elements)
+{
+    if (elements.getCount() == 0)
+        return nullptr;
+
+    // Verify that all operands are global instructions
+    for (auto element : elements)
+        if (element->getParent()->getOp() != kIROp_ModuleInst)
+            SLANG_ASSERT_FAILURE("createSet called with non-global operands");
+
+    List<IRInst*> sortedElements;
+    for (auto element : elements)
+        sortedElements.add(element);
+
+    // Sort elements by their unique IDs to ensure canonical ordering
+    sortedElements.sort(
+        [&](IRInst* a, IRInst* b) -> bool { return getUniqueID(a) < getUniqueID(b); });
+
+    return as<IRSetBase>(
+        emitIntrinsicInst(nullptr, op, sortedElements.getCount(), sortedElements.getBuffer()));
+}
+
+IRSetBase* IRBuilder::getSet(const HashSet<IRInst*>& elements)
+{
+    SLANG_ASSERT(elements.getCount() > 0);
+    auto firstElement = *elements.begin();
+    return getSet(getSetTypeForInst(firstElement), elements);
+}
+
+IRSetBase* IRBuilder::getSingletonSet(IROp op, IRInst* element)
+{
+    return getSet(op, {element});
+}
+
+IRSetBase* IRBuilder::getSingletonSet(IRInst* element)
+{
+    return getSet(getSetTypeForInst(element), {element});
+}
+
+UInt IRBuilder::getUniqueID(IRInst* inst)
+{
+    auto uniqueIDMap = getModule()->getUniqueIdMap();
+    auto existingId = uniqueIDMap->tryGetValue(inst);
+    if (existingId)
+        return *existingId;
+
+    auto id = uniqueIDMap->getCount();
+    uniqueIDMap->add(inst, id);
+    return id;
+}
+
+IROp IRBuilder::getSetTypeForInst(IRInst* inst)
+{
+    if (as<IRGeneric>(inst))
+        return kIROp_GenericSet;
+
+    if (as<IRTypeKind>(inst->getDataType()))
+        return kIROp_TypeSet;
+    else if (as<IRFuncType>(inst->getDataType()))
+        return kIROp_FuncSet;
+    else if (as<IRType>(inst) && !as<IRInterfaceType>(inst))
+        return kIROp_TypeSet;
+    else if (as<IRWitnessTableType>(inst->getDataType()))
+        return kIROp_WitnessTableSet;
+    else if (as<IRVoidLit>(inst))
+        return kIROp_TypeSet; // TODO: this feels wrong...
+    else
+        return kIROp_Invalid; // Return invalid IROp when not supported
+}
+
 //
 
 struct IRDumpContext
@@ -8286,6 +8366,9 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     if (as<IRSPIRVAsmOperand>(this))
         return false;
 
+    if (as<IRSetBase>(this))
+        return false;
+
     switch (getOp())
     {
     // By default, assume that we might have side effects,
@@ -8474,6 +8557,22 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_GetPerVertexInputArray:
     case kIROp_MetalCastToDepthTexture:
     case kIROp_GetCurrentStage:
+    case kIROp_GetDispatcher:
+    case kIROp_GetSpecializedDispatcher:
+    case kIROp_GetTagForMappedSet:
+    case kIROp_GetTagForSpecializedSet:
+    case kIROp_GetTagForSuperSet:
+    case kIROp_GetTagFromSequentialID:
+    case kIROp_GetSequentialIDFromTag:
+    case kIROp_CastInterfaceToTaggedUnionPtr:
+    case kIROp_CastTaggedUnionToInterfacePtr:
+    case kIROp_GetElementFromTag:
+    case kIROp_GetTagFromTaggedUnion:
+    case kIROp_GetTypeTagFromTaggedUnion:
+    case kIROp_GetValueFromTaggedUnion:
+    case kIROp_MakeTaggedUnion:
+    case kIROp_GetTagOfElementInSet:
+    case kIROp_UnboundedSet:
         return false;
 
     case kIROp_ForwardDifferentiate:

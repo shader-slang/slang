@@ -86,6 +86,7 @@
 #include "slang-ir-lower-reinterpret.h"
 #include "slang-ir-lower-result-type.h"
 #include "slang-ir-lower-tuple-types.h"
+#include "slang-ir-lower-typeflow-insts.h"
 #include "slang-ir-metadata.h"
 #include "slang-ir-metal-legalize.h"
 #include "slang-ir-missing-return.h"
@@ -114,6 +115,7 @@
 #include "slang-ir-synthesize-active-mask.h"
 #include "slang-ir-transform-params-to-constref.h"
 #include "slang-ir-translate-global-varying-var.h"
+#include "slang-ir-typeflow-specialize.h"
 #include "slang-ir-undo-param-copy.h"
 #include "slang-ir-uniformity.h"
 #include "slang-ir-user-type-hint.h"
@@ -1141,6 +1143,14 @@ Result linkAndOptimizeIR(
         // 1) It's not inlinable for some reason (for example if it's recursive)
         SLANG_RETURN_ON_FAIL(performTypeInlining(irModule, targetProgram, sink));
     }
+
+    lowerTagInsts(irModule, sink);
+
+    // Tagged union type lowering typically generates more reinterpret instructions.
+    if (lowerTaggedUnionTypes(irModule, sink))
+        requiredLoweringPassSet.reinterpret = true;
+
+    lowerUntaggedUnionTypes(irModule, sink);
 
     if (requiredLoweringPassSet.reinterpret)
         lowerReinterpret(targetProgram, irModule, sink);

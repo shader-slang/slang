@@ -2048,6 +2048,8 @@ public:
 
     IRDeduplicationContext* getDeduplicationContext() const { return &m_deduplicationContext; }
 
+    Dictionary<IRInst*, UInt>* getUniqueIdMap() { return &m_mapInstToUniqueId; }
+
     IRDominatorTree* findDominatorTree(IRGlobalValueWithCode* func)
     {
         IRAnalysis* analysis = m_mapInstToAnalysis.tryGetValue(func);
@@ -2164,6 +2166,12 @@ private:
     Dictionary<IRInst*, IRAnalysis> m_mapInstToAnalysis;
 
     Dictionary<ImmutableHashedString, List<IRInst*>> m_mapMangledNameToGlobalInst;
+
+    /// Hold a mapping for inst -> uniqueID. This mapping is generated on
+    /// demand if passes need them, rather than eagerly storing them on
+    /// insts when unnecessary.
+    ///
+    Dictionary<IRInst*, UInt> m_mapInstToUniqueId;
 };
 
 

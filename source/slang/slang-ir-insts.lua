@@ -677,6 +677,35 @@ local insts = {
 					},
 				},
 			},
+			{ UntaggedUnionType = {
+				hoistable = true,
+				-- A type that represents that the value's _type_ is one of types in the set operand.
+			} },
+			{ ElementOfSetType = {
+				hoistable = true,
+				-- A type that represents that the value must be an element of the set operand.
+			} },
+			{ SetTagType = {
+				hoistable = true,
+				-- Represents a tag-type for a set.
+				--
+				-- An inst whose type is SetTagType(set) is semantically carrying a 
+				-- run-time value that "picks" one of the elements of the set operand.
+				--
+				-- Only operand is a SetBase
+			} }, 
+			{ TaggedUnionType = {
+				hoistable = true,
+				-- Represents a tagged union type.
+				--
+				-- An inst whose type is a TaggedUnionType(typeSet, witnessTableSet) is semantically carrying a tuple of
+				-- two values: a value of SetTagType(witnessTableSet) to represent the tag, and a payload value of type
+				-- UntaggedUnionType(typeSet), which conceptually represents a union/"anyvalue" type.
+				--
+				-- This is most commonly used to specialize the type of existential insts once the possibilities can be statically determined.
+				-- 
+				-- Operands are a TypeSet and a WitnessTableSet that represent the possibilities of the existential
+			} }
 		},
 	},
 	-- IRGlobalValueWithCode
@@ -2649,6 +2678,173 @@ local insts = {
 			},
 		},
 	},
+	{
+		SetBase = {
+			-- Base class for all set representation.s
+			--
+			-- Semantically, `SetBase` types model sets of concrete values, and use Slang's de-duplication infrastructure
+			-- to allow set-equality to be the same as inst identity.
+			--
+			-- - Set ops have one or more operands that represent the elements of the set
+			--
+			-- - Set ops must have at least one operand. A zero-operand set is illegal.
+			--   The type-flow pass will represent this case using nullptr, so that uniqueness is preserved.
+			--
+			-- - All operands of a set _must_ be concrete, individual insts 
+			--      - Operands should NOT be an interface or abstract type.
+			--      - Operands should NOT be type parameters or existentail types (i.e. insts that appear in blocks)
+			--      - Operands should NOT be sets (i.e. sets should be flat and never heirarchical)
+			-- 
+			-- - Since sets are hositable, set ops should (consequently) only appear in the global scope.
+			--
+			-- - Set operands must be consistently sorted. i.e. a TypeSet(A, B) and TypeSet(B, A)
+			--   cannot exist at the same time, but either one is okay.
+			--
+			-- - To help with the implementation of sets, the IRBuilder class provides operations such as `getSet`
+			--   that will ensure the above invariants are maintained, and uses a persistent unique ID map to
+			--   ensure stable ordering of set elements.
+			-- 
+			--   Set representations should never be manually constructed to avoid breaking these invariants.
+			-- 
+			hoistable = true,
+			{ TypeSet = {} },
+			{ FuncSet = {} },
+			{ WitnessTableSet = {} },
+			{ GenericSet = {} },
+		},
+	},
+	{ UnboundedSet = {
+		hoistable = true,
+		--
+		-- A catch-all opcode to represent unbounded collections during
+		-- the type-flow specialization pass.
+		-- 
+		-- This op is usually used to mark insts that can contain a dynamic type
+		-- whose information cannot be gleaned from the type-flow analysis.
+		--
+		-- E.g. COM interface objects, whose implementations can be fully external to
+		-- the linkage
+		-- 
+		-- This op is only used to denote that an inst is unbounded so the specialization
+		-- pass does not attempt to specialize it. It should not appear in the code after
+		-- the specialization pass.
+		--
+		-- TODO: Consider the scenario where we can combine the unbounded case with known cases.
+		--       unbounded set should probably be an element and not a separate op.
+	} },
+	{ CastInterfaceToTaggedUnionPtr = {
+		-- Cast an interface-typed pointer to a tagged-union pointer with a known set.
+	} }, 
+	{ CastTaggedUnionToInterfacePtr = {
+		-- Cast a tagged-union pointer with a known set to a corresponding interface-typed pointer.
+	} }, 
+	{ GetTagForSuperSet = {
+		-- Translate a tag from a set to its equivalent in a super-set
+		--
+		-- Operands: (the tag for the source set)
+		-- The source and destination sets are implied by the type of the operand and the type of the result
+	} }, 
+	{ GetTagForMappedSet = {
+		-- Translate a tag from a set to its equivalent in a different set
+		-- based on a mapping induced by a lookup key
+		--
+		-- Operands: (the tag for the witness table set, the lookup key)
+	} },
+	{ GetTagForSpecializedSet = { 
+		-- Translate a tag from a set of generics to its equivalent in a specialized set
+		-- according to the set of specialization arguments that are encoded in the 
+		-- operands of this instruction.
+		--
+		-- Operands: (the tag for the generic set, any number of specialization arguments....)
+	} },
+	{ GetTagFromSequentialID = {
+		-- Translate an existing sequential ID (a 'global' ID) & and interface type into a tag
+	    -- the provided set (a 'local' ID)
+	} }, 
+	{ GetSequentialIDFromTag = {
+		-- Translate a tag from the given set (a 'local' ID) to a sequential ID (a 'global' ID)
+	} },
+	{ GetElementFromTag = { 
+	    -- Translate a tag to its corresponding element in the set. 
+		-- Input's type: SetTagType(set). 
+		-- Output's type: ElementOfSetType(set)
+		--
+		operands = {{"tag"}}
+	} },
+	{ GetDispatcher = {
+		-- Get a dispatcher function for a given witness table set + key.
+		--
+		-- Inputs: set of witness tables to create a dispatched for and the key to use to identify the 
+		--         entry that needs to be dispatched to. All witness tables must have an entry for the given key.
+		--         or else this is a malformed inst.
+		--
+		-- Output: a value of 'FuncType' that can be called.
+		--         This func-type will take a `TagType(witnessTableSet)` as the first parameter to 
+		--         discriminate which witness table to use, and the rest of the parameters.
+		--
+		hoistable = true,
+		operands = {{"witnessTableSet", "IRWitnessTableSet"}, {"lookupKey", "IRStructKey"}}
+	} },
+	{ GetSpecializedDispatcher = {
+		-- Get a specialized dispatcher function for a given witness table set + key, where
+		-- the key points to a generic function.
+		--
+		-- Operands: (set of witness tables, lookup key, specialization args...)
+		--
+		--
+		-- Output: a value of `FuncType` that can be called.
+		--         This func-type will take a `TagType(witnessTableSet)` as the first parameter to 
+		--         discriminate which generic to use, and the rest of the parameters.
+		--
+		hoistable = true
+	} },
+	{ GetTagFromTaggedUnion = {
+		-- Translate a tagged-union value to its corresponding tag in the tagged-union's set.
+		--
+		-- Input's type: TaggedUnionType(typeSet, tableSet)
+		--
+		-- Output's type: SetTagType(tableSet)
+		--
+		operands = {{"taggedUnionValue"}}
+	} },
+	{ GetTypeTagFromTaggedUnion = {
+		-- Translate a tagged-union value to its corresponding type tag in the tagged-union's set.
+		--
+		-- Input's type: TaggedUnionType(typeSet, tableSet)
+		--
+		-- Output's type: SetTagType(typeSet)
+		--
+		operands = {{"taggedUnionValue"}}
+	} },
+	{ GetValueFromTaggedUnion = {
+		-- Translate a tagged-union value to its corresponding value in the tagged-union's set.
+		--
+		-- Input's type: TaggedUnionType(typeSet, tableSet)
+		--
+		-- Output's type: UntaggedUnionType(typeSet)
+		--
+		operands = {{"taggedUnionValue"}}
+	} },
+	{ MakeTaggedUnion = {
+		-- Create a tagged-union value from a tag and a value.
+		--
+		-- Input's type: SetTagType(tableSet), UntaggedUnionType(typeSet)
+		--
+		-- Output's type: TaggedUnionType(typeSet, tableSet)
+		--
+		operands = { { "tag" }, { "value" } },
+	} },
+	{ GetTagOfElementInSet = {
+		-- Get the tag corresponding to an element in a set.
+		--
+		-- Operands: (element, set)
+		--    "element" must resolve into a concrete inst before lowering,
+		--    otherwise, this is an error.
+		--
+		-- Output's type: SetTagType(set)
+		--
+		hoistable = true
+	} },
 }
 
 -- A function to calculate some useful properties and put it in the table,

@@ -148,6 +148,12 @@ struct AssociatedTypeLookupSpecializationContext
             cast<IRWitnessTableTypeBase>(witnessTableType)->getConformanceType());
         if (!interfaceType)
             return;
+
+        List<IRWitnessTable*> tables =
+            sharedContext->getWitnessTablesFromInterfaceType(interfaceType);
+        if (tables.getCount() == 0)
+            return;
+
         auto key = inst->getRequirementKey();
         IRFunc* func = nullptr;
         if (!sharedContext->mapInterfaceRequirementKeyToDispatchMethods.tryGetValue(key, func))
