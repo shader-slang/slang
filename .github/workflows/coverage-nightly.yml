@@ -26,3 +26,4 @@ jobs:
       runs-on: '["ubuntu-22.04"]'
       build-llvm: true
       deploy-pages: true
+    secrets: inherit
