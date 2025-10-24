@@ -14127,16 +14127,20 @@ struct CapabilityDeclReferenceVisitor
                 handleParentDiagnosticFunc(DiagnosticCategory::Capability);
             }
 
-            // Merge the capability set represent by this case into the overall set, depending on this is
-            // a target-switch or stage-switch, we have different granuarity on how to merge things.
-            // The CapabilitySet is like a two level table
-            // CapabilitySet: {target1 target2 ...}
-            // [target1] -> {stage1, stage2, ...}
-            // [target2] -> {stage1, stage2, ...}
-            // and each stage is a bit mask of capabilities.
-            // If this is a target-switch, then we treat each target set as a bit mask, and merge into a specific target entry.
-            // If this is a stage-switch, then we treat each stage set as whole bit mask, and merge into a specific stage entry.
-            mergeNewCapability(set, targetCap, targetCase->loc, targetCase->capability, isStageSwitch);
+            // Merge the capability set represent by this case into the overall set, depending on
+            // this is a target-switch or stage-switch, we have different granuarity on how to merge
+            // things. The CapabilitySet is like a two level table CapabilitySet: {target1 target2
+            // ...} [target1] -> {stage1, stage2, ...} [target2] -> {stage1, stage2, ...} and each
+            // stage is a bit mask of capabilities. If this is a target-switch, then we treat each
+            // target set as a bit mask, and merge into a specific target entry. If this is a
+            // stage-switch, then we treat each stage set as whole bit mask, and merge into a
+            // specific stage entry.
+            mergeNewCapability(
+                set,
+                targetCap,
+                targetCase->loc,
+                targetCase->capability,
+                isStageSwitch);
         }
         handleProcessFunc(stmt, set, stmt->loc);
     }
@@ -14147,15 +14151,20 @@ struct CapabilityDeclReferenceVisitor
     }
 
 private:
-    void mergeNewCapability(CapabilitySet& currentSet, CapabilitySet& newSet, SourceLoc loc, CapabilityName caseName, bool isStageSwitch)
+    void mergeNewCapability(
+        CapabilitySet& currentSet,
+        CapabilitySet& newSet,
+        SourceLoc loc,
+        CapabilityName caseName,
+        bool isStageSwitch)
     {
         bool result = true;
         if (isStageSwitch)
         {
             // If this is stage-switch, we need to perform a more fine-grained merge
-            for (auto target: newSet.getCapabilityTargetSets())
+            for (auto target : newSet.getCapabilityTargetSets())
             {
-                for (auto stage: target.second.getShaderStageSets())
+                for (auto stage : target.second.getShaderStageSets())
                 {
                     result &= newSet.compatibleMerge(target.first, stage.second);
                     if (!result)
@@ -14168,7 +14177,7 @@ private:
         else
         {
             // If this is target-switch, we can just merge the whole target set
-            for (auto target: newSet.getCapabilityTargetSets())
+            for (auto target : newSet.getCapabilityTargetSets())
             {
                 result &= newSet.compatibleMerge(target.second);
                 if (!result)
@@ -14184,9 +14193,9 @@ private:
                 DiagnosticCategory::Capability,
                 loc,
                 Diagnostics::targetSwitchCapCasesConflict,
-                caseName,                               // arg0
-                newSet,                                 // arg1
-                currentSet);                            // arg2
+                caseName,    // arg0
+                newSet,      // arg1
+                currentSet); // arg2
         }
     }
 };
