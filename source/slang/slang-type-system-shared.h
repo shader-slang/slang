@@ -129,10 +129,26 @@ enum class MemoryScope : int32_t
     ShaderCall = 6,
 };
 
+// Represents the access qualifier of a pointer type.
 enum class AccessQualifier : uint64_t
 {
     ReadWrite = 0,
+
+    // The data being pointed to by a pointer can only be read through the pointer.
+    // This is to be distinguished from `Immutable`, which means the data being pointed to
+    // won't be changed by any means. In contrast, data pointed to by a `Read` pointer
+    // may still be changed through another pointer that is not read-only.
+    // This means that a pointer with `Read` access is meaningful only to the front-end
+    // type system, and is not expected to provide any optimization opportunities to
+    // the back-end.
     Read = 1,
+
+    // The data being pointed to by a pointer is known to be immutable and won't
+    // be changed by any means during the execution of the program. It is UB if
+    // the data is changed during the program execution. This is a stronger
+    // qualifier than `Read`, and may allow the backend to perform more aggresive
+    // optimizations.
+    Immutable = 2,
 };
 
 } // namespace Slang

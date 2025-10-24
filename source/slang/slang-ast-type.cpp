@@ -4,6 +4,7 @@
 #include "slang-ast-builder.h"
 #include "slang-ast-dispatch.h"
 #include "slang-ast-modifier.h"
+#include "slang-check.h"
 #include "slang-syntax.h"
 
 #include <assert.h>
@@ -13,6 +14,7 @@ namespace Slang
 
 bool isAbstractTypePack(Type* type)
 {
+    type = unwrapModifiedType(type);
     if (as<ExpandType>(type))
         return true;
     if (isDeclRefTypeOf<GenericTypePackParamDecl>(type))
@@ -22,6 +24,7 @@ bool isAbstractTypePack(Type* type)
 
 bool isTypePack(Type* type)
 {
+    type = unwrapModifiedType(type);
     if (as<ConcreteTypePack>(type))
         return true;
     return isAbstractTypePack(type);
@@ -481,23 +484,23 @@ void maybePrintAddrSpaceOperand(StringBuilder& out, AddressSpace addrSpace)
     switch (addrSpace)
     {
     case AddressSpace::Generic:
-        out << toSlice(", AddressSpace::Generic");
+        out << toSlice(", AddressSpace.Generic");
         break;
     case AddressSpace::UserPointer:
         // We expose UserPointer as Device to users
-        out << toSlice(", AddressSpace::Device");
+        out << toSlice(", AddressSpace.Device");
         break;
     case AddressSpace::GroupShared:
-        out << toSlice(", AddressSpace::GroupShared");
+        out << toSlice(", AddressSpace.GroupShared");
         break;
     case AddressSpace::Global:
-        out << toSlice(", AddressSpace::Global");
+        out << toSlice(", AddressSpace.Global");
         break;
     case AddressSpace::ThreadLocal:
-        out << toSlice(", AddressSpace::ThreadLocal");
+        out << toSlice(", AddressSpace.ThreadLocal");
         break;
     case AddressSpace::Uniform:
-        out << toSlice(", AddressSpace::Uniform");
+        out << toSlice(", AddressSpace.Uniform");
         break;
     default:
         break;
@@ -509,10 +512,13 @@ void maybePrintAccessQualifierOperand(StringBuilder& out, AccessQualifier access
     switch (accessQualifier)
     {
     case AccessQualifier::ReadWrite:
-        out << toSlice(", Access::ReadWrite");
+        out << toSlice(", Access.ReadWrite");
         break;
     case AccessQualifier::Read:
-        out << toSlice(", Access::Read");
+        out << toSlice(", Access.Read");
+        break;
+    case AccessQualifier::Immutable:
+        out << toSlice(", Access.Immutable");
         break;
     default:
         break;

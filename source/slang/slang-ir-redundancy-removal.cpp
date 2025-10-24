@@ -128,26 +128,8 @@ bool removeRedundancy(IRModule* module, bool hoistLoopInvariantInsts)
 
 bool isAddressMutable(IRInst* inst)
 {
-    auto rootType = getRootAddr(inst)->getDataType();
-    switch (rootType->getOp())
-    {
-    case kIROp_ParameterBlockType:
-    case kIROp_ConstantBufferType:
-    case kIROp_BorrowInParamType:
-        return false; // immutable
-
-    // We should consider StructuredBuffer as mutable by default, since the resources may alias.
-    // There could be anotherRWStructuredBuffer pointing to the same memory location as the
-    // structured buffer.
-    case kIROp_StructuredBufferLoad:
-    case kIROp_GetStructuredBufferPtr:
-        return true; // mutable
-    }
-
-    // Similarly, IRPtrTypeBase should also be considered writable always,
-    // because there can be aliasing.
-
-    return true; // mutable
+    auto rootAddr = getRootAddr(inst);
+    return !isPointerToImmutableLocation(rootAddr);
 }
 
 /// Eliminate redundant temporary variable copies in load-store patterns.
@@ -466,10 +448,35 @@ bool tryRemoveRedundantStore(IRGlobalValueWithCode* func, IRStore* store)
     bool hasAddrUse = false;
     bool hasOverridingStore = false;
 
-    // Stores to global variables will never get removed.
+    // Generally, we do not remove stores to global variables.
+    // A special case is if there is a store into a thread-local global var,
+    // and there are no other uses of the global var other than the store, we should be able to
+    // eliminate the global var. This special case optimization is needed so we don't generate
+    // code that stores a non-applicable builtin value into a thread-local global var that is not
+    // actually used (e.g. sv_instanceindex).
     auto rootVar = _getRootVar(store->getPtr());
     if (!isChildInstOf(rootVar, func))
+    {
+        if (auto globalVar = as<IRGlobalVar>(store->getPtr()))
+        {
+            if (auto ptrType = globalVar->getDataType())
+            {
+                switch (ptrType->getAddressSpace())
+                {
+                case AddressSpace::ThreadLocal:
+                    for (auto use = globalVar->firstUse; use; use = use->nextUse)
+                    {
+                        if (use->getUser() != store)
+                            return false;
+                    }
+                    store->removeAndDeallocate();
+                    globalVar->removeAndDeallocate();
+                    return true;
+                }
+            }
+        }
         return false;
+    }
 
     // A store can be removed if it stores into a local variable
     // that has no other uses than store.
@@ -602,6 +609,7 @@ bool tryRemoveRedundantStore(IRGlobalValueWithCode* func, IRStore* store)
             }
         }
     }
+
     return false;
 }
 

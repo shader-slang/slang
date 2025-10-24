@@ -4512,7 +4512,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_GetStringHash:
             result = emitGetStringHash(inst);
             break;
-        case kIROp_Undefined:
+        case kIROp_LoadFromUninitializedMemory:
+        case kIROp_Poison:
             result = emitOpUndef(parent, inst, inst->getDataType());
             break;
         case kIROp_SPIRVAsm:
@@ -6480,12 +6481,19 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             SpvStorageClassPhysicalStorageBuffer)
         {
             // If inst has a pointer type with PhysicalStorageBuffer address space,
-            // emit AliasedPointer decoration.
-            emitOpDecorate(
-                getSection(SpvLogicalSectionID::Annotations),
-                nullptr,
-                varInst,
-                (isVar ? SpvDecorationAliasedPointer : SpvDecorationAliased));
+            // emit AliasedPointer or RestrictPointer decoration.
+            SpvDecoration decor;
+            if (ptrType->getAccessQualifier() == AccessQualifier::Immutable)
+            {
+                // We can always safely use RestrictPointer for immutable pointers.
+                // This will allow better optimization.
+                decor = isVar ? SpvDecorationRestrictPointer : SpvDecorationRestrict;
+            }
+            else
+            {
+                decor = isVar ? SpvDecorationAliasedPointer : SpvDecorationAliased;
+            }
+            emitOpDecorate(getSection(SpvLogicalSectionID::Annotations), nullptr, varInst, decor);
         }
         else
         {

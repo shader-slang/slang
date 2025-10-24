@@ -32,6 +32,7 @@
 #include "slang-ir-collect-global-uniforms.h"
 #include "slang-ir-com-interface.h"
 #include "slang-ir-composite-reg-to-mem.h"
+#include "slang-ir-cuda-immutable-load.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-defer-buffer-load.h"
 #include "slang-ir-defunctionalization.h"
@@ -1138,7 +1139,7 @@ Result linkAndOptimizeIR(
     {
         // We could fail because
         // 1) It's not inlinable for some reason (for example if it's recursive)
-        SLANG_RETURN_ON_FAIL(performTypeInlining(irModule, sink));
+        SLANG_RETURN_ON_FAIL(performTypeInlining(irModule, targetProgram, sink));
     }
 
     if (requiredLoweringPassSet.reinterpret)
@@ -1225,6 +1226,12 @@ Result linkAndOptimizeIR(
     //
     if (fastIRSimplificationOptions.minimalOptimization)
     {
+        // Since we force-inlined functions, we need to clean up
+        // dead-branches that may have been revealed due to operations
+        // like inlining allowing us to find dead branches.
+        // These must be cleaned since otherwise static_assert's will falsely
+        // detect true due to dead branches with static_assert not being removed.
+        applySparseConditionalConstantPropagation(irModule, sink);
         eliminateDeadCode(irModule, deadCodeEliminationOptions);
     }
     else
@@ -1269,7 +1276,13 @@ Result linkAndOptimizeIR(
     // For CUDA targets, always inline global constants to avoid dynamic initialization
     // of __device__ variables rejected by NVRTC. This runs independently of the broader
     // resource/existential type legalization, which remains disabled for CUDA.
-    if (target == CodeGenTarget::CUDASource || options.shouldLegalizeExistentialAndResourceTypes)
+    //
+    // We also need this pass on the CPU targets in shader mode, as global
+    // constants may reference global parameters, which can't be emitted as
+    // constants.
+    if (target == CodeGenTarget::CUDASource ||
+        (isCPUTarget(targetRequest) && isKernelTarget(target)) ||
+        options.shouldLegalizeExistentialAndResourceTypes)
     {
         inlineGlobalConstantsForLegalization(irModule);
     }
@@ -1886,9 +1899,27 @@ Result linkAndOptimizeIR(
         specializeAddressSpaceForWGSL(irModule);
     }
 
+    bool emitSpirvDirectly = targetProgram->shouldEmitSPIRVDirectly();
+
+    if (isKhronosTarget(targetRequest) && emitSpirvDirectly)
+    {
+        // If we are emitting SPIR-V directly, we should try to specialize function calls
+        // whose argument is an access chain into a global variable/buffer directly after
+        // lowerBufferElementTypeToStorageType, so that we can be more SPIRV conformant by
+        // eliminating the case where an access chain is passed as function argument.
+        // This is disallowed by SPIRV rule 2.16.1 when VariablePointer is not declared.
+        specializeFuncsForBufferLoadArgs(codeGenContext, irModule);
+    }
+
+    // If we are generating code for CUDA, we should translate all immutable buffer loads to
+    // using `__ldg` intrinsic for improved performance.
+    if (isCUDATarget(targetRequest))
+    {
+        lowerImmutableBufferLoadForCUDA(targetProgram, irModule);
+    }
+
     performForceInlining(irModule);
 
-    bool emitSpirvDirectly = targetProgram->shouldEmitSPIRVDirectly();
     if (emitSpirvDirectly)
     {
         performIntrinsicFunctionInlining(irModule);
@@ -2548,6 +2579,31 @@ static SlangResult stripDbgSpirvFromArtifact(
     return SLANG_OK;
 }
 
+static bool shouldRunSPIRVValidation(CodeGenContext* codeGenContext)
+{
+    auto& optionSet = codeGenContext->getTargetProgram()->getOptionSet();
+
+    // If the user requested to skip validation, or if we are generating an incomplete library
+    // containing linkage decorations (Vulkan validation rules doesn't allow this), we skip
+    // validation.
+    if (optionSet.getBoolOption(CompilerOptionName::SkipSPIRVValidation) ||
+        optionSet.getBoolOption(CompilerOptionName::IncompleteLibrary))
+        return false;
+
+    // Also check the environment variable SLANG_RUN_SPIRV_VALIDATION.
+    // If it is set to "1", we should run validation.
+    StringBuilder runSpirvValEnvVar;
+    PlatformUtil::getEnvironmentVariable(
+        UnownedStringSlice("SLANG_RUN_SPIRV_VALIDATION"),
+        runSpirvValEnvVar);
+    if (runSpirvValEnvVar.getUnownedSlice() == "1")
+    {
+        return true;
+    }
+
+    return false;
+}
+
 // Helper function to create an artifact from IR used internally by
 // emitSPIRVForEntryPointsDirectly.
 static SlangResult createArtifactFromIR(
@@ -2645,23 +2701,15 @@ static SlangResult createArtifactFromIR(
             }
         }
 
-        if (!codeGenContext->shouldSkipSPIRVValidation())
+        if (shouldRunSPIRVValidation(codeGenContext))
         {
-            StringBuilder runSpirvValEnvVar;
-            PlatformUtil::getEnvironmentVariable(
-                UnownedStringSlice("SLANG_RUN_SPIRV_VALIDATION"),
-                runSpirvValEnvVar);
-            if (runSpirvValEnvVar.getUnownedSlice() == "1")
+            if (SLANG_FAILED(
+                    compiler->validate((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4))))
             {
-                if (SLANG_FAILED(compiler->validate(
-                        (uint32_t*)spirv.getBuffer(),
-                        int(spirv.getCount() / 4))))
-                {
-                    compiler->disassemble((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
-                    codeGenContext->getSink()->diagnoseWithoutSourceView(
-                        SourceLoc{},
-                        Diagnostics::spirvValidationFailed);
-                }
+                compiler->disassemble((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
+                codeGenContext->getSink()->diagnoseWithoutSourceView(
+                    SourceLoc{},
+                    Diagnostics::spirvValidationFailed);
             }
         }
 

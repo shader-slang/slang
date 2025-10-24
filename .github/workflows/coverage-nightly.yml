@@ -1,0 +1,29 @@
+name: Coverage (Nightly)
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: "0 2 * * *"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read # Read slang repo
+  pull-requests: write # For PR comments (if needed)
+  # Note: GITHUB_TOKEN automatically has write access to other org repos
+
+jobs:
+  coverage:
+    uses: ./.github/workflows/ci-slang-coverage.yml
+    with:
+      os: linux
+      compiler: clang-18
+      platform: x86_64
+      config: relwithdebinfo
+      runs-on: '["ubuntu-22.04"]'
+      build-llvm: true
+      deploy-pages: true
+    secrets: inherit

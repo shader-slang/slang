@@ -1952,6 +1952,18 @@ static LegalVal legalizeDefaultConstruct(IRTypeLegalizationContext* context, Leg
 
 static LegalVal legalizeUndefined(IRTypeLegalizationContext* context, IRInst* inst)
 {
+    // HACK: We check here if an undefined value we are trying to legalize is
+    // of an opaque type (such as a texture, buffer, or sampler), and issue
+    // a diagnostic (since there is really no way to make such code compile
+    // correctly for may of our downstream compilers).
+    //
+    // TODO(tfoley): This is emphatically *not* the right place for a diagnostic
+    // like this to be issued. We need rigorous checking for use of undefined
+    // values in the front-end. Once the front-end's checking can be trusted,
+    // the back-end should be able to remove any code that appears to use
+    // an uninitialized value of opaque type, since such code would have undefined
+    // behavior anyway.
+    //
     IRType* opaqueType = nullptr;
     if (isOpaqueType(inst->getFullType(), &opaqueType))
     {
@@ -1962,6 +1974,18 @@ static LegalVal legalizeUndefined(IRTypeLegalizationContext* context, IRInst* in
 
         context->m_sink->diagnose(loc, Diagnostics::useOfUninitializedOpaqueHandle, opaqueType);
     }
+
+    // It is not ideal, but this pass legalizes an undefined value to... nothing.
+    //
+    // As a result, in any context that tries to consume a `LegalVal` based on its type,
+    // we need to be prepared not only for a value that matches the structure of that type,
+    // but also the possibility of an empty value like this.
+    //
+    // TODO(tfoley): We should *either* have a distinct case of `LegalVal` to represent
+    // undefined-ness, or this code should follow the same flow as the other cases by
+    // recursively decomposing the structure of the instruction's type and building up
+    // a `LegalVal` that just happens to have undefined values at its leaves.
+    //
     return LegalVal();
 }
 
@@ -2044,7 +2068,8 @@ static LegalVal legalizeInst(
     case kIROp_Printf:
         result = legalizePrintf(context, args);
         break;
-    case kIROp_Undefined:
+    case kIROp_LoadFromUninitializedMemory:
+    case kIROp_Poison:
         return legalizeUndefined(context, inst);
     case kIROp_GpuForeach:
         // This case should only happen when compiling for a target that does not support

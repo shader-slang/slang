@@ -2734,6 +2734,12 @@ bool isWGPUTarget(TargetRequest* targetReq)
     return isWGPUTarget(targetReq->getTarget());
 }
 
+bool isKernelTarget(CodeGenTarget codeGenTarget)
+{
+    return ArtifactDescUtil::makeDescForCompileTarget(asExternal(codeGenTarget)).style ==
+           ArtifactStyle::Kernel;
+}
+
 SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgram)
 {
     // If we are emitting directly, there is no intermediate source language
