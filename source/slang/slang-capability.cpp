@@ -812,6 +812,21 @@ bool CapabilityTargetSet::operator==(CapabilityTargetSet const& that) const
     return true;
 }
 
+/// Perform a compatibleMerge on the given `targetSet` with `this`.
+/// This function treats the whole target set as a single bit mask, and perform the
+/// operation on it.
+/// Definition of compatibleMerge is:
+/// # compatibleMerge(A, B) =
+/// ⎧ B   if A = ∅
+/// ⎪ A   if B = ∅
+/// ⎪ A   if A ⊆ B
+/// ⎪ B   if B ⊆ A
+/// ⎩ ∅   otherwise
+/// For example:
+/// if A = {spirv, ext_X}, and B = {spirv, ext_X, ext_Y}, compatibleMerge(A, B) = A
+/// if A = {spirv, ext_X, ext_Y}, and B = {spirv, ext_X}, compatibleMerge(A, B) = B
+/// if A = {spirv, ext_X}, and B = {spirv, ext_Y}, compatibleMerge(A, B) = ∅
+/// If target A doesn't exist, then add target B directly.
 bool CapabilityTargetSet::compatibleMerge(const CapabilityTargetSet& targetSet)
 {
     CapabilityTargetSet tmp = *this;
@@ -836,6 +851,8 @@ bool CapabilityTargetSet::compatibleMerge(const CapabilityTargetSet& targetSet)
     }
 }
 
+/// Similar to compatibleMerge for CapabilityTargetSet, but this overload perform the operation
+/// on a finer granularity, we perform the operation on a specific stage of a target
 bool CapabilityTargetSet::compatibleMerge(const CapabilityStageSet& stageSet)
 {
     if (auto existStage = shaderStageSets.tryGetValue(stageSet.stage))

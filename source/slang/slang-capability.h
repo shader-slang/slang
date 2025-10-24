@@ -374,7 +374,8 @@ public:
         return (*(*m_targetSets.begin()).second.shaderStageSets.begin()).first;
     }
 
-    /// Perform a compatibleMerge on the given `targetSet` with `this`.
+    // Perform a compatibleMerge on the given `targetSet` with `this`.
+    // see CapabilityTargetSet::compatibleMerge for definition of 'compatibleMerge' operation.
     bool compatibleMerge(const CapabilityTargetSet& targetSet)
     {
         if (auto existTarget = m_targetSets.tryGetValue(targetSet.target))
@@ -389,6 +390,7 @@ public:
     }
 
     // Perform a compatibleMerge on the given `stageSet` and `target` with `this`.
+    // see CapabilityTargetSet::compatibleMerge for definition of 'compatibleMerge' operation.
     bool compatibleMerge(CapabilityAtom target, const CapabilityStageSet& stageSet)
     {
         if (auto targetIt = m_targetSets.tryGetValue(target))
