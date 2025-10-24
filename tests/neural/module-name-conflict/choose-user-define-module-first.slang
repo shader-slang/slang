@@ -7,9 +7,11 @@
 
 import neural;
 
+RWStructuredBuffer<int> outputBuffer;
+
 [shader("compute")]
 [numthreads(1, 1, 1)]
-int computeMain()
+void computeMain()
 {
-    return SomeLocalFunc(1);
+     outputBuffer[0] = SomeLocalFunc(1);
 }
