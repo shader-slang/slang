@@ -358,10 +358,10 @@ _Clang_ 17.0 is tested in CI and is the recommended minimum version.
 
 ## Static linking against libslang
 
-If linking against a static `libslang.a` you will need to link against some
-dependencies also if you're not already incorporating them into your project.
+To build statically, set the SLANG_LIB_TYPE flag in CMake to `STATIC`.
 
-You will need to link against:
+If linking against a static `libslang.a` you will also need to link against some
+dependencies also if you're not already incorporating them into your project:
 
 ```
 ${SLANG_DIR}/build/Release/lib/libslang.a
