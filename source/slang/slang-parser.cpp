@@ -7202,6 +7202,42 @@ static FloatFixKind _fixFloatLiteralValue(
                 }
                 break;
             }
+        case BaseType::BFloat16:
+            {
+                // Fix out of range
+                if (value > SLANG_BFLOAT16_MAX)
+                {
+                    if (Math::AreNearlyEqual(value, FLT_MAX, epsilon))
+                    {
+                        outValue = SLANG_BFLOAT16_MAX;
+                        return FloatFixKind::Truncated;
+                    }
+                    else
+                    {
+                        outValue = float(INFINITY);
+                        return FloatFixKind::Unrepresentable;
+                    }
+                }
+                else if (value < -SLANG_BFLOAT16_MAX)
+                {
+                    if (Math::AreNearlyEqual(-value, FLT_MAX, epsilon))
+                    {
+                        outValue = -SLANG_BFLOAT16_MAX;
+                        return FloatFixKind::Truncated;
+                    }
+                    else
+                    {
+                        outValue = -float(INFINITY);
+                        return FloatFixKind::Unrepresentable;
+                    }
+                }
+                else if (value && Math::Abs(value) < SLANG_BFLOAT16_SUB_NORMAL_MIN)
+                {
+                    outValue = 0.0f;
+                    return FloatFixKind::Zeroed;
+                }
+                break;
+            }
         default:
             break;
         }
@@ -7847,6 +7883,7 @@ static Expr* parseAtomicExpr(Parser* parser)
                 int fCount = 0;
                 int lCount = 0;
                 int hCount = 0;
+                int bCount = 0;
                 int unknownCount = 0;
                 while (suffixCursor < suffixEnd)
                 {
@@ -7867,6 +7904,11 @@ static Expr* parseAtomicExpr(Parser* parser)
                         hCount++;
                         break;
 
+                    case 'b':
+                    case 'B':
+                        bCount++;
+                        break;
+
                     default:
                         unknownCount++;
                         break;
@@ -7882,7 +7924,7 @@ static Expr* parseAtomicExpr(Parser* parser)
                     suffixBaseType = BaseType::Float;
                 }
                 // `f` suffix -> `float`
-                if (fCount == 1 && !lCount && !hCount)
+                if (fCount == 1 && !lCount && !hCount && !bCount)
                 {
                     suffixBaseType = BaseType::Float;
                 }
@@ -7895,6 +7937,11 @@ static Expr* parseAtomicExpr(Parser* parser)
                 else if (hCount == 1 && (fCount <= 1))
                 {
                     suffixBaseType = BaseType::Half;
+                }
+                // `bf` suffix on floating-point literal -> `bfloat16`
+                else if (bCount == 1 && fCount == 1)
+                {
+                    suffixBaseType = BaseType::BFloat16;
                 }
                 // TODO: are there other suffixes we need to handle?
                 else

@@ -18,6 +18,7 @@ static bool isMetaOp(IRInst* inst)
     case kIROp_IsUnsignedInt:
     case kIROp_IsSignedInt:
     case kIROp_IsHalf:
+    case kIROp_IsBFloat16:
     case kIROp_IsFloat:
     case kIROp_IsVector:
     case kIROp_GetNaturalStride:

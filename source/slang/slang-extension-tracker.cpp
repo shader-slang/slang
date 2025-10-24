@@ -94,6 +94,12 @@ void ShaderExtensionTracker::requireBaseTypeExtension(BaseType baseType)
 #endif
             break;
         }
+    case BaseType::BFloat16:
+        {
+            // https://github.com/KhronosGroup/GLSL/blob/main/extensions/ext/GL_EXT_bfloat16.txt
+            requireExtension(UnownedStringSlice::fromLiteral("GL_EXT_bfloat16"));
+            break;
+        }
     }
 
     m_hasBaseTypeFlags |= bit;
