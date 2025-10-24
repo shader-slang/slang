@@ -821,7 +821,7 @@ bool CapabilityTargetSet::operator==(CapabilityTargetSet const& that) const
 /// ⎪ A   if B = ∅
 /// ⎪ A   if A ⊆ B
 /// ⎪ B   if B ⊆ A
-/// ⎩ ∅   otherwise
+/// ⎩ ∅   otherwise, and function will return false.
 /// For example:
 /// if A = {spirv, ext_X}, and B = {spirv, ext_X, ext_Y}, compatibleMerge(A, B) = A
 /// if A = {spirv, ext_X, ext_Y}, and B = {spirv, ext_X}, compatibleMerge(A, B) = B

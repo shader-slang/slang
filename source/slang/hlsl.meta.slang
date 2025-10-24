@@ -25692,7 +25692,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     // Careful, this takes the offset in elements
     [ForceInline]
     [require(hlsl)]
-    [require(hlsl_coopvec_poc)]
+    [require(hlsl_coopvec_poc_sm_6_9)]
     void __Load(__constref groupshared T buffer[M], uint elemOffset)
     {
         static_assert(N <= M, "The given groupshared array is smaller than the given CoopVec");
@@ -25703,7 +25703,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             for(int i = 0; i < N; ++i)
                 this[i] = buffer[i + elemOffset];
             return;
-        case hlsl_coopvec_poc:
+        case hlsl_coopvec_poc_sm_6_9:
             __intrinsic_asm ".Load";
         }
     }
@@ -27372,7 +27372,7 @@ if(buffer.isRW)
 /// }
 /// ```
 [require(cooperative_vector)]
-[require(hlsl_coopvec_poc)]
+[require(hlsl_coopvec_poc_sm_6_9)]
 [require(optix_coopvec)]
 void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let N : int>(
     CoopVec<T, M> a,
@@ -27390,7 +27390,7 @@ void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let
         uint matrixInterpretationHLSL = __getHLSLCoopVecComponentType(matrixInterpretation);
         uint memoryLayoutHLSL = __getHLSLCoopVecMatrixLayout(memoryLayout);
         return a.__OuterProductAccumulate(b, matrix, matrixOffset, matrixStride, memoryLayoutHLSL, matrixInterpretationHLSL);
-    case hlsl_coopvec_poc:
+    case hlsl_coopvec_poc_sm_6_9:
         __intrinsic_asm "$0.OuterProductAccumulate($1, $2, $3, $4, $5, $6)";
     case spirv:
         let matrixInterpretationSpirv : int = __getSpvCoopVecComponentType(matrixInterpretation);
