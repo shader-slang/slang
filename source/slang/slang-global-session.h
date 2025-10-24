@@ -215,6 +215,7 @@ public:
     Scope* slangLanguageScope = nullptr;
     Scope* glslLanguageScope = nullptr;
     Name* glslModuleName = nullptr;
+    Name* neuralModuleName = nullptr;
 
     ModuleDecl* baseModuleDecl = nullptr;
     List<RefPtr<Module>> coreModules;

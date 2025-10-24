@@ -200,6 +200,14 @@ jobs:
             fi
           done
 
+          # Sign standard module files (.slang-module files)
+          echo "Signing standard module files..."
+          find "${lib_dir}" -name "*.slang-module" -type f | while read -r module_file; do
+            echo "Signing module '$module_file'..."
+            /usr/bin/codesign --force --options runtime -s "${IDENTITY_ID}" "$module_file" -v
+            7z a "slang-macos-dist.zip" "$module_file"
+          done
+
           timeout 1000 gon --log-level=debug ./extras/macos-notarize.json
           cp slang-macos-dist.zip "slang-macos-dist-${{matrix.platform}}.zip"
           echo "SLANG_NOTARIZED_DIST=slang-macos-dist-${{matrix.platform}}.zip" >> "$GITHUB_OUTPUT"
