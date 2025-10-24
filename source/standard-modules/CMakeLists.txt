@@ -5,7 +5,7 @@
 #
 # Neural module configuration
 # SLANG_STANDARD_MODULE_DIR_NAME is the output directory name for all the standard modules, currently there is only neural module
-set(SLANG_STANDARD_MODULE_DIR_NAME "slang-standard-module-${SLANG_VERSION_FULL}" CACHE STRING "Directory name for standard module")
+set(SLANG_STANDARD_MODULE_DIR_NAME "slang-standard-module-${SLANG_VERSION_NUMERIC}" CACHE STRING "Directory name for standard module")
 
 # SLANG_NEURAL_MODULE_FILE_NAME is the file name for the neural module
 set(SLANG_NEURAL_MODULE_FILE_NAME "neural.slang-module" CACHE STRING "module file name for neural module")
