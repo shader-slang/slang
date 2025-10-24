@@ -374,7 +374,7 @@ include(\"${slang_SOURCE_DIR}/cmake/RegenerateDllExports.cmake\")
         RUNTIME DESTINATION bin
         ARCHIVE DESTINATION lib
         LIBRARY DESTINATION lib
-        COMPONENT runtime
+        COMPONENT compatibility
     )
     
     message(STATUS "Windows proxy DLL (slang.dll) will be generated to forward to slang-compiler.dll")
@@ -398,7 +398,7 @@ if(UNIX AND SLANG_LIB_TYPE STREQUAL "SHARED")
     install(
         FILES $<TARGET_FILE_DIR:slang>/libslang.$<IF:$<PLATFORM_ID:Darwin>,dylib,so>
         DESTINATION lib
-        COMPONENT runtime
+        COMPONENT compatibility
     )
 
     message(STATUS "Unix backward compatibility symlink (libslang -> libslang-compiler) will be created during build and installation")
