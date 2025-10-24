@@ -3896,7 +3896,7 @@ static __forceinline__ __device__ void optixMakeMissHitObject(
 }
 #endif
 
-#if (OPTIX_VERSION >= 80100)
+#if (OPTIX_VERSION >= 90000)
 template<typename T>
 static __forceinline__ __device__ void optixMakeHitObject(
     OptixTraversableHandle AccelerationStructure,
@@ -3923,9 +3923,42 @@ static __forceinline__ __device__ void optixMakeHitObject(
         nullptr, /*OptixTraversableHandle* transforms*/
         0 /*numTransforms */);
 }
+#elif (OPTIX_VERSION >= 80100)
+template<typename T>
+static __forceinline__ __device__ void optixMakeHitObject(
+    OptixTraversableHandle AccelerationStructure,
+    uint InstanceIndex,
+    uint GeometryIndex,
+    uint PrimitiveIndex,
+    uint HitKind,
+    uint RayContributionToHitGroupIndex,
+    uint MultiplierForGeometryContributionToHitGroupIndex,
+    RayDesc Ray,
+    T attr,
+    OptixTraversableHandle* handle)
+{
+    // OptiX 8.1 version: call native optixMakeHitObject directly
+    optixMakeHitObject(
+        AccelerationStructure,                            // handle
+        Ray.Origin,                                       // rayOrigin
+        Ray.Direction,                                    // rayDirection
+        Ray.TMin,                                         // tmin
+        Ray.TMax,                                         // tmax
+        0.f,                                              // rayTime
+        RayContributionToHitGroupIndex,                   // sbtOffset
+        MultiplierForGeometryContributionToHitGroupIndex, // sbtStride
+        InstanceIndex,                                    // instIdx
+        nullptr,                                          // transforms
+        0,                                                // numTransforms
+        GeometryIndex,                                    // sbtGASIdx
+        PrimitiveIndex,                                   // primIdx
+        HitKind                                           // hitKind
+        /* no attributes passed - empty variadic pack */
+    );
+}
 #endif
 
-#if (OPTIX_VERSION >= 80100)
+#if (OPTIX_VERSION >= 90000)
 template<typename T>
 static __forceinline__ __device__ void optixMakeHitObject(
     uint HitGroupRecordIndex,
@@ -3951,9 +3984,40 @@ static __forceinline__ __device__ void optixMakeHitObject(
         nullptr, /*OptixTraversableHandle* transforms*/
         0 /*numTransforms */);
 }
+#elif (OPTIX_VERSION >= 80100)
+template<typename T>
+static __forceinline__ __device__ void optixMakeHitObject(
+    uint HitGroupRecordIndex,
+    OptixTraversableHandle AccelerationStructure,
+    uint InstanceIndex,
+    uint GeometryIndex,
+    uint PrimitiveIndex,
+    uint HitKind,
+    RayDesc Ray,
+    T attr,
+    OptixTraversableHandle* handle)
+{
+    // OptiX 8.1 version: call optixMakeHitObjectWithRecord directly
+    optixMakeHitObjectWithRecord(
+        AccelerationStructure, // handle
+        Ray.Origin,            // rayOrigin
+        Ray.Direction,         // rayDirection
+        Ray.TMin,              // tmin
+        Ray.TMax,              // tmax
+        0.f,                   // rayTime
+        HitGroupRecordIndex,   // sbtRecordIndex
+        InstanceIndex,         // instIdx
+        nullptr,               // transforms
+        0,                     // numTransforms
+        GeometryIndex,         // sbtGASIdx
+        PrimitiveIndex,        // primIdx
+        HitKind                // hitKind
+        /* no attributes passed - empty variadic pack */
+    );
+}
 #endif
 
-#if (OPTIX_VERSION >= 80100)
+#if (OPTIX_VERSION >= 90000)
 template<typename T>
 static __forceinline__ __device__ void optixMakeHitObject(
     OptixTraversableHandle AccelerationStructure,
@@ -3981,9 +4045,43 @@ static __forceinline__ __device__ void optixMakeHitObject(
         nullptr, /*OptixTraversableHandle* transforms*/
         0 /*numTransforms */);
 }
+#elif (OPTIX_VERSION >= 80100)
+template<typename T>
+static __forceinline__ __device__ void optixMakeHitObject(
+    OptixTraversableHandle AccelerationStructure,
+    uint InstanceIndex,
+    uint GeometryIndex,
+    uint PrimitiveIndex,
+    uint HitKind,
+    uint RayContributionToHitGroupIndex,
+    uint MultiplierForGeometryContributionToHitGroupIndex,
+    RayDesc Ray,
+    float CurrentTime,
+    T attr,
+    OptixTraversableHandle* handle)
+{
+    // OptiX 8.1 version: call native optixMakeHitObject directly
+    optixMakeHitObject(
+        AccelerationStructure,                            // handle
+        Ray.Origin,                                       // rayOrigin
+        Ray.Direction,                                    // rayDirection
+        Ray.TMin,                                         // tmin
+        Ray.TMax,                                         // tmax
+        CurrentTime,                                      // rayTime
+        RayContributionToHitGroupIndex,                   // sbtOffset
+        MultiplierForGeometryContributionToHitGroupIndex, // sbtStride
+        InstanceIndex,                                    // instIdx
+        nullptr,                                          // transforms
+        0,                                                // numTransforms
+        GeometryIndex,                                    // sbtGASIdx
+        PrimitiveIndex,                                   // primIdx
+        HitKind                                           // hitKind
+        /* no attributes passed - empty variadic pack */
+    );
+}
 #endif
 
-#if (OPTIX_VERSION >= 80100)
+#if (OPTIX_VERSION >= 90000)
 template<typename T>
 static __forceinline__ __device__ void optixMakeHitObject(
     uint HitGroupRecordIndex,
@@ -4009,6 +4107,38 @@ static __forceinline__ __device__ void optixMakeHitObject(
         data,
         nullptr, /*OptixTraversableHandle* transforms*/
         0 /*numTransforms */);
+}
+#elif (OPTIX_VERSION >= 80100)
+template<typename T>
+static __forceinline__ __device__ void optixMakeHitObject(
+    uint HitGroupRecordIndex,
+    OptixTraversableHandle AccelerationStructure,
+    uint InstanceIndex,
+    uint GeometryIndex,
+    uint PrimitiveIndex,
+    uint HitKind,
+    RayDesc Ray,
+    float CurrentTime,
+    T attr,
+    OptixTraversableHandle* handle)
+{
+    // OptiX 8.1 version: call optixMakeHitObjectWithRecord directly
+    optixMakeHitObjectWithRecord(
+        AccelerationStructure, // handle
+        Ray.Origin,            // rayOrigin
+        Ray.Direction,         // rayDirection
+        Ray.TMin,              // tmin
+        Ray.TMax,              // tmax
+        CurrentTime,           // rayTime
+        HitGroupRecordIndex,   // sbtRecordIndex
+        InstanceIndex,         // instIdx
+        nullptr,               // transforms
+        0,                     // numTransforms
+        GeometryIndex,         // sbtGASIdx
+        PrimitiveIndex,        // primIdx
+        HitKind                // hitKind
+        /* no attributes passed - empty variadic pack */
+    );
 }
 #endif
 
