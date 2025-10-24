@@ -174,7 +174,7 @@ jobs:
       - name: Deploy Coverage to Separate Repository
         if: ${{ inputs.deploy-pages }}
         env:
-          COVERAGE_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COVERAGE_REPO_TOKEN: ${{ secrets.SLANG_COVERAGE_REPORTS_PAT }}
         run: |
           # Get current date and short commit hash
           REPORT_DATE=$(date -u +"%Y-%m-%d")
