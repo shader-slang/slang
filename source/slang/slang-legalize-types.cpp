@@ -779,6 +779,25 @@ LegalType createLegalUniformBufferTypeForResources(
         }
         break;
 
+    case LegalType::Flavor::implicitDeref:
+        {
+            // This case handles nested parameter blocks like:
+            //      ParameterBlock<ParameterBlock<T>>
+            //
+            // When we legalize the outer ParameterBlock, we need to
+            // recursively legalize the inner ParameterBlock<T> which
+            // results in an implicitDeref wrapping. We recursively
+            // unwrap all nested parameter blocks to the innermost element.
+            //
+            // This enables arbitrary depth nesting for non-Metal targets.
+            return LegalType::implicitDeref(createLegalUniformBufferTypeForResources(
+                context,
+                op,
+                legalElementType.getImplicitDeref()->valueType,
+                layoutOperand));
+        }
+        break;
+
     default:
         SLANG_UNEXPECTED("unhandled legal type flavor");
         UNREACHABLE_RETURN(LegalType());
