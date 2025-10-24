@@ -180,12 +180,6 @@ jobs:
           security list-keychain -d user -s "$KEYCHAIN_PATH"
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${KEYCHAIN_PASSWORD}" "$KEYCHAIN_PATH"
 
-          # Set build directories (macOS uses lib/ for shared libraries)
-          config="${{matrix.config}}"
-          cmake_config="$(echo "${config}" | awk '{print toupper(substr($0,1,1)) tolower(substr($0,2))}')"
-          lib_dir="build/${cmake_config}/lib"
-          bin_dir="build/${cmake_config}/bin"
-
           binaries=(
             "${lib_dir}/libslang.dylib"
             "${lib_dir}/libslang-rt.dylib"
