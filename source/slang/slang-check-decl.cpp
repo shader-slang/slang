@@ -14129,12 +14129,19 @@ struct CapabilityDeclReferenceVisitor
 
             // Merge the capability set represent by this case into the overall set, depending on
             // this is a target-switch or stage-switch, we have different granuarity on how to merge
-            // things. The CapabilitySet is like a two level table CapabilitySet: {target1 target2
-            // ...} [target1] -> {stage1, stage2, ...} [target2] -> {stage1, stage2, ...} and each
-            // stage is a bit mask of capabilities. If this is a target-switch, then we treat each
-            // target set as a bit mask, and merge into a specific target entry. If this is a
-            // stage-switch, then we treat each stage set as whole bit mask, and merge into a
-            // specific stage entry.
+            // things. The CapabilitySet is a two level table:
+            //
+            //                  CapabilitySet
+            //        +--------------+--------------+              (level 1)
+            //      target1       target2       ... targetN
+            //              +---------+---------+                  (level 2)
+            //          stage1       stage2 ... stageN
+            //
+            // and each stage is a bit mask of capabilities. If this is a target-switch, then we
+            // treat each target set as a large bit mask, and merge two target set entry. If this
+            // is a stage-switch, then we treat each stage set as small bit mask, and merge two
+            // stage set entry. Therefore `isStageSwitch` flag is used to indicate which merging
+            // strategy to use.
             mergeNewCapability(
                 set,
                 targetCap,

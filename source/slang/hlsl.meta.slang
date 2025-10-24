@@ -22977,8 +22977,7 @@ const DynamicResourceTypeInfo kDynamicResourceCastableTypes[] = {
     { "RaytracingAccelerationStructure", "AccelerationStructure", "General", "Read" },
 };
 
-for (uint32_t i = 0; i < sizeof(kDynamicResourceCastableTypes)/sizeof(DynamicResourceTypeInfo) - 1; i++) {
-    auto type = kDynamicResourceCastableTypes[i];
+for (auto type : kDynamicResourceCastableTypes) {
     auto dynamicKind = type.dynamicKind;
     auto kind = type.kind;
     auto typeName = type.name;
@@ -23012,25 +23011,6 @@ ${{{{
 }
 }}}}
 
-[require(raytracing, sm_6_6)]
-extension RaytracingAccelerationStructure : __IDynamicResourceCastable<__DynamicResourceKind.General>
-{
-    __intrinsic_op($(kIROp_CastDynamicResource))
-    __implicit_conversion($(kConversionCost_GenericParamUpcast))
-    __init(__DynamicResource res);
-
-    static const DescriptorKind kind = DescriptorKind.AccelerationStructure;
-    static const DescriptorAccess descriptorAccess = DescriptorAccess.Read;
-
-    typealias Handle = DescriptorHandle<RaytracingAccelerationStructure>;
-
-    __implicit_conversion($(kConversionCost_ImplicitDereference))
-    [ForceInline]
-    __init(DescriptorHandle<RaytracingAccelerationStructure> bindless)
-    {
-        return getDescriptorFromHandle(bindless);
-    }
-}
 
 /// Represents a bindless handle to a descriptor. A descriptor handle is always an ordinary data type and can be
 /// declared in any memory location.
@@ -23255,9 +23235,7 @@ ${{{{
             return __getDynamicResourceHeap<T>($(bindlessOption.enumType).StorageBuffer_ReadWrite)[((uint2)handleValue).x];
     }
     case DescriptorKind.AccelerationStructure:
-    {
         return __slang_noop_cast<T>(RaytracingAccelerationStructure(__asuint64((uint2)handleValue)));
-    }
     default:
         return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Unknown)[((uint2)handleValue).x];
     }
