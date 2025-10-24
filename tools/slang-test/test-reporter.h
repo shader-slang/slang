@@ -156,6 +156,7 @@ protected:
     int m_numFailResults;
 
     bool m_inTest;
+    bool m_testResultAdded;
 
     std::recursive_mutex m_mutex;
 
