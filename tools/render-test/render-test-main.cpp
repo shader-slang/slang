@@ -375,9 +375,30 @@ struct AssignValsFromLayoutContext
         {
             // Allocate descriptor handle for bindless access
             DescriptorHandle handle;
-            DescriptorHandleAccess access = (srcBuffer.type == InputBufferType::StorageBuffer)
-                ? DescriptorHandleAccess::Read
-                : DescriptorHandleAccess::ReadWrite;
+
+            // Determine access mode from the shader parameter's resource type
+            auto handleType = dstCursor.getTypeLayout()->getType();
+            auto resourceType = handleType->getElementType();
+            auto resourceAccess = resourceType->getResourceAccess();
+
+            DescriptorHandleAccess access;
+            switch (resourceAccess)
+            {
+            case SLANG_RESOURCE_ACCESS_READ:
+                access = DescriptorHandleAccess::Read;
+                break;
+            case SLANG_RESOURCE_ACCESS_READ_WRITE:
+            case SLANG_RESOURCE_ACCESS_WRITE:
+            case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+            case SLANG_RESOURCE_ACCESS_APPEND:
+            case SLANG_RESOURCE_ACCESS_CONSUME:
+                access = DescriptorHandleAccess::ReadWrite;
+                break;
+            default:
+                // Default to read-write for unknown/none
+                access = DescriptorHandleAccess::ReadWrite;
+                break;
+            }
 
             SLANG_RETURN_ON_FAIL(bufferResource->getDescriptorHandle(
                 access,
@@ -509,10 +530,31 @@ struct AssignValsFromLayoutContext
             ComPtr<ITextureView> textureView;
             SLANG_RETURN_ON_FAIL(texture->getDefaultView(textureView.writeRef()));
 
+            // Determine access mode from the shader parameter's resource type
+            auto handleType = dstCursor.getTypeLayout()->getType();
+            auto resourceType = handleType->getElementType();
+            auto resourceAccess = resourceType->getResourceAccess();
+
             DescriptorHandle handle;
-            DescriptorHandleAccess access = srcVal->textureDesc.isRWTexture
-                ? DescriptorHandleAccess::ReadWrite
-                : DescriptorHandleAccess::Read;
+            DescriptorHandleAccess access;
+            switch (resourceAccess)
+            {
+            case SLANG_RESOURCE_ACCESS_READ:
+                access = DescriptorHandleAccess::Read;
+                break;
+            case SLANG_RESOURCE_ACCESS_READ_WRITE:
+            case SLANG_RESOURCE_ACCESS_WRITE:
+            case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+            case SLANG_RESOURCE_ACCESS_FEEDBACK:
+                access = DescriptorHandleAccess::ReadWrite;
+                break;
+            default:
+                // Fallback to isRWTexture hint from test input
+                access = srcVal->textureDesc.isRWTexture
+                    ? DescriptorHandleAccess::ReadWrite
+                    : DescriptorHandleAccess::Read;
+                break;
+            }
 
             SLANG_RETURN_ON_FAIL(textureView->getDescriptorHandle(access, &handle));
             SLANG_RETURN_ON_FAIL(dstCursor.setDescriptorHandle(handle));
