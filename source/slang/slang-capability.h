@@ -80,6 +80,9 @@ struct CapabilityStageSet
     /// Return false when `other` is fully incompatible.
     /// incompatability is when `this->stage` is not a supported stage by `other.shaderStageSets`.
     bool tryJoin(const CapabilityTargetSet& other);
+
+    /// See definition of CapabilityTargetSet::compatibleMerge for details.
+    bool compatibleMerge(const CapabilityStageSet& stageSet);
 };
 
 /// CapabilityTargetSet encapsulates all capabilities of a specific target
@@ -104,6 +107,27 @@ struct CapabilityTargetSet
 
     /// Are the two CapabilityTargetSet equal?
     bool operator==(CapabilityTargetSet const& that) const;
+
+    /// Perform a compatibleMerge on the given `targetSet` with `this`.
+    /// This function treats the whole target set as a single bit mask, and perform the
+    /// operation on it.
+    /// Definition of compatibleMerge is:
+    /// # compatibleMerge(A, B) =
+    /// ⎧ B   if A = ∅
+    /// ⎪ A   if B = ∅
+    /// ⎪ A   if A ⊆ B
+    /// ⎪ B   if B ⊆ A
+    /// ⎩ ∅   otherwise
+    /// For example:
+    /// if A = {spirv, ext_X}, and B = {spirv, ext_X, ext_Y}, compatibleMerge(A, B) = A
+    /// if A = {spirv, ext_X, ext_Y}, and B = {spirv, ext_X}, compatibleMerge(A, B) = B
+    /// if A = {spirv, ext_X}, and B = {spirv, ext_Y}, compatibleMerge(A, B) = ∅
+    /// If target A doesn't exist, then add target B directly.
+    bool compatibleMerge(const CapabilityTargetSet& targetSet);
+
+    /// Similar to compatibleMerge for CapabilityTargetSet, but this overload perform the operation
+    /// on a finer granularity, we perform the operation on a specific stage of a target
+    bool compatibleMerge(const CapabilityStageSet& stageSet);
 };
 
 enum class CheckCapabilityRequirementOptions
@@ -348,6 +372,37 @@ public:
         if (isEmpty() || isInvalid())
             return CapabilityAtom::Invalid;
         return (*(*m_targetSets.begin()).second.shaderStageSets.begin()).first;
+    }
+
+    /// Perform a compatibleMerge on the given `targetSet` with `this`.
+    bool compatibleMerge(const CapabilityTargetSet& targetSet)
+    {
+        if (auto existTarget = m_targetSets.tryGetValue(targetSet.target))
+        {
+            return existTarget->compatibleMerge(targetSet);
+        }
+        else
+        {
+            m_targetSets.add(targetSet.target, targetSet);
+            return true;
+        }
+    }
+
+    // Perform a compatibleMerge on the given `stageSet` and `target` with `this`.
+    bool compatibleMerge(CapabilityAtom target, const CapabilityStageSet& stageSet)
+    {
+        if (auto targetIt = m_targetSets.tryGetValue(target))
+        {
+            return targetIt->compatibleMerge(stageSet);
+        }
+        else
+        {
+            CapabilityTargetSet newTargetSet;
+            newTargetSet.target = target;
+            newTargetSet.shaderStageSets.add(stageSet.stage, stageSet);
+            m_targetSets.add(target, newTargetSet);
+            return true;
+        }
     }
 
 private:

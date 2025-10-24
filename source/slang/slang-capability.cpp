@@ -752,6 +752,30 @@ bool CapabilityStageSet::tryJoin(const CapabilityTargetSet& other)
     return true;
 }
 
+bool CapabilityStageSet::compatibleMerge(const CapabilityStageSet& stageSet)
+{
+    CapabilityStageSet tmp = *this;
+    tmp.atomSet->unionWith(stageSet.atomSet.value());
+
+    // if 'this' U stageSet == stageSet, then 'this' is a subset of stageSet
+    // do need to do anything
+    if (tmp.atomSet == stageSet.atomSet)
+    {
+        return true;
+    }
+    else if (tmp.atomSet == this->atomSet)
+    {
+        // 'stageSet' is a subset of 'this', so we can just copy over
+        atomSet = stageSet.atomSet;
+        return true;
+    }
+    else
+    {
+        // neither is a subset of the other, so we can not perform subset join
+        return false;
+    }
+}
+
 bool CapabilityTargetSet::tryJoin(const CapabilityTargetSets& other)
 {
     const CapabilityTargetSet* otherTargetSet = other.tryGetValue(this->target);
@@ -786,6 +810,43 @@ bool CapabilityTargetSet::operator==(CapabilityTargetSet const& that) const
             return false;
     }
     return true;
+}
+
+bool CapabilityTargetSet::compatibleMerge(const CapabilityTargetSet& targetSet)
+{
+    CapabilityTargetSet tmp = *this;
+    tmp.unionWith(targetSet);
+
+    // if this U targetSet == targetSet, then 'this' is a subset of targetSet
+    // do need to do anything
+    if (tmp == targetSet)
+    {
+        return true;
+    }
+    else if (tmp == *this)
+    {
+        // 'targetSet' is a subset of 'this', so we can just copy over
+        shaderStageSets = targetSet.getShaderStageSets();
+        return true;
+    }
+    else
+    {
+        // neither is a subset of the other, so we can not perform subset join
+        return false;
+    }
+}
+
+bool CapabilityTargetSet::compatibleMerge(const CapabilityStageSet& stageSet)
+{
+    if (auto existStage = shaderStageSets.tryGetValue(stageSet.stage))
+    {
+        return existStage->compatibleMerge(stageSet);
+    }
+    else
+    {
+        shaderStageSets.add(stageSet.stage, stageSet);
+        return true;
+    }
 }
 
 CapabilitySet& CapabilitySet::join(const CapabilitySet& other)

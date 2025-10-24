@@ -14126,11 +14126,17 @@ struct CapabilityDeclReferenceVisitor
                     oldCap);
                 handleParentDiagnosticFunc(DiagnosticCategory::Capability);
             }
-            addNewCapInTargetSwitch(
-                set,
-                targetCap,
-                stmt->targetCases[targetCaseIndex],
-                isStageSwitch);
+
+            // Merge the capability set represent by this case into the overall set, depending on this is
+            // a target-switch or stage-switch, we have different granuarity on how to merge things.
+            // The CapabilitySet is like a two level table
+            // CapabilitySet: {target1 target2 ...}
+            // [target1] -> {stage1, stage2, ...}
+            // [target2] -> {stage1, stage2, ...}
+            // and each stage is a bit mask of capabilities.
+            // If this is a target-switch, then we treat each target set as a bit mask, and merge into a specific target entry.
+            // If this is a stage-switch, then we treat each stage set as whole bit mask, and merge into a specific stage entry.
+            mergeNewCapability(set, targetCap, targetCase->loc, targetCase->capability, isStageSwitch);
         }
         handleProcessFunc(stmt, set, stmt->loc);
     }
@@ -14141,121 +14147,46 @@ struct CapabilityDeclReferenceVisitor
     }
 
 private:
-    void addNewCapInTargetSwitch(
-        CapabilitySet& currentSet,
-        const CapabilitySet& newTargets,
-        const TargetCaseStmt* processingTargetCase,
-        bool isStageSwitch)
+    void mergeNewCapability(CapabilitySet& currentSet, CapabilitySet& newSet, SourceLoc loc, CapabilityName caseName, bool isStageSwitch)
     {
-        // traverse all the targets in new target set
-        for (auto targetToAdd : newTargets.getCapabilityTargetSets())
+        bool result = true;
+        if (isStageSwitch)
         {
-            auto targetName = targetToAdd.first;
-            auto& currentCapTargetSets = currentSet.getCapabilityTargetSets();
-            // first, we need to find if this target already exists in the current set
-            if (auto* currentTarget = currentCapTargetSets.tryGetValue(targetName))
+            // If this is stage-switch, we need to perform a more fine-grained merge
+            for (auto target: newSet.getCapabilityTargetSets())
             {
-                // if the target already exists, we need to check whether this new target is
-                // a superset of the existing one, or the other way around. This is the validation
-                // check, because if this condition is not met, then we have conflicting capability
-                // requirements, and we will report a diagnostic.
-                CapabilityTargetSet tmp = *currentTarget;
-                tmp.unionWith(targetToAdd.second);
-                if (tmp == *currentTarget)
+                for (auto stage: target.second.getShaderStageSets())
                 {
-                    // if currentTarget U targetToAdd == currentTarget, then targetToAdd is a subset
-                    // of currentTarget. we will need to replace the existing target with the
-                    // 'targetToAdd'
-                    currentCapTargetSets.remove(targetName);
-                    currentCapTargetSets.add(targetName, targetToAdd.second);
+                    result &= newSet.compatibleMerge(target.first, stage.second);
+                    if (!result)
+                        break;
                 }
-                else if (tmp == targetToAdd.second)
-                {
-                }
-                else
-                {
-                    // If we are seeing stage switch, then the conflicting is supposed to happen,
-                    // because each case is a different stage the capability for different stage is
-                    // supposed to be different, therefore, we will have to look one level deeper to
-                    // check the each stage for this target
-                    if (isStageSwitch)
-                    {
-                        addNewCapInStageSwitch(
-                            *currentTarget,
-                            targetToAdd.second,
-                            processingTargetCase);
-                        continue;
-                    }
-
-                    // otherwise, we have conflicting capability requirements,
-                    // report diagnostic.
-                    CapabilitySet conflictCapSet1;
-                    CapabilitySet conflictCapSet2;
-
-                    conflictCapSet1.getCapabilityTargetSets().add(targetName, targetToAdd.second);
-                    conflictCapSet2.getCapabilityTargetSets().add(targetName, *currentTarget);
-
-                    maybeDiagnose(
-                        Base::getSink(),
-                        outerContext.getOptionSet(),
-                        DiagnosticCategory::Capability,
-                        processingTargetCase->loc,
-                        Diagnostics::targetSwitchCapCasesConflict,
-                        CapabilityName(processingTargetCase->capability), // arg0
-                        conflictCapSet1,                                  // arg1
-                        conflictCapSet2);                                 // arg2
-                    handleParentDiagnosticFunc(DiagnosticCategory::Capability);
-                }
-            }
-            else
-            {
-                // if the target does not exist, we can just add it to the current set
-                currentCapTargetSets.add(targetName, targetToAdd.second);
+                if (!result)
+                    break;
             }
         }
-    }
-
-    void addNewCapInStageSwitch(
-        CapabilityTargetSet& currentTarget,
-        const CapabilityTargetSet& newTarget,
-        const TargetCaseStmt* processingTargetCase)
-    {
-        for (auto stageToAdd : newTarget.getShaderStageSets())
+        else
         {
-            auto stageName = stageToAdd.first;
-            auto& currentStages = currentTarget.getShaderStageSets();
+            // If this is target-switch, we can just merge the whole target set
+            for (auto target: newSet.getCapabilityTargetSets())
+            {
+                result &= newSet.compatibleMerge(target.second);
+                if (!result)
+                    break;
+            }
+        }
 
-            CapabilityStageSet currentStage;
-            if (currentStages.tryGetValue(stageName, currentStage))
-            {
-                CapabilityStageSet tmp = currentStage;
-                tmp.atomSet.value().unionWith(stageToAdd.second.atomSet.value());
-                if (tmp.atomSet == currentStage.atomSet)
-                {
-                    currentStages.remove(stageName);
-                    currentStages.add(stageName, stageToAdd.second);
-                }
-                else if (tmp.atomSet == stageToAdd.second.atomSet)
-                {
-                }
-                else
-                {
-                    maybeDiagnose(
-                        Base::getSink(),
-                        outerContext.getOptionSet(),
-                        DiagnosticCategory::Capability,
-                        processingTargetCase->loc,
-                        Diagnostics::targetSwitchCapCasesConflict,
-                        CapabilityName(processingTargetCase->capability), // arg0
-                        stageToAdd.second.atomSet.value(),                // arg1
-                        currentStage.atomSet.value());                    // arg2
-                    handleParentDiagnosticFunc(DiagnosticCategory::Capability);
-                }
-            }
-            else
-            {
-                currentStages.add(stageName, stageToAdd.second);
-            }
+        if (!result)
+        {
+            maybeDiagnose(
+                Base::getSink(),
+                outerContext.getOptionSet(),
+                DiagnosticCategory::Capability,
+                loc,
+                Diagnostics::targetSwitchCapCasesConflict,
+                caseName,                               // arg0
+                newSet,                                 // arg1
+                currentSet);                            // arg2
         }
     }
 };
