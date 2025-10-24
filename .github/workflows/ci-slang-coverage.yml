@@ -171,10 +171,16 @@ jobs:
             fi
           fi
 
+      - name: Checkout Coverage Reports Repository
+        if: ${{ inputs.deploy-pages }}
+        uses: actions/checkout@v4
+        with:
+          repository: "shader-slang/slang-coverage-reports"
+          path: "coverage-repo"
+          token: ${{ secrets.SLANG_COVERAGE_REPORTS_PAT }}
+
       - name: Deploy Coverage to Separate Repository
         if: ${{ inputs.deploy-pages }}
-        env:
-          COVERAGE_REPO_TOKEN: ${{ secrets.SLANG_COVERAGE_REPORTS_PAT }}
         run: |
           # Get current date and short commit hash
           REPORT_DATE=$(date -u +"%Y-%m-%d")
@@ -182,8 +188,6 @@ jobs:
           FULL_COMMIT=$(git rev-parse HEAD)
           REPORT_DIR="reports/history/${REPORT_DATE}-${COMMIT_SHORT}"
 
-          # Clone the coverage reports repository
-          git clone https://x-access-token:${COVERAGE_REPO_TOKEN}@github.com/shader-slang/slang-coverage-reports.git coverage-repo
           cd coverage-repo
 
           # Configure git
