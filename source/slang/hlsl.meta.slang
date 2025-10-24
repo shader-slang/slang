@@ -23761,7 +23761,7 @@ ${{{{
 //
 
 __intrinsic_type($(kIROp_CoopMatrixType))
-[require(cooperative_matrix)]
+[require(cuda_cooperative_matrix)]
 __generic<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,
@@ -23778,13 +23778,13 @@ struct CoopMat
     //
 
     [ForceInline]
-    [require(cooperative_matrix)]
+    [require(cuda_cooperative_matrix)]
     __init()
     {
     }
 
     [ForceInline]
-    [require(cooperative_matrix)]
+    [require(cuda_cooperative_matrix)]
     __init(T t)
     {
         this.fill(t);
@@ -23800,7 +23800,7 @@ struct CoopMat
     }
 
     [ForceInline]
-    [require(cooperative_matrix)]
+    [require(cuda_cooperative_matrix)]
     __init(This x)
     {
         this = x;
@@ -23809,7 +23809,7 @@ struct CoopMat
     // Required for `IArithmetic`.
     [ForceInline]
     [OverloadRank(-10)]
-    [require(cooperative_matrix)]
+    [require(cuda_cooperative_matrix)]
     __init(int i)
     {
         this = CoopMat<T, S, M, N, R>(T(i));
@@ -23823,13 +23823,19 @@ struct CoopMat
     /// @param t The value to fill the matrix with.
     [ForceInline]
     [mutating]
-    [require(cooperative_matrix)]
+    [require(cuda_cooperative_matrix)]
     void fill(T t)
     {
-        this = spirv_asm
+        __target_switch
         {
-            result:$$CoopMat<T, S, M, N, R> = OpConstantComposite $t;
-        };
+        case spirv:
+            this = spirv_asm
+            {
+                result:$$CoopMat<T, S, M, N, R> = OpConstantComposite $t;
+            };
+        case cuda:
+            __intrinsic_asm "wmma::fill_fragment($this, $0)";
+        }
     }
 
     /// Copies the contents from another cooperative matrix into this matrix.

@@ -1023,6 +1023,9 @@ Compound Capabilities
 `cpp_hlsl`
 > CPP, and HLSL code-gen targets
 
+`cuda_cooperative_matrix`
+> Capabilities needed to use reduction operations with cooperative matrix
+
 `cuda_glsl_hlsl`
 > CUDA, GLSL, and HLSL code-gen targets
 
