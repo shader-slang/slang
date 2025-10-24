@@ -5,7 +5,7 @@ Concrete implementation of IVector storing elements inline (on stack/registers).
 InlineVector stores all elements in a fixed-size array, making it suitable for
 small vectors that can fit in registers or stack memory. Supports automatic differentiation
 for gradient computation in neural networks.
-@param T The element type (must be a floating-point type).
+@param T The element type
 @param N The vector size (compile-time constant).
 @remarks Type constraints:
 - `T` must conform to `__BuiltinFloatingPointType` (float, double, half, etc.)
@@ -26,11 +26,11 @@ public struct InlineVector<T, int N> : IVector<T, N>
     Internal storage for vector elements.
     @remarks Marked as derivative member to enable automatic differentiation.
     */
-    [DerivativeMember(Differential.m_data)]
-    internal T[N] m_data;
+    [DerivativeMember(Differential.data)]
+    internal T[N] data;
 
     /// Default constructor - initializes all elements to zero.
-    public __init() { m_data = {}; }
+    public __init() { data = {}; }
 
     /**
     Scalar broadcast constructor - fills all elements with the same value.
@@ -39,20 +39,20 @@ public struct InlineVector<T, int N> : IVector<T, N>
     public __init(T value) {
         [ForceUnroll]
         for (int i = 0; i < N; i++)
-            m_data[i] = value;
+            data[i] = value;
     }
 
     /**
     Array constructor - initializes from an array.
     @param[in] data Array of N elements to initialize the vector.
     */
-    public __init(T[N] data) { this.m_data = data; }
+    public __init(T[N] data) { this.data = data; }
 
     /**
     Copy constructor.
     @param[in] other The vector to copy from.
     */
-    public __init(This other) { this.m_data = other.m_data; }
+    public __init(This other) { this.data = other.data; }
 
     /**
     Element access operator.
@@ -61,8 +61,8 @@ public struct InlineVector<T, int N> : IVector<T, N>
     */
     public __subscript(int index) -> T
     {
-        get() { return this.m_data[index]; }
-        set() { this.m_data[index] = newValue; }
+        get() { return this.data[index]; }
+        set() { this.data[index] = newValue; }
     }
 
     // Linear transformation without bias
@@ -86,7 +86,7 @@ public struct InlineVector<T, int N> : IVector<T, N>
             for (int col = 0; col < N; col++)
             {
                 let elementOffset = Storage.getOffset(rowOffset, col);
-                output[row] += m_data[col] * weightStorage.read(elementOffset);
+                output[row] += data[col] * weightStorage.read(elementOffset);
             }
         }
 
@@ -212,7 +212,7 @@ public struct InlineVector<T, int N> : IVector<T, N>
             [ForceUnroll]
             for (int col = 0; col < N; col++)
             {
-                output[row] += m_data[col] * rowAddr[col];
+                output[row] += data[col] * rowAddr[col];
             }
         }
         return output;
