@@ -78,7 +78,6 @@ struct LowerCopyLogicalContext
         else
         {
             SLANG_UNIMPLEMENTED_X("splitBlockAt: unsupported insert loc mode");
-            return nullptr;
         }
     }
 

@@ -7899,7 +7899,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
-        auto srcValType = tryGetPointedToType(&builder, inst->getVal()->getDataType());
         auto dstValType = tryGetPointedToType(&builder, inst->getPtr()->getDataType());
         auto slangIRLoad = as<IRLoad>(builder.emitLoad(inst->getVal()));
         auto srcVal = emitLoad(parent, slangIRLoad);
