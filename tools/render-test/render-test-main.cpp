@@ -330,6 +330,23 @@ struct AssignValsFromLayoutContext
         return SLANG_OK;
     }
 
+    static bool isDescriptorHandleType(slang::TypeReflection* type)
+    {
+        // Descriptor handles are pointers to resource types
+        if (type->getKind() != slang::TypeReflection::Kind::Pointer)
+            return false;
+
+        auto elementType = type->getElementType();
+        if (!elementType)
+            return false;
+
+        auto elementKind = elementType->getKind();
+        return elementKind == slang::TypeReflection::Kind::Resource ||
+               elementKind == slang::TypeReflection::Kind::SamplerState ||
+               elementKind == slang::TypeReflection::Kind::TextureBuffer ||
+               elementKind == slang::TypeReflection::Kind::ShaderStorageBuffer;
+    }
+
     SlangResult assignBuffer(ShaderCursor const& dstCursor, ShaderInputLayout::BufferVal* srcVal)
     {
         const InputBufferDesc& srcBuffer = srcVal->bufferDesc;
@@ -350,6 +367,50 @@ struct AssignValsFromLayoutContext
             device,
             bufferResource));
 
+        // Keep buffer alive in resource context
+        resourceContext.resources.add(ComPtr<IResource>(bufferResource.get()));
+
+        // Check if this is a descriptor handle type
+        if (isDescriptorHandleType(dstCursor.getTypeLayout()->getType()))
+        {
+            // Allocate descriptor handle for bindless access
+            DescriptorHandle handle;
+
+            // Determine access mode from the shader parameter's resource type
+            auto handleType = dstCursor.getTypeLayout()->getType();
+            auto resourceType = handleType->getElementType();
+            auto resourceAccess = resourceType->getResourceAccess();
+
+            DescriptorHandleAccess access;
+            switch (resourceAccess)
+            {
+            case SLANG_RESOURCE_ACCESS_READ:
+                access = DescriptorHandleAccess::Read;
+                break;
+            case SLANG_RESOURCE_ACCESS_READ_WRITE:
+            case SLANG_RESOURCE_ACCESS_WRITE:
+            case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+            case SLANG_RESOURCE_ACCESS_APPEND:
+            case SLANG_RESOURCE_ACCESS_CONSUME:
+                access = DescriptorHandleAccess::ReadWrite;
+                break;
+            default:
+                // Default to read-write for unknown/none
+                access = DescriptorHandleAccess::ReadWrite;
+                break;
+            }
+
+            SLANG_RETURN_ON_FAIL(bufferResource->getDescriptorHandle(
+                access,
+                srcBuffer.format,
+                BufferRange{0, bufferSize},
+                &handle));
+
+            SLANG_RETURN_ON_FAIL(dstCursor.setDescriptorHandle(handle));
+            maybeAddOutput(dstCursor, srcVal, bufferResource);
+            return SLANG_OK;
+        }
+
         if ((dstCursor.getTypeLayout()->getType()->getKind() ==
                  slang::TypeReflection::Kind::Scalar &&
              dstCursor.getTypeLayout()->getType()->getScalarType() ==
@@ -360,7 +421,6 @@ struct AssignValsFromLayoutContext
             // we should write bufferResource as a pointer.
             uint64_t addr = bufferResource->getDeviceAddress();
             dstCursor.setData(&addr, sizeof(addr));
-            resourceContext.resources.add(ComPtr<IResource>(bufferResource.get()));
             maybeAddOutput(dstCursor, srcVal, bufferResource);
             return SLANG_OK;
         }
@@ -405,6 +465,8 @@ struct AssignValsFromLayoutContext
 
         if (counterResource)
         {
+            // Keep counter buffer alive
+            resourceContext.resources.add(ComPtr<IResource>(counterResource.get()));
             dstCursor.setBinding(Binding(bufferResource, counterResource));
         }
         else
@@ -430,7 +492,13 @@ struct AssignValsFromLayoutContext
             device,
             texture));
 
+        // Keep texture alive in resource context
+        resourceContext.resources.add(ComPtr<IResource>(texture.get()));
+
         auto sampler = _createSampler(device, samplerEntry->samplerDesc);
+
+        // Keep sampler alive in resource context
+        resourceContext.resources.add(ComPtr<IResource>(sampler.get()));
 
         dstCursor.setBinding(Binding(texture, sampler));
         maybeAddOutput(dstCursor, srcVal, texture);
@@ -451,6 +519,49 @@ struct AssignValsFromLayoutContext
             device,
             texture));
 
+        // Keep texture alive in resource context
+        resourceContext.resources.add(ComPtr<IResource>(texture.get()));
+
+        // Check if this is a descriptor handle type
+        if (isDescriptorHandleType(dstCursor.getTypeLayout()->getType()))
+        {
+            // Allocate descriptor handle for bindless access
+            // Get default texture view first, as handles are allocated from views
+            ComPtr<ITextureView> textureView;
+            SLANG_RETURN_ON_FAIL(texture->getDefaultView(textureView.writeRef()));
+
+            // Determine access mode from the shader parameter's resource type
+            auto handleType = dstCursor.getTypeLayout()->getType();
+            auto resourceType = handleType->getElementType();
+            auto resourceAccess = resourceType->getResourceAccess();
+
+            DescriptorHandle handle;
+            DescriptorHandleAccess access;
+            switch (resourceAccess)
+            {
+            case SLANG_RESOURCE_ACCESS_READ:
+                access = DescriptorHandleAccess::Read;
+                break;
+            case SLANG_RESOURCE_ACCESS_READ_WRITE:
+            case SLANG_RESOURCE_ACCESS_WRITE:
+            case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+            case SLANG_RESOURCE_ACCESS_FEEDBACK:
+                access = DescriptorHandleAccess::ReadWrite;
+                break;
+            default:
+                // Fallback to isRWTexture hint from test input
+                access = srcVal->textureDesc.isRWTexture
+                    ? DescriptorHandleAccess::ReadWrite
+                    : DescriptorHandleAccess::Read;
+                break;
+            }
+
+            SLANG_RETURN_ON_FAIL(textureView->getDescriptorHandle(access, &handle));
+            SLANG_RETURN_ON_FAIL(dstCursor.setDescriptorHandle(handle));
+            maybeAddOutput(dstCursor, srcVal, texture);
+            return SLANG_OK;
+        }
+
         dstCursor.setBinding(texture);
         maybeAddOutput(dstCursor, srcVal, texture);
         return SLANG_OK;
@@ -459,6 +570,19 @@ struct AssignValsFromLayoutContext
     SlangResult assignSampler(ShaderCursor const& dstCursor, ShaderInputLayout::SamplerVal* srcVal)
     {
         auto sampler = _createSampler(device, srcVal->samplerDesc);
+
+        // Keep sampler alive in resource context
+        resourceContext.resources.add(ComPtr<IResource>(sampler.get()));
+
+        // Check if this is a descriptor handle type
+        if (isDescriptorHandleType(dstCursor.getTypeLayout()->getType()))
+        {
+            // Allocate descriptor handle for bindless access
+            DescriptorHandle handle;
+            SLANG_RETURN_ON_FAIL(sampler->getDescriptorHandle(&handle));
+            SLANG_RETURN_ON_FAIL(dstCursor.setDescriptorHandle(handle));
+            return SLANG_OK;
+        }
 
         dstCursor.setBinding(sampler);
         return SLANG_OK;
