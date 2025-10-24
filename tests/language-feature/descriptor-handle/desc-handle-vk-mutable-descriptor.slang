@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain -DIS_DEFAULT
 
 // To intentionally fill up binding slots
 [[vk::binding(0, 1)]]

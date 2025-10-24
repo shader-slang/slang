@@ -537,20 +537,6 @@ bool checkStaticAssert(IRInst* inst, DiagnosticSink* sink)
     List<IRInst*> removeList;
     for (auto child : inst->getChildren())
     {
-        // For the generic/func has no use, there is no need to check the static_assert.
-        // Since this check occurs after dynamic dispatch, there should be no chance that this
-        // generic will be used later.
-        // The only situation that this can happen is when the generic is marked as
-        // `export`, so we will decorate this generic as [keepAlive], and it won't be removed by DCE
-        // passes.
-        if (auto funcIR = as<IRGlobalValueWithParams>(child))
-        {
-            if (!funcIR->hasUses() && !funcIR->findDecoration<IREntryPointDecoration>())
-            {
-                continue;
-            }
-        }
-
         if (checkStaticAssert(child, sink))
             removeList.add(child);
     }
