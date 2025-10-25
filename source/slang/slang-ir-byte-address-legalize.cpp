@@ -51,9 +51,9 @@ struct ByteAddressBufferLegalizationContext
 
         processInstRec(module->getModuleInst());
 
-        // After processing all instructions, handle propagation of legalized block parameters
-        // to their uses (function calls, etc.)
-        processBlockParams();
+        // Propagation the type change of parameters
+        // to their "use"-s around phi-node and function calls.
+        processParamTypes();
     }
 
     // We recursively walk the entire IR structure (except
@@ -1568,26 +1568,25 @@ struct ByteAddressBufferLegalizationContext
         return SLANG_OK;
     }
 
-    // Process legalized block parameters and propagate type changes to their uses.
-    // This handles all block parameters that were converted from ByteAddressBuffer
-    // to StructuredBuffer, updating their uses (e.g., function calls, passes through blocks).
-    void processBlockParams()
+    // Process legalized parameters and propagate type changes to their uses.
+    // This handles all parameters that were converted from ByteAddressBuffer
+    // to StructuredBuffer, updating their "use"-s.
+    void processParamTypes()
     {
-        // Create a worklist for propagating type changes through the IR
         List<IRInst*> workList;
 
-        // Initialize worklist with all block parameters that need propagation
         for (auto& [babIR, structuredBufferType] : byteAddrBufferToReplace)
         {
             workList.add(babIR);
         }
 
-        // Process the worklist to propagate type changes through all uses
         while (workList.getCount() > 0)
         {
             auto babIR = workList.getLast();
             workList.removeLast();
 
+            // iterate all "use"-s of `babIR` and change their type
+            // to `validBufferType`.
             auto validBufferType = byteAddrBufferToReplace[babIR];
 
             auto babIRType = babIR->getDataType();
@@ -1619,24 +1618,26 @@ struct ByteAddressBufferLegalizationContext
 
                     auto targetBlock = branchIR->getTargetBlock();
                     if (targetBlock != parentBlock)
-                        continue;
+                        continue; // skip unrelated branch
 
                     auto argBranch = branchIR->getOperand(argOperandIndex);
                     if (byteAddrBufferToReplace.containsKey(argBranch))
-                        continue;
+                        continue; // already processed
 
                     auto argType = argBranch->getDataType();
                     if (isTypeLegalForByteAddressLoadStore(argType))
                     {
                         // Element type should be same.
                         SLANG_ASSERT(argType == validBufferType);
-                        continue;
+                        continue; // already using a legal type
                     }
 
                     byteAddrBufferToReplace[argBranch] = validBufferType;
                     workList.add(argBranch);
                 }
 
+                // If the parameter belongs to function signature,
+                // we need to change the types on the call sites.
                 auto func = as<IRFunc>(parentBlock->getParent());
                 if (func && isFirstBlock(parentBlock))
                 {
@@ -1649,14 +1650,14 @@ struct ByteAddressBufferLegalizationContext
 
                         auto argCall = call->getOperand(argOperandIndex);
                         if (byteAddrBufferToReplace.containsKey(argCall))
-                            continue;
+                            continue; // already processed
 
                         auto argType = argCall->getDataType();
                         if (isTypeLegalForByteAddressLoadStore(argType))
                         {
                             // Element type should be same.
                             SLANG_ASSERT(argType == validBufferType);
-                            continue;
+                            continue; // already using a legal type
                         }
 
                         byteAddrBufferToReplace[argCall] = validBufferType;
