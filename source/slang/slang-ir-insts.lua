@@ -938,8 +938,16 @@ local insts = {
 	{ field = { struct_name = "StructField", min_operands = 2 } },
 	{ var = {} },
 	{ load = { min_operands = 1 } },
-	{ store = { min_operands = 2 } },
+	{
+		StoreBase =
+		{
+			operands = {{"ptr"}, {"val"}},
+			{ store = {} },
+			{ copyLogical = {} },
+		},
+	},
 	{ CUDA_LDG = {min_operands = 1 } },
+
 	-- Atomic Operations
 	{
 		AtomicOperation = {

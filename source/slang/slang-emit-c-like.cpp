@@ -2648,7 +2648,6 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit(")");
         }
         break;
-
     case kIROp_RWStructuredBufferGetElementPtr:
         {
             auto base = inst->getOperand(0);
