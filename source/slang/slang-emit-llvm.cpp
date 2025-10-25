@@ -226,41 +226,38 @@ static llvm::Instruction::CastOps getLLVMIntExtensionOp(IRType* type)
     }
 }
 
-// This class helps with converting types from Slang IR to LLVM IR. There are
-// three different kinds of types:
+// This class helps with converting types from Slang IR to LLVM IR. It can
+// create types for two different contexts:
 //
-// * _Value_ types are not observable through memory, and they essentially map
-//   to "registers" (SSA values). Hence, they can always use the fastest
-//   representation.
+// * getType(): creates types which appear in SSA values and are not observable
+//   through memory.
 //
-// * _Storage_ types are used when storing the data in memory. It's usually the
-//   same as the value type, but for example booleans in LLVM IR are `i1` (1-bit
-//   integer) which we obviously can't directly store on the stack.
-//
-// * _Debug_ types are "pretty" types with correct offset annotations so that
+// * getDebugType(): "pretty" types with correct offset annotations so that
 //   debuggers can show the contents of variables.
 //
-// One design choice here is that we don't lower struct or array types to LLVM
-// IR as LLVM aggregates. Instead, they're stored as opaque blobs of memory
-// (i8 arrays with alignment annotations). There are three reasons for this.
+// One design choice here is that all memory-related LLVM instructions (e.g.
+// getelementptr and alloca) are emitted with byte arrays (with proper alignment
+// annotations) instead of their actual types. There are two reasons for this:
 //
-// 1. Using aggregate types in values is "officially" discouraged:
-//    https://llvm.org/docs/Frontend/PerformanceTips.html#avoid-creating-values-of-aggregate-type
-//    Instead, they are created with alloca and passed around as pointers in the IR.
-//
-// 2. LLVM is undergoing a transition to a more type-agnostic form:
+// 1. LLVM is undergoing a transition to a more type-agnostic form:
 //    https://www.npopov.com/2025/01/05/This-year-in-LLVM-2024.html#ptradd
 //    In short, there is no longer any reason to specify the real type to
 //    getelementptr; LLVM already canonicalizes it to use `i8` and byte offsets
 //    anyway, and the type-based getelementptr itself may be removed in a
 //    future version.
 //
-// 3. This allows us to entirely ignore LLVM's ideas of how structs are laid
-//    out. We can fully control the memory layout of our own structs with no
-//    limitations from LLVM, which is great, because we have IRTypeLayoutRules.
+// 2. This allows us to entirely ignore LLVM's ideas of how structs are laid
+//    out in memory. We can fully control the memory layout of our own structs
+//    with no limitations from LLVM, which is great, because we already have
+//    IRTypeLayoutRules.
 //
-// At this point, only global struct/array constants need to be annotated with
-// an actual aggregate type in LLVM. So they build the type on-demand in
+// Furthermore, struct and array types are only passed around as pointers to
+// memory in stack. That's because using aggregate types in values is
+// "officially" discouraged:
+// https://llvm.org/docs/Frontend/PerformanceTips.html#avoid-creating-values-of-aggregate-type
+//
+// With these design choices, only global struct/array constants need to be
+// given an actual aggregate type in LLVM. So they build the type on-demand in
 // `emitConstant`.
 class LLVMTypeTranslator
 {
@@ -274,7 +271,6 @@ private:
     IRTypeLayoutRules* defaultPointerRules;
 
     Dictionary<IRType*, llvm::Type*> valueTypeMap;
-    Dictionary<IRTypeLayoutRules*, Dictionary<IRType*, llvm::Type*>> storageTypeMap;
     Dictionary<IRTypeLayoutRules*, Dictionary<IRType*, llvm::DIType*>> debugTypeMap;
     Dictionary<IRType*, IRType*> legalizedResourceTypeMap;
 
@@ -322,8 +318,8 @@ public:
         byteType = builder.getInt8Ty();
     }
 
-    // Returns the type you must use for passing around SSA values.
-    llvm::Type* getValueType(IRType* type)
+    // Returns the type you must use for passing around SSA values in LLVM IR.
+    llvm::Type* getType(IRType* type)
     {
         if (valueTypeMap.containsKey(type))
             return valueTypeMap.getValue(type);
@@ -341,7 +337,7 @@ public:
         case kIROp_HalfType:
             // TODO: Should we use normal float types for these in SSA? Maybe
             // depending on target triple? If we do that, we need to update
-            // getStorageType to make halfs be stored as halfs still.
+            // emitStore & emitLoad to make halfs be stored as halfs still.
             llvmType = builder->getHalfTy();
             break;
         case kIROp_FloatType:
@@ -373,7 +369,7 @@ public:
             break;
 
         case kIROp_RateQualifiedType:
-            llvmType = getValueType(as<IRRateQualifiedType>(type)->getValueType());
+            llvmType = getType(as<IRRateQualifiedType>(type)->getValueType());
             break;
 
         case kIROp_PtrType:
@@ -397,7 +393,7 @@ public:
         case kIROp_VectorType:
             {
                 auto vecType = static_cast<IRVectorType*>(type);
-                llvm::Type* elemType = getValueType(vecType->getElementType());
+                llvm::Type* elemType = getType(vecType->getElementType());
                 auto elemCount = int(getIntVal(vecType->getElementCount()));
                 llvmType = llvm::VectorType::get(elemType, llvm::ElementCount::getFixed(elemCount));
             }
@@ -410,11 +406,12 @@ public:
                 for (UInt i = 0; i < funcType->getParamCount(); ++i)
                 {
                     IRType* paramType = funcType->getParamType(i);
-                    paramTypes.add(getValueType(paramType));
+                    paramTypes.add(getType(paramType));
                 }
 
                 auto resultType = funcType->getResultType();
-                auto llvmReturnType = getValueType(resultType);
+                auto llvmReturnType = getType(resultType);
+
                 // If attempting to return an aggregate, turn it into an extra
                 // output parameter that is passed with a pointer.
                 if (isAggregateType(resultType))
@@ -451,47 +448,10 @@ public:
         return llvmType;
     }
 
-    // The storage type can be used to adjust how types are stored in memory
-    // as opposed to SSA values.
-    llvm::Type* getStorageType(IRType* type, IRTypeLayoutRules* rules)
-    {
-        {
-            auto& types = storageTypeMap[rules];
-            if (types.containsKey(type))
-                return types.getValue(type);
-        }
-
-        llvm::Type* storageType = nullptr;
-        switch (type->getOp())
-        {
-        case kIROp_BoolType:
-            {
-                // Can't really store an i1, so let's use whatever size the
-                // layout rules want.
-                IRSizeAndAlignment sizeAlignment;
-                Slang::getSizeAndAlignment(*compilerOptions, rules, type, &sizeAlignment);
-                storageType = builder->getIntNTy(sizeAlignment.size * 8);
-            }
-            break;
-
-        default:
-            // No special storage considerations, just use the same type as SSA
-            // values.
-            storageType = getValueType(type);
-            break;
-        }
-
-        {
-            auto& types = storageTypeMap[rules];
-            types[type] = storageType;
-        }
-        return storageType;
-    }
-
     llvm::DIType* getDebugType(IRType* type, IRTypeLayoutRules* rules)
     {
         {
-            Dictionary<IRType*, llvm::DIType*>& types = debugTypeMap[rules];
+            auto& types = debugTypeMap[rules];
             if (types.containsKey(type))
                 return types.getValue(type);
         }
@@ -707,37 +667,10 @@ public:
         }
 
         {
-            Dictionary<IRType*, llvm::DIType*>& types = debugTypeMap[rules];
+            auto& types = debugTypeMap[rules];
             types[type] = llvmType;
         }
         return llvmType;
-    }
-
-    // Use this instead of the regular Slang::getOffset(), it handles
-    // legalized resource types correctly.
-    IRIntegerValue getOffset(IRStructField* field, IRTypeLayoutRules* rules)
-    {
-        IRIntegerValue offset = 0;
-        auto structType = as<IRStructType>(field->getParent());
-        auto legalStructType = as<IRStructType>(legalizeResourceTypes(structType));
-        auto legalField = field;
-        if (legalStructType != structType)
-        {
-            for (auto ff : legalStructType->getFields())
-            {
-                if(ff->getKey() == field->getKey())
-                {
-                    legalField = ff;
-                    break;
-                }
-            }
-        }
-        Slang::getOffset(
-            *compilerOptions,
-            rules,
-            legalField,
-            &offset);
-        return offset;
     }
 
     // Swaps resource buffers in Slang IR to their legalized struct
@@ -811,33 +744,60 @@ public:
         return legalizedType;
     }
 
+    // Use this instead of the regular Slang::getOffset(), it handles
+    // legalized resource types correctly.
+    IRIntegerValue getOffset(IRStructField* field, IRTypeLayoutRules* rules)
+    {
+        IRIntegerValue offset = 0;
+        auto structType = as<IRStructType>(field->getParent());
+        auto legalStructType = as<IRStructType>(legalizeResourceTypes(structType));
+        auto legalField = field;
+        if (legalStructType != structType)
+        {
+            for (auto ff : legalStructType->getFields())
+            {
+                if(ff->getKey() == field->getKey())
+                {
+                    legalField = ff;
+                    break;
+                }
+            }
+        }
+        Slang::getOffset(
+            *compilerOptions,
+            rules,
+            legalField,
+            &offset);
+        return offset;
+    }
+
+    // Use this instead of the regular Slang::getSizeAndAlignment(), it handles
+    // legalized resource types correctly.
     IRSizeAndAlignment getSizeAndAlignment(IRType* type, IRTypeLayoutRules* rules)
     {
-        IRSizeAndAlignment elementSizeAlignment;
+        IRSizeAndAlignment sizeAlignment;
 
         Slang::getSizeAndAlignment(
             *compilerOptions,
             rules,
             legalizeResourceTypes(type),
-            &elementSizeAlignment);
+            &sizeAlignment);
 
-        return elementSizeAlignment;
+        return sizeAlignment;
     }
 
     // Allocates stack memory for given type. Returns a pointer to the start of
     // that memory.
     llvm::Value* emitAlloca(IRType* type, IRTypeLayoutRules* rules)
     {
-        IRSizeAndAlignment sizeAlign = getSizeAndAlignment(type, rules);
+        IRSizeAndAlignment sizeAlignment = getSizeAndAlignment(type, rules);
         return builder->Insert(new llvm::AllocaInst(
-            byteType, 0, builder->getInt32(sizeAlign.getStride()), llvm::Align(sizeAlign.alignment)
+            byteType, 0, builder->getInt32(sizeAlignment.getStride()), llvm::Align(sizeAlignment.alignment)
         ));
     }
 
-    // llvmVal must be using `getValueType(valType)`. It will be stored in
-    // llvmPtr.
-    //
-    // Returns the store instruction.
+    // llvmVal must be using `getType(valType)`. It will be stored in
+    // llvmPtr. Returns the store instruction.
     llvm::Value* emitStore(
         llvm::Value* llvmPtr,
         llvm::Value* llvmVal,
@@ -851,7 +811,7 @@ public:
         case kIROp_BoolType:
             {
                 // Booleans are i1 in values, but something larger in memory.
-                auto storageType = getStorageType(valType, rules);
+                auto storageType = builder->getIntNTy(sizeAlignment.size * 8);
                 auto expanded = builder->CreateZExt(llvmVal, storageType);
                 return builder->CreateAlignedStore(expanded, llvmPtr, llvm::MaybeAlign(sizeAlignment.alignment), isVolatile);
             }
@@ -861,13 +821,9 @@ public:
             // Arrays and struct values are always represented with an alloca
             // pointer.
             SLANG_ASSERT(llvmVal->getType()->isPointerTy());
-            if (rules != defaultPointerRules)
+            if (rules == defaultPointerRules)
             {
-                return crossLayoutMemCpy(llvmPtr, llvmVal, valType, rules, defaultPointerRules, isVolatile);
-            }
-            else
-            {
-                // Pointer-to-pointer copy, so generate inline memcpy.
+                // Equal memory layout, so we can just memcpy.
                 return builder->CreateMemCpyInline(
                     llvmPtr,
                     llvm::MaybeAlign(sizeAlignment.alignment),
@@ -877,13 +833,16 @@ public:
                     isVolatile
                 );
             }
+            else
+            {
+                return crossLayoutMemCpy(llvmPtr, llvmVal, valType, rules, defaultPointerRules, isVolatile);
+            }
         default:
             return builder->CreateAlignedStore(llvmVal, llvmPtr, llvm::MaybeAlign(sizeAlignment.alignment), isVolatile);
         }
     }
 
-    // Returns the loaded data using `getValueType(valType)` from llvmPtr.
-    //
+    // Returns the loaded data using `getType(valType)` from llvmPtr.
     // Returns the load instruction (= loaded value)
     llvm::Value* emitLoad(
         llvm::Value* llvmPtr,
@@ -891,19 +850,19 @@ public:
         IRTypeLayoutRules* rules,
         bool isVolatile = false
     ){
-        IRSizeAndAlignment elementSizeAlignment = getSizeAndAlignment(valType, rules);
+        IRSizeAndAlignment sizeAlignment = getSizeAndAlignment(valType, rules);
 
         switch(valType->getOp())
         {
         case kIROp_BoolType:
             {
                 // Booleans are i1 in values, but something larger in memory.
-                auto llvmType = getValueType(valType);
-                auto storageType = getStorageType(valType, rules);
+                auto llvmType = getType(valType);
+                auto storageType = builder->getIntNTy(sizeAlignment.size * 8);
                 auto storageBool = builder->CreateAlignedLoad(
                     storageType,
                     llvmPtr,
-                    llvm::MaybeAlign(elementSizeAlignment.alignment),
+                    llvm::MaybeAlign(sizeAlignment.alignment),
                     isVolatile);
 
                 return builder->CreateTrunc(storageBool, llvmType);
@@ -911,34 +870,35 @@ public:
             break;
         case kIROp_ArrayType:
         case kIROp_StructType:
-            if (rules != defaultPointerRules)
+            if (rules == defaultPointerRules)
             {
-                llvm::Value* llvmVar = emitAlloca(valType, defaultPointerRules);
-                crossLayoutMemCpy(llvmVar, llvmPtr, valType, defaultPointerRules, rules, isVolatile);
-                return llvmVar;
-            }
-            else
-            {
+                // Equal memory layout, so we can just memcpy.
                 llvm::Value* llvmVar = emitAlloca(valType, defaultPointerRules);
 
                 // Pointer-to-pointer copy, so generate inline memcpy.
                 builder->CreateMemCpyInline(
                     llvmVar,
-                    llvm::MaybeAlign(elementSizeAlignment.alignment),
+                    llvm::MaybeAlign(sizeAlignment.alignment),
                     llvmPtr,
-                    llvm::MaybeAlign(elementSizeAlignment.alignment),
-                    builder->getInt32(elementSizeAlignment.size),
+                    llvm::MaybeAlign(sizeAlignment.alignment),
+                    builder->getInt32(sizeAlignment.size),
                     isVolatile
                 );
                 return llvmVar;
             }
+            else
+            {
+                llvm::Value* llvmVar = emitAlloca(valType, defaultPointerRules);
+                crossLayoutMemCpy(llvmVar, llvmPtr, valType, defaultPointerRules, rules, isVolatile);
+                return llvmVar;
+            }
         default:
             {
-                auto llvmType = getValueType(valType);
+                auto llvmType = getType(valType);
                 return builder->CreateAlignedLoad(
                     llvmType,
                     llvmPtr,
-                    llvm::MaybeAlign(elementSizeAlignment.alignment),
+                    llvm::MaybeAlign(sizeAlignment.alignment),
                     isVolatile);
             }
         }
@@ -969,8 +929,11 @@ public:
         return builder->CreateGEP(byteType, llvmPtr, builder->getInt32(offset));
     }
 
+    // Emits zero padding as much as needed to make curSize == targetSize.
     UInt emitPaddingConstant(List<llvm::Constant*>& fields, UInt& curSize, UInt targetSize)
     {
+        SLANG_ASSERT(curSize <= targetSize);
+
         if(curSize < targetSize)
         {
             UInt bytes = targetSize - curSize;
@@ -987,11 +950,11 @@ public:
         return 0;
     }
 
-    // Tries to emit the given constant, but may return nullptr if that is not
-    // possible.
-    llvm::Constant* maybeEmitConstant(IRInst* inst, bool storage = false, bool withTrailingPadding = true)
+    // Tries to emit the given value as a constant, but may return nullptr if
+    // that is not possible.
+    llvm::Constant* maybeEmitConstant(IRInst* inst, bool inAggregate = false, bool withTrailingPadding = true)
     {
-        if (constantMap.containsKey(inst) && !storage)
+        if (constantMap.containsKey(inst) && !inAggregate)
             return constantMap.getValue(inst).get(withTrailingPadding);
 
         ConstantInfo llvmConstant;
@@ -1004,7 +967,7 @@ public:
                 IRBasicType* type = as<IRBasicType>(inst->getDataType());
                 if (type)
                 {
-                    llvmConstant = llvm::ConstantInt::get(getValueType(type), litInst->value.intVal);
+                    llvmConstant = llvm::ConstantInt::get(getType(type), litInst->value.intVal);
                 }
                 break;
             }
@@ -1015,7 +978,7 @@ public:
                 IRBasicType* type = as<IRBasicType>(inst->getDataType());
                 if (type)
                 {
-                    llvmConstant = llvm::ConstantFP::get(getValueType(type), litInst->value.floatVal);
+                    llvmConstant = llvm::ConstantFP::get(getType(type), litInst->value.floatVal);
                 }
             }
             break;
@@ -1028,7 +991,7 @@ public:
             {
                 auto ptrLit = static_cast<IRPtrLit*>(inst);
                 IRPtrType* type = as<IRPtrType>(inst->getDataType());
-                auto llvmType = llvm::cast<llvm::PointerType>(getValueType(type));
+                auto llvmType = llvm::cast<llvm::PointerType>(getType(type));
                 if (ptrLit->getValue() == nullptr)
                 {
                     llvmConstant = llvm::ConstantPointerNull::get(llvmType);
@@ -1050,7 +1013,7 @@ public:
                 for (UInt aa = 0; aa < inst->getOperandCount(); ++aa)
                 {
                     auto partInst = inst->getOperand(aa);
-                    auto constVal = maybeEmitConstant(partInst, storage);
+                    auto constVal = maybeEmitConstant(partInst, inAggregate);
                     if (!constVal)
                         return nullptr;
                     if (auto subvectorType = as<IRVectorType>(partInst->getDataType()))
@@ -1075,11 +1038,11 @@ public:
                     break;
                 }
 
-                if (storage)
+                if (inAggregate)
                 {
                     // To remove padding and alignment requirements from the
                     // vector, lower it as an array.
-                    auto elemType = getValueType(vectorType->getElementType());
+                    auto elemType = getType(vectorType->getElementType());
                     llvmConstant = llvm::ConstantArray::get(
                         llvm::ArrayType::get(elemType, values.getCount()),
                         llvm::ArrayRef(values.begin(), values.end()));
@@ -1108,13 +1071,13 @@ public:
             {
                 auto vectorType = cast<IRVectorType>(inst->getDataType());
                 int elemCount = getIntVal(vectorType->getElementCount());
-                llvm::Constant* value = maybeEmitConstant(inst->getOperand(0), storage);
+                llvm::Constant* value = maybeEmitConstant(inst->getOperand(0), inAggregate);
                 if (!value)
                     return nullptr;
 
-                if (storage)
+                if (inAggregate)
                 {
-                    auto elemType = getValueType(vectorType->getElementType());
+                    auto elemType = getType(vectorType->getElementType());
                     auto values = List<llvm::Constant*>::makeRepeated(value, elemCount);
                     llvmConstant = llvm::ConstantArray::get(
                         llvm::ArrayType::get(elemType, values.getCount()),
@@ -1213,7 +1176,7 @@ public:
             break;
         }
 
-        if ((llvmConstant.padded || llvmConstant.unpadded) && !storage)
+        if ((llvmConstant.padded || llvmConstant.unpadded) && !inAggregate)
             constantMap[inst] = llvmConstant;
         return llvmConstant.get(withTrailingPadding);
     }
@@ -1342,9 +1305,10 @@ struct LLVMEmitter
     // inline IR.
     std::unique_ptr<llvm::Linker> llvmLinker;
 
-    // These need to be stored separately. IRBuilderBase does not have a virtual
-    // destructor :/ Only one should exist at a time and the pointer is copied
-    // to llvmBuilder, which you should always use instead of these directly.
+    // These builder variants need to be stored separately. IRBuilderBase does
+    // not have a virtual destructor :/ Only one should exist at a time and the
+    // pointer is copied to llvmBuilder, which you should always use instead of
+    // these directly.
     std::unique_ptr<llvm::IRBuilder<>> llvmBuilderOpt;
     std::unique_ptr<llvm::IRBuilder<llvm::NoFolder>> llvmBuilderNoOpt;
     llvm::IRBuilderBase* llvmBuilder;
@@ -1356,8 +1320,17 @@ struct LLVMEmitter
     CodeGenContext* codeGenContext;
     llvm::DataLayout targetDataLayout;
 
+    // If true, we should emit LLVM debug info. If false, all debug-related
+    // members are uninitialized and unused.
     bool debug = false;
+
+    // Changes the behaviour when encountering a global instruction. If false,
+    // they're emitted as global variables. Otherwise, we'll try to inline them.
     bool inlineGlobalInstructions = false;
+
+    // These layout rules are used for all data types when they're stored in
+    // memory, EXCEPT when contained within a buffer with an explicit type layout
+    // parameter.
     IRTypeLayoutRules* defaultPointerRules = nullptr;
 
     // The LLVM value class is closest to Slang's IRInst, as it can represent
@@ -1370,6 +1343,8 @@ struct LLVMEmitter
     // be generated.
     Dictionary<IRInst*, llvm::GlobalVariable*> promotedGlobalInsts;
 
+    // "Global constructors" are functions that get called when the executable
+    // or library is loaded, similar to constructors of global variables in C++.
     List<llvm::Constant*> globalCtors;
     llvm::StructType* llvmCtorType;
 
@@ -1380,11 +1355,12 @@ struct LLVMEmitter
     struct VariableDebugInfo
     {
         llvm::DIVariable* debugVar;
-        // attached = first related DebugValue has been processed
+        // attached is true when the first related DebugValue has been
+        // processed.
         bool attached = false;
-        // isStackVar = has been alloca'd and declared as debugValue. Doesn't
-        // necessarily need further DebugValue tracking after that, since a
-        // real variable now actually exists in LLVM.
+        // isStackVar is true when the variable has been alloca'd and declared
+        // as debugValue. Doesn't necessarily need further DebugValue tracking
+        // after that, since a real variable now actually exists in LLVM.
         bool isStackVar = false;
     };
     Dictionary<IRInst*, VariableDebugInfo> variableDebugInfoMap;
@@ -1531,8 +1507,8 @@ struct LLVMEmitter
             compileUnit = llvmDebugBuilder->createCompileUnit(
                 // TODO: We should probably apply for a language ID in DWARF? Not
                 // sure how that process goes. Anyway, let's just use C++ as the
-                // ID until this target is properly usable. C doesn't work
-                // because debuggers won't use the un-mangled name in that lang.
+                // ID until this target stabilizes. C doesn't work because
+                // debuggers won't use the un-mangled name in that language.
                 llvm::dwarf::DW_LANG_C_plus_plus,
 
                 // The "compile unit" model doesn't work super well for Slang -
@@ -1593,6 +1569,7 @@ struct LLVMEmitter
 
     ~LLVMEmitter()
     {
+        // Everything else is managed and automatically free'd by llvmModule.
         delete targetMachine;
     }
 
@@ -1686,7 +1663,7 @@ struct LLVMEmitter
                     return llvmVar;
 
                 // Otherwise, we'll need a load instruction to get the value.
-                auto llvmValueType = types->getValueType(type);
+                auto llvmValueType = types->getType(type);
                 return llvmBuilder->CreateLoad(llvmValueType, llvmVar, false);
             }
             else
@@ -1850,7 +1827,7 @@ struct LLVMEmitter
 
     llvm::Value* _emitArithmetic(IRInst* inst)
     {
-        auto resultType = types->getValueType(inst->getDataType());
+        auto resultType = types->getType(inst->getDataType());
         bool isFloat = resultType->getScalarType()->isFloatingPointTy();
         bool isSigned = isSignedType(inst->getDataType());
 
@@ -2193,7 +2170,7 @@ struct LLVMEmitter
                 }
                 else
                 {
-                    llvmInst = llvm::PoisonValue::get(types->getValueType(type));
+                    llvmInst = llvm::PoisonValue::get(types->getType(type));
                 }
             }
             break;
@@ -2261,7 +2238,7 @@ struct LLVMEmitter
             llvmInst = types->maybeEmitConstant(inst);
             if (!llvmInst)
             {
-                auto llvmType = types->getValueType(inst->getDataType());
+                auto llvmType = types->getType(inst->getDataType());
 
                 // MakeVector of a scalar is a scalar.
                 if (!as<IRVectorType>(inst->getDataType()))
@@ -2300,7 +2277,7 @@ struct LLVMEmitter
             llvmInst = types->maybeEmitConstant(inst);
             if (!llvmInst)
             {
-                auto llvmType = llvm::cast<llvm::VectorType>(types->getValueType(inst->getDataType()));
+                auto llvmType = llvm::cast<llvm::VectorType>(types->getType(inst->getDataType()));
                 auto val = findValue(inst->getOperand(0));
                 llvmInst = llvmBuilder->CreateVectorSplat(llvmType->getElementCount(), val);
             }
@@ -2382,8 +2359,8 @@ struct LLVMEmitter
                 auto fromType = getVectorOrCoopMatrixElementType(fromTypeV);
                 auto toType = getVectorOrCoopMatrixElementType(toTypeV);
 
-                auto llvmFromType = types->getValueType(fromTypeV);
-                auto llvmToType = types->getValueType(toTypeV);
+                auto llvmFromType = types->getType(fromTypeV);
+                auto llvmToType = types->getType(toTypeV);
                 auto fromWidth = llvmFromType->getScalarSizeInBits();
                 auto toWidth = llvmToType->getScalarSizeInBits();
 
@@ -2396,7 +2373,7 @@ struct LLVMEmitter
                 else if(as<IRBoolType>(toType))
                 {
                     llvm::Constant* zero = llvm::ConstantInt::get(
-                        types->getValueType(fromType), 0);
+                        types->getType(fromType), 0);
                     if (toTypeV != toType)
                     { // Vector
                         zero = llvm::ConstantVector::getSplat(
@@ -2414,7 +2391,7 @@ struct LLVMEmitter
                     llvm::Instruction::CastOps cast = llvm::Instruction::CastOps::Trunc;
                     if (toWidth > fromWidth)
                         cast = getLLVMIntExtensionOp(fromType);
-                    llvmInst = llvmBuilder->CreateCast(cast, llvmValue, types->getValueType(toTypeV));
+                    llvmInst = llvmBuilder->CreateCast(cast, llvmValue, types->getType(toTypeV));
                 }
             }
             break;
@@ -2426,8 +2403,8 @@ struct LLVMEmitter
                 auto fromTypeV = inst->getOperand(0)->getDataType();
                 auto toTypeV = inst->getDataType();
 
-                auto llvmFromType = types->getValueType(fromTypeV);
-                auto llvmToType = types->getValueType(toTypeV);
+                auto llvmFromType = types->getType(fromTypeV);
+                auto llvmToType = types->getType(toTypeV);
 
                 auto fromSize = llvmFromType->getScalarSizeInBits();
                 auto toSize = llvmToType->getScalarSizeInBits();
@@ -2455,7 +2432,7 @@ struct LLVMEmitter
                         llvm::Instruction::CastOps::SIToFP : 
                         llvm::Instruction::CastOps::UIToFP,
                     findValue(inst->getOperand(0)),
-                    types->getValueType(toTypeV)
+                    types->getType(toTypeV)
                 );
             }
             break;
@@ -2473,7 +2450,7 @@ struct LLVMEmitter
                     llvmInst = llvmBuilder->CreateCmp(
                         llvm::CmpInst::Predicate::FCMP_UNE,
                         llvmValue,
-                        llvm::ConstantFP::getZero(types->getValueType(fromType))
+                        llvm::ConstantFP::getZero(types->getType(fromType))
                     );
                 }
                 else
@@ -2483,7 +2460,7 @@ struct LLVMEmitter
                             llvm::Instruction::CastOps::FPToSI :
                             llvm::Instruction::CastOps::FPToUI,
                         llvmValue,
-                        types->getValueType(toTypeV)
+                        types->getType(toTypeV)
                     );
                 }
             }
@@ -2496,7 +2473,7 @@ struct LLVMEmitter
                 llvmInst = llvmBuilder->CreateCast(
                     llvm::Instruction::CastOps::PtrToInt,
                     findValue(fromValue),
-                    types->getValueType(toTypeV)
+                    types->getType(toTypeV)
                 );
             }
             break;
@@ -2515,7 +2492,7 @@ struct LLVMEmitter
                 llvmInst = llvmBuilder->CreateCast(
                     llvm::Instruction::CastOps::IntToPtr,
                     findValue(fromValue),
-                    types->getValueType(toTypeV)
+                    types->getType(toTypeV)
                 );
             }
             break;
@@ -2534,7 +2511,7 @@ struct LLVMEmitter
 
                 auto llvmFromValue = findValue(fromValue);
                 auto llvmFromType = llvmFromValue->getType();
-                auto llvmToType = types->getValueType(toTypeV);
+                auto llvmToType = types->getType(toTypeV);
 
                 auto op = llvm::Instruction::CastOps::BitCast;
                 // It appears that sometimes casts between ints and ptrs occur
@@ -2700,7 +2677,7 @@ struct LLVMEmitter
 
         case kIROp_BitfieldExtract:
             {
-                auto type = types->getValueType(inst->getDataType());
+                auto type = types->getType(inst->getDataType());
                 auto val = _coerceNumeric(findValue(inst->getOperand(0)), type, false);
                 auto off = _coerceNumeric(findValue(inst->getOperand(1)), type, false);
                 auto bts = _coerceNumeric(findValue(inst->getOperand(2)), type, false);
@@ -2724,7 +2701,7 @@ struct LLVMEmitter
 
         case kIROp_BitfieldInsert:
             {
-                auto type = types->getValueType(inst->getDataType());
+                auto type = types->getType(inst->getDataType());
                 auto val = _coerceNumeric(findValue(inst->getOperand(0)), type, false);
                 auto insert = _coerceNumeric(findValue(inst->getOperand(1)), type, false);
                 auto off = _coerceNumeric(findValue(inst->getOperand(2)), type, false);
@@ -3215,7 +3192,7 @@ struct LLVMEmitter
 
         auto funcType = static_cast<IRFuncType*>(func->getDataType());
 
-        llvm::FunctionType* llvmFuncType = llvm::cast<llvm::FunctionType>(types->getValueType(funcType));
+        llvm::FunctionType* llvmFuncType = llvm::cast<llvm::FunctionType>(types->getType(funcType));
 
         llvm::Function* llvmFunc = llvm::Function::Create(
             llvmFuncType,
@@ -3473,7 +3450,7 @@ struct LLVMEmitter
                         }
                         else
                         {
-                            auto llvmType = types->getValueType(type);
+                            auto llvmType = types->getType(type);
                             llvmType->print(expanded);
                         }
                     }
@@ -3513,10 +3490,10 @@ struct LLVMEmitter
                     break;
                 case '[':
                     {
-                        bool storage = false;
+                        bool sizeQuery = false;
                         if (*cursor == 'S')
                         {
-                            storage = true;
+                            sizeQuery = true;
                             cursor++;
                         }
                         UInt argIndex = parseNumber()+1;
@@ -3527,14 +3504,14 @@ struct LLVMEmitter
 
                         IRType* argType = as<IRType>(arg);
 
-                        if (storage)
+                        if (sizeQuery)
                         {
                             IRSizeAndAlignment sizeAndAlignment = types->getSizeAndAlignment(argType, defaultPointerRules);
                             expanded << sizeAndAlignment.getStride();
                         }
                         else
                         {
-                            auto llvmType = types->getValueType(argType);
+                            auto llvmType = types->getType(argType);
                             llvmType->print(expanded);
                         }
 
@@ -3564,7 +3541,7 @@ struct LLVMEmitter
             expanded << "\nret ";
             if (hasReturnValue)
             {
-                auto llvmResultType = types->getValueType(resultType);
+                auto llvmResultType = types->getType(resultType);
                 llvmResultType->print(expanded);
                 expanded << " %result";
             }
@@ -4035,6 +4012,9 @@ struct LLVMEmitter
     {
         llvm::Function* llvmFunc = ensureFuncDecl(func);
 
+        // Aggregate return types are turned into an extra parameter instead of
+        // a return value, so `storeArg` and `epilogue` are used to route the
+        // ostensible return value into that parameter.
         llvm::Value* storeArg = nullptr;
         if (types->isAggregateType(func->getResultType()))
             storeArg = llvmFunc->getArg(llvmFunc->arg_size()-1);
