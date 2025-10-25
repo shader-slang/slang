@@ -3,7 +3,7 @@
 // CHECK: OpDecorate %primitives_color Location 0
 // CHECK: OpDecorate %primitives_color PerPrimitive
 // CHECK: OpDecorate %prim_color Location 0
-// CHECK: OpDecorate %prim_color Flat
+// CHECK: OpDecorate %prim_color PerPrimitive
 
 const static uint MAX_VERTS = 6;
 const static uint MAX_PRIMS = 2;
@@ -56,7 +56,7 @@ struct FragmentOut
 };
 
 [shader("fragment")]
-FragmentOut entry_fragment(in nointerpolation Primitive prim)
+FragmentOut entry_fragment(in perprimitive Primitive prim)
 {
     FragmentOut frag_out;
     frag_out.color = prim.color;
