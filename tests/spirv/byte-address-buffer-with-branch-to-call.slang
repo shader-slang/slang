@@ -46,5 +46,5 @@ void computeMain(int3 tid : SV_DispatchThreadID)
     //
     // It seems that there is a bug on the graphics driver
     // when `VariablePointersStorageBuffer` is used.
-    // DISABLED: SPIRV_BRANCH-NEXT: 21
+    // DISABLED_SPIRV_BRANCH-NEXT: 21
 }
