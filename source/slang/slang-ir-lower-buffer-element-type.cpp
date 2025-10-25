@@ -1080,19 +1080,17 @@ struct LoweredElementTypeContext
         }
     }
 
-    IRInst* getSourceAddrFromLoadInst(IRBuilder& builder, IRInst* loadInst)
+    IRInst* getSourceAddrFromLoadInst(IRBuilder& builder, IRInst* loadInst, IRInst* newPtrVal)
     {
         switch (loadInst->getOp())
         {
         case kIROp_Load:
-            return loadInst->getOperand(0);
+            return newPtrVal;
         case kIROp_StructuredBufferLoad:
         case kIROp_StructuredBufferLoadStatus:
         case kIROp_RWStructuredBufferLoad:
         case kIROp_RWStructuredBufferLoadStatus:
-            return builder.emitRWStructuredBufferGetElementPtr(
-                loadInst->getOperand(0),
-                loadInst->getOperand(1));
+            return builder.emitRWStructuredBufferGetElementPtr(newPtrVal, loadInst->getOperand(1));
         default:
             return nullptr;
         }
@@ -1321,7 +1319,8 @@ struct LoweredElementTypeContext
 
                                         // Try emit an inst that represent the address the load inst
                                         // is loading from.
-                                        auto srcPtr = getSourceAddrFromLoadInst(builder, user);
+                                        auto srcPtr =
+                                            getSourceAddrFromLoadInst(builder, user, ptrVal);
 
                                         // If there isn't a way to get a pointer to the source data
                                         // from the load inst, there isn't anything we can do other
