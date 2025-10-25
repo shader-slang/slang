@@ -12,6 +12,7 @@
 #endif
 
 #include "../renderer-shared.h"
+#include "slang-tag-version.h"
 
 namespace gfx
 {
@@ -30,14 +31,17 @@ Slang::Result GlslangModule::init()
     const char* dynamicLibraryName = "Unknown";
 
 #if SLANG_WINDOWS_FAMILY
+    // Windows: no versioning necessary
     dynamicLibraryName = "slang-glslang.dll";
     HMODULE module = ::LoadLibraryA(dynamicLibraryName);
     m_module = (void*)module;
 #elif SLANG_APPLE_FAMILY
-    dynamicLibraryName = "libslang_glslang.dylib";
+    // macOS: versioned library name to prevent conflicts
+    dynamicLibraryName = "libslang-glslang-" SLANG_VERSION_NUMERIC ".dylib";
     m_module = dlopen(dynamicLibraryName, RTLD_NOW | RTLD_GLOBAL);
 #else
-    dynamicLibraryName = "libslang_glslang.so";
+    // Linux: versioned library name to prevent conflicts
+    dynamicLibraryName = "libslang-glslang-" SLANG_VERSION_NUMERIC ".so";
     m_module = dlopen(dynamicLibraryName, RTLD_NOW);
 #endif
 

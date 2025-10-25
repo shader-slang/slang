@@ -181,12 +181,12 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${KEYCHAIN_PASSWORD}" "$KEYCHAIN_PATH"
 
           binaries=(
-            "${lib_dir}/libslang.dylib"
-            "${lib_dir}/libslang-rt.dylib"
+            "${lib_dir}/libslang-compiler.0.*.dylib"
+            "${lib_dir}/libslang-rt.0.*.dylib"
             "${lib_dir}/libslang-glslang.dylib"
-            "${lib_dir}/libslang-glsl-module.dylib"
+            "${lib_dir}/libslang-glsl-module-*.dylib"
             "${lib_dir}/libslang-llvm.dylib"
-            "${lib_dir}/libgfx.dylib"
+            "${lib_dir}/libgfx.0.*.dylib"
             "${bin_dir}/slangd"
             "${bin_dir}/slangc"
           )

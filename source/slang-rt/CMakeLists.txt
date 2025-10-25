@@ -16,4 +16,10 @@ if(SLANG_ENABLE_SLANGRT)
         # name so we don't attempt to export it
         EXPORT_SET_NAME SlangRTTargets
     )
+    set_target_properties(slang-rt PROPERTIES
+        VERSION 0.${SLANG_VERSION_NUMERIC}
+        SOVERSION 0.${SLANG_VERSION_NUMERIC}
+        MACHO_COMPATIBILITY_VERSION 0.0.0
+        MACHO_CURRENT_VERSION ${SLANG_VERSION_NUMERIC}
+    )
 endif()
