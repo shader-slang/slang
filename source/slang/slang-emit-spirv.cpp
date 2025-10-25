@@ -2900,6 +2900,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 varInst,
                 SpvDecorationNoPerspective);
             return true;
+        case IRInterpolationMode::PerPrimitive:
+            emitOpDecorate(
+                getSection(SpvLogicalSectionID::Annotations),
+                nullptr,
+                varInst,
+                SpvDecorationPerPrimitiveEXT);
+            return true;
         case IRInterpolationMode::Linear:
             return true;
         case IRInterpolationMode::Sample:
@@ -2918,22 +2925,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return true;
         default:
             return false;
-        }
-    }
-    void emitSystemVarDecoration(IRInst* var, SpvInst* varInst)
-    {
-        for (auto decor : var->getDecorations())
-        {
-            switch (decor->getOp())
-            {
-            case kIROp_GLSLPrimitivesRateDecoration:
-                emitOpDecorate(
-                    getSection(SpvLogicalSectionID::Annotations),
-                    decor,
-                    varInst,
-                    SpvDecorationPerPrimitiveEXT);
-                break;
-            }
         }
     }
 
@@ -3084,20 +3075,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         for (auto decor : var->getDecorations())
         {
-            switch (decor->getOp())
+            if (decor->getOp() == kIROp_RequireSPIRVDescriptorIndexingExtensionDecoration)
             {
-            case kIROp_GLSLPrimitivesRateDecoration:
-                emitOpDecorate(
-                    getSection(SpvLogicalSectionID::Annotations),
-                    decor,
-                    varInst,
-                    SpvDecorationPerPrimitiveEXT);
-                break;
-            case kIROp_RequireSPIRVDescriptorIndexingExtensionDecoration:
                 ensureExtensionDeclarationBeforeSpv15(
                     UnownedStringSlice("SPV_EXT_descriptor_indexing"));
                 requireSPIRVCapability(SpvCapabilityRuntimeDescriptorArray);
-                break;
             }
         }
     }
@@ -3278,7 +3260,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
         if (auto systemValInst = maybeEmitSystemVal(param))
         {
-            emitSystemVarDecoration(param, systemValInst);
             registerInst(param, systemValInst);
             return systemValInst;
         }

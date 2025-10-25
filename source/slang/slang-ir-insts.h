@@ -161,6 +161,7 @@ enum class IRInterpolationMode
     Sample,
 
     PerVertex,
+    PerPrimitive,
 };
 
 enum class IRTargetBuiltinVarName

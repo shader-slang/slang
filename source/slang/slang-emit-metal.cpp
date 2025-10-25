@@ -1527,6 +1527,7 @@ static UnownedStringSlice _getInterpolationModifierText(IRInterpolationMode mode
     switch (mode)
     {
     case IRInterpolationMode::PerVertex:
+    case IRInterpolationMode::PerPrimitive:
     case IRInterpolationMode::NoInterpolation:
         return UnownedStringSlice::fromLiteral("[[flat]]");
     case IRInterpolationMode::NoPerspective:
