@@ -14030,6 +14030,8 @@ struct CapabilityDeclReferenceVisitor
     {
         CapabilitySet set;
         auto targetCaseCount = stmt->targetCases.getCount();
+        bool isStageSwitch = as<StageSwitchStmt>(stmt) != nullptr;
+
         for (Index targetCaseIndex = 0; targetCaseIndex < targetCaseCount; targetCaseIndex++)
         {
             // The logic here is to collect a list of `case` statment capabilities
@@ -14124,7 +14126,28 @@ struct CapabilityDeclReferenceVisitor
                     oldCap);
                 handleParentDiagnosticFunc(DiagnosticCategory::Capability);
             }
-            set.unionWith(targetCap);
+
+            // Merge the capability set represent by this case into the overall set, depending on
+            // this is a target-switch or stage-switch, we have different granuarity on how to merge
+            // things. The CapabilitySet is a two level table:
+            //
+            //                  CapabilitySet
+            //        +--------------+--------------+              (level 1)
+            //      target1       target2       ... targetN
+            //              +---------+---------+                  (level 2)
+            //          stage1       stage2 ... stageN
+            //
+            // and each stage is a bit mask of capabilities. If this is a target-switch, then we
+            // treat each target set as a large bit mask, and merge two target set entry. If this
+            // is a stage-switch, then we treat each stage set as small bit mask, and merge two
+            // stage set entry. Therefore `isStageSwitch` flag is used to indicate which merging
+            // strategy to use.
+            mergeNewCapability(
+                set,
+                targetCap,
+                targetCase->loc,
+                CapabilityName(targetCase->capability),
+                isStageSwitch);
         }
         handleProcessFunc(stmt, set, stmt->loc);
     }
@@ -14132,6 +14155,55 @@ struct CapabilityDeclReferenceVisitor
     void visitRequireCapabilityDecl(RequireCapabilityDecl* decl)
     {
         handleProcessFunc(decl, decl->inferredCapabilityRequirements, decl->loc);
+    }
+
+private:
+    void mergeNewCapability(
+        CapabilitySet& currentSet,
+        CapabilitySet& newSet,
+        SourceLoc loc,
+        CapabilityName caseName,
+        bool isStageSwitch)
+    {
+        bool result = true;
+        if (isStageSwitch)
+        {
+            // If this is stage-switch, we need to perform a more fine-grained merge
+            for (auto target : newSet.getCapabilityTargetSets())
+            {
+                for (auto stage : target.second.getShaderStageSets())
+                {
+                    result &= currentSet.compatibleMerge(target.first, stage.second);
+                    if (!result)
+                        break;
+                }
+                if (!result)
+                    break;
+            }
+        }
+        else
+        {
+            // If this is target-switch, we can just merge the whole target set
+            for (auto target : newSet.getCapabilityTargetSets())
+            {
+                result &= currentSet.compatibleMerge(target.second);
+                if (!result)
+                    break;
+            }
+        }
+
+        if (!result)
+        {
+            maybeDiagnose(
+                Base::getSink(),
+                outerContext.getOptionSet(),
+                DiagnosticCategory::Capability,
+                loc,
+                Diagnostics::targetSwitchCapCasesConflict,
+                caseName,    // arg0
+                newSet,      // arg1
+                currentSet); // arg2
+        }
     }
 };
 

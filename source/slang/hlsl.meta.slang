@@ -17394,7 +17394,17 @@ __magic_type(RaytracingAccelerationStructureType)
 __intrinsic_type($(kIROp_RaytracingAccelerationStructureType))
 struct RaytracingAccelerationStructure
 {
-    [require(glsl_spirv, raytracing)]
+    // Here, we don't require 'raytracing' capability, instead, we add the
+    // extension directly in the generated code. The reason is that this
+    // struct is used in both raytracing and rayquery APIs, our current capability
+    // system cannot represent this struct with raytracing OR rayquery capability.
+    // So, we cannot add capability requirement on the struct itself.
+    // However, any use of this type will definitely require either raytracing or rayquery,
+    // so we have the guarantee that either raytracing or rayquery capability will be present.
+    // But if rayquery want to use this struct that is constructed from a descriptor handle,
+    // we need to make sure the raytracing extension is present.
+    __glsl_extension(GL_EXT_ray_tracing)
+    [require(glsl_spirv)]
     [__readNone]
     __init(uint64_t address)
     {
@@ -17402,6 +17412,7 @@ struct RaytracingAccelerationStructure
         {
         case spirv:
             return spirv_asm {
+                OpExtension "SPV_KHR_ray_tracing";
                 result: $$RaytracingAccelerationStructure = OpConvertUToAccelerationStructureKHR $address;
             };
         case glsl:
@@ -25687,7 +25698,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     // Careful, this takes the offset in elements
     [ForceInline]
     [require(hlsl)]
-    [require(hlsl_coopvec_poc)]
+    [require(hlsl_coopvec_poc_sm_6_9)]
     void __Load(__constref groupshared T buffer[M], uint elemOffset)
     {
         static_assert(N <= M, "The given groupshared array is smaller than the given CoopVec");
@@ -25698,7 +25709,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             for(int i = 0; i < N; ++i)
                 this[i] = buffer[i + elemOffset];
             return;
-        case hlsl_coopvec_poc:
+        case hlsl_coopvec_poc_sm_6_9:
             __intrinsic_asm ".Load";
         }
     }
@@ -27367,7 +27378,7 @@ if(buffer.isRW)
 /// }
 /// ```
 [require(cooperative_vector)]
-[require(hlsl_coopvec_poc)]
+[require(hlsl_coopvec_poc_sm_6_9)]
 [require(optix_coopvec)]
 void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let N : int>(
     CoopVec<T, M> a,
@@ -27385,7 +27396,7 @@ void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let
         uint matrixInterpretationHLSL = __getHLSLCoopVecComponentType(matrixInterpretation);
         uint memoryLayoutHLSL = __getHLSLCoopVecMatrixLayout(memoryLayout);
         return a.__OuterProductAccumulate(b, matrix, matrixOffset, matrixStride, memoryLayoutHLSL, matrixInterpretationHLSL);
-    case hlsl_coopvec_poc:
+    case hlsl_coopvec_poc_sm_6_9:
         __intrinsic_asm "$0.OuterProductAccumulate($1, $2, $3, $4, $5, $6)";
     case spirv:
         let matrixInterpretationSpirv : int = __getSpvCoopVecComponentType(matrixInterpretation);

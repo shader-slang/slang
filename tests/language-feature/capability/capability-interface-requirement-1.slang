@@ -11,7 +11,7 @@ public interface IAtomicAddable_Error1
 public struct AtomicAddable_Error1 : IAtomicAddable_Error1
 {
     [require(sm_5_0, glsl)]
-    // CHECK: ([[# @LINE+1]]): error 36118: {{.*}}hlsl
+    // CHECK: ([[# @LINE+1]]): error 36119: {{.*}}hlsl
     public void atomicAdd(RWByteAddressBuffer buf, uint addr, int64_t value) { }
 }
 

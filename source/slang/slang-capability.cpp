@@ -752,6 +752,30 @@ bool CapabilityStageSet::tryJoin(const CapabilityTargetSet& other)
     return true;
 }
 
+bool CapabilityStageSet::compatibleMerge(const CapabilityStageSet& stageSet)
+{
+    CapabilityStageSet tmp = *this;
+    tmp.atomSet->unionWith(stageSet.atomSet.value());
+
+    // if 'this' U stageSet == stageSet, then 'this' is a subset of stageSet
+    // do need to do anything
+    if (tmp.atomSet == stageSet.atomSet)
+    {
+        return true;
+    }
+    else if (tmp.atomSet == this->atomSet)
+    {
+        // 'stageSet' is a subset of 'this', so we can just copy over
+        atomSet = stageSet.atomSet;
+        return true;
+    }
+    else
+    {
+        // neither is a subset of the other, so we can not perform subset join
+        return false;
+    }
+}
+
 bool CapabilityTargetSet::tryJoin(const CapabilityTargetSets& other)
 {
     const CapabilityTargetSet* otherTargetSet = other.tryGetValue(this->target);
@@ -772,6 +796,74 @@ bool CapabilityTargetSet::tryJoin(const CapabilityTargetSets& other)
         this->shaderStageSets.remove(i);
 
     return true;
+}
+
+/// Are the two CapabilityTargetSet equal?
+bool CapabilityTargetSet::operator==(CapabilityTargetSet const& that) const
+{
+    for (auto stageSet : shaderStageSets)
+    {
+        auto thatStageSet = that.shaderStageSets.tryGetValue(stageSet.first);
+        if (!thatStageSet)
+            return false;
+        if (stageSet.second.atomSet != thatStageSet->atomSet)
+            return false;
+    }
+    return true;
+}
+
+/// Perform a compatibleMerge on the given `targetSet` with `this`.
+/// This function treats the whole target set as a single bit mask, and perform the
+/// operation on it.
+/// Definition of compatibleMerge is:
+/// # compatibleMerge(A, B) =
+/// ⎧ B   if A = ∅
+/// ⎪ A   if B = ∅
+/// ⎪ A   if A ⊆ B
+/// ⎪ B   if B ⊆ A
+/// ⎩ ∅   otherwise, and function will return false.
+/// For example:
+/// if A = {spirv, ext_X}, and B = {spirv, ext_X, ext_Y}, compatibleMerge(A, B) = A
+/// if A = {spirv, ext_X, ext_Y}, and B = {spirv, ext_X}, compatibleMerge(A, B) = B
+/// if A = {spirv, ext_X}, and B = {spirv, ext_Y}, compatibleMerge(A, B) = ∅
+/// If target A doesn't exist, then add target B directly.
+bool CapabilityTargetSet::compatibleMerge(const CapabilityTargetSet& targetSet)
+{
+    CapabilityTargetSet tmp = *this;
+    tmp.unionWith(targetSet);
+
+    // if this U targetSet == targetSet, then 'this' is a subset of targetSet
+    // do need to do anything
+    if (tmp == targetSet)
+    {
+        return true;
+    }
+    else if (tmp == *this)
+    {
+        // 'targetSet' is a subset of 'this', so we can just copy over
+        shaderStageSets = targetSet.getShaderStageSets();
+        return true;
+    }
+    else
+    {
+        // neither is a subset of the other, so we can not perform subset join
+        return false;
+    }
+}
+
+/// Similar to compatibleMerge for CapabilityTargetSet, but this overload perform the operation
+/// on a finer granularity, we perform the operation on a specific stage of a target
+bool CapabilityTargetSet::compatibleMerge(const CapabilityStageSet& stageSet)
+{
+    if (auto existStage = shaderStageSets.tryGetValue(stageSet.stage))
+    {
+        return existStage->compatibleMerge(stageSet);
+    }
+    else
+    {
+        shaderStageSets.add(stageSet.stage, stageSet);
+        return true;
+    }
 }
 
 CapabilitySet& CapabilitySet::join(const CapabilitySet& other)

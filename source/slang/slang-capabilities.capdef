@@ -228,6 +228,12 @@ def hlsl_2018 : _sm_5_1;
 /// [Version]
 def hlsl_coopvec_poc : _sm_6_8;
 
+/// Represent compatibility support for the deprecated POC DXC, but we need to use
+/// this capability to be compatible with cooperative_vector in target_switch, so
+/// join '_sm_6_9' here.
+/// [Compound]
+alias hlsl_coopvec_poc_sm_6_9 = hlsl_coopvec_poc + _sm_6_9;
+
 /// Represents capabilities required for DXIL Library compilation.
 /// [Version]
 alias dxil_lib = _sm_6_3;
