@@ -1011,7 +1011,7 @@ void createVarLayoutForLegalizedGlobalParam(
 
     if (declarator && declarator->flavor == GlobalVaryingDeclarator::Flavor::meshOutputPrimitives)
     {
-        builder->addDecoration(globalParam, kIROp_GLSLPrimitivesRateDecoration);
+        builder->addInterpolationModeDecoration(globalParam, IRInterpolationMode::PerPrimitive);
     }
 
     if (systemValueInfo)
@@ -3063,7 +3063,7 @@ static void legalizeMeshOutputParam(
         builder->addImportDecoration(blockParam, UnownedStringSlice(arrayName));
         if (isPerPrimitive)
         {
-            builder->addDecoration(blockParam, kIROp_GLSLPrimitivesRateDecoration);
+            builder->addInterpolationModeDecoration(blockParam, IRInterpolationMode::PerPrimitive);
         }
         // // While this is probably a correct thing to do, LRK::VaryingOutput
         // // isn't really used for redeclaraion of builtin outputs, and assumes

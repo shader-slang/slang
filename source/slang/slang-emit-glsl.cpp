@@ -160,6 +160,12 @@ void GLSLSourceEmitter::_requireFragmentShaderBarycentric()
     m_glslExtensionTracker->requireVersion(ProfileVersion::GLSL_450);
 }
 
+void GLSLSourceEmitter::_requireMeshShader()
+{
+    m_glslExtensionTracker->requireExtension(
+        UnownedStringSlice::fromLiteral("GL_EXT_mesh_shader"));
+    m_glslExtensionTracker->requireVersion(ProfileVersion::GLSL_450);
+}
 
 void GLSLSourceEmitter::_requireGLSLExtension(const UnownedStringSlice& name)
 {
@@ -3632,6 +3638,17 @@ bool GLSLSourceEmitter::_maybeEmitInterpolationModifierText(
             m_writer->emit("flat ");
         }
         return true;
+    case IRInterpolationMode::PerPrimitive:
+        if (stage == Stage::Fragment && isInput)
+        {
+            _requireMeshShader();
+            m_writer->emit("perprimitiveEXT ");
+        }
+        else
+        {
+            m_writer->emit("flat ");
+        }
+        return true;
     default:
         return false;
     }
@@ -3673,6 +3690,16 @@ void GLSLSourceEmitter::emitInterpolationModifiersImpl(
                 if (isInput)
                 {
                     _requireFragmentShaderBarycentric();
+                }
+            }
+            break;
+
+        case IRInterpolationMode::PerPrimitive:
+            if (stage == Stage::Fragment)
+            {
+                if (isInput)
+                {
+                    _requireMeshShader();
                 }
             }
             break;
