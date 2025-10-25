@@ -10,6 +10,7 @@
 // `Load2` or `Store3`).
 
 #include "slang-ir-insts.h"
+#include "slang-ir-util.h"
 #include "slang-ir-layout.h"
 
 namespace Slang
@@ -1602,37 +1603,64 @@ struct ByteAddressBufferLegalizationContext
             if (auto babParam = as<IRParam>(babIR))
             {
                 auto parentBlock = as<IRBlock>(babIR->getParent());
+                auto paramIndex = parentBlock->getParamIndex(babParam);
+                if (paramIndex < 0)
+                    continue;
+
+                UInt argOperandIndex = 1 + paramIndex;
 
                 // Handle Phi-node IRParam
-                auto paramIndex = parentBlock->getParamIndex(babParam);
-                if (paramIndex >= 0)
+                for (auto use = parentBlock->firstUse; use; use = use->nextUse)
                 {
-                    UInt argOperandIndex = 1 + paramIndex;
+                    auto user = use->getUser();
+                    auto branchIR = as<IRUnconditionalBranch>(user);
+                    if (!branchIR)
+                        continue;
 
-                    for (auto use = parentBlock->firstUse; use; use = use->nextUse)
+                    auto targetBlock = branchIR->getTargetBlock();
+                    if (targetBlock != parentBlock)
+                        continue;
+
+                    auto argBranch = branchIR->getOperand(argOperandIndex);
+                    if (byteAddrBufferToReplace.containsKey(argBranch))
+                        continue;
+
+                    auto argType = argBranch->getDataType();
+                    if (isTypeLegalForByteAddressLoadStore(argType))
+                    {
+                        // Element type should be same.
+                        SLANG_ASSERT(argType == validBufferType);
+                        continue;
+                    }
+
+                    byteAddrBufferToReplace[argBranch] = validBufferType;
+                    workList.add(argBranch);
+                }
+
+                auto func = as<IRFunc>(parentBlock->getParent());
+                if (func && isFirstBlock(parentBlock))
+                {
+                    for (auto use = func->firstUse; use; use = use->nextUse)
                     {
                         auto user = use->getUser();
-                        auto branchIR = as<IRUnconditionalBranch>(user);
-                        if (!branchIR)
+                        auto call = as<IRCall>(user);
+                        if (!call)
                             continue;
 
-                        auto targetBlock = branchIR->getTargetBlock();
-                        if (targetBlock != parentBlock)
+                        auto argCall = call->getOperand(argOperandIndex);
+                        if (byteAddrBufferToReplace.containsKey(argCall))
                             continue;
 
-                        auto newItem = branchIR->getOperand(argOperandIndex);
-                        if (byteAddrBufferToReplace.containsKey(newItem))
-                            continue;
-
-                        if (!as<IRByteAddressBufferTypeBase>(newItem->getDataType()))
+                        auto argType = argCall->getDataType();
+                        if (isTypeLegalForByteAddressLoadStore(argType))
                         {
                             // Element type should be same.
-                            SLANG_ASSERT(babIRType == validBufferType);
+                            SLANG_ASSERT(argType == validBufferType);
                             continue;
                         }
 
-                        byteAddrBufferToReplace[newItem] = validBufferType;
-                        workList.add(newItem);
+                        byteAddrBufferToReplace[argCall] = validBufferType;
+                        workList.add(argCall);
                     }
                 }
             }
