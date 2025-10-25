@@ -10,6 +10,7 @@
 // `Load2` or `Store3`).
 
 #include "slang-ir-insts.h"
+#include "slang-ir-util.h"
 #include "slang-ir-layout.h"
 
 namespace Slang
@@ -49,6 +50,10 @@ struct ByteAddressBufferLegalizationContext
         m_builder = IRBuilder(m_module);
 
         processInstRec(module->getModuleInst());
+
+        // Propagation the type change of parameters
+        // to their "use"-s around phi-node and function calls.
+        processParamTypes();
     }
 
     // We recursively walk the entire IR structure (except
@@ -985,6 +990,21 @@ struct ByteAddressBufferLegalizationContext
                 index);
         }
 
+        // Defer the handling of IRParam, because we need to propagate
+        // the type change to its "use"-s.
+        if (auto babParam = as<IRParam>(byteAddressBuffer))
+        {
+            if (byteAddrBufferToReplace.containsKey(babParam))
+                return babParam;
+
+            IRType* babType = babParam->getDataType();
+            IRType* structuredBufferType =
+                getEquivalentStructuredBufferParamType(elementType, babType);
+
+            byteAddrBufferToReplace[babParam] = structuredBufferType;
+            return babParam;
+        }
+
         // If we failed to pattern-match the byte-address buffer operand
         // against something we can handle, then we need to bail out
         // of our attempt to legalize things here.
@@ -1546,6 +1566,106 @@ struct ByteAddressBufferLegalizationContext
         }
 
         return SLANG_OK;
+    }
+
+    // Process legalized parameters and propagate type changes to their uses.
+    // This handles all parameters that were converted from ByteAddressBuffer
+    // to StructuredBuffer, updating their "use"-s.
+    void processParamTypes()
+    {
+        List<IRInst*> workList;
+
+        for (auto& [babIR, structuredBufferType] : byteAddrBufferToReplace)
+        {
+            workList.add(babIR);
+        }
+
+        while (workList.getCount() > 0)
+        {
+            auto babIR = workList.getLast();
+            workList.removeLast();
+
+            // iterate all "use"-s of `babIR` and change their type
+            // to `validBufferType`.
+            auto validBufferType = byteAddrBufferToReplace[babIR];
+
+            auto babIRType = babIR->getDataType();
+            if (isTypeLegalForByteAddressLoadStore(babIRType))
+            {
+                // Element type should be same.
+                SLANG_ASSERT(babIRType == validBufferType);
+                continue; // skip if already structuredbuffer
+            }
+
+            babIR->setFullType(validBufferType);
+
+            if (auto babParam = as<IRParam>(babIR))
+            {
+                auto parentBlock = as<IRBlock>(babIR->getParent());
+                auto paramIndex = parentBlock->getParamIndex(babParam);
+                if (paramIndex < 0)
+                    continue;
+
+                UInt argOperandIndex = 1 + paramIndex;
+
+                // Handle Phi-node IRParam
+                for (auto use = parentBlock->firstUse; use; use = use->nextUse)
+                {
+                    auto user = use->getUser();
+                    auto branchIR = as<IRUnconditionalBranch>(user);
+                    if (!branchIR)
+                        continue;
+
+                    auto targetBlock = branchIR->getTargetBlock();
+                    if (targetBlock != parentBlock)
+                        continue; // skip unrelated branch
+
+                    auto argBranch = branchIR->getOperand(argOperandIndex);
+                    if (byteAddrBufferToReplace.containsKey(argBranch))
+                        continue; // already processed
+
+                    auto argType = argBranch->getDataType();
+                    if (isTypeLegalForByteAddressLoadStore(argType))
+                    {
+                        // Element type should be same.
+                        SLANG_ASSERT(argType == validBufferType);
+                        continue; // already using a legal type
+                    }
+
+                    byteAddrBufferToReplace[argBranch] = validBufferType;
+                    workList.add(argBranch);
+                }
+
+                // If the parameter belongs to function signature,
+                // we need to change the types on the call sites.
+                auto func = as<IRFunc>(parentBlock->getParent());
+                if (func && isFirstBlock(parentBlock))
+                {
+                    for (auto use = func->firstUse; use; use = use->nextUse)
+                    {
+                        auto user = use->getUser();
+                        auto call = as<IRCall>(user);
+                        if (!call)
+                            continue;
+
+                        auto argCall = call->getOperand(argOperandIndex);
+                        if (byteAddrBufferToReplace.containsKey(argCall))
+                            continue; // already processed
+
+                        auto argType = argCall->getDataType();
+                        if (isTypeLegalForByteAddressLoadStore(argType))
+                        {
+                            // Element type should be same.
+                            SLANG_ASSERT(argType == validBufferType);
+                            continue; // already using a legal type
+                        }
+
+                        byteAddrBufferToReplace[argCall] = validBufferType;
+                        workList.add(argCall);
+                    }
+                }
+            }
+        }
     }
 };
 
