@@ -1619,7 +1619,8 @@ struct LLVMEmitter
         case kIROp_MakeVectorFromScalar:
             // kIROp_MakeArray & kIROp_MakeStruct are intentionally omitted
             // here; they must not be emitted as values in any other context
-            // than global vars.
+            // than global vars. `emitGlobalVarDecl` and
+            // `emitGlobalInstructionCtor` handle that part.
             llvmValue = types->maybeEmitConstant(inst);
             break;
         case kIROp_Specialize:
@@ -1682,15 +1683,10 @@ struct LLVMEmitter
         return llvmValue;
     }
 
-    void getUnderlyingTypeInfo(IRInst* inst, bool& isFloat, bool& isSigned)
-    {
-        IRType* elementType = getVectorOrCoopMatrixElementType(inst->getOperand(0)->getDataType());
-        IRBasicType* basicType = as<IRBasicType>(elementType);
-        isFloat = isFloatingType(basicType);
-        isSigned = isSignedType(basicType);
-    }
-
-    llvm::Value* _coerceNumeric(llvm::Value* val, llvm::Type* type, bool isSigned)
+    // Coerces the given value to the given type. Because LLVM IR does not carry
+    // signedness, the information on whether the original type of 'val' is
+    // signed is passed separately. This only affects integer extension.
+    llvm::Value* coerceNumeric(llvm::Value* val, llvm::Type* type, bool isSigned)
     {
         auto valType = val->getType();
         auto valWidth = valType->getPrimitiveSizeInBits();
@@ -1699,10 +1695,10 @@ struct LLVMEmitter
         if (type->isVectorTy() && !valType->isVectorTy())
         {
             auto vecType = llvm::cast<llvm::VectorType>(type);
-            // Splat into vector
+            // Splat scalar into vector
             return llvmBuilder->CreateVectorSplat(
                 vecType->getElementCount(),
-                _coerceNumeric(val, vecType->getElementType(), isSigned));
+                coerceNumeric(val, vecType->getElementType(), isSigned));
         }
         else if (type->getScalarType()->isFloatingPointTy())
         {
@@ -1728,8 +1724,8 @@ struct LLVMEmitter
 
     // Some operations in Slang IR may have mixed scalar and vector parameters,
     // whereas LLVM IR requires only scalars or only vectors. This function
-    // helps you figure out which one it is.
-    void _promoteParams(
+    // helps you promote each type as required.
+    void promoteParams(
         llvm::Value*& aValInOut, bool aIsSigned,
         llvm::Value*& bValInOut, bool bIsSigned
     ){
@@ -1772,11 +1768,11 @@ struct LLVMEmitter
         if (maxElementCount != 1)
             promotedType = llvm::VectorType::get(promotedType, llvm::ElementCount::getFixed(maxElementCount));
 
-        aValInOut = _coerceNumeric(aValInOut, promotedType, promotedSign);
-        bValInOut = _coerceNumeric(bValInOut, promotedType, promotedSign);
+        aValInOut = coerceNumeric(aValInOut, promotedType, promotedSign);
+        bValInOut = coerceNumeric(bValInOut, promotedType, promotedSign);
     }
 
-    llvm::Value* _emitCompare(IRInst* inst)
+    llvm::Value* emitCompare(IRInst* inst)
     {
         SLANG_ASSERT(inst->getOperandCount() == 2);
 
@@ -1787,7 +1783,7 @@ struct LLVMEmitter
 
         auto a = findValue(inst->getOperand(0));
         auto b = findValue(inst->getOperand(1));
-        _promoteParams(a, aSigned, b, bSigned);
+        promoteParams(a, aSigned, b, bSigned);
 
         bool isFloat = a->getType()->getScalarType()->isFloatingPointTy();
         bool isSigned = aSigned || bSigned;
@@ -1825,7 +1821,7 @@ struct LLVMEmitter
         return llvmBuilder->CreateCmp(pred, a, b);
     }
 
-    llvm::Value* _emitArithmetic(IRInst* inst)
+    llvm::Value* emitArithmetic(IRInst* inst)
     {
         auto resultType = types->getType(inst->getDataType());
         bool isFloat = resultType->getScalarType()->isFloatingPointTy();
@@ -1870,14 +1866,10 @@ struct LLVMEmitter
                 op = llvm::Instruction::FRem;
                 break;
             case kIROp_And:
-                op = llvm::Instruction::And;
-                break;
-            case kIROp_Or:
-                op = llvm::Instruction::Or;
-                break;
             case kIROp_BitAnd:
                 op = llvm::Instruction::And;
                 break;
+            case kIROp_Or:
             case kIROp_BitOr:
                 op = llvm::Instruction::Or;
                 break;
@@ -1898,8 +1890,8 @@ struct LLVMEmitter
             // Some ops in Slang, e.g. Lsh, may have differing types for the
             // operands. This is not allowed by LLVM. Both sides must match
             // the result type. Hence, we coerce as needed.
-            auto a = _coerceNumeric(findValue(inst->getOperand(0)), resultType, isSigned);
-            auto b = _coerceNumeric(findValue(inst->getOperand(1)), resultType, isSigned);
+            auto a = coerceNumeric(findValue(inst->getOperand(0)), resultType, isSigned);
+            auto b = coerceNumeric(findValue(inst->getOperand(1)), resultType, isSigned);
 
             return llvmBuilder->CreateBinOp(op, a, b);
         }
@@ -1911,41 +1903,14 @@ struct LLVMEmitter
         return nullptr;
     }
 
-    void declareAllocaDebugVar(llvm::StringRef name, llvm::Value* llvmVar, IRType* type)
-    {
-        if (!debug)
-            return;
-
-        auto varType = types->getDebugType(type, defaultPointerRules);
-
-        llvm::DILocation* loc = llvmBuilder->getCurrentDebugLocation();
-        if (!loc)
-            return;
-
-        auto debugVar = llvmDebugBuilder->createAutoVariable(
-            currentLocalScope, name, loc->getFile(), loc->getLine(),
-            varType, getOptions().getOptimizationLevel() == OptimizationLevel::None
-        );
-        llvmDebugBuilder->insertDeclare(
-            llvmVar,
-            llvm::cast<llvm::DILocalVariable>(debugVar),
-            llvmDebugBuilder->createExpression(),
-            loc,
-            llvmBuilder->GetInsertBlock()
-        );
-    }
-
-    static llvm::Value* _defaultOnReturnHandler(IRReturn*)
-    {
-        SLANG_ASSERT_FAILURE("Unexpected terminator in global scope!");
-        return nullptr;
-    }
-
     IRTypeLayoutRules* getBufferLayoutRules(IRType* bufferType)
     {
         return getTypeLayoutRuleForBuffer(codeGenContext->getTargetProgram(), bufferType);
     }
 
+    // Tries to find which layout rules apply to the given pointer, based on
+    // "provenance": we track the pointer to where we got it and check if the
+    // source is a buffer with a specific layout.
     IRTypeLayoutRules* getPtrLayoutRules(IRInst* ptr)
     {
         // Check if the pointer is actually based on an buffer with an explicit
@@ -1978,6 +1943,12 @@ struct LLVMEmitter
         return defaultPointerRules;
     }
 
+    static llvm::Value* _defaultOnReturnHandler(IRReturn*)
+    {
+        SLANG_ASSERT_FAILURE("Unexpected terminator in global scope!");
+        return nullptr;
+    }
+
     // Caution! This is only for emitting things which are considered
     // instructions in LLVM! It won't work for IRBlocks, IRFuncs & such.
     llvm::Value* emitLLVMInstruction(
@@ -2001,7 +1972,7 @@ struct LLVMEmitter
         case kIROp_Neq:
         case kIROp_Greater:
         case kIROp_Geq:
-            llvmInst = _emitCompare(inst);
+            llvmInst = emitCompare(inst);
             break;
 
         case kIROp_Specialize:
@@ -2026,7 +1997,7 @@ struct LLVMEmitter
         case kIROp_BitXor:
         case kIROp_Rsh:
         case kIROp_Lsh:
-            llvmInst = _emitArithmetic(inst);
+            llvmInst = emitArithmetic(inst);
             break;
 
         case kIROp_Return:
@@ -2062,10 +2033,29 @@ struct LLVMEmitter
                 if (maybeGetName(&linkageName, &prettyName, inst))
                 {
                     llvmVar->setName(linkageName);
-                    // TODO: This may be a bit of a hack. DebugVar fails to get
-                    // linked to the actual Var sometimes, which is why we do
-                    // this :/
-                    declareAllocaDebugVar(prettyName, llvmVar, ptrType->getValueType());
+
+                    // TODO: This is a bit of a hack. DebugVar fails to get
+                    // linked to the actual Var sometimes, which is why we
+                    // automatically create a debug var for each Slang IR var if
+                    // it has a name.:/
+
+                    llvm::DILocation* loc = llvmBuilder->getCurrentDebugLocation();
+                    if (debug && loc)
+                    {
+                        auto varType = types->getDebugType(ptrType->getValueType(), defaultPointerRules);
+
+                        auto debugVar = llvmDebugBuilder->createAutoVariable(
+                            currentLocalScope, prettyName, loc->getFile(), loc->getLine(),
+                            varType, getOptions().getOptimizationLevel() == OptimizationLevel::None
+                        );
+                        llvmDebugBuilder->insertDeclare(
+                            llvmVar,
+                            llvm::cast<llvm::DILocalVariable>(debugVar),
+                            llvmDebugBuilder->createExpression(),
+                            loc,
+                            llvmBuilder->GetInsertBlock()
+                        );
+                    }
                 }
 
                 llvmInst = llvmVar;
@@ -2678,18 +2668,19 @@ struct LLVMEmitter
         case kIROp_BitfieldExtract:
             {
                 auto type = types->getType(inst->getDataType());
-                auto val = _coerceNumeric(findValue(inst->getOperand(0)), type, false);
-                auto off = _coerceNumeric(findValue(inst->getOperand(1)), type, false);
-                auto bts = _coerceNumeric(findValue(inst->getOperand(2)), type, false);
+                auto val = coerceNumeric(findValue(inst->getOperand(0)), type, false);
+                auto off = coerceNumeric(findValue(inst->getOperand(1)), type, false);
+                auto bts = coerceNumeric(findValue(inst->getOperand(2)), type, false);
 
-                bool isFloat, isSigned;
-                getUnderlyingTypeInfo(inst, isFloat, isSigned);
+                IRType* elementType = getVectorOrCoopMatrixElementType(inst->getOperand(0)->getDataType());
+                IRBasicType* basicType = as<IRBasicType>(elementType);
+                bool isSigned = isSignedType(basicType);
 
                 auto shiftedVal = llvmBuilder->CreateLShr(
-                    val, _coerceNumeric(off, val->getType(), false)
+                    val, coerceNumeric(off, val->getType(), false)
                 );
 
-                auto numBits = _coerceNumeric(llvmBuilder->getInt32(type->getScalarSizeInBits()), val->getType(), false);
+                auto numBits = coerceNumeric(llvmBuilder->getInt32(type->getScalarSizeInBits()), val->getType(), false);
                 auto highBits = llvmBuilder->CreateSub(numBits, bts);
                 shiftedVal = llvmBuilder->CreateShl(shiftedVal, highBits);
                 if (isSigned)
@@ -2702,12 +2693,12 @@ struct LLVMEmitter
         case kIROp_BitfieldInsert:
             {
                 auto type = types->getType(inst->getDataType());
-                auto val = _coerceNumeric(findValue(inst->getOperand(0)), type, false);
-                auto insert = _coerceNumeric(findValue(inst->getOperand(1)), type, false);
-                auto off = _coerceNumeric(findValue(inst->getOperand(2)), type, false);
-                auto bts = _coerceNumeric(findValue(inst->getOperand(3)), type, false);
+                auto val = coerceNumeric(findValue(inst->getOperand(0)), type, false);
+                auto insert = coerceNumeric(findValue(inst->getOperand(1)), type, false);
+                auto off = coerceNumeric(findValue(inst->getOperand(2)), type, false);
+                auto bts = coerceNumeric(findValue(inst->getOperand(3)), type, false);
 
-                auto one = _coerceNumeric(llvmBuilder->getInt32(1), val->getType(), false);
+                auto one = coerceNumeric(llvmBuilder->getInt32(1), val->getType(), false);
                 auto mask = llvmBuilder->CreateShl(one, bts);
                 mask = llvmBuilder->CreateSub(mask, one);
                 mask = llvmBuilder->CreateShl(mask, off);
@@ -3141,9 +3132,7 @@ struct LLVMEmitter
     llvm::DISubprogram* ensureDebugFunc(IRGlobalValueWithCode* func, IRDebugFunction* debugFunc)
     {
         if (funcToDebugLLVM.containsKey(func))
-        {
             return funcToDebugLLVM[func];
-        }
 
         IRType* funcType = as<IRType>(func->getDataType());
         llvm::DIFile* file = nullptr;
@@ -3205,6 +3194,8 @@ struct LLVMEmitter
         if (maybeGetName(&linkageName, &prettyName, func))
             llvmFunc->setName(linkageName);
 
+        // If the name is missing for whatever reason, just generate one that
+        // shouldn't clash with anything else.
         if (llvmFunc->getName().size() == 0)
             llvmFunc->setName("__slang_anonymous_func_" + std::to_string(uniqueIDCounter++));
 
@@ -3213,6 +3204,8 @@ struct LLVMEmitter
         {
             auto llvmArg = llvmFunc->getArg(i);
 
+            // Aliasing out and reference parameters are UB in Slang, and
+            // telling this to LLVM should help with optimization.
             if (as<IROutParamType>(funcType->getParamType(i)))
             {
                 llvmArg->addAttr(llvm::Attribute::WriteOnly);
@@ -3247,11 +3240,10 @@ struct LLVMEmitter
         return llvmFunc;
     }
 
-    llvm::Value* ensureGlobalVarDecl(IRGlobalVar* var)
+    // Declares the global variable in LLVM IR and sets an initializer for it
+    // if it is trivial.
+    llvm::Value* emitGlobalVarDecl(IRGlobalVar* var)
     {
-        if (mapInstToLLVM.containsKey(var))
-            return mapInstToLLVM.getValue(var);
-
         IRPtrType* ptrType = var->getDataType();
 
         llvm::GlobalVariable* llvmVar = nullptr;
@@ -3300,6 +3292,8 @@ struct LLVMEmitter
         llvm::GlobalVariable* llvmVar = llvm::cast<llvm::GlobalVariable>(mapInstToLLVM.getValue(var));
 
         // If there's already an initializer, there's nothing more to do here.
+        // This happens when the initializer is a constant and is set in
+        // emitGlobalVarDecl.
         if (llvmVar->hasInitializer())
             return;
 
@@ -3325,6 +3319,9 @@ struct LLVMEmitter
             ctorType, llvm::GlobalValue::InternalLinkage, ctorName, *llvmModule
         );
 
+        // The return instruction of a global value initializer is supposed to
+        // set the global value, so we intercept that return and turn it into a
+        // store.
         auto epilogue = [&](IRReturn* ret) -> llvm::Value* {
             auto val = ret->getVal();
             types->emitStore(llvmVar, findValue(val), val->getDataType(), defaultPointerRules);
@@ -3373,7 +3370,7 @@ struct LLVMEmitter
             if (auto func = as<IRFunc>(inst))
                 ensureFuncDecl(func);
             else if(auto globalVar = as<IRGlobalVar>(inst))
-                ensureGlobalVarDecl(globalVar);
+                emitGlobalVarDecl(globalVar);
         }
     }
 
@@ -3392,7 +3389,13 @@ struct LLVMEmitter
 
         char const* cursor = intrinsicText.begin();
         char const* end = intrinsicText.end();
+
+        // This is a bit of a hack. We add a block to the function so that
+        // it gets printed as a definition instead of a declaration, and then
+        // fill in the actual contents later in this function.
+        llvm::BasicBlock* bb = llvm::BasicBlock::Create(*llvmContext, "", llvmFunc);
         llvmFunc->print(expanded);
+        bb->eraseFromParent();
 
         while (out.size() > 0 && out.back() != '{')
             out.pop_back();
@@ -3455,7 +3458,7 @@ struct LLVMEmitter
                         }
                     }
                     break;
-                case '_': // Hides type name
+                case '_': // '_<number>' excludes the type name
                 case '0':
                 case '1':
                 case '2':
@@ -3489,10 +3492,12 @@ struct LLVMEmitter
                     }
                     break;
                 case '[':
+                    // Type operand
                     {
                         bool sizeQuery = false;
                         if (*cursor == 'S')
                         {
+                            // '[S<number>]' returns the size of the type.
                             sizeQuery = true;
                             cursor++;
                         }
@@ -3531,10 +3536,10 @@ struct LLVMEmitter
             }
         }
 
+        // If the inline IR contains an assignment to %result, we assume that a
+        // corresponding return instruction needs to be added automatically.
         bool hasReturnValue = as<IRVoidType>(resultType) == nullptr;
-        bool resultFound =
-            out.find("%result=") != std::string::npos ||
-            out.find("%result =") != std::string::npos;
+        bool resultFound = out.find("%result") != std::string::npos;
 
         if (!hasReturnValue || resultFound)
         {
@@ -3553,6 +3558,9 @@ struct LLVMEmitter
         return out;
     }
 
+    // If the Slang IR function containing a target intrinsic is not fully
+    // specialized, this function creates a new concrete function based on the
+    // call.
     IRFunc* createTargetIntrinsicFunc(IRCall* callInst)
     {
         IRBuilder builder(callInst->getModule());
@@ -3586,11 +3594,12 @@ struct LLVMEmitter
         std::string& llvmTextIR
     ){
         llvm::SMDiagnostic diag;
+        // This creates a temporary module with only the contents of llvmTextIR.
         std::unique_ptr<llvm::Module> sourceModule = llvm::parseAssemblyString(
             llvmTextIR, diag, *llvmContext);
 
         if (!sourceModule)
-        {
+        { // Failed to parse the intrinsic
             std::string msgStr;
             llvm::raw_string_ostream diagOut(msgStr);
             diag.print("", diagOut, false);
@@ -3605,6 +3614,8 @@ struct LLVMEmitter
         sourceModule->setDataLayout(targetMachine->createDataLayout());
         sourceModule->setTargetTriple(targetMachine->getTargetTriple());
 
+        // Finally, we merge the contents of the temporary module back to the
+        // main llvmModule.
         llvmLinker->linkInModule(std::move(sourceModule), llvm::Linker::OverrideFromSrc);
     }
 
@@ -3614,14 +3625,10 @@ struct LLVMEmitter
         IRInst* intrinsicInst,
         UnownedStringSlice intrinsicDef
     ){
-        llvm::BasicBlock* bb = llvm::BasicBlock::Create(*llvmContext, "", llvmFunc);
-
         llvmFunc->setLinkage(llvm::Function::LinkageTypes::ExternalLinkage);
 
         std::string funcName = llvmFunc->getName().str();
         std::string llvmTextIR = expandIntrinsic(llvmFunc, intrinsicInst, func, intrinsicDef);
-
-        bb->eraseFromParent();
 
         emitGlobalLLVMIR(llvmTextIR);
 
@@ -3672,29 +3679,29 @@ struct LLVMEmitter
 
         if (!intrinsic)
         {
-            // Create all blocks first
+            // Create all blocks first, so that branch instructions can refer
+            // to blocks that haven't been filled in yet.
             for (auto irBlock : code->getBlocks())
             {
                 llvm::BasicBlock* llvmBlock = llvm::BasicBlock::Create(*llvmContext, "", llvmFunc);
                 mapInstToLLVM[irBlock] = llvmBlock;
             }
 
-            // Then, fill in the blocks. Lucky for us, there appears to basically be
-            // a 1:1 correspondence between Slang IR blocks and LLVM IR blocks, so
+            // Then, fill in the blocks. Lucky for us, there is pretty much a
+            // 1:1 correspondence between Slang IR blocks and LLVM IR blocks, so
             // this is straightforward.
             for (auto irBlock : code->getBlocks())
             {
                 llvm::BasicBlock* llvmBlock = llvm::cast<llvm::BasicBlock>(mapInstToLLVM.getValue(irBlock));
                 llvmBuilder->SetInsertPoint(llvmBlock);
 
-                if (irBlock == code->getFirstBlock())
+                // If we are emitting debug data and are starting the first
+                // block, set the debug location at the start of the function.
+                if (sp && irBlock == code->getFirstBlock())
                 {
-                    if (sp)
-                    {
-                        llvmBuilder->SetCurrentDebugLocation(
-                            llvm::DILocation::get(*llvmContext, sp->getLine(), 0, sp)
-                        );
-                    }
+                    llvmBuilder->SetCurrentDebugLocation(
+                        llvm::DILocation::get(*llvmContext, sp->getLine(), 0, sp)
+                    );
                 }
 
                 // Then, add the regular instructions.
@@ -4044,7 +4051,8 @@ struct LLVMEmitter
     void emitGlobalFunctions(IRModule* irModule)
     {
         // Use a separate worklist so that if new functions get added, they
-        // won't get iterated over.
+        // won't get iterated over. That can happen in some circumstances with
+        // __target_intrinsic.
         List<IRInst*> workList;
         for (auto inst : irModule->getGlobalInsts())
         {
@@ -4060,11 +4068,15 @@ struct LLVMEmitter
             }
             else if(auto globalVar = as<IRGlobalVar>(inst))
             {
+                // Globals may have initializer blocks with code, so they're
+                // also handled in this pass.
                 emitGlobalVarCtor(globalVar);
             }
         }
     }
 
+    // Emits all remaining global instructions within a function that gets
+    // called during the initialization of the program / library (llvm.global_ctors).
     void emitGlobalInstructionCtor()
     {
         if (promotedGlobalInsts.getCount() == 0)
@@ -4125,9 +4137,9 @@ struct LLVMEmitter
         emitGlobalInstructionCtor();
     }
 
-    // Optimizes the LLVM IR and destroys mapInstToLLVM.
     void optimize()
     {
+        // Destroy inst-to-llvm mappings, they're broken after optimization.
         mapInstToLLVM.clear();
 
         llvm::LoopAnalysisManager loopAnalysisManager;
@@ -4266,7 +4278,6 @@ struct LLVMEmitter
             return SLANG_FAIL;
         }
 
-        // Create the shared library
         ComPtr<ISlangSharedLibrary> sharedLibrary(new LLVMJITSharedLibrary2(std::move(jit)));
 
         const auto targetDesc = ArtifactDescUtil::makeDescForCompileTarget(
