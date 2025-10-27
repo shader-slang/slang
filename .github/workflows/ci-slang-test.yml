@@ -143,10 +143,17 @@ jobs:
       - name: Run slang-rhi tests
         run: |
           export SLANG_RHI_EXCLUDE_TESTS="md-clear*,cmd-copy*,cmd-upload*,fence*,staging-heap*,texture-create*"
-          if [[ "${{ inputs.os }}" == "macos" ]]; then
-            export SLANG_RHI_EXCLUDE_TESTS="sampler-array"
-          fi
           "$bin_dir/slang-rhi-tests" -check-devices -tce="$SLANG_RHI_EXCLUDE_TESTS"
+
+      - name: Run slang-rhi tests (OptiX 8.0)
+        if: inputs.os == 'windows' || inputs.os == 'linux'
+        run: |
+          "$bin_dir/slang-rhi-tests" -check-devices -optix-version=80000 -tc="ray-tracing-*.cuda"
+
+      - name: Run slang-rhi tests (OptiX 8.1)
+        if: inputs.os == 'windows' || inputs.os == 'linux'
+        run: |
+          "$bin_dir/slang-rhi-tests" -check-devices -optix-version=80100 -tc="ray-tracing-*.cuda"
 
   # Run slangpy tests when:
   # 1. full-gpu-tests is enabled AND

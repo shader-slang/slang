@@ -247,6 +247,17 @@ public:
             operand = addConstantValue(constantInst);
             mapInstToOperand[inst] = operand;
         }
+        else if (auto constantVector = as<IRMakeVector>(inst))
+        {
+            SLANG_ASSERT(constantVector->getOperandCount() > 0);
+            operand = ensureInst(constantVector->getOperand(0));
+            for (UInt i = 1; i < constantVector->getOperandCount(); i++)
+            {
+                ensureInst(constantVector->getOperand(i));
+            }
+            operand.size *= (uint32_t)constantVector->getOperandCount();
+            mapInstToOperand[inst] = operand;
+        }
         else
         {
             SLANG_UNEXPECTED("unsupported global inst for vm bytecode emit");
@@ -481,8 +492,12 @@ public:
     {
         switch (inst->getOp())
         {
-        case kIROp_Undefined:
+        case kIROp_Poison:
+        case kIROp_LoadFromUninitializedMemory:
             {
+                // We basically handle an undefined value by allocating a
+                // temporary and then not initializing it.
+                //
                 ensureWorkingsetMemory(funcBuilder, inst);
             }
             break;

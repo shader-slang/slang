@@ -1278,7 +1278,8 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit("uint32_t device*");
             break;
         case kIROp_RaytracingAccelerationStructureType:
-            m_writer->emit("acceleration_structure<instancing>");
+            m_writer->emit(
+                "metal::raytracing::acceleration_structure<metal::raytracing::instancing>");
             break;
         default:
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type");

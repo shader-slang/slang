@@ -12,13 +12,16 @@
 ///
 /// Many of our targets have special restrictions on what is allowed to be used as a
 /// buffer element. Examples are:
-/// - In HLSL and SPIRV, if you have ConstantBuffer<T>, T must be a struct.
 /// - In SPIRV, `bool` is considered a logical type, meaning it cannot appear inside
 ///   buffers. bool vectors and matrices needs to be lowered into arrays.
 /// - In SPIRV, if `T` is used to declare a buffer, then every member in `T` must have
 ///   explicit offset. But if it is used to declare a local variable, then it cannot
 ///   have explicit member offset. This means that we cannot use the same `Foo` struct
 ///   inside a `StructuredBuffer<Foo>` and also use it to declare a local variable.
+/// - In Metal, if we have a `struct Foo {Texture2D member; }` and
+///   `ParameterBlock<Foo>`, then we should translate it to
+///   `struct Foo_pb { Texture2D.Handle member; }` and `ParameterBlock<Foo_pb>`, so that
+///    the resource legalization pass won't hoist the texture out of the parameter block.
 ///
 /// We use the terms "physical", "storage", or "lowered" types to refer to types that
 /// are legal to use as buffer elements. In contrast, the terms "original" or "logical"
@@ -187,6 +190,11 @@
 ///       m_ptr = FieldAddr(ptr, member)
 ///       call f_1, m_ptr
 ///    ```
+///    Note that it is only correct to defer a load/CastStorageToLogicalDeref if the location
+///    being loaded from is immutable. Otherwise, we might be changing the order of memory
+///    operations and result in a change in application behavior. So this pass will also make sure
+///    that we only create `CastStorageToLogicalDeref(x)` such that `x` is an immutable location,
+///    such as an immutable temporary variable.
 ///
 /// # Trailing Pointer Rewrite
 ///
@@ -302,6 +310,11 @@ struct BufferElementTypeLoweringPolicy : public RefObject
     {
         return false;
     }
+
+    /// Returns true if the target allows declaring a local var in Function address space with a
+    /// StorageType that may have explicit layout. This is currently true for all targets except
+    /// SPIRV.
+    virtual bool canUseStorageTypeInLocalVar() { return true; }
 };
 
 BufferElementTypeLoweringPolicy* getBufferElementTypeLoweringPolicy(
@@ -1192,10 +1205,7 @@ struct LoweredElementTypeContext
                                 // and push the cast to inside the callee.
                                 // We will process calls after other gep insts, so for now just add
                                 // it into a separate worklist.
-                                if (castInst->getOp() == kIROp_CastStorageToLogical)
-                                {
-                                    callWorkListSet.add((IRCall*)user);
-                                }
+                                callWorkListSet.add((IRCall*)user);
                                 break;
                             }
                         case kIROp_Load:
@@ -1249,6 +1259,17 @@ struct LoweredElementTypeContext
                                 }
                                 if (!tempVar)
                                 {
+                                    // If the load is not from an immutable location, we
+                                    // must preserve the load and keep the result in a local
+                                    // var.
+                                    // Unfortunately, SPIRV disallow a physical type (type with
+                                    // explicit layout) to be used to declare a local variable.
+                                    // Therefore for SPIRV target only, we have to disable this
+                                    // optimization altogether and run the
+                                    // storage-type-to-logical-type translation at the load instead
+                                    // of continue delaying the translation.
+                                    if (!leafTypeLoweringPolicy->canUseStorageTypeInLocalVar())
+                                        break;
                                     tempVar = builder.emitVar(elementStorageType);
                                     builder.addDecoration(
                                         tempVar,
@@ -1261,7 +1282,8 @@ struct LoweredElementTypeContext
                                     castInst->getBufferType());
                                 user->replaceUsesWith(newCast);
                                 user->removeAndDeallocate();
-                                castInstWorkList.add(newCast);
+                                if (auto newCastStorage = as<IRCastStorageToLogicalBase>(newCast))
+                                    castInstWorkList.add(newCastStorage);
                                 break;
                             }
                         case kIROp_FieldExtract:
@@ -1353,6 +1375,16 @@ struct LoweredElementTypeContext
                         paramTypes.add(storagePtrType);
                         newArgs.add(castArg->getOperand(0));
                     }
+                    else if (auto castArgDeref = as<IRCastStorageToLogicalDeref>(arg))
+                    {
+                        auto storageValueType = tryGetPointedToOrBufferElementType(
+                            &builder,
+                            castArgDeref->getOperand(0)->getDataType());
+                        auto storagePtrType =
+                            builder.getBorrowInParamType(storageValueType, AddressSpace::Generic);
+                        paramTypes.add(storagePtrType);
+                        newArgs.add(castArgDeref->getOperand(0));
+                    }
                     else
                     {
                         paramTypes.add(arg->getDataType());
@@ -1422,7 +1454,7 @@ struct LoweredElementTypeContext
             auto param = params[i];
             SLANG_RELEASE_ASSERT(i < call->getArgCount());
             auto arg = call->getArg(i);
-            auto cast = as<IRCastStorageToLogical>(arg);
+            auto cast = as<IRCastStorageToLogicalBase>(arg);
             if (!cast)
                 continue;
             auto logicalParamType = param->getFullType();
@@ -1434,8 +1466,21 @@ struct LoweredElementTypeContext
             uses.clear();
             for (auto use = param->firstUse; use; use = use->nextUse)
                 uses.add(use);
-            auto castedParam =
-                builder.emitCastStorageToLogical(logicalParamType, param, cast->getBufferType());
+            IRInst* castedParam = nullptr;
+            if (arg->getOp() == kIROp_CastStorageToLogical)
+            {
+                castedParam = builder.emitCastStorageToLogical(
+                    logicalParamType,
+                    param,
+                    cast->getBufferType());
+            }
+            else
+            {
+                castedParam = builder.emitCastStorageToLogicalDeref(
+                    logicalParamType,
+                    param,
+                    cast->getBufferType());
+            }
             if (auto castStorage = as<IRCastStorageToLogicalBase>(castedParam))
                 outNewCasts.add(castStorage);
 
@@ -2317,6 +2362,13 @@ struct KhronosTargetBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLo
         BufferElementTypeLoweringOptions inOptions)
         : DefaultBufferElementTypeLoweringPolicy(inTarget, inOptions)
     {
+    }
+
+    virtual bool canUseStorageTypeInLocalVar() override
+    {
+        // SPIRV (Vulkan) does not allow using an explicitly laid out type to declare a local
+        // variable.
+        return false;
     }
 
     virtual bool shouldLowerMatrixType(IRMatrixType* matrixType, TypeLoweringConfig config) override

@@ -237,7 +237,10 @@ bool isPtrLikeOrHandleType(IRInst* type);
 
 bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, IRInst* addr);
 
-IRInst* getUndefInst(IRBuilder builder, IRModule* module);
+/// Get a unit-type (aka `void`) value using the `poison` instruction,
+/// which indicates an undefined (and potentially unstable) value.
+///
+IRInst* getUnitPoisonVal(IRBuilder builder, IRModule* module);
 
 // The the equivalent op of (a op b) in (b op' a). For example, a > b is equivalent to b < a. So (<)
 // ==> (>).
@@ -387,6 +390,9 @@ IRType* getIRVectorBaseType(IRType* type);
 // Retrieves the element type of a pointer, buffer, array, vector or matrix type.
 // This is the result type of a ElementExtract operation on a value of `type`.
 IRType* getElementType(IRBuilder& builder, IRType* type);
+
+// Find the struct field with `key` and return its type. Return nullptr if not found.
+IRType* getFieldType(IRType* type, IRStructKey* key);
 
 Int getSpecializationConstantId(IRGlobalParam* param);
 

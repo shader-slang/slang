@@ -800,6 +800,7 @@ IRInst* getRootAddr(IRInst* addr, List<IRInst*>& outAccessChain, List<IRInst*>* 
     return addr;
 }
 
+
 IRInst* getRootBufferOrAddr(IRInst* addr)
 {
     auto rootAddr = getRootAddr(addr);
@@ -953,11 +954,11 @@ bool canAddressesPotentiallyAlias(
     if (addr1 == addr2)
         return true;
 
-    addr1 = getRootBufferOrAddr(addr1);
-    addr2 = getRootBufferOrAddr(addr2);
+    auto root1 = getRootBufferOrAddr(addr1);
+    auto root2 = getRootBufferOrAddr(addr2);
 
-    auto addr1Class = getAliasingClass(addr1);
-    auto addr2Class = getAliasingClass(addr2);
+    auto addr1Class = getAliasingClass(root1);
+    auto addr2Class = getAliasingClass(root2);
 
     if (!canAddrClassesAlias(addr1Class, addr2Class))
         return false;
@@ -974,17 +975,17 @@ bool canAddressesPotentiallyAlias(
         case AddressAliasingClass::BoundBuffer:
         case AddressAliasingClass::BoundTexture:
         case AddressAliasingClass::ConstantBuffer:
-            if (addr1 != addr2)
+            if (root1 != root2)
                 return false;
             break;
         }
     }
 
     // A param and a var can never alias.
-    if (addr1->getOp() == kIROp_Param && addr1->getParent() == func->getFirstBlock() &&
-            addr2->getOp() == kIROp_Var ||
-        addr1->getOp() == kIROp_Var && addr2->getOp() == kIROp_Param &&
-            addr2->getParent() == func->getFirstBlock())
+    if (root1->getOp() == kIROp_Param && root1->getParent() == func->getFirstBlock() &&
+            root2->getOp() == kIROp_Var ||
+        root1->getOp() == kIROp_Var && root2->getOp() == kIROp_Param &&
+            root2->getParent() == func->getFirstBlock())
         return false;
 
     // If one addr is user pointer and one addr is a var,
@@ -992,11 +993,53 @@ bool canAddressesPotentiallyAlias(
     // the var.
     if (addr1Class == AddressAliasingClass::Var && addr2Class == AddressAliasingClass::UserPointer)
     {
-        return canVarAliasWithUserPointer(target, addr1);
+        return canVarAliasWithUserPointer(target, root1);
     }
     if (addr2Class == AddressAliasingClass::Var && addr1Class == AddressAliasingClass::UserPointer)
     {
-        return canVarAliasWithUserPointer(target, addr2);
+        return canVarAliasWithUserPointer(target, root2);
+    }
+
+    // If two addrs are rooted from the same object but found to statically differ in access chain,
+    // then they cannot alias.
+    if (root1 == root2)
+    {
+        List<IRInst*> accessChain1;
+        List<IRInst*> accessChain2;
+
+        // Since getRootBufferOrAddr has a different behavior around
+        // RWStructuredBufferGetElementPtr compared to getRootAddr,
+        // we need to call getRootAddr here again to get a simpler access chain
+        // that we can handle here, so that we don't need to handle the nuance
+        // of whether or not to trace past any RWStructuredBufferGetElementPtr.
+        //
+        root1 = getRootAddr(addr1, accessChain1, nullptr);
+        root2 = getRootAddr(addr2, accessChain2, nullptr);
+        if (root1 != root2)
+            return true;
+        for (Index i = 0; i < Math::Min(accessChain1.getCount(), accessChain2.getCount()); i++)
+        {
+            auto node1 = accessChain1[i];
+            auto node2 = accessChain2[i];
+            if (as<IRStructKey>(node1) && as<IRStructKey>(node2))
+            {
+                // Two different field keys means the two addresses cannot alias.
+                // TODO: If we are going to support union types, we need to exclude that
+                // here.
+                if (node1 != node2)
+                    return false;
+                // If the keys are the same, continue looking further down the access chain.
+                continue;
+            }
+            // Two different constant indices means the two addresses cannot alias.
+            auto index1 = as<IRIntLit>(node1);
+            auto index2 = as<IRIntLit>(node2);
+            if (index1 && index2 && index1->getValue() != index2->getValue())
+                return false;
+            // In all other cases, such as when either one of the indices is
+            // a untime value, we treat the two indices as potentially being the same.
+            return true;
+        }
     }
     return true;
 }
@@ -1128,13 +1171,13 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
     return false;
 }
 
-IRInst* getUndefInst(IRBuilder builder, IRModule* module)
+IRInst* getUnitPoisonVal(IRBuilder builder, IRModule* module)
 {
     IRInst* undefInst = nullptr;
 
     for (auto inst : module->getModuleInst()->getChildren())
     {
-        if (inst->getOp() == kIROp_Undefined && inst->getDataType() &&
+        if (inst->getOp() == kIROp_Poison && inst->getDataType() &&
             inst->getDataType()->getOp() == kIROp_VoidType)
         {
             undefInst = inst;
@@ -1145,7 +1188,7 @@ IRInst* getUndefInst(IRBuilder builder, IRModule* module)
     {
         auto voidType = builder.getVoidType();
         builder.setInsertAfter(voidType);
-        undefInst = builder.emitUndefined(voidType);
+        undefInst = builder.emitPoison(voidType);
     }
     return undefInst;
 }
@@ -1926,7 +1969,7 @@ List<IRBlock*> collectBlocksInRegion(
                 continue;
             if (!dom->dominates(firstBlock, succ))
                 continue;
-            if (!as<IRUnreachable>(breakBlock->getTerminator()))
+            if (!as<IRUnreachableBase>(breakBlock->getTerminator()))
             {
                 if (dom->dominates(breakBlock, succ))
                     continue;
@@ -2347,6 +2390,22 @@ IRType* getElementType(IRBuilder& builder, IRType* valueType)
     return nullptr;
 }
 
+IRType* getFieldType(IRType* valueType, IRStructKey* key)
+{
+    valueType = (IRType*)unwrapAttributedType(valueType);
+    if (auto structType = as<IRStructType>(valueType))
+    {
+        for (auto field : structType->getFields())
+        {
+            if (field->getKey() == key)
+            {
+                return field->getFieldType();
+            }
+        }
+    }
+    return nullptr;
+}
+
 Int getSpecializationConstantId(IRGlobalParam* param)
 {
     auto layout = findVarLayout(param);
@@ -2706,6 +2765,7 @@ bool isPointerToImmutableLocation(IRInst* loc)
     switch (loc->getOp())
     {
     case kIROp_GetStructuredBufferPtr:
+    case kIROp_RWStructuredBufferGetElementPtr:
     case kIROp_ImageSubscript:
         return isPointerToImmutableLocation(loc->getOperand(0));
     default:
@@ -2741,6 +2801,8 @@ bool isPointerToImmutableLocation(IRInst* loc)
         case AddressSpace::UniformConstant:
             return true;
         }
+        if (ptrType->getAccessQualifier() == AccessQualifier::Immutable)
+            return true;
     }
     return false;
 }

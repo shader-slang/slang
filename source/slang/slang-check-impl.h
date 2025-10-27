@@ -2009,33 +2009,12 @@ public:
         DeclRef<PropertyDecl> requiredMemberDeclRef,
         RefPtr<WitnessTable> witnessTable);
 
-    bool trySynthesizeWrapperTypePropertyRequirementWitness(
-        ConformanceCheckingContext* context,
-        DeclRef<PropertyDecl> requiredMemberDeclRef,
-        RefPtr<WitnessTable> witnessTable);
-
     bool trySynthesizeSubscriptRequirementWitness(
         ConformanceCheckingContext* context,
         const LookupResult& lookupResult,
         DeclRef<SubscriptDecl> requiredMemberDeclRef,
         RefPtr<WitnessTable> witnessTable);
 
-    bool trySynthesizeWrapperTypeSubscriptRequirementWitness(
-        ConformanceCheckingContext* context,
-        DeclRef<SubscriptDecl> requiredMemberDeclRef,
-        RefPtr<WitnessTable> witnessTable);
-
-    bool trySynthesizeAssociatedTypeRequirementWitness(
-        ConformanceCheckingContext* context,
-        LookupResult const& lookupResult,
-        DeclRef<AssocTypeDecl> requiredMemberDeclRef,
-        RefPtr<WitnessTable> witnessTable);
-
-    bool trySynthesizeAssociatedConstantRequirementWitness(
-        ConformanceCheckingContext* context,
-        LookupResult const& lookupResult,
-        DeclRef<VarDeclBase> requiredMemberDeclRef,
-        RefPtr<WitnessTable> witnessTable);
 
     /// Attempt to synthesize a declartion that can satisfy `requiredMemberDeclRef` using
     /// `lookupResult`.

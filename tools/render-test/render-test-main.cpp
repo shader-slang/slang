@@ -1112,7 +1112,7 @@ Result RenderTestApp::update()
         auto passEncoder = encoder->beginComputePass();
         auto rootObject =
             passEncoder->bindPipeline(static_cast<IComputePipeline*>(m_pipeline.get()));
-        applyBinding(rootObject);
+        SLANG_RETURN_ON_FAIL(applyBinding(rootObject));
         passEncoder->dispatchCompute(
             m_options.computeDispatchSize[0],
             m_options.computeDispatchSize[1],
@@ -1125,7 +1125,7 @@ Result RenderTestApp::update()
         auto rootObject = passEncoder->bindPipeline(
             static_cast<IRayTracingPipeline*>(m_pipeline.get()),
             m_shaderTable);
-        applyBinding(rootObject);
+        SLANG_RETURN_ON_FAIL(applyBinding(rootObject));
         passEncoder->dispatchRays(
             0,
             m_options.computeDispatchSize[0],
@@ -1151,7 +1151,7 @@ Result RenderTestApp::update()
         auto passEncoder = encoder->beginRenderPass(renderPass);
         auto rootObject =
             passEncoder->bindPipeline(static_cast<IRenderPipeline*>(m_pipeline.get()));
-        applyBinding(rootObject);
+        SLANG_RETURN_ON_FAIL(applyBinding(rootObject));
         setProjectionMatrix(rootObject);
 
         RenderState state;

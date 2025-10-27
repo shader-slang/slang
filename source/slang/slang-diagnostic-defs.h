@@ -383,6 +383,7 @@ DIAGNOSTIC(-1, Note, seeOpeningToken, "see opening '$0'")
 // 153xx - #include
 DIAGNOSTIC(15300, Error, includeFailed, "failed to find include file '$0'")
 DIAGNOSTIC(15301, Error, importFailed, "failed to find imported file '$0'")
+DIAGNOSTIC(15302, Error, cyclicInclude, "cyclic `#include` of file '$0'")
 DIAGNOSTIC(-1, Error, noIncludeHandlerSpecified, "no `#include` handler was specified")
 DIAGNOSTIC(
     15302,
@@ -660,8 +661,14 @@ DIAGNOSTIC(30025, Error, invalidArraySize, "array size must be non-negative.")
 DIAGNOSTIC(
     30027,
     Error,
-    disallowedArrayOfParameterBlock,
-    "Arrays of ParameterBlock are not allowed")
+    disallowedArrayOfNonAddressableType,
+    "Arrays of non-addressable type '$0' are not allowed")
+
+DIAGNOSTIC(
+    30028,
+    Error,
+    nonAddressableTypeInStructuredBuffer,
+    "'$0' is non-addressable and cannot be used in StructuredBuffer")
 DIAGNOSTIC(
     30029,
     Error,
@@ -1233,11 +1240,20 @@ DIAGNOSTIC(
     subTypeHasSubsetOfAbstractAtomsToSuperType,
     "subtype '$0' must have the same target/stage support as the supertype; '$0' is missing '$1'")
 DIAGNOSTIC(
-    36118,
+    36119,
     Error,
     requirmentHasSubsetOfAbstractAtomsToImplementation,
     "requirement '$0' must have the same target/stage support as the implementation; '$0' is "
     "missing '$1'")
+
+DIAGNOSTIC(
+    36120,
+    Error,
+    targetSwitchCapCasesConflict,
+    "the capability for case '$0' is '$1', which is conflicts with previous case which requires "
+    "'$2'."
+    "In target_switch, if two cases are belong to the same target, then one capability set has to "
+    "be a subset of the other.")
 
 // Attributes
 DIAGNOSTIC(31000, Warning, unknownAttributeName, "unknown attribute '$0'")

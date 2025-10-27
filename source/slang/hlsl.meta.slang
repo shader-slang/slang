@@ -880,6 +880,44 @@ __intrinsic_op($(kIROp_MetalCastToDepthTexture))
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
 _Texture<T,Shape,isArray,isMS,sampleCount,access,1,isCombined,format> __metal_asDepthTexture(_Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> tex);
 
+[require(wgsl)]
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
+void __wgsl_check_texture_type()
+{
+    // Texel element type checks
+    static_assert(
+        T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4> ||
+        T is int   || T is vector<int,  2> || T is vector<int,  3> || T is vector<int,  4> ||
+        T is uint  || T is vector<uint, 2> || T is vector<uint, 3> || T is vector<uint, 4>
+        , "WGSL supports only f32/i32/u32 type textures");
+    static_assert(isShadow == 0 || T is float
+        , "WGSL depth textures must be scalar f32");
+
+    // Array types
+    static_assert(isArray == 0 || isMS == 0
+        , "WGSL does not support multisampled texture arrays");
+    static_assert(isArray == 0 || Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE)
+        , "WGSL array texture shape must be either 2D or Cube");
+
+    // Depth texture shapes
+    static_assert(isShadow == 0 || Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE)
+        , "WGSL depth texture shape must be either 2D or Cube");
+
+    // Multisampled texture shapes
+    static_assert(isMS == 0 || Shape.flavor == $(SLANG_TEXTURE_2D)
+        , "WGSL multisampled texture shape must be 2D");
+}
+
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
+void __wgsl_check_texture_type_texel_offset()
+{
+     __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+
+     static_assert(Shape.flavor != $(SLANG_TEXTURE_2D) || Shape.flavor != $(SLANG_TEXTURE_3D)
+         , "WGSL texture shape must be 2D or 3D when sampling with texel offsets");
+}
+
+
 //@public:
 
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int, let format:int>
@@ -1877,6 +1915,11 @@ float __metal_SampleCmpLevel(_Texture<T,Shape,isArray,isMS,sampleCount,0,1,0,for
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int, let format:int>
 extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 {
+    //@hidden:
+    static const int access = 0;
+    static const int isCombined = 0;
+
+    //@public:
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0_fragment)]
@@ -1959,8 +2002,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     __truncate $$T result __sampledType(T) %sampled;
                 };
             case wgsl:
-                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
-                    , "WGSL supports only f32 type textures");
+                __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+
                 if (isArray == 1)
                 {
                     switch (Shape.flavor)
@@ -1971,6 +2014,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                         __intrinsic_asm "textureSample($0, $1, ($2).xy, i32(($2).z))$z";
                     case $(SLANG_TEXTURE_CUBE):
                         __intrinsic_asm "textureSample($0, $1, ($2).xyz, i32(($2).w))$z";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
                     }
                 }
                 __intrinsic_asm "textureSample($0, $1, $2)$z";
@@ -2023,18 +2068,17 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     __truncate $$T result __sampledType(T) %sampled;
                 };
             case wgsl:
-                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
-                    , "WGSL supports only f32 type textures");
+                __wgsl_check_texture_type_texel_offset<
+                    T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+
                 if (isArray == 1)
                 {
                     switch (Shape.flavor)
                     {
-                    case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "textureSample($0, $1, ($2).x, i32(($2).y), $3)$z";
                     case $(SLANG_TEXTURE_2D):
                         __intrinsic_asm "textureSample($0, $1, ($2).xy, i32(($2).z), $3)$z";
-                    case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "textureSample($0, $1, ($2).xyz, i32(($2).w), $3)$z";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
                     }
                 }
                 __intrinsic_asm "textureSample($0, $1, $2, $3)$z";
@@ -2171,18 +2215,18 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     __truncate $$T result __sampledType(T) %sampled;
                 };
             case wgsl:
-                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
-                    , "WGSL supports only f32 type textures");
+                __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+
                 if (isArray == 1)
                 {
                     switch (Shape.flavor)
                     {
-                    case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "textureSampleBias($0, $1, ($2).x, i32(($2).y), $3)$z";
                     case $(SLANG_TEXTURE_2D):
                         __intrinsic_asm "textureSampleBias($0, $1, ($2).xy, i32(($2).z), $3)$z";
                     case $(SLANG_TEXTURE_CUBE):
                         __intrinsic_asm "textureSampleBias($0, $1, ($2).xyz, i32(($2).w), $3)$z";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
                     }
                 }
                 __intrinsic_asm "textureSampleBias($0, $1, $2, $3)$z";
@@ -2234,18 +2278,16 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     __truncate $$T result __sampledType(T) %sampled;
                 };
             case wgsl:
-                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
-                    , "WGSL supports only f32 type textures");
+                __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+
                 if (isArray == 1)
                 {
                     switch (Shape.flavor)
                     {
-                    case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "textureSampleBias($0, $1, ($2).x, i32(($2).y), $3, $4)$z";
                     case $(SLANG_TEXTURE_2D):
                         __intrinsic_asm "textureSampleBias($0, $1, ($2).xy, i32(($2).z), $3, $4)$z";
-                    case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "textureSampleBias($0, $1, ($2).xyz, i32(($2).w), $3, $4)$z";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
                     }
                 }
                 __intrinsic_asm "textureSampleBias($0, $1, $2, $3, $4)$z";
@@ -2318,18 +2360,18 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 result:$$float = OpImageSampleDrefImplicitLod %sampledImage $location $compareValue;
             };
         case wgsl:
-            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
-                , "WGSL supports only f32 type textures");
+            __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+
             if (isArray == 1)
             {
                 switch (Shape.flavor)
                 {
-                case $(SLANG_TEXTURE_1D):
-                    __intrinsic_asm "textureSampleCompare($0, $1, ($2).x, i32(($2).y), $3)";
                 case $(SLANG_TEXTURE_2D):
                     __intrinsic_asm "textureSampleCompare($0, $1, ($2).xy, i32(($2).z), $3)";
                 case $(SLANG_TEXTURE_CUBE):
                     __intrinsic_asm "textureSampleCompare($0, $1, ($2).xyz, i32(($2).w), $3)";
+                default:
+                    __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
                 }
             }
             __intrinsic_asm "textureSampleCompare($0, $1, $2, $3)";
@@ -2349,18 +2391,18 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".SampleCmpLevelZero";
         case wgsl:
-            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
-                , "WGSL supports only f32 type textures");
+            __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+
             if (isArray == 1)
             {
                 switch (Shape.flavor)
                 {
-                case $(SLANG_TEXTURE_1D):
-                    __intrinsic_asm "textureSampleCompareLevel($0, $1, ($2).x, i32(($2).y), $3)";
                 case $(SLANG_TEXTURE_2D):
                     __intrinsic_asm "textureSampleCompareLevel($0, $1, ($2).xy, i32(($2).z), $3)";
                 case $(SLANG_TEXTURE_CUBE):
                     __intrinsic_asm "textureSampleCompareLevel($0, $1, ($2).xyz, i32(($2).w), $3)";
+                default:
+                    __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
                 }
             }
             __intrinsic_asm "textureSampleCompareLevel($0, $1, $2, $3)";
@@ -2400,18 +2442,16 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 result:$$float = OpImageSampleDrefImplicitLod %sampledImage $location $compareValue ConstOffset $offset;
             };
         case wgsl:
-            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
-                , "WGSL supports only f32 type textures");
+            __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+
             if (isArray == 1)
             {
                 switch (Shape.flavor)
                 {
-                case $(SLANG_TEXTURE_1D):
-                    __intrinsic_asm "textureSampleCompare($0, $1, ($2).x, i32(($2).y), $3, $4)";
                 case $(SLANG_TEXTURE_2D):
                     __intrinsic_asm "textureSampleCompare($0, $1, ($2).xy, i32(($2).z), $3, $4)";
-                case $(SLANG_TEXTURE_CUBE):
-                    __intrinsic_asm "textureSampleCompare($0, $1, ($2).xyz, i32(($2).w), $3, $4)";
+                default:
+                    __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
                 }
             }
             __intrinsic_asm "textureSampleCompare($0, $1, $2, $3, $4)";
@@ -2461,18 +2501,16 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".SampleCmpLevelZero";
         case wgsl:
-            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
-                , "WGSL supports only f32 type textures");
+            __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+
             if (isArray == 1)
             {
                 switch (Shape.flavor)
                 {
-                case $(SLANG_TEXTURE_1D):
-                    __intrinsic_asm "textureSampleCompareLevel($0, $1, ($2).x, i32(($2).y), $3, $4)";
                 case $(SLANG_TEXTURE_2D):
                     __intrinsic_asm "textureSampleCompareLevel($0, $1, ($2).xy, i32(($2).z), $3, $4)";
-                case $(SLANG_TEXTURE_CUBE):
-                    __intrinsic_asm "textureSampleCompareLevel($0, $1, ($2).xyz, i32(($2).w), $3, $4)";
+                default:
+                    __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
                 }
             }
             __intrinsic_asm "textureSampleCompareLevel($0, $1, $2, $3, $4)";
@@ -2639,18 +2677,18 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     __truncate $$T result __sampledType(T) %sampled;
                 };
             case wgsl:
-                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
-                    , "WGSL supports only f32 type textures");
+                __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+
                 if (isArray == 1)
                 {
                     switch (Shape.flavor)
                     {
-                    case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "textureSampleGrad($0, $1, ($2).x, i32(($2).y), $3, $4)$z";
                     case $(SLANG_TEXTURE_2D):
                         __intrinsic_asm "textureSampleGrad($0, $1, ($2).xy, i32(($2).z), $3, $4)$z";
                     case $(SLANG_TEXTURE_CUBE):
                         __intrinsic_asm "textureSampleGrad($0, $1, ($2).xyz, i32(($2).w), $3, $4)$z";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
                     }
                 }
                 __intrinsic_asm "textureSampleGrad($0, $1, $2, $3, $4)$z";
@@ -2703,18 +2741,16 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
                 };
             case wgsl:
-                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
-                    , "WGSL supports only f32 type textures");
+                __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+
                 if (isArray == 1)
                 {
                     switch (Shape.flavor)
                     {
-                    case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "textureSampleGrad($0, $1, ($2).x, i32(($2).y), $3, $4, $5)$z";
                     case $(SLANG_TEXTURE_2D):
                         __intrinsic_asm "textureSampleGrad($0, $1, ($2).xy, i32(($2).z), $3, $4, $5)$z";
-                    case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "textureSampleGrad($0, $1, ($2).xyz, i32(($2).w), $3, $4, $5)$z";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
                     }
                 }
                 __intrinsic_asm "textureSampleGrad($0, $1, $2, $3, $4, $5)$z";
@@ -2882,18 +2918,18 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     __truncate $$T result __sampledType(T) %sampled;
                 };
             case wgsl:
-                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
-                    , "WGSL supports only f32 type textures");
+                __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+
                 if (isArray == 1)
                 {
                     switch (Shape.flavor)
                     {
-                    case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "textureSampleLevel($0, $1, ($2).x, i32(($2).y), $3)$z";
                     case $(SLANG_TEXTURE_2D):
                         __intrinsic_asm "textureSampleLevel($0, $1, ($2).xy, i32(($2).z), $3)$z";
                     case $(SLANG_TEXTURE_CUBE):
                         __intrinsic_asm "textureSampleLevel($0, $1, ($2).xyz, i32(($2).w), $3)$z";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
                     }
                 }
                 __intrinsic_asm "textureSampleLevel($0, $1, $2, $3)$z";
@@ -2946,18 +2982,16 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     __truncate $$T result __sampledType(T) %sampled;
                 };
             case wgsl:
-                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
-                    , "WGSL supports only f32 type textures");
+                __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+
                 if (isArray == 1)
                 {
                     switch (Shape.flavor)
                     {
-                    case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "textureSampleLevel($0, $1, ($2).x, i32(($2).y), $3, $4)$z";
                     case $(SLANG_TEXTURE_2D):
                         __intrinsic_asm "textureSampleLevel($0, $1, ($2).xy, i32(($2).z), $3, $4)$z";
-                    case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "textureSampleLevel($0, $1, ($2).xyz, i32(($2).w), $3, $4)$z";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
                     }
                 }
                 __intrinsic_asm "textureSampleLevel($0, $1, $2, $3, $4)$z";
@@ -3049,6 +3083,9 @@ vector<T.Element,4> __texture_gather(
     vector<float, Shape.dimensions+isArray> location,
     int component)
 {
+    static const int isMS = 0;
+    static const int isCombined = 0;
+
     __target_switch
     {
     case glsl:
@@ -3079,6 +3116,8 @@ vector<T.Element,4> __texture_gather(
             result:$$vector<T.Element,4> = OpImageGather %sampledImage $location $component;
         };
     case wgsl:
+        __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+
         if (isShadow == 1)
         {
             // If depth texture, `textureGather` doesn't take channel value, `$3`.
@@ -3090,6 +3129,8 @@ vector<T.Element,4> __texture_gather(
                     __intrinsic_asm "textureGather($0, $1, ($2).xy, u32(($2).z))";
                 case $(SLANG_TEXTURE_CUBE):
                     __intrinsic_asm "textureGather($0, $1, ($2).xyz, u32(($2).w))";
+                default:
+                    __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
                 }
             }
             __intrinsic_asm "textureGather($0, $1, $2)";
@@ -3103,6 +3144,8 @@ vector<T.Element,4> __texture_gather(
                 __intrinsic_asm "textureGather($3, $0, $1, ($2).xy, u32(($2).z))";
             case $(SLANG_TEXTURE_CUBE):
                 __intrinsic_asm "textureGather($3, $0, $1, ($2).xyz, u32(($2).w))";
+            default:
+                __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
             }
         }
         __intrinsic_asm "textureGather($3, $0, $1, $2)";
@@ -3138,6 +3181,9 @@ vector<T.Element,4> __texture_gather_offset(
     vector<int, Shape.planeDimensions> offset,
     int component)
 {
+    static const int isMS = 0;
+    static const int isCombined = 0;
+
     __target_switch
     {
     case glsl:
@@ -3160,6 +3206,10 @@ vector<T.Element,4> __texture_gather_offset(
             result:$$vector<T.Element,4> = OpImageGather %sampledImage $location $component Offset $offset;
         };
     case wgsl:
+        __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+        static_assert(Shape.flavor == $(SLANG_TEXTURE_2D)
+            , "WGSL texture gather with offset is supported only on 2D textures");
+
         if (isShadow == 1)
         {
             // If depth texture, `textureGather` doesn't take channel value, `$4`.
@@ -3169,8 +3219,8 @@ vector<T.Element,4> __texture_gather_offset(
                 {
                 case $(SLANG_TEXTURE_2D):
                     __intrinsic_asm "textureGather($0, $1, ($2).xy, u32(($2).z), $3)";
-                case $(SLANG_TEXTURE_CUBE):
-                    __intrinsic_asm "textureGather($0, $1, ($2).xyz, u32(($2).w), $3)";
+                default:
+                    __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
                 }
             }
             __intrinsic_asm "textureGather($0, $1, $2, $3)";
@@ -3182,8 +3232,8 @@ vector<T.Element,4> __texture_gather_offset(
             {
             case $(SLANG_TEXTURE_2D):
                 __intrinsic_asm "textureGather($4, $0, $1, ($2).xy, u32(($2).z), $3)";
-            case $(SLANG_TEXTURE_CUBE):
-                __intrinsic_asm "textureGather($4, $0, $1, ($2).xyz, u32(($2).w), $3)";
+            default:
+                __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
             }
         }
         __intrinsic_asm "textureGather($4, $0, $1, $2, $3)";
@@ -3272,6 +3322,9 @@ vector<T.Element,4> __texture_gatherCmp(
     vector<float, Shape.dimensions+isArray> location,
     T.Element compareValue)
 {
+    static const int isMS = 0;
+    static const int isCombined = 0;
+
     __target_switch
     {
     case glsl:
@@ -3297,7 +3350,9 @@ vector<T.Element,4> __texture_gatherCmp(
             result:$$vector<T.Element,4> = OpImageDrefGather %sampledImage $location $compareValue;
         };
     case wgsl:
-        static_assert(isShadow == 1, "WGSL supports textureGatherCompare only for depth textures.");
+        __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+        static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE)
+            , "WGSL texture gather is supported only on 2D and Cube textures");
 
         if (isArray == 1)
         {
@@ -3307,6 +3362,8 @@ vector<T.Element,4> __texture_gatherCmp(
                 __intrinsic_asm "textureGatherCompare($0, $1, ($2).xy, u32(($2).z), $3)";
             case $(SLANG_TEXTURE_CUBE):
                 __intrinsic_asm "textureGatherCompare($0, $1, ($2).xyz, u32(($2).w), $3)";
+            default:
+                __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
             }
         }
         __intrinsic_asm "textureGatherCompare($0, $1, $2, $3)";
@@ -3342,6 +3399,9 @@ vector<T.Element,4> __texture_gatherCmp_offset(
     T.Element compareValue,
     vector<int, Shape.planeDimensions> offset)
 {
+    static const int isMS = 0;
+    static const int isCombined = 0;
+
     __target_switch
     {
     case glsl:
@@ -3363,7 +3423,9 @@ vector<T.Element,4> __texture_gatherCmp_offset(
             result:$$vector<T.Element,4> = OpImageDrefGather %sampledImage $location $compareValue ConstOffset $offset;
         };
     case wgsl:
-        static_assert(isShadow == 1, "WGSL supports textureGatherCompare only for depth textures.");
+        __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+        static_assert(Shape.flavor == $(SLANG_TEXTURE_2D)
+            , "WGSL texture gather with offset is supported only on 2D textures");
 
         if (isArray == 1)
         {
@@ -3371,8 +3433,8 @@ vector<T.Element,4> __texture_gatherCmp_offset(
             {
             case $(SLANG_TEXTURE_2D):
                 __intrinsic_asm "textureGatherCompare($0, $1, ($2).xy, u32(($2).z), $3, $4)";
-            case $(SLANG_TEXTURE_CUBE):
-                __intrinsic_asm "textureGatherCompare($0, $1, ($2).xyz, u32(($2).w), $3, $4)";
+            default:
+                __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
             }
         }
         __intrinsic_asm "textureGatherCompare($0, $1, $2, $3, $4)";
@@ -3654,32 +3716,29 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
             __intrinsic_asm ".Load";
 		case cuda:
             if (isArray != 0)
+            {
+                switch(Shape.flavor)
                 {
-     				static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_3D),
-                              "Integer coordinates are supported for texture reads only for 2D and 3D textures and 2D array textures.");
-
-                    if (Shape.flavor == $(SLANG_TEXTURE_2D))
-                    {
-						__intrinsic_asm "tex2DArrayfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z)";
-				    }
-                    else
-					{
-                        __intrinsic_asm "<invalid intrinsic>";
-                    }
+                case $(SLANG_TEXTURE_1D):
+                    __intrinsic_asm "tex1DArrayfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z)";
+                case $(SLANG_TEXTURE_2D):
+                    __intrinsic_asm "tex2DArrayfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z, ($1).w)";
                 }
-                else
+            }
+            else
+            {
+                switch(Shape.flavor)
                 {
-                    switch(Shape.flavor)
-                    {
-                    case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "tex2Dfetch_int<$T0>($0, ($1).x, ($1).y)";
-                    case $(SLANG_TEXTURE_3D):
-                        __intrinsic_asm "tex3Dfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z)";
-					case $(SLANG_TEXTURE_CUBE):
-                    default:
-                        __intrinsic_asm "<invalid intrinsic>";
-                    }
+                case $(SLANG_TEXTURE_1D):
+                    __intrinsic_asm "tex1Dfetch_int<$T0>($0, ($1).x, ($1).y)";
+                case $(SLANG_TEXTURE_2D):
+                    __intrinsic_asm "tex2Dfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z)";
+                case $(SLANG_TEXTURE_3D):
+                    __intrinsic_asm "tex3Dfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z, ($1).w)";
                 }
+            }
+            static_assert(false, "Unsupported 'Load' of 'texture' for 'cuda' target");
+            __intrinsic_asm "<invalid intrinsic>";
         case metal:
             switch (Shape.flavor)
             {
@@ -3767,12 +3826,12 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                 };
             }
         case wgsl:
+            __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+
             static_assert(Shape.flavor == $(SLANG_TEXTURE_1D)
                 || Shape.flavor == $(SLANG_TEXTURE_2D)
                 || Shape.flavor == $(SLANG_TEXTURE_3D)
-                , "WGSL doesn't supports textureLoad for Cube texture.");
-            static_assert(isArray == 0 || Shape.flavor == $(SLANG_TEXTURE_2D)
-                , "WGSL supports textureLoad for texture_2d_array but not for array of 1D, 3D or Cube.");
+                , "WGSL does not support textureLoad for Cube textures.");
 
             if (isArray == 1)
             {
@@ -3790,6 +3849,8 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                 __intrinsic_asm "textureLoad($0, ($1).xy, ($1).z)$z";
             case $(SLANG_TEXTURE_3D):
                 __intrinsic_asm "textureLoad($0, ($1).xyz, ($1).w)$z";
+            default:
+                __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
             }
             return __default<T>();
         }
@@ -3997,10 +4058,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                     };
                 }
             case wgsl:
-                static_assert(Shape.flavor == $(SLANG_TEXTURE_2D)
-                    , "WGSL supports textureLoad for texture_multisampled_2d but not for multisampled of 1D, 3D or Cube.");
-                static_assert(isArray == 0
-                    , "WGSL doesn't support array variants of multisampled textures for textureLoad.");
+                __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
 
                 __intrinsic_asm "textureLoad($0, $1, $2)$z";
         }
@@ -4155,6 +4213,12 @@ ${{{{
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
 extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
 {
+    //@hidden:
+    static const int isMS = 0;
+    static const int isCombined = 0;
+
+    //@public:
+
     ${{{{
         if (access != kCoreModule_ResourceAccessWriteOnly)
         {
@@ -4268,14 +4332,12 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
                 static_assert(false, "Unsupported 'Load' of 'texture' for 'metal' target");
                 __intrinsic_asm "<invalid intrinsics>";
             case wgsl:
+                __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, $(access), isShadow, isCombined, format>();
+
                 static_assert(Shape.flavor == $(SLANG_TEXTURE_1D)
                     || Shape.flavor == $(SLANG_TEXTURE_2D)
                     || Shape.flavor == $(SLANG_TEXTURE_3D)
-                    , "WGSL doesn't supports textureLoad for Cube texture.");
-                static_assert(isArray == 0 || Shape.flavor == $(SLANG_TEXTURE_2D)
-                    , "WGSL supports textureLoad for 2d_array but not for array of 1D, 3D or Cube.");
-                static_assert(isShadow == 0 || T is float
-                    , "WGSL supports only f32 depth textures");
+                    , "WGSL does not support textureLoad for Cube texture.");
 
                 if (isArray == 1)
                 {
@@ -4283,6 +4345,8 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
                     {
                     case $(SLANG_TEXTURE_2D):
                         __intrinsic_asm "textureLoad($0, ($1).xy, i32(($1).z))$z";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
                     }
                 }
                 __intrinsic_asm "textureLoad($0, $1)$z";
@@ -4397,12 +4461,12 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
                     __metalImageStore(this, location, newValue);
                 }
         case wgsl:
+            __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, $(access), isShadow, isCombined, format>();
+
             static_assert(Shape.flavor == $(SLANG_TEXTURE_1D)
                 || Shape.flavor == $(SLANG_TEXTURE_2D)
                 || Shape.flavor == $(SLANG_TEXTURE_3D)
-                , "WGSL doesn't supports textureStore for Cube texture.");
-            static_assert(isArray == 0 || Shape.flavor == $(SLANG_TEXTURE_2D)
-                , "WGSL supports textureStore for texture_store_2d_array but not for array of 1D, 3D or Cube.");
+                , "WGSL does not support textureStore for Cube textures.");
 
             // WGSL requires the value type to be always `vec4`
             if (isArray == 1)
@@ -4473,6 +4537,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
         // If a 'Texture[location]' is referred to by a '__ref', call 'kIROp_ImageSubscript(location)'.
         // This allows call's to stay aware that the input is from a 'Texture'.
         __intrinsic_op($(kIROp_ImageSubscript))
+        [nonmutating]
         ref;
     }
     ${{{{
@@ -4490,6 +4555,12 @@ if (access == kCoreModule_ResourceAccessReadWrite) {
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
 extension _Texture<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,format>
 {
+    //@hidden:
+    static const int isMS = 1;
+    static const int isCombined = 0;
+
+    //@public:
+
     [__readNone]
     [ForceInline]
     [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_compute_fragment)]
@@ -4537,10 +4608,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,format>
                     __truncate $$T result __sampledType(T) %sampled;
                 };
             case wgsl:
-                static_assert(Shape.flavor == $(SLANG_TEXTURE_2D)
-                    , "WGSL supports textureLoad for texture_multisampled_2d but not for multisampled of 1D, 3D or Cube.");
-                static_assert(isArray == 0
-                    , "WGSL doesn't support array variants of multisampled textures for textureLoad.");
+                __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, $(access), isShadow, isCombined, format>();
 
                 __intrinsic_asm "textureLoad($0, $1, $2)$z";
         }
@@ -4630,6 +4698,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,format>
         // If a 'Texture[location, sampleIndex]' is referred to by a '__ref', call 'kIROp_ImageSubscript(location, sampleIndex)'.
         // This allows call's to stay aware that the input is from a 'Texture'.
         __intrinsic_op($(kIROp_ImageSubscript))
+        [nonmutating]
         ref;
     }
 }
@@ -4756,17 +4825,35 @@ ${{{{
 }
 }}}}
 
-// Declare Sampler*Shadow type aliases.
+// Declare DepthTexture* and Sampler*Shadow type aliases.
 ${{{{
     for (int shape = 0; shape < 4; shape++)
-    for (int isArray = 0; isArray<=1; isArray++)
+    for (int isArray : { 0, 1 })
+    for (int isMS : { 0, 1 })
     {
+        if (isMS)
+        {
+            // Only DepthTexture2DMS and Sampler2DMSShadow.
+            if (shape != kCoreModule_ShapeIndex2D)
+                continue;
+        }
+
+        // No 3D Array.
+        if (shape == kCoreModule_ShapeIndex3D && isArray == 1)
+            continue;
 }}}}
-/// Represents a handle to a $(shapeTypeNames[shape]) combined texture-sampler for shadow comparison.
+/// Represents a handle to a$(isMS?" multisampled": "") $(shapeTypeNames[shape]) depth texture$(isArray?" array":"").
 /// @param format The storage format of the texture.
 /// @see Please refer to `_Texture` for more information about texture types.
 /// @category texture_types
-typealias Sampler$(shapeTypeNames[shape])$(arrayPostFix[isArray])Shadow<int format=0> = _Texture<float, __Shape$(shapeTypeNames[shape]), $(isArray), 0, 0, 0, 1, 1, format>;
+typealias DepthTexture$(shapeTypeNames[shape])$(msPostFix[isMS])$(arrayPostFix[isArray])<int format=0> = _Texture<float, __Shape$(shapeTypeNames[shape]), $(isArray), $(isMS), 0, 0, 1, 0, format>;
+
+/// Represents a handle to a$(isMS?" multisampled": "") $(shapeTypeNames[shape]) combined texture-sampler$(isArray?" array":"") for shadow comparison.
+/// @param format The storage format of the texture.
+/// @see Please refer to `_Texture` for more information about texture types.
+/// @category texture_types
+typealias Sampler$(shapeTypeNames[shape])$(msPostFix[isMS])$(arrayPostFix[isArray])Shadow<int format=0> = _Texture<float, __Shape$(shapeTypeNames[shape]), $(isArray), $(isMS), 0, 0, 1, 1, format>;
+
 ${{{{
     }
 }}}}
@@ -8869,6 +8956,12 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 T dot(vector<T, N> x, vector<T, N> y)
 {
+    // Handle 1-vector case explicitly since many backends don't support it natively
+    if (N == 1)
+    {
+        return x[0] * y[0];
+    }
+    
     __target_switch
     {
     case glsl: __intrinsic_asm "dot";
@@ -8891,6 +8984,12 @@ __generic<T : __BuiltinIntegerType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 T dot(vector<T, N> x, vector<T, N> y)
 {
+    // Handle 1-vector case explicitly since many backends don't support it natively
+    if (N == 1)
+    {
+        return x[0] * y[0];
+    }
+    
     __target_switch
     {
     case hlsl: __intrinsic_asm "dot";
@@ -17183,7 +17282,7 @@ ${{{{
             // If a 'Texture[index]' is referred to by a '__ref', call 'kIROp_ImageSubscript(index)'.
             // This allows call's to stay aware that the input is from a 'Texture'.
             __intrinsic_op($(kIROp_ImageSubscript))
-            [constref]
+            [nonmutating]
             ref;
 ${{{{
         } // access != SLANG_RESOURCE_ACCESS_READ
@@ -17291,7 +17390,17 @@ __magic_type(RaytracingAccelerationStructureType)
 __intrinsic_type($(kIROp_RaytracingAccelerationStructureType))
 struct RaytracingAccelerationStructure
 {
-    [require(glsl_spirv, raytracing)]
+    // Here, we don't require 'raytracing' capability, instead, we add the
+    // extension directly in the generated code. The reason is that this
+    // struct is used in both raytracing and rayquery APIs, our current capability
+    // system cannot represent this struct with raytracing OR rayquery capability.
+    // So, we cannot add capability requirement on the struct itself.
+    // However, any use of this type will definitely require either raytracing or rayquery,
+    // so we have the guarantee that either raytracing or rayquery capability will be present.
+    // But if rayquery want to use this struct that is constructed from a descriptor handle,
+    // we need to make sure the raytracing extension is present.
+    __glsl_extension(GL_EXT_ray_tracing)
+    [require(glsl_spirv)]
     [__readNone]
     __init(uint64_t address)
     {
@@ -17299,6 +17408,7 @@ struct RaytracingAccelerationStructure
         {
         case spirv:
             return spirv_asm {
+                OpExtension "SPV_KHR_ray_tracing";
                 result: $$RaytracingAccelerationStructure = OpConvertUToAccelerationStructureKHR $address;
             };
         case glsl:
@@ -23212,6 +23322,18 @@ extension<T, L : IBufferDataLayout> RasterizerOrderedStructuredBuffer<T, L> : IR
     int getCount() { uint count; uint stride; this.GetDimensions(count, stride); return count; }
 }
 
+[require(vk_mem_model)]
+internal void enableVMMDeviceScopeCapabilityIfNeeded(constexpr MemoryScope memoryScope)
+{
+    if (memoryScope == MemoryScope::Device)
+    {
+        spirv_asm
+        {
+            OpCapability VulkanMemoryModelDeviceScopeKHR;
+        };
+    }
+}
+
 namespace linalg
 {
 
@@ -23786,6 +23908,22 @@ struct CoopMat
         };
     }
 
+    // TODO: make this function an intrinsic and support all types via the single intrinsic
+    [require(cooperative_matrix, vk_mem_model)]
+    void StoreCoherent<
+        let matrixLayout : CoopMatMatrixLayout
+    >(T* buffer, uint element, uint stride, constexpr MemoryScope memoryScope)
+    {
+        enableVMMDeviceScopeCapabilityIfNeeded(memoryScope);
+        let alignment = 16U;
+        const int32_t scope = (int32_t)memoryScope;
+        return spirv_asm
+        {
+            %pointer:$$T* = OpPtrAccessChain $buffer $element;
+            OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned|MakePointerAvailable|NonPrivatePointer !alignment $scope;
+        };
+    }
+
     [ForceInline]
     [require(cooperative_matrix)]
     void Store<
@@ -23894,6 +24032,24 @@ ${{{{
         {
             %pointer:$$T* = OpPtrAccessChain $buffer $element;
             result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
+        };
+    }
+
+    // TODO: make this function an intrinsic and support all types via the single intrinsic
+    [ForceInline]
+    [__NoSideEffect]
+    [require(cooperative_matrix, vk_mem_model)]
+    static This LoadCoherent<
+        let matrixLayout : CoopMatMatrixLayout
+    >(T* buffer, uint element, uint stride, constexpr MemoryScope memoryScope)
+    {
+        enableVMMDeviceScopeCapabilityIfNeeded(memoryScope);
+        let alignment = 16U;
+        const int32_t scope = (int32_t)memoryScope;
+        return spirv_asm
+        {
+            %pointer:$$T* = OpPtrAccessChain $buffer $element;
+            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned|MakePointerVisible|NonPrivatePointer !alignment $scope;
         };
     }
 
@@ -24453,6 +24609,24 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 }
 
 [ForceInline]
+[require(cooperative_matrix, vk_mem_model)]
+CoopMat<T, S, M, N, R> coopMatLoadCoherent<
+    T : __BuiltinArithmeticType,
+    let S : MemoryScope,
+    let M : int,
+    let N : int,
+    let R : CoopMatMatrixUse,
+    let matrixLayout : CoopMatMatrixLayout
+>(
+    T* buffer,
+    uint element,
+    uint stride,
+    constexpr MemoryScope memoryScope)
+{
+    return CoopMat<T, S, M, N, R>.LoadCoherent<matrixLayout>(buffer, element, stride, memoryScope);
+}
+
+[ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
     T : __BuiltinArithmeticType,
@@ -24818,6 +24992,20 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         };
     }
 
+    // TODO: make this function an intrinsic and support all types via the single intrinsic
+    [require(cooperative_vector, vk_mem_model)]
+    void storeCoherent(T* buffer, int32_t byteOffset16ByteAligned = 0, constexpr MemoryScope memoryScope = MemoryScope::Device)
+    {
+        enableVMMDeviceScopeCapabilityIfNeeded(memoryScope);
+        let pointer = Ptr<T[]>(buffer);
+        let alignment = 16U;
+        const int32_t scope = (int32_t)memoryScope;
+        spirv_asm
+        {
+            OpCooperativeVectorStoreNV $pointer $byteOffset16ByteAligned $this Aligned|MakePointerAvailable|NonPrivatePointer !alignment $scope;
+        };
+    }
+
     [ForceInline]
     [require(cooperative_vector)]
     [require(hlsl_coopvec_poc)]
@@ -24987,6 +25175,20 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         return spirv_asm
         {
             result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV $pointer $byteOffset16ByteAligned Aligned !alignment;
+        };
+    }
+
+    // TODO: make this function an intrinsic and support all types via the single intrinsic
+    [require(cooperative_vector, vk_mem_model)]
+    static CoopVec<T, N> loadCoherent(T* buffer, int32_t byteOffset16ByteAligned = 0, constexpr MemoryScope memoryScope = MemoryScope::Device)
+    {
+        enableVMMDeviceScopeCapabilityIfNeeded(memoryScope);
+        let pointer = Ptr<T[]>(buffer);
+        let alignment = 16U;
+        const int32_t scope = (int32_t)memoryScope;
+        return spirv_asm
+        {
+            result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV $pointer $byteOffset16ByteAligned Aligned|MakePointerVisible|NonPrivatePointer !alignment $scope;
         };
     }
 
@@ -25492,7 +25694,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     // Careful, this takes the offset in elements
     [ForceInline]
     [require(hlsl)]
-    [require(hlsl_coopvec_poc)]
+    [require(hlsl_coopvec_poc_sm_6_9)]
     void __Load(__constref groupshared T buffer[M], uint elemOffset)
     {
         static_assert(N <= M, "The given groupshared array is smaller than the given CoopVec");
@@ -25503,7 +25705,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             for(int i = 0; i < N; ++i)
                 this[i] = buffer[i + elemOffset];
             return;
-        case hlsl_coopvec_poc:
+        case hlsl_coopvec_poc_sm_6_9:
             __intrinsic_asm ".Load";
         }
     }
@@ -26430,6 +26632,13 @@ CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(T* buffer, i
     return CoopVec<T, N>.load(buffer, byteOffset16ByteAligned);
 }
 
+[ForceInline]
+[require(spirv, cooperative_vector, vk_mem_model)]
+CoopVec<T, N> coopVecLoadCoherent<let N : int, T : __BuiltinArithmeticType>(T* buffer, int32_t byteOffset16ByteAligned = 0, constexpr MemoryScope memoryScope = MemoryScope::Device)
+{
+    return CoopVec<T, N>.loadCoherent(buffer, byteOffset16ByteAligned, memoryScope);
+}
+
 // Groupshared
 [ForceInline]
 [require(cooperative_vector)]
@@ -27165,7 +27374,7 @@ if(buffer.isRW)
 /// }
 /// ```
 [require(cooperative_vector)]
-[require(hlsl_coopvec_poc)]
+[require(hlsl_coopvec_poc_sm_6_9)]
 [require(optix_coopvec)]
 void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let N : int>(
     CoopVec<T, M> a,
@@ -27183,7 +27392,7 @@ void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let
         uint matrixInterpretationHLSL = __getHLSLCoopVecComponentType(matrixInterpretation);
         uint memoryLayoutHLSL = __getHLSLCoopVecMatrixLayout(memoryLayout);
         return a.__OuterProductAccumulate(b, matrix, matrixOffset, matrixStride, memoryLayoutHLSL, matrixInterpretationHLSL);
-    case hlsl_coopvec_poc:
+    case hlsl_coopvec_poc_sm_6_9:
         __intrinsic_asm "$0.OuterProductAccumulate($1, $2, $3, $4, $5, $6)";
     case spirv:
         let matrixInterpretationSpirv : int = __getSpvCoopVecComponentType(matrixInterpretation);

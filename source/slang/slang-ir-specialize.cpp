@@ -982,7 +982,7 @@ struct SpecializationContext
                     shouldSkip = true;
                     break;
                 }
-                if (item->getOperand(i)->getOp() == kIROp_Undefined)
+                if (as<IRUndefined>(item->getOperand(i)))
                 {
                     shouldSkip = true;
                     break;
@@ -1163,7 +1163,8 @@ struct SpecializationContext
                     // top-down through the program, so that we want to process
                     // the children of an instruction in their original order.
                     //
-                    for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
+                    for (auto child = inst->getLastDecorationOrChild(); child;
+                         child = child->getPrevInst())
                     {
                         // Also note that `addToWorkList` has been written
                         // to avoid adding any instruction that is a descendent
@@ -2055,6 +2056,7 @@ struct SpecializationContext
             }
         }
 
+        fixUpDebugFuncType(newFunc);
         return newFunc;
     }
 

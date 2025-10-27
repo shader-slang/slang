@@ -290,6 +290,13 @@ void addSiblingScopeForContainerDecl(ASTBuilder* builder, Scope* destScope, Cont
     destScope->nextSibling = subScope;
 }
 
+ContainerDecl* isStaticScopeDecl(Decl* decl)
+{
+    if (as<NamespaceDeclBase>(decl) || as<FileDecl>(decl))
+        return as<ContainerDecl>(decl);
+    return nullptr;
+}
+
 void SemanticsVisitor::diagnoseDeprecatedDeclRefUsage(
     DeclRef<Decl> declRef,
     SourceLoc loc,
@@ -2934,8 +2941,16 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
         if (!invoke->functionExpr)
             return rs;
 
-        // if this is still an invoke expression, test arguments passed to inout/out parameter are
-        // LValues
+        // if this is still an invoke expression, test arguments passed to inout/out parameter
+        // are LValues.
+        //
+        // A special case that allows us to skip this validation is when `expr` is an identical type
+        // cast, e.g. `(T)(funcThatReturnsT())`. In this case `ResolveInvoke(expr)` will simply
+        // return the argument expr `funcThatReturnsT()`. And we can skip rerunning any `out` param
+        // validation logic on the inner expr.
+        if (expr->arguments.getCount() == 1 && invoke == expr->arguments[0])
+            return rs;
+
         if (auto funcType = as<FuncType>(invoke->functionExpr->type))
         {
             if (!funcType->getErrorType()->equals(m_astBuilder->getBottomType()))
@@ -2958,9 +2973,9 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 auto paramType = funcType->getParamTypeWithDirectionWrapper(pp);
                 Expr* argExpr = nullptr;
                 ParamDecl* paramDecl = nullptr;
-                if (pp < expr->arguments.getCount())
+                if (pp < invoke->arguments.getCount())
                 {
-                    argExpr = expr->arguments[pp];
+                    argExpr = invoke->arguments[pp];
                     if (funcDeclBase)
                         paramDecl = funcDeclBase->getParameters()[pp];
                 }
@@ -2982,18 +2997,19 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                             auto implicitCastExpr = as<ImplicitCastExpr>(argExpr);
 
                             // NOTE:
-                            // This is currently only enabled for in/inout based scenarios. Ie NOT
-                            // ref.
+                            // This is currently only enabled for in/inout based scenarios. Ie
+                            // NOT ref.
                             //
                             // Depending on the target there can be an issue around atomics.
                             // The fall back transformation with InOut/OutImplicitCast is to
                             // introduce a temporary, and do the work on that and copy back.
                             //
-                            // This doesn't work with an atomic. So the work around is to not enable
-                            // the transformation with ref types, which atomics are defined on.
+                            // This doesn't work with an atomic. So the work around is to not
+                            // enable the transformation with ref types, which atomics are
+                            // defined on.
                             //
-                            // An argument can be made that transformation shouldn't apply to the
-                            // ref scenario in general.
+                            // An argument can be made that transformation shouldn't apply to
+                            // the ref scenario in general.
                             if (implicitCastExpr && as<OutParamTypeBase>(paramType) &&
                                 _canLValueCoerce(
                                     implicitCastExpr->arguments[0]->type,
@@ -3007,10 +3023,11 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                                 // a += b;
                                 // ```
                                 // That strictly speaking it's not allowed, but we are going to
-                                // allow it for now for situations were the types are uint/int and
-                                // vector/matrix varieties of those types
+                                // allow it for now for situations were the types are uint/int
+                                // and vector/matrix varieties of those types
                                 //
-                                // Then in lowering we are going to insert code to do something like
+                                // Then in lowering we are going to insert code to do something
+                                // like
                                 // ```
                                 // var OutType: tmp = arg;
                                 // f(... tmp);
@@ -3035,13 +3052,14 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                                             *implicitCastExpr);
                                 }
 
-                                // Replace the expression. This should make this situation easier to
-                                // detect.
-                                expr->arguments[pp] = lValueImplicitCast;
+                                // Replace the expression. This should make this situation
+                                // easier to detect.
+                                invoke->arguments[pp] = lValueImplicitCast;
                             }
                             else if (!as<ErrorType>(argExpr->type))
                             {
-                                // Emit additional diagnostic for invalid pointer taking operations
+                                // Emit additional diagnostic for invalid pointer taking
+                                // operations
                                 auto funcDeclRef = funcDeclRefExpr
                                                        ? getDeclRef(m_astBuilder, funcDeclRefExpr)
                                                        : DeclRef<Decl>();
@@ -3079,16 +3097,17 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                                     // Try and determine reason for failure
                                     if (as<RefParamType>(paramType))
                                     {
-                                        // Ref types are not allowed to use this mechanism because
-                                        // it breaks atomics
+                                        // Ref types are not allowed to use this mechanism
+                                        // because it breaks atomics
                                         diagnostic = &Diagnostics::implicitCastUsedAsLValueRef;
                                     }
                                     else if (!_canLValueCoerce(
                                                  implicitCastExpr->arguments[0]->type,
                                                  implicitCastExpr->type))
                                     {
-                                        // We restict what types can use this mechanism - currently
-                                        // int/uint and same sized matrix/vectors of those types.
+                                        // We restict what types can use this mechanism -
+                                        // currently int/uint and same sized matrix/vectors of
+                                        // those types.
                                         diagnostic = &Diagnostics::implicitCastUsedAsLValueType;
                                     }
                                     else
