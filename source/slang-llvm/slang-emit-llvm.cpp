@@ -1,8 +1,7 @@
-#include "slang-emit-llvm.h"
-#include "slang-ir-insts.h"
-#include "slang-ir-util.h"
-#include "slang-ir-layout.h"
-#include "slang-ir-lower-buffer-element-type.h"
+#include "../slang/slang-ir-insts.h"
+#include "../slang/slang-ir-util.h"
+#include "../slang/slang-ir-layout.h"
+#include "../slang/slang-ir-lower-buffer-element-type.h"
 #include "../core/slang-char-util.h"
 #include "../core/slang-func-ptr.h"
 #include "../compiler-core/slang-artifact-associated-impl.h"
@@ -33,8 +32,10 @@
 
 using namespace slang;
 
-namespace Slang
+namespace slang_llvm
 {
+
+using namespace Slang;
 
 // TODO: Merge this with LLVMJITSharedLibrary from slang-llvm, there's nothing
 // unique here.
@@ -4294,54 +4295,57 @@ struct LLVMEmitter
     }
 };
 
-SlangResult emitLLVMAssemblyFromIR(
-    CodeGenContext* codeGenContext,
-    IRModule* irModule,
-    IArtifact** outArtifact)
+} // namespace slang_llvm
+
+extern "C" SLANG_DLL_EXPORT
+SlangResult emitLLVMAssemblyFromIR_V1(
+    Slang::CodeGenContext* codeGenContext,
+    Slang::IRModule* irModule,
+    Slang::IArtifact** outArtifact)
 {
-    LLVMEmitter emitter(codeGenContext);
+    slang_llvm::LLVMEmitter emitter(codeGenContext);
     emitter.processModule(irModule);
     emitter.finalize();
 
-    String assembly;
+    Slang::String assembly;
     emitter.dumpAssembly(assembly);
 
-    ComPtr<ISlangBlob> blob = StringBlob::create(assembly);
-    auto artifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(codeGenContext->getTargetFormat()));
+    Slang::ComPtr<ISlangBlob> blob = Slang::StringBlob::create(assembly);
+    auto artifact = Slang::ArtifactUtil::createArtifactForCompileTarget(asExternal(codeGenContext->getTargetFormat()));
     artifact->addRepresentationUnknown(blob);
     *outArtifact = artifact.detach();
     return SLANG_OK;
 }
 
-SlangResult emitLLVMObjectFromIR(
-    CodeGenContext* codeGenContext,
-    IRModule* irModule,
-    IArtifact** outArtifact)
+extern "C" SLANG_DLL_EXPORT
+SlangResult emitLLVMObjectFromIR_V1(
+    Slang::CodeGenContext* codeGenContext,
+    Slang::IRModule* irModule,
+    Slang::IArtifact** outArtifact)
 {
-    LLVMEmitter emitter(codeGenContext);
+    slang_llvm::LLVMEmitter emitter(codeGenContext);
     emitter.processModule(irModule);
     emitter.finalize();
 
-    List<uint8_t> object;
+    Slang::List<uint8_t> object;
     emitter.generateObjectCode(object);
 
-    ComPtr<ISlangBlob> blob = RawBlob::create(object.getBuffer(), object.getCount());
-    auto artifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(codeGenContext->getTargetFormat()));
+    Slang::ComPtr<ISlangBlob> blob = Slang::RawBlob::create(object.getBuffer(), object.getCount());
+    auto artifact = Slang::ArtifactUtil::createArtifactForCompileTarget(asExternal(codeGenContext->getTargetFormat()));
     artifact->addRepresentationUnknown(blob);
     *outArtifact = artifact.detach();
 
     return SLANG_OK;
 }
 
-SlangResult emitLLVMJITFromIR(
-    CodeGenContext* codeGenContext,
-    IRModule* irModule,
-    IArtifact** outArtifact)
+extern "C" SLANG_DLL_EXPORT
+SlangResult emitLLVMJITFromIR_V1(
+    Slang::CodeGenContext* codeGenContext,
+    Slang::IRModule* irModule,
+    Slang::IArtifact** outArtifact)
 {
-    LLVMEmitter emitter(codeGenContext, true);
+    slang_llvm::LLVMEmitter emitter(codeGenContext, true);
     emitter.processModule(irModule);
     emitter.finalize();
     return emitter.generateJITLibrary(outArtifact);
 }
-
-} // namespace Slang

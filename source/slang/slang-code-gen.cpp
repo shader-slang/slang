@@ -1166,16 +1166,8 @@ SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     case CodeGenTarget::LLVMShaderAssembly:
     case CodeGenTarget::LLVMShaderObjectCode:
     case CodeGenTarget::LLVMShaderHostCallable:
-#if SLANG_ENABLE_LLVM_TARGET
         SLANG_RETURN_ON_FAIL(emitLLVMForEntryPoints(this, outArtifact));
         return SLANG_OK;
-#else
-        getSink()->diagnose(
-            SourceLoc(),
-            Diagnostics::unableToGenerateCodeForTarget,
-            TypeTextUtil::getCompileTargetName(SlangCompileTarget(target)));
-        return SLANG_FAIL;
-#endif
     default:
         break;
     }
