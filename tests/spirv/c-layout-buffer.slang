@@ -44,14 +44,14 @@ void computeMain()
     outputBuffer[3] = cpuBuffer[1].test2;
 }
 
-// SPIRV: OpMemberDecorate %A_c{{.*}} 0 Offset 0
-// SPIRV: OpMemberDecorate %A_c{{.*}} 1 Offset 8
-// SPIRV: OpMemberDecorate %B_c{{.*}} 0 Offset 0
-// SPIRV: OpMemberDecorate %C_c{{.*}} 0 Offset 0
-// SPIRV: OpMemberDecorate %C_c{{.*}} 1 Offset 16
-// SPIRV: OpMemberDecorate %C_c{{.*}} 2 Offset 20
-// SPIRV: OpMemberDecorate %C_c{{.*}} 3 Offset 32
-// SPIRV: OpMemberDecorate %C_c{{.*}} 4 Offset 36
-// SPIRV: OpMemberDecorate %C_c{{.*}} 5 Offset 37
-// SPIRV: OpDecorate %_runtimearr_C_c{{.*}} ArrayStride 40
+// SPIRV: OpMemberDecorate %A_c 0 Offset 0
+// SPIRV: OpMemberDecorate %A_c 1 Offset 8
+// SPIRV: OpMemberDecorate %B_c 0 Offset 0
+// SPIRV: OpMemberDecorate %C_c 0 Offset 0
+// SPIRV: OpMemberDecorate %C_c 1 Offset 16
+// SPIRV: OpMemberDecorate %C_c 2 Offset 20
+// SPIRV: OpMemberDecorate %C_c 3 Offset 32
+// SPIRV: OpMemberDecorate %C_c 4 Offset 36
+// SPIRV: OpMemberDecorate %C_c 5 Offset 37
+// SPIRV: OpDecorate %_runtimearr_C_c ArrayStride 40
 
