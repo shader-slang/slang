@@ -57,9 +57,16 @@ function(fetch_or_build_slang_llvm)
         slang_add_target(
             source/slang-llvm
             MODULE
-            LINK_WITH_PRIVATE core compiler-core clang-dep
-            # We include slang.h, but don't need to link with it
-            INCLUDE_FROM_PRIVATE slang
+            # Unfortunately, we need to link to the objects of libslang;
+            # otherwise things like IRBuilder aren't available in
+            # slang-emit-llvm.cpp.
+            LINK_WITH_PRIVATE
+                slang-common-objects
+                slang-no-embedded-core-module
+                slang-no-embedded-core-module-source
+                core
+                compiler-core
+                clang-dep
             # We include tools/slang-test/filecheck.h, but don't need to link
             # with it and it might not be a target if SLANG_ENABLE_TESTS is
             # false, so just include the directory manually here
@@ -70,15 +77,20 @@ function(fetch_or_build_slang_llvm)
             INSTALL
             INSTALL_COMPONENT slang-llvm
             EXPORT_SET_NAME SlangTargets
+            # The slang target must be built first so that fiddle generates the
+            # required headers.
+            REQUIRES slang
         )
 
-        llvm_config(slang-llvm ${LLVM_LINK_TYPE} filecheck native orcjit)
+        llvm_config(slang-llvm ${LLVM_LINK_TYPE} core support filecheck native orcjit)
 
         # If we don't include this, then the symbols in the LLVM linked here may
         # conflict with those of other LLVMs linked at runtime, for instance in mesa.
         set_target_properties(
             slang-llvm
-            PROPERTIES CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON
+            PROPERTIES
+                CXX_VISIBILITY_PRESET hidden
+                VISIBILITY_INLINES_HIDDEN ON
         )
         add_supported_cxx_linker_flags(
             slang-llvm
@@ -127,27 +139,4 @@ function(fetch_or_build_slang_llvm)
             )
         endif()
     endif()
-endfunction()
-
-function(configure_llvm_components)
-    # llvm-config is the only reliable way to get the actual library paths;
-    # FindLLVM.cmake misreports them on systems which bundle all LLVM libraries
-    # into one, e.g. OpenSUSE.
-    find_program(LLVM_CONFIG NAMES "llvm-config" "llvm-config-21" "llvm-config-20" "llvm-config-19" REQUIRED)
-    macro(run_llvm_config VARIABLE_NAME)
-        execute_process(
-            COMMAND "${LLVM_CONFIG}" ${ARGN}
-            OUTPUT_VARIABLE OUTPUT_VALUE
-            COMMAND_ERROR_IS_FATAL ANY
-            OUTPUT_STRIP_TRAILING_WHITESPACE
-        )
-        set(${VARIABLE_NAME} ${OUTPUT_VALUE} PARENT_SCOPE)
-    endmacro()
-
-    run_llvm_config(LLVM_LIBS "--libs" ${ARGN})
-    run_llvm_config(LLVM_INCLUDE_DIRS "--includedir")
-    run_llvm_config(LLVM_CXXFLAGS "--cxxflags")
-    run_llvm_config(LLVM_LDFLAGS "--ldflags")
-
-    separate_arguments(LLVM_LIBS)
 endfunction()

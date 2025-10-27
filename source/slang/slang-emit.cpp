@@ -15,7 +15,6 @@
 #include "slang-emit-cuda.h"
 #include "slang-emit-glsl.h"
 #include "slang-emit-hlsl.h"
-#include "slang-emit-llvm.h"
 #include "slang-emit-metal.h"
 #include "slang-emit-slang.h"
 #include "slang-emit-source-writer.h"
@@ -2898,16 +2897,33 @@ SlangResult emitHostVMCode(CodeGenContext* codeGenContext, ComPtr<IArtifact>& ou
     return SLANG_OK;
 }
 
-#if SLANG_ENABLE_LLVM_TARGET
 SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtifact>& outArtifact)
 {
+    ComPtr<ISlangSharedLibrary> library;
+
+    auto libraryLoader = codeGenContext->getSession()->m_sharedLibraryLoader;
+    auto result = libraryLoader->loadSharedLibrary("slang-llvm", library.writeRef());
     auto target = codeGenContext->getTargetFormat();
+
+    if (result == SLANG_FAIL)
+    {
+        codeGenContext->getSink()->diagnose(
+            SourceLoc(),
+            Diagnostics::unableToGenerateCodeForTarget,
+            TypeTextUtil::getCompileTargetName(SlangCompileTarget(target)));
+        return SLANG_FAIL;
+    }
 
     LinkedIR linkedIR;
     LinkingAndOptimizationOptions linkingAndOptimizationOptions;
     linkingAndOptimizationOptions.shouldLegalizeExistentialAndResourceTypes = false;
     SLANG_RETURN_ON_FAIL(
         linkAndOptimizeIR(codeGenContext, linkingAndOptimizationOptions, linkedIR));
+
+    using LLVMEmitterFunc = SlangResult (*)(
+        CodeGenContext* codeGenContext,
+        IRModule* irModule,
+        IArtifact** outArtifact);
 
     auto irModule = linkedIR.module;
 
@@ -2924,7 +2940,8 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
     case CodeGenTarget::LLVMShaderObjectCode:
         {
             IArtifact* artifact = nullptr;
-            emitLLVMObjectFromIR(codeGenContext, irModule, &artifact);
+            auto emit = (LLVMEmitterFunc)library->findFuncByName("emitLLVMObjectFromIR_V1");
+            emit(codeGenContext, irModule, &artifact);
             outArtifact = ComPtr<IArtifact>(artifact);
         }
         break;
@@ -2932,7 +2949,8 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
     case CodeGenTarget::LLVMShaderAssembly:
         {
             IArtifact* artifact = nullptr;
-            emitLLVMAssemblyFromIR(codeGenContext, irModule, &artifact);
+            auto emit = (LLVMEmitterFunc)library->findFuncByName("emitLLVMAssemblyFromIR_V1");
+            emit(codeGenContext, irModule, &artifact);
             outArtifact = ComPtr<IArtifact>(artifact);
         }
         break;
@@ -2940,7 +2958,8 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
     case CodeGenTarget::LLVMShaderHostCallable:
         {
             IArtifact* artifact = nullptr;
-            emitLLVMJITFromIR(codeGenContext, irModule, &artifact);
+            auto emit = (LLVMEmitterFunc)library->findFuncByName("emitLLVMJITFromIR_V1");
+            emit(codeGenContext, irModule, &artifact);
             outArtifact = ComPtr<IArtifact>(artifact);
         }
         break;
@@ -2948,6 +2967,5 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
 
     return SLANG_OK;
 }
-#endif
 
 } // namespace Slang

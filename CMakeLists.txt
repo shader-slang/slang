@@ -125,8 +125,6 @@ option(
 
 option(SLANG_ENABLE_DXIL "Enable generating DXIL with DXC" ON)
 
-option(SLANG_ENABLE_LLVM "Enable LLVM target" OFF)
-
 option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)")
 option(SLANG_ENABLE_IR_BREAK_ALLOC "Enable _debugUID on IR allocation")
 option(SLANG_ENABLE_ASAN "Enable ASAN (address sanitizer)")
@@ -339,7 +337,7 @@ enum_option(
     "Do not build llvm or fetch slang-llvm"
 )
 
-if((NOT SLANG_ENABLE_LLVM) AND (SLANG_SLANG_LLVM_FLAVOR MATCHES FETCH_BINARY))
+if(SLANG_SLANG_LLVM_FLAVOR MATCHES FETCH_BINARY)
     # If the user didn't specify a URL, find the best one now
     if(NOT SLANG_SLANG_LLVM_BINARY_URL)
         get_best_slang_binary_release_url("${SLANG_GITHUB_TOKEN}" url)
@@ -386,10 +384,6 @@ if(NOT SLANG_EXCLUDE_TINT)
             "https://github.com/shader-slang/dawn/releases/download/${slang_tint_release_tag}/slang-tint-windows-x64.zip"
         )
     endif()
-endif()
-
-if(SLANG_ENABLE_LLVM)
-    configure_llvm_components(core support)
 endif()
 
 #
