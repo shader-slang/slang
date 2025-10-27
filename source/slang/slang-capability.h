@@ -29,6 +29,9 @@ namespace Slang
 //
 #include "slang-generated-capability-defs.h"
 
+class CapabilitySetVal;
+class ASTBuilder;
+
 // Once we have a universe of suitable capability atoms, we can define
 // the capabilities of a target as simply the set of all atomic capabilities
 // that it supports.
@@ -51,6 +54,11 @@ namespace Slang
 struct CapabilityAtomSet : UIntSet
 {
     using UIntSet::UIntSet;
+
+    CapabilityAtomSet(const UIntSet& set)
+        : UIntSet(set)
+    {
+    }
 
     CapabilityAtomSet newSetWithoutImpliedAtoms() const;
 };
@@ -408,6 +416,10 @@ public:
         }
     }
 
+    /// Convert this mutable capability set to an immutable CapabilitySetVal
+    /// using the provided ASTBuilder for deduplication
+    CapabilitySetVal* freeze(ASTBuilder* astBuilder) const;
+
 private:
     /// underlying data of CapabilitySet.
     CapabilityTargetSets m_targetSets{};
@@ -493,17 +505,17 @@ class CapabilitySetTracker
 {
 public:
     static CapabilitySetTracker& getInstance();
-    
+
     void beginTracking();
     void endTracking();
     void registerCapabilitySet(const CapabilitySet* capSet);
     void unregisterCapabilitySet(const CapabilitySet* capSet);
-    
+
 private:
     bool m_isTracking = false;
-    bool m_inTrackerOperation = false;  // Guard against recursion
+    bool m_inTrackerOperation = false; // Guard against recursion
     HashSet<const CapabilitySet*> m_trackedSets;
-    
+
     void analyzeAndOutput();
 };
 

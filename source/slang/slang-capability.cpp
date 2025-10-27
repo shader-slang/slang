@@ -2,6 +2,8 @@
 #include "slang-capability.h"
 
 #include "../core/slang-dictionary.h"
+#include "slang-ast-builder.h"
+#include "slang-capability-val.h"
 
 // This file implements the core of the "capability" system.
 
@@ -2335,5 +2337,155 @@ TEST_ERROR_GEN_4 = _sm_6_5 + fragment + vertex + cpp;
 #undef CHECK_CAPS
 
 #endif
+
+//
+// CapabilitySetVal implementation
+//
+
+CapabilityStageSetVal* CapabilityTargetSetVal::findStageSet(CapabilityAtom stage) const
+{
+    // Linear search through sorted list - these lists are typically very short (1-4 items)
+    for (Index i = 0; i < getStageSetCount(); i++)
+    {
+        auto stageSet = getStageSet(i);
+        auto stageAtom = stageSet->getStage();
+        if (stageAtom == stage)
+            return stageSet;
+        if (stageAtom > stage)
+            break; // List is sorted, so we can stop early
+    }
+    return nullptr;
+}
+
+CapabilityTargetSetVal* CapabilitySetVal::findTargetSet(CapabilityAtom target) const
+{
+    // Linear search through sorted list - these lists are typically very short (1-4 items)
+    for (Index i = 0; i < getTargetSetCount(); i++)
+    {
+        auto targetSet = getTargetSet(i);
+        auto targetAtom = targetSet->getTarget();
+        if (targetAtom == target)
+            return targetSet;
+        if (targetAtom > target)
+            break; // List is sorted, so we can stop early
+    }
+    return nullptr;
+}
+
+bool CapabilitySetVal::isInvalid() const
+{
+    // Check if we have the invalid target atom
+    return findTargetSet(CapabilityAtom::Invalid) != nullptr;
+}
+
+CapabilitySet CapabilitySetVal::thaw() const
+{
+    CapabilitySet result;
+
+    if (isEmpty())
+        return result;
+
+    if (isInvalid())
+        return CapabilitySet::makeInvalid();
+
+    auto& targetSets = result.getCapabilityTargetSets();
+
+    // Convert each target set
+    for (Index targetIndex = 0; targetIndex < getTargetSetCount(); targetIndex++)
+    {
+        auto targetSetVal = getTargetSet(targetIndex);
+        auto targetAtom = targetSetVal->getTarget();
+
+        auto& targetSet = targetSets[targetAtom];
+        targetSet.target = targetAtom;
+
+        // Convert each stage set
+        for (Index stageIndex = 0; stageIndex < targetSetVal->getStageSetCount(); stageIndex++)
+        {
+            auto stageSetVal = targetSetVal->getStageSet(stageIndex);
+            auto stageAtom = stageSetVal->getStage();
+
+            auto& stageSet = targetSet.shaderStageSets[stageAtom];
+            stageSet.stage = stageAtom;
+
+            // Convert UIntSetVal back to CapabilityAtomSet
+            auto atomSetVal = stageSetVal->getAtomSet();
+            if (atomSetVal)
+            {
+                CapabilityAtomSet atomSet{atomSetVal->toUIntSet()};
+                stageSet.atomSet = atomSet;
+            }
+        }
+    }
+
+    return result;
+}
+
+CapabilitySetVal* CapabilitySet::freeze(ASTBuilder* astBuilder) const
+{
+    if (isEmpty())
+    {
+        return astBuilder->getOrCreate<CapabilitySetVal>();
+    }
+    
+    if (isInvalid())
+    {
+        // Create invalid capability set with invalid target
+        auto invalidAtomSet = astBuilder->getUIntSetVal(CapabilityAtomSet{});
+        auto invalidStageSet = astBuilder->getOrCreate<CapabilityStageSetVal>(
+            CapabilityAtom::Invalid, invalidAtomSet);
+        auto invalidTargetSet = astBuilder->getOrCreate<CapabilityTargetSetVal>(
+            CapabilityAtom::Invalid, invalidStageSet);
+        return astBuilder->getOrCreate<CapabilitySetVal>(invalidTargetSet);
+    }
+    
+    List<CapabilityTargetSetVal*> targetSetVals;
+    
+    // Convert each target set, maintaining sorted order
+    List<CapabilityAtom> sortedTargets;
+    for (auto& targetPair : m_targetSets)
+    {
+        sortedTargets.add(targetPair.first);
+    }
+    sortedTargets.sort([](CapabilityAtom a, CapabilityAtom b) { return (UInt)a < (UInt)b; });
+    
+    for (auto targetAtom : sortedTargets)
+    {
+        auto& targetSet = *m_targetSets.tryGetValue(targetAtom);
+        List<CapabilityStageSetVal*> stageSetVals;
+        
+        // Convert each stage set, maintaining sorted order
+        List<CapabilityAtom> sortedStages;
+        for (auto& stagePair : targetSet.shaderStageSets)
+        {
+            sortedStages.add(stagePair.first);
+        }
+        sortedStages.sort([](CapabilityAtom a, CapabilityAtom b) { return (UInt)a < (UInt)b; });
+        
+        for (auto stageAtom : sortedStages)
+        {
+            auto& stageSet = *targetSet.shaderStageSets.tryGetValue(stageAtom);
+            
+            // Convert CapabilityAtomSet to UIntSetVal
+            UIntSetVal* atomSetVal;
+            if (stageSet.atomSet.has_value())
+            {
+                atomSetVal = astBuilder->getUIntSetVal(stageSet.atomSet.value());
+            }
+            else
+            {
+                atomSetVal = astBuilder->getUIntSetVal(CapabilityAtomSet{});
+            }
+            
+            auto stageSetVal = astBuilder->getOrCreate<CapabilityStageSetVal>(stageAtom, atomSetVal);
+            stageSetVals.add(stageSetVal);
+        }
+        
+        auto targetSetVal = astBuilder->getOrCreate<CapabilityTargetSetVal>(targetAtom, stageSetVals);
+        targetSetVals.add(targetSetVal);
+    }
+    
+    return astBuilder->getOrCreate<CapabilitySetVal>(targetSetVals);
+}
 
 } // namespace Slang
