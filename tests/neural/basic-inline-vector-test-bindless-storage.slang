@@ -49,35 +49,35 @@ uniform RWStructuredBuffer<float> parametersFloat;
     uniform ElementType* parameters;
     uniform ElementType* dInput;
     uniform ElementType* dParameters;
-    typealias BindlessStorage = PointerStorage<ElementType>;
+    typealias Address = PointerAddress<ElementType>;
 #else
     uniform RWStructuredBuffer<ElementType>.Handle parameters;
     uniform RWStructuredBuffer<ElementType>.Handle dInput;
     uniform RWStructuredBuffer<ElementType>.Handle dParameters;
-    typealias BindlessStorage = BindlessBufferStorage<ElementType>;
+    typealias Address = BindlessAddress<ElementType>;
 #endif
 
 
 [Differentiable]
 OutputVector TestInlineVectorMatMul<InputVector, OutputVector>(
     InputVector input,
-    BindlessStorage.Address address)
+    Address address)
     where InputVector : IVector<ElementType, 4>
     where OutputVector : IVector<ElementType, 2>
 {
-    var outputVec = input.linearTransform<2, BindlessStorage, OutputVector>(address);
+    var outputVec = input.linearTransform<2, Address, OutputVector>(address);
     return outputVec;
 }
 
 [Differentiable]
 OutputVector TestInlineVectorMatMulAdd<InputVector, OutputVector>(
     InputVector input,
-    BindlessStorage.Address weightAddress,
-    BindlessStorage.Address biasAddress)
+    Address weightAddress,
+    Address biasAddress)
     where InputVector : IVector<ElementType, 4>
     where OutputVector : IVector<ElementType, 2>
 {
-    var outputVec = input.linearTransform<2, BindlessStorage, OutputVector>(weightAddress, biasAddress);
+    var outputVec = input.linearTransform<2, Address, OutputVector>(weightAddress, biasAddress);
     return outputVec;
 }
 
@@ -86,8 +86,8 @@ bool BasicTestWithoutBias()
 {
     ElementType[4] inputData = {ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0)};
     let input = InlineVector<ElementType, 4>(inputData);
-    BindlessStorage.Address weightAddress = { parameters };
-    BindlessStorage.Address dWeightAddress = { dParameters };
+    Address weightAddress = { parameters };
+    Address dWeightAddress = { dParameters };
 
     // Run the forward pass
     let outputVec = TestInlineVectorMatMul<InlineVector<ElementType, 4>, InlineVector<ElementType, 2>>(input, weightAddress);
@@ -96,7 +96,7 @@ bool BasicTestWithoutBias()
     // (5*1 + 6*2 + 7*3 + 8*4) = 70.0
     bool isPassed = (outputVec[0] == 30.0 && outputVec[1] == 70.0);
 
-    var weightDiffPair = DifferentialPtrPair<BindlessStorage.Address>(weightAddress, dWeightAddress);
+    var weightDiffPair = DifferentialPtrPair<Address>(weightAddress, dWeightAddress);
     let dRes = InlineVector<ElementType, 2>(1.0f);
     var dPair = diffPair(input);
 
@@ -124,10 +124,10 @@ bool BasicTestWithBias()
 {
     ElementType[4] inputData = {ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0)};
     let input = InlineVector<ElementType, 4>(inputData);
-    BindlessStorage.Address weightAddress = BindlessStorage.Address(parameters);
-    BindlessStorage.Address biasAddress = weightAddress.getOffset(8);
-    BindlessStorage.Address dWeightAddress = BindlessStorage.Address(dParameters);
-    BindlessStorage.Address dBiasAddress = dWeightAddress.getOffset(8);
+    Address weightAddress = Address(parameters);
+    Address biasAddress = weightAddress.getOffset(8);
+    Address dWeightAddress = Address(dParameters);
+    Address dBiasAddress = dWeightAddress.getOffset(8);
 
     // Run the forward pass
     let outputVec = TestInlineVectorMatMulAdd<InlineVector<ElementType, 4>, InlineVector<ElementType, 2>>(input, weightAddress, biasAddress);
@@ -136,8 +136,8 @@ bool BasicTestWithBias()
     // (5*1 + 6*2 + 7*3 + 8*4) + 10.0 = 80.0
     bool isPassed = (outputVec[0] == 39.0 && outputVec[1] == 80.0);
 
-    var weightDiffPair = DifferentialPtrPair<BindlessStorage.Address>(weightAddress, dWeightAddress);
-    var biasDiffPair = DifferentialPtrPair<BindlessStorage.Address>(biasAddress, dBiasAddress);
+    var weightDiffPair = DifferentialPtrPair<Address>(weightAddress, dWeightAddress);
+    var biasDiffPair = DifferentialPtrPair<Address>(biasAddress, dBiasAddress);
     let dOutput = InlineVector<ElementType, 2>(1.0);
     var dPair = diffPair(input);
 

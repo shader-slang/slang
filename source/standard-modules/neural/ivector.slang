@@ -135,11 +135,9 @@ public interface IVector<T, int N> : IDifferentiable
     - `OutputVector` must conform to `IVector<T, OutputSize>`
     */
     [Differentiable]
-    public OutputVector linearTransform<int OutputSize, BindlessStorage, OutputVector>(
-        BindlessStorage.Address weightAddress)
-            where BindlessStorage : IStorage<T>
-            where BindlessStorage.Address : IPointerLikeAddress<T>
-            where BindlessStorage.Address.Differential : IPointerLikeAddress<T.Differential>
+    public OutputVector linearTransform<int OutputSize, Address, OutputVector>(Address weightAddress)
+            where Address : IPointerLikeAddress<T>
+            where Address.Differential : IPointerLikeAddress<T.Differential>
             where OutputVector : IVector<T, OutputSize>;
 
     /**
@@ -165,11 +163,9 @@ public interface IVector<T, int N> : IDifferentiable
     - `OutputVector` must conform to `IVector<T, OutputSize>`
     */
     [Differentiable]
-    public OutputVector linearTransform<int OutputSize, BindlessStorage, OutputVector>(
-        BindlessStorage.Address weightAddress,
-        BindlessStorage.Address biasAddress)
-            where BindlessStorage : IStorage<T>
-            where BindlessStorage.Address : IPointerLikeAddress<T>
-            where BindlessStorage.Address.Differential : IPointerLikeAddress<T.Differential>
+    public OutputVector linearTransform<int OutputSize, Address, OutputVector>(
+        Address weightAddress, Address biasAddress)
+            where Address : IPointerLikeAddress<T>
+            where Address.Differential : IPointerLikeAddress<T.Differential>
             where OutputVector : IVector<T, OutputSize>;
 }
