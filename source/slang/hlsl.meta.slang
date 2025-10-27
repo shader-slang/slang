@@ -698,8 +698,48 @@ struct _Texture<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let is
 }
 
 //@hidden:
-// Combined texture sampler specific functions
 
+// Returns true when the stage supports implicit derivatives on the
+// target. This must match with compound capability `fragmentprocessing`.
+//
+[__readNone]
+[ForceInline]
+bool __targetHasImplicitDerivatives()
+{
+    __stage_switch
+    {
+    case fragment:
+        return true;
+
+    case compute:
+    case _raygen:
+    case _intersection:
+    case _anyhit:
+    case _closesthit:
+    case _miss:
+    case _callable:
+    case _amplification:
+    case _mesh:
+        __target_switch
+        {
+        case _GL_NV_compute_shader_derivatives:
+        case SPV_KHR_compute_shader_derivatives:
+        case _sm_6_6:
+            return true;
+
+        case hlsl:
+        case glsl:
+        case spirv:
+        default:
+            return false;
+        }
+
+    default:
+        return false;
+    }
+}
+
+// Combined texture sampler specific functions
 [require(glsl, texture_sm_4_1)]
 float __glsl_texture<TSampler, TCoord>(TSampler s, TCoord value)
 {
@@ -917,7 +957,6 @@ void __wgsl_check_texture_type_texel_offset()
          , "WGSL texture shape must be 2D or 3D when sampling with texel offsets");
 }
 
-
 //@public:
 
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int, let format:int>
@@ -1000,7 +1039,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     ///                   This parameter is currently only used when targeting HLSL.
     ///                   For other targets, the result status is always 0.
     ///@return The sampled texture value.
-    ///@see `SampleBias`, `SampleLevel`, `SampleGrad`, `SampleCmp`, `SampleCmpLevelZero`, `SampleCmpLevel`.
+    ///@see `SampleBias`, `SampleLevel`, `SampleLevelZero`, `SampleGrad`, `SampleCmp`, `SampleCmpLevelZero`, `SampleCmpLevel`.
     ///@remarks
     /// The `Sample` function is defined for all read-only texture types, including
     /// `Texture1D`, `Texture2D`, `Texture3D`, `TextureCube`,
@@ -1299,6 +1338,27 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             return __getTexture().SampleCmpLevelZero(__getComparisonSampler(), location, compareValue);
         case wgsl:
             return __getTexture().SampleCmpLevelZero(__getComparisonSampler(), location, compareValue);
+        case glsl:
+            if (!__targetHasImplicitDerivatives())
+            {
+                if (Shape.dimensions == 1 && isArray == 0)
+                {
+                    return __glsl_texture_1d_shadow(this, __makeVector(__makeVector(location, 0.0), compareValue));
+                }
+                else if (Shape.dimensions == 3 && isArray == 1)
+                {
+                    return __glsl_texture_3d_array_shadow(this, location, compareValue);
+                }
+                else
+                {
+                    return __glsl_texture(this, __makeVector(location, compareValue));
+                }
+            }
+            else
+            {
+                return SampleCmpLevel(location, compareValue, 0.0);
+            }
+
         default:
             return SampleCmpLevel(location, compareValue, 0.0);
         }
@@ -1382,6 +1442,22 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             return __getTexture().SampleCmpLevelZero(__getComparisonSampler(), location, compareValue, offset);
         case wgsl:
             return __getTexture().SampleCmpLevelZero(__getComparisonSampler(), location, compareValue, offset);
+        case glsl:
+            if (!__targetHasImplicitDerivatives())
+            {
+                if (Shape.dimensions == 1 && isArray == 0)
+                {
+                    return __glsl_texture_offset_1d_shadow(this, __makeVector(__makeVector(location, 0.0), compareValue), offset);
+                }
+                else
+                {
+                    return __glsl_texture_offset(this, __makeVector(location, compareValue), offset);
+                }
+            }
+            else
+            {
+                return SampleCmpLevel(location, compareValue, 0.0, offset);
+            }
         default:
             return SampleCmpLevel(location, compareValue, 0.0, offset);
         }
@@ -1418,6 +1494,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             }
             else
             {
+                static_assert(Shape.dimensions < 3 || isArray == 0, "GLSL: textureLod() does not support cube map arrays");
                 return __glsl_texture_level(this, __makeVector(location, compareValue), level);
             }
         case hlsl:
@@ -1719,6 +1796,52 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 __truncate $$T result __sampledType(T) %sampled;
             };
         }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
+    T SampleLevelZero(vector<float, Shape.dimensions+isArray> location)
+    {
+        __target_switch
+        {
+        case glsl:
+            if (!__targetHasImplicitDerivatives())
+                __intrinsic_asm "$ctexture($0, $1)$z";
+            break;
+
+        default:
+            break;
+        }
+
+        return SampleLevel(location, 0.0f);
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
+    T SampleLevelZero(vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        __target_switch
+        {
+        case glsl:
+            if (!__targetHasImplicitDerivatives())
+                __intrinsic_asm "$ctextureOffset($0, $1, $2)$z";
+            break;
+
+        default:
+            break;
+        }
+
+        return SampleLevel(location, 0.0f, offset);
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, sm_5_0)]
+    T SampleLevelZero(vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
+    {
+        return SampleLevel(location, 0.0f, offset, status);
     }
 }
 
