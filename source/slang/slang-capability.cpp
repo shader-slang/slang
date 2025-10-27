@@ -1495,6 +1495,172 @@ void printDiagnosticArg(StringBuilder& sb, const CapabilitySetVal* capabilitySet
     printDiagnosticArg(sb, CapabilitySet{capabilitySetVal});
 }
 
+void CapabilityStageSetVal::_toTextOverride(StringBuilder& out)
+{
+    out << "CapabilityStageSetVal{";
+    out << "stage=";
+    printDiagnosticArg(out, getStage());
+    out << ", atoms=";
+    if (auto atomSet = getAtomSet())
+    {
+        atomSet->toText(out);
+    }
+    else
+    {
+        out << "null";
+    }
+    out << "}";
+}
+
+void CapabilityTargetSetVal::_toTextOverride(StringBuilder& out)
+{
+    out << "CapabilityTargetSetVal{";
+    out << "target=";
+    printDiagnosticArg(out, getTarget());
+    out << ", stageSets=[";
+    for (Index i = 0; i < getStageSetCount(); i++)
+    {
+        if (i > 0)
+            out << ", ";
+        if (auto stageSet = getStageSet(i))
+        {
+            stageSet->toText(out);
+        }
+        else
+        {
+            out << "null";
+        }
+    }
+    out << "]}";
+}
+
+void CapabilitySetVal::_toTextOverride(StringBuilder& out)
+{
+    out << "CapabilitySetVal{targetSets=[";
+    for (Index i = 0; i < getTargetSetCount(); i++)
+    {
+        if (i > 0)
+            out << ", ";
+        if (auto targetSet = getTargetSet(i))
+        {
+            targetSet->toText(out);
+        }
+        else
+        {
+            out << "null";
+        }
+    }
+    out << "]}";
+}
+
+Val* CapabilityStageSetVal::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+
+    // Substitute the atom set
+    auto newAtomSet = getAtomSet();
+    if (newAtomSet)
+    {
+        newAtomSet = as<UIntSetVal>(newAtomSet->substituteImpl(astBuilder, subst, &diff));
+        if (!newAtomSet)
+            newAtomSet = getAtomSet(); // Keep original if substitution failed
+    }
+
+    if (diff)
+    {
+        if (ioDiff)
+            *ioDiff += diff;
+        return astBuilder->getOrCreate<CapabilityStageSetVal>(getStage(), newAtomSet);
+    }
+
+    return this;
+}
+
+Val* CapabilityTargetSetVal::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    List<CapabilityStageSetVal*> newStageSets;
+
+    // Substitute each stage set operand
+    for (Index i = 0; i < getStageSetCount(); i++)
+    {
+        auto stageSet = getStageSet(i);
+        if (stageSet)
+        {
+            auto newStageSet =
+                as<CapabilityStageSetVal>(stageSet->substituteImpl(astBuilder, subst, &diff));
+            if (!newStageSet)
+                newStageSet = stageSet; // Keep original if substitution failed
+            newStageSets.add(newStageSet);
+        }
+    }
+
+    if (diff)
+    {
+        if (ioDiff)
+            *ioDiff += diff;
+
+        // Create operand list: target atom + stage sets
+        List<Val*> operands;
+        operands.add(
+            astBuilder->getIntVal(astBuilder->getIntType(), (IntegerLiteralValue)getTarget()));
+        for (auto stageSet : newStageSets)
+        {
+            operands.add(stageSet);
+        }
+
+        return astBuilder->getOrCreate<CapabilityTargetSetVal>(operands.getArrayView());
+    }
+
+    return this;
+}
+
+Val* CapabilitySetVal::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    List<CapabilityTargetSetVal*> newTargetSets;
+
+    // Substitute each target set operand
+    for (Index i = 0; i < getTargetSetCount(); i++)
+    {
+        auto targetSet = getTargetSet(i);
+        if (targetSet)
+        {
+            auto newTargetSet =
+                as<CapabilityTargetSetVal>(targetSet->substituteImpl(astBuilder, subst, &diff));
+            if (!newTargetSet)
+                newTargetSet = targetSet; // Keep original if substitution failed
+            newTargetSets.add(newTargetSet);
+        }
+    }
+
+    if (diff)
+    {
+        if (ioDiff)
+            *ioDiff += diff;
+
+        // Create operand list from target sets
+        List<Val*> operands;
+        for (auto targetSet : newTargetSets)
+        {
+            operands.add(targetSet);
+        }
+
+        return astBuilder->getOrCreate<CapabilitySetVal>(operands.getArrayView());
+    }
+
+    return this;
+}
+
 // CapabilitySetTracker implementation - temporary instrumentation
 CapabilitySetTracker& CapabilitySetTracker::getInstance()
 {
