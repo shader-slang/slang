@@ -14074,7 +14074,7 @@ struct CapabilityDeclReferenceVisitor
                 }
                 if (as<StageSwitchStmt>(stmt))
                 {
-                    if (!maybeRequireCapability)
+                    if (!maybeRequireCapability || !maybeRequireCapability->capabilitySet)
                         targetCap = (CapabilitySet(CapabilityName::any_target)
                                          .getStagesThisHasButOtherDoesNot(set));
                     else
@@ -14084,7 +14084,7 @@ struct CapabilityDeclReferenceVisitor
                 }
                 else
                 {
-                    if (!maybeRequireCapability)
+                    if (!maybeRequireCapability || !maybeRequireCapability->capabilitySet)
                         targetCap = (CapabilitySet(CapabilityName::any_target)
                                          .getTargetsThisHasButOtherDoesNot(set));
                     else
@@ -14303,7 +14303,9 @@ CapabilitySet SemanticsDeclCapabilityVisitor::getDeclaredCapabilitySet(Decl* dec
                 if (auto decoration = as<RequireCapabilityAttribute>(mod))
                     localDeclaredCaps.unionWith(CapabilitySet{decoration->capabilitySet});
                 else if (auto entrypoint = as<EntryPointAttribute>(mod))
-                    stageToJoin = entrypoint->capabilitySet->getTargetStage();
+                    stageToJoin = entrypoint->capabilitySet
+                                      ? entrypoint->capabilitySet->getTargetStage()
+                                      : CapabilityAtom::Invalid;
             }
         }
         else

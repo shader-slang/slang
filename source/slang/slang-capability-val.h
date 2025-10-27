@@ -1,13 +1,12 @@
 #pragma once
 
-// #include "../core/slang-dictionary.h"
-// #include "../core/slang-list.h"
-// #include "../core/slang-string.h"
+// If we have these in the slang-capability.h header then we get some circular
+// includes due to the use of capabilty sets somewhere underneath
+// slang-ast-val.h (in slang-profile.h specifically)
+
 #include "slang-ast-val.h"
 #include "slang-capability.h"
 
-// #include <optional>
-// #include <stdint.h>
 
 //
 #include "slang-capability-val.h.fiddle"
@@ -17,12 +16,10 @@ namespace Slang
 {
 
 //
-// Immutable capability set representations using ASTBuilder for deduplication
+// Immutable representation of a capability stage set.
+// Contains a stage atom and an associated UIntSetVal representing the capability atoms.
+// These are deduplicated through the ASTBuilder to reduce memory usage.
 //
-
-/// Immutable representation of a capability stage set.
-/// Contains a stage atom and an associated UIntSetVal representing the capability atoms.
-/// These are deduplicated through the ASTBuilder to reduce memory usage.
 FIDDLE()
 class CapabilityStageSetVal : public Val
 {
@@ -39,9 +36,12 @@ class CapabilityStageSetVal : public Val
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
-/// Immutable representation of a capability target set.
-/// Contains a target atom and a sorted list of CapabilityStageSetVal objects.
-/// Uses sorted lists instead of dictionaries for better cache performance with small collections.
+//
+// Immutable representation of a capability target set.
+// Contains a target atom and a sorted list of CapabilityStageSetVal objects.
+// Uses sorted lists instead of dictionaries (these are never very long,
+// usually ~4 elements)
+//
 FIDDLE()
 class CapabilityTargetSetVal : public Val
 {
@@ -74,10 +74,12 @@ class CapabilityTargetSetVal : public Val
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
-/// Immutable representation of a complete capability set.
-/// Contains a sorted list of CapabilityTargetSetVal objects.
-/// This is the top-level immutable capability representation that can be shared
-/// and deduplicated across the compilation process.
+//
+// Immutable representation of a complete capability set.
+// Contains a sorted list of CapabilityTargetSetVal objects.
+// This is the top-level immutable capability representation that can be shared
+// and deduplicated across the compilation process.
+//
 FIDDLE()
 class CapabilitySetVal : public Val
 {

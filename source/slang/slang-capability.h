@@ -163,12 +163,10 @@ public:
     /// Default-construct an empty capability set
     CapabilitySet();
 
-    explicit CapabilitySet(CapabilitySetVal const* other);
-    CapabilitySet(CapabilitySet const& other);
-    CapabilitySet& operator=(CapabilitySet const& other);
-    CapabilitySet(CapabilitySet&& other);
-    CapabilitySet& operator=(CapabilitySet&& other);
-    ~CapabilitySet();
+    CapabilitySet(CapabilitySet const& other) = default;
+    CapabilitySet& operator=(CapabilitySet const& other) = default;
+    CapabilitySet(CapabilitySet&& other) = default;
+    CapabilitySet& operator=(CapabilitySet&& other) = default;
 
     /// Construct a capability set from an explicit list of atomic capabilities
     CapabilitySet(Int atomCount, CapabilityName const* atoms);
@@ -178,6 +176,9 @@ public:
 
     /// Construct a singleton set from a single atomic capability
     explicit CapabilitySet(CapabilityName atom);
+
+    /// Construct a capability set from an optional CapabilitySetVal
+    explicit CapabilitySet(CapabilitySetVal const* other);
 
     /// Make an empty capability set
     static CapabilitySet makeEmpty();
@@ -418,7 +419,6 @@ public:
     }
 
     /// Convert this mutable capability set to an immutable CapabilitySetVal
-    /// using the provided ASTBuilder for deduplication
     CapabilitySetVal* freeze(ASTBuilder* astBuilder) const;
 
 private:
@@ -500,29 +500,6 @@ const CapabilityAtomSet& getAtomSetOfStages();
 bool hasTargetAtom(const CapabilityAtomSet& setIn, CapabilityAtom& targetAtom);
 
 void freeCapabilityDefs();
-
-// Capability Set Statistics Tracking - temporary instrumentation
-class CapabilitySetTracker
-{
-public:
-    static CapabilitySetTracker& getInstance();
-
-    void beginTracking();
-    void endTracking();
-    void registerCapabilitySet(const CapabilitySet* capSet);
-    void unregisterCapabilitySet(const CapabilitySet* capSet);
-
-private:
-    bool m_isTracking = false;
-    bool m_inTrackerOperation = false; // Guard against recursion
-    HashSet<const CapabilitySet*> m_trackedSets;
-
-    void analyzeAndOutput();
-};
-
-// Global API for instrumentation
-void beginCapabilitySetTracking();
-void endCapabilitySetTracking();
 
 // #define UNIT_TEST_CAPABILITIES
 #ifdef UNIT_TEST_CAPABILITIES

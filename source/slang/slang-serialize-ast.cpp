@@ -3,7 +3,6 @@
 
 #include "core/slang-performance-profiler.h"
 #include "slang-ast-dispatch.h"
-#include "slang-capability.h"
 #include "slang-check.h"
 #include "slang-compiler.h"
 #include "slang-diagnostics.h"
@@ -1961,9 +1960,6 @@ ModuleDecl* readSerializedModuleAST(
 {
     SLANG_PROFILE;
 
-    // // Begin tracking capability sets during deserialization
-    // beginCapabilitySetTracking();
-
     // We expect the `chunk` that was passed in to be a RIFF
     // data chunk (matching what was written in `writeSerializedModuleAST()`,
     // and to be proper fossil-format data.
@@ -2058,9 +2054,6 @@ ModuleDecl* readSerializedModuleAST(
     // on-demand as needed, via the accessor methods on `ContainerDeclDirectMemberDecls`
     // and `ModuleDecl` that are implemented below.
     //
-
-    // // End tracking and output capability set statistics
-    // endCapabilitySetTracking();
 
     return moduleDecl;
 }

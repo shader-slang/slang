@@ -670,7 +670,6 @@ Modifier* SemanticsVisitor::validateAttribute(
             CapabilitySet set{capName};
             entryPointAttr->capabilitySet = set.freeze(getASTBuilder());
             HashSet<CapabilityAtom> stageToBeUsed;
-            // TODO: This can be done without the thaw
             for (auto& targetSet : set.getCapabilityTargetSets())
             {
                 for (auto& stageSet : targetSet.second.shaderStageSets)
@@ -2072,7 +2071,7 @@ void SemanticsVisitor::checkVisibility(Decl* decl)
     }
 }
 
-void postProcessingOnModifiers(Modifiers& modifiers, ASTBuilder* astBuilder)
+void postProcessingOnModifiers(ASTBuilder* astBuilder, Modifiers& modifiers)
 {
     // compress all `require` nodes into 1 `require` modifier
     RequireCapabilityAttribute* firstRequire = nullptr;
@@ -2209,7 +2208,7 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
         }
     }
 
-    postProcessingOnModifiers(syntaxNode->modifiers, m_astBuilder);
+    postProcessingOnModifiers(m_astBuilder, syntaxNode->modifiers);
 }
 
 void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)

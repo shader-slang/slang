@@ -1,7 +1,7 @@
 // slang-ast-type.cpp
 #include "slang-ast-val.h"
 
-#include "../core/slang-uint-set.h"
+#include "core/slang-uint-set.h"
 #include "slang-ast-builder.h"
 #include "slang-ast-dispatch.h"
 #include "slang-ast-natural-layout.h"
@@ -2116,7 +2116,9 @@ Val* IntVal::linkTimeResolve(Dictionary<String, IntVal*>& mapMangledNameToVal)
     SLANG_AST_NODE_VIRTUAL_CALL(IntVal, linkTimeResolve, (mapMangledNameToVal));
 }
 
-// UIntSetVal implementation
+//
+// UIntSetVal
+//
 
 UIntSet UIntSetVal::toUIntSet() const
 {
