@@ -766,9 +766,9 @@ struct LoweredElementTypeContext
             StringBuilder nameSB;
             getTypeNameHint(nameSB, type);
             nameSB << "_" << getLayoutName(config.layoutRuleName);
-            builder.addNameHintDecoration(loweredType, nameSB.produceString().getUnownedSlice());
             if (!config.lowerToPhysicalType)
                 nameSB << "_logical";
+            builder.addNameHintDecoration(loweredType, nameSB.produceString().getUnownedSlice());
             info.loweredType = loweredType;
             // Create fields.
             {
@@ -1336,10 +1336,12 @@ struct LoweredElementTypeContext
                                         // as the lowered storage type. We will declare a temporary
                                         // variable of this "logical storage" type to hold the
                                         // loaded value in Function address space.
+                                        newLoweringConfig =
+                                            TypeLoweringConfig::getLogicalTypeLoweringConfig(
+                                                config);
                                         auto logicalStorageTypeInfo = getLoweredTypeInfo(
                                             user->getDataType(),
-                                            TypeLoweringConfig::getLogicalTypeLoweringConfig(
-                                                config));
+                                            newLoweringConfig);
 
                                         // Try emit an inst that represent the address the load inst
                                         // is loading from.
@@ -1367,7 +1369,6 @@ struct LoweredElementTypeContext
                                         {
                                             builder.emitStore(tempVar, builder.emitLoad(srcPtr));
                                         }
-                                        newLoweringConfig.lowerToPhysicalType = false;
                                     }
                                     else
                                     {
@@ -1518,11 +1519,6 @@ struct LoweredElementTypeContext
                         specializedFuncType,
                         newCasts);
                     specializedFuncs[key] = specializedFunc;
-
-                    // The cloned function may also contain `call`s with
-                    // `CastStorageToLogical` arguments, and we want to add
-                    // thoses calls to the callWorkList for further processing.
-                    discoverCallsToProcess(callWorkList, specializedFunc);
                 }
                 builder.setInsertBefore(call);
                 auto newCall = builder.emitCallInst(
@@ -1595,8 +1591,6 @@ struct LoweredElementTypeContext
                     param,
                     cast->getLayoutConfig());
             }
-            if (auto castStorage = as<IRCastStorageToLogicalBase>(castedParam))
-                outNewCasts.add(castStorage);
 
             // Replace all previous uses of param to use castedParam instead.
             for (auto use : uses)
@@ -1604,6 +1598,17 @@ struct LoweredElementTypeContext
         }
         clonedFunc->setFullType(specializedFuncType);
         removeLinkageDecorations(clonedFunc);
+
+        // Add all `CastStorageToLogical` insts in the cloned func to the worklist
+        // for further processing.
+        for (auto block : clonedFunc->getBlocks())
+        {
+            for (auto child : block->getChildren())
+            {
+                if (auto castStorage = as<IRCastStorageToLogicalBase>(child))
+                    outNewCasts.add(castStorage);
+            }
+        }
         return clonedFunc;
     }
 
@@ -1804,7 +1809,7 @@ struct LoweredElementTypeContext
         auto ptrVal = castInst->getOperand(0);
         auto oldPtrType = castInst->getFullType();
         auto originalElementType = oldPtrType->getOperand(0);
-        auto config = getTypeLoweringConfigForBuffer(target, (IRType*)castInst->getLayoutConfig());
+        auto config = getTypeLoweringConfigFromInst(castInst->getLayoutConfig());
 
 
         LoweredElementTypeInfo loweredElementTypeInfo = {};
