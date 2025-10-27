@@ -102,5 +102,61 @@ class CapabilitySetVal : public Val
 
     /// Check if this capability set is invalid
     bool isInvalid() const;
+
+    // Const member functions from CapabilitySet (dummy implementations using thaw())
+
+    /// Is this capability set incompatible with the given `other` atom.
+    bool isIncompatibleWith(CapabilityAtom other) const { return thaw().isIncompatibleWith(other); }
+
+    /// Is this capability set incompatible with the given `other` name.
+    bool isIncompatibleWith(CapabilityName other) const { return thaw().isIncompatibleWith(other); }
+
+    /// Is this capability set incompatible with the given `other` set.
+    bool isIncompatibleWith(CapabilitySet const& other) const { return thaw().isIncompatibleWith(other); }
+
+    /// Does this capability set imply all the capabilities in `other`?
+    bool implies(CapabilitySet const& other) const { return thaw().implies(other); }
+
+    /// Does this capability set imply at least 1 set in other.
+    CapabilitySet::ImpliesReturnFlags atLeastOneSetImpliedInOther(CapabilitySet const& other) const { return thaw().atLeastOneSetImpliedInOther(other); }
+
+    /// Will a `join` with `other` change `this`?
+    bool joinWithOtherWillChangeThis(CapabilitySet const& other) const { return thaw().joinWithOtherWillChangeThis(other); }
+
+    /// Does this capability set imply the atomic capability `other`?
+    bool implies(CapabilityAtom other) const { return thaw().implies(other); }
+
+    /// Return a capability set of 'target' atoms 'this' has, but 'other' does not.
+    CapabilitySet getTargetsThisHasButOtherDoesNot(const CapabilitySet& other) const { return thaw().getTargetsThisHasButOtherDoesNot(other); }
+
+    /// Return a capability set of 'stage' atoms 'this' has, but 'other' does not.
+    CapabilitySet getStagesThisHasButOtherDoesNot(const CapabilitySet& other) const { return thaw().getStagesThisHasButOtherDoesNot(other); }
+
+    /// Are these two capability sets equal?
+    bool operator==(CapabilitySet const& that) const { return thaw() == that; }
+
+    /// returns true if 'this' is a better target for 'targetCaps' than 'that'
+    /// isEqual: is `this` and `that` equal
+    bool isBetterForTarget(
+        CapabilitySet const& that,
+        CapabilitySet const& targetCaps,
+        bool& isEqual) const 
+    { 
+        return thaw().isBetterForTarget(that, targetCaps, isEqual); 
+    }
+
+    // If this capability set uniquely implies one stage atom, return it. Otherwise returns
+    // CapabilityAtom::Invalid.
+    CapabilityAtom getUniquelyImpliedStageAtom() const { return thaw().getUniquelyImpliedStageAtom(); }
+
+    /// Get access to the raw atomic capabilities that define this set.
+    /// Get all bottom level UIntSets for each CapabilityTargetSet.
+    CapabilitySet::AtomSets::Iterator getAtomSets() const { return thaw().getAtomSets(); }
+
+    /// Gets the first valid compile-target found in the CapabilitySet
+    CapabilityAtom getCompileTarget() const { return thaw().getCompileTarget(); }
+
+    /// Gets the first valid stage found in the CapabilitySet
+    CapabilityAtom getTargetStage() const { return thaw().getTargetStage(); }
 };
 } // namespace Slang
