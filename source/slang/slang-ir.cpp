@@ -5903,9 +5903,9 @@ IRMakeStorageTypeLoweringConfig* IRBuilder::emitMakeStorageTypeLoweringConfig(
     bool lowerToPhysicalType)
 {
     IRInst* elements[] = {
-        getIntValue((IRIntegerValue)addrspace),
-        getIntValue((IRIntegerValue)ruleName),
-        getIntValue((IRIntegerValue)lowerToPhysicalType)};
+        getIntValue(getUInt64Type(), (IRIntegerValue)addrspace),
+        getIntValue(getUInt64Type(), (IRIntegerValue)ruleName),
+        getIntValue(getUInt64Type(), (IRIntegerValue)lowerToPhysicalType)};
     return (IRMakeStorageTypeLoweringConfig*)
         emitIntrinsicInst(getVoidType(), kIROp_MakeStorageTypeLoweringConfig, 3, elements);
 }
