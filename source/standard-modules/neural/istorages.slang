@@ -86,6 +86,5 @@ public interface IPointerLikeAddress<T> : IDifferentiablePtrType
     @param[in] value The value to add.
     */
     [require(cuda_glsl_hlsl_metal_spirv, sm_6_6)]
-    [require(spvBindlessTextureNV)]
     public void atomicAdd(uint index, T value);
 }

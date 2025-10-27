@@ -42,7 +42,6 @@ public struct BindlessBufferStorage<T> : IStorage<T>
         }
 
         [require(cuda_glsl_hlsl_metal_spirv, sm_6_6)]
-        [require(spvBindlessTextureNV)]
         public void atomicAdd(uint index, T value)
         {
             __atomic_add(handle[baseIndex + index], value);
@@ -62,7 +61,7 @@ public struct BindlessBufferStorage<T> : IStorage<T>
 
     // Following method will not be needed for bindless storage
     public T read(Address address) {return address[0];}
-    public void atomicAdd(Address address, T value) {}
+    public void atomicAdd(Address address, T value) {address.atomicAdd(0, value);}
     public void write(Address address, T value) {address[0] = value;}
     public static Address getOffset(Address base, int elements) { return base.getOffset(elements); }
 }
@@ -99,7 +98,6 @@ public struct PointerStorage<T> : IStorage<T>
         }
 
         [require(cuda_glsl_hlsl_metal_spirv, sm_6_6)]
-        [require(spvBindlessTextureNV)]
         public void atomicAdd(uint index, T value)
         {
             __atomic_add(ptr[index], value);
@@ -111,7 +109,7 @@ public struct PointerStorage<T> : IStorage<T>
 
     // Following method will not be needed for pointer storage
     public T read(Address address) {return address[0];}
-    public void atomicAdd(Address address, T value) {}
+    public void atomicAdd(Address address, T value) {address.atomicAdd(0, value);}
     public void write(Address address, T value) {address[0] = value;}
     public static Address getOffset(Address base, int elements) {return base.getOffset(elements);}
 }
