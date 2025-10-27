@@ -1482,6 +1482,16 @@ void printDiagnosticArg(StringBuilder& sb, List<CapabilityAtom>& list)
     printDiagnosticArg(sb, set.newSetWithoutImpliedAtoms());
 }
 
+void printDiagnosticArg(StringBuilder& sb, const CapabilitySetVal* capabilitySetVal)
+{
+    if (!capabilitySetVal)
+    {
+        sb << "{}";
+        return;
+    }
+    printDiagnosticArg(sb, capabilitySetVal->thaw());
+}
+
 // CapabilitySetTracker implementation - temporary instrumentation
 CapabilitySetTracker& CapabilitySetTracker::getInstance()
 {

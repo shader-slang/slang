@@ -492,6 +492,7 @@ bool isSpirvExtensionAtom(CapabilityAtom name);
 void printDiagnosticArg(StringBuilder& sb, CapabilityAtom atom);
 void printDiagnosticArg(StringBuilder& sb, CapabilityName name);
 void printDiagnosticArg(StringBuilder& sb, const CapabilityAtomSet& atomSet);
+void printDiagnosticArg(StringBuilder& sb, CapabilitySetVal* capabilitySetVal);
 
 const CapabilityAtomSet& getAtomSetOfTargets();
 const CapabilityAtomSet& getAtomSetOfStages();

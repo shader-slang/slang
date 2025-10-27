@@ -13181,8 +13181,10 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
                 getMangledName(astBuilder, funcDeclRef).getUnownedSlice());
         }
 
-        for (auto atomSet :
-             as<FuncDecl>(funcDeclRef.getDecl())->inferredCapabilityRequirements.getAtomSets())
+        // TODO: make a new iterator type instead of thawing here
+        CapabilitySet set =
+            as<FuncDecl>(funcDeclRef.getDecl())->inferredCapabilityRequirements->thaw();
+        for (auto atomSet : set.getAtomSets())
         {
             for (auto atomVal : atomSet)
             {
