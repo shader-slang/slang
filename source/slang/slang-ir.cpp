@@ -4960,10 +4960,21 @@ IRInst* IRBuilder::emitStore(IRInst* dstPtr, IRInst* srcVal, IRInst* align, IRIn
     return inst;
 }
 
-IRInst* IRBuilder::emitCopyLogical(IRInst* dest, IRInst* srcPtr)
+IRInst* IRBuilder::emitCopyLogical(IRInst* dest, IRInst* srcPtr, IRInst* instsToCopyAttributesFrom)
 {
-    IRInst* args[] = {dest, srcPtr};
-    return emitIntrinsicInst(getVoidType(), kIROp_CopyLogical, 2, args);
+    ShortList<IRInst*> operands;
+    operands.add(dest);
+    operands.add(srcPtr);
+    if (instsToCopyAttributesFrom)
+    {
+        for (auto attr : instsToCopyAttributesFrom->getAllAttrs())
+            operands.add(attr);
+    }
+    return emitIntrinsicInst(
+        getVoidType(),
+        kIROp_CopyLogical,
+        operands.getCount(),
+        operands.getArrayView().getBuffer());
 }
 
 IRInst* IRBuilder::emitAtomicStore(IRInst* dstPtr, IRInst* srcVal, IRInst* memoryOrder)

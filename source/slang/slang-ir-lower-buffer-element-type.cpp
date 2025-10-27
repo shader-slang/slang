@@ -1363,7 +1363,7 @@ struct LoweredElementTypeContext
                                         if (logicalStorageTypeInfo.loweredType !=
                                             elementStorageType)
                                         {
-                                            builder.emitCopyLogical(tempVar, srcPtr);
+                                            builder.emitCopyLogical(tempVar, srcPtr, user);
                                         }
                                         else
                                         {
@@ -1773,7 +1773,7 @@ struct LoweredElementTypeContext
         }
         else
         {
-            builder.emitCopyLogical(dest, src);
+            builder.emitCopyLogical(dest, src, nullptr);
         }
     }
 
