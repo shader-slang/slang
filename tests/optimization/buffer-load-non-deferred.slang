@@ -20,13 +20,14 @@ uniform Middle* cb;
 RWStructuredBuffer<float> outputBuffer;
 
 // SPV: OpEntryPoint
-
+// SPV13: OpEntryPoint
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void compute_main(uint3 tid: SV_DispatchThreadID)
 {
     Middle v = *cb;
     // SPV: OpCopyLogical
+    // SPV13-NOT: OpCopyLogical
     outputBuffer[0] = v.middleGetValue(0);
     cb.bottom.bigArray[0] = 42.0;
     outputBuffer[1] = v.middleGetValue(0);

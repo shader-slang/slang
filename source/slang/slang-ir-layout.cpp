@@ -770,7 +770,6 @@ IRTypeLayoutRules* IRTypeLayoutRules::get(IRTypeLayoutRuleName name)
         return getStd140();
     case IRTypeLayoutRuleName::Natural:
     case IRTypeLayoutRuleName::MetalParameterBlock:
-    case IRTypeLayoutRuleName::Logical:
         return getNatural();
     case IRTypeLayoutRuleName::C:
         return getC();

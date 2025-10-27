@@ -261,26 +261,28 @@ struct TypeLoweringConfig
 {
     AddressSpace addressSpace;
     IRTypeLayoutRuleName layoutRuleName;
-    IRTypeLayoutRules* getLayoutRule() const { return IRTypeLayoutRules::get(layoutRuleName); }
+    bool lowerToPhysicalType = true;
 
-    // Get the `TypeLoweringConfig` for "logical" layout that maps 1:1 to storage type, but without
-    // explicit layout so that the lowered type is usable in a Function/Private address space for
-    // SPIRV.
-    static TypeLoweringConfig getLogicalTypeLoweringConfig()
+    static TypeLoweringConfig getLogicalTypeLoweringConfig(TypeLoweringConfig config)
     {
-        TypeLoweringConfig config;
-        config.addressSpace = AddressSpace::Generic;
-        config.layoutRuleName = IRTypeLayoutRuleName::Logical;
-        return config;
+        TypeLoweringConfig result = config;
+        result.lowerToPhysicalType = false;
+        return result;
     }
+
+    IRTypeLayoutRules* getLayoutRule() const { return IRTypeLayoutRules::get(layoutRuleName); }
 
     bool operator==(const TypeLoweringConfig& other) const
     {
-        return addressSpace == other.addressSpace && layoutRuleName == other.layoutRuleName;
+        return addressSpace == other.addressSpace && layoutRuleName == other.layoutRuleName &&
+               lowerToPhysicalType == other.lowerToPhysicalType;
     }
     HashCode getHashCode() const
     {
-        return combineHash(Slang::getHashCode(addressSpace), Slang::getHashCode(layoutRuleName));
+        return combineHash(
+            Slang::getHashCode(addressSpace),
+            Slang::getHashCode(layoutRuleName),
+            Slang::getHashCode(lowerToPhysicalType));
     }
 };
 
@@ -395,8 +397,6 @@ const char* getLayoutName(IRTypeLayoutRuleName name)
         return "std430";
     case IRTypeLayoutRuleName::Natural:
         return "natural";
-    case IRTypeLayoutRuleName::Logical:
-        return "logical";
     case IRTypeLayoutRuleName::C:
         return "c";
     default:
@@ -406,7 +406,7 @@ const char* getLayoutName(IRTypeLayoutRuleName name)
 
 void maybeAddPhysicalTypeDecoration(IRBuilder& builder, IRInst* type, TypeLoweringConfig config)
 {
-    if (config.layoutRuleName != IRTypeLayoutRuleName::Logical)
+    if (config.lowerToPhysicalType)
         builder.addPhysicalTypeDecoration(type);
 }
 
@@ -670,7 +670,7 @@ struct LoweredElementTypeContext
                 }
             }
 
-            bool needExplicitLayout = config.layoutRuleName != IRTypeLayoutRuleName::Logical;
+            bool needExplicitLayout = config.lowerToPhysicalType;
             auto arrayType = as<IRArrayType>(arrayTypeBase);
             if (arrayType)
             {
@@ -681,6 +681,8 @@ struct LoweredElementTypeContext
                 StringBuilder nameSB;
                 nameSB << "_Array_" << getLayoutName(config.layoutRuleName) << "_";
                 getTypeNameHint(nameSB, arrayType->getElementType());
+                if (!config.lowerToPhysicalType)
+                    nameSB << "_logical";
                 nameSB << getArraySizeVal(arrayType->getElementCount());
 
                 builder.addNameHintDecoration(
@@ -765,6 +767,8 @@ struct LoweredElementTypeContext
             getTypeNameHint(nameSB, type);
             nameSB << "_" << getLayoutName(config.layoutRuleName);
             builder.addNameHintDecoration(loweredType, nameSB.produceString().getUnownedSlice());
+            if (!config.lowerToPhysicalType)
+                nameSB << "_logical";
             info.loweredType = loweredType;
             // Create fields.
             {
@@ -1034,7 +1038,7 @@ struct LoweredElementTypeContext
                         auto castedGEP = builder.emitCastStorageToLogical(
                             fieldAddrUser->getFullType(),
                             newElementPtr,
-                            castInst->getBufferType());
+                            castInst->getLayoutConfig());
                         fieldAddrUser->replaceUsesWith(castedGEP);
                         fieldAddrUser->removeAndDeallocate();
                         if (auto castStorage = as<IRCastStorageToLogicalBase>(castedGEP))
@@ -1096,6 +1100,26 @@ struct LoweredElementTypeContext
         }
     }
 
+    IRInst* emitTypeLoweringConfigToIR(IRBuilder& builder, TypeLoweringConfig config)
+    {
+        IRInst* elements[] = {
+            builder.getIntValue((IRIntegerValue)config.addressSpace),
+            builder.getIntValue((IRIntegerValue)config.layoutRuleName),
+            builder.getIntValue((IRIntegerValue)config.lowerToPhysicalType)};
+        return builder.emitMakeTuple(3, elements);
+    }
+
+    TypeLoweringConfig getTypeLoweringConfigFromInst(IRInst* inst)
+    {
+        SLANG_ASSERT(inst->getOp() == kIROp_MakeTuple);
+        SLANG_ASSERT(inst->getOperandCount() == 3);
+        TypeLoweringConfig config;
+        config.addressSpace = (AddressSpace)getIntVal(inst->getOperand(0));
+        config.layoutRuleName = (IRTypeLayoutRuleName)getIntVal(inst->getOperand(1));
+        config.lowerToPhysicalType = getIntVal(inst->getOperand(2)) != 0;
+        return config;
+    }
+
     void deferStorageToLogicalCasts(
         IRModule* module,
         List<IRCastStorageToLogicalBase*> castInstWorkList)
@@ -1114,8 +1138,7 @@ struct LoweredElementTypeContext
             {
                 auto castInst = castInstWorkList[i];
                 auto ptrVal = castInst->getOperand(0);
-                auto config =
-                    getTypeLoweringConfigForBuffer(target, (IRType*)castInst->getBufferType());
+                auto config = getTypeLoweringConfigFromInst(castInst->getLayoutConfig());
                 traverseUses(
                     castInst,
                     [&](IRUse* use)
@@ -1232,7 +1255,7 @@ struct LoweredElementTypeContext
                                 auto castOfGEP = builder.emitCastStorageToLogical(
                                     logicalType,
                                     storageGEP,
-                                    castInst->getBufferType());
+                                    castInst->getLayoutConfig());
                                 user->replaceUsesWith(castOfGEP);
                                 user->removeAndDeallocate();
                                 if (auto castStorage = as<IRCastStorageToLogical>(castOfGEP))
@@ -1292,13 +1315,13 @@ struct LoweredElementTypeContext
                                             kIROp_TempCallArgImmutableVarDecoration))
                                         tempVar = ptrVal;
                                 }
-                                auto newBufferType = castInst->getBufferType();
+                                TypeLoweringConfig newLoweringConfig = config;
+                                builder.setInsertBefore(user);
                                 if (!tempVar)
                                 {
                                     // If the load is not from an immutable location, we
                                     // must preserve the load and keep the result in a local
                                     // var.
-                                    builder.setInsertBefore(user);
                                     auto elementStorageType = tryGetPointedToOrBufferElementType(
                                         &builder,
                                         ptrVal->getDataType());
@@ -1315,7 +1338,8 @@ struct LoweredElementTypeContext
                                         // loaded value in Function address space.
                                         auto logicalStorageTypeInfo = getLoweredTypeInfo(
                                             user->getDataType(),
-                                            TypeLoweringConfig::getLogicalTypeLoweringConfig());
+                                            TypeLoweringConfig::getLogicalTypeLoweringConfig(
+                                                config));
 
                                         // Try emit an inst that represent the address the load inst
                                         // is loading from.
@@ -1337,16 +1361,13 @@ struct LoweredElementTypeContext
                                         if (logicalStorageTypeInfo.loweredType !=
                                             elementStorageType)
                                         {
-                                            builder.emitCopyLogical(
-                                                builder.getVoidType(),
-                                                tempVar,
-                                                srcPtr);
+                                            builder.emitCopyLogical(tempVar, srcPtr);
                                         }
                                         else
                                         {
                                             builder.emitStore(tempVar, builder.emitLoad(srcPtr));
                                         }
-                                        newBufferType = nullptr;
+                                        newLoweringConfig.lowerToPhysicalType = false;
                                     }
                                     else
                                     {
@@ -1372,7 +1393,7 @@ struct LoweredElementTypeContext
                                 auto newCast = builder.emitCastStorageToLogicalDeref(
                                     user->getFullType(),
                                     tempVar,
-                                    newBufferType);
+                                    emitTypeLoweringConfigToIR(builder, newLoweringConfig));
                                 user->replaceUsesWith(newCast);
                                 user->removeAndDeallocate();
                                 if (auto newCastStorage = as<IRCastStorageToLogicalBase>(newCast))
@@ -1390,7 +1411,7 @@ struct LoweredElementTypeContext
                                 auto castAddr = builder.emitCastStorageToLogical(
                                     builder.getPtrType(castInst->getDataType()),
                                     ptrVal,
-                                    castInst->getBufferType());
+                                    castInst->getLayoutConfig());
                                 IRInst* gep = nullptr;
                                 if (user->getOp() == kIROp_GetElement)
                                     gep = builder.emitElementAddress(castAddr, user->getOperand(1));
@@ -1420,7 +1441,7 @@ struct LoweredElementTypeContext
                                 auto castAddr = builder.emitCastStorageToLogical(
                                     builder.getPtrType(castInst->getDataType()),
                                     ptrVal,
-                                    castInst->getBufferType());
+                                    castInst->getLayoutConfig());
                                 dest->replaceUsesWith(castAddr);
                                 dest->removeAndDeallocate();
                                 if (auto castStorage = as<IRCastStorageToLogical>(castAddr))
@@ -1565,14 +1586,14 @@ struct LoweredElementTypeContext
                 castedParam = builder.emitCastStorageToLogical(
                     logicalParamType,
                     param,
-                    cast->getBufferType());
+                    cast->getLayoutConfig());
             }
             else
             {
                 castedParam = builder.emitCastStorageToLogicalDeref(
                     logicalParamType,
                     param,
-                    cast->getBufferType());
+                    cast->getLayoutConfig());
             }
             if (auto castStorage = as<IRCastStorageToLogicalBase>(castedParam))
                 outNewCasts.add(castStorage);
@@ -1698,8 +1719,11 @@ struct LoweredElementTypeContext
                     setInsertAfterOrdinaryInst(&builder, ptrVal);
                     builder.replaceOperand(use, loweredBufferType);
                     auto logicalBufferType = getLoweredPtrLikeType(bufferType, elementType);
-                    auto castStorageToLogical =
-                        builder.emitCastStorageToLogical(logicalBufferType, ptrVal, bufferType);
+                    auto loweringConfig = getTypeLoweringConfigForBuffer(target, bufferType);
+                    auto castStorageToLogical = builder.emitCastStorageToLogical(
+                        logicalBufferType,
+                        ptrVal,
+                        emitTypeLoweringConfigToIR(builder, loweringConfig));
                     traverseUses(
                         ptrVal,
                         [&](IRUse* ptrUse)
@@ -1734,6 +1758,20 @@ struct LoweredElementTypeContext
         }
     }
 
+    void copyLogical(IRBuilder& builder, IRInst* dest, IRInst* src)
+    {
+        auto destValType = tryGetPointedToType(&builder, dest->getDataType());
+        auto srcValType = tryGetPointedToType(&builder, src->getDataType());
+        if (isTypeEqual(destValType, srcValType))
+        {
+            builder.emitStore(dest, builder.emitLoad(src));
+        }
+        else
+        {
+            builder.emitCopyLogical(dest, src);
+        }
+    }
+
     void materializeStorageToLogicalCastsImpl(IRCastStorageToLogicalBase* castInst)
     {
         IRBuilder builder(castInst);
@@ -1752,7 +1790,7 @@ struct LoweredElementTypeContext
             auto castPtr = builder.emitCastStorageToLogical(
                 (IRType*)ptrType,
                 castInst->getVal(),
-                castInst->getBufferType());
+                castInst->getLayoutConfig());
             auto load = builder.emitLoad(castPtr);
             castInst->replaceUsesWith(load);
             castInst->removeAndDeallocate();
@@ -1766,7 +1804,7 @@ struct LoweredElementTypeContext
         auto ptrVal = castInst->getOperand(0);
         auto oldPtrType = castInst->getFullType();
         auto originalElementType = oldPtrType->getOperand(0);
-        auto config = getTypeLoweringConfigForBuffer(target, (IRType*)castInst->getBufferType());
+        auto config = getTypeLoweringConfigForBuffer(target, (IRType*)castInst->getLayoutConfig());
 
 
         LoweredElementTypeInfo loweredElementTypeInfo = {};
@@ -1870,6 +1908,20 @@ struct LoweredElementTypeContext
                             if (originalVal->getOp() == kIROp_CastStorageToLogicalDeref)
                             {
                                 addr = originalVal->getOperand(0);
+
+                                // `addr` should point to the same type as the lowered structure
+                                // buffer element type. There is only one case when this is not
+                                // true, that is when we are lowering for SPIRV, and `addr` may
+                                // point to a "logical strorage type" that is created to work around
+                                // SPIRV restriction that physical types cannot be used to declare
+                                // local variables. However when we generate SPIRV, we should have
+                                // already lowered all Append/Consume structured buffer operations
+                                // to standard Load/Store operations, so we should not hit this case
+                                // here. Instead they will be handled by the "else" branch of the
+                                // "if (sbAppend)" statement down below.
+                                SLANG_ASSERT(isTypeEqual(
+                                    tryGetPointedToType(&builder, addr->getDataType()),
+                                    loweredElementTypeInfo.loweredType));
                             }
                             else
                             {
@@ -1892,8 +1944,12 @@ struct LoweredElementTypeContext
                             if (originalVal->getOp() == kIROp_CastStorageToLogicalDeref)
                             {
                                 auto valAddr = originalVal->getOperand(0);
-                                auto storageVal = builder.emitLoad(valAddr);
-                                builder.emitStore(addr, storageVal);
+
+                                // In case `originalVal->getOperand(0)` is a tmp var of logical
+                                // storage type (created for SPIRV conformance), we need to use a
+                                // logical copy instead of a plain store to convert it to the actual
+                                // storage type.
+                                copyLogical(builder, addr, valAddr);
                             }
                             else
                             {
@@ -2107,8 +2163,6 @@ IRTypeLayoutRuleName getTypeLayoutRulesFromOp(IROp layoutTypeOp, IRTypeLayoutRul
 
 IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRType* bufferType)
 {
-    if (!bufferType)
-        return IRTypeLayoutRuleName::Logical;
     if (bufferType->getOp() == kIROp_ParameterBlockType && isMetalTarget(target->getTargetReq()))
     {
         return IRTypeLayoutRuleName::MetalParameterBlock;
@@ -2383,7 +2437,7 @@ struct DefaultBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
         LoweredElementTypeInfo info;
         info.originalType = type;
 
-        bool needExplicitLayout = config.layoutRuleName != IRTypeLayoutRuleName::Logical;
+        bool needExplicitLayout = config.lowerToPhysicalType;
 
         if (auto matrixType = as<IRMatrixType>(type))
         {
@@ -2405,6 +2459,8 @@ struct DefaultBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
                    << getIntVal(matrixType->getColumnCount());
             if (isColMajor)
                 nameSB << "_ColMajor";
+            if (!needExplicitLayout)
+                nameSB << "_logical";
             nameSB << getLayoutName(config.layoutRuleName);
             builder.addNameHintDecoration(loweredType, nameSB.produceString().getUnownedSlice());
             auto structKey = builder.createStructKey();

@@ -4960,10 +4960,10 @@ IRInst* IRBuilder::emitStore(IRInst* dstPtr, IRInst* srcVal, IRInst* align, IRIn
     return inst;
 }
 
-IRInst* IRBuilder::emitCopyLogical(IRType* type, IRInst* dest, IRInst* srcPtr)
+IRInst* IRBuilder::emitCopyLogical(IRInst* dest, IRInst* srcPtr)
 {
     IRInst* args[] = {dest, srcPtr};
-    return emitIntrinsicInst(type, kIROp_CopyLogical, 2, args);
+    return emitIntrinsicInst(getVoidType(), kIROp_CopyLogical, 2, args);
 }
 
 IRInst* IRBuilder::emitAtomicStore(IRInst* dstPtr, IRInst* srcVal, IRInst* memoryOrder)

@@ -2591,7 +2591,7 @@ struct IRCastStorageToLogicalBase : IRInst
 {
     FIDDLE(baseInst())
     IRInst* getVal() { return getOperand(0); }
-    IRInst* getBufferType() { return getOperand(1); }
+    IRInst* getLayoutConfig() { return getOperand(1); }
 };
 
 FIDDLE()
@@ -3771,7 +3771,7 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* emitStore(IRInst* dstPtr, IRInst* srcVal, IRInst* align);
     IRInst* emitStore(IRInst* dstPtr, IRInst* srcVal, IRInst* align, IRInst* memoryScope);
 
-    IRInst* emitCopyLogical(IRType* type, IRInst* dest, IRInst* srcPtr);
+    IRInst* emitCopyLogical(IRInst* dest, IRInst* srcPtr);
 
     IRInst* emitAtomicStore(IRInst* dstPtr, IRInst* srcVal, IRInst* memoryOrder);
 
