@@ -2343,8 +2343,10 @@ local insts = {
 	{ EnumCast = { operands = { { "value" } } } },
 	{ CastUInt2ToDescriptorHandle = { operands = { { "value" } } } },
 	{ CastDescriptorHandleToUInt2 = { operands = { { "value" } } } },
-	-- Represents a psuedo cast to convert between a logical type (user declared) and a storage Type
+	-- Represents a psuedo cast to convert between an original(user declared) type and a storage Type
 	-- (valid in buffer locations). The operand can either be a value or an address.
+	-- The first operand is a pointer to a storage type, the second operand must be a `MakeStorageTypeLoweringConfig` inst
+	-- that defines how the storage type is lowered from the original type.
 	{
 		CastStorageToLogicalBase = {
 			min_operands = 2,
@@ -2353,6 +2355,7 @@ local insts = {
 			{ CastStorageToLogicalDeref = { min_operands = 2, struct_name = "CastStorageToLogicalDeref" } },
 		},
 	},
+	{ MakeStorageTypeLoweringConfig = { hoistable = true, operands = { { "addressSpace" }, { "layoutRule" }, { "lowerToPhysicalType" } } } },
 	{ CastUInt64ToDescriptorHandle = { operands = { { "value" } } } },
 	{ CastDescriptorHandleToUInt64 = { operands = { { "value" } } } },
 	-- Represents a no-op cast to convert a resource pointer to a resource on targets where the resource handles are

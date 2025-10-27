@@ -1100,23 +1100,23 @@ struct LoweredElementTypeContext
         }
     }
 
-    IRInst* emitTypeLoweringConfigToIR(IRBuilder& builder, TypeLoweringConfig config)
+    IRMakeStorageTypeLoweringConfig* emitTypeLoweringConfigToIR(
+        IRBuilder& builder,
+        TypeLoweringConfig config)
     {
-        IRInst* elements[] = {
-            builder.getIntValue((IRIntegerValue)config.addressSpace),
-            builder.getIntValue((IRIntegerValue)config.layoutRuleName),
-            builder.getIntValue((IRIntegerValue)config.lowerToPhysicalType)};
-        return builder.emitMakeTuple(3, elements);
+        return builder.emitMakeStorageTypeLoweringConfig(
+            config.addressSpace,
+            config.layoutRuleName,
+            config.lowerToPhysicalType);
     }
 
-    TypeLoweringConfig getTypeLoweringConfigFromInst(IRInst* inst)
+    TypeLoweringConfig getTypeLoweringConfigFromInst(IRMakeStorageTypeLoweringConfig* inst)
     {
-        SLANG_ASSERT(inst->getOp() == kIROp_MakeTuple);
-        SLANG_ASSERT(inst->getOperandCount() == 3);
+        SLANG_ASSERT(inst);
         TypeLoweringConfig config;
-        config.addressSpace = (AddressSpace)getIntVal(inst->getOperand(0));
-        config.layoutRuleName = (IRTypeLayoutRuleName)getIntVal(inst->getOperand(1));
-        config.lowerToPhysicalType = getIntVal(inst->getOperand(2)) != 0;
+        config.addressSpace = (AddressSpace)getIntVal(inst->getAddressSpace());
+        config.layoutRuleName = (IRTypeLayoutRuleName)getIntVal(inst->getLayoutRule());
+        config.lowerToPhysicalType = getIntVal(inst->getLowerToPhysicalType()) != 0;
         return config;
     }
 
@@ -1810,7 +1810,6 @@ struct LoweredElementTypeContext
         auto oldPtrType = castInst->getFullType();
         auto originalElementType = oldPtrType->getOperand(0);
         auto config = getTypeLoweringConfigFromInst(castInst->getLayoutConfig());
-
 
         LoweredElementTypeInfo loweredElementTypeInfo = {};
         if (auto getElementPtr = as<IRGetElementPtr>(ptrVal))

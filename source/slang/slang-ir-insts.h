@@ -2591,7 +2591,10 @@ struct IRCastStorageToLogicalBase : IRInst
 {
     FIDDLE(baseInst())
     IRInst* getVal() { return getOperand(0); }
-    IRInst* getLayoutConfig() { return getOperand(1); }
+    IRMakeStorageTypeLoweringConfig* getLayoutConfig()
+    {
+        return as<IRMakeStorageTypeLoweringConfig>(getOperand(1));
+    }
 };
 
 FIDDLE()
@@ -3980,8 +3983,18 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* emitCastPtrToInt(IRInst* val);
     IRInst* emitCastIntToPtr(IRType* ptrType, IRInst* val);
 
-    IRInst* emitCastStorageToLogical(IRType* type, IRInst* val, IRInst* bufferType);
-    IRInst* emitCastStorageToLogicalDeref(IRType* type, IRInst* val, IRInst* bufferType);
+    IRMakeStorageTypeLoweringConfig* emitMakeStorageTypeLoweringConfig(
+        AddressSpace addrspace,
+        IRTypeLayoutRuleName ruleName,
+        bool lowerToPhysicalType);
+    IRInst* emitCastStorageToLogical(
+        IRType* type,
+        IRInst* val,
+        IRMakeStorageTypeLoweringConfig* config);
+    IRInst* emitCastStorageToLogicalDeref(
+        IRType* type,
+        IRInst* val,
+        IRMakeStorageTypeLoweringConfig* config);
 
     IRGlobalConstant* emitGlobalConstant(IRType* type);
 

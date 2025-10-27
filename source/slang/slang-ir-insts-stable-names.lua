@@ -683,4 +683,5 @@ return {
 	["Undefined.LoadFromUninitializedMemory"] = 679,
 	["CUDA_LDG"] = 680,
 	["StoreBase.copyLogical"] = 681,
+	["MakeStorageTypeLoweringConfig"] = 682,
 }
