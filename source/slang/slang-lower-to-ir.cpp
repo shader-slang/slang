@@ -13182,8 +13182,7 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         }
 
         // TODO: make a new iterator type instead of thawing here
-        CapabilitySet set =
-            as<FuncDecl>(funcDeclRef.getDecl())->inferredCapabilityRequirements->thaw();
+        CapabilitySet set{as<FuncDecl>(funcDeclRef.getDecl())->inferredCapabilityRequirements};
         for (auto atomSet : set.getAtomSets())
         {
             for (auto atomVal : atomSet)

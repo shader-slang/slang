@@ -163,6 +163,7 @@ public:
     /// Default-construct an empty capability set
     CapabilitySet();
 
+    explicit CapabilitySet(CapabilitySetVal const* other);
     CapabilitySet(CapabilitySet const& other);
     CapabilitySet& operator=(CapabilitySet const& other);
     CapabilitySet(CapabilitySet&& other);

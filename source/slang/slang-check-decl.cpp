@@ -13914,13 +13914,13 @@ static void _propagateRequirement(
     // If we have the same target+stage but current capabilities do not imply incoming capabilities,
     // we need to `join`.
     // TODO: Can this be made to take a CapabilitySetVal
-    if (!resultCaps.joinWithOtherWillChangeThis(nodeCaps->thaw()))
+    if (!resultCaps.joinWithOtherWillChangeThis(CapabilitySet{nodeCaps}))
         return;
 
     auto oldCaps = resultCaps;
-    bool isAnyInvalid = resultCaps.isInvalid() || nodeCaps->isInvalid();
+    bool isAnyInvalid = resultCaps.isInvalid() || nodeCaps && nodeCaps->isInvalid();
     // TODO: Can this be made to take a CapabilitySetVal
-    resultCaps.join(nodeCaps->thaw());
+    resultCaps.join(CapabilitySet{nodeCaps});
 
     auto decl = as<Decl>(userNode);
 
@@ -14158,7 +14158,7 @@ struct CapabilityDeclReferenceVisitor
                 CapabilityName(targetCase->capability),
                 isStageSwitch);
         }
-        handleProcessFunc(stmt, set, stmt->loc);
+        handleProcessFunc(stmt, set.freeze(this->getASTBuilder()), stmt->loc);
     }
 
     void visitRequireCapabilityDecl(RequireCapabilityDecl* decl)
@@ -14268,7 +14268,7 @@ void SemanticsDeclCapabilityVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         varDecl->findModifier<RequireCapabilityAttribute>(),
         [this, varDecl](SyntaxNode* node, const CapabilitySetVal* nodeCaps, SourceLoc refLoc)
         {
-            CapabilitySet set = varDecl->inferredCapabilityRequirements->thaw();
+            CapabilitySet set{varDecl->inferredCapabilityRequirements};
             _propagateRequirement(this, set, varDecl, node, nodeCaps, refLoc);
             varDecl->inferredCapabilityRequirements = set.freeze(getASTBuilder());
         },
@@ -14296,7 +14296,8 @@ CapabilitySet SemanticsDeclCapabilityVisitor::getDeclaredCapabilitySet(Decl* dec
     {
         CapabilitySet localDeclaredCaps;
         bool shouldBreak = false;
-        if (!as<AggTypeDeclBase>(parent) || parent->inferredCapabilityRequirements->isEmpty())
+        if (!as<AggTypeDeclBase>(parent) || !parent->inferredCapabilityRequirements ||
+            parent->inferredCapabilityRequirements->isEmpty())
         {
             for (auto mod : parent->modifiers)
             {
@@ -14308,7 +14309,7 @@ CapabilitySet SemanticsDeclCapabilityVisitor::getDeclaredCapabilitySet(Decl* dec
         }
         else
         {
-            localDeclaredCaps = parent->inferredCapabilityRequirements->thaw();
+            localDeclaredCaps = CapabilitySet{parent->inferredCapabilityRequirements};
             shouldBreak = true;
         }
         // Merge decl's capability declaration with the parent.
@@ -14338,7 +14339,7 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
     for (auto member : funcDecl->getDirectMemberDecls())
     {
         ensureDecl(member, DeclCheckState::CapabilityChecked);
-        CapabilitySet set = funcDecl->inferredCapabilityRequirements->thaw();
+        CapabilitySet set{funcDecl->inferredCapabilityRequirements};
         _propagateRequirement(
             this,
             set,
@@ -14357,7 +14358,7 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
         funcDecl->findModifier<RequireCapabilityAttribute>(),
         [this, funcDecl](SyntaxNode* node, const CapabilitySetVal* nodeCaps, SourceLoc refLoc)
         {
-            CapabilitySet set = funcDecl->inferredCapabilityRequirements->thaw();
+            CapabilitySet set{funcDecl->inferredCapabilityRequirements};
             _propagateRequirement(this, set, funcDecl, node, nodeCaps, refLoc);
             funcDecl->inferredCapabilityRequirements = set.freeze(getASTBuilder());
         },
@@ -14372,7 +14373,7 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
         if (parentAggTypeDecl)
         {
             ensureDecl(parentAggTypeDecl, DeclCheckState::CapabilityChecked);
-            CapabilitySet set = funcDecl->inferredCapabilityRequirements->thaw();
+            CapabilitySet set{funcDecl->inferredCapabilityRequirements};
             _propagateRequirement(
                 this,
                 set,
@@ -14392,7 +14393,7 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
     // capabilities are inferred from the children.
     if (declaredCaps.isEmpty())
     {
-        declaredCaps = funcDecl->inferredCapabilityRequirements->thaw();
+        declaredCaps = CapabilitySet{funcDecl->inferredCapabilityRequirements};
     }
     else
     {
@@ -14416,7 +14417,7 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
                 CheckCapabilityRequirementOptions::AvailableCanHaveSubsetOfAbstractAtoms,
                 declaredCaps,
                 // TODO: Remove this thaw, this takes a const CapabilitySet
-                funcDecl->inferredCapabilityRequirements->thaw(),
+                CapabilitySet{funcDecl->inferredCapabilityRequirements},
                 failedAvailableCapabilityConjunction,
                 checkCapabilityResult);
             diagnoseUndeclaredCapability(
@@ -14434,7 +14435,7 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
             // with the declared capabilities since we are assuming the stdlib
             // is not wrong.
             funcDecl->inferredCapabilityRequirements =
-                funcDecl->inferredCapabilityRequirements->thaw()
+                CapabilitySet{funcDecl->inferredCapabilityRequirements}
                     .join(declaredCaps)
                     .freeze(getASTBuilder());
         }
@@ -14456,7 +14457,7 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
         [this,
          inheritanceDecl](SyntaxNode* node, const CapabilitySetVal* nodeCaps, SourceLoc refLoc)
         {
-            CapabilitySet set = inheritanceDecl->inferredCapabilityRequirements->thaw();
+            CapabilitySet set{inheritanceDecl->inferredCapabilityRequirements};
             _propagateRequirement(this, set, inheritanceDecl, node, nodeCaps, refLoc);
             inheritanceDecl->inferredCapabilityRequirements = set.freeze(getASTBuilder());
         },
@@ -14492,8 +14493,8 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
             CapabilitySet::checkCapabilityRequirement(
                 CheckCapabilityRequirementOptions::MustHaveEqualAbstractAtoms,
                 // TODO: Can these thaws be removed
-                requirementDecl->inferredCapabilityRequirements->thaw(),
-                implDecl->inferredCapabilityRequirements->thaw(),
+                CapabilitySet{requirementDecl->inferredCapabilityRequirements},
+                CapabilitySet{implDecl->inferredCapabilityRequirements},
                 failedAvailableCapabilityConjunction,
                 checkCapabilityResult);
 
@@ -14542,8 +14543,8 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
     CapabilitySet::checkCapabilityRequirement(
         CheckCapabilityRequirementOptions::MustHaveEqualAbstractAtoms,
         // TODO: remove these thaws
-        inheritanceDecl->inferredCapabilityRequirements->thaw(),
-        inheritanceParentDecl->inferredCapabilityRequirements->thaw(),
+        CapabilitySet{inheritanceDecl->inferredCapabilityRequirements},
+        CapabilitySet{inheritanceParentDecl->inferredCapabilityRequirements},
         failedAvailableCapabilityConjunction,
         checkCapabilityResult);
 
@@ -14860,8 +14861,9 @@ void diagnoseMissingCapabilityProvenance(
                     continue;
                 checkedDecls.add(i.referencedNode);
                 auto innerReferencedDecl = as<Decl>(i.referencedNode);
-                if (!innerReferencedDecl ||
-                    !innerReferencedDecl->inferredCapabilityRequirements->implies(setToFind))
+                if (!(innerReferencedDecl &&
+                      CapabilitySet{innerReferencedDecl->inferredCapabilityRequirements}.implies(
+                          setToFind)))
                 {
                     // We found a source of the incompatible capability, follow this
                     // element inside the provenance stack until we are at the bottom
@@ -14950,7 +14952,7 @@ void diagnoseCapabilityProvenance(
                 break;
             }
 
-            if (!referencedDecl->inferredCapabilityRequirements->implies(atomToFind))
+            if (!CapabilitySet{referencedDecl->inferredCapabilityRequirements}.implies(atomToFind))
                 continue;
             maybeDiagnose(
                 sink,
@@ -14989,7 +14991,7 @@ void SemanticsDeclCapabilityVisitor::diagnoseUndeclaredCapability(
     const CapabilityAtomSet& failedAtomsInsideAvailableSet,
     bool printProvenance)
 {
-    if (decl->inferredCapabilityRequirements->isEmpty())
+    if (!decl->inferredCapabilityRequirements || decl->inferredCapabilityRequirements->isEmpty())
         return;
 
     // There are two causes for why type checking failed on failedAvailableSet.

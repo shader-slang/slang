@@ -33,6 +33,10 @@ class CapabilityStageSetVal : public Val
 
     /// Get the UIntSetVal containing the capability atoms for this stage
     UIntSetVal* getAtomSet() const { return as<UIntSetVal>(getOperand(1)); }
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride() { return this; }
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
 /// Immutable representation of a capability target set.
@@ -64,6 +68,10 @@ class CapabilityTargetSetVal : public Val
     /// Find a stage set by stage atom using linear search
     /// Returns nullptr if not found
     CapabilityStageSetVal* findStageSet(CapabilityAtom stage) const;
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride() { return this; }
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
 /// Immutable representation of a complete capability set.
@@ -206,5 +214,9 @@ class CapabilitySetVal : public Val
 
     /// Gets the first valid stage found in the CapabilitySet
     CapabilityAtom getTargetStage() const { return thaw().getTargetStage(); }
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride() { return this; }
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 } // namespace Slang

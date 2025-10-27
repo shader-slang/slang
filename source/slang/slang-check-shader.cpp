@@ -606,7 +606,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         targetCaps.join(stageCapabilitySet);
         // TODO: remove this thaw
         if (targetCaps.isIncompatibleWith(
-                entryPointFuncDecl->inferredCapabilityRequirements->thaw()))
+                CapabilitySet{entryPointFuncDecl->inferredCapabilityRequirements}))
         {
             // Incompatable means we don't support a set of abstract atoms.
             // Diagnose that we lack support for 'stage' and 'target' atoms with our provided
@@ -669,12 +669,13 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             if ((specificCapabilityRequested || specificProfileRequested) &&
                 targetCaps.atLeastOneSetImpliedInOther(
                     // TODO: remove this thaw, it's passed as const
-                    entryPointFuncDecl->inferredCapabilityRequirements->thaw()) ==
+                    CapabilitySet{entryPointFuncDecl->inferredCapabilityRequirements}) ==
                     CapabilitySet::ImpliesReturnFlags::NotImplied)
             {
                 CapabilitySet combinedSets = targetCaps;
                 // TODO: remove this thaw
-                combinedSets.join(entryPointFuncDecl->inferredCapabilityRequirements->thaw());
+                combinedSets.join(
+                    CapabilitySet{entryPointFuncDecl->inferredCapabilityRequirements});
                 CapabilityAtomSet addedAtoms{};
                 if (auto targetCapSet = targetCaps.getAtomSets())
                 {

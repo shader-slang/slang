@@ -411,6 +411,14 @@ CapabilitySet::CapabilitySet()
     CapabilitySetTracker::getInstance().registerCapabilitySet(this);
 }
 
+CapabilitySet::CapabilitySet(CapabilitySetVal const* other)
+{
+    if (other)
+    {
+        *this = other->thaw();
+    }
+}
+
 CapabilitySet::CapabilitySet(Int atomCount, CapabilityName const* atoms)
 {
     for (Int i = 0; i < atomCount; i++)
@@ -1484,12 +1492,7 @@ void printDiagnosticArg(StringBuilder& sb, List<CapabilityAtom>& list)
 
 void printDiagnosticArg(StringBuilder& sb, const CapabilitySetVal* capabilitySetVal)
 {
-    if (!capabilitySetVal)
-    {
-        sb << "{}";
-        return;
-    }
-    printDiagnosticArg(sb, capabilitySetVal->thaw());
+    printDiagnosticArg(sb, CapabilitySet{capabilitySetVal});
 }
 
 // CapabilitySetTracker implementation - temporary instrumentation
