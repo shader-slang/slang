@@ -604,7 +604,6 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         auto targetCaps = target->getTargetCaps();
         auto stageCapabilitySet = entryPoint->getProfile().getCapabilityName();
         targetCaps.join(stageCapabilitySet);
-        // TODO: remove this thaw
         if (targetCaps.isIncompatibleWith(
                 CapabilitySet{entryPointFuncDecl->inferredCapabilityRequirements}))
         {
@@ -662,7 +661,6 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 // If the entry point has an explicitly declared capability, then we
                 // will merge that with the target capability set before checking if
                 // there is an implicit upgrade.
-                // TODO: Remove this thaw, it's const
                 targetCaps.nonDestructiveJoin(
                     CapabilitySet{declaredCapsMod->declaredCapabilityRequirements});
             }
@@ -670,12 +668,10 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             // Only attempt to error if a specific profile or capability is requested
             if ((specificCapabilityRequested || specificProfileRequested) &&
                 targetCaps.atLeastOneSetImpliedInOther(
-                    // TODO: remove this thaw, it's passed as const
                     CapabilitySet{entryPointFuncDecl->inferredCapabilityRequirements}) ==
                     CapabilitySet::ImpliesReturnFlags::NotImplied)
             {
                 CapabilitySet combinedSets = targetCaps;
-                // TODO: remove this thaw
                 combinedSets.join(
                     CapabilitySet{entryPointFuncDecl->inferredCapabilityRequirements});
                 CapabilityAtomSet addedAtoms{};
@@ -714,7 +710,6 @@ bool resolveStageOfProfileWithEntryPoint(
     if (auto entryPointAttr = entryPointFuncDecl->findModifier<EntryPointAttribute>())
     {
         auto entryPointProfileStage = entryPointProfile.getStage();
-        // TODO: Can do this without the thaw
         auto entryPointStage =
             getStageFromAtom(CapabilitySet{entryPointAttr->capabilitySet}.getTargetStage());
 

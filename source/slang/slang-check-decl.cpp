@@ -13913,13 +13913,11 @@ static void _propagateRequirement(
     //
     // If we have the same target+stage but current capabilities do not imply incoming capabilities,
     // we need to `join`.
-    // TODO: Can this be made to take a CapabilitySetVal
     if (!resultCaps.joinWithOtherWillChangeThis(CapabilitySet{nodeCaps}))
         return;
 
     auto oldCaps = resultCaps;
     bool isAnyInvalid = resultCaps.isInvalid() || nodeCaps && nodeCaps->isInvalid();
-    // TODO: Can this be made to take a CapabilitySetVal
     resultCaps.join(CapabilitySet{nodeCaps});
 
     auto decl = as<Decl>(userNode);
@@ -14417,7 +14415,6 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
             CapabilitySet::checkCapabilityRequirement(
                 CheckCapabilityRequirementOptions::AvailableCanHaveSubsetOfAbstractAtoms,
                 declaredCaps,
-                // TODO: Remove this thaw, this takes a const CapabilitySet
                 CapabilitySet{funcDecl->inferredCapabilityRequirements},
                 failedAvailableCapabilityConjunction,
                 checkCapabilityResult);
@@ -14493,7 +14490,6 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
             CheckCapabilityRequirementResult checkCapabilityResult;
             CapabilitySet::checkCapabilityRequirement(
                 CheckCapabilityRequirementOptions::MustHaveEqualAbstractAtoms,
-                // TODO: Can these thaws be removed
                 CapabilitySet{requirementDecl->inferredCapabilityRequirements},
                 CapabilitySet{implDecl->inferredCapabilityRequirements},
                 failedAvailableCapabilityConjunction,
@@ -14543,7 +14539,6 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
     CheckCapabilityRequirementResult checkCapabilityResult;
     CapabilitySet::checkCapabilityRequirement(
         CheckCapabilityRequirementOptions::MustHaveEqualAbstractAtoms,
-        // TODO: remove these thaws
         CapabilitySet{inheritanceDecl->inferredCapabilityRequirements},
         CapabilitySet{inheritanceParentDecl->inferredCapabilityRequirements},
         failedAvailableCapabilityConjunction,

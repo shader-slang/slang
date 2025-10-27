@@ -4337,7 +4337,6 @@ $(type_info.return_type) $(type_info.method_name)(
         addDecoration(
             value,
             kIROp_RequirePreludeDecoration,
-            // TODO: Remove this thaw
             getCapabilityValue(CapabilitySet{caps}),
             getStringValue(prelude));
     }
