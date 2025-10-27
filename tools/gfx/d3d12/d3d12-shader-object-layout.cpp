@@ -338,29 +338,6 @@ Result ShaderObjectLayoutImpl::Builder::setElementTypeLayout(
                     subObjectLayout->getTotalResourceDescriptorCountWithoutOrdinaryDataBuffer();
                 objectCounts.sampler = subObjectLayout->getTotalSamplerDescriptorCount();
                 objectCounts.rootParam = subObjectRange.layout->getChildRootParameterCount();
-
-                // Note: In the implementation for some other graphics API (e.g.,
-                // Vulkan) there needs to be more work done to handle the fact that
-                // "pending" data from interface-type sub-objects get allocated to a
-                // distinct offset after all the "primary" data. We are consciously
-                // ignoring that issue here, and the physical layout of a shader object
-                // into the D3D12 binding state may end up interleaving
-                // resources/samplers for "primary" and "pending" data.
-                //
-                // If this choice ever causes issues, we can revisit the approach here.
-
-                // An interface-type range that includes ordinary data can
-                // increase the size of the ordinary data buffer we need to
-                // allocate for the parent object.
-                //
-                uint32_t ordinaryDataEnd =
-                    subObjectRange.offset.pendingOrdinaryData +
-                    (uint32_t)count * subObjectRange.stride.pendingOrdinaryData;
-
-                if (ordinaryDataEnd > m_totalOrdinaryDataSize)
-                {
-                    m_totalOrdinaryDataSize = ordinaryDataEnd;
-                }
             }
             break;
         }
@@ -648,7 +625,6 @@ void RootShaderObjectLayoutImpl::RootSignatureDescBuilder::addAsValue(
     BindingRegisterOffsetPair offset(varLayout);
     auto elementOffset = offset;
     elementOffset.primary.spaceOffset = 0;
-    elementOffset.pending.spaceOffset = 0;
     addAsValue(varLayout->getTypeLayout(), physicalDescriptorSetIndex, offset, elementOffset);
 }
 
@@ -757,7 +733,6 @@ void RootShaderObjectLayoutImpl::RootSignatureDescBuilder::addAsValue(
         subObjectRangeElementOffset +=
             BindingRegisterOffsetPair(typeLayout->getSubObjectRangeOffset(subObjectRangeIndex));
         subObjectRangeElementOffset.primary.spaceOffset = elementOffset.primary.spaceOffset;
-        subObjectRangeElementOffset.pending.spaceOffset = elementOffset.pending.spaceOffset;
 
         switch (bindingType)
         {
@@ -800,8 +775,6 @@ void RootShaderObjectLayoutImpl::RootSignatureDescBuilder::addAsValue(
                 BindingRegisterOffsetPair subDescriptorSetOffset;
                 subDescriptorSetOffset.primary.spaceOffset =
                     subObjectRangeContainerOffset.primary.spaceOffset;
-                subDescriptorSetOffset.pending.spaceOffset =
-                    subObjectRangeContainerOffset.pending.spaceOffset;
 
                 auto subPhysicalDescriptorSetIndex = addDescriptorSet();
 
