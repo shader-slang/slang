@@ -54,7 +54,7 @@ trap cleanup EXIT SIGHUP SIGINT SIGTERM
 # Options and parsing
 #
 repo=https://github.com/llvm/llvm-project
-branch=llvmorg-14.0.6
+branch=llvmorg-21.1.2
 source_dir=$temp_dir
 install_prefix=
 config=Release
@@ -122,6 +122,9 @@ cmake_arguments_for_slang=(
   -DLLVM_INCLUDE_EXAMPLES=0
   -DLLVM_INCLUDE_TESTS=0
   -DLLVM_ENABLE_TERMINFO=0
+  -DLLVM_FORCE_VC_REVISION=0
+  -DLLVM_FORCE_VC_REPOSITORY="https://github.com/llvm/llvm-project"
+  -DLLVM_ENABLE_DIA_SDK=0
   -DCLANG_BUILD_TOOLS=0
   -DCLANG_ENABLE_STATIC_ANALYZER=0
   -DCLANG_ENABLE_ARCMT=0

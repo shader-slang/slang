@@ -34,7 +34,7 @@ on:
 jobs:
   build:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
-    timeout-minutes: 60
+    timeout-minutes: 120
 
     defaults:
       run:

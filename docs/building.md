@@ -214,13 +214,13 @@ There are several options for getting llvm-support:
       containing such a file
     - If this isn't set then the build system tries to download it from the
       release on github matching the current tag. If such a tag doesn't exist
-      or doesn't have the correct os*arch combination then the latest release
+      or doesn't have the correct os\*arch combination then the latest release
       will be tried.
     - If `SLANG_SLANG_LLVM_BINARY_URL` is `FETCH_BINARY_IF_POSSIBLE` then in
       the case that a prebuilt binary can't be found then the build will proceed
       as though `DISABLE` was chosen
 - Use a system supplied LLVM: `-DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM`, you
-  must have llvm-14.0 and a matching libclang installed. It's important that
+  must have llvm-21.1 and a matching libclang installed. It's important that
   either:
     - You don't end up linking to a dynamic libllvm.so, this will almost
       certainly cause multiple versions of LLVM to be loaded at runtime,
