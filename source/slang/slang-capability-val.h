@@ -1,7 +1,13 @@
 #pragma once
 
+// #include "../core/slang-dictionary.h"
+// #include "../core/slang-list.h"
+// #include "../core/slang-string.h"
 #include "slang-ast-val.h"
 #include "slang-capability.h"
+
+// #include <optional>
+// #include <stdint.h>
 
 //
 #include "slang-capability-val.h.fiddle"

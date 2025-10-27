@@ -406,7 +406,8 @@ CapabilityAtom CapabilitySet::getUniquelyImpliedStageAtom() const
     return result;
 }
 
-CapabilitySet::CapabilitySet() {
+CapabilitySet::CapabilitySet()
+{
     CapabilitySetTracker::getInstance().registerCapabilitySet(this);
 }
 
@@ -1490,7 +1491,7 @@ CapabilitySetTracker& CapabilitySetTracker::getInstance()
 
 void CapabilitySetTracker::beginTracking()
 {
-    m_inTrackerOperation = true;  // Prevent recursion during setup
+    m_inTrackerOperation = true; // Prevent recursion during setup
     m_isTracking = true;
     m_trackedSets.clear();
     fprintf(stderr, "[CapabilitySetTracker] Began tracking capability sets\n");
@@ -1501,14 +1502,16 @@ void CapabilitySetTracker::endTracking()
 {
     if (!m_isTracking)
         return;
-    
-    m_inTrackerOperation = true;  // Prevent recursion during analysis
-    
-    fprintf(stderr, "[CapabilitySetTracker] Ending tracking, analyzing %d capability sets\n", 
-            (int)m_trackedSets.getCount());
-    
+
+    m_inTrackerOperation = true; // Prevent recursion during analysis
+
+    fprintf(
+        stderr,
+        "[CapabilitySetTracker] Ending tracking, analyzing %d capability sets\n",
+        (int)m_trackedSets.getCount());
+
     analyzeAndOutput();
-    
+
     m_isTracking = false;
     m_trackedSets.clear();
     m_inTrackerOperation = false;
@@ -1533,9 +1536,9 @@ void CapabilitySetTracker::unregisterCapabilitySet(const CapabilitySet* capSet)
 void CapabilitySetTracker::analyzeAndOutput()
 {
     // The m_inTrackerOperation flag should already be set by the caller
-    
+
     fprintf(stderr, "\n=== SLANG CAPABILITY SET STATISTICS ===\n");
-    
+
     // Statistics counters
     int totalSets = 0;
     int emptySets = 0;
@@ -1544,168 +1547,193 @@ void CapabilitySetTracker::analyzeAndOutput()
     Dictionary<CapabilityAtom, int> stageCounts;
     Dictionary<int, int> atomSizeDistribution;
     Dictionary<CapabilityAtom, Dictionary<CapabilityAtom, List<int>>> targetStageAtomCounts;
-    
+
     // For deduplication analysis - track equivalent structures
     Dictionary<String, List<const CapabilitySet*>> equivalentCapabilitySets;
     Dictionary<String, List<const CapabilityTargetSet*>> equivalentTargetSets;
     Dictionary<String, List<const CapabilityStageSet*>> equivalentStageSets;
     Dictionary<String, List<const CapabilityAtomSet*>> equivalentAtomSets;
-    
+
     // Helper functions to generate structural hashes for deduplication analysis
-    auto generateAtomSetHash = [](const CapabilityAtomSet& atomSet) -> String {
+    auto generateAtomSetHash = [](const CapabilityAtomSet& atomSet) -> String
+    {
         StringBuilder sb;
         sb << "atoms[";
-        
+
         // Convert to sorted list to ensure consistent hash regardless of iteration order
         List<UInt> sortedAtoms;
-        for (auto atom : atomSet) {
+        for (auto atom : atomSet)
+        {
             sortedAtoms.add((UInt)atom);
         }
         sortedAtoms.sort();
-        
+
         bool first = true;
-        for (auto atom : sortedAtoms) {
-            if (!first) sb << ",";
+        for (auto atom : sortedAtoms)
+        {
+            if (!first)
+                sb << ",";
             sb << atom;
             first = false;
         }
         sb << "]";
         return sb.produceString();
     };
-    
-    auto generateStageSetHash = [&](const CapabilityStageSet& stageSet) -> String {
+
+    auto generateStageSetHash = [&](const CapabilityStageSet& stageSet) -> String
+    {
         StringBuilder sb;
         sb << "stage:" << (UInt)stageSet.stage;
-        if (stageSet.atomSet) {
+        if (stageSet.atomSet)
+        {
             sb << ";atomSet:" << generateAtomSetHash(*stageSet.atomSet);
         }
         return sb.produceString();
     };
-    
-    auto generateTargetSetHash = [&](const CapabilityTargetSet& targetSet) -> String {
+
+    auto generateTargetSetHash = [&](const CapabilityTargetSet& targetSet) -> String
+    {
         StringBuilder sb;
         sb << "target:" << (UInt)targetSet.target << ";stages{";
-        
+
         // Sort stage pairs by stage atom to ensure consistent hash
         List<KeyValuePair<CapabilityAtom, String>> sortedStages;
-        for (auto& stagePair : targetSet.shaderStageSets) {
-            sortedStages.add(KeyValuePair<CapabilityAtom, String>(stagePair.first, generateStageSetHash(stagePair.second)));
+        for (auto& stagePair : targetSet.shaderStageSets)
+        {
+            sortedStages.add(KeyValuePair<CapabilityAtom, String>(
+                stagePair.first,
+                generateStageSetHash(stagePair.second)));
         }
-        sortedStages.sort([](const KeyValuePair<CapabilityAtom, String>& a, const KeyValuePair<CapabilityAtom, String>& b) {
-            return (UInt)a.key < (UInt)b.key;
-        });
-        
+        sortedStages.sort([](const KeyValuePair<CapabilityAtom, String>& a,
+                             const KeyValuePair<CapabilityAtom, String>& b)
+                          { return (UInt)a.key < (UInt)b.key; });
+
         bool first = true;
-        for (auto& sortedStage : sortedStages) {
-            if (!first) sb << ";";
+        for (auto& sortedStage : sortedStages)
+        {
+            if (!first)
+                sb << ";";
             sb << sortedStage.value;
             first = false;
         }
         sb << "}";
         return sb.produceString();
     };
-    
-    auto generateCapabilitySetHash = [&](const CapabilitySet& capSet) -> String {
-        if (capSet.isEmpty()) return "empty";
-        if (capSet.isInvalid()) return "invalid";
-        
+
+    auto generateCapabilitySetHash = [&](const CapabilitySet& capSet) -> String
+    {
+        if (capSet.isEmpty())
+            return "empty";
+        if (capSet.isInvalid())
+            return "invalid";
+
         StringBuilder sb;
         sb << "capSet{";
-        
+
         // Sort target pairs by target atom to ensure consistent hash
         List<KeyValuePair<CapabilityAtom, String>> sortedTargets;
-        for (auto& targetPair : capSet.getCapabilityTargetSets()) {
-            sortedTargets.add(KeyValuePair<CapabilityAtom, String>(targetPair.first, generateTargetSetHash(targetPair.second)));
+        for (auto& targetPair : capSet.getCapabilityTargetSets())
+        {
+            sortedTargets.add(KeyValuePair<CapabilityAtom, String>(
+                targetPair.first,
+                generateTargetSetHash(targetPair.second)));
         }
-        sortedTargets.sort([](const KeyValuePair<CapabilityAtom, String>& a, const KeyValuePair<CapabilityAtom, String>& b) {
-            return (UInt)a.key < (UInt)b.key;
-        });
-        
+        sortedTargets.sort([](const KeyValuePair<CapabilityAtom, String>& a,
+                              const KeyValuePair<CapabilityAtom, String>& b)
+                           { return (UInt)a.key < (UInt)b.key; });
+
         bool first = true;
-        for (auto& sortedTarget : sortedTargets) {
-            if (!first) sb << ";";
+        for (auto& sortedTarget : sortedTargets)
+        {
+            if (!first)
+                sb << ";";
             sb << sortedTarget.value;
             first = false;
         }
         sb << "}";
         return sb.produceString();
     };
-    
+
     // Analyze each tracked capability set
     for (auto capSet : m_trackedSets)
     {
-        if (!capSet) continue;
-        
+        if (!capSet)
+            continue;
+
         totalSets++;
-        
+
         // Track equivalent capability sets for deduplication analysis
         String capSetHash = generateCapabilitySetHash(*capSet);
-        if (!equivalentCapabilitySets.containsKey(capSetHash)) {
+        if (!equivalentCapabilitySets.containsKey(capSetHash))
+        {
             equivalentCapabilitySets[capSetHash] = List<const CapabilitySet*>();
         }
         equivalentCapabilitySets[capSetHash].add(capSet);
-        
+
         if (capSet->isEmpty())
         {
             emptySets++;
             continue;
         }
-        
+
         if (capSet->isInvalid())
         {
             invalidSets++;
             continue;
         }
-        
+
         auto& targetSets = capSet->getCapabilityTargetSets();
-        
+
         for (auto& targetPair : targetSets)
         {
             CapabilityAtom target = targetPair.first;
             auto& targetSet = targetPair.second;
-            
+
             // Track equivalent target sets for deduplication analysis
             String targetSetHash = generateTargetSetHash(targetSet);
-            if (!equivalentTargetSets.containsKey(targetSetHash)) {
+            if (!equivalentTargetSets.containsKey(targetSetHash))
+            {
                 equivalentTargetSets[targetSetHash] = List<const CapabilityTargetSet*>();
             }
             equivalentTargetSets[targetSetHash].add(&targetSet);
-            
+
             // Count target occurrences
             auto targetCountPtr = targetCounts.tryGetValue(target);
             targetCounts[target] = targetCountPtr ? *targetCountPtr + 1 : 1;
-            
+
             for (auto& stagePair : targetSet.shaderStageSets)
             {
                 CapabilityAtom stage = stagePair.first;
                 auto& stageSet = stagePair.second;
-                
+
                 // Track equivalent stage sets for deduplication analysis
                 String stageSetHash = generateStageSetHash(stageSet);
-                if (!equivalentStageSets.containsKey(stageSetHash)) {
+                if (!equivalentStageSets.containsKey(stageSetHash))
+                {
                     equivalentStageSets[stageSetHash] = List<const CapabilityStageSet*>();
                 }
                 equivalentStageSets[stageSetHash].add(&stageSet);
-                
+
                 // Count stage occurrences
                 auto stageCountPtr = stageCounts.tryGetValue(stage);
                 stageCounts[stage] = stageCountPtr ? *stageCountPtr + 1 : 1;
-                
+
                 if (stageSet.atomSet)
                 {
                     int atomCount = (int)stageSet.atomSet->countElements();
-                    
+
                     // Track equivalent atom sets for deduplication analysis
                     String atomSetHash = generateAtomSetHash(*stageSet.atomSet);
-                    if (!equivalentAtomSets.containsKey(atomSetHash)) {
+                    if (!equivalentAtomSets.containsKey(atomSetHash))
+                    {
                         equivalentAtomSets[atomSetHash] = List<const CapabilityAtomSet*>();
                     }
                     equivalentAtomSets[atomSetHash].add(stageSet.atomSet.operator->());
-                    
+
                     // Count atom set size distribution
                     auto sizeCountPtr = atomSizeDistribution.tryGetValue(atomCount);
                     atomSizeDistribution[atomCount] = sizeCountPtr ? *sizeCountPtr + 1 : 1;
-                    
+
                     // Track target-stage-atom combinations
                     if (!targetStageAtomCounts.containsKey(target))
                         targetStageAtomCounts[target] = Dictionary<CapabilityAtom, List<int>>();
@@ -1716,49 +1744,59 @@ void CapabilitySetTracker::analyzeAndOutput()
             }
         }
     }
-    
+
     // Output summary
     fprintf(stderr, "\nSUMMARY:\n");
     fprintf(stderr, "Total CapabilitySets tracked: %d\n", totalSets);
     fprintf(stderr, "Empty sets: %d\n", emptySets);
     fprintf(stderr, "Invalid sets: %d\n", invalidSets);
     fprintf(stderr, "Active sets: %d\n", totalSets - emptySets - invalidSets);
-    
+
     // Output target distribution
     fprintf(stderr, "\nTARGET DISTRIBUTION:\n");
     for (auto& pair : targetCounts)
     {
-        fprintf(stderr, "%s: %d occurrences\n", 
-                capabilityNameToString((CapabilityName)pair.first).begin(), pair.second);
+        fprintf(
+            stderr,
+            "%s: %d occurrences\n",
+            capabilityNameToString((CapabilityName)pair.first).begin(),
+            pair.second);
     }
-    
+
     // Output stage distribution
     fprintf(stderr, "\nSTAGE DISTRIBUTION:\n");
     for (auto& pair : stageCounts)
     {
-        fprintf(stderr, "%s: %d occurrences\n", 
-                capabilityNameToString((CapabilityName)pair.first).begin(), pair.second);
+        fprintf(
+            stderr,
+            "%s: %d occurrences\n",
+            capabilityNameToString((CapabilityName)pair.first).begin(),
+            pair.second);
     }
-    
+
     // Output atom set size distribution
     fprintf(stderr, "\nATOM SET SIZE DISTRIBUTION:\n");
     for (auto& pair : atomSizeDistribution)
     {
         fprintf(stderr, "%d atoms: %d atom sets\n", pair.first, pair.second);
     }
-    
+
     // Output detailed target-stage breakdown
     fprintf(stderr, "\nTARGET-STAGE BREAKDOWN:\n");
     for (auto& targetPair : targetStageAtomCounts)
     {
-        fprintf(stderr, "\nTarget: %s\n", 
-                capabilityNameToString((CapabilityName)targetPair.first).begin());
-        
+        fprintf(
+            stderr,
+            "\nTarget: %s\n",
+            capabilityNameToString((CapabilityName)targetPair.first).begin());
+
         for (auto& stagePair : targetPair.second)
         {
-            fprintf(stderr, "  Stage: %s\n", 
-                    capabilityNameToString((CapabilityName)stagePair.first).begin());
-            
+            fprintf(
+                stderr,
+                "  Stage: %s\n",
+                capabilityNameToString((CapabilityName)stagePair.first).begin());
+
             // Calculate stats for this target-stage combination
             auto& atomCounts = stagePair.second;
             if (atomCounts.getCount() > 0)
@@ -1766,24 +1804,30 @@ void CapabilitySetTracker::analyzeAndOutput()
                 int total = 0;
                 int minAtoms = atomCounts[0];
                 int maxAtoms = atomCounts[0];
-                
+
                 for (auto count : atomCounts)
                 {
                     total += count;
                     minAtoms = Math::Min(minAtoms, count);
                     maxAtoms = Math::Max(maxAtoms, count);
                 }
-                
+
                 float avgAtoms = (float)total / atomCounts.getCount();
-                
-                fprintf(stderr, "    Occurrences: %d, Min atoms: %d, Max atoms: %d, Avg atoms: %.1f\n",
-                        (int)atomCounts.getCount(), minAtoms, maxAtoms, avgAtoms);
-                
+
+                fprintf(
+                    stderr,
+                    "    Occurrences: %d, Min atoms: %d, Max atoms: %d, Avg atoms: %.1f\n",
+                    (int)atomCounts.getCount(),
+                    minAtoms,
+                    maxAtoms,
+                    avgAtoms);
+
                 // Show first few atom counts as samples
                 fprintf(stderr, "    Sample atom counts: [");
                 for (Index i = 0; i < Math::Min(Index(10), atomCounts.getCount()); i++)
                 {
-                    if (i > 0) fprintf(stderr, ", ");
+                    if (i > 0)
+                        fprintf(stderr, ", ");
                     fprintf(stderr, "%d", atomCounts[i]);
                 }
                 if (atomCounts.getCount() > 10)
@@ -1792,154 +1836,188 @@ void CapabilitySetTracker::analyzeAndOutput()
             }
         }
     }
-    
+
     // Deduplication analysis - equivalence set sizes
     fprintf(stderr, "\nDEDUPLICATION ANALYSIS:\n");
-    
+
     // Analyze capability set equivalence classes
     Dictionary<int, int> capSetEquivSizeDistribution;
     int totalCapSetDuplicates = 0;
     int uniqueCapSets = 0;
-    for (auto& equivClass : equivalentCapabilitySets) {
+    for (auto& equivClass : equivalentCapabilitySets)
+    {
         int setSize = (int)equivClass.second.getCount();
         auto sizeCount = capSetEquivSizeDistribution.tryGetValue(setSize);
         capSetEquivSizeDistribution[setSize] = sizeCount ? *sizeCount + 1 : 1;
-        if (setSize > 1) {
-            totalCapSetDuplicates += setSize - 1;  // All but one are duplicates
+        if (setSize > 1)
+        {
+            totalCapSetDuplicates += setSize - 1; // All but one are duplicates
         }
         uniqueCapSets++;
     }
-    
-    // Analyze target set equivalence classes  
+
+    // Analyze target set equivalence classes
     Dictionary<int, int> targetSetEquivSizeDistribution;
     int totalTargetSetDuplicates = 0;
     int uniqueTargetSets = 0;
-    for (auto& equivClass : equivalentTargetSets) {
+    for (auto& equivClass : equivalentTargetSets)
+    {
         int setSize = (int)equivClass.second.getCount();
         auto sizeCount = targetSetEquivSizeDistribution.tryGetValue(setSize);
         targetSetEquivSizeDistribution[setSize] = sizeCount ? *sizeCount + 1 : 1;
-        if (setSize > 1) {
+        if (setSize > 1)
+        {
             totalTargetSetDuplicates += setSize - 1;
         }
         uniqueTargetSets++;
     }
-    
+
     // Analyze stage set equivalence classes
     Dictionary<int, int> stageSetEquivSizeDistribution;
     int totalStageSetDuplicates = 0;
     int uniqueStageSets = 0;
-    for (auto& equivClass : equivalentStageSets) {
+    for (auto& equivClass : equivalentStageSets)
+    {
         int setSize = (int)equivClass.second.getCount();
         auto sizeCount = stageSetEquivSizeDistribution.tryGetValue(setSize);
         stageSetEquivSizeDistribution[setSize] = sizeCount ? *sizeCount + 1 : 1;
-        if (setSize > 1) {
+        if (setSize > 1)
+        {
             totalStageSetDuplicates += setSize - 1;
         }
         uniqueStageSets++;
     }
-    
+
     // Analyze atom set equivalence classes
     Dictionary<int, int> atomSetEquivSizeDistribution;
     int totalAtomSetDuplicates = 0;
     int uniqueAtomSets = 0;
-    for (auto& equivClass : equivalentAtomSets) {
+    for (auto& equivClass : equivalentAtomSets)
+    {
         int setSize = (int)equivClass.second.getCount();
         auto sizeCount = atomSetEquivSizeDistribution.tryGetValue(setSize);
         atomSetEquivSizeDistribution[setSize] = sizeCount ? *sizeCount + 1 : 1;
-        if (setSize > 1) {
+        if (setSize > 1)
+        {
             totalAtomSetDuplicates += setSize - 1;
         }
         uniqueAtomSets++;
     }
-    
+
     // Output deduplication potential
     fprintf(stderr, "\nCapability Set Deduplication Potential:\n");
     fprintf(stderr, "  Total capability sets: %d\n", totalSets);
     fprintf(stderr, "  Unique capability sets: %d\n", uniqueCapSets);
-    fprintf(stderr, "  Duplicates that could be eliminated: %d (%.1f%% reduction)\n", 
-            totalCapSetDuplicates, 
-            totalSets > 0 ? (100.0f * totalCapSetDuplicates / totalSets) : 0.0f);
-    
+    fprintf(
+        stderr,
+        "  Duplicates that could be eliminated: %d (%.1f%% reduction)\n",
+        totalCapSetDuplicates,
+        totalSets > 0 ? (100.0f * totalCapSetDuplicates / totalSets) : 0.0f);
+
     int totalTargetSetInstances = 0;
-    for (auto& equivClass : equivalentTargetSets) {
+    for (auto& equivClass : equivalentTargetSets)
+    {
         totalTargetSetInstances += (int)equivClass.second.getCount();
     }
-    
+
     fprintf(stderr, "\nTarget Set Deduplication Potential:\n");
     fprintf(stderr, "  Total target sets: %d\n", totalTargetSetInstances);
     fprintf(stderr, "  Unique target sets: %d\n", uniqueTargetSets);
-    fprintf(stderr, "  Duplicates that could be eliminated: %d (%.1f%% reduction)\n", 
-            totalTargetSetDuplicates,
-            totalTargetSetInstances > 0 ? (100.0f * totalTargetSetDuplicates / totalTargetSetInstances) : 0.0f);
-    
+    fprintf(
+        stderr,
+        "  Duplicates that could be eliminated: %d (%.1f%% reduction)\n",
+        totalTargetSetDuplicates,
+        totalTargetSetInstances > 0 ? (100.0f * totalTargetSetDuplicates / totalTargetSetInstances)
+                                    : 0.0f);
+
     int totalStageSetInstances = 0;
-    for (auto& equivClass : equivalentStageSets) {
+    for (auto& equivClass : equivalentStageSets)
+    {
         totalStageSetInstances += (int)equivClass.second.getCount();
     }
-    
+
     fprintf(stderr, "\nStage Set Deduplication Potential:\n");
     fprintf(stderr, "  Total stage sets: %d\n", totalStageSetInstances);
     fprintf(stderr, "  Unique stage sets: %d\n", uniqueStageSets);
-    fprintf(stderr, "  Duplicates that could be eliminated: %d (%.1f%% reduction)\n", 
-            totalStageSetDuplicates,
-            totalStageSetInstances > 0 ? (100.0f * totalStageSetDuplicates / totalStageSetInstances) : 0.0f);
-    
+    fprintf(
+        stderr,
+        "  Duplicates that could be eliminated: %d (%.1f%% reduction)\n",
+        totalStageSetDuplicates,
+        totalStageSetInstances > 0 ? (100.0f * totalStageSetDuplicates / totalStageSetInstances)
+                                   : 0.0f);
+
     int totalAtomSetInstances = 0;
-    for (auto& equivClass : equivalentAtomSets) {
+    for (auto& equivClass : equivalentAtomSets)
+    {
         totalAtomSetInstances += (int)equivClass.second.getCount();
     }
-    
+
     fprintf(stderr, "\nAtom Set Deduplication Potential:\n");
     fprintf(stderr, "  Total atom sets: %d\n", totalAtomSetInstances);
     fprintf(stderr, "  Unique atom sets: %d\n", uniqueAtomSets);
-    fprintf(stderr, "  Duplicates that could be eliminated: %d (%.1f%% reduction)\n", 
-            totalAtomSetDuplicates,
-            totalAtomSetInstances > 0 ? (100.0f * totalAtomSetDuplicates / totalAtomSetInstances) : 0.0f);
-    
+    fprintf(
+        stderr,
+        "  Duplicates that could be eliminated: %d (%.1f%% reduction)\n",
+        totalAtomSetDuplicates,
+        totalAtomSetInstances > 0 ? (100.0f * totalAtomSetDuplicates / totalAtomSetInstances)
+                                  : 0.0f);
+
     // Show equivalence class size distributions
     fprintf(stderr, "\nEquivalence Class Size Distributions:\n");
-    
+
     fprintf(stderr, "\nCapability Set equivalence class sizes:\n");
-    for (auto& pair : capSetEquivSizeDistribution) {
+    for (auto& pair : capSetEquivSizeDistribution)
+    {
         fprintf(stderr, "  %d equivalent capability sets: %d classes\n", pair.first, pair.second);
     }
-    
+
     fprintf(stderr, "\nTarget Set equivalence class sizes:\n");
-    for (auto& pair : targetSetEquivSizeDistribution) {
+    for (auto& pair : targetSetEquivSizeDistribution)
+    {
         fprintf(stderr, "  %d equivalent target sets: %d classes\n", pair.first, pair.second);
     }
-    
+
     fprintf(stderr, "\nStage Set equivalence class sizes:\n");
-    for (auto& pair : stageSetEquivSizeDistribution) {
+    for (auto& pair : stageSetEquivSizeDistribution)
+    {
         fprintf(stderr, "  %d equivalent stage sets: %d classes\n", pair.first, pair.second);
     }
-    
+
     fprintf(stderr, "\nAtom Set equivalence class sizes:\n");
-    for (auto& pair : atomSetEquivSizeDistribution) {
+    for (auto& pair : atomSetEquivSizeDistribution)
+    {
         fprintf(stderr, "  %d equivalent atom sets: %d classes\n", pair.first, pair.second);
     }
-    
+
     // Debug: Check for any suspicious patterns
     fprintf(stderr, "\nDEBUG VERIFICATION:\n");
     fprintf(stderr, "Largest capability set equivalence class: ");
     int maxCapSetEquivSize = 0;
-    for (auto& pair : capSetEquivSizeDistribution) {
-        if (pair.first > maxCapSetEquivSize) maxCapSetEquivSize = pair.first;
+    for (auto& pair : capSetEquivSizeDistribution)
+    {
+        if (pair.first > maxCapSetEquivSize)
+            maxCapSetEquivSize = pair.first;
     }
     fprintf(stderr, "%d instances\n", maxCapSetEquivSize);
-    
+
     // Show a few example hashes
     fprintf(stderr, "Sample capability set hashes:\n");
     int hashCount = 0;
-    for (auto& equivClass : equivalentCapabilitySets) {
-        if (hashCount < 3) {
-            fprintf(stderr, "  Hash: %s (appears %d times)\n", 
-                    equivClass.first.getBuffer(), (int)equivClass.second.getCount());
+    for (auto& equivClass : equivalentCapabilitySets)
+    {
+        if (hashCount < 3)
+        {
+            fprintf(
+                stderr,
+                "  Hash: %s (appears %d times)\n",
+                equivClass.first.getBuffer(),
+                (int)equivClass.second.getCount());
         }
         hashCount++;
-        if (hashCount >= 3) break;
+        if (hashCount >= 3)
+            break;
     }
-    
+
     fprintf(stderr, "\n=== END CAPABILITY SET STATISTICS ===\n\n");
 }
 
@@ -2427,20 +2505,21 @@ CapabilitySetVal* CapabilitySet::freeze(ASTBuilder* astBuilder) const
     {
         return astBuilder->getOrCreate<CapabilitySetVal>();
     }
-    
+
     if (isInvalid())
     {
         // Create invalid capability set with invalid target
         auto invalidAtomSet = astBuilder->getUIntSetVal(CapabilityAtomSet{});
-        auto invalidStageSet = astBuilder->getOrCreate<CapabilityStageSetVal>(
-            CapabilityAtom::Invalid, invalidAtomSet);
+        auto invalidStageSet =
+            astBuilder->getOrCreate<CapabilityStageSetVal>(CapabilityAtom::Invalid, invalidAtomSet);
         auto invalidTargetSet = astBuilder->getOrCreate<CapabilityTargetSetVal>(
-            CapabilityAtom::Invalid, invalidStageSet);
+            CapabilityAtom::Invalid,
+            invalidStageSet);
         return astBuilder->getOrCreate<CapabilitySetVal>(invalidTargetSet);
     }
-    
+
     List<CapabilityTargetSetVal*> targetSetVals;
-    
+
     // Convert each target set, maintaining sorted order
     List<CapabilityAtom> sortedTargets;
     for (auto& targetPair : m_targetSets)
@@ -2448,12 +2527,12 @@ CapabilitySetVal* CapabilitySet::freeze(ASTBuilder* astBuilder) const
         sortedTargets.add(targetPair.first);
     }
     sortedTargets.sort([](CapabilityAtom a, CapabilityAtom b) { return (UInt)a < (UInt)b; });
-    
+
     for (auto targetAtom : sortedTargets)
     {
         auto& targetSet = *m_targetSets.tryGetValue(targetAtom);
         List<CapabilityStageSetVal*> stageSetVals;
-        
+
         // Convert each stage set, maintaining sorted order
         List<CapabilityAtom> sortedStages;
         for (auto& stagePair : targetSet.shaderStageSets)
@@ -2461,11 +2540,11 @@ CapabilitySetVal* CapabilitySet::freeze(ASTBuilder* astBuilder) const
             sortedStages.add(stagePair.first);
         }
         sortedStages.sort([](CapabilityAtom a, CapabilityAtom b) { return (UInt)a < (UInt)b; });
-        
+
         for (auto stageAtom : sortedStages)
         {
             auto& stageSet = *targetSet.shaderStageSets.tryGetValue(stageAtom);
-            
+
             // Convert CapabilityAtomSet to UIntSetVal
             UIntSetVal* atomSetVal;
             if (stageSet.atomSet.has_value())
@@ -2476,15 +2555,17 @@ CapabilitySetVal* CapabilitySet::freeze(ASTBuilder* astBuilder) const
             {
                 atomSetVal = astBuilder->getUIntSetVal(CapabilityAtomSet{});
             }
-            
-            auto stageSetVal = astBuilder->getOrCreate<CapabilityStageSetVal>(stageAtom, atomSetVal);
+
+            auto stageSetVal =
+                astBuilder->getOrCreate<CapabilityStageSetVal>(stageAtom, atomSetVal);
             stageSetVals.add(stageSetVal);
         }
-        
-        auto targetSetVal = astBuilder->getOrCreate<CapabilityTargetSetVal>(targetAtom, stageSetVals);
+
+        auto targetSetVal =
+            astBuilder->getOrCreate<CapabilityTargetSetVal>(targetAtom, stageSetVals);
         targetSetVals.add(targetSetVal);
     }
-    
+
     return astBuilder->getOrCreate<CapabilitySetVal>(targetSetVals);
 }
 

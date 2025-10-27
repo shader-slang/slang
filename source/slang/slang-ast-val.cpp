@@ -2121,7 +2121,7 @@ Val* IntVal::linkTimeResolve(Dictionary<String, IntVal*>& mapMangledNameToVal)
 UIntSet UIntSetVal::toUIntSet() const
 {
     UIntSet result;
-    
+
     // Convert each bitmask operand back to UIntSet::Element
     for (Index i = 0; i < getBitmaskCount(); i++)
     {
@@ -2132,7 +2132,7 @@ UIntSet UIntSetVal::toUIntSet() const
             result.addRawElement(element, i);
         }
     }
-    
+
     return result;
 }
 
@@ -2146,7 +2146,8 @@ void UIntSetVal::_toTextOverride(StringBuilder& out)
     out << "UIntSetVal{";
     for (Index i = 0; i < getBitmaskCount(); i++)
     {
-        if (i > 0) out << ", ";
+        if (i > 0)
+            out << ", ";
         auto bitmask = getBitmask(i);
         if (bitmask)
         {
@@ -2164,7 +2165,7 @@ Val* UIntSetVal::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet
 {
     int diff = 0;
     List<ConstantIntVal*> newBitmasks;
-    
+
     // Substitute each bitmask operand
     for (Index i = 0; i < getBitmaskCount(); i++)
     {
@@ -2177,13 +2178,14 @@ Val* UIntSetVal::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet
             newBitmasks.add(newBitmask);
         }
     }
-    
+
     if (diff)
     {
-        if (ioDiff) *ioDiff += diff;
+        if (ioDiff)
+            *ioDiff += diff;
         return astBuilder->getOrCreate<UIntSetVal>(newBitmasks.getArrayView());
     }
-    
+
     return this;
 }
 

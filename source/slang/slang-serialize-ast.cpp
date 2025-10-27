@@ -2131,9 +2131,9 @@ ModuleDecl* readSerializedModuleAST(
     SourceLoc requestingSourceLoc)
 {
     SLANG_PROFILE;
-    
-    // Begin tracking capability sets during deserialization
-    beginCapabilitySetTracking();
+
+    // // Begin tracking capability sets during deserialization
+    // beginCapabilitySetTracking();
 
     // We expect the `chunk` that was passed in to be a RIFF
     // data chunk (matching what was written in `writeSerializedModuleAST()`,
@@ -2229,9 +2229,9 @@ ModuleDecl* readSerializedModuleAST(
     // on-demand as needed, via the accessor methods on `ContainerDeclDirectMemberDecls`
     // and `ModuleDecl` that are implemented below.
     //
-    
-    // End tracking and output capability set statistics
-    endCapabilitySetTracking();
+
+    // // End tracking and output capability set statistics
+    // endCapabilitySetTracking();
 
     return moduleDecl;
 }
