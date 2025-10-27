@@ -6,6 +6,7 @@
 #include "../core/slang-func-ptr.h"
 #include "../compiler-core/slang-artifact-associated-impl.h"
 #include "../compiler-core/slang-artifact-desc-util.h"
+#include "slang-llvm-jit-shared-library.h"
 #include <llvm/AsmParser/Parser.h>
 #include <llvm/ExecutionEngine/Orc/LLJIT.h>
 #include <llvm/IR/BasicBlock.h>
@@ -36,55 +37,6 @@ namespace slang_llvm
 {
 
 using namespace Slang;
-
-// TODO: Merge this with LLVMJITSharedLibrary from slang-llvm, there's nothing
-// unique here.
-class LLVMJITSharedLibrary2 : public ComBaseObject, public ISlangSharedLibrary
-{
-public:
-    SLANG_COM_BASE_IUNKNOWN_ALL
-
-    virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE
-    {
-        if (auto ptr = getInterface(guid))
-        {
-            return ptr;
-        }
-        return getObject(guid);
-    }
-
-    virtual SLANG_NO_THROW void* SLANG_MCALL findSymbolAddressByName(char const* name)
-        SLANG_OVERRIDE
-    {
-        auto fn = jit->lookup(name);
-        return fn ? (void*)fn.get().getValue() : nullptr;
-    }
-
-    LLVMJITSharedLibrary2(std::unique_ptr<llvm::orc::LLJIT> jit)
-        : jit(std::move(jit))
-    {
-    }
-
-protected:
-    ISlangUnknown* getInterface(const SlangUUID& uuid)
-    {
-        if (uuid == ISlangUnknown::getTypeGuid() || uuid == ISlangCastable::getTypeGuid() ||
-            uuid == ISlangSharedLibrary::getTypeGuid())
-        {
-            return static_cast<ISlangSharedLibrary*>(this);
-        }
-        return nullptr;
-    }
-
-    void* getObject(const SlangUUID& uuid)
-    {
-        SLANG_UNUSED(uuid);
-        return nullptr;
-    }
-
-
-    std::unique_ptr<llvm::orc::LLJIT> jit;
-};
 
 // There doesn't appear to be an LLVM output stream for writing into a memory
 // buffer. This implementation saves all written data directly into Slang's List
@@ -4279,7 +4231,7 @@ struct LLVMEmitter
             return SLANG_FAIL;
         }
 
-        ComPtr<ISlangSharedLibrary> sharedLibrary(new LLVMJITSharedLibrary2(std::move(jit)));
+        ComPtr<ISlangSharedLibrary> sharedLibrary(new LLVMJITSharedLibrary(std::move(jit)));
 
         const auto targetDesc = ArtifactDescUtil::makeDescForCompileTarget(
             SlangCompileTarget(getOptions().getTarget()));
