@@ -83,6 +83,37 @@ float testOperations<let isShadow : int>(
     uint status;
 
     /*
+        <Template Type> Object.Sample()
+    */
+    val += x1D.Sample(samplerState, u);
+    val += x2D.Sample(samplerState, float2(u, u));
+    val += x3D.Sample(samplerState, float3(u, u, u));
+    val += xCube.Sample(samplerState, normalize(float3(u, 1 - u, u)));
+
+    val += x1DArray.Sample(samplerState, float2(u, 0));
+    val += x2DArray.Sample(samplerState, float3(u, u, 0));
+    val += xCubeArray.Sample(samplerState, float4(u, u, u, 0));
+
+    // Offset variant
+    //  NOTE: The "cpu" profile does not like these, so it's disabled for now
+    val += x1D.Sample(samplerState, u, 1);
+    val += x2D.Sample(samplerState, float2(u, u), int2(1, 1));
+    val += x3D.Sample(samplerState, float3(u, u, u), int3(1, 1, 1));
+
+    val += x1DArray.Sample(samplerState, float2(u, 0), 1);
+    val += x2DArray.Sample(samplerState, float3(u, u, 0), int2(1, 1));
+
+    // Status variant
+#if !defined(VK)
+    val += x1D.Sample(samplerState, u, 1, status);
+    val += x2D.Sample(samplerState, float2(u, u), int2(1, 1), status);
+    val += x3D.Sample(samplerState, float3(u, u, u), int3(1, 1, 1), status);
+
+    val += x1DArray.Sample(samplerState, float2(u, 0), 1, status);
+    val += x2DArray.Sample(samplerState, float3(u, u, 0), int2(1, 1), status);
+#endif
+
+    /*
         <Template Type> Object.SampleLevel()
     */
     val += x1D.SampleLevel(samplerState, u, 0);
@@ -117,6 +148,34 @@ float testOperations<let isShadow : int>(
         float Object.SampleCmpLevelZero()
     */
     // NOTE: These are having issues with vulkan (glsl)
+    // SampleCmp() requires format with VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT.
+    val += x1D.SampleCmp(shadowSampler, u, 0);
+    val += x2D.SampleCmp(shadowSampler, float2(u, u), 0);
+    val += x1DArray.SampleCmp(shadowSampler, float2(u, u), 0);
+    val += xCube.SampleCmp(shadowSampler, normalize(float3(u, 1 - u, u)), 0);
+    val += x2DArray.SampleCmp(shadowSampler, normalize(float3(u, 1 - u, u)), 0);
+    val += xCubeArray.SampleCmp(shadowSampler, normalize(float4(u, 1-u, u, u)), 0);
+
+    // Offset variant
+    val += x1D.SampleCmp(shadowSampler, u, 0, 0);
+    val += x2D.SampleCmp(shadowSampler, float2(u, u), 0, int2(0, 0));
+    // TextureCube does not have an offset version of this
+
+    // Status variant
+#if !defined(VK)
+
+    val += x1D.SampleCmp(shadowSampler, u, 0, 0, status);
+    val += x2D.SampleCmp(shadowSampler, float2(u, u), 0, int2(0, 0), status);
+
+    val += x1DArray.SampleCmp(shadowSampler, float2(u, u), 0, 0, status);
+    val += x2DArray.SampleCmp(shadowSampler, normalize(float3(u, 1 - u, u)), 0, int2(0, 0), status);
+#endif
+
+
+    /*
+        float Object.SampleCmpLevelZero()
+    */
+    // NOTE: These are having issues with vulkan (glsl)
     // SampleCmpLevelZero() requires format with VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT.
     val += x1D.SampleCmpLevelZero(shadowSampler, u, 0);
     val += x2D.SampleCmpLevelZero(shadowSampler, float2(u, u), 0);
@@ -131,7 +190,7 @@ float testOperations<let isShadow : int>(
     // TextureCube does not have an offset version of this
 
     // Status variant
-    #if !defined(VK)
+#if !defined(VK)
 
     val += x1D.SampleCmpLevelZero(shadowSampler, u, 0, 0, status);
     val += x2D.SampleCmpLevelZero(shadowSampler, float2(u, u), 0, int2(0, 0), status);
@@ -409,19 +468,19 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     outputBuffer[idx] = val;
 }
 
-// DX11: 708
-// DX11: 708
-// DX11: 708
-// DX11: 708
-// DX12: 708
-// DX12: 708
-// DX12: 708
-// DX12: 708
-// DX12CS6: 754
-// DX12CS6: 754
-// DX12CS6: 754
-// DX12CS6: 754
-// VK: 718
-// VK: 718
-// VK: 718
-// VK: 718
+// DX11: 766
+// DX11: 766
+// DX11: 766
+// DX11: 766
+// DX12: 766
+// DX12: 766
+// DX12: 766
+// DX12: 766
+// DX12CS6: 812
+// DX12CS6: 812
+// DX12CS6: 812
+// DX12CS6: 812
+// VK: 758
+// VK: 758
+// VK: 758
+// VK: 758

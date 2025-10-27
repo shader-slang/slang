@@ -917,6 +917,68 @@ void __wgsl_check_texture_type_texel_offset()
          , "WGSL texture shape must be 2D or 3D when sampling with texel offsets");
 }
 
+[require(spirv)]
+[__readNone]
+[ForceInline]
+bool __spirv_stage_supports_implicit_lod_sampling()
+{
+    __stage_switch
+    {
+    case fragment:
+        return true;
+
+    default:
+        return false;
+    }
+}
+
+[require(hlsl)]
+[__readNone]
+[ForceInline]
+bool __hlsl_stage_supports_implicit_lod_sampling()
+{
+    __stage_switch
+    {
+    case fragment:
+        return true;
+
+    default:
+        return false;
+    }
+}
+
+[require(wgsl)]
+[__readNone]
+[ForceInline]
+bool __wgsl_stage_supports_implicit_lod_sampling()
+{
+    __stage_switch
+    {
+    case fragment:
+        return true;
+
+    default:
+        return false;
+    }
+}
+
+[__readNone]
+[ForceInline]
+bool __stage_supports_implicit_lod_sampling()
+{
+    __target_switch
+    {
+    case spirv:
+        return __spirv_stage_supports_implicit_lod_sampling();
+    case hlsl:
+        return __hlsl_stage_supports_implicit_lod_sampling();
+    case wgsl:
+        return __wgsl_stage_supports_implicit_lod_sampling();
+    default:
+        return true;
+    }
+}
+
 
 //@public:
 
@@ -1010,11 +1072,20 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     ///
     /// For HLSL/D3D targets, the texture element type must be a scalar or vector of float or half types.
     ///
+    /// This function is available in all stages. When the implicit
+    /// LOD or gradient is not available, LOD=0 is used. This follows
+    /// the GLSL convention.
+    ///
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0_fragment)]
     T Sample(vector<float, Shape.dimensions+isArray> location)
     {
+        if (!__stage_supports_implicit_lod_sampling())
+        {
+            return SampleLevel(location, 0.0f);
+        }
+
         __requireComputeDerivative();
         __target_switch
         {
@@ -1073,6 +1144,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0_fragment)]
     T Sample(vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset)
     {
+        if (!__stage_supports_implicit_lod_sampling())
+        {
+            return SampleLevel(location, 0.0f, offset);
+        }
+
         __requireComputeDerivative();
         __target_switch
         {
@@ -1104,6 +1180,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_clamp_fragment)]
     T Sample(vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, float clamp)
     {
+        if (!__stage_supports_implicit_lod_sampling())
+        {
+            return SampleLevel(location, clamp, offset);
+        }
+
         __requireComputeDerivative();
         __target_switch
         {
@@ -1131,6 +1212,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [ForceInline]
     T Sample(vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
+        if (!__stage_supports_implicit_lod_sampling())
+        {
+            return SampleLevel(location, clamp, offset, status);
+        }
+
         __requireComputeDerivative();
         __target_switch
         {
@@ -1252,6 +1338,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
     float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
+        if (!__stage_supports_implicit_lod_sampling())
+        {
+            return SampleCmpLevelZero(location, compareValue);
+        }
+
         __requireComputeDerivative();
         __target_switch
         {
@@ -1309,6 +1400,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
     float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
+        if (!__stage_supports_implicit_lod_sampling())
+        {
+            return SampleCmpLevelZero(location, compareValue, offset);
+        }
+
         __requireComputeDerivative();
         __target_switch
         {
@@ -1344,6 +1440,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(hlsl_spirv, sm_5_0)]
     float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
+        if (!__stage_supports_implicit_lod_sampling())
+        {
+            return SampleCmpLevel(location, compareValue, clamp, offset, status);
+        }
+
         __requireComputeDerivative();
         __target_switch
         {
@@ -1925,6 +2026,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0_fragment)]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location)
     {
+        if (!__stage_supports_implicit_lod_sampling())
+        {
+            return SampleLevel(s, location, 0.0f);
+        }
+
         __requireComputeDerivative();
         __target_switch
         {
@@ -2028,6 +2134,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0_fragment)]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset)
     {
+        if (!__stage_supports_implicit_lod_sampling())
+        {
+            return SampleLevel(s, location, 0.0f, offset);
+        }
+
         __requireComputeDerivative();
         __target_switch
         {
@@ -2091,6 +2202,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0_fragment)]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, float clamp)
     {
+        if (!__stage_supports_implicit_lod_sampling())
+        {
+            return SampleLevel(s, location, clamp, offset);
+        }
+
         __requireComputeDerivative();
         __target_switch
         {
@@ -2138,6 +2254,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [ForceInline]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
+        if (!__stage_supports_implicit_lod_sampling())
+        {
+            return SampleLevel(s, location, clamp, offset, status);
+        }
+
         __requireComputeDerivative();
         __target_switch
         {
@@ -2330,6 +2451,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
     float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
+        if (!__stage_supports_implicit_lod_sampling())
+        {
+            return SampleCmpLevelZero(s, location, compareValue);
+        }
+
         __requireComputeDerivative();
         __target_switch
         {
@@ -2416,6 +2542,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
     float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
+        if (!__stage_supports_implicit_lod_sampling())
+        {
+            return SampleCmpLevelZero(s, location, compareValue, offset);
+        }
+
         __requireComputeDerivative();
         __target_switch
         {
@@ -2463,6 +2594,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(hlsl_spirv, sm_5_0)]
     float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
+        if (!__stage_supports_implicit_lod_sampling())
+        {
+            return SampleCmpLevel(s, location, compareValue, clamp, offset, status);
+        }
+
         __requireComputeDerivative();
         __target_switch
         {
