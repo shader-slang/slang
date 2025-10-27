@@ -238,8 +238,9 @@ struct BitCastLoweringContext
         if (auto targetReq = targetProgram->getTargetReq())
         {
             auto target = targetReq->getTarget();
-            isDirectSpirv = (target == CodeGenTarget::SPIRV || target == CodeGenTarget::SPIRVAssembly) &&
-                            targetProgram->shouldEmitSPIRVDirectly();
+            isDirectSpirv =
+                (target == CodeGenTarget::SPIRV || target == CodeGenTarget::SPIRVAssembly) &&
+                targetProgram->shouldEmitSPIRVDirectly();
         }
 
         auto fromBasicType = as<IRBasicType>(fromType);
@@ -264,10 +265,12 @@ struct BitCastLoweringContext
         }
         if (isDirectSpirv)
         {
-            // For SPIRV, pointer-to-pointer bitcasts can be done if the pointers have the same storage class
+            // For SPIRV, pointer-to-pointer bitcasts can be done if the pointers have the same
+            // storage class
             auto fromPtrType = as<IRPtrTypeBase>(fromType);
             auto toPtrType = as<IRPtrTypeBase>(toType);
-            if (fromPtrType && toPtrType && fromPtrType->getAddressSpace() == toPtrType->getAddressSpace())
+            if (fromPtrType && toPtrType &&
+                fromPtrType->getAddressSpace() == toPtrType->getAddressSpace())
                 return;
         }
         else if (as<IRPointerLikeType>(fromType) || as<IRPointerLikeType>(toType))
@@ -279,16 +282,18 @@ struct BitCastLoweringContext
             return;
         }
 
-        // No processing needed for vector <-> scalar bitcasts of equal sizes on SPIRV, nor for some vector-to-vector bitcasts
+        // No processing needed for vector <-> scalar bitcasts of equal sizes on SPIRV, nor for some
+        // vector-to-vector bitcasts
         if (isDirectSpirv && fromTypeSize.size == toTypeSize.size)
         {
-            
-            // For vector-to-vector casts, the larger element count needs to be an integer multiple of the smaller element count
+
+            // For vector-to-vector casts, the larger element count needs to be an integer multiple
+            // of the smaller element count
             auto fromVectorType = as<IRVectorType>(fromType);
             auto toVectorType = as<IRVectorType>(toType);
             auto fromElementCount = getIRVectorElementSize(fromType);
             auto toElementCount = getIRVectorElementSize(toType);
-            
+
             if ((fromVectorType || fromBasicType) && (toVectorType || toBasicType) &&
                 (fromElementCount % toElementCount == 0 || toElementCount % fromElementCount == 0))
                 return;
