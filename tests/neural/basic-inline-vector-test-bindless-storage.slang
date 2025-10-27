@@ -86,8 +86,8 @@ bool BasicTestWithoutBias()
 {
     ElementType[4] inputData = {ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0)};
     let input = InlineVector<ElementType, 4>(inputData);
-    BindlessStorage.Address weightAddress = BindlessStorage.Address(parameters);
-    BindlessStorage.Address dWeightAddress = BindlessStorage.Address(dParameters);
+    BindlessStorage.Address weightAddress = { parameters };
+    BindlessStorage.Address dWeightAddress = { dParameters };
 
     // Run the forward pass
     let outputVec = TestInlineVectorMatMul<InlineVector<ElementType, 4>, InlineVector<ElementType, 2>>(input, weightAddress);
@@ -125,9 +125,9 @@ bool BasicTestWithBias()
     ElementType[4] inputData = {ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0)};
     let input = InlineVector<ElementType, 4>(inputData);
     BindlessStorage.Address weightAddress = BindlessStorage.Address(parameters);
-    BindlessStorage.Address biasAddress = BindlessStorage.Address(parameters, 8);
+    BindlessStorage.Address biasAddress = weightAddress.getOffset(8);
     BindlessStorage.Address dWeightAddress = BindlessStorage.Address(dParameters);
-    BindlessStorage.Address dBiasAddress = BindlessStorage.Address(dParameters, 8);
+    BindlessStorage.Address dBiasAddress = dWeightAddress.getOffset(8);
 
     // Run the forward pass
     let outputVec = TestInlineVectorMatMulAdd<InlineVector<ElementType, 4>, InlineVector<ElementType, 2>>(input, weightAddress, biasAddress);

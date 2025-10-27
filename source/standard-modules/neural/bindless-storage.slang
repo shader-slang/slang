@@ -26,10 +26,10 @@ public struct BindlessBufferStorage<T> : IStorage<T>
         internal RWStructuredBuffer<T>.Handle handle;
         internal uint baseIndex;
 
-        public __init(RWStructuredBuffer<T>.Handle handle, uint baseIndex = 0U)
+        public __init(RWStructuredBuffer<T>.Handle handle)
         {
             this.handle = handle;
-            this.baseIndex = baseIndex;
+            this.baseIndex = 0;
         }
 
         public __subscript(uint index)->T
@@ -51,7 +51,10 @@ public struct BindlessBufferStorage<T> : IStorage<T>
         public Address getOffset(int elements)
         {
             uint newBaseIndex = baseIndex + elements;
-            return Address(handle, newBaseIndex);
+
+            Address address = Address(handle);
+            address.baseIndex = newBaseIndex;
+            return address;
         }
     }
     public typealias Address = BindlessAddress;
@@ -61,7 +64,7 @@ public struct BindlessBufferStorage<T> : IStorage<T>
     public T read(Address address) {return address[0];}
     public void atomicAdd(Address address, T value) {}
     public void write(Address address, T value) {address[0] = value;}
-    public static Address getOffset(Address base, int elements) { return Address(base.handle, base.baseIndex + elements); }
+    public static Address getOffset(Address base, int elements) { return base.getOffset(elements); }
 }
 
 // [require(cpp_cuda_metal_spirv)]
@@ -75,34 +78,31 @@ public struct PointerStorage<T> : IStorage<T>
             PointerStorage<T.Differential>.PointerAddress;
 
         T* ptr;
-        uint baseIndex;
 
-        public __init(T* ptr, uint baseIndex = 0U)
+        public __init(T* ptr)
         {
             this.ptr = ptr;
-            this.baseIndex = baseIndex;
         }
 
         public __subscript(uint index)->T
         {
             [nonmutating]
-            get { return ptr[baseIndex + index]; }
+            get { return ptr[index]; }
 
             [mutating]
-            set { ptr[baseIndex + index] = newValue; }
+            set { ptr[index] = newValue; }
         }
 
-        public Address getOffset(uint elements)
+        public Address getOffset(int elements)
         {
-            uint newBaseIndex = baseIndex + elements;
-            return Address(ptr, newBaseIndex);
+            return Address(ptr + elements);
         }
 
         [require(cuda_glsl_hlsl_metal_spirv, sm_6_6)]
         [require(spvBindlessTextureNV)]
         public void atomicAdd(uint index, T value)
         {
-            __atomic_add(ptr[baseIndex + index], value);
+            __atomic_add(ptr[index], value);
         }
     }
 
@@ -113,5 +113,5 @@ public struct PointerStorage<T> : IStorage<T>
     public T read(Address address) {return address[0];}
     public void atomicAdd(Address address, T value) {}
     public void write(Address address, T value) {address[0] = value;}
-    public static Address getOffset(Address base, int elements) {return Address(base.ptr, base.baseIndex + elements * sizeof(T));}
+    public static Address getOffset(Address base, int elements) {return base.getOffset(elements);}
 }
