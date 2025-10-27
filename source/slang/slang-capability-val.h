@@ -116,72 +116,84 @@ class CapabilitySetVal : public Val
     // Const member functions from CapabilitySet (dummy implementations using thaw())
 
     /// Is this capability set incompatible with the given `other` atom.
-    bool isIncompatibleWith(CapabilityAtom other) const { return thaw().isIncompatibleWith(other); }
+    bool isIncompatibleWith(CapabilityAtom other) const
+    {
+        return CapabilitySet{this}.isIncompatibleWith(other);
+    }
 
     /// Is this capability set incompatible with the given `other` name.
-    bool isIncompatibleWith(CapabilityName other) const { return thaw().isIncompatibleWith(other); }
+    bool isIncompatibleWith(CapabilityName other) const
+    {
+        return CapabilitySet{this}.isIncompatibleWith(other);
+    }
 
     /// Is this capability set incompatible with the given `other` set.
     bool isIncompatibleWith(CapabilitySet const& other) const
     {
-        return thaw().isIncompatibleWith(other);
+        return CapabilitySet{this}.isIncompatibleWith(other);
     }
     bool isIncompatibleWith(CapabilitySetVal const* other) const
     {
-        return thaw().isIncompatibleWith(other->thaw());
+        return CapabilitySet{this}.isIncompatibleWith(CapabilitySet{other});
     }
 
     /// Does this capability set imply all the capabilities in `other`?
-    bool implies(CapabilitySet const& other) const { return thaw().implies(other); }
-    bool implies(CapabilitySetVal const* other) const { return thaw().implies(other->thaw()); }
+    bool implies(CapabilitySet const& other) const { return CapabilitySet{this}.implies(other); }
+    bool implies(CapabilitySetVal const* other) const
+    {
+        return CapabilitySet{this}.implies(CapabilitySet{other});
+    }
 
     /// Does this capability set imply at least 1 set in other.
     CapabilitySet::ImpliesReturnFlags atLeastOneSetImpliedInOther(CapabilitySet const& other) const
     {
-        return thaw().atLeastOneSetImpliedInOther(other);
+        return CapabilitySet{this}.atLeastOneSetImpliedInOther(other);
     }
     CapabilitySet::ImpliesReturnFlags atLeastOneSetImpliedInOther(
         CapabilitySetVal const* other) const
     {
-        return thaw().atLeastOneSetImpliedInOther(other->thaw());
+        return CapabilitySet{this}.atLeastOneSetImpliedInOther(CapabilitySet{other});
     }
 
     /// Will a `join` with `other` change `this`?
     bool joinWithOtherWillChangeThis(CapabilitySet const& other) const
     {
-        return thaw().joinWithOtherWillChangeThis(other);
+        return CapabilitySet{this}.joinWithOtherWillChangeThis(other);
     }
     bool joinWithOtherWillChangeThis(CapabilitySetVal const* other) const
     {
-        return thaw().joinWithOtherWillChangeThis(other->thaw());
+        return CapabilitySet{this}.joinWithOtherWillChangeThis(CapabilitySet{other});
     }
 
     /// Does this capability set imply the atomic capability `other`?
-    bool implies(CapabilityAtom other) const { return thaw().implies(other); }
+    bool implies(CapabilityAtom other) const { return CapabilitySet{this}.implies(other); }
 
     /// Return a capability set of 'target' atoms 'this' has, but 'other' does not.
     CapabilitySet getTargetsThisHasButOtherDoesNot(const CapabilitySet& other) const
     {
-        return thaw().getTargetsThisHasButOtherDoesNot(other);
+        return CapabilitySet{this}.getTargetsThisHasButOtherDoesNot(other);
     }
     CapabilitySet getTargetsThisHasButOtherDoesNot(CapabilitySetVal const* other) const
     {
-        return thaw().getTargetsThisHasButOtherDoesNot(other->thaw());
+        return CapabilitySet{this}.getTargetsThisHasButOtherDoesNot(CapabilitySet{other});
     }
 
     /// Return a capability set of 'stage' atoms 'this' has, but 'other' does not.
     CapabilitySet getStagesThisHasButOtherDoesNot(const CapabilitySet& other) const
     {
-        return thaw().getStagesThisHasButOtherDoesNot(other);
+        return CapabilitySet{this}.getStagesThisHasButOtherDoesNot(other);
     }
     CapabilitySet getStagesThisHasButOtherDoesNot(CapabilitySetVal const* other) const
     {
-        return thaw().getStagesThisHasButOtherDoesNot(other->thaw());
+        return CapabilitySet{this}.getStagesThisHasButOtherDoesNot(CapabilitySet{other});
     }
 
     /// Are these two capability sets equal?
-    bool operator==(CapabilitySet const& that) const { return thaw() == that; }
-    bool operator==(CapabilitySetVal const* that) const { return thaw() == that->thaw(); }
+    bool operator==(CapabilitySet const& that) const { return CapabilitySet{this} == that; }
+    bool operator==(CapabilitySetVal const* that) const
+    {
+        return CapabilitySet{this} == CapabilitySet{that};
+    }
 
     /// returns true if 'this' is a better target for 'targetCaps' than 'that'
     /// isEqual: is `this` and `that` equal
@@ -190,32 +202,36 @@ class CapabilitySetVal : public Val
         CapabilitySet const& targetCaps,
         bool& isEqual) const
     {
-        return thaw().isBetterForTarget(that, targetCaps, isEqual);
+        return CapabilitySet{this}.isBetterForTarget(that, targetCaps, isEqual);
     }
     bool isBetterForTarget(
         CapabilitySetVal const* that,
         CapabilitySetVal const* targetCaps,
         bool& isEqual) const
     {
-        return thaw().isBetterForTarget(that->thaw(), targetCaps->thaw(), isEqual);
+        return CapabilitySet{this}.isBetterForTarget(
+            CapabilitySet{that},
+            CapabilitySet{targetCaps},
+            isEqual);
     }
 
     // If this capability set uniquely implies one stage atom, return it. Otherwise returns
     // CapabilityAtom::Invalid.
     CapabilityAtom getUniquelyImpliedStageAtom() const
     {
-        return thaw().getUniquelyImpliedStageAtom();
+        return CapabilitySet{this}.getUniquelyImpliedStageAtom();
     }
 
     /// Get access to the raw atomic capabilities that define this set.
     /// Get all bottom level UIntSets for each CapabilityTargetSet.
-    // CapabilitySet::AtomSets::Iterator getAtomSets() const { return thaw().getAtomSets(); }
+    // CapabilitySet::AtomSets::Iterator getAtomSets() const { return
+    // CapabilitySet{this}.getAtomSets(); }
 
     /// Gets the first valid compile-target found in the CapabilitySet
-    CapabilityAtom getCompileTarget() const { return thaw().getCompileTarget(); }
+    CapabilityAtom getCompileTarget() const { return CapabilitySet{this}.getCompileTarget(); }
 
     /// Gets the first valid stage found in the CapabilitySet
-    CapabilityAtom getTargetStage() const { return thaw().getTargetStage(); }
+    CapabilityAtom getTargetStage() const { return CapabilitySet{this}.getTargetStage(); }
 
     void _toTextOverride(StringBuilder& out);
     Val* _resolveImplOverride() { return this; }
