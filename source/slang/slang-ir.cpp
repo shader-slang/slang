@@ -4960,14 +4960,17 @@ IRInst* IRBuilder::emitStore(IRInst* dstPtr, IRInst* srcVal, IRInst* align, IRIn
     return inst;
 }
 
-IRInst* IRBuilder::emitCopyLogical(IRInst* dest, IRInst* srcPtr, IRInst* instsToCopyAttributesFrom)
+IRInst* IRBuilder::emitCopyLogical(
+    IRInst* dest,
+    IRInst* srcPtr,
+    IRInst* instsToCopyLoadAttributesFrom)
 {
     ShortList<IRInst*> operands;
     operands.add(dest);
     operands.add(srcPtr);
-    if (instsToCopyAttributesFrom)
+    if (instsToCopyLoadAttributesFrom)
     {
-        for (auto attr : instsToCopyAttributesFrom->getAllAttrs())
+        for (auto attr : instsToCopyLoadAttributesFrom->getAllAttrs())
             operands.add(attr);
     }
     return emitIntrinsicInst(

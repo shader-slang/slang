@@ -3774,7 +3774,7 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* emitStore(IRInst* dstPtr, IRInst* srcVal, IRInst* align);
     IRInst* emitStore(IRInst* dstPtr, IRInst* srcVal, IRInst* align, IRInst* memoryScope);
 
-    IRInst* emitCopyLogical(IRInst* dest, IRInst* srcPtr, IRInst* instsToCopyAttributesFrom);
+    IRInst* emitCopyLogical(IRInst* dest, IRInst* srcPtr, IRInst* instsToCopyLoadAttributesFrom);
 
     IRInst* emitAtomicStore(IRInst* dstPtr, IRInst* srcVal, IRInst* memoryOrder);
 
