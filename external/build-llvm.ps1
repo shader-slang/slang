@@ -55,7 +55,7 @@ $null = Register-EngineEvent PowerShell.Exiting -Action $cleanup
 
 # Default values
 $repo = "https://github.com/llvm/llvm-project"
-$branch = "llvmorg-14.0.6"
+$branch = "llvmorg-21.1.2"
 $sourceDir = $tempDir.FullName
 $installPrefix = ""
 $config = "Release"
@@ -123,6 +123,7 @@ $cmakeArgumentsForSlang = @(
     "-DLLVM_INCLUDE_EXAMPLES=0"
     "-DLLVM_INCLUDE_TESTS=0"
     "-DLLVM_ENABLE_TERMINFO=0"
+    "-DLLVM_ENABLE_DIA_SDK=0"
     "-DCLANG_BUILD_TOOLS=0"
     "-DCLANG_ENABLE_STATIC_ANALYZER=0"
     "-DCLANG_ENABLE_ARCMT=0"
