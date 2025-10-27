@@ -1687,6 +1687,139 @@ CapabilitySetVal* CapabilitySet::freeze(ASTBuilder* astBuilder) const
     return result;
 }
 
+//
+// CapabilitySetVal native implementations
+//
+
+bool CapabilitySetVal::isIncompatibleWith(CapabilityAtom other) const
+{
+    if (isEmpty())
+        return false;
+    
+    // Convert single atom to a capability set and check compatibility
+    auto otherSet = CapabilitySet(CapabilityName(other));
+    return isIncompatibleWith(otherSet);
+}
+
+bool CapabilitySetVal::isIncompatibleWith(CapabilityName other) const
+{
+    if (isEmpty())
+        return false;
+    
+    // Convert single name to a capability set and check compatibility
+    auto otherSet = CapabilitySet(other);
+    return isIncompatibleWith(otherSet);
+}
+
+bool CapabilitySetVal::isIncompatibleWith(CapabilitySet const& other) const
+{
+    if (isEmpty())
+        return false;
+    if (other.isEmpty())
+        return false;
+
+    // Two capability sets are incompatible if there are no intersecting target/stage combinations
+    // Since Dictionary doesn't guarantee order, we iterate through the CapabilitySet's targets
+    // But we can still optimize by avoiding repeated linear searches in this CapabilitySetVal
+    for (auto& otherTargetPair : other.getCapabilityTargetSets())
+    {
+        auto otherTarget = otherTargetPair.first;
+        
+        // Use optimized linear search through sorted thisTargetSets
+        auto thisTargetSet = findTargetSet(otherTarget);
+        if (!thisTargetSet)
+            continue;
+
+        // Convert Dictionary to sorted iteration for stages
+        for (auto& otherStagePair : otherTargetPair.second.getShaderStageSets())
+        {
+            auto otherStage = otherStagePair.first;
+            
+            // Use optimized linear search through sorted stage sets
+            auto thisStageSet = thisTargetSet->findStageSet(otherStage);
+            if (thisStageSet)
+            {
+                // Found matching target/stage pair - sets are compatible
+                return false;
+            }
+        }
+    }
+    
+    // No matching target/stage pairs found - sets are incompatible
+    return true;
+}
+
+bool CapabilitySetVal::isIncompatibleWith(CapabilitySetVal const* other) const
+{
+    if (!other)
+        return false;
+    if (isEmpty())
+        return false;
+    if (other->isEmpty())
+        return false;
+
+    // Two capability sets are incompatible if there are no intersecting target/stage combinations
+    // Use two-pointer approach since both target sets are sorted by target atom
+    Index thisTargetIndex = 0;
+    Index otherTargetIndex = 0;
+    
+    while (thisTargetIndex < getTargetSetCount() && otherTargetIndex < other->getTargetSetCount())
+    {
+        auto thisTargetSet = getTargetSet(thisTargetIndex);
+        auto otherTargetSet = other->getTargetSet(otherTargetIndex);
+        
+        auto thisTarget = thisTargetSet->getTarget();
+        auto otherTarget = otherTargetSet->getTarget();
+        
+        if (thisTarget < otherTarget)
+        {
+            thisTargetIndex++;
+        }
+        else if (thisTarget > otherTarget)
+        {
+            otherTargetIndex++;
+        }
+        else
+        {
+            // Found matching target, now check stages using two-pointer approach
+            // Stage sets are also sorted by stage atom
+            Index thisStageIndex = 0;
+            Index otherStageIndex = 0;
+            
+            while (thisStageIndex < thisTargetSet->getStageSetCount() && 
+                   otherStageIndex < otherTargetSet->getStageSetCount())
+            {
+                auto thisStageSet = thisTargetSet->getStageSet(thisStageIndex);
+                auto otherStageSet = otherTargetSet->getStageSet(otherStageIndex);
+                
+                auto thisStage = thisStageSet->getStage();
+                auto otherStage = otherStageSet->getStage();
+                
+                if (thisStage < otherStage)
+                {
+                    thisStageIndex++;
+                }
+                else if (thisStage > otherStage)
+                {
+                    otherStageIndex++;
+                }
+                else
+                {
+                    // Found matching target/stage pair - sets are compatible
+                    return false;
+                }
+            }
+            
+            // Move to next target pair
+            thisTargetIndex++;
+            otherTargetIndex++;
+        }
+    }
+    
+    // No matching target/stage pairs found - sets are incompatible
+    return true;
+}
+
 
 #ifdef UNIT_TEST_CAPABILITIES
 

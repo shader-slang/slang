@@ -114,26 +114,16 @@ class CapabilitySetVal : public Val
     // Const member functions from CapabilitySet (dummy implementations using thaw())
 
     /// Is this capability set incompatible with the given `other` atom.
-    bool isIncompatibleWith(CapabilityAtom other) const
-    {
-        return CapabilitySet{this}.isIncompatibleWith(other);
-    }
+    bool isIncompatibleWith(CapabilityAtom other) const;
 
     /// Is this capability set incompatible with the given `other` name.
-    bool isIncompatibleWith(CapabilityName other) const
-    {
-        return CapabilitySet{this}.isIncompatibleWith(other);
-    }
+    bool isIncompatibleWith(CapabilityName other) const;
 
     /// Is this capability set incompatible with the given `other` set.
-    bool isIncompatibleWith(CapabilitySet const& other) const
-    {
-        return CapabilitySet{this}.isIncompatibleWith(other);
-    }
-    bool isIncompatibleWith(CapabilitySetVal const* other) const
-    {
-        return CapabilitySet{this}.isIncompatibleWith(CapabilitySet{other});
-    }
+    bool isIncompatibleWith(CapabilitySet const& other) const;
+    
+    /// Is this capability set incompatible with the given `other` set.
+    bool isIncompatibleWith(CapabilitySetVal const* other) const;
 
     /// Does this capability set imply all the capabilities in `other`?
     bool implies(CapabilitySet const& other) const { return CapabilitySet{this}.implies(other); }
