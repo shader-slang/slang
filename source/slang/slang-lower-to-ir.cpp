@@ -12073,7 +12073,8 @@ static void lowerFrontEndEntryPointToIR(
         // then we make sure to add one here, so the lowering logic knows it is an
         // entry point.
         auto entryPointAttr = context->astBuilder->create<EntryPointAttribute>();
-        entryPointAttr->capabilitySet = entryPoint->getProfile().getCapabilityName();
+        entryPointAttr->capabilitySet =
+            entryPoint->getProfile().getCapabilityName().freeze(context->astBuilder);
         addModifier(entryPointFuncDecl, entryPointAttr);
     }
 

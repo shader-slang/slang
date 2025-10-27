@@ -662,7 +662,9 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 // If the entry point has an explicitly declared capability, then we
                 // will merge that with the target capability set before checking if
                 // there is an implicit upgrade.
-                targetCaps.nonDestructiveJoin(declaredCapsMod->declaredCapabilityRequirements);
+                // TODO: Remove this thaw, it's const
+                targetCaps.nonDestructiveJoin(
+                    CapabilitySet{declaredCapsMod->declaredCapabilityRequirements});
             }
 
             // Only attempt to error if a specific profile or capability is requested
@@ -712,7 +714,9 @@ bool resolveStageOfProfileWithEntryPoint(
     if (auto entryPointAttr = entryPointFuncDecl->findModifier<EntryPointAttribute>())
     {
         auto entryPointProfileStage = entryPointProfile.getStage();
-        auto entryPointStage = getStageFromAtom(entryPointAttr->capabilitySet.getTargetStage());
+        // TODO: Can do this without the thaw
+        auto entryPointStage =
+            getStageFromAtom(CapabilitySet{entryPointAttr->capabilitySet}.getTargetStage());
 
         // Ensure every target is specifying the same stage as an entry-point
         // if a profile+stage was set, else user will not be aware that their
@@ -745,7 +749,7 @@ bool resolveStageOfProfileWithEntryPoint(
                 entryPointFuncDecl->getName(),
                 entryPointProfileStage,
                 entryPointStage);
-        entryPointProfile.additionalCapabilities.add(entryPointAttr->capabilitySet);
+        entryPointProfile.additionalCapabilities.add(CapabilitySet{entryPointAttr->capabilitySet});
         return true;
     }
     return false;

@@ -667,9 +667,11 @@ Modifier* SemanticsVisitor::validateAttribute(
 
             // Ensure this capability only defines 1 stage per target, else diagnose an error.
             // This is a fatal error, do not allow toggling this error off.
-            entryPointAttr->capabilitySet = CapabilitySet(capName);
+            CapabilitySet set{capName};
+            entryPointAttr->capabilitySet = set.freeze(getASTBuilder());
             HashSet<CapabilityAtom> stageToBeUsed;
-            for (auto& targetSet : entryPointAttr->capabilitySet.getCapabilityTargetSets())
+            // TODO: This can be done without the thaw
+            for (auto& targetSet : set.getCapabilityTargetSets())
             {
                 for (auto& stageSet : targetSet.second.shaderStageSets)
                     stageToBeUsed.add(stageSet.first);
@@ -1101,8 +1103,8 @@ Modifier* SemanticsVisitor::validateAttribute(
                         capName);
             }
         }
-        requireCapAttr->capabilitySet = CapabilitySet(capabilityNames);
-        if (requireCapAttr->capabilitySet.isInvalid())
+        requireCapAttr->capabilitySet = CapabilitySet(capabilityNames).freeze(getASTBuilder());
+        if (requireCapAttr->capabilitySet->isInvalid())
             maybeDiagnose(
                 getSink(),
                 this->getOptionSet(),
@@ -1129,7 +1131,7 @@ Modifier* SemanticsVisitor::validateAttribute(
         {
             return nullptr;
         }
-        requirePreludeAttr->capabilitySet = CapabilitySet(capName);
+        requirePreludeAttr->capabilitySet = CapabilitySet(capName).freeze(getASTBuilder());
         if (auto stringLitExpr = as<StringLiteralExpr>(attr->args[1]))
         {
             requirePreludeAttr->prelude = getStringLiteralTokenValue(stringLitExpr->token);
@@ -2070,7 +2072,7 @@ void SemanticsVisitor::checkVisibility(Decl* decl)
     }
 }
 
-void postProcessingOnModifiers(Modifiers& modifiers)
+void postProcessingOnModifiers(Modifiers& modifiers, ASTBuilder* astBuilder)
 {
     // compress all `require` nodes into 1 `require` modifier
     RequireCapabilityAttribute* firstRequire = nullptr;
@@ -2089,7 +2091,9 @@ void postProcessingOnModifiers(Modifiers& modifiers)
                 previous = m;
                 continue;
             }
-            firstRequire->capabilitySet.unionWith(req->capabilitySet);
+            CapabilitySet firstCapSet{firstRequire->capabilitySet};
+            firstCapSet.unionWith(CapabilitySet{req->capabilitySet});
+            firstRequire->capabilitySet = firstCapSet.freeze(astBuilder);
             if (previous)
                 previous->next = next;
             continue;
@@ -2205,7 +2209,7 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
         }
     }
 
-    postProcessingOnModifiers(syntaxNode->modifiers);
+    postProcessingOnModifiers(syntaxNode->modifiers, m_astBuilder);
 }
 
 void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)

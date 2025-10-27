@@ -14079,7 +14079,7 @@ struct CapabilityDeclReferenceVisitor
                                          .getStagesThisHasButOtherDoesNot(set));
                     else
                         targetCap =
-                            (maybeRequireCapability->capabilitySet.getStagesThisHasButOtherDoesNot(
+                            (maybeRequireCapability->capabilitySet->getStagesThisHasButOtherDoesNot(
                                 set));
                 }
                 else
@@ -14088,9 +14088,8 @@ struct CapabilityDeclReferenceVisitor
                         targetCap = (CapabilitySet(CapabilityName::any_target)
                                          .getTargetsThisHasButOtherDoesNot(set));
                     else
-                        targetCap =
-                            (maybeRequireCapability->capabilitySet.getTargetsThisHasButOtherDoesNot(
-                                set));
+                        targetCap = (maybeRequireCapability->capabilitySet
+                                         ->getTargetsThisHasButOtherDoesNot(set));
                 }
             }
             else
@@ -14100,7 +14099,7 @@ struct CapabilityDeclReferenceVisitor
 
                 if (maybeRequireCapability)
                 {
-                    CapabilitySet testingForInvalid = maybeRequireCapability->capabilitySet;
+                    CapabilitySet testingForInvalid{maybeRequireCapability->capabilitySet};
                     // Ensure case statement is valid with parent `[require(...)]`
                     testingForInvalid.join(targetCap);
                     if (testingForInvalid.isInvalid())
@@ -14302,9 +14301,9 @@ CapabilitySet SemanticsDeclCapabilityVisitor::getDeclaredCapabilitySet(Decl* dec
             for (auto mod : parent->modifiers)
             {
                 if (auto decoration = as<RequireCapabilityAttribute>(mod))
-                    localDeclaredCaps.unionWith(decoration->capabilitySet);
+                    localDeclaredCaps.unionWith(CapabilitySet{decoration->capabilitySet});
                 else if (auto entrypoint = as<EntryPointAttribute>(mod))
-                    stageToJoin = entrypoint->capabilitySet.getTargetStage();
+                    stageToJoin = entrypoint->capabilitySet->getTargetStage();
             }
         }
         else
@@ -14398,7 +14397,7 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
     else
     {
         auto declaredCapModifier = m_astBuilder->create<ExplicitlyDeclaredCapabilityModifier>();
-        declaredCapModifier->declaredCapabilityRequirements = declaredCaps;
+        declaredCapModifier->declaredCapabilityRequirements = declaredCaps.freeze(getASTBuilder());
         addModifier(funcDecl, declaredCapModifier);
         if (vis == DeclVisibility::Public)
         {

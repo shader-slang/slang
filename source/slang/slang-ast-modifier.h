@@ -194,7 +194,7 @@ FIDDLE()
 class ExplicitlyDeclaredCapabilityModifier : public Modifier
 {
     FIDDLE(...)
-    FIDDLE() CapabilitySet declaredCapabilityRequirements;
+    FIDDLE() CapabilitySetVal* declaredCapabilityRequirements;
 };
 
 // Marks a synthesized variable as local temporary variable.
@@ -916,7 +916,7 @@ FIDDLE()
 class RequireCapabilityAttribute : public Attribute
 {
     FIDDLE(...)
-    FIDDLE() CapabilitySet capabilitySet;
+    FIDDLE() CapabilitySetVal* capabilitySet;
 };
 
 
@@ -1274,7 +1274,7 @@ class EntryPointAttribute : public Attribute
 {
     FIDDLE(...)
     // The resolved capailities for our entry point.
-    FIDDLE() CapabilitySet capabilitySet;
+    FIDDLE() CapabilitySetVal* capabilitySet;
 };
 
 // A `[__vulkanRayPayload(location)]` attribute, which is used in the
@@ -1714,7 +1714,7 @@ FIDDLE()
 class RequirePreludeAttribute : public Attribute
 {
     FIDDLE(...)
-    FIDDLE() CapabilitySet capabilitySet;
+    FIDDLE() CapabilitySetVal* capabilitySet;
     FIDDLE() String prelude;
 };
 

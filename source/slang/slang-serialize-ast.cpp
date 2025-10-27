@@ -1241,29 +1241,29 @@ static void _reconstructCapabilitySet(CapabilitySet& capSet, const CapabilitySet
 }
 
 // Simplified CapabilitySet serialization using intermediate data structure
-template<typename S>
-void serialize(S const& serializer, CapabilitySet& value)
-{
-    SLANG_PROFILE_SECTION(serialize_CapabilitySet);
-
-    if (isWriting(serializer))
-    {
-        // Collect intermediate representation
-        CapabilitySetInfo info = _collectCapabilitySetInfo(value);
-
-        // Serialize the intermediate representation
-        serialize(serializer, info);
-    }
-    else
-    {
-        // Deserialize the intermediate representation
-        CapabilitySetInfo info;
-        serialize(serializer, info);
-
-        // Reconstruct the CapabilitySet
-        _reconstructCapabilitySet(value, info);
-    }
-}
+// template<typename S>
+// void serialize(S const& serializer, CapabilitySet& value)
+// {
+//     SLANG_PROFILE_SECTION(serialize_CapabilitySet);
+//
+//     if (isWriting(serializer))
+//     {
+//         // Collect intermediate representation
+//         CapabilitySetInfo info = _collectCapabilitySetInfo(value);
+//
+//         // Serialize the intermediate representation
+//         serialize(serializer, info);
+//     }
+//     else
+//     {
+//         // Deserialize the intermediate representation
+//         CapabilitySetInfo info;
+//         serialize(serializer, info);
+//
+//         // Reconstruct the CapabilitySet
+//         _reconstructCapabilitySet(value, info);
+//     }
+// }
 
 //
 // The `RequirementWitness` type is a variant, where the `m_flavor`
