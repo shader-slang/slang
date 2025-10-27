@@ -8,6 +8,7 @@
 #include <core/slang-com-object.h>
 #include <llvm/ADT/SmallString.h>
 #include <llvm/FileCheck/FileCheck.h>
+#include <llvm/Support/SourceMgr.h>
 #include <llvm/Support/raw_ostream.h>
 #include <slang-test/filecheck.h>
 
@@ -126,8 +127,7 @@ TestResult LLVMFileCheck::performTest(
         TestMessageType::RunError};
     sourceManager.setDiagHandler(fileCheckDiagHandler, static_cast<void*>(&reporterData));
 
-    auto checkPrefix = fc.buildCheckPrefixRegex();
-    if (fc.readCheckFile(sourceManager, rulesStringRef, checkPrefix))
+    if (fc.readCheckFile(sourceManager, rulesStringRef))
     {
         // FileCheck failed to find or understand any FileCheck rules in
         // the input file, automatic fail, and reported to the diag handler .
