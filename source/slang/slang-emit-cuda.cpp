@@ -241,8 +241,10 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
         }
     case kIROp_CoopMatrixType:
         {
-            out << "wmma::fragment<...>";
-            return SLANG_OK;
+            ensurePrelude("#include <mma.h>");
+            ensurePrelude("using namespace nvcuda;");
+
+            return emitWMMAFragmentType(as<IRCoopMatrixType>(type), out);
         }
     default:
         {
@@ -1108,5 +1110,149 @@ void CUDASourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
     _emitWitnessTableDefinitions();
 }
 
+static constexpr int find3rdDimension(int x, int y)
+{
+    constexpr auto makeKey = [](int a, int b) {
+        int low  = std::min(a, b);
+        int high = std::max(a, b);
+        return (high << 8) | low;
+    };
+
+    int key = makeKey(x, y);
+    switch(key)
+    {
+        case makeKey(16, 16):
+        case makeKey(8, 32):
+            return 16;
+        case makeKey(8, 16):
+            return 32;
+        case makeKey(16, 32):
+            return 8;
+        default:
+            return -1;
+    }
+}
+
+static void calculateTileSize(int matrixUse, int roundRowCount, int roundColCount, int otherDim, int out[3])
+{
+    switch(matrixUse)
+    {
+        case 0: // matirxA: CoopMat<M, N> where M and N will use used for m x k in wmma::fragment
+            out[0] = roundRowCount;
+            out[1] = otherDim;
+            out[2] = roundColCount;
+            break;
+        case 1: // matrixB: CoopMat<M, N> where M and N will be used for k x n in wmma::fragment
+            out[0] = otherDim;
+            out[1] = roundRowCount;
+            out[2] = roundColCount;
+            break;
+        case 2:
+            // accumulator: CoopMat<M, N> where M and N will be used for m x n in wmma::fragment
+            out[0] = roundRowCount;
+            out[1] = roundColCount;
+            out[2] = otherDim;
+            break;
+    }
+}
+
+static bool typeCheck(IROp op, int matrixUse)
+{
+    switch(matrixUse)
+    {
+        case 0: // matrixA
+        case 1: // matrixB
+            return op == kIROp_UInt8Type || op == kIROp_Int8Type || op == kIROp_HalfType;
+        case 2: // accumulator
+            return op == kIROp_IntType || op == kIROp_HalfType || op == kIROp_FloatType;
+    }
+    return false;
+}
+
+static UnownedStringSlice getMatrixUseName(int matrixUse)
+{
+    switch(matrixUse)
+    {
+        case 0:
+            return UnownedStringSlice("wmma::matrix_a");
+        case 1:
+            return UnownedStringSlice("wmma::matrix_b");
+        case 2:
+            return UnownedStringSlice("wmma::accumulator");
+        default:
+            return UnownedStringSlice();
+    }
+}
+
+static UnownedStringSlice getMatrixLayoutName(int matrixUse)
+{
+    switch(matrixUse)
+    {
+        case 0:
+            return UnownedStringSlice("wmma::matrix_a");
+        case 1:
+            return UnownedStringSlice("wmma::matrix_b");
+        case 2:
+            return UnownedStringSlice("wmma::accumulator");
+        default:
+            return UnownedStringSlice();
+    }
+}
+
+SlangResult CUDASourceEmitter::emitWMMAFragmentType(IRCoopMatrixType* coopMatType, StringBuilder& outStr)
+{
+    auto rowCount = static_cast<IRIntLit*>(coopMatType->getRowCount())->getValue();
+    auto colCount = static_cast<IRIntLit*>(coopMatType->getColumnCount())->getValue();
+    auto matrixUse = static_cast<IRIntLit*>(coopMatType->getMatrixUse())->getValue();
+
+    auto typeOp = coopMatType->getElementType()->getOp();
+    auto typeName = getBuiltinTypeName(typeOp);
+    if (!typeCheck(typeOp, matrixUse))
+    {
+        StringBuilder msg;
+        msg << "Unsupported data type in wmma::fragment: " << typeName;
+        ::Slang::handleSignal(::Slang::SignalType::AssertFailure, msg.begin());
+        return SLANG_FAIL;
+    }
+
+    auto roundUpTo32 = [](int x)
+    {
+        if (x < 8)
+            x = 8;
+
+        // Compute next power of 2
+        int pow2 = 1 << static_cast<int>(std::ceil(std::log2(x)));
+
+        // If result > 32, return invalid
+        if (pow2 > 32) return -1;
+
+        return pow2;
+    };
+
+    int roundRowCount = roundUpTo32(static_cast<int>(rowCount));
+    int roundColCount = roundUpTo32(static_cast<int>(colCount));
+    if (roundRowCount == -1 || roundColCount == -1)
+    {
+        StringBuilder msg;
+        msg << "Unsupported wmma::fragment size: " << rowCount << "x" << colCount;
+        ::Slang::handleSignal(::Slang::SignalType::AssertFailure, msg.begin());
+        return SLANG_FAIL;
+    }
+
+    int otherDim = find3rdDimension(roundRowCount, roundColCount);
+    if (otherDim == -1)
+    {
+        StringBuilder msg;
+        msg << "Unsupported wmma::fragment size: " << rowCount << "x" << colCount;
+        ::Slang::handleSignal(::Slang::SignalType::AssertFailure, msg.begin());
+        return SLANG_FAIL;
+    }
+
+    int wmmaFragmentSize[3] = {0, 0, 0};
+    calculateTileSize(matrixUse, roundRowCount, roundColCount, otherDim, wmmaFragmentSize);
+    outStr << "wmma::fragment"<< getMatrixUseName(matrixUse)<< "," << wmmaFragmentSize[0] << ", " << wmmaFragmentSize[1] << ", " << wmmaFragmentSize[2] << ", " << typeName << ">";
+
+    return SLANG_OK;
+}
 
 } // namespace Slang
