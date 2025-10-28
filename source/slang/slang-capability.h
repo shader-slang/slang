@@ -76,6 +76,8 @@ struct CapabilityStageSet
     /// LinkedList of all disjoint sets for fast remove/add of unconstrained list positions.
     std::optional<CapabilityAtomSet> atomSet{};
 
+    HashCode64 getHashCode() const;
+
     void addNewSet(CapabilityAtomSet&& setToAdd)
     {
         if (!atomSet)
@@ -101,6 +103,8 @@ struct CapabilityTargetSet
     CapabilityAtom target{};
 
     CapabilityStageSets shaderStageSets{};
+
+    HashCode64 getHashCode() const;
 
     /// Join a compatable target set from `this` with `CapabilityTargetSet other`.
     /// Return false when `other` is fully incompatible.
@@ -185,6 +189,8 @@ public:
 
     /// Make an invalid capability set (such that no target could ever support it)
     static CapabilitySet makeInvalid();
+
+    HashCode64 getHashCode() const;
 
     /// Is this capability set empty (such that any target supports it)?
     bool isEmpty() const;

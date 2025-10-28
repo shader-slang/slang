@@ -222,11 +222,6 @@ class CapabilitySetVal : public Val
         return CapabilitySet{this}.getUniquelyImpliedStageAtom();
     }
 
-    /// Get access to the raw atomic capabilities that define this set.
-    /// Get all bottom level UIntSets for each CapabilityTargetSet.
-    // CapabilitySet::AtomSets::Iterator getAtomSets() const { return
-    // CapabilitySet{this}.getAtomSets(); }
-
     /// Gets the first valid compile-target found in the CapabilitySet
     CapabilityAtom getCompileTarget() const { return CapabilitySet{this}.getCompileTarget(); }
 
@@ -238,6 +233,9 @@ class CapabilitySetVal : public Val
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
 private:
+    // It's a lot quicker to cache and copy the Capability set, thawing is done
+    // about 130000 times for the core module, but only 360 unique results are
+    // ever returned.
     mutable std::optional<CapabilitySet> cachedThawedCapabilitySet;
 };
 } // namespace Slang
