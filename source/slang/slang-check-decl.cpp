@@ -14420,18 +14420,19 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
 
     // Get require of decl + add parents
     auto declaredCaps = getDeclaredCapabilitySet(funcDecl);
-    auto vis = getDeclVisibility(funcDecl);
 
     // If 0 capabilities were annotated on this function,
-    // capabilities are inferred from the children.
+    // keep the capabilities inferred from the children.
     if (declaredCaps.isEmpty())
     {
-        declaredCaps = CapabilitySet{funcDecl->inferredCapabilityRequirements};
+        funcDecl->inferredCapabilityRequirements = mutableFuncDeclCapSet.freeze(getASTBuilder());
     }
     else
     {
+        auto vis = getDeclVisibility(funcDecl);
+        const auto frozenDeclaredCaps = declaredCaps.freeze(getASTBuilder());
         auto declaredCapModifier = m_astBuilder->create<ExplicitlyDeclaredCapabilityModifier>();
-        declaredCapModifier->declaredCapabilityRequirements = declaredCaps.freeze(getASTBuilder());
+        declaredCapModifier->declaredCapabilityRequirements = frozenDeclaredCaps;
         addModifier(funcDecl, declaredCapModifier);
         if (vis == DeclVisibility::Public)
         {
@@ -14459,7 +14460,7 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
                 true);
 
             // declared capabilities must be a superset.
-            funcDecl->inferredCapabilityRequirements = declaredCaps.freeze(getASTBuilder());
+            funcDecl->inferredCapabilityRequirements = frozenDeclaredCaps;
         }
         else
         {
