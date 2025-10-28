@@ -236,11 +236,6 @@ class CapabilitySetVal : public Val
         return CapabilitySet{this}.getUniquelyImpliedStageAtom();
     }
 
-    /// Get access to the raw atomic capabilities that define this set.
-    /// Get all bottom level UIntSets for each CapabilityTargetSet.
-    // CapabilitySet::AtomSets::Iterator getAtomSets() const { SLANG_PROFILE_CAPABILITY_SETS; return
-    // CapabilitySet{this}.getAtomSets(); }
-
     /// Gets the first valid compile-target found in the CapabilitySet
     CapabilityAtom getCompileTarget() const
     {
@@ -265,6 +260,9 @@ private:
         CapabilitySetVal const* other,
         CapabilitySet::ImpliesFlags flags) const;
 
+    // It's a lot quicker to cache and copy the Capability set, thawing is done
+    // about 130000 times for the core module, but only 360 unique results are
+    // ever returned.
     mutable std::optional<CapabilitySet> cachedThawedCapabilitySet;
 };
 } // namespace Slang

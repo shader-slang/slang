@@ -191,6 +191,27 @@ auto combineHash(H1 n, H2 m, Hs... args)
     return combineHash((n * 16777619) ^ m, args...);
 }
 
+template<typename I>
+HashCode64 symmetricHash(I begin, I end)
+{
+    using V = typename std::iterator_traits<I>::value_type;
+
+    HashCode64 sum = 0;
+    HashCode64 product = 1;
+    const HashCode64 prime = 0x9e3779b9;
+
+    for (I it = begin; it != end; ++it)
+    {
+        HashCode64 element_hash = getHashCode(*it);
+
+        sum += element_hash;
+        product *= element_hash | 1; // avoid zeros
+    }
+
+    product ^= product >> 16;
+
+    return sum ^ (product * prime);
+}
 struct Hasher
 {
 public:
