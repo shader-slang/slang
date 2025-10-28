@@ -1,4 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type
 
 // CHECK: type: int32_t
 // CHECK-COUNT-256: 10
@@ -8,6 +9,7 @@ RWStructuredBuffer<int32_t> outputBuffer;
 
 using namespace linalg;
 
+[shader("compute")]
 [numthreads(32, 1, 1)]
 void computeMain()
 {

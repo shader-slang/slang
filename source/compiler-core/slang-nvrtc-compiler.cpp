@@ -913,13 +913,6 @@ SlangResult NVRTCDownstreamCompiler::_maybeAddHalfSupport(
         }
     }
 
-    String includePath;
-    SLANG_RETURN_ON_FAIL(_getCUDAIncludePath(includePath));
-
-    // Add the found include path
-    ioCmdLine.addArg("-I");
-    ioCmdLine.addArg(includePath);
-
     ioCmdLine.addArg("-DSLANG_CUDA_ENABLE_HALF");
 
     return SLANG_OK;
@@ -1060,6 +1053,15 @@ SlangResult NVRTCDownstreamCompiler::compile(
         cmdLine.addArg("-I");
         cmdLine.addArg(asString(include));
     }
+
+    String includePath;
+    if (_getCUDAIncludePath(includePath) == SLANG_OK)
+    {
+        // Add the found include path
+        cmdLine.addArg("-I");
+        cmdLine.addArg(includePath);
+    }
+
 
     SLANG_RETURN_ON_FAIL(_maybeAddHalfSupport(options, cmdLine));
 
