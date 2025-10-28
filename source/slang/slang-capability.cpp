@@ -756,7 +756,7 @@ void CapabilitySet::nonDestructiveJoin(const CapabilitySetVal* other)
     // Treat null pointer as empty set
     if (!other)
         return;
-        
+
     if (this->isInvalid() || other->isInvalid())
         return;
 
@@ -765,7 +765,7 @@ void CapabilitySet::nonDestructiveJoin(const CapabilitySetVal* other)
         *this = CapabilitySet(other);
         return;
     }
-    
+
     for (auto& thisTargetSet : this->m_targetSets)
     {
         thisTargetSet.second.tryJoin(*other);
@@ -912,7 +912,7 @@ bool CapabilityTargetSet::tryJoin(const CapabilitySetVal& other)
             break;
         }
     }
-    
+
     if (!otherTargetSet)
         return false;
 
@@ -923,7 +923,7 @@ bool CapabilityTargetSet::tryJoin(const CapabilitySetVal& other)
         if (!shaderStageSet.second.tryJoin(*otherTargetSet))
             destroySet.add(shaderStageSet.first);
     }
-    
+
     if (destroySet.getCount() == Slang::Index(this->shaderStageSets.getCount()))
         return false;
 
@@ -1037,7 +1037,7 @@ CapabilitySet& CapabilitySet::join(const CapabilitySetVal* other)
     // Treat null pointer as empty set
     if (!other)
         return *this;
-        
+
     if (this->isEmpty() || other->isInvalid())
     {
         *this = CapabilitySet(other);
@@ -1867,6 +1867,7 @@ CapabilitySet CapabilitySetVal::thaw() const
     return result;
 }
 
+[[nodiscard]]
 CapabilitySetVal* CapabilitySet::freeze(ASTBuilder* astBuilder) const
 {
     SLANG_PROFILE_CAPABILITY_SETS;

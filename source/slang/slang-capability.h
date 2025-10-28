@@ -166,7 +166,7 @@ enum class CheckCapabilityRequirementResult
 struct CapabilitySet
 {
     friend class CapabilitySetVal;
-    
+
 public:
     /// Default-construct an empty capability set
     CapabilitySet();
@@ -430,6 +430,7 @@ public:
     }
 
     /// Convert this mutable capability set to an immutable CapabilitySetVal
+    [[nodiscard]]
     CapabilitySetVal* freeze(ASTBuilder* astBuilder) const;
 
 private:
