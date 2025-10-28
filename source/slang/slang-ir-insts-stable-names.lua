@@ -682,4 +682,6 @@ return {
 	["Attr.MemoryScope"] = 678,
 	["Undefined.LoadFromUninitializedMemory"] = 679,
 	["CUDA_LDG"] = 680,
+	["Decoration.spirvExport"] = 681,
+	["Decoration.spirvExtern"] = 682,
 }

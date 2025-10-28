@@ -1550,7 +1550,9 @@ local insts = {
 			{ public = { struct_name = "PublicDecoration" } },
 			{ hlslExport = { struct_name = "HLSLExportDecoration" } },
 			{ downstreamModuleExport = { struct_name = "DownstreamModuleExportDecoration" } },
+			{ spirvExport = { struct_name = "SpirVExportDecoration" } },
 			{ downstreamModuleImport = { struct_name = "DownstreamModuleImportDecoration" } },
+			{ spirvExtern = { struct_name = "SpirVExternDecoration" } },
 			{
 				patchConstantFunc = { struct_name = "PatchConstantFuncDecoration", operands = { { "func", "IRInst" } } },
 			},
