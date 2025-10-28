@@ -131,28 +131,21 @@ class CapabilitySetVal : public Val
     bool isIncompatibleWith(CapabilitySetVal const* other) const;
 
     /// Does this capability set imply all the capabilities in `other`?
-    bool implies(CapabilitySet const& other) const
-    {
-        SLANG_PROFILE_CAPABILITY_SETS;
-        return CapabilitySet{this}.implies(other);
-    }
+    bool implies(CapabilitySet const& other) const;
     bool implies(CapabilitySetVal const* other) const
     {
         SLANG_PROFILE_CAPABILITY_SETS;
-        return CapabilitySet{this}.implies(CapabilitySet{other});
+        return (int)_implies(other, CapabilitySet::ImpliesFlags::None) &
+               (int)CapabilitySet::ImpliesReturnFlags::Implied;
     }
 
     /// Does this capability set imply at least 1 set in other.
-    CapabilitySet::ImpliesReturnFlags atLeastOneSetImpliedInOther(CapabilitySet const& other) const
-    {
-        SLANG_PROFILE_CAPABILITY_SETS;
-        return CapabilitySet{this}.atLeastOneSetImpliedInOther(other);
-    }
+    CapabilitySet::ImpliesReturnFlags atLeastOneSetImpliedInOther(CapabilitySet const& other) const;
     CapabilitySet::ImpliesReturnFlags atLeastOneSetImpliedInOther(
         CapabilitySetVal const* other) const
     {
         SLANG_PROFILE_CAPABILITY_SETS;
-        return CapabilitySet{this}.atLeastOneSetImpliedInOther(CapabilitySet{other});
+        return _implies(other, CapabilitySet::ImpliesFlags::OnlyRequireASingleValidImply);
     }
 
     /// Will a `join` with `other` change `this`?
@@ -259,6 +252,11 @@ class CapabilitySetVal : public Val
 
 private:
     friend struct CapabilitySet;
+
+    /// Helper method for implies operations
+    CapabilitySet::ImpliesReturnFlags _implies(
+        CapabilitySetVal const* other,
+        CapabilitySet::ImpliesFlags flags) const;
 
     // It's a lot quicker to cache and copy the Capability set, thawing is done
     // about 130000 times for the core module, but only 360 unique results are

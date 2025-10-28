@@ -1868,6 +1868,28 @@ bool CapabilitySetVal::isIncompatibleWith(CapabilitySetVal const* other) const
     return !foundMatch;
 }
 
+CapabilitySet::ImpliesReturnFlags CapabilitySetVal::_implies(
+    CapabilitySetVal const* otherSet,
+    CapabilitySet::ImpliesFlags flags) const
+{
+    // todo
+}
+
+bool CapabilitySetVal::implies(CapabilitySet const& other) const
+{
+    SLANG_PROFILE_CAPABILITY_SETS;
+    // For mixed types, convert to CapabilitySet to maintain compatibility
+    return CapabilitySet{this}.implies(other);
+}
+
+CapabilitySet::ImpliesReturnFlags CapabilitySetVal::atLeastOneSetImpliedInOther(
+    CapabilitySet const& other) const
+{
+    SLANG_PROFILE_CAPABILITY_SETS;
+    // For mixed types, convert to CapabilitySet to maintain compatibility
+    return CapabilitySet{this}.atLeastOneSetImpliedInOther(other);
+}
+
 
 #ifdef UNIT_TEST_CAPABILITIES
 

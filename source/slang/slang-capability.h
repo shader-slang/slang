@@ -165,6 +165,8 @@ enum class CheckCapabilityRequirementResult
 
 struct CapabilitySet
 {
+    friend class CapabilitySetVal;
+    
 public:
     /// Default-construct an empty capability set
     CapabilitySet();

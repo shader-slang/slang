@@ -966,8 +966,6 @@ class UIntSetVal : public Val
 {
     FIDDLE(...)
 
-    friend class UIntSet;
-
     /// Get the number of bitmask operands
     Index getBitmaskCount() const { return getOperandCount(); }
 
