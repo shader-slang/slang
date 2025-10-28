@@ -1916,7 +1916,7 @@ struct LoweredElementTypeContext
                                 // `addr` should point to the same type as the lowered structure
                                 // buffer element type. There is only one case when this is not
                                 // true, that is when we are lowering for SPIRV, and `addr` may
-                                // point to a "logical strorage type" that is created to work around
+                                // point to a "logical storage type" that is created to work around
                                 // SPIRV restriction that physical types cannot be used to declare
                                 // local variables. However when we generate SPIRV, we should have
                                 // already lowered all Append/Consume structured buffer operations
