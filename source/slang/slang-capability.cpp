@@ -1,7 +1,8 @@
 // slang-capability.cpp
 #include "slang-capability.h"
 
-#include "../core/slang-dictionary.h"
+#include "core/slang-dictionary.h"
+#include "core/slang-performance-profiler.h"
 #include "slang-ast-builder.h"
 #include "slang-capability-val.h"
 
@@ -1626,6 +1627,7 @@ Val* CapabilitySetVal::_substituteImplOverride(
 
 CapabilityStageSetVal* CapabilityTargetSetVal::findStageSet(CapabilityAtom stage) const
 {
+    SLANG_PROFILE_CAPABILITY_SETS;
     // Linear search through sorted list - these lists are typically very short (1-4 items)
     for (Index i = 0; i < getStageSetCount(); i++)
     {
@@ -1641,6 +1643,7 @@ CapabilityStageSetVal* CapabilityTargetSetVal::findStageSet(CapabilityAtom stage
 
 CapabilityTargetSetVal* CapabilitySetVal::findTargetSet(CapabilityAtom target) const
 {
+    SLANG_PROFILE_CAPABILITY_SETS;
     // Linear search through sorted list - these lists are typically very short (1-4 items)
     for (Index i = 0; i < getTargetSetCount(); i++)
     {
@@ -1656,12 +1659,14 @@ CapabilityTargetSetVal* CapabilitySetVal::findTargetSet(CapabilityAtom target) c
 
 bool CapabilitySetVal::isInvalid() const
 {
+    SLANG_PROFILE_CAPABILITY_SETS;
     // Check if we have the invalid target atom
     return findTargetSet(CapabilityAtom::Invalid) != nullptr;
 }
 
 CapabilitySet CapabilitySetVal::thaw() const
 {
+    SLANG_PROFILE_CAPABILITY_SETS;
     if (isEmpty())
         return CapabilitySet::makeEmpty();
 
@@ -1705,6 +1710,7 @@ CapabilitySet CapabilitySetVal::thaw() const
 
 CapabilitySetVal* CapabilitySet::freeze(ASTBuilder* astBuilder) const
 {
+    SLANG_PROFILE_CAPABILITY_SETS;
     if (isEmpty())
     {
         return astBuilder->getOrCreate<CapabilitySetVal>();
@@ -1846,6 +1852,7 @@ void concurrentIterate(
 
 bool CapabilitySetVal::isIncompatibleWith(CapabilityAtom other) const
 {
+    SLANG_PROFILE_CAPABILITY_SETS;
     if (isEmpty())
         return false;
 
@@ -1856,6 +1863,7 @@ bool CapabilitySetVal::isIncompatibleWith(CapabilityAtom other) const
 
 bool CapabilitySetVal::isIncompatibleWith(CapabilityName other) const
 {
+    SLANG_PROFILE_CAPABILITY_SETS;
     if (isEmpty())
         return false;
 
@@ -1866,6 +1874,7 @@ bool CapabilitySetVal::isIncompatibleWith(CapabilityName other) const
 
 bool CapabilitySetVal::isIncompatibleWith(CapabilitySet const& other) const
 {
+    SLANG_PROFILE_CAPABILITY_SETS;
     if (isEmpty())
         return false;
     if (other.isEmpty())
@@ -1904,6 +1913,7 @@ bool CapabilitySetVal::isIncompatibleWith(CapabilitySet const& other) const
 
 bool CapabilitySetVal::isIncompatibleWith(CapabilitySetVal const* other) const
 {
+    SLANG_PROFILE_CAPABILITY_SETS;
     if (!other)
         return false;
     if (isEmpty())

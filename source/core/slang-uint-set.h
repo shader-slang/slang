@@ -211,6 +211,8 @@ public:
     bool areAllZero() { return _areAllZero(m_buffer.getBuffer(), m_buffer.getCount()); }
 
 protected:
+    friend class UIntSetVal;
+
     static bool _areAllZero(const UIntSet::Element* elems, Index count)
     {
         for (Index i = 0; i < count; ++i)
