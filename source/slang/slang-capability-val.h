@@ -233,6 +233,8 @@ class CapabilitySetVal : public Val
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
 private:
+    friend struct CapabilitySet;
+
     // It's a lot quicker to cache and copy the Capability set, thawing is done
     // about 130000 times for the core module, but only 360 unique results are
     // ever returned.

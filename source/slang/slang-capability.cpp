@@ -1740,6 +1740,11 @@ CapabilitySet CapabilitySetVal::thaw() const
 
 CapabilitySetVal* CapabilitySet::freeze(ASTBuilder* astBuilder) const
 {
+    if (auto cached = astBuilder->m_capabilitySetCache.tryGetValue(*this))
+    {
+        return *cached;
+    }
+
     if (isEmpty())
     {
         return astBuilder->getOrCreate<CapabilitySetVal>();
@@ -1798,7 +1803,13 @@ CapabilitySetVal* CapabilitySet::freeze(ASTBuilder* astBuilder) const
         targetSetVals.add(targetSetVal);
     }
 
-    return astBuilder->getOrCreate<CapabilitySetVal>(targetSetVals);
+    auto result = astBuilder->getOrCreate<CapabilitySetVal>(targetSetVals);
+    result->cachedThawedCapabilitySet = *this;
+
+    // Cache the result for future lookups
+    astBuilder->m_capabilitySetCache.add(*this, result);
+
+    return result;
 }
 
 
