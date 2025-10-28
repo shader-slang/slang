@@ -32,6 +32,7 @@ namespace Slang
 #include "slang-generated-capability-defs.h"
 
 class CapabilitySetVal;
+class CapabilityTargetSetVal;
 class ASTBuilder;
 
 // Once we have a universe of suitable capability atoms, we can define
@@ -115,6 +116,7 @@ struct CapabilityTargetSet
     /// 2. `this` has completly disjoint shader stages from other.
     bool tryJoin(const CapabilityTargetSets& other);
     void unionWith(const CapabilityTargetSet& other);
+    void unionWith(const CapabilityTargetSetVal& other);
 
     const CapabilityStageSets& getShaderStageSets() const { return shaderStageSets; }
     CapabilityStageSets& getShaderStageSets() { return shaderStageSets; }
@@ -238,6 +240,7 @@ public:
 
     /// Add all targets/sets of 'other' into 'this'. Overlapping sets are removed.
     void unionWith(const CapabilitySet& other);
+    void unionWith(const CapabilitySetVal* other);
 
     /// Return a capability set of 'target' atoms 'this' has, but 'other' does not.
     CapabilitySet getTargetsThisHasButOtherDoesNot(const CapabilitySet& other);

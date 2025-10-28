@@ -14340,7 +14340,7 @@ CapabilitySet SemanticsDeclCapabilityVisitor::getDeclaredCapabilitySet(Decl* dec
             for (auto mod : parent->modifiers)
             {
                 if (auto decoration = as<RequireCapabilityAttribute>(mod))
-                    localDeclaredCaps.unionWith(CapabilitySet{decoration->capabilitySet});
+                    localDeclaredCaps.unionWith(decoration->capabilitySet);
                 else if (auto entrypoint = as<EntryPointAttribute>(mod))
                     stageToJoin = entrypoint->capabilitySet
                                       ? entrypoint->capabilitySet->getTargetStage()

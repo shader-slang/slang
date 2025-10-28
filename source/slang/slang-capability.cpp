@@ -666,6 +666,35 @@ void CapabilityTargetSet::unionWith(const CapabilityTargetSet& other)
     }
 }
 
+void CapabilityTargetSet::unionWith(const CapabilityTargetSetVal& other)
+{
+    // Iterate through all stages in the CapabilityTargetSetVal
+    for (Index i = 0; i < other.getStageSetCount(); i++)
+    {
+        auto otherStageSetVal = other.getStageSet(i);
+        auto stageAtom = otherStageSetVal->getStage();
+
+        auto& thisStageSet = this->shaderStageSets[stageAtom];
+        thisStageSet.stage = stageAtom;
+
+        // Union the atom sets if they exist
+        auto otherAtomSetVal = otherStageSetVal->getAtomSet();
+        if (otherAtomSetVal)
+        {
+            if (!thisStageSet.atomSet)
+            {
+                // Convert UIntSetVal to UIntSet
+                thisStageSet.atomSet = otherAtomSetVal->toUIntSet();
+            }
+            else
+            {
+                // Union with the existing UIntSet
+                thisStageSet.atomSet->unionWith(*otherAtomSetVal);
+            }
+        }
+    }
+}
+
 void CapabilitySet::unionWith(const CapabilitySet& other)
 {
     if (this->isInvalid() || other.isInvalid())
@@ -678,6 +707,29 @@ void CapabilitySet::unionWith(const CapabilitySet& other)
         thisTargetSet.target = otherTargetSet.first;
         thisTargetSet.shaderStageSets.reserve(otherTargetSet.second.shaderStageSets.getCount());
         thisTargetSet.unionWith(otherTargetSet.second);
+    }
+}
+
+void CapabilitySet::unionWith(const CapabilitySetVal* other)
+{
+    if (!other)
+        return;
+
+    if (this->isInvalid() || other->isInvalid())
+        return;
+
+    // Iterate through all targets in the CapabilitySetVal
+    for (Index i = 0; i < other->getTargetSetCount(); i++)
+    {
+        auto otherTargetSetVal = other->getTargetSet(i);
+        auto targetAtom = otherTargetSetVal->getTarget();
+
+        CapabilityTargetSet& thisTargetSet = this->m_targetSets[targetAtom];
+        thisTargetSet.target = targetAtom;
+
+        // Estimate stage count for reservation
+        thisTargetSet.shaderStageSets.reserve(otherTargetSetVal->getStageSetCount());
+        thisTargetSet.unionWith(*otherTargetSetVal);
     }
 }
 
