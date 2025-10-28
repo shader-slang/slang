@@ -13920,8 +13920,7 @@ static void _propagateRequirement(
 
     auto oldCaps = resultCaps;
     bool isAnyInvalid = resultCaps->isInvalid() || nodeCaps && nodeCaps->isInvalid();
-    resultCaps =
-        CapabilitySet{resultCaps}.join(CapabilitySet{nodeCaps}).freeze(visitor->getASTBuilder());
+    resultCaps = CapabilitySet{resultCaps}.join(nodeCaps).freeze(visitor->getASTBuilder());
 
     auto decl = as<Decl>(userNode);
 
@@ -14121,7 +14120,7 @@ struct CapabilityDeclReferenceVisitor
             auto targetCase = stmt->targetCases[targetCaseIndex];
             auto oldCap = targetCap;
             auto bodyCap = getStatementCapabilityUsage(this, targetCase->body);
-            targetCap.join(CapabilitySet{bodyCap});
+            targetCap.join(bodyCap);
             if (targetCap.isInvalid())
             {
                 maybeDiagnose(
@@ -14315,16 +14314,18 @@ CapabilitySet SemanticsDeclCapabilityVisitor::getDeclaredCapabilitySet(Decl* dec
         }
         else
         {
-            localDeclaredCaps = CapabilitySet{parent->inferredCapabilityRequirements};
             shouldBreak = true;
         }
         // Merge decl's capability declaration with the parent.
-        declaredCaps.nonDestructiveJoin(localDeclaredCaps);
-
-        // If the parent already has inferred capability requirements, we should stop now
-        // since that already covers transitive parents.
         if (shouldBreak)
+        {
+            declaredCaps.nonDestructiveJoin(parent->inferredCapabilityRequirements);
+            // If the parent already has inferred capability requirements, we should stop now
+            // since that already covers transitive parents.
             break;
+        }
+        else
+            declaredCaps.nonDestructiveJoin(localDeclaredCaps);
     }
     if (!declaredCaps.isEmpty() && stageToJoin != CapabilityAtom::Invalid)
         declaredCaps.join(CapabilitySet((CapabilityName)stageToJoin));
