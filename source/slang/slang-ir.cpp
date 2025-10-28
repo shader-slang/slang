@@ -4960,6 +4960,26 @@ IRInst* IRBuilder::emitStore(IRInst* dstPtr, IRInst* srcVal, IRInst* align, IRIn
     return inst;
 }
 
+IRInst* IRBuilder::emitCopyLogical(
+    IRInst* dest,
+    IRInst* srcPtr,
+    IRInst* instsToCopyLoadAttributesFrom)
+{
+    ShortList<IRInst*> operands;
+    operands.add(dest);
+    operands.add(srcPtr);
+    if (instsToCopyLoadAttributesFrom)
+    {
+        for (auto attr : instsToCopyLoadAttributesFrom->getAllAttrs())
+            operands.add(attr);
+    }
+    return emitIntrinsicInst(
+        getVoidType(),
+        kIROp_CopyLogical,
+        operands.getCount(),
+        operands.getArrayView().getBuffer());
+}
+
 IRInst* IRBuilder::emitAtomicStore(IRInst* dstPtr, IRInst* srcVal, IRInst* memoryOrder)
 {
     auto inst = createInst<IRAtomicStore>(
@@ -5891,17 +5911,36 @@ IRInst* IRBuilder::emitCastIntToPtr(IRType* ptrType, IRInst* val)
     return inst;
 }
 
-IRInst* IRBuilder::emitCastStorageToLogical(IRType* type, IRInst* val, IRInst* bufferType)
+IRMakeStorageTypeLoweringConfig* IRBuilder::emitMakeStorageTypeLoweringConfig(
+    AddressSpace addrspace,
+    IRTypeLayoutRuleName ruleName,
+    bool lowerToPhysicalType)
+{
+    IRInst* elements[] = {
+        getIntValue(getUInt64Type(), (IRIntegerValue)addrspace),
+        getIntValue(getUInt64Type(), (IRIntegerValue)ruleName),
+        getIntValue(getUInt64Type(), (IRIntegerValue)lowerToPhysicalType)};
+    return (IRMakeStorageTypeLoweringConfig*)
+        emitIntrinsicInst(getVoidType(), kIROp_MakeStorageTypeLoweringConfig, 3, elements);
+}
+
+IRInst* IRBuilder::emitCastStorageToLogical(
+    IRType* type,
+    IRInst* val,
+    IRMakeStorageTypeLoweringConfig* config)
 {
     if (type == val->getDataType())
         return val;
-    IRInst* args[] = {val, bufferType};
+    IRInst* args[] = {val, config};
     return (IRCastStorageToLogical*)emitIntrinsicInst(type, kIROp_CastStorageToLogical, 2, args);
 }
 
-IRInst* IRBuilder::emitCastStorageToLogicalDeref(IRType* type, IRInst* val, IRInst* bufferType)
+IRInst* IRBuilder::emitCastStorageToLogicalDeref(
+    IRType* type,
+    IRInst* val,
+    IRMakeStorageTypeLoweringConfig* config)
 {
-    IRInst* args[] = {val, bufferType};
+    IRInst* args[] = {val, config};
     if (type == tryGetPointedToType(this, val->getDataType()))
         return emitLoad(type, val);
     return emitIntrinsicInst(type, kIROp_CastStorageToLogicalDeref, 2, args);
@@ -8474,6 +8513,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_GetPerVertexInputArray:
     case kIROp_MetalCastToDepthTexture:
     case kIROp_GetCurrentStage:
+    case kIROp_MakeStorageTypeLoweringConfig:
         return false;
 
     case kIROp_ForwardDifferentiate:

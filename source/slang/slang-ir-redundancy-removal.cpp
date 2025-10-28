@@ -432,14 +432,14 @@ static bool isMemoryScopeSubsetOf(MemoryScope x, MemoryScope y)
 // Inst's are relative to a memory scope, get that memory scope.
 static MemoryScope getMemoryScopeOfLoadStore(IRInst* inst)
 {
-    SLANG_ASSERT(as<IRLoad>(inst) || as<IRStore>(inst));
+    SLANG_ASSERT(as<IRLoad>(inst) || as<IRStoreBase>(inst));
     auto memoryScope = inst->findAttr<IRMemoryScopeAttr>();
     if (!memoryScope)
         return MemoryScope::Invocation;
     return (MemoryScope)getIntVal(memoryScope->getMemoryScope());
 }
 
-bool tryRemoveRedundantStore(IRGlobalValueWithCode* func, IRStore* store)
+bool tryRemoveRedundantStore(IRGlobalValueWithCode* func, IRStoreBase* store)
 {
     // We perform a quick and conservative check:
     // A store is redundant if it is followed by another store to the same address in
@@ -683,7 +683,7 @@ bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func)
             {
                 changed |= tryRemoveRedundantLoad(func, load);
             }
-            else if (auto store = as<IRStore>(inst))
+            else if (auto store = as<IRStoreBase>(inst))
             {
                 changed |= tryRemoveRedundantStore(func, store);
             }

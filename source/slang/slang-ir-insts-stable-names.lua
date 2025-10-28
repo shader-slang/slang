@@ -223,7 +223,7 @@ return {
 	["field"] = 219,
 	["var"] = 220,
 	["load"] = 221,
-	["store"] = 222,
+	["StoreBase.store"] = 222,
 	["AtomicOperation.atomicLoad"] = 223,
 	["AtomicOperation.atomicStore"] = 224,
 	["AtomicOperation.atomicExchange"] = 225,
@@ -682,4 +682,6 @@ return {
 	["Attr.MemoryScope"] = 678,
 	["Undefined.LoadFromUninitializedMemory"] = 679,
 	["CUDA_LDG"] = 680,
+	["StoreBase.copyLogical"] = 681,
+	["MakeStorageTypeLoweringConfig"] = 682,
 }
