@@ -13926,7 +13926,7 @@ static void _propagateSeeDefinitionOf(
 
 static void _propagateRequirement(
     SemanticsVisitor* visitor,
-    CapabilitySet& resultCaps,
+    CapabilitySetVal*& resultCaps,
     SyntaxNode* userNode,
     SyntaxNode* referencedNode,
     const CapabilitySetVal* nodeCaps,
@@ -13943,20 +13943,23 @@ static void _propagateRequirement(
         ensureDecl(visitor, referencedDecl, DeclCheckState::CapabilityChecked);
     }
 
+    if (!resultCaps)
+        resultCaps = CapabilitySet{}.freeze(visitor->getASTBuilder());
     // If we do not have the same target+stage, we need to `join` to remove excess target+stage.
     //
     // If we have the same target+stage but current capabilities do not imply incoming capabilities,
     // we need to `join`.
-    if (!resultCaps.joinWithOtherWillChangeThis(CapabilitySet{nodeCaps}))
+    if (!resultCaps->joinWithOtherWillChangeThis(nodeCaps))
         return;
 
     auto oldCaps = resultCaps;
     bool isAnyInvalid = resultCaps.isInvalid() || (nodeCaps && nodeCaps->isInvalid());
-    resultCaps.join(CapabilitySet{nodeCaps});
+    resultCaps =
+        CapabilitySet{resultCaps}.join(CapabilitySet{nodeCaps}).freeze(visitor->getASTBuilder());
 
     auto decl = as<Decl>(userNode);
 
-    if (!isAnyInvalid && resultCaps.isInvalid())
+    if (!isAnyInvalid && resultCaps->isInvalid())
     {
         // If joining the referenced decl's requirements results an invalid capability set,
         // then the decl is using things that require conflicting set of capabilities, and we
@@ -14010,7 +14013,7 @@ static void _propagateRequirement(
     }
 };
 
-CapabilitySet getStatementCapabilityUsage(SemanticsVisitor* visitor, Stmt* stmt);
+CapabilitySetVal* getStatementCapabilityUsage(SemanticsVisitor* visitor, Stmt* stmt);
 
 template<typename ProcessFunc, typename ParentDiagnosticFunc>
 struct CapabilityDeclReferenceVisitor
@@ -14152,7 +14155,7 @@ struct CapabilityDeclReferenceVisitor
             auto targetCase = stmt->targetCases[targetCaseIndex];
             auto oldCap = targetCap;
             auto bodyCap = getStatementCapabilityUsage(this, targetCase->body);
-            targetCap.join(bodyCap);
+            targetCap.join(CapabilitySet{bodyCap});
             if (targetCap.isInvalid())
             {
                 maybeDiagnose(
@@ -14273,12 +14276,12 @@ void visitReferencedDecls(
         visitor.dispatchIfNotNull(decl);
 }
 
-CapabilitySet getStatementCapabilityUsage(SemanticsVisitor* visitor, Stmt* stmt)
+CapabilitySetVal* getStatementCapabilityUsage(SemanticsVisitor* visitor, Stmt* stmt)
 {
     if (stmt == nullptr)
-        return CapabilitySet();
+        return nullptr;
 
-    CapabilitySet inferredRequirements;
+    CapabilitySetVal* inferredRequirements = nullptr;
     visitReferencedDecls(
         *visitor,
         stmt,
@@ -14299,9 +14302,13 @@ void SemanticsDeclCapabilityVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         varDecl->findModifier<RequireCapabilityAttribute>(),
         [this, varDecl](SyntaxNode* node, const CapabilitySetVal* nodeCaps, SourceLoc refLoc)
         {
-            CapabilitySet set{varDecl->inferredCapabilityRequirements};
-            _propagateRequirement(this, set, varDecl, node, nodeCaps, refLoc);
-            varDecl->inferredCapabilityRequirements = set.freeze(getASTBuilder());
+            _propagateRequirement(
+                this,
+                varDecl->inferredCapabilityRequirements,
+                varDecl,
+                node,
+                nodeCaps,
+                refLoc);
         },
         [this, varDecl](DiagnosticCategory category)
         { _propagateSeeDefinitionOf(this, varDecl, category); });
@@ -14372,15 +14379,13 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
     for (auto member : funcDecl->getDirectMemberDecls())
     {
         ensureDecl(member, DeclCheckState::CapabilityChecked);
-        CapabilitySet set{funcDecl->inferredCapabilityRequirements};
         _propagateRequirement(
             this,
-            set,
+            funcDecl->inferredCapabilityRequirements,
             funcDecl,
             member,
             member->inferredCapabilityRequirements,
             member->loc);
-        funcDecl->inferredCapabilityRequirements = set.freeze(getASTBuilder());
     }
 
     // visit the body of our funcDecl, propagate capabilities.
@@ -14391,9 +14396,13 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
         funcDecl->findModifier<RequireCapabilityAttribute>(),
         [this, funcDecl](SyntaxNode* node, const CapabilitySetVal* nodeCaps, SourceLoc refLoc)
         {
-            CapabilitySet set{funcDecl->inferredCapabilityRequirements};
-            _propagateRequirement(this, set, funcDecl, node, nodeCaps, refLoc);
-            funcDecl->inferredCapabilityRequirements = set.freeze(getASTBuilder());
+            _propagateRequirement(
+                this,
+                funcDecl->inferredCapabilityRequirements,
+                funcDecl,
+                node,
+                nodeCaps,
+                refLoc);
         },
         [this, funcDecl](DiagnosticCategory category)
         { _propagateSeeDefinitionOf(this, funcDecl, category); });
@@ -14406,15 +14415,14 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
         if (parentAggTypeDecl)
         {
             ensureDecl(parentAggTypeDecl, DeclCheckState::CapabilityChecked);
-            CapabilitySet set{funcDecl->inferredCapabilityRequirements};
+
             _propagateRequirement(
                 this,
-                set,
+                funcDecl->inferredCapabilityRequirements,
                 funcDecl,
                 parentAggTypeDecl,
                 parentAggTypeDecl->inferredCapabilityRequirements,
                 funcDecl->loc);
-            funcDecl->inferredCapabilityRequirements = set.freeze(getASTBuilder());
         }
     }
 
@@ -14490,9 +14498,13 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
         [this,
          inheritanceDecl](SyntaxNode* node, const CapabilitySetVal* nodeCaps, SourceLoc refLoc)
         {
-            CapabilitySet set{inheritanceDecl->inferredCapabilityRequirements};
-            _propagateRequirement(this, set, inheritanceDecl, node, nodeCaps, refLoc);
-            inheritanceDecl->inferredCapabilityRequirements = set.freeze(getASTBuilder());
+            _propagateRequirement(
+                this,
+                inheritanceDecl->inferredCapabilityRequirements,
+                inheritanceDecl,
+                node,
+                nodeCaps,
+                refLoc);
         },
         [this, inheritanceDecl](DiagnosticCategory category)
         { _propagateSeeDefinitionOf(this, inheritanceDecl, category); });

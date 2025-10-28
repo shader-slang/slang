@@ -156,8 +156,9 @@ class CapabilitySetVal : public Val
     }
     bool joinWithOtherWillChangeThis(CapabilitySetVal const* other) const
     {
-        SLANG_PROFILE_CAPABILITY_SETS;
-        return CapabilitySet{this}.joinWithOtherWillChangeThis(CapabilitySet{other});
+        return !(
+            (int)_implies(other, CapabilitySet::ImpliesFlags::CannotHaveMoreTargetAndStageSets) &
+            (int)CapabilitySet::ImpliesReturnFlags::Implied);
     }
 
     /// Does this capability set imply the atomic capability `other`?
