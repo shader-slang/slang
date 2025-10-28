@@ -2128,16 +2128,31 @@ UIntSet UIntSetVal::toUIntSet() const
     result.resizeBackingBufferDirectly(getBitmaskCount());
     for (Index i = 0; i < getBitmaskCount(); i++)
     {
-        result.m_buffer[i] = getBitmask(i)->getValue();
-        // auto bitmask = getBitmask(i);
-        // if (bitmask)
-        // {
-        //     auto element = static_cast<UIntSet::Element>(bitmask->getValue());
-        //     result.addRawElement(element, i);
-        // }
+        result.m_buffer[i] = getBitmask(i);
     }
 
     return result;
+}
+
+void UIntSet::unionWith(const UIntSetVal& set)
+{
+    // UIntSetVal has getBitmask accessor that returns Elements
+    const Index setCount = set.getBitmaskCount();
+    const Index minCount = Math::Min(setCount, m_buffer.getCount());
+
+    for (Index i = 0; i < minCount; ++i)
+    {
+        m_buffer[i] |= set.getBitmask(i);
+    }
+
+    // Add remaining elements from the UIntSetVal if it's larger
+    if (setCount > m_buffer.getCount())
+    {
+        for (Index i = m_buffer.getCount(); i < setCount; ++i)
+        {
+            m_buffer.add(set.getBitmask(i));
+        }
+    }
 }
 
 UIntSetVal* UIntSetVal::fromUIntSet(ASTBuilder* astBuilder, const UIntSet& uintSet)
@@ -2152,15 +2167,7 @@ void UIntSetVal::_toTextOverride(StringBuilder& out)
     {
         if (i > 0)
             out << ", ";
-        auto bitmask = getBitmask(i);
-        if (bitmask)
-        {
-            out << bitmask->getValue();
-        }
-        else
-        {
-            out << "null";
-        }
+        out << getBitmask(i);
     }
     out << "}";
 }
@@ -2173,7 +2180,7 @@ Val* UIntSetVal::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet
     // Substitute each bitmask operand
     for (Index i = 0; i < getBitmaskCount(); i++)
     {
-        auto bitmask = getBitmask(i);
+        auto bitmask = getBitmaskOperand(i);
         if (bitmask)
         {
             auto newBitmask = as<ConstantIntVal>(bitmask->substituteImpl(astBuilder, subst, &diff));

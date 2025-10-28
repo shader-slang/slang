@@ -2091,7 +2091,7 @@ void postProcessingOnModifiers(ASTBuilder* astBuilder, Modifiers& modifiers)
                 continue;
             }
             CapabilitySet firstCapSet{firstRequire->capabilitySet};
-            firstCapSet.unionWith(CapabilitySet{req->capabilitySet});
+            firstCapSet.unionWith(req->capabilitySet);
             firstRequire->capabilitySet = firstCapSet.freeze(astBuilder);
             if (previous)
                 previous->next = next;
