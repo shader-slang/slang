@@ -2,9 +2,10 @@
 #include "slang-capability.h"
 
 #include "core/slang-dictionary.h"
-#include "core/slang-performance-profiler.h"
 #include "slang-ast-builder.h"
 #include "slang-capability-val.h"
+
+#include <ranges>
 
 // This file implements the core of the "capability" system.
 
@@ -789,6 +790,31 @@ bool CapabilitySet::operator==(CapabilitySet const& that) const
         }
     }
     return true;
+}
+
+HashCode64 CapabilityStageSet::getHashCode() const
+{
+    HashCode64 stageHash = ::Slang::getHashCode(static_cast<uint64_t>(stage));
+    HashCode64 atomSetHash = atomSet ? atomSet->getHashCode() : 0;
+    return combineHash(stageHash, atomSetHash);
+}
+
+HashCode64 CapabilityTargetSet::getHashCode() const
+{
+    HashCode64 targetHash = ::Slang::getHashCode(static_cast<uint64_t>(target));
+    // The key and the "target" member of the target sets are always the same,
+    // so we can just hash the values
+    auto stageSetsView = shaderStageSets | std::views::values;
+    HashCode64 stageSetsHash = symmetricHash(stageSetsView.begin(), stageSetsView.end());
+    return combineHash(targetHash, stageSetsHash);
+}
+
+HashCode64 CapabilitySet::getHashCode() const
+{
+    // The key and the "target" member of the target sets are always the same,
+    // so we can just hash the values
+    auto targetSetsView = m_targetSets | std::views::values;
+    return symmetricHash(targetSetsView.begin(), targetSetsView.end());
 }
 
 CapabilitySet CapabilitySet::getTargetsThisHasButOtherDoesNot(const CapabilitySet& other)
