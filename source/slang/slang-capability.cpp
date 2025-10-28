@@ -1662,44 +1662,54 @@ bool CapabilitySetVal::isInvalid() const
 
 CapabilitySet CapabilitySetVal::thaw() const
 {
-    if (isEmpty())
-        return CapabilitySet::makeEmpty();
+    if (cachedThawedCapabilitySet.has_value())
+        return cachedThawedCapabilitySet.value();
 
-    if (isInvalid())
-        return CapabilitySet::makeInvalid();
+    SLANG_PROFILE_CAPABILITY_SETS;
 
     CapabilitySet result;
-
-    auto& targetSets = result.getCapabilityTargetSets();
-
-    // Convert each target set
-    for (Index targetIndex = 0; targetIndex < getTargetSetCount(); targetIndex++)
+    if (isEmpty())
     {
-        auto targetSetVal = getTargetSet(targetIndex);
-        auto targetAtom = targetSetVal->getTarget();
+        result = CapabilitySet::makeEmpty();
+    }
+    else if (isInvalid())
+    {
+        result = CapabilitySet::makeInvalid();
+    }
+    else
+    {
+        auto& targetSets = result.getCapabilityTargetSets();
 
-        auto& targetSet = targetSets[targetAtom];
-        targetSet.target = targetAtom;
-
-        // Convert each stage set
-        for (Index stageIndex = 0; stageIndex < targetSetVal->getStageSetCount(); stageIndex++)
+        // Convert each target set
+        for (Index targetIndex = 0; targetIndex < getTargetSetCount(); targetIndex++)
         {
-            auto stageSetVal = targetSetVal->getStageSet(stageIndex);
-            auto stageAtom = stageSetVal->getStage();
+            auto targetSetVal = getTargetSet(targetIndex);
+            auto targetAtom = targetSetVal->getTarget();
 
-            auto& stageSet = targetSet.shaderStageSets[stageAtom];
-            stageSet.stage = stageAtom;
+            auto& targetSet = targetSets[targetAtom];
+            targetSet.target = targetAtom;
 
-            // Convert UIntSetVal back to CapabilityAtomSet
-            auto atomSetVal = stageSetVal->getAtomSet();
-            if (atomSetVal)
+            // Convert each stage set
+            for (Index stageIndex = 0; stageIndex < targetSetVal->getStageSetCount(); stageIndex++)
             {
-                CapabilityAtomSet atomSet{atomSetVal->toUIntSet()};
-                stageSet.atomSet = atomSet;
+                auto stageSetVal = targetSetVal->getStageSet(stageIndex);
+                auto stageAtom = stageSetVal->getStage();
+
+                auto& stageSet = targetSet.shaderStageSets[stageAtom];
+                stageSet.stage = stageAtom;
+
+                // Convert UIntSetVal back to CapabilityAtomSet
+                auto atomSetVal = stageSetVal->getAtomSet();
+                if (atomSetVal)
+                {
+                    CapabilityAtomSet atomSet{atomSetVal->toUIntSet()};
+                    stageSet.atomSet = atomSet;
+                }
             }
         }
     }
 
+    cachedThawedCapabilitySet = result;
     return result;
 }
 
