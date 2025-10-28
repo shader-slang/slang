@@ -2355,6 +2355,8 @@ local insts = {
 			{ CastStorageToLogicalDeref = { min_operands = 2, struct_name = "CastStorageToLogicalDeref" } },
 		},
 	},
+	-- IR encoding of a `TypeLoweringConfig` object that defines how a type is lowered to a storage type.
+	-- This is produced/consumed only in the lower-buffer-element-to-storage-type pass.
 	{ MakeStorageTypeLoweringConfig = { hoistable = true, operands = { { "addressSpace" }, { "layoutRule" }, { "lowerToPhysicalType" } } } },
 	{ CastUInt64ToDescriptorHandle = { operands = { { "value" } } } },
 	{ CastDescriptorHandleToUInt64 = { operands = { { "value" } } } },

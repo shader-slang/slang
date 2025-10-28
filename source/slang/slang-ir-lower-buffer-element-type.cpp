@@ -1084,17 +1084,28 @@ struct LoweredElementTypeContext
         }
     }
 
-    IRInst* getSourceAddrFromLoadInst(IRBuilder& builder, IRInst* loadInst, IRInst* newPtrVal)
+    // Given a load/structured-buffer-load instruction `loadInst`, and a new base pointer
+    // `newBasePtr`, return the source address that can be used to represent the source address
+    // of the load instruction, but with `newBasePtr` as the base structured buffer pointer.
+    IRInst* getSourceAddrFromLoadInstWithNewBase(
+        IRBuilder& builder,
+        IRInst* loadInst,
+        IRInst* newBasePtr)
     {
         switch (loadInst->getOp())
         {
         case kIROp_Load:
-            return newPtrVal;
+            // A simple load does not have any extra access chain info, so we
+            // can simply return the new base pointer.
+            return newBasePtr;
         case kIROp_StructuredBufferLoad:
         case kIROp_StructuredBufferLoadStatus:
         case kIROp_RWStructuredBufferLoad:
         case kIROp_RWStructuredBufferLoadStatus:
-            return builder.emitRWStructuredBufferGetElementPtr(newPtrVal, loadInst->getOperand(1));
+            // For structured buffer loads, the new address can be obtained by
+            // getting the element pointer from the new base pointer and the original
+            // index operand.
+            return builder.emitRWStructuredBufferGetElementPtr(newBasePtr, loadInst->getOperand(1));
         default:
             return nullptr;
         }
@@ -1345,8 +1356,10 @@ struct LoweredElementTypeContext
 
                                         // Try emit an inst that represent the address the load inst
                                         // is loading from.
-                                        auto srcPtr =
-                                            getSourceAddrFromLoadInst(builder, user, ptrVal);
+                                        auto srcPtr = getSourceAddrFromLoadInstWithNewBase(
+                                            builder,
+                                            user,
+                                            ptrVal);
 
                                         // If there isn't a way to get a pointer to the source data
                                         // from the load inst, there isn't anything we can do other
