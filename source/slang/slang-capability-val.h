@@ -264,5 +264,7 @@ private:
     CapabilitySet::ImpliesReturnFlags _implies(
         CapabilitySetVal const* other,
         CapabilitySet::ImpliesFlags flags) const;
+
+    mutable std::optional<CapabilitySet> cachedThawedCapabilitySet;
 };
 } // namespace Slang
