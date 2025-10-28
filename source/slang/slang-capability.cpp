@@ -1691,11 +1691,85 @@ CapabilitySetVal* CapabilitySet::freeze(ASTBuilder* astBuilder) const
 // CapabilitySetVal native implementations
 //
 
+/// Generic template function for concurrent iteration over two sorted collections of the same type
+template<typename Collection, typename ElementType, typename KeyType, typename MatchCallback>
+void concurrentIterate(
+    const Collection& left,
+    const Collection& right,
+    Index (Collection::*countGetter)() const,
+    ElementType (Collection::*elementGetter)(Index) const,
+    KeyType (std::remove_pointer_t<ElementType>::*keyGetter)() const,
+    MatchCallback callback)
+{
+    Index leftIndex = 0;
+    Index rightIndex = 0;
+    Index leftSize = (left.*countGetter)();
+    Index rightSize = (right.*countGetter)();
+
+    while (leftIndex < leftSize && rightIndex < rightSize)
+    {
+        auto leftElement = (left.*elementGetter)(leftIndex);
+        auto rightElement = (right.*elementGetter)(rightIndex);
+        auto leftKey = (leftElement->*keyGetter)();
+        auto rightKey = (rightElement->*keyGetter)();
+
+        if (leftKey < rightKey)
+        {
+            leftIndex++;
+        }
+        else if (leftKey > rightKey)
+        {
+            rightIndex++;
+        }
+        else
+        {
+            // Found matching elements - call callback and check for early exit
+            if (callback(leftElement, rightElement))
+                return;
+
+            leftIndex++;
+            rightIndex++;
+        }
+    }
+}
+
+/// Overload for CapabilitySetVal target iteration
+template<typename MatchCallback>
+void concurrentIterate(
+    const CapabilitySetVal& left,
+    const CapabilitySetVal& right,
+    MatchCallback callback)
+{
+    concurrentIterate(
+        left,
+        right,
+        &CapabilitySetVal::getTargetSetCount,
+        &CapabilitySetVal::getTargetSet,
+        &CapabilityTargetSetVal::getTarget,
+        callback);
+}
+
+/// Overload for CapabilityTargetSetVal stage iteration
+template<typename MatchCallback>
+void concurrentIterate(
+    const CapabilityTargetSetVal& left,
+    const CapabilityTargetSetVal& right,
+    MatchCallback callback)
+{
+    concurrentIterate(
+        left,
+        right,
+        &CapabilityTargetSetVal::getStageSetCount,
+        &CapabilityTargetSetVal::getStageSet,
+        &CapabilityStageSetVal::getStage,
+        callback);
+}
+
 bool CapabilitySetVal::isIncompatibleWith(CapabilityAtom other) const
 {
     if (isEmpty())
         return false;
-    
+
     // Convert single atom to a capability set and check compatibility
     auto otherSet = CapabilitySet(CapabilityName(other));
     return isIncompatibleWith(otherSet);
@@ -1705,7 +1779,7 @@ bool CapabilitySetVal::isIncompatibleWith(CapabilityName other) const
 {
     if (isEmpty())
         return false;
-    
+
     // Convert single name to a capability set and check compatibility
     auto otherSet = CapabilitySet(other);
     return isIncompatibleWith(otherSet);
@@ -1724,7 +1798,7 @@ bool CapabilitySetVal::isIncompatibleWith(CapabilitySet const& other) const
     for (auto& otherTargetPair : other.getCapabilityTargetSets())
     {
         auto otherTarget = otherTargetPair.first;
-        
+
         // Use optimized linear search through sorted thisTargetSets
         auto thisTargetSet = findTargetSet(otherTarget);
         if (!thisTargetSet)
@@ -1734,7 +1808,7 @@ bool CapabilitySetVal::isIncompatibleWith(CapabilitySet const& other) const
         for (auto& otherStagePair : otherTargetPair.second.getShaderStageSets())
         {
             auto otherStage = otherStagePair.first;
-            
+
             // Use optimized linear search through sorted stage sets
             auto thisStageSet = thisTargetSet->findStageSet(otherStage);
             if (thisStageSet)
@@ -1744,7 +1818,7 @@ bool CapabilitySetVal::isIncompatibleWith(CapabilitySet const& other) const
             }
         }
     }
-    
+
     // No matching target/stage pairs found - sets are incompatible
     return true;
 }
@@ -1759,65 +1833,28 @@ bool CapabilitySetVal::isIncompatibleWith(CapabilitySetVal const* other) const
         return false;
 
     // Two capability sets are incompatible if there are no intersecting target/stage combinations
-    // Use two-pointer approach since both target sets are sorted by target atom
-    Index thisTargetIndex = 0;
-    Index otherTargetIndex = 0;
-    
-    while (thisTargetIndex < getTargetSetCount() && otherTargetIndex < other->getTargetSetCount())
-    {
-        auto thisTargetSet = getTargetSet(thisTargetIndex);
-        auto otherTargetSet = other->getTargetSet(otherTargetIndex);
-        
-        auto thisTarget = thisTargetSet->getTarget();
-        auto otherTarget = otherTargetSet->getTarget();
-        
-        if (thisTarget < otherTarget)
+    // Use concurrent iteration to find any matching target/stage pairs
+    bool foundMatch = false;
+    concurrentIterate(
+        *this,
+        *other,
+        [&](CapabilityTargetSetVal* thisTarget, CapabilityTargetSetVal* otherTarget) -> bool
         {
-            thisTargetIndex++;
-        }
-        else if (thisTarget > otherTarget)
-        {
-            otherTargetIndex++;
-        }
-        else
-        {
-            // Found matching target, now check stages using two-pointer approach
-            // Stage sets are also sorted by stage atom
-            Index thisStageIndex = 0;
-            Index otherStageIndex = 0;
-            
-            while (thisStageIndex < thisTargetSet->getStageSetCount() && 
-                   otherStageIndex < otherTargetSet->getStageSetCount())
-            {
-                auto thisStageSet = thisTargetSet->getStageSet(thisStageIndex);
-                auto otherStageSet = otherTargetSet->getStageSet(otherStageIndex);
-                
-                auto thisStage = thisStageSet->getStage();
-                auto otherStage = otherStageSet->getStage();
-                
-                if (thisStage < otherStage)
+            // Found matching targets - now check if any stages match
+            concurrentIterate(
+                *thisTarget,
+                *otherTarget,
+                [&](CapabilityStageSetVal*, CapabilityStageSetVal*) -> bool
                 {
-                    thisStageIndex++;
-                }
-                else if (thisStage > otherStage)
-                {
-                    otherStageIndex++;
-                }
-                else
-                {
-                    // Found matching target/stage pair - sets are compatible
-                    return false;
-                }
-            }
-            
-            // Move to next target pair
-            thisTargetIndex++;
-            otherTargetIndex++;
-        }
-    }
-    
-    // No matching target/stage pairs found - sets are incompatible
-    return true;
+                    // Found matching target/stage pair - set flag and exit early
+                    foundMatch = true;
+                    return true;
+                });
+            return foundMatch;
+        });
+
+    // If we found any matching target/stage pairs, sets are compatible
+    return !foundMatch;
 }
 
 

@@ -121,7 +121,7 @@ class CapabilitySetVal : public Val
 
     /// Is this capability set incompatible with the given `other` set.
     bool isIncompatibleWith(CapabilitySet const& other) const;
-    
+
     /// Is this capability set incompatible with the given `other` set.
     bool isIncompatibleWith(CapabilitySetVal const* other) const;
 
