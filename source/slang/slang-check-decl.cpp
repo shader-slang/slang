@@ -14055,7 +14055,7 @@ struct CapabilityDeclReferenceVisitor
         // this-> here because the clang lsp chokes otherwise
         handleProcessFunc(
             stmt,
-            CapabilitySet(CapabilityName::fragment).freeze(this->getASTBuilder()),
+            this->getASTBuilder()->getCapabilitySetVal(CapabilityName::fragment),
             stmt->loc);
     }
     void visitAddressOfExpr(AddressOfExpr* expr)
@@ -14063,7 +14063,7 @@ struct CapabilityDeclReferenceVisitor
         // __getAddress only works with certain targets
         handleProcessFunc(
             expr,
-            CapabilitySet(CapabilityName::cpp_cuda_metal_spirv).freeze(this->getASTBuilder()),
+            this->getASTBuilder()->getCapabilitySetVal(CapabilityName::cpp_cuda_metal_spirv),
             expr->loc);
         this->dispatchIfNotNull(expr->arg);
     }
