@@ -682,4 +682,6 @@ return {
 	["Attr.MemoryScope"] = 678,
 	["Undefined.LoadFromUninitializedMemory"] = 679,
 	["CUDA_LDG"] = 680,
+	["Type.BasicType.BFloat16"] = 681,
+	["IsBFloat16"] = 682,
 }

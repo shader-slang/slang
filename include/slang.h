@@ -1908,7 +1908,8 @@ public:                                                              \
         SLANG_SCALAR_TYPE_INT16,
         SLANG_SCALAR_TYPE_UINT16,
         SLANG_SCALAR_TYPE_INTPTR,
-        SLANG_SCALAR_TYPE_UINTPTR
+        SLANG_SCALAR_TYPE_UINTPTR,
+        SLANG_SCALAR_TYPE_BFLOAT16,
     };
 
     // abstract decl reflection

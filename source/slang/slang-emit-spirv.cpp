@@ -804,6 +804,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case BaseType::Float:
         case BaseType::Double:
         case BaseType::Half:
+        case BaseType::BFloat16:
             isFloatingPoint = true;
             break;
         case BaseType::Bool:
@@ -1077,6 +1078,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     return SpvLiteralBits::from32(uint32_t(FloatToHalf((float)fval->getValue())));
                 break;
             }
+        case kIROp_BFloat16Type:
+            {
+                if (auto fval = as<IRFloatLit>(inst))
+                    return SpvLiteralBits::from32(
+                        uint32_t(FloatToBfloat16((float)fval->getValue())));
+                break;
+            }
         case kIROp_FloatType:
             {
                 if (auto fval = as<IRFloatLit>(inst))
@@ -1166,6 +1174,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 inst,
                 type,
                 SpvLiteralBits::from32(uint32_t(FloatToHalf(float(val)))));
+        }
+        else if (type->getOp() == kIROp_BFloat16Type)
+        {
+            result = emitOpConstant(
+                inst,
+                type,
+                SpvLiteralBits::from32(uint32_t(FloatToBfloat16(float(val)))));
         }
         else
         {
@@ -1782,15 +1797,35 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             // > OpTypeFloat
 
         case kIROp_HalfType:
+        case kIROp_BFloat16Type:
         case kIROp_FloatType:
         case kIROp_DoubleType:
             {
                 const FloatInfo i = getFloatingTypeInfo(as<IRType>(inst));
+                bool needEncoding = false;
+                uint32_t encoding = 0u;
                 if (inst->getOp() == kIROp_DoubleType)
                     requireSPIRVCapability(SpvCapabilityFloat64);
                 else if (inst->getOp() == kIROp_HalfType)
                     requireSPIRVCapability(SpvCapabilityFloat16);
-                return emitOpTypeFloat(inst, SpvLiteralInteger::from32(int32_t(i.width)));
+                else if (inst->getOp() == kIROp_BFloat16Type)
+                {
+                    requireSPIRVCapability(SpvCapabilityBFloat16TypeKHR);
+                    ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_bfloat16"));
+                    needEncoding = true;
+                    encoding = SpvFPEncodingBFloat16KHR;
+                }
+                if (needEncoding)
+                {
+                    return emitOpTypeFloat(
+                        inst,
+                        SpvLiteralInteger::from32(int32_t(i.width)),
+                        SpvLiteralInteger::from32(encoding));
+                }
+                else
+                {
+                    return emitOpTypeFloat(inst, SpvLiteralInteger::from32(int32_t(i.width)));
+                }
             }
         case kIROp_PtrType:
         case kIROp_RefParamType:
@@ -1964,9 +1999,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
                 IRBuilder builder(m_irModule);
                 auto coopMatType = static_cast<IRCoopMatrixType*>(inst);
+                auto componentType = coopMatType->getElementType();
+                if (componentType->getOp() == kIROp_BFloat16Type)
+                    requireSPIRVCapability(SpvCapabilityBFloat16CooperativeMatrixKHR);
                 return emitOpTypeCoopMat(
                     coopMatType,
-                    coopMatType->getElementType(),
+                    componentType,
                     emitIntConstant(
                         static_cast<IRIntLit*>(coopMatType->getScope())->getValue(),
                         builder.getIntType()),
@@ -8115,6 +8153,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_FloatType:
         case kIROp_DoubleType:
         case kIROp_HalfType:
+        case kIROp_BFloat16Type:
             return true;
         case kIROp_VectorType:
             return isFloatType(as<IRVectorType>(type)->getElementType());
@@ -8154,6 +8193,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         switch (type->getOp())
         {
         case kIROp_HalfType:
+        case kIROp_BFloat16Type:
         case kIROp_UInt16Type:
         case kIROp_Int16Type:
             found |= TypeNeedsStorageFlag::kElementSize16;
@@ -8943,6 +8983,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             case kIROp_FloatType:
             case kIROp_DoubleType:
             case kIROp_HalfType:
+            case kIROp_BFloat16Type:
                 spvEncoding = 3; // Float
                 break;
             case kIROp_BoolType:
@@ -9428,6 +9469,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         }
                         continue;
                     }
+                case SpvOpDot:
+                    if (inst->getFullType()->getOp() == kIROp_BFloat16Type)
+                    {
+                        requireSPIRVCapability(SpvCapabilityBFloat16DotProductKHR);
+                    }
+                    break;
                 default:
                     break;
                 }

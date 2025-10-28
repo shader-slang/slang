@@ -116,6 +116,7 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
         BASE(Int16, 2);
         BASE(UInt16, 2);
         BASE(Half, 2);
+        BASE(BFloat16, 2);
 
         BASE(Int, 4);
         BASE(UInt, 4);
