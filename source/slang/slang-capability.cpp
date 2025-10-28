@@ -1958,7 +1958,7 @@ bool CapabilitySetVal::isIncompatibleWith(CapabilitySetVal const* other) const
             // Only process matching targets (skip gaps)
             if (!thisTarget || !otherTarget)
                 return false;
-                
+
             // Found matching targets - now check if any stages match
             concurrentIterate(
                 *thisTarget,
@@ -1968,7 +1968,7 @@ bool CapabilitySetVal::isIncompatibleWith(CapabilitySetVal const* other) const
                     // Only process matching stages (skip gaps)
                     if (!thisStage || !otherStage)
                         return false;
-                        
+
                     // Found matching target/stage pair - set flag and exit early
                     foundMatch = true;
                     return true;
@@ -1987,13 +1987,16 @@ CapabilitySet::ImpliesReturnFlags CapabilitySetVal::_implies(
     SLANG_PROFILE_CAPABILITY_SETS;
     // By default (`ImpliesFlags::None`): x implies (c | d) only if (x implies c) and (x implies d).
 
-    bool onlyRequireSingleImply = ((int)flags & (int)CapabilitySet::ImpliesFlags::OnlyRequireASingleValidImply);
-    bool cannotHaveMoreTargetAndStageSets = ((int)flags & (int)CapabilitySet::ImpliesFlags::CannotHaveMoreTargetAndStageSets);
-    bool canHaveSubsetOfTargetAndStageSets = ((int)flags & (int)CapabilitySet::ImpliesFlags::CanHaveSubsetOfTargetAndStageSets);
+    bool onlyRequireSingleImply =
+        ((int)flags & (int)CapabilitySet::ImpliesFlags::OnlyRequireASingleValidImply);
+    bool cannotHaveMoreTargetAndStageSets =
+        ((int)flags & (int)CapabilitySet::ImpliesFlags::CannotHaveMoreTargetAndStageSets);
+    bool canHaveSubsetOfTargetAndStageSets =
+        ((int)flags & (int)CapabilitySet::ImpliesFlags::CanHaveSubsetOfTargetAndStageSets);
 
     int flagsCollected = (int)CapabilitySet::ImpliesReturnFlags::NotImplied;
 
-    if (otherSet->isEmpty())
+    if (!otherSet || otherSet->isEmpty())
         return CapabilitySet::ImpliesReturnFlags::Implied;
 
     // If empty, and the other is not empty, it does not matter what flags are used,
@@ -2002,7 +2005,8 @@ CapabilitySet::ImpliesReturnFlags CapabilitySetVal::_implies(
     if (this->isEmpty())
         return CapabilitySet::ImpliesReturnFlags::NotImplied;
 
-    if (cannotHaveMoreTargetAndStageSets && this->getTargetSetCount() > otherSet->getTargetSetCount())
+    if (cannotHaveMoreTargetAndStageSets &&
+        this->getTargetSetCount() > otherSet->getTargetSetCount())
     {
         return CapabilitySet::ImpliesReturnFlags::NotImplied;
     }
@@ -2019,7 +2023,7 @@ CapabilitySet::ImpliesReturnFlags CapabilitySetVal::_implies(
                 // Other doesn't have this target - that's fine for implies
                 return false; // Continue
             }
-            
+
             if (!thisTarget)
             {
                 // 'this' lacks a target 'other' has
@@ -2031,7 +2035,8 @@ CapabilitySet::ImpliesReturnFlags CapabilitySetVal::_implies(
                 return true; // Early exit
             }
 
-            if (cannotHaveMoreTargetAndStageSets && thisTarget->getStageSetCount() > otherTarget->getStageSetCount())
+            if (cannotHaveMoreTargetAndStageSets &&
+                thisTarget->getStageSetCount() > otherTarget->getStageSetCount())
             {
                 impliesAll = false;
                 return true; // Early exit
@@ -2048,7 +2053,7 @@ CapabilitySet::ImpliesReturnFlags CapabilitySetVal::_implies(
                         // Other doesn't have this stage - that's fine for implies
                         return false; // Continue
                     }
-                    
+
                     if (!thisStage)
                     {
                         // 'this' lacks a stage 'other' has
@@ -2063,13 +2068,13 @@ CapabilitySet::ImpliesReturnFlags CapabilitySetVal::_implies(
                     // Check if all stage sets that are in 'other' are contained by 'this'
                     auto thisAtomSet = thisStage->getAtomSet();
                     auto otherAtomSet = otherStage->getAtomSet();
-                    
+
                     if (thisAtomSet && otherAtomSet)
                     {
                         auto thisUIntSet = thisAtomSet->toUIntSet();
                         auto otherUIntSet = otherAtomSet->toUIntSet();
                         bool contained = thisUIntSet.contains(otherUIntSet);
-                        
+
                         if (!onlyRequireSingleImply && !contained)
                         {
                             impliesAll = false;
@@ -2081,10 +2086,10 @@ CapabilitySet::ImpliesReturnFlags CapabilitySetVal::_implies(
                             return true; // Early exit - found one match
                         }
                     }
-                    
+
                     return false; // Continue
                 });
-                
+
             return !impliesAll; // Early exit if we failed
         });
 

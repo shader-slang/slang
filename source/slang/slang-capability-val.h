@@ -158,8 +158,9 @@ class CapabilitySetVal : public Val
     }
     bool joinWithOtherWillChangeThis(CapabilitySetVal const* other) const
     {
-        SLANG_PROFILE_CAPABILITY_SETS;
-        return CapabilitySet{this}.joinWithOtherWillChangeThis(CapabilitySet{other});
+        return !(
+            (int)_implies(other, CapabilitySet::ImpliesFlags::CannotHaveMoreTargetAndStageSets) &
+            (int)CapabilitySet::ImpliesReturnFlags::Implied);
     }
 
     /// Does this capability set imply the atomic capability `other`?
@@ -260,6 +261,8 @@ class CapabilitySetVal : public Val
 
 private:
     /// Helper method for implies operations
-    CapabilitySet::ImpliesReturnFlags _implies(CapabilitySetVal const* other, CapabilitySet::ImpliesFlags flags) const;
+    CapabilitySet::ImpliesReturnFlags _implies(
+        CapabilitySetVal const* other,
+        CapabilitySet::ImpliesFlags flags) const;
 };
 } // namespace Slang
