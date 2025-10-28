@@ -89,7 +89,7 @@ class Session;
 
 struct CompilerOptionSet
 {
-    void load(uint32_t count, slang::CompilerOptionEntry* entries);
+    void load(uint32_t count, const slang::CompilerOptionEntry* entries);
 
     void buildHash(DigestBuilder<SHA1>& builder);
 
