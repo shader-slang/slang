@@ -1305,6 +1305,17 @@ struct LLVMEmitter
     Dictionary<IRInst*, llvm::DIFile*> sourceDebugInfo;
     Dictionary<IRInst*, llvm::DISubprogram*> funcToDebugLLVM;
 
+    // These enums represent built-in functions whose implementations must be
+    // externally provided.
+    enum class ExternalFunc
+    {
+        Printf
+        // TODO: Texture sampling, RT functions?
+    };
+    // Map of external builtins. These are only forward-declared in the emitted
+    // LLVM IR.
+    Dictionary<ExternalFunc, llvm::Function*> externalFuncs;
+
     struct VariableDebugInfo
     {
         llvm::DIVariable* debugVar;
@@ -1503,21 +1514,6 @@ struct LLVMEmitter
             compileUnit,
             sourceDebugInfo,
             defaultPointerRules));
-
-        auto session = codeGenContext->getSession();
-        String prelude = session->getPreludeForLanguage(SourceLanguage::LLVM);
-        llvm::ModuleSummaryIndex llvmSummaryIndex(true);
-        llvm::SMDiagnostic diag;
-        llvm::MemoryBufferRef buf(
-            llvm::StringRef(prelude.begin(), prelude.getLength()),
-            llvm::StringRef("prelude")
-        );
-        if(llvm::parseAssemblyInto(buf, llvmModule.get(), &llvmSummaryIndex, diag))
-        {
-            //auto msg = diag.getMessage();
-            //printf("%s\n", msg.str().c_str());
-            SLANG_UNEXPECTED("Failed to parse LLVM prelude!");
-        }
     }
 
     ~LLVMEmitter()
@@ -1548,6 +1544,37 @@ struct LLVMEmitter
         case FloatingPointDenormalMode::FlushToZero:
             return llvm::DenormalMode::getPositiveZero();
         }
+    }
+
+    llvm::Function* getExternalBuiltin(ExternalFunc extFunc)
+    {
+        if (externalFuncs.containsKey(extFunc))
+            return externalFuncs.getValue(extFunc);
+
+        llvm::Function* func = nullptr;
+        auto emitDecl = [&](const char* name, llvm::Type* result, llvm::ArrayRef<llvm::Type*> params, bool isVarArgs){
+            llvm::FunctionType* funcType = llvm::FunctionType::get(result, params, isVarArgs);
+            return llvm::Function::Create(
+                funcType,
+                llvm::GlobalValue::ExternalLinkage,
+                name,
+                *llvmModule
+            );
+        };
+
+        switch(extFunc)
+        {
+        case ExternalFunc::Printf:
+            func = emitDecl("printf", llvmBuilder->getInt32Ty(), {llvmBuilder->getPtrTy()}, true);
+            llvm::AttrBuilder attrs(*llvmContext);
+            attrs.addCapturesAttr(llvm::CaptureInfo::none());
+            attrs.addAttribute(llvm::Attribute::NoAlias);
+            func->getArg(0)->addAttrs(attrs);
+            break;
+        }
+
+        externalFuncs[extFunc] = func;
+        return func;
     }
 
     // Finds the value of an instruction that has already been emitted, OR
@@ -2717,9 +2744,7 @@ struct LLVMEmitter
 
         case kIROp_Printf:
             {
-                // This function comes from the prelude.
-                auto llvmFunc = cast<llvm::Function>(llvmModule->getNamedValue("printf"));
-                SLANG_ASSERT(llvmFunc);
+                auto llvmFunc = getExternalBuiltin(ExternalFunc::Printf);
 
                 List<llvm::Value*> args;
                 args.add(findValue(inst->getOperand(0)));
