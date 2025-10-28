@@ -2125,14 +2125,16 @@ UIntSet UIntSetVal::toUIntSet() const
     UIntSet result;
 
     // Convert each bitmask operand back to UIntSet::Element
+    result.resizeBackingBufferDirectly(getBitmaskCount());
     for (Index i = 0; i < getBitmaskCount(); i++)
     {
-        auto bitmask = getBitmask(i);
-        if (bitmask)
-        {
-            auto element = static_cast<UIntSet::Element>(bitmask->getValue());
-            result.addRawElement(element, i);
-        }
+        result.m_buffer[i] = getBitmask(i)->getValue();
+        // auto bitmask = getBitmask(i);
+        // if (bitmask)
+        // {
+        //     auto element = static_cast<UIntSet::Element>(bitmask->getValue());
+        //     result.addRawElement(element, i);
+        // }
     }
 
     return result;

@@ -8,6 +8,8 @@
 #include <optional>
 #include <stdint.h>
 
+#define SLANG_PROFILE_CAPABILITY_SETS SLANG_PROFILE
+
 namespace Slang
 {
 
