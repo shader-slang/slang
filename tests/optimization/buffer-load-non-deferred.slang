@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=SPV13): -target spirv -profile spirv_1_3
 //TEST:SIMPLE(filecheck=SPV): -target spirv
 
-// Check that we are able to use OpCopyLogical to simplify loading a phyisical type into a local variable.
+// Check that we are able to use OpCopyLogical to simplify loading a physical type into a local variable.
 
 struct Bottom
 {
