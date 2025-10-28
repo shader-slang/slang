@@ -1984,6 +1984,7 @@ struct IRUnconditionalBranch : IRTerminatorInst
     IRUse block;
 
     IRBlock* getTargetBlock() { return (IRBlock*)block.get(); }
+    IRUse* getTargetBlockUse() { return &block; }
 
     UInt getArgCount();
     IRUse* getArgs();
@@ -2590,7 +2591,10 @@ struct IRCastStorageToLogicalBase : IRInst
 {
     FIDDLE(baseInst())
     IRInst* getVal() { return getOperand(0); }
-    IRInst* getBufferType() { return getOperand(1); }
+    IRMakeStorageTypeLoweringConfig* getLayoutConfig()
+    {
+        return as<IRMakeStorageTypeLoweringConfig>(getOperand(1));
+    }
 };
 
 FIDDLE()
@@ -3770,6 +3774,8 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* emitStore(IRInst* dstPtr, IRInst* srcVal, IRInst* align);
     IRInst* emitStore(IRInst* dstPtr, IRInst* srcVal, IRInst* align, IRInst* memoryScope);
 
+    IRInst* emitCopyLogical(IRInst* dest, IRInst* srcPtr, IRInst* instsToCopyLoadAttributesFrom);
+
     IRInst* emitAtomicStore(IRInst* dstPtr, IRInst* srcVal, IRInst* memoryOrder);
 
     IRInst* emitImageLoad(IRType* type, ShortList<IRInst*> params);
@@ -3977,8 +3983,18 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* emitCastPtrToInt(IRInst* val);
     IRInst* emitCastIntToPtr(IRType* ptrType, IRInst* val);
 
-    IRInst* emitCastStorageToLogical(IRType* type, IRInst* val, IRInst* bufferType);
-    IRInst* emitCastStorageToLogicalDeref(IRType* type, IRInst* val, IRInst* bufferType);
+    IRMakeStorageTypeLoweringConfig* emitMakeStorageTypeLoweringConfig(
+        AddressSpace addrspace,
+        IRTypeLayoutRuleName ruleName,
+        bool lowerToPhysicalType);
+    IRInst* emitCastStorageToLogical(
+        IRType* type,
+        IRInst* val,
+        IRMakeStorageTypeLoweringConfig* config);
+    IRInst* emitCastStorageToLogicalDeref(
+        IRType* type,
+        IRInst* val,
+        IRMakeStorageTypeLoweringConfig* config);
 
     IRGlobalConstant* emitGlobalConstant(IRType* type);
 

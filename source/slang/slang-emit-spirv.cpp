@@ -4196,6 +4196,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_BitCast:
             result = emitOpBitcast(parent, inst, inst->getDataType(), inst->getOperand(0));
             break;
+        case kIROp_CopyLogical:
+            result = emitCopyLogical(parent, as<IRCopyLogical>(inst));
+            break;
         case kIROp_BitfieldExtract:
             result = emitBitfieldExtract(parent, inst);
             break;
@@ -6739,6 +6742,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         break;
                     case kIROp_Loop:
                         argStartIndex = 3;
+                        // The use from a loop inst is a true source of control flow
+                        // only if the use is the loopInst's target block operand.
+                        // A use from loop's continue block shouldn't count as an incoming block.
+                        if (use != as<IRLoop>(branchInst)->getTargetBlockUse())
+                            continue;
                         break;
                     default:
                         // A phi argument can only come from an unconditional branch inst.
@@ -7931,6 +7939,25 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             inst->getFullType(),
             kResultID,
             inst->getOperand(0));
+    }
+
+    SpvInst* emitCopyLogical(SpvInstParent* parent, IRCopyLogical* inst)
+    {
+        IRBuilder builder(inst);
+        builder.setInsertBefore(inst);
+        auto dstValType = tryGetPointedToType(&builder, inst->getPtr()->getDataType());
+        auto srcValType = tryGetPointedToType(&builder, inst->getVal()->getDataType());
+        ShortList<IRInst*> attribs;
+        for (auto attrib : inst->getAllAttrs())
+        {
+            attribs.add(attrib);
+        }
+        auto slangIRLoad = as<IRLoad>(
+            builder.emitLoad(srcValType, inst->getVal(), attribs.getArrayView().arrayView));
+        auto srcVal = emitLoad(parent, slangIRLoad);
+        auto convertedVal =
+            emitInst(parent, nullptr, SpvOpCopyLogical, dstValType, kResultID, srcVal);
+        return emitOpStore(parent, nullptr, inst->getPtr(), convertedVal);
     }
 
     SpvInst* emitBitfieldExtract(SpvInstParent* parent, IRInst* inst)
