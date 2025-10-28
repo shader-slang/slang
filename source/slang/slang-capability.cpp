@@ -1699,6 +1699,7 @@ CapabilitySetVal* CapabilitySet::freeze(ASTBuilder* astBuilder) const
 //
 
 /// Generic template function for concurrent iteration over two sorted collections of the same type
+/// Calls callback for all elements, passing nullptr for gaps
 template<typename Collection, typename ElementType, typename KeyType, typename MatchCallback>
 void concurrentIterate(
     const Collection& left,
@@ -1713,6 +1714,7 @@ void concurrentIterate(
     Index leftSize = (left.*countGetter)();
     Index rightSize = (right.*countGetter)();
 
+    // Process elements while both collections have remaining items
     while (leftIndex < leftSize && rightIndex < rightSize)
     {
         auto leftElement = (left.*elementGetter)(leftIndex);
@@ -1722,21 +1724,44 @@ void concurrentIterate(
 
         if (leftKey < rightKey)
         {
+            // Left has element that right doesn't
+            if (callback(leftElement, nullptr))
+                return;
             leftIndex++;
         }
         else if (leftKey > rightKey)
         {
+            // Right has element that left doesn't
+            if (callback(nullptr, rightElement))
+                return;
             rightIndex++;
         }
         else
         {
-            // Found matching elements - call callback and check for early exit
+            // Found matching elements
             if (callback(leftElement, rightElement))
                 return;
-
             leftIndex++;
             rightIndex++;
         }
+    }
+
+    // Process remaining elements from left collection (if any)
+    while (leftIndex < leftSize)
+    {
+        auto leftElement = (left.*elementGetter)(leftIndex);
+        if (callback(leftElement, nullptr))
+            return;
+        leftIndex++;
+    }
+
+    // Process remaining elements from right collection (if any)
+    while (rightIndex < rightSize)
+    {
+        auto rightElement = (right.*elementGetter)(rightIndex);
+        if (callback(nullptr, rightElement))
+            return;
+        rightIndex++;
     }
 }
 
@@ -1771,6 +1796,7 @@ void concurrentIterate(
         &CapabilityStageSetVal::getStage,
         callback);
 }
+
 
 bool CapabilitySetVal::isIncompatibleWith(CapabilityAtom other) const
 {
@@ -1851,12 +1877,20 @@ bool CapabilitySetVal::isIncompatibleWith(CapabilitySetVal const* other) const
         *other,
         [&](CapabilityTargetSetVal* thisTarget, CapabilityTargetSetVal* otherTarget) -> bool
         {
+            // Only process matching targets (skip gaps)
+            if (!thisTarget || !otherTarget)
+                return false;
+                
             // Found matching targets - now check if any stages match
             concurrentIterate(
                 *thisTarget,
                 *otherTarget,
-                [&](CapabilityStageSetVal*, CapabilityStageSetVal*) -> bool
+                [&](CapabilityStageSetVal* thisStage, CapabilityStageSetVal* otherStage) -> bool
                 {
+                    // Only process matching stages (skip gaps)
+                    if (!thisStage || !otherStage)
+                        return false;
+                        
                     // Found matching target/stage pair - set flag and exit early
                     foundMatch = true;
                     return true;
@@ -1872,7 +1906,114 @@ CapabilitySet::ImpliesReturnFlags CapabilitySetVal::_implies(
     CapabilitySetVal const* otherSet,
     CapabilitySet::ImpliesFlags flags) const
 {
-    // todo
+    SLANG_PROFILE_CAPABILITY_SETS;
+    // By default (`ImpliesFlags::None`): x implies (c | d) only if (x implies c) and (x implies d).
+
+    bool onlyRequireSingleImply = ((int)flags & (int)CapabilitySet::ImpliesFlags::OnlyRequireASingleValidImply);
+    bool cannotHaveMoreTargetAndStageSets = ((int)flags & (int)CapabilitySet::ImpliesFlags::CannotHaveMoreTargetAndStageSets);
+    bool canHaveSubsetOfTargetAndStageSets = ((int)flags & (int)CapabilitySet::ImpliesFlags::CanHaveSubsetOfTargetAndStageSets);
+
+    int flagsCollected = (int)CapabilitySet::ImpliesReturnFlags::NotImplied;
+
+    if (otherSet->isEmpty())
+        return CapabilitySet::ImpliesReturnFlags::Implied;
+
+    // If empty, and the other is not empty, it does not matter what flags are used,
+    // `this` is considered to "not imply" another set. This is important since
+    // `T.join(U)` causes `T == U`.
+    if (this->isEmpty())
+        return CapabilitySet::ImpliesReturnFlags::NotImplied;
+
+    if (cannotHaveMoreTargetAndStageSets && this->getTargetSetCount() > otherSet->getTargetSetCount())
+    {
+        return CapabilitySet::ImpliesReturnFlags::NotImplied;
+    }
+
+    // Use concurrent iteration to process all target pairs
+    bool impliesAll = true;
+    concurrentIterate(
+        *this,
+        *otherSet,
+        [&](CapabilityTargetSetVal* thisTarget, CapabilityTargetSetVal* otherTarget) -> bool
+        {
+            if (!otherTarget)
+            {
+                // Other doesn't have this target - that's fine for implies
+                return false; // Continue
+            }
+            
+            if (!thisTarget)
+            {
+                // 'this' lacks a target 'other' has
+                if (onlyRequireSingleImply || canHaveSubsetOfTargetAndStageSets)
+                {
+                    return false; // Continue
+                }
+                impliesAll = false;
+                return true; // Early exit
+            }
+
+            if (cannotHaveMoreTargetAndStageSets && thisTarget->getStageSetCount() > otherTarget->getStageSetCount())
+            {
+                impliesAll = false;
+                return true; // Early exit
+            }
+
+            // Process all stage pairs for this target
+            concurrentIterate(
+                *thisTarget,
+                *otherTarget,
+                [&](CapabilityStageSetVal* thisStage, CapabilityStageSetVal* otherStage) -> bool
+                {
+                    if (!otherStage)
+                    {
+                        // Other doesn't have this stage - that's fine for implies
+                        return false; // Continue
+                    }
+                    
+                    if (!thisStage)
+                    {
+                        // 'this' lacks a stage 'other' has
+                        if (onlyRequireSingleImply || canHaveSubsetOfTargetAndStageSets)
+                        {
+                            return false; // Continue
+                        }
+                        impliesAll = false;
+                        return true; // Early exit
+                    }
+
+                    // Check if all stage sets that are in 'other' are contained by 'this'
+                    auto thisAtomSet = thisStage->getAtomSet();
+                    auto otherAtomSet = otherStage->getAtomSet();
+                    
+                    if (thisAtomSet && otherAtomSet)
+                    {
+                        auto thisUIntSet = thisAtomSet->toUIntSet();
+                        auto otherUIntSet = otherAtomSet->toUIntSet();
+                        bool contained = thisUIntSet.contains(otherUIntSet);
+                        
+                        if (!onlyRequireSingleImply && !contained)
+                        {
+                            impliesAll = false;
+                            return true; // Early exit
+                        }
+                        else if (onlyRequireSingleImply && contained)
+                        {
+                            flagsCollected |= (int)CapabilitySet::ImpliesReturnFlags::Implied;
+                            return true; // Early exit - found one match
+                        }
+                    }
+                    
+                    return false; // Continue
+                });
+                
+            return !impliesAll; // Early exit if we failed
+        });
+
+    if (!onlyRequireSingleImply && impliesAll)
+        flagsCollected |= (int)CapabilitySet::ImpliesReturnFlags::Implied;
+
+    return (CapabilitySet::ImpliesReturnFlags)flagsCollected;
 }
 
 bool CapabilitySetVal::implies(CapabilitySet const& other) const
