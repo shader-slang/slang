@@ -255,6 +255,8 @@ class CapabilitySetVal : public Val
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
 private:
+    friend struct CapabilitySet;
+
     /// Helper method for implies operations
     CapabilitySet::ImpliesReturnFlags _implies(
         CapabilitySetVal const* other,
