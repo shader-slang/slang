@@ -23834,7 +23834,9 @@ struct CoopMat
                 result:$$CoopMat<T, S, M, N, R> = OpConstantComposite $t;
             };
         case cuda:
-            __intrinsic_asm "wmma::fill_fragment($this, $0)";
+            // We have to use *($0) to represent *this, because this method is decorated
+            // as [mutating], so `this` is passed as a pointer.
+            __intrinsic_asm "wmma::fill_fragment(*($0), $1)";
         }
     }
 
@@ -23906,13 +23908,26 @@ struct CoopMat
     ///
     /// @remarks The return value is unlikely to be same to M * N.
     [ForceInline]
-    [require(cooperative_matrix)]
+    [require(cuda_cooperative_matrix)]
     static uint GetLength()
     {
-        return spirv_asm
+        __target_switch
         {
-            result:$$uint = OpCooperativeMatrixLengthKHR $$CoopMat<T, S, M, N, R>;
-        };
+        case spirv:
+            return spirv_asm
+            {
+                result:$$uint = OpCooperativeMatrixLengthKHR $$CoopMat<T, S, M, N, R>;
+            };
+        case cuda:
+            This result;
+            return __getNumElementsPerThread(result);
+        }
+    }
+
+    [require(cuda)]
+    internal static uint __getNumElementsPerThread(__ref This coopMat)
+    {
+        __intrinsic_asm "return ($0)->num_elements";
     }
 
     /// Returns the number of rows in the matrix.
@@ -24025,7 +24040,12 @@ struct CoopMat
     // Store
     //
 
-    [require(cooperative_matrix)]
+    /// Stores the cooperative matrix into a byte address buffer.
+    /// @param buffer The RWByteAddressBuffer to store the matrix into.
+    /// @param element The starting element index in the buffer to store the matrix into.
+    /// @param stride The stride in elements between consecutive rows (for row major layout) or columns (for column major layout)
+    ///        and must be a multiple of 8 for __half element type or multiple of 4 for float element type. (i.e., multiple of 16 bytes in both cases)
+    [require(cuda_cooperative_matrix, byteaddressbuffer)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout
     >(RWByteAddressBuffer buffer, uint element, uint stride)
@@ -24033,7 +24053,13 @@ struct CoopMat
         __store<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
     }
 
-    [require(cooperative_matrix)]
+    /// Stores the cooperative matrix into a structured buffer.
+    /// @param buffer The RWStructuredBuffer to store the matrix into.
+    /// @param element The starting element index in the buffer to store the matrix into.
+    /// @param stride The stride in elements between consecutive rows (for row major layout) or
+    ///        columns (for column major layout) and must be a multiple of 8 for __half element type
+    ///        or multiple of 4 for float element type. (i.e., multiple of 16 bytes in both cases)
+    [require(cuda_cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout
     >(RWStructuredBuffer<T> buffer, uint element, uint stride)
@@ -24041,32 +24067,58 @@ struct CoopMat
         __store<matrixLayout>(buffer, element, stride);
     }
 
-    [require(cooperative_matrix)]
+    [require(cuda_cooperative_matrix)]
     internal void __store<
         let matrixLayout : CoopMatMatrixLayout
     >(RWStructuredBuffer<T> buffer, uint element, uint stride)
     {
         let zero = 0;
         let alignment = 16U;
-        spirv_asm
+        __target_switch
         {
-            %storagePointerType = OpTypePointer StorageBuffer $$T;
-            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-            OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
-        };
+        case spirv:
+            spirv_asm
+            {
+                %storagePointerType = OpTypePointer StorageBuffer $$T;
+                %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
+                OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+            {
+                __intrinsic_asm "wmma::store_matrix_sync($0, ($1).data + $2, $3, wmma::row_major)";
+            }
+            else
+            {
+                __intrinsic_asm "wmma::store_matrix_sync($0, ($1).data + $2, $3, wmma::col_major)";
+            }
+        }
     }
 
-    [require(cooperative_matrix)]
+    [require(cuda_cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout
     >(T* buffer, uint element, uint stride)
     {
-        let alignment = 16U;
-        return spirv_asm
+        __target_switch
         {
-            %pointer:$$T* = OpPtrAccessChain $buffer $element;
-            OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
-        };
+        case spirv:
+            let alignment = 16U;
+            return spirv_asm
+            {
+                %pointer:$$T* = OpPtrAccessChain $buffer $element;
+                OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+            {
+                __intrinsic_asm "wmma::store_matrix_sync($0, ($1), $2, wmma::row_major)";
+            }
+            else
+            {
+                __intrinsic_asm "wmma::store_matrix_sync($0, ($1), $2, wmma::col_major)";
+            }
+        }
     }
 
     // TODO: make this function an intrinsic and support all types via the single intrinsic
@@ -24086,19 +24138,32 @@ struct CoopMat
     }
 
     [ForceInline]
-    [require(cooperative_matrix)]
+    [require(cuda_cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout,
         let V : int
     >(__ref groupshared T[V] data, uint element, uint stride)
     {
-        let alignment = 16U;
-        spirv_asm
+        __target_switch
         {
-            %workgroupPointerType = OpTypePointer Workgroup $$T;
-            %pointer:%workgroupPointerType = OpAccessChain &data $element;
-            OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
-        };
+        case spirv:
+            let alignment = 16U;
+            spirv_asm
+            {
+                %workgroupPointerType = OpTypePointer Workgroup $$T;
+                %pointer:%workgroupPointerType = OpAccessChain &data $element;
+                OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+            {
+                __intrinsic_asm "wmma::store_matrix_sync($0, ($1) + $2, $3, wmma::row_major)";
+            }
+            else
+            {
+                __intrinsic_asm "wmma::store_matrix_sync($0, ($1) + $2, $3, wmma::col_major)";
+            }
+        }
     }
 
     [ForceInline]
@@ -24147,7 +24212,7 @@ ${{{{
 }}}}
 
     [__NoSideEffect]
-    [require(cooperative_matrix)]
+    [require(cuda_cooperative_matrix, byteaddressbuffer)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout
     >(
@@ -24159,7 +24224,7 @@ ${{{{
     }
 
     [__NoSideEffect]
-    [require(cooperative_matrix)]
+    [require(cuda_cooperative_matrix)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout
     >(
@@ -24169,31 +24234,80 @@ ${{{{
     {
         let zero = 0;
         let alignment = 16U;
-        return spirv_asm
+        __target_switch
         {
-            %storagePointerType = OpTypePointer StorageBuffer $$T;
-            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
-        };
+        case spirv:
+            return spirv_asm
+            {
+                %storagePointerType = OpTypePointer StorageBuffer $$T;
+                %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
+                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            This result;
+            result.__load<matrixLayout, 0>(buffer, element, stride);
+            return result;
+        }
     }
 
 ${{{{
     } // RW
 }}}}
 
+    // generate internal __load method for different buffer types
+${{{{
+    for (const char* bufferType : { "RWStructuredBuffer<T>", "StructuredBuffer<T>", "T*", "T[V]" })
+    {
+        char loadRowMajorMatrixStr[256];
+        char loadColMajorMatrixStr[256];
+        snprintf(loadRowMajorMatrixStr, sizeof(loadRowMajorMatrixStr),
+            "\"wmma::load_matrix_sync(*($0), ($1)%s + $2, $3, wmma::row_major)\"",
+            (strstr(bufferType, "StructuredBuffer") != 0)  ? ".data" : "");
+        snprintf(loadColMajorMatrixStr, sizeof(loadColMajorMatrixStr),
+            "\"wmma::load_matrix_sync(*($0), ($1)%s + $2, $3, wmma::col_major)\"",
+            (strstr(bufferType, "StructuredBuffer") != 0)  ? ".data" : "");
+}}}}
+
+    [mutating]
+    [require(cuda)]
+    internal void __load<
+        let matrixLayout : CoopMatMatrixLayout,
+        int V = 0
+    > (
+        $(bufferType) buffer,
+        uint element,
+        uint stride)
+    {
+        if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+            __intrinsic_asm $(loadRowMajorMatrixStr);
+        else
+            __intrinsic_asm $(loadRowMajorMatrixStr);
+    }
+${{{{
+    } // for (const char* RW : { "RWStructuredBuffer", "StructuredBuffer", "T*", "T[]" })
+}}}}
+
     [ForceInline]
     [__NoSideEffect]
-    [require(cooperative_matrix)]
+    [require(cuda_cooperative_matrix)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout
     >(T* buffer, uint element, uint stride)
     {
-        let alignment = 16;
-        return spirv_asm
+        __target_switch
         {
-            %pointer:$$T* = OpPtrAccessChain $buffer $element;
-            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
-        };
+        case spirv:
+            let alignment = 16;
+            return spirv_asm
+            {
+                %pointer:$$T* = OpPtrAccessChain $buffer $element;
+                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            This result;
+            result.__load<matrixLayout, 0>(buffer, element, stride);
+            return result;
+        }
     }
 
     // TODO: make this function an intrinsic and support all types via the single intrinsic
@@ -24215,19 +24329,27 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cooperative_matrix)]
+    [require(cuda_cooperative_matrix)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
         let V : int
     >(__constref groupshared T[V] data, uint element, uint stride)
     {
-        let alignment = 16U;
-        return spirv_asm
+        __target_switch
         {
-            %workgroupPointerType = OpTypePointer Workgroup $$T;
-            %pointer:%workgroupPointerType = OpAccessChain &data $element;
-            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
-        };
+        case spirv:
+            let alignment = 16U;
+            return spirv_asm
+            {
+                %workgroupPointerType = OpTypePointer Workgroup $$T;
+                %pointer:%workgroupPointerType = OpAccessChain &data $element;
+                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            This result;
+            result.__load<matrixLayout, V>(data, element, stride);
+            return result;
+        }
     }
 
     [ForceInline]
@@ -24685,7 +24807,7 @@ ${{{{
 //
 
 [ForceInline]
-[require(cooperative_matrix)]
+[require(cuda_cooperative_matrix, byteaddressbuffer)]
 CoopMat<T, S, M, N, R> coopMatLoad<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,
@@ -24702,7 +24824,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 }
 
 [ForceInline]
-[require(cooperative_matrix)]
+[require(cuda_cooperative_matrix, byteaddressbuffer)]
 CoopMat<T, S, M, N, R> coopMatLoad<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,
@@ -24719,7 +24841,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 }
 
 [ForceInline]
-[require(cooperative_matrix)]
+[require(cuda_cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,
@@ -24736,7 +24858,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 }
 
 [ForceInline]
-[require(cooperative_matrix)]
+[require(cuda_cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,
@@ -24753,7 +24875,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 }
 
 [ForceInline]
-[require(cooperative_matrix)]
+[require(cuda_cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,
@@ -24788,7 +24910,7 @@ CoopMat<T, S, M, N, R> coopMatLoadCoherent<
 }
 
 [ForceInline]
-[require(cooperative_matrix)]
+[require(cuda_cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,

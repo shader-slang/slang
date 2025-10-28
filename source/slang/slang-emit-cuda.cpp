@@ -239,6 +239,11 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
             out << "OptixTraversableHandle";
             return SLANG_OK;
         }
+    case kIROp_CoopMatrixType:
+        {
+            out << "wmma::fragment<...>";
+            return SLANG_OK;
+        }
     default:
         {
             if (isNominalOp(type->getOp()))
