@@ -240,6 +240,7 @@ public:
     /// Join two capability sets to form ('this' & 'other').
     /// If a target/set has an incompatible atom, do not destroy the target/set.
     void nonDestructiveJoin(const CapabilitySet& other);
+    void nonDestructiveJoin(const CapabilitySetVal* other);
 
     /// Add all targets/sets of 'other' into 'this'. Overlapping sets are removed.
     void unionWith(const CapabilitySet& other);

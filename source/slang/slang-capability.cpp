@@ -753,6 +753,27 @@ void CapabilitySet::nonDestructiveJoin(const CapabilitySet& other)
     }
 }
 
+void CapabilitySet::nonDestructiveJoin(const CapabilitySetVal* other)
+{
+    // Treat null pointer as empty set
+    if (!other)
+        return;
+        
+    if (this->isInvalid() || other->isInvalid())
+        return;
+
+    if (this->isEmpty())
+    {
+        *this = CapabilitySet(other);
+        return;
+    }
+    
+    for (auto& thisTargetSet : this->m_targetSets)
+    {
+        thisTargetSet.second.tryJoin(*other);
+    }
+}
+
 bool CapabilitySet::operator==(CapabilitySet const& that) const
 {
     for (auto set : this->m_targetSets)
