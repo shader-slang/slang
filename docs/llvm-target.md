@@ -9,7 +9,7 @@ and debuggable Slang code on almost any platform.
 # Targets
 
 * `-target llvm-ir` generates LLVM IR in the text representation.
-* `-target llvm-obj` generates position-independent object code, which can be 
+* `-target llvm-obj` generates position-independent object code, which can be
 linked into an executable or a static or dynamic library.
 * `-target llvm-shader-ir` is like `llvm-ir` but generates a dispatch function for compute shader entry points.
 * `-target llvm-shader-obj` is like `llvm-obj` but generates a dispatch function for compute shader entry points.
