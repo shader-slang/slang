@@ -842,6 +842,23 @@ bool CapabilityStageSet::tryJoin(const CapabilityTargetSet& other)
     return true;
 }
 
+bool CapabilityStageSet::tryJoin(const CapabilityTargetSetVal& other)
+{
+    // Find the corresponding stage set in the immutable target set
+    CapabilityStageSetVal* otherStageSet = other.findStageSet(this->stage);
+    if (!otherStageSet)
+        return false;
+
+    // Join the atom sets if both exist
+    if (otherStageSet->getAtomSet() && this->atomSet)
+    {
+        UIntSetVal* otherAtomSet = otherStageSet->getAtomSet();
+        this->atomSet->unionWith(*otherAtomSet);
+    }
+
+    return true;
+}
+
 bool CapabilityStageSet::compatibleMerge(const CapabilityStageSet& stageSet)
 {
     CapabilityStageSet tmp = *this;
@@ -879,6 +896,40 @@ bool CapabilityTargetSet::tryJoin(const CapabilityTargetSets& other)
         if (!shaderStageSet.second.tryJoin(*otherTargetSet))
             destroySet.add(shaderStageSet.first);
     }
+    if (destroySet.getCount() == Slang::Index(this->shaderStageSets.getCount()))
+        return false;
+
+    for (const auto& i : destroySet)
+        this->shaderStageSets.remove(i);
+
+    return true;
+}
+
+bool CapabilityTargetSet::tryJoin(const CapabilitySetVal& other)
+{
+    // Find the corresponding target set in the immutable capability set
+    CapabilityTargetSetVal* otherTargetSet = nullptr;
+    for (Index i = 0; i < other.getTargetSetCount(); i++)
+    {
+        CapabilityTargetSetVal* targetSet = other.getTargetSet(i);
+        if (targetSet->getTarget() == this->target)
+        {
+            otherTargetSet = targetSet;
+            break;
+        }
+    }
+    
+    if (!otherTargetSet)
+        return false;
+
+    List<CapabilityAtom> destroySet;
+    destroySet.reserve(this->shaderStageSets.getCount());
+    for (auto& shaderStageSet : this->shaderStageSets)
+    {
+        if (!shaderStageSet.second.tryJoin(*otherTargetSet))
+            destroySet.add(shaderStageSet.first);
+    }
+    
     if (destroySet.getCount() == Slang::Index(this->shaderStageSets.getCount()))
         return false;
 
@@ -973,6 +1024,41 @@ CapabilitySet& CapabilitySet::join(const CapabilitySet& other)
     for (auto& thisTargetSet : this->m_targetSets)
     {
         if (!thisTargetSet.second.tryJoin(other.m_targetSets))
+        {
+            destroySet.add(thisTargetSet.first);
+        }
+    }
+    for (const auto& i : destroySet)
+    {
+        this->m_targetSets.remove(i);
+    }
+    // join made a invalid CapabilitySet
+    if (this->m_targetSets.getCount() == 0)
+        this->m_targetSets[CapabilityAtom::Invalid].target = CapabilityAtom::Invalid;
+    return *this;
+}
+
+CapabilitySet& CapabilitySet::join(const CapabilitySetVal* other)
+{
+    // Treat null pointer as empty set
+    if (!other)
+        return *this;
+        
+    if (this->isEmpty() || other->isInvalid())
+    {
+        *this = CapabilitySet(other);
+        return *this;
+    }
+    if (this->isInvalid())
+        return *this;
+    if (other->isEmpty())
+        return *this;
+
+    List<CapabilityAtom> destroySet;
+    destroySet.reserve(this->m_targetSets.getCount());
+    for (auto& thisTargetSet : this->m_targetSets)
+    {
+        if (!thisTargetSet.second.tryJoin(*other))
         {
             destroySet.add(thisTargetSet.first);
         }

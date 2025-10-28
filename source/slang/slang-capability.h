@@ -93,6 +93,7 @@ struct CapabilityStageSet
     /// Return false when `other` is fully incompatible.
     /// incompatability is when `this->stage` is not a supported stage by `other.shaderStageSets`.
     bool tryJoin(const CapabilityTargetSet& other);
+    bool tryJoin(const CapabilityTargetSetVal& other);
 
     /// See definition of CapabilityTargetSet::compatibleMerge for details.
     bool compatibleMerge(const CapabilityStageSet& stageSet);
@@ -115,6 +116,7 @@ struct CapabilityTargetSet
     /// 1. `this->target` is not a supported target by `other.shaderStageSets`
     /// 2. `this` has completly disjoint shader stages from other.
     bool tryJoin(const CapabilityTargetSets& other);
+    bool tryJoin(const CapabilitySetVal& other);
     void unionWith(const CapabilityTargetSet& other);
     void unionWith(const CapabilityTargetSetVal& other);
 
@@ -233,6 +235,7 @@ public:
     /// Destroy incompatible targets/sets apart of 'this' between ('this' & 'other').
     /// `this` may be made invalid if other is fully disjoint.
     CapabilitySet& join(const CapabilitySet& other);
+    CapabilitySet& join(const CapabilitySetVal* other);
 
     /// Join two capability sets to form ('this' & 'other').
     /// If a target/set has an incompatible atom, do not destroy the target/set.
