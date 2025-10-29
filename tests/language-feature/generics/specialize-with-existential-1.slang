@@ -39,4 +39,9 @@ void caller(IFoo f)
     byteBuffer.Store(0, e);
     *ptrFoo = c;
     let z = *ptrFoo;
+    Optional<IFoo> optFoo = z;
+    if (optFoo.hasValue)
+    {
+        optFoo.value.doSomething();
+    }
 }

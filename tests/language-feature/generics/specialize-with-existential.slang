@@ -16,6 +16,6 @@ int genericFunc<T:IFoo>(T v)
 
 void caller(IFoo f)
 {
-    // CHECK: ([[@LINE+1]]): error 33180: specializing generic 'genericFunc' with an existential type is not allowed
+    // CHECK: ([[@LINE+1]]): error 33180: specializing 'genericFunc' with an existential type is not allowed
     genericFunc(f);
 }

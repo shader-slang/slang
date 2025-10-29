@@ -37,13 +37,16 @@ void checkForIllegalGenericSpecializationWithExistentialTypeRec(
                     case kIROp_ExtractExistentialWitnessTable:
                     case kIROp_MakeExistential:
                         {
-                            auto generic = as<IRGeneric>(specialize->getBase());
-                            if (!generic)
-                                break;
+                            IRInst* specializationBase = specialize->getBase();
+                            if (auto generic = as<IRGeneric>(specializationBase))
+                                specializationBase = findInnerMostGenericReturnVal(generic);
+                            if (auto lookupWitness =
+                                    as<IRLookupWitnessMethod>(specialize->getBase()))
+                                specializationBase = lookupWitness->getRequirementKey();
                             sink->diagnose(
                                 specialize->sourceLoc,
                                 Diagnostics::cannotSpecializeGenericWithExistential,
-                                findGenericReturnVal(generic));
+                                specializationBase);
                             goto nextInst;
                         }
                     }
