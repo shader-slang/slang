@@ -4869,7 +4869,6 @@ _slang_waveClusteredRotate(bool4 value, unsigned int delta, unsigned int cluster
 
 #undef SLANG_WAVE_CLUSTERED_ROTATE_IMPL
 
-
 // ---------------------- OptiX Cooperative Vector Wrappers --------------------------------------
 #ifdef SLANG_CUDA_ENABLE_OPTIX
 
@@ -5053,3 +5052,32 @@ __forceinline__ __device__ VecTOut slangOptixCoopVecMatMul(
 #endif // (OPTIX_VERSION >= 90000)
 
 #endif // SLANG_CUDA_ENABLE_OPTIX
+
+template<typename T, int M, int N, int R>
+struct CoopMat
+{
+    void StoreRowMajor(RWStructuredBuffer<T> buffer, uint element, uint stride)
+    {
+        Store<0>(buffer, element, stride)
+    }
+    void StoreColMajor(RWStructuredBuffer<T> buffer, uint element, uint stride)
+    {
+        Store<1>(buffer, element, stride)
+    }
+
+    // Since we decide to use wmma ptx instructions and there is no `fill` instruction in PTX,
+    void fill(T t)
+    {
+        m_filled = true;
+        m_fillValue = t;
+    }
+
+private:
+    template<int matrixLayout>
+    void Store(RWStructuredBuffer<T> buffer, uint element, uint stride)
+    {
+
+    }
+    T m_fillValue;
+    bool m_filled = false;
+}
