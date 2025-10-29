@@ -1,3 +1,9 @@
+#ifdef _MSC_VER
+// A narrowing conversion is caused inside an LLVM header, which we can't fix
+// now. So let's just disable the warning.
+#pragma warning(disable : 4267)
+#endif
+
 #include "../compiler-core/slang-artifact-associated-impl.h"
 #include "../compiler-core/slang-artifact-desc-util.h"
 #include "../core/slang-char-util.h"
