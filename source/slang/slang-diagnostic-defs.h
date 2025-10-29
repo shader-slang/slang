@@ -301,6 +301,12 @@ DIAGNOSTIC(96, Error, kindNotLinkable, "not a known linkable kind '$0'")
 DIAGNOSTIC(97, Error, libraryDoesNotExist, "library '$0' does not exist")
 DIAGNOSTIC(98, Error, cannotAccessAsBlob, "cannot access as a blob")
 DIAGNOSTIC(99, Error, unknownDebugOption, "unknown debug option, known options are ($0)")
+DIAGNOSTIC(
+    104,
+    Error,
+    needToEnableExperimentFeature,
+    "'$0' is an experimental module, need to enable"
+    "'-experimental-feature' to load this module")
 
 //
 // 001xx - Downstream Compilers
@@ -844,6 +850,12 @@ DIAGNOSTIC(
     Error,
     cannotTakeConstantPointers,
     "Not allowed to take the address of an immutable object")
+DIAGNOSTIC(
+    33180,
+    Error,
+    cannotSpecializeGenericWithExistential,
+    "specializing '$0' with an existential type is not allowed. All generic arguments "
+    "must be statically resolvable at compile time.")
 DIAGNOSTIC(
     30100,
     Error,
