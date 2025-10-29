@@ -2139,7 +2139,7 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         else
         {
             SemanticsVisitor subVisitor(withDeclToExcludeFromLookup(varDecl));
-            initExpr = subVisitor.CheckExpr(initExpr);
+            initExpr = maybeOpenRef(subVisitor.CheckExpr(initExpr));
 
             // TODO: We might need some additional steps here to ensure
             // that the type of the expression is one we are okay with
