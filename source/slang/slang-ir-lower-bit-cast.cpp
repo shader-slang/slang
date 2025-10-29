@@ -325,16 +325,6 @@ struct BitCastLoweringContext
         {
             return;
         }
-        if (isDirectSpirv)
-        {
-            // For SPIRV, pointer-to-pointer bitcasts can be done if the pointers have the same
-            // storage class
-            auto fromPtrType = as<IRPtrTypeBase>(fromType);
-            auto toPtrType = as<IRPtrTypeBase>(toType);
-            if (fromPtrType && toPtrType &&
-                fromPtrType->getAddressSpace() == toPtrType->getAddressSpace())
-                return;
-        }
         if (as<IRPointerLikeType>(fromType) || as<IRPointerLikeType>(toType))
         {
             return;
