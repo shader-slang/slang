@@ -38,7 +38,7 @@ on:
 jobs:
   coverage:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
-    timeout-minutes: 120
+    timeout-minutes: 240  # 4 hours for serial execution (server-count: 1)
 
     defaults:
       run:
