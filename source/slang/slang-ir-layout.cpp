@@ -837,20 +837,4 @@ IRTypeLayoutRules* IRTypeLayoutRules::get(IRTypeLayoutRuleName name)
     }
 }
 
-//////////////////////////
-// C Layout
-//////////////////////////
-
-Result getCSizeAndAlignment(
-    CompilerOptionSet& optionSet,
-    IRType* type,
-    IRSizeAndAlignment* outSizeAndAlignment)
-{
-    return getSizeAndAlignment(
-        optionSet,
-        IRTypeLayoutRules::getC(),
-        type,
-        outSizeAndAlignment);
-}
-
 } // namespace Slang
