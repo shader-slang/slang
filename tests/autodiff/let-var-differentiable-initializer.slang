@@ -3,8 +3,8 @@
 // initializers (like dot) get properly marked as differentiable and can propagate
 // derivatives correctly
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -48,8 +48,12 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     
     // Test that all variants compile and can be differentiated
     // Expected: q·q = 1² + 2² + 3² = 1 + 4 + 9 = 14
-    outputBuffer[0] = test_let_without_type(q);      // Expect: 14.0
-    outputBuffer[1] = test_var_without_type(q);      // Expect: 14.0
-    outputBuffer[2] = test_let_with_type(q);         // Expect: 14.0
-    outputBuffer[3] = test_var_with_type(q);         // Expect: 14.0
+    // CHECK: 14.000000
+    outputBuffer[0] = test_let_without_type(q);
+    // CHECK: 14.000000
+    outputBuffer[1] = test_var_without_type(q);
+    // CHECK: 14.000000
+    outputBuffer[2] = test_let_with_type(q);
+    // CHECK: 14.000000
+    outputBuffer[3] = test_var_with_type(q);
 }
