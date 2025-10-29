@@ -684,4 +684,5 @@ return {
 	["CUDA_LDG"] = 680,
 	["StoreBase.copyLogical"] = 681,
 	["MakeStorageTypeLoweringConfig"] = 682,
+	["Decoration.experimentalModule"] = 683,
 }
