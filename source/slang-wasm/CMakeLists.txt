@@ -16,6 +16,11 @@ if(EMSCRIPTEN)
             core
             compiler-core
         INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/include .
+        REQUIRES
+            slang-capability-defs
+            slang-capability-lookup
+            slang-fiddle-output
+            slang-lookup-tables
     )
     # To generate binding code
     target_link_options(
