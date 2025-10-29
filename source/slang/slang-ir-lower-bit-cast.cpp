@@ -258,6 +258,66 @@ struct BitCastLoweringContext
             // Both fromType and toType are basic types, no processing needed.
             return;
         }
+
+        // Skip lowering bitcasts that can be directly handled by SPIR-V OpBitcast
+        if (isDirectSpirv && fromTypeSize.size == toTypeSize.size)
+        {
+            auto fromPtrType = as<IRPtrTypeBase>(fromType);
+            auto toPtrType = as<IRPtrTypeBase>(toType);
+
+            // OpBitcast can handle pointer <-> pointer bitcasts directly,
+            // but both pointers must have same storage class
+            if (fromPtrType && toPtrType && fromPtrType->getAddressSpace() == toPtrType->getAddressSpace())
+                return;
+
+            // OpBitcast can handle pointer -> scalar integer bitcasts directly
+            if (fromPtrType && toBasicType && isIntegralType(toType))
+                return;
+
+            // OpBitcast can handle scalar integer -> pointer bitcasts directly
+            if (fromBasicType && toPtrType && isIntegralType(fromType))
+                return;
+
+            auto fromVectorType = as<IRVectorType>(fromType);
+            auto toVectorType = as<IRVectorType>(toType);
+
+            // OpBitcast can handle pointer -> integer vector bitcasts directly,
+            // but those integers need to be 32-bit
+            if (fromPtrType && toVectorType)
+            {
+                auto elementType = toVectorType->getElementType();
+                if (isIntegralType(elementType))
+                {
+                    auto intInfo = getIntTypeInfo(elementType);
+                    if (intInfo.width == 32)
+                        return;
+                }
+            }
+
+            // OpBitcast can handle integer vector -> pointer bitcasts directly,
+            // but those integers need to be 32-bit
+            if (toPtrType && fromVectorType)
+            {
+                auto elementType = fromVectorType->getElementType();
+                if (isIntegralType(elementType))
+                {
+                    auto intInfo = getIntTypeInfo(elementType);
+                    // SPIR-V spec: only vectors of 32-bit integers allowed
+                    if (intInfo.width == 32)
+                        return;
+                }
+            }
+
+            // OpBitcast can handle vector <-> scalar bitcasts directly
+            // OpBitcast can also handle vector <-> vector bitcasts directly,
+            // but only if the larger element count is an integer multiple of the smaller element count
+            auto fromElementCount = getIRVectorElementSize(fromType);
+            auto toElementCount = getIRVectorElementSize(toType);
+            if ((fromVectorType || fromBasicType) && (toVectorType || toBasicType) &&
+                (fromElementCount % toElementCount == 0 || toElementCount % fromElementCount == 0))
+                return;
+        }
+
         // Ignore cases we cannot handle yet.
         if (as<IRResourceTypeBase>(fromType) || as<IRResourceTypeBase>(toType))
         {
@@ -280,23 +340,6 @@ struct BitCastLoweringContext
         if (as<IRSamplerStateTypeBase>(fromType) || as<IRSamplerStateTypeBase>(toType))
         {
             return;
-        }
-
-        // No processing needed for vector <-> scalar bitcasts of equal sizes on SPIRV, nor for some
-        // vector-to-vector bitcasts
-        if (isDirectSpirv && fromTypeSize.size == toTypeSize.size)
-        {
-
-            // For vector-to-vector casts, the larger element count needs to be an integer multiple
-            // of the smaller element count
-            auto fromVectorType = as<IRVectorType>(fromType);
-            auto toVectorType = as<IRVectorType>(toType);
-            auto fromElementCount = getIRVectorElementSize(fromType);
-            auto toElementCount = getIRVectorElementSize(toType);
-
-            if ((fromVectorType || fromBasicType) && (toVectorType || toBasicType) &&
-                (fromElementCount % toElementCount == 0 || toElementCount % fromElementCount == 0))
-                return;
         }
 
         if (fromTypeSize.size != toTypeSize.size)
