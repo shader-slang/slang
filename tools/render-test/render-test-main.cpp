@@ -1670,7 +1670,8 @@ static SlangResult _innerMain(
                 // As long as we have CPU, then this should work
                 return spSessionCheckPassThroughSupport(session, SLANG_PASS_THROUGH_GENERIC_C_CPP);
             }
-            else return SLANG_OK;
+            else
+                return SLANG_OK;
         default:
             break;
         }

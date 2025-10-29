@@ -2013,7 +2013,9 @@ LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getAnyValueRules()
     return &kLLVMAnyValueLayoutRulesImpl_;
 }
 
-LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getConstantBufferRules(CompilerOptionSet& compilerOptions, Type* containerType)
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getConstantBufferRules(
+    CompilerOptionSet& compilerOptions,
+    Type* containerType)
 {
     if (compilerOptions.shouldUseScalarLayout())
         return &kLLVMScalarLayoutRulesImpl_;
@@ -2076,7 +2078,8 @@ LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getSpecializationConstantRules()
     return &kLLVMLayoutRulesImpl_;
 }
 
-LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getShaderStorageBufferRules(CompilerOptionSet& compilerOptions)
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getShaderStorageBufferRules(
+    CompilerOptionSet& compilerOptions)
 {
     if (compilerOptions.shouldUseScalarLayout())
         return &kLLVMScalarLayoutRulesImpl_;
@@ -2086,7 +2089,8 @@ LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getShaderStorageBufferRules(Compiler
     return &kLLVMStd430LayoutRulesImpl_;
 }
 
-LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getParameterBlockRules(CompilerOptionSet& compilerOptions)
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getParameterBlockRules(
+    CompilerOptionSet& compilerOptions)
 {
     if (compilerOptions.shouldUseScalarLayout())
         return &kLLVMScalarLayoutRulesImpl_;

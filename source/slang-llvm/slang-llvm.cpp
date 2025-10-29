@@ -49,8 +49,8 @@
 
 #include "slang-com-helper.h"
 #include "slang-com-ptr.h"
-#include "slang.h"
 #include "slang-llvm-jit-shared-library.h"
+#include "slang.h"
 
 #include <compiler-core/slang-artifact-associated-impl.h>
 #include <compiler-core/slang-artifact-desc-util.h>

@@ -158,7 +158,9 @@ struct CollectGlobalUniformParametersContext
         {
             auto wrapperParamGroupType = builder->getConstantBufferType(
                 wrapperStructType,
-                builder->getType(isLLVMTarget(target) ? kIROp_CBufferLayoutType : kIROp_DefaultBufferLayoutType));
+                builder->getType(
+                    isLLVMTarget(target) ? kIROp_CBufferLayoutType
+                                         : kIROp_DefaultBufferLayoutType));
             wrapperParamType = wrapperParamGroupType;
         }
 

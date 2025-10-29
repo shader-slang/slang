@@ -606,10 +606,9 @@ static const KindExtension g_cpuKindExts[] = {
 
 /* static */ bool ArtifactDescUtil::isCpuLikeTarget(const ArtifactDesc& desc)
 {
-    if (
-        isDerivedFrom(desc.kind, ArtifactKind::CompileBinary) ||
-        isDerivedFrom(desc.kind, ArtifactKind::ObjectCode)
-    ){
+    if (isDerivedFrom(desc.kind, ArtifactKind::CompileBinary) ||
+        isDerivedFrom(desc.kind, ArtifactKind::ObjectCode))
+    {
         return isDerivedFrom(desc.payload, ArtifactPayload::CPULike);
     }
     else if (isDerivedFrom(desc.kind, ArtifactKind::Source))

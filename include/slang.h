@@ -640,12 +640,13 @@ typedef uint32_t SlangSizeT;
         SLANG_WGSL_SPIRV,            ///< SPIR-V via WebGPU shading language
 
         SLANG_HOST_VM, ///< Bytecode that can be interpreted by the Slang VM
-        SLANG_LLVM_HOST_ASSEMBLY,         ///< LLVM IR assembly
-        SLANG_LLVM_HOST_OBJECT_CODE,      ///< Object code generated via LLVM
-        SLANG_LLVM_HOST_HOST_CALLABLE,    ///< Host callable code via LLVM
-        SLANG_LLVM_SHADER_ASSEMBLY,       ///< LLVM IR assembly (kernel/shader)
-        SLANG_LLVM_SHADER_OBJECT_CODE,    ///< Object code generated via LLVM (kernel/shader)
-        SLANG_LLVM_SHADER_HOST_CALLABLE,  ///< Host callable code via LLVM (kernel/shader)
+
+        SLANG_LLVM_HOST_ASSEMBLY,        ///< LLVM IR assembly
+        SLANG_LLVM_HOST_OBJECT_CODE,     ///< Object code generated via LLVM
+        SLANG_LLVM_HOST_HOST_CALLABLE,   ///< Host callable code via LLVM
+        SLANG_LLVM_SHADER_ASSEMBLY,      ///< LLVM IR assembly (kernel/shader)
+        SLANG_LLVM_SHADER_OBJECT_CODE,   ///< Object code generated via LLVM (kernel/shader)
+        SLANG_LLVM_SHADER_HOST_CALLABLE, ///< Host callable code via LLVM (kernel/shader)
         SLANG_TARGET_COUNT_OF,
     };
 
@@ -1077,8 +1078,8 @@ typedef uint32_t SlangSizeT;
         ExperimentalFeature, // bool, enable experimental features
 
         LLVMTargetTriple, // string
-        LLVMCPU, // string
-        LLVMFeatures, // string
+        LLVMCPU,          // string
+        LLVMFeatures,     // string
 
         CountOf,
     };
