@@ -1397,6 +1397,31 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return m_NonSemanticDebugPrintfExtInst;
     }
 
+    /// Dictionary for dynamically imported extension instruction sets
+    Dictionary<UnownedStringSlice, SpvInst*> m_extInstImports;
+
+    /// Get or import an extension instruction set by name
+    SpvInst* getOrImportExtInstSet(const UnownedStringSlice& setName)
+    {
+        SpvInst* result = nullptr;
+        if (m_extInstImports.tryGetValue(setName, result))
+            return result;
+
+        // NonSemantic extension sets require SPV_KHR_non_semantic_info
+        if (setName.startsWith(UnownedStringSlice::fromLiteral("NonSemantic.")))
+        {
+            ensureExtensionDeclaration(
+                UnownedStringSlice::fromLiteral("SPV_KHR_non_semantic_info"));
+        }
+
+        result = emitOpExtInstImport(
+            getSection(SpvLogicalSectionID::ExtIntInstImports),
+            nullptr,
+            setName);
+        m_extInstImports[setName] = result;
+        return result;
+    }
+
     static SpvStorageClass addressSpaceToStorageClass(AddressSpace addrSpace)
     {
         SLANG_EXHAUSTIVE_SWITCH_BEGIN
@@ -4171,6 +4196,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_BitCast:
             result = emitOpBitcast(parent, inst, inst->getDataType(), inst->getOperand(0));
             break;
+        case kIROp_CopyLogical:
+            result = emitCopyLogical(parent, as<IRCopyLogical>(inst));
+            break;
         case kIROp_BitfieldExtract:
             result = emitBitfieldExtract(parent, inst);
             break;
@@ -6714,6 +6742,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         break;
                     case kIROp_Loop:
                         argStartIndex = 3;
+                        // The use from a loop inst is a true source of control flow
+                        // only if the use is the loopInst's target block operand.
+                        // A use from loop's continue block shouldn't count as an incoming block.
+                        if (use != as<IRLoop>(branchInst)->getTargetBlockUse())
+                            continue;
                         break;
                     default:
                         // A phi argument can only come from an unconditional branch inst.
@@ -6757,6 +6790,27 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             List<IRInst*> args;
             for (UInt i = 0; i < inst->getArgCount(); i++)
                 args.add(inst->getArg(i));
+            // Check if this is an extension instruction (has a "set" parameter)
+            if (spvOpDecor->getOperandCount() >= 2)
+            {
+                if (auto setName = as<IRStringLit>(spvOpDecor->getOperand(1)))
+                {
+                    // This is an extension instruction call
+                    // Import the extension set and emit OpExtInst
+                    SpvInst* extSet = getOrImportExtInstSet(setName->getStringSlice());
+                    return emitInst(
+                        parent,
+                        inst,
+                        SpvOpExtInst,
+                        inst->getFullType(),
+                        kResultID,
+                        extSet,
+                        SpvLiteralInteger::from32(op),
+                        args);
+                }
+            }
+
+            // Otherwise, treat as a raw SPIR-V opcode
             return emitInst(parent, inst, op, inst->getFullType(), kResultID, args);
         }
         else
@@ -7885,6 +7939,25 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             inst->getFullType(),
             kResultID,
             inst->getOperand(0));
+    }
+
+    SpvInst* emitCopyLogical(SpvInstParent* parent, IRCopyLogical* inst)
+    {
+        IRBuilder builder(inst);
+        builder.setInsertBefore(inst);
+        auto dstValType = tryGetPointedToType(&builder, inst->getPtr()->getDataType());
+        auto srcValType = tryGetPointedToType(&builder, inst->getVal()->getDataType());
+        ShortList<IRInst*> attribs;
+        for (auto attrib : inst->getAllAttrs())
+        {
+            attribs.add(attrib);
+        }
+        auto slangIRLoad = as<IRLoad>(
+            builder.emitLoad(srcValType, inst->getVal(), attribs.getArrayView().arrayView));
+        auto srcVal = emitLoad(parent, slangIRLoad);
+        auto convertedVal =
+            emitInst(parent, nullptr, SpvOpCopyLogical, dstValType, kResultID, srcVal);
+        return emitOpStore(parent, nullptr, inst->getPtr(), convertedVal);
     }
 
     SpvInst* emitBitfieldExtract(SpvInstParent* parent, IRInst* inst)

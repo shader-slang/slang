@@ -1067,6 +1067,8 @@ typedef uint32_t SlangSizeT;
 
         ForceCLayout, // bool
 
+        ExperimentalFeature, // bool, enable experimental features
+
         CountOf,
     };
 
@@ -3917,7 +3919,7 @@ struct TargetDesc
 
     /** Pointer to an array of compiler option entries, whose size is compilerOptionEntryCount.
      */
-    CompilerOptionEntry* compilerOptionEntries = nullptr;
+    const CompilerOptionEntry* compilerOptionEntries = nullptr;
 
     /** Number of additional compiler option entries.
      */
