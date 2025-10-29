@@ -332,14 +332,18 @@ struct AssignValsFromLayoutContext
 
     static bool isDescriptorHandleType(const ShaderCursor& cursor)
     {
-        // Descriptor handles in SPIRV/DX12 with bindless are lowered to uint2
+        // Descriptor handles in SPIRV/DX12 with bindless are lowered to uint2 or uint64
         // stored in uniform data.
         //
-        // IMPORTANT: We only check for uint2, NOT uint64!
-        // - uint64 in uniform data = device address (buffer pointer)
-        // - uint2 in uniform data = descriptor handle (index into bindless heap)
+        // Two representations:
+        // - uint2: Standard SPIRV path (OpAccessChain into __slang_resource_heap)
+        // - uint64: NVIDIA spvBindlessTextureNV path (OpConvertUToSampledImageNV)
         //
-        // Note: We DON'T check for Kind::Resource in uniform data because:
+        // Note: uint64 can also be device addresses (buffer pointers).
+        // We use try-and-fallback: if getDescriptorHandle() fails, we fall back
+        // to the device address path (which checks uint64 again).
+        //
+        // We DON'T check for Kind::Resource in uniform data because:
         // - On Metal/CUDA, regular resources appear as pointers in uniform data
         // - Those work fine with regular setBinding(), not descriptor handles
 
@@ -355,11 +359,17 @@ struct AssignValsFromLayoutContext
             auto type = typeLayout->getType();
             auto kind = type->getKind();
 
-            // Check for uint2 (SPIRV/DX12 descriptor handle)
-            // This is the ONLY pattern we detect as descriptor handles
+            // Check for uint2 (standard SPIRV/DX12 descriptor handle)
             if (kind == slang::TypeReflection::Kind::Vector && type->getElementCount() == 2 &&
                 type->getElementType()->getScalarType() ==
                     slang::TypeReflection::ScalarType::UInt32)
+                return true;
+
+            // Check for uint64 (NVIDIA spvBindlessTextureNV descriptor handle)
+            // Note: This also matches device addresses, but getDescriptorHandle() will
+            // fail for those and we'll fall back to the device address path
+            if (kind == slang::TypeReflection::Kind::Scalar &&
+                type->getScalarType() == slang::TypeReflection::ScalarType::UInt64)
                 return true;
         }
 
