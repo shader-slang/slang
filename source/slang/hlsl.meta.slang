@@ -23679,9 +23679,7 @@ struct CoopMat
                 result:$$CoopMat<T, S, M, N, R> = OpConstantComposite $t;
             };
         case cuda:
-            // We have to use *($0) to represent *this, because this method is decorated
-            // as [mutating], so `this` is passed as a pointer.
-            __intrinsic_asm "wmma::fill_fragment(*($0), $1)";
+            __intrinsic_asm "($0)->fill($1)";
         }
     }
 
@@ -23929,14 +23927,9 @@ struct CoopMat
                 OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
             };
         case cuda:
-            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-            {
-                __intrinsic_asm "wmma::store_matrix_sync($0, ($1).data + $2, $3, wmma::row_major)";
-            }
-            else
-            {
-                __intrinsic_asm "wmma::store_matrix_sync($0, ($1).data + $2, $3, wmma::col_major)";
-            }
+            matrixLayout == CoopMatMatrixLayout.RowMajor ?
+                __intrinsic_asm "$0.StoreRowMajor($1, $2, $3)":
+                __intrinsic_asm "$0.StoreColMajor($1, $2, $3)";
         }
     }
 
@@ -23955,14 +23948,9 @@ struct CoopMat
                 OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
             };
         case cuda:
-            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-            {
-                __intrinsic_asm "wmma::store_matrix_sync($0, ($1), $2, wmma::row_major)";
-            }
-            else
-            {
-                __intrinsic_asm "wmma::store_matrix_sync($0, ($1), $2, wmma::col_major)";
-            }
+            matrixLayout == CoopMatMatrixLayout.RowMajor ?
+                __intrinsic_asm "$0.StoreRowMajor($1, $2, $3)":
+                __intrinsic_asm "$0.StoreColMajor($1, $2, $3)";
         }
     }
 
@@ -24000,14 +23988,9 @@ struct CoopMat
                 OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
             };
         case cuda:
-            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-            {
-                __intrinsic_asm "wmma::store_matrix_sync($0, ($1) + $2, $3, wmma::row_major)";
-            }
-            else
-            {
-                __intrinsic_asm "wmma::store_matrix_sync($0, ($1) + $2, $3, wmma::col_major)";
-            }
+            matrixLayout == CoopMatMatrixLayout.RowMajor ?
+                __intrinsic_asm "$0.StoreRowMajor($1, $2, $3)":
+                __intrinsic_asm "$0.StoreColMajor($1, $2, $3)";
         }
     }
 
