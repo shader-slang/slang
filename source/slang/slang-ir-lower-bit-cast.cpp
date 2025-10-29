@@ -273,7 +273,7 @@ struct BitCastLoweringContext
                 fromPtrType->getAddressSpace() == toPtrType->getAddressSpace())
                 return;
         }
-        else if (as<IRPointerLikeType>(fromType) || as<IRPointerLikeType>(toType))
+        if (as<IRPointerLikeType>(fromType) || as<IRPointerLikeType>(toType))
         {
             return;
         }
