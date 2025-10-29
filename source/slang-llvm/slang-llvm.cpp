@@ -427,6 +427,9 @@ static uint64_t __stdcall _aulldiv(uint64_t a, uint64_t b)
     x(F64_sinh, sinh, double, (double)) \
     x(F64_cosh, cosh, double, (double)) \
     x(F64_tanh, tanh, double, (double)) \
+    x(F64_asinh, asinh, double, (double)) \
+    x(F64_acosh, acosh, double, (double)) \
+    x(F64_atanh, atanh, double, (double)) \
     x(F64_log2, log2, double, (double)) \
     x(F64_log, log, double, (double)) \
     x(F64_log10, log10, double, (double)) \
@@ -462,6 +465,9 @@ static uint64_t __stdcall _aulldiv(uint64_t a, uint64_t b)
     x(F32_sinh, sinhf, float, (float)) \
     x(F32_cosh, coshf, float, (float)) \
     x(F32_tanh, tanhf, float, (float)) \
+    x(F32_asinh, asinhf, float, (float)) \
+    x(F32_acosh, acoshf, float, (float)) \
+    x(F32_atanh, atanhf, float, (float)) \
     x(F32_log2, log2f, float, (float)) \
     x(F32_log, logf, float, (float)) \
     x(F32_log10, log10f, float, (float)) \
