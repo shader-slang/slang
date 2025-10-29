@@ -2,12 +2,12 @@
 
 struct AtomicCounter
 {
-      Atomic<uint> sharedNumber;
-      property uint value { get { return sharedNumber.load(); } }
+    Atomic<uint> sharedNumber;
+    property uint value { [constref] get { return sharedNumber.load(); } }
 }
 
 //TEST_INPUT: set gBuffer = ubuffer(data=[10 0 0 0], stride=4)
-StructuredBuffer<AtomicCounter> gBuffer;
+RWStructuredBuffer<AtomicCounter> gBuffer;
 
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 RWStructuredBuffer<uint> outputBuffer;
