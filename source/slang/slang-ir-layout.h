@@ -147,15 +147,4 @@ Result getStd430Offset(
     IRStructField* field,
     IRIntegerValue* outOffset);
 
-/// Compute (if necessary) and return the C size and alignment of `type`.
-///
-/// This operation may fail if `type` is not one that can be stored in
-/// general-purpose memory for the current target. In that case the
-/// type is considered to have no C layout.
-///
-Result getCSizeAndAlignment(
-    CompilerOptionSet& optionSet,
-    IRType* type,
-    IRSizeAndAlignment* outSizeAndAlignment);
-
 } // namespace Slang
