@@ -3744,7 +3744,7 @@ struct Atomic<T : IAtomicable>
 {
     /// Atomically load the stored `T` value
     __intrinsic_op($(kIROp_AtomicLoad))
-    [__ref] T load(MemoryOrder order = MemoryOrder.Relaxed);
+    [constref] T load(MemoryOrder order = MemoryOrder.Relaxed);
 
     /// Atomically store a new `T` value
     __intrinsic_op($(kIROp_AtomicStore))
