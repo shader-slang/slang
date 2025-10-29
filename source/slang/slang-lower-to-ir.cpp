@@ -10,6 +10,7 @@
 #include "slang-ir-bit-field-accessors.h"
 #include "slang-ir-check-differentiability.h"
 #include "slang-ir-check-recursion.h"
+#include "slang-ir-check-specialize-generic-with-existential.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-constexpr.h"
 #include "slang-ir-dce.h"
@@ -12472,6 +12473,15 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         checkAutoDiffUsages(module, compileRequest->getSink());
 
         checkForOperatorShiftOverflow(module, linkage->m_optionSet, compileRequest->getSink());
+
+        if (translationUnit->getModuleDecl()->languageVersion >=
+            SlangLanguageVersion::SLANG_LANGUAGE_VERSION_2025)
+        {
+            // We do not allow specializing a generic function with an existential type.
+            checkForIllegalGenericSpecializationWithExistentialType(
+                module,
+                compileRequest->getSink());
+        }
     }
 
     // The "mandatory" optimization passes may make use of the
