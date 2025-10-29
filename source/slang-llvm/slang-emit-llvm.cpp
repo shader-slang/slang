@@ -1392,7 +1392,10 @@ struct LLVMEmitter
     // Used to add code in in front of return in a function. If it returns
     // nullptr, the LLVM return instruction is generated "normally". Otherwise,
     // it's expected that you generated it in this function.
-    using FuncEpilogueCallback = Func<llvm::Value*, IRReturn*>;
+    //
+    // This uses std::function instead of Slang::Func, because Slang::Func
+    // requires RTTI which sadly is not available when linking to LLVM.
+    using FuncEpilogueCallback = std::function<llvm::Value*(IRReturn*)>;
 
     LLVMEmitter(CodeGenContext* codeGenContext, bool useJIT = false)
         : codeGenContext(codeGenContext)
@@ -3444,8 +3447,8 @@ struct LLVMEmitter
 
                 std::filesystem::path path(std::string(filename.begin(), filename.getLength()));
                 sourceDebugInfo[inst] = llvmDebugBuilder->createFile(
-                    path.filename().c_str(),
-                    path.parent_path().c_str(),
+                    path.filename().string().c_str(),
+                    path.parent_path().string().c_str(),
                     std::nullopt,
                     getStringLitAsLLVMString(debugSource->getSource()));
             }

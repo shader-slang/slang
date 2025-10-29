@@ -732,7 +732,7 @@ struct LLVMLayoutRules : IRTypeLayoutRules
         IRIntegerValue alignment = element.alignment;
         while (alignment < element.size * count)
             alignment *= 2;
-        return IRSizeAndAlignment(element.size * count, alignment);
+        return IRSizeAndAlignment(element.size * count, (int)alignment);
     }
 };
 
