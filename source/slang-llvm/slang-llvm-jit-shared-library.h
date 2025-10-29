@@ -1,6 +1,7 @@
+#include "slang-com-helper.h"
+
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
 
-#include "slang-com-helper.h"
 #include <core/slang-com-object.h>
 
 namespace slang_llvm
