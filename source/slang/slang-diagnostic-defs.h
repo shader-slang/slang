@@ -851,6 +851,12 @@ DIAGNOSTIC(
     cannotTakeConstantPointers,
     "Not allowed to take the address of an immutable object")
 DIAGNOSTIC(
+    33180,
+    Error,
+    cannotSpecializeGenericWithExistential,
+    "specializing '$0' with an existential type is not allowed. All generic arguments "
+    "must be statically resolvable at compile time.")
+DIAGNOSTIC(
     30100,
     Error,
     staticRefToNonStaticMember,
