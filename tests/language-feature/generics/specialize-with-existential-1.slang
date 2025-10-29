@@ -1,6 +1,9 @@
 //TEST:SIMPLE(filecheck=CHECK):
 
 // Check that we allow buffers of existential types to be used in Slang 2025.
+// This file contains many specializations of builtin generic types with existential types,
+// which we still allow, despite disallowing specializing user-defined generics with
+// existential types.
 
 #language slang 2025
 
