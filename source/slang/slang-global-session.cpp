@@ -104,6 +104,7 @@ void Session::init()
     glslLanguageScope->nextSibling = slangLanguageScope;
 
     glslModuleName = getNameObj("glsl");
+    neuralModuleName = getNameObj("neural");
 
     {
         for (Index i = 0; i < Index(SourceLanguage::CountOf); ++i)

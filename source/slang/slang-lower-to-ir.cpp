@@ -12236,6 +12236,10 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     context->includeDebugInfo =
         compileRequest->getLinkage()->m_optionSet.getDebugInfoLevel() != DebugInfoLevel::None;
 
+    if (translationUnit->getModuleDecl()->findModifier<ExperimentalModuleAttribute>())
+    {
+        builder->addDecoration(module->getModuleInst(), kIROp_ExperimentalModuleDecoration);
+    }
     // We need to emit IR for all public/exported symbols
     // in the translation unit.
     //

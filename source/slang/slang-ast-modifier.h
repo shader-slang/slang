@@ -2116,4 +2116,10 @@ public:
     List<Modifier*> getModifiers() { return memoryModifiers; }
 };
 
+FIDDLE()
+class ExperimentalModuleAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
 } // namespace Slang

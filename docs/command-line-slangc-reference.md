@@ -820,6 +820,11 @@ Enable experimental dynamic dispatch features
 Embed downstream IR into emitted slang IR 
 
 
+<a id="experimental-feature"></a>
+### -experimental-feature
+Enable experimental features (loading builtin neural module) 
+
+
 
 <a id="Internal"></a>
 ## Internal
