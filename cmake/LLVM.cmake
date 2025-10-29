@@ -82,7 +82,7 @@ function(fetch_or_build_slang_llvm)
             REQUIRES slang
         )
 
-        llvm_config(slang-llvm ${LLVM_LINK_TYPE} core support filecheck native orcjit codegen mc mcparser)
+        llvm_config(slang-llvm ${LLVM_LINK_TYPE} ${LLVM_TARGETS_TO_BUILD} core support filecheck orcjit codegen mc mcparser)
 
         # If we don't include this, then the symbols in the LLVM linked here may
         # conflict with those of other LLVMs linked at runtime, for instance in mesa.
