@@ -986,13 +986,13 @@ matrix<T,N,M> operator?:(matrix<bool,N,M> condition, matrix<T,N,M> ifTrue, matri
     return select(condition, ifTrue, ifFalse);
 }
 
-[ForceInline]
+[__unsafeForceInlineEarly]
 __generic<T> Optional<T> select(bool condition, __none_t ifTrue, T ifFalse)
 {
     return select(condition, Optional<T>(none), Optional<T>(ifFalse));
 }
 
-[ForceInline]
+[__unsafeForceInlineEarly]
 __generic<T> Optional<T> select(bool condition, T ifTrue, __none_t ifFalse)
 {
     return select(condition, Optional<T>(ifTrue), Optional<T>(none));
