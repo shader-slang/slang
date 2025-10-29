@@ -2145,7 +2145,8 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             // This ensures that calls in the initializer (like `dot`) get properly marked
             // with TreatAsDifferentiableExpr, which is needed for the IR lowering to add
             // the differentiableCallDecoration
-            if (auto parentFunc = getParentFunc(varDecl))
+            auto parentFunc = getParentFunc(varDecl);
+            if (parentFunc && parentFunc->findModifier<DifferentiableAttribute>())
                 contextToUse = contextToUse.withParentFunc(parentFunc);
 
             SemanticsVisitor subVisitor(contextToUse);
