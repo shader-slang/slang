@@ -2139,7 +2139,7 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         else
         {
             SemanticsContext contextToUse = withDeclToExcludeFromLookup(varDecl);
-            
+
             // If the parent function is differentiable, use withParentFunc to ensure
             // the differentiable context is preserved.
             // This ensures that calls in the initializer (like `dot`) get properly marked
