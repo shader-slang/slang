@@ -301,6 +301,12 @@ DIAGNOSTIC(96, Error, kindNotLinkable, "not a known linkable kind '$0'")
 DIAGNOSTIC(97, Error, libraryDoesNotExist, "library '$0' does not exist")
 DIAGNOSTIC(98, Error, cannotAccessAsBlob, "cannot access as a blob")
 DIAGNOSTIC(99, Error, unknownDebugOption, "unknown debug option, known options are ($0)")
+DIAGNOSTIC(
+    104,
+    Error,
+    needToEnableExperimentFeature,
+    "'$0' is an experimental module, need to enable"
+    "'-experimental-feature' to load this module")
 
 //
 // 001xx - Downstream Compilers
@@ -1240,11 +1246,20 @@ DIAGNOSTIC(
     subTypeHasSubsetOfAbstractAtomsToSuperType,
     "subtype '$0' must have the same target/stage support as the supertype; '$0' is missing '$1'")
 DIAGNOSTIC(
-    36118,
+    36119,
     Error,
     requirmentHasSubsetOfAbstractAtomsToImplementation,
     "requirement '$0' must have the same target/stage support as the implementation; '$0' is "
     "missing '$1'")
+
+DIAGNOSTIC(
+    36120,
+    Error,
+    targetSwitchCapCasesConflict,
+    "the capability for case '$0' is '$1', which is conflicts with previous case which requires "
+    "'$2'."
+    "In target_switch, if two cases are belong to the same target, then one capability set has to "
+    "be a subset of the other.")
 
 // Attributes
 DIAGNOSTIC(31000, Warning, unknownAttributeName, "unknown attribute '$0'")
