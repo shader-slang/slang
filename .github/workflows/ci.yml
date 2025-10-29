@@ -57,7 +57,7 @@ jobs:
 
   build-linux-release-gcc-x86_64:
     needs: [filter]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false  # Temporarily disabled - focusing on debug only
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: linux
@@ -68,7 +68,7 @@ jobs:
 
   build-linux-release-gcc-wasm:
     needs: [filter]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false  # Temporarily disabled - focusing on debug only
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: linux
@@ -80,7 +80,7 @@ jobs:
   # macOS builds
   build-macos-debug-clang-aarch64:
     needs: [filter]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false  # Temporarily disabled for Linux parallelism testing
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: macos
@@ -91,7 +91,7 @@ jobs:
 
   build-macos-release-clang-aarch64:
     needs: [filter]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false  # Temporarily disabled for Linux parallelism testing
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: macos
@@ -103,7 +103,7 @@ jobs:
   # Windows builds (self-hosted)
   build-windows-debug-cl-x86_64-gpu:
     needs: [filter]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false  # Temporarily disabled for Linux parallelism testing
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: windows
@@ -114,7 +114,7 @@ jobs:
 
   build-windows-release-cl-x86_64-gpu:
     needs: [filter]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false  # Temporarily disabled for Linux parallelism testing
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: windows
@@ -127,6 +127,10 @@ jobs:
   test-linux-debug-gcc-x86_64:
     needs: [filter, build-linux-debug-gcc-x86_64]
     if: needs.filter.outputs.should-run == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        iteration: [1, 2, 3, 4, 5]  # Run 5 times to catch intermittent failures
     uses: ./.github/workflows/ci-slang-test.yml
     with:
       os: linux
@@ -135,11 +139,15 @@ jobs:
       config: debug
       runs-on: '["ubuntu-22.04"]'
       test-category: smoke
-      server-count: 1
+      server-count: 8
 
   test-linux-release-gcc-x86_64:
     needs: [filter, build-linux-release-gcc-x86_64]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false  # Temporarily disabled - focusing on debug only
+    strategy:
+      fail-fast: false
+      matrix:
+        iteration: [1, 2, 3, 4, 5]  # Run 5 times to catch intermittent failures
     uses: ./.github/workflows/ci-slang-test.yml
     with:
       os: linux
@@ -148,12 +156,12 @@ jobs:
       config: release
       runs-on: '["ubuntu-22.04"]'
       test-category: full
-      server-count: 1
+      server-count: 8
 
   # macOS tests
   test-macos-debug-clang-aarch64:
     needs: [filter, build-macos-debug-clang-aarch64]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false  # Temporarily disabled for Linux parallelism testing
     uses: ./.github/workflows/ci-slang-test.yml
     with:
       os: macos
@@ -166,7 +174,7 @@ jobs:
 
   test-macos-release-clang-aarch64:
     needs: [filter, build-macos-release-clang-aarch64]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false  # Temporarily disabled for Linux parallelism testing
     uses: ./.github/workflows/ci-slang-test.yml
     with:
       os: macos
@@ -181,7 +189,7 @@ jobs:
   # Windows GPU tests (self-hosted)
   test-windows-debug-cl-x86_64-gpu:
     needs: [filter, build-windows-debug-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false  # Temporarily disabled for Linux parallelism testing
     uses: ./.github/workflows/ci-slang-test.yml
     with:
       os: windows
@@ -194,7 +202,7 @@ jobs:
 
   test-windows-release-cl-x86_64-gpu:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false  # Temporarily disabled for Linux parallelism testing
     uses: ./.github/workflows/ci-slang-test.yml
     with:
       os: windows

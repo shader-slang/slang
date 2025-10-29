@@ -15,6 +15,7 @@ concurrency:
 
 jobs:
   build:
+    if: false  # Temporarily disabled for Linux parallelism testing
     runs-on: [Windows, self-hosted]
     steps:
       - uses: actions/checkout@v4
