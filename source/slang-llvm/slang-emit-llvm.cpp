@@ -779,7 +779,7 @@ public:
                 return builder->CreateAlignedStore(
                     expanded,
                     llvmPtr,
-                    llvm::MaybeAlign(sizeAlignment.alignment),
+                    llvm::MaybeAlign(1),
                     isVolatile);
             }
             break;
@@ -793,9 +793,9 @@ public:
                 // Equal memory layout, so we can just memcpy.
                 return builder->CreateMemCpyInline(
                     llvmPtr,
-                    llvm::MaybeAlign(sizeAlignment.alignment),
+                    llvm::MaybeAlign(1),
                     llvmVal,
-                    llvm::MaybeAlign(sizeAlignment.alignment),
+                    llvm::MaybeAlign(1),
                     builder->getInt32(sizeAlignment.size),
                     isVolatile);
             }
@@ -813,7 +813,7 @@ public:
             return builder->CreateAlignedStore(
                 llvmVal,
                 llvmPtr,
-                llvm::MaybeAlign(sizeAlignment.alignment),
+                llvm::MaybeAlign(1),
                 isVolatile);
         }
     }
@@ -838,7 +838,7 @@ public:
                 auto storageBool = builder->CreateAlignedLoad(
                     storageType,
                     llvmPtr,
-                    llvm::MaybeAlign(sizeAlignment.alignment),
+                    llvm::MaybeAlign(1),
                     isVolatile);
 
                 return builder->CreateTrunc(storageBool, llvmType);
@@ -854,9 +854,9 @@ public:
                 // Pointer-to-pointer copy, so generate inline memcpy.
                 builder->CreateMemCpyInline(
                     llvmVar,
-                    llvm::MaybeAlign(sizeAlignment.alignment),
+                    llvm::MaybeAlign(1),
                     llvmPtr,
-                    llvm::MaybeAlign(sizeAlignment.alignment),
+                    llvm::MaybeAlign(1),
                     builder->getInt32(sizeAlignment.size),
                     isVolatile);
                 return llvmVar;
@@ -879,7 +879,7 @@ public:
                 return builder->CreateAlignedLoad(
                     llvmType,
                     llvmPtr,
-                    llvm::MaybeAlign(sizeAlignment.alignment),
+                    llvm::MaybeAlign(1),
                     isVolatile);
             }
         }
@@ -1264,9 +1264,9 @@ private:
             // is safe.
             return builder->CreateMemCpyInline(
                 dstPtr,
-                llvm::MaybeAlign(dstSizeAlignment.alignment),
+                llvm::MaybeAlign(1),
                 srcPtr,
-                llvm::MaybeAlign(srcSizeAlignment.alignment),
+                llvm::MaybeAlign(1),
                 builder->getInt32(minSize),
                 isVolatile);
         }
