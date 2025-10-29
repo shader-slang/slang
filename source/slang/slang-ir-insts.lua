@@ -2291,6 +2291,12 @@ local insts = {
 					min_operands = 3,
 				},
 			},
+			{
+				experimentalModule = {
+					-- Marks a module as an experimental module
+					struct_name = "ExperimentalModuleDecoration"
+				},
+			},
 		},
 	},
 	-- Decoration
