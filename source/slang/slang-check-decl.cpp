@@ -12612,6 +12612,18 @@ void checkDerivativeAttributeImpl(
             visitor->ensureDecl(candidate.declRef, DeclCheckState::TypesFullyResolved);
         }
     }
+    else if (auto overloadedExpr2 = as<OverloadedExpr2>(checkedFuncExpr))
+    {
+        for (auto candidate : overloadedExpr2->candidateExprs)
+        {
+            if (auto candidateDeclRefExpr = as<DeclRefExpr>(candidate))
+            {
+                visitor->ensureDecl(
+                    candidateDeclRefExpr->declRef,
+                    DeclCheckState::TypesFullyResolved);
+            }
+        }
+    }
     else
     {
         visitor->getSink()->diagnose(attr, Diagnostics::cannotResolveDerivativeFunction);
