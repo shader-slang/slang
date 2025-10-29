@@ -267,7 +267,8 @@ struct BitCastLoweringContext
 
             // OpBitcast can handle pointer <-> pointer bitcasts directly,
             // but both pointers must have same storage class
-            if (fromPtrType && toPtrType && fromPtrType->getAddressSpace() == toPtrType->getAddressSpace())
+            if (fromPtrType && toPtrType &&
+                fromPtrType->getAddressSpace() == toPtrType->getAddressSpace())
                 return;
 
             // OpBitcast can handle pointer -> scalar integer bitcasts directly
@@ -310,7 +311,8 @@ struct BitCastLoweringContext
 
             // OpBitcast can handle vector <-> scalar bitcasts directly
             // OpBitcast can also handle vector <-> vector bitcasts directly,
-            // but only if the larger element count is an integer multiple of the smaller element count
+            // but only if the larger element count is an integer multiple of the smaller element
+            // count
             auto fromElementCount = getIRVectorElementSize(fromType);
             auto toElementCount = getIRVectorElementSize(toType);
             if ((fromVectorType || fromBasicType) && (toVectorType || toBasicType) &&
