@@ -445,8 +445,8 @@ struct AssignValsFromLayoutContext
                 // Determine access mode from the shader parameter's resource type
                 auto handleType = dstCursor.getTypeLayout()->getType();
                 auto resourceType = handleType->getElementType();
-                auto resourceAccess =
-                    resourceType ? resourceType->getResourceAccess() : SLANG_RESOURCE_ACCESS_READ_WRITE;
+                auto resourceAccess = resourceType ? resourceType->getResourceAccess()
+                                                   : SLANG_RESOURCE_ACCESS_READ_WRITE;
                 DescriptorHandleAccess access = getDescriptorHandleAccess(resourceAccess);
 
                 // Try to get descriptor handle
