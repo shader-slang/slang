@@ -366,11 +366,19 @@ struct AssignValsFromLayoutContext
                 return true;
 
             // Check for uint64 (NVIDIA spvBindlessTextureNV descriptor handle)
-            // Note: This also matches device addresses, but getDescriptorHandle() will
-            // fail for those and we'll fall back to the device address path
+            // Note: uint64 can also be a device address. We distinguish by checking
+            // if there's an element type - descriptor handles are pointers to resources.
             if (kind == slang::TypeReflection::Kind::Scalar &&
                 type->getScalarType() == slang::TypeReflection::ScalarType::UInt64)
-                return true;
+            {
+                // Only treat as descriptor handle if it has an element type (resource)
+                // Plain uint64 with no element type is a device address
+                auto elementType = type->getElementType();
+                if (elementType &&
+                    (elementType->getKind() == slang::TypeReflection::Kind::Resource ||
+                     elementType->getKind() == slang::TypeReflection::Kind::SamplerState))
+                    return true;
+            }
         }
 
         return false;
@@ -419,7 +427,51 @@ struct AssignValsFromLayoutContext
         // Keep buffer alive in resource context
         resourceContext.resources.add(ComPtr<IResource>(bufferResource.get()));
 
-        // Check if this is a descriptor handle type
+        // Check for device address/pointer FIRST (before descriptor handles)
+        // This ensures plain uint64/pointer types use device addresses, not descriptor handles
+        if ((dstCursor.getTypeLayout()->getType()->getKind() ==
+                 slang::TypeReflection::Kind::Scalar &&
+             dstCursor.getTypeLayout()->getType()->getScalarType() ==
+                 slang::TypeReflection::ScalarType::UInt64) ||
+            dstCursor.getTypeLayout()->getType()->getKind() == slang::TypeReflection::Kind::Pointer)
+        {
+            // Check if this is actually a descriptor handle lowered to uint64
+            // (NVIDIA spvBindlessTextureNV path)
+            if (isDescriptorHandleType(dstCursor))
+            {
+                // Try to allocate descriptor handle for bindless access
+                DescriptorHandle handle;
+
+                // Determine access mode from the shader parameter's resource type
+                auto handleType = dstCursor.getTypeLayout()->getType();
+                auto resourceType = handleType->getElementType();
+                auto resourceAccess =
+                    resourceType ? resourceType->getResourceAccess() : SLANG_RESOURCE_ACCESS_READ_WRITE;
+                DescriptorHandleAccess access = getDescriptorHandleAccess(resourceAccess);
+
+                // Try to get descriptor handle
+                auto result = bufferResource->getDescriptorHandle(
+                    access,
+                    srcBuffer.format,
+                    BufferRange{0, bufferSize},
+                    &handle);
+
+                if (SLANG_SUCCEEDED(result))
+                {
+                    SLANG_RETURN_ON_FAIL(dstCursor.setDescriptorHandle(handle));
+                    maybeAddOutput(dstCursor, srcVal, bufferResource);
+                    return SLANG_OK;
+                }
+            }
+
+            // Regular device address/pointer (not a descriptor handle)
+            uint64_t addr = bufferResource->getDeviceAddress();
+            dstCursor.setData(&addr, sizeof(addr));
+            maybeAddOutput(dstCursor, srcVal, bufferResource);
+            return SLANG_OK;
+        }
+
+        // Check if this is a uint2 descriptor handle (standard SPIRV path)
         if (isDescriptorHandleType(dstCursor))
         {
             // Try to allocate descriptor handle for bindless access
@@ -446,20 +498,6 @@ struct AssignValsFromLayoutContext
                 return SLANG_OK;
             }
             // If getDescriptorHandle fails, fall through to regular binding
-        }
-
-        if ((dstCursor.getTypeLayout()->getType()->getKind() ==
-                 slang::TypeReflection::Kind::Scalar &&
-             dstCursor.getTypeLayout()->getType()->getScalarType() ==
-                 slang::TypeReflection::ScalarType::UInt64) ||
-            dstCursor.getTypeLayout()->getType()->getKind() == slang::TypeReflection::Kind::Pointer)
-        {
-            // dstCursor is pointer to an ordinary uniform data field,
-            // we should write bufferResource as a pointer.
-            uint64_t addr = bufferResource->getDeviceAddress();
-            dstCursor.setData(&addr, sizeof(addr));
-            maybeAddOutput(dstCursor, srcVal, bufferResource);
-            return SLANG_OK;
         }
 
         ComPtr<IBuffer> counterResource;
