@@ -5,10 +5,10 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -output-using-type -shaderobj -render-feature hardware-device
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj -render-feature double
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj
-// TODO: No clue why this test causes intermittent crashes. I've inspected the
-// resulting LLVM IR carefully several times and it seems straightforward and
-// completely innocuous.
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-llvm -compute -output-using-type -shaderobj
+// Normally, this test crashes intermittently due to requiring 32-byte alignment and
+// Slang-rhi just allocates buffers with malloc (16-byte alignment on most platforms).
+// Forcing the scalar layout gets rid of this alignment requirement.
+//TEST(compute):COMPARE_COMPUTE_EX:-llvm -compute -output-using-type -shaderobj -Xslang -fvk-use-scalar-layout
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<double4> outputBuffer;
