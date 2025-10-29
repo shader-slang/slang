@@ -1,6 +1,4 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -llvm -compute
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -llvm -Xslang -fvk-use-scalar-layout -compute
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -llvm -Xslang -fvk-use-c-layout -compute
 struct A
 {
     uint64_t f0;

@@ -2185,13 +2185,13 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
         return IRTypeLayoutRuleName::MetalParameterBlock;
     }
     auto targetReq = target->getTargetReq();
-    if (targetReq->getTarget() != CodeGenTarget::WGSL && !isLLVMTarget(targetReq))
+    if (targetReq->getTarget() != CodeGenTarget::WGSL)
     {
-        if (!isKhronosTarget(target->getTargetReq()))
+        if (!isKhronosTarget(target->getTargetReq()) && !isLLVMTarget(targetReq))
             return IRTypeLayoutRuleName::Natural;
 
         // If we are just emitting GLSL, we can just use the general layout rule.
-        if (!target->shouldEmitSPIRVDirectly())
+        if (!target->shouldEmitSPIRVDirectly() && !isLLVMTarget(targetReq))
             return IRTypeLayoutRuleName::Natural;
 
         // If the user specified a C-compatible buffer layout, then do that.
