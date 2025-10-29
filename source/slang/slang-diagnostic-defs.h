@@ -307,6 +307,7 @@ DIAGNOSTIC(
     needToEnableExperimentFeature,
     "'$0' is an experimental module, need to enable"
     "'-experimental-feature' to load this module")
+DIAGNOSTIC(105, Error, nullComponentType, "componentTypes[$0] is `nullptr`")
 
 //
 // 001xx - Downstream Compilers
