@@ -2140,7 +2140,18 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         }
         else
         {
-            SemanticsVisitor subVisitor(withDeclToExcludeFromLookup(varDecl));
+            SemanticsContext contextToUse = withDeclToExcludeFromLookup(varDecl);
+
+            // If the parent function is differentiable, use withParentFunc to ensure
+            // the differentiable context is preserved.
+            // This ensures that calls in the initializer (like `dot`) get properly marked
+            // with TreatAsDifferentiableExpr, which is needed for the IR lowering to add
+            // the differentiableCallDecoration
+            auto parentFunc = getParentFunc(varDecl);
+            if (parentFunc && parentFunc->findModifier<DifferentiableAttribute>())
+                contextToUse = contextToUse.withParentFunc(parentFunc);
+
+            SemanticsVisitor subVisitor(contextToUse);
             initExpr = subVisitor.CheckExpr(initExpr);
 
             // TODO: We might need some additional steps here to ensure
