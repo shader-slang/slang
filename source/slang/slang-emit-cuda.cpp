@@ -1155,24 +1155,11 @@ static UnownedStringSlice getMatrixUseName(int matrixUse)
     switch(matrixUse)
     {
         case 0:
-            return UnownedStringSlice("wmma::matrix_a");
+            return UnownedStringSlice("Slang_CUDA_WMMA::MatrixA");
         case 1:
-            return UnownedStringSlice("wmma::matrix_b");
+            return UnownedStringSlice("Slang_CUDA_WMMA::MatrixB");
         case 2:
-            return UnownedStringSlice("wmma::accumulator");
-        default:
-            return UnownedStringSlice();
-    }
-}
-
-static UnownedStringSlice getMatrixLayoutName(int matrixUse)
-{
-    switch(matrixUse)
-    {
-        case 0:
-            return UnownedStringSlice("wmma::row_major");
-        case 1:
-            return UnownedStringSlice("wmma::col_major");
+            return UnownedStringSlice("Slang_CUDA_WMMA::MatrixC");
         default:
             return UnownedStringSlice();
     }
@@ -1194,7 +1181,9 @@ SlangResult CUDASourceEmitter::emitWMMAFragmentType(IRCoopMatrixType* coopMatTyp
         return SLANG_FAIL;
     }
 
-    // outStr << "CoopMat<" << typeName << ", " << rowCount << ", " << colCount << ", " << getMatrixUseName(matrixUse) << ">";
+    outStr << "Slang_CUDA_WMMA::WmmaFragment<";
+
+    // We need to restrict the size combination be always 8, 16, or 32
     auto roundUpTo32 = [](int x)
     {
         if (x < 8)
@@ -1228,16 +1217,10 @@ SlangResult CUDASourceEmitter::emitWMMAFragmentType(IRCoopMatrixType* coopMatTyp
         return SLANG_FAIL;
     }
 
-    int wmmaFragmentSize[3] = {0, 0, 0};
-    calculateTileSize(matrixUse, roundRowCount, roundColCount, otherDim, wmmaFragmentSize);
-    outStr << "wmma::fragment<"<< getMatrixUseName(matrixUse)<< "," << wmmaFragmentSize[0] << ", " << wmmaFragmentSize[1] << ", " << wmmaFragmentSize[2] << ", " << typeName;
+    int fragmentSize[3] = {0, 0, 0};
+    calculateTileSize(matrixUse, roundRowCount, roundColCount, otherDim, fragmentSize);
+    outStr << typeName << "," << fragmentSize[0] << ", " << fragmentSize[1] << ", " << fragmentSize[2] << ", " << getMatrixUseName(matrixUse) << ">";
 
-    // For non-accumulator fragments, need to specify layout
-    // TODO: This is a design issue, we cannot specify layout for CoopMat, so make it default to row_major for now.
-    if (matrixUse != 2)
-        outStr << ", wmma::row_major";
-
-    outStr << ">";
     return SLANG_OK;
 }
 
