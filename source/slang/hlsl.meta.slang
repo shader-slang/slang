@@ -23927,9 +23927,10 @@ struct CoopMat
                 OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
             };
         case cuda:
-            matrixLayout == CoopMatMatrixLayout.RowMajor ?
-                __intrinsic_asm "$0.StoreRowMajor($1, $2, $3)":
-                __intrinsic_asm "$0.StoreColMajor($1, $2, $3)";
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$0.Store<RowMajor>($1, $2, $3)";
+            else
+                __intrinsic_asm "$0.Store<ColMajor>($1, $2, $3)";
         }
     }
 
@@ -23948,9 +23949,10 @@ struct CoopMat
                 OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
             };
         case cuda:
-            matrixLayout == CoopMatMatrixLayout.RowMajor ?
-                __intrinsic_asm "$0.StoreRowMajor($1, $2, $3)":
-                __intrinsic_asm "$0.StoreColMajor($1, $2, $3)";
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$0.Store<RowMajor>($1, $2, $3)";
+            else
+                __intrinsic_asm "$0.Store<ColMajor>($1, $2, $3)";
         }
     }
 
@@ -23988,9 +23990,10 @@ struct CoopMat
                 OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
             };
         case cuda:
-            matrixLayout == CoopMatMatrixLayout.RowMajor ?
-                __intrinsic_asm "$0.StoreRowMajor($1, $2, $3)":
-                __intrinsic_asm "$0.StoreColMajor($1, $2, $3)";
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$0.Store<RowMajor>($1, $2, $3)";
+            else
+                __intrinsic_asm "$0.Store<ColMajor>($1, $2, $3)";
         }
     }
 
