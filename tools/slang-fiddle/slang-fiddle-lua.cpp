@@ -3,7 +3,7 @@
 
 #define MAKE_LIB 1
 
-#ifdef SLANG_UNIX_FAMILY
+#if SLANG_UNIX_FAMILY
 #define LUA_USE_POSIX
 #endif
 
