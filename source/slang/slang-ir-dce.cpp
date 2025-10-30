@@ -665,6 +665,7 @@ bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions o
 
 bool isWeakReferenceOperand(IRInst* inst, UInt operandIndex)
 {
+    SLANG_UNUSED(operandIndex);
     // There are some type of operands that needs to be treated as
     // "weak" references -- they can never hold things alive, and
     // whenever we delete the referenced value, these operands needs

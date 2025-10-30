@@ -1563,7 +1563,6 @@ struct ExistentialLoweringContext : public InstPassBase
         {
             SLANG_UNEXPECTED("Unexpected type for ExtractExistentialWitnessTable operand");
         }
-        return false;
     }
 
     bool lowerGetValueFromBoundInterface(IRGetValueFromBoundInterface* inst)
@@ -1596,7 +1595,6 @@ struct ExistentialLoweringContext : public InstPassBase
             inst->removeAndDeallocate();
             return true;
         }
-        return true;
     }
 
     bool lowerExtractExistentialValue(IRExtractExistentialValue* inst)
@@ -1622,8 +1620,10 @@ struct ExistentialLoweringContext : public InstPassBase
             inst->removeAndDeallocate();
             return true;
         }
-        SLANG_UNEXPECTED("Unexpected type for ExtractExistentialValue operand");
-        return false;
+        else
+        {
+            SLANG_UNEXPECTED("Unexpected type for ExtractExistentialValue operand");
+        }
     }
 
     bool processGetSequentialIDInst(IRGetSequentialID* inst)
