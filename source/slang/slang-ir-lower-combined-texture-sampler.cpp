@@ -128,6 +128,16 @@ IRTypeLayout* maybeCreateArrayLayout(
     return elementTypeLayout;
 }
 
+IRTextureTypeBase* isCombinedTextureSamplerType(IRInst* typeInst)
+{
+    auto textureType = as<IRTextureTypeBase>(typeInst);
+    if (!textureType)
+        return nullptr;
+    if (!textureType->isCombined())
+        return nullptr;
+    return textureType;
+}
+
 void lowerCombinedTextureSamplers(
     CodeGenContext* codeGenContext,
     IRModule* module,
@@ -138,17 +148,19 @@ void lowerCombinedTextureSamplers(
     LowerCombinedSamplerContext context;
     context.codeGenTarget = codeGenContext->getTargetFormat();
 
+    bool hasCombinedSampler = false;
+
     // Lower combined texture sampler type into a struct type.
     for (auto globalInst : module->getGlobalInsts())
     {
+        if (isCombinedTextureSamplerType(globalInst))
+            hasCombinedSampler = true;
         auto globalParam = as<IRGlobalParam>(globalInst);
         if (!globalParam)
             continue;
         auto elementType = unwrapArray(globalParam->getFullType());
-        auto textureType = as<IRTextureTypeBase>(elementType);
+        auto textureType = isCombinedTextureSamplerType(elementType);
         if (!textureType)
-            continue;
-        if (!textureType->isCombined())
             continue;
         auto layoutDecor = globalParam->findDecoration<IRLayoutDecoration>();
         if (!layoutDecor)
@@ -199,7 +211,7 @@ void lowerCombinedTextureSamplers(
 
     // If no combined texture sampler type exist in the IR module,
     // we can exit now.
-    if (context.mapTypeToLoweredInfo.getCount() == 0)
+    if (!hasCombinedSampler)
         return;
 
     // We need to process all insts in the module, and replace
@@ -220,21 +232,29 @@ void lowerCombinedTextureSamplers(
                 case kIROp_CombinedTextureSamplerGetTexture:
                 case kIROp_CombinedTextureSamplerGetSampler:
                     {
-                        auto combinedSamplerType = inst->getOperand(0)->getDataType();
-                        auto loweredInfo =
-                            context.mapTypeToLoweredInfo.tryGetValue(combinedSamplerType);
-                        if (!loweredInfo)
-                            loweredInfo = context.mapLoweredTypeToLoweredInfo.tryGetValue(
-                                combinedSamplerType);
-                        if (!loweredInfo)
-                            continue;
+                        LoweredCombinedSamplerStructInfo loweredInfo;
+
+                        if (auto combinedSamplerType =
+                                as<IRTextureTypeBase>(inst->getOperand(0)->getDataType()))
+                        {
+                            loweredInfo =
+                                context.lowerCombinedTextureSamplerType(combinedSamplerType);
+                        }
+                        else
+                        {
+                            auto loweredInfoPtr = context.mapLoweredTypeToLoweredInfo.tryGetValue(
+                                inst->getOperand(0)->getDataType());
+                            if (!loweredInfoPtr)
+                                continue;
+                            loweredInfo = *loweredInfoPtr;
+                        }
                         builder.setInsertBefore(inst);
                         auto fieldExtract = builder.emitFieldExtract(
                             inst->getFullType(),
                             inst->getOperand(0),
                             inst->getOp() == kIROp_CombinedTextureSamplerGetSampler
-                                ? loweredInfo->sampler
-                                : loweredInfo->texture);
+                                ? loweredInfo.sampler
+                                : loweredInfo.texture);
                         inst->replaceUsesWith(fieldExtract);
                         inst->removeAndDeallocate();
                     }
