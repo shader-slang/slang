@@ -5053,31 +5053,238 @@ __forceinline__ __device__ VecTOut slangOptixCoopVecMatMul(
 
 #endif // SLANG_CUDA_ENABLE_OPTIX
 
-template<typename T, int M, int N, int R>
-struct CoopMat
+namespace Slang_cuda_wmma_impelemmentation
 {
-    void StoreRowMajor(RWStructuredBuffer<T> buffer, uint element, uint stride)
-    {
-        Store<0>(buffer, element, stride)
-    }
-    void StoreColMajor(RWStructuredBuffer<T> buffer, uint element, uint stride)
-    {
-        Store<1>(buffer, element, stride)
+// The reason we have to implement our own wmma operation on CUDA is the interface
+// design of cooperative_matrix on Vulkan is quite different from CUDA WMMA API, where
+// SPIRV spec doesn't require the matrix layout during declaration of the cooperative_matrix,
+// instead it is only required during load/store operations. However, in CUDA WMMA API, the layout
+// has to be specified during the declaration of the fragment itself. Slang's interface desgin
+// is more similar to SPIRV's cooperative_matrix. So to bridge this gap, we have to implement our
+// wmma operation by using PTX wmma instructions directly, because PTX wmma instructions is quite
+// similar to SPIRV's cooperative_matrix spec.
+
+// Helper macros for PTX instruction generation
+// Unified load macro - matrix can be 'a', 'b', or 'c'; layout can be 'row' or 'col'
+// matrix : 'a', 'b', 'c'
+// layout: row, col
+// shape: m16n16k16, m8n32k16, m32n8k16
+// type: f16, f32, s8, u8, s32, u32
+#define WMMA_LOAD_PTX(matrix, layout, shape, type) \
+    "wmma.load." #matrix ".sync.aligned." #layout "." #shape "." #type " "
+
+#define WMMA_STORE_PTX(layout, shape, type) \
+    "wmma.store.d.sync.aligned." #layout "." #shape "." #type " "
+
+#define WMMA_MMA_PTX(alayout, blayout, shape, dtype, ctype) \
+    "wmma.mma.sync.aligned." #alayout "." #blayout "." #shape "." #dtype "." #ctype " "
+
+// Helper struct for load/store operations - can be partially specialized
+// Handles loading A, B, C matrices and storing D matrix
+template<typename DataType, MatrixUse matrixUse, ShapeCombination shape>
+struct LoadStoreHelper;
+
+// Macro to generate the entire load_ab implementation with if constexpr
+// This handles both MatrixA and MatrixB cases in a single macro call
+// matrixUse: template parameter indicating which matrix (A or B)
+// shape: m16n16k16, m8n32k16, m32n8k16
+// dtype: f16, f32
+#define WMMA_LOAD_AB_IMPL(matrixUse, shape, dtype) \
+    if constexpr (matrixUse == MatrixUse::MatrixA) { \
+        asm volatile( \
+            WMMA_LOAD_PTX(a, row, shape, dtype) \
+            "{%0, %1, %2, %3, %4, %5, %6, %7}, [%8], %9;\n" \
+            : "=r"(regs[0]), "=r"(regs[1]), "=r"(regs[2]), "=r"(regs[3]), \
+              "=r"(regs[4]), "=r"(regs[5]), "=r"(regs[6]), "=r"(regs[7]) \
+            : "l"(source), "r"(stride) \
+        ); \
+    } else { \
+        asm volatile( \
+            WMMA_LOAD_PTX(b, row, shape, dtype) \
+            "{%0, %1, %2, %3, %4, %5, %6, %7}, [%8], %9;\n" \
+            : "=r"(regs[0]), "=r"(regs[1]), "=r"(regs[2]), "=r"(regs[3]), \
+              "=r"(regs[4]), "=r"(regs[5]), "=r"(regs[6]), "=r"(regs[7]) \
+            : "l"(source), "r"(stride) \
+        ); \
     }
 
-    // Since we decide to use wmma ptx instructions and there is no `fill` instruction in PTX,
+// Macro for loading C matrix (accumulator) - half uses 4 regs, float uses 8 regs
+#define WMMA_LOAD_C_IMPL_f16(shape, type) \
+    asm volatile( \
+        WMMA_LOAD_PTX(c, row, shape, type) \
+        "{%0, %1, %2, %3}, [%4], %5;\n" \
+        : "=r"(regs[0]), "=r"(regs[1]), "=r"(regs[2]), "=r"(regs[3]) \
+        : "l"(source), "r"(stride) \
+    );
+
+#define WMMA_LOAD_C_IMPL_f32(shape, type) \
+    asm volatile( \
+        WMMA_LOAD_PTX(c, row, shape, type) \
+        "{%0, %1, %2, %3, %4, %5, %6, %7}, [%8], %9;\n" \
+        : "=r"(regs[0]), "=r"(regs[1]), "=r"(regs[2]), "=r"(regs[3]), \
+          "=r"(regs[4]), "=r"(regs[5]), "=r"(regs[6]), "=r"(regs[7]) \
+        : "l"(source), "r"(stride) \
+    );
+
+// Macro for storing D matrix - half uses 4 regs, float uses 8 regs
+#define WMMA_STORE_IMPL_f16(shape) \
+    asm volatile( \
+        WMMA_STORE_PTX(row, shape, f16) \
+        "[%0], {%1, %2, %3, %4}, %5;\n" \
+        : \
+        : "l"(dest), "r"(regs[0]), "r"(regs[1]), "r"(regs[2]), "r"(regs[3]), "r"(stride) \
+    );
+
+#define WMMA_STORE_IMPL_f32(shape) \
+    asm volatile( \
+        WMMA_STORE_PTX(row, shape, f32) \
+        "[%0], {%1, %2, %3, %4, %5, %6, %7, %8}, %9;\n" \
+        : \
+        : "l"(dest), "r"(regs[0]), "r"(regs[1]), "r"(regs[2]), "r"(regs[3]), \
+          "r"(regs[4]), "r"(regs[5]), "r"(regs[6]), "r"(regs[7]), "r"(stride) \
+    );
+
+#define LOAD_IMPL(matrixUse, shape, type) \
+    if constexpr (matrixUse == MatrixUse::MatrixC) { \
+        WMMA_LOAD_C_IMPL_##type(shape, type); \
+    } else { \
+        WMMA_LOAD_AB_IMPL(matrixUse, shape, type); \
+    } \
+
+// Enums for template specialization
+enum class MatrixUse : int {
+    MatrixA = 0,
+    MatrixB = 1,
+    MatrixC = 2,
+};
+
+enum class ShapeCombination : int {
+    m16n16k16 = 0,
+    m8n32k16 = 1,
+    m32n8k16 = 2
+};
+
+// half, m16n16k16 (handles MatrixA, MatrixB, MatrixC, MatrixD)
+template<MatrixUse matrixUse>
+struct LoadStoreHelper<half, matrixUse, ShapeCombination::m16n16k16> {
+    static __device__ void load(unsigned* regs, const half* source, int stride) {
+        LOAD_IMPL(matrixUse, m16n16k16, f16)
+    }
+
+    static __device__ void store(unsigned* regs, half* dest, int stride) {
+        WMMA_STORE_IMPL_f16(m16n16k16)
+    }
+};
+
+// half, m8n32k16 (handles MatrixA, MatrixB, MatrixC, MatrixD)
+template<MatrixUse matrixUse>
+struct LoadStoreHelper<half, matrixUse, ShapeCombination::m8n32k16> {
+    static __device__ void load(unsigned* regs, const half* source, int stride) {
+        LOAD_IMPL(matrixUse, m8n32k16, f16)
+    }
+
+    static __device__ void store(unsigned* regs, half* dest, int stride) {
+        WMMA_STORE_IMPL_f16(m8n32k16)
+    }
+};
+
+// half, m32n8k16 (handles MatrixA, MatrixB, MatrixC, MatrixD)
+template<MatrixUse matrixUse>
+struct LoadStoreHelper<half, matrixUse, ShapeCombination::m32n8k16> {
+    static __device__ void load(unsigned* regs, const half* source, int stride) {
+        LOAD_IMPL(matrixUse, m32n8k16, f16)
+    }
+
+    static __device__ void store(unsigned* regs, half* dest, int stride) {
+        WMMA_STORE_IMPL_f16(m32n8k16)
+    }
+};
+
+// float, m16n16k16 (handles MatrixA, MatrixB, MatrixC, MatrixD)
+template<MatrixUse matrixUse>
+struct LoadStoreHelper<float, matrixUse, ShapeCombination::m16n16k16> {
+    static __device__ void load(unsigned* regs, const float* source, int stride) {
+        LOAD_IMPL(matrixUse, m16n16k16, f32)
+    }
+
+    static __device__ void store(unsigned* regs, float* dest, int stride) {
+        WMMA_STORE_IMPL_f32(m16n16k16)
+    }
+};
+
+// float, m8n32k16 (handles MatrixA, MatrixB, MatrixC, MatrixD)
+template<MatrixUse matrixUse>
+struct LoadStoreHelper<float, matrixUse, ShapeCombination::m8n32k16> {
+    static __device__ void load(unsigned* regs, const float* source, int stride) {
+        LOAD_IMPL(matrixUse, m8n32k16, f32)
+    }
+
+    static __device__ void store(unsigned* regs, float* dest, int stride) {
+        WMMA_STORE_IMPL_f32(m8n32k16)
+    }
+};
+
+// float, m32n8k16 (handles MatrixA, MatrixB, MatrixC, MatrixD)
+template<MatrixUse matrixUse>
+struct LoadStoreHelper<float, matrixUse, ShapeCombination::m32n8k16> {
+    static __device__ void load(unsigned* regs, const float* source, int stride) {
+        LOAD_IMPL(matrixUse, m32n8k16, f32)
+    }
+
+    static __device__ void store(unsigned* regs, float* dest, int stride) {
+        WMMA_STORE_IMPL_f32(m32n8k16)
+    }
+};
+// The dimensions of the fragment are specified by M, N, K which are totally determined during
+// compile time, so slang already did the pre-filter on the shape & type combination.
+template<typename T, int M, int N, int K>
+struct WmmaFragment
+{
+    enum MatrixLayout : int
+    {
+        RowMajor = 0,
+        ColMajor = 1
+    };
+
+    template<MatrixLayout layout>
+    void Store(RWStructuredBuffer<T> buffer, uint element, uint stride)
+    {
+    }
+
+    template<MatrixLayout layout>
+    void Load(RWStructuredBuffer<T> buffer, uint element, uint stride)
+    {
+    }
+
+    // There is no fill intrinsic in PTX wmma, so it's just 'move' value
+    // to the fragment registers.
     void fill(T t)
     {
-        m_filled = true;
-        m_fillValue = t;
+        unsigned packed;
+
+        if constexpr (std::is_same_v<T, half>) {
+            // Pack two half values into one 32-bit register
+            packed = __half_as_ushort(value) | (__half_as_ushort(value) << 16);
+        } else if constexpr (std::is_same_v<T, float>) {
+            // For float, each register holds one value
+            packed = __float_as_uint(value);
+        }
+
+        // Manually assign to prevent register coalescing
+        regs[0] = packed;
+        regs[1] = packed;
+        regs[2] = packed;
+        regs[3] = packed;
+        regs[4] = packed;
+        regs[5] = packed;
+        regs[6] = packed;
+        regs[7] = packed;
     }
 
 private:
-    template<int matrixLayout>
-    void Store(RWStructuredBuffer<T> buffer, uint element, uint stride)
-    {
+    // Maximum registers needed across all fragment types and data types
+    static constexpr int MAX_REGS = 8;
+    unsigned regs[MAX_REGS];
+};
 
-    }
-    T m_fillValue;
-    bool m_filled = false;
-}
+} // namespace Slang_cuda_wmma_impelemmentation
