@@ -2153,6 +2153,7 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 
             SemanticsVisitor subVisitor(contextToUse);
             initExpr = subVisitor.CheckExpr(initExpr);
+            initExpr = maybeOpenRef(initExpr);
 
             // TODO: We might need some additional steps here to ensure
             // that the type of the expression is one we are okay with
