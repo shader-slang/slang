@@ -3520,8 +3520,9 @@ void SemanticsDeclHeaderVisitor::checkGenericTypeEqualityConstraintSubType(
         Decl* supAncestor = as<DeclRefType>(decl->sup.type)->getDeclRef().getDecl();
         if (subAncestor == supAncestor)
         {
-            // If both side resolve to the same decl, there is no need to compare decl order, because
-            // we cannot decide the order. Instead we will just compare the DeclRefType itself.
+            // If both side resolve to the same decl, there is no need to compare decl order,
+            // because we cannot decide the order. Instead we will just compare the DeclRefType
+            // itself.
             return compareVals(*decl->sub.type, *decl->sup.type);
         }
 
