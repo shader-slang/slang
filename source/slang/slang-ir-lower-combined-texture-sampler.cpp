@@ -295,7 +295,6 @@ void lowerCombinedTextureSamplers(
 
                 case kIROp_MakeCombinedTextureSamplerFromHandle:
                     {
-                        auto combinedSamplerType = inst->getDataType();
                         auto loweredInfo = context.getLoweredTypeInfo(inst->getDataType());
                         if (!loweredInfo)
                             continue;
