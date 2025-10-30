@@ -1422,7 +1422,9 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf1DLayeredwrite_convert(
     int layer,
     cudaSurfaceBoundaryMode boundaryMode)
 {
-    static_assert(false, "CUDA doesn't support formatted surface writes on 1D array surfaces");
+    // TODO: static_assert(false) can fail on some compilers, even if template is not instantiated.
+    // We should check for this in hlsl.meta.slang instead.
+    // static_assert(false, "CUDA doesn't support formatted surface writes on 1D array surfaces");
 }
 
 // surf2Dwrite_convert
@@ -1502,7 +1504,9 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2DLayeredwrite_convert(
     int layer,
     cudaSurfaceBoundaryMode boundaryMode)
 {
-    static_assert(false, "CUDA doesn't support formatted surface writes on 2D array surfaces");
+    // TODO: static_assert(false) can fail on some compilers, even if template is not instantiated.
+    // We should check for this in hlsl.meta.slang instead.
+    // static_assert(false, "CUDA doesn't support formatted surface writes on 2D array surfaces");
 }
 
 // surf3Dwrite_convert
@@ -4648,7 +4652,9 @@ struct TensorView
 template<typename T>
 SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex1Dfetch_int(CUtexObject texObj, int x, int mip)
 {
-    static_assert(false, "CUDA does not support fetching from 1D textures");
+    // TODO: static_assert(false) can fail on some compilers, even if template is not instantiated.
+    // We should check for this in hlsl.meta.slang instead.
+    // static_assert(false, "CUDA does not support fetching from 1D textures");
 }
 
 #if 0
