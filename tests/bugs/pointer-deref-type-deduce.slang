@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -output-using-type
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -output-using-type -emit-spirv-directly
 
 //TEST_INPUT: set ptr = ubuffer(data=[42], stride=4)
 uniform int* ptr;
