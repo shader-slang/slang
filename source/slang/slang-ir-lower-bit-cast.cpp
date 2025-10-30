@@ -260,7 +260,8 @@ struct BitCastLoweringContext
         }
 
         // Skip lowering bitcasts that can be directly handled by SPIR-V OpBitcast
-        // The SPIR-V spec requires that OpBitcast's operand and result have the same size and different types
+        // The SPIR-V spec requires that OpBitcast's operand and result have the same size and
+        // different types
         if (isDirectSpirv && fromTypeSize.size == toTypeSize.size)
         {
             auto fromPtrType = as<IRPtrTypeBase>(fromType);
@@ -274,14 +275,14 @@ struct BitCastLoweringContext
                 auto fromValueType = fromPtrType->getValueType();
                 auto toValueType = toPtrType->getValueType();
 
-                // Unwrap atomic pointers, as they are emitted as the same type as non-atomic pointers
-                // in SPIR-V, but have different types from non-atomic pointers in IR
-                auto fromUnwrappedType = as<IRAtomicType>(fromValueType) 
-                    ? as<IRAtomicType>(fromValueType)->getElementType() 
-                    : fromValueType;
+                // Unwrap atomic pointers, as they are emitted as the same type as non-atomic
+                // pointers in SPIR-V, but have different types from non-atomic pointers in IR
+                auto fromUnwrappedType = as<IRAtomicType>(fromValueType)
+                                             ? as<IRAtomicType>(fromValueType)->getElementType()
+                                             : fromValueType;
                 auto toUnwrappedType = as<IRAtomicType>(toValueType)
-                    ? as<IRAtomicType>(toValueType)->getElementType()
-                    : toValueType;
+                                           ? as<IRAtomicType>(toValueType)->getElementType()
+                                           : toValueType;
 
                 // If the unwrapped types are different, we can use OpBitcast directly
                 if (!isTypeEqual(fromUnwrappedType, toUnwrappedType))
@@ -331,11 +332,13 @@ struct BitCastLoweringContext
             // OpBitcast can handle vector <-> scalar bitcasts directly
             // OpBitcast can also handle vector <-> vector bitcasts directly,
             // but only if the larger element count is an integer multiple of the smaller element
-            // count, and if the types are different (SPIR-V spec requires different operand/result types)
+            // count, and if the types are different (SPIR-V spec requires different operand/result
+            // types)
             auto fromElementCount = getIRVectorElementSize(fromType);
             auto toElementCount = getIRVectorElementSize(toType);
             if ((fromVectorType || fromBasicType) && (toVectorType || toBasicType) &&
-                (fromElementCount % toElementCount == 0 || toElementCount % fromElementCount == 0) &&
+                (fromElementCount % toElementCount == 0 ||
+                 toElementCount % fromElementCount == 0) &&
                 !isTypeEqual(fromType, toType))
                 return;
         }
