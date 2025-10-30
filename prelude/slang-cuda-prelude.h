@@ -5053,8 +5053,6 @@ __forceinline__ __device__ VecTOut slangOptixCoopVecMatMul(
 
 #endif // SLANG_CUDA_ENABLE_OPTIX
 
-namespace Slang_cuda_wmma_impelemmentation
-{
 // The reason we have to implement our own wmma operation on CUDA is the interface
 // design of cooperative_matrix on Vulkan is quite different from CUDA WMMA API, where
 // SPIRV spec doesn't require the matrix layout during declaration of the cooperative_matrix,
@@ -5063,6 +5061,8 @@ namespace Slang_cuda_wmma_impelemmentation
 // is more similar to SPIRV's cooperative_matrix. So to bridge this gap, we have to implement our
 // wmma operation by using PTX wmma instructions directly, because PTX wmma instructions is quite
 // similar to SPIRV's cooperative_matrix spec.
+namespace Slang_CUDA_WMMA
+{
 
 // Helper macros for PTX instruction generation
 // Unified load macro - matrix can be 'a', 'b', or 'c'; layout can be 'row' or 'col'
@@ -5070,205 +5070,263 @@ namespace Slang_cuda_wmma_impelemmentation
 // layout: row, col
 // shape: m16n16k16, m8n32k16, m32n8k16
 // type: f16, f32, s8, u8, s32, u32
-#define WMMA_LOAD_PTX(matrix, layout, shape, type) \
+#define WMMA_LOAD_PTX(matrix, layout, shape, type)                                          \
     "wmma.load." #matrix ".sync.aligned." #layout "." #shape "." #type " "
 
-#define WMMA_STORE_PTX(layout, shape, type) \
+#define WMMA_STORE_PTX(layout, shape, type)                                                 \
     "wmma.store.d.sync.aligned." #layout "." #shape "." #type " "
 
-#define WMMA_MMA_PTX(alayout, blayout, shape, dtype, ctype) \
+#define WMMA_MMA_PTX(alayout, blayout, shape, dtype, ctype)                                 \
     "wmma.mma.sync.aligned." #alayout "." #blayout "." #shape "." #dtype "." #ctype " "
-
-// Helper struct for load/store operations - can be partially specialized
-// Handles loading A, B, C matrices and storing D matrix
-template<typename DataType, MatrixUse matrixUse, ShapeCombination shape>
-struct LoadStoreHelper;
 
 // Macro to generate the entire load_ab implementation with if constexpr
 // This handles both MatrixA and MatrixB cases in a single macro call
 // matrixUse: template parameter indicating which matrix (A or B)
+// layout: row or col
 // shape: m16n16k16, m8n32k16, m32n8k16
 // dtype: f16, f32
-#define WMMA_LOAD_AB_IMPL(matrixUse, shape, dtype) \
-    if constexpr (matrixUse == MatrixUse::MatrixA) { \
-        asm volatile( \
-            WMMA_LOAD_PTX(a, row, shape, dtype) \
-            "{%0, %1, %2, %3, %4, %5, %6, %7}, [%8], %9;\n" \
-            : "=r"(regs[0]), "=r"(regs[1]), "=r"(regs[2]), "=r"(regs[3]), \
-              "=r"(regs[4]), "=r"(regs[5]), "=r"(regs[6]), "=r"(regs[7]) \
-            : "l"(source), "r"(stride) \
-        ); \
-    } else { \
-        asm volatile( \
-            WMMA_LOAD_PTX(b, row, shape, dtype) \
-            "{%0, %1, %2, %3, %4, %5, %6, %7}, [%8], %9;\n" \
-            : "=r"(regs[0]), "=r"(regs[1]), "=r"(regs[2]), "=r"(regs[3]), \
-              "=r"(regs[4]), "=r"(regs[5]), "=r"(regs[6]), "=r"(regs[7]) \
-            : "l"(source), "r"(stride) \
-        ); \
+#define WMMA_LOAD_AB_IMPL(matrixUse, layout, shape, dtype)                                  \
+    if constexpr (matrixUse == MatrixUse::MatrixA)                                          \
+    {                                                                                       \
+        asm volatile(                                                                       \
+            WMMA_LOAD_PTX(a, layout, shape, dtype)                                          \
+            "{%0, %1, %2, %3, %4, %5, %6, %7}, [%8], %9;\n"                                 \
+            : "=r"(regs[0]), "=r"(regs[1]), "=r"(regs[2]), "=r"(regs[3]),                   \
+              "=r"(regs[4]), "=r"(regs[5]), "=r"(regs[6]), "=r"(regs[7])                    \
+            : "l"(source), "r"(stride)                                                      \
+        );                                                                                  \
+    }                                                                                       \
+    else                                                                                    \
+    {                                                                                       \
+        asm volatile(                                                                       \
+            WMMA_LOAD_PTX(b, layout, shape, dtype)                                          \
+            "{%0, %1, %2, %3, %4, %5, %6, %7}, [%8], %9;\n"                                 \
+            : "=r"(regs[0]), "=r"(regs[1]), "=r"(regs[2]), "=r"(regs[3]),                   \
+              "=r"(regs[4]), "=r"(regs[5]), "=r"(regs[6]), "=r"(regs[7])                    \
+            : "l"(source), "r"(stride)                                                      \
+        );                                                                                  \
     }
 
 // Macro for loading C matrix (accumulator) - half uses 4 regs, float uses 8 regs
-#define WMMA_LOAD_C_IMPL_f16(shape, type) \
-    asm volatile( \
-        WMMA_LOAD_PTX(c, row, shape, type) \
-        "{%0, %1, %2, %3}, [%4], %5;\n" \
-        : "=r"(regs[0]), "=r"(regs[1]), "=r"(regs[2]), "=r"(regs[3]) \
-        : "l"(source), "r"(stride) \
+#define WMMA_LOAD_C_IMPL_f16(layout, shape, type)                                           \
+    asm volatile(                                                                           \
+        WMMA_LOAD_PTX(c, layout, shape, type)                                               \
+        "{%0, %1, %2, %3}, [%4], %5;\n"                                                     \
+        : "=r"(regs[0]), "=r"(regs[1]), "=r"(regs[2]), "=r"(regs[3])                        \
+        : "l"(source), "r"(stride)                                                          \
     );
 
-#define WMMA_LOAD_C_IMPL_f32(shape, type) \
-    asm volatile( \
-        WMMA_LOAD_PTX(c, row, shape, type) \
-        "{%0, %1, %2, %3, %4, %5, %6, %7}, [%8], %9;\n" \
-        : "=r"(regs[0]), "=r"(regs[1]), "=r"(regs[2]), "=r"(regs[3]), \
-          "=r"(regs[4]), "=r"(regs[5]), "=r"(regs[6]), "=r"(regs[7]) \
-        : "l"(source), "r"(stride) \
+#define WMMA_LOAD_C_IMPL_f32(layout, shape, type)                                           \
+    asm volatile(                                                                           \
+        WMMA_LOAD_PTX(c, layout, shape, type)                                               \
+        "{%0, %1, %2, %3, %4, %5, %6, %7}, [%8], %9;\n"                                     \
+        : "=r"(regs[0]), "=r"(regs[1]), "=r"(regs[2]), "=r"(regs[3]),                       \
+          "=r"(regs[4]), "=r"(regs[5]), "=r"(regs[6]), "=r"(regs[7])                        \
+        : "l"(source), "r"(stride)                                                          \
     );
 
 // Macro for storing D matrix - half uses 4 regs, float uses 8 regs
-#define WMMA_STORE_IMPL_f16(shape) \
-    asm volatile( \
-        WMMA_STORE_PTX(row, shape, f16) \
-        "[%0], {%1, %2, %3, %4}, %5;\n" \
-        : \
-        : "l"(dest), "r"(regs[0]), "r"(regs[1]), "r"(regs[2]), "r"(regs[3]), "r"(stride) \
+#define WMMA_STORE_IMPL_f16(layout, shape)                                                  \
+    asm volatile(                                                                           \
+        WMMA_STORE_PTX(layout, shape, f16)                                                  \
+        "[%0], {%1, %2, %3, %4}, %5;\n"                                                     \
+        :                                                                                   \
+        : "l"(dest), "r"(regs[0]), "r"(regs[1]), "r"(regs[2]), "r"(regs[3]), "r"(stride)    \
     );
 
-#define WMMA_STORE_IMPL_f32(shape) \
-    asm volatile( \
-        WMMA_STORE_PTX(row, shape, f32) \
-        "[%0], {%1, %2, %3, %4, %5, %6, %7, %8}, %9;\n" \
-        : \
-        : "l"(dest), "r"(regs[0]), "r"(regs[1]), "r"(regs[2]), "r"(regs[3]), \
-          "r"(regs[4]), "r"(regs[5]), "r"(regs[6]), "r"(regs[7]), "r"(stride) \
+#define WMMA_STORE_IMPL_f32(layout, shape)                                                  \
+    asm volatile(                                                                           \
+        WMMA_STORE_PTX(layout, shape, f32)                                                  \
+        "[%0], {%1, %2, %3, %4, %5, %6, %7, %8}, %9;\n"                                     \
+        :                                                                                   \
+        : "l"(dest), "r"(regs[0]), "r"(regs[1]), "r"(regs[2]), "r"(regs[3]),                \
+          "r"(regs[4]), "r"(regs[5]), "r"(regs[6]), "r"(regs[7]), "r"(stride)               \
     );
 
-#define LOAD_IMPL(matrixUse, shape, type) \
-    if constexpr (matrixUse == MatrixUse::MatrixC) { \
-        WMMA_LOAD_C_IMPL_##type(shape, type); \
-    } else { \
-        WMMA_LOAD_AB_IMPL(matrixUse, shape, type); \
-    } \
+
+// Helper macros to dispatch based on matrixUse and layout template parameters
+#define LOAD_IMPL(matrixUse, layout, shape, type)                                           \
+    if constexpr (matrixUse == MatrixUse::MatrixC)                                          \
+    {                                                                                       \
+        if constexpr (layout == Layout::RowMajor)                                           \
+            WMMA_LOAD_C_IMPL_##type(row, shape, type)                                       \
+        else                                                                                \
+            WMMA_LOAD_C_IMPL_##type(col, shape, type)                                       \
+    }                                                                                       \
+    else                                                                                    \
+    {                                                                                       \
+        if constexpr (layout == Layout::RowMajor)                                           \
+            WMMA_LOAD_AB_IMPL(matrixUse, row, shape, type)                                  \
+        else                                                                                \
+            WMMA_LOAD_AB_IMPL(matrixUse, col, shape, type)                                  \
+    }
+
+#define STORE_IMPL(layout, shape, type)                                                     \
+    if constexpr (layout == Layout::RowMajor)                                               \
+        WMMA_STORE_IMPL_##type(row, shape)                                                  \
+    else                                                                                    \
+        WMMA_STORE_IMPL_##type(col, shape)                                                  \
 
 // Enums for template specialization
-enum class MatrixUse : int {
+enum MatrixUse : int {
     MatrixA = 0,
     MatrixB = 1,
     MatrixC = 2,
 };
 
-enum class ShapeCombination : int {
+enum Layout : int {
+    RowMajor = 0,
+    ColMajor = 1
+};
+
+enum ShapeCombination : int {
     m16n16k16 = 0,
     m8n32k16 = 1,
     m32n8k16 = 2
 };
 
+template<typename DataType, MatrixUse matrixUse, Layout layout, ShapeCombination shape>
+struct LoadStoreHelper;
+
+// ====================================================================================
+// Partial template specializations for LoadStoreHelper
+// MatrixUse is kept as template parameter, only specialize on DataType and Shape
+// Handles loading A, B, C and storing D
+// ====================================================================================
+//
+#if SLANG_CUDA_ENABLE_HALF
 // half, m16n16k16 (handles MatrixA, MatrixB, MatrixC, MatrixD)
-template<MatrixUse matrixUse>
-struct LoadStoreHelper<half, matrixUse, ShapeCombination::m16n16k16> {
-    static __device__ void load(unsigned* regs, const half* source, int stride) {
-        LOAD_IMPL(matrixUse, m16n16k16, f16)
+template<MatrixUse matrixUse, Layout layout>
+struct LoadStoreHelper<half, matrixUse, layout, ShapeCombination::m16n16k16>
+{
+    static __device__ void load(unsigned* regs, const half* source, int stride)
+    {
+        LOAD_IMPL(matrixUse, layout, m16n16k16, f16)
     }
 
-    static __device__ void store(unsigned* regs, half* dest, int stride) {
-        WMMA_STORE_IMPL_f16(m16n16k16)
+    static __device__ void store(unsigned* regs, half* dest, int stride)
+    {
+        STORE_IMPL(layout, m16n16k16, f16)
     }
 };
 
 // half, m8n32k16 (handles MatrixA, MatrixB, MatrixC, MatrixD)
-template<MatrixUse matrixUse>
-struct LoadStoreHelper<half, matrixUse, ShapeCombination::m8n32k16> {
-    static __device__ void load(unsigned* regs, const half* source, int stride) {
-        LOAD_IMPL(matrixUse, m8n32k16, f16)
+template<MatrixUse matrixUse, Layout layout>
+struct LoadStoreHelper<half, matrixUse, layout, ShapeCombination::m8n32k16>
+{
+    static __device__ void load(unsigned* regs, const half* source, int stride)
+    {
+        LOAD_IMPL(matrixUse, layout, m8n32k16, f16)
     }
 
-    static __device__ void store(unsigned* regs, half* dest, int stride) {
-        WMMA_STORE_IMPL_f16(m8n32k16)
+    static __device__ void store(unsigned* regs, half* dest, int stride)
+    {
+        STORE_IMPL(layout, m8n32k16, f16)
     }
 };
 
 // half, m32n8k16 (handles MatrixA, MatrixB, MatrixC, MatrixD)
-template<MatrixUse matrixUse>
-struct LoadStoreHelper<half, matrixUse, ShapeCombination::m32n8k16> {
-    static __device__ void load(unsigned* regs, const half* source, int stride) {
-        LOAD_IMPL(matrixUse, m32n8k16, f16)
+template<MatrixUse matrixUse, Layout layout>
+struct LoadStoreHelper<half, matrixUse, layout, ShapeCombination::m32n8k16>
+{
+    static __device__ void load(unsigned* regs, const half* source, int stride)
+    {
+        LOAD_IMPL(matrixUse, layout, m32n8k16, f16)
     }
 
-    static __device__ void store(unsigned* regs, half* dest, int stride) {
-        WMMA_STORE_IMPL_f16(m32n8k16)
+    static __device__ void store(unsigned* regs, half* dest, int stride)
+    {
+        STORE_IMPL(layout, m32n8k16, f16)
     }
 };
+#endif // #if SLANG_CUDA_ENABLE_HALF
 
 // float, m16n16k16 (handles MatrixA, MatrixB, MatrixC, MatrixD)
-template<MatrixUse matrixUse>
-struct LoadStoreHelper<float, matrixUse, ShapeCombination::m16n16k16> {
-    static __device__ void load(unsigned* regs, const float* source, int stride) {
-        LOAD_IMPL(matrixUse, m16n16k16, f32)
+template<MatrixUse matrixUse, Layout layout>
+struct LoadStoreHelper<float, matrixUse, layout, ShapeCombination::m16n16k16>
+{
+    static __device__ void load(unsigned* regs, const float* source, int stride)
+    {
+        LOAD_IMPL(matrixUse, layout, m16n16k16, f32)
     }
 
-    static __device__ void store(unsigned* regs, float* dest, int stride) {
-        WMMA_STORE_IMPL_f32(m16n16k16)
+    static __device__ void store(unsigned* regs, float* dest, int stride)
+    {
+        STORE_IMPL(layout, m16n16k16, f32)
     }
 };
 
 // float, m8n32k16 (handles MatrixA, MatrixB, MatrixC, MatrixD)
-template<MatrixUse matrixUse>
-struct LoadStoreHelper<float, matrixUse, ShapeCombination::m8n32k16> {
-    static __device__ void load(unsigned* regs, const float* source, int stride) {
-        LOAD_IMPL(matrixUse, m8n32k16, f32)
+template<MatrixUse matrixUse, Layout layout>
+struct LoadStoreHelper<float, matrixUse, layout, ShapeCombination::m8n32k16>
+{
+    static __device__ void load(unsigned* regs, const float* source, int stride)
+    {
+        LOAD_IMPL(matrixUse, layout, m8n32k16, f32)
     }
 
-    static __device__ void store(unsigned* regs, float* dest, int stride) {
-        WMMA_STORE_IMPL_f32(m8n32k16)
+    static __device__ void store(unsigned* regs, float* dest, int stride)
+    {
+        STORE_IMPL(layout, m8n32k16, f32)
     }
 };
 
 // float, m32n8k16 (handles MatrixA, MatrixB, MatrixC, MatrixD)
-template<MatrixUse matrixUse>
-struct LoadStoreHelper<float, matrixUse, ShapeCombination::m32n8k16> {
-    static __device__ void load(unsigned* regs, const float* source, int stride) {
-        LOAD_IMPL(matrixUse, m32n8k16, f32)
+template<MatrixUse matrixUse, Layout layout>
+struct LoadStoreHelper<float, matrixUse, layout, ShapeCombination::m32n8k16>
+{
+    static __device__ void load(unsigned* regs, const float* source, int stride)
+    {
+        LOAD_IMPL(matrixUse, layout, m32n8k16, f32)
     }
 
-    static __device__ void store(unsigned* regs, float* dest, int stride) {
-        WMMA_STORE_IMPL_f32(m32n8k16)
+    static __device__ void store(unsigned* regs, float* dest, int stride)
+    {
+        STORE_IMPL(layout, m32n8k16, f32)
     }
 };
+
+template<typename T>
+unsigned __device__ Pack32Helper(T value);
+
+#if SLANG_CUDA_ENABLE_HALF
+template<>
+unsigned __device__ Pack32Helper<half>(half value)
+{
+    return __half_as_ushort(value) | (__half_as_ushort(value) << 16);
+};
+#endif
+
+template<>
+unsigned __device__ Pack32Helper<float>(float value)
+{
+    return __float_as_uint(value);
+};
+
 // The dimensions of the fragment are specified by M, N, K which are totally determined during
 // compile time, so slang already did the pre-filter on the shape & type combination.
-template<typename T, int M, int N, int K>
+template<typename T, int M, int N, int K, MatrixUse R>
 struct WmmaFragment
 {
-    enum MatrixLayout : int
+    template<Layout layout>
+    void __device__ Store(RWStructuredBuffer<T> buffer, uint element, uint stride)
     {
-        RowMajor = 0,
-        ColMajor = 1
-    };
-
-    template<MatrixLayout layout>
-    void Store(RWStructuredBuffer<T> buffer, uint element, uint stride)
-    {
+        LoadStoreHelper<T, R, layout, ShapeCombination::m16n16k16>::store(
+            regs, buffer.data + element, stride);
     }
 
-    template<MatrixLayout layout>
-    void Load(RWStructuredBuffer<T> buffer, uint element, uint stride)
+    template<Layout layout>
+    void __device__ Load(RWStructuredBuffer<T> buffer, uint element, uint stride)
     {
+        LoadStoreHelper<T, R, layout, ShapeCombination::m16n16k16>::load(
+            regs, buffer.data + element, stride);
     }
 
     // There is no fill intrinsic in PTX wmma, so it's just 'move' value
     // to the fragment registers.
-    void fill(T t)
+    void __device__ fill(T value)
     {
-        unsigned packed;
-
-        if constexpr (std::is_same_v<T, half>) {
-            // Pack two half values into one 32-bit register
-            packed = __half_as_ushort(value) | (__half_as_ushort(value) << 16);
-        } else if constexpr (std::is_same_v<T, float>) {
-            // For float, each register holds one value
-            packed = __float_as_uint(value);
-        }
+        unsigned packed = Pack32Helper(value);
 
         // Manually assign to prevent register coalescing
         regs[0] = packed;

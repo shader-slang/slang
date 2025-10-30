@@ -24083,9 +24083,9 @@ struct CoopMat
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-                __intrinsic_asm "$0.Store<RowMajor>($1, $2, $3)";
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>($1, $2, $3)";
             else
-                __intrinsic_asm "$0.Store<ColMajor>($1, $2, $3)";
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>($1, $2, $3)";
         }
     }
 
@@ -24105,9 +24105,9 @@ struct CoopMat
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-                __intrinsic_asm "$0.Store<RowMajor>($1, $2, $3)";
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>($1, $2, $3)";
             else
-                __intrinsic_asm "$0.Store<ColMajor>($1, $2, $3)";
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>($1, $2, $3)";
         }
     }
 
@@ -24146,9 +24146,9 @@ struct CoopMat
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-                __intrinsic_asm "$0.Store<RowMajor>($1, $2, $3)";
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>($1, $2, $3)";
             else
-                __intrinsic_asm "$0.Store<ColMajor>($1, $2, $3)";
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>($1, $2, $3)";
         }
     }
 
