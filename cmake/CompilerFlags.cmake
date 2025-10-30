@@ -112,6 +112,7 @@ function(set_default_compile_options target)
             -Wno-invalid-offsetof
             -Wno-newline-eof
             -Wno-return-std-move
+            -Wno-unused-but-set-variable
             # Allowed warnings:
             # If a function returns an address/reference to a local, we want it to
             # produce an error, because it probably means something very bad.
