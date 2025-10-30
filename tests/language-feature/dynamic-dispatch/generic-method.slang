@@ -31,7 +31,7 @@ float f(uint id, float x)
         obj = A();
     else if (id == 1)
         obj = B();
-    else if (id == 2)
+    else
         obj = C();
 
     return obj.calc(x);

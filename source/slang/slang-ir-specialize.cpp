@@ -6,7 +6,6 @@
 #include "slang-ir-dce.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-lower-typeflow-insts.h"
-#include "slang-ir-lower-witness-lookup.h"
 #include "slang-ir-peephole.h"
 #include "slang-ir-sccp.h"
 #include "slang-ir-ssa-simplification.h"

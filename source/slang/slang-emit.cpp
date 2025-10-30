@@ -22,6 +22,7 @@
 #include "slang-emit-vm.h"
 #include "slang-emit-wgsl.h"
 #include "slang-ir-any-value-inference.h"
+#include "slang-ir-any-value-marshalling.h"
 #include "slang-ir-autodiff.h"
 #include "slang-ir-bind-existentials.h"
 #include "slang-ir-byte-address-legalize.h"
@@ -79,7 +80,6 @@
 #include "slang-ir-lower-coopvec.h"
 #include "slang-ir-lower-dynamic-resource-heap.h"
 #include "slang-ir-lower-enum-type.h"
-#include "slang-ir-lower-generics.h"
 #include "slang-ir-lower-glsl-ssbo-types.h"
 #include "slang-ir-lower-l-value-cast.h"
 #include "slang-ir-lower-optional-type.h"
@@ -1199,15 +1199,13 @@ Result linkAndOptimizeIR(
         SLANG_RETURN_ON_FAIL(checkGetStringHashInsts(irModule, sink));
     }
 
-    // For targets that supports dynamic dispatch, we need to lower the
-    // generics / interface types to ordinary functions and types using
-    // function pointers.
-    dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-LOWER-GENERICS");
-    if (requiredLoweringPassSet.generics)
-        lowerGenerics(targetProgram, irModule, sink);
-    else
-        cleanupGenerics(targetProgram, irModule, sink);
-    dumpIRIfEnabled(codeGenContext, irModule, "AFTER-LOWER-GENERICS");
+    lowerTuples(irModule, sink);
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
+
+    generateAnyValueMarshallingFunctions(irModule);
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
 
     // Don't need to run any further target-dependent passes if we are generating code
     // for host vm.

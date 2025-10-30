@@ -7,7 +7,6 @@
 #include "slang-ir-specialize.h"
 #include "slang-ir-typeflow-collection.h"
 #include "slang-ir-util.h"
-#include "slang-ir-witness-table-wrapper.h"
 #include "slang-ir.h"
 
 
@@ -1132,9 +1131,6 @@ struct TypeFlowSpecializationContext
         case kIROp_MakeExistential:
             info = analyzeMakeExistential(context, as<IRMakeExistential>(inst));
             break;
-        // case kIROp_WrapExistential:
-        //     info = analyzeWrapExistential(context, as<IRWrapExistential>(inst));
-        //     break;
         case kIROp_LookupWitnessMethod:
             info = analyzeLookupWitnessMethod(context, as<IRLookupWitnessMethod>(inst));
             break;
@@ -1466,28 +1462,6 @@ struct TypeFlowSpecializationContext
         SLANG_UNEXPECTED("Unexpected witness table info type in analyzeMakeExistential");
     }
 
-    /*
-    IRInst* analyzeWrapExistential(IRInst* context, IRWrapExistential* wrapExistential)
-    {
-        if (auto valInfo = tryGetInfo(context, wrapExistential->getWrappedValue()))
-        {
-            // We need a single possible value for the wrapped value.
-            auto taggedUnionType = cast<IRTaggedUnionType>(valInfo);
-            SLANG_ASSERT(
-                taggedUnionType->getTypeSet()->isSingleton() &&
-                taggedUnionType->getWitnessTableSet()->isSingleton());
-            // Since the inst's result is expected to be a concrete type,
-            // we'll return a 'none' here. The info won't be recorded anyway.
-            //
-            return none();
-        }
-        else
-        {
-            return none();
-        }
-    }
-    */
-
     IRInst* analyzeMakeStruct(IRInst* context, IRMakeStruct* makeStruct, WorkQueue& workQueue)
     {
         // We'll process this in the same way as a field-address, but for
@@ -1525,6 +1499,7 @@ struct TypeFlowSpecializationContext
 
     IRInst* analyzeLoadFromUninitializedMemory(IRInst* context, IRInst* inst)
     {
+        SLANG_UNUSED(context);
         IRBuilder builder(module);
         if (as<IRInterfaceType>(inst->getDataType()) && !isConcreteType(inst->getDataType()))
         {
@@ -1575,7 +1550,6 @@ struct TypeFlowSpecializationContext
                 else if (
                     auto boundInterfaceType = as<IRBoundInterfaceType>(loadInst->getDataType()))
                 {
-                    IRBuilder builder(module);
                     return makeTaggedUnionType(cast<IRWitnessTableSet>(
                         builder.getSingletonSet(boundInterfaceType->getWitnessTable())));
                 }
@@ -1617,7 +1591,6 @@ struct TypeFlowSpecializationContext
             }
             else if (auto boundInterfaceType = as<IRBoundInterfaceType>(inst->getDataType()))
             {
-                IRBuilder builder(module);
                 return makeTaggedUnionType(cast<IRWitnessTableSet>(
                     builder.getSingletonSet(boundInterfaceType->getWitnessTable())));
             }
@@ -2676,7 +2649,6 @@ struct TypeFlowSpecializationContext
         //
         for (auto param : firstBlock->getParams())
         {
-            auto paramType = param->getDataType();
             auto paramInfo = tryGetInfo(context, param);
             if (paramInfo)
                 continue; // Already has some information
@@ -3887,6 +3859,7 @@ struct TypeFlowSpecializationContext
 
     bool specializeWrapExistential(IRInst* context, IRWrapExistential* inst)
     {
+        SLANG_UNUSED(context);
         inst->replaceUsesWith(inst->getWrappedValue());
         inst->removeAndDeallocate();
         return true;
