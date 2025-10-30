@@ -106,7 +106,7 @@ runs:
           --install-prefix "${{github.workspace}}/build/llvm-project-install" \
           --repo "https://${{github.token}}@github.com/llvm/llvm-project"
     - uses: actions/cache/save@v4
-      if: inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true'
+      if: inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true' && github.ref == 'refs/heads/master'
       with:
         path: build/llvm-project-install
         key: ${{ steps.cache-llvm.outputs.cache-primary-key }}
