@@ -1412,7 +1412,9 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf1DLayeredwrite_convert(
     int layer,
     cudaSurfaceBoundaryMode boundaryMode)
 {
-    static_assert(false, "CUDA doesn't support formatted surface writes on 1D array surfaces");
+    // TODO: static_assert(false) can fail on some compilers, even if template is not instantiated.
+    // We should check for this in hlsl.meta.slang instead.
+    // static_assert(false, "CUDA doesn't support formatted surface writes on 1D array surfaces");
 }
 
 // surf2Dwrite_convert
@@ -1492,7 +1494,9 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2DLayeredwrite_convert(
     int layer,
     cudaSurfaceBoundaryMode boundaryMode)
 {
-    static_assert(false, "CUDA doesn't support formatted surface writes on 2D array surfaces");
+    // TODO: static_assert(false) can fail on some compilers, even if template is not instantiated.
+    // We should check for this in hlsl.meta.slang instead.
+    // static_assert(false, "CUDA doesn't support formatted surface writes on 2D array surfaces");
 }
 
 // surf3Dwrite_convert
@@ -3896,7 +3900,7 @@ static __forceinline__ __device__ void optixMakeMissHitObject(
 }
 #endif
 
-#if (OPTIX_VERSION >= 80100)
+#if (OPTIX_VERSION >= 90000)
 template<typename T>
 static __forceinline__ __device__ void optixMakeHitObject(
     OptixTraversableHandle AccelerationStructure,
@@ -3923,9 +3927,42 @@ static __forceinline__ __device__ void optixMakeHitObject(
         nullptr, /*OptixTraversableHandle* transforms*/
         0 /*numTransforms */);
 }
+#elif (OPTIX_VERSION >= 80100)
+template<typename T>
+static __forceinline__ __device__ void optixMakeHitObject(
+    OptixTraversableHandle AccelerationStructure,
+    uint InstanceIndex,
+    uint GeometryIndex,
+    uint PrimitiveIndex,
+    uint HitKind,
+    uint RayContributionToHitGroupIndex,
+    uint MultiplierForGeometryContributionToHitGroupIndex,
+    RayDesc Ray,
+    T attr,
+    OptixTraversableHandle* handle)
+{
+    // OptiX 8.1 version: call native optixMakeHitObject directly
+    optixMakeHitObject(
+        AccelerationStructure,                            // handle
+        Ray.Origin,                                       // rayOrigin
+        Ray.Direction,                                    // rayDirection
+        Ray.TMin,                                         // tmin
+        Ray.TMax,                                         // tmax
+        0.f,                                              // rayTime
+        RayContributionToHitGroupIndex,                   // sbtOffset
+        MultiplierForGeometryContributionToHitGroupIndex, // sbtStride
+        InstanceIndex,                                    // instIdx
+        nullptr,                                          // transforms
+        0,                                                // numTransforms
+        GeometryIndex,                                    // sbtGASIdx
+        PrimitiveIndex,                                   // primIdx
+        HitKind                                           // hitKind
+        /* no attributes passed - empty variadic pack */
+    );
+}
 #endif
 
-#if (OPTIX_VERSION >= 80100)
+#if (OPTIX_VERSION >= 90000)
 template<typename T>
 static __forceinline__ __device__ void optixMakeHitObject(
     uint HitGroupRecordIndex,
@@ -3951,9 +3988,40 @@ static __forceinline__ __device__ void optixMakeHitObject(
         nullptr, /*OptixTraversableHandle* transforms*/
         0 /*numTransforms */);
 }
+#elif (OPTIX_VERSION >= 80100)
+template<typename T>
+static __forceinline__ __device__ void optixMakeHitObject(
+    uint HitGroupRecordIndex,
+    OptixTraversableHandle AccelerationStructure,
+    uint InstanceIndex,
+    uint GeometryIndex,
+    uint PrimitiveIndex,
+    uint HitKind,
+    RayDesc Ray,
+    T attr,
+    OptixTraversableHandle* handle)
+{
+    // OptiX 8.1 version: call optixMakeHitObjectWithRecord directly
+    optixMakeHitObjectWithRecord(
+        AccelerationStructure, // handle
+        Ray.Origin,            // rayOrigin
+        Ray.Direction,         // rayDirection
+        Ray.TMin,              // tmin
+        Ray.TMax,              // tmax
+        0.f,                   // rayTime
+        HitGroupRecordIndex,   // sbtRecordIndex
+        InstanceIndex,         // instIdx
+        nullptr,               // transforms
+        0,                     // numTransforms
+        GeometryIndex,         // sbtGASIdx
+        PrimitiveIndex,        // primIdx
+        HitKind                // hitKind
+        /* no attributes passed - empty variadic pack */
+    );
+}
 #endif
 
-#if (OPTIX_VERSION >= 80100)
+#if (OPTIX_VERSION >= 90000)
 template<typename T>
 static __forceinline__ __device__ void optixMakeHitObject(
     OptixTraversableHandle AccelerationStructure,
@@ -3981,9 +4049,43 @@ static __forceinline__ __device__ void optixMakeHitObject(
         nullptr, /*OptixTraversableHandle* transforms*/
         0 /*numTransforms */);
 }
+#elif (OPTIX_VERSION >= 80100)
+template<typename T>
+static __forceinline__ __device__ void optixMakeHitObject(
+    OptixTraversableHandle AccelerationStructure,
+    uint InstanceIndex,
+    uint GeometryIndex,
+    uint PrimitiveIndex,
+    uint HitKind,
+    uint RayContributionToHitGroupIndex,
+    uint MultiplierForGeometryContributionToHitGroupIndex,
+    RayDesc Ray,
+    float CurrentTime,
+    T attr,
+    OptixTraversableHandle* handle)
+{
+    // OptiX 8.1 version: call native optixMakeHitObject directly
+    optixMakeHitObject(
+        AccelerationStructure,                            // handle
+        Ray.Origin,                                       // rayOrigin
+        Ray.Direction,                                    // rayDirection
+        Ray.TMin,                                         // tmin
+        Ray.TMax,                                         // tmax
+        CurrentTime,                                      // rayTime
+        RayContributionToHitGroupIndex,                   // sbtOffset
+        MultiplierForGeometryContributionToHitGroupIndex, // sbtStride
+        InstanceIndex,                                    // instIdx
+        nullptr,                                          // transforms
+        0,                                                // numTransforms
+        GeometryIndex,                                    // sbtGASIdx
+        PrimitiveIndex,                                   // primIdx
+        HitKind                                           // hitKind
+        /* no attributes passed - empty variadic pack */
+    );
+}
 #endif
 
-#if (OPTIX_VERSION >= 80100)
+#if (OPTIX_VERSION >= 90000)
 template<typename T>
 static __forceinline__ __device__ void optixMakeHitObject(
     uint HitGroupRecordIndex,
@@ -4009,6 +4111,38 @@ static __forceinline__ __device__ void optixMakeHitObject(
         data,
         nullptr, /*OptixTraversableHandle* transforms*/
         0 /*numTransforms */);
+}
+#elif (OPTIX_VERSION >= 80100)
+template<typename T>
+static __forceinline__ __device__ void optixMakeHitObject(
+    uint HitGroupRecordIndex,
+    OptixTraversableHandle AccelerationStructure,
+    uint InstanceIndex,
+    uint GeometryIndex,
+    uint PrimitiveIndex,
+    uint HitKind,
+    RayDesc Ray,
+    float CurrentTime,
+    T attr,
+    OptixTraversableHandle* handle)
+{
+    // OptiX 8.1 version: call optixMakeHitObjectWithRecord directly
+    optixMakeHitObjectWithRecord(
+        AccelerationStructure, // handle
+        Ray.Origin,            // rayOrigin
+        Ray.Direction,         // rayDirection
+        Ray.TMin,              // tmin
+        Ray.TMax,              // tmax
+        CurrentTime,           // rayTime
+        HitGroupRecordIndex,   // sbtRecordIndex
+        InstanceIndex,         // instIdx
+        nullptr,               // transforms
+        0,                     // numTransforms
+        GeometryIndex,         // sbtGASIdx
+        PrimitiveIndex,        // primIdx
+        HitKind                // hitKind
+        /* no attributes passed - empty variadic pack */
+    );
 }
 #endif
 
@@ -4315,7 +4449,9 @@ struct TensorView
 template<typename T>
 SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex1Dfetch_int(CUtexObject texObj, int x, int mip)
 {
-    static_assert(false, "CUDA does not support fetching from 1D textures");
+    // TODO: static_assert(false) can fail on some compilers, even if template is not instantiated.
+    // We should check for this in hlsl.meta.slang instead.
+    // static_assert(false, "CUDA does not support fetching from 1D textures");
 }
 
 #if 0
