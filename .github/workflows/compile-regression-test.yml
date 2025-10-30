@@ -1,6 +1,7 @@
 name: Compile Regression-Test
 
 on:
+  workflow_dispatch:
   push:
     branches: [master]
     paths-ignore:
