@@ -2845,6 +2845,28 @@ local insts = {
 		--
 		hoistable = true
 	} },
+	{ UnboundedTypeElement = {
+		hoistable = true,
+		operands = { {"baseInterfaceType"} }
+	} },
+	{ UnboundedFuncElement = {
+		hoistable = true,
+	} },
+	{ UnboundedWitnessTableElement = {
+		hoistable = true,
+		operands = { {"baseInterfaceType"} }
+	} },
+	{ UnboundedGenericElement = {
+		hoistable = true,
+	} },
+	{ UninitializedTypeElement = {
+		hoistable = true,
+		operands = { {"baseInterfaceType"} }
+	} },
+	{ UninitializedWitnessTableElement = {
+		hoistable = true,
+		operands = { {"baseInterfaceType"} }
+	} },
 }
 
 -- A function to calculate some useful properties and put it in the table,

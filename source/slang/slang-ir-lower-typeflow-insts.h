@@ -4,9 +4,11 @@
 
 namespace Slang
 {
+class Linkage;
+class TargetProgram;
 
 // Lower `UntaggedUnionType` types.
-void lowerUntaggedUnionTypes(IRModule* module, DiagnosticSink* sink);
+void lowerUntaggedUnionTypes(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink);
 
 // Lower `SetTaggedUnion` and `CastInterfaceToTaggedUnionPtr` instructions
 // May create new `Reinterpret` instructions.
@@ -22,9 +24,14 @@ void lowerTagTypes(IRModule* module);
 void lowerTagInsts(IRModule* module, DiagnosticSink* sink);
 
 // Lower `GetTagFromSequentialID` and `GetSequentialIDFromTag` instructions
-void lowerSequentialIDTagCasts(IRModule* module, DiagnosticSink* sink);
+void lowerSequentialIDTagCasts(IRModule* module, Linkage* linkage, DiagnosticSink* sink);
 
 // Lower `GetDispatcher` and `GetSpecializedDispatcher` instructions
 bool lowerDispatchers(IRModule* module, DiagnosticSink* sink);
+
+// Lower `ExtractExistentialValue`, `ExtractExistentialType`, `ExtractExistentialWitnessTable`,
+// `InterfaceType`, `GetSequentialID`, `WitnessTableIDType` and `RTTIHandleType` instructions.
+//
+bool lowerExistentials(IRModule* module, DiagnosticSink* sink);
 
 } // namespace Slang

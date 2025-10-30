@@ -6,7 +6,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
-
+/*
 namespace Slang
 {
 bool isCPUTarget(TargetRequest* targetReq);
@@ -311,3 +311,5 @@ void lowerExistentials(SharedGenericsLoweringContext* sharedContext)
     context.processModule();
 }
 } // namespace Slang
+
+*/

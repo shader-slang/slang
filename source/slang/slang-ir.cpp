@@ -6617,6 +6617,15 @@ UInt IRBuilder::getUniqueID(IRInst* inst)
 
 IROp IRBuilder::getSetTypeForInst(IRInst* inst)
 {
+    if (as<IRUnboundedTypeElement>(inst) || as<IRUninitializedTypeElement>(inst))
+        return kIROp_TypeSet;
+    if (as<IRUnboundedFuncElement>(inst))
+        return kIROp_FuncSet;
+    if (as<IRUnboundedWitnessTableElement>(inst) || as<IRUninitializedWitnessTableElement>(inst))
+        return kIROp_WitnessTableSet;
+    if (as<IRUnboundedGenericElement>(inst))
+        return kIROp_GenericSet;
+
     if (as<IRGeneric>(inst))
         return kIROp_GenericSet;
 
@@ -8573,6 +8582,8 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_MakeTaggedUnion:
     case kIROp_GetTagOfElementInSet:
     case kIROp_UnboundedSet:
+    case kIROp_MakeDifferentialPairUserCode:
+    case kIROp_MakeDifferentialPtrPair:
         return false;
 
     case kIROp_ForwardDifferentiate:

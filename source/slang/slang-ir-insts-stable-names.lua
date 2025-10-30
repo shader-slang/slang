@@ -705,5 +705,11 @@ return {
 	["Type.ElementOfSetType"] = 701,
 	["MakeTaggedUnion"] = 702,
 	["GetTypeTagFromTaggedUnion"] = 703,
-	["GetTagOfElementInSet"] = 704
+	["GetTagOfElementInSet"] = 704,
+	["UnboundedTypeElement"] = 705,
+	["UnboundedFuncElement"] = 706,
+	["UnboundedWitnessTableElement"] = 707,
+	["UnboundedGenericElement"] = 708,
+	["UninitializedTypeElement"] = 709,
+	["UninitializedWitnessTableElement"] = 710,
 }

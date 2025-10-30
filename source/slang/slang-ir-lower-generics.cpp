@@ -9,7 +9,6 @@
 #include "slang-ir-generics-lowering-context.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-layout.h"
-#include "slang-ir-lower-existential.h"
 #include "slang-ir-lower-generic-call.h"
 #include "slang-ir-lower-generic-function.h"
 #include "slang-ir-lower-generic-type.h"
@@ -105,27 +104,6 @@ void cleanUpInterfaceTypes(SharedGenericsLoweringContext* sharedContext)
     }
 }
 
-void lowerIsTypeInsts(SharedGenericsLoweringContext* sharedContext)
-{
-    InstPassBase pass(sharedContext->module);
-    pass.processInstsOfType<IRIsType>(
-        kIROp_IsType,
-        [&](IRIsType* inst)
-        {
-            auto witnessTableType =
-                as<IRWitnessTableTypeBase>(inst->getValueWitness()->getDataType());
-            if (witnessTableType &&
-                isComInterfaceType((IRType*)witnessTableType->getConformanceType()))
-                return;
-            IRBuilder builder(sharedContext->module);
-            builder.setInsertBefore(inst);
-            auto eqlInst = builder.emitEql(
-                builder.emitGetSequentialIDInst(inst->getValueWitness()),
-                builder.emitGetSequentialIDInst(inst->getTargetWitness()));
-            inst->replaceUsesWith(eqlInst);
-            inst->removeAndDeallocate();
-        });
-}
 
 // Turn all references of witness table or RTTI objects into integer IDs, generate
 // specialized `switch` based dispatch functions based on witness table IDs, and remove
@@ -134,16 +112,13 @@ void lowerIsTypeInsts(SharedGenericsLoweringContext* sharedContext)
 // no pointers are involved in RTTI / dynamic dispatch logic.
 void specializeRTTIObjects(SharedGenericsLoweringContext* sharedContext, DiagnosticSink* sink)
 {
-    specializeDispatchFunctions(sharedContext);
+    /*specializeDispatchFunctions(sharedContext);
     if (sink->getErrorCount() != 0)
-        return;
+        return;*/
 
-    lowerSequentialIDTagCasts(sharedContext->module, sharedContext->sink);
-    lowerTagTypes(sharedContext->module);
+    // lowerIsTypeInsts(sharedContext);
 
-    lowerIsTypeInsts(sharedContext);
-
-    specializeDynamicAssociatedTypeLookup(sharedContext);
+    /*specializeDynamicAssociatedTypeLookup(sharedContext);
     if (sink->getErrorCount() != 0)
         return;
 
@@ -153,7 +128,7 @@ void specializeRTTIObjects(SharedGenericsLoweringContext* sharedContext, Diagnos
 
     cleanUpRTTIHandleTypes(sharedContext);
 
-    cleanUpInterfaceTypes(sharedContext);
+    cleanUpInterfaceTypes(sharedContext);*/
 }
 
 void checkTypeConformanceExists(SharedGenericsLoweringContext* context)
@@ -230,7 +205,7 @@ void lowerGenerics(TargetProgram* targetProgram, IRModule* module, DiagnosticSin
     sharedContext.targetProgram = targetProgram;
     sharedContext.sink = sink;
 
-    checkTypeConformanceExists(&sharedContext);
+    /*checkTypeConformanceExists(&sharedContext);
 
     // Replace all `makeExistential` insts with `makeExistentialWithRTTI`
     // before making any other changes. This is necessary because a parameter of
@@ -250,10 +225,6 @@ void lowerGenerics(TargetProgram* targetProgram, IRModule* module, DiagnosticSin
     if (sink->getErrorCount() != 0)
         return;
 
-    lowerExistentials(&sharedContext);
-    if (sink->getErrorCount() != 0)
-        return;
-
     lowerGenericCalls(&sharedContext);
     if (sink->getErrorCount() != 0)
         return;
@@ -261,6 +232,11 @@ void lowerGenerics(TargetProgram* targetProgram, IRModule* module, DiagnosticSin
     generateWitnessTableWrapperFunctions(&sharedContext);
     if (sink->getErrorCount() != 0)
         return;
+
+    lowerExistentials(&sharedContext);
+    if (sink->getErrorCount() != 0)
+        return;
+    */
 
     // This optional step replaces all uses of witness tables and RTTI objects with
     // sequential IDs. Without this step, we will emit code that uses function pointers and

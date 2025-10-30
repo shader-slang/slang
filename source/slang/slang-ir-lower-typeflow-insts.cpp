@@ -3,6 +3,7 @@
 #include "slang-ir-any-value-marshalling.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-layout.h"
 #include "slang-ir-specialize.h"
 #include "slang-ir-typeflow-collection.h"
 #include "slang-ir-util.h"
@@ -11,22 +12,11 @@
 
 namespace Slang
 {
-SlangInt calculateAnyValueSize(const HashSet<IRType*>& types)
-{
-    SlangInt maxSize = 0;
-    for (auto type : types)
-    {
-        auto size = getAnyValueSize(type);
-        if (size > maxSize)
-            maxSize = size;
-    }
-    return maxSize;
-}
 
-IRAnyValueType* createAnyValueType(IRBuilder* builder, const HashSet<IRType*>& types)
+UInt getUniqueID(IRBuilder* builder, IRInst* inst)
 {
-    auto size = calculateAnyValueSize(types);
-    return builder->getAnyValueType(size);
+    // Fallback.
+    return builder->getUniqueID(inst);
 }
 
 // Generate a single function that dispatches to each function in the collection.
@@ -238,7 +228,9 @@ struct TagOpsLoweringContext : public InstPassBase
         // Since all elements have a unique ID across the module, this is the identity operation.
         //
 
-        inst->replaceUsesWith(inst->getOperand(0));
+        IRBuilder builder(inst->getModule());
+        builder.setInsertAfter(inst);
+        inst->replaceUsesWith(builder.emitCast(inst->getDataType(), inst->getOperand(0), true));
         inst->removeAndDeallocate();
     }
 
@@ -273,8 +265,8 @@ struct TagOpsLoweringContext : public InstPassBase
                     // it must have been assigned a unique ID.
                     //
                     mapping.add(
-                        builder.getUniqueID(srcSet->getElement(i)),
-                        builder.getUniqueID(destElement));
+                        getUniqueID(&builder, srcSet->getElement(i)),
+                        getUniqueID(&builder, destElement));
                     break; // Found the index
                 }
             }
@@ -308,7 +300,7 @@ struct TagOpsLoweringContext : public InstPassBase
         IRBuilder builder(inst->getModule());
         builder.setInsertAfter(inst);
 
-        auto uniqueId = builder.getUniqueID(inst->getOperand(0));
+        auto uniqueId = getUniqueID(&builder, inst->getOperand(0));
         auto resultValue = builder.getIntValue(inst->getDataType(), uniqueId);
         inst->replaceUsesWith(resultValue);
         inst->removeAndDeallocate();
@@ -501,9 +493,63 @@ bool lowerDispatchers(IRModule* module, DiagnosticSink* sink)
 // This context lowers `TypeSet` instructions.
 struct SetLoweringContext : public InstPassBase
 {
-    SetLoweringContext(IRModule* module)
-        : InstPassBase(module)
+    SetLoweringContext(
+        IRModule* module,
+        TargetProgram* targetProgram,
+        DiagnosticSink* sink = nullptr)
+        : InstPassBase(module), targetProgram(targetProgram), sink(sink)
     {
+    }
+
+    SlangInt tryCalculateAnyValueSize(const HashSet<IRType*>& types)
+    {
+        SlangInt maxSize = 0;
+        for (auto type : types)
+        {
+            auto size = getAnyValueSize(type);
+            if (size > maxSize)
+                maxSize = size;
+
+            if (sink && !canTypeBeStored(type))
+            {
+                sink->diagnose(
+                    type->sourceLoc,
+                    Slang::Diagnostics::typeCannotBePackedIntoAnyValue,
+                    type);
+            }
+        }
+
+        // Defaults to 0 if any type could not be sized.
+        return maxSize;
+    }
+
+    IRAnyValueType* createAnyValueType(IRBuilder* builder, const HashSet<IRType*>& types)
+    {
+        auto size = tryCalculateAnyValueSize(types);
+        return builder->getAnyValueType(size);
+    }
+
+    bool canTypeBeStored(IRType* concreteType)
+    {
+        if (!areResourceTypesBindlessOnTarget(targetProgram->getTargetReq()))
+        {
+            IRType* opaqueType = nullptr;
+            if (isOpaqueType(concreteType, &opaqueType))
+            {
+                return false;
+            }
+        }
+
+        IRSizeAndAlignment sizeAndAlignment;
+        Result result = getNaturalSizeAndAlignment(
+            targetProgram->getOptionSet(),
+            concreteType,
+            &sizeAndAlignment);
+
+        if (SLANG_FAILED(result))
+            return false;
+
+        return true;
     }
 
     void lowerUntaggedUnionType(IRUntaggedUnionType* valueOfSetType)
@@ -532,15 +578,19 @@ struct SetLoweringContext : public InstPassBase
             kIROp_UntaggedUnionType,
             [&](IRUntaggedUnionType* inst) { return lowerUntaggedUnionType(inst); });
     }
+
+private:
+    DiagnosticSink* sink;
+    TargetProgram* targetProgram;
 };
 
 // Lower `UntaggedUnionType(TypeSet(...))` instructions by replacing them with
 // appropriate `AnyValueType` instructions.
 //
-void lowerUntaggedUnionTypes(IRModule* module, DiagnosticSink* sink)
+void lowerUntaggedUnionTypes(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
     SLANG_UNUSED(sink);
-    SetLoweringContext context(module);
+    SetLoweringContext context(module, targetProgram, sink);
     context.processModule();
 }
 
@@ -550,8 +600,8 @@ void lowerUntaggedUnionTypes(IRModule* module, DiagnosticSink* sink)
 //
 struct SequentialIDTagLoweringContext : public InstPassBase
 {
-    SequentialIDTagLoweringContext(IRModule* module)
-        : InstPassBase(module)
+    SequentialIDTagLoweringContext(Linkage* linkage, IRModule* module)
+        : InstPassBase(module), m_linkage(linkage)
     {
     }
     void lowerGetTagFromSequentialID(IRGetTagFromSequentialID* inst)
@@ -651,8 +701,112 @@ struct SequentialIDTagLoweringContext : public InstPassBase
         inst->removeAndDeallocate();
     }
 
+
+    // Ensures every witness table object has been assigned a sequential ID.
+    // All witness tables will have a SequentialID decoration after this function is run.
+    // The sequantial ID in the decoration will be the same as the one specified in the Linkage.
+    // Otherwise, a new ID will be generated and assigned to the witness table object, and
+    // the sequantial ID map in the Linkage will be updated to include the new ID, so they
+    // can be looked up by the user via future Slang API calls.
+    void ensureWitnessTableSequentialIDs()
+    {
+        StringBuilder generatedMangledName;
+
+        auto linkage = getLinkage();
+        for (auto inst : module->getGlobalInsts())
+        {
+            if (inst->getOp() == kIROp_WitnessTable)
+            {
+                UnownedStringSlice witnessTableMangledName;
+                if (auto instLinkage = inst->findDecoration<IRLinkageDecoration>())
+                {
+                    witnessTableMangledName = instLinkage->getMangledName();
+                }
+                else
+                {
+                    auto witnessTableType = as<IRWitnessTableType>(inst->getDataType());
+
+                    if (witnessTableType && witnessTableType->getConformanceType() == nullptr)
+                    {
+                        // Ignore witness tables that represent 'none' for optional witness table
+                        // types.
+                        continue;
+                    }
+
+                    if (witnessTableType && witnessTableType->getConformanceType()
+                                                ->findDecoration<IRSpecializeDecoration>())
+                    {
+                        // The interface is for specialization only, it would be an error if dynamic
+                        // dispatch is used through the interface. Skip assigning ID for the witness
+                        // table.
+                        continue;
+                    }
+
+                    // generate a unique linkage for it.
+                    static int32_t uniqueId = 0;
+                    uniqueId++;
+                    if (auto nameHint = inst->findDecoration<IRNameHintDecoration>())
+                    {
+                        generatedMangledName << nameHint->getName();
+                    }
+                    generatedMangledName << "_generated_witness_uuid_" << uniqueId;
+                    witnessTableMangledName = generatedMangledName.getUnownedSlice();
+                }
+
+                // If the inst already has a SequentialIDDecoration, stop now.
+                if (inst->findDecoration<IRSequentialIDDecoration>())
+                    continue;
+
+                // Get a sequential ID for the witness table using the map from the Linkage.
+                uint32_t seqID = 0;
+                if (!linkage->mapMangledNameToRTTIObjectIndex.tryGetValue(
+                        witnessTableMangledName,
+                        seqID))
+                {
+                    auto interfaceType =
+                        cast<IRWitnessTableType>(inst->getDataType())->getConformanceType();
+                    if (as<IRInterfaceType>(interfaceType))
+                    {
+                        auto interfaceLinkage =
+                            interfaceType->findDecoration<IRLinkageDecoration>();
+                        SLANG_ASSERT(
+                            interfaceLinkage && "An interface type does not have a linkage,"
+                                                "but a witness table associated with it has one.");
+                        auto interfaceName = interfaceLinkage->getMangledName();
+                        auto idAllocator =
+                            linkage->mapInterfaceMangledNameToSequentialIDCounters.tryGetValue(
+                                interfaceName);
+                        if (!idAllocator)
+                        {
+                            linkage->mapInterfaceMangledNameToSequentialIDCounters[interfaceName] =
+                                0;
+                            idAllocator =
+                                linkage->mapInterfaceMangledNameToSequentialIDCounters.tryGetValue(
+                                    interfaceName);
+                        }
+                        seqID = *idAllocator;
+                        ++(*idAllocator);
+                    }
+                    else
+                    {
+                        // NoneWitness, has special ID of -1.
+                        seqID = uint32_t(-1);
+                    }
+                    linkage->mapMangledNameToRTTIObjectIndex[witnessTableMangledName] = seqID;
+                }
+
+                // Add a decoration to the inst.
+                IRBuilder builder(module);
+                builder.setInsertBefore(inst);
+                builder.addSequentialIDDecoration(inst, seqID);
+            }
+        }
+    }
+
     void processModule()
     {
+        ensureWitnessTableSequentialIDs();
+
         processInstsOfType<IRGetTagFromSequentialID>(
             kIROp_GetTagFromSequentialID,
             [&](IRGetTagFromSequentialID* inst) { return lowerGetTagFromSequentialID(inst); });
@@ -661,12 +815,17 @@ struct SequentialIDTagLoweringContext : public InstPassBase
             kIROp_GetSequentialIDFromTag,
             [&](IRGetSequentialIDFromTag* inst) { return lowerGetSequentialIDFromTag(inst); });
     }
+
+    Linkage* getLinkage() { return m_linkage; }
+
+private:
+    Linkage* m_linkage;
 };
 
-void lowerSequentialIDTagCasts(IRModule* module, DiagnosticSink* sink)
+void lowerSequentialIDTagCasts(IRModule* module, Linkage* linkage, DiagnosticSink* sink)
 {
     SLANG_UNUSED(sink);
-    SequentialIDTagLoweringContext context(module);
+    SequentialIDTagLoweringContext context(linkage, module);
     context.processModule();
 }
 
@@ -854,7 +1013,7 @@ struct TaggedUnionLoweringContext : public InstPassBase
         inst->removeAndDeallocate();
     }
 
-    IRType* convertToTupleType(IRTaggedUnionType* taggedUnion)
+    IRType* lowerTaggedUnionType(IRTaggedUnionType* taggedUnion)
     {
         // Replace `TaggedUnionType(typeSet, tableSet)` with
         // `TupleType(SetTagType(tableSet), typeSet)`
@@ -920,25 +1079,35 @@ struct TaggedUnionLoweringContext : public InstPassBase
 
     bool lowerGetTypeTagFromTaggedUnion(IRGetTypeTagFromTaggedUnion* inst)
     {
-        // We don't use type tags anywhere, so this instruction should have no
-        // uses.
-        //
-        SLANG_ASSERT(inst->hasUses() == false);
-        inst->removeAndDeallocate();
+        IRBuilder builder(module);
+        builder.setInsertAfter(inst);
+        inst->replaceUsesWith(builder.emitPoison(inst->getDataType()));
         return true;
     }
 
+
     bool lowerMakeTaggedUnion(IRMakeTaggedUnion* inst)
     {
-        // We replace `MakeTaggedUnion(tag, val)` with `MakeTuple(tag, val)`
+        // We replace `MakeTaggedUnion(typeTag, witnessTableTag, val)` with `MakeTuple(tag, val)`
         //
 
         IRBuilder builder(module);
         builder.setInsertAfter(inst);
 
-        auto tag = inst->getOperand(0);
-        auto val = inst->getOperand(1);
-        inst->replaceUsesWith(builder.emitMakeTuple((IRType*)inst->getDataType(), {tag, val}));
+        auto tuTupleType = cast<IRTupleType>(inst->getDataType());
+
+        // The current lowering logic is only for bounded tagged unions (finite sets)
+        SLANG_ASSERT(!as<IRSetTagType>(tuTupleType->getOperand(0))->getSet()->isUnbounded());
+
+        auto typeTag = inst->getOperand(0);
+        // We'll ignore the type tag, since the table is the only thing we need.
+        // for the bounded case.
+        SLANG_UNUSED(typeTag);
+
+        auto witnessTableTag = inst->getOperand(1);
+        auto val = inst->getOperand(2);
+        inst->replaceUsesWith(
+            builder.emitMakeTuple((IRType*)inst->getDataType(), {witnessTableTag, val}));
         inst->removeAndDeallocate();
         return true;
     }
@@ -952,7 +1121,7 @@ struct TaggedUnionLoweringContext : public InstPassBase
             kIROp_TaggedUnionType,
             [&](IRTaggedUnionType* inst)
             {
-                inst->replaceUsesWith(convertToTupleType(inst));
+                inst->replaceUsesWith(lowerTaggedUnionType(inst));
                 inst->removeAndDeallocate();
             });
 
@@ -998,4 +1167,389 @@ bool lowerTaggedUnionTypes(IRModule* module, DiagnosticSink* sink)
     TaggedUnionLoweringContext context(module);
     return context.processModule();
 }
+
+void lowerIsTypeInsts(IRModule* module)
+{
+    InstPassBase pass(module);
+    pass.processInstsOfType<IRIsType>(
+        kIROp_IsType,
+        [&](IRIsType* inst)
+        {
+            auto witnessTableType =
+                as<IRWitnessTableTypeBase>(inst->getValueWitness()->getDataType());
+            if (witnessTableType &&
+                isComInterfaceType((IRType*)witnessTableType->getConformanceType()))
+                return;
+            IRBuilder builder(module);
+            builder.setInsertBefore(inst);
+            auto eqlInst = builder.emitEql(
+                builder.emitGetSequentialIDInst(inst->getValueWitness()),
+                builder.emitGetSequentialIDInst(inst->getTargetWitness()));
+            inst->replaceUsesWith(eqlInst);
+            inst->removeAndDeallocate();
+        });
+}
+
+struct ExistentialLoweringContext : public InstPassBase
+{
+    ExistentialLoweringContext(IRModule* module)
+        : InstPassBase(module)
+    {
+    }
+
+
+    bool _canReplace(IRUse* use)
+    {
+        switch (use->getUser()->getOp())
+        {
+        case kIROp_WitnessTableIDType:
+        case kIROp_WitnessTableType:
+        case kIROp_RTTIPointerType:
+        case kIROp_RTTIHandleType:
+        case kIROp_ComPtrType:
+        case kIROp_NativePtrType:
+            {
+                // Don't replace
+                return false;
+            }
+        case kIROp_ThisType:
+            {
+                // Appears replacable.
+                break;
+            }
+        case kIROp_PtrType:
+            {
+                // We can have ** and ComPtr<T>*.
+                // If it's a pointer type it could be because it is a global.
+                break;
+            }
+        default:
+            break;
+        }
+        return true;
+    }
+
+    // Replace all WitnessTableID type or RTTIHandleType with `uint2`.
+    void lowerHandleTypes()
+    {
+        List<IRInst*> instsToRemove;
+        for (auto inst : module->getGlobalInsts())
+        {
+            switch (inst->getOp())
+            {
+            case kIROp_WitnessTableIDType:
+                if (isComInterfaceType((IRType*)inst->getOperand(0)))
+                    continue;
+                // fall through
+            case kIROp_RTTIHandleType:
+                {
+                    IRBuilder builder(module);
+                    builder.setInsertBefore(inst);
+                    auto uint2Type = builder.getVectorType(
+                        builder.getUIntType(),
+                        builder.getIntValue(builder.getIntType(), 2));
+                    inst->replaceUsesWith(uint2Type);
+                    instsToRemove.add(inst);
+                }
+                break;
+            }
+        }
+        for (auto inst : instsToRemove)
+            inst->removeAndDeallocate();
+    }
+
+    IRInst* lowerInterfaceType(IRInst* interfaceType)
+    {
+        if (isComInterfaceType((IRType*)interfaceType))
+            return (IRType*)interfaceType;
+
+        IRBuilder builder(module);
+        if (isBuiltin(interfaceType))
+            return (IRType*)builder.getIntValue(builder.getIntType(), 0);
+
+        IRIntegerValue anyValueSize = 0;
+        if (auto decor = interfaceType->findDecoration<IRAnyValueSizeDecoration>())
+        {
+            anyValueSize = decor->getSize();
+        }
+
+        auto anyValueType = builder.getAnyValueType(anyValueSize);
+        auto witnessTableType = builder.getWitnessTableIDType((IRType*)interfaceType);
+        auto rttiType = builder.getRTTIHandleType();
+
+        return builder.getTupleType(rttiType, witnessTableType, anyValueType);
+    }
+
+    IRInst* lowerBoundInterfaceType(IRBoundInterfaceType* boundInterfaceType)
+    {
+        IRBuilder builder(module);
+
+        auto payloadType = boundInterfaceType->getConcreteType();
+        auto witnessTableType = builder.getWitnessTableIDType(
+            (IRType*)as<IRWitnessTable>(boundInterfaceType->getWitnessTable())
+                ->getConformanceType());
+        auto rttiType = builder.getRTTIHandleType();
+        auto interfaceType = boundInterfaceType->getInterfaceType();
+
+        IRIntegerValue anyValueSize = 16;
+        if (auto decor = interfaceType->findDecoration<IRAnyValueSizeDecoration>())
+        {
+            anyValueSize = decor->getSize();
+        }
+
+        auto anyValueType = builder.getAnyValueType(anyValueSize);
+
+        return builder.getTupleType(
+            rttiType,
+            witnessTableType,
+            builder.getPseudoPtrType(payloadType),
+            anyValueType);
+    }
+
+    bool lowerExtractExistentialType(IRExtractExistentialType* inst)
+    {
+        // Replace with extraction of the value type from the tagged-union tuple.
+        //
+
+        IRBuilder builder(module);
+        builder.setInsertAfter(inst);
+
+        if (auto tupleType = as<IRTupleType>(inst->getOperand(0)->getDataType()))
+        {
+            inst->replaceUsesWith(builder.emitGetTupleElement(
+                (IRType*)tupleType->getOperand(0),
+                inst->getOperand(0),
+                0));
+            inst->removeAndDeallocate();
+        }
+        else if (auto comPtrType = as<IRComPtrType>(inst->getOperand(0)->getDataType()))
+        {
+            inst->replaceUsesWith(inst->getOperand(0));
+            inst->removeAndDeallocate();
+        }
+        return true;
+    }
+
+    bool lowerExtractExistentialWitnessTable(IRExtractExistentialWitnessTable* inst)
+    {
+        // Replace with extraction of the value from the tagged-union tuple.
+        //
+
+        IRBuilder builder(module);
+        builder.setInsertAfter(inst);
+
+        if (auto tupleType = as<IRTupleType>(inst->getOperand(0)->getDataType()))
+        {
+            inst->replaceUsesWith(builder.emitGetTupleElement(
+                (IRType*)tupleType->getOperand(1),
+                inst->getOperand(0),
+                1));
+            inst->removeAndDeallocate();
+            return true;
+        }
+        else if (auto comPtrType = as<IRComPtrType>(inst->getOperand(0)->getDataType()))
+        {
+            inst->replaceUsesWith(inst->getOperand(0));
+            inst->removeAndDeallocate();
+            return true;
+        }
+        else
+        {
+            SLANG_UNEXPECTED("Unexpected type for ExtractExistentialWitnessTable operand");
+        }
+        return false;
+    }
+
+    bool lowerGetValueFromBoundInterface(IRGetValueFromBoundInterface* inst)
+    {
+        // Replace with extraction of the value from the tagged-union tuple.
+        //
+
+        IRBuilder builder(module);
+        builder.setInsertAfter(inst);
+
+        auto tupleType = as<IRTupleType>(inst->getOperand(0)->getDataType());
+
+        if (as<IRPseudoPtrType>(tupleType->getOperand(2)))
+        {
+            inst->replaceUsesWith(builder.emitGetTupleElement(
+                (IRType*)tupleType->getOperand(2),
+                inst->getOperand(0),
+                2));
+            inst->removeAndDeallocate();
+            return true;
+        }
+        else
+        {
+            inst->replaceUsesWith(builder.emitUnpackAnyValue(
+                inst->getDataType(),
+                builder.emitGetTupleElement(
+                    (IRType*)tupleType->getOperand(2),
+                    inst->getOperand(0),
+                    2)));
+            inst->removeAndDeallocate();
+            return true;
+        }
+        return true;
+    }
+
+    bool lowerExtractExistentialValue(IRExtractExistentialValue* inst)
+    {
+        // Replace with extraction of the value from the tagged-union tuple.
+        //
+
+        IRBuilder builder(module);
+        builder.setInsertAfter(inst);
+
+        if (auto tupleType = as<IRTupleType>(inst->getOperand(0)->getDataType()))
+        {
+            inst->replaceUsesWith(builder.emitGetTupleElement(
+                (IRType*)tupleType->getOperand(2),
+                inst->getOperand(0),
+                2));
+            inst->removeAndDeallocate();
+            return true;
+        }
+        else if (auto comPtrType = as<IRComPtrType>(inst->getOperand(0)->getDataType()))
+        {
+            inst->replaceUsesWith(inst->getOperand(0));
+            inst->removeAndDeallocate();
+            return true;
+        }
+        SLANG_UNEXPECTED("Unexpected type for ExtractExistentialValue operand");
+        return false;
+    }
+
+    bool processGetSequentialIDInst(IRGetSequentialID* inst)
+    {
+        // If the operand is a witness table, it is already replaced with a uint2
+        // at this point, where the first element in the uint2 is the id of the
+        // witness table.
+        IRBuilder builder(module);
+        builder.setInsertBefore(inst);
+
+        if (auto table = as<IRWitnessTable>(inst->getRTTIOperand()))
+        {
+            auto seqDecoration = table->findDecoration<IRSequentialIDDecoration>();
+            SLANG_ASSERT(seqDecoration && "Witness table missing SequentialID decoration");
+            auto id = builder.getIntValue(builder.getUIntType(), seqDecoration->getSequentialID());
+            inst->replaceUsesWith(id);
+            inst->removeAndDeallocate();
+            return true;
+        }
+
+
+        UInt index = 0;
+        auto id = builder.emitSwizzle(builder.getUIntType(), inst->getRTTIOperand(), 1, &index);
+        inst->replaceUsesWith(id);
+        inst->removeAndDeallocate();
+        return true;
+    }
+
+    void processModule()
+    {
+        // Then, start lowering the remaining non-COM/non-Builtin interface types
+        // At this point, we should only bea dealing with public facing uses of
+        // interface types (which must lower into a 3-tuple of RTTI, witness table ID, AnyValue)
+        //
+        processInstsOfType<IRInterfaceType>(
+            kIROp_InterfaceType,
+            [&](IRInterfaceType* inst)
+            {
+                IRBuilder builder(module);
+                builder.setInsertInto(module);
+                if (auto loweredInterfaceType = lowerInterfaceType(inst))
+                {
+                    if (loweredInterfaceType != inst)
+                    {
+
+                        traverseUses(
+                            inst,
+                            [&](IRUse* use)
+                            {
+                                if (_canReplace(use))
+                                    builder.replaceOperand(use, loweredInterfaceType);
+                            });
+                    }
+                }
+            });
+
+        processInstsOfType<IRBoundInterfaceType>(
+            kIROp_BoundInterfaceType,
+            [&](IRBoundInterfaceType* inst)
+            {
+                IRBuilder builder(module);
+                builder.setInsertInto(module);
+                if (auto loweredBoundInterfaceType = lowerBoundInterfaceType(inst))
+                {
+                    if (loweredBoundInterfaceType != inst)
+                    {
+                        traverseUses(
+                            inst,
+                            [&](IRUse* use)
+                            {
+                                if (_canReplace(use))
+                                    builder.replaceOperand(use, loweredBoundInterfaceType);
+                            });
+                    }
+                }
+            });
+
+        // Replace any other uses with dummy value 0.
+        // TODO: Ideally, we should replace it with IRPoison..
+        {
+            IRBuilder builder(module);
+            builder.setInsertInto(module);
+            auto dummyInterfaceObj = builder.getIntValue(builder.getIntType(), 0);
+            processInstsOfType<IRInterfaceType>(
+                kIROp_InterfaceType,
+                [&](IRInterfaceType* inst)
+                {
+                    if (!isComInterfaceType((IRType*)inst))
+                    {
+                        inst->replaceUsesWith(dummyInterfaceObj);
+                        inst->removeAndDeallocate();
+                    }
+                });
+        }
+
+        processAllInsts(
+            [&](IRInst* inst)
+            {
+                switch (inst->getOp())
+                {
+                case kIROp_ExtractExistentialType:
+                    lowerExtractExistentialType(cast<IRExtractExistentialType>(inst));
+                    break;
+                case kIROp_ExtractExistentialValue:
+                    lowerExtractExistentialValue(cast<IRExtractExistentialValue>(inst));
+                    break;
+                case kIROp_ExtractExistentialWitnessTable:
+                    lowerExtractExistentialWitnessTable(
+                        cast<IRExtractExistentialWitnessTable>(inst));
+                    break;
+                case kIROp_GetValueFromBoundInterface:
+                    lowerGetValueFromBoundInterface(cast<IRGetValueFromBoundInterface>(inst));
+                    break;
+                }
+            });
+
+        lowerIsTypeInsts(module);
+
+        processInstsOfType<IRGetSequentialID>(
+            kIROp_GetSequentialID,
+            [&](IRGetSequentialID* inst) { return processGetSequentialIDInst(inst); });
+
+        lowerHandleTypes();
+    }
+};
+
+bool lowerExistentials(IRModule* module, DiagnosticSink* sink)
+{
+    SLANG_UNUSED(sink);
+    ExistentialLoweringContext context(module);
+    context.processModule();
+    return true;
+};
+
 }; // namespace Slang

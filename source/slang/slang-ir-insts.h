@@ -2842,7 +2842,23 @@ struct IRSetBase : IRInst
     FIDDLE(baseInst())
     UInt getCount() { return getOperandCount(); }
     IRInst* getElement(UInt idx) { return getOperand(idx); }
-    bool isSingleton() { return getOperandCount() == 1; }
+    bool isSingleton() { return (getOperandCount() == 1) && !isUnbounded(); }
+    bool isUnbounded()
+    {
+        // This is an unbounded set if any of its elements are unbounded.
+        for (UInt ii = 0; ii < getOperandCount(); ++ii)
+        {
+            switch (getElement(ii)->getOp())
+            {
+            case kIROp_UnboundedTypeElement:
+            case kIROp_UnboundedWitnessTableElement:
+            case kIROp_UnboundedFuncElement:
+            case kIROp_UnboundedGenericElement:
+                return true;
+            }
+        }
+        return false;
+    }
 };
 
 FIDDLE()
@@ -3587,10 +3603,14 @@ $(type_info.return_type) $(type_info.method_name)(
         return emitMakeTuple(SLANG_COUNT_OF(args), args);
     }
 
-    IRMakeTaggedUnion* emitMakeTaggedUnion(IRType* type, IRInst* tag, IRInst* value)
+    IRMakeTaggedUnion* emitMakeTaggedUnion(
+        IRType* type,
+        IRInst* typeTag,
+        IRInst* witnessTableTag,
+        IRInst* value)
     {
-        IRInst* args[] = {tag, value};
-        return cast<IRMakeTaggedUnion>(emitIntrinsicInst(type, kIROp_MakeTaggedUnion, 2, args));
+        IRInst* args[] = {typeTag, witnessTableTag, value};
+        return cast<IRMakeTaggedUnion>(emitIntrinsicInst(type, kIROp_MakeTaggedUnion, 3, args));
     }
 
     IRInst* emitMakeValuePack(IRType* type, UInt count, IRInst* const* args);
@@ -4206,6 +4226,42 @@ $(type_info.return_type) $(type_info.method_name)(
     {
         IRInst* operands[] = {collection};
         return cast<IRSetTagType>(emitIntrinsicInst(nullptr, kIROp_SetTagType, 1, operands));
+    }
+
+    IRUnboundedTypeElement* getUnboundedTypeElement(IRInst* interfaceType)
+    {
+        return cast<IRUnboundedTypeElement>(
+            emitIntrinsicInst(nullptr, kIROp_UnboundedTypeElement, 1, &interfaceType));
+    }
+
+    IRUnboundedWitnessTableElement* getUnboundedWitnessTableElement(IRInst* interfaceType)
+    {
+        return cast<IRUnboundedWitnessTableElement>(
+            emitIntrinsicInst(nullptr, kIROp_UnboundedWitnessTableElement, 1, &interfaceType));
+    }
+
+    IRUnboundedFuncElement* getUnboundedFuncElement()
+    {
+        return cast<IRUnboundedFuncElement>(
+            emitIntrinsicInst(nullptr, kIROp_UnboundedFuncElement, 0, nullptr));
+    }
+
+    IRUnboundedGenericElement* getUnboundedGenericElement()
+    {
+        return cast<IRUnboundedGenericElement>(
+            emitIntrinsicInst(nullptr, kIROp_UnboundedGenericElement, 0, nullptr));
+    }
+
+    IRUninitializedTypeElement* getUninitializedTypeElement(IRInst* interfaceType)
+    {
+        return cast<IRUninitializedTypeElement>(
+            emitIntrinsicInst(nullptr, kIROp_UninitializedTypeElement, 1, &interfaceType));
+    }
+
+    IRUninitializedWitnessTableElement* getUninitializedWitnessTableElement(IRInst* interfaceType)
+    {
+        return cast<IRUninitializedWitnessTableElement>(
+            emitIntrinsicInst(nullptr, kIROp_UninitializedWitnessTableElement, 1, &interfaceType));
     }
 
     IRGetTagOfElementInSet* emitGetTagOfElementInSet(

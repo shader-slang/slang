@@ -183,6 +183,7 @@ IRFunc* specializeDispatchFunction(
 // Otherwise, a new ID will be generated and assigned to the witness table object, and
 // the sequantial ID map in the Linkage will be updated to include the new ID, so they
 // can be looked up by the user via future Slang API calls.
+/*
 void ensureWitnessTableSequentialIDs(SharedGenericsLoweringContext* sharedContext)
 {
     StringBuilder generatedMangledName;
@@ -274,6 +275,7 @@ void ensureWitnessTableSequentialIDs(SharedGenericsLoweringContext* sharedContex
         }
     }
 }
+*/
 
 // Fixes up call sites of a dispatch function, so that the witness table argument is replaced with
 // its sequential ID.
@@ -309,7 +311,7 @@ void fixupDispatchFuncCall(SharedGenericsLoweringContext* sharedContext, IRFunc*
 void specializeDispatchFunctions(SharedGenericsLoweringContext* sharedContext)
 {
     // First we ensure that all witness table objects has a sequential ID assigned.
-    ensureWitnessTableSequentialIDs(sharedContext);
+    // ensureWitnessTableSequentialIDs(sharedContext);
 
     // Generate specialized dispatch functions and fixup call sites.
     for (const auto& [_, dispatchFunc] : sharedContext->mapInterfaceRequirementKeyToDispatchMethods)

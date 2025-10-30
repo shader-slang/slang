@@ -38,20 +38,24 @@ IRInst* upcastSet(IRBuilder* builder, IRInst* arg, IRType* destInfo)
 
         if (argTUType != destTUType)
         {
-            // Technically, IRTaggedUnionType is not a TupleType,
-            // but in practice it works the same way so we'll re-use Slang's
-            // tuple accessors & constructors
-            //
             auto argTableTag = builder->emitGetTagFromTaggedUnion(arg);
-            auto reinterpretedTag = upcastSet(
+            auto reinterpretedTableTag = upcastSet(
                 builder,
                 argTableTag,
                 builder->getSetTagType(destTUType->getWitnessTableSet()));
 
+            auto argTypeTag = builder->emitGetTypeTagFromTaggedUnion(arg);
+            auto reinterpretedTypeTag =
+                upcastSet(builder, argTypeTag, builder->getSetTagType(destTUType->getTypeSet()));
+
             auto argVal = builder->emitGetValueFromTaggedUnion(arg);
             auto reinterpretedVal =
                 upcastSet(builder, argVal, builder->getUntaggedUnionType(destTUType->getTypeSet()));
-            return builder->emitMakeTaggedUnion(destTUType, reinterpretedTag, reinterpretedVal);
+            return builder->emitMakeTaggedUnion(
+                destTUType,
+                reinterpretedTypeTag,
+                reinterpretedTableTag,
+                reinterpretedVal);
         }
     }
     else if (as<IRSetTagType>(argInfo) && as<IRSetTagType>(destInfo))

@@ -8,5 +8,8 @@
 
 namespace Slang
 {
-void inferAnyValueSizeWhereNecessary(TargetProgram* targetProgram, IRModule* module);
+void inferAnyValueSizeWhereNecessary(
+    TargetProgram* targetProgram,
+    IRModule* module,
+    DiagnosticSink* sink);
 }
