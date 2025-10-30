@@ -22,6 +22,22 @@ struct LowerCombinedSamplerContext
     Dictionary<IRType*, LoweredCombinedSamplerStructInfo> mapLoweredTypeToLoweredInfo;
     CodeGenTarget codeGenTarget;
 
+    std::optional<LoweredCombinedSamplerStructInfo> getLoweredTypeInfo(
+        IRType* textureTypeOrLoweredType)
+    {
+        if (auto combinedSamplerType = as<IRTextureTypeBase>(textureTypeOrLoweredType))
+        {
+            return lowerCombinedTextureSamplerType(combinedSamplerType);
+        }
+        else
+        {
+            auto loweredInfoPtr = mapLoweredTypeToLoweredInfo.tryGetValue(textureTypeOrLoweredType);
+            if (!loweredInfoPtr)
+                return std::nullopt;
+            return *loweredInfoPtr;
+        }
+    }
+
     LoweredCombinedSamplerStructInfo lowerCombinedTextureSamplerType(IRTextureTypeBase* textureType)
     {
         if (auto loweredInfo = mapTypeToLoweredInfo.tryGetValue(textureType))
@@ -232,29 +248,17 @@ void lowerCombinedTextureSamplers(
                 case kIROp_CombinedTextureSamplerGetTexture:
                 case kIROp_CombinedTextureSamplerGetSampler:
                     {
-                        LoweredCombinedSamplerStructInfo loweredInfo;
-
-                        if (auto combinedSamplerType =
-                                as<IRTextureTypeBase>(inst->getOperand(0)->getDataType()))
-                        {
-                            loweredInfo =
-                                context.lowerCombinedTextureSamplerType(combinedSamplerType);
-                        }
-                        else
-                        {
-                            auto loweredInfoPtr = context.mapLoweredTypeToLoweredInfo.tryGetValue(
-                                inst->getOperand(0)->getDataType());
-                            if (!loweredInfoPtr)
-                                continue;
-                            loweredInfo = *loweredInfoPtr;
-                        }
+                        auto loweredInfo =
+                            context.getLoweredTypeInfo(inst->getOperand(0)->getDataType());
+                        if (!loweredInfo)
+                            continue;
                         builder.setInsertBefore(inst);
                         auto fieldExtract = builder.emitFieldExtract(
                             inst->getFullType(),
                             inst->getOperand(0),
                             inst->getOp() == kIROp_CombinedTextureSamplerGetSampler
-                                ? loweredInfo.sampler
-                                : loweredInfo.texture);
+                                ? loweredInfo->sampler
+                                : loweredInfo->texture);
                         inst->replaceUsesWith(fieldExtract);
                         inst->removeAndDeallocate();
                     }
@@ -268,9 +272,7 @@ void lowerCombinedTextureSamplers(
                             // where native resource handles are already bindless, e.g. metal.
                             // On these platforms, the handle is a struct containing texture
                             // and sampler fields, so we just need to insert the extract operations.
-                            auto combinedSamplerType = inst->getDataType();
-                            auto loweredInfo =
-                                context.mapTypeToLoweredInfo.tryGetValue(combinedSamplerType);
+                            auto loweredInfo = context.getLoweredTypeInfo(inst->getDataType());
                             if (!loweredInfo)
                                 continue;
                             builder.setInsertBefore(inst);
@@ -294,8 +296,7 @@ void lowerCombinedTextureSamplers(
                 case kIROp_MakeCombinedTextureSamplerFromHandle:
                     {
                         auto combinedSamplerType = inst->getDataType();
-                        auto loweredInfo =
-                            context.mapTypeToLoweredInfo.tryGetValue(combinedSamplerType);
+                        auto loweredInfo = context.getLoweredTypeInfo(inst->getDataType());
                         if (!loweredInfo)
                             continue;
                         auto handle = inst->getOperand(0);
