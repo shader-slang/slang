@@ -436,12 +436,13 @@ static int pipeCLOEXEC(int pipefd[2])
     int stdoutPipe[2] = {-1, -1};
     int stderrPipe[2] = {-1, -1};
 
-    // We will create this pipe with O_CLOEXEC, so that it gets closed
-    // automatically if the child's exec succeeds
+    // We will create all pipes with O_CLOEXEC, so that they get closed
+    // automatically if the child's exec succeeds. This prevents file descriptor
+    // leaks when creating many processes in parallel.
     int execWatchPipe[2] = {-1, -1};
 
-    if (pipe(stdinPipe) == -1 || pipe(stdoutPipe) == -1 || pipe(stderrPipe) == -1 ||
-        pipeCLOEXEC(execWatchPipe) == -1)
+    if (pipeCLOEXEC(stdinPipe) == -1 || pipeCLOEXEC(stdoutPipe) == -1 ||
+        pipeCLOEXEC(stderrPipe) == -1 || pipeCLOEXEC(execWatchPipe) == -1)
     {
         whatFailed = "pipe";
         goto reportErr;
