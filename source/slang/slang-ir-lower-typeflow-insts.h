@@ -32,6 +32,6 @@ bool lowerDispatchers(IRModule* module, DiagnosticSink* sink);
 // Lower `ExtractExistentialValue`, `ExtractExistentialType`, `ExtractExistentialWitnessTable`,
 // `InterfaceType`, `GetSequentialID`, `WitnessTableIDType` and `RTTIHandleType` instructions.
 //
-bool lowerExistentials(IRModule* module, DiagnosticSink* sink);
+bool lowerExistentials(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink);
 
 } // namespace Slang

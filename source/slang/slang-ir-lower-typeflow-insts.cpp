@@ -1398,11 +1398,12 @@ void lowerIsTypeInsts(IRModule* module)
 
 struct ExistentialLoweringContext : public InstPassBase
 {
-    ExistentialLoweringContext(IRModule* module)
-        : InstPassBase(module)
+    TargetProgram* targetProgram;
+
+    ExistentialLoweringContext(IRModule* module, TargetProgram* targetProgram)
+        : InstPassBase(module), targetProgram(targetProgram)
     {
     }
-
 
     bool _canReplace(IRUse* use)
     {
@@ -1505,11 +1506,24 @@ struct ExistentialLoweringContext : public InstPassBase
 
         auto anyValueType = builder.getAnyValueType(anyValueSize);
 
-        return builder.getTupleType(
-            rttiType,
-            witnessTableType,
-            builder.getPseudoPtrType(payloadType),
-            anyValueType);
+        IRSizeAndAlignment sizeAndAlignment;
+        Result result = getNaturalSizeAndAlignment(
+            targetProgram->getOptionSet(),
+            payloadType,
+            &sizeAndAlignment);
+        if (SLANG_FAILED(result) || sizeAndAlignment.size > anyValueSize)
+        {
+            return builder.getTupleType(
+                rttiType,
+                witnessTableType,
+                builder.getPseudoPtrType(payloadType),
+                anyValueType);
+        }
+        else
+        {
+            // Regular case (lower in the same way as unbound interface types)
+            return builder.getTupleType(rttiType, witnessTableType, anyValueType);
+        }
     }
 
     bool lowerExtractExistentialType(IRExtractExistentialType* inst)
@@ -1750,10 +1764,10 @@ struct ExistentialLoweringContext : public InstPassBase
     }
 };
 
-bool lowerExistentials(IRModule* module, DiagnosticSink* sink)
+bool lowerExistentials(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
     SLANG_UNUSED(sink);
-    ExistentialLoweringContext context(module);
+    ExistentialLoweringContext context(module, targetProgram);
     context.processModule();
     return true;
 };

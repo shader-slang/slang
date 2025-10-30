@@ -1186,7 +1186,7 @@ Result linkAndOptimizeIR(
 
     eliminateDeadCode(irModule, fastIRSimplificationOptions.deadCodeElimOptions);
 
-    lowerExistentials(irModule, sink);
+    lowerExistentials(irModule, targetProgram, sink);
 
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
