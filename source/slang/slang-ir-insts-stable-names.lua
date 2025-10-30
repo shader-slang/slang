@@ -223,7 +223,7 @@ return {
 	["field"] = 219,
 	["var"] = 220,
 	["load"] = 221,
-	["store"] = 222,
+	["StoreBase.store"] = 222,
 	["AtomicOperation.atomicLoad"] = 223,
 	["AtomicOperation.atomicStore"] = 224,
 	["AtomicOperation.atomicExchange"] = 225,
@@ -682,6 +682,7 @@ return {
 	["Attr.MemoryScope"] = 678,
 	["Undefined.LoadFromUninitializedMemory"] = 679,
 	["CUDA_LDG"] = 680,
+<<<<<<< HEAD
   	["SetBase.TypeSet"] = 681,
 	["SetBase.FuncSet"] = 682,
 	["SetBase.WitnessTableSet"] = 683,
@@ -712,4 +713,9 @@ return {
 	["UnboundedGenericElement"] = 708,
 	["UninitializedTypeElement"] = 709,
 	["UninitializedWitnessTableElement"] = 710,
+=======
+	["StoreBase.copyLogical"] = 681,
+	["MakeStorageTypeLoweringConfig"] = 682,
+	["Decoration.experimentalModule"] = 683,
+>>>>>>> upstream
 }
