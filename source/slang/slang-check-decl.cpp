@@ -194,6 +194,8 @@ static List<ConstructorDecl*> _getCtorList(
     ConstructorDecl** defaultCtorOut);
 static Expr* constructDefaultInitExprForType(SemanticsVisitor* visitor, VarDeclBase* varDecl);
 
+int compareVals(Val& lhs, Val& rhs);
+
 /// Visitor to transition declarations to `DeclCheckState::CheckedModifiers`
 struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
                                        public DeclVisitor<SemanticsDeclModifiersVisitor>
@@ -3516,6 +3518,14 @@ void SemanticsDeclHeaderVisitor::checkGenericTypeEqualityConstraintSubType(
 
         Decl* subAncestor = as<DeclRefType>(decl->sub.type)->getDeclRef().getDecl();
         Decl* supAncestor = as<DeclRefType>(decl->sup.type)->getDeclRef().getDecl();
+        if (subAncestor == supAncestor)
+        {
+            // If both side resolve to the same decl, there is no need to compare decl order,
+            // because we cannot decide the order. Instead we will just compare the DeclRefType
+            // itself.
+            return compareVals(*decl->sub.type, *decl->sup.type);
+        }
+
         auto ancestor = findDeclsLowestCommonAncestor(subAncestor, supAncestor);
         if (!ancestor)
         {
