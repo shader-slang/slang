@@ -9517,7 +9517,6 @@ T exp10(T x)
     __target_switch
     {
     case metal: __intrinsic_asm "exp10";
-    case llvm: __intrinsic_asm "%result = call $T0 @llvm.exp10($0)";
     default:
         const T ln10 = T(2.302585092994045901); // ln(10)
         return exp(x * ln10);
@@ -9532,7 +9531,6 @@ vector<T,N> exp10(vector<T,N> x)
     __target_switch
     {
     case metal: __intrinsic_asm "exp10";
-    case llvm: __intrinsic_asm "%result = call $T0 @llvm.exp10($0)";
     default:
         const T ln10 = T(2.30258509299); // ln(10)
         return exp(x * ln10);
