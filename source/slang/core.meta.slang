@@ -124,6 +124,9 @@ interface IRangedValue
     static const This minValue;
 }
 
+__attributeTarget(ModuleDecl)
+attribute_syntax [ExperimentalModule] : ExperimentalModuleAttribute;
+
 __attributeTarget(DeclBase)
 attribute_syntax [TreatAsDifferentiable] : TreatAsDifferentiableAttribute;
 
@@ -983,13 +986,13 @@ matrix<T,N,M> operator?:(matrix<bool,N,M> condition, matrix<T,N,M> ifTrue, matri
     return select(condition, ifTrue, ifFalse);
 }
 
-[ForceInline]
+[__unsafeForceInlineEarly]
 __generic<T> Optional<T> select(bool condition, __none_t ifTrue, T ifFalse)
 {
     return select(condition, Optional<T>(none), Optional<T>(ifFalse));
 }
 
-[ForceInline]
+[__unsafeForceInlineEarly]
 __generic<T> Optional<T> select(bool condition, T ifTrue, __none_t ifFalse)
 {
     return select(condition, Optional<T>(ifTrue), Optional<T>(none));
@@ -3741,7 +3744,7 @@ struct Atomic<T : IAtomicable>
 {
     /// Atomically load the stored `T` value
     __intrinsic_op($(kIROp_AtomicLoad))
-    [__ref] T load(MemoryOrder order = MemoryOrder.Relaxed);
+    [constref] T load(MemoryOrder order = MemoryOrder.Relaxed);
 
     /// Atomically store a new `T` value
     __intrinsic_op($(kIROp_AtomicStore))

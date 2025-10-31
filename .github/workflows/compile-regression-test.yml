@@ -1,6 +1,7 @@
 name: Compile Regression-Test
 
 on:
+  workflow_dispatch:
   push:
     branches: [master]
     paths-ignore:
@@ -54,6 +55,7 @@ jobs:
           platform: ${{matrix.platform}}
           config: ${{matrix.config}}
           build-llvm: true
+          use-cached-llvm: false
       - name: Build Slang
         run: |
           cmake --preset default --fresh \
