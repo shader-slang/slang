@@ -260,6 +260,14 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
     }
 
     bool DoStructuredBuffersNeedSeparateCounterBuffer() override { return true; }
+
+    SimpleLayoutInfo GetDescriptorHandleLayout(DescriptorHandleType* descriptorHandleType) override
+    {
+        SLANG_UNUSED(descriptorHandleType);
+        // For SPIR-V targets, DescriptorHandle<T> is treated as uint2
+        auto uintInfo = GetScalarLayout(BaseType::UInt);
+        return GetVectorLayout(BaseType::UInt, uintInfo, 2);
+    }
 };
 
 /// Common behavior for GLSL-family layout.
@@ -5818,6 +5826,21 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
                     varyingRuleSet->GetVectorLayout(elementBaseType, elementInfo, colCount);
                 rowTypeLayout->addResourceUsage(rowInfo.kind, rowInfo.size);
             }
+        }
+
+        return typeLayout;
+    }
+    else if (auto descriptorHandleType = as<DescriptorHandleType>(type))
+    {
+        RefPtr<TypeLayout> typeLayout = new TypeLayout();
+        typeLayout->type = type;
+        typeLayout->rules = rules;
+
+        for (int rr = 0; rr < varyingRulesCount; ++rr)
+        {
+            auto varyingRuleSet = varyingRules[rr];
+            auto info = varyingRuleSet->GetDescriptorHandleLayout(descriptorHandleType);
+            typeLayout->addResourceUsage(info.kind, info.size);
         }
 
         return typeLayout;
