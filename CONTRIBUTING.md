@@ -122,6 +122,11 @@ $ cmake --build --preset release
 #### MacOS
 Install Xcode from the App Store.
 
+Make sure the Metal Toolchain is installed, either using Xcode Components settings, or from the command line:
+```
+$ xcodebuild -downloadComponent MetalToolchain
+```
+
 Install CMake and Ninja; we recommend using [Homebrew](https://brew.sh/) for installing them.
 ```
 $ brew install ninja

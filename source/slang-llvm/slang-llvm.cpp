@@ -2,7 +2,7 @@
 #include "clang/Basic/TargetOptions.h"
 #include "clang/Basic/Version.h"
 #include "clang/CodeGen/CodeGenAction.h"
-#include "clang/CodeGen/ObjectFilePCHContainerOperations.h"
+#include "clang/CodeGen/ObjectFilePCHContainerWriter.h"
 #include "clang/Config/config.h"
 #include "clang/Driver/DriverDiagnostic.h"
 #include "clang/Driver/Options.h"
@@ -15,6 +15,7 @@
 #include "clang/Frontend/Utils.h"
 #include "clang/FrontendTool/Utils.h"
 #include "clang/Lex/PreprocessorOptions.h"
+#include "clang/Serialization/ObjectFilePCHContainerReader.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Config/llvm-config.h"
 #include "llvm/LinkAllPasses.h"
@@ -226,13 +227,8 @@ void* LLVMJITSharedLibrary::castAs(const Guid& guid)
 
 void* LLVMJITSharedLibrary::findSymbolAddressByName(char const* name)
 {
-    auto fnExpected = m_jit->lookup(name);
-    if (fnExpected)
-    {
-        auto fn = std::move(*fnExpected);
-        return (void*)fn.getAddress();
-    }
-    return nullptr;
+    auto fn = m_jit->lookup(name);
+    return fn ? (void*)fn.get().getValue() : nullptr;
 }
 
 
@@ -653,7 +649,7 @@ SlangResult LLVMDownstreamCompiler::compile(
     pchOps->registerWriter(std::make_unique<ObjectFilePCHContainerWriter>());
     pchOps->registerReader(std::make_unique<ObjectFilePCHContainerReader>());
 
-    IntrusiveRefCntPtr<DiagnosticOptions> diagOpts = new DiagnosticOptions();
+    DiagnosticOptions diagOpts;
 
     ComPtr<IArtifactDiagnostics> diagnostics(new ArtifactDiagnostics);
 
@@ -721,8 +717,6 @@ SlangResult LLVMDownstreamCompiler::compile(
         }
     }
 
-    const InputKind inputKind(language, InputKind::Format::Source);
-
     {
         auto& opts = invocation.getFrontendOpts();
 
@@ -732,7 +726,7 @@ SlangResult LLVMDownstreamCompiler::compile(
         // input is a memory buffer. For Slang usage, this probably isn't an issue, because it's
         // *output* typically holds #line directives.
         {
-
+            const InputKind inputKind(language, InputKind::Format::Source);
             FrontendInputFile inputFile(*sourceBuffer, inputKind);
             opts.Inputs.push_back(inputFile);
         }
@@ -776,7 +770,7 @@ SlangResult LLVMDownstreamCompiler::compile(
     }
 
     {
-        auto opts = invocation.getLangOpts();
+        auto& opts = invocation.getLangOpts();
 
         std::vector<std::string> includes;
         for (const auto& includePath : options.includePaths)
@@ -784,16 +778,11 @@ SlangResult LLVMDownstreamCompiler::compile(
             includes.push_back(includePath.begin());
         }
 
-        clang::CompilerInvocation::setLangDefaults(
-            *opts,
-            inputKind,
-            targetTriple,
-            includes,
-            langStd);
+        clang::LangOptions::setLangDefaults(opts, language, targetTriple, includes, langStd);
 
         if (options.floatingPointMode == DownstreamCompileOptions::FloatingPointMode::Fast)
         {
-            opts->FastMath = true;
+            opts.FastMath = true;
         }
     }
 
@@ -853,7 +842,7 @@ SlangResult LLVMDownstreamCompiler::compile(
 #endif
 
     // Create the actual diagnostics engine.
-    clang->createDiagnostics();
+    clang->createDiagnostics(*llvm::vfs::getRealFileSystem());
     clang->setDiagnostics(diags.get());
 
     if (!clang->hasDiagnostics())
@@ -1037,36 +1026,33 @@ SlangResult LLVMDownstreamCompiler::compile(
                     // Add all the symbolmap
                     SymbolMap symbolMap;
 
-                    // symbolMap.insert(std::make_pair(mangler("sin"),
-                    // JITEvaluatedSymbol::fromPointer(static_cast<double (*)(double)>(&sin))));
-
                     {
                         static const NameAndFunc funcs[] = {SLANG_LLVM_FUNCS(
                             SLANG_LLVM_FUNC) SLANG_PLATFORM_FUNCS(SLANG_LLVM_FUNC)};
 
                         for (auto& func : funcs)
                         {
-                            symbolMap.insert(std::make_pair(
-                                mangler(func.name),
-                                JITEvaluatedSymbol::fromPointer(func.func)));
+                            symbolMap[mangler(func.name)] = {
+                                ExecutorAddr::fromPtr(func.func),
+                                JITSymbolFlags::Callable};
                         }
                     }
 
 #if SLANG_PTR_IS_32 && SLANG_VC
                     {
                         // https://docs.microsoft.com/en-us/windows/win32/devnotes/-win32-alldiv
-                        symbolMap.insert(std::make_pair(
-                            mangler("_alldiv"),
-                            JITEvaluatedSymbol::fromPointer(WinSpecific::_alldiv)));
-                        symbolMap.insert(std::make_pair(
-                            mangler("_allrem"),
-                            JITEvaluatedSymbol::fromPointer(WinSpecific::_allrem)));
-                        symbolMap.insert(std::make_pair(
-                            mangler("_aullrem"),
-                            JITEvaluatedSymbol::fromPointer(WinSpecific::_aullrem)));
-                        symbolMap.insert(std::make_pair(
-                            mangler("_aulldiv"),
-                            JITEvaluatedSymbol::fromPointer(WinSpecific::_aulldiv)));
+                        symbolMap[mangler("_alldiv")] = {
+                            ExecutorAddr::fromPtr(WinSpecific::_alldiv),
+                            JITSymbolFlags::Callable};
+                        symbolMap[mangler("_allrem")] = {
+                            ExecutorAddr::fromPtr(WinSpecific::_allrem),
+                            JITSymbolFlags::Callable};
+                        symbolMap[mangler("_aulldiv")] = {
+                            ExecutorAddr::fromPtr(WinSpecific::_aulldiv),
+                            JITSymbolFlags::Callable};
+                        symbolMap[mangler("_aullrem")] = {
+                            ExecutorAddr::fromPtr(WinSpecific::_aullrem),
+                            JITSymbolFlags::Callable};
                     }
 #endif
 
@@ -1076,7 +1062,9 @@ SlangResult LLVMDownstreamCompiler::compile(
                     }
 
                     // Required or the symbols won't be found
-                    jit->getMainJITDylib().addToLinkOrder(stdcLib);
+                    jit->getMainJITDylib().addToLinkOrder(
+                        stdcLib,
+                        JITDylibLookupFlags::MatchAllSymbols);
                 }
             }
 

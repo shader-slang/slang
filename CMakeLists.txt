@@ -128,6 +128,7 @@ option(SLANG_ENABLE_DXIL "Enable generating DXIL with DXC" ON)
 option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)")
 option(SLANG_ENABLE_IR_BREAK_ALLOC "Enable _debugUID on IR allocation")
 option(SLANG_ENABLE_ASAN "Enable ASAN (address sanitizer)")
+option(SLANG_ENABLE_COVERAGE "Enable code coverage instrumentation")
 
 option(SLANG_ENABLE_PREBUILT_BINARIES "Enable using prebuilt binaries" ON)
 option(SLANG_ENABLE_GFX "Enable gfx targets" ON)
@@ -501,6 +502,7 @@ add_subdirectory(source/slang-core-module)
 add_subdirectory(source/slang-glsl-module)
 add_subdirectory(source/slang)
 add_subdirectory(source/slangc)
+add_subdirectory(source/standard-modules)
 add_subdirectory(examples)
 
 #

@@ -8,7 +8,7 @@
 
 struct WorkData
 {
-    float A[2*2];
+    float A[2*4];
     float B[1024];
     
     float Foo(uint i) { return A[i] * B[i]; }

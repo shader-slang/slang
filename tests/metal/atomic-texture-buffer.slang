@@ -34,37 +34,37 @@ void test()
 #endif //FLOAT
  
     // buffer
-// METAL: ->atomic_fetch_add
-// METAL: ->atomic_fetch_and
-// METAL: ->atomic_fetch_max
-// METAL: ->atomic_fetch_min
-// METAL: ->atomic_fetch_or
-// METAL: ->atomic_fetch_xor
-// METAL: ->atomic_fetch_add
-// METAL: ->atomic_fetch_and
-// METAL: ->atomic_fetch_max
-// METAL: ->atomic_fetch_min
-// METAL: ->atomic_fetch_or
-// METAL: ->atomic_fetch_xor
-// METAL: ->atomic_exchange
-// METAL: ->atomic_compare_exchange_weak
-// METAL: ->atomic_compare_exchange_weak
+// METAL: .atomic_fetch_add
+// METAL: .atomic_fetch_and
+// METAL: .atomic_fetch_max
+// METAL: .atomic_fetch_min
+// METAL: .atomic_fetch_or
+// METAL: .atomic_fetch_xor
+// METAL: .atomic_fetch_add
+// METAL: .atomic_fetch_and
+// METAL: .atomic_fetch_max
+// METAL: .atomic_fetch_min
+// METAL: .atomic_fetch_or
+// METAL: .atomic_fetch_xor
+// METAL: .atomic_exchange
+// METAL: .atomic_compare_exchange_weak
+// METAL: .atomic_compare_exchange_weak
 
-// METAL: ->atomic_fetch_add
-// METAL: ->atomic_fetch_and
-// METAL: ->atomic_fetch_max
-// METAL: ->atomic_fetch_min
-// METAL: ->atomic_fetch_or
-// METAL: ->atomic_fetch_xor
-// METAL: ->atomic_fetch_add
-// METAL: ->atomic_fetch_and
-// METAL: ->atomic_fetch_max
-// METAL: ->atomic_fetch_min
-// METAL: ->atomic_fetch_or
-// METAL: ->atomic_fetch_xor
-// METAL: ->atomic_exchange
-// METAL: ->atomic_compare_exchange_weak
-// METAL: ->atomic_compare_exchange_weak
+// METAL: .atomic_fetch_add
+// METAL: .atomic_fetch_and
+// METAL: .atomic_fetch_max
+// METAL: .atomic_fetch_min
+// METAL: .atomic_fetch_or
+// METAL: .atomic_fetch_xor
+// METAL: .atomic_fetch_add
+// METAL: .atomic_fetch_and
+// METAL: .atomic_fetch_max
+// METAL: .atomic_fetch_min
+// METAL: .atomic_fetch_or
+// METAL: .atomic_fetch_xor
+// METAL: .atomic_exchange
+// METAL: .atomic_compare_exchange_weak
+// METAL: .atomic_compare_exchange_weak
 	InterlockedAdd(intBuffer[0], valInt);
 	InterlockedAnd(intBuffer[0], valInt);
 	InterlockedMax(intBuffer[0], valInt);
