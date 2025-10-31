@@ -17,12 +17,13 @@ SLANG_UNIT_TEST(multiFileModuleCache)
     // Prepare the virtual file system with the module files.
     const char* commonAttrSource = R"(
         module attrs;
+        public struct MyType { int x; }
         public void doThing() {}
     )";
     const char* debugSource = R"(
         module debug;
         import common.attrs;
-
+        struct Wrapper { MyType t; }
         [shader("compute")]
         [numthreads(1,1,1)]
         void computeMain(uint3 workGroup : SV_GroupID)
@@ -114,5 +115,25 @@ SLANG_UNIT_TEST(multiFileModuleCache)
         auto codeStr =
             UnownedStringSlice((const char*)code->getBufferPointer(), code->getBufferSize());
         SLANG_CHECK(codeStr.indexOf(toSlice("computeMain")) != -1);
+    }
+
+    // Phase 3: Check that we can fail gracefully if an imported module is missing.
+    {
+        memoryPrecompiledFS.remove("root1/common/attrs.slang-module");
+
+        ComPtr<slang::ISession> session;
+        sessionDesc.searchPathCount = 1;
+        const char* searchPaths[] = {"root1"};
+        sessionDesc.searchPaths = searchPaths;
+        sessionDesc.fileSystem = precompiledFs;
+        SLANG_CHECK_ABORT(
+            globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+        ComPtr<ISlangBlob> diagnostics;
+        auto module = session->loadModule("debug", diagnostics.writeRef());
+        SLANG_CHECK_ABORT(module == nullptr);
+        auto errMsg = UnownedStringSlice(
+            (const char*)diagnostics->getBufferPointer(),
+            diagnostics->getBufferSize());
+        SLANG_CHECK(errMsg.indexOf(toSlice("error")) != -1);
     }
 }
