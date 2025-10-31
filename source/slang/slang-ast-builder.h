@@ -630,6 +630,9 @@ public:
     Val* getSNormModifierVal();
     Val* getNoDiffModifierVal();
 
+    /// Create a UIntSetVal from a UIntSet
+    UIntSetVal* getUIntSetVal(const UIntSet& uintSet);
+
     TupleType* getTupleType(ArrayView<Type*> types);
 
     FuncType* getFuncType(ArrayView<Type*> parameters, Type* result, Type* errorType = nullptr);

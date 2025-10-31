@@ -1,6 +1,7 @@
 // slang-ast-type.cpp
 #include "slang-ast-val.h"
 
+#include "core/slang-uint-set.h"
 #include "slang-ast-builder.h"
 #include "slang-ast-dispatch.h"
 #include "slang-ast-natural-layout.h"
@@ -2113,6 +2114,81 @@ bool IntVal::isLinkTimeVal()
 Val* IntVal::linkTimeResolve(Dictionary<String, IntVal*>& mapMangledNameToVal)
 {
     SLANG_AST_NODE_VIRTUAL_CALL(IntVal, linkTimeResolve, (mapMangledNameToVal));
+}
+
+//
+// UIntSetVal
+//
+
+UIntSet UIntSetVal::toUIntSet() const
+{
+    UIntSet result;
+
+    // Convert each bitmask operand back to UIntSet::Element
+    for (Index i = 0; i < getBitmaskCount(); i++)
+    {
+        auto bitmask = getBitmask(i);
+        if (bitmask)
+        {
+            auto element = static_cast<UIntSet::Element>(bitmask->getValue());
+            result.addRawElement(element, i);
+        }
+    }
+
+    return result;
+}
+
+UIntSetVal* UIntSetVal::fromUIntSet(ASTBuilder* astBuilder, const UIntSet& uintSet)
+{
+    return astBuilder->getUIntSetVal(uintSet);
+}
+
+void UIntSetVal::_toTextOverride(StringBuilder& out)
+{
+    out << "UIntSetVal{";
+    for (Index i = 0; i < getBitmaskCount(); i++)
+    {
+        if (i > 0)
+            out << ", ";
+        auto bitmask = getBitmask(i);
+        if (bitmask)
+        {
+            out << bitmask->getValue();
+        }
+        else
+        {
+            out << "null";
+        }
+    }
+    out << "}";
+}
+
+Val* UIntSetVal::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+{
+    int diff = 0;
+    List<ConstantIntVal*> newBitmasks;
+
+    // Substitute each bitmask operand
+    for (Index i = 0; i < getBitmaskCount(); i++)
+    {
+        auto bitmask = getBitmask(i);
+        if (bitmask)
+        {
+            auto newBitmask = as<ConstantIntVal>(bitmask->substituteImpl(astBuilder, subst, &diff));
+            if (!newBitmask)
+                newBitmask = bitmask; // Keep original if substitution failed
+            newBitmasks.add(newBitmask);
+        }
+    }
+
+    if (diff)
+    {
+        if (ioDiff)
+            *ioDiff += diff;
+        return astBuilder->getOrCreate<UIntSetVal>(newBitmasks.getArrayView());
+    }
+
+    return this;
 }
 
 } // namespace Slang

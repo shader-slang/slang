@@ -2,6 +2,8 @@
 #include "slang-capability.h"
 
 #include "../core/slang-dictionary.h"
+#include "slang-ast-builder.h"
+#include "slang-capability-val.h"
 
 // This file implements the core of the "capability" system.
 
@@ -405,6 +407,14 @@ CapabilityAtom CapabilitySet::getUniquelyImpliedStageAtom() const
 }
 
 CapabilitySet::CapabilitySet() {}
+
+CapabilitySet::CapabilitySet(CapabilitySetVal const* other)
+{
+    if (other)
+    {
+        *this = other->thaw();
+    }
+}
 
 CapabilitySet::CapabilitySet(Int atomCount, CapabilityName const* atoms)
 {
@@ -1438,6 +1448,324 @@ void printDiagnosticArg(StringBuilder& sb, List<CapabilityAtom>& list)
         set.add((UInt)i);
     printDiagnosticArg(sb, set.newSetWithoutImpliedAtoms());
 }
+
+void printDiagnosticArg(StringBuilder& sb, const CapabilitySetVal* capabilitySetVal)
+{
+    printDiagnosticArg(sb, CapabilitySet{capabilitySetVal});
+}
+
+void CapabilityStageSetVal::_toTextOverride(StringBuilder& out)
+{
+    out << "CapabilityStageSetVal{";
+    out << "stage=";
+    printDiagnosticArg(out, getStage());
+    out << ", atoms=";
+    if (auto atomSet = getAtomSet())
+    {
+        atomSet->toText(out);
+    }
+    else
+    {
+        out << "null";
+    }
+    out << "}";
+}
+
+void CapabilityTargetSetVal::_toTextOverride(StringBuilder& out)
+{
+    out << "CapabilityTargetSetVal{";
+    out << "target=";
+    printDiagnosticArg(out, getTarget());
+    out << ", stageSets=[";
+    for (Index i = 0; i < getStageSetCount(); i++)
+    {
+        if (i > 0)
+            out << ", ";
+        if (auto stageSet = getStageSet(i))
+        {
+            stageSet->toText(out);
+        }
+        else
+        {
+            out << "null";
+        }
+    }
+    out << "]}";
+}
+
+void CapabilitySetVal::_toTextOverride(StringBuilder& out)
+{
+    out << "CapabilitySetVal{targetSets=[";
+    for (Index i = 0; i < getTargetSetCount(); i++)
+    {
+        if (i > 0)
+            out << ", ";
+        if (auto targetSet = getTargetSet(i))
+        {
+            targetSet->toText(out);
+        }
+        else
+        {
+            out << "null";
+        }
+    }
+    out << "]}";
+}
+
+Val* CapabilityStageSetVal::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+
+    // Substitute the atom set
+    auto newAtomSet = getAtomSet();
+    if (newAtomSet)
+    {
+        newAtomSet = as<UIntSetVal>(newAtomSet->substituteImpl(astBuilder, subst, &diff));
+        if (!newAtomSet)
+            newAtomSet = getAtomSet(); // Keep original if substitution failed
+    }
+
+    if (diff)
+    {
+        if (ioDiff)
+            *ioDiff += diff;
+        return astBuilder->getOrCreate<CapabilityStageSetVal>(getStage(), newAtomSet);
+    }
+
+    return this;
+}
+
+Val* CapabilityTargetSetVal::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    List<CapabilityStageSetVal*> newStageSets;
+
+    // Substitute each stage set operand
+    for (Index i = 0; i < getStageSetCount(); i++)
+    {
+        auto stageSet = getStageSet(i);
+        if (stageSet)
+        {
+            auto newStageSet =
+                as<CapabilityStageSetVal>(stageSet->substituteImpl(astBuilder, subst, &diff));
+            if (!newStageSet)
+                newStageSet = stageSet; // Keep original if substitution failed
+            newStageSets.add(newStageSet);
+        }
+    }
+
+    if (diff)
+    {
+        if (ioDiff)
+            *ioDiff += diff;
+
+        // Create operand list: target atom + stage sets
+        List<Val*> operands;
+        operands.add(
+            astBuilder->getIntVal(astBuilder->getIntType(), (IntegerLiteralValue)getTarget()));
+        for (auto stageSet : newStageSets)
+        {
+            operands.add(stageSet);
+        }
+
+        return astBuilder->getOrCreate<CapabilityTargetSetVal>(operands.getArrayView());
+    }
+
+    return this;
+}
+
+Val* CapabilitySetVal::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    List<CapabilityTargetSetVal*> newTargetSets;
+
+    // Substitute each target set operand
+    for (Index i = 0; i < getTargetSetCount(); i++)
+    {
+        auto targetSet = getTargetSet(i);
+        if (targetSet)
+        {
+            auto newTargetSet =
+                as<CapabilityTargetSetVal>(targetSet->substituteImpl(astBuilder, subst, &diff));
+            if (!newTargetSet)
+                newTargetSet = targetSet; // Keep original if substitution failed
+            newTargetSets.add(newTargetSet);
+        }
+    }
+
+    if (diff)
+    {
+        if (ioDiff)
+            *ioDiff += diff;
+
+        // Create operand list from target sets
+        List<Val*> operands;
+        for (auto targetSet : newTargetSets)
+        {
+            operands.add(targetSet);
+        }
+
+        return astBuilder->getOrCreate<CapabilitySetVal>(operands.getArrayView());
+    }
+
+    return this;
+}
+
+//
+// CapabilitySetVal
+//
+
+CapabilityStageSetVal* CapabilityTargetSetVal::findStageSet(CapabilityAtom stage) const
+{
+    // Linear search through sorted list - these lists are typically very short (1-4 items)
+    for (Index i = 0; i < getStageSetCount(); i++)
+    {
+        auto stageSet = getStageSet(i);
+        auto stageAtom = stageSet->getStage();
+        if (stageAtom == stage)
+            return stageSet;
+        if (stageAtom > stage)
+            break; // List is sorted, so we can stop early
+    }
+    return nullptr;
+}
+
+CapabilityTargetSetVal* CapabilitySetVal::findTargetSet(CapabilityAtom target) const
+{
+    // Linear search through sorted list - these lists are typically very short (1-4 items)
+    for (Index i = 0; i < getTargetSetCount(); i++)
+    {
+        auto targetSet = getTargetSet(i);
+        auto targetAtom = targetSet->getTarget();
+        if (targetAtom == target)
+            return targetSet;
+        if (targetAtom > target)
+            break; // List is sorted, so we can stop early
+    }
+    return nullptr;
+}
+
+bool CapabilitySetVal::isInvalid() const
+{
+    // Check if we have the invalid target atom
+    return findTargetSet(CapabilityAtom::Invalid) != nullptr;
+}
+
+CapabilitySet CapabilitySetVal::thaw() const
+{
+    if (isEmpty())
+        return CapabilitySet::makeEmpty();
+
+    if (isInvalid())
+        return CapabilitySet::makeInvalid();
+
+    CapabilitySet result;
+
+    auto& targetSets = result.getCapabilityTargetSets();
+
+    // Convert each target set
+    for (Index targetIndex = 0; targetIndex < getTargetSetCount(); targetIndex++)
+    {
+        auto targetSetVal = getTargetSet(targetIndex);
+        auto targetAtom = targetSetVal->getTarget();
+
+        auto& targetSet = targetSets[targetAtom];
+        targetSet.target = targetAtom;
+
+        // Convert each stage set
+        for (Index stageIndex = 0; stageIndex < targetSetVal->getStageSetCount(); stageIndex++)
+        {
+            auto stageSetVal = targetSetVal->getStageSet(stageIndex);
+            auto stageAtom = stageSetVal->getStage();
+
+            auto& stageSet = targetSet.shaderStageSets[stageAtom];
+            stageSet.stage = stageAtom;
+
+            // Convert UIntSetVal back to CapabilityAtomSet
+            auto atomSetVal = stageSetVal->getAtomSet();
+            if (atomSetVal)
+            {
+                CapabilityAtomSet atomSet{atomSetVal->toUIntSet()};
+                stageSet.atomSet = atomSet;
+            }
+        }
+    }
+
+    return result;
+}
+
+CapabilitySetVal* CapabilitySet::freeze(ASTBuilder* astBuilder) const
+{
+    if (isEmpty())
+    {
+        return astBuilder->getOrCreate<CapabilitySetVal>();
+    }
+
+    if (isInvalid())
+    {
+        // Create invalid capability set with invalid target
+        auto invalidAtomSet = astBuilder->getUIntSetVal(CapabilityAtomSet{});
+        auto invalidStageSet =
+            astBuilder->getOrCreate<CapabilityStageSetVal>(CapabilityAtom::Invalid, invalidAtomSet);
+        auto invalidTargetSet = astBuilder->getOrCreate<CapabilityTargetSetVal>(
+            CapabilityAtom::Invalid,
+            invalidStageSet);
+        return astBuilder->getOrCreate<CapabilitySetVal>(invalidTargetSet);
+    }
+
+    List<CapabilityTargetSetVal*> targetSetVals;
+
+    // Convert each target set, maintaining sorted order
+    List<CapabilityAtom> sortedTargets;
+    for (auto& targetPair : m_targetSets)
+    {
+        sortedTargets.add(targetPair.first);
+    }
+    sortedTargets.sort([](CapabilityAtom a, CapabilityAtom b) { return (UInt)a < (UInt)b; });
+
+    for (auto targetAtom : sortedTargets)
+    {
+        auto& targetSet = *m_targetSets.tryGetValue(targetAtom);
+        List<CapabilityStageSetVal*> stageSetVals;
+
+        // Convert each stage set, maintaining sorted order
+        List<CapabilityAtom> sortedStages;
+        for (auto& stagePair : targetSet.shaderStageSets)
+        {
+            sortedStages.add(stagePair.first);
+        }
+        sortedStages.sort([](CapabilityAtom a, CapabilityAtom b) { return (UInt)a < (UInt)b; });
+
+        for (auto stageAtom : sortedStages)
+        {
+            auto& stageSet = *targetSet.shaderStageSets.tryGetValue(stageAtom);
+
+            // Convert CapabilityAtomSet to UIntSetVal
+            UIntSetVal* atomSetVal;
+            atomSetVal = astBuilder->getUIntSetVal(stageSet.atomSet.value_or(CapabilityAtomSet{}));
+
+            auto stageSetVal =
+                astBuilder->getOrCreate<CapabilityStageSetVal>(stageAtom, atomSetVal);
+            stageSetVals.add(stageSetVal);
+        }
+
+        auto targetSetVal =
+            astBuilder->getOrCreate<CapabilityTargetSetVal>(targetAtom, stageSetVals);
+        targetSetVals.add(targetSetVal);
+    }
+
+    return astBuilder->getOrCreate<CapabilitySetVal>(targetSetVals);
+}
+
 
 #ifdef UNIT_TEST_CAPABILITIES
 

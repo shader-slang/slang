@@ -3975,7 +3975,7 @@ static NodeBase* parseRequireCapabilityDecl(Parser* parser, void*)
             continue;
         break;
     }
-    decl->inferredCapabilityRequirements = CapabilitySet(capNames);
+    decl->inferredCapabilityRequirements = CapabilitySet(capNames).freeze(parser->astBuilder);
     parser->ReadToken(TokenType::Semicolon);
     return decl;
 }

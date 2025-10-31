@@ -29,6 +29,9 @@ namespace Slang
 //
 #include "slang-generated-capability-defs.h"
 
+class CapabilitySetVal;
+class ASTBuilder;
+
 // Once we have a universe of suitable capability atoms, we can define
 // the capabilities of a target as simply the set of all atomic capabilities
 // that it supports.
@@ -51,6 +54,11 @@ namespace Slang
 struct CapabilityAtomSet : UIntSet
 {
     using UIntSet::UIntSet;
+
+    CapabilityAtomSet(const UIntSet& set)
+        : UIntSet(set)
+    {
+    }
 
     CapabilityAtomSet newSetWithoutImpliedAtoms() const;
 };
@@ -168,6 +176,9 @@ public:
 
     /// Construct a singleton set from a single atomic capability
     explicit CapabilitySet(CapabilityName atom);
+
+    /// Construct a capability set from an optional CapabilitySetVal
+    explicit CapabilitySet(CapabilitySetVal const* other);
 
     /// Make an empty capability set
     static CapabilitySet makeEmpty();
@@ -406,6 +417,9 @@ public:
             return true;
         }
     }
+
+    /// Convert this mutable capability set to an immutable CapabilitySetVal
+    CapabilitySetVal* freeze(ASTBuilder* astBuilder) const;
 
 private:
     /// underlying data of CapabilitySet.
