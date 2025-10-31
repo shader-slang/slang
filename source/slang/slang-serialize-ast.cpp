@@ -1658,7 +1658,7 @@ void ASTSerialWriteContext::_writeImportedModule(
     ModuleDecl* moduleDecl)
 {
     ASTNodeType type = _getAsASTNodeType(PseudoASTNodeType::ImportedModule);
-    auto moduleName = moduleDecl->getName();
+    auto moduleName = String(moduleDecl->module->getName());
 
     serialize(serializer, type);
     serialize(serializer, moduleName);
@@ -1683,7 +1683,9 @@ ModuleDecl* ASTSerialReadContext::_readImportedModule(ASTSerializer const& seria
     auto module = _linkage->findOrImportModule(moduleName, _requestingSourceLoc, _sink);
     if (!module)
     {
-        SLANG_ABORT_COMPILATION("failed to load an imported module during AST deserialization");
+        if (_sink)
+            _sink->diagnose(_requestingSourceLoc, Diagnostics::importFailed, moduleName);
+        return nullptr;
     }
     return module->getModuleDecl();
 }
