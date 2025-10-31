@@ -2112,7 +2112,8 @@ SlangResult Linkage::loadSerializedModuleContents(
     {
         addSiblingScopeForContainerDecl(m_astBuilder, moduleDecl->ownedScope, fileDecl);
     }
-
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
     return SLANG_OK;
 }
 
