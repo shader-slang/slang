@@ -1069,6 +1069,27 @@ void lowerTagTypes(IRModule* module)
     context.processModule();
 }
 
+bool isEffectivelyComPtrType(IRType* type)
+{
+    if (!type)
+        return false;
+    if (type->findDecoration<IRComInterfaceDecoration>() || type->getOp() == kIROp_ComPtrType)
+    {
+        return true;
+    }
+    if (auto witnessTableType = as<IRWitnessTableTypeBase>(type))
+    {
+        return isComInterfaceType((IRType*)witnessTableType->getConformanceType());
+    }
+    if (auto ptrType = as<IRNativePtrType>(type))
+    {
+        auto valueType = ptrType->getValueType();
+        return valueType->findDecoration<IRComInterfaceDecoration>() != nullptr;
+    }
+
+    return false;
+}
+
 // This context lowers `CastInterfaceToTaggedUnionPtr` and
 // `CastTaggedUnionToInterfacePtr` by finding all `IRLoad` and
 // `IRStore` uses of these insts, and upcasting the tagged-union
@@ -1542,7 +1563,7 @@ struct ExistentialLoweringContext : public InstPassBase
                 0));
             inst->removeAndDeallocate();
         }
-        else if (auto comPtrType = as<IRComPtrType>(inst->getOperand(0)->getDataType()))
+        else if (isEffectivelyComPtrType((IRType*)inst->getOperand(0)->getDataType()))
         {
             inst->replaceUsesWith(inst->getOperand(0));
             inst->removeAndDeallocate();
@@ -1567,7 +1588,7 @@ struct ExistentialLoweringContext : public InstPassBase
             inst->removeAndDeallocate();
             return true;
         }
-        else if (auto comPtrType = as<IRComPtrType>(inst->getOperand(0)->getDataType()))
+        else if (isEffectivelyComPtrType((IRType*)inst->getOperand(0)->getDataType()))
         {
             inst->replaceUsesWith(inst->getOperand(0));
             inst->removeAndDeallocate();
@@ -1628,7 +1649,7 @@ struct ExistentialLoweringContext : public InstPassBase
             inst->removeAndDeallocate();
             return true;
         }
-        else if (auto comPtrType = as<IRComPtrType>(inst->getOperand(0)->getDataType()))
+        else if (isEffectivelyComPtrType((IRType*)inst->getOperand(0)->getDataType()))
         {
             inst->replaceUsesWith(inst->getOperand(0));
             inst->removeAndDeallocate();
