@@ -501,13 +501,6 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
         // Conform to C/C++ size is adjusted to the largest alignment
         ioStructInfo->size = _roundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
     }
-
-    SimpleLayoutInfo GetDescriptorHandleLayout(DescriptorHandleType* descriptorHandleType) override
-    {
-        SLANG_UNUSED(descriptorHandleType);
-        // For CPU targets, DescriptorHandle<T> is treated as uint64_t
-        return GetScalarLayout(BaseType::UInt64);
-    }
 };
 
 // The CUDA compiler NVRTC only works on 64 bit operating systems.
@@ -649,13 +642,6 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
     {
         // Conform to CUDA/C/C++ size is adjusted to the largest alignment
         ioStructInfo->size = _roundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
-    }
-
-    SimpleLayoutInfo GetDescriptorHandleLayout(DescriptorHandleType* descriptorHandleType) override
-    {
-        SLANG_UNUSED(descriptorHandleType);
-        // For CUDA targets, DescriptorHandle<T> is treated as uint64_t
-        return GetScalarLayout(BaseType::UInt64);
     }
 };
 
