@@ -194,6 +194,8 @@ static List<ConstructorDecl*> _getCtorList(
     ConstructorDecl** defaultCtorOut);
 static Expr* constructDefaultInitExprForType(SemanticsVisitor* visitor, VarDeclBase* varDecl);
 
+int compareVals(Val& lhs, Val& rhs);
+
 /// Visitor to transition declarations to `DeclCheckState::CheckedModifiers`
 struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
                                        public DeclVisitor<SemanticsDeclModifiersVisitor>
@@ -2138,8 +2140,20 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         }
         else
         {
-            SemanticsVisitor subVisitor(withDeclToExcludeFromLookup(varDecl));
+            SemanticsContext contextToUse = withDeclToExcludeFromLookup(varDecl);
+
+            // If the parent function is differentiable, use withParentFunc to ensure
+            // the differentiable context is preserved.
+            // This ensures that calls in the initializer (like `dot`) get properly marked
+            // with TreatAsDifferentiableExpr, which is needed for the IR lowering to add
+            // the differentiableCallDecoration
+            auto parentFunc = getParentFunc(varDecl);
+            if (parentFunc && parentFunc->findModifier<DifferentiableAttribute>())
+                contextToUse = contextToUse.withParentFunc(parentFunc);
+
+            SemanticsVisitor subVisitor(contextToUse);
             initExpr = subVisitor.CheckExpr(initExpr);
+            initExpr = maybeOpenRef(initExpr);
 
             // TODO: We might need some additional steps here to ensure
             // that the type of the expression is one we are okay with
@@ -3516,6 +3530,14 @@ void SemanticsDeclHeaderVisitor::checkGenericTypeEqualityConstraintSubType(
 
         Decl* subAncestor = as<DeclRefType>(decl->sub.type)->getDeclRef().getDecl();
         Decl* supAncestor = as<DeclRefType>(decl->sup.type)->getDeclRef().getDecl();
+        if (subAncestor == supAncestor)
+        {
+            // If both side resolve to the same decl, there is no need to compare decl order,
+            // because we cannot decide the order. Instead we will just compare the DeclRefType
+            // itself.
+            return compareVals(*decl->sub.type, *decl->sup.type);
+        }
+
         auto ancestor = findDeclsLowestCommonAncestor(subAncestor, supAncestor);
         if (!ancestor)
         {
