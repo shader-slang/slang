@@ -3,6 +3,7 @@
 #include "slang-ir-extract-value-from-type.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
+#include "slang-ir-util.h"
 #include "slang-ir.h"
 
 namespace Slang
@@ -232,7 +233,19 @@ struct BitCastLoweringContext
         IRSizeAndAlignment fromTypeSize;
         getNaturalSizeAndAlignment(targetProgram->getOptionSet(), fromType, &fromTypeSize);
 
-        if (as<IRBasicType>(fromType) != nullptr && as<IRBasicType>(toType) != nullptr)
+        // Check if the target is directly emitted SPIRV
+        bool isDirectSpirv = false;
+        if (auto targetReq = targetProgram->getTargetReq())
+        {
+            auto target = targetReq->getTarget();
+            isDirectSpirv =
+                (target == CodeGenTarget::SPIRV || target == CodeGenTarget::SPIRVAssembly) &&
+                targetProgram->shouldEmitSPIRVDirectly();
+        }
+
+        auto fromBasicType = as<IRBasicType>(fromType);
+        auto toBasicType = as<IRBasicType>(toType);
+        if (fromBasicType && toBasicType)
         {
             if (fromTypeSize.size != toTypeSize.size)
                 sink->diagnose(
@@ -245,6 +258,91 @@ struct BitCastLoweringContext
             // Both fromType and toType are basic types, no processing needed.
             return;
         }
+
+        // Skip lowering bitcasts that can be directly handled by SPIR-V OpBitcast
+        // The SPIR-V spec requires that OpBitcast's operand and result have the same size and
+        // different types
+        if (isDirectSpirv && fromTypeSize.size == toTypeSize.size)
+        {
+            auto fromPtrType = as<IRPtrTypeBase>(fromType);
+            auto toPtrType = as<IRPtrTypeBase>(toType);
+
+            // OpBitcast can handle pointer <-> pointer bitcasts directly,
+            // but both pointers must have same storage class but must point to different types
+            if (fromPtrType && toPtrType &&
+                fromPtrType->getAddressSpace() == toPtrType->getAddressSpace())
+            {
+                auto fromValueType = fromPtrType->getValueType();
+                auto toValueType = toPtrType->getValueType();
+
+                // Unwrap atomic pointers, as they are emitted as the same type as non-atomic
+                // pointers in SPIR-V, but have different types from non-atomic pointers in IR
+                auto fromUnwrappedType = as<IRAtomicType>(fromValueType)
+                                             ? as<IRAtomicType>(fromValueType)->getElementType()
+                                             : fromValueType;
+                auto toUnwrappedType = as<IRAtomicType>(toValueType)
+                                           ? as<IRAtomicType>(toValueType)->getElementType()
+                                           : toValueType;
+
+                // If the unwrapped types are different, we can use OpBitcast directly
+                if (!isTypeEqual(fromUnwrappedType, toUnwrappedType))
+                {
+                    return;
+                }
+            }
+
+            // OpBitcast can handle pointer -> scalar integer bitcasts directly
+            if (fromPtrType && toBasicType && isIntegralType(toType))
+                return;
+
+            // OpBitcast can handle scalar integer -> pointer bitcasts directly
+            if (fromBasicType && toPtrType && isIntegralType(fromType))
+                return;
+
+            auto fromVectorType = as<IRVectorType>(fromType);
+            auto toVectorType = as<IRVectorType>(toType);
+
+            // OpBitcast can handle pointer -> integer vector bitcasts directly,
+            // but those integers need to be 32-bit
+            if (fromPtrType && toVectorType)
+            {
+                auto elementType = toVectorType->getElementType();
+                if (isIntegralType(elementType))
+                {
+                    auto intInfo = getIntTypeInfo(elementType);
+                    if (intInfo.width == 32)
+                        return;
+                }
+            }
+
+            // OpBitcast can handle integer vector -> pointer bitcasts directly,
+            // but those integers need to be 32-bit
+            if (toPtrType && fromVectorType)
+            {
+                auto elementType = fromVectorType->getElementType();
+                if (isIntegralType(elementType))
+                {
+                    auto intInfo = getIntTypeInfo(elementType);
+                    // SPIR-V spec: only vectors of 32-bit integers allowed
+                    if (intInfo.width == 32)
+                        return;
+                }
+            }
+
+            // OpBitcast can handle vector <-> scalar bitcasts directly
+            // OpBitcast can also handle vector <-> vector bitcasts directly,
+            // but only if the larger element count is an integer multiple of the smaller element
+            // count, and if the types are different (SPIR-V spec requires different operand/result
+            // types)
+            auto fromElementCount = getIRVectorElementSize(fromType);
+            auto toElementCount = getIRVectorElementSize(toType);
+            if ((fromVectorType || fromBasicType) && (toVectorType || toBasicType) &&
+                (fromElementCount % toElementCount == 0 ||
+                 toElementCount % fromElementCount == 0) &&
+                !isTypeEqual(fromType, toType))
+                return;
+        }
+
         // Ignore cases we cannot handle yet.
         if (as<IRResourceTypeBase>(fromType) || as<IRResourceTypeBase>(toType))
         {
