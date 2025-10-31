@@ -49,6 +49,23 @@ struct EnumTypeLoweringContext
         if (!type)
             return nullptr;
 
+        if (auto attributedType = as<IRAttributedType>(type))
+        {
+            IRBuilder builder(module);
+
+            List<IRAttr*> attrs;
+            for (auto attr : attributedType->getAllAttrs())
+                attrs.add(attr);
+
+            RefPtr<LoweredEnumTypeInfo> info = new LoweredEnumTypeInfo();
+            info->enumType = (IRType*)type;
+            info->loweredType = builder.getAttributedType(
+                getLoweredEnumType(type->getOperand(0))->loweredType,
+                attrs);
+            loweredEnumTypes[type] = info;
+            return info.Ptr();
+        }
+
         if (type->getOp() != kIROp_EnumType)
             return nullptr;
 

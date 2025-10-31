@@ -82,6 +82,20 @@ public:
         return true;
     }
 
+    bool isDebugInst(IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_DebugLine:
+        case kIROp_DebugScope:
+        case kIROp_DebugVar:
+        case kIROp_DebugValue:
+            return true;
+        default:
+            return false;
+        }
+    }
+
     virtual bool propagate(IRBuilder& builder, IRFunc* f) override
     {
         bool hasReadNoneCall = false;
@@ -90,7 +104,7 @@ public:
             for (auto inst : block->getChildren())
             {
                 // Is this inst known to not have global side effect/analyzable?
-                if (!isKnownOpCodeWithSideEffect(inst->getOp()))
+                if (!isKnownOpCodeWithSideEffect(inst->getOp()) && !isDebugInst(inst))
                 {
                     if (inst->mightHaveSideEffects() || isResourceLoad(inst->getOp()))
                     {
@@ -121,6 +135,12 @@ public:
                         }
                     }
                 }
+
+                // If the inst is a debug instruction, skip it.
+                // these are only annotations
+                //
+                if (isDebugInst(inst)) // TODO: May not need this
+                    continue;
 
                 // Do any operands defined have pointer type of global or
                 // unknown source? Passing them into a readNone callee may cause

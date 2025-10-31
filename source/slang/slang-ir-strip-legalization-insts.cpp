@@ -68,12 +68,8 @@ void unpinWitnessTables(IRModule* module)
         if (!witnessTable)
             continue;
 
-        // If a witness table is not used for dynamic dispatch, unpin it.
-        if (!witnessTable->findDecoration<IRDynamicDispatchWitnessDecoration>())
-        {
-            while (auto decor = witnessTable->findDecoration<IRKeepAliveDecoration>())
-                decor->removeAndDeallocate();
-        }
+        while (auto decor = witnessTable->findDecoration<IRKeepAliveDecoration>())
+            decor->removeAndDeallocate();
     }
 }
 

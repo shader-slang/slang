@@ -1,8 +1,8 @@
 // slang-ir-layout.cpp
 #include "slang-ir-layout.h"
 
-#include "slang-ir-generics-lowering-context.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-util.h"
 
 // This file implements facilities for computing and caching layout
 // information on IR types.
@@ -300,12 +300,17 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
             return SLANG_OK;
         }
         break;
+    case kIROp_SetTagType:
+        {
+            outSizeAndAlignment->size = 4;
+            outSizeAndAlignment->alignment = 4;
+            return SLANG_OK;
+        }
+        break;
     case kIROp_InterfaceType:
         {
             auto interfaceType = cast<IRInterfaceType>(type);
-            auto size = SharedGenericsLoweringContext::getInterfaceAnyValueSize(
-                interfaceType,
-                interfaceType->sourceLoc);
+            auto size = getInterfaceAnyValueSize(interfaceType, interfaceType->sourceLoc);
             size += kRTTIHeaderSize;
             size = align(size, 4);
             IRSizeAndAlignment resultLayout;

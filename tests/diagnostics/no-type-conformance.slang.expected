@@ -1,8 +1,0 @@
-result code = -1
-standard error = {
-tests/diagnostics/no-type-conformance.slang(12): error 50100: No type conformances are found for interface 'IFoo'. Code generation for current target requires at least one implementation type present in the linkage.
-    obj.get();
-           ^
-}
-standard output = {
-}
