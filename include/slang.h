@@ -2645,10 +2645,13 @@ struct TypeLayoutReflection
     }
 
     // Pending Type Layout functionality has been removed
-    TypeLayoutReflection* getPendingDataTypeLayout() { return nullptr; }
+    [[deprecated]] TypeLayoutReflection* getPendingDataTypeLayout() { return nullptr; }
 
     // Pending Type Layout functionality has been removed
-    VariableLayoutReflection* getSpecializedTypePendingDataVarLayout() { return nullptr; }
+    [[deprecated]] VariableLayoutReflection* getSpecializedTypePendingDataVarLayout()
+    {
+        return nullptr;
+    }
 
     SlangInt getBindingRangeCount()
     {
@@ -2994,7 +2997,7 @@ struct VariableLayoutReflection
     }
 
     // Pending Type Layout functionality has been removed
-    VariableLayoutReflection* getPendingDataLayout() { return nullptr; }
+    [[deprecated]] VariableLayoutReflection* getPendingDataLayout() { return nullptr; }
 };
 
 struct FunctionReflection
