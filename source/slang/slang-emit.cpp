@@ -2899,13 +2899,10 @@ SlangResult emitHostVMCode(CodeGenContext* codeGenContext, ComPtr<IArtifact>& ou
 
 SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtifact>& outArtifact)
 {
-    ComPtr<ISlangSharedLibrary> library;
-
-    auto libraryLoader = codeGenContext->getSession()->m_sharedLibraryLoader;
-    auto result = libraryLoader->loadSharedLibrary("slang-llvm", library.writeRef());
     auto target = codeGenContext->getTargetFormat();
 
-    if (result == SLANG_FAIL)
+    ISlangSharedLibrary* library = codeGenContext->getSession()->getOrLoadSlangLLVM();
+    if (!library)
     {
         codeGenContext->getSink()->diagnose(
             SourceLoc(),
