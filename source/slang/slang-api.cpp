@@ -11,6 +11,7 @@
 #include "slang-compiler.h"
 #include "slang-internal.h"
 #include "slang-repro.h"
+#include "slang-tag-version.h"
 
 // implementation of C interface
 
@@ -65,24 +66,60 @@ SlangResult tryLoadBuiltinModuleFromCache(
     return SLANG_OK;
 }
 
-// Attempt to load a precompiled builtin module from slang-xxx-module.dll.
+// Attempt to load a precompiled builtin module from slang-xxx-module.
+// The module name is versioned on Mac and Linux platforms, but not on Windows.
 SlangResult tryLoadBuiltinModuleFromDLL(
     slang::IGlobalSession* globalSession,
     slang::BuiltinModuleName builtinModuleName)
 {
-    Slang::String moduleFileName =
-        Slang::String("slang-") + Slang::getBuiltinModuleNameStr(builtinModuleName) + "-module";
+    // Construct the versioned module name: slang-{module}-module[-{version}]
+    // e.g., "slang-glsl-module-2025.19.1" which becomes:
+    //   - Linux: libslang-glsl-module-2025.19.1.so
+    //   - macOS: libslang-glsl-module-2025.19.1.dylib
+    //   - Windows: slang-glsl-module.dll
+    // Modules are runtime-loaded libraries. We need to version these because
+    // they end up deployed on Mac and Linux platforms in a directory that ends
+    // up in the library path.
+    Slang::String versionString =
+        (SLANG_WINDOWS_FAMILY) ? "" : Slang::String("-") + SLANG_VERSION_NUMERIC;
+    Slang::String moduleFileName = Slang::String("slang-") +
+                                   Slang::getBuiltinModuleNameStr(builtinModuleName) + "-module" +
+                                   versionString;
 
     Slang::SharedLibrary::Handle libHandle = nullptr;
 
     SLANG_RETURN_ON_FAIL(Slang::SharedLibrary::load(moduleFileName.getBuffer(), libHandle));
     if (!libHandle)
         return SLANG_FAIL;
-    void* ptr = Slang::SharedLibrary::findSymbolAddressByName(libHandle, "slang_getEmbeddedModule");
-    if (!ptr)
+
+    // Check if the module is the same version as the slang dll.
+    void* emBuildTagPtr = Slang::SharedLibrary::findSymbolAddressByName(
+        libHandle,
+        "slang_getEmbeddedModuleBuildTagString");
+    if (!emBuildTagPtr)
+    {
+        Slang::SharedLibrary::unload(libHandle);
         return SLANG_FAIL;
+    }
+    typedef const char*(GetEmbeddedModuleBuildTagStringFunc)();
+    auto getEmbeddedModuleBuildTagString = (GetEmbeddedModuleBuildTagStringFunc*)emBuildTagPtr;
+    const char* buildTagString = getEmbeddedModuleBuildTagString();
+    if (strcmp(buildTagString, SLANG_TAG_VERSION) != 0)
+    {
+        Slang::SharedLibrary::unload(libHandle);
+        return SLANG_FAIL;
+    }
+
+    // Load the embedded module.
+    void* emPtr =
+        Slang::SharedLibrary::findSymbolAddressByName(libHandle, "slang_getEmbeddedModule");
+    if (!emPtr)
+    {
+        Slang::SharedLibrary::unload(libHandle);
+        return SLANG_FAIL;
+    }
     typedef ISlangBlob*(GetEmbeddedModuleFunc)();
-    auto getEmbeddedModule = (GetEmbeddedModuleFunc*)ptr;
+    auto getEmbeddedModule = (GetEmbeddedModuleFunc*)emPtr;
     auto blob = getEmbeddedModule();
     SLANG_RETURN_ON_FAIL(globalSession->loadBuiltinModule(
         builtinModuleName,

@@ -8,7 +8,7 @@ It applies to the "COM-lite" Slang API, rather than the deprecated C Slang API (
 
 The goal is to maintain binary compatibility as much as possible between Slang releases, and to aid applications in dealing with changes to Slang.
 
-Slang is distributed as a dynamic library, and there is an expectation from Slang API users that upgrading by installing an updated slang.dll or slang.so will not break their application unnecessarily.
+Slang is distributed as a dynamic library, and there is an expectation from Slang API users that upgrading by installing an updated slang-compiler.dll or slang-compiler.so will not break their application unnecessarily.
 
 ABI compatibility within the Slang API can be preserved between releases if some rules are followed by developers.
 
@@ -16,7 +16,7 @@ Slang API uses a "COM-lite" structure wherein functionality is exposed through i
 
 1. It is preferred to create *new* COM interfaces when adding new functionality.
 * This maintains ABI compatibility.
-* Applications must acquire access to the new functionality using QueryInterface(), which will gracefully fail if the slang.dll/slang.so does not implement the functionality.
+* Applications must acquire access to the new functionality using QueryInterface(), which will gracefully fail if the slang-compiler.dll/libslang-compiler.so does not implement the functionality.
 
 2. Changes to existing virtual methods in COM interfaces should be avoided, as that is an ABI breakage.
 * If a change is required though, change the interface's UUID.
@@ -24,7 +24,7 @@ Slang API uses a "COM-lite" structure wherein functionality is exposed through i
 3. New virtual methods _may_ be added (only) to the end of existing COM interface structs.
 * This does not disturb the ABI compatibility of the associated vtable. Old apps can remain unaware of the new function pointers appended to the end of the vtable.
 * A UUID change is not necessary.
-* Note that in the event that a Slang application which uses the added feature is run with an old slang.dll/slang.so, the experience for the user is not as clean as if the added method belongs to a new interface.
+* Note that in the event that a Slang application which uses the added feature is run with an old slang-compiler.dll/libslang-compiler.so, the experience for the user is not as clean as if the added method belongs to a new interface.
 
 Adding Experimental Interfaces
 ==============================
