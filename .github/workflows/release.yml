@@ -181,12 +181,12 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${KEYCHAIN_PASSWORD}" "$KEYCHAIN_PATH"
 
           binaries=(
-            "${lib_dir}/libslang.dylib"
-            "${lib_dir}/libslang-rt.dylib"
+            "${lib_dir}/libslang-compiler.0.*.dylib"
+            "${lib_dir}/libslang-rt.0.*.dylib"
             "${lib_dir}/libslang-glslang.dylib"
-            "${lib_dir}/libslang-glsl-module.dylib"
+            "${lib_dir}/libslang-glsl-module-*.dylib"
             "${lib_dir}/libslang-llvm.dylib"
-            "${lib_dir}/libgfx.dylib"
+            "${lib_dir}/libgfx.0.*.dylib"
             "${bin_dir}/slangd"
             "${bin_dir}/slangc"
           )
@@ -211,6 +211,45 @@ jobs:
           timeout 1000 gon --log-level=debug ./extras/macos-notarize.json
           cp slang-macos-dist.zip "slang-macos-dist-${{matrix.platform}}.zip"
           echo "SLANG_NOTARIZED_DIST=slang-macos-dist-${{matrix.platform}}.zip" >> "$GITHUB_OUTPUT"
+
+      - name: Add version to shared libraries
+        if: matrix.os == 'linux' || matrix.os == 'macos'
+        run: |
+          triggering_ref=${{ github.ref_name }}
+          if [[ $triggering_ref =~ ^v[0-9] ]]; then
+            version=${triggering_ref#v}
+          else
+            version=$triggering_ref
+          fi
+
+          if [[ "${{ matrix.os }}" == "macos" ]]; then
+            lib_ext="dylib"
+          else
+            lib_ext="so"
+          fi
+
+          cd "$lib_dir"
+
+          # Version the slang-compiler library
+          for lib in libslang-compiler; do
+            if [[ -f "${lib}.${lib_ext}" ]]; then
+              echo "Processing ${lib}.${lib_ext}..."
+
+              # Rename to versioned name
+              mv "${lib}.${lib_ext}" "${lib}.${lib_ext}.0.${version}"
+              echo "Created: ${lib}.${lib_ext}.0.${version} (real file)"
+
+              ln -s "${lib}.${lib_ext}.0.${version}" "${lib}.${lib_ext}.0"
+              echo "Created: ${lib}.${lib_ext}.0 -> ${lib}.${lib_ext}.0.${version}"
+
+              ln -s "${lib}.${lib_ext}.0" "${lib}.${lib_ext}"
+              echo "Created: ${lib}.${lib_ext} -> ${lib}.${lib_ext}.0"
+            fi
+          done
+
+          # Create backwards compatibility symlink (temporary)
+          ln -s "libslang-compiler.${lib_ext}" "libslang.${lib_ext}"
+          echo "Created: libslang.${lib_ext} -> libslang-compiler.${lib_ext}"
 
       - name: Package Slang
         id: package
