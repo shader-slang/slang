@@ -426,6 +426,8 @@ void AutoDiffTranscriberBase::copyOriginalDecorations(IRInst* origFunc, IRInst* 
     {
         switch (decor->getOp())
         {
+        case kIROp_DebugLocationDecoration:
+        case kIROp_DebugFuncDecoration:
         case kIROp_ForceInlineDecoration:
             cloneDecoration(decor, diffFunc);
             break;

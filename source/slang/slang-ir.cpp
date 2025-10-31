@@ -3165,6 +3165,7 @@ IRInst* IRBuilder::emitDebugInlinedAt(
     IRInst* debugFunc,
     IRInst* outerInlinedAt)
 {
+    SLANG_ASSERT(debugFunc);
     if (outerInlinedAt)
     {
         IRInst* args[] = {line, col, file, debugFunc, outerInlinedAt};
