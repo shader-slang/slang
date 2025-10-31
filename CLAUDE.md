@@ -10,6 +10,10 @@ Reference other instruction files as well:
 
 - @.github/copilot-instructions.md
 
+User-specific instructions for Slang:
+
+- @~/.claude/slang-instructions.md
+
 ## Build System and Common Commands
 
 **IMPORTANT:** On Windows, always use `cmake.exe` (not `cmake`) to ensure proper GPU test execution. Using `cmake` without the `.exe` extension may invoke WSL's cmake, which cannot run GPU tests.

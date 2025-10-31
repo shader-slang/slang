@@ -106,8 +106,9 @@ vkd3d-proton.cache.write
 .*.swp
 .*.swo
 
-# Claude local settings
+# Claude local settings and memory
 /.claude/settings.local.json
+CLAUDE.local.md
 
 # Other temporary files
 /generators
