@@ -1,13 +1,16 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=SPIRV): -vk -shaderobj -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=SPIRV_BRANCH): -vk -shaderobj -output-using-type -Xslang -DBRANCH
+
+// VariablePointersStorageBuffer is not working on the current GCP servers; driver 573.07.
+// github issue #8876
+//DISABLE_TEST:COMPARE_COMPUTE(filecheck-buffer=BRANCH): -vk -shaderobj -output-using-type -Xslang -DBRANCH
 
 // This tests if the function parameter is properly legalized from ByteAddressBuffer to StructurredBuffer.
 
 //TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
-//TEST_INPUT:ubuffer(data=[10 11], stride=4):name input
-ByteAddressBuffer input;
+//TEST_INPUT:ubuffer(data=[10 11], stride=4):name input1
+ByteAddressBuffer input1;
 
 //TEST_INPUT:ubuffer(data=[20 21], stride=4):name input2
 ByteAddressBuffer input2;
@@ -29,7 +32,7 @@ int getFromBuffer(ByteAddressBuffer buf, int offset)
 [numthreads(1, 1, 1)]
 void computeMain(int3 tid : SV_DispatchThreadID)
 {
-    ByteAddressBuffer buf = input;
+    ByteAddressBuffer buf = input1;
 
 #if defined(BRANCH)
     if (tid.x == 0)
@@ -42,9 +45,6 @@ void computeMain(int3 tid : SV_DispatchThreadID)
     // SPIRV: 10
     // SPIRV-NEXT: 11
 
-    // SPIRV_BRANCH: 20
-    //
-    // It seems that there is a bug on the graphics driver
-    // when `VariablePointersStorageBuffer` is used.
-    // DISABLED_SPIRV_BRANCH-NEXT: 21
+    // BRANCH: 20
+    // BRANCH-NEXT: 21
 }

@@ -81,13 +81,12 @@ void testStruct2Struct(int tid)
 void testBuffer2Struct(int tid)
 {
     SomeObject o;
+    o.nested.b = input1;
 
 #if defined(BRANCH)
     if (tid == 0)
         o.nested.b = input2;
-    else
 #endif
-        o.nested.b = input1;
 
     let data = o.nested.b.Load<uint4>(0);
     outputBuffer[2] = data;
