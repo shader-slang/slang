@@ -604,7 +604,8 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         auto targetCaps = target->getTargetCaps();
         auto stageCapabilitySet = entryPoint->getProfile().getCapabilityName();
         targetCaps.join(stageCapabilitySet);
-        if (targetCaps.isIncompatibleWith(entryPointFuncDecl->inferredCapabilityRequirements))
+        if (targetCaps.isIncompatibleWith(
+                CapabilitySet{entryPointFuncDecl->inferredCapabilityRequirements}))
         {
             // Incompatable means we don't support a set of abstract atoms.
             // Diagnose that we lack support for 'stage' and 'target' atoms with our provided
@@ -666,11 +667,12 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             // Only attempt to error if a specific profile or capability is requested
             if ((specificCapabilityRequested || specificProfileRequested) &&
                 targetCaps.atLeastOneSetImpliedInOther(
-                    entryPointFuncDecl->inferredCapabilityRequirements) ==
+                    CapabilitySet{entryPointFuncDecl->inferredCapabilityRequirements}) ==
                     CapabilitySet::ImpliesReturnFlags::NotImplied)
             {
                 CapabilitySet combinedSets = targetCaps;
-                combinedSets.join(entryPointFuncDecl->inferredCapabilityRequirements);
+                combinedSets.join(
+                    CapabilitySet{entryPointFuncDecl->inferredCapabilityRequirements});
                 CapabilityAtomSet addedAtoms{};
                 if (auto targetCapSet = targetCaps.getAtomSets())
                 {
@@ -707,7 +709,8 @@ bool resolveStageOfProfileWithEntryPoint(
     if (auto entryPointAttr = entryPointFuncDecl->findModifier<EntryPointAttribute>())
     {
         auto entryPointProfileStage = entryPointProfile.getStage();
-        auto entryPointStage = getStageFromAtom(entryPointAttr->capabilitySet.getTargetStage());
+        auto entryPointStage =
+            getStageFromAtom(CapabilitySet{entryPointAttr->capabilitySet}.getTargetStage());
 
         // Ensure every target is specifying the same stage as an entry-point
         // if a profile+stage was set, else user will not be aware that their
@@ -740,7 +743,7 @@ bool resolveStageOfProfileWithEntryPoint(
                 entryPointFuncDecl->getName(),
                 entryPointProfileStage,
                 entryPointStage);
-        entryPointProfile.additionalCapabilities.add(entryPointAttr->capabilitySet);
+        entryPointProfile.additionalCapabilities.add(CapabilitySet{entryPointAttr->capabilitySet});
         return true;
     }
     return false;

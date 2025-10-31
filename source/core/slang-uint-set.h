@@ -14,6 +14,8 @@
 namespace Slang
 {
 
+class UIntSetVal;
+
 constexpr Index intLog2(unsigned x)
 {
     return x == 1 ? 0 : 1 + intLog2(x >> 1);
@@ -113,6 +115,7 @@ public:
 
     /// Store the union between this and set
     void unionWith(const UIntSet& set);
+    void unionWith(const UIntSetVal& set);
     /// Store the intersection between this and set
     void intersectWith(const UIntSet& set);
     /// Store the subtraction between this and set
@@ -211,6 +214,8 @@ public:
     bool areAllZero() { return _areAllZero(m_buffer.getBuffer(), m_buffer.getCount()); }
 
 protected:
+    friend class UIntSetVal;
+
     static bool _areAllZero(const UIntSet::Element* elems, Index count)
     {
         for (Index i = 0; i < count; ++i)
