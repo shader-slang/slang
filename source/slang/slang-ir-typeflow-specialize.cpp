@@ -811,7 +811,6 @@ struct TypeFlowSpecializationContext
         if (areInfosEqual(info1, info2))
             return info1;
 
-        // TODO: Move into utility function to avoid dropping information.
         if (as<IRArrayType>(info1) && as<IRArrayType>(info2))
         {
             SLANG_ASSERT(info1->getOperand(1) == info2->getOperand(1));
@@ -1895,10 +1894,9 @@ struct TypeFlowSpecializationContext
             auto tableSet = taggedUnion->getWitnessTableSet();
             if (auto uninitElement = tableSet->tryGetUninitializedElement())
             {
-                // TODO: Need a better diagnostic here.
                 sink->diagnose(
                     inst->sourceLoc,
-                    Diagnostics::noTypeConformancesFoundForInterface,
+                    Diagnostics::dynamicDispatchOnPotentiallyUninitializedExistential,
                     uninitElement->getOperand(0));
 
                 return none(); // We'll return none so that the analysis doesn't
