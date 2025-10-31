@@ -2031,7 +2031,7 @@ struct TypeFlowSpecializationContext
                         // cases, when it comes to specializing a function or placing a call to a
                         // function, we will default to the single unbounded element case.
                         //
-                        IRInst* unboundedElement;
+                        IRInst* unboundedElement = nullptr;
                         forEachInSet(
                             elementOfSetType->getSet(),
                             [&](IRInst* element)
@@ -2090,7 +2090,7 @@ struct TypeFlowSpecializationContext
                                 return elementOfSetType->getSet()->getElement(0);
                             else if (elementOfSetType->getSet()->isUnbounded())
                             {
-                                IRInst* unboundedElement;
+                                IRInst* unboundedElement = nullptr;
                                 forEachInSet(
                                     elementOfSetType->getSet(),
                                     [&](IRInst* element)
@@ -3818,22 +3818,16 @@ struct TypeFlowSpecializationContext
         auto typeSet = taggedUnion->getTypeSet();
 
         IRInst* witnessTableTag = nullptr;
-        IRInst* typeTag = nullptr;
         if (auto witnessTable = as<IRWitnessTable>(inst->getWitnessTable()))
         {
             witnessTableTag = builder.emitGetTagOfElementInSet(
                 (IRType*)makeTagType(tableSet),
                 witnessTable,
                 tableSet);
-            typeTag = builder.emitGetTagOfElementInSet(
-                (IRType*)makeTagType(typeSet),
-                inst->getDataType(),
-                typeSet);
         }
         else if (as<IRSetTagType>(inst->getWitnessTable()->getDataType()))
         {
             witnessTableTag = upcastSet(&builder, inst->getWitnessTable(), makeTagType(tableSet));
-            typeTag = nullptr;
         }
 
         // Create the appropriate any-value type
