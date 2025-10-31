@@ -406,8 +406,10 @@ public:
                 return types.getValue(type);
         }
 
+        auto legalizedType = legalizeResourceTypes(type);
+
         llvm::DIType* llvmType = nullptr;
-        switch (type->getOp())
+        switch (legalizedType->getOp())
         {
         case kIROp_VoidType:
             llvmType = debugBuilder->createUnspecifiedType("void");
@@ -467,7 +469,7 @@ public:
 
         case kIROp_PtrType:
             {
-                auto ptr = as<IRPtrType>(type);
+                auto ptr = as<IRPtrType>(legalizedType);
                 llvmType = debugBuilder->createPointerType(
                     getDebugType(ptr->getValueType(), rules),
                     targetDataLayout.getPointerSizeInBits());
@@ -479,6 +481,12 @@ public:
                 "NativeRef",
                 targetDataLayout.getPointerSizeInBits(),
                 llvm::dwarf::DW_ATE_address);
+            break;
+
+        case kIROp_RawPointerType:
+            llvmType = debugBuilder->createPointerType(
+                debugBuilder->createUnspecifiedType("void"),
+                targetDataLayout.getPointerSizeInBits());
             break;
 
         case kIROp_StringType:
@@ -495,7 +503,7 @@ public:
         case kIROp_BorrowInOutParamType:
         case kIROp_BorrowInParamType:
             {
-                auto ptr = as<IRPtrTypeBase>(type);
+                auto ptr = as<IRPtrTypeBase>(legalizedType);
                 llvmType = debugBuilder->createReferenceType(
                     llvm::dwarf::DW_TAG_reference_type,
                     getDebugType(ptr->getValueType(), rules),
@@ -505,7 +513,7 @@ public:
 
         case kIROp_VectorType:
             {
-                auto vecType = static_cast<IRVectorType*>(type);
+                auto vecType = static_cast<IRVectorType*>(legalizedType);
                 auto elemCount = int(getIntVal(vecType->getElementCount()));
                 llvm::DIType* elemType = getDebugType(vecType->getElementType(), rules);
                 IRSizeAndAlignment sizeAndAlignment = getSizeAndAlignment(vecType, rules);
@@ -526,7 +534,7 @@ public:
         case kIROp_UnsizedArrayType:
         case kIROp_ArrayType:
             {
-                auto arrayType = static_cast<IRArrayTypeBase*>(type);
+                auto arrayType = static_cast<IRArrayTypeBase*>(legalizedType);
                 llvm::DIType* elemType = getDebugType(arrayType->getElementType(), rules);
                 auto irElemCount = arrayType->getElementCount();
                 auto elemCount = irElemCount ? getIntVal(irElemCount) : 0;
@@ -547,7 +555,7 @@ public:
 
         case kIROp_StructType:
             {
-                auto structType = static_cast<IRStructType*>(type);
+                auto structType = static_cast<IRStructType*>(legalizedType);
 
                 IRSizeAndAlignment sizeAndAlignment = getSizeAndAlignment(structType, rules);
 
@@ -587,7 +595,7 @@ public:
                     llvm::ArrayRef<llvm::Metadata*>(types.begin(), types.end()));
 
                 llvm::StringRef linkageName, prettyName;
-                maybeGetName(&linkageName, &prettyName, type);
+                maybeGetName(&linkageName, &prettyName, legalizedType);
 
                 sizeAndAlignment.size = align(sizeAndAlignment.size, sizeAndAlignment.alignment);
 
@@ -606,7 +614,7 @@ public:
 
         case kIROp_FuncType:
             {
-                auto funcType = static_cast<IRFuncType*>(type);
+                auto funcType = static_cast<IRFuncType*>(legalizedType);
 
                 List<llvm::Metadata*> elements;
                 elements.add(getDebugType(funcType->getResultType(), rules));
@@ -621,10 +629,14 @@ public:
             }
             break;
 
+        case kIROp_RateQualifiedType:
+            llvmType = getDebugType(as<IRRateQualifiedType>(legalizedType)->getValueType(), rules);
+            break;
+
         default:
             {
                 llvm::StringRef linkageName, prettyName;
-                maybeGetName(&linkageName, &prettyName, type);
+                maybeGetName(&linkageName, &prettyName, legalizedType);
                 llvmType = debugBuilder->createUnspecifiedType(prettyName);
             }
             break;
@@ -1701,13 +1713,23 @@ struct LLVMEmitter
                         llvmBuilder->getInt8Ty(),
                         sizeAndAlignment.getStride());
 
-                    llvmVar = new llvm::GlobalVariable(
-                        llvmType,
-                        false,
-                        llvm::GlobalValue::PrivateLinkage);
+                    if (auto constVal = types->maybeEmitConstant(inst))
+                    {
+                        llvmVar = new llvm::GlobalVariable(
+                            constVal->getType(),
+                            false,
+                            llvm::GlobalValue::PrivateLinkage);
+                        llvmVar->setInitializer(constVal);
+                    }
+                    else
+                    {
+                        llvmVar = new llvm::GlobalVariable(
+                            llvmType,
+                            false,
+                            llvm::GlobalValue::PrivateLinkage);
+                        llvmVar->setAlignment(llvm::Align(sizeAndAlignment.alignment));
+                    }
                     llvmModule->insertGlobalVariable(llvmVar);
-                    llvmVar->setInitializer(llvm::PoisonValue::get(llvmType));
-                    llvmVar->setAlignment(llvm::Align(sizeAndAlignment.alignment));
                     promotedGlobalInsts[inst] = llvmVar;
                 }
 
@@ -4200,19 +4222,13 @@ struct LLVMEmitter
 
         for (auto [inst, globalVar] : promotedGlobalInsts)
         {
-            // See if we can lower it directly as a constant
-            auto constVal = types->maybeEmitConstant(inst);
-            if (constVal)
-            {
-                globalVar->setInitializer(constVal);
-            }
-            else
-            {
-                // Otherwise, emit the instructions needed to construct the
-                // value.
-                auto llvmInst = emitLLVMInstruction(inst);
-                types->emitStore(globalVar, llvmInst, inst->getDataType(), defaultPointerRules);
-            }
+            if (globalVar->hasInitializer())
+                continue;
+
+            // Emit the instructions needed to construct the value.
+            auto llvmInst = emitLLVMInstruction(inst);
+            globalVar->setInitializer(llvm::PoisonValue::get(globalVar->getValueType()));
+            types->emitStore(globalVar, llvmInst, inst->getDataType(), defaultPointerRules);
         }
 
         inlineGlobalInstructions = false;
@@ -4418,7 +4434,7 @@ extern "C" SLANG_DLL_EXPORT SlangResult emitLLVMAssemblyFromIR_V1(
     Slang::String assembly;
     emitter.dumpAssembly(assembly);
 
-    Slang::ComPtr<ISlangBlob> blob = Slang::StringBlob::create(assembly);
+    Slang::ComPtr<ISlangBlob> blob = Slang::StringBlob::moveCreate(assembly);
     auto artifact = Slang::ArtifactUtil::createArtifactForCompileTarget(
         asExternal(codeGenContext->getTargetFormat()));
     artifact->addRepresentationUnknown(blob);
