@@ -1,5 +1,8 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=NOBRANCH): -vk -shaderobj -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BRANCH): -vk -shaderobj -output-using-type -Xslang -DBRANCH
+
+// VariablePointersStorageBuffer is not working on the current GCP servers; driver 573.07.
+// github issue #8876
+//DISABLE_TEST:COMPARE_COMPUTE(filecheck-buffer=BRANCH): -vk -shaderobj -output-using-type -Xslang -DBRANCH
 
 // This tests if a dynamic branching works for the legalization from ByteAddressBuffer to StructurredBuffer.
 
