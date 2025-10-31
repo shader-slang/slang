@@ -25,5 +25,6 @@ jobs:
       config: relwithdebinfo
       runs-on: '["ubuntu-22.04"]'
       build-llvm: true
+      server-count: 1  # Serial execution for deterministic coverage
       deploy-pages: true
     secrets: inherit
