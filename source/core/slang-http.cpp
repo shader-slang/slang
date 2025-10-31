@@ -368,6 +368,7 @@ SlangResult HTTPPacketConnection::waitForResult(Int timeOutInMs)
         // We timed out
         if (timeOutInTicks >= 0 && int64_t(Process::getClockTick()) - startTick >= timeOutInTicks)
         {
+            m_readResult = SLANG_E_TIME_OUT;
             break;
         }
 

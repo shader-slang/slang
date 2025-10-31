@@ -38,9 +38,11 @@
 #endif
 
 #include <filesystem>
-#include <limits.h> /* PATH_MAX */
+#include <functional> // for std::hash
+#include <limits.h>   /* PATH_MAX */
 #include <stdio.h>
 #include <stdlib.h>
+#include <thread> // for std::this_thread::get_id
 
 namespace Slang
 {
@@ -129,8 +131,17 @@ namespace Slang
     const UnownedStringSlice& inPrefix,
     Slang::String& outFileName)
 {
+    // Include process ID and thread ID to avoid conflicts when running parallel tests
+    // or multiple processes simultaneously
+    const pid_t pid = getpid();
+    const auto threadId = std::this_thread::get_id();
+
+    // Convert thread ID to a hash for uniqueness
+    std::hash<std::thread::id> hasher;
+    const size_t threadHash = hasher(threadId);
+
     StringBuilder builder;
-    builder << "/tmp/" << inPrefix << "-XXXXXX";
+    builder << "/tmp/" << inPrefix << "-p" << Int64(pid) << "-t" << UInt64(threadHash) << "-XXXXXX";
 
     List<char> buffer;
     auto copySize = builder.getLength();
