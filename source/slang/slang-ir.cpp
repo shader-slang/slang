@@ -6613,16 +6613,20 @@ IRSetBase* IRBuilder::getSet(IROp op, const HashSet<IRInst*>& elements)
         if (element->getParent()->getOp() != kIROp_ModuleInst)
             SLANG_ASSERT_FAILURE("createSet called with non-global operands");
 
-    List<IRInst*> sortedElements;
+    List<IRInst*>* sortedElements = getModule()->getContainerPool().getList<IRInst>();
     for (auto element : elements)
-        sortedElements.add(element);
+        sortedElements->add(element);
 
     // Sort elements by their unique IDs to ensure canonical ordering
-    sortedElements.sort(
+    sortedElements->sort(
         [&](IRInst* a, IRInst* b) -> bool { return getUniqueID(a) < getUniqueID(b); });
 
-    return as<IRSetBase>(
-        emitIntrinsicInst(nullptr, op, sortedElements.getCount(), sortedElements.getBuffer()));
+    auto setBaseInst = as<IRSetBase>(
+        emitIntrinsicInst(nullptr, op, sortedElements->getCount(), sortedElements->getBuffer()));
+
+    getModule()->getContainerPool().free(sortedElements);
+
+    return setBaseInst;
 }
 
 IRSetBase* IRBuilder::getSet(const HashSet<IRInst*>& elements)

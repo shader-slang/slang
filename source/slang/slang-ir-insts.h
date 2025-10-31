@@ -2863,6 +2863,51 @@ struct IRSetBase : IRInst
         }
         return false;
     }
+
+    IRInst* tryGetUnboundedElement()
+    {
+        for (UInt ii = 0; ii < getOperandCount(); ++ii)
+        {
+            switch (getElement(ii)->getOp())
+            {
+            case kIROp_UnboundedTypeElement:
+            case kIROp_UnboundedWitnessTableElement:
+            case kIROp_UnboundedFuncElement:
+            case kIROp_UnboundedGenericElement:
+                return getElement(ii);
+            }
+        }
+        return nullptr;
+    }
+
+    bool containsUninitializedElement()
+    {
+        // This is a "potentially uninitialized" set if any of its elements are unbounded.
+        for (UInt ii = 0; ii < getOperandCount(); ++ii)
+        {
+            switch (getElement(ii)->getOp())
+            {
+            case kIROp_UninitializedTypeElement:
+            case kIROp_UninitializedWitnessTableElement:
+                return true;
+            }
+        }
+        return false;
+    }
+
+    IRInst* tryGetUninitializedElement()
+    {
+        for (UInt ii = 0; ii < getOperandCount(); ++ii)
+        {
+            switch (getElement(ii)->getOp())
+            {
+            case kIROp_UninitializedTypeElement:
+            case kIROp_UninitializedWitnessTableElement:
+                return getElement(ii);
+            }
+        }
+        return nullptr;
+    }
 };
 
 FIDDLE()

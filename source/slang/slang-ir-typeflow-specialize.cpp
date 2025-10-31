@@ -494,6 +494,12 @@ bool isConcreteType(IRInst* inst)
         return isConcreteType(ptrType->getValueType());
     }
 
+    if (auto generic = as<IRGeneric>(inst))
+    {
+        if (as<IRFuncType>(getGenericReturnVal(generic)))
+            return false; // Can be refined into set of concrete generics.
+    }
+
     return true;
 }
 
@@ -555,28 +561,6 @@ bool isOptionalExistentialType(IRInst* inst)
         if (auto interfaceType = as<IRInterfaceType>(optionalType->getValueType()))
             return !isComInterfaceType(interfaceType) && !isBuiltin(interfaceType);
     return false;
-}
-
-IRInst* maybeGetUninitializedElement(IRSetBase* set)
-{
-    IRInst* foundInst = nullptr;
-    forEachInSet(
-        set,
-        [&](IRInst* element)
-        {
-            if (auto uninitializedTypeElement = as<IRUninitializedTypeElement>(element))
-            {
-                foundInst = uninitializedTypeElement;
-            }
-            else if (
-                auto uninitializedWitnessTableElement =
-                    as<IRUninitializedWitnessTableElement>(element))
-            {
-                foundInst = uninitializedWitnessTableElement;
-            }
-        });
-
-    return foundInst;
 }
 
 // Parent context for the full type-flow pass.
@@ -851,14 +835,6 @@ struct TypeFlowSpecializationContext
                 (IRType*)unionPropagationInfo(info1->getOperand(0), info2->getOperand(0)),
                 as<IRPtrTypeBase>(info1));
         }
-
-        /*
-        if (as<IRUnboundedSet>(info1) && as<IRUnboundedSet>(info2))
-        {
-            // If either info is unbounded, the union is unbounded
-            return makeUnbounded();
-        }
-        */
 
         // For all other cases which are structured composites of sets,
         // we simply take the set union for all the set operands.
@@ -1409,16 +1385,22 @@ struct TypeFlowSpecializationContext
                 return none();
             }
 
-            auto tables = collectExistentialTables(interfaceType);
+            HashSet<IRInst*>& tables = *module->getContainerPool().getHashSet<IRInst>();
+            collectExistentialTables(interfaceType, tables);
             if (tables.getCount() > 0)
-                return makeTaggedUnionType(
+            {
+                auto resultTaggedUnionType = makeTaggedUnionType(
                     as<IRWitnessTableSet>(builder.getSet(kIROp_WitnessTableSet, tables)));
+                module->getContainerPool().free(&tables);
+                return resultTaggedUnionType;
+            }
             else
             {
                 sink->diagnose(
                     inst,
                     Diagnostics::noTypeConformancesFoundForInterface,
                     interfaceType);
+                module->getContainerPool().free(&tables);
                 return none();
             }
         }
@@ -1437,8 +1419,6 @@ struct TypeFlowSpecializationContext
         if (isComInterfaceType(inst->getDataType()))
         {
             return none();
-            // return builder.getComPtrType(inst->getDataType());
-            // return makeUnbounded();
         }
 
         auto witnessTable = inst->getWitnessTable();
@@ -1452,9 +1432,6 @@ struct TypeFlowSpecializationContext
 
         if (!witnessTableInfo)
             return none();
-
-        // if (as<IRUnboundedSet>(witnessTableInfo))
-        //     return makeUnbounded();
 
         if (auto elementOfSetType = as<IRElementOfSetType>(witnessTableInfo))
             return makeTaggedUnionType(cast<IRWitnessTableSet>(elementOfSetType->getSet()));
@@ -1535,12 +1512,24 @@ struct TypeFlowSpecializationContext
                 {
                     if (!isComInterfaceType(interfaceType))
                     {
-                        auto tables = collectExistentialTables(interfaceType);
+                        HashSet<IRInst*>& tables = *module->getContainerPool().getHashSet<IRInst>();
+                        collectExistentialTables(interfaceType, tables);
                         if (tables.getCount() > 0)
-                            return makeTaggedUnionType(as<IRWitnessTableSet>(
+                        {
+                            auto resultTaggedUnionType = makeTaggedUnionType(as<IRWitnessTableSet>(
                                 builder.getSet(kIROp_WitnessTableSet, tables)));
+                            module->getContainerPool().free(&tables);
+                            return resultTaggedUnionType;
+                        }
                         else
+                        {
+                            sink->diagnose(
+                                loadInst,
+                                Diagnostics::noTypeConformancesFoundForInterface,
+                                interfaceType);
+                            module->getContainerPool().free(&tables);
                             return none();
+                        }
                     }
                     else
                     {
@@ -1577,12 +1566,20 @@ struct TypeFlowSpecializationContext
             {
                 if (!isComInterfaceType(interfaceType))
                 {
-                    auto tables = collectExistentialTables(interfaceType);
+                    HashSet<IRInst*>& tables = *module->getContainerPool().getHashSet<IRInst>();
+                    collectExistentialTables(interfaceType, tables);
                     if (tables.getCount() > 0)
-                        return makeTaggedUnionType(
+                    {
+                        auto resultTaggedUnionType = makeTaggedUnionType(
                             as<IRWitnessTableSet>(builder.getSet(kIROp_WitnessTableSet, tables)));
+                        module->getContainerPool().free(&tables);
+                        return resultTaggedUnionType;
+                    }
                     else
+                    {
+                        module->getContainerPool().free(&tables);
                         return none();
+                    }
                 }
                 else
                 {
@@ -1839,7 +1836,7 @@ struct TypeFlowSpecializationContext
         if (auto elementOfSetType = as<IRElementOfSetType>(witnessTableInfo))
         {
             IRBuilder builder(module);
-            HashSet<IRInst*> results;
+            HashSet<IRInst*>& results = *module->getContainerPool().getHashSet<IRInst>();
             forEachInSet(
                 cast<IRWitnessTableSet>(elementOfSetType->getSet()),
                 [&](IRInst* table)
@@ -1862,7 +1859,10 @@ struct TypeFlowSpecializationContext
                     results.add(lookupWitnessTableEntry(cast<IRWitnessTable>(table), key));
                 });
 
-            return makeElementOfSetType(builder.getSet(results));
+            auto resultSetType = makeElementOfSetType(builder.getSet(results));
+            module->getContainerPool().free(&results);
+
+            return resultSetType;
         }
 
         if (!witnessTableInfo)
@@ -1893,9 +1893,9 @@ struct TypeFlowSpecializationContext
         if (auto taggedUnion = as<IRTaggedUnionType>(operandInfo))
         {
             auto tableSet = taggedUnion->getWitnessTableSet();
-            if (auto uninitElement = maybeGetUninitializedElement(tableSet))
+            if (auto uninitElement = tableSet->tryGetUninitializedElement())
             {
-                // Uninitialized element should contain
+                // TODO: Need a better diagnostic here.
                 sink->diagnose(
                     inst->sourceLoc,
                     Diagnostics::noTypeConformancesFoundForInterface,
@@ -1995,7 +1995,7 @@ struct TypeFlowSpecializationContext
         // Handle the 'many' or 'one' cases.
         if (as<IRElementOfSetType>(operandInfo) || isGlobalInst(operand))
         {
-            List<IRInst*> specializationArgs;
+            List<IRInst*>& specializationArgs = *module->getContainerPool().getList<IRInst>();
             for (UInt i = 0; i < inst->getArgCount(); ++i)
             {
                 // For concrete args, add as-is.
@@ -2012,7 +2012,10 @@ struct TypeFlowSpecializationContext
 
                 // If any of the args are 'empty' sets, we can't generate a specialization just yet.
                 if (!argInfo)
+                {
+                    module->getContainerPool().free(&specializationArgs);
                     return none();
+                }
 
                 if (as<IRTaggedUnionType>(argInfo))
                 {
@@ -2023,7 +2026,9 @@ struct TypeFlowSpecializationContext
                 {
                     if (elementOfSetType->getSet()->isSingleton())
                         specializationArgs.add(elementOfSetType->getSet()->getElement(0));
-                    else if (elementOfSetType->getSet()->isUnbounded())
+                    else if (
+                        auto unboundedElement =
+                            elementOfSetType->getSet()->tryGetUnboundedElement())
                     {
                         // Infinite set.
                         //
@@ -2031,15 +2036,6 @@ struct TypeFlowSpecializationContext
                         // cases, when it comes to specializing a function or placing a call to a
                         // function, we will default to the single unbounded element case.
                         //
-                        IRInst* unboundedElement = nullptr;
-                        forEachInSet(
-                            elementOfSetType->getSet(),
-                            [&](IRInst* element)
-                            {
-                                if (as<IRUnboundedTypeElement>(element) ||
-                                    as<IRUnboundedWitnessTableElement>(element))
-                                    unboundedElement = element;
-                            });
                         IRBuilder builder(module);
                         SLANG_ASSERT(unboundedElement);
                         auto pureUnboundedSet = builder.getSingletonSet(unboundedElement);
@@ -2088,17 +2084,10 @@ struct TypeFlowSpecializationContext
                         {
                             if (elementOfSetType->getSet()->isSingleton())
                                 return elementOfSetType->getSet()->getElement(0);
-                            else if (elementOfSetType->getSet()->isUnbounded())
+                            else if (
+                                auto unboundedElement =
+                                    elementOfSetType->getSet()->tryGetUnboundedElement())
                             {
-                                IRInst* unboundedElement = nullptr;
-                                forEachInSet(
-                                    elementOfSetType->getSet(),
-                                    [&](IRInst* element)
-                                    {
-                                        if (as<IRUnboundedTypeElement>(element))
-                                            unboundedElement = element;
-                                    });
-                                SLANG_ASSERT(unboundedElement);
                                 IRBuilder builder(module);
                                 return makeUntaggedUnionType(
                                     cast<IRTypeSet>(builder.getSingletonSet(unboundedElement)));
@@ -2114,7 +2103,7 @@ struct TypeFlowSpecializationContext
                         return type;
                 };
 
-                List<IRType*> newParamTypes;
+                List<IRType*>& newParamTypes = *module->getContainerPool().getList<IRType>();
                 for (auto paramType : funcType->getParamTypes())
                     newParamTypes.add((IRType*)substituteSets(paramType));
                 IRBuilder builder(module);
@@ -2123,6 +2112,7 @@ struct TypeFlowSpecializationContext
                     newParamTypes.getCount(),
                     newParamTypes.getBuffer(),
                     (IRType*)substituteSets(funcType->getResultType()));
+                module->getContainerPool().free(&newParamTypes);
             }
             else if (auto typeInfo = tryGetInfo(context, inst->getDataType()))
             {
@@ -2140,12 +2130,14 @@ struct TypeFlowSpecializationContext
                 }
                 else
                 {
+                    module->getContainerPool().free(&specializationArgs);
                     return none();
                 }
             }
             else
             {
                 // We don't have a type we can work with just yet.
+                module->getContainerPool().free(&specializationArgs);
                 return none(); // No info for the type
             }
 
@@ -2154,11 +2146,12 @@ struct TypeFlowSpecializationContext
                 // Our func-type operand is not yet been lifted.
                 // For now, we can't say anything.
                 //
+                module->getContainerPool().free(&specializationArgs);
                 return none();
             }
 
             // Specialize each element in the set
-            HashSet<IRInst*> specializedSet;
+            HashSet<IRInst*>& specializedSet = *module->getContainerPool().getHashSet<IRInst>();
 
             IRSetBase* set = nullptr;
             if (auto elementOfSetType = as<IRElementOfSetType>(operandInfo))
@@ -2200,7 +2193,10 @@ struct TypeFlowSpecializationContext
             }
 
             IRBuilder builder(module);
-            return makeElementOfSetType(builder.getSet(specializedSet));
+            auto resultSetType = makeElementOfSetType(builder.getSet(specializedSet));
+            module->getContainerPool().free(&specializedSet);
+            module->getContainerPool().free(&specializationArgs);
+            return resultSetType;
         }
 
         if (!operandInfo)
@@ -2681,7 +2677,8 @@ struct TypeFlowSpecializationContext
 
     bool specializeInstsInBlock(IRInst* context, IRBlock* block)
     {
-        List<IRInst*> instsToLower;
+        List<IRInst*>& instsToLower = *module->getContainerPool().getList<IRInst>();
+
         bool hasChanges = false;
         for (auto inst : block->getChildren())
             instsToLower.add(inst);
@@ -2689,6 +2686,7 @@ struct TypeFlowSpecializationContext
         for (auto inst : instsToLower)
             hasChanges |= specializeInst(context, inst);
 
+        module->getContainerPool().free(&instsToLower);
         return hasChanges;
     }
 
@@ -3056,13 +3054,13 @@ struct TypeFlowSpecializationContext
             auto thisInstInfo = cast<IRElementOfSetType>(tryGetInfo(context, inst));
             if (thisInstInfo->getSet() != nullptr)
             {
-                List<IRInst*> operands = {witnessTableInst, inst->getRequirementKey()};
+                IRInst* operands[] = {witnessTableInst, inst->getRequirementKey()};
 
                 auto newInst = builder.emitIntrinsicInst(
                     (IRType*)makeTagType(thisInstInfo->getSet()),
                     kIROp_GetTagForMappedSet,
-                    operands.getCount(),
-                    operands.getBuffer());
+                    2,
+                    operands);
 
                 inst->replaceUsesWith(newInst);
                 inst->removeAndDeallocate();
@@ -3176,7 +3174,7 @@ struct TypeFlowSpecializationContext
     {
         if (auto valOfSetType = as<IRUntaggedUnionType>(currentType))
         {
-            HashSet<IRInst*> setElements;
+            HashSet<IRInst*>& setElements = *module->getContainerPool().getHashSet<IRInst>();
             forEachInSet(
                 valOfSetType->getSet(),
                 [&](IRInst* element) { setElements.add(element); });
@@ -3197,6 +3195,7 @@ struct TypeFlowSpecializationContext
             // If this is a set, we need to create a new set with the new type
             IRBuilder builder(module);
             auto newSet = builder.getSet(kIROp_TypeSet, setElements);
+            module->getContainerPool().free(&setElements);
             return makeUntaggedUnionType(cast<IRTypeSet>(newSet));
         }
         else if (currentType == newType)
@@ -3216,7 +3215,7 @@ struct TypeFlowSpecializationContext
         }
         else // Need to create a new set.
         {
-            HashSet<IRInst*> setElements;
+            HashSet<IRInst*>& setElements = *module->getContainerPool().getHashSet<IRInst>();
 
             SLANG_ASSERT(!as<IRSetBase>(currentType) && !as<IRSetBase>(newType));
 
@@ -3226,6 +3225,7 @@ struct TypeFlowSpecializationContext
             // If this is a set, we need to create a new set with the new type
             IRBuilder builder(module);
             auto newSet = builder.getSet(kIROp_TypeSet, setElements);
+            module->getContainerPool().free(&setElements);
             return makeUntaggedUnionType(cast<IRTypeSet>(newSet));
         }
     }
@@ -3237,17 +3237,22 @@ struct TypeFlowSpecializationContext
     {
         SLANG_UNUSED(key);
 
-        List<IRType*> extraParamTypes;
+        List<IRType*>& extraParamTypes = *module->getContainerPool().getList<IRType>();
         extraParamTypes.add((IRType*)makeTagType(tableSet));
 
         auto innerFuncType = getEffectiveFuncTypeForSet(resultFuncSet);
-        List<IRType*> allParamTypes;
+        List<IRType*>& allParamTypes = *module->getContainerPool().getList<IRType>();
         allParamTypes.addRange(extraParamTypes);
         for (auto paramType : innerFuncType->getParamTypes())
             allParamTypes.add(paramType);
 
         IRBuilder builder(module);
-        return builder.getFuncType(allParamTypes, innerFuncType->getResultType());
+        auto resultFuncType = builder.getFuncType(allParamTypes, innerFuncType->getResultType());
+
+        module->getContainerPool().free(&extraParamTypes);
+        module->getContainerPool().free(&allParamTypes);
+
+        return resultFuncType;
     }
 
     // Get an effective func type to use for the callee.
@@ -3274,21 +3279,14 @@ struct TypeFlowSpecializationContext
 
         if (calleeSet->isUnbounded())
         {
-            IRUnboundedFuncElement* unboundedFuncElement = nullptr;
-            forEachInSet(
-                calleeSet,
-                [&](IRInst* func)
-                {
-                    if (as<IRUnboundedFuncElement>(func))
-                        unboundedFuncElement = as<IRUnboundedFuncElement>(func);
-                });
-            SLANG_ASSERT(unboundedFuncElement);
+            IRUnboundedFuncElement* unboundedFuncElement =
+                cast<IRUnboundedFuncElement>(calleeSet->tryGetUnboundedElement());
             return cast<IRFuncType>(unboundedFuncElement->getOperand(0));
         }
 
         IRBuilder builder(module);
 
-        List<IRType*> paramTypes;
+        List<IRType*>& paramTypes = *module->getContainerPool().getList<IRType>();
         IRType* resultType = nullptr;
 
         auto updateParamType = [&](Index index, IRType* paramType) -> IRType*
@@ -3315,7 +3313,7 @@ struct TypeFlowSpecializationContext
             }
         };
 
-        List<IRInst*> calleesToProcess;
+        List<IRInst*>& calleesToProcess = *module->getContainerPool().getList<IRInst>();
         forEachInSet(calleeSet, [&](IRInst* func) { calleesToProcess.add(func); });
 
         for (auto context : calleesToProcess)
@@ -3342,11 +3340,13 @@ struct TypeFlowSpecializationContext
             }
         }
 
+        module->getContainerPool().free(&calleesToProcess);
+
         //
         // Add in extra parameter types for a call to a dynamic generic callee
         //
 
-        List<IRType*> extraParamTypes;
+        List<IRType*>& extraParamTypes = *module->getContainerPool().getList<IRType>();
 
         // If the any of the elements in the callee (or the callee itself in case
         // of a singleton) is a dynamic specialization, each non-singleton WitnessTableSet,
@@ -3364,11 +3364,17 @@ struct TypeFlowSpecializationContext
                     extraParamTypes.add((IRType*)makeTagType(tableSet));
         }
 
-        List<IRType*> allParamTypes;
+        List<IRType*>& allParamTypes = *module->getContainerPool().getList<IRType>();
         allParamTypes.addRange(extraParamTypes);
         allParamTypes.addRange(paramTypes);
 
-        return builder.getFuncType(allParamTypes, resultType);
+        auto resultFuncType = builder.getFuncType(allParamTypes, resultType);
+
+        module->getContainerPool().free(&paramTypes);
+        module->getContainerPool().free(&extraParamTypes);
+        module->getContainerPool().free(&allParamTypes);
+
+        return resultFuncType;
     }
 
     IRFuncType* getEffectiveFuncType(IRInst* callee)
@@ -3382,9 +3388,10 @@ struct TypeFlowSpecializationContext
     // For a `Specialize` instruction that has dynamic tag arguments,
     // extract all the tags and return them as a list.
     //
-    List<IRInst*> getArgsForSetSpecializedGeneric(IRSpecialize* specializedCallee)
+    void addArgsForSetSpecializedGeneric(
+        IRSpecialize* specializedCallee,
+        List<IRInst*>& outCallArgs)
     {
-        List<IRInst*> callArgs;
         for (UInt ii = 0; ii < specializedCallee->getArgCount(); ii++)
         {
             auto specArg = specializedCallee->getArg(ii);
@@ -3395,10 +3402,8 @@ struct TypeFlowSpecializationContext
             //
             if (auto tagType = as<IRSetTagType>(argInfo))
                 if (as<IRWitnessTableSet>(tagType->getSet()))
-                    callArgs.add(specArg);
+                    outCallArgs.add(specArg);
         }
-
-        return callArgs;
     }
 
     IRInst* maybeSpecializeCalleeType(IRInst* callee)
@@ -3503,8 +3508,7 @@ struct TypeFlowSpecializationContext
         if (isNoneCallee(callee))
             return false;
 
-        // IRInst* calleeTagInst = nullptr;
-        List<IRInst*> callArgs;
+        List<IRInst*>& callArgs = *module->getContainerPool().getList<IRInst>();
 
         // This is a bit of a workaround for specialized callee's
         // whose function types haven't been specialized yet (can
@@ -3607,11 +3611,10 @@ struct TypeFlowSpecializationContext
             else if (isSetSpecializedGeneric(setTag->getSet()->getElement(0)))
             {
                 // Single element which is a set specialized generic.
-                callArgs.addRange(getArgsForSetSpecializedGeneric(cast<IRSpecialize>(callee)));
+                addArgsForSetSpecializedGeneric(cast<IRSpecialize>(callee), callArgs);
                 callee = setTag->getSet()->getElement(0);
 
                 auto funcType = getEffectiveFuncType(callee);
-                // callee->setFullType(funcType);
                 IRBuilder builder(module);
                 builder.setInsertInto(module);
                 callee = builder.replaceOperand(&callee->typeUse, funcType);
@@ -3651,7 +3654,6 @@ struct TypeFlowSpecializationContext
             // by the analysis.
             //
             auto funcType = getEffectiveFuncType(callee);
-            // callee->setFullType(funcType);
             IRBuilder builder(module);
             builder.setInsertInto(module);
             callee = builder.replaceOperand(&callee->typeUse, funcType);
@@ -3667,7 +3669,6 @@ struct TypeFlowSpecializationContext
                 for (auto paramType : oldFuncType->getParamTypes())
                     paramTypes.add(paramType);
                 auto newFuncType = builder.getFuncType(paramTypes, resultType);
-                // callee->setFullType(newFuncType);
                 builder.setInsertInto(module);
                 callee = builder.replaceOperand(&callee->typeUse, newFuncType);
             }
@@ -3746,7 +3747,6 @@ struct TypeFlowSpecializationContext
             auto newCall = builder.emitCallInst(calleeFuncType->getResultType(), callee, callArgs);
             inst->replaceUsesWith(newCall);
             inst->removeAndDeallocate();
-            return true;
         }
         else if (calleeFuncType->getResultType() != inst->getFullType())
         {
@@ -3754,13 +3754,12 @@ struct TypeFlowSpecializationContext
             // need to update the result type.
             //
             inst->setFullType(calleeFuncType->getResultType());
-            return true;
+            changed = true;
         }
-        else
-        {
-            // Nothing changed.
-            return false;
-        }
+
+        module->getContainerPool().free(&callArgs);
+
+        return changed;
     }
 
     bool specializeMakeStruct(IRInst* context, IRMakeStruct* inst)
@@ -3960,12 +3959,12 @@ struct TypeFlowSpecializationContext
                     kIROp_CastInterfaceToTaggedUnionPtr,
                     1,
                     &bufferHandle);
-                List<IRInst*> newLoadOperands = {newHandle, inst->getOperand(1)};
+                IRInst* newLoadOperands[] = {newHandle, inst->getOperand(1)};
                 auto newLoad = builder.emitIntrinsicInst(
                     specializedValType,
                     inst->getOp(),
-                    newLoadOperands.getCount(),
-                    newLoadOperands.getBuffer());
+                    2,
+                    newLoadOperands);
 
                 inst->replaceUsesWith(newLoad);
                 inst->removeAndDeallocate();
@@ -4050,7 +4049,7 @@ struct TypeFlowSpecializationContext
                         IRBuilder builder(inst);
                         setInsertBeforeOrdinaryInst(&builder, inst);
 
-                        List<IRInst*> specOperands;
+                        List<IRInst*>& specOperands = *module->getContainerPool().getList<IRInst>();
                         specOperands.add(inst->getBase());
 
                         for (UInt ii = 0; ii < inst->getArgCount(); ii++)
@@ -4061,6 +4060,7 @@ struct TypeFlowSpecializationContext
                             kIROp_GetTagForSpecializedSet,
                             specOperands.getCount(),
                             specOperands.getBuffer());
+                        module->getContainerPool().free(&specOperands);
 
                         inst->replaceUsesWith(newInst);
                         inst->removeAndDeallocate();
@@ -4076,7 +4076,7 @@ struct TypeFlowSpecializationContext
 
         // For all other specializations, we'll 'drop' the dynamic tag information.
         bool changed = false;
-        List<IRInst*> args;
+        List<IRInst*>& args = *module->getContainerPool().getList<IRInst>();
         for (UIndex i = 0; i < inst->getArgCount(); i++)
         {
             auto arg = inst->getArg(i);
@@ -4114,10 +4114,9 @@ struct TypeFlowSpecializationContext
 
             inst->replaceUsesWith(newInst);
             inst->removeAndDeallocate();
-            return true;
         }
-
-        return false;
+        module->getContainerPool().free(&args);
+        return changed;
     }
 
     bool specializeGetValueFromBoundInterface(IRInst* context, IRGetValueFromBoundInterface* inst)
@@ -4300,12 +4299,12 @@ struct TypeFlowSpecializationContext
             auto firstElement = tagType->getSet()->getElement(0);
             auto interfaceType =
                 as<IRInterfaceType>(as<IRWitnessTable>(firstElement)->getConformanceType());
-            List<IRInst*> args = {interfaceType, arg};
+            IRInst* args[] = {interfaceType, arg};
             auto newInst = builder.emitIntrinsicInst(
                 (IRType*)builder.getUIntType(),
                 kIROp_GetSequentialIDFromTag,
-                args.getCount(),
-                args.getBuffer());
+                2,
+                args);
 
             inst->replaceUsesWith(newInst);
             inst->removeAndDeallocate();
@@ -4495,10 +4494,8 @@ struct TypeFlowSpecializationContext
         return false;
     }
 
-    HashSet<IRInst*> collectExistentialTables(IRInterfaceType* interfaceType)
+    void collectExistentialTables(IRInterfaceType* interfaceType, HashSet<IRInst*>& outTables)
     {
-        HashSet<IRInst*> tables;
-
         IRWitnessTableType* targetTableType = nullptr;
         // First, find the IRWitnessTableType that wraps the given interfaceType
         for (auto use = interfaceType->firstUse; use; use = use->nextUse)
@@ -4522,13 +4519,11 @@ struct TypeFlowSpecializationContext
                 {
                     if (witnessTable->getDataType() == targetTableType)
                     {
-                        tables.add(witnessTable);
+                        outTables.add(witnessTable);
                     }
                 }
             }
         }
-
-        return tables;
     }
 
     bool processModule()
