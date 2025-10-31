@@ -47,7 +47,7 @@ cmake.exe --build build --config Release
 cd ../..
 ```
 
-## Update SPIRV-Tools
+## Update SPIRV-Headers
 
 1. Update the SPIRV-Headers submodule to what SPIRV-Tools uses
    ```
