@@ -3637,6 +3637,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // We will defer the emit of the contents in loop header block
         // until all Phi insts are emitted.
         List<IRLoop*> pendingLoopInsts;
+        sortBlocksInFunc(irFunc);
         for (auto irBlock : irFunc->getBlocks())
         {
             // Note: because we already created the block above,
