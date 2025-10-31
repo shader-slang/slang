@@ -22,6 +22,7 @@
 #include <signal.h>
 #endif
 
+#include <mutex>
 #include <time.h>
 
 namespace Slang
@@ -384,6 +385,11 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
 
 static const int kCannotExecute = 126;
 
+// Global mutex to serialize fork() calls across threads
+// fork() in a multi-threaded program requires serialization to prevent
+// race conditions with file descriptors and other process-global state
+static std::mutex g_forkMutex;
+
 static int pipeCLOEXEC(int pipefd[2])
 {
 #if SLANG_APPLE_FAMILY
@@ -441,10 +447,16 @@ static int pipeCLOEXEC(int pipefd[2])
     // leaks when creating many processes in parallel.
     int execWatchPipe[2] = {-1, -1};
 
+    // Lock to serialize fork() across threads. fork() in a multi-threaded program
+    // has race conditions with the global FD table. We must serialize from pipe
+    // creation through exec verification to prevent FD corruption.
+    std::unique_lock<std::mutex> forkLock(g_forkMutex);
+
     if (pipeCLOEXEC(stdinPipe) == -1 || pipeCLOEXEC(stdoutPipe) == -1 ||
         pipeCLOEXEC(stderrPipe) == -1 || pipeCLOEXEC(execWatchPipe) == -1)
     {
         whatFailed = "pipe";
+        forkLock.unlock();
         goto reportErr;
     }
 
@@ -456,6 +468,7 @@ static int pipeCLOEXEC(int pipefd[2])
     {
         if (-1 == (next = fcntl(stdinPipe[0], F_DUPFD, 3)))
         {
+            forkLock.unlock();
             goto reportErr;
         }
         close(stdinPipe[0]);
@@ -465,6 +478,7 @@ static int pipeCLOEXEC(int pipefd[2])
     {
         if (-1 == (next = fcntl(stdoutPipe[1], F_DUPFD, 3)))
         {
+            forkLock.unlock();
             goto reportErr;
         }
         close(stdoutPipe[1]);
@@ -474,6 +488,7 @@ static int pipeCLOEXEC(int pipefd[2])
     {
         if (-1 == (next = fcntl(stderrPipe[1], F_DUPFD, 3)))
         {
+            forkLock.unlock();
             goto reportErr;
         }
         close(stderrPipe[1]);
@@ -483,6 +498,7 @@ static int pipeCLOEXEC(int pipefd[2])
     {
         if (-1 == (next = fcntl(execWatchPipe[1], F_DUPFD_CLOEXEC, 3)))
         {
+            forkLock.unlock();
             goto reportErr;
         }
         close(execWatchPipe[1]);
@@ -494,6 +510,7 @@ static int pipeCLOEXEC(int pipefd[2])
     if (childPid == -1)
     {
         whatFailed = "fork";
+        forkLock.unlock();
         goto reportErr;
     }
 
@@ -595,8 +612,15 @@ static int pipeCLOEXEC(int pipefd[2])
             goto closePipes;
         }
 
+        // Exec verification complete - release fork lock to allow other threads
+        forkLock.unlock();
+
         outProcess = new UnixProcess(childPid, streams[0].readRef());
     }
+
+    // Success - ensure lock is released (already done above, but defense in depth)
+    if (forkLock.owns_lock())
+        forkLock.unlock();
 
     goto closePipes;
 
