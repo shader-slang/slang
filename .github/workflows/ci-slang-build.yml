@@ -122,20 +122,7 @@ jobs:
               echo "ℹ️  ccache_symlinks_path not set - building without ccache"
             fi
 
-            if [[ "${{ inputs.os }}" =~ "windows" && "${{ inputs.config }}" == "debug" ]]; then
-              # Doing a debug build will try to link against a release built llvm, this
-              # is a problem on Windows, so make slang-llvm in release build and use
-              # that as though it's a fetched binary via these presets.
-              cmake --workflow --preset slang-llvm
-
-              # Configure, pointing to our just-generated slang-llvm archive
-              cmake --preset default --fresh \
-                -DSLANG_SLANG_LLVM_FLAVOR=FETCH_BINARY \
-                "-DSLANG_SLANG_LLVM_BINARY_URL=$(pwd)/build/dist-release/slang-llvm.zip" \
-                "-DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }}" \
-                "${cmake_launcher_defines[@]}"
-              cmake --workflow --preset "${{ inputs.config }}"
-            elif [[ "${{ inputs.build-llvm }}" = "false" ]]; then
+            if [[ "${{ inputs.build-llvm }}" = "false" ]]; then
               # linux aarch64 cannot build llvm.
               cmake --preset default --fresh \
                 -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
