@@ -100,14 +100,15 @@ runs:
       with:
         path: build/llvm-project-install
         # Use os*compiler*platform in lieu of an ABI key here, which is what we really want
-        key: llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ hashFiles('external/build-llvm.sh') }}
+        key: llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${cmake_config}-${{ hashFiles('external/build-llvm.sh') }}
     - name: Build LLVM
       if: inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true'
       shell: bash
       run: |
         ./external/build-llvm.sh \
           --install-prefix "${{github.workspace}}/build/llvm-project-install" \
-          --repo "https://${{github.token}}@github.com/llvm/llvm-project"
+          --repo "https://${{github.token}}@github.com/llvm/llvm-project" \
+          --config ${cmake_config}
     - uses: actions/cache/save@v4
       if: inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true' && github.ref == 'refs/heads/master' && inputs.use-cached-llvm == 'true'
       with:
