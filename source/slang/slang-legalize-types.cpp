@@ -1656,11 +1656,6 @@ IRVarLayout* createVarLayout(
     IRVarLayout::Builder varLayoutBuilder(irBuilder, typeLayout);
     buildSimpleVarLayout(&varLayoutBuilder, varChain.primaryChain, typeLayout);
 
-    if (const auto pendingDataTypeLayout = typeLayout->getPendingDataTypeLayout())
-    {
-        varLayoutBuilder.setPendingVarLayout(
-            createSimpleVarLayout(irBuilder, varChain.pendingChain, typeLayout));
-    }
 
     return varLayoutBuilder.build();
 }

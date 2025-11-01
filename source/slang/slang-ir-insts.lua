@@ -2455,12 +2455,6 @@ local insts = {
 	{
 		Attr = {
 			hoistable = true,
-			{
-				pendingLayout = {
-					struct_name = "PendingLayoutAttr",
-					operands = { { "layout", "IRLayout" } },
-				},
-			},
 			{ stage = { struct_name = "StageAttr", operands = { { "stageOperand", "IRIntLit" } } } },
 			{
 				structFieldLayout = {

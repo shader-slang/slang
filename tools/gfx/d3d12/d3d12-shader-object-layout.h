@@ -82,9 +82,6 @@ public:
         SubObjectRangeOffset() {}
 
         SubObjectRangeOffset(slang::VariableLayoutReflection* varLayout);
-
-        /// The offset for "pending" ordinary data related to this range
-        uint32_t pendingOrdinaryData = 0;
     };
 
     /// Stride information for a sub-object range
@@ -93,9 +90,6 @@ public:
         SubObjectRangeStride() {}
 
         SubObjectRangeStride(slang::TypeLayoutReflection* typeLayout);
-
-        /// The strid for "pending" ordinary data related to this range
-        uint32_t pendingOrdinaryData = 0;
     };
 
     /// Information about a sub-objecrt range
@@ -358,20 +352,15 @@ public:
         struct BindingRegisterOffsetPair
         {
             BindingRegisterOffset primary;
-            BindingRegisterOffset pending;
 
             BindingRegisterOffsetPair() {}
 
             BindingRegisterOffsetPair(slang::VariableLayoutReflection* varLayout)
-                : primary(varLayout), pending(varLayout->getPendingDataLayout())
+                : primary(varLayout)
             {
             }
 
-            void operator+=(BindingRegisterOffsetPair const& other)
-            {
-                primary += other.primary;
-                pending += other.pending;
-            }
+            void operator+=(BindingRegisterOffsetPair const& other) { primary += other.primary; }
         };
         /// Add a new descriptor set to the layout being computed.
         ///

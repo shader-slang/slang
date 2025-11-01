@@ -13,20 +13,12 @@ ShaderObjectLayoutImpl::SubObjectRangeOffset::SubObjectRangeOffset(
     slang::VariableLayoutReflection* varLayout)
     : BindingOffset(varLayout)
 {
-    if (auto pendingLayout = varLayout->getPendingDataLayout())
-    {
-        pendingOrdinaryData = (uint32_t)pendingLayout->getOffset(SLANG_PARAMETER_CATEGORY_UNIFORM);
-    }
 }
 
 ShaderObjectLayoutImpl::SubObjectRangeStride::SubObjectRangeStride(
     slang::TypeLayoutReflection* typeLayout)
     : BindingOffset(typeLayout)
 {
-    if (auto pendingLayout = typeLayout->getPendingDataTypeLayout())
-    {
-        pendingOrdinaryData = (uint32_t)typeLayout->getStride();
-    }
 }
 
 Result ShaderObjectLayoutImpl::Builder::setElementTypeLayout(
@@ -175,36 +167,6 @@ Result ShaderObjectLayoutImpl::Builder::setElementTypeLayout(
                     subObjectLayout.writeRef());
             }
             break;
-        case slang::BindingType::ExistentialValue:
-            // In the case of an interface-type sub-object range, we can only
-            // construct a layout if we have static specialization information
-            // that tells us what type we expect to find in that range.
-            //
-            // The static specialization information is expected to take the
-            // form of a "pending" type layotu attached to the interface type
-            // of the leaf type layout.
-            //
-            if (auto pendingTypeLayout = slangLeafTypeLayout->getPendingDataTypeLayout())
-            {
-                createForElementType(
-                    m_renderer,
-                    m_session,
-                    pendingTypeLayout,
-                    subObjectLayout.writeRef());
-
-                // An interface-type range that includes ordinary data can
-                // increase the size of the ordinary data buffer we need to
-                // allocate for the parent object.
-                //
-                uint32_t ordinaryDataEnd =
-                    subObjectRange.offset.pendingOrdinaryData +
-                    (uint32_t)bindingRange.count * subObjectRange.stride.pendingOrdinaryData;
-
-                if (ordinaryDataEnd > m_totalOrdinaryDataSize)
-                {
-                    m_totalOrdinaryDataSize = ordinaryDataEnd;
-                }
-            }
         }
         subObjectRange.layout = subObjectLayout;
 
