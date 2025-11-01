@@ -396,7 +396,14 @@ DIAGNOSTIC(
     Error,
     noUniqueIdentity,
     "`#include` handler didn't generate a unique identity for file '$0'")
-
+DIAGNOSTIC(
+    15303,
+    Error,
+    cannotResolveImportedDecl,
+    "cannot resolve imported declaration '$0' from precompiled module '$1'. Make sure "
+    "module '$1' is up-to-date. If you suspect this to be a compiler bug, file an issue "
+    "on GitHub (https://github.com/shader-slang/slang/issues) or join the Slang Discord for "
+    "assistance")
 
 // 154xx - macro definition
 DIAGNOSTIC(15400, Warning, macroRedefinition, "redefinition of macro '$0'")
