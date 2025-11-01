@@ -4,6 +4,8 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 // Not supported in WGSL: Arrays of textures or buffers
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
+// Not supported in LLVM: Textures
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-llvm
 
 // Test that a function that returns a resource type can be
 // compiled for targets that don't natively support resource

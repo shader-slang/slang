@@ -2,6 +2,9 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -d3d12 -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -metal -shaderobj -output-using-type -render-features argument-buffer-tier-2
+// Disabled due to: https://github.com/shader-slang/slang-rhi/issues/535
+//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj -output-using-type
+//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -llvm -shaderobj -output-using-type
 // nested-parameter-block-2.slang
 
 struct CB

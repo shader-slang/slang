@@ -49,6 +49,7 @@
 
 #include "slang-com-helper.h"
 #include "slang-com-ptr.h"
+#include "slang-llvm-jit-shared-library.h"
 #include "slang.h"
 
 #include <compiler-core/slang-artifact-associated-impl.h>
@@ -169,68 +170,6 @@ public:
 
     Desc m_desc;
 };
-
-
-/* !!!!!!!!!!!!!!!!!!!!! LLVMJITSharedLibrary !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-/* This implementation uses atomic ref counting to ensure the shared libraries lifetime can outlive
-the LLVMDownstreamCompileResult and the compilation that created it */
-class LLVMJITSharedLibrary : public ComBaseObject, public ISlangSharedLibrary
-{
-public:
-    // ISlangUnknown
-    SLANG_COM_BASE_IUNKNOWN_ALL
-
-    /// ICastable
-    virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
-
-    // ISlangSharedLibrary impl
-    virtual SLANG_NO_THROW void* SLANG_MCALL findSymbolAddressByName(char const* name)
-        SLANG_OVERRIDE;
-
-    LLVMJITSharedLibrary(std::unique_ptr<llvm::orc::LLJIT> jit)
-        : m_jit(std::move(jit))
-    {
-    }
-
-protected:
-    ISlangUnknown* getInterface(const SlangUUID& uuid);
-    void* getObject(const SlangUUID& uuid);
-
-    std::unique_ptr<llvm::orc::LLJIT> m_jit;
-};
-
-ISlangUnknown* LLVMJITSharedLibrary::getInterface(const SlangUUID& guid)
-{
-    if (guid == ISlangUnknown::getTypeGuid() || guid == ISlangCastable::getTypeGuid() ||
-        guid == ISlangSharedLibrary::getTypeGuid())
-    {
-        return static_cast<ISlangSharedLibrary*>(this);
-    }
-    return nullptr;
-}
-
-void* LLVMJITSharedLibrary::getObject(const SlangUUID& uuid)
-{
-    SLANG_UNUSED(uuid);
-    return nullptr;
-}
-
-void* LLVMJITSharedLibrary::castAs(const Guid& guid)
-{
-    if (auto ptr = getInterface(guid))
-    {
-        return ptr;
-    }
-    return getObject(guid);
-}
-
-void* LLVMJITSharedLibrary::findSymbolAddressByName(char const* name)
-{
-    auto fn = m_jit->lookup(name);
-    return fn ? (void*)fn.get().getValue() : nullptr;
-}
-
 
 static void _ensureSufficientStack() {}
 

@@ -1206,6 +1206,19 @@ void Session::addBuiltinSource(
     outModule = module;
 }
 
+ISlangSharedLibrary* Session::getOrLoadSlangLLVM()
+{
+    if (m_slangLLVM.get())
+        return m_slangLLVM.get();
+
+    auto result = m_sharedLibraryLoader->loadSharedLibrary("slang-llvm", m_slangLLVM.writeRef());
+
+    if (result == SLANG_FAIL)
+        return nullptr;
+
+    return m_slangLLVM.get();
+}
+
 SlangResult checkExternalCompilerSupport(Session* session, PassThroughMode passThrough)
 {
     // Check if the type is supported on this compile

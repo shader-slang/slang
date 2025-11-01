@@ -6,6 +6,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-wgsl -compute -shaderobj -render-feature half -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -g0 -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-llvm -compute -shaderobj -output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;

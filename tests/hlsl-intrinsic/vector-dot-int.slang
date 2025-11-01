@@ -2,6 +2,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-llvm -compute -shaderobj -output-using-type
 
 // No 16-bit and 64-bit integer support on DX11.
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type -xslang -DDX11

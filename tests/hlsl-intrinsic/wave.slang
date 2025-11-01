@@ -6,6 +6,7 @@
 //TEST:COMPARE_COMPUTE_EX:-cuda -compute -capability cuda_sm_7_0 -shaderobj
 //TEST:COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj
 //TEST:COMPARE_COMPUTE_EX:-metal -compute -shaderobj
+//DISABLE_TEST:COMPARE_COMPUTE_EX:-llvm -compute -shaderobj
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;

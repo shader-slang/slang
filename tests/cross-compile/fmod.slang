@@ -6,6 +6,7 @@
 //TEST(compute):COMPARE_COMPUTE:-dx11 -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE:-vk -compute -shaderobj -emit-spirv-via-glsl
 //TEST(compute):COMPARE_COMPUTE:-vk -compute -shaderobj -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE:-llvm -compute -shaderobj
 
 //TEST_INPUT:cbuffer(data=[4 0 0 0]):name=C
 cbuffer C

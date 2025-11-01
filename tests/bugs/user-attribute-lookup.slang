@@ -1,5 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 //TEST(compute,vulkan):COMPARE_COMPUTE_EX:-vk -slang -compute -shaderobj
+// LLVM disabled due to missing texture support.
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-llvm -compute -shaderobj
 //TEST_INPUT: Sampler:name samplerState
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer

@@ -11,17 +11,14 @@ These features may include
 * Compile Slang code to bitcode 
 * JIT execution of bitcode
 
-Currently only executing code via 'host-callable' mechanism is supported.
+Currently supports:
+* Executing Slang code via 'host-callable' mechanism.
+* Compiling Slang to LLVM IR (see [LLVM target documentation](docs/llvm-target.md))
 
 How to use
 ==========
 
 If the `slang-llvm` shared library/dll is available to Slang, Slang will automatically use LLVM JIT for `host-callable` compilations.
-
-Limitiations
-============
- 
-* Only supports `host-callable`
 
 Building LLVM/Clang
 ===================

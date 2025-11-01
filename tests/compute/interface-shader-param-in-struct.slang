@@ -9,6 +9,11 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 // Passing, but: slang-test: Test context Slang session is leaking #5610
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-wgpu
+// There seems to be an issue with Slang-rhi not generating the EntryPointParams
+// data correctly when RWStructuredBuffer is involved, possibly related:
+// https://github.com/shader-slang/slang-rhi/issues/535
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -slang -compute
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-llvm -slang -compute
 
 // A lot of the setup is the same as for `interface-shader-param`,
 // so look there if you want the comments.
