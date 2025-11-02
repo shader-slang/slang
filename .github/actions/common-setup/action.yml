@@ -36,17 +36,6 @@ runs:
         sudo apt-get update
         sudo apt-get install -y libx11-dev
 
-    - name: Free disk space (Linux GitHub runner only)
-      if: ${{ inputs.os == 'linux' && runner.environment != 'self-hosted' }}
-      uses: jlumbroso/free-disk-space@v1.3.1
-      with:
-        android: true
-        dotnet: true
-        haskell: true
-        large-packages: true
-        docker-images: true
-        swap-storage: true
-
     - name: Setup Node.js (Linux only)
       if: inputs.os == 'linux'
       uses: actions/setup-node@v4
@@ -112,6 +101,18 @@ runs:
         path: build/llvm-project-install
         # Use os*compiler*platform in lieu of an ABI key here, which is what we really want
         key: llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-${{ hashFiles('external/build-llvm.sh') }}
+
+    - name: Free disk space for LLVM build (Linux GitHub runner only)
+      if: ${{ inputs.os == 'linux' && runner.environment != 'self-hosted' && inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true'}}
+      uses: jlumbroso/free-disk-space@v1.3.1
+      with:
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: true
+        docker-images: true
+        swap-storage: true
+
     - name: Build LLVM
       if: inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true'
       shell: bash
