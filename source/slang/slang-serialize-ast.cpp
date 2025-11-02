@@ -1680,11 +1680,11 @@ ModuleDecl* ASTSerialReadContext::_readImportedModule(ASTSerializer const& seria
     //
     Name* moduleName = nullptr;
     serialize(serializer, moduleName);
-    auto module = _linkage->findOrImportModule(moduleName, SourceLoc(), _sink);
+    auto module = _linkage->findOrImportModule(moduleName, _requestingSourceLoc, _sink);
     if (!module)
     {
         if (_sink)
-            _sink->diagnose(SourceLoc(), Diagnostics::importFailed, moduleName);
+            _sink->diagnose(_requestingSourceLoc, Diagnostics::importFailed, moduleName);
         return nullptr;
     }
     return module->getModuleDecl();
