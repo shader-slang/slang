@@ -102,25 +102,20 @@ runs:
         # Use os*compiler*platform in lieu of an ABI key here, which is what we really want
         key: llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-${{ hashFiles('external/build-llvm.sh') }}
 
-    - name: Free disk space for LLVM build (Linux GitHub runner only)
-      if: ${{ inputs.os == 'linux' && runner.environment != 'self-hosted' && inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true'}}
-      uses: jlumbroso/free-disk-space@v1.3.1
-      with:
-        android: true
-        dotnet: true
-        haskell: true
-        large-packages: true
-        docker-images: true
-        swap-storage: true
-
     - name: Build LLVM
       if: inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true'
       shell: bash
       run: |
+        config=${cmake_config}
+        # Always build the release version of LLVM on Linux; it takes too much
+        # time and disk space to compile the debug build on the CI.
+        if [[ "${{inputs.os}}" == linux* ]]; then
+          config=Release
+        fi
         ./external/build-llvm.sh \
           --install-prefix "${{github.workspace}}/build/llvm-project-install" \
           --repo "https://${{github.token}}@github.com/llvm/llvm-project" \
-          --config ${cmake_config}
+          --config $config
     - uses: actions/cache/save@v4
       if: inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true' && github.ref == 'refs/heads/master' && inputs.use-cached-llvm == 'true'
       with:

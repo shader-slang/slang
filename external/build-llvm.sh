@@ -164,10 +164,6 @@ cmake_arguments_for_slang=(
   -DCLANG_INCLUDE_TESTS=0
   # Requirements for Slang
   -DLLVM_ENABLE_PROJECTS=clang
-  -DLLVM_BUILD_LLVM_DYLIB=1
-  -DLLVM_BUILD_LLVM_DYLIB_VIS=1
-  -DLLVM_LINK_LLVM_DYLIB=0
-  -DCLANG_LINK_CLANG_DYLIB=0
   -DLLVM_ENABLE_RTTI=1
   "-DLLVM_TARGETS_TO_BUILD=X86;ARM;AArch64"
   # Get LLVM to use the static linked version of the msvc runtime
