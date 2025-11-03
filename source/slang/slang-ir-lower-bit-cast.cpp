@@ -268,9 +268,10 @@ struct BitCastLoweringContext
             auto toPtrType = as<IRPtrTypeBase>(toType);
 
             // OpBitcast can handle pointer <-> pointer bitcasts directly,
-            // but both pointers must have same storage class but must point to different types
+            // but both pointers must have same storage class and different types.
             if (fromPtrType && toPtrType &&
-                fromPtrType->getAddressSpace() == toPtrType->getAddressSpace())
+                fromPtrType->getAddressSpace() == toPtrType->getAddressSpace() &&
+                !isTypeEqual(fromPtrType, toPtrType))
             {
                 auto fromValueType = fromPtrType->getValueType();
                 auto toValueType = toPtrType->getValueType();
@@ -286,9 +287,7 @@ struct BitCastLoweringContext
 
                 // If the unwrapped types are different, we can use OpBitcast directly
                 if (!isTypeEqual(fromUnwrappedType, toUnwrappedType))
-                {
                     return;
-                }
             }
 
             // OpBitcast can handle pointer -> scalar integer bitcasts directly
