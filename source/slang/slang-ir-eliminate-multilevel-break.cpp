@@ -69,6 +69,36 @@ struct EliminateMultiLevelBreakContext
                 if (auto continueBlock = getContinueBlock())
                     if (continueBlock != loop->getTargetBlock())
                         exitBlocks.add(continueBlock);
+
+            // If this is a switch nested inside a loop, the parent loop's continue block
+            // and target block should also be considered exit blocks of the switch region.
+            // This prevents the switch from incorrectly including these blocks as part of its own blocks,
+            // which would cause a dictionary collision.
+            if (as<IRSwitch>(headerInst))
+            {
+                auto parentRegion = parent;
+                while (parentRegion)
+                {
+                    if (auto parentLoop = as<IRLoop>(parentRegion->headerInst))
+                    {
+                        // Add the parent loop's continue block if it's non-trivial
+                        if (auto continueBlock = parentRegion->getContinueBlock())
+                        {
+                            IRBlock* targetBlock = parentLoop->getTargetBlock();
+                            if (continueBlock != targetBlock)
+                            {
+                                exitBlocks.add(continueBlock);
+                            }
+                            else
+                            {
+                                // If continue == target, we still need to add it as an exit block for nested switches
+                                exitBlocks.add(targetBlock);
+                            }
+                        }
+                    }
+                    parentRegion = parentRegion->parent;
+                }
+            }
         }
 
         void replaceBreakBlock(IRBuilder* builder, IRBlock* block)
@@ -118,8 +148,13 @@ struct EliminateMultiLevelBreakContext
         {
             // Push all exit blocks to a stack so we can easily check if a block is an exit block in
             // its parent regions.
+            // Track which exit blocks we actually added (not already in the set) so we can pop only those.
+            List<IRBlock*> addedExitBlocks;
             for (auto exitBlock : info.exitBlocks)
-                exitBlocks.add(exitBlock);
+            {
+                if (exitBlocks.add(exitBlock))
+                    addedExitBlocks.add(exitBlock);
+            }
 
             auto successors = as<IRBlock>(info.headerInst->getParent())->getSuccessors();
             for (auto successor : successors)
@@ -168,8 +203,8 @@ struct EliminateMultiLevelBreakContext
                 }
             }
 
-            // Pop the exit blocks.
-            for (auto exitBlock : info.exitBlocks)
+            // Pop the exit blocks that we added.
+            for (auto exitBlock : addedExitBlocks)
                 exitBlocks.remove(exitBlock);
         }
 
