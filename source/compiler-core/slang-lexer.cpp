@@ -1934,8 +1934,10 @@ TokenList Lexer::lexAllTokens()
 
     const int offset = sourceView->getRange().getOffset(tok.loc);
 
-    SLANG_ASSERT(offset >= 0 && offset <= in.getLength());
-    SLANG_ASSERT(Index(offset + tok.charsCount) <= in.getLength());
+    if (offset < 0 || offset >= in.getLength())
+        return UnownedStringSlice();
+    if (Index(offset + tok.charsCount) > in.getLength())
+        return UnownedStringSlice();
 
     return UnownedStringSlice(in.begin() + offset, in.begin() + offset + tok.charsCount);
 }
