@@ -1719,6 +1719,9 @@ NodeBase* ASTSerialReadContext::_readImportedDecl(ASTSerializer const& serialize
     serialize(serializer, importedFromModuleDecl);
     serialize(serializer, mangledName);
 
+    if (!importedFromModuleDecl)
+        return nullptr;
+
     auto importedFromModule = importedFromModuleDecl->module;
     if (!importedFromModule)
     {
@@ -1729,8 +1732,11 @@ NodeBase* ASTSerialReadContext::_readImportedDecl(ASTSerializer const& serialize
         importedFromModule->findExportedDeclByMangledName(mangledName.getUnownedSlice());
     if (!importedDecl)
     {
-        SLANG_ABORT_COMPILATION(
-            "failed to load an imported declaration during AST deserialization");
+        _sink->diagnose(
+            SourceLoc(),
+            Diagnostics::cannotResolveImportedDecl,
+            mangledName,
+            importedFromModule->getName());
     }
     return importedDecl;
 }
