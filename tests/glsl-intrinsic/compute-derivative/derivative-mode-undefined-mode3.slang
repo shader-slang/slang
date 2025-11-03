@@ -14,6 +14,7 @@ int someFunc()
     return asint(ddx(1));
 }
 
+[numthreads(2,2,1)]
 void main(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     outputBuffer.result = someFunc();

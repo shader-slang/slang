@@ -70,6 +70,9 @@ bool isMetalTarget(TargetRequest* targetReq);
 bool isKhronosTarget(TargetRequest* targetReq);
 bool isKhronosTarget(CodeGenTarget target);
 
+/// Are we generating code where SPIRV is the target?
+bool isSPIRV(CodeGenTarget codeGenTarget);
+
 /// Are we generating code for a CUDA API (CUDA / OptiX)?
 bool isCUDATarget(TargetRequest* targetReq);
 
@@ -79,6 +82,9 @@ bool isCPUTarget(TargetRequest* targetReq);
 /// Are we generating code for the WebGPU API?
 bool isWGPUTarget(TargetRequest* targetReq);
 bool isWGPUTarget(CodeGenTarget target);
+
+// Are we generating code for a Kernel-style target (as opposed to host-style target)
+bool isKernelTarget(CodeGenTarget codeGenTarget);
 
 /// A request to generate output in some target format.
 class TargetRequest : public RefObject

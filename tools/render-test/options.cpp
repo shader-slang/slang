@@ -154,9 +154,9 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
         {
             outOptions.shaderType = ShaderProgramType::GraphicsTaskMeshCompute;
         }
-        else if (argValue == "-use-dxil")
+        else if (argValue == "-use-dxbc")
         {
-            outOptions.useDXIL = true;
+            outOptions.useDXBC = true;
         }
         else if (argValue == "-skip-spirv-validation")
         {
@@ -277,6 +277,16 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
         else if (argValue == "-show-adapter-info")
         {
             outOptions.showAdapterInfo = true;
+        }
+        else if (argValue == "-ignore-abort-msg")
+        {
+#ifdef _MSC_VER
+            _set_abort_behavior(0, _WRITE_ABORT_MSG);
+#endif
+        }
+        else if (argValue == "-cache-rhi-device")
+        {
+            outOptions.cacheRhiDevice = true;
         }
         else
         {

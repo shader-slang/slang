@@ -89,7 +89,7 @@ class Session;
 
 struct CompilerOptionSet
 {
-    void load(uint32_t count, slang::CompilerOptionEntry* entries);
+    void load(uint32_t count, const slang::CompilerOptionEntry* entries);
 
     void buildHash(DigestBuilder<SHA1>& builder);
 
@@ -347,6 +347,8 @@ struct CompilerOptionSet
     }
 
     bool shouldUseDXLayout() { return getBoolOption(CompilerOptionName::ForceDXLayout); }
+
+    bool shouldUseCLayout() { return getBoolOption(CompilerOptionName::ForceCLayout); }
 
     bool shouldDumpIntermediates() { return getBoolOption(CompilerOptionName::DumpIntermediates); }
 

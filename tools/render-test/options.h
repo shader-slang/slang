@@ -64,7 +64,8 @@ struct Options
 
     bool outputUsingType = false;
 
-    bool useDXIL = false;
+    bool useDXBC = false;
+
     bool onlyStartup = false;
 
     bool performanceProfile = false;
@@ -94,6 +95,9 @@ struct Options
     bool showAdapterInfo = false;
 
     bool skipSPIRVValidation = false;
+
+    // Whether to enable RHI device caching (default: false in render-test)
+    bool cacheRhiDevice = false;
 
     Slang::List<Slang::String> capabilities;
 

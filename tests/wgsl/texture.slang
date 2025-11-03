@@ -35,66 +35,14 @@ Texture2DArray<float4> t2DArray_f32v4;
 //TEST_INPUT: TextureCube(size=4, content = zero, arrayLength=2):name tCubeArray_f32v4
 TextureCubeArray<float4> tCubeArray_f32v4;
 
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
-typealias depth2d = _Texture<
-    T,
-    __Shape2D,
-    0, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    0, // isCombined
-    format
->;
-
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
-typealias depth2d_array = _Texture<
-    T,
-    __Shape2D,
-    1, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    0, // isCombined
-    format
->;
-
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
-typealias depthcube = _Texture<
-    T,
-    __ShapeCube,
-    0, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    0, // isCombined
-    format
->;
-
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
-typealias depthcube_array = _Texture<
-    T,
-    __ShapeCube,
-    1, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    0, // isCombined
-    format
->;
-
 //TEST_INPUT: Texture2D(size=4, content = zero):name d2D
-depth2d<float> d2D;
+DepthTexture2D d2D;
 //TEST_INPUT: TextureCube(size=4, content = zero):name dCube
-depthcube<float> dCube;
+DepthTextureCube dCube;
 //TEST_INPUT: Texture2D(size=4, content = zero, arrayLength=2):name d2DArray
-depth2d_array<float> d2DArray;
+DepthTexture2DArray d2DArray;
 //TEST_INPUT: TextureCube(size=4, content = zero, arrayLength=2):name dCubeArray
-depthcube_array<float> dCubeArray;
+DepthTextureCubeArray dCubeArray;
 
 //TEST_INPUT: Sampler:name samplerState
 SamplerState samplerState;
@@ -286,6 +234,29 @@ bool TEST_texture<T>(
 
         // WGSL: textureSampleLevel({{\(*}}t2DArray
         && all(Tvn(T.Element(0)) == t2DArray.SampleLevel(samplerState, float3(u, u, 0), 0, int2(1, 1)))
+
+        // Depth textures
+
+        // WGSL: textureSampleLevel({{\(*}}d2D
+        && float(0) == d2D.SampleLevel(samplerState, float2(u, u), 0)
+
+        // WGSL: textureSampleLevel({{\(*}}dCube
+        && float(0) == dCube.SampleLevel(samplerState, normalize(float3(u, 1 - u, u)), 0)
+
+        // WGSL: textureSampleLevel({{\(*}}d2DArray
+        && float(0) == d2DArray.SampleLevel(samplerState, float3(u, u, 0), 0)
+
+        // WGSL: textureSampleLevel({{\(*}}dCubeArray
+        && float(0) == dCubeArray.SampleLevel(samplerState, float4(normalize(float3(u, 1 - u, u)), 0), 0)
+
+        // Offset variant
+
+        // WGSL: textureSampleLevel({{\(*}}d2D
+        && float(0) == d2D.SampleLevel(samplerState, float2(u, u), 0, int2(1, 1))
+
+        // WGSL: textureSampleLevel({{\(*}}d2DArray
+        && float(0) == d2DArray.SampleLevel(samplerState, float3(u, u, 0), 0, int2(1, 1))
+
 
         // ==================
         // float SampleCmp()

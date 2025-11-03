@@ -474,6 +474,11 @@ Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, Byt
 Pack members using FXCs member packing rules when targeting GLSL or SPIRV. 
 
 
+<a id="fvk-use-c-layout"></a>
+### -fvk-use-c-layout
+Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, ByteAddressBuffer and general pointers follow the C/C++ structure layout rules when targeting SPIRV. 
+
+
 <a id="fvk-b-shift"></a>
 ### -fvk-b-shift, -fvk-s-shift, -fvk-t-shift, -fvk-u-shift
 
@@ -813,6 +818,11 @@ Enable experimental dynamic dispatch features
 <a id="embed-downstream-ir"></a>
 ### -embed-downstream-ir
 Embed downstream IR into emitted slang IR 
+
+
+<a id="experimental-feature"></a>
+### -experimental-feature
+Enable experimental features (loading builtin neural module) 
 
 
 
@@ -1202,6 +1212,7 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_KHR_cooperative_matrix` : enables the SPV_KHR_cooperative_matrix extension 
 * `SPV_NV_tensor_addressing` : enables the SPV_NV_tensor_addressing extension 
 * `SPV_NV_cooperative_matrix2` : enables the SPV_NV_cooperative_matrix2 extension 
+* `SPV_NV_bindless_texture` : enables the SPV_NV_bindless_texture extension 
 * `spvDeviceGroup` 
 * `spvAtomicFloat32AddEXT` 
 * `spvAtomicFloat16AddEXT` 
@@ -1254,7 +1265,9 @@ A capability describes an optional feature that a target may or may not support.
 * `spvQuadControlKHR` 
 * `spvVulkanMemoryModelKHR` 
 * `spvVulkanMemoryModelDeviceScopeKHR` 
+* `spvBindlessTextureNV` 
 * `metallib_latest` 
+* `hlsl_coopvec_poc_sm_6_9` 
 * `dxil_lib` 
 * `any_target` 
 * `any_textual_target` 
@@ -1262,6 +1275,7 @@ A capability describes an optional feature that a target may or may not support.
 * `any_cpp_target` 
 * `cpp_cuda` 
 * `cpp_cuda_spirv` 
+* `cpp_cuda_metal_spirv` 
 * `cuda_spirv` 
 * `cpp_cuda_glsl_spirv` 
 * `cpp_cuda_glsl_hlsl` 

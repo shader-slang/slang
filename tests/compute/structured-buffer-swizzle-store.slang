@@ -1,4 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
+//TEST(compute):COMPARE_COMPUTE: -cuda -shaderobj
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4),name=buf
 RWStructuredBuffer<float4> buf;

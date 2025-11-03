@@ -5,7 +5,7 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -mtl -compute -profile metallib_2_4
 // No support for uint16_t on fxc - we need SM6.2 and dxil to use uint16_t with d3d12
 // https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/hlsl-shader-model-6-0-features-for-direct3d-12
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -dx12 -profile cs_6_2 -use-dxil -shaderobj -render-feature hardware-device
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -dx12 -profile cs_6_2 -shaderobj -render-feature hardware-device
 // wgpu only has 32-bit support, so we do not try and test it here
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -vk -compute -emit-spirv-via-glsl
 

@@ -1,6 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK_SPIRV): -target spirv -entry computeMain -profile cs_6_2 -emit-spirv-via-glsl
 //TEST:SIMPLE(filecheck=CHECK_SPIRV): -target spirv -entry computeMain -profile cs_6_2 -emit-spirv-directly
 //TEST:CROSS_COMPILE: -target dxil-assembly -entry computeMain -profile cs_6_2
+//TEST:SIMPLE(filecheck=CHECK_CUDA): -target cuda -entry computeMain -profile cs_6_2
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=16):out
 RWStructuredBuffer<int> outputBuffer;
@@ -45,3 +46,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     int index = pos.x + pos.y * 4;
     outputBuffer[index] = index;
 }
+
+// CHECK_CUDA: surf2Dread<__half>
+// CHECK_CUDA: surf2Dread<__half2{{.*}}>
+// CHECK_CUDA: surf2Dread<__half4{{.*}}>
+// CHECK_CUDA: surf2Dwrite<__half>
+// CHECK_CUDA: surf2Dwrite<__half2{{.*}}>
+// CHECK_CUDA: surf2Dwrite<__half4{{.*}}>

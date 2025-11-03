@@ -228,6 +228,12 @@ def hlsl_2018 : _sm_5_1;
 /// [Version]
 def hlsl_coopvec_poc : _sm_6_8;
 
+/// Represent compatibility support for the deprecated POC DXC, but we need to use
+/// this capability to be compatible with cooperative_vector in target_switch, so
+/// join '_sm_6_9' here.
+/// [Compound]
+alias hlsl_coopvec_poc_sm_6_9 = hlsl_coopvec_poc + _sm_6_9;
+
 /// Represents capabilities required for DXIL Library compilation.
 /// [Version]
 alias dxil_lib = _sm_6_3;
@@ -270,6 +276,10 @@ alias cpp_cuda = cpp | cuda;
 /// CPP, CUDA and SPIRV code-gen targets
 /// [Compound]
 alias cpp_cuda_spirv = cpp | cuda | spirv;
+
+/// CPP, CUDA, Metal, and SPIRV code-gen targets
+/// [Compound]
+alias cpp_cuda_metal_spirv = cpp | cuda | metal | spirv;
 
 /// CUDA and SPIRV code-gen targets
 /// [Compound]
@@ -597,6 +607,9 @@ def SPV_NV_tensor_addressing : _spirv_1_6;
 /// [EXT]
 def SPV_NV_cooperative_matrix2 : SPV_NV_tensor_addressing + SPV_KHR_cooperative_matrix;
 
+/// Represents the SPIR-V extension for SPV_NV_bindless_texture.
+/// [EXT]
+def SPV_NV_bindless_texture: _spirv_1_0;
 
 // SPIRV Capabilities.
 
@@ -807,6 +820,10 @@ def spvVulkanMemoryModelKHR : SPV_KHR_vulkan_memory_model;
 /// Represents the SPIR-V capability for vulkan memory model.
 /// [EXT]
 def spvVulkanMemoryModelDeviceScopeKHR : SPV_KHR_vulkan_memory_model;
+
+/// Represents the SPIR-V capability for the bindless texture.
+/// [EXT]
+def spvBindlessTextureNV : SPV_NV_bindless_texture;
 
 // The following capabilities all pertain to how ray tracing shaders are translated
 // to GLSL, where there are two different extensions that can provide the core
@@ -2153,6 +2170,7 @@ alias subgroup_ballot_activemask = spirv_1_0 + GL_KHR_shader_subgroup_ballot
                       | glsl + GL_KHR_shader_subgroup_ballot
                       | _sm_6_0
                       | _cuda_sm_7_0
+                      | metal
                       ;
 /// Capabilities required to use GLSL-style subgroup operations 'subgroup_basic_ballot'
 /// [Compound]
@@ -2221,6 +2239,7 @@ alias subgroup_partitioned = _sm_6_5
 /// [Compound]
 alias subgroup_rotate = GL_KHR_shader_subgroup_rotate 
                        | metal
+                       | _cuda_sm_5_0
                        ;
 
 /// (All implemented targets) Capabilities required to use atomic operations of GLSL tier-1 float atomics
@@ -2255,6 +2274,7 @@ alias helper_lane = _sm_6_0 + fragment
 alias quad_control = _sm_6_7
                     | GL_EXT_shader_quad_control + GL_EXT_maximal_reconvergence + GL_KHR_shader_subgroup_vote
                     | metal
+                    | _cuda_sm_5_0
                     ;
 
 /// Capabilities required to enable shader breakpoints

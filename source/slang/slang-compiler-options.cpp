@@ -4,7 +4,7 @@
 
 namespace Slang
 {
-void CompilerOptionSet::load(uint32_t count, slang::CompilerOptionEntry* entries)
+void CompilerOptionSet::load(uint32_t count, const slang::CompilerOptionEntry* entries)
 {
     for (uint32_t i = 0; i < count; i++)
     {
@@ -143,6 +143,7 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
         case CompilerOptionName::EmitSpirvDirectly:
         case CompilerOptionName::GLSLForceScalarLayout:
         case CompilerOptionName::ForceDXLayout:
+        case CompilerOptionName::ForceCLayout:
         case CompilerOptionName::MatrixLayoutRow:
         case CompilerOptionName::MatrixLayoutColumn:
         case CompilerOptionName::VulkanInvertY:

@@ -4,7 +4,7 @@
 namespace Slang
 {
 
-/* static */ const BaseTypeInfo BaseTypeInfo::s_info[Index(BaseType::CountOf)] = {
+/* static */ const BaseTypeInfo BaseTypeInfo::s_info[Index(BaseType::CountOfPrimitives)] = {
     {0, 0, uint8_t(BaseType::Void)},
     {uint8_t(sizeof(bool)), 0, uint8_t(BaseType::Bool)},
     {uint8_t(sizeof(int8_t)),

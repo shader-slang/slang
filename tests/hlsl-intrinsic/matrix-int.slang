@@ -2,7 +2,7 @@
 
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl

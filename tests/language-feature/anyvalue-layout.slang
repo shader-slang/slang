@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12  -use-dxil -profile cs_6_1 -output-using-type
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12  -profile cs_6_1 -output-using-type
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -output-using-type
 
 interface IFoo

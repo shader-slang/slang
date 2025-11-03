@@ -215,9 +215,12 @@ public in int gl_ViewIndex : SV_ViewID;
 public in int gl_ViewportIndex : SV_ViewportArrayIndex;
 public in int gl_BaseVertex : SV_StartVertexLocation;
 public in int gl_BaseInstance : SV_StartInstanceLocation;
+public in int gl_DrawID : SV_DrawIndex;
 
 public in int gl_FragInvocationCountEXT : SV_FragInvocationCount;
 public in int2 gl_FragSizeEXT : SV_FragSize;
+
+public in float2 gl_SamplePosition : SV_VulkanSamplePosition;
 
 
 // Override operator* behavior to compute algebric product of matrices and vectors.
@@ -1912,7 +1915,7 @@ public vector<T.Element,4> texture(Sampler1D<T> sampler, float p)
 __generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> texture(Sampler1D<T> sampler, float p, constexpr float bias)
+public vector<T.Element,4> texture(Sampler1D<T> sampler, float p, float bias)
 {
     return __vectorReshape2<T.Element, 4>(sampler.SampleBias(p, bias));
 }
@@ -1948,7 +1951,7 @@ public vector<T.Element,4> texture(_Texture<
         0, // isShadow
         1, // isCombined
         format
-    > sampler, vector<float,Shape.dimensions+isArray> p, constexpr float bias)
+    > sampler, vector<float,Shape.dimensions+isArray> p, float bias)
 {
     return __vectorReshape2<T.Element,4>(sampler.SampleBias(p, bias));
 }
@@ -3889,7 +3892,7 @@ public vector<T.Element,4> textureGatherOffset(_Texture<
         0, // isShadow
         1, // isCombined
         format
-    > sampler, vector<float,2+isArray> p, constexpr vector<int,2> offset, int comp = 0)
+    > sampler, vector<float,2+isArray> p, vector<int,2> offset, int comp = 0)
 {
     switch (comp)
     {
@@ -3913,10 +3916,11 @@ public vec4 textureGatherOffset(_Texture<
         1, // isShadow
         1, // isCombined
         format
-    > sampler, vector<float,2+isArray> p, float refZ, constexpr vector<int,2> offset)
+    > sampler, vector<float,2+isArray> p, float refZ, vector<int,2> offset)
 {
     return sampler.GatherCmp(p, refZ, offset);
 }
+
 
 // -------------------
 // textureGatherOffsets
@@ -4518,7 +4522,7 @@ ${{{{
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
                     %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomicExchange %ptr Device ImageMemory $data
+                    result:$$$(targetType.type) = OpAtomicExchange %ptr Device Relaxed $data
                 };
             }
             }
@@ -4541,7 +4545,7 @@ ${{{{
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
                     %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Min$(targetType.SPVAtomicSuffix) %ptr Device ImageMemory $data
+                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Min$(targetType.SPVAtomicSuffix) %ptr Device Relaxed $data
                 };
             }
             }
@@ -4564,7 +4568,7 @@ ${{{{
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
                     %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Max$(targetType.SPVAtomicSuffix) %ptr Device ImageMemory $data
+                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Max$(targetType.SPVAtomicSuffix) %ptr Device Relaxed $data
                 };
             }
             }
@@ -4590,7 +4594,7 @@ ${{{{
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
                     %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomicAnd %ptr Device ImageMemory $data
+                    result:$$$(targetType.type) = OpAtomicAnd %ptr Device Relaxed $data
                 };
             }
             }
@@ -4612,7 +4616,7 @@ ${{{{
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
                     %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomicOr %ptr Device ImageMemory $data
+                    result:$$$(targetType.type) = OpAtomicOr %ptr Device Relaxed $data
                 };
             }
             }
@@ -4635,7 +4639,7 @@ ${{{{
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
                     %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomicXor %ptr Device ImageMemory $data
+                    result:$$$(targetType.type) = OpAtomicXor %ptr Device Relaxed $data
                 };
             }
             }
@@ -4657,7 +4661,7 @@ ${{{{
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
                     %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomicCompareExchange %ptr Device ImageMemory ImageMemory $data $compare
+                    result:$$$(targetType.type) = OpAtomicCompareExchange %ptr Device Relaxed Relaxed $data $compare
                 };
             }
             }
@@ -9058,7 +9062,7 @@ public uint atomicCounterIncrement(atomic_uint c)
     {
         return spirv_asm
         {
-            OpAtomicIIncrement $$uint result $c Device UniformMemory
+            OpAtomicIIncrement $$uint result $c Device AtomicCounterMemory
         };
     }
     }
@@ -9117,7 +9121,7 @@ public uint atomicCounterDecrement(atomic_uint c)
         // we want a discarded side effect and then return the new value
         return spirv_asm
         {
-            %discardedValue:$$uint = OpAtomicIDecrement $c Device UniformMemory;
+            %discardedValue:$$uint = OpAtomicIDecrement $c Device AtomicCounterMemory;
             OpLoad $$uint result $c
         };
     }
@@ -9137,7 +9141,7 @@ public uint atomicCounterAdd(atomic_uint c, uint data)
     {
         return spirv_asm
         {
-            OpAtomicIAdd $$uint result $c Device UniformMemory $data
+            OpAtomicIAdd $$uint result $c Device AtomicCounterMemory $data
         };
     }
     }
@@ -9159,7 +9163,7 @@ public uint atomicCounterSubtract(atomic_uint c, uint data)
     {
         return spirv_asm
         {
-            OpAtomicISub $$uint result $c Device UniformMemory $data
+            OpAtomicISub $$uint result $c Device AtomicCounterMemory $data
         };
     }
     }   
@@ -9178,7 +9182,7 @@ public uint atomicCounterMin(atomic_uint c, uint data)
     {
         return spirv_asm
         {
-            OpAtomicUMin $$uint result $c Device UniformMemory $data
+            OpAtomicUMin $$uint result $c Device AtomicCounterMemory $data
         };
     }
     }
@@ -9197,7 +9201,7 @@ public uint atomicCounterMax(atomic_uint c, uint data)
     {
         return spirv_asm
         {
-            OpAtomicUMax $$uint result $c Device UniformMemory $data
+            OpAtomicUMax $$uint result $c Device AtomicCounterMemory $data
         };
     }
     }
@@ -9216,7 +9220,7 @@ public uint atomicCounterAnd(atomic_uint c, uint data)
     {
         return spirv_asm
         {
-            OpAtomicAnd $$uint result $c Device UniformMemory $data
+            OpAtomicAnd $$uint result $c Device AtomicCounterMemory $data
         };
     }
     }   
@@ -9235,7 +9239,7 @@ public uint atomicCounterOr(atomic_uint c, uint data)
     {
         return spirv_asm
         {
-            OpAtomicOr $$uint result $c Device UniformMemory $data
+            OpAtomicOr $$uint result $c Device AtomicCounterMemory $data
         };
     }
     }
@@ -9254,7 +9258,7 @@ public uint atomicCounterXor(atomic_uint c, uint data)
     {
         return spirv_asm
         {
-            OpAtomicXor $$uint result $c Device UniformMemory $data
+            OpAtomicXor $$uint result $c Device AtomicCounterMemory $data
         };
     }
     }
@@ -9273,7 +9277,7 @@ public uint atomicCounterExchange(atomic_uint c, uint data)
     {
         return spirv_asm
         {
-            OpAtomicExchange $$uint result $c Device UniformMemory $data
+            OpAtomicExchange $$uint result $c Device AtomicCounterMemory $data
         };
     }
     }
@@ -9292,7 +9296,7 @@ public uint atomicCounterCompSwap(atomic_uint c, uint compare, uint data)
     {
         return spirv_asm
         {
-            OpAtomicCompareExchange $$uint result $c Device UniformMemory UniformMemory $data $compare
+            OpAtomicCompareExchange $$uint result $c Device AtomicCounterMemory AtomicCounterMemory $data $compare
         };
     }
     }

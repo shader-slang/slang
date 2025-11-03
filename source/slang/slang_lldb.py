@@ -57,6 +57,15 @@ class IRInstListBase_synthetic(lldb.SBSyntheticValueProvider):
             self.children.append(child.Clone(f"[{i}]"))
             pointer = child.GetNonSyntheticValue().GetChildMemberWithName("next")
             i += 1
+            if i >= 5000:
+                # The debugger can call this function on uninitialized
+                # values, so we need to ensure that we stop iterating at
+                # some point. Ideally we'd provide a synthetic child
+                # called something like `[more]` to see another batch of
+                # many children in the case where there really is just a
+                # very large list, but this is good enough because one
+                # can always manually follow `next` pointers.
+                break
 
     def has_children(self):
         return True
@@ -77,30 +86,48 @@ class IRInst_synthetic(lldb.SBSyntheticValueProvider):
 
     def update(self):
         self.children = Children()
+
+        if self.valobj.type.IsPointerType():
+            if self.valobj.unsigned != 0:
+                valobj = self.valobj.deref
+                for i in range(valobj.GetNumChildren()):
+                    self.children.append(valobj.GetChildAtIndex(i))
+            return
+
         target = self.valobj.target
         ty = self.valobj.type
         op = self.valobj.GetChildMemberWithName("m_op")
 
         # literal values
         value: list[tuple[str, lldb.SBValue]] = []
-        match op.value:
-            case "kIROp_StringLit":
-                string_lit_t = target.FindFirstType("Slang::IRStringLit")
-                string_lit = self.valobj.Cast(string_lit_t)
-                val = string_lit.GetChildMemberWithName("value")
-                value = [("[value]", val.GetChildMemberWithName("stringVal"))]
-            case "kIROp_IntLit":
-                int_lit_t = target.FindFirstType("Slang::IRIntLit")
-                int_lit = self.valobj.Cast(int_lit_t)
-                val = int_lit.GetChildMemberWithName("value")
-                value = [("[value]", val.GetChildMemberWithName("intVal"))]
+        # Using `Cast` here seems to work just fine in the LLDB CLI with
+        # `v`, as well as in CodeLLDB, but for some reason it does not
+        # work correctly with `p`, causing the `[value]` child to be
+        # missing in that case. It is possible to fix that by using
+        # `EvaluateExpression` instead, but that significantly degrades
+        # performance, so we choose not to do it here.
+        if op.value == "kIROp_StringLit":
+            string_lit_t = target.FindFirstType("Slang::IRStringLit")
+            string_lit = self.valobj.Cast(string_lit_t)
+            val = string_lit.GetChildMemberWithName("value")
+            value = [("[value]", val.GetChildMemberWithName("stringVal"))]
+        elif op.value == "kIROp_IntLit":
+            int_lit_t = target.FindFirstType("Slang::IRIntLit")
+            int_lit = self.valobj.Cast(int_lit_t)
+            val = int_lit.GetChildMemberWithName("value")
+            value = [("[value]", val.GetChildMemberWithName("intVal"))]
 
         # operands
         operands: list[tuple[str, lldb.SBValue]] = []
         offset = ty.GetByteSize()
         ir_use_t = target.FindFirstType("Slang::IRUse")
         ir_use_size = ir_use_t.GetByteSize()
-        for index in range(self.valobj.GetChildMemberWithName("operandCount").unsigned):
+        operand_count = self.valobj.GetChildMemberWithName("operandCount").unsigned
+        # We must ensure that we don't loop for an unbounded amount of
+        # time, so we cap the number of operands displayed here. Ideally
+        # we'd provide a way to view more in the case of instructions
+        # with more than this many operands, though.
+        for index in range(min(operand_count, 10)):
             name = f"[operand{index}]"
             operand = self.valobj.CreateChildAtOffset(
                 name, offset + index * ir_use_size, ir_use_t
@@ -137,6 +164,8 @@ class IRInst_synthetic(lldb.SBSyntheticValueProvider):
 
 
 def IRInst_summary(valobj: lldb.SBValue, dict) -> str:
+    if valobj.type.IsPointerType():
+        return "nullptr" if valobj.unsigned == 0 else valobj.deref.summary
     val = valobj.GetNonSyntheticValue()
     op = val.GetChildMemberWithName("m_op")
     return f"{{{op.value} {val.address_of.value}}}"

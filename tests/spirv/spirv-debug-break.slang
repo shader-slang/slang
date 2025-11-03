@@ -1,5 +1,5 @@
 // spirv-instruction.slang
-//TEST(compute, vulkan):SIMPLE(filecheck=CHECK):-target glsl -entry computeMain -stage compute
+// TEST:SIMPLE(filecheck=CHECK):-target glsl -entry computeMain -stage compute
 
 [[vk::spirv_instruction(1, "NonSemantic.DebugBreak")]]
 void _spvDebugBreak(int v);

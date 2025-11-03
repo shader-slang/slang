@@ -70,13 +70,13 @@ int getTypeBitSize(Type* t);
 // that can be used as lookup key in caches
 struct BasicTypeKey
 {
-    uint32_t baseType : 8;
-    uint32_t dim1 : 4;
-    uint32_t dim2 : 4;
-    uint32_t knownConstantBitCount : 8;
+    uint32_t baseType : 5;
+    uint32_t dim1 : 8;
+    uint32_t dim2 : 8;
+    uint32_t knownConstantBitCount : 6;
     uint32_t knownNegative : 1;
     uint32_t isLValue : 1;
-    uint32_t reserved : 6;
+    uint32_t reserved : 3;
     uint32_t getRaw() const
     {
         uint32_t val;
@@ -84,7 +84,7 @@ struct BasicTypeKey
         return val;
     }
     bool operator==(BasicTypeKey other) const { return getRaw() == other.getRaw(); }
-    static BasicTypeKey invalid() { return BasicTypeKey{0xff, 0, 0, 0, 0, 0, 0}; }
+    static BasicTypeKey invalid() { return BasicTypeKey{0x1f, 0, 0, 0, 0, 0, 0}; }
 };
 
 SLANG_FORCE_INLINE BasicTypeKey makeBasicTypeKey(
@@ -699,6 +699,8 @@ struct SharedSemanticsContext : public RefObject
 
     GLSLBindingOffsetTracker m_glslBindingOffsetTracker;
 
+    Dictionary<Decl*, bool> m_typeContainsRecursionCache;
+
 public:
     SharedSemanticsContext(
         Linkage* linkage,
@@ -919,19 +921,6 @@ private:
         FacetList baseFacets,
         FacetList::Builder& ioMergedFacets);
 
-    struct TypePair
-    {
-        Type* type0;
-        Type* type1;
-        HashCode getHashCode() const
-        {
-            return combineHash(Slang::getHashCode(type0), Slang::getHashCode(type1));
-        }
-        bool operator==(const TypePair& other) const
-        {
-            return type0 == other.type0 && type1 == other.type1;
-        }
-    };
     Dictionary<Type*, InheritanceInfo> m_mapTypeToInheritanceInfo;
     Dictionary<DeclRef<Decl>, InheritanceInfo> m_mapDeclRefToInheritanceInfo;
     Dictionary<TypePair, SubtypeWitness*> m_mapTypePairToSubtypeWitness;
@@ -1924,10 +1913,10 @@ public:
         DeclRef<Decl> candidateMethod; // The method that was considered but failed
         Type* actualType = nullptr;    // For type mismatches: the actual type found
         Type* expectedType = nullptr;  // For type mismatches: the expected type
-        ParameterDirection actualDir =
-            kParameterDirection_In; // For direction mismatches: the actual direction
-        ParameterDirection expectedDir =
-            kParameterDirection_In;     // For direction mismatches: the expected direction
+        ParamPassingMode actualDir =
+            ParamPassingMode::In; // For direction mismatches: the actual direction
+        ParamPassingMode expectedDir =
+            ParamPassingMode::In;       // For direction mismatches: the expected direction
         ParamDecl* paramDecl = nullptr; // For direction mismatches: the parameter declaration
     };
 
@@ -2020,33 +2009,12 @@ public:
         DeclRef<PropertyDecl> requiredMemberDeclRef,
         RefPtr<WitnessTable> witnessTable);
 
-    bool trySynthesizeWrapperTypePropertyRequirementWitness(
-        ConformanceCheckingContext* context,
-        DeclRef<PropertyDecl> requiredMemberDeclRef,
-        RefPtr<WitnessTable> witnessTable);
-
     bool trySynthesizeSubscriptRequirementWitness(
         ConformanceCheckingContext* context,
         const LookupResult& lookupResult,
         DeclRef<SubscriptDecl> requiredMemberDeclRef,
         RefPtr<WitnessTable> witnessTable);
 
-    bool trySynthesizeWrapperTypeSubscriptRequirementWitness(
-        ConformanceCheckingContext* context,
-        DeclRef<SubscriptDecl> requiredMemberDeclRef,
-        RefPtr<WitnessTable> witnessTable);
-
-    bool trySynthesizeAssociatedTypeRequirementWitness(
-        ConformanceCheckingContext* context,
-        LookupResult const& lookupResult,
-        DeclRef<AssocTypeDecl> requiredMemberDeclRef,
-        RefPtr<WitnessTable> witnessTable);
-
-    bool trySynthesizeAssociatedConstantRequirementWitness(
-        ConformanceCheckingContext* context,
-        LookupResult const& lookupResult,
-        DeclRef<VarDeclBase> requiredMemberDeclRef,
-        RefPtr<WitnessTable> witnessTable);
 
     /// Attempt to synthesize a declartion that can satisfy `requiredMemberDeclRef` using
     /// `lookupResult`.
@@ -3037,7 +3005,7 @@ public:
     }
 
     Expr* visitSizeOfLikeExpr(SizeOfLikeExpr* expr);
-
+    Expr* visitAddressOfExpr(AddressOfExpr* expr);
     Expr* visitIncompleteExpr(IncompleteExpr* expr);
     Expr* visitBoolLiteralExpr(BoolLiteralExpr* expr);
     Expr* visitNullPtrLiteralExpr(NullPtrLiteralExpr* expr);
@@ -3250,7 +3218,7 @@ bool isImmutableBufferType(Type* type);
 
 // Check if `type` is nullable. An `Optional<T>` will occupy the same space as `T`, if `T`
 // is nullable.
-bool isNullableType(Type* type);
+bool doesTypeHaveAnUnusedBitPatternThatCanBeUsedForOptionalRepresentation(Type* type);
 
 EnumDecl* isEnumType(Type* type);
 

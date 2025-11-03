@@ -63,6 +63,7 @@ FIDDLE() namespace Slang
     void printDiagnosticArg(StringBuilder & sb, ASTNodeType nodeType);
     void printDiagnosticArg(StringBuilder & sb, const CapabilitySet& set);
     void printDiagnosticArg(StringBuilder & sb, List<CapabilityAtom> & set);
+    void printDiagnosticArg(StringBuilder & sb, const CapabilitySetVal* set);
 
     struct QualifiedDeclPath
     {
@@ -1260,6 +1261,7 @@ FIDDLE() namespace Slang
         Type* Ptr() { return type; }
         operator Type*() { return type; }
         Type* operator->() { return Ptr(); }
+        explicit operator bool() const { return type != nullptr; }
 
         ThisType& operator=(const ThisType& rhs) = default;
 
@@ -1686,16 +1688,96 @@ FIDDLE() namespace Slang
     };
 
     /// Represents the "direction" that a parameter is being passed (e.g., `in` or `out`
-    enum ParameterDirection
+    enum class ParamPassingMode
     {
-        kParameterDirection_In,       ///< Copy in
-        kParameterDirection_Out,      ///< Copy out
-        kParameterDirection_InOut,    ///< Copy in, copy out
-        kParameterDirection_Ref,      ///< By-reference
-        kParameterDirection_ConstRef, ///< By-const-reference
+        /// Pass a value as input.
+        ///
+        /// Indicated by using the `in` modifier on a parameter,
+        /// or simply using no modifier (on a parameter of
+        /// copyable type). This is the default mode.
+        ///
+        /// Must (almost by definition) be passed a copy
+        /// of the argument.
+        ///
+        ///
+        In,
+
+        /// Pass a reference to a memory location, to be used for output.
+        ///
+        /// Indicated by using the `out` modifier on a parameter
+        /// (while not also using `in`).
+        ///
+        /// May semantically be implemented by directly passing a
+        /// reference to the argument, or a reference to a temporary
+        /// that is moved out of after the call.
+        ///
+        /// Storage at the passed-in address should be unintialized
+        /// on input, and will be must be initialized by the callee
+        /// on any normal return path. On an error return, the storage
+        /// must be uninitialized.
+        ///
+        Out,
+
+        /// Pass a reference to a borrowed immutable value.
+        ///
+        /// Indicated by using the `borrow` modifier on a parameter,
+        /// or the combination of `borrow` and `in` (while not also
+        /// using `out`).
+        ///
+        /// May semantically be implemented by directly passing a
+        /// reference to the argument, or a reference to a temporary
+        /// that is moved/copied into before the call.
+        ///
+        /// Storage at the passed-in address must be guaranteed (by
+        /// the caller) to be immutable for the duration of the call.
+        ///
+        BorrowIn,
+
+        /// Pass a reference to a borrowed mutable value.
+        ///
+        /// Indicated by using the `inout` modifier on a parameter,
+        /// or the combination of `in` and `out`; may also be combined
+        /// with `borrow` to make the semantics more clear.
+        ///
+        /// May semantically be implemented by directly passing a
+        /// reference to the argument, or a reference to a temporary
+        /// that is moved/copied into before the call, and then
+        /// moved/copied out of after the call.
+        ///
+        /// Storage at the passed-in address must be guaranteed (by
+        /// the caller) to not be be accessed (including both reads
+        /// and writes) via any other potentially-aliasing access path.
+        /// Put another way, the callee has exclusive access to the
+        /// memory location for the duration of the call.
+        ///
+        BorrowInOut,
+
+        /// Pass a reference to a mutable memory location.
+        ///
+        /// Indicated by using the `ref` modifier on a parmater
+        /// (without also using the `readonly` or `writeonly` modifiers).
+        ///
+        /// Must be implemented by directly passing a reference to
+        /// the memory location of the argument. It is an error if
+        /// an argument resolves to a storage location that is not
+        /// a memory location (and cannot be turned into a memory
+        /// location via, e.g., a `ref` accessor).
+        ///
+        /// The memory location at the passed-in address may be
+        /// accessed (for reads, writes, atomics, etc.) during the
+        /// duration of the call, through access paths that alias
+        /// the parameter. The callee does not have a guarantee
+        /// of exclusivity of access to the memory location, and
+        /// must take appropriate precautions to ensure consistency,
+        /// coherency, and synchronization of access.
+        ///
+        /// This parameter-passing mode is more-or-less just syntactic
+        /// sugar for a parameter of an explicit pointer type (`Ptr<T>`).
+        ///
+        Ref,
     };
 
-    void printDiagnosticArg(StringBuilder & sb, ParameterDirection direction);
+    void printDiagnosticArg(StringBuilder & sb, ParamPassingMode direction);
 
     /// The kind of a builtin interface requirement that can be automatically synthesized.
     enum class BuiltinRequirementKind

@@ -6,7 +6,7 @@
 // them in the existential-type field itself.
 
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -use-dxil
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 // Slang-RHI/WGPU: Too small buffer is bound #5604

@@ -3,6 +3,8 @@
 
 #include "slang-ast-base.h"
 #include "slang-ast-decl.h"
+
+//
 #include "slang-ast-val.h.fiddle"
 
 FIDDLE()
@@ -54,8 +56,8 @@ public:
 };
 
 
-// Represent a lookup of SuperType::`m_decl` from `lookupSourceType` type that we know conforms to
-// SuperType.
+// Represent a lookup of witness of SuperType::`m_decl` from `lookupSource` type that we know
+// conforms to SuperType.
 FIDDLE()
 class LookupDeclRef : public DeclRefBase
 {
@@ -66,7 +68,7 @@ public:
     // The source type that we are looking up from.
     Type* getLookupSource() { return as<Type>(getOperand(1)); }
 
-    // Witness that `lookupSourceType`:SuperType.
+    // Witness that `lookupSource`:SuperType.
     SubtypeWitness* getWitness() { return as<SubtypeWitness>(getOperand(2)); }
 
     LookupDeclRef(Decl* declToLookup, Type* lookupSource, SubtypeWitness* witness)
@@ -957,6 +959,36 @@ class BackwardDifferentiatePropagateVal : public DifferentiateVal
     }
 };
 
+/// A value that represents a UInt set stored as a list of bitmask operands.
+/// This is used for efficient deduplication of capability sets through ASTBuilder caching.
+FIDDLE()
+class UIntSetVal : public Val
+{
+    FIDDLE(...)
+
+    /// Get the number of bitmask operands
+    Index getBitmaskCount() const { return getOperandCount(); }
+
+    /// Get a specific bitmask operand as a constant integer value
+    ConstantIntVal* getBitmask(Index index) const { return as<ConstantIntVal>(getOperand(index)); }
+
+    /// Get all bitmask operands as a view
+    Val::OperandView<ConstantIntVal> getBitmasks() const
+    {
+        return Val::OperandView<ConstantIntVal>(this, 0, getOperandCount());
+    }
+
+    /// Convert this UIntSetVal to a UIntSet
+    UIntSet toUIntSet() const;
+
+    /// Create a UIntSetVal from a UIntSet using the given ASTBuilder
+    static UIntSetVal* fromUIntSet(ASTBuilder* astBuilder, const UIntSet& uintSet);
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride() { return this; }
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
 
 template<typename F>
 void SubstitutionSet::forEachGenericSubstitution(F func) const
@@ -1011,6 +1043,10 @@ inline bool isTypeEqualityWitness(Val* witness)
                 return false;
         }
         return true;
+    }
+    else if (auto expandWitness = as<ExpandSubtypeWitness>(witness))
+    {
+        return isTypeEqualityWitness(expandWitness->getPatternTypeWitness());
     }
     return false;
 }
