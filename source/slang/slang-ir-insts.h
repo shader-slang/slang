@@ -1044,19 +1044,6 @@ struct IRLayout : IRInst
 
 struct IRVarLayout;
 
-/// An attribute to specify that a layout has another layout attached for "pending" data.
-///
-/// "Pending" data refers to the parts of a type or variable that
-/// couldn't be laid out until the concrete types for existential
-/// type slots were filled in. The layout of pending data may not
-/// be contiguous with the layout of the original type/variable.
-///
-FIDDLE()
-struct IRPendingLayoutAttr : IRAttr
-{
-    FIDDLE(leafInst())
-};
-
 /// Layout information for a type.
 ///
 /// The most important thing this instruction provides is the
@@ -1085,8 +1072,6 @@ struct IRTypeLayout : IRLayout
     /// Unwrap any layers of array-ness and return the outer-most non-array type.
     IRTypeLayout* unwrapArray();
 
-    /// Get the layout for pending data, if present.
-    IRTypeLayout* getPendingDataTypeLayout();
 
     /// A builder for constructing `IRTypeLayout`s
     struct Builder
@@ -1107,8 +1092,6 @@ struct IRTypeLayout : IRLayout
         /// Add all resource usage from `typeLayout`.
         void addResourceUsageFrom(IRTypeLayout* typeLayout);
 
-        /// Set the (optional) layout for pending data.
-        void setPendingTypeLayout(IRTypeLayout* typeLayout) { m_pendingTypeLayout = typeLayout; }
 
         /// Build a type layout according to the information specified so far.
         IRTypeLayout* build();
@@ -1136,7 +1119,6 @@ struct IRTypeLayout : IRLayout
         void addAttrs(List<IRInst*>& ioOperands);
 
         IRBuilder* m_irBuilder = nullptr;
-        IRTypeLayout* m_pendingTypeLayout = nullptr;
 
         struct ResInfo
         {
@@ -1601,8 +1583,6 @@ struct IRVarLayout : IRLayout
     /// Find the system-value semantic attribute for this variable, if any.
     IRSystemValueSemanticAttr* findSystemValueSemanticAttr();
 
-    /// Get the (optional) layout for any "pending" data assocaited with this variable.
-    IRVarLayout* getPendingVarLayout();
 
     /// Builder for construction `IRVarLayout`s in a stateful fashion
     struct Builder
@@ -1628,8 +1608,6 @@ struct IRVarLayout : IRLayout
         /// Either fetch or add a `ResInfo` record for `kind` and return it
         ResInfo* findOrAddResourceInfo(LayoutResourceKind kind);
 
-        /// Set the (optional) variable layout for pending data.
-        void setPendingVarLayout(IRVarLayout* varLayout) { m_pendingVarLayout = varLayout; }
 
         /// Set the (optional) system-valeu semantic for this variable.
         void setSystemValueSemantic(String const& name, UInt index);
@@ -1654,7 +1632,6 @@ struct IRVarLayout : IRLayout
         IRBuilder* getIRBuilder() { return m_irBuilder; };
 
         IRTypeLayout* m_typeLayout = nullptr;
-        IRVarLayout* m_pendingVarLayout = nullptr;
 
         IRSystemValueSemanticAttr* m_systemValueSemantic = nullptr;
         IRUserSemanticAttr* m_userSemantic = nullptr;
@@ -4152,7 +4129,6 @@ $(type_info.return_type) $(type_info.method_name)(
 
     IRTypeSizeAttr* getTypeSizeAttr(LayoutResourceKind kind, LayoutSize size);
     IRVarOffsetAttr* getVarOffsetAttr(LayoutResourceKind kind, UInt offset, UInt space = 0);
-    IRPendingLayoutAttr* getPendingLayoutAttr(IRLayout* pendingLayout);
     IRStructFieldLayoutAttr* getFieldLayoutAttr(IRInst* key, IRVarLayout* layout);
     IRTupleFieldLayoutAttr* getTupleFieldLayoutAttr(IRTypeLayout* layout);
     IRCaseTypeLayoutAttr* getCaseTypeLayoutAttr(IRTypeLayout* layout);
