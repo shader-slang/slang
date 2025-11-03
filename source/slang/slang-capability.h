@@ -436,8 +436,7 @@ public:
     }
 
     /// Convert this mutable capability set to an immutable CapabilitySetVal
-    [[nodiscard]]
-    CapabilitySetVal* freeze(ASTBuilder* astBuilder) const;
+    [[nodiscard]] CapabilitySetVal* freeze(ASTBuilder* astBuilder) const;
 
 private:
     /// underlying data of CapabilitySet.

@@ -1777,8 +1777,7 @@ CapabilitySet CapabilitySetVal::thaw() const
     return result;
 }
 
-[[nodiscard]]
-CapabilitySetVal* CapabilitySet::freeze(ASTBuilder* astBuilder) const
+[[nodiscard]] CapabilitySetVal* CapabilitySet::freeze(ASTBuilder* astBuilder) const
 {
     if (auto cached = astBuilder->m_capabilitySetCache.tryGetValue(*this))
     {
