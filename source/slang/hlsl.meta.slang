@@ -1029,26 +1029,40 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         }
     }
 
-    /// Samples the texture at the given location.
+    /// Samples the texture at a given location using implicit level of detail.
     ///
     ///@param s The `SamplerState` to use for the sampling operation. This parameter is omitted when `this` is a combined texture sampler type (`isCombined == 0`).
     ///@param location The location to sample the texture at.
     ///@param offset Texel offset to apply.
-    ///@param clamp The max level of detail to use.
+    ///@param clamp The maximum level of detail to use.
     ///@param[out] status The result status of the operation.
     ///                   This parameter is currently only used when targeting HLSL.
     ///                   For other targets, the result status is always 0.
     ///@return The sampled texture value.
-    ///@see `SampleBias`, `SampleLevel`, `SampleLevelZero`, `SampleGrad`, `SampleCmp`, `SampleCmpLevelZero`, `SampleCmpLevel`.
+    ///
+    /// `location` is a vector of floats as follows:
+    /// - For 1d/2d/3d-textures, the vector is a 1d/2d/3d-vector specifying the sample location. Usually, normalized coordinates are used
+    ///   such that the coordinate range `[0, 1]` denotes the full span of the texture. Depending on the sampler state and the sampled texture type,
+    ///   other conventions may also be used. For example, `GL_TEXTURE_RECTANGLE` uses non-normalized texel locations.
+    /// - For cube textures, the location is a 3d-vector specifying the direction from the center of the cube at the sample. The direction
+    ///   does not need to be normalized.
+    /// - For texture arrays, the location vector is appended with the array index. The array
+    ///   index (float) is first rounded to the nearest integer value and then clamped to `[0, d-1]` where `d` is the number of array elements.
+    ///
     ///@remarks
     /// The `Sample` function is defined for all read-only texture types, including
     /// `Texture1D`, `Texture2D`, `Texture3D`, `TextureCube`,
     /// `Texture1DArray`, `Texture2DArray` and `TextureCubeArray`.
     ///
-    /// The function is not available for read-write texture types.
+    /// This function requires the implicit sampling derivatives, which are always available in the fragment stage. In other stages, the derivatives
+    /// are enabled on the target using the appropriate target extensions as necessary. It is an error to use this function when
+    /// implicit derivatives cannot be enabled. See also capability `GL_NV_compute_shader_derivatives`.
+    ///
+    /// This function is not available for read-write and write-only texture types.
     ///
     /// For HLSL/D3D targets, the texture element type must be a scalar or vector of float or half types.
     ///
+    ///@see `SampleBias`, `SampleLevel`, `SampleLevelZero`, `SampleGrad`, `SampleCmp`, `SampleCmpLevelZero`, `SampleCmpLevel`.
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0_fragment)]
@@ -1798,6 +1812,24 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         }
     }
 
+    /// Samples the texture at a given location using MIP level 0.
+    ///
+    ///@param s The `SamplerState` to use for the sampling operation. This parameter is omitted when `this` is a combined texture sampler type (`isCombined == 0`).
+    ///@param location The location to sample the texture at.
+    ///@param offset Texel offset to apply.
+    ///@param[out] status The result status of the operation.
+    ///                   This parameter is currently only used when targeting HLSL.
+    ///                   For other targets, the result status is always 0.
+    ///@return The sampled texture value.
+    ///
+    /// See `Sample()` for the full specification.
+    ///
+    ///@remarks
+    /// When targeting GLSL, depending on whether implicit derivatives are enabled, this function translates to `texture()` (derivatives disabled)
+    /// or `textureLod()` (derivatives enabled). This allows the use of texture types in stages without implicit derivatives that would otherwise
+    /// be unusable due to the missing `textureLod()` variants.
+    ///
+    ///@see `Sample`, `SampleBias`, `SampleLevel`, `SampleGrad`, `SampleCmp`, `SampleCmpLevelZero`, `SampleCmpLevel`, `GL_NV_compute_shader_derivatives`.
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
