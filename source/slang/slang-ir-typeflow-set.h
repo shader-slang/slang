@@ -1,4 +1,4 @@
-// slang-ir-typeflow-collection.h
+// slang-ir-typeflow-set.h
 #pragma once
 #include "slang-ir-insts.h"
 #include "slang-ir.h"

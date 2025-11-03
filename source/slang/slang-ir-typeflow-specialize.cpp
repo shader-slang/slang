@@ -5,7 +5,7 @@
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-specialize.h"
-#include "slang-ir-typeflow-collection.h"
+#include "slang-ir-typeflow-set.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 
@@ -419,20 +419,6 @@ IRType* fromDirectionAndType(IRBuilder* builder, ParameterDirectionInfo info, IR
     }
 }
 
-IRInst* lookupWitnessTableEntry(IRWitnessTable* table, IRInst* key)
-{
-    if (auto entry = findWitnessTableEntry(table, key))
-    {
-        return entry;
-    }
-    else if (as<IRVoidType>(table->getConcreteType()))
-    {
-        SLANG_UNEXPECTED("Looking up entry on 'none' witness table");
-    }
-
-    return nullptr;
-}
-
 // Helper to test if an inst is in the global scope.
 bool isGlobalInst(IRInst* inst)
 {
@@ -442,15 +428,16 @@ bool isGlobalInst(IRInst* inst)
 // This is fairly fundamental check:
 // This method checks whether a inst's type cannot accept any further refinement.
 //
-// e.g. an inst of `UInt` type cannot be further refined (under the current scope
-// of the type-flow pass), since it has a concrete type, and we do not
-// track values.
+// Examples:
+// 1. an inst of `UInt` type cannot be further refined (under the current scope
+// of the type-flow pass), since it has a concrete type, and we cannot replace it
+// with a "narrower" type.
 //
-// an inst of `InterfaceType` represents a tagged union of any type that implements
+// 2. an inst of `InterfaceType` represents a tagged union of any type that implements
 // the interface, so it can be further refined by determining a smaller set of
 // possibilities (i.e. via `TaggedUnionType(tableSet, typeSet)`).
 //
-// Similarly, an inst of `WitnessTableType` represents any witness table,
+// 3. Similarly, an inst of `WitnessTableType` represents any witness table,
 // so it can accept a further refinement into `ElementOfSetType(tableSet)`.
 //
 // In the future, we may want to extend this check to something more nuanced,
@@ -525,7 +512,15 @@ IRInst* makeInfoForConcreteType(IRModule* module, IRInst* type)
         cast<IRTypeSet>(builder.getSingletonSet(kIROp_TypeSet, type)));
 }
 
-IROp getSetOpFromDataType(IRType* type)
+// Determines a suitable set opcode to use to represent a set of elements of the given type.
+//
+// e.g. an inst of WitnessTableType can be be refined using a WitnessTableSet (but it doesn't make
+// sense to use a TypeSet or FuncSet).
+//
+// This is primarily used for `LookupWitnessMethod`, where the resulting element could be
+// a generic, witness table, type or function, depending on the type of the lookup inst.
+//
+IROp getSetOpFromType(IRType* type)
 {
     switch (type->getOp())
     {
@@ -1875,10 +1870,10 @@ struct TypeFlowSpecializationContext
                         return;
                     }
 
-                    results.add(lookupWitnessTableEntry(cast<IRWitnessTable>(table), key));
+                    results.add(findWitnessTableEntry(cast<IRWitnessTable>(table), key));
                 });
 
-            auto setOp = getSetOpFromDataType(inst->getDataType());
+            auto setOp = getSetOpFromType(inst->getDataType());
             auto resultSetType = makeElementOfSetType(builder.getSet(setOp, results));
             module->getContainerPool().free(&results);
 
@@ -2057,7 +2052,7 @@ struct TypeFlowSpecializationContext
                         //
                         IRBuilder builder(module);
                         SLANG_ASSERT(unboundedElement);
-                        auto setOp = getSetOpFromDataType(inst->getArg(i)->getDataType());
+                        auto setOp = getSetOpFromType(inst->getArg(i)->getDataType());
                         auto pureUnboundedSet = builder.getSingletonSet(setOp, unboundedElement);
                         if (auto typeSet = as<IRTypeSet>(pureUnboundedSet))
                             specializationArgs.add(makeUntaggedUnionType(typeSet));
@@ -2213,7 +2208,7 @@ struct TypeFlowSpecializationContext
             }
 
             IRBuilder builder(module);
-            auto setOp = getSetOpFromDataType(inst->getDataType());
+            auto setOp = getSetOpFromType(inst->getDataType());
             auto resultSetType = makeElementOfSetType(builder.getSet(setOp, specializedSet));
             module->getContainerPool().free(&specializedSet);
             module->getContainerPool().free(&specializationArgs);
@@ -3041,7 +3036,7 @@ struct TypeFlowSpecializationContext
         // Handle trivial case where inst's operand is a concrete table.
         if (auto witnessTable = as<IRWitnessTable>(inst->getWitnessTable()))
         {
-            inst->replaceUsesWith(lookupWitnessTableEntry(witnessTable, inst->getRequirementKey()));
+            inst->replaceUsesWith(findWitnessTableEntry(witnessTable, inst->getRequirementKey()));
             inst->removeAndDeallocate();
             return true;
         }
@@ -3481,6 +3476,9 @@ struct TypeFlowSpecializationContext
         return callee;
     }
 
+    // Filter out `NoneTypeElement` and `NoneWitnessTableElement` from a set (if any exist)
+    // and construct a new set of the same kind.
+    //
     IRSetBase* filterNoneElements(IRSetBase* set)
     {
         auto setOp = set->getOp();
@@ -3506,10 +3504,12 @@ struct TypeFlowSpecializationContext
 
         if (!containsNone)
         {
+            // Return the same set if there were no None elements
             module->getContainerPool().free(&filteredElements);
             return set;
         }
 
+        // Create a new set without the filtered elements
         auto newFuncSet = cast<IRSetBase>(builder.getSet(setOp, filteredElements));
         module->getContainerPool().free(&filteredElements);
         return newFuncSet;
@@ -3729,10 +3729,12 @@ struct TypeFlowSpecializationContext
             // Occasionally, we will determine that there are absolutely no possible callees
             // for a call site. This typically happens to impossible branches.
             //
-            // The correct way to handle such cases is to improve the analysis to avoid
-            // branches that are impossible. For now, we will just remove the callee and
-            // replace with a default value. The exact value doesn't matter since we've determined
-            // that this code is unreachable.
+            // If this happens, the inst representing the callee would have been replaced
+            // with a poison value. In this case, we're simply going to replace the entire call
+            // with a default-constructed value of the appropriate type.
+            //
+            // Note that it doesn't matter what we replace it with since this code should be
+            // effectively unreachable.
             //
             IRBuilder builder(context);
             builder.setInsertBefore(inst);
@@ -3759,9 +3761,11 @@ struct TypeFlowSpecializationContext
             {
                 auto oldFuncType = as<IRFuncType>(callee->getDataType());
                 IRBuilder builder(module);
+
                 List<IRType*> paramTypes;
                 for (auto paramType : oldFuncType->getParamTypes())
                     paramTypes.add(paramType);
+
                 auto newFuncType = builder.getFuncType(paramTypes, resultType);
                 builder.setInsertInto(module);
                 callee = builder.replaceOperand(&callee->typeUse, newFuncType);
@@ -3795,7 +3799,7 @@ struct TypeFlowSpecializationContext
                     break;
                 }
 
-            // Out parameters are handled at the callee's end
+            // Upcasting of out-parameters is the responsibility of the callee.
             case ParameterDirectionInfo::Kind::Out:
 
             // For all other modes, sets must match ('subtyping' is not allowed)
@@ -4511,10 +4515,20 @@ struct TypeFlowSpecializationContext
         if (auto srcTaggedUnionType =
                 as<IRTaggedUnionType>(inst->getOptionalOperand()->getDataType()))
         {
-            // Since `GetOptionalValue` is the reverse of `MakeOptionalValue`, and we treat
-            // the latter as a no-op, then `GetOptionalValue` is also a no-op (we simply pass
-            // the inner existential value as-is)
+            // How we handle `GetOptionalValue` depends on whether our analysis
+            // shows that there can be a 'none' type in the input.
             //
+            // If not, we can do a simple replace with the operand since the
+            // input and output are equivalent (this is a no-op)
+            //
+            // If so, then we will cast the tagged-union's tag to a sub-set (without the none),
+            // and unpack the untagged union-type'd value into the smaller union type.
+            //
+            // Note that the union is "smaller" only in the sense that it doesn't have the 'none'
+            // type. Since a 'none' value takes up 0 space, the two union types will end up having
+            // the same size in the end.
+            //
+
 
             IRBuilder builder(inst);
             auto destTaggedUnionType = cast<IRTaggedUnionType>(tryGetInfo(context, inst));
@@ -4657,7 +4671,7 @@ struct TypeFlowSpecializationContext
     {
         bool hasChanges = false;
 
-        // Phase 1: Information Propagation
+        // Part 1: Information Propagation
         //    This phase propagates type information through the module
         //    and records them into different maps in the current context.
         //
@@ -4669,7 +4683,7 @@ struct TypeFlowSpecializationContext
             return false;
         }
 
-        // Phase 2: Dynamic Instruction Specialization
+        // Part 2: Dynamic Instruction Specialization
         //    Re-write dynamic instructions into specialized versions based on the
         //    type information in the previous phase.
         //

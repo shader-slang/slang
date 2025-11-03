@@ -18,8 +18,8 @@ bool lowerTaggedUnionTypes(IRModule* module, DiagnosticSink* sink);
 // Lower `SetTagType` types
 void lowerTagTypes(IRModule* module);
 
-// Lower `GetTagOfElementInSet`,
-// `GetTagForSuperSet`, and `GetTagForMappedSet` instructions,
+// Lower `GetTagOfElementInSet`, `GetTagForSuperSet`, `GetTagForSubSet` and `GetTagForMappedSet`
+// instructions,
 //
 void lowerTagInsts(IRModule* module, DiagnosticSink* sink);
 

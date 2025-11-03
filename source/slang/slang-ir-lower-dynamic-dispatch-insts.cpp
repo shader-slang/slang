@@ -1,11 +1,11 @@
-#include "slang-ir-lower-typeflow-insts.h"
+#include "slang-ir-lower-dynamic-dispatch-insts.h"
 
 #include "slang-ir-any-value-marshalling.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-specialize.h"
-#include "slang-ir-typeflow-collection.h"
+#include "slang-ir-typeflow-set.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 
@@ -136,7 +136,15 @@ IRStringLit* _getWitnessTableWrapperFuncName(IRModule* module, IRFunc* func)
     return nullptr;
 }
 
-
+// Create a wrapper function that makes a specific function's signature match it's type in the
+// interface requirement.
+//
+// e.g. the signature of the function from the caller's side might look like: ((ThisType, float) ->
+// ThisType) while the actual implementation function might be ((FooImpl, float) -> FooImpl).
+//
+// The witness table wrapper will marshal from the union-types (ThisType) to the concrete types
+// (FooImpl) expected by the implementation.
+//
 IRFunc* emitWitnessTableWrapper(IRModule* module, IRInst* funcInst, IRInst* interfaceRequirementVal)
 {
     auto funcTypeInInterface = cast<IRFuncType>(interfaceRequirementVal);
@@ -285,6 +293,10 @@ IRFunc* createDispatchFunc(IRFuncType* dispatchFuncType, Dictionary<IRInst*, IRI
         auto funcInst = kvPair.second;
         auto funcTag = kvPair.first;
 
+        // The different functions in the mapping may have different signatures,
+        // so we need to emit a wrapper that marshals the parameters to the expected types for
+        // each function.
+        //
         auto wrapperFunc = emitWitnessTableWrapper(funcInst->getModule(), funcInst, innerFuncType);
 
         // Create case block
@@ -716,9 +728,9 @@ bool lowerDispatchers(IRModule* module, DiagnosticSink* sink)
 }
 
 // This context lowers `TypeSet` instructions.
-struct SetLoweringContext : public InstPassBase
+struct UntaggedUnionLoweringContext : public InstPassBase
 {
-    SetLoweringContext(
+    UntaggedUnionLoweringContext(
         IRModule* module,
         TargetProgram* targetProgram,
         DiagnosticSink* sink = nullptr)
@@ -735,6 +747,11 @@ struct SetLoweringContext : public InstPassBase
             if (size > maxSize)
                 maxSize = size;
 
+            // We need to consider whether the concrete type can be stored in an `AnyValue`.
+            //
+            // For example, resource types that are not bindless on the target cannot be marshalled
+            // and we need to diagnose that.
+            //
             if (sink && !canTypeBeStored(type))
             {
                 sink->diagnose(
@@ -808,16 +825,22 @@ struct SetLoweringContext : public InstPassBase
         untaggedUnionType->replaceUsesWith(anyValueType);
     }
 
+    // Replace any uses of `NoneTypeElement` with `VoidType`.
+    void replaceNoneTypeElementWithVoidType()
+    {
+        IRBuilder builder(module);
+        auto noneTypeElement = builder.getNoneTypeElement();
+        noneTypeElement->replaceUsesWith(builder.getVoidType());
+        noneTypeElement->removeAndDeallocate();
+    }
+
     void processModule()
     {
         processInstsOfType<IRUntaggedUnionType>(
             kIROp_UntaggedUnionType,
             [&](IRUntaggedUnionType* inst) { return lowerUntaggedUnionType(inst); });
 
-        IRBuilder builder(module);
-        auto noneTypeElement = builder.getNoneTypeElement();
-        noneTypeElement->replaceUsesWith(builder.getVoidType());
-        noneTypeElement->removeAndDeallocate();
+        replaceNoneTypeElementWithVoidType();
     }
 
 private:
@@ -831,7 +854,7 @@ private:
 void lowerUntaggedUnionTypes(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
     SLANG_UNUSED(sink);
-    SetLoweringContext context(module, targetProgram, sink);
+    UntaggedUnionLoweringContext context(module, targetProgram, sink);
     context.processModule();
 }
 
@@ -924,12 +947,12 @@ struct SequentialIDTagLoweringContext : public InstPassBase
             {
                 // Get unique ID for the witness table
                 SLANG_UNUSED(cast<IRWitnessTable>(table));
-                auto outputId = builder.getUniqueID(table);
+                auto inputId = builder.getUniqueID(table);
                 auto seqDecoration = table->findDecoration<IRSequentialIDDecoration>();
                 if (seqDecoration)
                 {
-                    auto inputId = seqDecoration->getSequentialID();
-                    mapping.add({outputId, inputId});
+                    auto outputId = seqDecoration->getSequentialID();
+                    mapping.add({inputId, outputId});
                 }
             });
 
@@ -944,11 +967,15 @@ struct SequentialIDTagLoweringContext : public InstPassBase
 
 
     // Ensures every witness table object has been assigned a sequential ID.
+    //
     // All witness tables will have a SequentialID decoration after this function is run.
-    // The sequantial ID in the decoration will be the same as the one specified in the Linkage.
+    //
+    // The sequential ID in the decoration will be the same as the one specified in the Linkage.
+    //
     // Otherwise, a new ID will be generated and assigned to the witness table object, and
-    // the sequantial ID map in the Linkage will be updated to include the new ID, so they
+    // the sequential ID map in the Linkage will be updated to include the new ID, so they
     // can be looked up by the user via future Slang API calls.
+    //
     void ensureWitnessTableSequentialIDs()
     {
         StringBuilder generatedMangledName;
@@ -1138,6 +1165,9 @@ struct TaggedUnionLoweringContext : public InstPassBase
     {
     }
 
+    // Extract the required components from an interface-typed value
+    // and create a tagged union tuple from the result.
+    //
     IRInst* convertToTaggedUnion(
         IRBuilder* builder,
         IRInst* val,
@@ -1341,6 +1371,13 @@ struct TaggedUnionLoweringContext : public InstPassBase
 
     bool lowerGetTypeTagFromTaggedUnion(IRGetTypeTagFromTaggedUnion* inst)
     {
+        // `GetTypeTagFromTaggedUnion(taggedUnionVal)` is not expected to
+        // appear after lowering, since we currently don't need the type tag
+        // for anything.
+        //
+        // We'll replace it with a poison value so that any accidental uses will result in
+        // an error later on.
+        //
         IRBuilder builder(module);
         builder.setInsertAfter(inst);
         inst->replaceUsesWith(builder.emitPoison(inst->getDataType()));
@@ -1387,37 +1424,35 @@ struct TaggedUnionLoweringContext : public InstPassBase
                 inst->removeAndDeallocate();
             });
 
-        // TODO: Is this repeated scanning of the module inefficient?
-        // It feels like this form could be very efficient if it's automatically
-        // 'fused' together.
-        //
-        processInstsOfType<IRGetTagFromTaggedUnion>(
-            kIROp_GetTagFromTaggedUnion,
-            [&](IRGetTagFromTaggedUnion* inst) { return lowerGetTagFromTaggedUnion(inst); });
-
-        processInstsOfType<IRGetTypeTagFromTaggedUnion>(
-            kIROp_GetTypeTagFromTaggedUnion,
-            [&](IRGetTypeTagFromTaggedUnion* inst)
-            { return lowerGetTypeTagFromTaggedUnion(inst); });
-
-        processInstsOfType<IRGetValueFromTaggedUnion>(
-            kIROp_GetValueFromTaggedUnion,
-            [&](IRGetValueFromTaggedUnion* inst) { return lowerGetValueFromTaggedUnion(inst); });
-
-        processInstsOfType<IRMakeTaggedUnion>(
-            kIROp_MakeTaggedUnion,
-            [&](IRMakeTaggedUnion* inst) { return lowerMakeTaggedUnion(inst); });
-
-        // Then, convert any loads/stores from reinterpreted pointers.
         bool hasCastInsts = false;
-        processInstsOfType<IRCastInterfaceToTaggedUnionPtr>(
-            kIROp_CastInterfaceToTaggedUnionPtr,
-            [&](IRCastInterfaceToTaggedUnionPtr* inst)
+        processAllInsts(
+            [&](IRInst* inst)
             {
-                hasCastInsts = true;
-                return lowerCastInterfaceToTaggedUnionPtr(inst);
+                switch (inst->getOp())
+                {
+                case kIROp_GetTagFromTaggedUnion:
+                    lowerGetTagFromTaggedUnion(as<IRGetTagFromTaggedUnion>(inst));
+                    break;
+                case kIROp_GetTypeTagFromTaggedUnion:
+                    lowerGetTypeTagFromTaggedUnion(as<IRGetTypeTagFromTaggedUnion>(inst));
+                    break;
+                case kIROp_GetValueFromTaggedUnion:
+                    lowerGetValueFromTaggedUnion(as<IRGetValueFromTaggedUnion>(inst));
+                    break;
+                case kIROp_MakeTaggedUnion:
+                    lowerMakeTaggedUnion(as<IRMakeTaggedUnion>(inst));
+                    break;
+                case kIROp_CastInterfaceToTaggedUnionPtr:
+                    {
+                        hasCastInsts = true;
+                        lowerCastInterfaceToTaggedUnionPtr(
+                            as<IRCastInterfaceToTaggedUnionPtr>(inst));
+                    }
+                    break;
+                default:
+                    break;
+                }
             });
-
         return hasCastInsts;
     }
 };
@@ -1430,6 +1465,9 @@ bool lowerTaggedUnionTypes(IRModule* module, DiagnosticSink* sink)
     return context.processModule();
 }
 
+// Convert `IsType` insts into an boolean equality check on the sequential IDs of the
+// witness table operands.
+//
 void lowerIsTypeInsts(IRModule* module)
 {
     InstPassBase pass(module);
@@ -1530,6 +1568,13 @@ struct ExistentialLoweringContext : public InstPassBase
         if (isBuiltin(interfaceType))
             return (IRType*)builder.getIntValue(builder.getIntType(), 0);
 
+        // In the dynamic-dispatch case, a value of interface type
+        // is going to be packed into the "any value" part of a tuple.
+        // The size of the "any value" part depends on the interface
+        // type (e.g., it might have an `[anyValueSize(8)]` attribute
+        // indicating that 8 bytes needs to be reserved).
+        //
+
         IRIntegerValue anyValueSize = 0;
         if (auto decor = interfaceType->findDecoration<IRAnyValueSizeDecoration>())
         {
@@ -1540,11 +1585,21 @@ struct ExistentialLoweringContext : public InstPassBase
         auto witnessTableType = builder.getWitnessTableIDType((IRType*)interfaceType);
         auto rttiType = builder.getRTTIHandleType();
 
+        // In the ordinary (dynamic) case, an existential type decomposes
+        // into a tuple of:
+        //
+        //      (RTTI, witness table, any-value).
+        //
         return builder.getTupleType(rttiType, witnessTableType, anyValueType);
     }
 
     IRInst* lowerBoundInterfaceType(IRBoundInterfaceType* boundInterfaceType)
     {
+        // A bound interface type represents an existential together with
+        // static knowledge that the value stored in the extistential has
+        // a particular concrete type.
+        //
+
         IRBuilder builder(module);
 
         auto payloadType = boundInterfaceType->getConcreteType();
@@ -1562,6 +1617,27 @@ struct ExistentialLoweringContext : public InstPassBase
 
         auto anyValueType = builder.getAnyValueType(anyValueSize);
 
+        // Because static specialization is being used (at least in part),
+        // we do *not* have a guarantee that the `concreteType` is one
+        // that can fit into the `anyValueSize` of the interface.
+        //
+        // We will use the IR layout logic to see if we can compute
+        // a size for the type, which can lead to a few different outcomes:
+        //
+        // * If a size is computed successfully, and it is smaller than or
+        //   equal to `anyValueSize`, then the concrete value will fit into
+        //   the reserved area, and the layout will match the dynamic case.
+        //
+        // * If a size is computed successfully, and it is larger than
+        //   `anyValueSize`, then the concrete value cannot fit into the
+        //   reserved area, and it needs to be stored out-of-line.
+        //
+        // * If size cannot be computed, then that implies that the type
+        //   includes non-ordinary data (e.g., a `Texture2D` on a D3D11
+        //   target), and cannot possible fit into the reserved area
+        //   (which consists of only uniform bytes). In this case, the
+        //   value must be stored out-of-line.
+        //
         IRSizeAndAlignment sizeAndAlignment;
         Result result = getNaturalSizeAndAlignment(
             targetProgram->getOptionSet(),
@@ -1569,6 +1645,11 @@ struct ExistentialLoweringContext : public InstPassBase
             &sizeAndAlignment);
         if (SLANG_FAILED(result) || sizeAndAlignment.size > anyValueSize)
         {
+            // In the case where static specialization mandateds out-of-line storage,
+            // an existential type decomposes into a tuple of:
+            //
+            //      (RTTI, witness table, pseudo pointer, any-value)
+            //
             return builder.getTupleType(
                 rttiType,
                 witnessTableType,
@@ -1584,7 +1665,7 @@ struct ExistentialLoweringContext : public InstPassBase
 
     bool lowerExtractExistentialType(IRExtractExistentialType* inst)
     {
-        // Replace with extraction of the value type from the tagged-union tuple.
+        // Replace with extraction of the type as a value from the existential tuple.
         //
 
         IRBuilder builder(module);
@@ -1608,7 +1689,7 @@ struct ExistentialLoweringContext : public InstPassBase
 
     bool lowerExtractExistentialWitnessTable(IRExtractExistentialWitnessTable* inst)
     {
-        // Replace with extraction of the value from the tagged-union tuple.
+        // Replace with extraction of the witness table identifier from the existential tuple.
         //
 
         IRBuilder builder(module);
@@ -1669,7 +1750,7 @@ struct ExistentialLoweringContext : public InstPassBase
 
     bool lowerExtractExistentialValue(IRExtractExistentialValue* inst)
     {
-        // Replace with extraction of the value from the tagged-union tuple.
+        // Replace with extraction of the value payload from the existential tuple.
         //
 
         IRBuilder builder(module);
@@ -1714,7 +1795,6 @@ struct ExistentialLoweringContext : public InstPassBase
             return true;
         }
 
-
         UInt index = 0;
         auto id = builder.emitSwizzle(builder.getUIntType(), inst->getRTTIOperand(), 1, &index);
         inst->replaceUsesWith(id);
@@ -1725,8 +1805,13 @@ struct ExistentialLoweringContext : public InstPassBase
     void processModule()
     {
         // Then, start lowering the remaining non-COM/non-Builtin interface types
-        // At this point, we should only bea dealing with public facing uses of
-        // interface types (which must lower into a 3-tuple of RTTI, witness table ID, AnyValue)
+        // At this point, we should only be dealing with public facing uses of
+        // interface types, as all internal uses would have been rewritten
+        // into known tagged-union types.
+        //
+        // These must lower into either a
+        // TupleType(RTTI, witness table ID, AnyValue) for regular interface types or a
+        // TupleType(RTTI, witness table ID, PseudoPtr, AnyValue) for bound interface types.
         //
         processInstsOfType<IRInterfaceType>(
             kIROp_InterfaceType,
@@ -1772,7 +1857,7 @@ struct ExistentialLoweringContext : public InstPassBase
             });
 
         // Replace any other uses with dummy value 0.
-        // TODO: Ideally, we should replace it with IRPoison..
+        // TODO: Ideally, we should replace it with OpPoison?
         {
             IRBuilder builder(module);
             builder.setInsertInto(module);

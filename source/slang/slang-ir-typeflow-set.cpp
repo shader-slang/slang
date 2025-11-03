@@ -1,4 +1,4 @@
-#include "slang-ir-typeflow-collection.h"
+#include "slang-ir-typeflow-set.h"
 
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
