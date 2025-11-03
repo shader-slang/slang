@@ -320,12 +320,6 @@ DIAGNOSTIC(
     "downstream compiler '$0' doesn't support whole program compilation")
 DIAGNOSTIC(102, Note, downstreamCompileTime, "downstream compile time: $0s")
 DIAGNOSTIC(103, Note, performanceBenchmarkResult, "compiler performance benchmark:\n$0")
-DIAGNOSTIC(
-    104,
-    Error,
-    unrecognizedTargetTriple,
-    "LLVM failed to find the target triple \"$0\":\n$1")
-DIAGNOSTIC(105, Error, llvmCodegenFailed, "LLVM failed to generate code")
 DIAGNOSTIC(99999, Note, noteFailedToLoadDynamicLibrary, "failed to load dynamic library '$0'")
 
 //

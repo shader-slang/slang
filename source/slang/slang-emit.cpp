@@ -15,6 +15,7 @@
 #include "slang-emit-cuda.h"
 #include "slang-emit-glsl.h"
 #include "slang-emit-hlsl.h"
+#include "slang-emit-llvm.h"
 #include "slang-emit-metal.h"
 #include "slang-emit-slang.h"
 #include "slang-emit-source-writer.h"
@@ -2917,11 +2918,6 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
     SLANG_RETURN_ON_FAIL(
         linkAndOptimizeIR(codeGenContext, linkingAndOptimizationOptions, linkedIR));
 
-    using LLVMEmitterFunc = SlangResult (*)(
-        CodeGenContext* codeGenContext,
-        IRModule* irModule,
-        IArtifact** outArtifact);
-
     auto irModule = linkedIR.module;
 
     dumpIRIfEnabled(codeGenContext, irModule, "POST LINK AND OPTIMIZE");
@@ -2937,8 +2933,7 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
     case CodeGenTarget::LLVMShaderObjectCode:
         {
             IArtifact* artifact = nullptr;
-            auto emit = (LLVMEmitterFunc)library->findFuncByName("emitLLVMObjectFromIR_V1");
-            emit(codeGenContext, irModule, &artifact);
+            emitLLVMAssemblyFromIR(codeGenContext, irModule, &artifact);
             outArtifact = ComPtr<IArtifact>(artifact);
         }
         break;
@@ -2946,8 +2941,7 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
     case CodeGenTarget::LLVMShaderAssembly:
         {
             IArtifact* artifact = nullptr;
-            auto emit = (LLVMEmitterFunc)library->findFuncByName("emitLLVMAssemblyFromIR_V1");
-            emit(codeGenContext, irModule, &artifact);
+            emitLLVMAssemblyFromIR(codeGenContext, irModule, &artifact);
             outArtifact = ComPtr<IArtifact>(artifact);
         }
         break;
@@ -2955,8 +2949,7 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
     case CodeGenTarget::LLVMShaderHostCallable:
         {
             IArtifact* artifact = nullptr;
-            auto emit = (LLVMEmitterFunc)library->findFuncByName("emitLLVMJITFromIR_V1");
-            emit(codeGenContext, irModule, &artifact);
+            emitLLVMJITFromIR(codeGenContext, irModule, &artifact);
             outArtifact = ComPtr<IArtifact>(artifact);
         }
         break;

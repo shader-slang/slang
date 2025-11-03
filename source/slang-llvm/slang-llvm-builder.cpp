@@ -4,15 +4,13 @@
 #pragma warning(disable : 4267)
 #endif
 
-#include "../compiler-core/slang-artifact-associated-impl.h"
-#include "../compiler-core/slang-artifact-desc-util.h"
-#include "../core/slang-char-util.h"
-#include "../core/slang-func-ptr.h"
-#include "../slang/slang-ir-insts.h"
-#include "../slang/slang-ir-layout.h"
-#include "../slang/slang-ir-lower-buffer-element-type.h"
-#include "../slang/slang-ir-util.h"
+#include "compiler-core/slang-artifact-associated-impl.h"
+#include "compiler-core/slang-artifact-desc-util.h"
+#include "compiler-core/slang-artifact-associated.h"
+#include "core/slang-list.h"
+#include "core/slang-com-object.h"
 #include "slang-llvm-jit-shared-library.h"
+#include "slang-llvm-builder.h"
 
 #include <filesystem>
 #include <llvm/AsmParser/Parser.h>
@@ -73,92 +71,586 @@ struct BinaryLLVMOutputStream : public llvm::raw_pwrite_stream
     void reserveExtraSpace(uint64_t ExtraSize) override { output.reserve(tell() + ExtraSize); }
 };
 
-// This function attempts to find names associated with a variable or function.
-// `linkageName` is the name actually used as a symbol in object code and LLVM
-// IR, while `prettyName` is shown to the user in a debugger.
-static bool maybeGetName(
-    llvm::StringRef* linkageNameOut,
-    llvm::StringRef* prettyNameOut,
-    IRInst* irInst)
+llvm::DenormalMode getLLVMDenormalMode(SlangFpDenormalMode mode)
 {
-    *linkageNameOut = "";
-    *prettyNameOut = "";
-
-    UnownedStringSlice linkageName;
-    UnownedStringSlice prettyName;
-    if (auto externCppDecoration = irInst->findDecoration<IRExternCppDecoration>())
+    switch (mode)
     {
-        linkageName = externCppDecoration->getName();
+    default:
+    case SLANG_FP_DENORM_MODE_ANY:
+        return llvm::DenormalMode::getDefault();
+    case SLANG_FP_DENORM_MODE_PRESERVE:
+        return llvm::DenormalMode::getPreserveSign();
+    case SLANG_FP_DENORM_MODE_FTZ:
+        return llvm::DenormalMode::getPositiveZero();
     }
-    else if (auto linkageDecoration = irInst->findDecoration<IRLinkageDecoration>())
-    {
-        linkageName = linkageDecoration->getMangledName();
-    }
-
-    if (auto nameDecor = irInst->findDecoration<IRNameHintDecoration>())
-    {
-        prettyName = nameDecor->getName();
-    }
-
-    // If we don't have a pretty name or a linkage name, use the other one for
-    // both.
-    if (prettyName.getLength() == 0)
-        prettyName = linkageName;
-    else if (linkageName.getLength() == 0)
-        linkageName = prettyName;
-
-    if (prettyName.getLength() == 0 || linkageName.getLength() == 0)
-        return false;
-
-    *linkageNameOut = llvm::StringRef(linkageName.begin(), linkageName.getLength());
-    *prettyNameOut = llvm::StringRef(prettyName.begin(), prettyName.getLength());
-    return true;
 }
 
-static llvm::StringRef getStringLitAsLLVMString(IRInst* inst)
+static LLVMInst* wrap(llvm::Value* val)
 {
-    auto source = as<IRStringLit>(inst)->getStringSlice();
-    return llvm::StringRef(source.begin(), source.getLength());
+    return reinterpret_cast<LLVMInst*>(val);
 }
 
-static bool isPtrVolatile(IRInst* value)
+static LLVMType* wrap(llvm::Type* type)
 {
-    if (auto memoryQualifier = value->findDecoration<IRMemoryQualifierSetDecoration>())
-    {
-        if (memoryQualifier->getMemoryQualifierBit() & MemoryQualifierSetModifier::Flags::kVolatile)
-        {
-            return true;
-        }
-    }
-    return false;
+    return reinterpret_cast<LLVMType*>(type);
 }
 
-// Tries to determine a debug location for a given inst. E.g. if given a struct,
-// it'll first try to check if it has explicit debug location information, and
-// if not, it'll give the module's beginning at least.
-static void findDebugLocation(
-    llvm::DICompileUnit* compileUnit,
-    const Dictionary<IRInst*, llvm::DIFile*>& sourceDebugInfo,
-    IRInst* inst,
-    llvm::DIFile*& file,
-    llvm::DIScope*& scope,
-    unsigned& line)
+static LLVMDebugNode* wrap(llvm::DINode* node)
 {
-    if (!inst || inst->getOp() == kIROp_ModuleInst)
+    return reinterpret_cast<LLVMDebugNode*>(node);
+}
+
+static llvm::Value* unwrap(LLVMInst* val)
+{
+    return reinterpret_cast<llvm::Value*>(val);
+}
+
+static llvm::Type* unwrap(LLVMType* type)
+{
+    return reinterpret_cast<llvm::Type*>(type);
+}
+
+static llvm::DINode* unwrap(LLVMDebugNode* node)
+{
+    return reinterpret_cast<llvm::DINode*>(node);
+}
+
+template<typename T>
+static llvm::ArrayRef<decltype(unwrap(T()))> unwrap(Slice<T> slice)
+{
+    using TargetType = decltype(unwrap(T()));
+    return llvm::ArrayRef(reinterpret_cast<const TargetType*>(slice.begin()), slice.count);
+}
+
+llvm::StringRef charSliceToLLVM(TerminatedCharSlice slice)
+{
+    return llvm::StringRef(slice.begin(), slice.count);
+}
+
+class LLVMBuilder : public ComBaseObject, public ILLVMBuilder
+{
+    LLVMBuilderOptions options;
+
+    std::unique_ptr<llvm::LLVMContext> llvmContext;
+    std::unique_ptr<llvm::Module> llvmModule;
+    // This only links LLVM modules together, not object code. It's used for
+    // inline IR.
+    std::unique_ptr<llvm::Linker> llvmLinker;
+
+    // These builder variants need to be stored separately. IRBuilderBase does
+    // not have a virtual destructor :/ Only one should exist at a time and the
+    // pointer is copied to llvmBuilder, which you should always use instead of
+    // these directly.
+    std::unique_ptr<llvm::IRBuilder<>> llvmBuilderOpt;
+    std::unique_ptr<llvm::IRBuilder<llvm::NoFolder>> llvmBuilderNoOpt;
+    llvm::IRBuilderBase* llvmBuilder;
+    llvm::DICompileUnit* compileUnit;
+    llvm::TargetMachine* targetMachine;
+    llvm::DataLayout targetDataLayout;
+
+    std::unique_ptr<llvm::DIBuilder> llvmDebugBuilder;
+
+    llvm::GlobalVariable* promotedGlobalInsts;
+
+    // "Global constructors" are functions that get called when the executable
+    // or library is loaded, similar to constructors of global variables in C++.
+    List<llvm::Constant*> globalCtors;
+    llvm::StructType* llvmCtorType;
+
+    // This one is cached here, because we spam it constantly with every GEP.
+    llvm::Type* byteType;
+
+public:
+    typedef ComBaseObject Super;
+
+    // IUnknown
+    SLANG_COM_BASE_IUNKNOWN_ALL
+
+    LLVMBuilder(
+        LLVMBuilderOptions options,
+        IArtifact** outErrorArtifact);
+    ~LLVMBuilder();
+
+    void* getInterface(const Guid& guid);
+
+    IArtifact* createErrorArtifact(const ArtifactDiagnostic& diagnostic);
+
+    int getPointerSizeInBits() override;
+
+    LLVMType* getVoidType() override;
+    LLVMType* getIntType(int bitSize) override;
+    LLVMType* getFloatType(int bitSize) override;
+    LLVMType* getPointerType() override;
+    LLVMType* getVectorType(int elementCount, LLVMType* elementType) override;
+    LLVMType* getBufferType() override;
+    LLVMType* getFunctionType(LLVMType* returnType, Slice<LLVMType*> paramTypes, bool variadic) override;
+
+    LLVMInst* emitAlloca(int size, int alignment) override;
+    LLVMInst* emitGetElementPtr(LLVMInst* ptr, int stride, LLVMInst* index) override;
+    LLVMInst* emitStore(LLVMInst* value, LLVMInst* ptr, int alignment, bool isVolatile = false) override;
+    LLVMInst* emitLoad(LLVMType* type, LLVMInst* ptr, int alignment, bool isVolatile = false) override;
+    LLVMInst* emitIntResize(LLVMInst* value, LLVMType* into, bool isSigned = false) override;
+    LLVMInst* emitCopy(LLVMInst* dstPtr, int dstAlign, LLVMInst* srcPtr, int srcAlign, int bytes, bool isVolatile = false) override;
+
+    LLVMInst* getConstantInt(uint64_t value, int bitSize) override;
+
+    LLVMDebugNode* getDebugFallbackType(TerminatedCharSlice name) override;
+    LLVMDebugNode* getDebugVoidType() override;
+    LLVMDebugNode* getDebugIntType(const char* name, bool isSigned, int bitSize) override;
+    LLVMDebugNode* getDebugFloatType(const char* name, int bitSize) override;
+    LLVMDebugNode* getDebugPointerType(LLVMDebugNode* pointee) override;
+    LLVMDebugNode* getDebugReferenceType(LLVMDebugNode* pointee) override;
+    LLVMDebugNode* getDebugStringType() override;
+    LLVMDebugNode* getDebugVectorType(int sizeBytes, int alignBytes, int elementCount, LLVMDebugNode* elementType) override;
+    LLVMDebugNode* getDebugArrayType(int sizeBytes, int alignBytes, int elementCount, LLVMDebugNode* elementType) override;
+    LLVMDebugNode* getDebugStructField(
+        LLVMDebugNode* type,
+        TerminatedCharSlice name,
+        int offset,
+        int size,
+        int alignment,
+        LLVMDebugNode* file,
+        int line
+    ) override;
+    LLVMDebugNode* getDebugStructType(
+        Slice<LLVMDebugNode*> fields,
+        TerminatedCharSlice name,
+        int size,
+        int alignment,
+        LLVMDebugNode* file,
+        int line
+    ) override;
+    LLVMDebugNode* getDebugFunctionType(LLVMDebugNode* returnType, Slice<LLVMDebugNode*> paramTypes) override;
+};
+
+LLVMBuilder::LLVMBuilder(
+    LLVMBuilderOptions options,
+    IArtifact** outErrorArtifact
+): options(options)
+{
+    llvmContext.reset(new llvm::LLVMContext());
+    llvmModule.reset(new llvm::Module("module", *llvmContext));
+    llvmLinker.reset(new llvm::Linker(*llvmModule));
+    llvmDebugBuilder.reset(new llvm::DIBuilder(*llvmModule));
+
+    llvm::InitializeAllTargetInfos();
+    llvm::InitializeAllTargets();
+    llvm::InitializeAllTargetMCs();
+    llvm::InitializeAllAsmParsers();
+    llvm::InitializeAllAsmPrinters();
+
+    if (options.optLevel == SLANG_OPTIMIZATION_LEVEL_NONE)
     {
-        scope = compileUnit;
-        file = compileUnit->getFile();
-        line = 0;
-    }
-    else if (auto debugLocation = inst->findDecoration<IRDebugLocationDecoration>())
-    {
-        file = sourceDebugInfo.getValue(debugLocation->getSource());
-        scope = file;
-        line = getIntVal(debugLocation->getLine());
+        // The default IR builder has a built-in constant folder; for
+        // absolutely zero optimization, we need to disable it like this.
+        llvmBuilderNoOpt.reset(new llvm::IRBuilder<llvm::NoFolder>(*llvmContext));
+        llvmBuilder = llvmBuilderNoOpt.get();
     }
     else
-        findDebugLocation(compileUnit, sourceDebugInfo, inst->getParent(), file, scope, line);
+    {
+        llvmBuilderOpt.reset(new llvm::IRBuilder<>(*llvmContext));
+        llvmBuilder = llvmBuilderOpt.get();
+    }
+
+    // Functions that initialize global variables are "constructors" in
+    // LLVM; they're called automatically at the start of the program and
+    // need to be recorded with this type.
+    llvmCtorType = llvm::StructType::get(
+        llvmBuilder->getInt32Ty(),
+        llvmBuilder->getPtrTy(0),
+        llvmBuilder->getPtrTy(0));
+
+    // TODO: Should probably complain here if the target machine's pointer
+    // size doesn't match SLANG_PTR_IS_32 & SLANG_PTR_IS_64. Although, I'd
+    // rather just fix the whole pointer size mechanism in Slang.
+    std::string targetTripleStr = llvm::sys::getDefaultTargetTriple();
+    if (options.targetTriple.count != 0 && !options.useJIT)
+        targetTripleStr = std::string(options.targetTriple.begin(), options.targetTriple.count);
+
+    std::string error;
+    const llvm::Target* target = llvm::TargetRegistry::lookupTarget(targetTripleStr, error);
+    if (!target)
+    {
+        ArtifactDiagnostic diagnostic;
+        diagnostic.severity = ArtifactDiagnostic::Severity::Error;
+        diagnostic.stage = ArtifactDiagnostic::Stage::Link;
+        diagnostic.text = TerminatedCharSlice(error.c_str(), error.length());
+        *outErrorArtifact = createErrorArtifact(diagnostic);
+        return;
+    }
+
+    llvm::TargetOptions opt;
+
+    opt.NoTrappingFPMath = 1;
+
+    opt.setFPDenormalMode(getLLVMDenormalMode(options.fp64DenormalMode));
+    opt.setFP32DenormalMode(getLLVMDenormalMode(options.fp64DenormalMode));
+
+    switch (options.fpMode)
+    {
+    default:
+    case SLANG_FLOATING_POINT_MODE_DEFAULT:
+        break;
+    case SLANG_FLOATING_POINT_MODE_FAST:
+        opt.UnsafeFPMath = 1;
+        opt.NoSignedZerosFPMath = 1;
+        opt.ApproxFuncFPMath = 1;
+        break;
+    case SLANG_FLOATING_POINT_MODE_PRECISE:
+        opt.UnsafeFPMath = 0;
+        opt.NoInfsFPMath = 0;
+        opt.NoNaNsFPMath = 0;
+        opt.NoSignedZerosFPMath = 0;
+        opt.ApproxFuncFPMath = 0;
+        break;
+    }
+
+    llvm::CodeGenOptLevel optLevel = llvm::CodeGenOptLevel::None;
+    switch (options.optLevel)
+    {
+    case SLANG_OPTIMIZATION_LEVEL_NONE:
+        optLevel = llvm::CodeGenOptLevel::None;
+        break;
+    default:
+    case SLANG_OPTIMIZATION_LEVEL_DEFAULT:
+        optLevel = llvm::CodeGenOptLevel::Less;
+        break;
+    case SLANG_OPTIMIZATION_LEVEL_HIGH:
+        optLevel = llvm::CodeGenOptLevel::Default;
+        break;
+    case SLANG_OPTIMIZATION_LEVEL_MAXIMAL:
+        optLevel = llvm::CodeGenOptLevel::Aggressive;
+        break;
+    }
+
+    llvm::Triple targetTriple(targetTripleStr);
+
+    targetMachine = target->createTargetMachine(
+        targetTriple,
+        charSliceToLLVM(options.cpu),
+        charSliceToLLVM(options.features),
+        opt,
+        llvm::Reloc::PIC_,
+        std::nullopt,
+        optLevel);
+
+    targetDataLayout = targetMachine->createDataLayout();
+    llvmModule->setDataLayout(targetDataLayout);
+    llvmModule->setTargetTriple(targetTriple);
+
+    byteType = llvmBuilder->getInt8Ty();
+
+    if (options.debugLevel != SLANG_DEBUG_INFO_LEVEL_NONE)
+    {
+        llvmModule->addModuleFlag(
+            llvm::Module::Warning,
+            "Debug Info Version",
+            llvm::DEBUG_METADATA_VERSION);
+
+        // TODO: Support separate debug info - that'll need to use the SplitName
+        // parameter!
+        compileUnit = llvmDebugBuilder->createCompileUnit(
+            // TODO: We should probably apply for a language ID in DWARF? Not
+            // sure how that process goes. Anyway, let's just use C++ as the
+            // ID until this target stabilizes. C doesn't work because
+            // debuggers won't use the un-mangled name in that language.
+            llvm::dwarf::DW_LANG_C_plus_plus,
+
+            // The "compile unit" model doesn't work super well for Slang -
+            // we're supposed to only have one for the debug info per output
+            // file, as if we were building each .slang-module into a separate
+            // `.o`. Which we can't really do without losing large swathes of
+            // language features.
+            //
+            // Anyway, for now, we'll give no name to the "compile unit" and
+            // just operate with individual files separately. This doesn't
+            // prevent the debugger from seeing our source in any way.
+            llvmDebugBuilder->createFile("<slang-llvm>", "."),
+
+            "Slang compiler",
+
+            options.optLevel != SLANG_OPTIMIZATION_LEVEL_NONE,
+
+            charSliceToLLVM(options.debugCommandLineArgs),
+
+            0);
+    }
 }
+
+LLVMBuilder::~LLVMBuilder()
+{
+    // Everything else is managed and automatically free'd by llvmModule.
+    delete targetMachine;
+}
+
+void* LLVMBuilder::getInterface(const Guid& guid)
+{
+    if (guid == ISlangUnknown::getTypeGuid() || guid == ILLVMBuilder::getTypeGuid())
+    {
+        return static_cast<ILLVMBuilder*>(this);
+    }
+    return nullptr;
+}
+
+IArtifact* LLVMBuilder::createErrorArtifact(const ArtifactDiagnostic& diagnostic)
+{
+    ComPtr<IArtifactDiagnostics> diagnostics(new ArtifactDiagnostics);
+    diagnostics->add(diagnostic);
+    diagnostics->setResult(SLANG_FAIL);
+
+    auto artifact = ArtifactUtil::createArtifact(
+        ArtifactDesc::make(ArtifactKind::None, ArtifactPayload::None));
+    ArtifactUtil::addAssociated(artifact, diagnostics);
+    return artifact.detach();
+}
+
+int LLVMBuilder::getPointerSizeInBits()
+{
+    return targetDataLayout.getPointerSizeInBits();
+}
+
+LLVMType* LLVMBuilder::getVoidType()
+{
+    return wrap(llvmBuilder->getVoidTy());
+}
+
+LLVMType* LLVMBuilder::getIntType(int bitSize)
+{
+    return wrap(llvmBuilder->getIntNTy(bitSize));
+}
+
+LLVMType* LLVMBuilder::getFloatType(int bitSize)
+{
+    llvm::Type* type = nullptr;
+    switch (bitSize)
+    {
+    case 16:
+        type = llvmBuilder->getHalfTy();
+        break;
+    case 32:
+        type = llvmBuilder->getFloatTy();
+        break;
+    case 64:
+        type = llvmBuilder->getDoubleTy();
+        break;
+    default:
+        break;
+    }
+    return wrap(type);
+}
+
+LLVMType* LLVMBuilder::getPointerType()
+{
+    return wrap(llvmBuilder->getPtrTy());
+}
+
+LLVMType* LLVMBuilder::getVectorType(int elementCount, LLVMType* elementType)
+{
+    auto type = llvm::VectorType::get(
+        unwrap(elementType),
+        llvm::ElementCount::getFixed(elementCount)
+    );
+    return wrap(type);
+}
+
+LLVMType* LLVMBuilder::getBufferType()
+{
+    return wrap(llvm::StructType::get(llvmBuilder->getPtrTy(0), llvmBuilder->getIntPtrTy(targetDataLayout)));
+}
+
+LLVMType* LLVMBuilder::getFunctionType(LLVMType* returnType, Slice<LLVMType*> paramTypes, bool variadic)
+{
+    return wrap(llvm::FunctionType::get(unwrap(returnType), unwrap(paramTypes), variadic));
+}
+
+LLVMInst* LLVMBuilder::emitAlloca(int size, int alignment)
+{
+    return wrap(llvmBuilder->Insert(new llvm::AllocaInst(
+        byteType,
+        0,
+        llvmBuilder->getInt32(size),
+        llvm::Align(alignment))));
+}
+
+LLVMInst* LLVMBuilder::emitGetElementPtr(LLVMInst* ptr, int stride, LLVMInst* index)
+{
+    return wrap(llvmBuilder->CreateGEP(
+        stride == 1 ? byteType : llvm::ArrayType::get(byteType, stride),
+        unwrap(ptr),
+        unwrap(index)));
+}
+
+LLVMInst* LLVMBuilder::emitStore(LLVMInst* value, LLVMInst* ptr, int alignment, bool isVolatile)
+{
+    return wrap(llvmBuilder->CreateAlignedStore(
+        unwrap(value),
+        unwrap(ptr),
+        llvm::MaybeAlign(alignment),
+        isVolatile));
+}
+
+LLVMInst* LLVMBuilder::emitLoad(LLVMType* type, LLVMInst* ptr, int alignment, bool isVolatile)
+{
+    return wrap(llvmBuilder->CreateAlignedLoad(
+        unwrap(type),
+        unwrap(ptr),
+        llvm::MaybeAlign(alignment),
+        isVolatile));
+}
+
+LLVMInst* LLVMBuilder::emitIntResize(LLVMInst* value, LLVMType* into, bool isSigned)
+{
+    auto llvmValue = unwrap(value);
+    auto llvmType = unwrap(into);
+    return wrap(isSigned ? 
+        llvmBuilder->CreateSExtOrTrunc(llvmValue, llvmType) :
+        llvmBuilder->CreateZExtOrTrunc(llvmValue, llvmType)
+    );
+}
+
+LLVMInst* LLVMBuilder::emitCopy(LLVMInst* dstPtr, int dstAlign, LLVMInst* srcPtr, int srcAlign, int bytes, bool isVolatile)
+{
+    return wrap(llvmBuilder->CreateMemCpyInline(
+        unwrap(dstPtr),
+        llvm::MaybeAlign(dstAlign),
+        unwrap(srcPtr),
+        llvm::MaybeAlign(srcAlign),
+        llvmBuilder->getInt32(bytes),
+        isVolatile));
+}
+
+LLVMInst* LLVMBuilder::getConstantInt(uint64_t value, int bitSize)
+{
+    return wrap(llvmBuilder->getIntN(bitSize, value));
+}
+
+LLVMDebugNode* LLVMBuilder::getDebugFallbackType(TerminatedCharSlice name)
+{
+    return wrap(llvmDebugBuilder->createUnspecifiedType(charSliceToLLVM(name)));
+}
+
+LLVMDebugNode* LLVMBuilder::getDebugVoidType()
+{
+    return wrap(llvmDebugBuilder->createUnspecifiedType("void"));
+}
+
+LLVMDebugNode* LLVMBuilder::getDebugIntType(const char* name, bool isSigned, int bitSize)
+{
+    unsigned encoding = isSigned ? llvm::dwarf::DW_ATE_signed : llvm::dwarf::DW_ATE_unsigned;
+    if (bitSize == 1) encoding = llvm::dwarf::DW_ATE_boolean;
+    return wrap(llvmDebugBuilder->createBasicType(name, bitSize, encoding));
+}
+
+LLVMDebugNode* LLVMBuilder::getDebugFloatType(const char* name, int bitSize)
+{
+    return wrap(llvmDebugBuilder->createBasicType(name, bitSize, llvm::dwarf::DW_ATE_float));
+}
+
+LLVMDebugNode* LLVMBuilder::getDebugPointerType(LLVMDebugNode* pointee)
+{
+    llvm::DIType* llvmPointee = llvm::cast<llvm::DIType>(unwrap(pointee ? pointee : getDebugVoidType()));
+    return wrap(llvmDebugBuilder->createPointerType(llvmPointee, targetDataLayout.getPointerSizeInBits()));
+}
+
+LLVMDebugNode* LLVMBuilder::getDebugReferenceType(LLVMDebugNode* pointee)
+{
+    return wrap(llvmDebugBuilder->createReferenceType(
+        llvm::dwarf::DW_TAG_reference_type,
+        llvm::cast<llvm::DIType>(unwrap(pointee)),
+        targetDataLayout.getPointerSizeInBits()));
+}
+
+LLVMDebugNode* LLVMBuilder::getDebugStringType()
+{
+    return wrap(llvmDebugBuilder->createPointerType(
+                llvmDebugBuilder->createBasicType("char", 8, llvm::dwarf::DW_ATE_signed_char),
+                targetDataLayout.getPointerSizeInBits()));
+}
+
+LLVMDebugNode* LLVMBuilder::getDebugVectorType(int sizeBytes, int alignBytes, int elementCount, LLVMDebugNode* elementType)
+{
+    if (sizeBytes < alignBytes)
+        sizeBytes = alignBytes;
+
+    llvm::Metadata* subscript = llvmDebugBuilder->getOrCreateSubrange(0, elementCount);
+    llvm::DINodeArray subscriptArray = llvmDebugBuilder->getOrCreateArray(subscript);
+    return wrap(llvmDebugBuilder->createVectorType(
+        sizeBytes * 8,
+        alignBytes * 8,
+        llvm::cast<llvm::DIType>(unwrap(elementType)),
+        subscriptArray));
+}
+
+LLVMDebugNode* LLVMBuilder::getDebugArrayType(int sizeBytes, int alignBytes, int elementCount, LLVMDebugNode* elementType)
+{
+    llvm::Metadata* subscript = llvmDebugBuilder->getOrCreateSubrange(0, elementCount);
+    llvm::DINodeArray subscriptArray = llvmDebugBuilder->getOrCreateArray(subscript);
+    return wrap(llvmDebugBuilder->createArrayType(
+        sizeBytes * 8,
+        alignBytes * 8,
+        llvm::cast<llvm::DIType>(unwrap(elementType)),
+        subscriptArray));
+}
+
+LLVMDebugNode* LLVMBuilder::getDebugStructField(
+    LLVMDebugNode* type,
+    TerminatedCharSlice name,
+    int offset,
+    int size,
+    int alignment,
+    LLVMDebugNode* file,
+    int line
+){
+    llvm::DIFile* llvmFile = llvm::cast<llvm::DIFile>(unwrap(file));
+    return wrap(llvmDebugBuilder->createMemberType(
+        llvmFile,
+        charSliceToLLVM(name),
+        llvmFile,
+        line,
+        size * 8,
+        alignment * 8,
+        offset * 8,
+        llvm::DINode::FlagZero,
+        llvm::cast<llvm::DIType>(unwrap(type))));
+}
+
+LLVMDebugNode* LLVMBuilder::getDebugStructType(
+    Slice<LLVMDebugNode*> fields,
+    TerminatedCharSlice name,
+    int size,
+    int alignment,
+    LLVMDebugNode* file,
+    int line
+){
+    llvm::DINodeArray fieldTypes = llvmDebugBuilder->getOrCreateArray(
+        llvm::ArrayRef<llvm::Metadata*>(reinterpret_cast<llvm::Metadata* const*>(fields.begin()), fields.count));
+
+    llvm::DIFile* llvmFile = llvm::cast<llvm::DIFile>(unwrap(file));
+
+    return wrap(llvmDebugBuilder->createStructType(
+        llvmFile,
+        charSliceToLLVM(name),
+        llvmFile,
+        line,
+        size * 8,
+        alignment * 8,
+        llvm::DINode::FlagZero,
+        nullptr,
+        fieldTypes));
+}
+
+LLVMDebugNode* LLVMBuilder::getDebugFunctionType(LLVMDebugNode* returnType, Slice<LLVMDebugNode*> paramTypes)
+{
+    List<llvm::Metadata*> elements;
+    elements.add(unwrap(returnType));
+    for (LLVMDebugNode* param : paramTypes)
+        elements.add(unwrap(param));
+
+    return wrap(llvmDebugBuilder->createSubroutineType(llvmDebugBuilder->getOrCreateTypeArray(
+        llvm::ArrayRef<llvm::Metadata*>(elements.begin(), elements.end()))));
+}
+
+/*
 
 static llvm::Instruction::CastOps getLLVMIntExtensionOp(IRType* type)
 {
@@ -178,39 +670,6 @@ static llvm::Instruction::CastOps getLLVMIntExtensionOp(IRType* type)
     }
 }
 
-// This class helps with converting types from Slang IR to LLVM IR. It can
-// create types for two different contexts:
-//
-// * getType(): creates types which appear in SSA values and are not observable
-//   through memory.
-//
-// * getDebugType(): "pretty" types with correct offset annotations so that
-//   debuggers can show the contents of variables.
-//
-// One design choice here is that all memory-related LLVM instructions (e.g.
-// getelementptr and alloca) are emitted with byte arrays (with proper alignment
-// annotations) instead of their actual types. There are two reasons for this:
-//
-// 1. LLVM is undergoing a transition to a more type-agnostic form:
-//    https://www.npopov.com/2025/01/05/This-year-in-LLVM-2024.html#ptradd
-//    In short, there is no longer any reason to specify the real type to
-//    getelementptr; LLVM already canonicalizes it to use `i8` and byte offsets
-//    anyway, and the type-based getelementptr itself may be removed in a
-//    future version.
-//
-// 2. This allows us to entirely ignore LLVM's ideas of how structs are laid
-//    out in memory. We can fully control the memory layout of our own structs
-//    with no limitations from LLVM, which is great, because we already have
-//    IRTypeLayoutRules.
-//
-// Furthermore, struct and array types are only passed around as pointers to
-// memory in stack. That's because using aggregate types in values is
-// "officially" discouraged:
-// https://llvm.org/docs/Frontend/PerformanceTips.html#avoid-creating-values-of-aggregate-type
-//
-// With these design choices, only global struct/array constants need to be
-// given an actual aggregate type in LLVM. So they build the type on-demand in
-// `emitConstant`.
 class LLVMTypeTranslator
 {
 private:
@@ -4419,57 +4878,6 @@ struct LLVMEmitter
         return SLANG_OK;
     }
 };
+*/
 
 } // namespace slang_llvm
-
-extern "C" SLANG_DLL_EXPORT SlangResult emitLLVMAssemblyFromIR_V1(
-    Slang::CodeGenContext* codeGenContext,
-    Slang::IRModule* irModule,
-    Slang::IArtifact** outArtifact)
-{
-    slang_llvm::LLVMEmitter emitter(codeGenContext);
-    emitter.processModule(irModule);
-    emitter.finalize();
-
-    Slang::String assembly;
-    emitter.dumpAssembly(assembly);
-
-    Slang::ComPtr<ISlangBlob> blob = Slang::StringBlob::moveCreate(assembly);
-    auto artifact = Slang::ArtifactUtil::createArtifactForCompileTarget(
-        asExternal(codeGenContext->getTargetFormat()));
-    artifact->addRepresentationUnknown(blob);
-    *outArtifact = artifact.detach();
-    return SLANG_OK;
-}
-
-extern "C" SLANG_DLL_EXPORT SlangResult emitLLVMObjectFromIR_V1(
-    Slang::CodeGenContext* codeGenContext,
-    Slang::IRModule* irModule,
-    Slang::IArtifact** outArtifact)
-{
-    slang_llvm::LLVMEmitter emitter(codeGenContext);
-    emitter.processModule(irModule);
-    emitter.finalize();
-
-    Slang::List<uint8_t> object;
-    emitter.generateObjectCode(object);
-
-    Slang::ComPtr<ISlangBlob> blob = Slang::RawBlob::create(object.getBuffer(), object.getCount());
-    auto artifact = Slang::ArtifactUtil::createArtifactForCompileTarget(
-        asExternal(codeGenContext->getTargetFormat()));
-    artifact->addRepresentationUnknown(blob);
-    *outArtifact = artifact.detach();
-
-    return SLANG_OK;
-}
-
-extern "C" SLANG_DLL_EXPORT SlangResult emitLLVMJITFromIR_V1(
-    Slang::CodeGenContext* codeGenContext,
-    Slang::IRModule* irModule,
-    Slang::IArtifact** outArtifact)
-{
-    slang_llvm::LLVMEmitter emitter(codeGenContext, true);
-    emitter.processModule(irModule);
-    emitter.finalize();
-    return emitter.generateJITLibrary(outArtifact);
-}
