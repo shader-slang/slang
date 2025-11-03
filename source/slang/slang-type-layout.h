@@ -415,20 +415,6 @@ public:
     UInt uniformAlignment = 1;
 
 
-    /// The layout for data that is conceptually owned by this type, but which is pending layout.
-    ///
-    /// When a type contains interface/existential fields (recursively), the
-    /// actual data referenced by these fields needs to get allocated somewhere,
-    /// but it cannot go inline at the point where the interface/existential
-    /// type appears, or else the layout of a composite object would change
-    /// when the concrete type(s) we plug in change.
-    ///
-    /// We solve this problem by tracking this data that is "pending" layout,
-    /// and then "flushing" the pending data at appropriate places during
-    /// the layout process.
-    ///
-    RefPtr<TypeLayout> pendingDataTypeLayout;
-
     ResourceInfo* FindResourceInfo(LayoutResourceKind kind)
     {
         for (auto& rr : resourceInfos)
@@ -611,7 +597,6 @@ public:
 
     void removeResourceUsage(LayoutResourceKind kind);
 
-    RefPtr<VarLayout> pendingVarLayout;
 
     /// Offset in binding ranges within the parent type
     ///
@@ -791,7 +776,6 @@ class ExistentialSpecializedTypeLayout : public TypeLayout
 {
 public:
     RefPtr<TypeLayout> baseTypeLayout;
-    RefPtr<VarLayout> pendingDataVarLayout;
 };
 
 /// Layout for a scoped entity like a program, module, or entry point

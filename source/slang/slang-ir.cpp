@@ -929,12 +929,6 @@ IRTypeLayout* IRTypeLayout::unwrapArray()
     return typeLayout;
 }
 
-IRTypeLayout* IRTypeLayout::getPendingDataTypeLayout()
-{
-    if (auto attr = findAttr<IRPendingLayoutAttr>())
-        return cast<IRTypeLayout>(attr->getLayout());
-    return nullptr;
-}
 
 IROperandList<IRTypeSizeAttr> IRTypeLayout::getSizeAttrs()
 {
@@ -996,10 +990,6 @@ void IRTypeLayout::Builder::addAttrs(List<IRInst*>& operands)
         operands.add(sizeAttr);
     }
 
-    if (auto pendingTypeLayout = m_pendingTypeLayout)
-    {
-        operands.add(irBuilder->getPendingLayoutAttr(pendingTypeLayout));
-    }
 
     addAttrsImpl(operands);
 }
@@ -1159,14 +1149,6 @@ Stage IRVarLayout::getStage()
     return Stage::Unknown;
 }
 
-IRVarLayout* IRVarLayout::getPendingVarLayout()
-{
-    if (auto pendingLayoutAttr = findAttr<IRPendingLayoutAttr>())
-    {
-        return cast<IRVarLayout>(pendingLayoutAttr->getLayout());
-    }
-    return nullptr;
-}
 
 IRVarLayout::Builder::Builder(IRBuilder* irBuilder, IRTypeLayout* typeLayout)
     : m_irBuilder(irBuilder), m_typeLayout(typeLayout)
@@ -1241,11 +1223,6 @@ IRVarLayout* IRVarLayout::Builder::build()
     if (auto stageAttr = m_stageAttr)
         operands.add(stageAttr);
 
-    if (auto pendingVarLayout = m_pendingVarLayout)
-    {
-        IRInst* pendingLayoutAttr = irBuilder->getPendingLayoutAttr(pendingVarLayout);
-        operands.add(pendingLayoutAttr);
-    }
 
     return irBuilder->getVarLayout(operands);
 }
@@ -6496,16 +6473,6 @@ IRVarOffsetAttr* IRBuilder::getVarOffsetAttr(LayoutResourceKind kind, UInt offse
         createIntrinsicInst(getVoidType(), kIROp_VarOffsetAttr, operandCount, operands));
 }
 
-IRPendingLayoutAttr* IRBuilder::getPendingLayoutAttr(IRLayout* pendingLayout)
-{
-    IRInst* operands[] = {pendingLayout};
-
-    return cast<IRPendingLayoutAttr>(createIntrinsicInst(
-        getVoidType(),
-        kIROp_PendingLayoutAttr,
-        SLANG_COUNT_OF(operands),
-        operands));
-}
 
 IRStructFieldLayoutAttr* IRBuilder::getFieldLayoutAttr(IRInst* key, IRVarLayout* layout)
 {

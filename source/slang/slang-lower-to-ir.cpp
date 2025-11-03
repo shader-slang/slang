@@ -12809,22 +12809,14 @@ IRVarLayout* lowerVarLayout(IRLayoutGenContext* context, VarLayout* varLayout);
 
 /// Shared code for most `lowerTypeLayout` cases.
 ///
-/// Handles copying of resource usage and pending data type layout
-/// from the AST `typeLayout` to the specified `builder`.
+/// Handles copying of resource usage from the AST `typeLayout` to the
+/// specified `builder`.
 ///
-static IRTypeLayout* _lowerTypeLayoutCommon(
-    IRLayoutGenContext* context,
-    IRTypeLayout::Builder* builder,
-    TypeLayout* typeLayout)
+static IRTypeLayout* _lowerTypeLayoutCommon(IRTypeLayout::Builder* builder, TypeLayout* typeLayout)
 {
     for (auto resInfo : typeLayout->resourceInfos)
     {
         builder->addResourceUsage(resInfo.kind, resInfo.count);
-    }
-
-    if (auto pendingTypeLayout = typeLayout->pendingDataTypeLayout)
-    {
-        builder->setPendingTypeLayout(lowerTypeLayout(context, pendingTypeLayout));
     }
 
     return builder->build();
@@ -12852,14 +12844,14 @@ IRTypeLayout* lowerTypeLayout(IRLayoutGenContext* context, TypeLayout* typeLayou
         builder.setOffsetElementTypeLayout(
             lowerTypeLayout(context, paramGroupTypeLayout->offsetElementTypeLayout));
 
-        return _lowerTypeLayoutCommon(context, &builder, paramGroupTypeLayout);
+        return _lowerTypeLayoutCommon(&builder, paramGroupTypeLayout);
     }
     else if (auto structuredBufferTypeLayout = as<StructuredBufferTypeLayout>(typeLayout))
     {
         auto irElementTypeLayout =
             lowerTypeLayout(context, structuredBufferTypeLayout->elementTypeLayout);
         IRStructuredBufferTypeLayout::Builder builder(context->irBuilder, irElementTypeLayout);
-        return _lowerTypeLayoutCommon(context, &builder, structuredBufferTypeLayout);
+        return _lowerTypeLayoutCommon(&builder, structuredBufferTypeLayout);
     }
     else if (auto structTypeLayout = as<StructTypeLayout>(typeLayout))
     {
@@ -12935,13 +12927,13 @@ IRTypeLayout* lowerTypeLayout(IRLayoutGenContext* context, TypeLayout* typeLayou
             builder.addField(irFieldKey, irFieldLayout);
         }
 
-        return _lowerTypeLayoutCommon(context, &builder, structTypeLayout);
+        return _lowerTypeLayoutCommon(&builder, structTypeLayout);
     }
     else if (auto arrayTypeLayout = as<ArrayTypeLayout>(typeLayout))
     {
         auto irElementTypeLayout = lowerTypeLayout(context, arrayTypeLayout->elementTypeLayout);
         IRArrayTypeLayout::Builder builder(context->irBuilder, irElementTypeLayout);
-        return _lowerTypeLayoutCommon(context, &builder, arrayTypeLayout);
+        return _lowerTypeLayoutCommon(&builder, arrayTypeLayout);
     }
     else if (auto ptrTypeLayout = as<PointerTypeLayout>(typeLayout))
     {
@@ -12951,7 +12943,7 @@ IRTypeLayout* lowerTypeLayout(IRLayoutGenContext* context, TypeLayout* typeLayou
 
         // auto irValueTypeLayout = lowerTypeLayout(context, ptrTypeLayout->valueTypeLayout);
         IRPointerTypeLayout::Builder builder(context->irBuilder);
-        return _lowerTypeLayoutCommon(context, &builder, ptrTypeLayout);
+        return _lowerTypeLayoutCommon(&builder, ptrTypeLayout);
     }
     else if (auto streamOutputTypeLayout = as<StreamOutputTypeLayout>(typeLayout))
     {
@@ -12959,7 +12951,7 @@ IRTypeLayout* lowerTypeLayout(IRLayoutGenContext* context, TypeLayout* typeLayou
             lowerTypeLayout(context, streamOutputTypeLayout->elementTypeLayout);
 
         IRStreamOutputTypeLayout::Builder builder(context->irBuilder, irElementTypeLayout);
-        return _lowerTypeLayoutCommon(context, &builder, streamOutputTypeLayout);
+        return _lowerTypeLayoutCommon(&builder, streamOutputTypeLayout);
     }
     else if (auto matrixTypeLayout = as<MatrixTypeLayout>(typeLayout))
     {
@@ -12972,19 +12964,19 @@ IRTypeLayout* lowerTypeLayout(IRLayoutGenContext* context, TypeLayout* typeLayou
         // along this data as best we can for now.
 
         IRMatrixTypeLayout::Builder builder(context->irBuilder, matrixTypeLayout->mode);
-        return _lowerTypeLayoutCommon(context, &builder, matrixTypeLayout);
+        return _lowerTypeLayoutCommon(&builder, matrixTypeLayout);
     }
     else if (auto existentialTypeLayout = as<ExistentialTypeLayout>(typeLayout))
     {
         IRExistentialTypeLayout::Builder builder(context->irBuilder);
-        return _lowerTypeLayoutCommon(context, &builder, existentialTypeLayout);
+        return _lowerTypeLayoutCommon(&builder, existentialTypeLayout);
     }
     else
     {
         // If no special case applies we will build a generic `IRTypeLayout`.
         //
         IRTypeLayout::Builder builder(context->irBuilder);
-        return _lowerTypeLayoutCommon(context, &builder, typeLayout);
+        return _lowerTypeLayoutCommon(&builder, typeLayout);
     }
 }
 
@@ -13002,10 +12994,6 @@ IRVarLayout* lowerVarLayout(
         irResInfo->space = resInfo.space;
     }
 
-    if (auto pendingVarLayout = varLayout->pendingVarLayout)
-    {
-        irLayoutBuilder.setPendingVarLayout(lowerVarLayout(context, pendingVarLayout));
-    }
 
     // We will only generate layout information with *either* a system-value
     // semantic or a user-defined semantic, and we will always check for
@@ -13143,7 +13131,7 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         globalStructTypeLayoutBuilder.addField(irVar, irLayout);
     }
     auto irGlobalStructTypeLayout =
-        _lowerTypeLayoutCommon(context, &globalStructTypeLayoutBuilder, globalStructLayout);
+        _lowerTypeLayoutCommon(&globalStructTypeLayoutBuilder, globalStructLayout);
 
     auto globalScopeVarLayout = programLayout->parametersLayout;
     auto globalScopeTypeLayout = globalScopeVarLayout->typeLayout;
@@ -13162,10 +13150,8 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         globalParameterGroupTypeLayoutBuilder.setOffsetElementTypeLayout(
             lowerTypeLayout(context, paramGroupTypeLayout->offsetElementTypeLayout));
 
-        auto irParamGroupTypeLayout = _lowerTypeLayoutCommon(
-            context,
-            &globalParameterGroupTypeLayoutBuilder,
-            paramGroupTypeLayout);
+        auto irParamGroupTypeLayout =
+            _lowerTypeLayoutCommon(&globalParameterGroupTypeLayoutBuilder, paramGroupTypeLayout);
 
         irGlobalScopeTypeLayout = irParamGroupTypeLayout;
     }

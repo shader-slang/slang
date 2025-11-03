@@ -217,89 +217,6 @@ Result ShaderObjectImpl::_writeOrdinaryData(
     SLANG_ASSERT(srcSize <= destSize);
     memcpy(dest, src, srcSize);
 
-    // In the case where this object has any sub-objects of
-    // existential/interface type, we need to recurse on those objects
-    // that need to write their state into an appropriate "pending" allocation.
-    //
-    // Note: Any values that could fit into the "payload" included
-    // in the existential-type field itself will have already been
-    // written as part of `setObject()`. This loop only needs to handle
-    // those sub-objects that do not "fit."
-    //
-    // An implementers looking at this code might wonder if things could be changed
-    // so that *all* writes related to sub-objects for interface-type fields could
-    // be handled in this one location, rather than having some in `setObject()` and
-    // others handled here.
-    //
-    Index subObjectRangeCounter = 0;
-    for (auto const& subObjectRangeInfo : layout->getSubObjectRanges())
-    {
-        Index subObjectRangeIndex = subObjectRangeCounter++;
-        auto const& bindingRangeInfo =
-            layout->getBindingRange(subObjectRangeInfo.bindingRangeIndex);
-
-        // We only need to handle sub-object ranges for interface/existential-type fields,
-        // because fields of constant-buffer or parameter-block type are responsible for
-        // the ordinary/uniform data of their own existential/interface-type sub-objects.
-        //
-        if (bindingRangeInfo.bindingType != slang::BindingType::ExistentialValue)
-            continue;
-
-        // Each sub-object range represents a single "leaf" field, but might be nested
-        // under zero or more outer arrays, such that the number of existential values
-        // in the same range can be one or more.
-        //
-        auto count = bindingRangeInfo.count;
-
-        // We are not concerned with the case where the existential value(s) in the range
-        // git into the payload part of the leaf field.
-        //
-        // In the case where the value didn't fit, the Slang layout strategy would have
-        // considered the requirements of the value as a "pending" allocation, and would
-        // allocate storage for the ordinary/uniform part of that pending allocation inside
-        // of the parent object's type layout.
-        //
-        // Here we assume that the Slang reflection API can provide us with a single byte
-        // offset and stride for the location of the pending data allocation in the specialized
-        // type layout, which will store the values for this sub-object range.
-        //
-        // TODO: The reflection API functions we are assuming here haven't been implemented
-        // yet, so the functions being called here are stubs.
-        //
-        // TODO: It might not be that a single sub-object range can reliably map to a single
-        // contiguous array with a single stride; we need to carefully consider what the layout
-        // logic does for complex cases with multiple layers of nested arrays and structures.
-        //
-        size_t subObjectRangePendingDataOffset = subObjectRangeInfo.offset.pendingOrdinaryData;
-        size_t subObjectRangePendingDataStride = subObjectRangeInfo.stride.pendingOrdinaryData;
-
-        // If the range doesn't actually need/use the "pending" allocation at all, then
-        // we need to detect that case and skip such ranges.
-        //
-        // TODO: This should probably be handled on a per-object basis by caching a "does it fit?"
-        // bit as part of the information for bound sub-objects, given that we already
-        // compute the "does it fit?" status as part of `setObject()`.
-        //
-        if (subObjectRangePendingDataOffset == 0)
-            continue;
-
-        for (Slang::Index i = 0; i < count; ++i)
-        {
-            auto subObject = m_objects[bindingRangeInfo.subObjectIndex + i];
-
-            ShaderObjectLayoutImpl* subObjectLayout = subObject->getLayout();
-
-            auto subObjectOffset =
-                subObjectRangePendingDataOffset + i * subObjectRangePendingDataStride;
-
-            auto subObjectDest = (char*)dest + subObjectOffset;
-
-            subObject->_writeOrdinaryData(
-                subObjectDest,
-                destSize - subObjectOffset,
-                subObjectLayout);
-        }
-    }
     return SLANG_OK;
 }
 
@@ -741,9 +658,6 @@ Result RootShaderObjectImpl::bindAsRoot(BindingContext* context, RootShaderObjec
     // for pending data.
     //
     BindingOffset offset;
-#if 0
-    offset.pending = layout->getPendingDataOffset();
-#endif
 
     // Note: We could *almost* call `bindAsConstantBuffer()` here to bind
     // the state of the root object itself, but there is an important
