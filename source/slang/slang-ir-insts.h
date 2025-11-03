@@ -4347,13 +4347,13 @@ $(type_info.return_type) $(type_info.method_name)(
 
     void addRequirePreludeDecoration(
         IRInst* value,
-        const CapabilitySet& caps,
+        const CapabilitySetVal* caps,
         UnownedStringSlice prelude)
     {
         addDecoration(
             value,
             kIROp_RequirePreludeDecoration,
-            getCapabilityValue(caps),
+            getCapabilityValue(CapabilitySet{caps}),
             getStringValue(prelude));
     }
 
