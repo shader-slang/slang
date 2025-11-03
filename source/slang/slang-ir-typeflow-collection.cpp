@@ -85,9 +85,9 @@ IRInst* upcastSet(IRBuilder* builder, IRInst* arg, IRType* destInfo)
         if (argInfo != destInfo)
         {
             auto argSet = as<IRUntaggedUnionType>(argInfo)->getSet();
-            if (argSet->isSingleton() && as<IRVoidType>(argSet->getElement(0)))
+            if (argSet->isSingleton() && as<IRNoneTypeElement>(argSet->getElement(0)))
             {
-                // There's a specific case where we're trying to reinterpret a value of 'void'
+                // There's a specific case where we're trying to reinterpret a value of 'none'
                 // type. We'll avoid emitting a reinterpret in this case, and emit a
                 // default-construct instead.
                 //

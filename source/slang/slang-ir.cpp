@@ -6605,9 +6605,6 @@ IREntryPointLayout* IRBuilder::getEntryPointLayout(
 
 IRSetBase* IRBuilder::getSet(IROp op, const HashSet<IRInst*>& elements)
 {
-    if (elements.getCount() == 0)
-        return nullptr;
-
     // Verify that all operands are global instructions
     for (auto element : elements)
         if (element->getParent()->getOp() != kIROp_ModuleInst)
@@ -6631,6 +6628,7 @@ IRSetBase* IRBuilder::getSet(IROp op, const HashSet<IRInst*>& elements)
 
 IRSetBase* IRBuilder::getSet(const HashSet<IRInst*>& elements)
 {
+    // Cannot call getSet with an empty set of elements and no specific op-code.
     SLANG_ASSERT(elements.getCount() > 0);
     auto firstElement = *elements.begin();
     return getSet(getSetTypeForInst(firstElement), elements);
@@ -8614,6 +8612,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_GetTagForMappedSet:
     case kIROp_GetTagForSpecializedSet:
     case kIROp_GetTagForSuperSet:
+    case kIROp_GetTagForSubSet:
     case kIROp_GetTagFromSequentialID:
     case kIROp_GetSequentialIDFromTag:
     case kIROp_CastInterfaceToTaggedUnionPtr:
@@ -8628,6 +8627,16 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_MakeDifferentialPairUserCode:
     case kIROp_MakeDifferentialPtrPair:
     case kIROp_MakeStorageTypeLoweringConfig:
+        return false;
+
+    case kIROp_UnboundedFuncElement:
+    case kIROp_UnboundedTypeElement:
+    case kIROp_UnboundedWitnessTableElement:
+    case kIROp_UnboundedGenericElement:
+    case kIROp_UninitializedTypeElement:
+    case kIROp_UninitializedWitnessTableElement:
+    case kIROp_NoneTypeElement:
+    case kIROp_NoneWitnessTableElement:
         return false;
 
     case kIROp_ForwardDifferentiate:

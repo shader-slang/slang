@@ -440,6 +440,22 @@ struct TagOpsLoweringContext : public InstPassBase
         inst->removeAndDeallocate();
     }
 
+    void lowerGetTagForSubSet(IRGetTagForSubSet* inst)
+    {
+        // `GetTagForSubSet` is a no-op since we want to translate the tag
+        // for an element in the sub-set to a tag for the same element in a sub-set.
+        // It is assumed that this operation has already been confirmed as safe.
+        //
+        // Since all elements have a unique ID across the module, this is the identity operation.
+        //
+
+        IRBuilder builder(inst->getModule());
+        builder.setInsertAfter(inst);
+        inst->replaceUsesWith(builder.emitCast(inst->getDataType(), inst->getOperand(0), true));
+        inst->removeAndDeallocate();
+    }
+
+
     void lowerGetTagForMappedSet(IRGetTagForMappedSet* inst)
     {
         // `GetTagForMappedSet` turns into a integer mapping from
@@ -518,6 +534,9 @@ struct TagOpsLoweringContext : public InstPassBase
         {
         case kIROp_GetTagForSuperSet:
             lowerGetTagForSuperSet(as<IRGetTagForSuperSet>(inst));
+            break;
+        case kIROp_GetTagForSubSet:
+            lowerGetTagForSubSet(as<IRGetTagForSubSet>(inst));
             break;
         case kIROp_GetTagForMappedSet:
             lowerGetTagForMappedSet(as<IRGetTagForMappedSet>(inst));
@@ -771,6 +790,17 @@ struct SetLoweringContext : public InstPassBase
             {
                 types.add(type);
             }
+            else if (auto noneType = as<IRNoneTypeElement>(valueOfSetType->getSet()->getElement(i)))
+            {
+                // Can safely skip. (effectively 0 size)
+            }
+            else
+            {
+                // Should either be a type or NoneTypeElement (if other cases are okay, need to
+                // handle them here)
+                //
+                SLANG_UNEXPECTED("Expected type element in UntaggedUnionType set");
+            }
         }
 
         IRBuilder builder(module);
@@ -783,6 +813,11 @@ struct SetLoweringContext : public InstPassBase
         processInstsOfType<IRUntaggedUnionType>(
             kIROp_UntaggedUnionType,
             [&](IRUntaggedUnionType* inst) { return lowerUntaggedUnionType(inst); });
+
+        IRBuilder builder(module);
+        auto noneTypeElement = builder.getNoneTypeElement();
+        noneTypeElement->replaceUsesWith(builder.getVoidType());
+        noneTypeElement->removeAndDeallocate();
     }
 
 private:

@@ -427,8 +427,7 @@ IRInst* lookupWitnessTableEntry(IRWitnessTable* table, IRInst* key)
     }
     else if (as<IRVoidType>(table->getConcreteType()))
     {
-        IRBuilder builder(table->getModule());
-        return builder.getVoidValue();
+        SLANG_UNEXPECTED("Looking up entry on 'none' witness table");
     }
 
     return nullptr;
@@ -522,7 +521,36 @@ IRInst* makeInfoForConcreteType(IRModule* module, IRInst* type)
             getArrayStride(arrayType));
     }
 
-    return builder.getUntaggedUnionType(cast<IRTypeSet>(builder.getSingletonSet(type)));
+    return builder.getUntaggedUnionType(
+        cast<IRTypeSet>(builder.getSingletonSet(kIROp_TypeSet, type)));
+}
+
+IROp getSetOpFromDataType(IRType* type)
+{
+    switch (type->getOp())
+    {
+    case kIROp_WitnessTableType: // Can be refined into set of concrete tables
+        return kIROp_WitnessTableSet;
+    case kIROp_FuncType: // Can be refined into set of concrete functions
+        return kIROp_FuncSet;
+    case kIROp_GenericKind: // Can be refined into set of concrete generics
+        return kIROp_GenericSet;
+    case kIROp_TypeKind: // Can be refined into set of concrete types
+        return kIROp_TypeSet;
+    case kIROp_TypeType: // Can be refined into set of concrete types
+        return kIROp_TypeSet;
+    default:
+        break;
+    }
+
+    if (auto generic = as<IRGeneric>(type))
+    {
+        auto innerValType = getGenericReturnVal(generic);
+        if (as<IRFuncType>(innerValType) || as<IRWitnessTableType>(innerValType))
+            return kIROp_GenericSet; // Can be refined into set of concrete generics.
+    }
+
+    return kIROp_Invalid;
 }
 
 // Helper to check if an IRParam is a function parameter (vs. a phi param or generic param)
@@ -594,6 +622,9 @@ struct TypeFlowSpecializationContext
                     typeSet.add(builder.getUninitializedTypeElement(
                         as<IRUninitializedWitnessTableElement>(witnessTable)
                             ->getBaseInterfaceType()));
+                    break;
+                case kIROp_NoneWitnessTableElement:
+                    typeSet.add(builder.getNoneTypeElement());
                     break;
                 }
             });
@@ -1155,6 +1186,9 @@ struct TypeFlowSpecializationContext
         case kIROp_MakeOptionalValue:
             info = analyzeMakeOptionalValue(context, as<IRMakeOptionalValue>(inst));
             break;
+        case kIROp_GetOptionalValue:
+            info = analyzeGetOptionalValue(context, as<IRGetOptionalValue>(inst));
+            break;
         }
 
         // If we didn't get any info from inst-specific analysis, we'll try to get
@@ -1322,8 +1356,8 @@ struct TypeFlowSpecializationContext
                         if (isConcreteType(concreteReturnType))
                         {
                             IRBuilder builder(module);
-                            returnInfo = builder.getUntaggedUnionType(
-                                cast<IRTypeSet>(builder.getSingletonSet(concreteReturnType)));
+                            returnInfo = builder.getUntaggedUnionType(cast<IRTypeSet>(
+                                builder.getSingletonSet(kIROp_TypeSet, concreteReturnType)));
                         }
                     }
 
@@ -1423,8 +1457,8 @@ struct TypeFlowSpecializationContext
         auto witnessTable = inst->getWitnessTable();
         // Concrete case.
         if (as<IRWitnessTable>(witnessTable))
-            return makeTaggedUnionType(
-                as<IRWitnessTableSet>(builder.getSingletonSet(witnessTable)));
+            return makeTaggedUnionType(as<IRWitnessTableSet>(
+                builder.getSingletonSet(kIROp_WitnessTableSet, witnessTable)));
 
         // Get the witness table info
         auto witnessTableInfo = tryGetInfo(context, witnessTable);
@@ -1538,8 +1572,9 @@ struct TypeFlowSpecializationContext
                 else if (
                     auto boundInterfaceType = as<IRBoundInterfaceType>(loadInst->getDataType()))
                 {
-                    return makeTaggedUnionType(cast<IRWitnessTableSet>(
-                        builder.getSingletonSet(boundInterfaceType->getWitnessTable())));
+                    return makeTaggedUnionType(cast<IRWitnessTableSet>(builder.getSingletonSet(
+                        kIROp_WitnessTableSet,
+                        boundInterfaceType->getWitnessTable())));
                 }
                 else
                 {
@@ -1587,8 +1622,9 @@ struct TypeFlowSpecializationContext
             }
             else if (auto boundInterfaceType = as<IRBoundInterfaceType>(inst->getDataType()))
             {
-                return makeTaggedUnionType(cast<IRWitnessTableSet>(
-                    builder.getSingletonSet(boundInterfaceType->getWitnessTable())));
+                return makeTaggedUnionType(cast<IRWitnessTableSet>(builder.getSingletonSet(
+                    kIROp_WitnessTableSet,
+                    boundInterfaceType->getWitnessTable())));
             }
         }
 
@@ -1702,39 +1738,13 @@ struct TypeFlowSpecializationContext
         return none();
     }
 
-    // Locate the 'none' witness table in the global scope
-    // of the module in context. This will be the table
-    // that conforms to 'nullptr' and has 'void' as the concrete type
-    //
-    IRWitnessTable* findNoneWitness()
-    {
-        IRBuilder builder(module);
-        auto voidType = builder.getVoidType();
-        for (auto inst : module->getGlobalInsts())
-        {
-            if (auto witnessTable = as<IRWitnessTable>(inst))
-            {
-                if (witnessTable->getConcreteType() == voidType &&
-                    witnessTable->getConformanceType() == nullptr)
-                    return witnessTable;
-            }
-        }
-
-        return nullptr;
-    }
-
     // Get the witness table inst to be used for the 'none' case of
     // an optional witness table.
     //
-    IRWitnessTable* getNoneWitness()
+    IRInst* getNoneWitness()
     {
-        if (auto table = findNoneWitness())
-            return table;
-
         IRBuilder builder(module);
-        auto voidType = builder.getVoidType();
-
-        return builder.createWitnessTable(nullptr, voidType);
+        return builder.getNoneWitnessTableElement();
     }
 
     IRInst* analyzeMakeOptionalNone(IRInst* context, IRMakeOptionalNone* inst)
@@ -1794,20 +1804,18 @@ struct TypeFlowSpecializationContext
 
     IRInst* analyzeGetOptionalValue(IRInst* context, IRGetOptionalValue* inst)
     {
-        if (isOptionalExistentialType(inst->getDataType()))
+        if (isOptionalExistentialType(inst->getOperand(0)->getDataType()))
         {
-            // This is an interesting case.. technically, at this point we could go
-            // from a larger set to a smaller one (without the none-type).
-            //
-            // However, for simplicitly reasons, we currently only allow up-casting,
-            // so for now we'll just passthrough all types (so the result will
-            // assume that 'none-type' is a possiblity even though we statically know
-            // that it isn't).
-            //
+            // TODO: Document.
             if (auto info = tryGetInfo(context, inst->getOperand(0)))
             {
                 SLANG_ASSERT(as<IRTaggedUnionType>(info));
-                return info;
+
+                IRBuilder builder(module);
+                auto taggedUnion = as<IRTaggedUnionType>(info);
+                return builder.getTaggedUnionType(
+                    cast<IRWitnessTableSet>(filterNoneElements(taggedUnion->getWitnessTableSet())),
+                    cast<IRTypeSet>(filterNoneElements(taggedUnion->getTypeSet())));
             }
         }
 
@@ -1858,7 +1866,8 @@ struct TypeFlowSpecializationContext
                     results.add(lookupWitnessTableEntry(cast<IRWitnessTable>(table), key));
                 });
 
-            auto resultSetType = makeElementOfSetType(builder.getSet(results));
+            auto setOp = getSetOpFromDataType(inst->getDataType());
+            auto resultSetType = makeElementOfSetType(builder.getSet(setOp, results));
             module->getContainerPool().free(&results);
 
             return resultSetType;
@@ -2036,7 +2045,8 @@ struct TypeFlowSpecializationContext
                         //
                         IRBuilder builder(module);
                         SLANG_ASSERT(unboundedElement);
-                        auto pureUnboundedSet = builder.getSingletonSet(unboundedElement);
+                        auto setOp = getSetOpFromDataType(inst->getArg(i)->getDataType());
+                        auto pureUnboundedSet = builder.getSingletonSet(setOp, unboundedElement);
                         if (auto typeSet = as<IRTypeSet>(pureUnboundedSet))
                             specializationArgs.add(makeUntaggedUnionType(typeSet));
                         else
@@ -2087,8 +2097,8 @@ struct TypeFlowSpecializationContext
                                     elementOfSetType->getSet()->tryGetUnboundedElement())
                             {
                                 IRBuilder builder(module);
-                                return makeUntaggedUnionType(
-                                    cast<IRTypeSet>(builder.getSingletonSet(unboundedElement)));
+                                return makeUntaggedUnionType(cast<IRTypeSet>(
+                                    builder.getSingletonSet(kIROp_TypeSet, unboundedElement)));
                             }
                             else
                                 return makeUntaggedUnionType(
@@ -2191,7 +2201,8 @@ struct TypeFlowSpecializationContext
             }
 
             IRBuilder builder(module);
-            auto resultSetType = makeElementOfSetType(builder.getSet(specializedSet));
+            auto setOp = getSetOpFromDataType(inst->getDataType());
+            auto resultSetType = makeElementOfSetType(builder.getSet(setOp, specializedSet));
             module->getContainerPool().free(&specializedSet);
             module->getContainerPool().free(&specializationArgs);
             return resultSetType;
@@ -2269,13 +2280,24 @@ struct TypeFlowSpecializationContext
                                 true,
                                 workQueue);
                         }
-                        else if (as<IRType>(arg) || as<IRWitnessTable>(arg))
+                        else if (as<IRType>(arg))
                         {
                             IRBuilder builder(module);
                             updateInfo(
                                 context,
                                 param,
-                                makeElementOfSetType(builder.getSingletonSet(arg)),
+                                makeElementOfSetType(builder.getSingletonSet(kIROp_TypeSet, arg)),
+                                true,
+                                workQueue);
+                        }
+                        else if (as<IRWitnessTable>(arg))
+                        {
+                            IRBuilder builder(module);
+                            updateInfo(
+                                context,
+                                param,
+                                makeElementOfSetType(
+                                    builder.getSingletonSet(kIROp_WitnessTableSet, arg)),
                                 true,
                                 workQueue);
                         }
@@ -2315,9 +2337,6 @@ struct TypeFlowSpecializationContext
 
         auto propagateToCallSite = [&](IRInst* callee)
         {
-            if (as<IRVoidLit>(callee))
-                return;
-
             if (as<IRUnboundedFuncElement>(callee))
             {
                 // An unbounded element represents an unknown function,
@@ -3036,6 +3055,13 @@ struct TypeFlowSpecializationContext
             inst->removeAndDeallocate();
             return true;
         }
+        else if (elementOfSetType->getSet()->isEmpty())
+        {
+            auto poison = builder.emitPoison(inst->getDataType());
+            inst->replaceUsesWith(poison);
+            inst->removeAndDeallocate();
+            return true;
+        }
 
         // If we reach here, we have a truly dynamic case. Multiple elements.
         // We need to emit a run-time inst to keep track of the tag.
@@ -3099,6 +3125,12 @@ struct TypeFlowSpecializationContext
                 inst->removeAndDeallocate();
                 return true;
             }
+            else if (elementOfSetType->getSet()->isEmpty())
+            {
+                inst->replaceUsesWith(builder.emitPoison(inst->getDataType()));
+                inst->removeAndDeallocate();
+                return true;
+            }
             else
             {
                 // Replace with GetElement(specializedInst, 0) -> TagType(tableSet)
@@ -3134,6 +3166,15 @@ struct TypeFlowSpecializationContext
             inst->removeAndDeallocate();
             return true;
         }
+        else if (as<IRPoison>(existential))
+        {
+            IRBuilder builder(inst);
+            builder.setInsertAfter(inst);
+
+            inst->replaceUsesWith(builder.emitPoison(inst->getDataType()));
+            inst->removeAndDeallocate();
+            return true;
+        }
 
         return false;
     }
@@ -3148,6 +3189,14 @@ struct TypeFlowSpecializationContext
                 // Found a single possible type. Statically known concrete type.
                 auto singletonValue = elementOfSetType->getSet()->getElement(0);
                 inst->replaceUsesWith(singletonValue);
+                inst->removeAndDeallocate();
+                return true;
+            }
+            else if (elementOfSetType->getSet()->isEmpty())
+            {
+                IRBuilder builder(inst);
+                builder.setInsertBefore(inst);
+                inst->replaceUsesWith(builder.emitPoison(inst->getDataType()));
                 inst->removeAndDeallocate();
                 return true;
             }
@@ -3378,7 +3427,8 @@ struct TypeFlowSpecializationContext
     IRFuncType* getEffectiveFuncType(IRInst* callee)
     {
         IRBuilder builder(module);
-        return getEffectiveFuncTypeForSet(cast<IRFuncSet>(builder.getSingletonSet(callee)));
+        return getEffectiveFuncTypeForSet(
+            cast<IRFuncSet>(builder.getSingletonSet(kIROp_FuncSet, callee)));
     }
 
     // Helper function for specializing calls.
@@ -3417,6 +3467,40 @@ struct TypeFlowSpecializationContext
         }
 
         return callee;
+    }
+
+    IRSetBase* filterNoneElements(IRSetBase* set)
+    {
+        auto setOp = set->getOp();
+
+        IRBuilder builder(module);
+        HashSet<IRInst*>& filteredElements = *module->getContainerPool().getHashSet<IRInst>();
+        bool containsNone = false;
+        forEachInSet(
+            set,
+            [&](IRInst* element)
+            {
+                switch (element->getOp())
+                {
+                case kIROp_NoneTypeElement:
+                case kIROp_NoneWitnessTableElement:
+                    containsNone = true;
+                    break;
+                default:
+                    filteredElements.add(element);
+                    break;
+                }
+            });
+
+        if (!containsNone)
+        {
+            module->getContainerPool().free(&filteredElements);
+            return set;
+        }
+
+        auto newFuncSet = cast<IRSetBase>(builder.getSet(setOp, filteredElements));
+        module->getContainerPool().free(&filteredElements);
+        return newFuncSet;
     }
 
     bool specializeCall(IRInst* context, IRCall* inst)
@@ -3521,7 +3605,7 @@ struct TypeFlowSpecializationContext
         //
         if (auto setTag = as<IRSetTagType>(callee->getDataType()))
         {
-            if (!setTag->isSingleton())
+            if (!setTag->isSingleton() && !setTag->getSet()->isEmpty())
             {
                 // Multiple callees case:
                 //
@@ -3628,7 +3712,7 @@ struct TypeFlowSpecializationContext
                     "Unexpected operand type for type-flow specialization of Call inst");
             }
         }
-        else if (as<IRVoidLit>(callee))
+        else if (as<IRPoison>(callee))
         {
             // Occasionally, we will determine that there are absolutely no possible callees
             // for a call site. This typically happens to impossible branches.
@@ -4358,16 +4442,17 @@ struct TypeFlowSpecializationContext
             auto noneWitnessTable = taggedUnionType->getWitnessTableSet()->getElement(0);
 
             auto singletonWitnessTableTagType =
-                makeTagType(builder.getSingletonSet(noneWitnessTable));
+                makeTagType(builder.getSingletonSet(kIROp_WitnessTableSet, noneWitnessTable));
             IRInst* tableTag = builder.emitGetTagOfElementInSet(
                 (IRType*)singletonWitnessTableTagType,
                 noneWitnessTable,
                 taggedUnionType->getWitnessTableSet());
 
-            auto singletonTypeTagType = makeTagType(builder.getSingletonSet(builder.getVoidType()));
+            auto singletonTypeTagType =
+                makeTagType(builder.getSingletonSet(kIROp_TypeSet, builder.getNoneTypeElement()));
             IRInst* typeTag = builder.emitGetTagOfElementInSet(
                 (IRType*)singletonTypeTagType,
-                builder.getVoidType(),
+                builder.getNoneTypeElement(),
                 taggedUnionType->getTypeSet());
 
             auto newTuple = builder.emitMakeTaggedUnion(
@@ -4411,16 +4496,48 @@ struct TypeFlowSpecializationContext
     bool specializeGetOptionalValue(IRInst* context, IRGetOptionalValue* inst)
     {
         SLANG_UNUSED(context);
-        if (as<IRTaggedUnionType>(inst->getOptionalOperand()->getDataType()))
+        if (auto srcTaggedUnionType =
+                as<IRTaggedUnionType>(inst->getOptionalOperand()->getDataType()))
         {
             // Since `GetOptionalValue` is the reverse of `MakeOptionalValue`, and we treat
             // the latter as a no-op, then `GetOptionalValue` is also a no-op (we simply pass
             // the inner existential value as-is)
             //
 
-            auto newInst = inst->getOptionalOperand();
-            inst->replaceUsesWith(newInst);
-            inst->removeAndDeallocate();
+            IRBuilder builder(inst);
+            auto destTaggedUnionType = cast<IRTaggedUnionType>(tryGetInfo(context, inst));
+            if (destTaggedUnionType != srcTaggedUnionType)
+            {
+                // If the source and destination tagged-union types are different,
+                // we need to emit a cast.
+                builder.setInsertBefore(inst);
+                IRInst* tag = builder.emitGetTagFromTaggedUnion(inst->getOptionalOperand());
+                auto downcastedTag = builder.emitIntrinsicInst(
+                    (IRType*)makeTagType(destTaggedUnionType->getWitnessTableSet()),
+                    kIROp_GetTagForSubSet,
+                    1,
+                    &tag);
+
+                auto unpackedValue = builder.emitUnpackAnyValue(
+                    getLoweredType(makeUntaggedUnionType(destTaggedUnionType->getTypeSet())),
+                    builder.emitGetValueFromTaggedUnion(inst->getOptionalOperand()));
+
+                auto newTaggedUnion = builder.emitMakeTaggedUnion(
+                    getLoweredType(destTaggedUnionType),
+                    builder.emitPoison(makeTagType(destTaggedUnionType->getTypeSet())),
+                    downcastedTag,
+                    unpackedValue);
+
+
+                inst->replaceUsesWith(newTaggedUnion);
+                inst->removeAndDeallocate();
+            }
+            else
+            {
+                inst->replaceUsesWith(inst->getOptionalOperand());
+                inst->removeAndDeallocate();
+            }
+
             return true;
         }
         return false;

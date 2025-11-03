@@ -2846,6 +2846,7 @@ struct IRSetBase : IRInst
     FIDDLE(baseInst())
     UInt getCount() { return getOperandCount(); }
     IRInst* getElement(UInt idx) { return getOperand(idx); }
+    bool isEmpty() { return getOperandCount() == 0; }
     bool isSingleton() { return (getOperandCount() == 1) && !isUnbounded(); }
     bool isUnbounded()
     {
@@ -4323,6 +4324,18 @@ $(type_info.return_type) $(type_info.method_name)(
     {
         return cast<IRUninitializedWitnessTableElement>(
             emitIntrinsicInst(nullptr, kIROp_UninitializedWitnessTableElement, 1, &interfaceType));
+    }
+
+    IRNoneTypeElement* getNoneTypeElement()
+    {
+        return cast<IRNoneTypeElement>(
+            emitIntrinsicInst(nullptr, kIROp_NoneTypeElement, 0, nullptr));
+    }
+
+    IRNoneWitnessTableElement* getNoneWitnessTableElement()
+    {
+        return cast<IRNoneWitnessTableElement>(
+            emitIntrinsicInst(nullptr, kIROp_NoneWitnessTableElement, 0, nullptr));
     }
 
     IRGetTagOfElementInSet* emitGetTagOfElementInSet(

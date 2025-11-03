@@ -715,4 +715,7 @@ return {
 	["UnboundedGenericElement"] = 711,
 	["UninitializedTypeElement"] = 712,
 	["UninitializedWitnessTableElement"] = 713,
+	["NoneTypeElement"] = 714,
+	["NoneWitnessTableElement"] = 716,
+	["GetTagForSubSet"] = 718
 }

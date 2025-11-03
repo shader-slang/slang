@@ -2729,7 +2729,7 @@ local insts = {
 			{ TypeSet = {} },
 			{ FuncSet = {} },
 			{ WitnessTableSet = {} },
-			{ GenericSet = {} },
+			{ GenericSet = {} }
 		},
 	},
 	{ UnboundedSet = {
@@ -2759,6 +2759,12 @@ local insts = {
 	} }, 
 	{ GetTagForSuperSet = {
 		-- Translate a tag from a set to its equivalent in a super-set
+		--
+		-- Operands: (the tag for the source set)
+		-- The source and destination sets are implied by the type of the operand and the type of the result
+	} }, 
+	{ GetTagForSubSet = {
+		-- Translate a tag from a set to its equivalent in a sub-set
 		--
 		-- Operands: (the tag for the source set)
 		-- The source and destination sets are implied by the type of the operand and the type of the result
@@ -2885,6 +2891,12 @@ local insts = {
 	{ UninitializedWitnessTableElement = {
 		hoistable = true,
 		operands = { {"baseInterfaceType"} }
+	} },
+	{ NoneTypeElement = {
+		hoistable = true
+	} },
+	{ NoneWitnessTableElement = {
+		hoistable = true
 	} },
 }
 
