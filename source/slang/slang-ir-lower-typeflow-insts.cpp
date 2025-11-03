@@ -777,20 +777,20 @@ struct SetLoweringContext : public InstPassBase
         return true;
     }
 
-    void lowerUntaggedUnionType(IRUntaggedUnionType* valueOfSetType)
+    void lowerUntaggedUnionType(IRUntaggedUnionType* untaggedUnionType)
     {
         // Type collections are replaced with `AnyValueType` large enough to hold
         // any of the types in the collection.
         //
 
         HashSet<IRType*> types;
-        for (UInt i = 0; i < valueOfSetType->getSet()->getCount(); i++)
+        for (UInt i = 0; i < untaggedUnionType->getSet()->getCount(); i++)
         {
-            if (auto type = as<IRType>(valueOfSetType->getSet()->getElement(i)))
+            if (auto type = as<IRType>(untaggedUnionType->getSet()->getElement(i)))
             {
                 types.add(type);
             }
-            else if (auto noneType = as<IRNoneTypeElement>(valueOfSetType->getSet()->getElement(i)))
+            else if (as<IRNoneTypeElement>(untaggedUnionType->getSet()->getElement(i)))
             {
                 // Can safely skip. (effectively 0 size)
             }
@@ -805,7 +805,7 @@ struct SetLoweringContext : public InstPassBase
 
         IRBuilder builder(module);
         auto anyValueType = createAnyValueType(&builder, types);
-        valueOfSetType->replaceUsesWith(anyValueType);
+        untaggedUnionType->replaceUsesWith(anyValueType);
     }
 
     void processModule()

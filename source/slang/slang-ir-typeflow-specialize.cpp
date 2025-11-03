@@ -550,6 +550,18 @@ IROp getSetOpFromDataType(IRType* type)
             return kIROp_GenericSet; // Can be refined into set of concrete generics.
     }
 
+    // Slight workaround for the fact that we can have cases where the type has not been specialized
+    // yet (particularly from auto-diff)
+    //
+    if (auto specialize = as<IRSpecialize>(type))
+    {
+        auto innerValType = getGenericReturnVal(specialize->getBase());
+        if (as<IRFuncType>(innerValType))
+            return kIROp_FuncSet;
+        if (as<IRWitnessTableType>(innerValType))
+            return kIROp_WitnessTableSet;
+    }
+
     return kIROp_Invalid;
 }
 

@@ -2871,31 +2871,86 @@ local insts = {
 		hoistable = true
 	} },
 	{ UnboundedTypeElement = {
+		-- An element of TypeSet that represents an unbounded set of types conforming to
+		-- the given interface type.
+		-- 
+		-- Used in cases where a finite set of types cannot be determined during type-flow analysis.
+		-- 
+		-- Note that this is a set element, not a set in itself, so a TypeSet(A, B, UnboundedTypeElement(I))
+		-- represents a set where we know two concrete types A and B, and any number of other types that conform to interface I.
+		--
 		hoistable = true,
 		operands = { {"baseInterfaceType"} }
 	} },
 	{ UnboundedFuncElement = {
+		-- An element of FuncSet that represents an unbounded set of functions of a certain
+		-- func-type
+		-- 
+		-- Used in cases where a finite set of functions cannot be determined during type-flow analysis.
+		--
+		-- Similar to UnboundedTypeElement, this is a set element, not a set in itself.
+		-- 
 		hoistable = true,
+		operands = { {"funcType"} }
 	} },
 	{ UnboundedWitnessTableElement = {
+		-- An element of WitnessTableSet that represents an unbounded set of witness tables of a certain
+		-- interface type
+		-- 
+		-- Used in cases where a finite set of witness tables cannot be determined during type-flow analysis.
+		--
+		-- Similar to UnboundedTypeElement, this is a set element, not a set in itself.
+		-- 
 		hoistable = true,
 		operands = { {"baseInterfaceType"} }
 	} },
 	{ UnboundedGenericElement = {
+		-- An element of GenericSet that represents an unbounded set of generics of a certain
+		-- interface type
+		-- 
+		-- Used in cases where a finite set of generics cannot be determined during type-flow analysis.
+		--
+		-- Similar to UnboundedTypeElement, this is a set element, not a set in itself.
+		-- 
 		hoistable = true,
 	} },
 	{ UninitializedTypeElement = {
+		-- An element that represents an uninitialized type of a certain interface.
+		-- 
+		-- Used to denote cases where the type represented may be garbage (e.g. from a `LoadFromUninitializedMemory`)
+		--
+		-- Similar to UnboundedXYZElement IR ops described above, this is a set element, not a set in itself.
+		-- e.g. a `TypeSet(A, B, UninitializedTypeElement(I))` represents a set where we know two concrete types A and B,
+		-- and an uninitialized type that conforms to interface I.
+		--
+		-- Note: In practice, having any uninitialized type in a TypeSet will likely force the entire set to be treated as 
+		-- uninitialized, and this element is mainly so that we can provide useful errors during the type-flow specialization pass.
+		--
 		hoistable = true,
 		operands = { {"baseInterfaceType"} }
 	} },
 	{ UninitializedWitnessTableElement = {
+		-- An element that represents an uninitialized witness table of a certain interface.
+		-- 
+		-- Used to denote cases where the witness table information may be garbage (e.g. from a `LoadFromUninitializedMemory`)
+		--
+		-- Similar to UninitializedTypeElement, this is a set element, not a set in itself.
+		-- 
 		hoistable = true,
 		operands = { {"baseInterfaceType"} }
 	} },
 	{ NoneTypeElement = {
+		-- An element that represents a default 'none' case (only relevant in the context of OptionalType)
+		-- 
+		-- Similar to UnboundedXYZElement IR ops described above, this is a set element, not a set in itself.
+		--
 		hoistable = true
 	} },
 	{ NoneWitnessTableElement = {
+		-- An element that represents a default 'none' case (only relevant in the context of OptionalType)
+		--
+		-- Similar to UnboundedXYZElement IR ops described above, this is a set element, not a set in itself.
+		--
 		hoistable = true
 	} },
 }

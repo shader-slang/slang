@@ -716,6 +716,6 @@ return {
 	["UninitializedTypeElement"] = 712,
 	["UninitializedWitnessTableElement"] = 713,
 	["NoneTypeElement"] = 714,
-	["NoneWitnessTableElement"] = 716,
-	["GetTagForSubSet"] = 718
+	["NoneWitnessTableElement"] = 715,
+	["GetTagForSubSet"] = 716
 }
