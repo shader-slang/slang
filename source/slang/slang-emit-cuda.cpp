@@ -1110,7 +1110,7 @@ void CUDASourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
     _emitWitnessTableDefinitions();
 }
 
-static bool typeCheck(IROp op, int matrixUse)
+static bool typeCheck(IROp op, uint32_t matrixUse)
 {
     switch (matrixUse)
     {
@@ -1123,7 +1123,7 @@ static bool typeCheck(IROp op, int matrixUse)
     return false;
 }
 
-static UnownedStringSlice getMatrixUseName(int matrixUse)
+static UnownedStringSlice getMatrixUseName(uint32_t matrixUse)
 {
     switch (matrixUse)
     {
@@ -1259,9 +1259,10 @@ SlangResult CUDASourceEmitter::emitWMMAFragmentType(
     IRCoopMatrixType* coopMatType,
     StringBuilder& outStr)
 {
-    auto rowCount = static_cast<IRIntLit*>(coopMatType->getRowCount())->getValue();
-    auto colCount = static_cast<IRIntLit*>(coopMatType->getColumnCount())->getValue();
-    auto matrixUse = static_cast<IRIntLit*>(coopMatType->getMatrixUse())->getValue();
+    uint32_t rowCount = (uint32_t) static_cast<IRIntLit*>(coopMatType->getRowCount())->getValue();
+    uint32_t colCount =
+        (uint32_t) static_cast<IRIntLit*>(coopMatType->getColumnCount())->getValue();
+    uint32_t matrixUse = (uint32_t) static_cast<IRIntLit*>(coopMatType->getMatrixUse())->getValue();
 
     auto typeOp = coopMatType->getElementType()->getOp();
     auto typeName = getBuiltinTypeName(typeOp);
