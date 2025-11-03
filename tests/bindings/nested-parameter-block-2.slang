@@ -2,6 +2,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -d3d12 -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -metal -shaderobj -output-using-type -render-features argument-buffer-tier-2
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj -output-using-type
 // nested-parameter-block-2.slang
 
 struct CB
@@ -29,7 +30,7 @@ struct MyBuffer
 {
     RWStructuredBuffer<uint4> resultBuffer;
 }
-//TEST_INPUT: set pb2 = new MyBuffer { out ubuffer(data=[0 0 0 0], stride=4) }
+//TEST_INPUT: set pb2 = new MyBuffer { out ubuffer(data=[0 0 0 0], stride=16, count=4) }
 ParameterBlock<MyBuffer> pb2;
 
 // Main entry-point. Applies the transformation encoded by `transformer`
