@@ -12076,7 +12076,8 @@ static void lowerFrontEndEntryPointToIR(
         // then we make sure to add one here, so the lowering logic knows it is an
         // entry point.
         auto entryPointAttr = context->astBuilder->create<EntryPointAttribute>();
-        entryPointAttr->capabilitySet = entryPoint->getProfile().getCapabilityName();
+        entryPointAttr->capabilitySet =
+            entryPoint->getProfile().getCapabilityName().freeze(context->astBuilder);
         addModifier(entryPointFuncDecl, entryPointAttr);
     }
 
@@ -13197,8 +13198,10 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
                 getMangledName(astBuilder, funcDeclRef).getUnownedSlice());
         }
 
-        for (auto atomSet :
-             as<FuncDecl>(funcDeclRef.getDecl())->inferredCapabilityRequirements.getAtomSets())
+        auto asFuncDecl = as<FuncDecl>(funcDeclRef.getDecl());
+        SLANG_ASSERT(asFuncDecl);
+        CapabilitySet set{asFuncDecl->inferredCapabilityRequirements};
+        for (auto atomSet : set.getAtomSets())
         {
             for (auto atomVal : atomSet)
             {
