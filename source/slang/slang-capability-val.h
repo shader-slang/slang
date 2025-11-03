@@ -33,7 +33,6 @@ class CapabilityStageSetVal : public Val
 
     void _toTextOverride(StringBuilder& out);
     Val* _resolveImplOverride() { return this; }
-    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
 //
@@ -71,7 +70,6 @@ class CapabilityTargetSetVal : public Val
 
     void _toTextOverride(StringBuilder& out);
     Val* _resolveImplOverride() { return this; }
-    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
 //
@@ -230,7 +228,6 @@ class CapabilitySetVal : public Val
 
     void _toTextOverride(StringBuilder& out);
     Val* _resolveImplOverride() { return this; }
-    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
 private:
     friend struct CapabilitySet;

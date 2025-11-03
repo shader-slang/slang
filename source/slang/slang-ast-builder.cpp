@@ -800,6 +800,7 @@ UIntSetVal* ASTBuilder::getUIntSetVal(const UIntSet& uintSet)
     // Convert UIntSet buffer to list of ConstantIntVals
     List<ConstantIntVal*> bitmasks;
     const auto& buffer = uintSet.getBuffer();
+    bitmasks.reserve(buffer.getCount());
 
     for (Index i = 0; i < buffer.getCount(); i++)
     {

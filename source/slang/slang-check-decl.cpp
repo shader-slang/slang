@@ -13917,7 +13917,7 @@ static void _propagateRequirement(
         return;
 
     auto oldCaps = resultCaps;
-    bool isAnyInvalid = resultCaps.isInvalid() || nodeCaps && nodeCaps->isInvalid();
+    bool isAnyInvalid = resultCaps.isInvalid() || (nodeCaps && nodeCaps->isInvalid());
     resultCaps.join(CapabilitySet{nodeCaps});
 
     auto decl = as<Decl>(userNode);

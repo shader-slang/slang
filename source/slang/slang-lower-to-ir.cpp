@@ -13182,7 +13182,9 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
                 getMangledName(astBuilder, funcDeclRef).getUnownedSlice());
         }
 
-        CapabilitySet set{as<FuncDecl>(funcDeclRef.getDecl())->inferredCapabilityRequirements};
+        auto asFuncDecl = as<FuncDecl>(funcDeclRef.getDecl());
+        SLANG_ASSERT(asFuncDecl);
+        CapabilitySet set{asFuncDecl->inferredCapabilityRequirements};
         for (auto atomSet : set.getAtomSets())
         {
             for (auto atomVal : atomSet)
