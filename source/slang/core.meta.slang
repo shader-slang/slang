@@ -1270,7 +1270,7 @@ ${{{{
         [__unsafeForceInlineEarly]
         __init(int value)
         {
-            return $(kBaseTypes[tt].name)(float(value));
+            this = $(kBaseTypes[tt].name)(float(value));
         }
 
          __intrinsic_op($(kIROp_FloatCast)) float toFloat();
