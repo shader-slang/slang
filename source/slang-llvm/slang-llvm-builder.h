@@ -24,6 +24,7 @@ struct LLVMBuilderOptions
     SlangFpDenormalMode fp64DenormalMode;
     bool useJIT;
     SlangFloatingPointMode fpMode;
+    SlangCompileTarget target;
 };
 
 class ILLVMBuilder : public ISlangUnknown
@@ -34,13 +35,11 @@ public:
     //==========================================================================
     // Native type layout info
     //==========================================================================
-
     virtual int getPointerSizeInBits() = 0;
 
     //==========================================================================
-    // Type creation
+    // Types
     //==========================================================================
-
     virtual LLVMType* getVoidType() = 0;
     virtual LLVMType* getIntType(int bitSize) = 0;
     virtual LLVMType* getFloatType(int bitSize) = 0;
@@ -94,6 +93,13 @@ public:
         int line
     ) = 0;
     virtual LLVMDebugNode* getDebugFunctionType(LLVMDebugNode* returnType, Slice<LLVMDebugNode*> paramTypes) = 0;
+
+    //==========================================================================
+    // Code generation
+    //==========================================================================
+    virtual SlangResult generateAssembly(IArtifact** outArtifact) = 0;
+    virtual SlangResult generateObjectCode(IArtifact** outArtifact) = 0;
+    virtual SlangResult generateJITLibrary(IArtifact** outArtifact) = 0;
 };
 
 }

@@ -5,7 +5,7 @@
 #include "slang-ir-layout.h"
 #include "slang-ir-lower-buffer-element-type.h"
 #include "slang-ir-util.h"
-#include "../slang-llvm/slang-llvm-builder.h"
+#include "slang-llvm/slang-llvm-builder.h"
 
 #include <filesystem>
 
@@ -1195,6 +1195,7 @@ struct LLVMEmitter
     bool debug = false;
 
     ComPtr<ILLVMBuilder> builder;
+    std::unique_ptr<LLVMTypeTranslator> types;
 
     // Changes the behaviour when encountering a global instruction. If false,
     // they're emitted as global variables. Otherwise, we'll try to inline them.
@@ -1275,6 +1276,7 @@ struct LLVMEmitter
         auto params = sb.toString();
 
         LLVMBuilderOptions builderOpt;
+        builderOpt.target = asExternal(codeGenContext->getTargetFormat());
         builderOpt.targetTriple = TerminatedCharSlice(targetTripleOption.begin(), targetTripleOption.getLength());
         builderOpt.cpu = TerminatedCharSlice(cpuOption.begin(), cpuOption.getLength());
         builderOpt.features = TerminatedCharSlice(featOption.begin(), featOption.getLength());
@@ -1299,16 +1301,11 @@ struct LLVMEmitter
         else
             defaultPointerRules = IRTypeLayoutRules::get(IRTypeLayoutRuleName::LLVM);
 
-    /*
         types.reset(new LLVMTypeTranslator(
-            *llvmBuilder,
-            *llvmDebugBuilder,
+            builder,
             getOptions(),
-            targetDataLayout,
-            compileUnit,
             sourceDebugInfo,
             defaultPointerRules));
-        */
     }
 
     DiagnosticSink* getSink() { return codeGenContext->getSink(); }
@@ -3949,171 +3946,6 @@ struct LLVMEmitter
         emitGlobalFunctions(irModule);
         emitGlobalInstructionCtor();
     }
-
-    void optimize()
-    {
-        // Destroy inst-to-llvm mappings, they're broken after optimization.
-        mapInstToLLVM.clear();
-
-        llvm::LoopAnalysisManager loopAnalysisManager;
-        llvm::FunctionAnalysisManager functionAnalysisManager;
-        llvm::CGSCCAnalysisManager CGSCCAnalysisManager;
-        llvm::ModuleAnalysisManager moduleAnalysisManager;
-
-        llvm::PassBuilder passBuilder(targetMachine);
-        passBuilder.registerModuleAnalyses(moduleAnalysisManager);
-        passBuilder.registerCGSCCAnalyses(CGSCCAnalysisManager);
-        passBuilder.registerFunctionAnalyses(functionAnalysisManager);
-        passBuilder.registerLoopAnalyses(loopAnalysisManager);
-        passBuilder.crossRegisterProxies(
-            loopAnalysisManager,
-            functionAnalysisManager,
-            CGSCCAnalysisManager,
-            moduleAnalysisManager);
-
-        llvm::OptimizationLevel llvmLevel = llvm::OptimizationLevel::O0;
-
-        switch (getOptions().getOptimizationLevel())
-        {
-        case OptimizationLevel::None:
-            llvmLevel = llvm::OptimizationLevel::O0;
-            break;
-        default:
-        case OptimizationLevel::Default:
-            llvmLevel = llvm::OptimizationLevel::O1;
-            break;
-        case OptimizationLevel::High:
-            llvmLevel = llvm::OptimizationLevel::O2;
-            break;
-        case OptimizationLevel::Maximal:
-            llvmLevel = llvm::OptimizationLevel::O3;
-            break;
-        }
-
-        // Run the actual optimizations.
-        llvm::ModulePassManager modulePassManager =
-            passBuilder.buildPerModuleDefaultPipeline(llvmLevel);
-        modulePassManager.run(*llvmModule, moduleAnalysisManager);
-    }
-
-    void finalize()
-    {
-        // Dump the global constructors array
-        if (globalCtors.getCount() != 0)
-        {
-            auto ctorArrayType = llvm::ArrayType::get(llvmCtorType, globalCtors.getCount());
-            auto ctorArray = llvm::ConstantArray::get(
-                ctorArrayType,
-                llvm::ArrayRef(globalCtors.begin(), globalCtors.end()));
-            new llvm::GlobalVariable(
-                *llvmModule,
-                ctorArrayType,
-                false,
-                llvm::GlobalValue::AppendingLinkage,
-                ctorArray,
-                "llvm.global_ctors");
-        }
-
-        // std::string out;
-        // llvm::raw_string_ostream rso(out);
-        // llvmModule->print(rso, nullptr);
-        // printf("%s\n", out.c_str());
-
-        llvm::verifyModule(*llvmModule, &llvm::errs());
-
-        // O0 is separately handled inside `optimize()`; we need to call it in
-        // any case to make sure that `ForceInline` functions get inlined.
-        optimize();
-
-        if (debug)
-        {
-            llvmDebugBuilder->finalize();
-        }
-    }
-
-    void dumpAssembly(String& assemblyOut)
-    {
-        std::string out;
-        llvm::raw_string_ostream rso(out);
-        llvmModule->print(rso, nullptr);
-        assemblyOut = out.c_str();
-    }
-
-    void generateObjectCode(List<uint8_t>& objectOut)
-    {
-        BinaryLLVMOutputStream output(objectOut);
-
-        llvm::legacy::PassManager pass;
-        auto fileType = llvm::CodeGenFileType::ObjectFile;
-        if (targetMachine->addPassesToEmitFile(pass, output, nullptr, fileType))
-        {
-            codeGenContext->getSink()->diagnose(SourceLoc(), Diagnostics::llvmCodegenFailed);
-            return;
-        }
-
-        pass.run(*llvmModule);
-    }
-
-    SlangResult generateJITLibrary(IArtifact** outArtifact)
-    {
-        std::unique_ptr<llvm::orc::LLJIT> jit;
-        ComPtr<IArtifactDiagnostics> diagnostics(new ArtifactDiagnostics());
-        {
-            llvm::orc::LLJITBuilder jitBuilder;
-            llvm::Expected<std::unique_ptr<llvm::orc::LLJIT>> expectJit = jitBuilder.create();
-
-            if (!expectJit)
-            {
-                auto err = expectJit.takeError();
-
-                std::string jitErrorString;
-                llvm::raw_string_ostream jitErrorStream(jitErrorString);
-
-                jitErrorStream << err;
-
-                ArtifactDiagnostic diagnostic;
-
-                StringBuilder buf;
-                buf << "Unable to create JIT engine: " << jitErrorString.c_str();
-
-                diagnostic.severity = ArtifactDiagnostic::Severity::Error;
-                diagnostic.stage = ArtifactDiagnostic::Stage::Link;
-                diagnostic.text = TerminatedCharSlice(buf.getBuffer(), buf.getLength());
-
-                // Add the error
-                diagnostics->add(diagnostic);
-                diagnostics->setResult(SLANG_FAIL);
-
-                auto artifact = ArtifactUtil::createArtifact(
-                    ArtifactDesc::make(ArtifactKind::None, ArtifactPayload::None));
-                ArtifactUtil::addAssociated(artifact, diagnostics);
-
-                *outArtifact = artifact.detach();
-                return SLANG_OK;
-            }
-            jit = std::move(*expectJit);
-        }
-        llvm::orc::ThreadSafeModule threadSafeModule(std::move(llvmModule), std::move(llvmContext));
-
-        if (auto err = jit->addIRModule(std::move(threadSafeModule)))
-        {
-            return SLANG_FAIL;
-        }
-
-        ComPtr<ISlangSharedLibrary> sharedLibrary(new LLVMJITSharedLibrary(std::move(jit)));
-
-        const auto targetDesc = ArtifactDescUtil::makeDescForCompileTarget(
-            SlangCompileTarget(getOptions().getTarget()));
-
-        auto artifact = ArtifactUtil::createArtifact(targetDesc);
-        ArtifactUtil::addAssociated(artifact, diagnostics);
-
-        artifact->addRepresentation(sharedLibrary);
-
-        *outArtifact = artifact.detach();
-
-        return SLANG_OK;
-    }
 */
 };
 
@@ -4124,17 +3956,7 @@ SlangResult emitLLVMAssemblyFromIR(
 {
     LLVMEmitter emitter(codeGenContext);
     emitter.processModule(irModule);
-    emitter.finalize();
-
-    String assembly;
-    emitter.dumpAssembly(assembly);
-
-    ComPtr<ISlangBlob> blob = StringBlob::moveCreate(assembly);
-    auto artifact = ArtifactUtil::createArtifactForCompileTarget(
-        asExternal(codeGenContext->getTargetFormat()));
-    artifact->addRepresentationUnknown(blob);
-    *outArtifact = artifact.detach();
-    return SLANG_OK;
+    return emitter.builder->generateAssembly(outArtifact);
 }
 
 SlangResult emitLLVMObjectFromIR(
@@ -4144,18 +3966,7 @@ SlangResult emitLLVMObjectFromIR(
 {
     LLVMEmitter emitter(codeGenContext);
     emitter.processModule(irModule);
-    emitter.finalize();
-
-    List<uint8_t> object;
-    emitter.generateObjectCode(object);
-
-    ComPtr<ISlangBlob> blob = RawBlob::create(object.getBuffer(), object.getCount());
-    auto artifact = ArtifactUtil::createArtifactForCompileTarget(
-        asExternal(codeGenContext->getTargetFormat()));
-    artifact->addRepresentationUnknown(blob);
-    *outArtifact = artifact.detach();
-
-    return SLANG_OK;
+    return emitter.builder->generateObjectCode(outArtifact);
 }
 
 SlangResult emitLLVMJITFromIR(
@@ -4165,8 +3976,7 @@ SlangResult emitLLVMJITFromIR(
 {
     LLVMEmitter emitter(codeGenContext, true);
     emitter.processModule(irModule);
-    emitter.finalize();
-    return emitter.generateJITLibrary(outArtifact);
+    return emitter.builder->generateJITLibrary(outArtifact);
 }
 
 } // namespace Slang
