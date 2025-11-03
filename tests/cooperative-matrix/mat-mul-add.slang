@@ -1,4 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
 
 // CHECK: type: float
 // CHECK-COUNT-256: 241.0
@@ -12,6 +13,7 @@ typealias CoopMatAType = CoopMat<float16_t, MemoryScope.Subgroup, 16, 16, CoopMa
 typealias CoopMatBType = CoopMat<float16_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixB>;
 typealias CoopMatCType = CoopMat<float32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>;
 
+[shader("compute")]
 [numthreads(32, 1, 1)]
 void computeMain()
 {

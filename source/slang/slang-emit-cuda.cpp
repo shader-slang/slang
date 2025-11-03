@@ -1110,81 +1110,154 @@ void CUDASourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
     _emitWitnessTableDefinitions();
 }
 
-static constexpr int find3rdDimension(int x, int y)
-{
-    constexpr auto makeKey = [](int a, int b) {
-        int low  = std::min(a, b);
-        int high = std::max(a, b);
-        return (high << 8) | low;
-    };
-
-    int key = makeKey(x, y);
-    switch(key)
-    {
-        case makeKey(16, 16):
-        case makeKey(8, 32):
-            return 16;
-        case makeKey(8, 16):
-            return 32;
-        case makeKey(16, 32):
-            return 8;
-        default:
-            return -1;
-    }
-}
-
-static void calculateTileSize(int matrixUse, int roundRowCount, int roundColCount, int otherDim, int out[3])
-{
-    switch(matrixUse)
-    {
-        case 0: // matirxA: CoopMat<M, N> where M and N will use used for m x k in wmma::fragment
-            out[0] = roundRowCount;
-            out[1] = otherDim;
-            out[2] = roundColCount;
-            break;
-        case 1: // matrixB: CoopMat<M, N> where M and N will be used for k x n in wmma::fragment
-            out[0] = otherDim;
-            out[1] = roundRowCount;
-            out[2] = roundColCount;
-            break;
-        case 2:
-            // accumulator: CoopMat<M, N> where M and N will be used for m x n in wmma::fragment
-            out[0] = roundRowCount;
-            out[1] = roundColCount;
-            out[2] = otherDim;
-            break;
-    }
-}
-
 static bool typeCheck(IROp op, int matrixUse)
 {
-    switch(matrixUse)
+    switch (matrixUse)
     {
-        case 0: // matrixA
-        case 1: // matrixB
-            return op == kIROp_UInt8Type || op == kIROp_Int8Type || op == kIROp_HalfType;
-        case 2: // accumulator
-            return op == kIROp_IntType || op == kIROp_HalfType || op == kIROp_FloatType;
+    case 0: // matrixA
+    case 1: // matrixB
+        return op == kIROp_UInt8Type || op == kIROp_Int8Type || op == kIROp_HalfType;
+    case 2: // accumulator
+        return op == kIROp_IntType || op == kIROp_HalfType || op == kIROp_FloatType;
     }
     return false;
 }
 
 static UnownedStringSlice getMatrixUseName(int matrixUse)
 {
-    switch(matrixUse)
+    switch (matrixUse)
     {
-        case 0:
-            return UnownedStringSlice("Slang_CUDA_WMMA::MatrixA");
-        case 1:
-            return UnownedStringSlice("Slang_CUDA_WMMA::MatrixB");
-        case 2:
-            return UnownedStringSlice("Slang_CUDA_WMMA::MatrixC");
-        default:
-            return UnownedStringSlice();
+    case 0:
+        return UnownedStringSlice("Slang_CUDA_WMMA::MatrixA");
+    case 1:
+        return UnownedStringSlice("Slang_CUDA_WMMA::MatrixB");
+    case 2:
+        return UnownedStringSlice("Slang_CUDA_WMMA::MatrixC");
+    default:
+        return UnownedStringSlice();
     }
 }
 
-SlangResult CUDASourceEmitter::emitWMMAFragmentType(IRCoopMatrixType* coopMatType, StringBuilder& outStr)
+static inline bool isValidDimension(uint32_t matrixUse, uint32_t row, uint32_t col)
+{
+    // Matrix A: row=m (max 32), col=k (max 16)
+    // Matrix B: row=k (max 16), col=n (max 32)
+    // Matrix C/D: row=m (max 32), col=n (max 32)
+    switch (matrixUse)
+    {
+    case 0:
+        return row <= 32 && col <= 16;
+    case 1:
+        return row <= 16 && col <= 32;
+    case 2:
+    default:
+        return row <= 32 && col <= 32;
+    }
+}
+
+// Helper: Convert dimension to index ([0-8]->0, (8,16]->1, (16,32]->2)
+// The assumption is that the input must be always smaller than 32.
+inline uint32_t dimToIndex(uint32_t dim)
+{
+    return (dim <= 8) ? 0 : (dim <= 16) ? 1 : 2;
+}
+
+enum ShapeCombination : uint32_t
+{
+    m16n16k16 = 0,
+    m8n32k16 = 1,
+    m32n8k16 = 2,
+    Invalid = 3
+};
+
+/*
+ * Lookup Table Strategy - Minimize Dimension Changes:
+ * Note: This is actually a WAR for us, because our CoopMat only allow specifying row and col
+ *       dimensions, but not k. So we have to pick a shape that matches WMMA's requirement.
+ *       However, this will bring us a problem. For example, if we have (m=8,n=8),
+ *       there is no such WMMA shape, the only thing we can do is to find the best fit shape.
+ *       Now the candidate shapes are: m16n16k16, m8n32k16, m32n8k16.
+ *       Current strategy is that we pick the shape that requires the least changes to the input
+ *       so that will make the remaining candidates as m8n32k16, m32n8k16 (1 change each).
+ *       Then we can assign different cost for changing m and n, for example, we can say changing
+ *       m is more expensive than changing n, so we can pick m8n32k16 as the final shape.
+ *
+ *       The strategy is based on nothing, it's just a way to help us determine a shape.
+ *       However, this strategy cannot guarantee us matrix A/B/C are always shape-compatible.
+ *
+ *       Or we can choose to not find the best fit, after rounding the dimension, we can just pick
+ *       the available shape, and if it doesn't match, we just error out.
+ * ==============================================================================
+ * Input (m,n)  | Index [m][n] | Chosen Shape  | Changes Required
+ * -------------|--------------|---------------|--------------------------------
+ * (8,  8)      | [0][0]       | m8n32k16      | 1 change: n 8->32  (vs 2 for m16n16k16)
+ * (8,  16)     | [0][1]       | m16n16k16     | 1 change: m 8->16
+ * (8,  32)     | [0][2]       | m8n32k16      | Exact match ✓
+ * (16, 8)      | [1][0]       | m16n16k16     | 1 change: n 8->16
+ * (16, 16)     | [1][1]       | m16n16k16     | Exact match ✓
+ * (16, 32)     | [1][2]       | m8n32k16      | 1 change: m 16->8
+ * (32, 8)      | [2][0]       | m32n8k16      | Exact match ✓
+ * (32, 16)     | [2][1]       | m32n8k16      | 1 change: n 16->8
+ * (32, 32)     | [2][2]       | m16n16k16     | 2 changes: fallback to balanced shape
+ */
+inline constexpr ShapeCombination getShapeFromMN(uint32_t m_idx, uint32_t n_idx)
+{
+    constexpr ShapeCombination lookup[3][3] = {
+        {ShapeCombination::m8n32k16, ShapeCombination::m16n16k16, ShapeCombination::m8n32k16},
+        {ShapeCombination::m16n16k16, ShapeCombination::m16n16k16, ShapeCombination::m8n32k16},
+        {ShapeCombination::m32n8k16, ShapeCombination::m32n8k16, ShapeCombination::m16n16k16}};
+
+    return lookup[m_idx][n_idx];
+}
+
+// Given matrix use, row and col dimensions, compute the WMMA shape combination
+inline ShapeCombination computeShapeCombination(uint32_t matrixUse, uint32_t row, uint32_t col)
+{
+    // Validate dimensions at the beginning, because the following logic assumes valid dimensions.
+    if (!isValidDimension(matrixUse, row, col))
+    {
+        return ShapeCombination::Invalid;
+    }
+
+    switch (matrixUse)
+    {
+    case 0:
+        {
+            // For Matrix A: row=m, col=k (k is always 16)
+            // Only m matters, map: m=8->m8n32k16, m=16->m16n16k16, m=32->m32n8k16
+            int m_idx = dimToIndex(row);
+            constexpr ShapeCombination shapes[3] = {
+                ShapeCombination::m8n32k16,  // m=8
+                ShapeCombination::m16n16k16, // m=16
+                ShapeCombination::m32n8k16   // m=32
+            };
+            return shapes[m_idx];
+        }
+    case 1:
+        {
+            // For Matrix B: row=k (k is always 16), col=n
+            // Only n matters, map: n=8->m32n8k16, n=16->m16n16k16, n=32->m8n32k16
+            int n_idx = dimToIndex(col);
+            constexpr ShapeCombination shapes[3] = {
+                ShapeCombination::m32n8k16,  // n=8
+                ShapeCombination::m16n16k16, // n=16
+                ShapeCombination::m8n32k16   // n=32
+            };
+            return shapes[n_idx];
+        }
+    case 2:
+    default:
+        {
+            // For Matrix C/D: row=m, col=n
+            // Both dimensions matter, use lookup table
+            return getShapeFromMN(dimToIndex(row), dimToIndex(col));
+        }
+    }
+}
+
+SlangResult CUDASourceEmitter::emitWMMAFragmentType(
+    IRCoopMatrixType* coopMatType,
+    StringBuilder& outStr)
 {
     auto rowCount = static_cast<IRIntLit*>(coopMatType->getRowCount())->getValue();
     auto colCount = static_cast<IRIntLit*>(coopMatType->getColumnCount())->getValue();
@@ -1192,53 +1265,57 @@ SlangResult CUDASourceEmitter::emitWMMAFragmentType(IRCoopMatrixType* coopMatTyp
 
     auto typeOp = coopMatType->getElementType()->getOp();
     auto typeName = getBuiltinTypeName(typeOp);
+    // TODO: We should add a pass in IR to validate the coop matrix types, such that
+    // we can provide better diagnostic messages here.
     if (!typeCheck(typeOp, matrixUse))
     {
         StringBuilder msg;
-        msg << "Unsupported data type in wmma::fragment: " << typeName;
-        ::Slang::handleSignal(::Slang::SignalType::AssertFailure, msg.begin());
+        getSink()->diagnose(
+            SourceLoc(),
+            Diagnostics::cooperativeMatrixUnsupportedElementType,
+            typeName,
+            matrixUse == 0 ? "A" : (matrixUse == 1 ? "B" : "C"));
+        SLANG_RELEASE_ASSERT(false);
         return SLANG_FAIL;
     }
 
     outStr << "Slang_CUDA_WMMA::WmmaFragment<";
 
-    // We need to restrict the size combination be always 8, 16, or 32
-    auto roundUpTo32 = [](int x)
+    uint32_t fragmentSize[3] = {0, 0, 0}; // m, n, k
+    ShapeCombination shape = computeShapeCombination(matrixUse, rowCount, colCount);
+    switch (shape)
     {
-        if (x < 8)
-            x = 8;
-
-        // Compute next power of 2
-        int pow2 = 1 << static_cast<int>(std::ceil(std::log2(x)));
-
-        // If result > 32, return invalid
-        if (pow2 > 32) return -1;
-
-        return pow2;
-    };
-
-    int roundRowCount = roundUpTo32(static_cast<int>(rowCount));
-    int roundColCount = roundUpTo32(static_cast<int>(colCount));
-    if (roundRowCount == -1 || roundColCount == -1)
-    {
-        StringBuilder msg;
-        msg << "Unsupported wmma::fragment size: " << rowCount << "x" << colCount;
-        ::Slang::handleSignal(::Slang::SignalType::AssertFailure, msg.begin());
-        return SLANG_FAIL;
+    case ShapeCombination::m16n16k16:
+        fragmentSize[0] = 16;
+        fragmentSize[1] = 16;
+        fragmentSize[2] = 16;
+        break;
+    case ShapeCombination::m8n32k16:
+        fragmentSize[0] = 8;
+        fragmentSize[1] = 32;
+        fragmentSize[2] = 16;
+        break;
+    case ShapeCombination::m32n8k16:
+        fragmentSize[0] = 32;
+        fragmentSize[1] = 8;
+        fragmentSize[2] = 16;
+        break;
+    case ShapeCombination::Invalid:
+    default:
+        {
+            getSink()->diagnose(
+                SourceLoc(),
+                Diagnostics::cooperativeMatrixInvalidShape,
+                rowCount,
+                colCount,
+                matrixUse == 0 ? "A" : (matrixUse == 1 ? "B" : "C"));
+            SLANG_RELEASE_ASSERT(false);
+            return SLANG_FAIL;
+        }
     }
 
-    int otherDim = find3rdDimension(roundRowCount, roundColCount);
-    if (otherDim == -1)
-    {
-        StringBuilder msg;
-        msg << "Unsupported wmma::fragment size: " << rowCount << "x" << colCount;
-        ::Slang::handleSignal(::Slang::SignalType::AssertFailure, msg.begin());
-        return SLANG_FAIL;
-    }
-
-    int fragmentSize[3] = {0, 0, 0};
-    calculateTileSize(matrixUse, roundRowCount, roundColCount, otherDim, fragmentSize);
-    outStr << typeName << "," << fragmentSize[0] << ", " << fragmentSize[1] << ", " << fragmentSize[2] << ", " << getMatrixUseName(matrixUse) << ">";
+    outStr << typeName << "," << fragmentSize[0] << ", " << fragmentSize[1] << ", "
+           << fragmentSize[2] << ", " << getMatrixUseName(matrixUse) << ">";
 
     return SLANG_OK;
 }

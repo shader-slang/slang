@@ -23925,7 +23925,7 @@ struct CoopMat
     [require(cuda)]
     internal static uint __getNumElementsPerThread(__ref This coopMat)
     {
-        __intrinsic_asm "return ($0)->num_elements";
+        __intrinsic_asm "($0)->GetLength()";
     }
 
     /// Returns the number of rows in the matrix.
@@ -24146,9 +24146,9 @@ struct CoopMat
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>($1, $2, $3)";
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>(($1)->m_data, $2, $3)";
             else
-                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>($1, $2, $3)";
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>(($1)->m_data, $2, $3)";
         }
     }
 
@@ -24230,47 +24230,15 @@ ${{{{
                 result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
             };
         case cuda:
-            This result;
-            result.__load<matrixLayout, 0>(buffer, element, stride);
-            return result;
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>($0, $1, $2)";
+            else
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>($0, $1, $2)";
         }
     }
 
 ${{{{
     } // RW
-}}}}
-
-    // generate internal __load method for different buffer types
-${{{{
-    for (const char* bufferType : { "RWStructuredBuffer<T>", "StructuredBuffer<T>", "T*", "T[V]" })
-    {
-        char loadRowMajorMatrixStr[256];
-        char loadColMajorMatrixStr[256];
-        snprintf(loadRowMajorMatrixStr, sizeof(loadRowMajorMatrixStr),
-            "\"wmma::load_matrix_sync(*($0), ($1)%s + $2, $3, wmma::row_major)\"",
-            (strstr(bufferType, "StructuredBuffer") != 0)  ? ".data" : "");
-        snprintf(loadColMajorMatrixStr, sizeof(loadColMajorMatrixStr),
-            "\"wmma::load_matrix_sync(*($0), ($1)%s + $2, $3, wmma::col_major)\"",
-            (strstr(bufferType, "StructuredBuffer") != 0)  ? ".data" : "");
-}}}}
-
-    [mutating]
-    [require(cuda)]
-    internal void __load<
-        let matrixLayout : CoopMatMatrixLayout,
-        int V = 0
-    > (
-        $(bufferType) buffer,
-        uint element,
-        uint stride)
-    {
-        if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-            __intrinsic_asm $(loadRowMajorMatrixStr);
-        else
-            __intrinsic_asm $(loadRowMajorMatrixStr);
-    }
-${{{{
-    } // for (const char* RW : { "RWStructuredBuffer", "StructuredBuffer", "T*", "T[]" })
 }}}}
 
     [ForceInline]
@@ -24290,9 +24258,10 @@ ${{{{
                 result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
             };
         case cuda:
-            This result;
-            result.__load<matrixLayout, 0>(buffer, element, stride);
-            return result;
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>($0, $1, $2)";
+            else
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>($0, $1, $2)";
         }
     }
 
@@ -24332,9 +24301,10 @@ ${{{{
                 result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
             };
         case cuda:
-            This result;
-            result.__load<matrixLayout, V>(data, element, stride);
-            return result;
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>(($0)->m_data, $1, $2)";
+            else
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>(($0)->m_data, $1, $2)";
         }
     }
 
@@ -24997,7 +24967,7 @@ CoopMat<T, S, M, N, R> operator *<
 // Cooperative Matrix Multiply-Accumulate
 //
 
-[require(cooperative_matrix)]
+[require(cuda_cooperative_matrix)]
 CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> coopMatMulAdd<
     T : __BuiltinArithmeticType,
     let saturatingAccumulation : bool,
@@ -25013,33 +24983,49 @@ CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> coopMatMulAdd<
     CoopMat<V, S, K, N, CoopMatMatrixUse.MatrixB> matB,
     CoopMat<W, S, M, N, CoopMatMatrixUse.MatrixAccumulator> matC)
 {
-    // https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/KHR/SPV_KHR_cooperative_matrix.asciidoc#3x-cooperative-matrix-operands
-    int operands = 0; // NoneKHR
-    if (__isSignedInt<U>())
+    __target_switch
     {
-        operands |= 0x01; // MatrixASignedComponentsKHR
-    }
-    if (__isSignedInt<V>())
-    {
-        operands |= 0x02; // MatrixBSignedComponentsKHR
-    }
-    if (__isSignedInt<W>())
-    {
-        operands |= 0x04; // MatrixCSignedComponentsKHR
-    }
-    if (__isSignedInt<T>())
-    {
-        operands |= 0x08; // MatrixResultSignedComponentsKHR
-    }
-    if (saturatingAccumulation)
-    {
-        operands |= 0x10; // SaturatingAccumulationKHR
-    }
+    case spirv:
+        // https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/KHR/SPV_KHR_cooperative_matrix.asciidoc#3x-cooperative-matrix-operands
+        int operands = 0; // NoneKHR
+        if (__isSignedInt<U>())
+        {
+            operands |= 0x01; // MatrixASignedComponentsKHR
+        }
+        if (__isSignedInt<V>())
+        {
+            operands |= 0x02; // MatrixBSignedComponentsKHR
+        }
+        if (__isSignedInt<W>())
+        {
+            operands |= 0x04; // MatrixCSignedComponentsKHR
+        }
+        if (__isSignedInt<T>())
+        {
+            operands |= 0x08; // MatrixResultSignedComponentsKHR
+        }
+        if (saturatingAccumulation)
+        {
+            operands |= 0x10; // SaturatingAccumulationKHR
+        }
 
-    return spirv_asm
-    {
-        result:$$CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> = OpCooperativeMatrixMulAddKHR $matA $matB $matC !operands;
-    };
+        return spirv_asm
+        {
+            result:$$CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> = OpCooperativeMatrixMulAddKHR $matA $matB $matC !operands;
+        };
+    case cuda:
+        __intrinsic_asm R"(Slang_CUDA_WMMA::coopMatMulAdd<
+                                                         $T0::ElementType,
+                                                         $T1::ElementType,
+                                                         $T2::ElementType,
+                                                         $TR::ElementType,
+                                                         $T0::m_M,
+                                                         $T0::m_N,
+                                                         $T0::m_K,
+                                                         $T0::m_layout,
+                                                         $T1::m_layout
+                                                        >($0, $1, $2))";
+    }
 }
 
 extension<
