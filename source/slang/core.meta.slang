@@ -344,12 +344,20 @@ interface __BuiltinType
 {
 }
 
+/// Represents types that can be used on CoopMat / CoopVec.
+/// Implemented by some builtin types which will be used on ML extensions.
+[sealed]
+[builtin]
+interface __BuiltinMLElementType : __BuiltinType
+{
+}
+
 /// A type that can be used for arithmetic operations. For defining generic functions that work with builtin scalar arithmetic types only.
 /// Builtin types implementing this interface: `int`, `uint`, `int64_t`, `uint64_t`, `int8_t`, `uint8_t`, `int16_t`, `uint16_t`, `float`, `half`, `double`.
 /// To define generic functions that work with both scalar and vector types, use `IInteger` or `IFloat` instead.
 [sealed]
 [builtin]
-interface __BuiltinArithmeticType : __BuiltinType, IArithmetic
+interface __BuiltinArithmeticType : __BuiltinType, __BuiltinMLElementType, IArithmetic
 {
 }
 
@@ -810,7 +818,7 @@ struct DifferentialPtrPair : IDifferentiablePtrType
 /// Represents builtin floating point scalar types.
 /// To define generic functions that work with both scalar and vector types, use `IFloat` instead.
 ///
-/// Implemented by `float`, `half`, `bfloat16` and `double` types.
+/// Implemented by `float`, `half` and `double` types.
 [sealed]
 [builtin]
 [TreatAsDifferentiable]
@@ -1031,7 +1039,6 @@ ${{{{
     switch (kBaseTypes[tt].tag)
     {
     case BaseType::Half:
-    case BaseType::BFloat16:
     case BaseType::Float:
     case BaseType::Double:
 }}}}
@@ -1039,6 +1046,7 @@ ${{{{
     ,  __BuiltinRealType
     ,  __BuiltinSignedArithmeticType
     ,  __BuiltinArithmeticType
+    , __BuiltinMLElementType
 ${{{{
         break;
     case BaseType::Int8:
@@ -1067,10 +1075,18 @@ ${{{{
 }}}}
     ,  __BuiltinInt64Type
 ${{{{
+    if (kBaseTypes[tt].tag != BaseType::IntPtr && kBaseTypes[tt].tag != BaseType::UIntPtr)
+}}}}
+    ,  __BuiltinMLElementType
+${{{{
         ; // fall through
     case BaseType::Bool:
 }}}}
     ,  __BuiltinLogicalType
+${{{{
+    case BaseType::BFloat16:
+}}}}
+    ,  __BuiltinMLElementType
 ${{{{
         break;
 
@@ -1106,7 +1122,7 @@ ${{{{
             builtinConversionKind = kBuiltinConversion_FloatToDouble;
 
         const char* attrib = "";
-        if ((kBaseTypes[tt].flags & kBaseTypes[ss].flags & (FLOAT_MASK | BFLOAT_MASK)) != 0)
+        if ((kBaseTypes[tt].flags & kBaseTypes[ss].flags & FLOAT_MASK) != 0)
             attrib = "[TreatAsDifferentiable]";
 }}}}
     $(attrib)
@@ -1199,7 +1215,6 @@ ${{{{
     default:
         break;
     case BaseType::Half:
-    case BaseType::BFloat16:
     case BaseType::Float:
     case BaseType::Double:
 }}}}
@@ -1240,6 +1255,25 @@ ${{{{
         {
             return __realCast<Differential, U>(a) * b;
         }
+${{{{
+        break;
+    }
+
+    // If this is a ML element type.
+    //
+    switch (kBaseTypes[tt].tag)
+    {
+    default:
+        break;
+    case BaseType::BFloat16:
+}}}}
+        [__unsafeForceInlineEarly]
+        __init(int value)
+        {
+            return $(kBaseTypes[tt].name)(float(value));
+        }
+
+         __intrinsic_op($(kIROp_FloatCast)) float toFloat();
 ${{{{
         break;
     }

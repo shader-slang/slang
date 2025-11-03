@@ -23608,7 +23608,7 @@ ${{{{
 __intrinsic_type($(kIROp_CoopMatrixType))
 [require(cooperative_matrix)]
 __generic<
-    T : __BuiltinArithmeticType,
+    T : __BuiltinMLElementType,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -23616,7 +23616,6 @@ __generic<
 >
 struct CoopMat
     : IArray<T>
-    , IArithmetic
 {
     //
     // Initialization
@@ -23638,7 +23637,7 @@ struct CoopMat
     [ForceInline]
     [require(cooperative_matrix_conversion)]
     __init<
-        U : __BuiltinArithmeticType
+        U : __BuiltinMLElementType
     >(CoopMat<U, S, M, N, R> other)
     {
         this.copyFrom(other);
@@ -23649,15 +23648,6 @@ struct CoopMat
     __init(This x)
     {
         this = x;
-    }
-
-    // Required for `IArithmetic`.
-    [ForceInline]
-    [OverloadRank(-10)]
-    [require(cooperative_matrix)]
-    __init(int i)
-    {
-        this = CoopMat<T, S, M, N, R>(T(i));
     }
 
     //
@@ -23684,7 +23674,7 @@ struct CoopMat
     [mutating]
     [require(cooperative_matrix_conversion)]
     void copyFrom<
-        U : __BuiltinArithmeticType
+        U : __BuiltinMLElementType
     >(CoopMat<U, S, M, N, R> other)
     {
         if (__isFloat<T>() && __isInt<U>())
@@ -24105,83 +24095,6 @@ ${{{{
     }
 
     //
-    // Arithmetic
-    //
-
-    __intrinsic_op($(kIROp_Add))
-    This add(This other);
-
-    __intrinsic_op($(kIROp_Sub))
-    This sub(This other);
-
-    __intrinsic_op($(kIROp_Mul))
-    This mul(This other);
-
-    __intrinsic_op($(kIROp_Div))
-    This div(This other);
-
-    __intrinsic_op($(kIROp_Neg))
-    This neg();
-
-    This mod(This other)
-    {
-        This ret;
-        for (int i = 0; i < GetLength(); ++i)
-        {
-            ret[i] = this[i] % other[i];
-        }
-        return ret;
-    }
-
-    //
-    // Equality and ordering
-    //
-
-    bool equals(This other)
-    {
-        for (int i = 0; i < GetLength(); i++)
-        {
-            if (this[i] != other[i])
-            {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    bool lessThan(This other)
-    {
-        for (int i = 0; i < GetLength(); i++)
-        {
-            if (this[i] < other[i])
-            {
-                return true;
-            }
-            else if (this[i] > other[i])
-            {
-                return false;
-            }
-        }
-        return false;
-    }
-
-    bool lessThanOrEquals(This other)
-    {
-        for (int i = 0; i < GetLength(); i++)
-        {
-            if (this[i] < other[i])
-            {
-                return true;
-            }
-            else if (this[i] > other[i])
-            {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    //
     // Load with TensorLayout and TensorView
     //
 
@@ -24517,6 +24430,101 @@ ${{{{
 
 } // struct CoopMat
 
+__generic<
+    T : __BuiltinArithmeticType,
+    let S : MemoryScope,
+    let M : int,
+    let N : int,
+    let R : CoopMatMatrixUse
+>
+extension CoopMat<T, S, M, N, R> : IArithmetic
+{
+    // Required for `IArithmetic`.
+    [ForceInline]
+    [OverloadRank(-10)]
+    [require(cooperative_matrix)]
+    __init(int i)
+    {
+        this = CoopMat<T, S, M, N, R>(T(i));
+    }
+
+    //
+    // Arithmetic
+    //
+
+    __intrinsic_op($(kIROp_Add))
+    This add(This other);
+
+    __intrinsic_op($(kIROp_Sub))
+    This sub(This other);
+
+    __intrinsic_op($(kIROp_Mul))
+    This mul(This other);
+
+    __intrinsic_op($(kIROp_Div))
+    This div(This other);
+
+    __intrinsic_op($(kIROp_Neg))
+    This neg();
+
+    This mod(This other)
+    {
+        This ret;
+        for (int i = 0; i < GetLength(); ++i)
+        {
+            ret[i] = this[i] % other[i];
+        }
+        return ret;
+    }
+
+    //
+    // Equality and ordering
+    //
+
+    bool equals(This other)
+    {
+        for (int i = 0; i < GetLength(); i++)
+        {
+            if (this[i] != other[i])
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool lessThan(This other)
+    {
+        for (int i = 0; i < GetLength(); i++)
+        {
+            if (this[i] < other[i])
+            {
+                return true;
+            }
+            else if (this[i] > other[i])
+            {
+                return false;
+            }
+        }
+        return false;
+    }
+
+    bool lessThanOrEquals(This other)
+    {
+        for (int i = 0; i < GetLength(); i++)
+        {
+            if (this[i] < other[i])
+            {
+                return true;
+            }
+            else if (this[i] > other[i])
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+} // TODO
 
 //
 // Convenience loading functions for cooperative matrices which infer the
@@ -24526,7 +24534,7 @@ ${{{{
 [ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
-    T : __BuiltinArithmeticType,
+    T : __BuiltinMLElementType,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -24543,7 +24551,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 [ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
-    T : __BuiltinArithmeticType,
+    T : __BuiltinMLElementType,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -24560,7 +24568,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 [ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
-    T : __BuiltinArithmeticType,
+    T : __BuiltinMLElementType,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -24577,7 +24585,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 [ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
-    T : __BuiltinArithmeticType,
+    T : __BuiltinMLElementType,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -24594,7 +24602,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 [ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
-    T : __BuiltinArithmeticType,
+    T : __BuiltinMLElementType,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -24611,7 +24619,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 [ForceInline]
 [require(cooperative_matrix, vk_mem_model)]
 CoopMat<T, S, M, N, R> coopMatLoadCoherent<
-    T : __BuiltinArithmeticType,
+    T : __BuiltinMLElementType,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -24629,7 +24637,7 @@ CoopMat<T, S, M, N, R> coopMatLoadCoherent<
 [ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
-    T : __BuiltinArithmeticType,
+    T : __BuiltinMLElementType,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -24652,8 +24660,8 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 [require(cooperative_matrix_conversion)]
 __intrinsic_op($(kIROp_IntCast))
 CoopMat<T,S,M,N,R> __int_cast<
-    T : __BuiltinArithmeticType,
-    U : __BuiltinArithmeticType,
+    T : __BuiltinMLElementType,
+    U : __BuiltinMLElementType,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -24663,8 +24671,8 @@ CoopMat<T,S,M,N,R> __int_cast<
 [require(cooperative_matrix_conversion)]
 __intrinsic_op($(kIROp_FloatCast))
 CoopMat<T,S,M,N,R> __real_cast<
-    T : __BuiltinArithmeticType,
-    U : __BuiltinArithmeticType,
+    T : __BuiltinMLElementType,
+    U : __BuiltinMLElementType,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -24674,8 +24682,8 @@ CoopMat<T,S,M,N,R> __real_cast<
 [require(cooperative_matrix_conversion)]
 __intrinsic_op($(kIROp_CastIntToFloat))
 CoopMat<T,S,M,N,R> __int_to_float_cast<
-    T : __BuiltinArithmeticType,
-    U : __BuiltinArithmeticType,
+    T : __BuiltinMLElementType,
+    U : __BuiltinMLElementType,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -24685,8 +24693,8 @@ CoopMat<T,S,M,N,R> __int_to_float_cast<
 [require(cooperative_matrix_conversion)]
 __intrinsic_op($(kIROp_CastFloatToInt))
 CoopMat<T,S,M,N,R> __float_to_int_cast<
-    T : __BuiltinArithmeticType,
-    U : __BuiltinArithmeticType,
+    T : __BuiltinMLElementType,
+    U : __BuiltinMLElementType,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -24730,11 +24738,11 @@ CoopMat<T, S, M, N, R> operator *<
 
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> coopMatMulAdd<
-    T : __BuiltinArithmeticType,
+    T : __BuiltinMLElementType,
     let saturatingAccumulation : bool,
-    U : __BuiltinArithmeticType,
-    V : __BuiltinArithmeticType,
-    W : __BuiltinArithmeticType,
+    U : __BuiltinMLElementType,
+    V : __BuiltinMLElementType,
+    W : __BuiltinMLElementType,
     let S : MemoryScope,
     let M : int,
     let K : int,
@@ -24774,12 +24782,12 @@ CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> coopMatMulAdd<
 }
 
 extension<
-    T : __BuiltinArithmeticType,
+    T : __BuiltinMLElementType,
     let S : MemoryScope,
     let M : int,
     let N : int,
     let R : linalg.CoopMatMatrixUse,
-    each Ts : __BuiltinArithmeticType
+    each Ts : __BuiltinMLElementType
 > Tuple<linalg.CoopMat<T, S, M, N, R>, expand linalg.CoopMat<each Ts, S, M, N, R>>
 {
     __intrinsic_op($(kIROp_CoopMatMapElementIFunc))
