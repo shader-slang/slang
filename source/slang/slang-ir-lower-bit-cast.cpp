@@ -5,6 +5,7 @@
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-capability.h"
 
 namespace Slang
 {
@@ -235,8 +236,18 @@ struct BitCastLoweringContext
 
         // Check if the target is directly emitted SPIRV
         bool isDirectSpirv = false;
+        bool isSpirv15OrLater = false;
         if (auto targetReq = targetProgram->getTargetReq())
         {
+            auto targetCaps = targetReq->getTargetCaps();
+            for (auto atomSet : targetCaps.getAtomSets())
+            {
+                for (auto atom : atomSet)
+                {
+                    // Check for SPIR-V 1.5 (any later version will inherit from it)
+                    isSpirv15OrLater = isSpirv15OrLater || (CapabilityName)atom == CapabilityName::_spirv_1_5;
+                }
+            }
             auto target = targetReq->getTarget();
             isDirectSpirv =
                 (target == CodeGenTarget::SPIRV || target == CodeGenTarget::SPIRVAssembly) &&
@@ -302,8 +313,8 @@ struct BitCastLoweringContext
             auto toVectorType = as<IRVectorType>(toType);
 
             // OpBitcast can handle pointer -> integer vector bitcasts directly,
-            // but those integers need to be 32-bit
-            if (fromPtrType && toVectorType)
+            // but those integers need to be 32-bit and SPIR-V 1.5+ is required
+            if (fromPtrType && toVectorType && isSpirv15OrLater)
             {
                 auto elementType = toVectorType->getElementType();
                 if (isIntegralType(elementType))
@@ -315,14 +326,13 @@ struct BitCastLoweringContext
             }
 
             // OpBitcast can handle integer vector -> pointer bitcasts directly,
-            // but those integers need to be 32-bit
-            if (toPtrType && fromVectorType)
+            // but those integers need to be 32-bit and SPIR-V 1.5+ is required
+            if (toPtrType && fromVectorType && isSpirv15OrLater)
             {
                 auto elementType = fromVectorType->getElementType();
                 if (isIntegralType(elementType))
                 {
                     auto intInfo = getIntTypeInfo(elementType);
-                    // SPIR-V spec: only vectors of 32-bit integers allowed
                     if (intInfo.width == 32)
                         return;
                 }
