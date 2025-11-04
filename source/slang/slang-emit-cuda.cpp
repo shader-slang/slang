@@ -241,9 +241,6 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
         }
     case kIROp_CoopMatrixType:
         {
-            ensurePrelude("#include <mma.h>");
-            ensurePrelude("using namespace nvcuda;");
-
             return emitWMMAFragmentType(as<IRCoopMatrixType>(type), out);
         }
     default:
