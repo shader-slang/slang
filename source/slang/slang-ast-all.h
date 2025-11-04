@@ -9,3 +9,4 @@
 #include "slang-ast-stmt.h"
 #include "slang-ast-type.h"
 #include "slang-ast-val.h"
+#include "slang-capability-val.h"
