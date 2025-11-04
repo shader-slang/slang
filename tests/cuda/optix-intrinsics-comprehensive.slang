@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target cuda
-//TEST:SIMPLE(filecheck=CHECK_PTX): -target ptx
+//TEST:SIMPLE(filecheck=CHECK_PTX): -target ptx -Xnvrtc -I"./external/optix-dev/include/"
 
 //TEST_INPUT: set scene = AccelerationStructure
 uniform RaytracingAccelerationStructure scene;

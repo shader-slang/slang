@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -entry closestHitShader -stage closesthit
-//TEST:SIMPLE(filecheck=CHECK_PTX): -target ptx -entry closestHitShader -stage closesthit
+//TEST:SIMPLE(filecheck=CHECK_PTX): -target ptx -entry closestHitShader -stage closesthit -Xnvrtc -I"./external/optix-dev/include/"
 
 //CHECK: optixGetAttribute_0()
 //CHECK: __int_as_float(optixGetAttribute_1())

@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target cuda
-//TEST:SIMPLE(filecheck=CHECK-PTX): -target ptx
+//TEST:SIMPLE(filecheck=CHECK-PTX): -target ptx -Xnvrtc -I"./external/optix-dev/include/"
 
 // Test that we emit a valid raygeneration kernel.
 // This test will fail if either: (1) `OptixTraversableHandle` is not emitted
