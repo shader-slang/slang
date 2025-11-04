@@ -1970,7 +1970,8 @@ local insts = {
 		-- For higher-order derivatives.
 		{ SynthesizedForwardDerivativeWitnessTable = { min_operands = 1 } },
 		{ SynthesizedBackwardDerivativeWitnessTable = { min_operands = 1 } },
-		{ MakeIDifferentiableWitness = { min_operands = 1 } }
+		{ MakeIDifferentiableWitness = { min_operands = 1 } },
+		{ SynthesizedBackwardDerivativeWitnessTableFromLegacyBwdDiffFunc = { min_operands = 2 } },
 	} },
 	{ PrimalSubstitute = { min_operands = 1 } },
 	{ DispatchKernel = { min_operands = 3 } },

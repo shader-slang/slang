@@ -819,6 +819,13 @@ static IRInst* maybeHoist(IRBuilder& builder, IRInst* inst)
                         // hoistResult;
 }
 
+static IRInst* maybeHoistAndSpecialize(IRBuilder& builder, IRInst* inst)
+{
+    IRInst* specializedVal = nullptr;
+    auto hoistResult = hoistValueFromGeneric(builder, inst, specializedVal, true);
+    return (specializedVal) ? specializedVal : hoistResult;
+}
+
 // Transcribe a function definition (AD 2.0)
 void BackwardDiffTranscriberBase::_transcribeFuncImpl(
     IRBuilder* builder,
@@ -835,6 +842,7 @@ void BackwardDiffTranscriberBase::_transcribeFuncImpl(
     // Create IRFunc* for propagate function &
     // create the IRFuncType for it.
     //
+    builder->setInsertAfter(targetFunc);
     auto propagateFunc = builder->createFunc();
 
 
@@ -2287,11 +2295,11 @@ LegacyToNewBackwardDiffTranslationFuncContext::Result LegacyToNewBackwardDiffTra
     generateName(builder, primalFunc, contextType, "s_bwdCallableCtx_");
 
     // Hoist contextType first.
-    auto contextTypeGlobalVal = maybeHoist(*builder, contextType);
+    auto contextTypeGlobalVal = maybeHoistAndSpecialize(*builder, contextType);
 
-    auto applyFuncGlobalVal = maybeHoist(*builder, applyFunc);
-    auto bwdPropFuncGlobalVal = maybeHoist(*builder, bwdPropFunc);
-    auto getValFuncGlobalVal = maybeHoist(*builder, getValFunc);
+    auto applyFuncGlobalVal = maybeHoistAndSpecialize(*builder, applyFunc);
+    auto bwdPropFuncGlobalVal = maybeHoistAndSpecialize(*builder, bwdPropFunc);
+    auto getValFuncGlobalVal = maybeHoistAndSpecialize(*builder, getValFunc);
     return {applyFuncGlobalVal, contextTypeGlobalVal, getValFuncGlobalVal, bwdPropFuncGlobalVal};
 }
 
@@ -2299,8 +2307,7 @@ LegacyToNewBackwardDiffTranslationFuncContext::Result LegacyToNewBackwardDiffTra
 IRInst* maybeTranslateLegacyToNewBackwardDerivative(
     AutoDiffSharedContext* sharedContext,
     DiagnosticSink* sink,
-    IRBackwardFromLegacyBwdDiffFunc*
-        translateInst) // TODO: Make this be legacy backward differentiate
+    IRBackwardFromLegacyBwdDiffFunc* translateInst)
 {
     IRInst* primalFunc = translateInst->getOperand(0);
     IRInst* bwdDiffFunc = translateInst->getOperand(1);
@@ -2326,8 +2333,7 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
 IRInst* maybeTranslateLegacyBackwardDerivative(
     AutoDiffSharedContext* sharedContext,
     DiagnosticSink* sink,
-    IRLegacyBackwardDifferentiate*
-        translateInst) // TODO: Make this be legacy backward differentiate
+    IRLegacyBackwardDifferentiate* translateInst)
 {
     IRInst* applyBwdFunc = translateInst->getOperand(0);
     IRInst* contextType = translateInst->getOperand(1);
@@ -2430,5 +2436,79 @@ IRInst* maybeTranslateTrivialBackwardDerivative(
         {bwdPrimalFunc, bwdPropagateFunc, bwdContextGetValFunc, (IRType*)bwdContextType});
 }
 
+IRInst* maybeTranslateBackwardDerivativeWitnessFromLegacyBwdDiffFunc(
+    AutoDiffSharedContext* sharedContext,
+    DiagnosticSink* sink,
+    IRSynthesizedBackwardDerivativeWitnessTableFromLegacyBwdDiffFunc* translateInst)
+{
+    IRInst* primalFunc = translateInst->getOperand(0);
+    IRInst* bwdDiffFunc = translateInst->getOperand(1);
+
+    IRBuilder builder(sharedContext->moduleInst);
+    builder.setInsertBefore(translateInst);
+
+    LegacyToNewBackwardDiffTranslationFuncContext context(
+        primalFunc,
+        bwdDiffFunc,
+        sharedContext,
+        sink);
+
+    LegacyToNewBackwardDiffTranslationFuncContext::Result translationResult =
+        context.translate(&builder);
+
+    auto bwdDiffTable = builder.createWitnessTable(
+        (IRType*)builder.emitSpecializeInst(
+            builder.getTypeKind(),
+            sharedContext->backwardDifferentiableInterfaceType,
+            1,
+            &primalFunc),
+        (IRType*)primalFunc);
+
+    // ?
+    auto bwdDiffInterface = cast<IRInterfaceType>(
+        getGenericReturnVal(sharedContext->backwardDifferentiableInterfaceType));
+    builder.createWitnessTableEntry(
+        bwdDiffTable,
+        cast<IRInterfaceRequirementEntry>(bwdDiffInterface->getOperand(0))->getRequirementKey(),
+        translationResult.contextType);
+
+    auto bwdCallableTable = builder.createWitnessTable(
+        (IRType*)builder.emitSpecializeInst(
+            builder.getTypeKind(),
+            sharedContext->backwardCallableInterfaceType,
+            1,
+            &primalFunc),
+        (IRType*)translationResult.contextType);
+
+    auto bwdCallableInterface =
+        cast<IRInterfaceType>(getGenericReturnVal(sharedContext->backwardCallableInterfaceType));
+
+    builder.createWitnessTableEntry(
+        bwdCallableTable,
+        cast<IRInterfaceRequirementEntry>(bwdCallableInterface->getOperand(0))->getRequirementKey(),
+        translationResult.bwdPropFunc);
+    builder.createWitnessTableEntry(
+        bwdCallableTable,
+        cast<IRInterfaceRequirementEntry>(bwdCallableInterface->getOperand(1))->getRequirementKey(),
+        translationResult.getValFunc);
+
+    builder.createWitnessTableEntry(
+        bwdDiffTable,
+        cast<IRInterfaceRequirementEntry>(bwdDiffInterface->getOperand(1))->getRequirementKey(),
+        bwdCallableTable);
+
+    builder.createWitnessTableEntry(
+        bwdDiffTable,
+        cast<IRInterfaceRequirementEntry>(bwdDiffInterface->getOperand(2))->getRequirementKey(),
+        translationResult.applyBwdFunc);
+
+    builder.createWitnessTableEntry(
+        bwdDiffTable,
+        cast<IRInterfaceRequirementEntry>(bwdDiffInterface->getOperand(3))->getRequirementKey(),
+        bwdDiffFunc);
+
+    maybeHoist(builder, bwdCallableTable);
+    return bwdDiffTable;
+}
 
 } // namespace Slang

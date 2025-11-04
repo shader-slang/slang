@@ -1179,4 +1179,9 @@ IRInst* maybeTranslateTrivialBackwardDerivative(
     DiagnosticSink* sink,
     IRTrivialBackwardDifferentiate* translateInst);
 
+IRInst* maybeTranslateBackwardDerivativeWitnessFromLegacyBwdDiffFunc(
+    AutoDiffSharedContext* sharedContext,
+    DiagnosticSink* sink,
+    IRSynthesizedBackwardDerivativeWitnessTableFromLegacyBwdDiffFunc* translateInst);
+
 } // namespace Slang

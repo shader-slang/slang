@@ -712,5 +712,6 @@ return {
 	["TranslateBase.SynthesizedBackwardDerivativeWitnessTable"] = 713,
 	["TranslateBase.LegacyBackwardDifferentiate"] = 714,
 	["TranslateBase.TrivialBackwardDifferentiate"] = 715,
-	["WeakUse"] = 716
+	["WeakUse"] = 716,
+	["TranslateBase.SynthesizedBackwardDerivativeWitnessTableFromLegacyBwdDiffFunc"] = 717,
 }

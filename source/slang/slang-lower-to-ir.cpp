@@ -9290,11 +9290,71 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             // TODO: Store the op in the modifier
             IRInst* subTypeInst = irSubType;
+            auto synModifier = inheritanceDecl->findModifier<SynthesizedModifier>();
+
+            List<Val*> valOperands;
+            if (isDeclRefTypeOf<CallableDecl>(subType))
+                valOperands.add(as<DeclRefType>(subType)->getDeclRef().declRefBase);
+            else
+                valOperands.add(subType);
+
+            for (auto arg : synModifier->operands)
+            {
+                valOperands.add(arg);
+            }
+
+            // TODO: de-duplicate this logic.
+            List<IRInst*> irOperands;
+            for (auto operand : valOperands)
+            {
+                if (auto declRefOperand = as<DeclRefBase>(operand->resolve()))
+                {
+                    if (auto funcDeclRef = DeclRef<Decl>(declRefOperand).as<FunctionDeclBase>())
+                    {
+                        FuncDeclBaseTypeInfo innerInfo;
+                        _lowerFuncDeclBaseTypeInfo(subContext, funcDeclRef, innerInfo);
+
+                        auto targetDeclRefInfo =
+                            emitDeclRef(subContext, funcDeclRef, innerInfo.type);
+
+                        SLANG_ASSERT(targetDeclRefInfo.flavor == LoweredValInfo::Flavor::Simple);
+                        auto _targetIRFunc = getSimpleVal(subContext, targetDeclRefInfo);
+                        irOperands.add(_targetIRFunc);
+                    }
+                    else
+                    {
+                        // Assume that we have a type here...
+                        LoweredValInfo info =
+                            emitDeclRef(subContext, declRefOperand, subBuilder->getTypeKind());
+                        if (info.flavor == LoweredValInfo::Flavor::Simple)
+                        {
+                            irOperands.add(getSimpleVal(subContext, info));
+                        }
+                        else
+                        {
+                            SLANG_UNEXPECTED("Unexpected operand type in synthesized function");
+                        }
+                    }
+                }
+                else
+                {
+                    LoweredValInfo info = lowerVal(subContext, operand);
+                    if (info.flavor == LoweredValInfo::Flavor::Simple)
+                    {
+                        irOperands.add(getSimpleVal(subContext, info));
+                    }
+                    else
+                    {
+                        SLANG_UNEXPECTED("Unexpected operand type in synthesized function");
+                    }
+                }
+            }
+
             irWitnessTable = subBuilder->emitIntrinsicInst(
                 subBuilder->getWitnessTableType(irWitnessTableBaseType),
-                kIROp_SynthesizedForwardDerivativeWitnessTable,
-                1,
-                &subTypeInst);
+                (IROp)synModifier->op,
+                irOperands.getCount(),
+                irOperands.getBuffer());
         }
 
         // Override with the correct witness-table

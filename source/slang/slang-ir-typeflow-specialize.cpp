@@ -441,6 +441,9 @@ struct TypeFlowSpecializationContext
     Dictionary<IRInst*, IRInst*> resolvedInstMap;
     IRInst* getResolvedGlobalInst(IRInst* inst)
     {
+        if (!inst)
+            return nullptr;
+
         SLANG_ASSERT(isGlobalInst(inst));
 
         switch (inst->getOp())
@@ -977,47 +980,90 @@ struct TypeFlowSpecializationContext
 
     TranslationBaseInfo getTranslationBaseInfo(IRInst* inst)
     {
-        IRInst* primalFunc = inst->getOperand(0);
+        TranslationBaseInfo baseInfo;
+        for (UIndex ii = 0; ii < inst->getOperandCount(); ii++)
+        {
+            bool valid = true;
+            valid &= addOperand(baseInfo, inst->getOperand(ii));
 
-        TranslationBaseInfo info;
-        bool valid = true;
-        valid &= addOperand(info, primalFunc);
+            if (!valid)
+                return TranslationBaseInfo();
+        }
 
-        if (!valid)
-            return TranslationBaseInfo();
+        return baseInfo;
+    }
 
-        return info;
+    IRInst* getSubstitutedFuncType(IRInst* context, IRFuncType* funcType)
+    {
+        auto substituteSets = [&](IRInst* type) -> IRInst*
+        {
+            if (auto info = tryGetInfo(context, type))
+            {
+                if (auto infoCollectionTag = as<IRCollectionTagType>(info))
+                {
+                    if (infoCollectionTag->isSingleton())
+                        return infoCollectionTag->getCollection()->getElement(0);
+                    else
+                        return infoCollectionTag->getCollection();
+                }
+                else
+                    return type;
+            }
+            else
+                return type;
+        };
+
+        List<IRType*> newParamTypes;
+        for (auto paramType : funcType->getParamTypes())
+            newParamTypes.add((IRType*)substituteSets(paramType));
+        IRBuilder builder(module);
+        builder.setInsertInto(module);
+
+        return builder.getFuncType(
+            newParamTypes.getCount(),
+            newParamTypes.getBuffer(),
+            (IRType*)substituteSets(funcType->getResultType()));
     }
 
     IRInst* analyzeTranslation(IRInst* context, IRInst* inst)
     {
-        auto info = tryGetInfo(context, inst->getOperand(0));
-        if (!info)
-            return none();
+        List<IRInst*> operandInfos;
+        for (UInt i = 0; i < inst->getOperandCount(); i++)
+        {
+            // Translation insts should _never_ operate on collections.
+            // We should only encounter collections of translations.
+            //
+            if (auto info = tryGetInfo(context, inst->getOperand(i)))
+            {
+                SLANG_ASSERT(as<IRCollectionBase>(info) || as<IRCollectionTagType>(info));
+                SLANG_ASSERT(info->getOperandCount() == 1);
+                operandInfos.add(info->getOperand(0));
+            }
+            else
+            {
+                return none();
+            }
+        }
 
         IRBuilder builder(module);
         builder.setInsertBefore(inst);
 
-        IRCollectionBase* collection = nullptr;
-        if (auto tagType = as<IRCollectionTagType>(info))
-            collection = as<IRCollectionBase>(tagType->getCollection());
-        else if (as<IRCollectionBase>(info))
-            collection = as<IRCollectionBase>(info);
-        else
-            SLANG_UNEXPECTED("Unexpected info type for translation.");
+        auto substFuncType =
+            (IRType*)getSubstitutedFuncType(context, cast<IRFuncType>(inst->getDataType()));
 
-        forEachInCollection(
-            collection,
-            [&](IRInst* instElement)
-            {
-                if (auto specInst = as<IRSpecialize>(instElement))
-                {
-                }
-                else
-                {
-                    SLANG_UNEXPECTED("Unexpected element type in translation collection.");
-                }
-            });
+        if (isGlobalInst(substFuncType))
+        {
+            auto translationInst = builder.emitIntrinsicInst(
+                substFuncType,
+                inst->getOp(),
+                operandInfos.getCount(),
+                operandInfos.getBuffer());
+            return cBuilder.makeSingletonSet(translationInst);
+        }
+        else
+        {
+            return none();
+        }
     }
 
     void processInstForPropagation(IRInst* context, IRInst* inst, WorkQueue& workQueue)
@@ -1053,6 +1099,9 @@ struct TypeFlowSpecializationContext
             break;
         case kIROp_Call:
             info = analyzeCall(context, as<IRCall>(inst), workQueue);
+            break;
+        case kIROp_AttributedType:
+            info = analyzeAttributedType(context, as<IRAttributedType>(inst), workQueue);
             break;
         case kIROp_Specialize:
             info = analyzeSpecialize(context, as<IRSpecialize>(inst), workQueue);
@@ -1368,6 +1417,36 @@ struct TypeFlowSpecializationContext
                 cast<IRTableCollection>(tagType->getCollection()),
                 [&](IRInst* table)
                 {
+                    if (as<IRSpecialize>(table))
+                    {
+                        auto specialize = cast<IRSpecialize>(table);
+                        auto generic = cast<IRGeneric>(specialize->getBase());
+                        auto genericReturnVal = findGenericReturnVal(generic);
+
+                        // Resolve table..
+                        // Note that we're modifying the generic & then specializing it.
+                        // rather than specializing the result, since it allows us to reuse
+                        // the generic.
+                        //
+                        switch (genericReturnVal->getOp())
+                        {
+                        case kIROp_SynthesizedBackwardDerivativeWitnessTable:
+                        case kIROp_SynthesizedForwardDerivativeWitnessTable:
+                        case kIROp_SynthesizedBackwardDerivativeWitnessTableFromLegacyBwdDiffFunc:
+                            {
+                                auto translatedInst =
+                                    translationContext.maybeTranslateInst(genericReturnVal);
+                                genericReturnVal->replaceUsesWith(translatedInst);
+                                genericReturnVal = translatedInst;
+                                break;
+                            }
+                        default:
+                            break;
+                        }
+
+                        table = specializeGeneric(specialize);
+                    }
+
                     auto resolvedTable = resolve(table);
                     auto result = findWitnessTableEntry(cast<IRWitnessTable>(resolvedTable), key);
                     result->setFullType((IRType*)resolve(result->getFullType()));
@@ -1434,9 +1513,9 @@ struct TypeFlowSpecializationContext
 
     IRInst* analyzeSpecialize(IRInst* context, IRSpecialize* inst, WorkQueue& workQueue)
     {
-        return _analyzeInvoke(context, inst, workQueue);
+        // return _analyzeInvoke(context, inst, workQueue);
 
-        /*auto operand = inst->getBase();
+        auto operand = inst->getBase();
         auto operandInfo = tryGetInfo(context, operand);
 
         if (!operandInfo)
@@ -1503,33 +1582,7 @@ struct TypeFlowSpecializationContext
                 typeOfSpecialization = inst->getDataType();
             else if (auto funcType = as<IRFuncType>(inst->getDataType()))
             {
-                auto substituteSets = [&](IRInst* type) -> IRInst*
-                {
-                    if (auto info = tryGetInfo(context, type))
-                    {
-                        if (auto infoCollectionTag = as<IRCollectionTagType>(info))
-                        {
-                            if (infoCollectionTag->isSingleton())
-                                return infoCollectionTag->getCollection()->getElement(0);
-                            else
-                                return infoCollectionTag->getCollection();
-                        }
-                        else
-                            return type;
-                    }
-                    else
-                        return type;
-                };
-
-                List<IRType*> newParamTypes;
-                for (auto paramType : funcType->getParamTypes())
-                    newParamTypes.add((IRType*)substituteSets(paramType));
-                IRBuilder builder(module);
-                builder.setInsertInto(module);
-                typeOfSpecialization = builder.getFuncType(
-                    newParamTypes.getCount(),
-                    newParamTypes.getBuffer(),
-                    (IRType*)substituteSets(funcType->getResultType()));
+                typeOfSpecialization = (IRType*)getSubstitutedFuncType(context, funcType);
             }
             else if (auto typeInfo = tryGetInfo(context, inst->getDataType()))
             {
@@ -1557,6 +1610,17 @@ struct TypeFlowSpecializationContext
                     return none();
                 }
             }
+            else if (as<IRWitnessTableType>(inst->getDataType()))
+            {
+                // Keep going.. we'll avoid trying to create
+                // proper witness table types, since the point of this pass
+                // is to eliminate them anyway.
+                // We'll intentionally make an invalid dummy type, so that
+                // if we _dont_ eliminate this later, it will fail validation/codegen
+                //
+                IRBuilder builder(module);
+                typeOfSpecialization = builder.getWitnessTableType(nullptr);
+            }
             else
             {
                 // We don't have a type we can work with just yet.
@@ -1572,7 +1636,7 @@ struct TypeFlowSpecializationContext
             }
             else
             {
-                typeOfSpecialization = (IRType*)getResolvedGlobalInst(inst->getDataType());
+                typeOfSpecialization = (IRType*)getResolvedGlobalInst(typeOfSpecialization);
             }
 
             IRCollectionBase* collection = nullptr;
@@ -1604,7 +1668,6 @@ struct TypeFlowSpecializationContext
             else
                 return cBuilder.makeSet(specializedSet);
         }
-        */
 
         SLANG_UNEXPECTED("Unhandled PropagationJudgment in analyzeExtractExistentialWitnessTable");
     }
@@ -1632,7 +1695,103 @@ struct TypeFlowSpecializationContext
                 {
                     auto specialize = cast<IRSpecialize>(context);
                     auto generic = cast<IRGeneric>(specialize->getBase());
-                    IRFunc* func = cast<IRFunc>(findGenericReturnVal(generic));
+                    auto genericReturnVal = findGenericReturnVal(generic);
+
+                    if (as<IRTranslateBase>(genericReturnVal) ||
+                        as<IRTranslatedTypeBase>(genericReturnVal))
+                    {
+                        switch (genericReturnVal->getOp())
+                        {
+                        // Instructions that need function bodys to be analyzed.
+                        // In this case, we'll translate the generic and then
+                        // specialize it with the same arguments.
+                        //
+                        // This is primarily to avoid excessive invocations of auto-diff since
+                        // specialization parameters can be frequently updated during
+                        // the type-flow analysis, and trying to stamp out and differentiate
+                        // a specialized version for transient cases can be wasteful.
+                        //
+                        case kIROp_ForwardDifferentiate:
+                        case kIROp_TrivialForwardDifferentiate:
+                        case kIROp_BackwardDifferentiatePrimal:
+                        case kIROp_BackwardDifferentiatePropagate:
+                        case kIROp_BackwardContextGetPrimalVal:
+                        case kIROp_BackwardDiffIntermediateContextType:
+                        case kIROp_TrivialBackwardDifferentiatePrimal:
+                        case kIROp_TrivialBackwardDifferentiatePropagate:
+                        case kIROp_TrivialBackwardContextGetPrimalVal:
+                        case kIROp_TrivialBackwardDiffIntermediateContextType:
+                            {
+                                auto baseInfo = getTranslationBaseInfo(genericReturnVal);
+                                IRBuilder builder(module);
+                                auto genericTranslationInst = builder.emitIntrinsicInst(
+                                    nullptr,
+                                    genericReturnVal->getOp(),
+                                    baseInfo.operands.getCount(),
+                                    baseInfo.operands.getBuffer());
+                                auto resolvedInst = resolve(genericTranslationInst);
+                                auto materializedVal =
+                                    materialize(&builder, baseInfo, resolvedInst);
+
+                                if (resolvedInst != genericTranslationInst)
+                                    genericReturnVal->replaceUsesWith(materializedVal);
+
+                                genericReturnVal = materializedVal;
+                            }
+                            break;
+
+                        // Other instructions are wrappers, and only need a function reference..
+                        // we can just directly translate them in this case.
+                        //
+                        case kIROp_LegacyBackwardDifferentiate:
+                        case kIROp_FunctionCopy:
+                            {
+                                auto translatedInst =
+                                    translationContext.maybeTranslateInst(genericReturnVal);
+
+                                if (as<IRSpecialize>(translatedInst))
+                                {
+                                    // If we ended up translating to a specialize,
+                                    // we need to materialize it now.
+                                    translatedInst =
+                                        specializeGeneric(as<IRSpecialize>(translatedInst));
+                                }
+
+                                if (translatedInst != genericReturnVal)
+                                    genericReturnVal->replaceUsesWith(translatedInst);
+
+                                genericReturnVal = translatedInst;
+                            }
+                            break;
+                        case kIROp_BackwardPrimalFromLegacyBwdDiffFunc:
+                        case kIROp_BackwardPropagateFromLegacyBwdDiffFunc:
+                        case kIROp_BackwardContextGetValFromLegacyBwdDiffFunc:
+                        case kIROp_BackwardContextFromLegacyBwdDiffFunc:
+                            {
+                                auto translatedInst =
+                                    translationContext.maybeTranslateInst(genericReturnVal);
+
+                                if (as<IRSpecialize>(translatedInst))
+                                {
+                                    // If we ended up translating to a specialize,
+                                    // we need to materialize it now.
+                                    translatedInst =
+                                        specializeGeneric(as<IRSpecialize>(translatedInst));
+                                }
+
+                                if (translatedInst != genericReturnVal)
+                                    genericReturnVal->replaceUsesWith(translatedInst);
+
+                                genericReturnVal = translatedInst;
+                            }
+                            break;
+                        default:
+                            SLANG_UNEXPECTED("Unsupported translation in dynamic generic");
+                            break;
+                        }
+                    }
+
+                    auto func = cast<IRFunc>(genericReturnVal);
 
                     // Transfer information from specialization arguments to the params in the
                     // first generic block.
@@ -1753,6 +1912,47 @@ struct TypeFlowSpecializationContext
     IRInst* analyzeCall(IRInst* context, IRCall* inst, WorkQueue& workQueue)
     {
         return _analyzeInvoke(context, inst, workQueue);
+    }
+
+    IRInst* analyzeAttributedType(IRInst* context, IRAttributedType* inst, WorkQueue& workQueue)
+    {
+        auto base = inst->getBaseType();
+        if (auto baseInfo = tryGetInfo(context, base))
+        {
+            // Wrap all elements into the attributed type.
+            IRBuilder builder(module);
+            HashSet<IRInst*> attributedSet;
+            List<IRAttr*> attributes;
+            for (UIndex ii = 1; ii < inst->getOperandCount(); ++ii)
+                attributes.add(cast<IRAttr>(inst->getOperand(ii)));
+
+            if (auto tag = as<IRCollectionTagType>(baseInfo))
+            {
+                forEachInCollection(
+                    tag,
+                    [&](IRInst* element)
+                    {
+                        attributedSet.add(builder.getAttributedType((IRType*)element, attributes));
+                    });
+                return makeTagType(cBuilder.makeSet(attributedSet));
+            }
+            else if (auto collection = as<IRCollectionBase>(baseInfo))
+            {
+                forEachInCollection(
+                    collection,
+                    [&](IRInst* element)
+                    {
+                        attributedSet.add(builder.getAttributedType((IRType*)element, attributes));
+                    });
+                return cBuilder.makeSet(attributedSet);
+            }
+            else
+            {
+                SLANG_UNEXPECTED("Unexpected PropagationJudgment in analyzeAttributedType");
+            }
+        }
+
+        return none();
     }
 
     void maybeUpdatePtr(IRInst* context, IRInst* inst, IRInst* info, WorkQueue& workQueue)
@@ -3086,7 +3286,7 @@ struct TypeFlowSpecializationContext
 
     bool specializeCall(IRInst* context, IRCall* inst)
     {
-        auto callee = inst->getCallee();
+        auto callee = resolve(inst->getCallee());
         IRInst* calleeTagInst = nullptr;
 
         // This is a bit of a workaround for specialized callee's
@@ -3117,8 +3317,8 @@ struct TypeFlowSpecializationContext
         // One other case to avoid is if the function is a global LookupWitnessMethod
         // which can be created when optional witnesses are specialized.
         //
-        if (as<IRLookupWitnessMethod>(callee))
-            return false;
+        // if (as<IRLookupWitnessMethod>(callee))
+        //    return false;
 
         auto expectedFuncType = getEffectiveFuncType(callee);
 
@@ -3423,21 +3623,25 @@ struct TypeFlowSpecializationContext
 
     bool specializeSpecialize(IRInst* context, IRSpecialize* inst)
     {
-        bool isFuncReturn = false;
+        bool isDynamic = false;
 
         // TODO: Would checking this inst's info be enough instead?
         // This seems long-winded.
         if (auto concreteGeneric = as<IRGeneric>(inst->getBase()))
-            isFuncReturn = as<IRFunc>(getGenericReturnVal(concreteGeneric)) != nullptr;
+            isDynamic = as<IRFunc>(getGenericReturnVal(concreteGeneric)) ||
+                        as<IRWitnessTable>(getGenericReturnVal(concreteGeneric));
         else if (auto tagType = as<IRCollectionTagType>(inst->getBase()->getDataType()))
         {
             auto firstConcreteGeneric = as<IRGeneric>(tagType->getCollection()->getElement(0));
-            isFuncReturn = as<IRFunc>(getGenericReturnVal(firstConcreteGeneric)) != nullptr;
+            isDynamic = as<IRFunc>(getGenericReturnVal(firstConcreteGeneric)) ||
+                        as<IRWitnessTable>(getGenericReturnVal(firstConcreteGeneric));
         }
 
-        // We'll emit a dynamic tag inst if the result is a func collection with multiple
-        // elements
-        if (isFuncReturn)
+        // If the result needs to be dynamic, we'll emit a tag inst.
+        //
+        // TODO: What if we have multiple elements with dynamic generics?
+        //
+        if (isDynamic)
         {
             if (auto info = tryGetInfo(context, inst))
             {

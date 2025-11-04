@@ -66,7 +66,7 @@ struct FooImpl1: IFoo<8>
     }
 }
 
-/*
+
 // There's a slight issue with dynamic dispatch over generic interfaces. Uncomment after that is fixed.
 
 struct FooImpl2: IFoo<8>
@@ -83,15 +83,15 @@ struct FooImpl2: IFoo<8>
         return GetterImpl({x, x+5, x+7, x+9, x+11, x+13, x+15, x+17});
     }
 }
-*/
+
 
 IFoo<8> getFoo(uint id)
 {
-    /*if (id == 0)
+    if (id == 0)
         return FooImpl1();
     else
-        return FooImpl2();*/
-    return FooImpl1();
+        return FooImpl2();
+    //return FooImpl1();
 }
 
 [Differentiable]

@@ -1034,10 +1034,12 @@ AutoDiffSharedContext::AutoDiffSharedContext(IRModuleInst* inModuleInst)
         forwardDifferentiableInterfaceType = cast<IRGeneric>(findForwardDifferentiableInterface());
         backwardDifferentiableInterfaceType =
             cast<IRGeneric>(findBackwardDifferentiableInterface());
+        backwardCallableInterfaceType = cast<IRGeneric>(findBackwardCallableInterface());
 
         IRBuilder builder(moduleInst);
         builder.addKeepAliveDecoration(forwardDifferentiableInterfaceType);
         builder.addKeepAliveDecoration(backwardDifferentiableInterfaceType);
+        builder.addKeepAliveDecoration(backwardCallableInterfaceType);
 
         isInterfaceAvailable = true;
     }
@@ -1112,6 +1114,29 @@ IRInst* AutoDiffSharedContext::findBackwardDifferentiableInterface()
                 if (auto decor = inner->findDecoration<IRKnownBuiltinDecoration>())
                 {
                     if (decor->getName() == KnownBuiltinDeclName::IBackwardDifferentiable)
+                    {
+                        return globalInst;
+                    }
+                }
+            }
+        }
+    }
+    return nullptr;
+}
+
+
+IRInst* AutoDiffSharedContext::findBackwardCallableInterface()
+{
+    if (auto module = as<IRModuleInst>(moduleInst))
+    {
+        for (auto globalInst : module->getGlobalInsts())
+        {
+            if (auto generic = as<IRGeneric>(globalInst))
+            {
+                auto inner = getGenericReturnVal(generic);
+                if (auto decor = inner->findDecoration<IRKnownBuiltinDecoration>())
+                {
+                    if (decor->getName() == KnownBuiltinDeclName::IBwdCallable)
                     {
                         return globalInst;
                     }
@@ -4291,6 +4316,12 @@ void releaseDifferentiableInterfaces(AutoDiffSharedContext* context)
     }
 
     for (auto decoration : context->backwardDifferentiableInterfaceType->getDecorations())
+    {
+        if (auto keepAliveDecoration = decoration->findDecoration<IRKeepAliveDecoration>())
+            decorationsToRemove.add(keepAliveDecoration);
+    }
+
+    for (auto decoration : context->backwardCallableInterfaceType->getDecorations())
     {
         if (auto keepAliveDecoration = decoration->findDecoration<IRKeepAliveDecoration>())
             decorationsToRemove.add(keepAliveDecoration);

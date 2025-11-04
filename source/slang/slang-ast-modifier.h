@@ -180,6 +180,8 @@ FIDDLE()
 class SynthesizedModifier : public Modifier
 {
     FIDDLE(...)
+    FIDDLE() uint32_t op = kIROp_Nop;
+    FIDDLE() List<Val*> operands;
 };
 
 // Marks that the definition of a func decl is synthesized static invoke func for

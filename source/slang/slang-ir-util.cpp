@@ -444,6 +444,17 @@ IRInst* hoistValueFromGeneric(
             false);
         newGeneric->setFullType((IRType*)genericFuncType);
     }
+    else if (newResultVal->getOp() == kIROp_WitnessTable)
+    {
+        IRBuilder subBuilder = builder;
+        IRInst* subOutSpecialized = nullptr;
+        auto genericWitnessTableType = hoistValueFromGeneric(
+            subBuilder,
+            newResultVal->getFullType(),
+            subOutSpecialized,
+            false);
+        newGeneric->setFullType((IRType*)genericWitnessTableType);
+    }
     else
     {
         newGeneric->setFullType(builder.getTypeKind());

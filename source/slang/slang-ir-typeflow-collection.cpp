@@ -111,10 +111,14 @@ IROp CollectionBuilder::getCollectionTypeForInst(IRInst* inst)
         return kIROp_TypeCollection;
     else if (as<IRFuncType>(inst->getDataType()))
         return kIROp_FuncCollection;
-    else if (as<IRType>(inst) && !as<IRInterfaceType>(inst))
-        return kIROp_TypeCollection;
     else if (as<IRWitnessTableType>(inst->getDataType()))
         return kIROp_TableCollection;
+    else if (auto specInst = as<IRSpecialize>(inst))
+    {
+        return getCollectionTypeForInst(getGenericReturnVal(specInst->getBase()));
+    }
+    else if (as<IRType>(inst) && !as<IRInterfaceType>(inst))
+        return kIROp_TypeCollection;
     else
         return kIROp_Invalid; // Return invalid IROp when not supported
 }

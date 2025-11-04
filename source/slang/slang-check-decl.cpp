@@ -8204,7 +8204,9 @@ static DeclRef<ExtensionDecl> extendContainerDecl(
     ContainerDecl* decl,
     Type* targetType,
     SubstitutionSet& outSubstSet,
-    bool synthesizedInheritance = false)
+    IROp synthesisOp = kIROp_Nop,
+    UCount extraArgCount = 0,
+    Val* const* extraArgs = nullptr)
 {
     auto astBuilder = getCurrentASTBuilder();
 
@@ -8229,10 +8231,13 @@ static DeclRef<ExtensionDecl> extendContainerDecl(
     fwdDiffInheritanceDecl->base.type = as<Type>(targetType->substitute(astBuilder, substSet));
     extensionDecl->addMember(fwdDiffInheritanceDecl);
 
-    if (synthesizedInheritance)
+    if (synthesisOp != kIROp_Nop)
     {
         auto synthesizedModifier = astBuilder->create<SynthesizedModifier>();
+        synthesizedModifier->op = synthesisOp;
         addModifier(fwdDiffInheritanceDecl, synthesizedModifier);
+        for (UCount aa = 0; aa < extraArgCount; ++aa)
+            synthesizedModifier->operands.add(extraArgs[aa]->substitute(astBuilder, substSet));
     }
 
     // Add the forward diff extension to the module.
@@ -8506,8 +8511,12 @@ bool SemanticsVisitor::trySynthesizeDiffFuncRequirementWitness(
         auto fwdDiffFuncAsType = m_astBuilder->getForwardDiffFuncInterfaceType(
             DeclRefType::create(getCurrentASTBuilder(), synFunc->getDefaultDeclRef()));
         SubstitutionSet substSet;
-        auto higherOrderFwdDiffExtension =
-            extendContainerDecl(this, synFunc, fwdDiffFuncAsType, substSet, true);
+        auto higherOrderFwdDiffExtension = extendContainerDecl(
+            this,
+            synFunc,
+            fwdDiffFuncAsType,
+            substSet,
+            kIROp_SynthesizedForwardDerivativeWitnessTable);
         this->ensureDecl(higherOrderFwdDiffExtension, DeclCheckState::ReadyForLookup);
     }
 
@@ -12617,7 +12626,7 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                             synFuncDeclRef.getDecl(),
                             fwdDiffFuncAsType,
                             substSet,
-                            true);
+                            kIROp_SynthesizedForwardDerivativeWitnessTable);
                         this->ensureDecl(
                             higherOrderFwdDiffExtension,
                             DeclCheckState::ReadyForLookup);
@@ -16079,11 +16088,23 @@ static void translateBwdDerivativeAttributeToAD2(
         DeclRefType::create(getCurrentASTBuilder(), targetFuncDecl->getDefaultDeclRef());
 
     SubstitutionSet substSet;
+    Val* bwdDiffFunc = as<DeclRefExpr>(attr->funcExpr)->declRef;
+    /*
+    auto bwdDiffExtension = extendContainerDecl(
+        visitor,
+        targetFuncDecl,
+        getCurrentASTBuilder()->getBackwardDiffFuncInterfaceType(funcAsType),
+        substSet,
+        kIROp_SynthesizedBackwardDerivativeWitnessTableFromLegacyBwdDiffFunc,
+        1,
+        &bwdDiffFunc);
+    */
     auto bwdDiffExtension = extendContainerDecl(
         visitor,
         targetFuncDecl,
         getCurrentASTBuilder()->getBackwardDiffFuncInterfaceType(funcAsType),
         substSet);
+
 
     auto substFuncAsTypeFromExtension =
         as<DeclRefType>(substFuncAsType->substitute(getCurrentASTBuilder(), substSet));

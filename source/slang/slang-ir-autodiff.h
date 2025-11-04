@@ -100,6 +100,7 @@ struct AutoDiffSharedContext
     //
     IRGeneric* forwardDifferentiableInterfaceType = nullptr;
     IRGeneric* backwardDifferentiableInterfaceType = nullptr;
+    IRGeneric* backwardCallableInterfaceType = nullptr;
 
     // The struct key for the 'Differential' associated type
     // defined inside IDifferential. We use this to lookup the differential
@@ -171,6 +172,7 @@ private:
     IRInst* findDifferentiableInterface();
     IRInst* findForwardDifferentiableInterface();
     IRInst* findBackwardDifferentiableInterface();
+    IRInst* findBackwardCallableInterface();
 
     IRStructType* findNullDifferentialStructType();
 

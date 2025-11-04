@@ -143,9 +143,6 @@ IRInst* TranslationContext::maybeTranslateInst(IRInst* inst)
         {
             auto funcOperand = inst->getOperand(0);
             translationResult = funcOperand;
-            SLANG_ASSERT(!as<IRSpecialize>(translationResult));
-            // if (auto specInst = as<IRSpecialize>(translationResult))
-            //     translationResult = specializeGeneric(specInst);
         }
         break;
     case kIROp_BackwardContextFromLegacyBwdDiffFunc:
@@ -225,6 +222,15 @@ IRInst* TranslationContext::maybeTranslateInst(IRInst* inst)
                     cast<IRDifferentialPtrPairType>(baseType),
                     DiffConformanceKind::Ptr));
             }
+        }
+        break;
+    case kIROp_SynthesizedBackwardDerivativeWitnessTableFromLegacyBwdDiffFunc:
+        {
+            SLANG_ASSERT("not supported anymore.. ");
+            return memoize(maybeTranslateBackwardDerivativeWitnessFromLegacyBwdDiffFunc(
+                &autodiffContext,
+                sink,
+                cast<IRSynthesizedBackwardDerivativeWitnessTableFromLegacyBwdDiffFunc>(inst)));
         }
         break;
     // Translate special func-types.
