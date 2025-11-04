@@ -4873,6 +4873,7 @@ _slang_waveClusteredRotate(bool4 value, unsigned int delta, unsigned int cluster
 // ---------------------- OptiX Cooperative Vector Wrappers --------------------------------------
 #ifdef SLANG_CUDA_ENABLE_OPTIX
 
+#if defined(OPTIX_VERSION) && OPTIX_VERSION >= 90000
 // Constexpr function to map Slang component type enum to OptiX cooperative vector element type
 __host__ __device__ constexpr OptixCoopVecElemType slangToOptixComponentType(unsigned slangEnum)
 {
@@ -4929,6 +4930,7 @@ struct SlangToOptixMatrixLayout
 {
     static constexpr OptixCoopVecMatrixLayout value = slangToOptixMatrixLayout(SlangEnum);
 };
+#endif
 
 // Template trait to extract vector size from OptixCoopVec<T, N>
 // Conditional compilation for NVRTC compatibility
