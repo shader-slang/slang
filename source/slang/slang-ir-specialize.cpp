@@ -3378,6 +3378,13 @@ IRInst* specializeGenericWithSetArgs(IRSpecialize* specializeInst)
             loweredFunc->setFullType(
                 builder.getFuncType(funcTypeParams, loweredFuncType->getResultType()));
         }
+        else if (as<IRDebugFunction>(inst))
+        {
+            // Emit out into the global scope.
+            IRBuilder globalBuilder(builder.getModule());
+            globalBuilder.setInsertInto(builder.getModule());
+            cloneInst(&staticCloningEnv, &globalBuilder, inst);
+        }
         else if (!as<IRReturn>(inst))
         {
             // Clone insts in the generic under two different environments:
