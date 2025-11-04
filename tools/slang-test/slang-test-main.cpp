@@ -5502,7 +5502,9 @@ SlangResult innerMain(int argc, char** argv)
         else
         {
             // If there are too many failed tests, don't bother retrying.
-            printf("Too many failed tests for retry(%d) - setting all to failed\n", (int)context.failedFileTests.getCount());
+            printf(
+                "Too many failed tests for retry(%d) - setting all to failed\n",
+                (int)context.failedFileTests.getCount());
             fflush(stdout);
             for (auto& test : context.failedFileTests)
             {

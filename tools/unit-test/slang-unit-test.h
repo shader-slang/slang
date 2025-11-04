@@ -12,13 +12,14 @@ enum class TestResult
 
     // Special states with negative values (lowest precedence)
     Uninitialized = -2, ///< Test result not yet set - initial state before any results are added
-    PendingRetry = -1,  ///< Test failed and is scheduled for retry - not counted in any statistics yet
+    PendingRetry =
+        -1, ///< Test failed and is scheduled for retry - not counted in any statistics yet
 
     // Normal test results (NOTE! Do NOT CHANGE - binary compatibility!)
-    Ignored = 0,        ///< Test was explicitly skipped/ignored
-    Pass = 1,           ///< Test passed
-    ExpectedFail = 2,   ///< Test expected to fail based on expected failure list
-    Fail = 3,           ///< Test failed
+    Ignored = 0,      ///< Test was explicitly skipped/ignored
+    Pass = 1,         ///< Test passed
+    ExpectedFail = 2, ///< Test expected to fail based on expected failure list
+    Fail = 3,         ///< Test failed
 };
 
 enum class TestMessageType

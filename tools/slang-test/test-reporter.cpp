@@ -358,8 +358,7 @@ void TestReporter::_addResult(TestInfo info)
     // The test will be re-run and reported again with a final result
     if (info.testResult == TestResult::PendingRetry)
     {
-        printf("failed(pending retry) '%S'\n",
-               info.name.toWString().begin());
+        printf("failed(pending retry) '%S'\n", info.name.toWString().begin());
         fflush(stdout);
         return;
     }
