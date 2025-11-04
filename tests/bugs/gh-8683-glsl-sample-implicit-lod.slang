@@ -26,13 +26,13 @@ buffer MyBlockName
 [shader("vertex")]
 void vertexMain() {
 
-// VK_VTX: OpImageSampleExplicitLod
 // VK_VTX-NOT: OpImageSampleImplicitLod
+// VK_VTX: OpImageSampleExplicitLod
 
 // GLSL_VTX: texture(
 
-// HLSL_VTX: SampleLevel(
 // HLSL_VTX-NOT: Sample(
+// HLSL_VTX: SampleLevel(
 
     vec3 val = texture(uBumpTexture, vec2(0,0)).rgb;
 
@@ -43,8 +43,8 @@ void vertexMain() {
 [shader("fragment")]
 void fragmentMain() {
 
-// VK_FRAG: OpImageSampleImplicitLod
 // VK_FRAG-NOT: OpImageSampleExplicitLod
+// VK_FRAG: OpImageSampleImplicitLod
 
 // GLSL_FRAG: texture(
 
