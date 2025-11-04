@@ -44,13 +44,17 @@ void computeMain(uint3 sv_dispatchThreadID : SV_DispatchThreadID)
     // CHECK-NEXT: 4
     // CHECK-NEXT: 4
     // CHECK-NEXT: 4
-    // CHECK-NEXT: 4
-    // CHECK-NEXT: 4
-    // CHECK-NEXT: 4
-    // CHECK-NEXT: 4
-    // CHECK-NEXT: 4
-    // CHECK-NEXT: 4
-    // CHECK-NEXT: 4
-    // CHECK-NEXT: 4
-    pb2.resultBuffer[sv_dispatchThreadID.x] = scene.sceneCb.value.x + scene.data[0].x + scene.material.cb.value.x + scene.material.data[0].x;
+    // CHECK-NEXT: 5
+    // CHECK-NEXT: 5
+    // CHECK-NEXT: 5
+    // CHECK-NEXT: 5
+    // CHECK-NEXT: 6
+    // CHECK-NEXT: 6
+    // CHECK-NEXT: 6
+    // CHECK-NEXT: 6
+    // CHECK-NEXT: 7
+    // CHECK-NEXT: 7
+    // CHECK-NEXT: 7
+    // CHECK-NEXT: 7
+    pb2.resultBuffer[sv_dispatchThreadID.x] = sv_dispatchThreadID.x + scene.sceneCb.value.x + scene.data[0].x + scene.material.cb.value.x + scene.material.data[0].x;
 }
