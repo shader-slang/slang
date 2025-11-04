@@ -61,7 +61,11 @@ public:
     //==========================================================================
     // Constant values
     //==========================================================================
-    virtual LLVMInst* getConstantInt(uint64_t value, int bitSize) = 0;
+    virtual LLVMInst* getConstantInt(LLVMType* type, uint64_t value) = 0;
+    virtual LLVMInst* getConstantPtr(uint64_t value) = 0;
+    virtual LLVMInst* getConstantFloat(LLVMType* type, double value) = 0;
+    virtual LLVMInst* getConstantArray(Slice<LLVMInst*> values) = 0;
+    virtual LLVMInst* getConstantString(TerminatedCharSlice literal) = 0;
 
     //==========================================================================
     // Debug info

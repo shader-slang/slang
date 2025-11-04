@@ -91,6 +91,13 @@ static void findDebugLocation(
         findDebugLocation(sourceDebugInfo, inst->getParent(), file, line);
 }
 
+static TerminatedCharSlice getStringLitAsSlice(IRInst* inst)
+{
+    auto source = as<IRStringLit>(inst)->getStringSlice();
+    return TerminatedCharSlice(source.begin(), source.getLength());
+}
+
+
 /*
 static llvm::Instruction::CastOps getLLVMIntExtensionOp(IRType* type)
 {
@@ -190,6 +197,39 @@ public:
     {
     }
 
+    int getTypeBits(IRType* type)
+    {
+        switch (type->getOp())
+        {
+        case kIROp_BoolType:
+            return 1;
+        case kIROp_Int8Type:
+        case kIROp_UInt8Type:
+            return 8;
+        case kIROp_Int16Type:
+        case kIROp_UInt16Type:
+        case kIROp_HalfType:
+            return 16;
+        case kIROp_IntType:
+        case kIROp_UIntType:
+        case kIROp_FloatType:
+            return 32;
+        case kIROp_Int64Type:
+        case kIROp_UInt64Type:
+        case kIROp_DoubleType:
+            return 64;
+
+        case kIROp_IntPtrType:
+        case kIROp_UIntPtrType:
+        case kIROp_PtrType:
+            return builder->getPointerSizeInBits();
+
+        default:
+            SLANG_ASSERT_FAILURE("Unexpected type in getTypeBits!");
+            return 0;
+        }
+    }
+
     // Returns the type you must use for passing around SSA values in LLVM IR.
     LLVMType* getType(IRType* type)
     {
@@ -203,41 +243,24 @@ public:
         case kIROp_VoidType:
             llvmType = builder->getVoidType();
             break;
-        case kIROp_BoolType:
-            llvmType = builder->getIntType(1);
-            break;
+
         case kIROp_HalfType:
-            // TODO: Should we use normal float types for these in SSA? Maybe
-            // depending on target triple? If we do that, we need to update
-            // emitStore & emitLoad to make halfs be stored as halfs still.
-            llvmType = builder->getFloatType(16);
-            break;
         case kIROp_FloatType:
-            llvmType = builder->getFloatType(32);
-            break;
         case kIROp_DoubleType:
-            llvmType = builder->getFloatType(64);
-            break;
+            llvmType = builder->getFloatType(getTypeBits(type));
+
+        case kIROp_BoolType:
         case kIROp_Int8Type:
         case kIROp_UInt8Type:
-            llvmType = builder->getIntType(8);
-            break;
         case kIROp_Int16Type:
         case kIROp_UInt16Type:
-            llvmType = builder->getIntType(16);
-            break;
         case kIROp_IntType:
         case kIROp_UIntType:
-            llvmType = builder->getIntType(32);
-            break;
         case kIROp_Int64Type:
         case kIROp_UInt64Type:
-            llvmType = builder->getIntType(64);
-            break;
-
         case kIROp_IntPtrType:
         case kIROp_UIntPtrType:
-            llvmType = builder->getIntType(builder->getPointerSizeInBits());
+            llvmType = builder->getIntType(getTypeBits(type));
             break;
 
         case kIROp_RateQualifiedType:
@@ -262,6 +285,7 @@ public:
             // a pointer is just that same opaque pointer.
             llvmType = builder->getPointerType();
             break;
+
         case kIROp_VectorType:
             {
                 auto vecType = static_cast<IRVectorType*>(type);
@@ -782,12 +806,11 @@ public:
         IRTypeLayoutRules* rules)
     {
         IRIntegerValue offset = getOffset(field, rules);
-        return builder->emitGetElementPtr(llvmPtr, 1, builder->getConstantInt(offset, 32));
+        return builder->emitGetElementPtr(llvmPtr, 1, builder->getConstantInt(builder->getIntType(32), offset));
     }
 
-    /*
     // Emits zero padding as much as needed to make curSize == targetSize.
-    UInt emitPaddingConstant(List<llvm::Constant*>& fields, UInt& curSize, UInt targetSize)
+    UInt emitPaddingConstant(List<LLVMInst*>& fields, UInt& curSize, UInt targetSize)
     {
         SLANG_ASSERT(curSize <= targetSize);
 
@@ -796,11 +819,9 @@ public:
             UInt bytes = targetSize - curSize;
             curSize = targetSize;
 
-            auto byteType = builder->getInt8Ty();
-            auto type = llvm::ArrayType::get(byteType, bytes);
-            auto zero = llvm::ConstantInt::get(byteType, 0);
-            auto zeros = List<llvm::Constant*>::makeRepeated(zero, bytes);
-            fields.add(llvm::ConstantArray::get(type, llvm::ArrayRef(zeros.begin(), zeros.end())));
+            auto zero = builder->getConstantInt(builder->getIntType(8), 0);
+            auto zeros = List<LLVMInst*>::makeRepeated(zero, bytes);
+            fields.add(builder->getConstantArray(Slice(zeros.begin(), zeros.getCount())));
 
             return bytes;
         }
@@ -809,7 +830,7 @@ public:
 
     // Tries to emit the given value as a constant, but may return nullptr if
     // that is not possible.
-    llvm::Constant* maybeEmitConstant(
+    LLVMInst* maybeEmitConstant(
         IRInst* inst,
         bool inAggregate = false,
         bool withTrailingPadding = true)
@@ -826,9 +847,7 @@ public:
                 auto litInst = static_cast<IRConstant*>(inst);
                 IRBasicType* type = as<IRBasicType>(inst->getDataType());
                 if (type)
-                {
-                    llvmConstant = llvm::ConstantInt::get(getType(type), litInst->value.intVal);
-                }
+                    llvmConstant = builder->getConstantInt(getType(type), litInst->value.intVal);
                 break;
             }
 
@@ -837,35 +856,21 @@ public:
                 auto litInst = static_cast<IRConstant*>(inst);
                 IRBasicType* type = as<IRBasicType>(inst->getDataType());
                 if (type)
-                {
-                    llvmConstant = llvm::ConstantFP::get(getType(type), litInst->value.floatVal);
-                }
+                    llvmConstant = builder->getConstantFloat(getType(type), litInst->value.floatVal);
             }
             break;
 
         case kIROp_StringLit:
-            llvmConstant = builder->CreateGlobalString(getStringLitAsLLVMString(inst));
+            llvmConstant = builder->getConstantString(getStringLitAsSlice(inst));
             break;
 
         case kIROp_PtrLit:
             {
                 auto ptrLit = static_cast<IRPtrLit*>(inst);
-                IRPtrType* type = as<IRPtrType>(inst->getDataType());
-                auto llvmType = llvm::cast<llvm::PointerType>(getType(type));
-                if (ptrLit->getValue() == nullptr)
-                {
-                    llvmConstant = llvm::ConstantPointerNull::get(llvmType);
-                }
-                else
-                {
-                    llvmConstant = llvm::ConstantExpr::getIntToPtr(
-                        llvm::ConstantInt::get(
-                            builder->getIntPtrTy(targetDataLayout),
-                            ((uintptr_t)ptrLit->getValue())),
-                        llvmType);
-                }
+                llvmConstant = builder->getConstantPtr((uintptr_t)ptrLit->getValue());
             }
             break;
+        /*
         case kIROp_MakeVector:
             {
                 List<llvm::Constant*> values;
@@ -1037,6 +1042,7 @@ public:
                     true);
             }
             break;
+        */
         default:
             break;
         }
@@ -1045,7 +1051,6 @@ public:
             constantMap[inst] = llvmConstant;
         return llvmConstant.get(withTrailingPadding);
     }
-    */
 
     // Returns true for any type that translates into an aggregate type in LLVM.
     bool isAggregateType(IRType* type)
@@ -1091,12 +1096,12 @@ private:
                 {
                     auto dstElemPtr = emitArrayGetElementPtr(
                         dstPtr,
-                        builder->getConstantInt(elem, 32),
+                        builder->getConstantInt(builder->getIntType(32), elem),
                         elemType,
                         dstLayout);
                     auto srcElemPtr = emitArrayGetElementPtr(
                         srcPtr,
-                        builder->getConstantInt(elem, 32),
+                        builder->getConstantInt(builder->getIntType(32), elem),
                         elemType,
                         srcLayout);
                     last = crossLayoutMemCpy(
@@ -3955,7 +3960,7 @@ SlangResult emitLLVMAssemblyFromIR(
     IArtifact** outArtifact)
 {
     LLVMEmitter emitter(codeGenContext);
-    emitter.processModule(irModule);
+    //emitter.processModule(irModule);
     return emitter.builder->generateAssembly(outArtifact);
 }
 
@@ -3965,7 +3970,7 @@ SlangResult emitLLVMObjectFromIR(
     IArtifact** outArtifact)
 {
     LLVMEmitter emitter(codeGenContext);
-    emitter.processModule(irModule);
+    //emitter.processModule(irModule);
     return emitter.builder->generateObjectCode(outArtifact);
 }
 
@@ -3975,7 +3980,7 @@ SlangResult emitLLVMJITFromIR(
     IArtifact** outArtifact)
 {
     LLVMEmitter emitter(codeGenContext, true);
-    emitter.processModule(irModule);
+    //emitter.processModule(irModule);
     return emitter.builder->generateJITLibrary(outArtifact);
 }
 

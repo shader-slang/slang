@@ -123,6 +123,12 @@ static llvm::ArrayRef<decltype(unwrap(T()))> unwrap(Slice<T> slice)
     return llvm::ArrayRef(reinterpret_cast<const TargetType*>(slice.begin()), slice.count);
 }
 
+template<typename T, typename U>
+static llvm::ArrayRef<T*> upcast(Slice<U> slice)
+{
+    return llvm::ArrayRef(reinterpret_cast<T* const*>(slice.begin()), slice.count);
+}
+
 llvm::StringRef charSliceToLLVM(TerminatedCharSlice slice)
 {
     return llvm::StringRef(slice.begin(), slice.count);
@@ -196,7 +202,11 @@ public:
     LLVMInst* emitIntResize(LLVMInst* value, LLVMType* into, bool isSigned = false) override;
     LLVMInst* emitCopy(LLVMInst* dstPtr, int dstAlign, LLVMInst* srcPtr, int srcAlign, int bytes, bool isVolatile = false) override;
 
-    LLVMInst* getConstantInt(uint64_t value, int bitSize) override;
+    LLVMInst* getConstantInt(LLVMType* type, uint64_t value) override;
+    LLVMInst* getConstantPtr(uint64_t value) override;
+    LLVMInst* getConstantFloat(LLVMType* type, double value) override;
+    LLVMInst* getConstantArray(Slice<LLVMInst*> values) override;
+    LLVMInst* getConstantString(TerminatedCharSlice literal) override;
 
     LLVMDebugNode* getDebugFallbackType(TerminatedCharSlice name) override;
     LLVMDebugNode* getDebugVoidType() override;
@@ -605,9 +615,48 @@ LLVMInst* LLVMBuilder::emitCopy(LLVMInst* dstPtr, int dstAlign, LLVMInst* srcPtr
         isVolatile));
 }
 
-LLVMInst* LLVMBuilder::getConstantInt(uint64_t value, int bitSize)
+LLVMInst* LLVMBuilder::getConstantInt(LLVMType* type, uint64_t value)
 {
-    return wrap(llvmBuilder->getIntN(bitSize, value));
+    return wrap(llvm::ConstantInt::get(unwrap(type), value));
+}
+
+LLVMInst* LLVMBuilder::getConstantPtr(uint64_t value)
+{
+    auto llvmType = llvmBuilder->getPtrTy();
+    if (value == 0)
+    {
+        return wrap(llvm::ConstantPointerNull::get(llvmType));
+    }
+    else
+    {
+        return wrap(llvm::ConstantExpr::getIntToPtr(
+                    llvm::ConstantInt::get(
+                        llvmBuilder->getIntPtrTy(targetDataLayout),
+                        value),
+                    llvmType));
+    }
+}
+
+LLVMInst* LLVMBuilder::getConstantFloat(LLVMType* type, double value)
+{
+    return wrap(llvm::ConstantFP::get(unwrap(type), value));
+}
+
+LLVMInst* LLVMBuilder::getConstantArray(Slice<LLVMInst*> values)
+{
+    llvm::ArrayType* type = nullptr;
+    if (values.count != 0)
+    {
+        type = llvm::ArrayType::get(unwrap(values[0])->getType(), values.count);
+    }
+    else type = llvm::ArrayType::get(byteType, 0);
+
+    return wrap(llvm::ConstantArray::get(type, upcast<llvm::Constant>(values)));
+}
+
+LLVMInst* LLVMBuilder::getConstantString(TerminatedCharSlice literal)
+{
+    return wrap(llvmBuilder->CreateGlobalString(charSliceToLLVM(literal)));
 }
 
 LLVMDebugNode* LLVMBuilder::getDebugFallbackType(TerminatedCharSlice name)
@@ -708,9 +757,7 @@ LLVMDebugNode* LLVMBuilder::getDebugStructType(
     LLVMDebugNode* file,
     int line
 ){
-    llvm::DINodeArray fieldTypes = llvmDebugBuilder->getOrCreateArray(
-        llvm::ArrayRef<llvm::Metadata*>(reinterpret_cast<llvm::Metadata* const*>(fields.begin()), fields.count));
-
+    llvm::DINodeArray fieldTypes = llvmDebugBuilder->getOrCreateArray(upcast<llvm::Metadata>(fields));
     llvm::DIFile* llvmFile = llvm::cast<llvm::DIFile>(unwrap(file));
 
     return wrap(llvmDebugBuilder->createStructType(
