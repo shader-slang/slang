@@ -116,3 +116,48 @@ git push origin update_spirv # Use your own branch name as needed
 ```
 
 Once all changes are pushed to GitHub, you can create a Pull Request on the main Slang repository.
+
+## CI Validation
+
+The Slang CI system includes an automated check that verifies the generated files in `external/spirv-tools-generated/` are up-to-date whenever changes are made to `external/spirv-tools` or `external/spirv-headers`.
+
+### What the CI Check Does
+
+When you create a Pull Request that modifies the SPIRV submodules, the CI will:
+
+1. Detect changes to `external/spirv-tools` or `external/spirv-headers`
+2. Automatically regenerate the files that should be in `external/spirv-tools-generated/`
+3. Compare the regenerated files with the committed files
+4. **Fail the CI** if there are any discrepancies
+
+This ensures that all generated files are correctly synchronized with the SPIRV-Tools version.
+
+### If the CI Check Fails
+
+If you see a failure from the "Check SPIRV Generated Files" job, it means the generated files are out of sync. The CI output will show:
+
+- Which files are missing
+- Which files have differences
+- Which files are orphaned (should be removed)
+
+To fix the issue, follow the instructions in the CI output, or re-run the steps in the [Copy the generated files](#copy-the-generated-files-from-spirv-toolsbuild-to-spirv-tools-generated) section above.
+
+### Testing Locally
+
+You can run the same check locally before pushing to catch issues early:
+
+```bash
+bash extras/check-spirv-generated.sh
+```
+
+This script will verify that your generated files match what would be produced by building SPIRV-Tools with the current submodule version.
+
+### Using the Automated Script
+
+For convenience, you can use the `external/bump-glslang.sh` script which automates the entire update process including generating files:
+
+```bash
+bash external/bump-glslang.sh
+```
+
+This script handles updating submodules and regenerating all necessary files.

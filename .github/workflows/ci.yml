@@ -205,6 +205,36 @@ jobs:
       test-category: full
       full-gpu-tests: true
 
+  # Check SPIRV generated files are up-to-date
+  check-spirv-generated:
+    needs: [filter]
+    if: needs.filter.outputs.should-run == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential
+      - run: bash extras/check-spirv-generated.sh
+        env:
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+      - name: Upload build artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spirv-tools-build-artifacts
+          path: |
+            external/spirv-tools/build-ci-check/*.inc
+            external/spirv-tools/build-ci-check/*.h
+          if-no-files-found: ignore
+          retention-days: 7
+
   check-ci:
     needs:
       [
@@ -214,6 +244,7 @@ jobs:
         test-macos-debug-clang-aarch64,
         test-linux-release-gcc-x86_64,
         test-linux-debug-gcc-x86_64,
+        check-spirv-generated,
       ]
     runs-on: ubuntu-latest
     if: always() # Always run, even if dependencies fail
@@ -227,6 +258,7 @@ jobs:
           echo "macOS Debug ARM64: ${{ needs.test-macos-debug-clang-aarch64.result }}"
           echo "Linux Release x64: ${{ needs.test-linux-release-gcc-x86_64.result }}"
           echo "Linux Debug x64: ${{ needs.test-linux-debug-gcc-x86_64.result }}"
+          echo "SPIRV Generated Files: ${{ needs.check-spirv-generated.result }}"
 
           # Check if any required jobs failed (allow success or skipped)
           if [[ "${{ needs.test-windows-release-cl-x86_64-gpu.result }}" == "failure" ]] || \
@@ -235,12 +267,14 @@ jobs:
              [[ "${{ needs.test-macos-debug-clang-aarch64.result }}" == "failure" ]] || \
              [[ "${{ needs.test-linux-release-gcc-x86_64.result }}" == "failure" ]] || \
              [[ "${{ needs.test-linux-debug-gcc-x86_64.result }}" == "failure" ]] || \
+             [[ "${{ needs.check-spirv-generated.result }}" == "failure" ]] || \
              [[ "${{ needs.test-windows-release-cl-x86_64-gpu.result }}" == "cancelled" ]] || \
              [[ "${{ needs.test-windows-debug-cl-x86_64-gpu.result }}" == "cancelled" ]] || \
              [[ "${{ needs.test-macos-release-clang-aarch64.result }}" == "cancelled" ]] || \
              [[ "${{ needs.test-macos-debug-clang-aarch64.result }}" == "cancelled" ]] || \
              [[ "${{ needs.test-linux-release-gcc-x86_64.result }}" == "cancelled" ]] || \
-             [[ "${{ needs.test-linux-debug-gcc-x86_64.result }}" == "cancelled" ]]; then
+             [[ "${{ needs.test-linux-debug-gcc-x86_64.result }}" == "cancelled" ]] || \
+             [[ "${{ needs.check-spirv-generated.result }}" == "cancelled" ]]; then
             echo "❌ One or more CI jobs failed or were cancelled"
             exit 1
           fi
