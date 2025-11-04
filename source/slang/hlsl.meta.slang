@@ -697,8 +697,8 @@ extension vector<int64_t,2>:ITexelElement
 /// | `DepthTexture1DArray`             |      | 130 / EXT_texture_array               | SM 4.0 | -           |        | -    |
 /// | `DepthTexture2D`                  |      | 110                                   | SM 4.0 | 1.0         |        | 1.0  |
 /// | `DepthTexture2DArray`             |      | 130 / EXT_texture_array               | SM 4.0 | 1.0         |        | 1.0  |
-/// | `DepthTexture2DMS`                |      | 430 / ARB_texture_storage_multisample | SM 4.0 | 1.0         |        | 1.0  |
-/// | `DepthTexture2DMSArray`           |      | 430 / ARB_texture_storage_multisample | SM 4.0 | 2.0         |        | -    |
+/// | `DepthTexture2DMS`                |      | -                                     | SM 4.0 | 1.0         |        | 1.0  |
+/// | `DepthTexture2DMSArray`           |      | -                                     | SM 4.0 | 2.0         |        | -    |
 /// | `DepthTexture3D`                  |      | -                                     | -      | -           |        | -    |
 /// | `DepthTextureCube`                |      | 110                                   | SM 4.0 | 1.0         |        | 1.0  |
 /// | `DepthTextureCubeArray`           |      | 400 / ARB_texture_cube_map_array      | SM 4.0 | 1.0         |        | 1.0  |
@@ -720,8 +720,8 @@ extension vector<int64_t,2>:ITexelElement
 /// | `Texture1DArray`                  |      | 130 / EXT_texture_array               | SM 4.0 | 1.0         |        | -    |
 /// | `Texture2D`                       |      | 110                                   | SM 4.0 | 1.0         |        | 1.0  |
 /// | `Texture2DArray`                  |      | 130 / EXT_texture_array               | SM 4.0 | 1.0         |        | 1.0  |
-/// | `Texture2DMS`                     |      | 110                                   | SM 4.0 | 1.0         |        | 1.0  |
-/// | `Texture2DMSArray`                |      | 430 / ARB_texture_storage_multisample | SM 4.0 | 2.0         |        | -    |
+/// | `Texture2DMS`                     |      | 150(*)                                | SM 4.0 | 1.0         |        | 1.0  |
+/// | `Texture2DMSArray`                |      | 150(*)                                | SM 4.0 | 2.0         |        | -    |
 /// | `Texture3D`                       |      | 110                                   | SM 4.0 | 1.0         |        | 1.0  |
 /// | `TextureCube`                     |      | 110                                   | SM 4.0 | 1.0         |        | 1.0  |
 /// | `TextureCubeArray`                |      | 400 / ARB_texture_cube_map_array      | SM 4.0 | 1.0         |        | 1.0  |
@@ -730,6 +730,8 @@ extension vector<int64_t,2>:ITexelElement
 /// | `WTexture2D`                      |      | 420 / ARB_shader_image_load_store     | -      | 1.0         |        | 1.0  |
 /// | `WTexture2DArray`                 |      | 420 / ARB_shader_image_load_store     | -      | 1.0         |        | 1.0  |
 /// | `WTexture3D`                      |      | 420 / ARB_shader_image_load_store     | -      | 1.0         |        | 1.0  |
+///
+/// (*) Usable only via combined texture-sampler types.
 ///
 /// The combined texture-sampler types and their backend support:
 ///
