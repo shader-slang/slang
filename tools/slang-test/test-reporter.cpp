@@ -91,7 +91,6 @@ TestReporter::TestReporter()
     m_maxFailTestResults = 10;
 
     m_inTest = false;
-    m_testResultAdded = false;
     m_dumpOutputOnFailure = false;
     m_verbosity = VerbosityLevel::Info;
 }
@@ -133,7 +132,6 @@ void TestReporter::startTest(const char* testName)
 
     m_numCurrentResults = 0;
     m_numFailResults = 0;
-    m_testResultAdded = false;
 
     m_currentInfo = TestInfo();
     m_currentInfo.name = testName;
@@ -161,7 +159,6 @@ void TestReporter::addResult(TestResult result)
         result = TestResult::ExpectedFail;
     m_currentInfo.testResult = combine(m_currentInfo.testResult, result);
     m_numCurrentResults++;
-    m_testResultAdded = true;
 }
 
 TestResult TestReporter::getResult() const
@@ -188,7 +185,6 @@ void TestReporter::addResultWithLocation(
     result = adjustResult(m_currentInfo.name.getUnownedSlice(), result);
 
     m_numCurrentResults++;
-    m_testResultAdded = true;
 
     m_currentInfo.testResult = combine(m_currentInfo.testResult, result);
     if (result != TestResult::Fail)
@@ -344,15 +340,27 @@ static void _appendTime(double timeInSec, StringBuilder& out)
 
 void TestReporter::_addResult(TestInfo info)
 {
+    // If test result is still uninitialized, no result was ever set for this test
+    // This likely indicates a bug in the test framework usage
+    if (info.testResult == TestResult::Uninitialized)
+    {
+        assert(!"Test ended without setting a result - this is likely a bug");
+        // Don't count uninitialized tests in statistics
+        return;
+    }
+
     if (info.testResult == TestResult::Ignored && m_hideIgnored)
     {
         return;
     }
 
-    // If no result was added for this test it is deferred for retry
-    // Skip updating test counters
-    if (!m_testResultAdded)
+    // If test is pending retry, don't count it in any statistics yet
+    // The test will be re-run and reported again with a final result
+    if (info.testResult == TestResult::PendingRetry)
     {
+        printf("failed(pending retry) '%S'\n",
+               info.name.toWString().begin());
+        fflush(stdout);
         return;
     }
 
