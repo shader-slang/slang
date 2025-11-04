@@ -588,7 +588,7 @@ public:
     static void _writeCompilerOptionEntryHelper(
         Slang::StringBuilder& builder,
         int indent,
-        slang::CompilerOptionEntry* compilerOptionEntries,
+        const slang::CompilerOptionEntry* compilerOptionEntries,
         uint32_t compilerOptionEntryCount,
         bool isLast = false);
     static void _writeGlobalSessionDescHelper(

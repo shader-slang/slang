@@ -17,6 +17,7 @@
 #include "slang-ir-legalize-mesh-outputs.h"
 #include "slang-ir-loop-unroll.h"
 #include "slang-ir-lower-buffer-element-type.h"
+#include "slang-ir-lower-copy-logical.h"
 #include "slang-ir-peephole.h"
 #include "slang-ir-redundancy-removal.h"
 #include "slang-ir-sccp.h"
@@ -2288,6 +2289,19 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             t->replaceUsesWith(lowered);
         }
 
+        // If older than spirv 1.4, we need more legalization steps due to lack of opcodes.
+        if (!m_sharedContext->isSpirv14OrLater())
+        {
+            // Legalize OpSelect returning non-vector-composites.
+            if (m_codeGenContext->getRequiredLoweringPassSet().nonVectorCompositeSelect)
+                legalizeNonVectorCompositeSelect(m_module);
+
+            // Lower OpCopyLogical to element-wise stores.
+            // Note that it is important to run this pass before processing functions, since we may
+            // introduce new loops that needs to be legalized.
+            lowerCopyLogical(m_module);
+        }
+
         for (auto globalInst : m_module->getGlobalInsts())
         {
             if (auto func = as<IRFunc>(globalInst))
@@ -2332,11 +2346,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // invalid SPIR-V.
         bool skipFuncParamValidation = false;
         validateAtomicOperations(skipFuncParamValidation, m_sink, m_module->getModuleInst());
-
-        // If older than spirv 1.4, legalize OpSelect returning non-vector-composites
-        if (m_codeGenContext->getRequiredLoweringPassSet().nonVectorCompositeSelect &&
-            !m_sharedContext->isSpirv14OrLater())
-            legalizeNonVectorCompositeSelect(m_module);
     }
 
     void updateFunctionTypes()

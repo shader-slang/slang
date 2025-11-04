@@ -938,8 +938,16 @@ local insts = {
 	{ field = { struct_name = "StructField", min_operands = 2 } },
 	{ var = {} },
 	{ load = { min_operands = 1 } },
-	{ store = { min_operands = 2 } },
+	{
+		StoreBase =
+		{
+			operands = {{"ptr"}, {"val"}},
+			{ store = {} },
+			{ copyLogical = {} },
+		},
+	},
 	{ CUDA_LDG = {min_operands = 1 } },
+
 	-- Atomic Operations
 	{
 		AtomicOperation = {
@@ -2283,6 +2291,12 @@ local insts = {
 					min_operands = 3,
 				},
 			},
+			{
+				experimentalModule = {
+					-- Marks a module as an experimental module
+					struct_name = "ExperimentalModuleDecoration"
+				},
+			},
 		},
 	},
 	-- Decoration
@@ -2335,8 +2349,10 @@ local insts = {
 	{ EnumCast = { operands = { { "value" } } } },
 	{ CastUInt2ToDescriptorHandle = { operands = { { "value" } } } },
 	{ CastDescriptorHandleToUInt2 = { operands = { { "value" } } } },
-	-- Represents a psuedo cast to convert between a logical type (user declared) and a storage Type
+	-- Represents a psuedo cast to convert between an original(user declared) type and a storage Type
 	-- (valid in buffer locations). The operand can either be a value or an address.
+	-- The first operand is a pointer to a storage type, the second operand must be a `MakeStorageTypeLoweringConfig` inst
+	-- that defines how the storage type is lowered from the original type.
 	{
 		CastStorageToLogicalBase = {
 			min_operands = 2,
@@ -2345,6 +2361,9 @@ local insts = {
 			{ CastStorageToLogicalDeref = { min_operands = 2, struct_name = "CastStorageToLogicalDeref" } },
 		},
 	},
+	-- IR encoding of a `TypeLoweringConfig` object that defines how a type is lowered to a storage type.
+	-- This is produced/consumed only in the lower-buffer-element-to-storage-type pass.
+	{ MakeStorageTypeLoweringConfig = { hoistable = true, operands = { { "addressSpace" }, { "layoutRule" }, { "lowerToPhysicalType" } } } },
 	{ CastUInt64ToDescriptorHandle = { operands = { { "value" } } } },
 	{ CastDescriptorHandleToUInt64 = { operands = { { "value" } } } },
 	-- Represents a no-op cast to convert a resource pointer to a resource on targets where the resource handles are
@@ -2436,12 +2455,6 @@ local insts = {
 	{
 		Attr = {
 			hoistable = true,
-			{
-				pendingLayout = {
-					struct_name = "PendingLayoutAttr",
-					operands = { { "layout", "IRLayout" } },
-				},
-			},
 			{ stage = { struct_name = "StageAttr", operands = { { "stageOperand", "IRIntLit" } } } },
 			{
 				structFieldLayout = {
