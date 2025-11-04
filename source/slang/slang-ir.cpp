@@ -8054,7 +8054,7 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
                 for (UInt ii = 0; ii < user->getOperandCount(); ii++)
                     operands.add(user->getOperand(ii));
 
-                auto getUniqueId = [&](IRInst* inst)
+                auto getUniqueId = [&](IRInst* inst) -> UInt
                 {
                     auto uniqueIDMap = module->getUniqueIdMap();
                     auto existingId = uniqueIDMap->tryGetValue(inst);
@@ -8063,11 +8063,11 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
 
                     auto id = uniqueIDMap->getCount();
                     uniqueIDMap->add(inst, id);
-                    return id;
+                    return (UInt)id;
                 };
 
-                operands.sort([&](IRInst* a, IRInst* b)
-                              { return getUniqueId(a) < getUniqueId(b); });
+                operands.sort(
+                    [&](IRInst* a, IRInst* b) -> bool { return getUniqueId(a) < getUniqueId(b); });
 
                 for (UInt ii = 0; ii < user->getOperandCount(); ii++)
                     user->getOperandUse(ii)->usedValue = operands[ii];
