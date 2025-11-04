@@ -447,180 +447,169 @@ static int pipeCLOEXEC(int pipefd[2])
     // leaks when creating many processes in parallel.
     int execWatchPipe[2] = {-1, -1};
 
-    // Lock to serialize fork() across threads. fork() in a multi-threaded program
-    // has race conditions with the global FD table. We must serialize from pipe
-    // creation through exec verification to prevent FD corruption.
-    std::unique_lock<std::mutex> forkLock(g_forkMutex);
-
-    if (pipeCLOEXEC(stdinPipe) == -1 || pipeCLOEXEC(stdoutPipe) == -1 ||
-        pipeCLOEXEC(stderrPipe) == -1 || pipeCLOEXEC(execWatchPipe) == -1)
+    // Serialize fork() across threads to prevent FD table corruption.
+    // fork() in a multi-threaded program has race conditions with the global FD table.
+    // Note: scoped_lock destructor runs even when goto jumps out of scope (C++ guarantee).
     {
-        whatFailed = "pipe";
-        forkLock.unlock();
-        goto reportErr;
-    }
+        std::scoped_lock forkLock(g_forkMutex);
 
-    // Make sure that none of our pipes are going to be clobbered by dup2 to
-    // 0,1,2 in the child.
-    whatFailed = "fcntl";
-    int next;
-    if (stdinPipe[0] < 3)
-    {
-        if (-1 == (next = fcntl(stdinPipe[0], F_DUPFD, 3)))
+        if (pipeCLOEXEC(stdinPipe) == -1 || pipeCLOEXEC(stdoutPipe) == -1 ||
+            pipeCLOEXEC(stderrPipe) == -1 || pipeCLOEXEC(execWatchPipe) == -1)
         {
-            forkLock.unlock();
+            whatFailed = "pipe";
             goto reportErr;
         }
-        close(stdinPipe[0]);
-        stdinPipe[0] = next;
-    }
-    if (stdoutPipe[1] < 3)
-    {
-        if (-1 == (next = fcntl(stdoutPipe[1], F_DUPFD, 3)))
+
+        // Make sure that none of our pipes are going to be clobbered by dup2 to
+        // 0,1,2 in the child.
+        whatFailed = "fcntl";
+        int next;
+        if (stdinPipe[0] < 3)
         {
-            forkLock.unlock();
+            if (-1 == (next = fcntl(stdinPipe[0], F_DUPFD, 3)))
+            {
+                goto reportErr;
+            }
+            close(stdinPipe[0]);
+            stdinPipe[0] = next;
+        }
+        if (stdoutPipe[1] < 3)
+        {
+            if (-1 == (next = fcntl(stdoutPipe[1], F_DUPFD, 3)))
+            {
+                goto reportErr;
+            }
+            close(stdoutPipe[1]);
+            stdoutPipe[1] = next;
+        }
+        if (stderrPipe[1] < 3)
+        {
+            if (-1 == (next = fcntl(stderrPipe[1], F_DUPFD, 3)))
+            {
+                goto reportErr;
+            }
+            close(stderrPipe[1]);
+            stderrPipe[1] = next;
+        }
+        if (execWatchPipe[1] < 3)
+        {
+            if (-1 == (next = fcntl(execWatchPipe[1], F_DUPFD_CLOEXEC, 3)))
+            {
+                goto reportErr;
+            }
+            close(execWatchPipe[1]);
+            execWatchPipe[1] = next;
+        }
+        whatFailed = nullptr;
+
+        childPid = fork();
+        if (childPid == -1)
+        {
+            whatFailed = "fork";
             goto reportErr;
         }
-        close(stdoutPipe[1]);
-        stdoutPipe[1] = next;
-    }
-    if (stderrPipe[1] < 3)
-    {
-        if (-1 == (next = fcntl(stderrPipe[1], F_DUPFD, 3)))
+
+        if (childPid == 0)
         {
-            forkLock.unlock();
-            goto reportErr;
-        }
-        close(stderrPipe[1]);
-        stderrPipe[1] = next;
-    }
-    if (execWatchPipe[1] < 3)
-    {
-        if (-1 == (next = fcntl(execWatchPipe[1], F_DUPFD_CLOEXEC, 3)))
-        {
-            forkLock.unlock();
-            goto reportErr;
-        }
-        close(execWatchPipe[1]);
-        execWatchPipe[1] = next;
-    }
-    whatFailed = nullptr;
+            // We are the child process.
 
-    childPid = fork();
-    if (childPid == -1)
-    {
-        whatFailed = "fork";
-        forkLock.unlock();
-        goto reportErr;
-    }
+            // Close unused fds and duplicate into standard handles
 
-    if (childPid == 0)
-    {
-        // We are the child process.
+            ::close(execWatchPipe[0]);
+            ::close(stdinPipe[1]);
+            ::close(stdoutPipe[0]);
+            ::close(stderrPipe[0]);
 
-        // Close unused fds and duplicate into standard handles
+            dup2(stdinPipe[0], STDIN_FILENO);
+            ::close(stdinPipe[0]);
+            dup2(stdoutPipe[1], STDOUT_FILENO);
+            ::close(stdoutPipe[1]);
+            dup2(stderrPipe[1], STDERR_FILENO);
+            ::close(stderrPipe[1]);
 
-        ::close(execWatchPipe[0]);
-        ::close(stdinPipe[1]);
-        ::close(stdoutPipe[0]);
-        ::close(stderrPipe[0]);
+            // Reset locale to ensure the output can be parsed regardless of user's
+            // locale.
+            setenv("LC_ALL", "C", 1);
 
-        dup2(stdinPipe[0], STDIN_FILENO);
-        ::close(stdinPipe[0]);
-        dup2(stdoutPipe[1], STDOUT_FILENO);
-        ::close(stdoutPipe[1]);
-        dup2(stderrPipe[1], STDERR_FILENO);
-        ::close(stderrPipe[1]);
+            if (exe.m_type == ExecutableLocation::Type::Path)
+            {
+                // Use the specified path (ie don't search)
+                ::execv(argPtrs[0], (char* const*)&argPtrs[0]);
+            }
+            else
+            {
+                // Search for the executable
+                ::execvp(argPtrs[0], (char* const*)&argPtrs[0]);
+            }
 
-        // Reset locale to ensure the output can be parsed regardless of user's
-        // locale.
-        setenv("LC_ALL", "C", 1);
+            // If we get here, then `exec` failed
 
-        if (exe.m_type == ExecutableLocation::Type::Path)
-        {
-            // Use the specified path (ie don't search)
-            ::execv(argPtrs[0], (char* const*)&argPtrs[0]);
+            // Signal the failure to our parent
+            int execErr = errno;
+            if (::write(execWatchPipe[1], &execErr, sizeof(execErr)))
+                fprintf(stderr, "error: `exec` watch pipe write failed\n");
+
+            // NOTE! Because we have dup2 into STDERR_FILENO, this error will *not* generally appear
+            // on the terminal but in the stderrPipe.
+            fprintf(stderr, "error: `exec` failed\n");
+
+            // Terminate with failure.
+            // Call _exit() rather than exit() so we don't run anything registered with atexit()
+            ::_exit(kCannotExecute);
         }
         else
         {
-            // Search for the executable
-            ::execvp(argPtrs[0], (char* const*)&argPtrs[0]);
-        }
+            // We are the parent process
+            ::close(execWatchPipe[1]);
+            ::close(stdinPipe[0]);
+            ::close(stdoutPipe[1]);
+            ::close(stderrPipe[1]);
 
-        // If we get here, then `exec` failed
+            RefPtr<Stream> streams[Index(StdStreamType::CountOf)];
 
-        // Signal the failure to our parent
-        int execErr = errno;
-        if (::write(execWatchPipe[1], &execErr, sizeof(execErr)))
-            fprintf(stderr, "error: `exec` watch pipe write failed\n");
+            // Previously code didn't need to close, so we'll make stream now own the handles
+            streams[Index(StdStreamType::Out)] =
+                new UnixPipeStream(stdoutPipe[0], FileAccess::Read, true);
+            stdoutPipe[0] = -1;
+            streams[Index(StdStreamType::ErrorOut)] =
+                new UnixPipeStream(stderrPipe[0], FileAccess::Read, true);
+            stderrPipe[0] = -1;
+            streams[Index(StdStreamType::In)] =
+                new UnixPipeStream(stdinPipe[1], FileAccess::Write, true);
+            stdinPipe[1] = -1;
 
-        // NOTE! Because we have dup2 into STDERR_FILENO, this error will *not* generally appear on
-        // the terminal but in the stderrPipe.
-        fprintf(stderr, "error: `exec` failed\n");
-
-        // Terminate with failure.
-        // Call _exit() rather than exit() so we don't run anything registered with atexit()
-        ::_exit(kCannotExecute);
-    }
-    else
-    {
-        // We are the parent process
-        ::close(execWatchPipe[1]);
-        ::close(stdinPipe[0]);
-        ::close(stdoutPipe[1]);
-        ::close(stderrPipe[1]);
-
-        RefPtr<Stream> streams[Index(StdStreamType::CountOf)];
-
-        // Previously code didn't need to close, so we'll make stream now own the handles
-        streams[Index(StdStreamType::Out)] =
-            new UnixPipeStream(stdoutPipe[0], FileAccess::Read, true);
-        stdoutPipe[0] = -1;
-        streams[Index(StdStreamType::ErrorOut)] =
-            new UnixPipeStream(stderrPipe[0], FileAccess::Read, true);
-        stderrPipe[0] = -1;
-        streams[Index(StdStreamType::In)] =
-            new UnixPipeStream(stdinPipe[1], FileAccess::Write, true);
-        stdinPipe[1] = -1;
-
-        // Check that the exec actually succeeded
-        int execErrCode;
-        // Our success is if we read zero bytes, indicating that the pipe was
-        // closed by the child's exec and O_CLOEXEC. (and us just above)
-        const int readRes = ::read(execWatchPipe[0], &execErrCode, sizeof(execErrCode));
-        if (readRes < 0)
-        {
-            whatFailed = "read from forked process";
-            goto reportErr;
-        }
-        else if (readRes > 0)
-        {
-            // exec failed, and the child reported back to us
-            // don't print messages by default, as we do some speculative
-            // execution of processes to see if they exist and it gets noisy
-            const bool verbose = false;
-            if (verbose)
+            // Check that the exec actually succeeded
+            int execErrCode;
+            // Our success is if we read zero bytes, indicating that the pipe was
+            // closed by the child's exec and O_CLOEXEC. (and us just above)
+            const int readRes = ::read(execWatchPipe[0], &execErrCode, sizeof(execErrCode));
+            if (readRes < 0)
             {
-                fprintf(
-                    stderr,
-                    "error: exec for \"%s\" failed: %s\n",
-                    argPtrs[0],
-                    ::strerror(execErrCode));
+                whatFailed = "read from forked process";
+                goto reportErr;
             }
-            whatFailed = "exec";
-            // Don't report the exec as we expect some of them to fail
-            goto closePipes;
-        }
+            else if (readRes > 0)
+            {
+                // exec failed, and the child reported back to us
+                // don't print messages by default, as we do some speculative
+                // execution of processes to see if they exist and it gets noisy
+                const bool verbose = false;
+                if (verbose)
+                {
+                    fprintf(
+                        stderr,
+                        "error: exec for \"%s\" failed: %s\n",
+                        argPtrs[0],
+                        ::strerror(execErrCode));
+                }
+                whatFailed = "exec";
+                // Don't report the exec as we expect some of them to fail
+                goto closePipes;
+            }
 
-        // Exec verification complete - release fork lock to allow other threads
-        forkLock.unlock();
-
-        outProcess = new UnixProcess(childPid, streams[0].readRef());
-    }
-
-    // Success - ensure lock is released (already done above, but defense in depth)
-    if (forkLock.owns_lock())
-        forkLock.unlock();
+            outProcess = new UnixProcess(childPid, streams[0].readRef());
+        } // End parent process branch
+    }     // End fork critical section - scoped_lock destructor releases mutex
 
     goto closePipes;
 
