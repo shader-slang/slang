@@ -769,7 +769,7 @@ public:
     DeclRefBase* getDefaultDeclRef();
 
     FIDDLE() NameLoc nameAndLoc;
-    FIDDLE() CapabilitySet inferredCapabilityRequirements;
+    FIDDLE() CapabilitySetVal* inferredCapabilityRequirements = nullptr;
 
     RefPtr<MarkupEntry> markup;
 
