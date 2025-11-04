@@ -531,7 +531,7 @@ Extensions
 > This capability changes the interpretation of GLSL implicit-LOD texture sampling functions as follows, matching
 > the GLSL shader specification:
 > - Derivatives enabled: Implicit-LOD `texture()` functions are assumed to use implicit LOD.
-> - Derivatives disabled: Implicit-LOD `texture()` functions are assumed to use MIP level 0.
+> - Derivatives disabled: Implicit-LOD `texture()` functions are assumed to use the base texture.
 > 
 > This applies to GLSL as both source and target.
 
