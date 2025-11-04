@@ -243,8 +243,7 @@ struct BitCastLoweringContext
             isDirectSpirv =
                 (target == CodeGenTarget::SPIRV || target == CodeGenTarget::SPIRVAssembly) &&
                 targetProgram->shouldEmitSPIRVDirectly();
-            isSpirv15OrLater =
-                targetReq->getTargetCaps().implies(CapabilityAtom::_spirv_1_5);
+            isSpirv15OrLater = targetReq->getTargetCaps().implies(CapabilityAtom::_spirv_1_5);
         }
 
         auto fromBasicType = as<IRBasicType>(fromType);
