@@ -1307,7 +1307,7 @@ struct TaggedUnionLoweringContext : public InstPassBase
         // Replace `TaggedUnionType(typeSet, tableSet)` with
         // `TupleType(SetTagType(tableSet), typeSet)`
         //
-        // Unless the collection has a single element, in which case we
+        // Unless the set has a single element, in which case we
         // replace it with `TupleType(SetTagType(tableSet), elementType)`
         //
         // We still maintain a tuple type (even though it's not really necesssary) to avoid

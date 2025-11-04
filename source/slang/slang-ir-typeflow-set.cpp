@@ -108,7 +108,7 @@ IRInst* upcastSet(IRBuilder* builder, IRInst* arg, IRType* destInfo)
         // we need to perform a pack operation.
         //
         // This case only arises when passing a value of type T to a parameter
-        // of a type-collection that contains T.
+        // of a type-set that contains T.
         //
         return builder->emitPackAnyValue((IRType*)destInfo, arg);
     }

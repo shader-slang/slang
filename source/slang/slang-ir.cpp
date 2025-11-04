@@ -6626,22 +6626,9 @@ IRSetBase* IRBuilder::getSet(IROp op, const HashSet<IRInst*>& elements)
     return setBaseInst;
 }
 
-IRSetBase* IRBuilder::getSet(const HashSet<IRInst*>& elements)
-{
-    // Cannot call getSet with an empty set of elements and no specific op-code.
-    SLANG_ASSERT(elements.getCount() > 0);
-    auto firstElement = *elements.begin();
-    return getSet(getSetTypeForInst(firstElement), elements);
-}
-
 IRSetBase* IRBuilder::getSingletonSet(IROp op, IRInst* element)
 {
     return getSet(op, {element});
-}
-
-IRSetBase* IRBuilder::getSingletonSet(IRInst* element)
-{
-    return getSet(getSetTypeForInst(element), {element});
 }
 
 UInt IRBuilder::getUniqueID(IRInst* inst)
@@ -6654,34 +6641,6 @@ UInt IRBuilder::getUniqueID(IRInst* inst)
     auto id = uniqueIDMap->getCount();
     uniqueIDMap->add(inst, id);
     return id;
-}
-
-IROp IRBuilder::getSetTypeForInst(IRInst* inst)
-{
-    if (as<IRUnboundedTypeElement>(inst) || as<IRUninitializedTypeElement>(inst))
-        return kIROp_TypeSet;
-    if (as<IRUnboundedFuncElement>(inst))
-        return kIROp_FuncSet;
-    if (as<IRUnboundedWitnessTableElement>(inst) || as<IRUninitializedWitnessTableElement>(inst))
-        return kIROp_WitnessTableSet;
-    if (as<IRUnboundedGenericElement>(inst))
-        return kIROp_GenericSet;
-
-    if (as<IRGeneric>(inst))
-        return kIROp_GenericSet;
-
-    if (as<IRTypeKind>(inst->getDataType()))
-        return kIROp_TypeSet;
-    else if (as<IRFuncType>(inst->getDataType()))
-        return kIROp_FuncSet;
-    else if (as<IRType>(inst) && !as<IRInterfaceType>(inst))
-        return kIROp_TypeSet;
-    else if (as<IRWitnessTableType>(inst->getDataType()))
-        return kIROp_WitnessTableSet;
-    else if (as<IRVoidLit>(inst))
-        return kIROp_TypeSet; // TODO: this feels wrong...
-    else
-        return kIROp_Invalid; // Return invalid IROp when not supported
 }
 
 //
@@ -8125,8 +8084,8 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
                 SLANG_ASSERT(module);
 
                 List<IRInst*>& operands = *module->getContainerPool().getList<IRInst>();
-                for (UInt i = 0; i < user->getOperandCount(); i++)
-                    operands.add(user->getOperand(i));
+                for (UInt ii = 0; ii < user->getOperandCount(); ii++)
+                    operands.add(user->getOperand(ii));
 
                 auto getUniqueId = [&](IRInst* inst)
                 {
@@ -8143,8 +8102,8 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
                 operands.sort([&](IRInst* a, IRInst* b)
                               { return getUniqueId(a) < getUniqueId(b); });
 
-                for (UInt i = 0; i < user->getOperandCount(); i++)
-                    user->getOperandUse(i)->usedValue = operands[i];
+                for (UInt ii = 0; ii < user->getOperandCount(); ii++)
+                    user->getOperandUse(ii)->usedValue = operands[ii];
 
                 module->getContainerPool().free(&operands);
             }

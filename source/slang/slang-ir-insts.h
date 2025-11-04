@@ -5126,14 +5126,10 @@ $(type_info.return_type) $(type_info.method_name)(
     void addRayPayloadDecoration(IRType* inst) { addDecoration(inst, kIROp_RayPayloadDecoration); }
 
     IRSetBase* getSet(IROp op, const HashSet<IRInst*>& elements);
-    IRSetBase* getSet(const HashSet<IRInst*>& elements);
 
     IRSetBase* getSingletonSet(IROp op, IRInst* element);
-    IRSetBase* getSingletonSet(IRInst* element);
 
     UInt getUniqueID(IRInst* inst);
-
-    IROp getSetTypeForInst(IRInst* inst);
 };
 
 // Helper to establish the source location that will be used

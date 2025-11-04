@@ -889,7 +889,8 @@ struct SpecializationContext
                 if (!skipSpecialization)
                 {
                     IRBuilder builder(module);
-                    auto newSet = builder.getSet(satisfyingValSet);
+                    auto setOp = getSetOpFromType(lookupInst->getDataType());
+                    auto newSet = builder.getSet(setOp, satisfyingValSet);
                     addUsersToWorkList(lookupInst);
                     if (as<IRTypeSet>(newSet))
                     {
