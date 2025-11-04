@@ -27,6 +27,23 @@ struct LLVMBuilderOptions
     SlangCompileTarget target;
 };
 
+enum LLVMAttribute : uint32_t
+{
+    SLANG_LLVM_ATTR_NONE      = 0,
+    SLANG_LLVM_ATTR_NOALIAS   = 1<<0,
+    SLANG_LLVM_ATTR_NOCAPTURE = 1<<1,
+    SLANG_LLVM_ATTR_READONLY  = 1<<2,
+    SLANG_LLVM_ATTR_WRITEONLY = 1<<3,
+};
+
+enum LLVMFuncAttribute : uint32_t
+{
+    SLANG_LLVM_FUNC_ATTR_NONE              = 0,
+    SLANG_LLVM_FUNC_ATTR_ALWAYSINLINE      = 1<<0,
+    SLANG_LLVM_FUNC_ATTR_NOINLINE          = 1<<1,
+    SLANG_LLVM_FUNC_ATTR_EXTERNALLYVISIBLE = 1<<2,
+};
+
 class ILLVMBuilder : public ISlangUnknown
 {
 public:
@@ -50,6 +67,23 @@ public:
     virtual LLVMType* getFunctionType(LLVMType* returnType, Slice<LLVMType*> paramTypes, bool variadic = false) = 0;
 
     //==========================================================================
+    // Global symbols
+    //==========================================================================
+    virtual LLVMInst* declareFunction(
+        LLVMType* funcType,
+        TerminatedCharSlice name,
+        uint32_t attributes) = 0;
+    virtual LLVMInst* getFunctionArg(LLVMInst* funcDecl, int argIndex) = 0;
+    virtual void setAttribute(LLVMInst* arg, uint32_t attribute) = 0;
+    virtual LLVMInst* declareGlobalVariable(
+        LLVMInst* initializer,
+        bool externallyVisible = false) = 0;
+    virtual LLVMInst* declareGlobalVariable(
+        int size,
+        int alignment,
+        bool externallyVisible = false) = 0;
+
+    //==========================================================================
     // Instruction emitting
     //==========================================================================
     virtual LLVMInst* emitAlloca(int size, int alignment) = 0;
@@ -58,6 +92,16 @@ public:
     virtual LLVMInst* emitLoad(LLVMType* type, LLVMInst* ptr, int alignment, bool isVolatile = false) = 0;
     virtual LLVMInst* emitIntResize(LLVMInst* value, LLVMType* into, bool isSigned = false) = 0;
     virtual LLVMInst* emitCopy(LLVMInst* dstPtr, int dstAlign, LLVMInst* srcPtr, int srcAlign, int bytes, bool isVolatile = false) = 0;
+
+    // Coerces the given value to the given type. Because LLVM IR does not carry
+    // signedness, the information on whether the original type of 'val' is
+    // signed is passed separately. This only affects integer extension.
+    virtual LLVMInst* coerceNumeric(LLVMInst* src, LLVMType* dstType, bool valueIsSigned) = 0;
+
+    // Some operations in Slang IR may have mixed scalar and vector parameters,
+    // whereas LLVM IR requires only scalars or only vectors. This function
+    // helps you promote each type as required.
+    virtual void operationPromote(LLVMInst** aValInOut, bool aIsSigned, LLVMInst** bValInOut, bool bIsSigned) = 0;
 
     //==========================================================================
     // Constant values

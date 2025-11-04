@@ -1285,34 +1285,31 @@ struct LLVMEmitter
 
     CompilerOptionSet& getOptions() { return codeGenContext->getTargetProgram()->getOptionSet(); }
 
-    /*
-    llvm::Function* getExternalBuiltin(ExternalFunc extFunc)
+    LLVMInst* getExternalBuiltin(ExternalFunc extFunc)
     {
         if (externalFuncs.containsKey(extFunc))
             return externalFuncs.getValue(extFunc);
 
-        llvm::Function* func = nullptr;
+        LLVMInst* func = nullptr;
         auto emitDecl = [&](const char* name,
-                            llvm::Type* result,
-                            llvm::ArrayRef<llvm::Type*> params,
+                            LLVMType* result,
+                            Slice<LLVMType*> params,
                             bool isVarArgs)
         {
-            llvm::FunctionType* funcType = llvm::FunctionType::get(result, params, isVarArgs);
-            return llvm::Function::Create(
-                funcType,
-                llvm::GlobalValue::ExternalLinkage,
-                name,
-                *llvmModule);
+            auto funcType = builder->getFunctionType(result, params, isVarArgs);
+            return builder->declareFunction(funcType, TerminatedCharSlice(name), SLANG_LLVM_FUNC_ATTR_EXTERNALLYVISIBLE);
         };
 
         switch (extFunc)
         {
         case ExternalFunc::Printf:
-            func = emitDecl("printf", llvmBuilder->getInt32Ty(), {llvmBuilder->getPtrTy()}, true);
-            llvm::AttrBuilder attrs(*llvmContext);
-            attrs.addCapturesAttr(llvm::CaptureInfo::none());
-            attrs.addAttribute(llvm::Attribute::NoAlias);
-            func->getArg(0)->addAttrs(attrs);
+            LLVMType* params[1] = {builder->getPointerType()};
+            func = emitDecl("printf", builder->getIntType(32), {params, 1}, true);
+
+            builder->setAttribute(
+                builder->getFunctionArg(func, 0),
+                SLANG_LLVM_ATTR_NOALIAS | SLANG_LLVM_ATTR_NOCAPTURE
+            );
             break;
         }
 
@@ -1323,14 +1320,14 @@ struct LLVMEmitter
     // Finds the value of an instruction that has already been emitted, OR
     // creates the value if it's a constant. Also, if inlineGlobalInstructions
     // is set, this will inline such instructions as needed.
-    llvm::Value* findValue(IRInst* inst)
+    LLVMInst* findValue(IRInst* inst)
     {
         if (mapInstToLLVM.containsKey(inst))
             return mapInstToLLVM.getValue(inst);
 
         bool globalInstruction = inst->getParent()->getOp() == kIROp_ModuleInst;
 
-        llvm::Value* llvmValue = nullptr;
+        LLVMInst* llvmValue = nullptr;
         switch (inst->getOp())
         {
         case kIROp_IntLit:
@@ -1365,37 +1362,20 @@ struct LLVMEmitter
                 // This is a global instruction getting referenced. So, we generate
                 // a global variable for it (if we don't have one yet) and report
                 // this incident.
-                llvm::GlobalVariable* llvmVar = nullptr;
+                LLVMInst* llvmVar = nullptr;
                 auto type = inst->getDataType();
+                IRSizeAndAlignment sizeAndAlignment =
+                    types->getSizeAndAlignment(type, defaultPointerRules);
                 if (promotedGlobalInsts.containsKey(inst))
                 {
                     llvmVar = promotedGlobalInsts.getValue(inst);
                 }
                 else
                 {
-                    IRSizeAndAlignment sizeAndAlignment =
-                        types->getSizeAndAlignment(type, defaultPointerRules);
-                    auto llvmType = llvm::ArrayType::get(
-                        llvmBuilder->getInt8Ty(),
-                        sizeAndAlignment.getStride());
-
                     if (auto constVal = types->maybeEmitConstant(inst))
-                    {
-                        llvmVar = new llvm::GlobalVariable(
-                            constVal->getType(),
-                            false,
-                            llvm::GlobalValue::PrivateLinkage);
-                        llvmVar->setInitializer(constVal);
-                    }
+                        llvmVar = builder->declareGlobalVariable(constVal, false);
                     else
-                    {
-                        llvmVar = new llvm::GlobalVariable(
-                            llvmType,
-                            false,
-                            llvm::GlobalValue::PrivateLinkage);
-                        llvmVar->setAlignment(llvm::Align(sizeAndAlignment.alignment));
-                    }
-                    llvmModule->insertGlobalVariable(llvmVar);
+                        llvmVar = builder->declareGlobalVariable(sizeAndAlignment.size, sizeAndAlignment.alignment, false);
                     promotedGlobalInsts[inst] = llvmVar;
                 }
 
@@ -1404,8 +1384,7 @@ struct LLVMEmitter
                     return llvmVar;
 
                 // Otherwise, we'll need a load instruction to get the value.
-                auto llvmValueType = types->getType(type);
-                return llvmBuilder->CreateLoad(llvmValueType, llvmVar, false);
+                return builder->emitLoad(types->getType(type), llvmVar, sizeAndAlignment.alignment);
             }
             else
             {
@@ -1422,99 +1401,7 @@ struct LLVMEmitter
         return llvmValue;
     }
 
-    // Coerces the given value to the given type. Because LLVM IR does not carry
-    // signedness, the information on whether the original type of 'val' is
-    // signed is passed separately. This only affects integer extension.
-    llvm::Value* coerceNumeric(llvm::Value* val, llvm::Type* type, bool isSigned)
-    {
-        auto valType = val->getType();
-        auto valWidth = valType->getPrimitiveSizeInBits();
-        auto targetWidth = type->getPrimitiveSizeInBits();
-
-        if (type->isVectorTy() && !valType->isVectorTy())
-        {
-            auto vecType = llvm::cast<llvm::VectorType>(type);
-            // Splat scalar into vector
-            return llvmBuilder->CreateVectorSplat(
-                vecType->getElementCount(),
-                coerceNumeric(val, vecType->getElementType(), isSigned));
-        }
-        else if (type->getScalarType()->isFloatingPointTy())
-        {
-            // Extend or truncate float
-            if (valWidth < targetWidth)
-            {
-                return llvmBuilder->CreateFPExt(val, type);
-            }
-            else if (valWidth > targetWidth)
-            {
-                return llvmBuilder->CreateFPTrunc(val, type);
-            }
-        }
-        else if (type->getScalarType()->isIntegerTy())
-        {
-            // Extend or truncate int
-            if (valWidth != targetWidth)
-                return isSigned ? llvmBuilder->CreateSExtOrTrunc(val, type)
-                                : llvmBuilder->CreateZExtOrTrunc(val, type);
-        }
-
-        return val;
-    }
-
-    // Some operations in Slang IR may have mixed scalar and vector parameters,
-    // whereas LLVM IR requires only scalars or only vectors. This function
-    // helps you promote each type as required.
-    void promoteParams(
-        llvm::Value*& aValInOut,
-        bool aIsSigned,
-        llvm::Value*& bValInOut,
-        bool bIsSigned)
-    {
-        llvm::Type* aType = aValInOut->getType();
-        llvm::Type* bType = bValInOut->getType();
-        if (aType == bType)
-            return;
-
-        llvm::Type* aElementType = aType->getScalarType();
-        llvm::Type* bElementType = bType->getScalarType();
-        int aElementCount = 1;
-        int bElementCount = 1;
-        if (aType->isVectorTy())
-        {
-            auto vecType = llvm::cast<llvm::VectorType>(aType);
-            aElementCount = vecType->getElementCount().getFixedValue();
-        }
-        if (bType->isVectorTy())
-        {
-            auto vecType = llvm::cast<llvm::VectorType>(bType);
-            bElementCount = vecType->getElementCount().getFixedValue();
-        }
-
-        int aElementWidth = aElementType->getScalarSizeInBits();
-        int bElementWidth = bElementType->getScalarSizeInBits();
-        bool aFloat = aElementType->isFloatingPointTy();
-        bool bFloat = bElementType->isFloatingPointTy();
-        int maxElementCount = aElementCount > bElementCount ? aElementCount : bElementCount;
-
-        llvm::Type* promotedType = aType;
-        bool promotedSign = aIsSigned || bIsSigned;
-
-        if (!aFloat && bFloat)
-            promotedType = aElementType;
-        else if (aFloat && !bFloat)
-            promotedType = bElementType;
-        else
-            promotedType = aElementWidth > bElementWidth ? aElementType : bElementType;
-
-        if (maxElementCount != 1)
-            promotedType =
-                llvm::VectorType::get(promotedType, llvm::ElementCount::getFixed(maxElementCount));
-
-        aValInOut = coerceNumeric(aValInOut, promotedType, promotedSign);
-        bValInOut = coerceNumeric(bValInOut, promotedType, promotedSign);
-    }
-
+    /*
     llvm::Value* emitCompare(IRInst* inst)
     {
         SLANG_ASSERT(inst->getOperandCount() == 2);

@@ -196,12 +196,21 @@ public:
     LLVMType* getBufferType() override;
     LLVMType* getFunctionType(LLVMType* returnType, Slice<LLVMType*> paramTypes, bool variadic) override;
 
+    LLVMInst* declareFunction(LLVMType* funcType, TerminatedCharSlice name, uint32_t attributes) override;
+    LLVMInst* getFunctionArg(LLVMInst* funcDecl, int argIndex) override;
+    void setAttribute(LLVMInst* arg, uint32_t attribute) override;
+    LLVMInst* declareGlobalVariable(LLVMInst* initializer, bool externallyVisible) override;
+    LLVMInst* declareGlobalVariable(int size, int alignment, bool externallyVisible) override;
+
     LLVMInst* emitAlloca(int size, int alignment) override;
     LLVMInst* emitGetElementPtr(LLVMInst* ptr, int stride, LLVMInst* index) override;
     LLVMInst* emitStore(LLVMInst* value, LLVMInst* ptr, int alignment, bool isVolatile = false) override;
     LLVMInst* emitLoad(LLVMType* type, LLVMInst* ptr, int alignment, bool isVolatile = false) override;
     LLVMInst* emitIntResize(LLVMInst* value, LLVMType* into, bool isSigned = false) override;
     LLVMInst* emitCopy(LLVMInst* dstPtr, int dstAlign, LLVMInst* srcPtr, int srcAlign, int bytes, bool isVolatile = false) override;
+
+    LLVMInst* coerceNumeric(LLVMInst* src, LLVMType* dstType, bool valueIsSigned) override;
+    void operationPromote(LLVMInst** aVal, bool aIsSigned, LLVMInst** bVal, bool bIsSigned) override;
 
     LLVMInst* getPoison(LLVMType* type) override;
     LLVMInst* getConstantInt(LLVMType* type, uint64_t value) override;
@@ -570,6 +579,75 @@ LLVMType* LLVMBuilder::getFunctionType(LLVMType* returnType, Slice<LLVMType*> pa
     return wrap(llvm::FunctionType::get(unwrap(returnType), unwrap(paramTypes), variadic));
 }
 
+LLVMInst* LLVMBuilder::declareFunction(LLVMType* funcType, TerminatedCharSlice name, uint32_t attributes)
+{
+    llvm::GlobalValue::LinkageTypes linkage = llvm::GlobalValue::PrivateLinkage;
+
+    if (attributes & SLANG_LLVM_FUNC_ATTR_EXTERNALLYVISIBLE)
+        linkage = llvm::GlobalValue::ExternalLinkage;
+
+    auto func = llvm::Function::Create(
+        llvm::cast<llvm::FunctionType>(unwrap(funcType)),
+        linkage,
+        charSliceToLLVM(name),
+        *llvmModule);
+
+    if (attributes & SLANG_LLVM_FUNC_ATTR_ALWAYSINLINE)
+        func->addFnAttr(llvm::Attribute::AttrKind::AlwaysInline);
+    if (attributes & SLANG_LLVM_FUNC_ATTR_NOINLINE)
+        func->addFnAttr(llvm::Attribute::AttrKind::NoInline);
+    return wrap(func);
+}
+
+LLVMInst* LLVMBuilder::getFunctionArg(LLVMInst* funcDecl, int argIndex)
+{
+    return wrap(llvm::cast<llvm::Function>(unwrap(funcDecl))->getArg(argIndex));
+}
+
+void LLVMBuilder::setAttribute(LLVMInst* arg, uint32_t attribute)
+{
+    auto llvmArg = llvm::cast<llvm::Argument>(unwrap(arg));
+    llvm::AttrBuilder attrs(*llvmContext);
+    if (attribute & SLANG_LLVM_ATTR_NOALIAS)
+        attrs.addAttribute(llvm::Attribute::NoAlias);
+    if (attribute & SLANG_LLVM_ATTR_NOCAPTURE)
+        attrs.addCapturesAttr(llvm::CaptureInfo::none());
+    if (attribute & SLANG_LLVM_ATTR_READONLY)
+        attrs.addAttribute(llvm::Attribute::ReadOnly);
+    if (attribute & SLANG_LLVM_ATTR_WRITEONLY)
+        attrs.addAttribute(llvm::Attribute::WriteOnly);
+    llvmArg->addAttrs(attrs);
+}
+
+LLVMInst* LLVMBuilder::declareGlobalVariable(
+    LLVMInst* initializer,
+    bool externallyVisible)
+{
+    auto llvmVal = llvm::cast<llvm::Constant>(unwrap(initializer));
+    auto llvmVar = new llvm::GlobalVariable(
+        llvmVal->getType(),
+        false,
+        llvm::GlobalValue::PrivateLinkage);
+    llvmVar->setInitializer(llvmVal);
+    llvmModule->insertGlobalVariable(llvmVar);
+    return wrap(llvmVar);
+}
+
+LLVMInst* LLVMBuilder::declareGlobalVariable(
+    int size,
+    int alignment,
+    bool externallyVisible)
+{
+    auto llvmType = llvm::ArrayType::get(llvmBuilder->getInt8Ty(), size);
+    auto llvmVar = new llvm::GlobalVariable(
+        llvmType,
+        false,
+        externallyVisible ? llvm::GlobalValue::ExternalLinkage : llvm::GlobalValue::PrivateLinkage);
+    llvmVar->setAlignment(llvm::Align(alignment));
+    llvmModule->insertGlobalVariable(llvmVar);
+    return wrap(llvmVar);
+}
+
 LLVMInst* LLVMBuilder::emitAlloca(int size, int alignment)
 {
     return wrap(llvmBuilder->Insert(new llvm::AllocaInst(
@@ -624,6 +702,93 @@ LLVMInst* LLVMBuilder::emitCopy(LLVMInst* dstPtr, int dstAlign, LLVMInst* srcPtr
         llvm::MaybeAlign(srcAlign),
         llvmBuilder->getInt32(bytes),
         isVolatile));
+}
+
+LLVMInst* LLVMBuilder::coerceNumeric(LLVMInst* src, LLVMType* dstType, bool valueIsSigned)
+{
+    auto val = unwrap(src);
+    auto type = unwrap(dstType);
+    auto valType = val->getType();
+    auto valWidth = valType->getPrimitiveSizeInBits();
+    auto targetWidth = type->getPrimitiveSizeInBits();
+
+    if (type->isVectorTy() && !valType->isVectorTy())
+    {
+        auto vecType = llvm::cast<llvm::VectorType>(type);
+        // Splat scalar into vector
+        val = llvmBuilder->CreateVectorSplat(
+            vecType->getElementCount(),
+            unwrap(coerceNumeric(wrap(val), wrap(vecType->getElementType()), valueIsSigned)));
+    }
+    else if (type->getScalarType()->isFloatingPointTy())
+    {
+        // Extend or truncate float
+        if (valWidth < targetWidth)
+        {
+            val = llvmBuilder->CreateFPExt(val, type);
+        }
+        else if (valWidth > targetWidth)
+        {
+            val = llvmBuilder->CreateFPTrunc(val, type);
+        }
+    }
+    else if (type->getScalarType()->isIntegerTy())
+    {
+        // Extend or truncate int
+        if (valWidth != targetWidth)
+            val = valueIsSigned ? llvmBuilder->CreateSExtOrTrunc(val, type)
+                            : llvmBuilder->CreateZExtOrTrunc(val, type);
+    }
+
+    return wrap(val);
+}
+
+void LLVMBuilder::operationPromote(LLVMInst** aValInOut, bool aIsSigned, LLVMInst** bValInOut, bool bIsSigned)
+{
+    auto aVal = unwrap(*aValInOut);
+    auto bVal = unwrap(*bValInOut);
+    llvm::Type* aType = aVal->getType();
+    llvm::Type* bType = bVal->getType();
+    if (aType == bType)
+        return;
+
+    llvm::Type* aElementType = aType->getScalarType();
+    llvm::Type* bElementType = bType->getScalarType();
+    int aElementCount = 1;
+    int bElementCount = 1;
+    if (aType->isVectorTy())
+    {
+        auto vecType = llvm::cast<llvm::VectorType>(aType);
+        aElementCount = vecType->getElementCount().getFixedValue();
+    }
+    if (bType->isVectorTy())
+    {
+        auto vecType = llvm::cast<llvm::VectorType>(bType);
+        bElementCount = vecType->getElementCount().getFixedValue();
+    }
+
+    int aElementWidth = aElementType->getScalarSizeInBits();
+    int bElementWidth = bElementType->getScalarSizeInBits();
+    bool aFloat = aElementType->isFloatingPointTy();
+    bool bFloat = bElementType->isFloatingPointTy();
+    int maxElementCount = aElementCount > bElementCount ? aElementCount : bElementCount;
+
+    llvm::Type* promotedType = aType;
+    bool promotedSign = aIsSigned || bIsSigned;
+
+    if (!aFloat && bFloat)
+        promotedType = aElementType;
+    else if (aFloat && !bFloat)
+        promotedType = bElementType;
+    else
+        promotedType = aElementWidth > bElementWidth ? aElementType : bElementType;
+
+    if (maxElementCount != 1)
+        promotedType =
+            llvm::VectorType::get(promotedType, llvm::ElementCount::getFixed(maxElementCount));
+
+    *aValInOut = coerceNumeric(*aValInOut, wrap(promotedType), promotedSign);
+    *bValInOut = coerceNumeric(*bValInOut, wrap(promotedType), promotedSign);
 }
 
 LLVMInst* LLVMBuilder::getPoison(LLVMType* type)
