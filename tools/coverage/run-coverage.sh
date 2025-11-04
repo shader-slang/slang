@@ -1,15 +1,6 @@
 #!/usr/bin/env bash
 # Script to run tests with coverage and generate reports
 
-# Check Bash version (requires 4.0+ for modern syntax like &>)
-if [[ -z "${BASH_VERSION}" ]] || [[ "${BASH_VERSION%%.*}" -lt 4 ]]; then
-  echo "Error: This script requires Bash 4.0 or later (current: ${BASH_VERSION:-unknown})" >&2
-  if [[ "$OSTYPE" == "darwin" ]]; then
-    echo "On macOS, you can install a newer Bash via Homebrew: brew install bash" >&2
-  fi
-  exit 1
-fi
-
 set -e
 
 # Parse arguments
@@ -97,7 +88,7 @@ else
   "$SLANG_TEST" "${TEST_ARGS[@]}"
 
   # Check if any profraw files were generated
-  if ! ls "$COVERAGE_DIR"/slang-test-*.profraw &>/dev/null; then
+  if ! ls "$COVERAGE_DIR"/slang-test-*.profraw >/dev/null 2>&1; then
     echo
     echo "Warning: No coverage data was generated."
     echo "Make sure the binaries were built with SLANG_ENABLE_COVERAGE=ON"

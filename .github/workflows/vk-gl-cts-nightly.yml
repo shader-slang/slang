@@ -82,7 +82,7 @@ jobs:
         run: |
           Expand-Archive VK-GL-CTS_WithSlang-0.0.7-win64.zip
 
-          copy ${{ github.workspace }}\build\Release\bin\slang.dll ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.7-win64\slang.dll
+          copy ${{ github.workspace }}\build\Release\bin\slang-compiler.dll ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.7-win64\slang-compiler.dll
           copy ${{ github.workspace }}\build\Release\bin\slang-glslang.dll ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.7-win64\slang-glslang.dll
           copy ${{ github.workspace }}\build\Release\bin\slang-glsl-module.dll ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.7-win64\slang-glsl-module.dll
           copy ${{ github.workspace }}\build\Release\bin\test-server.exe ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.7-win64\test-server.exe

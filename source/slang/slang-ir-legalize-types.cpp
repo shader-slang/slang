@@ -2883,48 +2883,18 @@ static void _addFieldsToWrappedBufferElementTypeLayout(
             //
             // We've been tracking a `varChain` that
             // remembers all the parent `struct` fields
-            // we've navigated through to get here, and
-            // that information has been tracking two
-            // different pieces of layout:
+            // we've navigated through to get here
             //
-            // * The "primary" layout represents the storage
+            // * The layout represents the storage
             // of the buffer element type as we usually
             // think of its (e.g., the bytes starting at offset zero).
             //
-            // * The "pending" layout tells us where all the
-            // fields representing concrete types plugged in
-            // for interface-type slots got placed.
-            //
-            // We have tunneled down info to tell us which case
-            // we should use (`isSpecial`).
-            //
-            // Most of the logic is the same between the two
-            // cases. We will be computing layout information
+            // We will be computing layout information
             // for a field of the new/wrapped buffer element type.
-            //
-            IRVarLayout* newFieldLayout = nullptr;
-            if (isSpecial)
-            {
-                // In the special case, that field will be laid out
-                // based on the "pending" var chain, and the type
-                // of the pending data for the element.
-                //
-                newFieldLayout = createSimpleVarLayout(
-                    irBuilder,
-                    varChain.pendingChain,
-                    elementTypeLayout->getPendingDataTypeLayout());
-            }
-            else
-            {
-                // The ordinary case just uses the primary layout
-                // information and the primary/nominal type of
-                // the field.
-                //
-                newFieldLayout =
-                    createSimpleVarLayout(irBuilder, varChain.primaryChain, elementTypeLayout);
-            }
+            IRVarLayout* newFieldLayout =
+                createSimpleVarLayout(irBuilder, varChain.primaryChain, elementTypeLayout);
 
-            // Either way, we add the new field to the struct type
+            // We add the new field to the struct type
             // layout we are building, and also update the mapping
             // information so that we can find the field layout
             // based on the IR key for the struct field.
@@ -3020,24 +2990,20 @@ static void _addFieldsToWrappedBufferElementTypeLayout(
             {
                 if (auto existentialTypeLayout = as<IRExistentialTypeLayout>(elementTypeLayout))
                 {
-                    if (const auto pendingTypeLayout =
-                            existentialTypeLayout->getPendingDataTypeLayout())
+                    SLANG_ASSERT(tupleInfo->elements.getCount() == 1);
+
+                    for (auto ee : tupleInfo->elements)
                     {
-                        SLANG_ASSERT(tupleInfo->elements.getCount() == 1);
-
-                        for (auto ee : tupleInfo->elements)
-                        {
-                            _addFieldsToWrappedBufferElementTypeLayout(
-                                irBuilder,
-                                existentialTypeLayout,
-                                newTypeLayout,
-                                ee.field,
-                                varChain,
-                                true);
-                        }
-
-                        return;
+                        _addFieldsToWrappedBufferElementTypeLayout(
+                            irBuilder,
+                            existentialTypeLayout,
+                            newTypeLayout,
+                            ee.field,
+                            varChain,
+                            true);
                     }
+
+                    return;
                 }
             }
 
@@ -3074,101 +3040,8 @@ static void _addFieldsToWrappedBufferElementTypeLayout(
     }
 }
 
-/// Add offset information for `kind` to `resultVarLayout`,
-/// if it doesn't already exist, and adjust the offset so
-/// that it will represent an offset relative to the
-/// "primary" data for the surrounding type, rather than
-/// being relative to the "pending" data.
-///
-static void _addOffsetVarLayoutEntry(
-    IRVarLayout::Builder* resultVarLayout,
-    LegalVarChain const& varChain,
-    LayoutResourceKind kind)
-{
-    // If the target already has an offset for this kind, bail out.
-    //
-    if (resultVarLayout->usesResourceKind(kind))
-        return;
-
-    // Add the `ResourceInfo` that will represent the offset for
-    // this resource kind (it will be initialized to zero by default)
-    //
-    auto resultResInfo = resultVarLayout->findOrAddResourceInfo(kind);
-
-    // Add in any contributions from the "pending" var chain, since
-    // that chain of offsets will accumulate to get the leaf offset
-    // within the pending data, which in this case we assume amounts
-    // to an *absolute* offset.
-    //
-    for (auto vv = varChain.pendingChain; vv; vv = vv->next)
-    {
-        if (auto chainResInfo = vv->varLayout->findOffsetAttr(kind))
-        {
-            resultResInfo->offset += chainResInfo->getOffset();
-            resultResInfo->space += chainResInfo->getSpace();
-        }
-    }
-
-    // Subtract any contributions from the primary var chain, since
-    // we want the resulting offset to be relative to the same
-    // base as that chain.
-    //
-    for (auto vv = varChain.primaryChain; vv; vv = vv->next)
-    {
-        if (auto chainResInfo = vv->varLayout->findOffsetAttr(kind))
-        {
-            resultResInfo->offset -= chainResInfo->getOffset();
-            resultResInfo->space -= chainResInfo->getSpace();
-        }
-    }
-}
-
-/// Create a variable layout for an field with "pending" type.
-///
-/// The given `typeLayout` should represent the type of a field
-/// that is being stored in "pending" data, but that now needs
-/// to be made relative to the "primary" data, because we are
-/// legalizing the pending data out of the code.
-///
-static IRVarLayout* _createOffsetVarLayout(
-    IRBuilder* irBuilder,
-    LegalVarChain const& varChain,
-    IRTypeLayout* typeLayout)
-{
-    IRVarLayout::Builder resultVarLayoutBuilder(irBuilder, typeLayout);
-
-    // For every resource kind the type consumes, we will
-    // compute an adjusted offset for the variable that
-    // encodes the (absolute) offset of the pending data
-    // in `varChain` relative to its primary data.
-    //
-    for (auto resInfo : typeLayout->getSizeAttrs())
-    {
-        _addOffsetVarLayoutEntry(&resultVarLayoutBuilder, varChain, resInfo->getResourceKind());
-    }
-
-    return resultVarLayoutBuilder.build();
-}
-
 /// Place offset information from `srcResInfo` onto `dstLayout`,
 /// offset by whatever is in `offsetVarLayout`
-static void addOffsetResInfo(
-    IRVarLayout::Builder* dstLayout,
-    IRVarOffsetAttr* srcResInfo,
-    IRVarLayout* offsetVarLayout)
-{
-    auto kind = srcResInfo->getResourceKind();
-    auto dstResInfo = dstLayout->findOrAddResourceInfo(kind);
-
-    dstResInfo->offset = srcResInfo->getOffset();
-    dstResInfo->space = srcResInfo->getSpace();
-
-    if (auto offsetResInfo = offsetVarLayout->findOffsetAttr(kind))
-    {
-        dstResInfo->offset += offsetResInfo->getOffset();
-        dstResInfo->space += offsetResInfo->getSpace();
-    }
-}
 
 /// Create layout information for a wrapped buffer type.
 ///
@@ -3201,8 +3074,7 @@ static void addOffsetResInfo(
 static IRTypeLayout* _createWrappedBufferTypeLayout(
     IRBuilder* irBuilder,
     IRTypeLayout* oldTypeLayout,
-    WrappedBufferPseudoType* wrappedBufferTypeInfo,
-    LegalVarChain const& outerVarChain)
+    WrappedBufferPseudoType* wrappedBufferTypeInfo)
 {
     // We shouldn't get invoked unless there was a parameter group type,
     // so we will sanity check for that just to be sure.
@@ -3212,44 +3084,15 @@ static IRTypeLayout* _createWrappedBufferTypeLayout(
     if (!oldParameterGroupTypeLayout)
         return oldTypeLayout;
 
-    // The original type must have been split between the direct/primary
-    // data and some amount of "pending" data to deal with interface-type
-    // data in the element type of the parameter group.
-    //
     // The legalization step will have already flattened the data inside of
-    // the group to a single `struct` type, which places the primary data first,
-    // and then any pending data into additional fields.
+    // the group to a single `struct` type.
     //
     // Our job is to compute a type layout that we can apply to that new
-    // element type, and to a parameter group surrounding it, that will
-    // re-create the original intention of the split layout (both primary
-    // and pending data) for a type that now only has the "primary" data.
+    // element type, and to a parameter group surrounding it.
     //
 
     IRParameterGroupTypeLayout::Builder newTypeLayoutBuilder(irBuilder);
     newTypeLayoutBuilder.addResourceUsageFrom(oldTypeLayout);
-
-    // Any fields in the "pending" data will have offset information
-    // that is relative to the pending data for their parent, and so on.
-    // We need to compute layout information that only includes primary
-    // data, so any offset information that is relative to the pending data
-    // needs to instead be relative to the primary data. That amounts to
-    // computing the absolute offset of each pending field, and then
-    // subtracting off the absolute offset of the primary data.
-    //
-    // We will compute the offset that needs to be added up front,
-    // and store it in the form of a `VarLayout`. The offsets we need
-    // can be computed from the `outerVarChain`, and we only need to
-    // store offset information for resource kinds actually consumed
-    // by the pending data type for the buffer as a whole (e.g., we
-    // don't need to apply offsetting to uniform bytes, because
-    // those don't show up in the resource usage of a constant buffer
-    // itself, and so the offsets already *are* relative to the start
-    // of the buffer).
-    //
-    auto offsetVarLayout =
-        _createOffsetVarLayout(irBuilder, outerVarChain, oldTypeLayout->getPendingDataTypeLayout());
-    LegalVarChainLink offsetVarChain(LegalVarChain(), offsetVarLayout);
 
     // We will start our construction of the pieces of the output
     // type layout by looking at the "container" type/variable.
@@ -3279,18 +3122,6 @@ static IRTypeLayout* _createWrappedBufferTypeLayout(
         IRTypeLayout::Builder newContainerTypeLayoutBuilder(irBuilder);
         newContainerTypeLayoutBuilder.addResourceUsageFrom(oldPrimaryContainerTypeLayout);
 
-        if (auto oldPendingContainerVarLayout = oldPrimaryContainerVarLayout->getPendingVarLayout())
-        {
-            // Whatever resources were allocated for the pending data type,
-            // our new combined container type needs to account for them
-            // (e.g., if we didn't have a constant buffer in the primary
-            // data, but one got allocated in the pending data, we need
-            // to end up with type layout information that includes a
-            // constnat buffer).
-            //
-            auto oldPendingContainerTypeLayout = oldPendingContainerVarLayout->getTypeLayout();
-            newContainerTypeLayoutBuilder.addResourceUsageFrom(oldPendingContainerTypeLayout);
-        }
         auto newContainerTypeLayout = newContainerTypeLayoutBuilder.build();
 
 
@@ -3308,31 +3139,6 @@ static IRTypeLayout* _createWrappedBufferTypeLayout(
             newResInfo->space = resInfo->getSpace();
         }
 
-        // It is possible that a constant buffer and/or space didn't get
-        // allocated for the "primary" data, but ended up being required for
-        // the "pending" data (this would happen if, e.g., a constant buffer
-        // didn't appear to have any uniform data in it, but then once we
-        // plugged in concrete types for interface fields it did...), so
-        // we need to account for that case and copy over the relevant
-        // resource usage from the pending data, if there is any.
-        //
-        if (auto oldPendingContainerVarLayout = oldPrimaryContainerVarLayout->getPendingVarLayout())
-        {
-            // We also need to add offset information based on the "pending"
-            // var layout, but we need to deal with the fact that this information
-            // is currently stored relative to the pending var layout for the surrounding
-            // context (passed in as `outerVarChain.pendingChain`), but we need it to be
-            // relative to the primary layout for the surrounding context
-            // (`outerVarChain.primaryChain`). This is where the `offsetVarLayout` we computed above
-            // comes in handy, because it represents the value(s) we need to add to each of the
-            // per-resource-kind offsets.
-            //
-            for (auto resInfo : oldPendingContainerVarLayout->getOffsetAttrs())
-            {
-                addOffsetResInfo(&newContainerVarLayoutBuilder, resInfo, offsetVarLayout);
-            }
-        }
-
         auto newContainerVarLayout = newContainerVarLayoutBuilder.build();
         newTypeLayoutBuilder.setContainerVarLayout(newContainerVarLayout);
     }
@@ -3340,8 +3146,7 @@ static IRTypeLayout* _createWrappedBufferTypeLayout(
     // Now that we've dealt with the container variable, we can turn
     // our attention to the element type. This is the part that
     // actually got legalized and required us to create a "wrapped"
-    // buffer type in the first place, so we know that it will
-    // have both primary and "pending" parts.
+    // buffer type in the first place.
     //
     // Let's start by extracting the fields we care about from
     // the original element type/var layout, and constructing
@@ -3366,14 +3171,10 @@ static IRTypeLayout* _createWrappedBufferTypeLayout(
     // determines how we got to each leaf field, and is
     // used to add up the offsets that will be stored
     // in the new `VarLayout`s that get created.
-    // We know we need to add in some offsets (usually
-    // negative) to any fields that were pending data,
-    // so we will account for that in the initial
-    // chain of outer variables that we pass in.
+    // Initialize the variable chain for element type processing.
     //
     LegalVarChain varChainForElementType;
     varChainForElementType.primaryChain = nullptr;
-    varChainForElementType.pendingChain = offsetVarChain.primaryChain;
 
     _addFieldsToWrappedBufferElementTypeLayout(
         irBuilder,
@@ -3427,21 +3228,6 @@ static LegalVal declareVars(
 {
     LegalVarChain varChain = inVarChain;
     IRTypeLayout* typeLayout = inTypeLayout;
-    if (isSpecial)
-    {
-        if (varChain.pendingChain)
-        {
-            varChain.primaryChain = varChain.pendingChain;
-            varChain.pendingChain = nullptr;
-        }
-        if (typeLayout)
-        {
-            if (auto pendingTypeLayout = typeLayout->getPendingDataTypeLayout())
-            {
-                typeLayout = pendingTypeLayout;
-            }
-        }
-    }
 
     switch (type.flavor)
     {
@@ -3592,11 +3378,8 @@ static LegalVal declareVars(
         {
             auto wrappedBuffer = type.getWrappedBuffer();
 
-            auto wrappedTypeLayout = _createWrappedBufferTypeLayout(
-                context->builder,
-                typeLayout,
-                wrappedBuffer,
-                varChain);
+            auto wrappedTypeLayout =
+                _createWrappedBufferTypeLayout(context->builder, typeLayout, wrappedBuffer);
 
             auto innerVal = declareSimpleVar(
                 context,
