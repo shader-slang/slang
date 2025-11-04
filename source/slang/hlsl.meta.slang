@@ -711,15 +711,15 @@ bool __targetHasImplicitDerivatives()
     case fragment:
         return true;
 
-    case compute:
-    case _raygen:
-    case _intersection:
-    case _anyhit:
-    case _closesthit:
-    case _miss:
-    case _callable:
     case _amplification:
+    case _anyhit:
+    case _callable:
+    case _closesthit:
+    case _intersection:
     case _mesh:
+    case _miss:
+    case _raygen:
+    case compute:
         __target_switch
         {
         case _GL_NV_compute_shader_derivatives:
