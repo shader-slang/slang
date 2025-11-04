@@ -1,11 +1,11 @@
 #include "slang-ir-lower-bit-cast.h"
 
+#include "slang-capability.h"
 #include "slang-ir-extract-value-from-type.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
-#include "slang-capability.h"
 
 namespace Slang
 {
@@ -245,7 +245,8 @@ struct BitCastLoweringContext
                 for (auto atom : atomSet)
                 {
                     // Check for SPIR-V 1.5 (any later version will inherit from it)
-                    isSpirv15OrLater = isSpirv15OrLater || (CapabilityName)atom == CapabilityName::_spirv_1_5;
+                    isSpirv15OrLater =
+                        isSpirv15OrLater || (CapabilityName)atom == CapabilityName::_spirv_1_5;
                 }
             }
             auto target = targetReq->getTarget();
