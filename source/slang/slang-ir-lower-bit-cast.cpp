@@ -234,25 +234,17 @@ struct BitCastLoweringContext
         IRSizeAndAlignment fromTypeSize;
         getNaturalSizeAndAlignment(targetProgram->getOptionSet(), fromType, &fromTypeSize);
 
-        // Check if the target is directly emitted SPIRV
+        // Check if the target is directly emitted SPIRV and if the target is SPIRV 1.5 or later
         bool isDirectSpirv = false;
         bool isSpirv15OrLater = false;
         if (auto targetReq = targetProgram->getTargetReq())
         {
-            auto targetCaps = targetReq->getTargetCaps();
-            for (auto atomSet : targetCaps.getAtomSets())
-            {
-                for (auto atom : atomSet)
-                {
-                    // Check for SPIR-V 1.5 (any later version will inherit from it)
-                    isSpirv15OrLater =
-                        isSpirv15OrLater || (CapabilityName)atom == CapabilityName::_spirv_1_5;
-                }
-            }
             auto target = targetReq->getTarget();
             isDirectSpirv =
                 (target == CodeGenTarget::SPIRV || target == CodeGenTarget::SPIRVAssembly) &&
                 targetProgram->shouldEmitSPIRVDirectly();
+            isSpirv15OrLater =
+                targetReq->getTargetCaps().implies(CapabilityAtom::_spirv_1_5);
         }
 
         auto fromBasicType = as<IRBasicType>(fromType);
