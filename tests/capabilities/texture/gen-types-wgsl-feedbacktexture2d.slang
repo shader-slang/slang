@@ -1,9 +1,12 @@
 // THIS IS A GENERATED FILE. DO NOT EDIT!
+// Instead, edit generate-types-tests.py and then regenerate this test
+// by running: ./generate-types-tests.py
 //
 // Texture types capability test: wgsl / FeedbackTexture2D<SAMPLER_FEEDBACK_MIN_MIP>
-// - Supported since: None
+// - Type supported since target version:  None
+// - Target version for positive test:     None
+// - Target version for negative test:     1.0
 //
-// To regenerate, run: ./generate-types-tests.py
 
 //TEST:SIMPLE(filecheck=NEGATIVE): -entry fragMain -stage fragment -target wgsl
 
@@ -21,25 +24,11 @@ Texture2D<float4> feedbackSamplerInput2D;
 [shader("fragment")]
 void fragMain()
 {
-// POSITIVE: result code = 0
-// POSITIVE-LABEL: fragMain
-// POSITIVE-NOT: error
+// Expect either a compilation error or warning 41012 for upgraded profile to support functionality
+// NEGATIVE: {{error [[:digit:]]+|warning 41012}}:
 
-// NEGATIVE: result code = -1
-// NEGATIVE: error
-
-    int ret = 0;
-    texHandle.WriteSamplerFeedbackLevel(feedbackSamplerInput2D, samplerState, float2(0, 0), float(0));
-    ret = 0;
-    outputBuffer[0] = 0x12345 + ret;
- }
-
-[numthreads(4, 1, 1)]
-void computeMain()
-{
     int ret = 0;
     texHandle.WriteSamplerFeedbackLevel(feedbackSamplerInput2D, samplerState, float2(0, 0), float(0));
     ret = 0;
     outputBuffer[0] = 0x12345 + ret;
 }
-// POSITIVE_RESULT: 12345

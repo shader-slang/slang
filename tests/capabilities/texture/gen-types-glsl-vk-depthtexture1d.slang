@@ -1,12 +1,15 @@
 // THIS IS A GENERATED FILE. DO NOT EDIT!
+// Instead, edit generate-types-tests.py and then regenerate this test
+// by running: ./generate-types-tests.py
 //
 // Texture types capability test: glsl-vk / DepthTexture1D
-// - Supported since: 110
+// - Type supported since target version:  110
+// - Target version for positive test:     150
+// - Target version for negative test:     None
 //
-// To regenerate, run: ./generate-types-tests.py
 
 // Test disabled, see https://github.com/shader-slang/slang/issues/8802
-//DISABLE_TEST:SIMPLE(filecheck=POSITIVE): -entry fragMain -stage fragment -target glsl
+//DISABLE_TEST:SIMPLE(filecheck=POSITIVE): -entry fragMain -stage fragment -target glsl -profile glsl_150
 //DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_RESULT): -vk -emit-spirv-via-glsl
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
@@ -21,17 +24,16 @@ SamplerComparisonState samplerComparisonState;
 [shader("fragment")]
 void fragMain()
 {
+// POSITIVE-NOT: {{(error|warning).*}}:
 // POSITIVE: result code = 0
+// POSITIVE-NOT: {{(error|warning).*}}:
 // POSITIVE-LABEL: main
-// POSITIVE-NOT: error
-
-// NEGATIVE: result code = -1
-// NEGATIVE: error
+// POSITIVE-NOT: {{(error|warning).*}}:
 
     int ret = 0;
     ret = int((texHandle.SampleCmpLevelZero(samplerComparisonState, float(0), float(0))).x);
     outputBuffer[0] = 0x12345 + ret;
- }
+}
 
 [numthreads(4, 1, 1)]
 void computeMain()

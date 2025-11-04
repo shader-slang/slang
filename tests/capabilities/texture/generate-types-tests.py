@@ -5,13 +5,13 @@ import sys
 
 # TEST OP
 #
-# sampler ops, mip_level 0
+# sampler ops, level 0
 #   1  - sample with 1-dimensional coord
 #   2  - sample with 2-dimensional coord
 #   3  - sample with 3-dimensional coord
 #   4  - sample with 4-dimensional coord
 #
-# load ops
+# load ops without sampler state
 #  11  - load with 1-dimensional coord
 #  12  - load with 2-dimensional coord
 #  13  - load with 3-dimensional coord
@@ -24,29 +24,45 @@ import sys
 #  22  - store with 2-dimensional coord
 #  23  - store with 3-dimensional coord
 #
-# feedback sampler ops, mip_level 0
+# feedback sampler ops, level 0
 #  32  - write sampler feedback with 2-dimensional coord
 #  33  - write sampler feedback with 3-dimensional coord
 #
-# depth/shadow sampler ops, mip_level 0
+# depth/shadow sampler ops, level 0
 #  41  - sample with 1-dimensional coord
 #  42  - sample with 2-dimensional coord
 #  43  - sample with 3-dimensional coord
 #  44  - sample with 4-dimensional coord
 
+# Test info for Target/Texture type combo
 class TestInfo:
+
+    # Constructor
+    #
+    # minVersion: Minimum backend version required for the test type. Version 'None'
+    #             signifies that the texture type is not supported at all on the target.
+    #
+    # testOp:     Test operation code (see the list above)
     def __init__(self, minVersion, testOp):
         self.minVersion = minVersion
         self.testOp = testOp
         self.disableForIssue = None
         self.disableComputeForIssue = None
+        self.disableNegativeTestForIssue = None
 
+    # Mark the test completely skipped due to a bug
     def bug(self, issue):
         self.disableForIssue = issue
         return self
 
+    # Mark the functional compute test skipped due to a bug
     def disableComputeTest(self, issue):
         self.disableComputeForIssue = issue
+        return self
+
+    # Mark the negative test skipped due to a bug
+    def disableNegativeTest(self, issue):
+        self.disableNegativeTestForIssue = issue
         return self
 
 def getWgslTests():
@@ -111,8 +127,10 @@ def getMetalTests():
     backend = {
         "name" : "metal",
         "versions" : [
-            ("1.0", "metal", "-mtl"),
-            ("2.0", "metal", "-mtl")
+            ("1.0", None, None), # unsupported by Slang
+            ("2.0", None, None), # unsupported by Slang
+            ("2.3", "metal -profile metallib_2_3", "-mtl"),
+            ("2.4", "metal -profile metallib_2_4", "-mtl"),
         ]
     }
 
@@ -170,73 +188,94 @@ def getGlslTests(nameSuffix, simpleTarget, vkTargetAdditionalFlags):
         "name" : f"glsl{nameSuffix}",
         "positive-label" : "main",
         "versions" : [
-            ("110", f"{simpleTarget}", f"-vk {vkTargetAdditionalFlags}"),
-            ("130", f"{simpleTarget}", f"-vk {vkTargetAdditionalFlags}"),
-            ("400", f"{simpleTarget}", f"-vk {vkTargetAdditionalFlags}"),
-            ("420", f"{simpleTarget}", f"-vk {vkTargetAdditionalFlags}"),
-            ("430", f"{simpleTarget}", f"-vk {vkTargetAdditionalFlags}"),
-            ("450", f"{simpleTarget}", f"-vk {vkTargetAdditionalFlags}"),
+            ("110", None, None), # unsupported by Slang
+            ("120", None, None), # unsupported by Slang
+            ("130", None, None), # unsupported by Slang
+            ("140", None, None), # unsupported by Slang
+            ("150", f"{simpleTarget} -profile glsl_150", f"-vk {vkTargetAdditionalFlags}"),
+            ("330", f"{simpleTarget} -profile glsl_330", f"-vk {vkTargetAdditionalFlags}"),
+            ("400", f"{simpleTarget} -profile glsl_400", f"-vk {vkTargetAdditionalFlags}"),
+            ("410", f"{simpleTarget} -profile glsl_410", f"-vk {vkTargetAdditionalFlags}"),
+            ("420", f"{simpleTarget} -profile glsl_420", f"-vk {vkTargetAdditionalFlags}"),
+            ("430", f"{simpleTarget} -profile glsl_430", f"-vk {vkTargetAdditionalFlags}"),
+            ("440", f"{simpleTarget} -profile glsl_440", f"-vk {vkTargetAdditionalFlags}"),
+            ("450", f"{simpleTarget} -profile glsl_450", f"-vk {vkTargetAdditionalFlags}"),
+            ("460", f"{simpleTarget} -profile glsl_460", f"-vk {vkTargetAdditionalFlags}"),
         ]
     }
 
     tests = {
-        "Texture1D<float4>"        : TestInfo("110", 12),
-        "Texture1DArray<float4>"   : TestInfo("130", 13),
-        "Texture2D<float4>"        : TestInfo("110", 13),
-        "Texture2DArray<float4>"   : TestInfo("130", 14),
-        "Texture2DMS<float4>"      : TestInfo("110", 13),
-        "Texture2DMSArray<float4>" : TestInfo("430", 14),
-        "Texture3D<float4>"        : TestInfo("110", 14),
+        "Texture1D<float4>"        : TestInfo("110", 1),
+        "Texture1DArray<float4>"   : TestInfo("130", 2),
+        "Texture2D<float4>"        : TestInfo("110", 2),
+        "Texture2DArray<float4>"   : TestInfo("130", 3),
+        "Texture2DMS<float4>"      : TestInfo(None,  13), # accessibe only via combined texture+sampler
+        "Texture2DMSArray<float4>" : TestInfo(None,  14), # accessibe only via combined texture+sampler
+        "Texture3D<float4>"        : TestInfo("110", 3),
         "TextureCube<float4>"      : TestInfo("110", 3),
-        "TextureCubeArray<float4>" : TestInfo("400", 4),
+        "TextureCubeArray<float4>" : TestInfo("400", 4).disableNegativeTest(8912),
 
         "DepthTexture1D"           : TestInfo("110", 41).bug(8802),
         "DepthTexture1DArray"      : TestInfo("130", 42).bug(8802),
         "DepthTexture2D"           : TestInfo("110", 42).bug(8802),
         "DepthTexture2DArray"      : TestInfo("130", 43).bug(8802),
-        "DepthTexture2DMS"         : TestInfo("430", 15).bug(8802),
-        "DepthTexture2DMSArray"    : TestInfo("430", 16).bug(8802),
-        "DepthTexture3D"           : TestInfo(None,  43).bug(8721),
+        "DepthTexture2DMS"         : TestInfo(None,  15),
+        "DepthTexture2DMSArray"    : TestInfo(None,  16),
+        "DepthTexture3D"           : TestInfo(None,  43),
         "DepthTextureCube"         : TestInfo("110", 43).bug(8802),
         "DepthTextureCubeArray"    : TestInfo("400", 44).bug(8802),
 
-        "RWTexture1D<float4>"        : TestInfo("420", 11),
-        "RWTexture1DArray<float4>"   : TestInfo("420", 12),
-        "RWTexture2D<float4>"        : TestInfo("420", 12),
-        "RWTexture2DArray<float4>"   : TestInfo("420", 13),
-        "RWTexture2DMS<float4>"      : TestInfo("420", 15),
-        "RWTexture2DMSArray<float4>" : TestInfo("420", 16),
-        "RWTexture3D<float4>"        : TestInfo("420", 13),
+        "RWTexture1D<float4>"        : TestInfo("420", 11).disableNegativeTest(8908),
+        "RWTexture1DArray<float4>"   : TestInfo("420", 12).disableNegativeTest(8908),
+        "RWTexture2D<float4>"        : TestInfo("420", 12).disableNegativeTest(8908),
+        "RWTexture2DArray<float4>"   : TestInfo("420", 13).disableNegativeTest(8908),
+        "RWTexture2DMS<float4>"      : TestInfo("420", 15).disableNegativeTest(8908),
+        "RWTexture2DMSArray<float4>" : TestInfo("420", 16).disableNegativeTest(8908),
+        "RWTexture3D<float4>"        : TestInfo("420", 13).disableNegativeTest(8908),
 
-        "WTexture1D<float4>"        : TestInfo("420", 21),
-        "WTexture1DArray<float4>"   : TestInfo("420", 22),
-        "WTexture2D<float4>"        : TestInfo("420", 22),
-        "WTexture2DArray<float4>"   : TestInfo("420", 23),
-        "WTexture3D<float4>"        : TestInfo("420", 23),
+        "WTexture1D<float4>"        : TestInfo("420", 21).disableNegativeTest(8908),
+        "WTexture1DArray<float4>"   : TestInfo("420", 22).disableNegativeTest(8908),
+        "WTexture2D<float4>"        : TestInfo("420", 22).disableNegativeTest(8908),
+        "WTexture2DArray<float4>"   : TestInfo("420", 23).disableNegativeTest(8908),
+        "WTexture3D<float4>"        : TestInfo("420", 23).disableNegativeTest(8908),
 
         "FeedbackTexture2D<SAMPLER_FEEDBACK_MIN_MIP>"      : TestInfo(None,  32),
         "FeedbackTexture2DArray<SAMPLER_FEEDBACK_MIN_MIP>" : TestInfo(None,  33),
 
-        "RasterizerOrderedTexture1D<float4>"        : TestInfo("450", 21).disableComputeTest(8787), # note: this feature requires ARB_fragment_shader_interlock
-        "RasterizerOrderedTexture1DArray<float4>"   : TestInfo("450", 22).disableComputeTest(8787), # note: this feature requires ARB_fragment_shader_interlock
-        "RasterizerOrderedTexture2D<float4>"        : TestInfo("450", 22).disableComputeTest(8787), # note: this feature requires ARB_fragment_shader_interlock
-        "RasterizerOrderedTexture2DArray<float4>"   : TestInfo("450", 23).disableComputeTest(8787), # note: this feature requires ARB_fragment_shader_interlock
-        "RasterizerOrderedTexture3D<float4>"        : TestInfo("450", 23).disableComputeTest(8787), # note: this feature requires ARB_fragment_shader_interlock
+        "RasterizerOrderedTexture1D<float4>"        : TestInfo("450", 21).disableComputeTest(8787).disableNegativeTest(8908), # note: this feature requires ARB_fragment_shader_interlock
+        "RasterizerOrderedTexture1DArray<float4>"   : TestInfo("450", 22).disableComputeTest(8787).disableNegativeTest(8908), # note: this feature requires ARB_fragment_shader_interlock
+        "RasterizerOrderedTexture2D<float4>"        : TestInfo("450", 22).disableComputeTest(8787).disableNegativeTest(8908), # note: this feature requires ARB_fragment_shader_interlock
+        "RasterizerOrderedTexture2DArray<float4>"   : TestInfo("450", 23).disableComputeTest(8787).disableNegativeTest(8908), # note: this feature requires ARB_fragment_shader_interlock
+        "RasterizerOrderedTexture3D<float4>"        : TestInfo("450", 23).disableComputeTest(8787).disableNegativeTest(8908), # note: this feature requires ARB_fragment_shader_interlock
     }
 
     return (backend, tests)
 
 
-def getPositiveNegativeBackendTarget(backend, minSupportedVersion):
-    if minSupportedVersion is None:
-        return (None, backend["versions"][-1])
+def getPositiveNegativeBackendTargets(backend, minSupportedVersion):
 
-    previousVersion = None
+    negativeTestTarget = None
+    minimumVersionMet = False
+
     for versionTuple in backend["versions"]:
         if versionTuple[0] == minSupportedVersion:
-            return (versionTuple, previousVersion)
-        previousVersion = versionTuple
+            minimumVersionMet = True
 
+        # is this version unsupported by Slang
+        if versionTuple[1] is None:
+            continue
+
+        # supported, so update negative or positive test target accordingly
+        if minimumVersionMet:
+            return (versionTuple, negativeTestTarget)
+        else:
+            negativeTestTarget = versionTuple
+
+    # if we get here, we didn't find a working target version for the positive test
+    if (minSupportedVersion is None) or minimumVersionMet:
+        return (None, negativeTestTarget)
+
+    # a test refers to undefined target version, bail out
     print(f"Undefined version: {minSupportedVersion}")
     sys.exit(1)
 
@@ -284,6 +323,9 @@ def emitTestOp(f, testOp):
         f.write("    ret = int((texHandle.SampleCmpLevelZero(samplerComparisonState, float3(0, 0, 0), float(0))).x);\n")
     elif testOp == 44:
         f.write("    ret = int((texHandle.SampleCmpLevelZero(samplerComparisonState, float4(0, 0, 0, 0), float(0))).x);\n")
+    else:
+        print(f"Undefined test op code: {testOp}")
+        sys.exit(1)
 
 def generateSingleTest(filepath, backend, testType, testInfo):
 
@@ -332,33 +374,62 @@ def generateSingleTest(filepath, backend, testType, testInfo):
         "RasterizerOrderedTexture3D<float4>"        : "Texture3D(size=4, content = zero)",
     }
 
-    # - We'll omit positive test if the feature is not supported at all
-    # - We'll omit negative test if the feature is supported in every version
-    (positiveTest, negativeTest) = \
-        getPositiveNegativeBackendTarget(backend, testInfo.minVersion)
+    # Determine the first supporting version and highest non-supporting version
+    (positiveTestTarget, negativeTestTarget) = \
+        getPositiveNegativeBackendTargets(backend, testInfo.minVersion)
 
+    positiveTestTargetVersion = None
+    if positiveTestTarget is not None:
+        positiveTestTargetVersion = positiveTestTarget[0]
+
+    negativeTestTargetVersion = None
+    if negativeTestTarget is not None:
+        negativeTestTargetVersion = negativeTestTarget[0]
+
+    # Determine which tests to generate
+    generateNegativeTest = negativeTestTarget is not None
+    generatePositiveTest = positiveTestTarget is not None
+    generatePositiveComputeTest = generatePositiveTest
 
     with open(filepath, "w") as f:
         f.write(f"// THIS IS A GENERATED FILE. DO NOT EDIT!\n")
+        f.write( "// Instead, edit generate-types-tests.py and then regenerate this test\n")
+        f.write( "// by running: ./generate-types-tests.py\n")
         f.write( "//\n")
         f.write(f"// Texture types capability test: {backend['name']} / {testType}\n")
-        f.write(f"// - Supported since: {testInfo.minVersion}\n")
+        f.write(f"// - Type supported since target version:  {testInfo.minVersion}\n")
+        f.write(f"// - Target version for positive test:     {positiveTestTargetVersion}\n")
+        f.write(f"// - Target version for negative test:     {negativeTestTargetVersion}\n")
         f.write( "//\n")
-        f.write( "// To regenerate, run: ./generate-types-tests.py\n")
         f.write( "\n")
-        disablePrefix=""
+
+        # determine if tests are disabled
+        disableTestPrefix = ""
+        disableComputeTestPrefix = ""
+        disableNegativeTestPrefix = ""
         if testInfo.disableForIssue is not None:
             f.write(f"// Test disabled, see https://github.com/shader-slang/slang/issues/{testInfo.disableForIssue}\n")
-            disablePrefix="DISABLE_"
-        if positiveTest is not None:
-            f.write(f"//{disablePrefix}TEST:SIMPLE(filecheck=POSITIVE): -entry fragMain -stage fragment -target {positiveTest[1]}\n")
-            if testInfo.disableComputeForIssue is not None:
-                f.write(f"// Compute test disabled, see https://github.com/shader-slang/slang/issues/{testInfo.disableComputeForIssue}\n")
-                disablePrefix="DISABLE_"
-            f.write(f"//{disablePrefix}TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_RESULT): {positiveTest[2]}\n")
+            disableTestPrefix = "DISABLE_"
+            disableNegativeTestPrefix = "DISABLE_"
+            disableComputeTestPrefix = "DISABLE_"
 
-        if (positiveTest is None) and (negativeTest is not None): # TODO: version test
-            f.write(f"//{disablePrefix}TEST:SIMPLE(filecheck=NEGATIVE): -entry fragMain -stage fragment -target {negativeTest[1]}\n")
+        if disableComputeTestPrefix == "" and testInfo.disableComputeForIssue is not None:
+            f.write(f"// Compute test disabled, see https://github.com/shader-slang/slang/issues/{testInfo.disableComputeForIssue}\n")
+            disableComputeTestPrefix = "DISABLE_"
+
+        if disableNegativeTestPrefix == "" and testInfo.disableNegativeTestForIssue is not None:
+            f.write(f"// Negative test disabled, see https://github.com/shader-slang/slang/issues/{testInfo.disableNegativeTestForIssue}\n")
+            disableNegativeTestPrefix = "DISABLE_"
+
+        if generatePositiveTest:
+            f.write(f"//{disableTestPrefix}TEST:SIMPLE(filecheck=POSITIVE): -entry fragMain -stage fragment -target {positiveTestTarget[1]}\n")
+
+        if generatePositiveComputeTest:
+            f.write(f"//{disableComputeTestPrefix}TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_RESULT): {positiveTestTarget[2]}\n")
+
+        if generateNegativeTest:
+            f.write(f"//{disableNegativeTestPrefix}TEST:SIMPLE(filecheck=NEGATIVE): -entry fragMain -stage fragment -target {negativeTestTarget[1]}\n")
+
         f.write( "\n")
         f.write( "//TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer\n")
         f.write( "RWStructuredBuffer<int> outputBuffer;\n")
@@ -388,30 +459,38 @@ def generateSingleTest(filepath, backend, testType, testInfo):
         f.write( "[shader(\"fragment\")]\n")
         f.write( "void fragMain()\n")
         f.write( "{\n")
-        f.write( "// POSITIVE: result code = 0\n")
 
-        labelName = "fragMain"
-        if "positive-label" in backend:
-            labelName = backend["positive-label"]
-        f.write(f"// POSITIVE-LABEL: {labelName}\n")
-        f.write( "// POSITIVE-NOT: error\n")
-        f.write( "\n")
-        f.write( "// NEGATIVE: result code = -1\n")
-        f.write( "// NEGATIVE: error\n")
-        f.write( "\n")
-        f.write( "    int ret = 0;\n")
-        emitTestOp(f, testInfo.testOp);
-        f.write( "    outputBuffer[0] = 0x12345 + ret;\n")
-        f.write( " }\n")
-        f.write( "\n")
-        f.write( "[numthreads(4, 1, 1)]\n")
-        f.write( "void computeMain()\n")
-        f.write( "{\n")
+        if generatePositiveTest:
+            labelName = "fragMain"
+            if "positive-label" in backend:
+                labelName = backend["positive-label"]
+
+            f.write( "// POSITIVE-NOT: {{(error|warning).*}}:\n")
+            f.write( "// POSITIVE: result code = 0\n")
+            f.write( "// POSITIVE-NOT: {{(error|warning).*}}:\n")
+            f.write(f"// POSITIVE-LABEL: {labelName}\n")
+            f.write( "// POSITIVE-NOT: {{(error|warning).*}}:\n")
+            f.write( "\n")
+
+        if generateNegativeTest:
+            f.write( "// Expect either a compilation error or warning 41012 for upgraded profile to support functionality\n")
+            f.write( "// NEGATIVE: {{error [[:digit:]]+|warning 41012}}:\n")
+            f.write( "\n")
+
         f.write( "    int ret = 0;\n")
         emitTestOp(f, testInfo.testOp);
         f.write( "    outputBuffer[0] = 0x12345 + ret;\n")
         f.write( "}\n")
-        f.write( "// POSITIVE_RESULT: 12345\n")
+        if generatePositiveComputeTest:
+            f.write( "\n")
+            f.write( "[numthreads(4, 1, 1)]\n")
+            f.write( "void computeMain()\n")
+            f.write( "{\n")
+            f.write( "    int ret = 0;\n")
+            emitTestOp(f, testInfo.testOp);
+            f.write( "    outputBuffer[0] = 0x12345 + ret;\n")
+            f.write( "}\n")
+            f.write( "// POSITIVE_RESULT: 12345\n")
 
 def generateTests(backendTestTuple):
     backend = backendTestTuple[0]

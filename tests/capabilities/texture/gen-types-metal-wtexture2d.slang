@@ -1,11 +1,14 @@
 // THIS IS A GENERATED FILE. DO NOT EDIT!
+// Instead, edit generate-types-tests.py and then regenerate this test
+// by running: ./generate-types-tests.py
 //
 // Texture types capability test: metal / WTexture2D<float4>
-// - Supported since: 1.0
+// - Type supported since target version:  1.0
+// - Target version for positive test:     2.3
+// - Target version for negative test:     None
 //
-// To regenerate, run: ./generate-types-tests.py
 
-//TEST:SIMPLE(filecheck=POSITIVE): -entry fragMain -stage fragment -target metal
+//TEST:SIMPLE(filecheck=POSITIVE): -entry fragMain -stage fragment -target metal -profile metallib_2_3
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_RESULT): -mtl
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
@@ -17,18 +20,17 @@ WTexture2D<float4> texHandle;
 [shader("fragment")]
 void fragMain()
 {
+// POSITIVE-NOT: {{(error|warning).*}}:
 // POSITIVE: result code = 0
+// POSITIVE-NOT: {{(error|warning).*}}:
 // POSITIVE-LABEL: fragMain
-// POSITIVE-NOT: error
-
-// NEGATIVE: result code = -1
-// NEGATIVE: error
+// POSITIVE-NOT: {{(error|warning).*}}:
 
     int ret = 0;
     texHandle.Store(int2(0, 0), float4(0, 0, 0, 0));
     ret = 0;
     outputBuffer[0] = 0x12345 + ret;
- }
+}
 
 [numthreads(4, 1, 1)]
 void computeMain()

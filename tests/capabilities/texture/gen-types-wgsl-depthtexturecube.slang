@@ -1,12 +1,15 @@
 // THIS IS A GENERATED FILE. DO NOT EDIT!
+// Instead, edit generate-types-tests.py and then regenerate this test
+// by running: ./generate-types-tests.py
 //
 // Texture types capability test: wgsl / DepthTextureCube
-// - Supported since: 1.0
+// - Type supported since target version:  1.0
+// - Target version for positive test:     1.0
+// - Target version for negative test:     None
 //
-// To regenerate, run: ./generate-types-tests.py
 
-//TEST:SIMPLE(filecheck=POSITIVE): -entry fragMain -stage fragment -target wgsl
 // Compute test disabled, see https://github.com/shader-slang/slang/issues/8786
+//TEST:SIMPLE(filecheck=POSITIVE): -entry fragMain -stage fragment -target wgsl
 //DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_RESULT): -wgpu
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
@@ -21,17 +24,16 @@ SamplerComparisonState samplerComparisonState;
 [shader("fragment")]
 void fragMain()
 {
+// POSITIVE-NOT: {{(error|warning).*}}:
 // POSITIVE: result code = 0
+// POSITIVE-NOT: {{(error|warning).*}}:
 // POSITIVE-LABEL: fragMain
-// POSITIVE-NOT: error
-
-// NEGATIVE: result code = -1
-// NEGATIVE: error
+// POSITIVE-NOT: {{(error|warning).*}}:
 
     int ret = 0;
     ret = int((texHandle.SampleCmpLevelZero(samplerComparisonState, float3(0, 0, 0), float(0))).x);
     outputBuffer[0] = 0x12345 + ret;
- }
+}
 
 [numthreads(4, 1, 1)]
 void computeMain()

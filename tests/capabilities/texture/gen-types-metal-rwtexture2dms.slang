@@ -1,12 +1,15 @@
 // THIS IS A GENERATED FILE. DO NOT EDIT!
+// Instead, edit generate-types-tests.py and then regenerate this test
+// by running: ./generate-types-tests.py
 //
 // Texture types capability test: metal / RWTexture2DMS<float4>
-// - Supported since: None
+// - Type supported since target version:  None
+// - Target version for positive test:     None
+// - Target version for negative test:     2.4
 //
-// To regenerate, run: ./generate-types-tests.py
 
 // Test disabled, see https://github.com/shader-slang/slang/issues/8721
-//DISABLE_TEST:SIMPLE(filecheck=NEGATIVE): -entry fragMain -stage fragment -target metal
+//DISABLE_TEST:SIMPLE(filecheck=NEGATIVE): -entry fragMain -stage fragment -target metal -profile metallib_2_4
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -17,23 +20,10 @@ RWTexture2DMS<float4> texHandle;
 [shader("fragment")]
 void fragMain()
 {
-// POSITIVE: result code = 0
-// POSITIVE-LABEL: fragMain
-// POSITIVE-NOT: error
+// Expect either a compilation error or warning 41012 for upgraded profile to support functionality
+// NEGATIVE: {{error [[:digit:]]+|warning 41012}}:
 
-// NEGATIVE: result code = -1
-// NEGATIVE: error
-
-    int ret = 0;
-    ret = int((texHandle.Load(int2(0, 0), 0)).x);
-    outputBuffer[0] = 0x12345 + ret;
- }
-
-[numthreads(4, 1, 1)]
-void computeMain()
-{
     int ret = 0;
     ret = int((texHandle.Load(int2(0, 0), 0)).x);
     outputBuffer[0] = 0x12345 + ret;
 }
-// POSITIVE_RESULT: 12345
