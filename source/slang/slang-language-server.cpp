@@ -211,7 +211,7 @@ SlangResult LanguageServer::parseNextMessage()
                 if (response.result.getKind() == JSONValue::Kind::Array)
                 {
                     auto arr = m_connection->getContainer()->getArray(response.result);
-                    if (arr.getCount() == 13)
+                    if (arr.getCount() == 14)
                     {
                         updatePredefinedMacros(arr[0]);
                         updateSearchPaths(arr[1]);
@@ -219,7 +219,8 @@ SlangResult LanguageServer::parseNextMessage()
                         updateCommitCharacters(arr[3]);
                         updateFormattingOptions(arr[4], arr[5], arr[6], arr[7], arr[8], arr[9]);
                         updateInlayHintOptions(arr[10], arr[11]);
-                        updateTraceOptions(arr[12]);
+                        updateWorkspaceFlavor(arr[12]);
+                        updateTraceOptions(arr[13]);
                     }
                 }
                 break;
@@ -2373,6 +2374,30 @@ void LanguageServer::updateTraceOptions(const JSONValue& value)
     }
 }
 
+void LanguageServer::updateWorkspaceFlavor(const JSONValue& value)
+{
+    if (value.isValid())
+    {
+        auto container = m_connection->getContainer();
+        JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
+        String str;
+        if (SLANG_SUCCEEDED(converter.convert(value, &str)))
+        {
+            WorkspaceFlavor flavor = WorkspaceFlavor::Standard;
+            if (str == "standard")
+            {
+                flavor = WorkspaceFlavor::Standard;
+            }
+            else if (str == "vfx")
+            {
+                flavor = WorkspaceFlavor::VFX;
+            }
+
+            m_core.m_workspace->workspaceFlavor = flavor;
+        }
+    }
+}
+
 void LanguageServer::sendConfigRequest()
 {
     ConfigurationParams args;
@@ -2400,6 +2425,8 @@ void LanguageServer::sendConfigRequest()
     item.section = "slang.inlayHints.deducedTypes";
     args.items.add(item);
     item.section = "slang.inlayHints.parameterNames";
+    args.items.add(item);
+    item.section = "slang.workspaceFlavor";
     args.items.add(item);
     item.section = "slangLanguageServer.trace.server";
     args.items.add(item);
@@ -2962,6 +2989,10 @@ void LanguageServer::updateConfigFromJSON(const JSONValue& jsonVal)
         else if (key == "slang.inlayHints.parameterNames")
         {
             updateInlayHintOptions(JSONValue(), kv.value);
+        }
+        else if (key == "slang.workspaceFlavor")
+        {
+            updateWorkspaceFlavor(kv.value);
         }
     }
 }

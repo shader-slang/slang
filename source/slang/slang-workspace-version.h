@@ -172,6 +172,7 @@ public:
     OrderedHashSet<String> workspaceSearchPaths;
     List<OwnedPreprocessorMacroDefinition> predefinedMacros;
     bool searchInWorkspace = true;
+    WorkspaceFlavor workspaceFlavor = WorkspaceFlavor::Standard;
 
     slang::IGlobalSession* slangGlobalSession;
     Dictionary<String, RefPtr<DocumentVersion>> openedDocuments;
