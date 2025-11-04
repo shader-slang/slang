@@ -8567,7 +8567,9 @@ void SemanticsDeclBodyVisitor::visitEnumDecl(EnumDecl* decl)
 {
     SLANG_OUTER_SCOPE_CONTEXT_DECL_RAII(this, decl);
 
-    auto enumType = DeclRefType::create(m_astBuilder, createDefaultSubstitutionsIfNeeded(m_astBuilder, this, makeDeclRef(decl)));
+    auto enumType = DeclRefType::create(
+        m_astBuilder,
+        createDefaultSubstitutionsIfNeeded(m_astBuilder, this, makeDeclRef(decl)));
 
     auto tagType = decl->tagType;
 
@@ -8662,7 +8664,9 @@ void SemanticsDeclBodyVisitor::visitEnumCaseDecl(EnumCaseDecl* decl)
 
     ensureDecl(parentEnumDecl, DeclCheckState::ReadyForLookup);
 
-    decl->type.type = DeclRefType::create(m_astBuilder, createDefaultSubstitutionsIfNeeded(m_astBuilder, this, makeDeclRef(parentEnumDecl)));
+    decl->type.type = DeclRefType::create(
+        m_astBuilder,
+        createDefaultSubstitutionsIfNeeded(m_astBuilder, this, makeDeclRef(parentEnumDecl)));
 
     // The tag type should have already been set by
     // the surrounding `enum` declaration.
@@ -14619,15 +14623,16 @@ DeclVisibility getDeclVisibility(Decl* decl)
 {
     // Protect against stack overflow from deep recursion
     thread_local int recursionDepth = 0;
-    struct RecursionGuard {
+    struct RecursionGuard
+    {
         RecursionGuard() { recursionDepth++; }
         ~RecursionGuard() { recursionDepth--; }
     };
     RecursionGuard guard;
-    
+
     if (recursionDepth > 100)
         return DeclVisibility::Public;
-    
+
     if (as<GenericTypeParamDeclBase>(decl) || as<GenericValueParamDecl>(decl) ||
         as<GenericTypeConstraintDecl>(decl))
     {
