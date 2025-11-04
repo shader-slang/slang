@@ -1577,8 +1577,12 @@ SlangResult EndToEndCompileRequest::compile()
     if (reflectionPath.getLength() != 0)
     {
         auto reflection = this->getReflection();
-        if (!reflection) {
-            getSink()->diagnose(SourceLoc(), Diagnostics::cannotEmitReflectionWithoutTarget, "Cannot emit reflection JSON: no compilation target available");
+        if (!reflection)
+        {
+            getSink()->diagnose(
+                SourceLoc(),
+                Diagnostics::cannotEmitReflectionWithoutTarget,
+                "Cannot emit reflection JSON: no compilation target available");
             return SLANG_FAIL;
         }
         auto bufferWriter = PrettyWriter();
