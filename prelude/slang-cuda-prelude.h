@@ -5464,7 +5464,7 @@ inline unsigned __device__ Pack32Helper<uint8_t>(uint8_t value)
 
 // The dimensions of the fragment are specified by M, N, K which are totally determined during
 // compile time, so slang already did the pre-filter on the shape & type combination.
-template<typename T, int M, int N, int K, MatrixUse R, Layout layout = RowMajor>
+template<typename T, int M, int N, int K, MatrixUse R, Layout MatrixLayout = RowMajor>
 struct WmmaFragment
 {
     typedef WmmaFragment<T, M, N, K, R> This;
@@ -5524,7 +5524,7 @@ struct WmmaFragment
     static constexpr int m_M = M;
     static constexpr int m_N = N;
     static constexpr int m_K = K;
-    static constexpr Layout m_layout = layout;
+    static constexpr Layout m_layout = MatrixLayout;
 
     // Maximum registers needed across all fragment types and data types
     static constexpr int MAX_REGS = 8;

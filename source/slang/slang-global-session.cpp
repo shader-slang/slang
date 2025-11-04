@@ -1173,8 +1173,14 @@ void Session::addBuiltinSource(
         SLANG_UNEXPECTED("error in Slang core module");
     }
 
-    // Compiling the core module should not yield any warnings.
-    SLANG_ASSERT(sink.outputBuffer.getLength() == 0);
+    if (sink.outputBuffer.getLength())
+    {
+        char const* diagnostics = sink.outputBuffer.getBuffer();
+        fprintf(stderr, "%s", diagnostics);
+
+        PlatformUtil::outputDebugMessage(diagnostics);
+        SLANG_UNEXPECTED("Compiling the core module should not yield any warnings");
+    }
 
     // Extract the AST for the code we just parsed
     auto module = compileRequest->translationUnits[translationUnitIndex]->getModule();

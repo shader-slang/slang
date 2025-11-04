@@ -23833,7 +23833,7 @@ struct CoopMat
             {
                 result:$$CoopMat<T, S, M, N, R> = OpConstantComposite $t;
             };
-        case _cuda_sm_8_0:
+        case cuda:
             __intrinsic_asm "($0)->fill($1)";
         }
     }
@@ -23916,13 +23916,13 @@ struct CoopMat
             {
                 result:$$uint = OpCooperativeMatrixLengthKHR $$CoopMat<T, S, M, N, R>;
             };
-        case _cuda_sm_8_0:
+        case cuda:
             This result;
             return __getNumElementsPerThread(result);
         }
     }
 
-    [require(_cuda_sm_8_0)]
+    [require(cuda_sm_8_0)]
     internal static uint __getNumElementsPerThread(__ref This coopMat)
     {
         __intrinsic_asm "($0)->GetLength()";
@@ -24081,7 +24081,7 @@ struct CoopMat
                 %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
                 OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
             };
-        case _cuda_sm_8_0:
+        case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
                 __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>($1, $2, $3)";
             else
@@ -24103,7 +24103,7 @@ struct CoopMat
                 %pointer:$$T* = OpPtrAccessChain $buffer $element;
                 OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
             };
-        case _cuda_sm_8_0:
+        case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
                 __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>($1, $2, $3)";
             else
@@ -24144,7 +24144,7 @@ struct CoopMat
                 %pointer:%workgroupPointerType = OpAccessChain &data $element;
                 OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
             };
-        case _cuda_sm_8_0:
+        case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
                 __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>(($1)->m_data, $2, $3)";
             else
@@ -24229,7 +24229,7 @@ ${{{{
                 %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
                 result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
             };
-        case _cuda_sm_8_0:
+        case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
                 __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>($0, $1, $2)";
             else
@@ -24257,7 +24257,7 @@ ${{{{
                 %pointer:$$T* = OpPtrAccessChain $buffer $element;
                 result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
             };
-        case _cuda_sm_8_0:
+        case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
                 __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>($0, $1, $2)";
             else
@@ -24300,7 +24300,7 @@ ${{{{
                 %pointer:%workgroupPointerType = OpAccessChain &data $element;
                 result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
             };
-        case _cuda_sm_8_0:
+        case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
                 __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>(($0)->m_data, $1, $2)";
             else
@@ -25013,7 +25013,7 @@ CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> coopMatMulAdd<
         {
             result:$$CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> = OpCooperativeMatrixMulAddKHR $matA $matB $matC !operands;
         };
-    case _cuda_sm_8_0:
+    case cuda:
         __intrinsic_asm R"(Slang_CUDA_WMMA::coopMatMulAdd<
                                                          $T0::ElementType,
                                                          $T1::ElementType,

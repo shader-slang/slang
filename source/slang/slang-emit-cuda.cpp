@@ -241,6 +241,8 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
         }
     case kIROp_CoopMatrixType:
         {
+            // CUDA wmma require SM 7.5+
+            m_extensionTracker->requireSMVersion(SemanticVersion(7, 5));
             return emitWMMAFragmentType(as<IRCoopMatrixType>(type), out);
         }
     default:
