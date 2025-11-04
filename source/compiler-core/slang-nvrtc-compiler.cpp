@@ -849,6 +849,34 @@ SlangResult NVRTCDownstreamCompiler::_findOptixIncludePath(String& outPath)
         return SLANG_OK;
     }
 
+    // As a fallback, check for OptiX headers in the local external/optix-dev/include
+    // directory relative to the executable path. This is checked last (after user paths
+    // and system installations) to allow users to override with their own OptiX SDK.
+    {
+        StringBuilder instancePathBuilder;
+        if (SLANG_SUCCEEDED(PlatformUtil::getInstancePath(instancePathBuilder)))
+        {
+            // Get executable path, then go up to project root
+            // instancePathBuilder already contains the bin directory path
+            // Executable is in build/Debug/bin or build/Release/bin
+            // Go up 3 levels: bin -> Debug/Release -> build -> project root
+            String binPath = instancePathBuilder;
+            String buildTypeDir = Path::getParentDirectory(binPath);
+            String buildDir = Path::getParentDirectory(buildTypeDir);
+            String projectRoot = Path::getParentDirectory(buildDir);
+
+            String localOptixPath =
+                Path::combine(Path::combine(projectRoot, "external/optix-dev"), "include");
+            String optixHeader = Path::combine(localOptixPath, g_optixHeaderName);
+
+            if (File::exists(optixHeader))
+            {
+                outPath = localOptixPath;
+                return SLANG_OK;
+            }
+        }
+    }
+
     return SLANG_E_NOT_FOUND;
 }
 
