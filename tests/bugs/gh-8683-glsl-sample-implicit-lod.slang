@@ -1,9 +1,9 @@
-//TEST:SIMPLE(filecheck=VK-CHECK-VTX): -target spirv -stage vertex -entry vertexMain -allow-glsl
-//TEST:SIMPLE(filecheck=VK-CHECK-FRAG): -target spirv -stage fragment -entry fragmentMain -allow-glsl
-//TEST:SIMPLE(filecheck=GLSL-CHECK-VTX): -target glsl -stage vertex -entry vertexMain -allow-glsl
-//TEST:SIMPLE(filecheck=GLSL-CHECK-FRAG): -target glsl -stage fragment -entry fragmentMain -allow-glsl
-//TEST:SIMPLE(filecheck=HLSL-CHECK-VTX): -target hlsl -stage vertex -entry vertexMain -allow-glsl
-//TEST:SIMPLE(filecheck=HLSL-CHECK-FRAG): -target hlsl -stage fragment -entry fragmentMain -allow-glsl
+//TEST:SIMPLE(filecheck=VK_VTX): -target spirv -stage vertex -entry vertexMain -allow-glsl
+//TEST:SIMPLE(filecheck=VK_FRAG): -target spirv -stage fragment -entry fragmentMain -allow-glsl
+//TEST:SIMPLE(filecheck=GLSL_VTX): -target glsl -stage vertex -entry vertexMain -allow-glsl
+//TEST:SIMPLE(filecheck=GLSL_FRAG): -target glsl -stage fragment -entry fragmentMain -allow-glsl
+//TEST:SIMPLE(filecheck=HLSL_VTX): -target hlsl -stage vertex -entry vertexMain -allow-glsl
+//TEST:SIMPLE(filecheck=HLSL_FRAG): -target hlsl -stage fragment -entry fragmentMain -allow-glsl
 
 // Regression test for https://github.com/shader-slang/slang/issues/8683
 //
@@ -26,13 +26,13 @@ buffer MyBlockName
 [shader("vertex")]
 void vertexMain() {
 
-// VK-CHECK-VTX: OpImageSampleExplicitLod
-// VK-CHECK-VTX-NOT: OpImageSampleImplicitLod
+// VK_VTX: OpImageSampleExplicitLod
+// VK_VTX-NOT: OpImageSampleImplicitLod
 
-// GLSL-CHECK-VTX: texture(
+// GLSL_VTX: texture(
 
-// HLSL-CHECK-VTX: SampleLevel(
-// HLSL-CHECK-VTX-NOT: Sample(
+// HLSL_VTX: SampleLevel(
+// HLSL_VTX-NOT: Sample(
 
     vec3 val = texture(uBumpTexture, vec2(0,0)).rgb;
 
@@ -43,13 +43,13 @@ void vertexMain() {
 [shader("fragment")]
 void fragmentMain() {
 
-// VK-CHECK-FRAG: OpImageSampleImplicitLod
-// VK-CHECK-FRAG-NOT: OpImageSampleExplicitLod
+// VK_FRAG: OpImageSampleImplicitLod
+// VK_FRAG-NOT: OpImageSampleExplicitLod
 
-// GLSL-CHECK-FRAG: texture(
+// GLSL_FRAG: texture(
 
-// HLSL-CHECK-FRAG-NOT: SampleLevel(
-// HLSL-CHECK-FRAG: Sample(
+// HLSL_FRAG-NOT: SampleLevel(
+// HLSL_FRAG: Sample(
 
     vec3 val = texture(uBumpTexture, vec2(0,0)).rgb;
 
