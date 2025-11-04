@@ -870,10 +870,9 @@ public:
                 llvmConstant = builder->getConstantPtr((uintptr_t)ptrLit->getValue());
             }
             break;
-        /*
         case kIROp_MakeVector:
             {
-                List<llvm::Constant*> values;
+                List<LLVMInst*> values;
                 for (UInt aa = 0; aa < inst->getOperandCount(); ++aa)
                 {
                     auto partInst = inst->getOperand(aa);
@@ -884,13 +883,9 @@ public:
                     {
                         auto elemCount = getIntVal(subvectorType->getElementCount());
                         for (IRIntegerValue j = 0; j < elemCount; ++j)
-                        {
-                            auto index = llvm::ConstantInt::get(builder->getInt32Ty(), j);
-                            values.add(llvm::ConstantExpr::getExtractElement(constVal, index));
-                        }
+                            values.add(builder->getConstantExtractElement(constVal, j));
                     }
-                    else
-                        values.add(constVal);
+                    else values.add(constVal);
                 }
 
                 auto vectorType = as<IRVectorType>(inst->getDataType());
@@ -908,9 +903,7 @@ public:
                     // To remove padding and alignment requirements from the
                     // vector, lower it as an array.
                     auto elemType = getType(vectorType->getElementType());
-                    llvmConstant = llvm::ConstantArray::get(
-                        llvm::ArrayType::get(elemType, values.getCount()),
-                        llvm::ArrayRef(values.begin(), values.end()));
+                    llvmConstant = builder->getConstantArray(Slice(values.begin(), values.getCount()));
 
                     int alignedCount = getVectorAlignedCount(vectorType, defaultPointerRules);
                     if (alignedCount != values.getCount())
@@ -918,17 +911,13 @@ public:
                         // Fill padding with poison, nobody should use it in
                         // computations.
                         while (values.getCount() < alignedCount)
-                            values.add(llvm::PoisonValue::get(elemType));
-
-                        llvmConstant.padded = llvm::ConstantArray::get(
-                            llvm::ArrayType::get(elemType, values.getCount()),
-                            llvm::ArrayRef(values.begin(), values.end()));
+                            values.add(builder->getPoison(elemType));
+                        llvmConstant.padded = builder->getConstantArray(Slice(values.begin(), values.getCount()));
                     }
                 }
                 else
                 {
-                    llvmConstant =
-                        llvm::ConstantVector::get(llvm::ArrayRef(values.begin(), values.end()));
+                    llvmConstant = builder->getConstantVector(Slice(values.begin(), values.getCount()));
                 }
             }
             break;
@@ -936,44 +925,35 @@ public:
             {
                 auto vectorType = cast<IRVectorType>(inst->getDataType());
                 int elemCount = getIntVal(vectorType->getElementCount());
-                llvm::Constant* value = maybeEmitConstant(inst->getOperand(0), inAggregate);
+                LLVMInst* value = maybeEmitConstant(inst->getOperand(0), inAggregate);
                 if (!value)
                     return nullptr;
 
                 if (inAggregate)
                 {
                     auto elemType = getType(vectorType->getElementType());
-                    auto values = List<llvm::Constant*>::makeRepeated(value, elemCount);
-                    llvmConstant = llvm::ConstantArray::get(
-                        llvm::ArrayType::get(elemType, values.getCount()),
-                        llvm::ArrayRef(values.begin(), values.end()));
+                    auto values = List<LLVMInst*>::makeRepeated(value, elemCount);
+                    llvmConstant = builder->getConstantArray(Slice(values.begin(), values.getCount()));
 
                     int alignedCount = getVectorAlignedCount(vectorType, defaultPointerRules);
                     if (alignedCount != values.getCount())
                     {
                         while (values.getCount() < alignedCount)
-                            values.add(llvm::PoisonValue::get(elemType));
+                            values.add(builder->getPoison(elemType));
 
-                        llvmConstant.padded = llvm::ConstantArray::get(
-                            llvm::ArrayType::get(elemType, values.getCount()),
-                            llvm::ArrayRef(values.begin(), values.end()));
+                        llvmConstant.padded = builder->getConstantArray(Slice(values.begin(), values.getCount()));
                     }
                 }
                 else
                 {
-                    llvmConstant = llvm::ConstantVector::getSplat(
-                        llvm::ElementCount::getFixed(elemCount),
-                        value);
+                    llvmConstant = builder->getConstantVector(value, elemCount);
                 }
             }
             break;
-            // It is possible to remove both MakeArray and MakeStruct here;
-            // that only causes more complex code for initializing global
-            // variables.
         case kIROp_MakeArray:
             {
                 auto arrayType = cast<IRArrayTypeBase>(inst->getDataType());
-                List<llvm::Constant*> values;
+                List<LLVMInst*> values;
 
                 for (UInt aa = 0; aa < inst->getOperandCount(); ++aa)
                 {
@@ -983,12 +963,7 @@ public:
                     values.add(constVal);
                 }
 
-                auto elemCount = values.getCount();
-                auto llvmElemType = elemCount == 0 ? byteType : values[0]->getType();
-
-                llvmConstant = llvm::ConstantArray::get(
-                    llvm::ArrayType::get(llvmElemType, elemCount),
-                    llvm::ArrayRef(values.begin(), values.end()));
+                llvmConstant = builder->getConstantArray(Slice(values.begin(), values.getCount()));
 
                 if (needsUnpaddedArrayTypeWorkaround(arrayType, defaultPointerRules))
                 {
@@ -997,13 +972,11 @@ public:
                         true,
                         false);
 
-                    auto initPart = llvm::ConstantArray::get(
-                        llvm::ArrayType::get(llvmElemType, elemCount - 1),
-                        llvm::ArrayRef(values.begin(), elemCount - 1));
+                    auto initPart = builder->getConstantArray(Slice(values.begin(), values.getCount()-1));
 
                     // This should be a struct for the workaround.
-                    llvm::Constant* fields[2] = {initPart, lastPart};
-                    llvmConstant.unpadded = llvm::ConstantStruct::getAnon(fields, true);
+                    LLVMInst* fields[2] = {initPart, lastPart};
+                    llvmConstant.unpadded = builder->getConstantStruct(Slice(fields, 2));
                 }
             }
             break;
@@ -1015,7 +988,7 @@ public:
                 IRSizeAndAlignment sizeAndAlignment =
                     getSizeAndAlignment(structType, defaultPointerRules);
 
-                List<llvm::Constant*> values;
+                List<LLVMInst*> values;
                 auto field = structType->getFields().begin();
                 for (UInt aa = 0; aa < inst->getOperandCount(); ++aa, ++field)
                 {
@@ -1028,21 +1001,16 @@ public:
                     emitPaddingConstant(values, llvmSize, offset);
 
                     values.add(constVal);
-                    llvmSize += targetDataLayout.getTypeStoreSize(constVal->getType());
+                    llvmSize += builder->getStoreSizeOf(constVal);
                 }
 
-                llvmConstant.unpadded = llvm::ConstantStruct::getAnon(
-                    llvm::ArrayRef(values.begin(), values.end()),
-                    true);
+                llvmConstant.unpadded = builder->getConstantStruct(Slice<LLVMInst*>(values.begin(), values.getCount()));
 
                 emitPaddingConstant(values, llvmSize, sizeAndAlignment.getStride());
 
-                llvmConstant.padded = llvm::ConstantStruct::getAnon(
-                    llvm::ArrayRef(values.begin(), values.end()),
-                    true);
+                llvmConstant.padded = builder->getConstantStruct(Slice<LLVMInst*>(values.begin(), values.getCount()));
             }
             break;
-        */
         default:
             break;
         }

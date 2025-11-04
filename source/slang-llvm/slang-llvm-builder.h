@@ -36,6 +36,7 @@ public:
     // Native type layout info
     //==========================================================================
     virtual int getPointerSizeInBits() = 0;
+    virtual int getStoreSizeOf(LLVMInst* value) = 0;
 
     //==========================================================================
     // Types
@@ -61,11 +62,16 @@ public:
     //==========================================================================
     // Constant values
     //==========================================================================
+    virtual LLVMInst* getPoison(LLVMType* type) = 0;
     virtual LLVMInst* getConstantInt(LLVMType* type, uint64_t value) = 0;
     virtual LLVMInst* getConstantPtr(uint64_t value) = 0;
     virtual LLVMInst* getConstantFloat(LLVMType* type, double value) = 0;
     virtual LLVMInst* getConstantArray(Slice<LLVMInst*> values) = 0;
     virtual LLVMInst* getConstantString(TerminatedCharSlice literal) = 0;
+    virtual LLVMInst* getConstantStruct(Slice<LLVMInst*> values) = 0;
+    virtual LLVMInst* getConstantVector(Slice<LLVMInst*> values) = 0;
+    virtual LLVMInst* getConstantVector(LLVMInst* value, int count) = 0;
+    virtual LLVMInst* getConstantExtractElement(LLVMInst* value, int index) = 0;
 
     //==========================================================================
     // Debug info

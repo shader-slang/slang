@@ -186,6 +186,7 @@ public:
     void finalize();
 
     int getPointerSizeInBits() override;
+    int getStoreSizeOf(LLVMInst* value) override;
 
     LLVMType* getVoidType() override;
     LLVMType* getIntType(int bitSize) override;
@@ -202,11 +203,16 @@ public:
     LLVMInst* emitIntResize(LLVMInst* value, LLVMType* into, bool isSigned = false) override;
     LLVMInst* emitCopy(LLVMInst* dstPtr, int dstAlign, LLVMInst* srcPtr, int srcAlign, int bytes, bool isVolatile = false) override;
 
+    LLVMInst* getPoison(LLVMType* type) override;
     LLVMInst* getConstantInt(LLVMType* type, uint64_t value) override;
     LLVMInst* getConstantPtr(uint64_t value) override;
     LLVMInst* getConstantFloat(LLVMType* type, double value) override;
     LLVMInst* getConstantArray(Slice<LLVMInst*> values) override;
     LLVMInst* getConstantString(TerminatedCharSlice literal) override;
+    LLVMInst* getConstantStruct(Slice<LLVMInst*> values) override;
+    LLVMInst* getConstantVector(Slice<LLVMInst*> values) override;
+    LLVMInst* getConstantVector(LLVMInst* value, int count) override;
+    LLVMInst* getConstantExtractElement(LLVMInst* value, int index) override;
 
     LLVMDebugNode* getDebugFallbackType(TerminatedCharSlice name) override;
     LLVMDebugNode* getDebugVoidType() override;
@@ -505,6 +511,11 @@ int LLVMBuilder::getPointerSizeInBits()
     return targetDataLayout.getPointerSizeInBits();
 }
 
+int LLVMBuilder::getStoreSizeOf(LLVMInst* value)
+{
+    return targetDataLayout.getTypeStoreSize(unwrap(value)->getType());
+}
+
 LLVMType* LLVMBuilder::getVoidType()
 {
     return wrap(llvmBuilder->getVoidTy());
@@ -615,6 +626,11 @@ LLVMInst* LLVMBuilder::emitCopy(LLVMInst* dstPtr, int dstAlign, LLVMInst* srcPtr
         isVolatile));
 }
 
+LLVMInst* LLVMBuilder::getPoison(LLVMType* type)
+{
+    return wrap(llvm::PoisonValue::get(unwrap(type)));
+}
+
 LLVMInst* LLVMBuilder::getConstantInt(LLVMType* type, uint64_t value)
 {
     return wrap(llvm::ConstantInt::get(unwrap(type), value));
@@ -657,6 +673,29 @@ LLVMInst* LLVMBuilder::getConstantArray(Slice<LLVMInst*> values)
 LLVMInst* LLVMBuilder::getConstantString(TerminatedCharSlice literal)
 {
     return wrap(llvmBuilder->CreateGlobalString(charSliceToLLVM(literal)));
+}
+
+LLVMInst* LLVMBuilder::getConstantStruct(Slice<LLVMInst*> values)
+{
+    return wrap(llvm::ConstantStruct::getAnon(upcast<llvm::Constant>(values), true));
+}
+
+LLVMInst* LLVMBuilder::getConstantVector(Slice<LLVMInst*> values)
+{
+    return wrap(llvm::ConstantVector::get(upcast<llvm::Constant>(values)));
+}
+
+LLVMInst* LLVMBuilder::getConstantVector(LLVMInst* value, int count)
+{
+    return wrap(llvm::ConstantVector::getSplat(
+        llvm::ElementCount::getFixed(count),
+        llvm::cast<llvm::Constant>(unwrap(value))));
+}
+
+LLVMInst* LLVMBuilder::getConstantExtractElement(LLVMInst* value, int index)
+{
+    auto llvmIndex = llvm::ConstantInt::get(llvmBuilder->getInt32Ty(), index);
+    return wrap(llvm::ConstantExpr::getExtractElement(llvm::cast<llvm::Constant>(unwrap(value)), llvmIndex));
 }
 
 LLVMDebugNode* LLVMBuilder::getDebugFallbackType(TerminatedCharSlice name)
