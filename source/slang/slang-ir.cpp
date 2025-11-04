@@ -8117,6 +8117,38 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
             // Swap this use over to use the other value.
             uu->usedValue = other;
 
+            bool userIsSetInst = as<IRSetBase>(uu->getUser()) != nullptr;
+            if (userIsSetInst)
+            {
+                // Set insts need their operands sorted
+                auto module = user->getModule();
+                SLANG_ASSERT(module);
+
+                List<IRInst*>& operands = *module->getContainerPool().getList<IRInst>();
+                for (UInt i = 0; i < user->getOperandCount(); i++)
+                    operands.add(user->getOperand(i));
+
+                auto getUniqueId = [&](IRInst* inst)
+                {
+                    auto uniqueIDMap = module->getUniqueIdMap();
+                    auto existingId = uniqueIDMap->tryGetValue(inst);
+                    if (existingId)
+                        return *existingId;
+
+                    auto id = uniqueIDMap->getCount();
+                    uniqueIDMap->add(inst, id);
+                    return id;
+                };
+
+                operands.sort([&](IRInst* a, IRInst* b)
+                              { return getUniqueId(a) < getUniqueId(b); });
+
+                for (UInt i = 0; i < user->getOperandCount(); i++)
+                    user->getOperandUse(i)->usedValue = operands[i];
+
+                module->getContainerPool().free(&operands);
+            }
+
             // If `other` is hoistable, then we need to make sure `other` is hoisted
             // to a point before `user`, if it is not already so.
             _maybeHoistOperand(uu);
@@ -8616,14 +8648,12 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_GetTagFromSequentialID:
     case kIROp_GetSequentialIDFromTag:
     case kIROp_CastInterfaceToTaggedUnionPtr:
-    case kIROp_CastTaggedUnionToInterfacePtr:
     case kIROp_GetElementFromTag:
     case kIROp_GetTagFromTaggedUnion:
     case kIROp_GetTypeTagFromTaggedUnion:
     case kIROp_GetValueFromTaggedUnion:
     case kIROp_MakeTaggedUnion:
     case kIROp_GetTagOfElementInSet:
-    case kIROp_UnboundedSet:
     case kIROp_MakeDifferentialPairUserCode:
     case kIROp_MakeDifferentialPtrPair:
     case kIROp_MakeStorageTypeLoweringConfig:

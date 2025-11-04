@@ -28,7 +28,7 @@ IRInst* upcastSet(IRBuilder* builder, IRInst* arg, IRType* destInfo)
 
     if (as<IRTaggedUnionType>(argInfo) && as<IRTaggedUnionType>(destInfo))
     {
-        // A collection tagged union is essentially a tuple(TagType(tableSet),
+        // A tagged union is essentially a tuple(TagType(tableSet),
         // typeSet) We simply extract the two components, upcast each one, and put it
         // back together.
         //
@@ -60,12 +60,12 @@ IRInst* upcastSet(IRBuilder* builder, IRInst* arg, IRType* destInfo)
     }
     else if (as<IRSetTagType>(argInfo) && as<IRSetTagType>(destInfo))
     {
-        // If the arg represents a tag of a colleciton, but the dest is a _different_
-        // collection, then we need to emit a tag operation to reinterpret the
+        // If the arg represents a tag of a set, but the dest is a _different_
+        // set, then we need to emit a tag operation to reinterpret the
         // tag.
         //
         // Note that, by the invariant provided by the typeflow analysis, the target
-        // collection must necessarily be a super-set.
+        // set must necessarily be a super-set.
         //
         if (argInfo != destInfo)
         {
@@ -74,7 +74,7 @@ IRInst* upcastSet(IRBuilder* builder, IRInst* arg, IRType* destInfo)
     }
     else if (as<IRUntaggedUnionType>(argInfo) && as<IRUntaggedUnionType>(destInfo))
     {
-        // If the arg has a collection type, but the dest is a _different_ collection,
+        // If the arg has a untagged union type, but the dest is a _different_ untagged union,
         // we need to perform a reinterpret.
         //
         // e.g. TypeSet({T1, T2}) may lower to AnyValueType(N), while

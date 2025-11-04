@@ -863,14 +863,14 @@ struct SpecializationContext
         IRInterfaceType* interfaceType = nullptr;
         if (!witnessTable)
         {
-            if (auto collection = as<IRWitnessTableSet>(lookupInst->getWitnessTable()))
+            if (auto witnessTableSet = as<IRWitnessTableSet>(lookupInst->getWitnessTable()))
             {
                 auto requirementKey = lookupInst->getRequirementKey();
 
                 HashSet<IRInst*> satisfyingValSet;
                 bool skipSpecialization = false;
                 forEachInSet(
-                    collection,
+                    witnessTableSet,
                     [&](IRInst* instElement)
                     {
                         if (auto table = as<IRWitnessTable>(instElement))
@@ -904,7 +904,7 @@ struct SpecializationContext
                     else
                     {
                         // Should not see any other case.
-                        SLANG_UNREACHABLE("unexpected collection type");
+                        SLANG_UNREACHABLE("unexpected set kind");
                     }
 
                     return true;
@@ -3254,25 +3254,25 @@ IRInst* specializeGenericWithSetArgs(IRSpecialize* specializeInst)
     for (auto param : generic->getFirstBlock()->getParams())
     {
         auto specArg = specializeInst->getArg(argIndex++);
-        if (auto collection = as<IRSetBase>(specArg))
+        if (auto set = as<IRSetBase>(specArg))
         {
             // We're dealing with a set of types.
             if (as<IRTypeType>(param->getDataType()))
             {
                 SLANG_ASSERT("Should not happen");
-                cloneEnv.mapOldValToNew[param] = builder.getUntaggedUnionType(collection);
+                cloneEnv.mapOldValToNew[param] = builder.getUntaggedUnionType(set);
             }
             else if (as<IRWitnessTableType>(param->getDataType()))
             {
                 // For cloning parameter types, we want to just use the
-                // collection.
+                // set.
                 //
-                staticCloningEnv.mapOldValToNew[param] = collection;
+                staticCloningEnv.mapOldValToNew[param] = set;
 
                 // We'll create an integer parameter for all the rest of
                 // the insts which will may need the runtime tag.
                 //
-                auto tagType = (IRType*)builder.getSetTagType(collection);
+                auto tagType = (IRType*)builder.getSetTagType(set);
                 // cloneEnv.mapOldValToNew[param] = builder.emitParam(tagType);
                 extraParamMap.add(param, builder.emitParam(tagType));
                 extraParamTypes.add(tagType);

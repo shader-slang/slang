@@ -2732,30 +2732,8 @@ local insts = {
 			{ GenericSet = {} }
 		},
 	},
-	{ UnboundedSet = {
-		hoistable = true,
-		--
-		-- A catch-all opcode to represent unbounded collections during
-		-- the type-flow specialization pass.
-		-- 
-		-- This op is usually used to mark insts that can contain a dynamic type
-		-- whose information cannot be gleaned from the type-flow analysis.
-		--
-		-- E.g. COM interface objects, whose implementations can be fully external to
-		-- the linkage
-		-- 
-		-- This op is only used to denote that an inst is unbounded so the specialization
-		-- pass does not attempt to specialize it. It should not appear in the code after
-		-- the specialization pass.
-		--
-		-- TODO: Consider the scenario where we can combine the unbounded case with known cases.
-		--       unbounded set should probably be an element and not a separate op.
-	} },
 	{ CastInterfaceToTaggedUnionPtr = {
 		-- Cast an interface-typed pointer to a tagged-union pointer with a known set.
-	} }, 
-	{ CastTaggedUnionToInterfacePtr = {
-		-- Cast a tagged-union pointer with a known set to a corresponding interface-typed pointer.
 	} }, 
 	{ GetTagForSuperSet = {
 		-- Translate a tag from a set to its equivalent in a super-set

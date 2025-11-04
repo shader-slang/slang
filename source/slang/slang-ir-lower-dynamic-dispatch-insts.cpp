@@ -467,7 +467,6 @@ struct TagOpsLoweringContext : public InstPassBase
         inst->removeAndDeallocate();
     }
 
-
     void lowerGetTagForMappedSet(IRGetTagForMappedSet* inst)
     {
         // `GetTagForMappedSet` turns into a integer mapping from
@@ -631,7 +630,6 @@ struct DispatcherLoweringContext : public InstPassBase
                 });
         }
     }
-
 
     void lowerGetSpecializedDispatcher(IRGetSpecializedDispatcher* dispatcher)
     {
@@ -1152,8 +1150,7 @@ bool isEffectivelyComPtrType(IRType* type)
     return false;
 }
 
-// This context lowers `CastInterfaceToTaggedUnionPtr` and
-// `CastTaggedUnionToInterfacePtr` by finding all `IRLoad` and
+// This context lowers `CastInterfaceToTaggedUnionPtr` by finding all `IRLoad` and
 // `IRStore` uses of these insts, and upcasting the tagged-union
 // tuple to the the interface-based tuple (of the loaded inst or before
 // storing the val, as necessary)
@@ -1725,24 +1722,34 @@ struct ExistentialLoweringContext : public InstPassBase
         builder.setInsertAfter(inst);
 
         auto tupleType = as<IRTupleType>(inst->getOperand(0)->getDataType());
-
+        auto element =
+            builder.emitGetTupleElement((IRType*)tupleType->getOperand(2), inst->getOperand(0), 2);
         if (as<IRPseudoPtrType>(tupleType->getOperand(2)))
         {
-            inst->replaceUsesWith(builder.emitGetTupleElement(
-                (IRType*)tupleType->getOperand(2),
-                inst->getOperand(0),
-                2));
+            // The first case is when legacy static specialization
+            // is applied, and the element is a "pseudo-pointer."
+            //
+            // Semantically, we should emit a (pseudo-)load from the pseudo-pointer
+            // to go from `PseudoPtr<T>` to `T`.
+            //
+            // TODO: Actually introduce and emit a "psedudo-load" instruction
+            // here. For right now we are just using the value directly and
+            // downstream passes seem okay with it, but it isn't really
+            // type-correct to be doing this.
+            //
+            inst->replaceUsesWith(element);
             inst->removeAndDeallocate();
             return true;
         }
         else
         {
-            inst->replaceUsesWith(builder.emitUnpackAnyValue(
-                inst->getDataType(),
-                builder.emitGetTupleElement(
-                    (IRType*)tupleType->getOperand(2),
-                    inst->getOperand(0),
-                    2)));
+            // The second case is when the dynamic-dispatch layout is
+            // being used, and the element is an "any-value."
+            //
+            // In this case we need to emit an unpacking operation
+            // to get from `AnyValue` to `T`.
+            //
+            inst->replaceUsesWith(builder.emitUnpackAnyValue(inst->getDataType(), element));
             inst->removeAndDeallocate();
             return true;
         }
@@ -1782,6 +1789,8 @@ struct ExistentialLoweringContext : public InstPassBase
         // If the operand is a witness table, it is already replaced with a uint2
         // at this point, where the first element in the uint2 is the id of the
         // witness table.
+        //
+
         IRBuilder builder(module);
         builder.setInsertBefore(inst);
 

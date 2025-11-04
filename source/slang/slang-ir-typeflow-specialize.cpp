@@ -601,7 +601,7 @@ bool isOptionalExistentialType(IRInst* inst)
 // Parent context for the full type-flow pass.
 struct TypeFlowSpecializationContext
 {
-    // Make a tagged-union-type out of a given collection of tables.
+    // Make a tagged-union-type out of a given set of tables.
     //
     // This type can be used for insts that are semantically a tuple of a tag (to select a table)
     // and a payload to contain the existential value.
@@ -611,7 +611,7 @@ struct TypeFlowSpecializationContext
         IRBuilder builder(module);
         HashSet<IRInst*> typeSet;
 
-        // Create a type collection out of the base types from each table.
+        // Create a type set out of the base types from each table.
         forEachInSet(
             tableSet,
             [&](IRInst* witnessTable)
@@ -642,21 +642,6 @@ struct TypeFlowSpecializationContext
             cast<IRTypeSet>(builder.getSet(kIROp_TypeSet, typeSet)));
     }
 
-    // Create an unbounded set.
-    //
-    // This is a catch-all for cases where we can't enumerate the possibilites.
-    // We use this as a sentinel value to figure out when NOT to specialize a
-    // given inst.
-    //
-    // Most commonly occurs with COM objects & some builtin-in interface types.
-    //
-    IRUnboundedSet* makeUnbounded()
-    {
-        IRBuilder builder(module);
-        return as<IRUnboundedSet>(
-            builder.emitIntrinsicInst(nullptr, kIROp_UnboundedSet, 0, nullptr));
-    }
-
     // Creates an 'empty' inst (denoted by nullptr), that
     // can be used to denote one of two things:
     //
@@ -669,7 +654,7 @@ struct TypeFlowSpecializationContext
     //
     IRInst* none() { return nullptr; }
 
-    // Make an untagged-union type out of a given collection of types.
+    // Make an untagged-union type out of a given set of types.
     //
     // This is used to denote insts whose value can be of multiple possible types,
     // Note that unlike tagged-unions, untagged-unions do not have any information
@@ -762,11 +747,13 @@ struct TypeFlowSpecializationContext
     {
         if (inst->getDataType())
         {
-            // If the data-type is already a collection type, then the refinement
-            // occured during a previous phase. For now, we simply re-use that info directly.
+            // If the data-type is already a tagged union or untagged union or
+            // element-of-set type, then the refinement occured during a previous phase.
             //
-            // In the future, it makes sense to ignore the pre-existing type and treat
-            // them as an upper-bound on the new info.
+            // For now, we simply re-use that info directly.
+            //
+            // In the future, it makes sense to treat it as non-concrete and use
+            // them as an upper-bound for further refinement.
             //
             switch (inst->getDataType()->getOp())
             {
@@ -1071,7 +1058,7 @@ struct TypeFlowSpecializationContext
         // 3. Continue (2) until no more information has changed.
         //
         // This process is guaranteed to terminate because our propagation 'states' (i.e.
-        // collection insts and their wrapped versions) form a lattice. This is an order-theoretic
+        // sets and their composites) form a lattice. This is an order-theoretic
         // structure that implies that
         //      (i) each update moves us strictly 'upward', and
         //      (ii) that there are a finite number of possible states.

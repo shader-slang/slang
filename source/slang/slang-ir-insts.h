@@ -4184,18 +4184,12 @@ $(type_info.return_type) $(type_info.method_name)(
     IRMetalSetPrimitive* emitMetalSetPrimitive(IRInst* index, IRInst* primitive);
     IRMetalSetIndices* emitMetalSetIndices(IRInst* index, IRInst* indices);
 
-    // TODO: Move all the collection-based ops into the builder.
-    IRUnboundedSet* emitUnboundedSet()
-    {
-        return cast<IRUnboundedSet>(emitIntrinsicInst(nullptr, kIROp_UnboundedSet, 0, nullptr));
-    }
-
     IRGetElementFromTag* emitGetElementFromTag(IRInst* tag)
     {
         auto tagType = cast<IRSetTagType>(tag->getDataType());
-        IRInst* collection = tagType->getSet();
-        auto elementType = cast<IRElementOfSetType>(
-            emitIntrinsicInst(nullptr, kIROp_ElementOfSetType, 1, &collection));
+        IRInst* set = tagType->getSet();
+        auto elementType =
+            cast<IRElementOfSetType>(emitIntrinsicInst(nullptr, kIROp_ElementOfSetType, 1, &set));
         return cast<IRGetElementFromTag>(
             emitIntrinsicInst(elementType, kIROp_GetElementFromTag, 1, &tag));
     }
@@ -4204,9 +4198,9 @@ $(type_info.return_type) $(type_info.method_name)(
     {
         auto taggedUnionType = cast<IRTaggedUnionType>(tag->getDataType());
 
-        IRInst* collection = taggedUnionType->getWitnessTableSet();
+        IRInst* set = taggedUnionType->getWitnessTableSet();
         auto tableTagType =
-            cast<IRSetTagType>(emitIntrinsicInst(nullptr, kIROp_SetTagType, 1, &collection));
+            cast<IRSetTagType>(emitIntrinsicInst(nullptr, kIROp_SetTagType, 1, &set));
 
         return cast<IRGetTagFromTaggedUnion>(
             emitIntrinsicInst(tableTagType, kIROp_GetTagFromTaggedUnion, 1, &tag));
@@ -4216,9 +4210,9 @@ $(type_info.return_type) $(type_info.method_name)(
     {
         auto taggedUnionType = cast<IRTaggedUnionType>(tag->getDataType());
 
-        IRInst* collection = taggedUnionType->getTypeSet();
+        IRInst* typeSet = taggedUnionType->getTypeSet();
         auto typeTagType =
-            cast<IRSetTagType>(emitIntrinsicInst(nullptr, kIROp_SetTagType, 1, &collection));
+            cast<IRSetTagType>(emitIntrinsicInst(nullptr, kIROp_SetTagType, 1, &typeSet));
 
         return cast<IRGetTypeTagFromTaggedUnion>(
             emitIntrinsicInst(typeTagType, kIROp_GetTypeTagFromTaggedUnion, 1, &tag));

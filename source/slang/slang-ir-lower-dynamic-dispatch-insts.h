@@ -1,4 +1,4 @@
-// slang-ir-typeflow-specialize.h
+// slang-ir-lower-dynamic-dispatch-insts.h
 #pragma once
 #include "slang-ir.h"
 
