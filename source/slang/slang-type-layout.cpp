@@ -5832,18 +5832,25 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
     }
     else if (auto descriptorHandleType = as<DescriptorHandleType>(type))
     {
-        RefPtr<TypeLayout> typeLayout = new TypeLayout();
-        typeLayout->type = type;
-        typeLayout->rules = rules;
+        // RefPtr<TypeLayout> typeLayout = new TypeLayout();
+        // typeLayout->type = type;
+        // typeLayout->rules = rules;
 
-        for (int rr = 0; rr < varyingRulesCount; ++rr)
-        {
-            auto varyingRuleSet = varyingRules[rr];
-            auto info = varyingRuleSet->GetDescriptorHandleLayout(descriptorHandleType);
-            typeLayout->addResourceUsage(info.kind, info.size);
-        }
+        // for (int rr = 0; rr < varyingRulesCount; ++rr)
+        // {
+        //     auto varyingRuleSet = varyingRules[rr];
+        //     auto info = varyingRuleSet->GetDescriptorHandleLayout(descriptorHandleType);
+        //     typeLayout->addResourceUsage(info.kind, info.size);
+        // }
 
-        return typeLayout;
+        // return typeLayout;
+        
+        if (areResourceTypesBindlessOnTarget(context.targetReq))
+            return getSimpleVaryingParameterTypeLayout(context, descriptorHandleType->getElementType(), directionMask);
+        auto uint2Type = context.astBuilder->getVectorType(
+            context.astBuilder->getUIntType(),
+            context.astBuilder->getIntVal(context.astBuilder->getIntType(), 2));
+        return getSimpleVaryingParameterTypeLayout(context, uint2Type, directionMask);
     }
 
     // catch-all case in case nothing matched
