@@ -613,6 +613,15 @@ struct DispatcherLoweringContext : public InstPassBase
         {
             auto dispatchFunc =
                 createDispatchFunc(cast<IRFuncType>(dispatcher->getDataType()), elements);
+
+            if (auto nameHint = dispatcher->getLookupKey()->findDecoration<IRNameHintDecoration>())
+            {
+                builder.setInsertBefore(dispatchFunc);
+                StringBuilder sb;
+                sb << "s_dispatch_" << nameHint->getName() << "";
+                builder.addNameHintDecoration(dispatchFunc, sb.getUnownedSlice());
+            }
+
             traverseUses(
                 dispatcher,
                 [&](IRUse* use)
@@ -687,6 +696,20 @@ struct DispatcherLoweringContext : public InstPassBase
         {
             auto dispatchFunc =
                 createDispatchFunc(cast<IRFuncType>(dispatcher->getDataType()), elements);
+
+            if (auto keyNameHint = key->findDecoration<IRNameHintDecoration>())
+            {
+                builder.setInsertBefore(dispatchFunc);
+                StringBuilder sb;
+                sb << "s_dispatch_" << keyNameHint->getName() << "";
+                for (auto specArg : specArgs)
+                {
+                    sb << "_";
+                    getTypeNameHint(sb, specArg);
+                }
+                builder.addNameHintDecoration(dispatchFunc, sb.getUnownedSlice());
+            }
+
             traverseUses(
                 dispatcher,
                 [&](IRUse* use)

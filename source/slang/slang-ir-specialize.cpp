@@ -3260,7 +3260,7 @@ IRInst* specializeGenericWithSetArgs(IRSpecialize* specializeInst)
             // We're dealing with a set of types.
             if (as<IRTypeType>(param->getDataType()))
             {
-                SLANG_ASSERT("Should not happen");
+                // TODO: This case should not happen anymore.
                 cloneEnv.mapOldValToNew[param] = builder.getUntaggedUnionType(set);
             }
             else if (as<IRWitnessTableType>(param->getDataType()))
@@ -3310,6 +3310,12 @@ IRInst* specializeGenericWithSetArgs(IRSpecialize* specializeInst)
         {
             auto returnedFunc = cast<IRFunc>(inst);
             auto funcFirstBlock = returnedFunc->getFirstBlock();
+
+            builder.setInsertBefore(loweredFunc->getFirstBlock());
+            for (auto decoration : returnedFunc->getDecorations())
+            {
+                cloneInst(&staticCloningEnv, &builder, decoration);
+            }
 
             builder.setInsertInto(loweredFunc);
             for (auto block : returnedFunc->getBlocks())
