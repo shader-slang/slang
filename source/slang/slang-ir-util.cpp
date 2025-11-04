@@ -2752,8 +2752,13 @@ bool isIROpaqueType(IRType* type)
     switch (type->getOp())
     {
     case kIROp_TextureType:
+    case kIROp_GLSLImageType:
     case kIROp_SamplerStateType:
     case kIROp_SamplerComparisonStateType:
+    case kIROp_SubpassInputType:
+    case kIROp_RaytracingAccelerationStructureType:
+    case kIROp_RayQueryType:
+    case kIROp_HitObjectType:
         return true;
     default:
         return false;
