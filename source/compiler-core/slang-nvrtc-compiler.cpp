@@ -800,9 +800,18 @@ SlangResult NVRTCDownstreamCompiler::_findOptixIncludePath(String& outPath)
             auto versionString = path.subString(path.lastIndexOf(' ') + 1, path.getLength());
 #else
             // Paths are expected to look like "./NVIDIA-OptiX-SDK-X.X.X-suffix"
-            auto versionString = path.subString(0, path.lastIndexOf('-'));
-            versionString =
-                versionString.subString(path.lastIndexOf('-') + 1, versionString.getLength());
+            // Extract version between "SDK-" and the next "-"
+            auto sdkPrefix = UnownedStringSlice::fromLiteral("NVIDIA-OptiX-SDK-");
+            auto versionString = path;
+            if (path.startsWith(sdkPrefix))
+            {
+                versionString = path.tail(sdkPrefix.getLength());
+                auto dashIndex = versionString.indexOf('-');
+                if (dashIndex != Index(-1))
+                {
+                    versionString = versionString.head(dashIndex);
+                }
+            }
 #endif
             if (SLANG_SUCCEEDED(SemanticVersion::parse(versionString, '.', optixPath.version)))
             {

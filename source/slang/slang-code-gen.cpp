@@ -424,7 +424,13 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
             if (arg.startsWith("-I"))
             {
                 // We handle the -I option, by just adding to the include paths
-                includePaths.add(arg.getUnownedSlice().tail(2));
+                // Strip quotes if present (they may come from test command lines)
+                auto path = arg.getUnownedSlice().tail(2);
+                if (path.getLength() >= 2 && path[0] == '"' && path[path.getLength() - 1] == '"')
+                {
+                    path = UnownedStringSlice(path.begin() + 1, path.end() - 1);
+                }
+                includePaths.add(path);
             }
             else
             {
