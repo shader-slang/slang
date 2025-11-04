@@ -174,7 +174,7 @@ jobs:
             # Copy bin directory excluding debug files
             if [ -d "build/${cmake_config}/bin" ]; then
               mkdir -p "artifacts-staging/${cmake_config}/bin"
-              find "build/${cmake_config}/bin" -type f ! -name "*.pdb" ! -name "*.ilk" ! -name "*.dwarf" ! -name "*.debug" ! -name "*.dSYM" -exec cp {} "artifacts-staging/${cmake_config}/bin/" \; || echo "Failed to copy bin directory"
+              find "build/${cmake_config}/bin" -maxdepth 1 -type f ! -name "*.pdb" ! -name "*.ilk" ! -name "*.dwarf" ! -name "*.debug" ! -name "*.dSYM" -exec cp {} "artifacts-staging/${cmake_config}/bin/" \; || echo "Failed to copy bin directory"
 
               cp -r "build/${cmake_config}/bin/D3D12" "artifacts-staging/${cmake_config}/bin/" || echo "Failed to copy bin/D3D12 directory"
               if [[ "${{ inputs.os }}" == "windows" ]]; then
