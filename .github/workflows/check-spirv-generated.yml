@@ -4,11 +4,11 @@ on:
   pull_request:
     branches: [master]
     paths:
-      - 'external/spirv-tools/**'
-      - 'external/spirv-headers/**'
-      - 'external/spirv-tools-generated/**'
-      - '.github/workflows/check-spirv-generated.yml'
-      - 'extras/check-spirv-generated.sh'
+      - "external/spirv-tools/**"
+      - "external/spirv-headers/**"
+      - "external/spirv-tools-generated/**"
+      - ".github/workflows/check-spirv-generated.yml"
+      - "extras/check-spirv-generated.sh"
 
 jobs:
   check-spirv-generated:
@@ -19,13 +19,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Need full history for git diff
-          submodules: false  # We'll init them selectively in the script
+          fetch-depth: 0 # Need full history for git diff
+          submodules: false # We'll init them selectively in the script
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.x'
+          python-version: "3.x"
 
       - name: Install dependencies
         run: |
@@ -48,4 +48,3 @@ jobs:
             external/spirv-tools/build-ci-check/*.h
           if-no-files-found: ignore
           retention-days: 7
-
