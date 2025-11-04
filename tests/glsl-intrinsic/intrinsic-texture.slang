@@ -589,7 +589,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
         // SPIR_GRADS:    OpImageSampleImplicitLod{{.*}}[[LOAD]]
-        // SPIR_NOGRADS:  OpImageSampleExplicitLod{{.*}}[[LOAD]]
+        // SPIR_NOGRADS:  OpImageSampleExplicitLod{{.*}}[[LOAD]]{{.*}} Lod %
         && gvec4(T.Element(0)) == texture(gsampler1D, float(coord))
 
         // GLSL_GRADS:    texture({{.*}}sampler1D
@@ -597,7 +597,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
         // SPIR_GRADS:    OpImageSampleImplicitLod{{.*}}[[LOAD]]{{.*}} Bias %
-        // SPIR_NOGRADS:  OpImageSampleExplicitLod{{.*}}[[LOAD]]{{.*}}
+        // SPIR_NOGRADS:  OpImageSampleExplicitLod{{.*}}[[LOAD]]{{.*}} Lod %
         && gvec4(T.Element(0)) == texture(gsampler1D, float(coord), float(0))
 
         // GLSL_GRADS:    texture({{.*}}sampler2D
@@ -605,7 +605,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
         // SPIR_GRADS:    OpImageSampleImplicitLod{{.*}}[[LOAD]]
-        // SPIR_NOGRADS:  OpImageSampleExplicitLod{{.*}}[[LOAD]]
+        // SPIR_NOGRADS:  OpImageSampleExplicitLod{{.*}}[[LOAD]]{{.*}} Lod %
         && gvec4(T.Element(0)) == texture(gsampler2D, vec2(coord))
 
         // GLSL_GRADS:    texture({{.*}}sampler2D
@@ -613,7 +613,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
         // SPIR_GRADS:    OpImageSampleImplicitLod{{.*}}[[LOAD]]{{.*}} Bias %
-        // SPIR_NOGRADS:  OpImageSampleExplicitLod{{.*}}[[LOAD]]{{.*}}
+        // SPIR_NOGRADS:  OpImageSampleExplicitLod{{.*}}[[LOAD]]{{.*}} Lod %
         && gvec4(T.Element(0)) == texture(gsampler2D, vec2(coord), float(0))
 
         // GLSL_GRADS:    texture({{.*}}sampler3D
@@ -621,7 +621,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler3D
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler3D
         // SPIR_GRADS:    OpImageSampleImplicitLod{{.*}}[[LOAD]]
-        // SPIR_NOGRADS:  OpImageSampleExplicitLod{{.*}}[[LOAD]]
+        // SPIR_NOGRADS:  OpImageSampleExplicitLod{{.*}}[[LOAD]]{{.*}} Lod %
         && gvec4(T.Element(0)) == texture(gsampler3D, vec3(coord))
 
         // GLSL_GRADS:    texture({{.*}}sampler3D
@@ -629,7 +629,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler3D
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler3D
         // SPIR_GRADS:    OpImageSampleImplicitLod{{.*}}[[LOAD]]{{.*}} Bias %
-        // SPIR_NOGRADS:  OpImageSampleExplicitLod{{.*}}[[LOAD]]{{.*}}
+        // SPIR_NOGRADS:  OpImageSampleExplicitLod{{.*}}[[LOAD]]{{.*}} Lod %
         && gvec4(T.Element(0)) == texture(gsampler3D, vec3(coord), float(0))
 
         // GLSL_GRADS:    texture({{.*}}samplerCube
@@ -637,7 +637,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCube
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCube
         // SPIR_GRADS:    OpImageSampleImplicitLod{{.*}}[[LOAD]]
-        // SPIR_NOGRADS:  OpImageSampleExplicitLod{{.*}}[[LOAD]]
+        // SPIR_NOGRADS:  OpImageSampleExplicitLod{{.*}}[[LOAD]]{{.*}} Lod %
         && gvec4(T.Element(0)) == texture(gsamplerCube, vec3(coord))
 
         // GLSL_GRADS:    texture({{.*}}samplerCube
@@ -645,7 +645,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCube
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCube
         // SPIR_GRADS:    OpImageSampleImplicitLod{{.*}}[[LOAD]]{{.*}} Bias %
-        // SPIR_NOGRADS:  OpImageSampleExplicitLod{{.*}}[[LOAD]]{{.*}}
+        // SPIR_NOGRADS:  OpImageSampleExplicitLod{{.*}}[[LOAD]]{{.*}} Lod %
         && gvec4(T.Element(0)) == texture(gsamplerCube, vec3(coord), float(0))
 
         // GLSL_GRADS:    texture({{.*}}sampler1DShadow
@@ -653,7 +653,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DShadow
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DShadow
         // SPIR_GRADS:    OpImageSampleDrefImplicitLod{{.*}}[[LOAD]]
-        // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod{{.*}}[[LOAD]]
+        // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod{{.*}}[[LOAD]]{{.*}} Lod %
         && float(0) == texture(uniform_sampler1DShadow, vec3(coord))
 
         // GLSL_GRADS:    texture({{.*}}sampler1DShadow
@@ -661,7 +661,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DShadow
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DShadow
         // SPIR_GRADS:    OpImageSampleDrefImplicitLod{{.*}}[[LOAD]]{{.*}} Bias %
-        // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod{{.*}}[[LOAD]]{{.*}}
+        // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod{{.*}}[[LOAD]]{{.*}} Lod %
         && float(0) == texture(uniform_sampler1DShadow, vec3(coord), float(0))
 
         // GLSL_GRADS:    texture({{.*}}sampler2DShadow
@@ -669,7 +669,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
         // SPIR_GRADS:    OpImageSampleDrefImplicitLod{{.*}}[[LOAD]]
-        // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod{{.*}}[[LOAD]]
+        // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod{{.*}}[[LOAD]]{{.*}} Lod %
         && (float(0) == texture(uniform_sampler2DShadow, vec3(coord)) || ignoreResultF32)
 
         // GLSL_GRADS:    texture({{.*}}sampler2DShadow
@@ -677,7 +677,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
         // SPIR_GRADS:    OpImageSampleDrefImplicitLod{{.*}}[[LOAD]]{{.*}} Bias %
-        // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod{{.*}}[[LOAD]]{{.*}}
+        // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod{{.*}}[[LOAD]]{{.*}} Lod %
         && (float(0) == texture(uniform_sampler2DShadow, vec3(coord), float(0)) || ignoreResultF32)
 
         // GLSL_GRADS:    texture({{.*}}samplerCubeShadow
@@ -685,7 +685,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeShadow
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeShadow
         // SPIR_GRADS:    OpImageSampleDrefImplicitLod{{.*}}[[LOAD]]
-        // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod{{.*}}[[LOAD]]
+        // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod{{.*}}[[LOAD]]{{.*}} Lod %
         && (float(0) == texture(uniform_samplerCubeShadow, vec4(coord)) || ignoreResultF32)
 
         // GLSL_GRADS:    texture({{.*}}samplerCubeShadow
@@ -693,7 +693,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeShadow
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeShadow
         // SPIR_GRADS:    OpImageSampleDrefImplicitLod{{.*}}[[LOAD]]{{.*}} Bias %
-        // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod{{.*}}[[LOAD]]{{.*}}
+        // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod{{.*}}[[LOAD]]{{.*}} Lod %
         && (float(0) == texture(uniform_samplerCubeShadow, vec4(coord), float(0)) || ignoreResultF32)
 
         // GLSL_GRADS:    texture({{.*}}sampler2DArray
@@ -701,7 +701,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArray
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArray
         // SPIR_GRADS:    OpImageSampleImplicitLod{{.*}}[[LOAD]]
-        // SPIR_NOGRADS:  OpImageSampleExplicitLod{{.*}}[[LOAD]]
+        // SPIR_NOGRADS:  OpImageSampleExplicitLod{{.*}}[[LOAD]]{{.*}} Lod %
         && gvec4(T.Element(0)) == texture(gsampler2DArray, vec3(coord))
 
         // GLSL_GRADS:    texture({{.*}}sampler2DArray
@@ -709,7 +709,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArray
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArray
         // SPIR_GRADS:    OpImageSampleImplicitLod{{.*}}[[LOAD]]{{.*}} Bias %
-        // SPIR_NOGRADS:  OpImageSampleExplicitLod{{.*}}[[LOAD]]{{.*}}
+        // SPIR_NOGRADS:  OpImageSampleExplicitLod{{.*}}[[LOAD]]{{.*}} Lod %
         && gvec4(T.Element(0)) == texture(gsampler2DArray, vec3(coord), float(0))
 
         // GLSL_GRADS:    texture({{.*}}samplerCubeArray
@@ -717,7 +717,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeArray
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeArray
         // SPIR_GRADS:    OpImageSampleImplicitLod{{.*}}[[LOAD]]
-        // SPIR_NOGRADS:  OpImageSampleExplicitLod{{.*}}[[LOAD]]
+        // SPIR_NOGRADS:  OpImageSampleExplicitLod{{.*}}[[LOAD]]{{.*}} Lod %
         && gvec4(T.Element(0)) == texture(gsamplerCubeArray, vec4(coord))
 
         // GLSL_GRADS:    texture({{.*}}samplerCubeArray
@@ -725,7 +725,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeArray
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeArray
         // SPIR_GRADS:    OpImageSampleImplicitLod{{.*}}[[LOAD]]{{.*}} Bias %
-        // SPIR_NOGRADS:  OpImageSampleExplicitLod{{.*}}[[LOAD]]{{.*}}
+        // SPIR_NOGRADS:  OpImageSampleExplicitLod{{.*}}[[LOAD]]{{.*}} Lod %
         && gvec4(T.Element(0)) == texture(gsamplerCubeArray, vec4(coord), float(0))
 
         // GLSL_GRADS:    texture({{.*}}sampler1DArray
@@ -733,7 +733,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArray
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArray
         // SPIR_GRADS:    OpImageSampleImplicitLod{{.*}}[[LOAD]]
-        // SPIR_NOGRADS:  OpImageSampleExplicitLod{{.*}}[[LOAD]]
+        // SPIR_NOGRADS:  OpImageSampleExplicitLod{{.*}}[[LOAD]]{{.*}} Lod %
         && gvec4(T.Element(0)) == texture(gsampler1DArray, vec2(coord))
 
         // GLSL_GRADS:    texture({{.*}}sampler1DArray
@@ -741,7 +741,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArray
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArray
         // SPIR_GRADS:    OpImageSampleImplicitLod{{.*}}[[LOAD]]{{.*}} Bias %
-        // SPIR_NOGRADS:  OpImageSampleExplicitLod{{.*}}[[LOAD]]{{.*}}
+        // SPIR_NOGRADS:  OpImageSampleExplicitLod{{.*}}[[LOAD]]{{.*}} Lod %
         && gvec4(T.Element(0)) == texture(gsampler1DArray, vec2(coord), float(0))
 
         // GLSL_GRADS:    texture({{.*}}sampler1DArrayShadow
@@ -749,7 +749,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArrayShadow
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArrayShadow
         // SPIR_GRADS:    OpImageSampleDrefImplicitLod{{.*}}[[LOAD]]
-        // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod{{.*}}[[LOAD]]
+        // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod{{.*}}[[LOAD]]{{.*}} Lod %
         && float(0) == texture(uniform_sampler1DArrayShadow, vec3(coord))
 
         // GLSL_GRADS:    texture({{.*}}sampler1DArrayShadow
@@ -757,7 +757,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArrayShadow
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArrayShadow
         // SPIR_GRADS:    OpImageSampleDrefImplicitLod{{.*}}[[LOAD]]{{.*}} Bias %
-        // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod{{.*}}[[LOAD]]{{.*}}
+        // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod{{.*}}[[LOAD]]{{.*}} Lod %
         && float(0) == texture(uniform_sampler1DArrayShadow, vec3(coord), float(0))
 
         // GLSL_GRADS:    texture({{.*}}sampler2DArrayShadow
@@ -765,7 +765,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArrayShadow
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArrayShadow
         // SPIR_GRADS:    OpImageSampleDrefImplicitLod{{.*}}[[LOAD]]
-        // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod{{.*}}[[LOAD]]
+        // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod{{.*}}[[LOAD]]{{.*}} Lod %
         && float(0) == texture(uniform_sampler2DArrayShadow, vec4(coord))
 
         // GLSL_GRADS:    texture({{.*}}sampler2DRect
@@ -773,7 +773,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DRect
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DRect
         // SPIR_GRADS:    OpImageSampleImplicitLod{{.*}}[[LOAD]]
-        // SPIR_NOGRADS:  OpImageSampleExplicitLod{{.*}}[[LOAD]]
+        // SPIR_NOGRADS:  OpImageSampleExplicitLod{{.*}}[[LOAD]]{{.*}} Lod %
         && gvec4(T.Element(0)) == texture(gsampler2DRect, vec2(coord))
 
         // GLSL_GRADS:    texture({{.*}}sampler2DRectShadow
@@ -781,7 +781,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DRectShadow
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DRectShadow
         // SPIR_GRADS:    OpImageSampleDrefImplicitLod{{.*}}[[LOAD]]
-        // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod{{.*}}[[LOAD]]
+        // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod{{.*}}[[LOAD]]{{.*}} Lod %
         && float(0) == texture(uniform_sampler2DRectShadow, vec3(coord))
 
         // GLSL_GRADS:    texture({{.*}}samplerCubeArrayShadow
@@ -789,7 +789,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeArrayShadow
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeArrayShadow
         // SPIR_GRADS:    OpImageSampleDrefImplicitLod{{.*}}[[LOAD]]
-        // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod{{.*}}[[LOAD]]
+        // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod{{.*}}[[LOAD]]{{.*}} Lod %
         && float(0) == texture(uniform_samplerCubeArrayShadow, vec4(coord), float(0))
 
         // GLSL_GRADS:    textureProj({{.*}}sampler1D
@@ -909,7 +909,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // SPIR_GRADS-COUNT-2:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DRect
         // SPIR_NOGRADS-COUNT-2:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DRect
         // SPIR_GRADS:    OpImageSampleProjImplicitLod {{.*}}[[LOAD]]
-        // SPIR_NOGRADS:  OpImageSampleProjExplicitLod {{.*}}[[LOAD]]
+        // SPIR_NOGRADS:  OpImageSampleProjExplicitLod {{.*}}[[LOAD]]{{.*}} Lod %
         && gvec4(T.Element(0)) == textureProj(gsampler2DRect, vec3(coord))
         && gvec4(T.Element(0)) == textureProj(gsampler2DRect, vec4(coord))
 
@@ -1005,7 +1005,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // GLSL_NOGRADS:  textureOffset({{.*}}sampler1D
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1D
-        // SPIR_GRADS:    OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}}ConstOffset %
+        // SPIR_GRADS:    OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}} Bias|ConstOffset %
         // SPIR_NOGRADS:  OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset %
         && gvec4(T.Element(0)) == textureOffset(gsampler1D, float(coord), int(1))
 
@@ -1021,8 +1021,8 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // GLSL_NOGRADS:  textureOffset({{.*}}sampler2D
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2D
-        // SPIR_GRADS:    OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}}ConstOffset %
-        // SPIR_NOGRADS:  OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}}ConstOffset %
+        // SPIR_GRADS:    OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}} Bias|ConstOffset %
+        // SPIR_NOGRADS:  OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset %
         && gvec4(T.Element(0)) == textureOffset(gsampler2D, vec2(coord), offset2D)
 
         // GLSL_GRADS:    textureOffset({{.*}}sampler2D
@@ -1037,8 +1037,8 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // GLSL_NOGRADS:  textureOffset({{.*}}sampler3D
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler3D
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler3D
-        // SPIR_GRADS:    OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}}ConstOffset %
-        // SPIR_NOGRADS:  OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}}ConstOffset %
+        // SPIR_GRADS:    OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}} Bias|ConstOffset %
+        // SPIR_NOGRADS:  OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset %
         && gvec4(T.Element(0)) == textureOffset(gsampler3D, vec3(coord), offset3D)
 
         // GLSL_GRADS:    textureOffset({{.*}}sampler3D
@@ -1053,7 +1053,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // GLSL_NOGRADS:  textureOffset({{.*}}sampler2DShadow
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DShadow
-        // SPIR_GRADS:    OpImageSampleDrefImplicitLod {{.*}}[[LOAD]]{{.*}}ConstOffset %
+        // SPIR_GRADS:    OpImageSampleDrefImplicitLod {{.*}}[[LOAD]]{{.*}} Bias|ConstOffset %
         // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset %
         && (float(0) == textureOffset(uniform_sampler2DShadow, vec3(coord), offset2D) || ignoreResultF32)
 
@@ -1069,16 +1069,16 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // GLSL_NOGRADS:  textureOffset({{.*}}sampler2DRect
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DRect
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DRect
-        // SPIR_GRADS:    OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}}ConstOffset %
-        // SPIR_NOGRADS:  OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}}ConstOffset %
+        // SPIR_GRADS:    OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}} Bias|ConstOffset %
+        // SPIR_NOGRADS:  OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset %
         && gvec4(T.Element(0)) == textureOffset(gsampler2DRect, vec2(coord), offset2D)
 
         // GLSL_GRADS:    textureOffset({{.*}}sampler2DRectShadow
         // GLSL_NOGRADS:  textureOffset({{.*}}sampler2DRectShadow
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DRectShadow
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DRectShadow
-        // SPIR_GRADS:    OpImageSampleDrefImplicitLod {{.*}}[[LOAD]]{{.*}}ConstOffset %
-        // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}}ConstOffset %
+        // SPIR_GRADS:    OpImageSampleDrefImplicitLod {{.*}}[[LOAD]]{{.*}} Bias|ConstOffset %
+        // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset %
         && float(0) == textureOffset(uniform_sampler2DRectShadow, vec3(coord), offset2D)
 
         // GLSL_GRADS:    textureOffset({{.*}}sampler1DShadow
@@ -1101,7 +1101,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // GLSL_NOGRADS:  textureOffset({{.*}}sampler1DArray
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArray
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DArray
-        // SPIR_GRADS:    OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}}ConstOffset %
+        // SPIR_GRADS:    OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}} Bias|ConstOffset %
         // SPIR_NOGRADS:  OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset %
         && gvec4(T.Element(0)) == textureOffset(gsampler1DArray, vec2(coord), int(1))
 
@@ -1117,7 +1117,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // GLSL_NOGRADS:  textureOffset({{.*}}sampler2DArray
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArray
         // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArray
-        // SPIR_GRADS:    OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}}ConstOffset %
+        // SPIR_GRADS:    OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}} Bias|ConstOffset %
         // SPIR_NOGRADS:  OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset %
         && gvec4(T.Element(0)) == textureOffset(gsampler2DArray, vec3(coord), offset2D)
 
