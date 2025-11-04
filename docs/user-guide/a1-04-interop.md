@@ -160,7 +160,7 @@ bool __targetHasImplicitDerivativesInComputeStage()
     }
 }
 ```
-Case `hlsl` is required here, since capability `_sm_6_6` inherits the base capability `hlsl`. Similarly, `_GL_NV_compute_shader_derivatives` and `SPV_KHR_compute_shader_derivatives` inherit from `glsl` and `spirv`, respectively, and hence, the `glsl` and `spirv` cases are also required as the target-specific catch-alls. The rationale for this behavior is that when a feature requires specific handling by one or more targets, the default case will no longer provide a possibly unintended fallback in case of unmet requirements.
+In this example, case `hlsl` is required, since capability `_sm_6_6` inherits the base capability `hlsl`. Otherwise, this function would not be well-formed for HLSL capability level `_sm_6_5` and below. Similarly, `_GL_NV_compute_shader_derivatives` and `SPV_KHR_compute_shader_derivatives` inherit from `glsl` and `spirv`, respectively, and hence, the `glsl` and `spirv` cases are also required as the target-specific catch-alls. The rationale for this behavior is that when a feature requires specific handling by one or more targets, the default case will no longer provide a possibly unintended fallback in case of unmet requirements.
 
 Currently, the following targets are supported in a `case` statement: `cpp`, `cuda`, `glsl`, `hlsl`, `metal`, `spirv`, and `wgsl`.
 
