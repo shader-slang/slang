@@ -5832,6 +5832,7 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
     }
     else if (auto descriptorHandleType = as<DescriptorHandleType>(type))
     {
+        // REMOVE - OLD
         // RefPtr<TypeLayout> typeLayout = new TypeLayout();
         // typeLayout->type = type;
         // typeLayout->rules = rules;
@@ -5851,15 +5852,17 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
             // For bindless targets, DescriptorHandle<T> maps to T.
             // However, if T is an opaque resource type, we cannot use it directly
             // as a varying parameter (opaque types return nullptr from processEntryPointVaryingParameter).
-            if (isOpaqueHandleType(elementType))
-            {
+            // REMOVE - T must conform to IOpaqueDescriptor, so isOpaqueHandleType is always true
+            // if (isOpaqueHandleType(elementType))
+            // {
                 // For bindless targets, resources are pointers/addresses (uint64_t on 64-bit systems),
                 // so we use uint64_t layout for varying parameters when T is opaque.
                 auto uint64Type = context.astBuilder->getUInt64Type();
                 return getSimpleVaryingParameterTypeLayout(context, uint64Type, directionMask);
-            }
+            // }
+            // REMOVE - T must conform to IOpaqueDescriptor, so isOpaqueHandleType is always true
             // Otherwise, recursively get the layout for the element type
-            return getSimpleVaryingParameterTypeLayout(context, elementType, directionMask);
+            // return getSimpleVaryingParameterTypeLayout(context, elementType, directionMask);
         }
 
         auto uint2Type = context.astBuilder->getVectorType(
