@@ -4245,10 +4245,9 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addExplicitUniformField(
     auto uniformInfo = m_info;
     m_rules->AddStructField(&uniformInfo, fieldInfo);
     m_info.alignment = uniformInfo.alignment;
-    m_info.size.raw = Math::Max(
-        m_info.size.getFiniteValue(),
-        (size_t)(uniformOffset + fieldResult.layout->FindResourceInfo(LayoutResourceKind::Uniform)
-                                     ->count.getFiniteValue()));
+    m_info.size = max(
+        m_info.size,
+        uniformOffset + fieldResult.layout->FindResourceInfo(LayoutResourceKind::Uniform)->count);
     return fieldLayout;
 }
 
