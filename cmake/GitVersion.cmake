@@ -13,7 +13,7 @@ function(get_git_version var_numeric var dir)
                 describe
                 --tags
                 --match
-                v*
+                v20[2-9][0-9].[0-9]*
             )
             execute_process(
                 COMMAND ${command}
@@ -32,7 +32,7 @@ function(get_git_version var_numeric var dir)
             else()
                 message(
                     WARNING
-                    "Couldn't parse version (like v1.2.3 or v1.2.3-foo) from ${version_out}, using ${version} for now"
+                    "Couldn't parse version (like v2025.21 or v2025.21-foo) from ${version_out}, using ${version} for now"
                 )
             endif()
         else()
