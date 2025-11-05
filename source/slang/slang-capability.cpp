@@ -702,11 +702,20 @@ void CapabilitySet::nonDestructiveJoin(const CapabilitySet& other)
 
 bool CapabilitySet::operator==(CapabilitySet const& that) const
 {
+    // Check if both sets have the same number of target sets
+    if (this->m_targetSets.getCount() != that.m_targetSets.getCount())
+        return false;
+
     for (auto set : this->m_targetSets)
     {
         auto thatSet = that.m_targetSets.tryGetValue(set.first);
         if (!thatSet)
             return false;
+
+        // Check if both target sets have the same number of stage sets
+        if (set.second.shaderStageSets.getCount() != thatSet->shaderStageSets.getCount())
+            return false;
+
         for (auto stageSet : set.second.shaderStageSets)
         {
             auto thatStageSet = thatSet->shaderStageSets.tryGetValue(stageSet.first);
