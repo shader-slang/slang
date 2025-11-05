@@ -2934,7 +2934,7 @@ DIAGNOSTIC(
     52009,
     Error,
     cannotEmitReflectionWithoutTarget,
-    "cannot emit reflection JSON: no compilation target available")
+    "cannot emit reflection JSON; no compilation target available")
 DIAGNOSTIC(
     53001,
     Error,

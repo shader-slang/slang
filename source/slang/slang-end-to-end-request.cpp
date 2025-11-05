@@ -1581,8 +1581,7 @@ SlangResult EndToEndCompileRequest::compile()
         {
             getSink()->diagnose(
                 SourceLoc(),
-                Diagnostics::cannotEmitReflectionWithoutTarget,
-                "Cannot emit reflection JSON: no compilation target available");
+                Diagnostics::cannotEmitReflectionWithoutTarget);
             return SLANG_FAIL;
         }
         auto bufferWriter = PrettyWriter();
