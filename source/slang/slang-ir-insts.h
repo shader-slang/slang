@@ -1027,7 +1027,8 @@ struct IRTypeSizeAttr : public IRLayoutResourceInfoAttr
     {
         return LayoutSize::fromRaw(LayoutSize::RawValue(getIntVal(getSizeInst())));
     }
-    size_t getFiniteSize() { return getSize().getFiniteValue(); }
+    size_t getFiniteSize() { return getSize().getFiniteValue(); }  // DEPRECATED: unsafe
+    LayoutIndex getSizeAsIndex() { return LayoutIndex::fromSize(getSize()); }
 };
 
 // Layout

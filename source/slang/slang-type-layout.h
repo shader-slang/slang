@@ -193,25 +193,53 @@ struct LayoutIndex
 
     static LayoutIndex invalid() { return LayoutIndex{s_invalid}; }
 
-    // static LayoutIndex infinite()
-    // {
-    //     LayoutIndex result;
-    //     result.raw = RawValue(-1);
-    //     return result;
-    // }
-    //
-    // bool isInfinite() const { return raw == RawValue(-1); }
-    //
-    // bool isFinite() const { return raw != RawValue(-1); }
-    // RawValue getFiniteValue() const
-    // {
-    //     SLANG_ASSERT(isFinite());
-    //     return raw;
-    // }
-    //
-    // bool operator==(LayoutIndex that) const { return raw == that.raw; }
-    //
-    // bool operator!=(LayoutIndex that) const { return raw != that.raw; }
+    bool isValid() const { return raw != s_invalid; }
+    bool isInvalid() const { return raw == s_invalid; }
+    
+    RawValue getValue() const 
+    {
+        SLANG_ASSERT(isValid());
+        return raw;
+    }
+    
+    bool operator==(LayoutIndex that) const { return raw == that.raw; }
+    bool operator!=(LayoutIndex that) const { return raw != that.raw; }
+
+    void operator+=(LayoutIndex right)
+    {
+        if (isInvalid() || right.isInvalid())
+        {
+            *this = invalid();
+        }
+        else
+        {
+            raw = raw + right.raw;
+        }
+    }
+
+    void operator+=(RawValue right)
+    {
+        if (isInvalid())
+        {
+            // Stay invalid
+        }
+        else
+        {
+            raw = raw + right;
+        }
+    }
+
+    void operator*=(LayoutIndex right)
+    {
+        if (isInvalid() || right.isInvalid())
+        {
+            *this = invalid();
+        }
+        else
+        {
+            raw = raw * right.raw;
+        }
+    }
     //
     // bool operator>(LayoutIndex that) const
     // {

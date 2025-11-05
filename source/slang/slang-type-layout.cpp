@@ -582,8 +582,10 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
         SimpleLayoutInfo elementInfo,
         size_t elementCount) override
     {
-
-        const auto elementSize = elementInfo.size.getFiniteValue();
+        // For vector layouts, infinite element sizes don't make sense
+        const auto elementSize = elementInfo.size.isFinite() 
+            ? elementInfo.size.getFiniteValue()
+            : 1;  // fallback to minimal size for invalid cases
 
         // These rules can largely be determines by looking at
         // 'vector_types.h' in the CUDA SDK
@@ -646,7 +648,10 @@ struct MetalLayoutRulesImpl : public CPULayoutRulesImpl
     {
         SLANG_UNUSED(elementType);
 
-        const auto elementSize = elementInfo.size.getFiniteValue();
+        // For vector layouts, infinite element sizes don't make sense
+        const auto elementSize = elementInfo.size.isFinite() 
+            ? elementInfo.size.getFiniteValue()
+            : 1;  // fallback to minimal size for invalid cases
         auto alignedElementCount = 1 << Math::Log2Ceil((uint32_t)elementCount);
 
         // Metal aligns vectors to 2/4 element boundaries.
@@ -3613,7 +3618,7 @@ RefPtr<StructuredBufferTypeLayout> createStructuredBufferWithCounterTypeLayout(
     {
         auto counterResourceInfo = counterVarLayout->findOrAddResourceInfo(typeResourceInfo.kind);
         // We expect this index to be 1
-        counterResourceInfo->index = typeResourceInfo.count.getFiniteValue();
+        counterResourceInfo->index = LayoutIndex::fromSize(typeResourceInfo.count);
     }
 
     typeLayout->counterVarLayout = counterVarLayout;
@@ -3984,7 +3989,7 @@ static RefPtr<TypeLayout> maybeAdjustLayoutForArrayElementType(
             if (requireNewSpace)
             {
                 adjustedField->findOrAddResourceInfo(LayoutResourceKind::RegisterSpace)->index =
-                    spaceOffsetForField.getFiniteValue();
+                    LayoutIndex::fromSize(spaceOffsetForField);
             }
 
             adjustedStructTypeLayout->fields.add(adjustedField);
@@ -4154,7 +4159,7 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
     if (fieldTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform))
     {
         fieldLayout->AddResourceInfo(LayoutResourceKind::Uniform)->index =
-            uniformOffset.getFiniteValue();
+            LayoutIndex::fromSize(uniformOffset);
     }
 
     // Add offset information for any other resource kinds
@@ -4193,7 +4198,7 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
             // entry to tell that the field is introducing a new space for itself.
             //
             fieldLayout->findOrAddResourceInfo(LayoutResourceKind::RegisterSpace)->index =
-                spaceOffset.getFiniteValue();
+                LayoutIndex::fromSize(spaceOffset);
             fieldResourceInfo->space = 0;
             fieldResourceInfo->index = 0;
         }
@@ -4206,7 +4211,7 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
             //
             auto structTypeResourceInfo =
                 m_typeLayout->findOrAddResourceInfo(fieldTypeResourceInfo.kind);
-            fieldResourceInfo->index = structTypeResourceInfo->count.getFiniteValue();
+            fieldResourceInfo->index = LayoutIndex::fromSize(structTypeResourceInfo->count);
             structTypeResourceInfo->count += fieldTypeResourceInfo.count;
             if (fieldTypeResourceInfo.kind == LayoutResourceKind::SubElementRegisterSpace &&
                 canTypeDirectlyUseRegisterSpace(fieldTypeLayout))
@@ -4727,7 +4732,10 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         typeLayout->uniformAlignment = info.alignment;
 
         typeLayout->elementTypeLayout = element.layout;
-        typeLayout->uniformStride = element.info.getUniformLayout().size.getFiniteValue();
+        auto elementSize = element.info.getUniformLayout().size;
+        typeLayout->uniformStride = elementSize.isFinite() 
+            ? elementSize.getFiniteValue() 
+            : 0;  // For infinite element sizes, stride doesn't make sense, use 0
 
         typeLayout->addResourceUsage(info.kind, info.size);
 
@@ -4780,7 +4788,10 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         auto rowInfo = rules->GetVectorLayout(elementBaseType, elementInfo, colCount);
 
         size_t majorStride = info.elementStride;
-        size_t minorStride = elementInfo.getUniformLayout().size.getFiniteValue();
+        auto elementSize = elementInfo.getUniformLayout().size;
+        size_t minorStride = elementSize.isFinite() 
+            ? elementSize.getFiniteValue() 
+            : 0;  // For infinite element sizes, stride doesn't make sense, use 0
 
         size_t rowStride = 0;
         size_t colStride = 0;
@@ -4929,7 +4940,10 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             Int baseExistentialSlotIndex = 0;
             if (auto resInfo =
                     typeLayout->FindResourceInfo(LayoutResourceKind::ExistentialTypeParam))
-                baseExistentialSlotIndex = Int(resInfo->count.getFiniteValue());
+            {
+                auto slotCount = LayoutIndex::fromSize(resInfo->count);
+                baseExistentialSlotIndex = slotCount.isValid() ? Int(slotCount.getValue()) : 0;
+            }
             //
             // When computing the layout for the field, we will give it access
             // to all the incoming specialized type slots that haven't already
@@ -5019,7 +5033,10 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
                 Int baseExistentialSlotIndex = 0;
                 if (auto resInfo =
                         typeLayout->FindResourceInfo(LayoutResourceKind::ExistentialTypeParam))
-                    baseExistentialSlotIndex = Int(resInfo->count.getFiniteValue());
+                {
+                    auto slotCount = LayoutIndex::fromSize(resInfo->count);
+                    baseExistentialSlotIndex = slotCount.isValid() ? Int(slotCount.getValue()) : 0;
+                }
                 //
                 // When computing the layout for the field, we will give it access
                 // to all the incoming specialized type slots that haven't already
