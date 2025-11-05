@@ -38,13 +38,29 @@ public:
             auto microseconds =
                 std::chrono::duration_cast<std::chrono::microseconds>(func.value.duration);
             double milliseconds = microseconds.count() / 1000.0;
-            snprintf(
-                buffer,
-                sizeof(buffer),
-                "[*] %30s \t%d \t%8.2fms\n",
-                func.key,
-                func.value.invocationCount,
-                milliseconds);
+
+            if (func.value.invocationCount > 50)
+            {
+                double timePerOperation = milliseconds / func.value.invocationCount;
+                snprintf(
+                    buffer,
+                    sizeof(buffer),
+                    "[*] %30s \t%d \t%8.2fms \t%8.4fms/op\n",
+                    func.key,
+                    func.value.invocationCount,
+                    milliseconds,
+                    timePerOperation);
+            }
+            else
+            {
+                snprintf(
+                    buffer,
+                    sizeof(buffer),
+                    "[*] %30s \t%d \t%8.2fms\n",
+                    func.key,
+                    func.value.invocationCount,
+                    milliseconds);
+            }
 
             out << buffer;
         }
