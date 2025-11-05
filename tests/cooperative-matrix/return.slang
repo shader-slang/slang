@@ -1,4 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
 
 // CHECK: type: float
 // CHECK-NEXT: 3.000000
@@ -21,6 +22,7 @@ CoopMatType doubleCoopmat(CoopMatType mat)
     return mat * 3.0;
 }
 
+[shader("compute")]
 [numthreads(32, 1, 1)]
 void computeMain()
 {

@@ -5497,6 +5497,182 @@ struct WmmaFragment
         regs[7] = packed;
     }
 
+    __device__ This operator*(T b)
+    {
+        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
+        This result;
+
+        // This loop will be unrolled by the compiler becuase nregs is constexpr
+        for (int i = 0; i < nregs; i++)
+        {
+            result.set(i, get(i) * b);
+        }
+        return result;
+    }
+
+    __device__ This operator*(const This& b)
+    {
+        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
+        This result;
+
+        // This loop will be unrolled by the compiler becuase nregs is constexpr
+        for (int i = 0; i < nregs; i++)
+        {
+            result.set(i, get(i) * b.get(i));
+        }
+        return result;
+    }
+
+    __device__ This operator/(const This& other)
+    {
+        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
+        This result;
+
+        for (int i = 0; i < nregs; i++)
+        {
+            result.set(i, get(i) / other.get(i));
+        }
+        return result;
+    }
+
+    __device__ This operator-(const This& other)
+    {
+        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
+        This result;
+
+        for (int i = 0; i < nregs; i++)
+        {
+            result.set(i, get(i) - other.get(i));
+        }
+        return result;
+    }
+
+    __device__ This operator-()
+    {
+        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
+        This result;
+
+        for (int i = 0; i < nregs; i++)
+        {
+            result.set(i, -get(i));
+        }
+        return result;
+    }
+
+    __device__ This operator+(const This& other)
+    {
+        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
+        This result;
+
+        for (int i = 0; i < nregs; i++)
+        {
+            result.set(i, get(i) + other.get(i));
+        }
+        return result;
+    }
+
+    __device__ This operator%(const This& other)
+    {
+        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
+        This result;
+
+        for (int i = 0; i < nregs; i++)
+        {
+            result.set(i, get(i) % other.get(i));
+        }
+        return result;
+    }
+
+    template<typename U>
+    __device__ void copyFrom(const WmmaFragment<U, M, N, K, R>& other)
+    {
+        // If the data type is different, we need to copy element by element.
+        // Since the shape of two matrices are the same, they have the same
+        // number of elements.
+        for (int i = 0; i < elements_per_thread; i++)
+        {
+            set(i, static_cast<T>(other.get(i)));
+        }
+    }
+
+    // Get element by index (handles bit-level access for packed types)
+    // For example: u8/s8 matrices have 4 elements per register (32-bit)
+    //   - index 0: bits [0:7]   of regs[0]
+    //   - index 1: bits [8:15]  of regs[0]
+    //   - index 2: bits [16:23] of regs[0]
+    //   - index 3: bits [24:31] of regs[0]
+    //   - index 4: bits [0:7]   of regs[1], etc.
+    __device__ T get(int index) const
+    {
+        if constexpr (sizeof(T) == 4)
+        {
+            // T is 32-bit (float or int32): 1 element per register
+            return *reinterpret_cast<const T*>(&regs[index]);
+        }
+        else if constexpr (sizeof(T) == 2)
+        {
+            // T is 16-bit (half): 2 elements per register
+            // Elements per register: [0:15] and [16:31]
+            int regIndex = index / 2;
+            int elementOffset = index % 2;
+            int bitOffset = elementOffset * 16;
+            uint32_t extracted = (regs[regIndex] >> bitOffset) & 0xFFFF;
+            uint16_t value16 = static_cast<uint16_t>(extracted);
+            return *reinterpret_cast<const T*>(&value16);
+        }
+        else if constexpr (sizeof(T) == 1)
+        {
+            // T is 8-bit (int8_t, uint8_t): 4 elements per register
+            // Elements per register: [0:7], [8:15], [16:23], [24:31]
+            int regIndex = index / 4;
+            int elementOffset = index % 4;
+            int bitOffset = elementOffset * 8;
+            uint32_t extracted = (regs[regIndex] >> bitOffset) & 0xFF;
+            uint8_t value8 = static_cast<uint8_t>(extracted);
+            return *reinterpret_cast<const T*>(&value8);
+        }
+    }
+
+    // Set element by index (handles bit-level access for packed types)
+    __device__ void set(int index, T value)
+    {
+        if constexpr (sizeof(T) == 4)
+        {
+            // T is 32-bit (float or int32): 1 element per register
+            regs[index] = *reinterpret_cast<const uint32_t*>(&value);
+        }
+        else if constexpr (sizeof(T) == 2)
+        {
+            // T is 16-bit (half): 2 elements per register
+            int regIndex = index / 2;
+            int elementOffset = index % 2;
+            int bitOffset = elementOffset * 16;
+            uint32_t mask = 0xFFFF;
+            uint16_t value16 = *reinterpret_cast<const uint16_t*>(&value);
+
+            // Clear the bits at the target position
+            regs[regIndex] &= ~(mask << bitOffset);
+
+            // Set the new value
+            regs[regIndex] |= (static_cast<uint32_t>(value16) << bitOffset);
+        }
+        else if constexpr (sizeof(T) == 1)
+        {
+            // T is 8-bit (int8_t, uint8_t): 4 elements per register
+            int regIndex = index / 4;
+            int elementOffset = index % 4;
+            int bitOffset = elementOffset * 8;
+            uint32_t mask = 0xFF;
+            uint8_t value8 = *reinterpret_cast<const uint8_t*>(&value);
+
+            // Clear the bits at the target position
+            regs[regIndex] &= ~(mask << bitOffset);
+
+            // Set the new value
+            regs[regIndex] |= (static_cast<uint32_t>(value8) << bitOffset);
+        }
+    }
+
     template<Layout layout>
     void __device__ Store(T* buffer, uint element, uint stride)
     {
@@ -5528,7 +5704,7 @@ struct WmmaFragment
 
     // Maximum registers needed across all fragment types and data types
     static constexpr int MAX_REGS = 8;
-    unsigned regs[MAX_REGS];
+    unsigned regs[MAX_REGS] = {};
 
     static constexpr uint32_t elements_per_warp = (R == MatrixUse::MatrixA)   ? (M * K)
                                                   : (R == MatrixUse::MatrixB) ? (K * N)

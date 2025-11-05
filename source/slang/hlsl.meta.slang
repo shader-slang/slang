@@ -23848,6 +23848,9 @@ struct CoopMat
         U : __BuiltinArithmeticType
     >(CoopMat<U, S, M, N, R> other)
     {
+    __target_switch
+    {
+    case spirv:
         if (__isFloat<T>() && __isInt<U>())
             this = __int_to_float_cast<T>(other);
         else if (__isInt<T>() && __isFloat<U>())
@@ -23856,6 +23859,10 @@ struct CoopMat
             this = __real_cast<T>(other);
         else if (__isInt<T>() && __isInt<U>())
             this = __int_cast<T>(other);
+    case cuda:
+        __intrinsic_asm "($0)->copyFrom<$T1::ElementType>($1)";
+    }
+
     }
 
     //
@@ -23880,19 +23887,38 @@ struct CoopMat
         return GetLength();
     }
 
+    /// Subscript operator to access elements in the cooperative matrix.
+    /// The components of a cooperative matrix are spread cross the threads in its scope,
+    /// it's implementation-dependent manner. Therefore, Vulkan and CUDA could have different
+    /// distributions. The subscript operator only provides the access to the elements that
+    /// belong to the current thread, but the locations of those elements on the matrix is
+    /// unspecified. It indicates that user can only use this operator to perform uniform
+    /// operations.
     __subscript(int index) -> T
     {
         [__NoSideEffect]
         [nonmutating]
         get
         {
-            return __indexRead(index);
+            __target_switch
+            {
+            case spirv:
+                return __indexRead(index);
+            case cuda:
+                __intrinsic_asm "($0).get($1)";
+            }
         }
 
         [mutating]
         set
         {
-            __indexRef(index) = newValue;
+            __target_switch
+            {
+            case spirv:
+                __indexRef(index) = newValue;
+            case cuda:
+                __intrinsic_asm "($0)->set($1, $2)";
+            }
         }
     }
 
@@ -24009,12 +24035,18 @@ struct CoopMat
     [require(cooperative_matrix_map_element)]
     This MapElement(functype(uint32_t, uint32_t, T)->T mapOp)
     {
-        return spirv_asm
+        __target_switch
         {
-            OpCapability CooperativeMatrixPerElementOperationsNV;
-            OpExtension "SPV_NV_cooperative_matrix2";
-            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixPerElementOpNV $this $mapOp;
-        };
+        case spirv:
+            return spirv_asm
+            {
+                OpCapability CooperativeMatrixPerElementOperationsNV;
+                OpExtension "SPV_NV_cooperative_matrix2";
+                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixPerElementOpNV $this $mapOp;
+            };
+        case cuda:
+            __intrinsic_asm "$0.MapElement($1)";
+        }
     }
 
     __intrinsic_op($(kIROp_CoopMatMapElementIFunc))
@@ -24936,7 +24968,7 @@ CoopMat<T,S,M,N,R> __float_to_int_cast<
 // Cooperative Matrix multiplication with scalar
 //
 
-[require(cooperative_matrix)]
+[require(cuda_cooperative_matrix)]
 CoopMat<T, S, M, N, R> operator *<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,
@@ -24945,10 +24977,16 @@ CoopMat<T, S, M, N, R> operator *<
     let R : CoopMatMatrixUse
 >(CoopMat<T, S, M, N, R> lhs, const T rhs)
 {
-    return spirv_asm
+    __target_switch
     {
-        result:$$CoopMat<T, S, M, N, R> = OpMatrixTimesScalar $lhs $rhs;
-    };
+    case spirv:
+        return spirv_asm
+        {
+            result:$$CoopMat<T, S, M, N, R> = OpMatrixTimesScalar $lhs $rhs;
+        };
+    case cuda:
+        __intrinsic_asm "$0 * $1";
+    }
 }
 
 [require(cooperative_matrix)]
