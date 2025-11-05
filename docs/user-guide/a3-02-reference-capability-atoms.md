@@ -525,6 +525,15 @@ Extensions
 
 `GL_NV_compute_shader_derivatives`
 > Represents the GL_NV_compute_shader_derivatives extension.
+> 
+> This capability enables the use of implicit derivatives in compute, ray tracing, and mesh stages.
+> 
+> This capability changes the interpretation of GLSL implicit-LOD texture sampling functions as follows, matching
+> the GLSL shader specification:
+> - Derivatives enabled: Implicit-LOD `texture()` functions are assumed to use implicit LOD.
+> - Derivatives disabled: Implicit-LOD `texture()` functions are assumed to use the base texture.
+> 
+> This applies to GLSL as both source and target.
 
 `GL_NV_cooperative_vector`
 > Represents the GL_NV_cooperative_vector extension.
