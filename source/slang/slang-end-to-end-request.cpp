@@ -1579,9 +1579,7 @@ SlangResult EndToEndCompileRequest::compile()
         auto reflection = this->getReflection();
         if (!reflection)
         {
-            getSink()->diagnose(
-                SourceLoc(),
-                Diagnostics::cannotEmitReflectionWithoutTarget);
+            getSink()->diagnose(SourceLoc(), Diagnostics::cannotEmitReflectionWithoutTarget);
             return SLANG_FAIL;
         }
         auto bufferWriter = PrettyWriter();
