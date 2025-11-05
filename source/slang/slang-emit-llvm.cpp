@@ -72,7 +72,7 @@ static bool isPtrVolatile(IRInst* value)
 // it'll first try to check if it has explicit debug location information, and
 // if not, it'll give the module's beginning at least.
 static void findDebugLocation(
-    const Dictionary<IRInst*, LLVMDebugNode*>& sourceDebugInfo,
+    const Dictionary<IRInst*, LLVMDebugNode*>& instToDebugLLVM,
     IRInst* inst,
     LLVMDebugNode*& file,
     unsigned& line)
@@ -84,11 +84,11 @@ static void findDebugLocation(
     }
     else if (auto debugLocation = inst->findDecoration<IRDebugLocationDecoration>())
     {
-        file = sourceDebugInfo.getValue(debugLocation->getSource());
+        file = instToDebugLLVM.getValue(debugLocation->getSource());
         line = getIntVal(debugLocation->getLine());
     }
     else
-        findDebugLocation(sourceDebugInfo, inst->getParent(), file, line);
+        findDebugLocation(instToDebugLLVM, inst->getParent(), file, line);
 }
 
 static TerminatedCharSlice getStringLitAsSlice(IRInst* inst)
@@ -96,27 +96,6 @@ static TerminatedCharSlice getStringLitAsSlice(IRInst* inst)
     auto source = as<IRStringLit>(inst)->getStringSlice();
     return TerminatedCharSlice(source.begin(), source.getLength());
 }
-
-
-/*
-static llvm::Instruction::CastOps getLLVMIntExtensionOp(IRType* type)
-{
-    switch (type->getOp())
-    {
-    case kIROp_BoolType:
-    case kIROp_UInt16Type:
-    case kIROp_UIntType:
-    case kIROp_UInt64Type:
-    case kIROp_UIntPtrType:
-    case kIROp_PtrType:
-        // Zero-extend unsigned types
-        return llvm::Instruction::CastOps::ZExt;
-    default:
-        // Sign-extend the rest
-        return llvm::Instruction::CastOps::SExt;
-    }
-}
-*/
 
 // This class helps with converting types from Slang IR to LLVM IR. It can
 // create types for two different contexts:
@@ -156,7 +135,7 @@ class LLVMTypeTranslator
 private:
     ILLVMBuilder* builder;
     CompilerOptionSet* compilerOptions;
-    const Dictionary<IRInst*, LLVMDebugNode*>* sourceDebugInfo;
+    const Dictionary<IRInst*, LLVMDebugNode*>* instToDebugLLVM;
     IRTypeLayoutRules* defaultPointerRules;
 
     Dictionary<IRType*, LLVMType*> valueTypeMap;
@@ -188,11 +167,11 @@ public:
     LLVMTypeTranslator(
         ILLVMBuilder* builder,
         CompilerOptionSet& compilerOptions,
-        const Dictionary<IRInst*, LLVMDebugNode*>& sourceDebugInfo,
+        const Dictionary<IRInst*, LLVMDebugNode*>& instToDebugLLVM,
         IRTypeLayoutRules* rules)
         : builder(builder)
         , compilerOptions(&compilerOptions)
-        , sourceDebugInfo(&sourceDebugInfo)
+        , instToDebugLLVM(&instToDebugLLVM)
         , defaultPointerRules(rules)
     {
     }
@@ -468,7 +447,7 @@ public:
 
                 LLVMDebugNode* file;
                 unsigned line;
-                findDebugLocation(*sourceDebugInfo, structType, file, line);
+                findDebugLocation(*instToDebugLLVM, structType, file, line);
 
                 List<LLVMDebugNode*> types;
                 for (auto field : structType->getFields())
@@ -1189,9 +1168,8 @@ struct LLVMEmitter
     // be generated.
     Dictionary<IRInst*, LLVMInst*> promotedGlobalInsts;
 
-    // Map of DebugSource instructions to LLVM debug files
-    Dictionary<IRInst*, LLVMDebugNode*> sourceDebugInfo;
-    Dictionary<IRInst*, LLVMDebugNode*> funcToDebugLLVM;
+    // Map of debug instructions to LLVM debug nodes.
+    Dictionary<IRInst*, LLVMDebugNode*> instToDebugLLVM;
 
     // These enums represent built-in functions whose implementations must be
     // externally provided.
@@ -1204,25 +1182,15 @@ struct LLVMEmitter
     // LLVM IR.
     Dictionary<ExternalFunc, LLVMInst*> externalFuncs;
 
-    struct VariableDebugInfo
-    {
-        LLVMDebugNode* debugVar;
-        // attached is true when the first related DebugValue has been
-        // processed.
-        bool attached = false;
-        // isStackVar is true when the variable has been alloca'd and declared
-        // as debugValue. Doesn't necessarily need further DebugValue tracking
-        // after that, since a real variable now actually exists in LLVM.
-        bool isStackVar = false;
-    };
-    Dictionary<IRInst*, VariableDebugInfo> variableDebugInfoMap;
-
     // Used to skip some instructions whose value is derived from DebugVar.
     HashSet<IRInst*> debugInsts;
 
-    LLVMDebugNode* currentLocalScope = nullptr;
     bool debugInlinedScope = false;
     UInt uniqueIDCounter = 0;
+
+    // Cached, because it's used so often.
+    LLVMType* int32Type = nullptr;
+    LLVMType* int64Type = nullptr;
 
     // Used to add code in in front of return in a function. If it returns
     // nullptr, the LLVM return instruction is generated "normally". Otherwise,
@@ -1277,8 +1245,11 @@ struct LLVMEmitter
         types.reset(new LLVMTypeTranslator(
             builder,
             getOptions(),
-            sourceDebugInfo,
+            instToDebugLLVM,
             defaultPointerRules));
+
+        int32Type = builder->getIntType(32);
+        int64Type = builder->getIntType(64);
     }
 
     DiagnosticSink* getSink() { return codeGenContext->getSink(); }
@@ -1304,10 +1275,11 @@ struct LLVMEmitter
         {
         case ExternalFunc::Printf:
             LLVMType* params[1] = {builder->getPointerType()};
-            func = emitDecl("printf", builder->getIntType(32), {params, 1}, true);
+            func = emitDecl("printf", int32Type, {params, 1}, true);
 
-            builder->setAttribute(
+            builder->setArgInfo(
                 builder->getFunctionArg(func, 0),
+                TerminatedCharSlice("format"),
                 SLANG_LLVM_ATTR_NOALIAS | SLANG_LLVM_ATTR_NOCAPTURE
             );
             break;
@@ -1330,6 +1302,9 @@ struct LLVMEmitter
         LLVMInst* llvmValue = nullptr;
         switch (inst->getOp())
         {
+        case kIROp_VoidLit:
+            return nullptr;
+
         case kIROp_IntLit:
         case kIROp_BoolLit:
         case kIROp_FloatLit:
@@ -1401,8 +1376,7 @@ struct LLVMEmitter
         return llvmValue;
     }
 
-    /*
-    llvm::Value* emitCompare(IRInst* inst)
+    LLVMInst* emitCompare(IRInst* inst)
     {
         SLANG_ASSERT(inst->getOperandCount() == 2);
 
@@ -1413,124 +1387,103 @@ struct LLVMEmitter
 
         auto a = findValue(inst->getOperand(0));
         auto b = findValue(inst->getOperand(1));
-        promoteParams(a, aSigned, b, bSigned);
 
-        bool isFloat = a->getType()->getScalarType()->isFloatingPointTy();
-        bool isSigned = aSigned || bSigned;
-
-        llvm::CmpInst::Predicate pred;
+        LLVMCompareOp op;
         switch (inst->getOp())
         {
         case kIROp_Less:
-            pred = isFloat    ? llvm::CmpInst::Predicate::FCMP_OLT
-                   : isSigned ? llvm::CmpInst::Predicate::ICMP_SLT
-                              : llvm::CmpInst::Predicate::ICMP_ULT;
+            op = LLVMCompareOp::Less;
             break;
         case kIROp_Leq:
-            pred = isFloat    ? llvm::CmpInst::Predicate::FCMP_OLE
-                   : isSigned ? llvm::CmpInst::Predicate::ICMP_SLE
-                              : llvm::CmpInst::Predicate::ICMP_ULE;
+            op = LLVMCompareOp::LessEqual;
             break;
         case kIROp_Eql:
-            pred = isFloat ? llvm::CmpInst::Predicate::FCMP_OEQ : llvm::CmpInst::Predicate::ICMP_EQ;
+            op = LLVMCompareOp::Equal;
             break;
         case kIROp_Neq:
-            pred = isFloat ? llvm::CmpInst::Predicate::FCMP_ONE : llvm::CmpInst::Predicate::ICMP_NE;
+            op = LLVMCompareOp::NotEqual;
             break;
         case kIROp_Greater:
-            pred = isFloat    ? llvm::CmpInst::Predicate::FCMP_OGT
-                   : isSigned ? llvm::CmpInst::Predicate::ICMP_SGT
-                              : llvm::CmpInst::Predicate::ICMP_UGT;
+            op = LLVMCompareOp::Greater;
             break;
         case kIROp_Geq:
-            pred = isFloat    ? llvm::CmpInst::Predicate::FCMP_OGE
-                   : isSigned ? llvm::CmpInst::Predicate::ICMP_SGE
-                              : llvm::CmpInst::Predicate::ICMP_UGE;
+            op = LLVMCompareOp::GreaterEqual;
             break;
         default:
             SLANG_UNEXPECTED("Unsupported compare op");
             break;
         }
 
-        return llvmBuilder->CreateCmp(pred, a, b);
+        return builder->emitCompareOp(op, a, aSigned, b, bSigned);
     }
 
-    llvm::Value* emitArithmetic(IRInst* inst)
+    LLVMInst* emitArithmetic(IRInst* inst)
     {
         auto resultType = types->getType(inst->getDataType());
-        bool isFloat = resultType->getScalarType()->isFloatingPointTy();
+
         bool isSigned = isSignedType(inst->getDataType());
 
         if (inst->getOperandCount() == 1)
         {
             auto llvmValue = findValue(inst->getOperand(0));
+            LLVMUnaryOp op;
             switch (inst->getOp())
             {
             case kIROp_Neg:
-                return isFloat ? llvmBuilder->CreateFNeg(llvmValue)
-                               : llvmBuilder->CreateNeg(llvmValue);
+                op = LLVMUnaryOp::Negate;
             case kIROp_Not:
             case kIROp_BitNot:
-                return llvmBuilder->CreateNot(llvmValue);
+                op = LLVMUnaryOp::Not;
             default:
                 SLANG_UNEXPECTED("Unsupported unary arithmetic op");
                 break;
             }
+            return builder->emitUnaryOp(op, llvmValue);
         }
         else if (inst->getOperandCount() == 2)
         {
-            llvm::Instruction::BinaryOps op;
+            LLVMBinaryOp op;
             switch (inst->getOp())
             {
             case kIROp_Add:
-                op = isFloat ? llvm::Instruction::FAdd : llvm::Instruction::Add;
+                op = LLVMBinaryOp::Add;
                 break;
             case kIROp_Sub:
-                op = isFloat ? llvm::Instruction::FSub : llvm::Instruction::Sub;
+                op = LLVMBinaryOp::Sub;
                 break;
             case kIROp_Mul:
-                op = isFloat ? llvm::Instruction::FMul : llvm::Instruction::Mul;
+                op = LLVMBinaryOp::Mul;
                 break;
             case kIROp_Div:
-                op = isFloat    ? llvm::Instruction::FDiv
-                     : isSigned ? llvm::Instruction::SDiv
-                                : llvm::Instruction::UDiv;
+                op = LLVMBinaryOp::Div;
                 break;
             case kIROp_IRem:
-                op = isSigned ? llvm::Instruction::SRem : llvm::Instruction::URem;
-                break;
             case kIROp_FRem:
-                op = llvm::Instruction::FRem;
+                op = LLVMBinaryOp::Rem;
                 break;
             case kIROp_And:
             case kIROp_BitAnd:
-                op = llvm::Instruction::And;
+                op = LLVMBinaryOp::And;
                 break;
             case kIROp_Or:
             case kIROp_BitOr:
-                op = llvm::Instruction::Or;
+                op = LLVMBinaryOp::Or;
                 break;
             case kIROp_BitXor:
-                op = llvm::Instruction::Xor;
+                op = LLVMBinaryOp::Xor;
                 break;
             case kIROp_Rsh:
-                op = isSigned ? llvm::Instruction::AShr : llvm::Instruction::LShr;
+                op = LLVMBinaryOp::RightShift;
                 break;
             case kIROp_Lsh:
-                op = llvm::Instruction::Shl;
+                op = LLVMBinaryOp::LeftShift;
                 break;
             default:
                 SLANG_UNEXPECTED("Unsupported binary arithmetic op");
                 break;
             }
 
-            // Some ops in Slang, e.g. Lsh, may have differing types for the
-            // operands. This is not allowed by LLVM. Both sides must match
-            // the result type. Hence, we coerce as needed.
-            auto a = coerceNumeric(findValue(inst->getOperand(0)), resultType, isSigned);
-            auto b = coerceNumeric(findValue(inst->getOperand(1)), resultType, isSigned);
-
-            return llvmBuilder->CreateBinOp(op, a, b);
+            return builder->emitBinaryOp(op, findValue(inst->getOperand(0)), findValue(inst->getOperand(1)), resultType, isSigned);
         }
         else
         {
@@ -1580,7 +1533,7 @@ struct LLVMEmitter
         return defaultPointerRules;
     }
 
-    static llvm::Value* _defaultOnReturnHandler(IRReturn*)
+    static LLVMInst* _defaultOnReturnHandler(IRReturn*)
     {
         SLANG_ASSERT_FAILURE("Unexpected terminator in global scope!");
         return nullptr;
@@ -1588,11 +1541,11 @@ struct LLVMEmitter
 
     // Caution! This is only for emitting things which are considered
     // instructions in LLVM! It won't work for IRBlocks, IRFuncs & such.
-    llvm::Value* emitLLVMInstruction(
+    LLVMInst* emitLLVMInstruction(
         IRInst* inst,
         FuncEpilogueCallback onReturn = _defaultOnReturnHandler)
     {
-        llvm::Value* llvmInst = nullptr;
+        LLVMInst* llvmInst = nullptr;
         switch (inst->getOp())
         {
         case kIROp_IntLit:
@@ -1645,17 +1598,7 @@ struct LLVMEmitter
                 // If onReturnCallback didn't generate the return instruction
                 // for us, we have to do it here.
                 if (!llvmInst)
-                {
-                    auto retVal = retInst->getVal();
-                    if (retVal->getOp() == kIROp_VoidLit)
-                    {
-                        llvmInst = llvmBuilder->CreateRetVoid();
-                    }
-                    else
-                    {
-                        llvmInst = llvmBuilder->CreateRet(findValue(retVal));
-                    }
-                }
+                    llvmInst = builder->emitReturn(findValue(retInst->getVal()));
             }
             break;
 
@@ -1664,38 +1607,24 @@ struct LLVMEmitter
                 auto var = static_cast<IRVar*>(inst);
                 auto ptrType = var->getDataType();
 
-                llvm::Value* llvmVar =
+                LLVMInst* llvmVar =
                     types->emitAlloca(ptrType->getValueType(), defaultPointerRules);
 
-                llvm::StringRef linkageName, prettyName;
+                TerminatedCharSlice linkageName, prettyName;
                 if (maybeGetName(&linkageName, &prettyName, inst))
                 {
-                    llvmVar->setName(linkageName);
+                    builder->setName(llvmVar, linkageName);
 
                     // TODO: This is a bit of a hack. DebugVar fails to get
                     // linked to the actual Var sometimes, which is why we
                     // automatically create a debug var for each Slang IR var if
                     // it has a name.:/
-
-                    llvm::DILocation* loc = llvmBuilder->getCurrentDebugLocation();
-                    if (debug && loc)
+                    if (debug)
                     {
                         auto varType =
                             types->getDebugType(ptrType->getValueType(), defaultPointerRules);
-
-                        auto debugVar = llvmDebugBuilder->createAutoVariable(
-                            currentLocalScope,
-                            prettyName,
-                            loc->getFile(),
-                            loc->getLine(),
-                            varType,
-                            getOptions().getOptimizationLevel() == OptimizationLevel::None);
-                        llvmDebugBuilder->insertDeclare(
-                            llvmVar,
-                            llvm::cast<llvm::DILocalVariable>(debugVar),
-                            llvmDebugBuilder->createExpression(),
-                            loc,
-                            llvmBuilder->GetInsertBlock());
+                        auto debugVar = builder->emitDebugVar(prettyName, varType);
+                        builder->emitDebugValue(debugVar, nullptr);
                     }
                 }
 
@@ -1707,60 +1636,52 @@ struct LLVMEmitter
         case kIROp_UnconditionalBranch:
             {
                 auto branch = as<IRUnconditionalBranch>(inst);
-                auto llvmTarget = llvm::cast<llvm::BasicBlock>(findValue(branch->getTargetBlock()));
-                llvmInst = llvmBuilder->CreateBr(llvmTarget);
+                llvmInst = builder->emitReturn(findValue(branch->getTargetBlock()));
             }
             break;
 
         case kIROp_IfElse:
             {
                 auto ifelseInst = static_cast<IRIfElse*>(inst);
-                auto trueBlock =
-                    llvm::cast<llvm::BasicBlock>(findValue(ifelseInst->getTrueBlock()));
-                auto falseBlock =
-                    llvm::cast<llvm::BasicBlock>(findValue(ifelseInst->getFalseBlock()));
                 auto cond = findValue(ifelseInst->getCondition());
-                llvmInst = llvmBuilder->CreateCondBr(cond, trueBlock, falseBlock);
+                auto trueBlock = findValue(ifelseInst->getTrueBlock());
+                auto falseBlock = findValue(ifelseInst->getFalseBlock());
+                llvmInst = builder->emitCondBranch(cond, trueBlock, falseBlock);
             }
             break;
 
         case kIROp_Switch:
             {
                 auto switchInst = static_cast<IRSwitch*>(inst);
-                auto defaultBlock =
-                    llvm::cast<llvm::BasicBlock>(findValue(switchInst->getBreakLabel()));
+                auto defaultBlock = findValue(switchInst->getBreakLabel());
                 auto llvmCondition = findValue(switchInst->getCondition());
 
                 auto defaultLabel = switchInst->getDefaultLabel();
                 if (defaultLabel)
-                    defaultBlock = llvm::cast<llvm::BasicBlock>(findValue(defaultLabel));
+                    defaultBlock = findValue(defaultLabel);
 
-                auto llvmSwitch = llvmBuilder->CreateSwitch(
-                    llvmCondition,
-                    defaultBlock,
-                    switchInst->getCaseCount());
+                List<LLVMInst*> values;
+                List<LLVMInst*> blocks;
                 for (UInt c = 0; c < switchInst->getCaseCount(); c++)
                 {
                     auto value = switchInst->getCaseValue(c);
                     auto intLit = as<IRIntLit>(value);
                     SLANG_ASSERT(intLit);
 
-                    auto llvmCaseBlock =
-                        llvm::cast<llvm::BasicBlock>(findValue(switchInst->getCaseLabel(c)));
-                    auto llvmCaseValue =
-                        llvm::cast<llvm::ConstantInt>(types->maybeEmitConstant(intLit));
-
-                    llvmSwitch->addCase(llvmCaseValue, llvmCaseBlock);
+                    values.add(types->maybeEmitConstant(intLit));
+                    blocks.add(findValue(switchInst->getCaseLabel(c)));
                 }
-                llvmInst = llvmSwitch;
+                llvmInst = builder->emitSwitch(llvmCondition,
+                    Slice(values.begin(), values.getCount()),
+                    Slice(blocks.begin(), blocks.getCount()),
+                    defaultBlock);
             }
             break;
 
         case kIROp_Select:
             {
                 auto selectInst = static_cast<IRSelect*>(inst);
-
-                llvmInst = llvmBuilder->CreateSelect(
+                llvmInst = builder->emitSelect(
                     findValue(selectInst->getCondition()),
                     findValue(selectInst->getTrueResult()),
                     findValue(selectInst->getFalseResult()));
@@ -1801,12 +1722,13 @@ struct LLVMEmitter
                 auto type = inst->getDataType();
                 if (types->isAggregateType(type))
                 {
-                    // Aggregates are always stack-allocated.
+                    // Aggregates are always stack-allocated; we need to give a
+                    // valid pointer even if the value is undefined.
                     llvmInst = types->emitAlloca(type, defaultPointerRules);
                 }
                 else
                 {
-                    llvmInst = llvm::PoisonValue::get(types->getType(type));
+                    llvmInst = builder->getPoison(types->getType(type));
                 }
             }
             break;
@@ -1816,12 +1738,11 @@ struct LLVMEmitter
                 auto lowbits = findValue(inst->getOperand(0));
                 auto highbits = findValue(inst->getOperand(1));
 
-                auto i64Type = llvmBuilder->getInt64Ty();
+                lowbits = builder->emitCast(lowbits, int64Type, false);
+                highbits = builder->emitCast(highbits, int64Type, false);
 
-                lowbits = llvmBuilder->CreateZExt(lowbits, i64Type);
-                highbits = llvmBuilder->CreateZExt(highbits, i64Type);
-                highbits = llvmBuilder->CreateShl(highbits, llvmBuilder->getInt64(32));
-                llvmInst = llvmBuilder->CreateOr(lowbits, highbits);
+                highbits = builder->emitBinaryOp(LLVMBinaryOp::LeftShift, highbits, builder->getConstantInt(int64Type, 32));
+                llvmInst = builder->emitBinaryOp(LLVMBinaryOp::Or, lowbits, highbits);
             }
             break;
 
@@ -1830,9 +1751,9 @@ struct LLVMEmitter
             for (UInt aa = 0; aa < inst->getOperandCount(); ++aa)
             {
                 auto op = inst->getOperand(aa);
-                llvm::Value* ptr = types->emitArrayGetElementPtr(
+                LLVMInst* ptr = types->emitArrayGetElementPtr(
                     llvmInst,
-                    llvmBuilder->getInt32(aa),
+                    builder->getConstantInt(int32Type, aa),
                     op->getDataType(),
                     defaultPointerRules);
                 types->emitStore(ptr, findValue(op), op->getDataType(), defaultPointerRules);
@@ -1846,7 +1767,7 @@ struct LLVMEmitter
                 auto field = type->getFields().begin();
                 for (UInt aa = 0; aa < inst->getOperandCount(); ++aa, ++field)
                 {
-                    llvm::Value* ptr =
+                    LLVMInst* ptr =
                         types->emitStructGetElementPtr(llvmInst, *field, defaultPointerRules);
                     auto op = inst->getOperand(aa);
                     types->emitStore(ptr, findValue(op), op->getDataType(), defaultPointerRules);
@@ -1863,9 +1784,9 @@ struct LLVMEmitter
                 auto llvmElement = findValue(element);
                 for (IRIntegerValue i = 0; i < elementCount; ++i)
                 {
-                    llvm::Value* ptr = types->emitArrayGetElementPtr(
+                    LLVMInst* ptr = types->emitArrayGetElementPtr(
                         llvmInst,
-                        llvmBuilder->getInt32(i),
+                        builder->getConstantInt(int32Type, i),
                         element->getDataType(),
                         defaultPointerRules);
                     types->emitStore(ptr, llvmElement, element->getDataType(), defaultPointerRules);
@@ -1886,26 +1807,26 @@ struct LLVMEmitter
                     break;
                 }
 
-                llvmInst = llvm::PoisonValue::get(llvmType);
+                llvmInst = builder->getPoison(llvmType);
                 UInt elemIndex = 0;
                 for (UInt aa = 0; aa < inst->getOperandCount(); ++aa)
                 {
-                    auto val = findValue(inst->getOperand(aa));
-                    auto valType = val->getType();
-                    if (valType->isVectorTy())
+                    auto op = inst->getOperand(aa);
+                    auto val = findValue(op);
+
+                    if (auto vector = as<IRVectorType>(op->getDataType()))
                     {
-                        auto vecType = llvm::cast<llvm::FixedVectorType>(valType);
-                        auto elemCount = vecType->getNumElements();
-                        for (UInt j = 0; j < elemCount; ++j)
+                        auto elemCount = getIntVal(vector->getElementCount());
+                        for (IRIntegerValue j = 0; j < elemCount; ++j)
                         {
-                            auto entry = llvmBuilder->CreateExtractElement(val, j);
-                            llvmInst = llvmBuilder->CreateInsertElement(llvmInst, entry, elemIndex);
+                            auto entry = builder->emitExtractElement(val, builder->getConstantInt(int32Type, j));
+                            llvmInst = builder->emitInsertElement(llvmInst, entry, builder->getConstantInt(int32Type, elemIndex));
                             elemIndex++;
                         }
                     }
                     else
                     {
-                        llvmInst = llvmBuilder->CreateInsertElement(llvmInst, val, elemIndex);
+                        llvmInst = builder->emitInsertElement(llvmInst, val, builder->getConstantInt(int32Type, elemIndex));
                         elemIndex++;
                     }
                 }
@@ -1916,9 +1837,11 @@ struct LLVMEmitter
             llvmInst = types->maybeEmitConstant(inst);
             if (!llvmInst)
             {
-                auto llvmType = llvm::cast<llvm::VectorType>(types->getType(inst->getDataType()));
                 auto val = findValue(inst->getOperand(0));
-                llvmInst = llvmBuilder->CreateVectorSplat(llvmType->getElementCount(), val);
+
+                auto vector = cast<IRVectorType>(inst->getDataType());
+                auto elemCount = getIntVal(vector->getElementCount());
+                llvmInst = builder->emitVectorSplat(val, elemCount);
             }
             break;
 
@@ -1928,7 +1851,7 @@ struct LLVMEmitter
                 auto baseInst = swizzleInst->getBase();
                 if (swizzleInst->getElementCount() == 1)
                 {
-                    llvmInst = llvmBuilder->CreateExtractElement(
+                    llvmInst = builder->emitExtractElement(
                         findValue(baseInst),
                         findValue(swizzleInst->getElementIndex(0)));
                 }
@@ -1941,9 +1864,9 @@ struct LLVMEmitter
                         int val = as<IRIntLit>(swizzleInst->getElementIndex(i))->getValue();
                         mask.add(val);
                     }
-                    llvmInst = llvmBuilder->CreateShuffleVector(
+                    llvmInst = builder->emitVectorShuffle(
                         findValue(baseInst),
-                        llvm::ArrayRef<int>(mask.begin(), mask.end()));
+                        Slice(mask.begin(), mask.getCount()));
                 }
             }
             break;
@@ -1958,10 +1881,9 @@ struct LLVMEmitter
                 for (UInt i = 0; i < swizzledInst->getElementCount(); ++i)
                 {
                     IRInst* irElementIndex = swizzledInst->getElementIndex(i);
-                    IRIntegerValue elementIndex = getIntVal(irElementIndex);
-                    auto llvmSrcElement = llvmBuilder->CreateExtractElement(llvmSrc, i);
-                    llvmInst =
-                        llvmBuilder->CreateInsertElement(llvmInst, llvmSrcElement, elementIndex);
+                    auto index = types->maybeEmitConstant(irElementIndex);
+                    auto llvmSrcElement = builder->emitExtractElement(llvmSrc, builder->getConstantInt(int32Type, i));
+                    llvmInst = builder->emitInsertElement(llvmInst, llvmSrcElement, index);
                 }
             }
             break;
@@ -1984,201 +1906,45 @@ struct LLVMEmitter
                 for (UInt i = 0; i < swizzledInst->getElementCount(); ++i)
                 {
                     IRInst* irElementIndex = swizzledInst->getElementIndex(i);
-                    IRIntegerValue elementIndex = getIntVal(irElementIndex);
 
                     auto llvmDstElement = types->emitArrayGetElementPtr(
                         llvmDst,
-                        llvmBuilder->getInt32(elementIndex),
+                        types->maybeEmitConstant(irElementIndex),
                         elementType,
                         rules);
-                    auto llvmSrcElement = llvmBuilder->CreateExtractElement(llvmSrc, i);
+                    auto llvmSrcElement = builder->emitExtractElement(llvmSrc, builder->getConstantInt(int32Type, i));
                     llvmInst = types->emitStore(llvmDstElement, llvmSrcElement, elementType, rules);
                 }
             }
             break;
 
         case kIROp_IntCast:
-            {
-                auto llvmValue = findValue(inst->getOperand(0));
-
-                auto fromTypeV = inst->getOperand(0)->getDataType();
-                auto toTypeV = inst->getDataType();
-                auto fromType = getVectorOrCoopMatrixElementType(fromTypeV);
-                auto toType = getVectorOrCoopMatrixElementType(toTypeV);
-
-                auto llvmFromType = types->getType(fromTypeV);
-                auto llvmToType = types->getType(toTypeV);
-                auto fromWidth = llvmFromType->getScalarSizeInBits();
-                auto toWidth = llvmToType->getScalarSizeInBits();
-
-                if (fromWidth == toWidth)
-                {
-                    // LLVM integers are sign-ambiguous, so if the width is the
-                    // same, there's nothing to do.
-                    llvmInst = llvmValue;
-                }
-                else if (as<IRBoolType>(toType))
-                {
-                    llvm::Constant* zero = llvm::ConstantInt::get(types->getType(fromType), 0);
-                    if (toTypeV != toType)
-                    { // Vector
-                        zero = llvm::ConstantVector::getSplat(
-                            llvm::cast<llvm::VectorType>(llvmToType)->getElementCount(),
-                            zero);
-                    }
-                    llvmInst =
-                        llvmBuilder->CreateCmp(llvm::CmpInst::Predicate::ICMP_NE, llvmValue, zero);
-                }
-                else
-                {
-                    llvm::Instruction::CastOps cast = llvm::Instruction::CastOps::Trunc;
-                    if (toWidth > fromWidth)
-                        cast = getLLVMIntExtensionOp(fromType);
-                    llvmInst = llvmBuilder->CreateCast(cast, llvmValue, types->getType(toTypeV));
-                }
-            }
-            break;
-
         case kIROp_FloatCast:
-            {
-                auto llvmValue = findValue(inst->getOperand(0));
-
-                auto fromTypeV = inst->getOperand(0)->getDataType();
-                auto toTypeV = inst->getDataType();
-
-                auto llvmFromType = types->getType(fromTypeV);
-                auto llvmToType = types->getType(toTypeV);
-
-                auto fromSize = llvmFromType->getScalarSizeInBits();
-                auto toSize = llvmToType->getScalarSizeInBits();
-
-                if (fromSize == toSize)
-                {
-                    llvmInst = llvmValue;
-                }
-                else
-                {
-                    llvmInst = llvmBuilder->CreateCast(
-                        fromSize < toSize ? llvm::Instruction::CastOps::FPExt
-                                          : llvm::Instruction::CastOps::FPTrunc,
-                        llvmValue,
-                        llvmToType);
-                }
-            }
-            break;
-
         case kIROp_CastIntToFloat:
-            {
-                auto fromTypeV = inst->getOperand(0)->getDataType();
-                auto toTypeV = inst->getDataType();
-                llvmInst = llvmBuilder->CreateCast(
-                    isSignedType(fromTypeV) ? llvm::Instruction::CastOps::SIToFP
-                                            : llvm::Instruction::CastOps::UIToFP,
-                    findValue(inst->getOperand(0)),
-                    types->getType(toTypeV));
-            }
-            break;
-
         case kIROp_CastFloatToInt:
-            {
-                auto fromTypeV = inst->getOperand(0)->getDataType();
-                auto fromType = getVectorOrCoopMatrixElementType(fromTypeV);
-                auto toTypeV = inst->getDataType();
-                auto toType = getVectorOrCoopMatrixElementType(toTypeV);
-                auto llvmValue = findValue(inst->getOperand(0));
-
-                if (as<IRBoolType>(toType))
-                {
-                    llvmInst = llvmBuilder->CreateCmp(
-                        llvm::CmpInst::Predicate::FCMP_UNE,
-                        llvmValue,
-                        llvm::ConstantFP::getZero(types->getType(fromType)));
-                }
-                else
-                {
-                    llvmInst = llvmBuilder->CreateCast(
-                        isSignedType(toTypeV) ? llvm::Instruction::CastOps::FPToSI
-                                              : llvm::Instruction::CastOps::FPToUI,
-                        llvmValue,
-                        types->getType(toTypeV));
-                }
-            }
-            break;
-
         case kIROp_CastPtrToInt:
-            {
-                auto fromValue = inst->getOperand(0);
-                auto toTypeV = inst->getDataType();
-                llvmInst = llvmBuilder->CreateCast(
-                    llvm::Instruction::CastOps::PtrToInt,
-                    findValue(fromValue),
-                    types->getType(toTypeV));
-            }
-            break;
-
         case kIROp_CastPtrToBool:
-            {
-                auto fromValue = inst->getOperand(0);
-                llvmInst = llvmBuilder->CreateIsNotNull(findValue(fromValue));
-            }
-            break;
-
         case kIROp_CastIntToPtr:
             {
-                auto fromValue = inst->getOperand(0);
-                auto toTypeV = inst->getDataType();
-                llvmInst = llvmBuilder->CreateCast(
-                    llvm::Instruction::CastOps::IntToPtr,
-                    findValue(fromValue),
-                    types->getType(toTypeV));
+                auto fromTypeV = inst->getOperand(0)->getDataType();
+                auto fromType = getVectorOrCoopMatrixElementType(fromTypeV);
+                llvmInst = builder->emitCast(
+                    findValue(inst->getOperand(0)),
+                    types->getType(inst->getDataType()),
+                    isSignedType(fromType));
             }
             break;
 
         case kIROp_PtrCast:
-            {
-                // ptr-to-ptr casts are no-ops due to opaque pointers.
-                llvmInst = findValue(inst->getOperand(0));
-            }
+            // ptr-to-ptr casts are always no-ops due to opaque pointers.
+            llvmInst = findValue(inst->getOperand(0));
             break;
 
         case kIROp_BitCast:
-            {
-                auto fromValue = inst->getOperand(0);
-                auto toTypeV = inst->getDataType();
-
-                auto llvmFromValue = findValue(fromValue);
-                auto llvmFromType = llvmFromValue->getType();
-                auto llvmToType = types->getType(toTypeV);
-
-                auto op = llvm::Instruction::CastOps::BitCast;
-                // It appears that sometimes casts between ints and ptrs occur
-                // as bitcasts. Fix the operation in that case.
-                if (llvmFromType->isPointerTy() && llvmToType->isIntegerTy())
-                    op = llvm::Instruction::CastOps::PtrToInt;
-                else if (llvmFromType->isIntegerTy() && llvmToType->isPointerTy())
-                    op = llvm::Instruction::CastOps::IntToPtr;
-                else if (llvmFromType->isPointerTy() && !llvmToType->isPointerTy())
-                {
-                    // Cast from pointer to ???, so first cast to int and then
-                    // perform the bitcast.
-                    llvmFromValue = llvmBuilder->CreateCast(
-                        llvm::Instruction::CastOps::PtrToInt,
-                        llvmFromValue,
-                        llvmBuilder->getIntPtrTy(targetDataLayout));
-                }
-                else if (!llvmFromType->isPointerTy() && llvmToType->isPointerTy())
-                {
-                    // Cast from ??? to pointer, so first bitcast to equally
-                    // sized int type and then do IntToPtr cast.
-                    llvmFromValue = llvmBuilder->CreateCast(
-                        llvm::Instruction::CastOps::BitCast,
-                        llvmFromValue,
-                        llvmBuilder->getIntPtrTy(targetDataLayout));
-                    op = llvm::Instruction::CastOps::IntToPtr;
-                }
-
-                llvmInst = llvmBuilder->CreateCast(op, llvmFromValue, llvmToType);
-            }
+            llvmInst = builder->emitBitCast(
+                findValue(inst->getOperand(0)),
+                types->getType(inst->getDataType())
+            );
             break;
 
         case kIROp_FieldAddress:
@@ -2234,7 +2000,7 @@ struct LLVMEmitter
                 auto key = as<IRStructKey>(fieldExtractInst->getField());
                 auto field = findStructField(structType, key);
 
-                llvm::Value* ptr = types->emitStructGetElementPtr(llvmBase, field, rules);
+                LLVMInst* ptr = types->emitStructGetElementPtr(llvmBase, field, rules);
 
                 llvmInst = types->emitLoad(ptr, field->getFieldType(), rules);
             }
@@ -2295,15 +2061,14 @@ struct LLVMEmitter
                 if (as<IRVectorType>(baseTy))
                 {
                     // For vectors, we can use extractelement
-                    llvmInst = llvmBuilder->CreateExtractElement(llvmVal, findValue(indexInst));
+                    llvmInst = builder->emitExtractElement(llvmVal, findValue(indexInst));
                 }
                 else if (auto arrayType = as<IRArrayTypeBase>(baseTy))
                 {
                     // emitGEP + emitLoad.
-                    SLANG_ASSERT(llvmVal->getType()->isPointerTy());
                     auto rules = getPtrLayoutRules(baseInst);
                     auto elemType = arrayType->getElementType();
-                    llvm::Value* ptr = types->emitArrayGetElementPtr(
+                    LLVMInst* ptr = types->emitArrayGetElementPtr(
                         llvmVal,
                         findValue(indexInst),
                         elemType,
@@ -2317,53 +2082,27 @@ struct LLVMEmitter
 
         case kIROp_BitfieldExtract:
             {
-                auto type = types->getType(inst->getDataType());
-                auto val = coerceNumeric(findValue(inst->getOperand(0)), type, false);
-                auto off = coerceNumeric(findValue(inst->getOperand(1)), type, false);
-                auto bts = coerceNumeric(findValue(inst->getOperand(2)), type, false);
-
                 IRType* elementType =
                     getVectorOrCoopMatrixElementType(inst->getOperand(0)->getDataType());
                 IRBasicType* basicType = as<IRBasicType>(elementType);
                 bool isSigned = isSignedType(basicType);
 
-                auto shiftedVal =
-                    llvmBuilder->CreateLShr(val, coerceNumeric(off, val->getType(), false));
-
-                auto numBits = coerceNumeric(
-                    llvmBuilder->getInt32(type->getScalarSizeInBits()),
-                    val->getType(),
-                    false);
-                auto highBits = llvmBuilder->CreateSub(numBits, bts);
-                shiftedVal = llvmBuilder->CreateShl(shiftedVal, highBits);
-                if (isSigned)
-                    llvmInst = llvmBuilder->CreateAShr(shiftedVal, highBits);
-                else
-                    llvmInst = llvmBuilder->CreateLShr(shiftedVal, highBits);
+                llvmInst = builder->emitBitfieldExtract(
+                    findValue(inst->getOperand(0)),
+                    findValue(inst->getOperand(1)),
+                    findValue(inst->getOperand(2)),
+                    types->getType(inst->getDataType()),
+                    isSigned);
             }
             break;
 
         case kIROp_BitfieldInsert:
-            {
-                auto type = types->getType(inst->getDataType());
-                auto val = coerceNumeric(findValue(inst->getOperand(0)), type, false);
-                auto insert = coerceNumeric(findValue(inst->getOperand(1)), type, false);
-                auto off = coerceNumeric(findValue(inst->getOperand(2)), type, false);
-                auto bts = coerceNumeric(findValue(inst->getOperand(3)), type, false);
-
-                auto one = coerceNumeric(llvmBuilder->getInt32(1), val->getType(), false);
-                auto mask = llvmBuilder->CreateShl(one, bts);
-                mask = llvmBuilder->CreateSub(mask, one);
-                mask = llvmBuilder->CreateShl(mask, off);
-
-                insert = llvmBuilder->CreateShl(insert, off);
-                insert = llvmBuilder->CreateAnd(insert, mask);
-
-                auto notMask = llvmBuilder->CreateNot(mask);
-
-                val = llvmBuilder->CreateAnd(val, notMask);
-                llvmInst = llvmBuilder->CreateOr(val, insert);
-            }
+            llvmInst = builder->emitBitfieldInsert(
+                findValue(inst->getOperand(0)),
+                findValue(inst->getOperand(1)),
+                findValue(inst->getOperand(2)),
+                findValue(inst->getOperand(3)),
+                types->getType(inst->getDataType()));
             break;
 
         case kIROp_Call:
@@ -2392,30 +2131,28 @@ struct LLVMEmitter
                     }
                 }
 
-                auto llvmFuncInst = findValue(funcValue);
-                auto llvmFunc = llvm::cast<llvm::Function>(llvmFuncInst);
-
-                List<llvm::Value*> args;
+                List<LLVMInst*> args;
 
                 for (IRInst* arg : callInst->getArgsList())
-                {
                     args.add(findValue(arg));
-                }
 
-                llvm::Value* allocValue = nullptr;
+                LLVMInst* allocValue = nullptr;
                 // If attempting to return an aggregate, turn it into an extra
                 // output parameter that is passed with a pointer.
                 if (types->isAggregateType(inst->getDataType()))
                 {
                     allocValue = types->emitAlloca(inst->getDataType(), defaultPointerRules);
                     args.add(allocValue);
+
                 }
-                auto returnVal =
-                    llvmBuilder->CreateCall(llvmFunc, llvm::ArrayRef(args.begin(), args.end()));
+                auto returnVal = builder->emitCall(
+                    findValue(funcValue),
+                    Slice(args.begin(), args.getCount()));
                 llvmInst = allocValue ? allocValue : returnVal;
             }
             break;
 
+            /*
         case kIROp_Printf:
             {
                 auto llvmFunc = getExternalBuiltin(ExternalFunc::Printf);
@@ -2595,9 +2332,10 @@ struct LLVMEmitter
                 llvmInst = llvmBuilder->CreateInsertValue(llvmByteBuffer, llvmElementCount, 1);
             }
             break;
+            */
 
         case kIROp_Unreachable:
-            return llvmBuilder->CreateUnreachable();
+            return builder->emitUnreachable();
 
         case kIROp_GlobalValueRef:
             llvmInst = findValue(inst->getOperand(0));
@@ -2612,7 +2350,7 @@ struct LLVMEmitter
                 {
                     auto slice = stringLit->getStringSlice();
                     auto hash = getStableHashCode32(slice.begin(), slice.getLength()).hash;
-                    llvmInst = llvmBuilder->getInt32(hash);
+                    llvmInst = builder->getConstantInt(int32Type, hash);
                 }
                 else
                 {
@@ -2630,110 +2368,47 @@ struct LLVMEmitter
 
         case kIROp_DebugVar:
             debugInsts.add(inst);
-            if (debug && currentLocalScope)
+            if (debug)
             {
                 auto debugVarInst = static_cast<IRDebugVar*>(inst);
 
                 auto ptrType = as<IRPtrType>(debugVarInst->getDataType());
                 auto varType = types->getDebugType(ptrType->getValueType(), defaultPointerRules);
 
-                auto file = sourceDebugInfo.getValue(debugVarInst->getSource());
+                auto file = instToDebugLLVM.getValue(debugVarInst->getSource());
                 auto line = getIntVal(debugVarInst->getLine());
                 IRInst* argIndex = debugVarInst->getArgIndex();
 
-                llvm::StringRef linkageName, prettyName;
+                TerminatedCharSlice linkageName, prettyName;
                 maybeGetName(&linkageName, &prettyName, inst);
 
-                if (argIndex && !debugInlinedScope)
-                {
-                    variableDebugInfoMap[inst] = {
-                        llvmDebugBuilder->createParameterVariable(
-                            currentLocalScope,
-                            prettyName,
-                            getIntVal(argIndex) + 1,
-                            file,
-                            line,
-                            varType,
-                            getOptions().getOptimizationLevel() == OptimizationLevel::None),
-                        false,
-                        false};
-                }
-                else
-                {
-                    variableDebugInfoMap[inst] = {
-                        llvmDebugBuilder->createAutoVariable(
-                            currentLocalScope,
-                            prettyName,
-                            file,
-                            line,
-                            varType,
-                            getOptions().getOptimizationLevel() == OptimizationLevel::None),
-                        false,
-                        false};
-                }
+                int arg = argIndex && !debugInlinedScope ? getIntVal(argIndex) : -1;
+                builder->emitDebugVar(prettyName, varType, file, line, arg);
             }
             return nullptr;
 
         case kIROp_DebugValue:
             debugInsts.add(inst);
-            if (debug && currentLocalScope)
+            if (debug)
             {
                 auto debugValueInst = static_cast<IRDebugValue*>(inst);
                 auto debugVar = debugValueInst->getDebugVar();
-                if (!variableDebugInfoMap.containsKey(debugVar))
-                    return nullptr;
-
-                VariableDebugInfo& debugInfo = variableDebugInfoMap.getValue(debugVar);
-
-                llvm::DILocation* loc = llvmBuilder->getCurrentDebugLocation();
-                if (!loc)
-                    loc = llvm::DILocation::get(
-                        *llvmContext,
-                        debugInfo.debugVar->getLine(),
-                        0,
-                        debugInfo.debugVar->getScope());
-
-                llvm::Value* value = findValue(debugValueInst->getValue());
-                llvm::AllocaInst* alloca = llvm::dyn_cast<llvm::AllocaInst>(value);
-                if (!debugInfo.attached && alloca)
-                {
-                    debugInfo.isStackVar = true;
-                    llvmDebugBuilder->insertDeclare(
-                        alloca,
-                        llvm::cast<llvm::DILocalVariable>(debugInfo.debugVar),
-                        llvmDebugBuilder->createExpression(),
-                        loc,
-                        llvmBuilder->GetInsertBlock());
-                }
-                else if (!debugInfo.isStackVar)
-                {
-                    llvmDebugBuilder->insertDbgValueIntrinsic(
-                        findValue(debugValueInst->getValue()),
-                        llvm::cast<llvm::DILocalVariable>(debugInfo.debugVar),
-                        llvmDebugBuilder->createExpression(),
-                        loc,
-                        llvmBuilder->GetInsertBlock());
-                }
-                debugInfo.attached = true;
+                auto value = findValue(debugValueInst->getValue());
+                builder->emitDebugValue(instToDebugLLVM.getValue(debugVar), value);
             }
             return nullptr;
 
         case kIROp_DebugLine:
             debugInsts.add(inst);
-            if (debug && currentLocalScope)
+            if (debug)
             {
                 auto debugLineInst = static_cast<IRDebugLine*>(inst);
 
-                // auto file = sourceDebugInfo.getValue(debugLineInst->getSource());
+                // auto file = instToDebugLLVM.getValue(debugLineInst->getSource());
                 auto line = getIntVal(debugLineInst->getLineStart());
                 auto col = getIntVal(debugLineInst->getColStart());
 
-                debugLineInst->getLineEnd();
-                debugLineInst->getColStart();
-                debugLineInst->getColEnd();
-
-                llvmBuilder->SetCurrentDebugLocation(
-                    llvm::DILocation::get(*llvmContext, line, col, currentLocalScope));
+                builder->setDebugLocation(line, col);
             }
             return nullptr;
 
@@ -2778,7 +2453,7 @@ struct LLVMEmitter
         return llvmInst;
     }
 
-    llvm::GlobalValue::LinkageTypes getLinkageType(IRInst* inst)
+    bool isDeclExternallyVisible(IRInst* inst)
     {
         for (auto decor : inst->getDecorations())
         {
@@ -2791,19 +2466,20 @@ struct LLVMEmitter
             case kIROp_HLSLExportDecoration:
             case kIROp_DllExportDecoration:
                 {
-                    return llvm::GlobalValue::ExternalLinkage;
+                    return true;
                 }
             default:
                 break;
             }
         }
-        return llvm::GlobalValue::PrivateLinkage;
+        return false;
     }
 
+    /*
     llvm::DISubprogram* ensureDebugFunc(IRGlobalValueWithCode* func, IRDebugFunction* debugFunc)
     {
-        if (funcToDebugLLVM.containsKey(func))
-            return funcToDebugLLVM[func];
+        if (instToDebugLLVM.containsKey(func))
+            return instToDebugLLVM[func];
 
         IRType* funcType = as<IRType>(func->getDataType());
         llvm::DIFile* file = nullptr;
@@ -2817,7 +2493,7 @@ struct LLVMEmitter
             if (as<IRFuncType>(debugFuncType))
                 funcType = debugFuncType;
 
-            file = sourceDebugInfo.getValue(debugFunc->getFile());
+            file = instToDebugLLVM.getValue(debugFunc->getFile());
             line = getIntVal(debugFunc->getLine());
         }
         else
@@ -2840,75 +2516,78 @@ struct LLVMEmitter
             line,
             llvm::DINode::FlagPrototyped,
             llvm::DISubprogram::SPFlagDefinition);
-        funcToDebugLLVM[func] = sp;
+        instToDebugLLVM[func] = sp;
         return sp;
     }
+    */
 
-    llvm::Function* ensureFuncDecl(IRFunc* func)
+    LLVMInst* ensureFuncDecl(IRFunc* func)
     {
         if (mapInstToLLVM.containsKey(func))
-            return llvm::cast<llvm::Function>(mapInstToLLVM.getValue(func));
+            return mapInstToLLVM.getValue(func);
 
         auto funcType = static_cast<IRFuncType*>(func->getDataType());
 
-        llvm::FunctionType* llvmFuncType = llvm::cast<llvm::FunctionType>(types->getType(funcType));
+        LLVMType* llvmFuncType = types->getType(funcType);
 
-        llvm::Function* llvmFunc = llvm::Function::Create(
-            llvmFuncType,
-            getLinkageType(func),
-            "", // Name is conditionally set below.
-            *llvmModule);
+        String tmp;
+        TerminatedCharSlice linkageName, prettyName;
+        if (!maybeGetName(&linkageName, &prettyName, func))
+        {
+            // If the name is missing for whatever reason, just generate one that
+            // shouldn't clash with anything else.
+            tmp = "__slang_anonymous_func_";
+            tmp.append(uniqueIDCounter++);
+            linkageName = TerminatedCharSlice(tmp.begin(), tmp.getLength());
+        }
 
-        llvm::StringRef linkageName, prettyName;
-        if (maybeGetName(&linkageName, &prettyName, func))
-            llvmFunc->setName(linkageName);
+        uint32_t funcAttributes = 0;
+        if (isDeclExternallyVisible(func))
+            funcAttributes |= SLANG_LLVM_FUNC_ATTR_EXTERNALLYVISIBLE;
 
-        // If the name is missing for whatever reason, just generate one that
-        // shouldn't clash with anything else.
-        if (llvmFunc->getName().size() == 0)
-            llvmFunc->setName("__slang_anonymous_func_" + std::to_string(uniqueIDCounter++));
+        // Attach attributes based on decorations!
+        if (func->findDecoration<IRReadNoneDecoration>())
+            funcAttributes |= SLANG_LLVM_FUNC_ATTR_READNONE;
+        if (func->findDecoration<IRForceInlineDecoration>())
+            funcAttributes |= SLANG_LLVM_FUNC_ATTR_ALWAYSINLINE;
+        if (func->findDecoration<IRNoInlineDecoration>())
+            funcAttributes |= SLANG_LLVM_FUNC_ATTR_NOINLINE;
+
+        LLVMInst* llvmFunc = builder->declareFunction(llvmFuncType, linkageName, funcAttributes);
 
         UInt i = 0;
         for (auto pp = func->getFirstParam(); pp; pp = pp->getNextParam(), ++i)
         {
-            auto llvmArg = llvmFunc->getArg(i);
+            auto llvmArg = builder->getFunctionArg(llvmFunc, i);
 
             // Aliasing out and reference parameters are UB in Slang, and
             // telling this to LLVM should help with optimization.
+            uint32_t attributes = 0;
             if (as<IROutParamType>(funcType->getParamType(i)))
             {
-                llvmArg->addAttr(llvm::Attribute::WriteOnly);
-                llvmArg->addAttr(llvm::Attribute::NoAlias);
+                attributes = SLANG_LLVM_ATTR_WRITEONLY | SLANG_LLVM_ATTR_NOALIAS;
             }
             else if (as<IRBorrowInParamType>(funcType->getParamType(i)))
             {
-                llvmArg->addAttr(llvm::Attribute::ReadOnly);
-                llvmArg->addAttr(llvm::Attribute::NoAlias);
+                attributes = SLANG_LLVM_ATTR_READONLY | SLANG_LLVM_ATTR_NOALIAS;
             }
             else if (as<IRBorrowInOutParamType>(funcType->getParamType(i)))
             {
-                llvmArg->addAttr(llvm::Attribute::NoAlias);
+                attributes = SLANG_LLVM_ATTR_NOALIAS;
             }
 
-            llvm::StringRef linkageName, prettyName;
-            if (maybeGetName(&linkageName, &prettyName, pp))
-                llvmArg->setName(linkageName);
+            TerminatedCharSlice linkageName, prettyName;
+            maybeGetName(&linkageName, &prettyName, pp);
 
+            builder->setArgInfo(llvmArg, linkageName, attributes);
             mapInstToLLVM[pp] = llvmArg;
         }
-
-        // Attach attributes based on decorations!
-        if (func->findDecoration<IRReadNoneDecoration>())
-            llvmFunc->setOnlyAccessesArgMemory();
-        else if (func->findDecoration<IRForceInlineDecoration>())
-            llvmFunc->addFnAttr(llvm::Attribute::AttrKind::AlwaysInline);
-        else if (func->findDecoration<IRNoInlineDecoration>())
-            llvmFunc->addFnAttr(llvm::Attribute::AttrKind::NoInline);
 
         mapInstToLLVM[func] = llvmFunc;
         return llvmFunc;
     }
 
+    /*
     // Declares the global variable in LLVM IR and sets an initializer for it
     // if it is trivial.
     llvm::Value* emitGlobalVarDecl(IRGlobalVar* var)
@@ -3027,7 +2706,7 @@ struct LLVMEmitter
                 auto filename = as<IRStringLit>(debugSource->getFileName())->getStringSlice();
 
                 std::filesystem::path path(std::string(filename.begin(), filename.getLength()));
-                sourceDebugInfo[inst] = llvmDebugBuilder->createFile(
+                instToDebugLLVM[inst] = llvmDebugBuilder->createFile(
                     path.filename().string().c_str(),
                     path.parent_path().string().c_str(),
                     std::nullopt,
@@ -3046,34 +2725,22 @@ struct LLVMEmitter
                 emitGlobalVarDecl(globalVar);
         }
     }
+    */
 
     // Using std::string as the LLVM API works with that. It's not to be
     // ingested by Slang.
-    std::string expandIntrinsic(
-        llvm::Function* llvmFunc,
+    String expandIntrinsic(
+        LLVMInst* llvmFunc,
         IRInst* intrinsicInst,
         IRFunc* parentFunc,
         UnownedStringSlice intrinsicText)
     {
-        std::string out;
-        llvm::raw_string_ostream expanded(out);
+        String expanded;
 
         auto resultType = parentFunc->getResultType();
 
         char const* cursor = intrinsicText.begin();
         char const* end = intrinsicText.end();
-
-        // This is a bit of a hack. We add a block to the function so that
-        // it gets printed as a definition instead of a declaration, and then
-        // fill in the actual contents later in this function.
-        llvm::BasicBlock* bb = llvm::BasicBlock::Create(*llvmContext, "", llvmFunc);
-        llvmFunc->print(expanded);
-        bb->eraseFromParent();
-
-        while (out.size() > 0 && out.back() != '{')
-            out.pop_back();
-
-        expanded << "\nentry:\n";
 
         auto parseNumber = [&]()
         {
@@ -3123,12 +2790,12 @@ struct LLVMEmitter
                         {
                             IRSizeAndAlignment sizeAndAlignment =
                                 types->getSizeAndAlignment(type, defaultPointerRules);
-                            expanded << sizeAndAlignment.getStride();
+                            expanded.append(sizeAndAlignment.getStride());
                         }
                         else
                         {
                             auto llvmType = types->getType(type);
-                            llvmType->print(expanded);
+                            builder->printType(expanded, llvmType);
                         }
                     }
                     break;
@@ -3162,7 +2829,7 @@ struct LLVMEmitter
                         }
 
                         auto llvmParam = findValue(param);
-                        llvmParam->printAsOperand(expanded, d != '_');
+                        builder->printValue(expanded, llvmParam, d != '_');
                     }
                     break;
                 case '[':
@@ -3187,12 +2854,12 @@ struct LLVMEmitter
                         {
                             IRSizeAndAlignment sizeAndAlignment =
                                 types->getSizeAndAlignment(argType, defaultPointerRules);
-                            expanded << sizeAndAlignment.getStride();
+                            expanded.append(sizeAndAlignment.getStride());
                         }
                         else
                         {
                             auto llvmType = types->getType(argType);
-                            llvmType->print(expanded);
+                            builder->printType(expanded, llvmType);
                         }
 
                         SLANG_ASSERT(*cursor == ']');
@@ -3206,7 +2873,7 @@ struct LLVMEmitter
             }
             else
             {
-                expanded << *cursor;
+                expanded.appendChar(*cursor);
                 cursor++;
             }
         }
@@ -3214,24 +2881,22 @@ struct LLVMEmitter
         // If the inline IR contains an assignment to %result, we assume that a
         // corresponding return instruction needs to be added automatically.
         bool hasReturnValue = as<IRVoidType>(resultType) == nullptr;
-        bool resultFound = out.find("%result") != std::string::npos;
+        bool resultFound = expanded.indexOf("%result") >= 0;
 
         if (!hasReturnValue || resultFound)
         {
-            expanded << "\nret ";
+            expanded.append("\nret ");
             if (hasReturnValue)
             {
                 auto llvmResultType = types->getType(resultType);
-                llvmResultType->print(expanded);
-                expanded << " %result";
+                builder->printType(expanded, llvmResultType);
+                expanded.append(" %result");
             }
             else
-                expanded << "void";
+                expanded.append("void");
         }
 
-        expanded << "\n}\n";
-
-        return out;
+        return expanded;
     }
 
     // If the Slang IR function containing a target intrinsic is not fully
@@ -3267,59 +2932,19 @@ struct LLVMEmitter
 
     // This function inserts the given LLVM IR in the global scope.
     // Uses std::string due to that being what LLVM emits and ingests.
-    void emitGlobalLLVMIR(std::string& llvmTextIR)
-    {
-        llvm::SMDiagnostic diag;
-        // This creates a temporary module with only the contents of llvmTextIR.
-        std::unique_ptr<llvm::Module> sourceModule =
-            llvm::parseAssemblyString(llvmTextIR, diag, *llvmContext);
-
-        if (!sourceModule)
-        { // Failed to parse the intrinsic
-            std::string msgStr;
-            llvm::raw_string_ostream diagOut(msgStr);
-            diag.print("", diagOut, false);
-
-            msgStr = "\n" + llvmTextIR + "\n" + msgStr;
-            UnownedStringSlice msgSlice(msgStr.data(), msgStr.size());
-
-            codeGenContext->getSink()->diagnose(
-                SourceLoc(),
-                Diagnostics::snippetParsingFailed,
-                msgSlice);
-            return;
-        }
-
-        sourceModule->setDataLayout(targetMachine->createDataLayout());
-        sourceModule->setTargetTriple(targetMachine->getTargetTriple());
-
-        // Finally, we merge the contents of the temporary module back to the
-        // main llvmModule.
-        llvmLinker->linkInModule(std::move(sourceModule), llvm::Linker::OverrideFromSrc);
-    }
-
     void emitTargetIntrinsicFunction(
         IRFunc* func,
-        llvm::Function*& llvmFunc,
+        LLVMInst*& llvmFunc,
         IRInst* intrinsicInst,
         UnownedStringSlice intrinsicDef)
     {
-        llvmFunc->setLinkage(llvm::Function::LinkageTypes::ExternalLinkage);
+        String llvmTextIR = expandIntrinsic(llvmFunc, intrinsicInst, func, intrinsicDef);
 
-        std::string funcName = llvmFunc->getName().str();
-        std::string llvmTextIR = expandIntrinsic(llvmFunc, intrinsicInst, func, intrinsicDef);
-
-        emitGlobalLLVMIR(llvmTextIR);
-
-        llvmFunc = llvm::cast<llvm::Function>(llvmModule->getNamedValue(funcName));
-        llvmFunc->setLinkage(llvm::Function::LinkageTypes::PrivateLinkage);
-        // Intrinsic functions usually do nothing other than call a single
-        // instruction; we can just inline them by default.
-        llvmFunc->addFnAttr(llvm::Attribute::AttrKind::AlwaysInline);
-
-        mapInstToLLVM[func] = llvmFunc;
+        mapInstToLLVM[func] = builder->emitInlineIRFunction(
+            llvmFunc, TerminatedCharSlice(llvmTextIR.begin(), llvmTextIR.getLength()));
     }
 
+    /*
     void emitGlobalValueWithCode(
         IRGlobalValueWithCode* code,
         llvm::Function* llvmFunc,
@@ -3399,296 +3024,30 @@ struct LLVMEmitter
 
         currentLocalScope = nullptr;
     }
+    */
 
-    // Creates a function that runs a whole workgroup of the entry point.
-    // TODO: Ideally, this should vectorize over the workgroup.
-    llvm::Function* emitComputeEntryPointGroupFunc(
-        IRFunc* entryPoint,
-        llvm::Function* llvmEntryPoint,
-        IREntryPointDecoration* entryPointDecor)
-    {
-        llvmBuilder->SetCurrentDebugLocation(llvm::DebugLoc());
-
-        llvm::Type* uintType = llvmBuilder->getInt32Ty();
-
-        llvm::Type* argTypes[3] = {
-            llvmBuilder->getPtrTy(0),
-            llvmBuilder->getPtrTy(0),
-            llvmBuilder->getPtrTy(0)};
-        llvm::FunctionType* dispatchFuncType =
-            llvm::FunctionType::get(llvmBuilder->getVoidTy(), argTypes, false);
-
-        auto groupName = String(entryPointDecor->getName()->getStringSlice());
-        groupName.append("_Group");
-        llvm::Function* dispatcher = llvm::Function::Create(
-            dispatchFuncType,
-            llvm::GlobalValue::ExternalLinkage,
-            llvm::StringRef(groupName.begin(), groupName.getLength()),
-            *llvmModule);
-
-        for (auto& arg : dispatcher->args())
-            arg.addAttr(llvm::Attribute::NoAlias);
-
-        llvm::BasicBlock* entryBlock = llvm::BasicBlock::Create(*llvmContext, "entry", dispatcher);
-        llvmBuilder->SetInsertPoint(entryBlock);
-
-        // This is the data passed to the actual entry point.
-        llvm::StructType* threadVaryingInputType = llvm::StructType::get(
-            // groupID
-            llvm::VectorType::get(uintType, llvm::ElementCount::getFixed(3)),
-            // groupThreadID
-            llvm::VectorType::get(uintType, llvm::ElementCount::getFixed(3)));
-
-        // TODO: DeSPMD? That will also require scalarization of vector
-        // operations, so it should be done after everything has been emitted.
-
-        llvm::Type* groupIDType = llvm::ArrayType::get(uintType, 3);
-        llvm::Value* groupID = dispatcher->getArg(0);
-        llvm::Value* threadInput = llvmBuilder->CreateAlloca(threadVaryingInputType);
-
-        llvm::Value* threadID[3];
-
-        auto numThreadsDecor = entryPoint->findDecoration<IRNumThreadsDecoration>();
-        llvm::Value* workGroupSize[3] = {
-            llvmBuilder->getInt32(numThreadsDecor ? getIntVal(numThreadsDecor->getX()) : 1),
-            llvmBuilder->getInt32(numThreadsDecor ? getIntVal(numThreadsDecor->getY()) : 1),
-            llvmBuilder->getInt32(numThreadsDecor ? getIntVal(numThreadsDecor->getZ()) : 1)};
-
-        for (int i = 0; i < 3; ++i)
-        {
-            llvm::Value* inIndices[2] = {llvmBuilder->getInt32(0), llvmBuilder->getInt32(i)};
-
-            auto inGroupPtr = llvmBuilder->CreateGEP(groupIDType, groupID, inIndices);
-            auto inGroupID = llvmBuilder->CreateLoad(
-                uintType,
-                inGroupPtr,
-                llvm::Twine("ingroupID").concat(llvm::Twine(i)));
-
-            llvm::Value* outIndices[3] = {
-                llvmBuilder->getInt32(0),
-                llvmBuilder->getInt32(0),
-                llvmBuilder->getInt32(i)};
-            auto outGroupPtr = llvmBuilder->CreateGEP(
-                threadVaryingInputType,
-                threadInput,
-                outIndices,
-                llvm::Twine("groupID").concat(llvm::Twine(i)));
-            llvmBuilder->CreateStore(inGroupID, outGroupPtr);
-
-            outIndices[1] = llvmBuilder->getInt32(1);
-            threadID[i] = llvmBuilder->CreateGEP(
-                threadVaryingInputType,
-                threadInput,
-                outIndices,
-                llvm::Twine("threadID").concat(llvm::Twine(i)));
-        }
-
-        llvm::BasicBlock* threadEntryBlocks[3];
-        llvm::BasicBlock* threadBodyBlocks[3];
-        llvm::BasicBlock* threadEndBlocks[3];
-        llvm::BasicBlock* endBlock;
-
-        // Create all blocks first, so that they can jump around.
-        for (int i = 0; i < 3; ++i)
-        {
-            threadEntryBlocks[i] = llvm::BasicBlock::Create(
-                *llvmContext,
-                llvm::Twine("threadEntry").concat(llvm::Twine(i)),
-                dispatcher);
-            threadBodyBlocks[i] = llvm::BasicBlock::Create(
-                *llvmContext,
-                llvm::Twine("threadBody").concat(llvm::Twine(i)),
-                dispatcher);
-        }
-
-        for (int i = 2; i >= 0; --i)
-        {
-            threadEndBlocks[i] = llvm::BasicBlock::Create(
-                *llvmContext,
-                llvm::Twine("threadEnd").concat(llvm::Twine(i)),
-                dispatcher);
-        }
-        endBlock = llvm::BasicBlock::Create(*llvmContext, llvm::Twine("end"), dispatcher);
-
-        // Populate thread dispatch headers.
-        for (int i = 0; i < 3; ++i)
-        {
-            llvmBuilder->CreateStore(llvmBuilder->getInt32(0), threadID[i]);
-            llvmBuilder->CreateBr(threadEntryBlocks[i]);
-            llvmBuilder->SetInsertPoint(threadEntryBlocks[i]);
-
-            auto id = llvmBuilder->CreateLoad(uintType, threadID[i]);
-            auto cond =
-                llvmBuilder->CreateCmp(llvm::CmpInst::Predicate::ICMP_ULT, id, workGroupSize[i]);
-
-            auto merge = i == 0 ? endBlock : threadEndBlocks[i - 1];
-            llvmBuilder->CreateCondBr(cond, threadBodyBlocks[i], merge);
-            llvmBuilder->SetInsertPoint(threadBodyBlocks[i]);
-        }
-
-        // Do the call to the actual entry point function.
-        llvm::Value* args[3] = {threadInput, dispatcher->getArg(1), dispatcher->getArg(2)};
-        llvmBuilder->CreateCall(llvmEntryPoint, args);
-        llvmBuilder->CreateBr(threadEndBlocks[2]);
-
-        // Finish thread dispatch blocks
-        for (int i = 2; i >= 0; --i)
-        {
-            llvmBuilder->SetInsertPoint(threadEndBlocks[i]);
-            auto id = llvmBuilder->CreateLoad(uintType, threadID[i]);
-            auto inc = llvmBuilder->CreateAdd(id, llvmBuilder->getInt32(1));
-            llvmBuilder->CreateStore(inc, threadID[i]);
-            llvmBuilder->CreateBr(threadEntryBlocks[i]);
-        }
-
-        llvmBuilder->SetInsertPoint(endBlock);
-        llvmBuilder->CreateRetVoid();
-        return dispatcher;
-    }
-
-    // This generates a dispatching function for a given compute entry
-    // point. It runs workgroups serially.
     void emitComputeEntryPointDispatcher(
         IRFunc* entryPoint,
-        llvm::Function* llvmEntryPoint,
+        LLVMInst* llvmEntryPoint,
         IREntryPointDecoration* entryPointDecor)
     {
-        llvm::Function* groupFunc =
-            emitComputeEntryPointGroupFunc(entryPoint, llvmEntryPoint, entryPointDecor);
+        auto groupName = String(entryPointDecor->getName()->getStringSlice());
+        auto numThreadsDecor = entryPoint->findDecoration<IRNumThreadsDecoration>();
 
-        llvmBuilder->SetCurrentDebugLocation(llvm::DebugLoc());
+        LLVMInst* groupFunc = builder->emitComputeEntryPointWorkGroup(
+            llvmEntryPoint,
+            getStringLitAsSlice(entryPointDecor->getName()),
+            numThreadsDecor ? getIntVal(numThreadsDecor->getX()) : 1,
+            numThreadsDecor ? getIntVal(numThreadsDecor->getY()) : 1,
+            numThreadsDecor ? getIntVal(numThreadsDecor->getZ()) : 1,
+            32
+        );
 
-        llvm::Type* uintType = llvmBuilder->getInt32Ty();
-
-        llvm::Type* argTypes[3] = {
-            llvmBuilder->getPtrTy(0),
-            llvmBuilder->getPtrTy(0),
-            llvmBuilder->getPtrTy(0)};
-        llvm::FunctionType* dispatchFuncType =
-            llvm::FunctionType::get(llvmBuilder->getVoidTy(), argTypes, false);
-
-        auto entryPointName = entryPointDecor->getName()->getStringSlice();
-        llvm::Function* dispatcher = llvm::Function::Create(
-            dispatchFuncType,
-            llvm::GlobalValue::ExternalLinkage,
-            llvm::StringRef(entryPointName.begin(), entryPointName.getLength()),
-            *llvmModule);
-
-        for (auto& arg : dispatcher->args())
-            arg.addAttr(llvm::Attribute::NoAlias);
-
-        // This has to be ABI-compatible with the C++ target. So don't go
-        // changing this without a good reason to.
-        llvm::StructType* varyingInputType = llvm::StructType::get(
-            // startGroupID
-            llvm::ArrayType::get(uintType, 3),
-            // endGroupID
-            llvm::ArrayType::get(uintType, 3));
-
-        llvm::BasicBlock* entryBlock = llvm::BasicBlock::Create(*llvmContext, "entry", dispatcher);
-        llvmBuilder->SetInsertPoint(entryBlock);
-
-        llvm::Value* varyingInput = dispatcher->getArg(0);
-        llvm::Type* groupIDType = llvm::ArrayType::get(uintType, 3);
-        llvm::Value* groupIDVar = llvmBuilder->CreateAlloca(groupIDType);
-
-        llvm::Value* startGroupID[3];
-        llvm::Value* groupID[3];
-        llvm::Value* endGroupID[3];
-
-        for (int i = 0; i < 3; ++i)
-        {
-            llvm::Value* varyingIndices[3] = {
-                llvmBuilder->getInt32(0),
-                llvmBuilder->getInt32(0), // startGroupID && groupID
-                llvmBuilder->getInt32(i),
-            };
-
-            auto startGroupPtr =
-                llvmBuilder->CreateGEP(varyingInputType, varyingInput, varyingIndices);
-            startGroupID[i] = llvmBuilder->CreateLoad(
-                uintType,
-                startGroupPtr,
-                llvm::Twine("startGroupID").concat(llvm::Twine(i)));
-
-            llvm::Value* groupIndices[2] = {llvmBuilder->getInt32(0), llvmBuilder->getInt32(i)};
-            groupID[i] = llvmBuilder->CreateGEP(
-                groupIDType,
-                groupIDVar,
-                groupIndices,
-                llvm::Twine("groupID").concat(llvm::Twine(i)));
-            varyingIndices[1] = llvmBuilder->getInt32(1);
-            auto endGroupPtr =
-                llvmBuilder->CreateGEP(varyingInputType, varyingInput, varyingIndices);
-            endGroupID[i] = llvmBuilder->CreateLoad(
-                uintType,
-                endGroupPtr,
-                llvm::Twine("endGroupID").concat(llvm::Twine(i)));
-        }
-        // We need 3 nested loops... :(
-
-        llvm::BasicBlock* wgEntryBlocks[3];
-        llvm::BasicBlock* wgBodyBlocks[3];
-        llvm::BasicBlock* wgEndBlocks[3];
-        llvm::BasicBlock* endBlock;
-
-        // Create all blocks first, so that they can jump around.
-        for (int i = 0; i < 3; ++i)
-        {
-            wgEntryBlocks[i] = llvm::BasicBlock::Create(
-                *llvmContext,
-                llvm::Twine("dispatchEntry").concat(llvm::Twine(i)),
-                dispatcher);
-            wgBodyBlocks[i] = llvm::BasicBlock::Create(
-                *llvmContext,
-                llvm::Twine("dispatchBody").concat(llvm::Twine(i)),
-                dispatcher);
-        }
-
-        for (int i = 2; i >= 0; --i)
-        {
-            wgEndBlocks[i] = llvm::BasicBlock::Create(
-                *llvmContext,
-                llvm::Twine("dispatchEnd").concat(llvm::Twine(i)),
-                dispatcher);
-        }
-        endBlock = llvm::BasicBlock::Create(*llvmContext, llvm::Twine("end"), dispatcher);
-
-        // Populate group dispatch headers.
-        for (int i = 0; i < 3; ++i)
-        {
-            llvmBuilder->CreateStore(startGroupID[i], groupID[i]);
-            llvmBuilder->CreateBr(wgEntryBlocks[i]);
-            llvmBuilder->SetInsertPoint(wgEntryBlocks[i]);
-            auto id = llvmBuilder->CreateLoad(uintType, groupID[i]);
-            auto cond =
-                llvmBuilder->CreateCmp(llvm::CmpInst::Predicate::ICMP_ULT, id, endGroupID[i]);
-
-            auto merge = i == 0 ? endBlock : wgEndBlocks[i - 1];
-
-            llvmBuilder->CreateCondBr(cond, wgBodyBlocks[i], merge);
-            llvmBuilder->SetInsertPoint(wgBodyBlocks[i]);
-        }
-
-        // Do the call to the actual entry point function.
-        llvm::Value* args[3] = {groupIDVar, dispatcher->getArg(1), dispatcher->getArg(2)};
-        llvmBuilder->CreateCall(groupFunc, args);
-        llvmBuilder->CreateBr(wgEndBlocks[2]);
-
-        // Finish group dispatch blocks
-        for (int i = 2; i >= 0; --i)
-        {
-            llvmBuilder->SetInsertPoint(wgEndBlocks[i]);
-            auto id = llvmBuilder->CreateLoad(uintType, groupID[i]);
-            auto inc = llvmBuilder->CreateAdd(id, llvmBuilder->getInt32(1));
-            llvmBuilder->CreateStore(inc, groupID[i]);
-            llvmBuilder->CreateBr(wgEntryBlocks[i]);
-        }
-
-        llvmBuilder->SetInsertPoint(endBlock);
-        llvmBuilder->CreateRetVoid();
+        auto entryPointName = entryPointDecor->getName();
+        builder->emitComputeEntryPointDispatcher(groupFunc, getStringLitAsSlice(entryPointName));
     }
 
+    /*
     void emitFuncDefinition(IRFunc* func)
     {
         llvm::Function* llvmFunc = ensureFuncDecl(func);
