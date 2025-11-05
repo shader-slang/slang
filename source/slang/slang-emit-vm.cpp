@@ -1083,6 +1083,11 @@ public:
         }
     }
 
+    bool isUnreachableBlock(IRBlock* block)
+    {
+        return as<IRUnreachable>(block->getTerminator()) != nullptr;
+    }
+
     void emitFunction(IRFunc* func)
     {
         VMByteCodeFunctionBuilder funcBuilder;
@@ -1100,6 +1105,9 @@ public:
 
         for (auto block : func->getBlocks())
         {
+            if (isUnreachableBlock(block))
+                continue;
+
             mapBlockToByteOffset[block] = funcBuilder.code.getCount();
 
             for (auto inst : block->getChildren())

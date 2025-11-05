@@ -94,7 +94,7 @@ void lowerReinterpret(TargetProgram* target, IRModule* module, DiagnosticSink* s
     // Before processing reinterpret insts, ensure that existential types without
     // user-defined sizes have inferred sizes where possible.
     //
-    inferAnyValueSizeWhereNecessary(target, module);
+    /*inferAnyValueSizeWhereNecessary(target, module, sink);*/
 
     ReinterpretLoweringContext context;
     context.module = module;

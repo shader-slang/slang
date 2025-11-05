@@ -3509,6 +3509,7 @@ void collectParameterLists(
                         context,
                         as<DeclRefType>(thisType)->getDeclRef());
                 }
+
                 if (declRef.getDecl()->findModifier<NoDiffThisAttribute>())
                 {
                     auto noDiffAttr = context->astBuilder->getNoDiffModifierVal();
@@ -11328,15 +11329,23 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     for (auto param : paramCloneInfos)
                     {
                         typeBuilder.setInsertInto(param.clonedParam);
-                        auto paramType = param.originalParam->getFullType();
-                        // TODO: This clone seems a bit hacky..
-                        param.clonedParam->setFullType(
-                            as<IRModuleInst>(paramType->getParent())
-                                ? paramType
-                                : (IRType*)cloneInst(
-                                      &cloneEnv,
-                                      &typeBuilder,
-                                      param.originalParam->getFullType()));
+
+
+                        // If the type is present in the generic (i.e. not in module scope),
+                        // then we need to make a clone since it is likely to be dependent
+                        // on the new parameters we just emitted and we want to obtain the
+                        // effective type in the current context.
+                        //
+                        // If it's in the global scope, we're good if we use the same type.
+                        //
+                        if (!as<IRModuleInst>(param.originalParam->getFullType()->getParent()))
+                            param.clonedParam->setFullType((IRType*)cloneInst(
+                                &cloneEnv,
+                                &typeBuilder,
+                                param.originalParam->getFullType()));
+                        else
+                            param.clonedParam->setFullType(param.originalParam->getFullType());
+
                         cloneInstDecorationsAndChildren(
                             &cloneEnv,
                             typeBuilder.getModule(),

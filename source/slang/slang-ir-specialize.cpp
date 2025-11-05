@@ -5,13 +5,11 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-insts.h"
-#include "slang-ir-loop-unroll.h"
-#include "slang-ir-lower-witness-lookup-chain.h"
-#include "slang-ir-lower-witness-lookup.h"
+#include "slang-ir-lower-dynamic-dispatch-insts.h"
 #include "slang-ir-peephole.h"
 #include "slang-ir-sccp.h"
 #include "slang-ir-ssa-simplification.h"
-#include "slang-ir-typeflow-collection.h"
+#include "slang-ir-typeflow-set.h"
 #include "slang-ir-typeflow-specialize.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
@@ -176,7 +174,8 @@ struct SpecializationContext
 
         if (isWrapperType(inst))
         {
-            // For all the wrapper type, we need to make sure the operands are fully specialized.
+            // For all the wrapper type, we need to make sure the operands are fully
+            // specialized.
             return areAllOperandsFullySpecialized(inst);
         }
 
@@ -274,7 +273,7 @@ struct SpecializationContext
     // using the simple key type defined as part of the IR cloning infrastructure.
     //
     typedef IRSimpleSpecializationKey Key;
-    Dictionary<Key, IRInst*> genericSpecializations;
+    Dictionary<Key, IRSpecializationDictionaryItem*> genericSpecializations;
 
 
     // Now let's look at the task of finding or generation a
@@ -331,8 +330,7 @@ struct SpecializationContext
             // existing specialization that has been registered.
             // If one is found, our work is done.
             //
-            IRInst* specializedVal = nullptr;
-            if (genericSpecializations.tryGetValue(key, specializedVal))
+            if (auto specializedVal = tryGetDictionaryEntry(genericSpecializations, key))
                 return specializedVal;
         }
 
@@ -359,8 +357,12 @@ struct SpecializationContext
         // specializations so that we don't instantiate
         // this generic again for the same arguments.
         //
-        genericSpecializations.add(key, specializedVal);
-        addEntryToIRDictionary(kIROp_GenericSpecializationDictionary, key.vals, specializedVal);
+        genericSpecializations.add(
+            key,
+            addEntryToIRDictionary(
+                kIROp_GenericSpecializationDictionary,
+                key.vals,
+                specializedVal));
 
         return specializedVal;
     }
@@ -875,14 +877,14 @@ struct SpecializationContext
         IRInterfaceType* interfaceType = nullptr;
         if (!witnessTable)
         {
-            if (auto collection = as<IRTableCollection>(lookupInst->getWitnessTable()))
+            if (auto witnessTableSet = as<IRWitnessTableSet>(lookupInst->getWitnessTable()))
             {
                 auto requirementKey = lookupInst->getRequirementKey();
 
                 HashSet<IRInst*> satisfyingValSet;
                 bool skipSpecialization = false;
-                forEachInCollection(
-                    collection,
+                forEachInSet(
+                    witnessTableSet,
                     [&](IRInst* instElement)
                     {
                         if (auto table = as<IRWitnessTable>(instElement))
@@ -900,18 +902,32 @@ struct SpecializationContext
 
                 if (!skipSpecialization)
                 {
-                    CollectionBuilder cBuilder(lookupInst->getModule());
-                    auto newCollection = cBuilder.makeSet(satisfyingValSet);
+                    IRBuilder builder(module);
+                    auto setOp = getSetOpFromType(lookupInst->getDataType());
+                    auto newSet = builder.getSet(setOp, satisfyingValSet);
                     addUsersToWorkList(lookupInst);
-                    lookupInst->replaceUsesWith(newCollection);
-                    lookupInst->removeAndDeallocate();
+                    if (as<IRTypeSet>(newSet))
+                    {
+                        lookupInst->replaceUsesWith(builder.getUntaggedUnionType(newSet));
+                        lookupInst->removeAndDeallocate();
+                    }
+                    else if (as<IRWitnessTableSet>(newSet))
+                    {
+                        lookupInst->replaceUsesWith(newSet);
+                        lookupInst->removeAndDeallocate();
+                    }
+                    else
+                    {
+                        // Should not see any other case.
+                        SLANG_UNREACHABLE("unexpected set kind");
+                    }
+
                     return true;
                 }
                 else
                     return false;
             }
-
-            if (auto thisTypeWitness = as<IRThisTypeWitness>(lookupInst->getWitnessTable()))
+            else if (auto thisTypeWitness = as<IRThisTypeWitness>(lookupInst->getWitnessTable()))
             {
                 if (auto witnessTableType =
                         as<IRWitnessTableTypeBase>(thisTypeWitness->getDataType()))
@@ -922,9 +938,10 @@ struct SpecializationContext
                     interfaceType = as<IRInterfaceType>(witnessTableType->getConformanceType());
                 }
             }
-
-            if (!interfaceType)
+            else
+            {
                 return false;
+            }
         }
 
         // Because we have a concrete witness table, we can
@@ -1061,10 +1078,7 @@ struct SpecializationContext
                     dict.remove(key);
                 continue;
             }
-            auto value = as<typename std::remove_pointer<typename TDict::ValueType>::type>(
-                item->getOperand(0));
-            SLANG_ASSERT(value);
-            dict[key] = value;
+            dict[key] = item;
         }
 
         // Clean up the IR dictionary
@@ -1107,7 +1121,10 @@ struct SpecializationContext
         return dictInst;
     }
 
-    void addEntryToIRDictionary(IROp dictOp, const List<IRInst*>& key, IRInst* val)
+    IRSpecializationDictionaryItem* addEntryToIRDictionary(
+        IROp dictOp,
+        const List<IRInst*>& key,
+        IRInst* val)
     {
         auto dictInst = getOrCreateIRDictionary(dictOp);
         List<IRInst*> args;
@@ -1115,11 +1132,35 @@ struct SpecializationContext
         args.addRange(key);
         IRBuilder builder(module);
         builder.setInsertInto(dictInst);
-        builder.emitIntrinsicInst(
+        return cast<IRSpecializationDictionaryItem>(builder.emitIntrinsicInst(
             nullptr,
             kIROp_SpecializationDictionaryItem,
             (UInt)args.getCount(),
-            args.getBuffer());
+            args.getBuffer()));
+    }
+
+    // Look up an entry in the given specialization dictionary.
+    //
+    // Takes care of cases where the entry is not longer valid
+    // by removing the entry in the dictionary and returning null.
+    //
+    IRInst* tryGetDictionaryEntry(
+        Dictionary<IRSimpleSpecializationKey, IRSpecializationDictionaryItem*>& dict,
+        const IRSimpleSpecializationKey& key)
+    {
+        IRSpecializationDictionaryItem* item = nullptr;
+        if (dict.tryGetValue(key, item))
+        {
+            if (!as<IRUndefined>(item->getOperand(0)))
+                return item->getOperand(0);
+            else
+            {
+                dict.remove(key);
+                return nullptr;
+            }
+        }
+
+        return nullptr;
     }
 
     // All of the machinery for generic specialization
@@ -1246,10 +1287,10 @@ struct SpecializationContext
 
             // Once the work list has gone dry, we should have the invariant
             // that there are no `specialize` instructions inside of non-generic
-            // functions that in turn reference a generic type/function unless the generic is for a
-            // builtin type/function, or some of the type arguments are unknown at compile time, in
-            // which case we will rely on a follow up pass the translate it into a dynamic dispatch
-            // function.
+            // functions that in turn reference a generic type/function unless the generic is
+            // for a builtin type/function, or some of the type arguments are unknown at compile
+            // time, in which case we will rely on a follow up pass the translate it into a
+            // dynamic dispatch function.
             //
             // Now we consider lower lookupWitnessMethod insts into dynamic dispatch calls,
             // which may open up more specialization opportunities.
@@ -1260,9 +1301,7 @@ struct SpecializationContext
                 if (iterChanged)
                 {
                     eliminateDeadCode(module->getModuleInst());
-
-                    // Sync our local dictionary with the one in the IR.
-                    readSpecializationDictionaries();
+                    lowerDispatchers(module, sink);
                 }
             }
 
@@ -1305,8 +1344,9 @@ struct SpecializationContext
         return false;
     }
 
-    /// Used by `maybeSpecailizeBufferLoadCall`, this function returns a new specialized callee that
-    /// replaces a `specialize(.operator[], oldType)` to `specialize(.operator[], newElementType)`.
+    /// Used by `maybeSpecailizeBufferLoadCall`, this function returns a new specialized callee
+    /// that replaces a `specialize(.operator[], oldType)` to `specialize(.operator[],
+    /// newElementType)`.
     IRInst* getNewSpecializedBufferLoadCallee(
         IRInst* oldSpecializedCallee,
         IRType* newContainerType,
@@ -1585,18 +1625,21 @@ struct SpecializationContext
         // Once we've constructed our key, we can try to look for an
         // existing specialization of the callee that we can use.
         //
-        IRFunc* specializedCallee = nullptr;
-        if (!existentialSpecializedFuncs.tryGetValue(key, specializedCallee))
+        IRFunc* specializedCallee =
+            cast<IRFunc>(tryGetDictionaryEntry(existentialSpecializedFuncs, key));
+
+        if (!specializedCallee)
         {
             // If we didn't find a specialized callee already made, then we
             // will go ahead and create one, and then register it in our cache.
             //
             specializedCallee = createExistentialSpecializedFunc(inst, calleeFunc);
-            existentialSpecializedFuncs.add(key, specializedCallee);
-            addEntryToIRDictionary(
-                kIROp_ExistentialFuncSpecializationDictionary,
-                key.vals,
-                specializedCallee);
+            existentialSpecializedFuncs.add(
+                key,
+                addEntryToIRDictionary(
+                    kIROp_ExistentialFuncSpecializationDictionary,
+                    key.vals,
+                    specializedCallee));
         }
 
         // At this point we have found or generated a specialized version
@@ -1820,7 +1863,8 @@ struct SpecializationContext
     // In order to cache and re-use functions that have had existential-type
     // parameters specialized, we need storage for the cache.
     //
-    Dictionary<IRSimpleSpecializationKey, IRFunc*> existentialSpecializedFuncs;
+    Dictionary<IRSimpleSpecializationKey, IRSpecializationDictionaryItem*>
+        existentialSpecializedFuncs;
 
     // The logic for creating a specialized callee function by plugging
     // in concrete types for existentials is similar to other cases of
@@ -2068,8 +2112,8 @@ struct SpecializationContext
             // concrete type, we can simplify the function to return the concrete type.
             // We also need to mark the simplfiied function with a result witness decoration
             // so we can rewrite all the callsites into IRMakeExistential using the witness.
-            // This is effectively pushing the MakeExistential to the call sites, so optimizations
-            // can happen across the function call boundaries.
+            // This is effectively pushing the MakeExistential to the call sites, so
+            // optimizations can happen across the function call boundaries.
             IRInst* witnessTable = nullptr;
             IRInst* concreteType = nullptr;
             for (auto block : newFunc->getBlocks())
@@ -2626,7 +2670,8 @@ struct SpecializationContext
         }
     }
 
-    Dictionary<IRSimpleSpecializationKey, IRStructType*> existentialSpecializedStructs;
+    Dictionary<IRSimpleSpecializationKey, IRSpecializationDictionaryItem*>
+        existentialSpecializedStructs;
 
     bool maybeSpecializeBindExistentialsType(IRBindExistentialsType* type)
     {
@@ -2720,10 +2765,12 @@ struct SpecializationContext
                 key.vals.add(type->getExistentialArg(ii));
             }
 
-            IRStructType* newStructType = nullptr;
             addUsersToWorkList(type);
 
-            if (!existentialSpecializedStructs.tryGetValue(key, newStructType))
+            IRStructType* newStructType =
+                cast<IRStructType>(tryGetDictionaryEntry(existentialSpecializedStructs, key));
+
+            if (!newStructType)
             {
                 builder.setInsertBefore(baseStructType);
                 newStructType = builder.createStructType();
@@ -2751,11 +2798,12 @@ struct SpecializationContext
                     builder.createStructField(newStructType, oldField->getKey(), newFieldType);
                 }
 
-                existentialSpecializedStructs.add(key, newStructType);
-                addEntryToIRDictionary(
-                    kIROp_ExistentialTypeSpecializationDictionary,
-                    key.vals,
-                    newStructType);
+                existentialSpecializedStructs.add(
+                    key,
+                    addEntryToIRDictionary(
+                        kIROp_ExistentialTypeSpecializationDictionary,
+                        key.vals,
+                        newStructType));
             }
 
             type->replaceUsesWith(newStructType);
@@ -3158,34 +3206,59 @@ void finalizeSpecialization(IRModule* module)
     }
 }
 
-// DUPLICATE: merge.
-static bool isDynamicGeneric(IRInst* callee)
+// Evaluate a `Specialize` inst where the arguments are sets of types (or witness tables)
+// rather than concrete singleton types and the generic returns a function.
+//
+// This needs to be slightly different from the usual case because the function
+// needs dynamic information to select a specific element from each collection
+// at runtime.
+//
+// The resulting function will therefore have additional parameters at the beginning
+// to accept this information.
+//
+IRInst* specializeGenericWithSetArgs(IRSpecialize* specializeInst)
 {
-    // If the callee is a specialization, and at least one of its arguments
-    // is a type-flow-collection, then it is a dynamic generic.
+    // The high-level logic for specializing a generic to operate over collections
+    // is similar to specializing a simple generic:
+    // We "evaluate" the instructions in the first block of the generic and return
+    // the function that is returned by the generic.
     //
-    if (auto specialize = as<IRSpecialize>(callee))
-    {
-        auto generic = as<IRGeneric>(specialize->getBase());
+    // The key difference is that in the static case, all generic parameters, and instructions
+    // in the generic's body are guaranteed to be "baked out" into concrete types or witness
+    // tables.
+    //
+    // In the dynamic case, some generic parameters may turn into function parameters that
+    // accept a tag, and any lookup instructions might then have to be cloned into the function
+    // body.
+    //
+    // This is a slightly complex transformation that proceeds as follows:
+    //
+    // - Create an empty function that represents the final product.
+    //
+    // - Add any dynamic parameters of the generic to the function's first block. Keep track of
+    // the
+    //   first block for later. For now, we only treat `WitnessTableType` parameters that have
+    //   `WitnessTableSet` arguments (with atleast 2 distinct elements) as dynamic. Each such
+    //   parameter will get a corresponding parameter of `TagType(tableSet)`
+    //
+    // - Clone in the rest of the generic's body into the first block of the function.
+    //   The tricky part here is that we may have parameter types that depend on other
+    //   parameters. This is a pattern that is allowed in the generic, but not in functions.
+    //
+    //   To handle this, we maintain two cloning environments, a regular `cloneEnv` that
+    //   registers the parameters, and a `staticCloneEnv` that is a child of `cloneEnv`, but
+    //   overrides the dynamic parameters with their static collection. The `staticCloneEnv` is
+    //   used to clone in the parameter and function types, while the `cloneEnv` is used for the
+    //   rest.
+    //
+    // - When we reach the return value (i.e. the function inside the generic), we clone in the
+    // parameters
+    //   of the function into the first block, and place them _after_ the parameters derived
+    //   from the generic. Then the rest of the inner function's first block is cloned in.
+    //
+    // - All other blocks can be cloned in as usual.
+    //
 
-        // Only functions need dynamic-aware specialization.
-        if (getGenericReturnVal(generic)->getOp() != kIROp_Func)
-            return false;
-
-        for (UInt i = 0; i < specialize->getArgCount(); i++)
-        {
-            auto arg = specialize->getArg(i);
-            if (as<IRCollectionBase>(arg))
-                return true; // Found a type-flow-collection argument
-        }
-        return false; // No type-flow-collection arguments found
-    }
-
-    return false;
-}
-
-static IRInst* specializeDynamicGeneric(IRSpecialize* specializeInst)
-{
     auto generic = cast<IRGeneric>(specializeInst->getBase());
     auto genericReturnVal = findGenericReturnVal(generic);
 
@@ -3208,30 +3281,32 @@ static IRInst* specializeDynamicGeneric(IRSpecialize* specializeInst)
 
     Index argIndex = 0;
     List<IRType*> extraParamTypes;
+    OrderedDictionary<IRInst*, IRInst*> extraParamMap;
     // Map the generic's parameters to the specialized arguments.
     for (auto param : generic->getFirstBlock()->getParams())
     {
         auto specArg = specializeInst->getArg(argIndex++);
-        if (auto collection = as<IRCollectionBase>(specArg))
+        if (auto set = as<IRSetBase>(specArg))
         {
             // We're dealing with a set of types.
             if (as<IRTypeType>(param->getDataType()))
             {
-                // auto unionType = createAnyValueTypeFromInsts(collectionSet);
-                cloneEnv.mapOldValToNew[param] = collection;
+                // TODO: This case should not happen anymore.
+                cloneEnv.mapOldValToNew[param] = builder.getUntaggedUnionType(set);
             }
             else if (as<IRWitnessTableType>(param->getDataType()))
             {
                 // For cloning parameter types, we want to just use the
-                // collection.
+                // set.
                 //
-                staticCloningEnv.mapOldValToNew[param] = collection;
+                staticCloningEnv.mapOldValToNew[param] = set;
 
                 // We'll create an integer parameter for all the rest of
                 // the insts which will may need the runtime tag.
                 //
-                auto tagType = (IRType*)makeTagType(collection);
-                cloneEnv.mapOldValToNew[param] = builder.emitParam(tagType);
+                auto tagType = (IRType*)builder.getSetTagType(set);
+                // cloneEnv.mapOldValToNew[param] = builder.emitParam(tagType);
+                extraParamMap.add(param, builder.emitParam(tagType));
                 extraParamTypes.add(tagType);
             }
         }
@@ -3243,6 +3318,21 @@ static IRInst* specializeDynamicGeneric(IRSpecialize* specializeInst)
         }
     }
 
+    // The parameters we've used so far are merely tags, we can't use them directly
+    // without turning them into elements.
+    //
+    // We'll emit a `GetElementFromTag` on the parameter and map that to the original generic
+    // parameter.
+    //
+    for (auto paramPair : extraParamMap)
+    {
+        auto originalParam = paramPair.key;
+        auto newTagParam = paramPair.value;
+
+        auto getElementInst = builder.emitGetElementFromTag(newTagParam);
+        cloneEnv.mapOldValToNew[originalParam] = getElementInst;
+    }
+
     // Clone in the rest of the generic's body including the blocks of the returned func.
     for (auto inst = generic->getFirstBlock()->getFirstOrdinaryInst(); inst;
          inst = inst->getNextInst())
@@ -3252,7 +3342,12 @@ static IRInst* specializeDynamicGeneric(IRSpecialize* specializeInst)
             auto returnedFunc = cast<IRFunc>(inst);
             auto funcFirstBlock = returnedFunc->getFirstBlock();
 
-            // cloneEnv.mapOldValToNew[funcFirstBlock] = loweredFunc->getFirstBlock();
+            builder.setInsertBefore(loweredFunc->getFirstBlock());
+            for (auto decoration : returnedFunc->getDecorations())
+            {
+                cloneInst(&staticCloningEnv, &builder, decoration);
+            }
+
             builder.setInsertInto(loweredFunc);
             for (auto block : returnedFunc->getBlocks())
             {
@@ -3341,8 +3436,8 @@ IRInst* specializeGenericImpl(
     IRModule* module,
     SpecializationContext* context)
 {
-    if (isDynamicGeneric(specializeInst))
-        return specializeDynamicGeneric(specializeInst);
+    if (isSetSpecializedGeneric(specializeInst))
+        return specializeGenericWithSetArgs(specializeInst);
 
     // Effectively, specializing a generic amounts to "calling" the generic
     // on its concrete argument values and computing the
@@ -3424,14 +3519,14 @@ IRInst* specializeGenericImpl(
             {
                 auto specializedVal = findCloneForOperand(&env, returnValInst->getVal());
 
-                // Clone decorations on the orignal `specialize` inst over to the newly specialized
-                // value.
+                // Clone decorations on the orignal `specialize` inst over to the newly
+                // specialized value.
                 cloneInstDecorationsAndChildren(&env, module, specializeInst, specializedVal);
 
-                // Perform IR simplifications to fold constants in this specialized value if it is a
-                // function, so further specializations from the specialized function will have as
-                // simple specialization arguments as possible to avoid creating specializations
-                // that eventually simplified into the same thing.
+                // Perform IR simplifications to fold constants in this specialized value if it
+                // is a function, so further specializations from the specialized function will
+                // have as simple specialization arguments as possible to avoid creating
+                // specializations that eventually simplified into the same thing.
                 if (context)
                 {
                     if (auto func = as<IRFunc>(specializedVal))
@@ -3487,8 +3582,8 @@ IRInst* specializeGeneric(IRSpecialize* specializeInst)
     if (!module)
         return specializeInst;
 
-    if (isDynamicGeneric(specializeInst))
-        return specializeDynamicGeneric(specializeInst);
+    if (isSetSpecializedGeneric(specializeInst))
+        return specializeGenericWithSetArgs(specializeInst);
 
     // Standard static specialization of generic.
     return specializeGenericImpl(baseGeneric, specializeInst, module, nullptr);

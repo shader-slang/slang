@@ -31,7 +31,7 @@ IInterface factoryAB(uint id, float x)
         return B();
 }
 
-// Should lower to accept A, B, C or D (but not E)
+// Should lower to accept A, B (but not C)
 float calc(IInterface obj, float y)
 {
     return obj.calc(y);

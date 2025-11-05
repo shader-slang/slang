@@ -70,7 +70,7 @@ func fs_main(VertexOutput input)->FragmentOutput
     return output;
 }
 
-//WGSL: fn _S{{[0-9]+}}( _S{{[0-9]+}} : u32, _S{{[0-9]+}} : AnyValue8) -> f32
+//WGSL: fn s_dispatch_IShape_getArea_{{[0-9]+}}( _S{{[0-9]+}} : u32, _S{{[0-9]+}} : AnyValue8) -> f32
 //WGSL-NEXT:{
 //WGSL-DAG:            return U_SR14switch_2Dxcase6Circle7getAreap0pf_wtwrapper_0(_S{{[0-9]+}});
 //WGSL-DAG:            return U_SR14switch_2Dxcase9Rectangle7getAreap0pf_wtwrapper_0(_S{{[0-9]+}});

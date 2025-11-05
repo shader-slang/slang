@@ -1811,6 +1811,7 @@ bool isGlobalOrUnknownMutableAddress(IRGlobalValueWithCode* parentFunc, IRInst* 
     case kIROp_GlobalConstant:
     case kIROp_Var:
     case kIROp_Param:
+    case kIROp_DebugVar:
         break;
     case kIROp_Call:
         return true;
@@ -2954,6 +2955,25 @@ bool canRelaxInstOrderRule(IRInst* inst, IRInst* useOfInst)
 {
     bool isSameBlock = (inst->getParent() == useOfInst->getParent());
     return isSameBlock && isGenericParameter(useOfInst) && (useOfInst->getDataType() == inst);
+}
+
+IRIntegerValue getInterfaceAnyValueSize(IRInst* type, SourceLoc usageLoc)
+{
+    SLANG_UNUSED(usageLoc);
+
+    if (auto decor = type->findDecoration<IRAnyValueSizeDecoration>())
+    {
+        return decor->getSize();
+    }
+
+    // We could conceivably make it an error to have an interface
+    // without an `[anyValueSize(...)]` attribute, but then we risk
+    // producing error messages even when doing 100% static specialization.
+    //
+    // It is simpler to use a reasonable default size and treat any
+    // type without an explicit attribute as using that size.
+    //
+    return kDefaultAnyValueSize;
 }
 
 } // namespace Slang
