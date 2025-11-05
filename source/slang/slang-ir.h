@@ -2113,8 +2113,8 @@ public:
     // It represents the version of module regarding semantics and doesn't have
     // anything to do with serialization format
     //
-    const static UInt k_minSupportedModuleVersion = 1;
-    const static UInt k_maxSupportedModuleVersion = 4;
+    const static UInt k_minSupportedModuleVersion = 4;
+    const static UInt k_maxSupportedModuleVersion = 5;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
 private:

@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: [Windows, benchmark, self-hosted]
+    runs-on: [Windows, self-hosted, benchmark]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -30,7 +30,6 @@ jobs:
           platform: x86_64
           config: release
           build-llvm: true
-          use-cached-llvm: false
       - name: Build Slang
         run: |
           cmake --preset default --fresh -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM -DCMAKE_COMPILE_WARNING_AS_ERROR=false

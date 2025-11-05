@@ -29,6 +29,9 @@ namespace Slang
 //
 #include "slang-generated-capability-defs.h"
 
+class CapabilitySetVal;
+class ASTBuilder;
+
 // Once we have a universe of suitable capability atoms, we can define
 // the capabilities of a target as simply the set of all atomic capabilities
 // that it supports.
@@ -52,6 +55,11 @@ struct CapabilityAtomSet : UIntSet
 {
     using UIntSet::UIntSet;
 
+    CapabilityAtomSet(const UIntSet& set)
+        : UIntSet(set)
+    {
+    }
+
     CapabilityAtomSet newSetWithoutImpliedAtoms() const;
 };
 
@@ -67,6 +75,8 @@ struct CapabilityStageSet
 
     /// LinkedList of all disjoint sets for fast remove/add of unconstrained list positions.
     std::optional<CapabilityAtomSet> atomSet{};
+
+    HashCode64 getHashCode() const;
 
     void addNewSet(CapabilityAtomSet&& setToAdd)
     {
@@ -93,6 +103,8 @@ struct CapabilityTargetSet
     CapabilityAtom target{};
 
     CapabilityStageSets shaderStageSets{};
+
+    HashCode64 getHashCode() const;
 
     /// Join a compatable target set from `this` with `CapabilityTargetSet other`.
     /// Return false when `other` is fully incompatible.
@@ -169,11 +181,16 @@ public:
     /// Construct a singleton set from a single atomic capability
     explicit CapabilitySet(CapabilityName atom);
 
+    /// Construct a capability set from an optional CapabilitySetVal
+    explicit CapabilitySet(CapabilitySetVal const* other);
+
     /// Make an empty capability set
     static CapabilitySet makeEmpty();
 
     /// Make an invalid capability set (such that no target could ever support it)
     static CapabilitySet makeInvalid();
+
+    HashCode64 getHashCode() const;
 
     /// Is this capability set empty (such that any target supports it)?
     bool isEmpty() const;
@@ -406,6 +423,9 @@ public:
             return true;
         }
     }
+
+    /// Convert this mutable capability set to an immutable CapabilitySetVal
+    CapabilitySetVal* freeze(ASTBuilder* astBuilder) const;
 
 private:
     /// underlying data of CapabilitySet.
