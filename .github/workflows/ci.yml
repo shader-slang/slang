@@ -188,7 +188,7 @@ jobs:
       compiler: cl
       platform: x86_64
       config: debug
-      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+      runs-on: '["Windows", "self-hosted", "GCP-T4", "neural-test"]'
       test-category: full
       full-gpu-tests: true
 
@@ -201,7 +201,7 @@ jobs:
       compiler: cl
       platform: x86_64
       config: release
-      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+      runs-on: '["Windows", "self-hosted", "GCP-T4", "neural-test"]'
       test-category: full
       full-gpu-tests: true
 
