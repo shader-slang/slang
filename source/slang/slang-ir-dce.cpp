@@ -75,7 +75,7 @@ struct DeadCodeEliminationContext
         }
     }
 
-    IRInst* getUndefInst()
+    IRInst* getUnitPoisonVal()
     {
         if (!undefInst)
         {
@@ -84,7 +84,7 @@ struct DeadCodeEliminationContext
                 builder.setInsertBefore(firstChild);
             else
                 builder.setInsertInto(module->getModuleInst());
-            undefInst = Slang::getUndefInst(builder, module);
+            undefInst = Slang::getUnitPoisonVal(builder, module);
         }
         return undefInst;
     }
@@ -109,12 +109,20 @@ struct DeadCodeEliminationContext
             //
             markInstAsLive(root);
 
-            // Ensure there is a global undef inst that is always alive.
-            // This undef inst will be used to fill in weak-referencing uses
-            // whose used value is marked as dead and eliminated.
-            // We always make sure this undef inst is available to prevent
-            // infiniate oscilating loops.
-            markInstAsLive(getUndefInst());
+            // We will use a single instruction representing an undefined
+            // value (using the `poison` instruction) as the replacement
+            // for any lingering uses of a value that is marked as dead
+            // (those uses logically represent "weak" references to the
+            // original value, since they didn't cause it to be kept alive).
+            //
+            // We need to make sure that this unique undefined value is
+            // treated as live, because if it is allowed to be removed then
+            // the compiler can get into an infinite oscillating loop where
+            // we determine that this instruction is not live and thus try
+            // to remove it and replace it with... a new instruction that
+            // is exactly like it.
+            //
+            markInstAsLive(getUnitPoisonVal());
 
             // Marking the module as live should have
             // seeded our work list, so we can now start
@@ -233,7 +241,7 @@ struct DeadCodeEliminationContext
             //
             if (inst->hasUses())
             {
-                inst->replaceUsesWith(getUndefInst());
+                inst->replaceUsesWith(getUnitPoisonVal());
             }
 
             if (inst->getOp() == kIROp_Param)

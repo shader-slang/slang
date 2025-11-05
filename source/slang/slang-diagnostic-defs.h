@@ -301,6 +301,12 @@ DIAGNOSTIC(96, Error, kindNotLinkable, "not a known linkable kind '$0'")
 DIAGNOSTIC(97, Error, libraryDoesNotExist, "library '$0' does not exist")
 DIAGNOSTIC(98, Error, cannotAccessAsBlob, "cannot access as a blob")
 DIAGNOSTIC(99, Error, unknownDebugOption, "unknown debug option, known options are ($0)")
+DIAGNOSTIC(
+    104,
+    Error,
+    needToEnableExperimentFeature,
+    "'$0' is an experimental module, need to enable"
+    "'-experimental-feature' to load this module")
 
 //
 // 001xx - Downstream Compilers
@@ -383,13 +389,21 @@ DIAGNOSTIC(-1, Note, seeOpeningToken, "see opening '$0'")
 // 153xx - #include
 DIAGNOSTIC(15300, Error, includeFailed, "failed to find include file '$0'")
 DIAGNOSTIC(15301, Error, importFailed, "failed to find imported file '$0'")
+DIAGNOSTIC(15302, Error, cyclicInclude, "cyclic `#include` of file '$0'")
 DIAGNOSTIC(-1, Error, noIncludeHandlerSpecified, "no `#include` handler was specified")
 DIAGNOSTIC(
     15302,
     Error,
     noUniqueIdentity,
     "`#include` handler didn't generate a unique identity for file '$0'")
-
+DIAGNOSTIC(
+    15303,
+    Error,
+    cannotResolveImportedDecl,
+    "cannot resolve imported declaration '$0' from precompiled module '$1'. Make sure "
+    "module '$1' is up-to-date. If you suspect this to be a compiler bug, file an issue "
+    "on GitHub (https://github.com/shader-slang/slang/issues) or join the Slang Discord for "
+    "assistance")
 
 // 154xx - macro definition
 DIAGNOSTIC(15400, Warning, macroRedefinition, "redefinition of macro '$0'")
@@ -660,8 +674,14 @@ DIAGNOSTIC(30025, Error, invalidArraySize, "array size must be non-negative.")
 DIAGNOSTIC(
     30027,
     Error,
-    disallowedArrayOfParameterBlock,
-    "Arrays of ParameterBlock are not allowed")
+    disallowedArrayOfNonAddressableType,
+    "Arrays of non-addressable type '$0' are not allowed")
+
+DIAGNOSTIC(
+    30028,
+    Error,
+    nonAddressableTypeInStructuredBuffer,
+    "'$0' is non-addressable and cannot be used in StructuredBuffer")
 DIAGNOSTIC(
     30029,
     Error,
@@ -837,6 +857,12 @@ DIAGNOSTIC(
     Error,
     cannotTakeConstantPointers,
     "Not allowed to take the address of an immutable object")
+DIAGNOSTIC(
+    33180,
+    Error,
+    cannotSpecializeGenericWithExistential,
+    "specializing '$0' with an existential type is not allowed. All generic arguments "
+    "must be statically resolvable at compile time.")
 DIAGNOSTIC(
     30100,
     Error,
@@ -1233,11 +1259,20 @@ DIAGNOSTIC(
     subTypeHasSubsetOfAbstractAtomsToSuperType,
     "subtype '$0' must have the same target/stage support as the supertype; '$0' is missing '$1'")
 DIAGNOSTIC(
-    36118,
+    36119,
     Error,
     requirmentHasSubsetOfAbstractAtomsToImplementation,
     "requirement '$0' must have the same target/stage support as the implementation; '$0' is "
     "missing '$1'")
+
+DIAGNOSTIC(
+    36120,
+    Error,
+    targetSwitchCapCasesConflict,
+    "the capability for case '$0' is '$1', which is conflicts with previous case which requires "
+    "'$2'."
+    "In target_switch, if two cases are belong to the same target, then one capability set has to "
+    "be a subset of the other.")
 
 // Attributes
 DIAGNOSTIC(31000, Warning, unknownAttributeName, "unknown attribute '$0'")
@@ -1454,16 +1489,6 @@ DIAGNOSTIC(
     duplicateModifier,
     "modifier '$0' is redundant or conflicting with existing modifier '$1'")
 DIAGNOSTIC(31203, Error, cannotExportIncompleteType, "cannot export incomplete type '$0'")
-DIAGNOSTIC(
-    31204,
-    Error,
-    incompleteTypeCannotBeUsedInBuffer,
-    "incomplete type '$0' cannot be used in a buffer")
-DIAGNOSTIC(
-    31205,
-    Error,
-    incompleteTypeCannotBeUsedInUniformParameter,
-    "incomplete type '$0' cannot be used in a uniform parameter")
 DIAGNOSTIC(
     31206,
     Error,
@@ -1701,6 +1726,22 @@ DIAGNOSTIC(
     Error,
     invalidEqualityConstraintSupType,
     "type '$0' is not a proper type to use in a generic equality constraint.")
+DIAGNOSTIC(
+    30405,
+    Error,
+    noValidEqualityConstraintSubType,
+    "generic equality constraint requires at least one operand to be dependant on the generic "
+    "declaration")
+DIAGNOSTIC(
+    30402,
+    Note,
+    invalidEqualityConstraintSubType,
+    "type '$0' cannot be constrained by a type equality")
+DIAGNOSTIC(
+    30407,
+    Warning,
+    failedEqualityConstraintCanonicalOrder,
+    "failed to resolve canonical order of generic equality constraint.")
 
 // 305xx: initializer lists
 DIAGNOSTIC(30500, Error, tooManyInitializers, "too many initializers (expected $0, got $1)")
@@ -2087,6 +2128,18 @@ DIAGNOSTIC(
     "expected a constant value of type '$0' as argument for specialization parameter '$1'")
 
 DIAGNOSTIC(
+    38010,
+    Warning,
+    unhandledModOnEntryPointParameter,
+    "$0 on parameter '$1' is unsupported on entry point parameters and will be ignored")
+
+DIAGNOSTIC(
+    38011,
+    Error,
+    entryPointCannotReturnResourceType,
+    "entry point '$0' cannot return type '$1' that contains resource types")
+
+DIAGNOSTIC(
     38100,
     Error,
     typeDoesntImplementInterfaceRequirement,
@@ -2206,8 +2259,8 @@ DIAGNOSTIC(
 DIAGNOSTIC(
     38034,
     Error,
-    cannotUseConstRefOnDifferentiableParameter,
-    "cannot use '__constref' on a differentiable parameter.")
+    cannotUseBorrowInOnDifferentiableParameter,
+    "cannot use 'borrow in' on a differentiable parameter.")
 DIAGNOSTIC(
     38034,
     Error,
@@ -2259,6 +2312,18 @@ DIAGNOSTIC(
     Error,
     vectorWithInvalidElementCountEncountered,
     "vector has invalid element count '$0', valid values are between '$1' and '$2' inclusive")
+
+DIAGNOSTIC(
+    38204,
+    Error,
+    cannotUseResourceTypeInStructuredBuffer,
+    "StructuredBuffer element type '$0' cannot contain resource or opaque handle types")
+
+DIAGNOSTIC(
+    38205,
+    Error,
+    recursiveTypesFoundInStructuredBuffer,
+    "structured buffer element type '$0' contains recursive type references")
 
 // 39xxx - Type layout and parameter binding.
 
@@ -2446,10 +2511,7 @@ DIAGNOSTIC(
     "\"index\"] attribute to provide a binding location.")
 DIAGNOSTIC(40006, Error, unimplementedSystemValueSemantic, "unknown system-value semantic '$0'")
 
-
 DIAGNOSTIC(49999, Error, unknownSystemValueSemantic, "unknown system-value semantic '$0'")
-
-DIAGNOSTIC(40006, Error, needCompileTimeConstant, "expected a compile-time constant")
 
 DIAGNOSTIC(40007, Internal, irValidationFailed, "IR validation failed: $0")
 
@@ -2473,6 +2535,9 @@ DIAGNOSTIC(
     unconstrainedGenericParameterNotAllowedInDynamicFunction,
     "unconstrained generic paramter '$0' is not allowed in a dynamic function.")
 
+DIAGNOSTIC(40012, Error, needCompileTimeConstant, "expected a compile-time constant")
+
+DIAGNOSTIC(40013, Error, argIsNotConstexpr, "arg $0 in '$1' is not a compile-time constant")
 
 DIAGNOSTIC(
     40020,
@@ -2964,12 +3029,16 @@ DIAGNOSTIC(
     Error,
     divisionByMatrixNotSupported,
     "division by matrix is not supported for Metal and WGSL targets.")
-
 DIAGNOSTIC(
     56103,
     Error,
     int16NotSupportedInWGSL,
     "16-bit integer type '$0' is not supported by the WGSL backend.")
+DIAGNOSTIC(
+    56104,
+    Error,
+    assignToRefNotSupported,
+    "whole struct must be assiged to mesh output at once for Metal target.")
 
 DIAGNOSTIC(57001, Warning, spirvOptFailed, "spirv-opt failed. $0")
 DIAGNOSTIC(57002, Error, unknownPatchConstantParameter, "unknown patch constant parameter '$0'.")

@@ -626,6 +626,9 @@ Extensions
 `SPV_KHR_vulkan_memory_model`
 > Represents the SPIR-V extension for SPV_KHR_vulkan_memory_model.
 
+`SPV_NV_bindless_texture`
+> Represents the SPIR-V extension for SPV_NV_bindless_texture.
+
 `SPV_NV_cluster_acceleration_structure`
 > Represents the SPIR-V extension for cluster acceleration structure.
 
@@ -674,6 +677,9 @@ Extensions
 
 `spvAtomicFloat64MinMaxEXT`
 > Represents the SPIR-V capability for atomic float 64 min/max operations.
+
+`spvBindlessTextureNV`
+> Represents the SPIR-V capability for the bindless texture.
 
 `spvCooperativeMatrixBlockLoadsNV`
 > Represents the SPIR-V capability for cooperative matrix 2
@@ -1088,6 +1094,11 @@ Compound Capabilities
 
 `helper_lane`
 > Capabilities required to enable helper-lane demotion
+
+`hlsl_coopvec_poc_sm_6_9`
+> Represent compatibility support for the deprecated POC DXC, but we need to use
+> this capability to be compatible with cooperative_vector in target_switch, so
+> join '_sm_6_9' here.
 
 `hlsl_spirv`
 > HLSL, and SPIRV code-gen targets

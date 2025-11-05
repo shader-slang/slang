@@ -1,0 +1,344 @@
+name: CI Coverage Workflow
+
+on:
+  workflow_call:
+    inputs:
+      os:
+        required: true
+        type: string
+      compiler:
+        required: true
+        type: string
+      platform:
+        required: true
+        type: string
+      config:
+        required: true
+        type: string
+      runs-on:
+        required: true
+        type: string
+      build-llvm:
+        required: false
+        type: boolean
+        default: true
+      server-count:
+        required: false
+        type: number
+        default: 8
+      deploy-pages:
+        required: false
+        type: boolean
+        default: false
+      pr-comment:
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  coverage:
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    timeout-minutes: 120
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          fetch-depth: "0"
+
+      - name: Install Clang 18 and LLVM Tools
+        if: inputs.compiler == 'clang-18' && inputs.os == 'linux'
+        shell: bash
+        run: |
+          # Add LLVM APT repository
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-18 main"
+          sudo apt-get update
+
+          # Install clang-18 and LLVM coverage tools
+          sudo apt-get install -y clang-18 clang++-18 llvm-18
+
+          # Create symlinks for coverage tools (llvm-profdata, llvm-cov)
+          sudo update-alternatives --install /usr/bin/llvm-profdata llvm-profdata /usr/bin/llvm-profdata-18 100
+          sudo update-alternatives --install /usr/bin/llvm-cov llvm-cov /usr/bin/llvm-cov-18 100
+
+          # Verify installation
+          clang-18 --version
+          clang++-18 --version
+          llvm-profdata --version
+          llvm-cov --version
+
+      - name: Setup
+        uses: ./.github/actions/common-setup
+        with:
+          os: ${{ inputs.os }}
+          compiler: ${{ inputs.compiler }}
+          platform: ${{ inputs.platform }}
+          config: ${{ inputs.config }}
+          build-llvm: ${{ inputs.build-llvm }}
+
+      - name: Build Slang with Coverage
+        run: |
+          echo "cmake version: $(cmake --version)"
+          echo "Building with coverage instrumentation (preset: coverage)"
+
+          # Show ccache status if available
+          if command -v ccache &> /dev/null; then
+            echo "🔧 ccache configuration:"
+            ccache --show-config | head -20 || true
+            echo "📊 ccache statistics (pre-build):"
+            ccache --show-stats || true
+          else
+            echo "ℹ️  ccache not available"
+          fi
+
+          # Prepare ccache launcher arguments if ccache is available
+          cmake_launcher_defines=()
+          if [[ -n "${ccache_symlinks_path:-}" ]]; then
+            echo "🔧 Using ccache with launcher: ${ccache_symlinks_path}"
+            echo "🔧 CCACHE_DIR is set to: ${CCACHE_DIR:-'not set'}"
+            cmake_launcher_defines+=("-DCMAKE_C_COMPILER_LAUNCHER=${ccache_symlinks_path}")
+            cmake_launcher_defines+=("-DCMAKE_CXX_COMPILER_LAUNCHER=${ccache_symlinks_path}")
+          else
+            echo "ℹ️  ccache_symlinks_path not set - building without ccache"
+          fi
+
+          if [[ "${{ inputs.os }}" =~ "windows" && "${{ inputs.config }}" == "debug" ]]; then
+            # Doing a debug build will try to link against a release built llvm, this
+            # is a problem on Windows, so make slang-llvm in release build and use
+            # that as though it's a fetched binary via these presets.
+            cmake --workflow --preset slang-llvm
+
+            # Configure, pointing to our just-generated slang-llvm archive
+            cmake --preset coverage --fresh \
+              -DSLANG_SLANG_LLVM_FLAVOR=FETCH_BINARY \
+              "-DSLANG_SLANG_LLVM_BINARY_URL=$(pwd)/build/dist-release/slang-llvm.zip" \
+              "${cmake_launcher_defines[@]}"
+            cmake --build --preset coverage
+          elif [[ "${{ inputs.build-llvm }}" = "false" ]]; then
+            # linux aarch64 cannot build llvm.
+            cmake --preset coverage --fresh \
+              -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
+              "${cmake_launcher_defines[@]}"
+            cmake --build --preset coverage
+          else
+            # Otherwise, use the "system" llvm we have just build or got from the
+            # cache in the setup phase
+            cmake --preset coverage --fresh \
+              -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
+              "${cmake_launcher_defines[@]}"
+            cmake --build --preset coverage
+          fi
+
+          # Show ccache statistics after build
+          if command -v ccache &> /dev/null; then
+            echo "📊 ccache statistics (post-build):"
+            ccache --show-stats || true
+          fi
+
+      - name: Run Tests with Coverage
+        run: |
+          # Generate both HTML and LCOV formats
+          export COVERAGE_HTML=1
+          export COVERAGE_LCOV=1
+          export COVERAGE_HTML_DIR="$PWD/coverage-html"
+          export COVERAGE_LCOV_FILE="$PWD/coverage.lcov"
+
+          # Set SPIRV validation environment variables (same as regular CI)
+          export SLANG_RUN_SPIRV_VALIDATION=1
+          export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
+
+          # Build slang-test arguments (same as regular CI)
+          test_args=(
+            "-expected-failure-list" "tests/expected-failure-github.txt"
+            "-expected-failure-list" "tests/expected-failure-no-gpu.txt"
+            "-skip-reference-image-generation"
+            "-show-adapter-info"
+            "-ignore-abort-msg"
+            "-enable-debug-layers" "true"
+          )
+
+          # Add test server arguments if server count > 1
+          if [ "${{ inputs.server-count }}" -gt 1 ]; then
+            test_args+=("-use-test-server")
+            test_args+=("-server-count" "${{ inputs.server-count }}")
+          fi
+
+          # Run coverage with standard CI options
+          ./tools/coverage/run-coverage.sh "${test_args[@]}"
+
+      - name: Generate Coverage Summary
+        id: coverage-summary
+        run: |
+          # Extract all coverage metrics from llvm-cov report output
+          # The report was already generated by run-coverage.sh
+          BUILD_DIR="${BUILD_DIR:-build}"
+          CONFIG="${CONFIG:-RelWithDebInfo}"
+          COVERAGE_DIR="${COVERAGE_DIR:-$BUILD_DIR/coverage-data}"
+
+          if [[ "$OSTYPE" == "darwin"* ]]; then
+            LLVM_COV="${LLVM_COV:-xcrun llvm-cov}"
+            LIB_EXT="dylib"
+          else
+            LLVM_COV="${LLVM_COV:-llvm-cov}"
+            LIB_EXT="so"
+          fi
+
+          LIBSLANG="$BUILD_DIR/$CONFIG/lib/libslang.$LIB_EXT"
+
+          # Generate machine-readable coverage report
+          REPORT_OUTPUT=$($LLVM_COV report "$LIBSLANG" -instr-profile="$COVERAGE_DIR/slang-test.profdata" 2>/dev/null || echo "")
+
+          if [[ -n "$REPORT_OUTPUT" ]]; then
+            # Extract TOTALS line which contains all metrics
+            TOTALS_LINE=$(echo "$REPORT_OUTPUT" | grep "^TOTAL" | head -1)
+
+            if [[ -n "$TOTALS_LINE" ]]; then
+              # Parse the TOTALS line - format is typically:
+              # TOTAL  regions_hit regions_total region_pct  functions_hit functions_total function_pct  lines_hit lines_total line_pct  branches_hit branches_total branch_pct
+              read -r _ regions_hit regions_total region_pct functions_hit functions_total function_pct lines_hit lines_total line_pct branches_hit branches_total branch_pct <<< "$TOTALS_LINE"
+
+              # Output for GitHub Actions
+              echo "coverage=$line_pct" >> $GITHUB_OUTPUT
+
+              # Generate step summary
+              cat >> $GITHUB_STEP_SUMMARY <<EOF
+          # Coverage Report
+          - **Line Coverage:** ${line_pct}% (${lines_hit} / ${lines_total})
+          - **Region Coverage:** ${region_pct}% (${regions_hit} / ${regions_total})
+          - **Function Coverage:** ${function_pct}% (${functions_hit} / ${functions_total})
+          - **Branch Coverage:** ${branch_pct}% (${branches_hit} / ${branches_total})
+          EOF
+
+              # Save coverage summary as JSON for historical tracking
+              REPORT_DATE=$(date -u +"%Y-%m-%d")
+              COMMIT_SHORT=$(git rev-parse --short HEAD)
+              cat > coverage-summary.json <<EOF
+          {
+            "date": "${REPORT_DATE}",
+            "commit": "${COMMIT_SHORT}",
+            "platform": "${{ inputs.os }}",
+            "platform_detail": "${{ inputs.os }}-${{ inputs.platform }}",
+            "line_coverage": "${line_pct}",
+            "lines_hit": ${lines_hit},
+            "lines_found": ${lines_total},
+            "region_coverage": "${region_pct}",
+            "regions_hit": ${regions_hit},
+            "regions_found": ${regions_total},
+            "function_coverage": "${function_pct}",
+            "functions_hit": ${functions_hit},
+            "functions_found": ${functions_total},
+            "branch_coverage": "${branch_pct}",
+            "branches_hit": ${branches_hit},
+            "branches_found": ${branches_total}
+          }
+          EOF
+              echo "Saved coverage summary to coverage-summary.json"
+              cat coverage-summary.json
+            fi
+          fi
+
+      - name: Upload Coverage Artifacts for Merging
+        if: ${{ !inputs.deploy-pages }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ inputs.os }}-${{ inputs.platform }}
+          path: |
+            coverage-summary.json
+            coverage-html/
+            build/${{ inputs.config }}/coverage-data/slang-test.profdata
+            build/${{ inputs.config }}/lib/libslang.*
+          retention-days: 7
+
+      - name: Checkout Coverage Reports Repository
+        if: ${{ inputs.deploy-pages }}
+        uses: actions/checkout@v4
+        with:
+          repository: "shader-slang/slang-coverage-reports"
+          path: "coverage-repo"
+          token: ${{ secrets.SLANG_COVERAGE_REPORTS_PAT }}
+
+      - name: Deploy Coverage to Separate Repository
+        if: ${{ inputs.deploy-pages }}
+        run: |
+          # Get current date and short commit hash
+          REPORT_DATE=$(date -u +"%Y-%m-%d")
+          COMMIT_SHORT=$(git rev-parse --short HEAD)
+          FULL_COMMIT=$(git rev-parse HEAD)
+          REPORT_DIR="reports/history/${REPORT_DATE}-${COMMIT_SHORT}"
+
+          cd coverage-repo
+
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Create directory structure
+          mkdir -p "${REPORT_DIR}"
+          mkdir -p reports/latest
+
+          # Copy coverage HTML to historical location
+          cp -r ../coverage-html/* "${REPORT_DIR}/"
+
+          # Copy coverage summary JSON if it exists
+          if [[ -f ../coverage-summary.json ]]; then
+            cp ../coverage-summary.json "${REPORT_DIR}/"
+          fi
+
+          # Update latest (replace entire directory)
+          rm -rf reports/latest/*
+          cp -r ../coverage-html/* reports/latest/
+
+          # Copy coverage summary to latest
+          if [[ -f ../coverage-summary.json ]]; then
+            cp ../coverage-summary.json reports/latest/
+          fi
+
+          # Generate historical index
+          bash ../tools/coverage/generate-history-index.sh reports/history
+
+          # Generate main landing page
+          bash ../tools/coverage/generate-landing-page.sh reports
+
+          # Commit and push if there are changes
+          git add reports/
+          if ! git diff --cached --quiet; then
+            TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+            git commit -m "Add coverage report for ${REPORT_DATE} (${COMMIT_SHORT})" \
+                       -m "Generated from shader-slang/slang@${FULL_COMMIT}" \
+                       -m "Date: ${TIMESTAMP}"
+
+            git push origin main
+            echo "Coverage report deployed successfully"
+          else
+            echo "No changes to coverage report"
+          fi
+
+      - name: Report Coverage in PR
+        if: ${{ inputs.pr-comment }}
+        uses: zgosalvez/github-actions-report-lcov@v4
+        with:
+          coverage-files: coverage.lcov
+          minimum-coverage: 0
+          artifact-name: coverage-report
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          update-comment: true
+
+      - name: Compress and Upload LCOV Report
+        run: |
+          # Compress LCOV file to save space
+          gzip -9 coverage.lcov
+          echo "Compressed LCOV file:"
+          ls -lh coverage.lcov.gz
+
+      - name: Upload LCOV Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-lcov-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}
+          path: coverage.lcov.gz
+          retention-days: 7
+          compression-level: 0 # Already compressed, no need to compress again

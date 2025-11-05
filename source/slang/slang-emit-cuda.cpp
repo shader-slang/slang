@@ -214,6 +214,25 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
             out << "TensorView";
             return SLANG_OK;
         }
+    case kIROp_CoopVectorType:
+        {
+            if (isOptixCoopVec)
+            {
+                auto coopVecType = static_cast<IRCoopVectorType*>(type);
+                auto elemCount = int(getIntVal(coopVecType->getElementCount()));
+                auto elemType = coopVecType->getElementType();
+
+                out << "OptixCoopVec<" << getBuiltinTypeName(elemType->getOp()) << ", " << elemCount
+                    << ">";
+                return SLANG_OK;
+            }
+            SLANG_DIAGNOSE_UNEXPECTED(
+                getSink(),
+                SourceLoc(),
+                "Cooperative vectors should have been lowered before reaching CUDA emit for "
+                "non-OptiX targets");
+            return SLANG_FAIL;
+        }
     case kIROp_RaytracingAccelerationStructureType:
     case kIROp_HitObjectType:
         {
@@ -921,6 +940,13 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit(")");
             return true;
         }
+    case kIROp_CUDALDG:
+        {
+            m_writer->emit("__ldg(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(")");
+        }
+        return true;
     default:
         break;
     }

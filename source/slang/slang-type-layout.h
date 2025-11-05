@@ -415,20 +415,6 @@ public:
     UInt uniformAlignment = 1;
 
 
-    /// The layout for data that is conceptually owned by this type, but which is pending layout.
-    ///
-    /// When a type contains interface/existential fields (recursively), the
-    /// actual data referenced by these fields needs to get allocated somewhere,
-    /// but it cannot go inline at the point where the interface/existential
-    /// type appears, or else the layout of a composite object would change
-    /// when the concrete type(s) we plug in change.
-    ///
-    /// We solve this problem by tracking this data that is "pending" layout,
-    /// and then "flushing" the pending data at appropriate places during
-    /// the layout process.
-    ///
-    RefPtr<TypeLayout> pendingDataTypeLayout;
-
     ResourceInfo* FindResourceInfo(LayoutResourceKind kind)
     {
         for (auto& rr : resourceInfos)
@@ -611,7 +597,6 @@ public:
 
     void removeResourceUsage(LayoutResourceKind kind);
 
-    RefPtr<VarLayout> pendingVarLayout;
 
     /// Offset in binding ranges within the parent type
     ///
@@ -791,7 +776,6 @@ class ExistentialSpecializedTypeLayout : public TypeLayout
 {
 public:
     RefPtr<TypeLayout> baseTypeLayout;
-    RefPtr<VarLayout> pendingDataVarLayout;
 };
 
 /// Layout for a scoped entity like a program, module, or entry point
@@ -1183,11 +1167,11 @@ struct TypeLayoutContext
     // Options passed to object layout
     ObjectLayoutRulesImpl::Options objectLayoutOptions;
 
-    // Mangled names to DeclRefType, this is used to match up 'extern' types to
+    // Mangled names to Type, this is used to match up 'extern' types to
     // their linked in definitions during layout generation
-    std::optional<Dictionary<String, DeclRefType*>> externTypeMap;
+    std::optional<Dictionary<String, Type*>> externTypeMap;
 
-    DeclRefType* lookupExternDeclRefType(DeclRefType* declRefType);
+    Type* lookupExternDeclRefType(DeclRefType* declRefType);
     void buildExternTypeMap();
 
     LayoutRulesImpl* getRules() { return rules; }
@@ -1230,6 +1214,16 @@ struct TypeLayoutContext
             result.specializationArgs = nullptr;
         }
         return result;
+    }
+
+    IntVal* tryResolveLinkTimeVal(IntVal* inVal) const
+    {
+        if (!programLayout)
+            return inVal;
+        auto constIntVal = programLayout->getProgram()->tryFoldIntVal(inVal);
+        if (constIntVal)
+            return constIntVal;
+        return inVal;
     }
 };
 

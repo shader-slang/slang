@@ -332,7 +332,7 @@ IRInst* extractMultiByteValueAtOffset(
             restSize,
             offset + firstHalfSize);
 
-        auto resultType = builder.getUIntType();
+        IRType* resultType = builder.getUIntType();
         if (size > 4)
         {
             resultType = builder.getUInt64Type();

@@ -1619,7 +1619,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
         auto ptrType = load->getPtr()->getDataType();
         if (load->getPtr()->getOp() == kIROp_GlobalParam)
         {
-            if (ptrType->getOp() == kIROp_ConstRefType)
+            if (ptrType->getOp() == kIROp_BorrowInParamType)
                 return true;
             if (auto ptrTypeBase = as<IRPtrTypeBase>(ptrType))
             {
@@ -1679,7 +1679,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     // for GLSL), so we check this only after all those special cases are
     // considered.
     //
-    if (inst->getOp() == kIROp_Undefined)
+    if (as<IRUndefined>(inst))
         return false;
 
     // Okay, at this point we know our instruction must have a single use.
@@ -2388,7 +2388,8 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
     case kIROp_RTTIPointerType:
         break;
 
-    case kIROp_Undefined:
+    case kIROp_LoadFromUninitializedMemory:
+    case kIROp_Poison:
     case kIROp_DefaultConstruct:
         m_writer->emit(getName(inst));
         break;
@@ -2543,6 +2544,9 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
     case kIROp_CastDescriptorHandleToUInt2:
     case kIROp_CastUInt2ToDescriptorHandle:
     case kIROp_CastDescriptorHandleToResource:
+    case kIROp_CastResourceToDescriptorHandle:
+    case kIROp_CastUInt64ToDescriptorHandle:
+    case kIROp_CastDescriptorHandleToUInt64:
         emitOperand(inst->getOperand(0), outerPrec);
         break;
     // Binary ops
@@ -3242,7 +3246,8 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     case kIROp_LiveRangeEnd:
         emitLiveness(inst);
         break;
-    case kIROp_Undefined:
+    case kIROp_LoadFromUninitializedMemory:
+    case kIROp_Poison:
     case kIROp_DefaultConstruct:
         {
             auto type = inst->getDataType();
@@ -3877,24 +3882,24 @@ void CLikeSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
     // encoded as a parameter of pointer type, so
     // we need to decode that here.
     //
-    if (auto outType = as<IROutType>(type))
+    if (auto outType = as<IROutParamType>(type))
     {
         m_writer->emit("out ");
         type = outType->getValueType();
     }
-    else if (auto inOutType = as<IRInOutType>(type))
+    else if (auto inOutType = as<IRBorrowInOutParamType>(type))
     {
         m_writer->emit("inout ");
         type = inOutType->getValueType();
     }
-    else if (auto refType = as<IRRefType>(type))
+    else if (auto refType = as<IRRefParamType>(type))
     {
         // Note: There is no HLSL/GLSL equivalent for by-reference parameters,
         // so we don't actually expect to encounter these in user code.
         m_writer->emit("inout ");
         type = refType->getValueType();
     }
-    else if (auto constRefType = as<IRConstRefType>(type))
+    else if (auto constRefType = as<IRBorrowInParamType>(type))
     {
         type = constRefType->getValueType();
     }
@@ -4946,7 +4951,7 @@ void CLikeSourceEmitter::emitGlobalParam(IRGlobalParam* varDecl)
             varType = ptrType->getValueType();
             break;
         default:
-            if (as<IROutTypeBase>(ptrType))
+            if (as<IROutParamTypeBase>(ptrType))
                 varType = ptrType->getValueType();
             break;
         }

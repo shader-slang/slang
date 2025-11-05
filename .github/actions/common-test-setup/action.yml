@@ -1,0 +1,127 @@
+name: Common Test Setup
+description: "Common setup steps for Slang test jobs"
+
+inputs:
+  os:
+    required: true
+    description: "Operating system"
+  compiler:
+    required: true
+    description: "Compiler to use"
+  platform:
+    required: true
+    description: "Platform to build for"
+  config:
+    required: true
+    description: "Build configuration"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup
+      uses: ./.github/actions/common-setup
+      with:
+        os: ${{ inputs.os }}
+        compiler: ${{ inputs.compiler }}
+        platform: ${{ inputs.platform }}
+        config: ${{ inputs.config }}
+        build-llvm: false
+
+    - uses: actions/download-artifact@v4
+      with:
+        name: slang-tests-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}
+        path: github_artifact
+
+    - name: Setup environment
+      shell: bash
+      run: |
+        # Artifacts are now directly extracted to github_artifact directory
+        # Just ensure all executables are executable
+        chmod +x github_artifact/${cmake_config}/bin/* 2>/dev/null || echo "No executables to make executable"
+
+        # Set up bin_dir based on platform and config
+        bin_dir=$(pwd)/github_artifact/${cmake_config}/bin
+        echo "bin_dir=$bin_dir" >> $GITHUB_ENV
+
+        # Also set lib_dir for slangpy tests
+        lib_dir=$(pwd)/github_artifact/${cmake_config}/lib
+        echo "lib_dir=$lib_dir" >> $GITHUB_ENV
+
+        # Set up library path for runtime linking
+        if [[ "${{ inputs.os }}" == "linux" ]]; then
+          echo "LD_LIBRARY_PATH=${lib_dir}:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+        elif [[ "${{ inputs.os }}" == "macos" ]]; then
+          echo "DYLD_LIBRARY_PATH=${lib_dir}:$DYLD_LIBRARY_PATH" >> $GITHUB_ENV
+        elif [[ "${{ inputs.os }}" == "windows" ]]; then
+          # On Windows, DLLs should be in the same directory as executables or in PATH
+          # Use $GITHUB_PATH instead of $PATH for preservation across steps and
+          # avoid unix-like/windows-like path issues
+          # echo "$bin_dir" >> $GITHUB_PATH
+          # echo "$lib_dir" >> $GITHUB_PATH
+          echo "skipping setting PATH in Windows"
+        fi
+
+        # List directory contents
+        echo "Contents of bin_dir ($bin_dir):"
+        ls -a "$bin_dir" 2>/dev/null || echo "bin_dir not found"
+        echo "Contents of lib_dir ($lib_dir):"
+        ls -a "$lib_dir" 2>/dev/null || echo "lib_dir not found"
+
+    - name: Check runtime environment
+      shell: bash
+      run: |
+        echo "Checking supported backends"
+        # Capture the output of slang-test while also displaying it
+        # Add retry logic for intermittent failures
+        for attempt in 1 2 3; do
+          if smokeResult=$("$bin_dir/slang-test" "tests/render/check-backend-support-on-ci.slang" 2>&1); then
+            break
+          else
+            echo "⚠️  Attempt $attempt failed, retrying..."
+            if [ $attempt -eq 3 ]; then
+              echo "❌ ERROR: slang-test failed to run after 3 attempts"
+              echo "Output: $smokeResult"
+              exit 1
+            fi
+            sleep 2
+          fi
+        done
+        supportedBackends="$(echo "$smokeResult" | grep 'Supported backends: ')"
+        echo "$smokeResult"
+        echo "$supportedBackends"
+
+        # Check if the output contains "llvm" (case-insensitive)
+        if echo "$supportedBackends" | grep -qi "llvm"; then
+          echo "✅ LLVM backend support detected"
+        else
+          echo "❌ ERROR: LLVM backend support not detected - this is required to run the filecheck!"
+        fi
+
+        # Function to check API support
+        check_api_support() {
+          local api_list=("$@")
+          for api in "${api_list[@]}"; do
+            if echo "$smokeResult" | grep -qi "${api}: Supported"; then
+              echo "✅ ${api} API support detected"
+            else
+              echo "❌ ${api} API support not detected"
+              exit 1
+            fi
+          done
+        }
+
+        # Platform-specific API checks - fail if APIs are not available
+        if [[ "${{ inputs.os }}" == "macos" ]]; then
+          check_api_support "mtl,metal"
+        elif [[ "${{ inputs.os }}" == "windows" ]]; then
+          check_api_support "vk,vulkan" "dx12,d3d12" "dx11,d3d11" "cuda"
+
+          echo "Printing CUDA compiler version: ..."
+          nvcc --version || (echo "ERROR: CUDA compiler (nvcc) not available on Windows" && exit 1)
+          echo "Printing GPU driver version: ..."
+          nvidia-smi -q | grep Version || (echo "ERROR: NVIDIA driver (nvidia-smi) not available on Windows" && exit 1)
+          echo "Printing Vulkan SDK version: ..."
+          vulkaninfo | grep -i version || (echo "ERROR: Vulkan SDK (vulkaninfo) not available on Windows" && exit 1)
+        fi        
+        echo "All environment variables:"
+        env | sort

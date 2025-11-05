@@ -1094,98 +1094,6 @@ void serialize(S const& serializer, DeclAssociationList& value)
 }
 
 //
-// The various types used to store capabilities on declarations
-// are all semantically equivalent to simpler types.
-//
-
-// A `CapabilityAtomSet` is an optimized representation of a
-// set of a `CapabilityAtom`s (which we can encode as just
-// a sequence).
-//
-SLANG_DECLARE_FOSSILIZED_AS(CapabilityAtomSet, List<CapabilityAtom>);
-
-// A `CapabilityStateSet` can simply be encoded using its `atomSet` member.
-//
-SLANG_DECLARE_FOSSILIZED_AS_MEMBER(CapabilityStageSet, atomSet);
-
-// A `CapabilityStageSet` is really just a wrapper around a `CapabilityStageSets`
-// (which is itself just a dictionary of `CapabilityStateSet`s).
-//
-SLANG_DECLARE_FOSSILIZED_AS(CapabilityTargetSet, CapabilityStageSets);
-
-// A `CapabilitySet` is really just a wrapper around a `CapabilityTargetSets`
-// (which is itself just a dictionary of `CapabilityTargetSet`s).
-//
-SLANG_DECLARE_FOSSILIZED_AS(CapabilitySet, CapabilityTargetSets);
-
-template<typename S>
-void serialize(S const& serializer, CapabilityAtomSet& value)
-{
-    SLANG_SCOPED_SERIALIZER_ARRAY(serializer);
-    if (isWriting(serializer))
-    {
-        for (auto rawAtom : value)
-        {
-            auto atom = CapabilityAtom(rawAtom);
-            serialize(serializer, atom);
-        }
-    }
-    else
-    {
-        while (hasElements(serializer))
-        {
-            CapabilityAtom atom = CapabilityAtom(0);
-            serialize(serializer, atom);
-            value.add(UInt(atom));
-        }
-    }
-}
-
-template<typename S>
-void serialize(S const& serializer, CapabilityStageSet& value)
-{
-    serialize(serializer, value.atomSet);
-}
-
-template<typename S>
-void serialize(S const& serializer, CapabilityTargetSet& value)
-{
-    serialize(serializer, value.shaderStageSets);
-
-    // The value for each entry in `shaderStageSets` have
-    // a `stage` field that is redundant with the key for
-    // that entry. Rather than serialize the key as part
-    // of the `CapabilityStageSet` type, we instead copy
-    // it over from the key to the value in the case where
-    // we are reading.
-    //
-    if (isReading(serializer))
-    {
-        for (auto& p : value.shaderStageSets)
-            p.second.stage = p.first;
-    }
-}
-
-template<typename S>
-void serialize(S const& serializer, CapabilitySet& value)
-{
-    serialize(serializer, value.getCapabilityTargetSets());
-
-    // The value for each entry in `getCapabilityTargetSets()` have
-    // a `target` field that is redundant with the key for
-    // that entry. Rather than serialize the key as part
-    // of the `CapabilityTargetSet` type, we instead copy
-    // it over from the key to the value in the case where
-    // we are reading.
-    //
-    if (isReading(serializer))
-    {
-        for (auto& p : value.getCapabilityTargetSets())
-            p.second.target = p.first;
-    }
-}
-
-//
 // The `RequirementWitness` type is a variant, where the `m_flavor`
 // field determines what data can follow.
 //
@@ -1579,7 +1487,7 @@ void ASTSerialWriteContext::_writeImportedModule(
     ModuleDecl* moduleDecl)
 {
     ASTNodeType type = _getAsASTNodeType(PseudoASTNodeType::ImportedModule);
-    auto moduleName = moduleDecl->getName();
+    auto moduleName = String(moduleDecl->module->getName());
 
     serialize(serializer, type);
     serialize(serializer, moduleName);
@@ -1604,7 +1512,9 @@ ModuleDecl* ASTSerialReadContext::_readImportedModule(ASTSerializer const& seria
     auto module = _linkage->findOrImportModule(moduleName, _requestingSourceLoc, _sink);
     if (!module)
     {
-        SLANG_ABORT_COMPILATION("failed to load an imported module during AST deserialization");
+        if (_sink)
+            _sink->diagnose(_requestingSourceLoc, Diagnostics::importFailed, moduleName);
+        return nullptr;
     }
     return module->getModuleDecl();
 }
@@ -1638,6 +1548,9 @@ NodeBase* ASTSerialReadContext::_readImportedDecl(ASTSerializer const& serialize
     serialize(serializer, importedFromModuleDecl);
     serialize(serializer, mangledName);
 
+    if (!importedFromModuleDecl)
+        return nullptr;
+
     auto importedFromModule = importedFromModuleDecl->module;
     if (!importedFromModule)
     {
@@ -1648,8 +1561,11 @@ NodeBase* ASTSerialReadContext::_readImportedDecl(ASTSerializer const& serialize
         importedFromModule->findExportedDeclByMangledName(mangledName.getUnownedSlice());
     if (!importedDecl)
     {
-        SLANG_ABORT_COMPILATION(
-            "failed to load an imported declaration during AST deserialization");
+        _sink->diagnose(
+            SourceLoc(),
+            Diagnostics::cannotResolveImportedDecl,
+            mangledName,
+            importedFromModule->getName());
     }
     return importedDecl;
 }

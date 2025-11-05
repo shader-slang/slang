@@ -1,0 +1,238 @@
+name: CI Build Workflow
+
+on:
+  workflow_call:
+    inputs:
+      os:
+        required: true
+        type: string
+      compiler:
+        required: true
+        type: string
+      platform:
+        required: true
+        type: string
+      config:
+        required: true
+        type: string
+      runs-on:
+        required: true
+        type: string
+      warnings-as-errors:
+        required: false
+        type: boolean
+        default: true
+      build-llvm:
+        required: false
+        type: boolean
+        default: true
+      server-count:
+        required: false
+        type: number
+        default: 8
+
+jobs:
+  build:
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    timeout-minutes: 120
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          fetch-depth: "2"
+
+      - name: Setup
+        uses: ./.github/actions/common-setup
+        with:
+          os: ${{ inputs.os }}
+          compiler: ${{ inputs.compiler }}
+          platform: ${{ inputs.platform }}
+          config: ${{ inputs.config }}
+          build-llvm: ${{ inputs.build-llvm }}
+
+      # Don't need to check this on every config
+      - name: Check Stable Names Table
+        if: ${{ inputs.os == 'linux' && inputs.config == 'debug' }}
+        run: ./extras/check-ir-stable-names-gh-actions.sh
+
+      - name: Check Version Constants
+        id: check-ir-versions
+        if: ${{ inputs.os == 'linux' && inputs.config == 'debug' && github.event_name == 'pull_request' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_EVENT_PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+        run: ./extras/check-inst-version-changes.sh
+
+      - name: Upload IR version check results
+        if: ${{ steps.check-ir-versions.outputs.artifact_created == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ir-version-check-results
+          path: ir-version-check-artifact/
+          retention-days: 1
+
+      - name: Build Slang
+        run: |
+          echo "cmake version: $(cmake --version)"
+
+          # Show ccache status if available
+          if command -v ccache &> /dev/null; then
+            echo "🔧 ccache configuration:"
+            ccache --show-config | head -20 || true
+            echo "📊 ccache statistics (pre-build):"
+            ccache --show-stats || true
+          else
+            echo "ℹ️  ccache not available"
+          fi
+
+          if [[ "${{ inputs.platform }}" == "wasm" ]]; then
+            git clone https://github.com/emscripten-core/emsdk.git
+            pushd emsdk
+              ./emsdk install latest
+              ./emsdk activate latest
+              source ./emsdk_env.sh
+            popd
+            cmake --workflow --preset generators --fresh
+            mkdir generators
+            cmake --install build --config Release --component generators --prefix generators
+            emcmake cmake -DSLANG_GENERATORS_PATH=generators/bin --preset emscripten -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
+            cmake --build --preset emscripten --config "$cmake_config" --target slang-wasm
+            mkdir "build.em/$cmake_config/bin/smoke"
+            cp tests/wasm/smoke/* "build.em/$cmake_config/bin/smoke/"
+            cd "build.em/$cmake_config/bin"
+            [ -f "slang-wasm.wasm" ]
+            [ -f "slang-wasm.js" ]
+            node smoke/smoke-test.js smoke/rand_float.slang computeMain
+          else
+            # Prepare ccache launcher arguments if ccache is available
+            cmake_launcher_defines=()
+            if [[ -n "${ccache_symlinks_path:-}" ]]; then
+              echo "🔧 Using ccache with launcher: ${ccache_symlinks_path}"
+              echo "🔧 CCACHE_DIR is set to: ${CCACHE_DIR:-'not set'}"
+              cmake_launcher_defines+=("-DCMAKE_C_COMPILER_LAUNCHER=${ccache_symlinks_path}")
+              cmake_launcher_defines+=("-DCMAKE_CXX_COMPILER_LAUNCHER=${ccache_symlinks_path}")
+            else
+              echo "ℹ️  ccache_symlinks_path not set - building without ccache"
+            fi
+
+            if [[ "${{ inputs.os }}" =~ "windows" && "${{ inputs.config }}" == "debug" ]]; then
+              # Doing a debug build will try to link against a release built llvm, this
+              # is a problem on Windows, so make slang-llvm in release build and use
+              # that as though it's a fetched binary via these presets.
+              cmake --workflow --preset slang-llvm
+
+              # Configure, pointing to our just-generated slang-llvm archive
+              cmake --preset default --fresh \
+                -DSLANG_SLANG_LLVM_FLAVOR=FETCH_BINARY \
+                "-DSLANG_SLANG_LLVM_BINARY_URL=$(pwd)/build/dist-release/slang-llvm.zip" \
+                "-DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }}" \
+                "${cmake_launcher_defines[@]}"
+              cmake --workflow --preset "${{ inputs.config }}"
+            elif [[ "${{ inputs.build-llvm }}" = "false" ]]; then
+              # linux aarch64 cannot build llvm.
+              cmake --preset default --fresh \
+                -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
+                -DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }} \
+                "${cmake_launcher_defines[@]}"
+              cmake --workflow --preset "${{ inputs.config }}"
+            else
+              # Otherwise, use the "system" llvm we have just build or got from the
+              # cache in the setup phase
+              cmake --preset default --fresh \
+                -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
+                -DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }} \
+                "${cmake_launcher_defines[@]}"
+              cmake --workflow --preset "${{ inputs.config }}"
+            fi
+          fi
+
+          # Show ccache statistics after build
+          if command -v ccache &> /dev/null; then
+            echo "📊 ccache statistics (post-build):"
+            ccache --show-stats || true
+          fi
+
+      - name: Check documented compiler versions
+        run: bash extras/verify-documented-compiler-version.sh
+
+      - name: Prepare artifacts for upload
+        run: |
+          # Create a staging directory for artifacts with config-specific subdirectory
+          mkdir -p "artifacts-staging/${cmake_config}"
+
+          # Copy artifacts from the specific configuration directory
+          if [ -d "build/${cmake_config}" ]; then
+            echo "Copying artifacts from build/${cmake_config} to github_artifact/${cmake_config}..."
+
+            # Copy bin directory excluding debug files
+            if [ -d "build/${cmake_config}/bin" ]; then
+              mkdir -p "artifacts-staging/${cmake_config}/bin"
+              find "build/${cmake_config}/bin" -maxdepth 1 -type f ! -name "*.pdb" ! -name "*.ilk" ! -name "*.dwarf" ! -name "*.debug" ! -name "*.dSYM" -exec cp {} "artifacts-staging/${cmake_config}/bin/" \; || echo "Failed to copy bin directory"
+
+              cp -r "build/${cmake_config}/bin/D3D12" "artifacts-staging/${cmake_config}/bin/" || echo "Failed to copy bin/D3D12 directory"
+              cp -r "build/${cmake_config}/bin/optix" "artifacts-staging/${cmake_config}/bin/" || echo "Failed to copy bin/optix directory"
+              if [[ "${{ inputs.os }}" == "windows" ]]; then
+                # Copy the standard module directory (name includes version, e.g., slang-standard-module-2025.15.1)
+                # Use a loop to handle glob pattern expansion properly
+                found_module=false
+                for module_dir in build/${cmake_config}/bin/slang-standard-module-*; do
+                  if [ -d "$module_dir" ]; then
+                    echo "Copying standard module directory: $module_dir"
+                    cp -r "$module_dir" "artifacts-staging/${cmake_config}/bin/" && found_module=true
+                  fi
+                done
+                if [ "$found_module" = false ]; then
+                  echo "Warning: No slang-standard-module directory found in build/${cmake_config}/bin/"
+                  ls -la "build/${cmake_config}/bin/" | grep slang || true
+                fi
+              fi
+            fi
+
+            # Copy everything from lib directory
+            if [ -d "build/${cmake_config}/lib" ]; then
+              cp -r "build/${cmake_config}/lib" "artifacts-staging/${cmake_config}/" || echo "Failed to copy lib directory"
+            fi
+
+            # Copy share directory if it exists
+            if [ -d "build/${cmake_config}/share" ]; then
+              cp -r "build/${cmake_config}/share" "artifacts-staging/${cmake_config}/" || echo "Failed to copy share directory"
+            fi
+
+            # Copy include directory if it exists
+            if [ -d "build/${cmake_config}/include" ]; then
+              cp -r "build/${cmake_config}/include" "artifacts-staging/${cmake_config}/" || echo "Failed to copy include directory"
+            fi
+
+            # Copy examples directory if it exists (contains shader files for examples)
+            if [ -d "build/examples" ]; then
+              cp -r "build/examples" "artifacts-staging/" || echo "Failed to copy examples directory"
+            fi
+
+          echo "Artifacts staging directory contents (recursive):"
+          ls -laR artifacts-staging/
+          else
+            echo "Configuration directory build/${cmake_config} not found!"
+            echo "Available build directories:"
+            ls -la build/ || echo "No build directory found"
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: slang-build-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}
+          path: |
+            build/dist-${{inputs.config}}/**/ZIP/slang/*
+            build.em/Release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: slang-tests-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}
+          path: artifacts-staging/
+          retention-days: 1

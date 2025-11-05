@@ -303,6 +303,7 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
     case kIROp_WitnessTable:
     case kIROp_InterfaceType:
     case kIROp_EnumType:
+    case kIROp_SymbolAlias:
         return cloneGlobalValue(this, originalValue);
 
     case kIROp_BoolLit:
@@ -347,7 +348,6 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
             return builder->getVoidValue();
         }
         break;
-
     default:
         {
             // In the default case, assume that we have some sort of "hoistable"
@@ -1415,7 +1415,10 @@ IRInst* cloneInst(
             builder,
             cast<IRGlobalGenericParam>(originalInst),
             originalValues);
-
+    case kIROp_SymbolAlias:
+        // If we encounter a symbol alias, we want to clone
+        // the value it refers to instead of the alias itself.
+        return context->maybeCloneValue(cast<IRSymbolAlias>(originalInst)->getOperand(0));
     default:
         break;
     }
@@ -1867,7 +1870,8 @@ void convertAtomicToStorageBuffer(
                         auto funcTypeInst = (user->getOperand(0));
                         auto funcType = funcTypeInst->getFullType();
 
-                        auto paramReplacment = builder.getInOutType(builder.getUIntType());
+                        auto paramReplacment =
+                            builder.getBorrowInOutParamType(builder.getUIntType());
                         funcType->getOperand(1)->replaceUsesWith(paramReplacment);
                         builder.addForceInlineDecoration(funcTypeInst);
 

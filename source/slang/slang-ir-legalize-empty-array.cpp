@@ -50,9 +50,30 @@ struct EmptyArrayLoweringContext
         return ptr && isEmptyArray(ptr->getValueType());
     }
 
-    // Visit each instruction and replace it with legalized instructiosn if necessary.
+    // Visit each instruction and replace it with legalized instructions if necessary.
     void processInst(IRInst* inst)
     {
+        //
+        // This function is handling several different replacements at once:
+        //
+        // * Instructions that would create an empty array value are changed
+        //   to create a unit value (`void`) instead.
+        //
+        // * Instruction that would try to read an element from an empty array,
+        //   or form a pointer to such an element, instead yield a `poison`
+        //   (undefined) value. Note that they do not yield `LoadFromUninitializedMemory`
+        //   because there is no guarantee that there would be anything in the
+        //   memory corresponding to an index into an empty array.
+        //
+        // * Instructions that would try to read from an undefined pointer,
+        //   buffer, image, etc. yield `poison`.
+        //
+        // * Instructions that would try to write to an undefined pointer,
+        //   buffer, image, etc. are skipped (the behavior is undefined, so
+        //   "do nothing" is a valid choice for the behavior, which has the
+        //   nice side effect of potentially rendering other code redundant).
+        //
+
         IRInst* replacement = nullptr;
 
         IRBuilder builder(module);
@@ -65,64 +86,64 @@ struct EmptyArrayLoweringContext
             [&](IRGetElement* getElement)
             {
                 const auto base = getElement->getBase();
-                return hasEmptyArrayType(base) ? builder.emitUndefined(getElement->getDataType())
+                return hasEmptyArrayType(base) ? builder.emitPoison(getElement->getDataType())
                                                : nullptr;
             },
             [&](IRGetElementPtr* gep)
             {
                 const auto base = gep->getBase();
                 return hasEmptyArrayPtrType(gep) || hasEmptyArrayPtrType(base) ||
-                               base->getOp() == kIROp_Undefined
-                           ? builder.emitUndefined(gep->getDataType())
+                               as<IRUndefined>(base)
+                           ? builder.emitPoison(gep->getDataType())
                            : nullptr;
             },
             [&](IRFieldAddress* gep)
             {
                 const auto base = gep->getBase();
-                return hasEmptyArrayPtrType(gep) || base->getOp() == kIROp_Undefined
-                           ? builder.emitUndefined(gep->getDataType())
+                return hasEmptyArrayPtrType(gep) || as<IRUndefined>(base)
+                           ? builder.emitPoison(gep->getDataType())
                            : nullptr;
             },
             [&](IRLoad* load)
             {
-                return load->getOperand(0)->getOp() == kIROp_Undefined
-                           ? builder.emitUndefined(load->getDataType())
+                return as<IRUndefined>(load->getOperand(0))
+                           ? builder.emitPoison(load->getDataType())
                            : nullptr;
             },
             [&](IRImageLoad* load)
             {
-                return load->getOperand(0)->getOp() == kIROp_Undefined
-                           ? builder.emitUndefined(load->getDataType())
+                return as<IRUndefined>(load->getOperand(0))
+                           ? builder.emitPoison(load->getDataType())
                            : nullptr;
             },
             [&](IRStore* store)
             {
-                if (store->getPtr()->getOp() == kIROp_Undefined)
+                if (as<IRUndefined>(store->getPtr()))
                     store->removeAndDeallocate();
                 return nullptr;
             },
             [&](IRAtomicStore* store)
             {
-                if (store->getPtr()->getOp() == kIROp_Undefined)
+                if (as<IRUndefined>(store->getPtr()))
                     store->removeAndDeallocate();
                 return nullptr;
             },
             [&](IRImageStore* store)
             {
-                if (store->getImage()->getOp() == kIROp_Undefined)
+                if (as<IRUndefined>(store->getImage()))
                     store->removeAndDeallocate();
                 return nullptr;
             },
             [&](IRImageSubscript* subscript)
             {
-                return subscript->getImage()->getOp() == kIROp_Undefined
-                           ? builder.emitUndefined(subscript->getDataType())
+                return as<IRUndefined>(subscript->getImage())
+                           ? builder.emitPoison(subscript->getDataType())
                            : nullptr;
             },
             [&](IRAtomicOperation* atomic)
             {
-                return atomic->getOperand(0)->getOp() == kIROp_Undefined
-                           ? builder.emitUndefined(atomic->getDataType())
+                return as<IRUndefined>(atomic->getOperand(0))
+                           ? builder.emitPoison(atomic->getDataType())
                            : nullptr;
             },
             // The following should match any instruction which can construct a 0-sized array.

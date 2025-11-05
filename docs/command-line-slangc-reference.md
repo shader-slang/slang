@@ -820,6 +820,11 @@ Enable experimental dynamic dispatch features
 Embed downstream IR into emitted slang IR 
 
 
+<a id="experimental-feature"></a>
+### -experimental-feature
+Enable experimental features (loading builtin neural module) 
+
+
 
 <a id="Internal"></a>
 ## Internal
@@ -1207,6 +1212,7 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_KHR_cooperative_matrix` : enables the SPV_KHR_cooperative_matrix extension 
 * `SPV_NV_tensor_addressing` : enables the SPV_NV_tensor_addressing extension 
 * `SPV_NV_cooperative_matrix2` : enables the SPV_NV_cooperative_matrix2 extension 
+* `SPV_NV_bindless_texture` : enables the SPV_NV_bindless_texture extension 
 * `spvDeviceGroup` 
 * `spvAtomicFloat32AddEXT` 
 * `spvAtomicFloat16AddEXT` 
@@ -1259,7 +1265,9 @@ A capability describes an optional feature that a target may or may not support.
 * `spvQuadControlKHR` 
 * `spvVulkanMemoryModelKHR` 
 * `spvVulkanMemoryModelDeviceScopeKHR` 
+* `spvBindlessTextureNV` 
 * `metallib_latest` 
+* `hlsl_coopvec_poc_sm_6_9` 
 * `dxil_lib` 
 * `any_target` 
 * `any_textual_target` 

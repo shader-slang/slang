@@ -864,7 +864,15 @@ struct SpecializationContext
         // the result of a `specialize` instruction or other
         // operation that will yield such a table.
         //
+        // Since we unify the frontend such that all LookupDeclRef node
+        // on a interface requirement will always be lowered to lookup
+        // witness, it creats an exception that IRThisTypeWitness, a non-concrete
+        // witness table, also need to be specialized. Otherwise, there is
+        // no logic in the later passes can handle it. However, we know for
+        // sure that the IRThisTypeWitness is only used to wrap an interface
+        // type, therefore, it must be only used to exact the interface requirement.
         auto witnessTable = as<IRWitnessTable>(lookupInst->getWitnessTable());
+        IRInterfaceType* interfaceType = nullptr;
         if (!witnessTable)
         {
             if (auto collection = as<IRTableCollection>(lookupInst->getWitnessTable()))
@@ -902,10 +910,21 @@ struct SpecializationContext
                 else
                     return false;
             }
-            else
+
+            if (auto thisTypeWitness = as<IRThisTypeWitness>(lookupInst->getWitnessTable()))
             {
-                return false;
+                if (auto witnessTableType =
+                        as<IRWitnessTableTypeBase>(thisTypeWitness->getDataType()))
+                {
+                    if (!areAllOperandsFullySpecialized(witnessTableType))
+                        return false;
+
+                    interfaceType = as<IRInterfaceType>(witnessTableType->getConformanceType());
+                }
             }
+
+            if (!interfaceType)
+                return false;
         }
 
         // Because we have a concrete witness table, we can
@@ -913,7 +932,26 @@ struct SpecializationContext
         // the given interface requirement.
         //
         auto requirementKey = lookupInst->getRequirementKey();
-        auto satisfyingVal = findWitnessVal(witnessTable, requirementKey);
+        IRInst* satisfyingVal = nullptr;
+
+        if (witnessTable)
+            satisfyingVal = findWitnessVal(witnessTable, requirementKey);
+        else
+        {
+            // If we are specializing ThisTypeWitness, the result of the specialization
+            // could be a WitnessTabelType, in such case, in order to not break the generality
+            // the specialziation (we don't specialize WitnessTableType here), we will wrap it
+            // into another ThisTypeWitnes and handle it later.
+            satisfyingVal = findInterfaceRequirement(interfaceType, requirementKey);
+            if (auto witnessTableType = as<IRWitnessTableType>(satisfyingVal))
+            {
+                auto newInterfaceType = as<IRInterfaceType>(witnessTableType->getConformanceType());
+                IRBuilder builderStorage(module);
+                IRBuilder* builder = &builderStorage;
+                builder->setInsertBefore(lookupInst);
+                satisfyingVal = builder->createThisTypeWitness(newInterfaceType);
+            }
+        }
 
         // We expect to always find a satisfying value, but
         // we will go ahead and code defensively so that
@@ -979,6 +1017,7 @@ struct SpecializationContext
 
         return nullptr;
     }
+
     template<typename TDict>
     void _readSpecializationDictionaryImpl(TDict& dict, IRInst* dictInst)
     {
@@ -1005,7 +1044,7 @@ struct SpecializationContext
                 {
                     isInvalid = true;
                 }
-                else if (item->getOperand(i)->getOp() == kIROp_Undefined)
+                if (as<IRUndefined>(item->getOperand(i)))
                 {
                     isInvalid = true;
                 }
@@ -1176,7 +1215,8 @@ struct SpecializationContext
                     // top-down through the program, so that we want to process
                     // the children of an instruction in their original order.
                     //
-                    for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
+                    for (auto child = inst->getLastDecorationOrChild(); child;
+                         child = child->getPrevInst())
                     {
                         // Also note that `addToWorkList` has been written
                         // to avoid adding any instruction that is a descendent
@@ -2078,6 +2118,7 @@ struct SpecializationContext
             }
         }
 
+        fixUpDebugFuncType(newFunc);
         return newFunc;
     }
 

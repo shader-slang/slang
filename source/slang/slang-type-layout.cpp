@@ -1387,7 +1387,7 @@ LayoutRulesImpl kCPushConstantRulesImpl_ = {
 
 LayoutRulesImpl kCVaryingInputLayoutRulesImpl_ = {
     &kCLayoutRulesFamilyImpl,
-    &kGLSLVaryingOutputLayoutRulesImpl,
+    &kGLSLVaryingInputLayoutRulesImpl,
     &kGLSLObjectLayoutRulesImpl,
 };
 
@@ -2712,6 +2712,12 @@ bool isWGPUTarget(TargetRequest* targetReq)
     return isWGPUTarget(targetReq->getTarget());
 }
 
+bool isKernelTarget(CodeGenTarget codeGenTarget)
+{
+    return ArtifactDescUtil::makeDescForCompileTarget(asExternal(codeGenTarget)).style ==
+           ArtifactStyle::Kernel;
+}
+
 SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgram)
 {
     // If we are emitting directly, there is no intermediate source language
@@ -2896,21 +2902,6 @@ RefPtr<TypeLayout> applyOffsetToTypeLayout(
             break;
         }
     }
-    if (auto oldPendingTypeLayout = oldTypeLayout->pendingDataTypeLayout)
-    {
-        if (auto pendingOffsetVarLayout = offsetVarLayout->pendingVarLayout)
-        {
-            for (auto oldResInfo : oldPendingTypeLayout->resourceInfos)
-            {
-                if (const auto offsetResInfo =
-                        pendingOffsetVarLayout->FindResourceInfo(oldResInfo.kind))
-                {
-                    anyHit = true;
-                    break;
-                }
-            }
-        }
-    }
 
     if (!anyHit)
         return oldTypeLayout;
@@ -2948,36 +2939,6 @@ RefPtr<TypeLayout> applyOffsetToTypeLayout(
                 }
             }
 
-            if (auto oldPendingField = oldField->pendingVarLayout)
-            {
-                RefPtr<VarLayout> newPendingField = new VarLayout();
-                newPendingField->varDecl = oldPendingField->varDecl;
-                newPendingField->typeLayout = oldPendingField->typeLayout;
-                newPendingField->flags = oldPendingField->flags;
-                newPendingField->semanticIndex = oldPendingField->semanticIndex;
-                newPendingField->semanticName = oldPendingField->semanticName;
-                newPendingField->stage = oldPendingField->stage;
-                newPendingField->systemValueSemantic = oldPendingField->systemValueSemantic;
-                newPendingField->systemValueSemanticIndex =
-                    oldPendingField->systemValueSemanticIndex;
-
-                newField->pendingVarLayout = newPendingField;
-
-                for (auto oldResInfo : oldPendingField->resourceInfos)
-                {
-                    auto newResInfo = newPendingField->findOrAddResourceInfo(oldResInfo.kind);
-                    newResInfo->index = oldResInfo.index;
-                    newResInfo->space = oldResInfo.space;
-                    if (auto pendingOffsetVarLayout = offsetVarLayout->pendingVarLayout)
-                    {
-                        if (auto offsetResInfo =
-                                pendingOffsetVarLayout->FindResourceInfo(oldResInfo.kind))
-                        {
-                            newResInfo->index += offsetResInfo->index;
-                        }
-                    }
-                }
-            }
 
             newStructTypeLayout->fields.add(newField);
 
@@ -3009,14 +2970,6 @@ RefPtr<TypeLayout> applyOffsetToTypeLayout(
         newResInfo->count = oldResInfo.count;
     }
 
-    if (auto oldPendingTypeLayout = oldTypeLayout->pendingDataTypeLayout)
-    {
-        if (auto pendingOffsetVarLayout = offsetVarLayout->pendingVarLayout)
-        {
-            newTypeLayout->pendingDataTypeLayout =
-                applyOffsetToTypeLayout(oldPendingTypeLayout, pendingOffsetVarLayout);
-        }
-    }
 
     return newTypeLayout;
 }
@@ -3099,14 +3052,6 @@ IRVarLayout* applyOffsetToVarLayout(
     IRVarLayout::Builder adjustedLayoutBuilder(irBuilder, baseLayout->getTypeLayout());
     adjustedLayoutBuilder.cloneEverythingButOffsetsFrom(baseLayout);
 
-    if (auto basePendingLayout = baseLayout->getPendingVarLayout())
-    {
-        if (auto offsetPendingLayout = offsetLayout->getPendingVarLayout())
-        {
-            adjustedLayoutBuilder.setPendingVarLayout(
-                applyOffsetToVarLayout(irBuilder, basePendingLayout, offsetPendingLayout));
-        }
-    }
 
     for (auto baseResInfo : baseLayout->getOffsetAttrs())
     {
@@ -3486,152 +3431,6 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
     // type layout that need to get placed somwhere, but wasn't
     // included in the layout computed so far.
     //
-    // All of this is extra work we only have to do if there is
-    // "pending" data in the element type layout.
-    //
-    if (auto pendingElementTypeLayout = rawElementTypeLayout->pendingDataTypeLayout)
-    {
-        auto rules = rawElementTypeLayout->rules;
-
-        // Note that because we conservatively allocated both
-        // a constant buffer `register`/`binding` and a `space`/`set`
-        // for the container in cases where the element type
-        // might need it (which included interface/existential types),
-        // there is no need to worry about a case where `pendingElementType`
-        // could require a constant buffer `register`/`binding` or
-        // as `space`/`set` to be allocated but we didn't already
-        // allocate one in the non-pending layout.
-        //
-        // Out focus here is then on setting up the representation
-        // of the "pending" data for the element type, and in
-        // particular on dealing with any data that needs to
-        // "bleed through" to the resource usage of the overall
-        // parameter group.
-        //
-        RefPtr<VarLayout> pendingElementVarLayout = new VarLayout();
-        pendingElementVarLayout->typeLayout = pendingElementTypeLayout;
-
-        elementVarLayout->pendingVarLayout = pendingElementVarLayout;
-
-        // Any ordinary/uniform part of the pending data wil always be "masked" and
-        // needs to come after any uniform data from the original element type.
-        //
-        // To kick things off we will initialize state for `struct` type layout,
-        // so that we can lay out the pending data as if it were the second
-        // field in a structure type, after the original data.
-        //
-        UniformLayoutInfo uniformLayout = rules->BeginStructLayout();
-        if (auto resInfo = rawElementTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform))
-        {
-            uniformLayout.alignment = rawElementTypeLayout->uniformAlignment;
-            uniformLayout.size = resInfo->count;
-        }
-
-        // Now we can scan through the resources used by the pending data.
-        //
-        for (auto resInfo : pendingElementTypeLayout->resourceInfos)
-        {
-            if (resInfo.kind == LayoutResourceKind::Uniform)
-            {
-                // For the ordinary/uniform resource kind, we will add the resource
-                // usage as if it was a structure field, and then write the resulting
-                // offset into the variable layout for the pending data.
-                //
-                auto offset = rules->AddStructField(
-                    &uniformLayout,
-                    UniformLayoutInfo(resInfo.count, pendingElementTypeLayout->uniformAlignment));
-                pendingElementVarLayout->findOrAddResourceInfo(resInfo.kind)->index =
-                    offset.getFiniteValue();
-            }
-            else
-            {
-                // For all other resource kinds, we simply need to add an
-                // entry to the pending layout to represent the resource
-                // usage of the pending data.
-                //
-                pendingElementVarLayout->findOrAddResourceInfo(resInfo.kind);
-            }
-        }
-        rules->EndStructLayout(&uniformLayout);
-
-        // Okay, now we have a `VarLayout` for the element data, and an overall `TypeLayout`
-        // for all the data that this parameter group needs allocated for pending
-        // data.
-        //
-        // The next major step is to compute the version of that combined resource usage
-        // that will "bleed through" and thus needs to be allocated at the next level
-        // up the hierarchy.
-        //
-        RefPtr<TypeLayout> unmaskedPendingDataTypeLayout = new TypeLayout();
-        _addUnmaskedResourceUsage(
-            false,
-            unmaskedPendingDataTypeLayout,
-            pendingElementTypeLayout,
-            wantSpaceOrSet);
-
-        // TODO: we should probably optimize for the case where there is no unmasked
-        // usage that needs to be reported out, since it should be a common case.
-
-        // Now we need to update the type layout to  what we've done.
-        //
-        typeLayout->pendingDataTypeLayout = unmaskedPendingDataTypeLayout;
-
-        // We will now attempt to compute reasonable offset information for
-        // (non-uniform) pending data in the element type. There are basically
-        // two cases here:
-        //
-        // 1. If the resource kind is one that is "masked" by the container,
-        // then the pending data can be statically placed at an offset fater
-        // the diret (non-pending) element data.
-        //
-        // 2. If the resource kind is one that "bleeds through" to the container,
-        // then its offset will always be relative to the location that
-        // gets allocated for pending data in the container, which means it
-        // is always zero.
-        //
-        // Because the offsets are currently all set to zero, we only
-        // need to check for case (1).
-        //
-        for (auto pendingVarResInfo : pendingElementVarLayout->resourceInfos)
-        {
-            auto kind = pendingVarResInfo.kind;
-
-            // If we are looking at uniform resource usage, we already
-            // handled it easlier.
-            //
-            if (kind == LayoutResourceKind::Uniform)
-                continue;
-
-            // If the usage is unmasked, the nwe are in case (2) and should
-            // skip out.
-            //
-            if (unmaskedPendingDataTypeLayout->FindResourceInfo(kind))
-                continue;
-
-            // Okay, we have resource info for somethign that is going
-            // to be "masked" by the container, in which case we
-            // can compute a fixed offset, after any existing data
-            // of the same kind.
-            //
-            auto existingVarResInfo = elementVarLayout->FindResourceInfo(kind);
-            if (!existingVarResInfo)
-                continue;
-
-            auto existingTypeResInfo = elementVarLayout->typeLayout->FindResourceInfo(kind);
-            if (!existingTypeResInfo)
-                continue;
-
-            // TODO: We need a more robust solution than just calling
-            // `getFiniteValue` here.
-            //
-            pendingVarResInfo.index =
-                existingVarResInfo->index + existingTypeResInfo->count.getFiniteValue();
-        }
-
-        // TODO: we should probably adjust the size reported by the element type
-        // to include any "pending" data that was allocated into the group, so
-        // that it can be easier for client code to allocate their instances.
-    }
 
     // The existing Slang reflection API was created before we really
     // understood the wrinkle that the "container" and elements parts
@@ -3677,14 +3476,6 @@ static bool needsConstantBuffer(
     if (_usesOrdinaryData(elementTypeLayout))
         return true;
 
-    // We also need a constant buffer if there is any "pending"
-    // data that need ordinary/uniform data allocated to them.
-    //
-    if (auto pendingDataTypeLayout = elementTypeLayout->pendingDataTypeLayout)
-    {
-        if (_usesOrdinaryData(pendingDataTypeLayout))
-            return true;
-    }
 
     // Finally, on certain targets we always want to create
     // wrapper constant buffer layouts, even if there is no
@@ -4918,7 +4709,8 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     else if (auto vecType = as<VectorExpressionType>(type))
     {
         auto elementType = vecType->getElementType();
-        size_t elementCount = (size_t)getIntVal(vecType->getElementCount());
+        size_t elementCount =
+            (size_t)getIntVal(context.tryResolveLinkTimeVal(vecType->getElementCount()));
 
         auto element = _createTypeLayout(context, elementType);
 
@@ -4944,8 +4736,9 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     }
     else if (auto matType = as<MatrixExpressionType>(type))
     {
-        size_t rowCount = (size_t)getIntVal(matType->getRowCount());
-        size_t colCount = (size_t)getIntVal(matType->getColumnCount());
+        size_t rowCount = (size_t)getIntVal(context.tryResolveLinkTimeVal(matType->getRowCount()));
+        size_t colCount =
+            (size_t)getIntVal(context.tryResolveLinkTimeVal(matType->getColumnCount()));
 
         auto elementType = matType->getElementType();
         auto elementResult = _createTypeLayout(context, elementType);
@@ -5031,7 +4824,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             context,
             arrayType,
             arrayType->getElementType(),
-            arrayType->getElementCount());
+            context.tryResolveLinkTimeVal(arrayType->getElementCount()));
     }
     else if (auto atomicType = as<AtomicType>(type))
     {
@@ -5086,9 +4879,26 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     }
     else if (auto optionalType = as<OptionalType>(type))
     {
-        // OptionalType should be laid out the same way as Tuple<T, bool>.
-        if (isNullableType(optionalType->getValueType()))
+        // Sometimes a type `T` has an unused bit pattern that
+        // can be used to represent the null/absent optional value,
+        // and for such types the size of an `Optional<T>` can be
+        // the same as a `T`, by making use of that unused pattern.
+        //
+        if (doesTypeHaveAnUnusedBitPatternThatCanBeUsedForOptionalRepresentation(
+                optionalType->getValueType()))
             return _createTypeLayout(context, optionalType->getValueType());
+
+        // For all other types, an `Optional<T>` is laid out more-or-less
+        // as tuple of a `T` and a `bool`.
+        //
+        // TODO(tfoley): This code implements the `(T,bool)` ordering,
+        // which provides more easy opportunities to generate compact
+        // layouts by using "tail padding" than the `(bool, T)` ordering.
+        // However the "natural layout" implementation does not match
+        // what is being done here (it uses the `(bool, T)` ordering).
+        // The discrepancy should probably be fixed, but doing so would
+        // technically be a breaking change.
+        //
         Array<Type*, 2> types =
             makeArray(optionalType->getValueType(), context.astBuilder->getBoolType());
         auto tupleType = context.astBuilder->getTupleType(types.getView());
@@ -5100,7 +4910,6 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         // except that we won't have a declref to the field.
 
         StructTypeLayoutBuilder typeLayoutBuilder;
-        StructTypeLayoutBuilder pendingDataTypeLayoutBuilder;
 
         typeLayoutBuilder.beginLayout(type, rules);
         auto typeLayout = typeLayoutBuilder.getTypeLayout();
@@ -5136,34 +4945,9 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             auto fieldTypeLayout = fieldResult.layout;
 
             auto fieldVarLayout = typeLayoutBuilder.addField(DeclRef<VarDeclBase>(), fieldResult);
-
-            // If any of the members of the `Tuple` type had existential/interface
-            // type, then we need to compute a second `StructTypeLayout` that
-            // represents the layout and resource using for the "pending data"
-            // that this type needs to have stored somewhere, but which can't
-            // be laid out in the layout of the type itself.
-            //
-            if (auto fieldPendingDataTypeLayout = fieldTypeLayout->pendingDataTypeLayout)
-            {
-                // We only create this secondary layout on-demand, so that
-                // we don't end up with a bunch of empty structure type layouts
-                // created for no reason.
-                //
-                pendingDataTypeLayoutBuilder.beginLayoutIfNeeded(type, rules);
-                auto fieldPendingVarLayout = pendingDataTypeLayoutBuilder.addField(
-                    DeclRef<VarDeclBase>(),
-                    fieldPendingDataTypeLayout);
-                fieldVarLayout->pendingVarLayout = fieldPendingVarLayout;
-            }
         }
 
         typeLayoutBuilder.endLayout();
-        pendingDataTypeLayoutBuilder.endLayout();
-
-        if (auto pendingDataTypeLayout = pendingDataTypeLayoutBuilder.getTypeLayout())
-        {
-            typeLayout->pendingDataTypeLayout = pendingDataTypeLayout;
-        }
 
         return _updateLayout(context, type, typeLayoutBuilder.getTypeLayoutResult());
     }
@@ -5172,16 +4956,17 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         // If we are trying to get the layout of some extern type, do our best
         // to look it up in other loaded modules and generate the type layout
         // based on that.
-        declRefType = context.lookupExternDeclRefType(declRefType);
-        auto declRef = declRefType->getDeclRef();
+        auto resolvedType = context.lookupExternDeclRefType(declRefType);
+        if (resolvedType != type)
+            return _createTypeLayout(context, resolvedType);
 
+        auto declRef = declRefType->getDeclRef();
 
         if (auto structDeclRef = declRef.as<StructDecl>())
         {
             StructTypeLayoutBuilder typeLayoutBuilder;
-            StructTypeLayoutBuilder pendingDataTypeLayoutBuilder;
 
-            typeLayoutBuilder.beginLayout(type, rules);
+            typeLayoutBuilder.beginLayout(declRefType, rules);
             auto typeLayout = typeLayoutBuilder.getTypeLayout();
 
             _addLayout(context, type, typeLayout);
@@ -5251,33 +5036,9 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
                 auto fieldTypeLayout = fieldResult.layout;
 
                 auto fieldVarLayout = typeLayoutBuilder.addField(field, fieldResult);
-
-                // If any of the fields of the `struct` type had existential/interface
-                // type, then we need to compute a second `StructTypeLayout` that
-                // represents the layout and resource using for the "pending data"
-                // that this type needs to have stored somewhere, but which can't
-                // be laid out in the layout of the type itself.
-                //
-                if (auto fieldPendingDataTypeLayout = fieldTypeLayout->pendingDataTypeLayout)
-                {
-                    // We only create this secondary layout on-demand, so that
-                    // we don't end up with a bunch of empty structure type layouts
-                    // created for no reason.
-                    //
-                    pendingDataTypeLayoutBuilder.beginLayoutIfNeeded(type, rules);
-                    auto fieldPendingVarLayout =
-                        pendingDataTypeLayoutBuilder.addField(field, fieldPendingDataTypeLayout);
-                    fieldVarLayout->pendingVarLayout = fieldPendingVarLayout;
-                }
             }
 
             typeLayoutBuilder.endLayout();
-            pendingDataTypeLayoutBuilder.endLayout();
-
-            if (auto pendingDataTypeLayout = pendingDataTypeLayoutBuilder.getTypeLayout())
-            {
-                typeLayout->pendingDataTypeLayout = pendingDataTypeLayout;
-            }
 
             return _updateLayout(context, type, typeLayoutBuilder.getTypeLayoutResult());
         }
@@ -5503,35 +5264,6 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
                         break;
                     }
                 }
-
-                // If the value does fit, then there is nothing else to be
-                // done; the layout that would have been computed without
-                // knowing the `concreteType` is sufficient.
-                //
-                // If the value does *not* fit, then we need to figure out
-                // where the excess data will go.
-                //
-                if (!fits)
-                {
-                    // If we were doing layout for a typical CPU target, then
-                    // we could just say that the fixed-size storage contains
-                    // a data pointer to a "payload" of the data that wouldn't fit.
-                    //
-                    // We will borrow intuition from the approach, by saying that
-                    // the payload is stored somewhere else, but we will *not*
-                    // lock down where precisely "somewhere else" is going to be
-                    // at this point.
-                    //
-                    // Instead, we will store information about the layout of
-                    // the data that needs to go somewhere else, and leave it
-                    // up to the parent type/context to find a suitable place
-                    // for the data.
-                    //
-                    // Because we know the layout of the data, but not the placement,
-                    // it is considered to be a "pending" part of the type layout.
-                    //
-                    typeLayout->pendingDataTypeLayout = createTypeLayout(context, concreteType);
-                }
             }
             // Interface type occupies a uniform slot for the fixed size storage, with alignment of
             // 4 bytes.
@@ -5589,34 +5321,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
                 typeLayout->addResourceUsage(resInfo);
         }
 
-        RefPtr<VarLayout> pendingDataVarLayout = new VarLayout();
-        if (auto pendingDataTypeLayout = baseTypeLayoutResult.layout->pendingDataTypeLayout)
-        {
-            pendingDataVarLayout->typeLayout = pendingDataTypeLayout;
-            for (auto pendingResInfo : pendingDataTypeLayout->resourceInfos)
-            {
-                auto kind = pendingResInfo.kind;
-                UInt index = 0;
-                if (kind == LayoutResourceKind::Uniform)
-                {
-                    LayoutSize uniformOffset = rules->AddStructField(
-                        &info,
-                        makeTypeLayoutResult(pendingDataTypeLayout).info.getUniformLayout());
-
-                    index = uniformOffset.getFiniteValue();
-                }
-                else
-                {
-                    if (auto primaryResInfo = baseTypeLayoutResult.layout->FindResourceInfo(kind))
-                        index = primaryResInfo->count.getFiniteValue();
-                    typeLayout->addResourceUsage(pendingResInfo);
-                }
-                pendingDataVarLayout->AddResourceInfo(kind)->index = index;
-            }
-        }
-
         typeLayout->baseTypeLayout = baseTypeLayoutResult.layout;
-        typeLayout->pendingDataVarLayout = pendingDataVarLayout;
 
         typeLayout->uniformAlignment = info.alignment;
         if (info.size != 0)
@@ -5673,6 +5378,20 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
         for (int rr = 0; rr < varyingRulesCount; ++rr)
         {
             auto info = varyingRules[rr]->GetScalarLayout(baseType);
+            typeLayout->addResourceUsage(info.kind, info.size);
+        }
+
+        return typeLayout;
+    }
+    else if (as<PtrType>(type))
+    {
+        RefPtr<TypeLayout> typeLayout = new PointerTypeLayout();
+        typeLayout->type = type;
+        typeLayout->rules = rules;
+
+        for (int rr = 0; rr < varyingRulesCount; ++rr)
+        {
+            auto info = varyingRules[rr]->GetPointerLayout();
             typeLayout->addResourceUsage(info.kind, info.size);
         }
 
@@ -5855,26 +5574,71 @@ GlobalGenericParamDecl* GenericParamTypeLayout::getGlobalGenericParamDecl()
     return rsDeclRef.getDecl();
 }
 
-DeclRefType* TypeLayoutContext::lookupExternDeclRefType(DeclRefType* declRefType)
+// Get the decl ref to the outer generic if the decl referenced by `declRef` is generic.
+DeclRef<GenericDecl> getOuterGeneric(DeclRef<Decl> declRef)
+{
+    if (auto directDeclRef = as<DirectDeclRef>(declRef.declRefBase))
+    {
+        if (as<GenericDecl>(directDeclRef->getDecl()))
+            return DeclRef<GenericDecl>(directDeclRef);
+        if (as<GenericDecl>(directDeclRef->getParent()->getDecl()))
+            return DeclRef<GenericDecl>(directDeclRef->getParent());
+    }
+    else if (auto genAppDeclRef = as<GenericAppDeclRef>(declRef.declRefBase))
+    {
+        return DeclRef<GenericDecl>(genAppDeclRef->getBase());
+    }
+    return DeclRef<GenericDecl>();
+}
+
+Type* TypeLayoutContext::lookupExternDeclRefType(DeclRefType* declRefType)
 {
     const auto declRef = declRefType->getDeclRef();
     const auto decl = declRef.getDecl();
     const auto isExtern =
         decl->hasModifier<ExternAttribute>() || decl->hasModifier<ExternModifier>();
+    Type* resultType = declRefType;
     if (isExtern)
     {
         if (!externTypeMap)
             buildExternTypeMap();
         const auto mangledName = getMangledName(targetReq->getLinkage()->getASTBuilder(), decl);
-        externTypeMap->tryGetValue(mangledName, declRefType);
+        externTypeMap->tryGetValue(mangledName, resultType);
+        if (auto resolvedDeclRef = isDeclRefTypeOf<Decl>(resultType))
+        {
+            if (resolvedDeclRef != declRef)
+            {
+                // If declRef is a GenericApp, we should replace the generic base to
+                // resolveDeclRef's base.
+                if (auto originalGenericApp = as<GenericAppDeclRef>(declRef.declRefBase))
+                {
+                    if (auto resolvedOuterGeneric = getOuterGeneric(resolvedDeclRef.getDecl()))
+                    {
+                        auto substGenericApp = astBuilder->getGenericAppDeclRef(
+                            resolvedOuterGeneric,
+                            originalGenericApp->getArgs());
+                        resultType = DeclRefType::create(astBuilder, substGenericApp);
+                    }
+                }
+            }
+        }
     }
-    return declRefType;
+
+    // If the type is an alias of another type, then we should create the type layout
+    // from the aliased type instead.
+    if (auto aggTypeDeclRef = isDeclRefTypeOf<AggTypeDecl>(resultType))
+    {
+        if (auto aliasedType = as<Type>(getAliasedType(astBuilder, aggTypeDeclRef)))
+        {
+            return aliasedType;
+        }
+    }
+    return resultType;
 }
 
 void TypeLayoutContext::buildExternTypeMap()
 {
     externTypeMap.emplace();
-    const auto linkage = targetReq->getLinkage();
 
     HashSet<String> externNames;
     Dictionary<String, DeclRefType*> allTypes;
@@ -5883,6 +5647,8 @@ void TypeLayoutContext::buildExternTypeMap()
     // We'll match them up later
     auto processDecl = [&](auto&& go, Decl* decl) -> void
     {
+        if (auto genericDecl = as<GenericDecl>(decl))
+            decl = genericDecl->inner;
         const auto isExtern =
             decl->hasModifier<ExternAttribute>() || decl->hasModifier<ExternModifier>();
 
@@ -5900,7 +5666,7 @@ void TypeLayoutContext::buildExternTypeMap()
             }
         }
 
-        if (auto scopeDecl = as<ScopeDecl>(decl))
+        if (auto scopeDecl = isStaticScopeDecl(decl))
         {
             for (auto member : scopeDecl->getDirectMemberDecls())
             {
@@ -5909,7 +5675,7 @@ void TypeLayoutContext::buildExternTypeMap()
         }
     };
 
-    for (const auto& m : linkage->loadedModulesList)
+    for (const auto& m : programLayout->getProgram()->getModuleDependencies())
     {
         const auto& ast = m->getModuleDecl();
         for (auto member : ast->getDirectMemberDecls())

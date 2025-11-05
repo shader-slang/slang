@@ -1462,7 +1462,7 @@ struct DiffTransposePass
                 auto pairVal = builder->emitMakeDifferentialPair(pairType, primalVal, diffVal);
                 builder->emitStore(tempVar, pairVal);
                 args.add(tempVar);
-                argTypes.add(builder->getInOutType(pairType));
+                argTypes.add(builder->getBorrowInOutParamType(pairType));
                 argRequiresLoad.add(false);
                 writebacks.add(DiffValWriteBack{instPair->getDiff(), tempVar});
             }
@@ -1491,17 +1491,17 @@ struct DiffTransposePass
                         diffZero));
 
                 args.add(var);
-                argTypes.add(builder->getInOutType(pairType));
+                argTypes.add(builder->getBorrowInOutParamType(pairType));
                 argRequiresLoad.add(true);
             }
             else
             {
-                if (as<IROutType>(paramType))
+                if (as<IROutParamType>(paramType))
                 {
                     args.add(nullptr);
                     argRequiresLoad.add(false);
                 }
-                else if (as<IRInOutType>(paramType))
+                else if (as<IRBorrowInOutParamType>(paramType))
                 {
                     arg = builder->emitLoad(arg);
                     args.add(arg);

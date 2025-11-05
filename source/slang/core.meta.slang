@@ -146,6 +146,9 @@ interface IRangedValue
     static const This minValue;
 }
 
+__attributeTarget(ModuleDecl)
+attribute_syntax [ExperimentalModule] : ExperimentalModuleAttribute;
+
 __attributeTarget(DeclBase)
 attribute_syntax [TreatAsDifferentiable] : TreatAsDifferentiableAttribute;
 
@@ -1043,13 +1046,13 @@ matrix<T,N,M> operator?:(matrix<bool,N,M> condition, matrix<T,N,M> ifTrue, matri
     return select(condition, ifTrue, ifFalse);
 }
 
-[ForceInline]
+[__unsafeForceInlineEarly]
 __generic<T> Optional<T> select(bool condition, __none_t ifTrue, T ifFalse)
 {
     return select(condition, Optional<T>(none), Optional<T>(ifFalse));
 }
 
-[ForceInline]
+[__unsafeForceInlineEarly]
 __generic<T> Optional<T> select(bool condition, T ifTrue, __none_t ifFalse)
 {
     return select(condition, Optional<T>(ifTrue), Optional<T>(none));
@@ -1331,18 +1334,17 @@ struct __none_t
 {
 };
 
-// @hidden: this type is a BaseType since we want it to work with
-// `registerBuiltinDecl`
-__builtin_type($((int)BaseType::AddressSpace))
+/// @category misc_types
+__magic_enum(AddressSpace)
 enum AddressSpace : uint64_t
 {
     Device = $((uint64_t)AddressSpace::UserPointer),
     GroupShared = $((uint64_t)AddressSpace::GroupShared),
+    VaryingInput = $((uint64_t)AddressSpace::Input),
 };
 
-// @hidden: this type is a BaseType since we want it to work with
-// `registerBuiltinDecl`
-__builtin_type($((int)BaseType::MemoryScope))
+/// @category misc_types
+__magic_enum(MemoryScope)
 enum MemoryScope : int32_t
 {
     CrossDevice = $((int32_t)MemoryScope::CrossDevice),
@@ -1353,13 +1355,30 @@ enum MemoryScope : int32_t
     QueueFamily = $((int32_t)MemoryScope::QueueFamily),
 }
 
-// @hidden: this type is a BaseType since we want it to work with
-// `registerBuiltinDecl`
-__builtin_type($((int)BaseType::AccessQualifier))
+/// @category misc_types
+/// Describes the access permissions for a pointer type.
+__magic_enum(AccessQualifier)
 enum Access : uint64_t
 {
+    /// The data maybe read and modified through the pointer. This is the default access qualifier
+    /// for a pointer type.
     ReadWrite = $((uint64_t)AccessQualifier::ReadWrite),
+
+    /// The data being pointed to by a pointer can only be read through the pointer.
+    /// This is to be distinguished from `Immutable`, which means the data being pointed to
+    /// won't be changed by any means. In contrast, data pointed to by a `Read` pointer
+    /// may still be changed through another pointer that is not read-only.
+    /// This means that a pointer with `Read` access is meaningful only to the front-end
+    /// type system, and is not expected to provide any optimization opportunities to
+    /// the back-end.
     Read = $((uint64_t)AccessQualifier::Read),
+
+    /// The data being pointed to by a pointer is known to be immutable and won't
+    /// be changed by any means during the execution of the program. It is UB if
+    /// the data is changed during the program execution. This is a stronger
+    /// qualifier than `Read`, and may allow the backend to perform more aggressive
+    /// optimizations.
+    Immutable = $((uint64_t)AccessQualifier::Immutable),
 }
 
 //@public:
@@ -1367,11 +1386,10 @@ enum Access : uint64_t
 /// @param T The type of the value pointed to.
 /// @remarks `T* val` is equivalent to `Ptr<T> val`.
 __magic_type(PtrType)
-__intrinsic_type($(kIROp_PtrType))
 struct Ptr<
     T, 
-    Access access = Access::ReadWrite, 
-    AddressSpace addrSpace = AddressSpace::Device>
+    Access access = Access.ReadWrite, 
+    AddressSpace addrSpace = AddressSpace.Device>
 {
     // A user is allowed to explicitly cast between any pointer type of
     // the same address space
@@ -1384,39 +1402,66 @@ struct Ptr<
     __intrinsic_op($(kIROp_CastIntToPtr))
     __init(int64_t val);
 
-    // By default, getter is not an L value
+    /// Subscript a pointer to get a reference to a value.
+    ///
+    /// The pointer must reference a memory location where
+    /// N >= 0 values of type `T` are stored sequentially,
+    /// in a layout consistent with an array `T[N]`;
+    /// otherwise, this operation has undefined behavior.
+    ///
+    /// The `index` parameter must satisfy 0 <= `index` <= N;
+    /// otherwise, this operation has undefined behavior.
+    ///
     __generic<TInt : __BuiltinIntegerType>
     __subscript(TInt index) -> T
     {
+        //
+        // TODO(tfoley): The `Ptr` type's subscript operation
+        // currently provides a `ref` accessor (which returns a
+        // reference that can be used for reading or writing),
+        // independent of the `Access` that is specified by the
+        // generic arguments  of a particular pointer type. In
+        // practice, this means that subscripting a read-only
+        // pointer yields a readable *and* writable reference.
+        //
+        // Previous versions of the code module attempted to
+        // address the problem by providing a `get` accessor
+        // on all platforms, and then use an `extension` to
+        // introduce a `ref` accessor only to pointers that
+        // are known to be mutable. That approach does not work,
+        // however, because it is necessary that subscripting
+        // a pointer yields a reference (l-value), whether or not
+        // the reference is read-only.
+        //
+        // A different solution to the problem is needed, whether
+        // by splitting up read-only and read-write pointers as
+        // distinct types (as many languages do), or by allowing
+        // the subscript operation to explicitly return a reference
+        // with the same access as the pointer itself.
+        //
+
         __intrinsic_op($(kIROp_GetOffsetPtr))
         [nonmutating]
+        [__NoSideEffect]
         ref;
     }
 };
 
-extension<T, AddressSpace addrSpace> Ptr<T, Access::ReadWrite, addrSpace>
-{
-    // We have a `ref` accessor if we are ReadWrite. This means only `ReadWrite`
-    // can be used as an L-value.
-    __generic<TInt : __BuiltinIntegerType>
-    __subscript(TInt index) -> Ref<T>
-    {
-        // If a 'Ptr[index]' is referred to by a '__ref', call 'kIROp_GetOffsetPtr(index)'
-        __intrinsic_op($(kIROp_GetOffsetPtr))
-        [nonmutating]
-        ref;
-    }
-}
+/// Represents a pointer to immutable data. Immutable data is known at compile time to remain unchanged during the entire
+/// execution of the program. This knowledge allows the compiler to perform more aggressive optimizations around the memory
+/// accesses through such pointers. If the data is changed during the program execution, the behavior is undefined and loaded
+/// data through such pointers may be invalid.
+typealias ImmutablePtr<T, AddressSpace addrSpace = AddressSpace.Device> = Ptr<T, Access.Immutable, addrSpace>;
 
 //@hidden:
 __intrinsic_op($(kIROp_AlignedAttr))
-void __align_attr(int alignment);
+internal int __align_attr(int alignment);
 
 __intrinsic_op($(kIROp_Load))
-T __load_aligned<T, U>(T* ptr, U alignmentAttr);
+internal T __load_aligned<T>(T* ptr, int alignmentAttr);
 
 __intrinsic_op($(kIROp_Store))
-void __store_aligned<T, U>(T* ptr, T value, U alignmentAttr);
+internal void __store_aligned<T>(T* ptr, T value, int alignmentAttr);
 
 //@public:
 
@@ -1447,6 +1492,42 @@ T loadAligned<int alignment, T>(T* ptr)
 void storeAligned<int alignment, T>(T* ptr, T value)
 {
     __store_aligned(ptr, value, __align_attr(alignment));
+}
+
+//@hidden:
+__intrinsic_op($(kIROp_MemoryScopeAttr))
+internal int __memoryscope_attr(MemoryScope scope);
+
+__intrinsic_op($(kIROp_Load))
+internal T __load_coherent<T, Access access, AddressSpace addrSpace>(Ptr<T, access, addrSpace> ptr, int alignmentAttr, int memoryScopeAttr);
+
+__intrinsic_op($(kIROp_Store))
+internal void __store_coherent<T, AddressSpace addrSpace>(Ptr<T, Access::ReadWrite, addrSpace> ptr, T value, int alignmentAttr, int memoryScopeAttr);
+
+/// Store a value coherently to a memoryscope.
+/// Tighter memory scopes may be faster to operate on.
+/// @param ptr The pointer to store value to.
+/// @param value The value to store.
+///
+[require(SPV_KHR_vulkan_memory_model)]
+[ForceInline]
+__generic<int alignment, MemoryScope scope, T, AddressSpace addrSpace> 
+void storeCoherent(Ptr<T, Access::ReadWrite, addrSpace> ptr, T value)
+{
+    __store_coherent<T, addrSpace>(ptr, value, __align_attr(alignment), __memoryscope_attr(scope));
+}
+
+/// Load a value coherently to a memoryscope.
+/// Tighter memory scopes may be faster to operate on.
+/// @param ptr The pointer to load from.
+///
+[require(SPV_KHR_vulkan_memory_model)]
+[ForceInline]
+[__NoSideEffect]
+__generic<int alignment, MemoryScope scope, T, Access access, AddressSpace addrSpace> 
+T loadCoherent(Ptr<T, access, addrSpace> ptr)
+{
+    return __load_coherent<T, access, addrSpace>(ptr, __align_attr(alignment), __memoryscope_attr(scope));
 }
 
 ${{{
@@ -1561,28 +1642,37 @@ extension uintptr_t : IRangedValue
 }
 
 //@hidden:
-__generic<T>
-__magic_type(OutType)
-__intrinsic_type($(kIROp_OutType))
-struct Out
+
+// TODO(tfoley): This should really map over to `kIROp_PtrType`,
+// but is currently still mapping to the IR opcode used for `ref`
+// parameters.
+//
+__magic_type(ExplicitRefType)
+__intrinsic_type($(kIROp_RefParamType))
+struct Ref<
+    T, 
+    Access access = Access::ReadWrite, 
+    AddressSpace addrSpace = AddressSpace::Device>
 {};
 
-__generic<T>
-__magic_type(InOutType)
-__intrinsic_type($(kIROp_InOutType))
-struct InOut
+__magic_type(OutParamType)
+__intrinsic_type($(kIROp_OutParamType))
+struct OutParam<T>
 {};
 
-__generic<T>
-__magic_type(RefType)
-__intrinsic_type($(kIROp_RefType))
-struct Ref
+__magic_type(BorrowInOutParamType)
+__intrinsic_type($(kIROp_BorrowInOutParamType))
+struct BorrowInOutParam<T>
 {};
 
-__generic<T>
-__magic_type(ConstRefType)
-__intrinsic_type($(kIROp_ConstRefType))
-struct ConstRef
+__magic_type(RefParamType)
+__intrinsic_type($(kIROp_RefParamType))
+struct RefParam<T>
+{};
+
+__magic_type(BorrowInParamType)
+__intrinsic_type($(kIROp_BorrowInParamType))
+struct BorrowInParam<T>
 {};
 
 // __Addr<T> is AddressSpace::Generic since Slang will specalize & validate the address-space
@@ -2710,15 +2800,9 @@ for (auto op : intrinsicUnaryOps)
 }}}}
 
 // Only ReadWrite is an L-value.
-__generic<T, AddressSpace addrSpace>
+__generic<T, Access access, AddressSpace addrSpace>
 __intrinsic_op(0)
-__prefix Ref<T> operator*(Ptr<T, Access::ReadWrite, addrSpace> value);
-
-// Unknown access qualifier or Access::Read access qualifier is a promise
-// that the pointer is not going to be used as an L-value.
-__generic<$(ptrTypeParameterList)>
-__intrinsic_op(0)
-__prefix ConstRef<T> operator*($(fullPtrType) value);
+__prefix Ref<T, access, addrSpace> operator*(Ptr<T, access, addrSpace> value);
 
 // TODO: [require(cpu)]. This cannot be done yet since this change breaks slangpy
 __generic<T>
@@ -3494,7 +3578,7 @@ __prefix T operator ~(T v0);
 // IR level type traits.
 
 __generic<T>
-__intrinsic_op($(kIROp_Undefined))
+__intrinsic_op($(kIROp_Poison)) // Note: attempting to actually *use* the result of `__declVal()` will always be invalid.
 T __declVal();
 
 __generic<T>
@@ -3698,7 +3782,7 @@ struct Atomic<T : IAtomicable>
 {
     /// Atomically load the stored `T` value
     __intrinsic_op($(kIROp_AtomicLoad))
-    [__ref] T load(MemoryOrder order = MemoryOrder.Relaxed);
+    [constref] T load(MemoryOrder order = MemoryOrder.Relaxed);
 
     /// Atomically store a new `T` value
     __intrinsic_op($(kIROp_AtomicStore))

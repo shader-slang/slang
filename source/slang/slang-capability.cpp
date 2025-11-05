@@ -2,6 +2,10 @@
 #include "slang-capability.h"
 
 #include "../core/slang-dictionary.h"
+#include "slang-ast-builder.h"
+#include "slang-capability-val.h"
+
+#include <ranges>
 
 // This file implements the core of the "capability" system.
 
@@ -406,6 +410,14 @@ CapabilityAtom CapabilitySet::getUniquelyImpliedStageAtom() const
 
 CapabilitySet::CapabilitySet() {}
 
+CapabilitySet::CapabilitySet(CapabilitySetVal const* other)
+{
+    if (other)
+    {
+        *this = other->thaw();
+    }
+}
+
 CapabilitySet::CapabilitySet(Int atomCount, CapabilityName const* atoms)
 {
     for (Int i = 0; i < atomCount; i++)
@@ -707,6 +719,31 @@ bool CapabilitySet::operator==(CapabilitySet const& that) const
     return true;
 }
 
+HashCode64 CapabilityStageSet::getHashCode() const
+{
+    HashCode64 stageHash = ::Slang::getHashCode(static_cast<uint64_t>(stage));
+    HashCode64 atomSetHash = atomSet ? atomSet->getHashCode() : 0;
+    return combineHash(stageHash, atomSetHash);
+}
+
+HashCode64 CapabilityTargetSet::getHashCode() const
+{
+    HashCode64 targetHash = ::Slang::getHashCode(static_cast<uint64_t>(target));
+    // The key and the "target" member of the target sets are always the same,
+    // so we can just hash the values
+    auto stageSetsView = shaderStageSets | std::views::values;
+    HashCode64 stageSetsHash = symmetricHash(stageSetsView.begin(), stageSetsView.end());
+    return combineHash(targetHash, stageSetsHash);
+}
+
+HashCode64 CapabilitySet::getHashCode() const
+{
+    // The key and the "target" member of the target sets are always the same,
+    // so we can just hash the values
+    auto targetSetsView = m_targetSets | std::views::values;
+    return symmetricHash(targetSetsView.begin(), targetSetsView.end());
+}
+
 CapabilitySet CapabilitySet::getTargetsThisHasButOtherDoesNot(const CapabilitySet& other)
 {
     CapabilitySet newSet{};
@@ -752,6 +789,30 @@ bool CapabilityStageSet::tryJoin(const CapabilityTargetSet& other)
     return true;
 }
 
+bool CapabilityStageSet::compatibleMerge(const CapabilityStageSet& stageSet)
+{
+    CapabilityStageSet tmp = *this;
+    tmp.atomSet->unionWith(stageSet.atomSet.value());
+
+    // if 'this' U stageSet == stageSet, then 'this' is a subset of stageSet
+    // do need to do anything
+    if (tmp.atomSet == stageSet.atomSet)
+    {
+        return true;
+    }
+    else if (tmp.atomSet == this->atomSet)
+    {
+        // 'stageSet' is a subset of 'this', so we can just copy over
+        atomSet = stageSet.atomSet;
+        return true;
+    }
+    else
+    {
+        // neither is a subset of the other, so we can not perform subset join
+        return false;
+    }
+}
+
 bool CapabilityTargetSet::tryJoin(const CapabilityTargetSets& other)
 {
     const CapabilityTargetSet* otherTargetSet = other.tryGetValue(this->target);
@@ -772,6 +833,74 @@ bool CapabilityTargetSet::tryJoin(const CapabilityTargetSets& other)
         this->shaderStageSets.remove(i);
 
     return true;
+}
+
+/// Are the two CapabilityTargetSet equal?
+bool CapabilityTargetSet::operator==(CapabilityTargetSet const& that) const
+{
+    for (auto stageSet : shaderStageSets)
+    {
+        auto thatStageSet = that.shaderStageSets.tryGetValue(stageSet.first);
+        if (!thatStageSet)
+            return false;
+        if (stageSet.second.atomSet != thatStageSet->atomSet)
+            return false;
+    }
+    return true;
+}
+
+/// Perform a compatibleMerge on the given `targetSet` with `this`.
+/// This function treats the whole target set as a single bit mask, and perform the
+/// operation on it.
+/// Definition of compatibleMerge is:
+/// # compatibleMerge(A, B) =
+/// ⎧ B   if A = ∅
+/// ⎪ A   if B = ∅
+/// ⎪ A   if A ⊆ B
+/// ⎪ B   if B ⊆ A
+/// ⎩ ∅   otherwise, and function will return false.
+/// For example:
+/// if A = {spirv, ext_X}, and B = {spirv, ext_X, ext_Y}, compatibleMerge(A, B) = A
+/// if A = {spirv, ext_X, ext_Y}, and B = {spirv, ext_X}, compatibleMerge(A, B) = B
+/// if A = {spirv, ext_X}, and B = {spirv, ext_Y}, compatibleMerge(A, B) = ∅
+/// If target A doesn't exist, then add target B directly.
+bool CapabilityTargetSet::compatibleMerge(const CapabilityTargetSet& targetSet)
+{
+    CapabilityTargetSet tmp = *this;
+    tmp.unionWith(targetSet);
+
+    // if this U targetSet == targetSet, then 'this' is a subset of targetSet
+    // do need to do anything
+    if (tmp == targetSet)
+    {
+        return true;
+    }
+    else if (tmp == *this)
+    {
+        // 'targetSet' is a subset of 'this', so we can just copy over
+        shaderStageSets = targetSet.getShaderStageSets();
+        return true;
+    }
+    else
+    {
+        // neither is a subset of the other, so we can not perform subset join
+        return false;
+    }
+}
+
+/// Similar to compatibleMerge for CapabilityTargetSet, but this overload perform the operation
+/// on a finer granularity, we perform the operation on a specific stage of a target
+bool CapabilityTargetSet::compatibleMerge(const CapabilityStageSet& stageSet)
+{
+    if (auto existStage = shaderStageSets.tryGetValue(stageSet.stage))
+    {
+        return existStage->compatibleMerge(stageSet);
+    }
+    else
+    {
+        shaderStageSets.add(stageSet.stage, stageSet);
+        return true;
+    }
 }
 
 CapabilitySet& CapabilitySet::join(const CapabilitySet& other)
@@ -1346,6 +1475,218 @@ void printDiagnosticArg(StringBuilder& sb, List<CapabilityAtom>& list)
         set.add((UInt)i);
     printDiagnosticArg(sb, set.newSetWithoutImpliedAtoms());
 }
+
+void printDiagnosticArg(StringBuilder& sb, const CapabilitySetVal* capabilitySetVal)
+{
+    printDiagnosticArg(sb, CapabilitySet{capabilitySetVal});
+}
+
+void CapabilityStageSetVal::_toTextOverride(StringBuilder& out)
+{
+    out << "CapabilityStageSetVal{";
+    out << "stage=";
+    printDiagnosticArg(out, getStage());
+    out << ", atoms=";
+    auto atomSet = getAtomSet();
+    atomSet->toText(out);
+    out << "}";
+}
+
+void CapabilityTargetSetVal::_toTextOverride(StringBuilder& out)
+{
+    out << "CapabilityTargetSetVal{";
+    out << "target=";
+    printDiagnosticArg(out, getTarget());
+    out << ", stageSets=[";
+    for (Index i = 0; i < getStageSetCount(); i++)
+    {
+        if (i > 0)
+            out << ", ";
+        auto stageSet = getStageSet(i);
+        stageSet->toText(out);
+    }
+    out << "]}";
+}
+
+void CapabilitySetVal::_toTextOverride(StringBuilder& out)
+{
+    out << "CapabilitySetVal{targetSets=[";
+    for (Index i = 0; i < getTargetSetCount(); i++)
+    {
+        if (i > 0)
+            out << ", ";
+        auto targetSet = getTargetSet(i);
+        targetSet->toText(out);
+    }
+    out << "]}";
+}
+
+//
+// CapabilitySetVal
+//
+
+CapabilityStageSetVal* CapabilityTargetSetVal::findStageSet(CapabilityAtom stage) const
+{
+    // Linear search through sorted list - these lists are typically very short (1-4 items)
+    for (Index i = 0; i < getStageSetCount(); i++)
+    {
+        auto stageSet = getStageSet(i);
+        auto stageAtom = stageSet->getStage();
+        if (stageAtom == stage)
+            return stageSet;
+        if (stageAtom > stage)
+            break; // List is sorted, so we can stop early
+    }
+    return nullptr;
+}
+
+CapabilityTargetSetVal* CapabilitySetVal::findTargetSet(CapabilityAtom target) const
+{
+    // Linear search through sorted list - these lists are typically very short (1-4 items)
+    for (Index i = 0; i < getTargetSetCount(); i++)
+    {
+        auto targetSet = getTargetSet(i);
+        auto targetAtom = targetSet->getTarget();
+        if (targetAtom == target)
+            return targetSet;
+        if (targetAtom > target)
+            break; // List is sorted, so we can stop early
+    }
+    return nullptr;
+}
+
+bool CapabilitySetVal::isInvalid() const
+{
+    // Check if we have the invalid target atom
+    return findTargetSet(CapabilityAtom::Invalid) != nullptr;
+}
+
+CapabilitySet CapabilitySetVal::thaw() const
+{
+    if (cachedThawedCapabilitySet.has_value())
+        return cachedThawedCapabilitySet.value();
+
+    CapabilitySet result;
+    if (isEmpty())
+    {
+        result = CapabilitySet::makeEmpty();
+    }
+    else if (isInvalid())
+    {
+        result = CapabilitySet::makeInvalid();
+    }
+    else
+    {
+        auto& targetSets = result.getCapabilityTargetSets();
+
+        // Convert each target set
+        for (Index targetIndex = 0; targetIndex < getTargetSetCount(); targetIndex++)
+        {
+            auto targetSetVal = getTargetSet(targetIndex);
+            auto targetAtom = targetSetVal->getTarget();
+
+            auto& targetSet = targetSets[targetAtom];
+            targetSet.target = targetAtom;
+
+            // Convert each stage set
+            for (Index stageIndex = 0; stageIndex < targetSetVal->getStageSetCount(); stageIndex++)
+            {
+                auto stageSetVal = targetSetVal->getStageSet(stageIndex);
+                auto stageAtom = stageSetVal->getStage();
+
+                auto& stageSet = targetSet.shaderStageSets[stageAtom];
+                stageSet.stage = stageAtom;
+
+                // Convert UIntSetVal back to CapabilityAtomSet
+                auto atomSetVal = stageSetVal->getAtomSet();
+                if (atomSetVal)
+                {
+                    CapabilityAtomSet atomSet{atomSetVal->toUIntSet()};
+                    stageSet.atomSet = atomSet;
+                }
+            }
+        }
+    }
+
+    cachedThawedCapabilitySet = result;
+    return result;
+}
+
+CapabilitySetVal* CapabilitySet::freeze(ASTBuilder* astBuilder) const
+{
+    if (auto cached = astBuilder->m_capabilitySetCache.tryGetValue(*this))
+    {
+        return *cached;
+    }
+
+    if (isEmpty())
+    {
+        return astBuilder->getOrCreate<CapabilitySetVal>();
+    }
+
+    if (isInvalid())
+    {
+        // Create invalid capability set with invalid target
+        auto invalidAtomSet = astBuilder->getUIntSetVal(CapabilityAtomSet{});
+        auto invalidStageSet =
+            astBuilder->getOrCreate<CapabilityStageSetVal>(CapabilityAtom::Invalid, invalidAtomSet);
+        auto invalidTargetSet = astBuilder->getOrCreate<CapabilityTargetSetVal>(
+            CapabilityAtom::Invalid,
+            invalidStageSet);
+        return astBuilder->getOrCreate<CapabilitySetVal>(invalidTargetSet);
+    }
+
+    List<CapabilityTargetSetVal*> targetSetVals;
+
+    // Convert each target set, maintaining sorted order
+    List<CapabilityAtom> sortedTargets;
+    sortedTargets.reserve(m_targetSets.getCount());
+    for (auto& targetPair : m_targetSets)
+    {
+        sortedTargets.add(targetPair.first);
+    }
+    sortedTargets.sort([](CapabilityAtom a, CapabilityAtom b) { return (UInt)a < (UInt)b; });
+
+    for (auto targetAtom : sortedTargets)
+    {
+        auto& targetSet = m_targetSets.getValue(targetAtom);
+        List<CapabilityStageSetVal*> stageSetVals;
+
+        // Convert each stage set, maintaining sorted order
+        List<CapabilityAtom> sortedStages;
+        for (auto& stagePair : targetSet.shaderStageSets)
+        {
+            sortedStages.add(stagePair.first);
+        }
+        sortedStages.sort([](CapabilityAtom a, CapabilityAtom b) { return (UInt)a < (UInt)b; });
+
+        for (auto stageAtom : sortedStages)
+        {
+            auto& stageSet = targetSet.shaderStageSets.getValue(stageAtom);
+
+            // Convert CapabilityAtomSet to UIntSetVal
+            UIntSetVal* atomSetVal;
+            atomSetVal = astBuilder->getUIntSetVal(stageSet.atomSet.value_or(CapabilityAtomSet{}));
+
+            auto stageSetVal =
+                astBuilder->getOrCreate<CapabilityStageSetVal>(stageAtom, atomSetVal);
+            stageSetVals.add(stageSetVal);
+        }
+
+        auto targetSetVal =
+            astBuilder->getOrCreate<CapabilityTargetSetVal>(targetAtom, stageSetVals);
+        targetSetVals.add(targetSetVal);
+    }
+
+    auto result = astBuilder->getOrCreate<CapabilitySetVal>(targetSetVals);
+    result->cachedThawedCapabilitySet = *this;
+
+    // Cache the result for future lookups
+    astBuilder->m_capabilitySetCache.add(*this, result);
+
+    return result;
+}
+
 
 #ifdef UNIT_TEST_CAPABILITIES
 

@@ -110,6 +110,7 @@ protected:
     Type* m_diffInterfaceType = nullptr;
     Type* m_forwardDiffFuncInterfaceType = nullptr;
     Type* m_builtinTypes[Index(BaseType::CountOf)];
+    Dictionary<String, Type*> m_magicEnumTypes;
 
     Dictionary<String, Decl*> m_magicDecls;
     Dictionary<BuiltinRequirementKind, Decl*> m_builtinRequirementDecls;
@@ -200,6 +201,7 @@ struct ValKeyEqual
 class ASTBuilder : public RefObject
 {
     friend class SharedASTBuilder;
+    friend struct CapabilitySet;
 
 public:
     /// Get a `Val` that has the AST node class and operands described by `desc`.
@@ -521,6 +523,8 @@ public:
     Type* getSpecializedBuiltinType(Type* typeParam, const char* magicTypeName);
     Type* getSpecializedBuiltinType(ArrayView<Val*> genericArgs, const char* magicTypeName);
 
+    Type* getMagicEnumType(const char* magicEnumName);
+
     Type* getDefaultLayoutType();
     Type* getDefaultPushConstantLayoutType();
     Type* getStd140LayoutType();
@@ -549,17 +553,23 @@ public:
     PtrType* getPtrType(Type* valueType, AccessQualifier accessQualifier, AddressSpace addrSpace);
     PtrType* getPtrType(Type* valueType, Val* accessQualifier, Val* addrSpace);
 
-    // Construct the type `Out<valueType>`
-    OutType* getOutType(Type* valueType);
+    // Construct the type `OutParam<valueType>`
+    OutParamType* getOutParamType(Type* valueType);
 
-    // Construct the type `InOut<valueType>`
-    InOutType* getInOutType(Type* valueType);
+    // Construct the type `InOutParam<valueType>`
+    BorrowInOutParamType* getBorrowInOutParamType(Type* valueType);
+
+    // Construct the type `RefParam<valueType>`
+    RefParamType* getRefParamType(Type* valueType);
+
+    // Construct the type `ImmutableBorrowParam<valueType>`
+    BorrowInParamType* getConstRefParamType(Type* valueType);
 
     // Construct the type `Ref<valueType>`
-    RefType* getRefType(Type* valueType);
+    ExplicitRefType* getExplicitRefType(Type* valueType);
 
-    // Construct the type `ConstRef<valueType>`
-    ConstRefType* getConstRefType(Type* valueType);
+    // Construct the type `Ref<valueType, .Read>`
+    ExplicitRefType* getExplicitConstRefType(Type* valueType);
 
     // Construct the type `Optional<valueType>`
     OptionalType* getOptionalType(Type* valueType);
@@ -640,6 +650,9 @@ public:
     Val* getUNormModifierVal();
     Val* getSNormModifierVal();
     Val* getNoDiffModifierVal();
+
+    /// Create a UIntSetVal from a UIntSet
+    UIntSetVal* getUIntSetVal(const UIntSet& uintSet);
 
     TupleType* getTupleType(ArrayView<Type*> types);
 
@@ -815,6 +828,9 @@ protected:
 
     /// List of all nodes that require being dtored when ASTBuilder is dtored
     List<NodeBase*> m_dtorNodes;
+
+    /// Cache for CapabilitySet::freeze() to avoid recreating identical CapabilitySetVal objects
+    Dictionary<CapabilitySet, CapabilitySetVal*> m_capabilitySetCache;
 
     MemoryArena m_arena;
 };

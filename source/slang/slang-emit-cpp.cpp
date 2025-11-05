@@ -305,7 +305,7 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
         }
     case kIROp_NativePtrType:
     case kIROp_PtrType:
-    case kIROp_ConstRefType:
+    case kIROp_BorrowInParamType:
         {
             // Special note on `constref` types and why they are not emitted
             // as a `const` pointer:
@@ -499,8 +499,8 @@ void CPPSourceEmitter::useType(IRType* type)
             type = static_cast<IRPtrType*>(type)->getValueType();
             break;
         }
-    case kIROp_RefType:
-    case kIROp_ConstRefType:
+    case kIROp_RefParamType:
+    case kIROp_BorrowInParamType:
         {
             type = static_cast<IRPtrTypeBase*>(type)->getValueType();
             break;
@@ -1151,16 +1151,16 @@ void CPPSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
             break;
         }
     case kIROp_PtrType:
-    case kIROp_InOutType:
-    case kIROp_OutType:
+    case kIROp_BorrowInOutParamType:
+    case kIROp_OutParamType:
         {
             auto ptrType = cast<IRPtrTypeBase>(type);
             PtrDeclaratorInfo ptrDeclarator(declarator);
             _emitType(ptrType->getValueType(), &ptrDeclarator);
         }
         break;
-    case kIROp_RefType:
-    case kIROp_ConstRefType:
+    case kIROp_RefParamType:
+    case kIROp_BorrowInParamType:
         {
             auto ptrType = cast<IRPtrTypeBase>(type);
             PtrDeclaratorInfo refDeclarator(declarator);
@@ -1172,16 +1172,7 @@ void CPPSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
             auto arrayType = static_cast<IRArrayType*>(type);
             auto elementType = arrayType->getElementType();
             int elementCount = int(getIntVal(arrayType->getElementCount()));
-            auto nameHint = arrayType->findDecoration<IRNameHintDecoration>();
-            bool isCoopVec = nameHint && (nameHint->getName() == UnownedStringSlice("CoopVec"));
-            if (isCoopVec && isOptixCoopVec)
-            {
-                m_writer->emit("OptixCoopVec<");
-            }
-            else
-            {
-                m_writer->emit("FixedArray<");
-            }
+            m_writer->emit("FixedArray<");
             _emitType(elementType, nullptr);
             m_writer->emit(", ");
             m_writer->emit(elementCount);

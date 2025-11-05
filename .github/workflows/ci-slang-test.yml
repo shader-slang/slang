@@ -1,0 +1,224 @@
+name: CI Test Workflow
+
+on:
+  workflow_call:
+    inputs:
+      os:
+        required: true
+        type: string
+      compiler:
+        required: true
+        type: string
+      platform:
+        required: true
+        type: string
+      config:
+        required: true
+        type: string
+      runs-on:
+        required: true
+        type: string
+      test-category:
+        required: false
+        type: string
+        default: smoke
+      full-gpu-tests:
+        required: false
+        type: boolean
+        default: false
+      server-count:
+        required: false
+        type: number
+        default: 8
+      enable-debug-layers:
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  test-slang:
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Common Test Setup
+        uses: ./.github/actions/common-test-setup
+        with:
+          os: ${{ inputs.os }}
+          compiler: ${{ inputs.compiler }}
+          platform: ${{ inputs.platform }}
+          config: ${{ inputs.config }}
+
+      - name: Test Slang
+        run: |
+          export SLANG_RUN_SPIRV_VALIDATION=1
+          export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
+          if [ "${{ inputs.enable-debug-layers }}" == "true" ]; then
+            export VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation
+          fi
+          # Build common slang-test arguments
+          slang_test_args=(
+            "-category" "${{ inputs.test-category }}"
+            "-expected-failure-list" "tests/expected-failure-github.txt"
+            "-skip-reference-image-generation"
+            "-show-adapter-info"
+            "-ignore-abort-msg"
+            "-enable-debug-layers" "${{ inputs.enable-debug-layers }}"
+          )
+
+          # Add test server arguments only if server count > 1
+          if [ "${{ inputs.server-count }}" -gt 1 ]; then
+            slang_test_args+=("-use-test-server")
+            slang_test_args+=("-server-count" "${{ inputs.server-count }}")
+          fi
+
+          # Add no-GPU failure list for non-GPU tests
+          if [[ "${{ inputs.full-gpu-tests }}" != "true" ]]; then
+            slang_test_args+=("-expected-failure-list" "tests/expected-failure-no-gpu.txt")
+          fi
+
+          # Execute slang-test with all arguments
+          "$bin_dir/slang-test" "${slang_test_args[@]}"
+      - name: Run Slang examples
+        # Run GLSL backend tests on release for pull requests, and not on merge_group, to reduce CI load.
+        if: inputs.full-gpu-tests && inputs.config == 'release' && github.event_name == 'pull_request'
+        run: |
+          .github/workflows/ci-examples.sh \
+           --bin-dir "$bin_dir" \
+           --os "${{ inputs.os }}" \
+           --platform "${{ inputs.platform }}" \
+           --config "${{ inputs.config }}" \
+           --skip-file tests/expected-example-failure-github.txt
+      - name: Run slangc tests
+        run: |
+          PATH=$bin_dir:$PATH tools/slangc-test/test.sh
+      - name: Test Slang via glsl
+        # Run GLSL backend tests on release for pull requests, and not on merge_group, to reduce CI load.
+        if: inputs.os != 'macos' && inputs.full-gpu-tests && inputs.config == 'release' && github.event_name == 'pull_request'
+        run: |
+          export SLANG_RUN_SPIRV_VALIDATION=1
+          export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
+          "$bin_dir/slang-test" \
+            -use-test-server \
+            -server-count ${{ inputs.server-count }} \
+            -category ${{ inputs.test-category }} \
+            -emit-spirv-via-glsl \
+            -ignore-abort-msg \
+            -api vk \
+            -expected-failure-list tests/expected-failure-via-glsl.txt \
+            -skip-reference-image-generation
+
+  # Run slang-rhi tests when:
+  # 1. full-gpu-tests is enabled AND
+  # 2. Either it's a pull request OR config is release
+  # This is to reduce the CI load but do some check on pull requests.
+  # expensive slang-rhi tests are excluded with -tce option, because they are not relevant for Slang.
+  test-slang-rhi:
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    timeout-minutes: 30
+    if: inputs.full-gpu-tests && (github.event_name == 'pull_request' || inputs.config == 'release')
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          fetch-depth: "1"
+
+      - name: Common Test Setup
+        uses: ./.github/actions/common-test-setup
+        with:
+          os: ${{ inputs.os }}
+          compiler: ${{ inputs.compiler }}
+          platform: ${{ inputs.platform }}
+          config: ${{ inputs.config }}
+
+      - name: Run slang-rhi tests
+        run: |
+          export SLANG_RHI_EXCLUDE_TESTS="md-clear*,cmd-copy*,cmd-upload*,fence*,staging-heap*,texture-create*"
+          "$bin_dir/slang-rhi-tests" -check-devices -tce="$SLANG_RHI_EXCLUDE_TESTS"
+
+      - name: Run slang-rhi tests (OptiX 8.0)
+        if: inputs.os == 'windows' || inputs.os == 'linux'
+        run: |
+          "$bin_dir/slang-rhi-tests" -check-devices -optix-version=80000 -tc="ray-tracing-*.cuda"
+
+      - name: Run slang-rhi tests (OptiX 8.1)
+        if: inputs.os == 'windows' || inputs.os == 'linux'
+        run: |
+          "$bin_dir/slang-rhi-tests" -check-devices -optix-version=80100 -tc="ray-tracing-*.cuda"
+
+  # Run slangpy tests when:
+  # 1. full-gpu-tests is enabled AND
+  # 2. Either it's a pull request OR config is release
+  # This is to reduce the CI load but do some check on pull requests.
+  test-slangpy:
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    timeout-minutes: 30
+    if: inputs.full-gpu-tests && (github.event_name == 'pull_request' || inputs.config == 'release')
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Common Test Setup
+        uses: ./.github/actions/common-test-setup
+        with:
+          os: ${{ inputs.os }}
+          compiler: ${{ inputs.compiler }}
+          platform: ${{ inputs.platform }}
+          config: ${{ inputs.config }}
+
+      - name: Setup Python
+        if: ${{ runner.environment != 'self-hosted' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Run slangpy tests
+        run: |
+          python --version
+          echo "Cleaning up existing installations and installing slangpy..."
+
+          # Try to uninstall existing slangpy
+          python -m pip uninstall -y slangpy || echo "slangpy not found or already removed"
+
+          # Install slangpy
+          python -m pip install --verbose slangpy --user
+
+          # Get site packages directory
+          SITE_PACKAGES=$(python -c "import slangpy; import os; print(os.path.dirname(os.path.dirname(slangpy.__file__)))" | tail -n 1)
+          echo "Site packages directory: $SITE_PACKAGES"
+          echo "bin_dir location: $bin_dir"
+          echo "lib_dir location: $lib_dir"
+          # Copy library files
+          if [[ "${{ inputs.os }}" == "windows" ]]; then
+            cp "$bin_dir"/slang*.dll "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy library files"; exit 1; }
+          else
+            cp "$lib_dir"/libslang*.* "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy library files"; exit 1; }
+          fi
+
+          echo "Listing files in slangpy directory..."
+          ls -la "$SITE_PACKAGES/slangpy/"
+
+          # Skip package installation on self-hosted runners to avoid permission issues
+          if [[ ! "${{ inputs.runs-on }}" =~ self-hosted ]]; then
+            echo "Installing python packages..."
+            curl -fsSL https://raw.githubusercontent.com/shader-slang/slangpy/main/requirements-dev.txt -o requirements-dev.txt
+            python -m pip install -r requirements-dev.txt --user
+            python -m pip install pytest-github-actions-annotate-failures --user
+            python -m pip install pytest-xdist --user
+          fi
+
+          echo "Running pytest on slangpy tests..."
+          export PYTHONPATH="$SITE_PACKAGES"
+          python -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n auto --maxprocesses=3

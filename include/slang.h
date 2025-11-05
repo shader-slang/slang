@@ -489,6 +489,18 @@ convention for interface methods.
     #define SLANG_UNALIGNED_ACCESS 0
 #endif
 
+// Backtrace
+#if SLANG_LINUX_FAMILY
+    #include <features.h> // for __GLIBC__ define, if using GNU libc
+    #if defined(__GLIBC__) || (__ANDROID_API__ >= 33)
+        #define SLANG_HAS_BACKTRACE 1
+    #else
+        #define SLANG_HAS_BACKTRACE 0
+    #endif
+#else
+    #define SLANG_HAS_BACKTRACE 0
+#endif
+
 // One endianness must be set
 #if ((SLANG_BIG_ENDIAN | SLANG_LITTLE_ENDIAN) == 0)
     #error "Couldn't determine endianness"
@@ -1054,6 +1066,8 @@ typedef uint32_t SlangSizeT;
         UseMSVCStyleBitfieldPacking, // bool
 
         ForceCLayout, // bool
+
+        ExperimentalFeature, // bool, enable experimental features
 
         CountOf,
     };
@@ -2632,17 +2646,13 @@ struct TypeLayoutReflection
         return spReflectionTypeLayout_getGenericParamIndex((SlangReflectionTypeLayout*)this);
     }
 
-    TypeLayoutReflection* getPendingDataTypeLayout()
-    {
-        return (TypeLayoutReflection*)spReflectionTypeLayout_getPendingDataTypeLayout(
-            (SlangReflectionTypeLayout*)this);
-    }
+    // Pending Type Layout functionality has been removed
+    [[deprecated]] TypeLayoutReflection* getPendingDataTypeLayout() { return nullptr; }
 
-    VariableLayoutReflection* getSpecializedTypePendingDataVarLayout()
+    // Pending Type Layout functionality has been removed
+    [[deprecated]] VariableLayoutReflection* getSpecializedTypePendingDataVarLayout()
     {
-        return (VariableLayoutReflection*)
-            spReflectionTypeLayout_getSpecializedTypePendingDataVarLayout(
-                (SlangReflectionTypeLayout*)this);
+        return nullptr;
     }
 
     SlangInt getBindingRangeCount()
@@ -2988,11 +2998,8 @@ struct VariableLayoutReflection
         return spReflectionVariableLayout_getStage((SlangReflectionVariableLayout*)this);
     }
 
-    VariableLayoutReflection* getPendingDataLayout()
-    {
-        return (VariableLayoutReflection*)spReflectionVariableLayout_getPendingDataLayout(
-            (SlangReflectionVariableLayout*)this);
-    }
+    // Pending Type Layout functionality has been removed
+    [[deprecated]] VariableLayoutReflection* getPendingDataLayout() { return nullptr; }
 };
 
 struct FunctionReflection
@@ -3506,6 +3513,13 @@ struct DeclReflection
         return (DeclReflection*)spReflectionDecl_getParent((SlangReflectionDecl*)this);
     }
 
+    Modifier* findModifier(Modifier::ID id)
+    {
+        return (Modifier*)spReflectionDecl_findModifier(
+            (SlangReflectionDecl*)this,
+            (SlangModifierID)id);
+    }
+
     template<Kind K>
     struct FilteredList
     {
@@ -3898,7 +3912,7 @@ struct TargetDesc
 
     /** Pointer to an array of compiler option entries, whose size is compilerOptionEntryCount.
      */
-    CompilerOptionEntry* compilerOptionEntries = nullptr;
+    const CompilerOptionEntry* compilerOptionEntries = nullptr;
 
     /** Number of additional compiler option entries.
      */

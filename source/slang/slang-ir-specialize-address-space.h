@@ -24,6 +24,13 @@ struct InitialAddressSpaceAssigner
     virtual AddressSpace getLeafInstAddressSpace(IRInst* inst) = 0;
 };
 
+struct NoOpInitialAddressSpaceAssigner : public InitialAddressSpaceAssigner
+{
+    virtual bool tryAssignAddressSpace(IRInst*, AddressSpace&) { return false; }
+    virtual AddressSpace getAddressSpaceFromVarType(IRInst* type);
+    virtual AddressSpace getLeafInstAddressSpace(IRInst* inst);
+};
+
 /// Propagate address space information through the IR module.
 /// Specialize functions with reference/pointer parameters to use the correct address space
 /// based on the address space of the arguments.

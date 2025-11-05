@@ -191,15 +191,6 @@ void emitBaseType(ManglingContext* context, BaseType baseType)
     case BaseType::IntPtr:
         emitRaw(context, "ip");
         break;
-    case BaseType::AddressSpace:
-        emitRaw(context, "as");
-        break;
-    case BaseType::AccessQualifier:
-        emitRaw(context, "aq");
-        break;
-    case BaseType::MemoryScope:
-        emitRaw(context, "mem");
-        break;
 
     default:
         SLANG_UNEXPECTED("unimplemented case in base type mangling");
@@ -262,7 +253,7 @@ void emitType(ManglingContext* context, Type* type)
         auto n = funcType->getParamCount();
         emit(context, n);
         for (Index i = 0; i < n; ++i)
-            emitType(context, funcType->getParamType(i));
+            emitType(context, funcType->getParamTypeWithDirectionWrapper(i));
         emitType(context, funcType->getResultType());
         emitType(context, funcType->getErrorType());
     }
@@ -679,6 +670,7 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
                                   funcAliasDeclRef.getDecl()->targetDeclRef)
                                   .as<CallableDecl>();
         }
+
         // Get parameter type as a list.
         List<Type*> parameterTypes;
         List<ParameterDirection> parameterDirections;
