@@ -1829,6 +1829,7 @@ CapabilitySet CapabilitySetVal::thaw() const
 
         // Convert each stage set, maintaining sorted order
         List<CapabilityAtom> sortedStages;
+        sortedStages.reserve(targetSet.shaderStageSets.getCount());
         for (auto& stagePair : targetSet.shaderStageSets)
         {
             sortedStages.add(stagePair.first);

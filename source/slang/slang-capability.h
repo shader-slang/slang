@@ -8,7 +8,9 @@
 #include <optional>
 #include <stdint.h>
 
-#define SLANG_PROFILE_CAPABILITY_SETS SLANG_PROFILE
+#define SLANG_PROFILE_CAPABILITY_SETS
+// uncomment this define to instrument capability sets
+// #define SLANG_PROFILE_CAPABILITY_SETS SLANG_PROFILE
 
 namespace Slang
 {

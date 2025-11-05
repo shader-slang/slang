@@ -2172,32 +2172,4 @@ void UIntSetVal::_toTextOverride(StringBuilder& out)
     out << "}";
 }
 
-Val* UIntSetVal::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
-{
-    int diff = 0;
-    List<ConstantIntVal*> newBitmasks;
-
-    // Substitute each bitmask operand
-    for (Index i = 0; i < getBitmaskCount(); i++)
-    {
-        auto bitmask = getBitmaskOperand(i);
-        if (bitmask)
-        {
-            auto newBitmask = as<ConstantIntVal>(bitmask->substituteImpl(astBuilder, subst, &diff));
-            if (!newBitmask)
-                newBitmask = bitmask; // Keep original if substitution failed
-            newBitmasks.add(newBitmask);
-        }
-    }
-
-    if (diff)
-    {
-        if (ioDiff)
-            *ioDiff += diff;
-        return astBuilder->getOrCreate<UIntSetVal>(newBitmasks.getArrayView());
-    }
-
-    return this;
-}
-
 } // namespace Slang

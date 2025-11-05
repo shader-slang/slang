@@ -8,8 +8,7 @@
 #include "slang-ast-val.h"
 #include "slang-capability.h"
 
-
-//
+// empty comment to preserve the order with clang-format
 #include "slang-capability-val.h.fiddle"
 
 FIDDLE()

@@ -993,7 +993,6 @@ class UIntSetVal : public Val
 
     void _toTextOverride(StringBuilder& out);
     Val* _resolveImplOverride() { return this; }
-    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
 
