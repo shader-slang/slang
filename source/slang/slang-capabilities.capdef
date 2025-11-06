@@ -2094,6 +2094,14 @@ alias image_size = texture_sm_4_1_compute_fragment | GL_ARB_shader_image_size;
 /// Capabilities required to query texture sample info
 /// [Compound]
 alias texture_size = texture_sm_4_1 | GL_ARB_shader_image_size;
+/// Capabilities required for implicit level of detail texturing
+///
+/// In general, this capability is available in the fragment stage and
+/// in other stages where implicit derivatives are enabled.
+/// [Compound]
+alias texture_implicit_lod = fragment
+                           | raytracingstages_compute_amplification_mesh + GL_NV_compute_shader_derivatives
+                           ;
 /// Capabilities required to query texture LOD info
 /// [Compound]
 alias texture_querylod = texture_sm_4_1 | GL_EXT_texture_query_lod;

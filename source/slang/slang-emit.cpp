@@ -437,6 +437,7 @@ void calcRequiredLoweringPassSet(
         result.resolveVaryingInputRef = true;
         break;
     case kIROp_GetCurrentStage:
+    case kIROp_SupportImplicitDerivatives:
         result.specializeStageSwitch = true;
         break;
     case kIROp_MissingReturn:
@@ -1199,7 +1200,7 @@ Result linkAndOptimizeIR(
     // After dynamic dispatch logic is resolved into ordinary function calls,
     // we can now run our stage specialization logic.
     if (requiredLoweringPassSet.specializeStageSwitch)
-        specializeStageSwitch(irModule);
+        specializeStageSwitch(targetRequest, irModule);
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 #if 0

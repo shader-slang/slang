@@ -1318,6 +1318,12 @@ Compound Capabilities
 `texture_gather`
 > Capabilities required to use 'vertex/fragment/geometry shader only' texture gather operations
 
+`texture_implicit_lod`
+> Capabilities required for implicit level of detail texturing
+> 
+> In general, this capability is available in the fragment stage and
+> in other stages where implicit derivatives are enabled.
+
 `texture_querylevels`
 > Capabilities required to query texture level info
 

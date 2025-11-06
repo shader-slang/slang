@@ -288,7 +288,7 @@ public:
     // This is used for adding conjunctions directly and efficently, this is not functionally a
     // join. if `knownStage`/`knownTarget` is not CapabilityAtom::Invalid, the given atom will be
     // assumed as an assigned key atom (faster)
-    inline void addConjunction(
+    void addConjunction(
         CapabilityAtomSet conjunction,
         CapabilityAtom knownTarget,
         CapabilityAtom knownStage);

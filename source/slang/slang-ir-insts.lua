@@ -1231,6 +1231,7 @@ local insts = {
 	},
 	{ RequireTargetExtension = { operands = { { "extension" } } } },
 	{ RequireComputeDerivative = {} },
+	{ SupportImplicitDerivatives = {} },
 	{ StaticAssert = { operands = { { "condition" }, { "message" } } } },
 	{ Printf = { operands = { { "format" } } } },
 	-- Quad control execution modes.

@@ -3684,6 +3684,11 @@ __Addr<T> __getLegalizedSPIRVGlobalParamAddr(T val);
 __intrinsic_op($(kIROp_RequireComputeDerivative))
 void __requireComputeDerivative();
 
+// Returns true when the current execution environment has implicit
+// derivatives. This function will not try to enable the derivatives.
+__intrinsic_op($(kIROp_SupportImplicitDerivatives))
+bool __supportImplicitDerivatives();
+
 __intrinsic_op($(kIROp_RequireMaximallyReconverges))
 void __requireMaximallyReconverges();
 

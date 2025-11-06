@@ -15,9 +15,14 @@ bool funcHasGetCurrentStageInst(IRGlobalValueWithCode* func)
     {
         for (auto inst : block->getChildren())
         {
-            if (inst->getOp() == kIROp_GetCurrentStage)
+            switch (inst->getOp())
             {
+            case kIROp_GetCurrentStage:
+            case kIROp_SupportImplicitDerivatives:
                 return true;
+
+            default:
+                break;
             }
         }
     }
@@ -57,10 +62,62 @@ void discoverStageSpecificFunctions(HashSet<IRInst*>& stageSpecificFunctions, IR
     }
 }
 
+bool stageHasImplicitDerivativesByCapabilities(TargetRequest* target, Stage stage)
+{
+    const CapabilityAtom stageAtom = getAtomFromStage(stage);
+    const CapabilitySet& targetCaps = target->getTargetCaps();
+    const CapabilityTargetSets& targetSets = targetCaps.getCapabilityTargetSets();
+
+    for (const auto& entry : targetSets)
+    {
+        const CapabilityStageSet* stageSet = entry.second.shaderStageSets.tryGetValue(stageAtom);
+        if (!stageSet)
+            continue;
+
+        StringBuilder sb { };
+
+        if (stageSet->atomSet.has_value())
+        {
+            CapabilitySet available { };
+            available.addConjunction(stageSet->atomSet.value(), entry.first, stageAtom);
+
+            CapabilitySet required(CapabilityName::texture_implicit_lod);
+            CapabilityAtomSet failed;
+            CheckCapabilityRequirementResult result;
+
+            CapabilitySet::checkCapabilityRequirement(
+                CheckCapabilityRequirementOptions::AvailableCanHaveSubsetOfAbstractAtoms,
+                available,
+                required,
+                failed,
+                result);
+
+            if (result == CheckCapabilityRequirementResult::AvailableIsASuperSetToRequired)
+            {
+                return true;
+            }
+
+        }
+    }
+
+    return false;
+}
+
+bool stageHasImplicitDerivatives(TargetRequest* target, Stage stage)
+{
+    if (stageHasImplicitDerivativesByCapabilities(target, stage))
+    {
+        return true;
+    }
+
+    return false;
+}
+
 // Given a func, replace all `GetCurrentStage` insts with the given stage, and rewrite all calls to
 // stage specific functions to the specialized function for the given stage.
 //
 void specializeFuncToStage(
+    TargetRequest *targetRequest,
     Stage stage,
     IRGlobalValueWithCode* func,
     Dictionary<IRInst*, Dictionary<Stage, IRInst*>>& mapFuncToStageSpecializedFunc)
@@ -74,6 +131,7 @@ void specializeFuncToStage(
             switch (inst->getOp())
             {
             case kIROp_GetCurrentStage:
+            case kIROp_SupportImplicitDerivatives:
             case kIROp_Call:
                 instsToModify.add(inst);
                 break;
@@ -82,6 +140,7 @@ void specializeFuncToStage(
     }
 
     IRInst* stageVal = nullptr;
+    IRInst* implicitDerivativesVal = nullptr;
     IRBuilder builder(func);
     for (auto inst : instsToModify)
     {
@@ -100,6 +159,19 @@ void specializeFuncToStage(
                 inst->removeAndDeallocate();
                 break;
             }
+
+        case kIROp_SupportImplicitDerivatives:
+            {
+                if (!implicitDerivativesVal)
+                {
+                    bool hasImplicitDerivatives = stageHasImplicitDerivatives(targetRequest, stage);
+                    implicitDerivativesVal = builder.getBoolValue(hasImplicitDerivatives);
+                }
+                inst->replaceUsesWith(implicitDerivativesVal);
+                inst->removeAndDeallocate();
+                break;
+            }
+
         case kIROp_Call:
             {
                 // Replace calls to stage specific functions with the specialized function for the
@@ -121,7 +193,7 @@ void specializeFuncToStage(
     }
 }
 
-void specializeStageSwitch(IRModule* module)
+void specializeStageSwitch(TargetRequest* targetRequest, IRModule* module)
 {
     Dictionary<IRInst*, HashSet<IRFunc*>> mapInstToReferencingEntryPoints;
     buildEntryPointReferenceGraph(mapInstToReferencingEntryPoints, module);
@@ -166,6 +238,7 @@ void specializeStageSwitch(IRModule* module)
         {
             auto stage = entryPointDecor->getProfile().getStage();
             specializeFuncToStage(
+                targetRequest,
                 stage,
                 as<IRGlobalValueWithCode>(func),
                 mapFuncToStageSpecializedFunc);
@@ -181,6 +254,7 @@ void specializeStageSwitch(IRModule* module)
                 auto stage = pair.first;
                 auto specializedFunc = pair.second;
                 specializeFuncToStage(
+                    targetRequest,
                     stage,
                     as<IRGlobalValueWithCode>(specializedFunc),
                     mapFuncToStageSpecializedFunc);

@@ -3,11 +3,13 @@
 
 namespace Slang
 {
+
+struct TargetRequest;
 struct IRModule;
 
 // Repalce all stage_switch insts with the case that matches current calling entrypoint.
 //
-void specializeStageSwitch(IRModule* module);
+void specializeStageSwitch(TargetRequest* targetRequest, IRModule* module);
 
 } // namespace Slang
 
