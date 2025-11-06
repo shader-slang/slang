@@ -812,6 +812,11 @@ UIntSetVal* ASTBuilder::getUIntSetVal(const UIntSet& uintSet)
     return getOrCreate<UIntSetVal>(bitmasks);
 }
 
+CapabilitySetVal* ASTBuilder::getCapabilitySetVal(CapabilityName capability)
+{
+    return CapabilitySet{capability}.freeze(this);
+}
+
 FuncType* ASTBuilder::getFuncType(ArrayView<Type*> parameters, Type* result, Type* errorType)
 {
     if (!errorType)
