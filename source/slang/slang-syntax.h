@@ -272,8 +272,13 @@ Val::OperandView<Val> findInnerMostGenericArgs(SubstitutionSet subst);
 ///
 ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl);
 
-/// Get the parameter-passing mode that will actually be used
-/// for `paramDecl`, based on both its modifiers and type.
+/// Get the parameter-passing mode to use for a parameter.
+///
+/// The actual mode to use takes into account both the explicit
+/// modifiers on the declaration, as well as the declared type
+/// of the parameter. In cases where the parameter's type
+/// is not copyable, the mode implied by its declaration may be
+/// adjusted to something else.
 ///
 ParamPassingMode getParamPassingMode(ParamDecl* paramDecl);
 

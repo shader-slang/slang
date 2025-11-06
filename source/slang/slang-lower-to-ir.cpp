@@ -2787,11 +2787,11 @@ void addArg(
     List<IRInst*>* ioArgs,            //< The argument list being built
     List<OutArgumentFixup>* ioFixups, //< "Fixup" logic to apply for `out` or `inout` arguments
     LoweredValInfo argVal,            //< The lowered value of the argument to add
-    ParamPassingMode actualParamPassingMode, //< The direction of the parameter (`in`, `out`, etc.)
+    ParamPassingMode paramPassingMode, //< The mode of the parameter (`in`, `out`, etc.)
     Type* argType,                           //< The AST-level type of the argument
     SourceLoc loc)                           //< A location to use if we need to report an error
 {
-    switch (actualParamPassingMode)
+    switch (paramPassingMode)
     {
     case ParamPassingMode::In:
         // Default `in` parameters are the easiest case: we can
@@ -2903,7 +2903,7 @@ void addArg(
             // then we need to transfer the initial value of the
             // argument into the temporary before the call.
             //
-            if (actualParamPassingMode != ParamPassingMode::Out)
+            if (paramPassingMode != ParamPassingMode::Out)
             {
                 assign(context, tempVar, argVal);
             }
@@ -2948,7 +2948,7 @@ void addArg(
             // `getAddress()` operation has sufficient information to do things
             // like pick between `get`/`set` and `ref` accessors on properties.
             //
-            if (actualParamPassingMode != ParamPassingMode::BorrowIn)
+            if (paramPassingMode != ParamPassingMode::BorrowIn)
             {
                 OutArgumentFixup fixup;
                 fixup.src = tempVar;
@@ -2971,7 +2971,7 @@ void addArg(
 /// Add argument(s) corresponding to one parameter to a call
 ///
 /// The `argExpr` is the AST-level expression being passed as an argument to the call.
-/// The `paramType` and `actualParamPassingMode` represent what is known about the receiving
+/// The `paramType` and `paramPassingMode` represent what is known about the receiving
 /// parameter of the callee (e.g., if the parameter `in`, `inout`, etc.).
 /// The `ioArgs` array receives the IR-level argument(s) that are added for the given
 /// argument expression.
@@ -2981,12 +2981,12 @@ void addArg(
 ///
 void addCallArgsForParam(
     IRGenContext* context,
-    ParamPassingMode actualParamPassingMode,
+    ParamPassingMode paramPassingMode,
     Expr* argExpr,
     List<IRInst*>* ioArgs,
     List<OutArgumentFixup>* ioFixups)
 {
-    switch (actualParamPassingMode)
+    switch (paramPassingMode)
     {
     case ParamPassingMode::Ref:
     case ParamPassingMode::BorrowIn:
@@ -2999,7 +2999,7 @@ void addCallArgsForParam(
                 ioArgs,
                 ioFixups,
                 loweredArg,
-                actualParamPassingMode,
+                paramPassingMode,
                 argExpr->type,
                 argExpr->loc);
         }
@@ -3057,13 +3057,13 @@ ParamPassingMode adjustParamPassingModeBasedOnParamType(
     ParamPassingMode originalMode,
     Type* paramType)
 {
-    // If the type is copyable, then the default mode is appropriate to use.
+    // If the type is copyable, then the original mode is appropriate to use.
     //
     if (isCopyableType(paramType))
         return originalMode;
 
     // If we have a non-copyable parameter type, we will inspect
-    // the default mode and see whether it needs adjustting.
+    // the original mode and see whether it needs adjustting.
     //
     switch (originalMode)
     {
@@ -3080,14 +3080,6 @@ ParamPassingMode adjustParamPassingModeBasedOnParamType(
     }
 }
 
-/// Get the actual parameter-passing mode to use for a parameter.
-///
-/// The actual mode takes into account both the mode as derived
-/// from the declaration (e.g., from explicit modifiers), as well
-/// as the type of the parameter. In cases where the parameter's type
-/// is not copyable, the mode implied by its declaration may be adjusted
-/// to something else.
-///
 ParamPassingMode getParamPassingMode(ParamDecl* paramDecl)
 {
     auto declaredMode = getExplicitlyDeclaredParamPassingMode(paramDecl);
@@ -3433,21 +3425,14 @@ struct IRLoweringParameterInfo
     // This AST-level type of the parameter
     Type* type = nullptr;
 
-    /// The parameter-passing mode that was derived from the parameter's
-    /// declaration and the surrounding context of that declaration, but
-    /// which does not take the type of the parameter into consideration.
+    /// The parameter-passing mode that was *intended* by the user,
+    /// as determined from the declaration (and declaration context)
+    /// of the paraemter, as well as its type.
     ///
-    ParamPassingMode declaredParamPassingMode = ParamPassingMode::In;
-
-    /// The parameter-passing mode that was derived from the parameter's
-    /// declaration and the surrounding context, and that might also
-    /// have been adjusted based on the type of the parameters (notably,
-    /// whether or not the parameter's type is copyable).
+    /// This is in most respects the "correct" parameter-passing mode
+    /// for the parameter.
     ///
-    /// This is in most respects the "correct" parameter-passing mode for
-    /// the parameter.
-    ///
-    ParamPassingMode adjustedParamPassingMode = ParamPassingMode::In;
+    ParamPassingMode intendedParamPassingMode = ParamPassingMode::In;
 
     /// The final parameter-passing mode that is actually being used
     /// as part of lowering.
@@ -3457,7 +3442,7 @@ struct IRLoweringParameterInfo
     /// parameter-passing mode of entry-point varying parameters away
     /// from what they were declared as without informing the user.
     ///
-    ParamPassingMode hackedParamPassingMode = ParamPassingMode::In;
+    ParamPassingMode actualParamPassingModeToUse = ParamPassingMode::In;
 
     // The variable/parameter declaration for
     // this parameter (if any)
@@ -3486,8 +3471,8 @@ IRLoweringParameterInfo getParameterInfo(
     IRLoweringParameterInfo info;
     info.type = paramType;
     info.decl = paramDecl;
-    info.adjustedParamPassingMode = adjustedParamPassingMode;
-    info.hackedParamPassingMode = adjustedParamPassingMode;
+    info.intendedParamPassingMode = adjustedParamPassingMode;
+    info.actualParamPassingModeToUse = adjustedParamPassingMode;
     info.isThisParam = false;
     return info;
 }
@@ -3542,9 +3527,8 @@ void addThisParameter(
     IRLoweringParameterInfo info;
     info.type = type;
     info.decl = nullptr;
-    info.declaredParamPassingMode = impliedParamPassingMode;
-    info.adjustedParamPassingMode = adjustedParamPassingMode;
-    info.hackedParamPassingMode = adjustedParamPassingMode;
+    info.intendedParamPassingMode = adjustedParamPassingMode;
+    info.actualParamPassingModeToUse = adjustedParamPassingMode;
     info.isThisParam = true;
 
     ioParameterLists->params.add(info);
@@ -3561,9 +3545,8 @@ void maybeAddReturnDestinationParam(ParameterLists* ioParameterLists, Type* resu
         IRLoweringParameterInfo info;
         info.type = resultType;
         info.decl = nullptr;
-        info.declaredParamPassingMode = paramPassingMode;
-        info.adjustedParamPassingMode = paramPassingMode;
-        info.hackedParamPassingMode = paramPassingMode;
+        info.intendedParamPassingMode = paramPassingMode;
+        info.actualParamPassingModeToUse = paramPassingMode;
         info.isReturnDestination = true;
         ioParameterLists->params.add(info);
     }
@@ -3610,7 +3593,7 @@ bool doesParamAppearToBeAnEntryPointVaryingInput(
     // We are only intereste in parameters that would otherwise
     // be lowered to just use `in`.
     //
-    if (paramInfo.adjustedParamPassingMode != ParamPassingMode::In)
+    if (paramInfo.actualParamPassingModeToUse != ParamPassingMode::In)
         return false;
 
     // We are only concerned with varying parameters, so `uniform`
@@ -3664,7 +3647,7 @@ void maybeModifyParamPassingModeForDetectedEntryPointVaryingInput(
     // We basically just want to change the parameter from `in`
     // to `borrow in`, so that it is an immutable by-reference parameter.
     //
-    ioParamInfo.hackedParamPassingMode = ParamPassingMode::BorrowIn;
+    ioParamInfo.actualParamPassingModeToUse = ParamPassingMode::BorrowIn;
 }
 
 //
@@ -4005,7 +3988,7 @@ void _lowerFuncDeclBaseTypeInfo(
         // might include a wrapper to represent that mode as a
         // specific case of pointer type.
         //
-        switch (paramInfo.hackedParamPassingMode)
+        switch (paramInfo.actualParamPassingModeToUse)
         {
         case ParamPassingMode::In:
             // The default `in` parameter-passing mode required no wrapping.
@@ -4127,7 +4110,7 @@ static LoweredValInfo _emitCallToAccessor(
             &allArgs,
             &fixups,
             base,
-            thisParam.hackedParamPassingMode,
+            thisParam.actualParamPassingModeToUse,
             thisParam.type,
             SourceLoc());
     }
@@ -11589,7 +11572,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 //
                 LoweredValInfo paramVal;
 
-                switch (paramInfo.hackedParamPassingMode)
+                switch (paramInfo.actualParamPassingModeToUse)
                 {
                 case ParamPassingMode::In:
                     {
@@ -11696,7 +11679,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         // here, to account for the other workaround logic that was
                         // implemented.
                         //
-                        // We detect the case where the parameter was *declared* to
+                        // We detect the case where the parameter was *intended* to
                         // be `in`, but has been realized as a `borrow in` parameter
                         // in the IR, and insert a temporary.
                         //
@@ -11704,7 +11687,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         // lowering of entry points to Slang IR, this hackery can be
                         // removed.
                         //
-                        if (paramInfo.adjustedParamPassingMode == ParamPassingMode::In)
+                        if (paramInfo.intendedParamPassingMode == ParamPassingMode::In)
                         {
                             if (auto irBorrowInParamType = as<IRBorrowInParamType>(irParamType))
                             {
