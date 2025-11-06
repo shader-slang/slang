@@ -1,6 +1,39 @@
 #ifndef SLANG_LLVM_BUILDER_H
 #define SLANG_LLVM_BUILDER_H
 
+// The LLVM target of Slang is split in two halves:
+// * slang/slang-emit-llvm.cpp (Emitter)
+// * slang-llvm/slang-llvm-builder.cpp (Builder)
+//
+// The Emitter handles all matters related to Slang IR, calling into Builder
+// once it knows what it wants to emit. The Builder handles generating LLVM IR
+// without knowledge of Slang IR or any other Slang internals.
+//
+// This split is done for a couple of reasons. First, the Slang compiler where
+// Emitter resides, cannot directly link to LLVM. Instead, LLVM is linked to
+// a separate and optional shared library, `slang-llvm.dll`. This is because as
+// a dependency, LLVM is big (hundreds of megabytes) and hairy (can require
+// compiler flags that we don't want for the compiler code). Many (or most) of
+// the users of the Slang compiler have no need for LLVM.
+//
+// Secondly, this allows `slang-compiler` and `slang-llvm` to be somewhat
+// independent; one can update the LLVM version of the Builder in `slang-llvm`
+// without needing to recompile `slang-compiler`. It is also possible to add
+// support for new instructions to the Emitter without having to recompile
+// `slang-llvm`.
+//
+// When deciding on which side to place new code, consider:
+// * Access to Slang IR or other matters internal to the compiler belong in Emitter.
+// * Access to LLVM IRBuilder and code generation belong to Builder.
+// * Builder should not be tied to Slang language concepts, but it should
+//   cover general GPU concepts (e.g. buffers, textures etc.).
+//
+// A general rule of thumb is: you should be able to use Builder to generate
+// code for _any_ GPU language, not just what Slang currently is. Even though
+// the LLVM target only considers CPUs for now, this may not always be the case
+// in the future, so it's good to retain the option to also emit GPU-specific
+// things correctly.
+
 #include "core/slang-common.h"
 #include "compiler-core/slang-artifact.h"
 #include "slang.h"
