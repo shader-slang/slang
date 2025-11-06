@@ -35,16 +35,14 @@ jobs:
       - name: Run SPIRV generated files check
         run: |
           bash extras/check-spirv-generated.sh
-        env:
-          GITHUB_BASE_REF: ${{ github.base_ref }}
 
       - name: Upload build artifacts on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: spirv-tools-build-artifacts
+          name: spirv-tools-generated-files-expected
           path: |
-            external/spirv-tools/build-ci-check/*.inc
-            external/spirv-tools/build-ci-check/*.h
+            external/spirv-tools/artifacts-for-upload/*.inc
+            external/spirv-tools/artifacts-for-upload/*.h
           if-no-files-found: ignore
-          retention-days: 7
+          retention-days: 1
