@@ -2784,12 +2784,12 @@ static void applyOutArgumentFixups(IRGenContext* context, List<OutArgumentFixup>
 /// Add one argument value to the argument list for a call being constructed
 void addArg(
     IRGenContext* context,
-    List<IRInst*>* ioArgs,            //< The argument list being built
-    List<OutArgumentFixup>* ioFixups, //< "Fixup" logic to apply for `out` or `inout` arguments
-    LoweredValInfo argVal,            //< The lowered value of the argument to add
+    List<IRInst*>* ioArgs,             //< The argument list being built
+    List<OutArgumentFixup>* ioFixups,  //< "Fixup" logic to apply for `out` or `inout` arguments
+    LoweredValInfo argVal,             //< The lowered value of the argument to add
     ParamPassingMode paramPassingMode, //< The mode of the parameter (`in`, `out`, etc.)
-    Type* argType,                           //< The AST-level type of the argument
-    SourceLoc loc)                           //< A location to use if we need to report an error
+    Type* argType,                     //< The AST-level type of the argument
+    SourceLoc loc)                     //< A location to use if we need to report an error
 {
     switch (paramPassingMode)
     {
