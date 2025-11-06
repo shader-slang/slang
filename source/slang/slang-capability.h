@@ -8,6 +8,10 @@
 #include <optional>
 #include <stdint.h>
 
+#define SLANG_PROFILE_CAPABILITY_SETS
+// uncomment this define to instrument capability sets
+// #define SLANG_PROFILE_CAPABILITY_SETS SLANG_PROFILE
+
 namespace Slang
 {
 
@@ -30,6 +34,7 @@ namespace Slang
 #include "slang-generated-capability-defs.h"
 
 class CapabilitySetVal;
+class CapabilityTargetSetVal;
 class ASTBuilder;
 
 // Once we have a universe of suitable capability atoms, we can define
@@ -90,6 +95,7 @@ struct CapabilityStageSet
     /// Return false when `other` is fully incompatible.
     /// incompatability is when `this->stage` is not a supported stage by `other.shaderStageSets`.
     bool tryJoin(const CapabilityTargetSet& other);
+    bool tryJoin(const CapabilityTargetSetVal& other);
 
     /// See definition of CapabilityTargetSet::compatibleMerge for details.
     bool compatibleMerge(const CapabilityStageSet& stageSet);
@@ -112,7 +118,9 @@ struct CapabilityTargetSet
     /// 1. `this->target` is not a supported target by `other.shaderStageSets`
     /// 2. `this` has completly disjoint shader stages from other.
     bool tryJoin(const CapabilityTargetSets& other);
+    bool tryJoin(const CapabilitySetVal& other);
     void unionWith(const CapabilityTargetSet& other);
+    void unionWith(const CapabilityTargetSetVal& other);
 
     const CapabilityStageSets& getShaderStageSets() const { return shaderStageSets; }
     CapabilityStageSets& getShaderStageSets() { return shaderStageSets; }
@@ -163,6 +171,8 @@ enum class CheckCapabilityRequirementResult
 
 struct CapabilitySet
 {
+    friend class CapabilitySetVal;
+
 public:
     /// Default-construct an empty capability set
     CapabilitySet();
@@ -227,13 +237,16 @@ public:
     /// Destroy incompatible targets/sets apart of 'this' between ('this' & 'other').
     /// `this` may be made invalid if other is fully disjoint.
     CapabilitySet& join(const CapabilitySet& other);
+    CapabilitySet& join(const CapabilitySetVal* other);
 
     /// Join two capability sets to form ('this' & 'other').
     /// If a target/set has an incompatible atom, do not destroy the target/set.
     void nonDestructiveJoin(const CapabilitySet& other);
+    void nonDestructiveJoin(const CapabilitySetVal* other);
 
     /// Add all targets/sets of 'other' into 'this'. Overlapping sets are removed.
     void unionWith(const CapabilitySet& other);
+    void unionWith(const CapabilitySetVal* other);
 
     /// Return a capability set of 'target' atoms 'this' has, but 'other' does not.
     CapabilitySet getTargetsThisHasButOtherDoesNot(const CapabilitySet& other);
@@ -425,7 +438,7 @@ public:
     }
 
     /// Convert this mutable capability set to an immutable CapabilitySetVal
-    CapabilitySetVal* freeze(ASTBuilder* astBuilder) const;
+    [[nodiscard]] CapabilitySetVal* freeze(ASTBuilder* astBuilder) const;
 
 private:
     /// underlying data of CapabilitySet.

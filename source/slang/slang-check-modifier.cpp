@@ -2075,12 +2075,14 @@ void postProcessingOnModifiers(ASTBuilder* astBuilder, Modifiers& modifiers)
 {
     // compress all `require` nodes into 1 `require` modifier
     RequireCapabilityAttribute* firstRequire = nullptr;
+    CapabilitySet accumulatedCapSet;
+    bool hasChanges = false;
     Modifier* previous = nullptr;
     Modifier* next = nullptr;
+
     for (auto m = modifiers.first; m != nullptr; m = next)
     {
         next = m->next;
-        //
 
         if (auto req = as<RequireCapabilityAttribute>(m))
         {
@@ -2090,16 +2092,28 @@ void postProcessingOnModifiers(ASTBuilder* astBuilder, Modifiers& modifiers)
                 previous = m;
                 continue;
             }
-            CapabilitySet firstCapSet{firstRequire->capabilitySet};
-            firstCapSet.unionWith(CapabilitySet{req->capabilitySet});
-            firstRequire->capabilitySet = firstCapSet.freeze(astBuilder);
+
+            if (!hasChanges)
+            {
+                // If we are about to start making changes, thaw the capability set
+                accumulatedCapSet = CapabilitySet{firstRequire->capabilitySet};
+            }
+
+            accumulatedCapSet.unionWith(req->capabilitySet);
+            hasChanges = true;
+
             if (previous)
                 previous->next = next;
             continue;
         }
 
-        //
         previous = m;
+    }
+
+    // Only freeze once at the end if we made changes
+    if (hasChanges)
+    {
+        firstRequire->capabilitySet = accumulatedCapSet.freeze(astBuilder);
     }
 }
 

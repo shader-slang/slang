@@ -3238,7 +3238,7 @@ void diagnoseMissingCapabilityProvenance(
     CompilerOptionSet& optionSet,
     DiagnosticSink* sink,
     Decl* decl,
-    CapabilitySet& setToFind);
+    CapabilitySet const& setToFind);
 void diagnoseCapabilityProvenance(
     CompilerOptionSet& optionSet,
     DiagnosticSink* sink,

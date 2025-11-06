@@ -120,3 +120,8 @@ CLAUDE.local.md
 *.profdata
 /coverage-html/
 /coverage.lcov
+
+# Valgrind, perf,
+callgrind.out.*
+perf.data
+perf.data.*
