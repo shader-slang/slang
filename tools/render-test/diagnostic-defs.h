@@ -37,5 +37,6 @@ DIAGNOSTIC(1003, Error, unknownSourceLanguage, "unknown source language name")
 DIAGNOSTIC(1003, Error, unknown, "unknown source language name")
 DIAGNOSTIC(1004, Error, unknownCommandLineOption, "unknown command-line option '$0'")
 DIAGNOSTIC(1005, Error, unexpectedPositionalArg, "unexpected positional arg")
+DIAGNOSTIC(1006, Error, invalidRenderFeature, "invalid render feature name '$0'")
 
 #undef DIAGNOSTIC

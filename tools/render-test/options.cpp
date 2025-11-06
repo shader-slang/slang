@@ -20,6 +20,27 @@ namespace renderer_test
 {
 using namespace Slang;
 
+// Helper function to check if a feature name is valid
+static bool isValidFeatureName(const UnownedStringSlice& featureName)
+{
+#define SLANG_RHI_FEATURES_X(id, name) name,
+    static const char* kValidFeatureNames[] = {
+        SLANG_RHI_FEATURES(SLANG_RHI_FEATURES_X)
+    };
+#undef SLANG_RHI_FEATURES_X
+
+    static const int kFeatureCount = sizeof(kValidFeatureNames) / sizeof(kValidFeatureNames[0]);
+
+    for (int i = 0; i < kFeatureCount; i++)
+    {
+        if (featureName == UnownedStringSlice(kValidFeatureNames[i]))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
 {
     using namespace Slang;
@@ -111,14 +132,23 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
         }
         else if (argValue == "-render-features" || argValue == "-render-feature")
         {
-            String features;
-            SLANG_RETURN_ON_FAIL(reader.expectArg(features));
+            CommandLineArg featuresArg;
+            SLANG_RETURN_ON_FAIL(reader.expectArg(featuresArg));
 
             List<UnownedStringSlice> values;
-            StringUtil::split(features.getUnownedSlice(), ',', values);
+            StringUtil::split(featuresArg.value.getUnownedSlice(), ',', values);
 
             for (const auto& value : values)
             {
+                // Validate that the feature name is recognized
+                if (!isValidFeatureName(value))
+                {
+                    sink.diagnose(
+                        featuresArg.loc,
+                        RenderTestDiagnostics::invalidRenderFeature,
+                        value);
+                    return SLANG_FAIL;
+                }
                 outOptions.renderFeatures.add(value);
             }
         }
