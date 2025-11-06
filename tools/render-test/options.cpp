@@ -24,9 +24,7 @@ using namespace Slang;
 static bool isValidFeatureName(const UnownedStringSlice& featureName)
 {
 #define SLANG_RHI_FEATURES_X(id, name) name,
-    static const char* kValidFeatureNames[] = {
-        SLANG_RHI_FEATURES(SLANG_RHI_FEATURES_X)
-    };
+    static const char* kValidFeatureNames[] = {SLANG_RHI_FEATURES(SLANG_RHI_FEATURES_X)};
 #undef SLANG_RHI_FEATURES_X
 
     static const int kFeatureCount = sizeof(kValidFeatureNames) / sizeof(kValidFeatureNames[0]);
