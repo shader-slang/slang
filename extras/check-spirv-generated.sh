@@ -35,7 +35,7 @@ git submodule update --init --recursive external/spirv-tools
 echo_info "Verifying spirv-headers commit matches spirv-tools DEPS..."
 
 # Get the expected commit from spirv-tools/DEPS
-EXPECTED_COMMIT=$(grep spirv_headers_revision external/spirv-tools/DEPS | sed "s/.*'\([^']*\)'.*/\1/")
+EXPECTED_COMMIT=$(grep spirv_headers_revision external/spirv-tools/DEPS | grep -o "'[a-f0-9]\{40\}'" | tr -d "'")
 
 if [ -z "$EXPECTED_COMMIT" ]; then
   echo_error "Could not extract spirv_headers_revision from external/spirv-tools/DEPS"
