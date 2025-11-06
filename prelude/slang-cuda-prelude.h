@@ -5165,12 +5165,12 @@ struct PtxTypeName<float>
     static constexpr const char name[] = "f32";
 };
 template<>
-struct PtxTypeName<int8_t>
+struct PtxTypeName<char>
 {
     static constexpr const char name[] = "s8";
 };
 template<>
-struct PtxTypeName<uint8_t>
+struct PtxTypeName<unsigned char>
 {
     static constexpr const char name[] = "u8";
 };
@@ -5236,67 +5236,80 @@ struct RegisterCount<int32_t, M, N, K, MatrixUse::MatrixD>
 
 // Uint8 (u8) - varies by shape
 template<>
-struct RegisterCount<uint8_t, 16, 16, 16, MatrixUse::MatrixA>
+struct RegisterCount<unsigned char, 16, 16, 16, MatrixUse::MatrixA>
 {
     static constexpr int value = 2;
 };
 template<>
-struct RegisterCount<uint8_t, 16, 16, 16, MatrixUse::MatrixB>
+struct RegisterCount<unsigned char, 16, 16, 16, MatrixUse::MatrixB>
 {
     static constexpr int value = 2;
 };
 template<>
-struct RegisterCount<uint8_t, 8, 32, 16, MatrixUse::MatrixA>
+struct RegisterCount<unsigned char, 8, 32, 16, MatrixUse::MatrixA>
 {
     static constexpr int value = 1;
 };
 template<>
-struct RegisterCount<uint8_t, 8, 32, 16, MatrixUse::MatrixB>
+struct RegisterCount<unsigned char, 8, 32, 16, MatrixUse::MatrixB>
 {
     static constexpr int value = 4;
 };
 template<>
-struct RegisterCount<uint8_t, 32, 8, 16, MatrixUse::MatrixA>
+struct RegisterCount<unsigned char, 32, 8, 16, MatrixUse::MatrixA>
 {
     static constexpr int value = 4;
 };
 template<>
-struct RegisterCount<uint8_t, 32, 8, 16, MatrixUse::MatrixB>
+struct RegisterCount<unsigned char, 32, 8, 16, MatrixUse::MatrixB>
 {
     static constexpr int value = 1;
 };
 
 // Int8 (s8) - same as u8
 template<>
-struct RegisterCount<int8_t, 16, 16, 16, MatrixUse::MatrixA>
+struct RegisterCount<char, 16, 16, 16, MatrixUse::MatrixA>
 {
     static constexpr int value = 2;
 };
 template<>
-struct RegisterCount<int8_t, 16, 16, 16, MatrixUse::MatrixB>
+struct RegisterCount<char, 16, 16, 16, MatrixUse::MatrixB>
 {
     static constexpr int value = 2;
 };
 template<>
-struct RegisterCount<int8_t, 8, 32, 16, MatrixUse::MatrixA>
+struct RegisterCount<char, 8, 32, 16, MatrixUse::MatrixA>
 {
     static constexpr int value = 1;
 };
 template<>
-struct RegisterCount<int8_t, 8, 32, 16, MatrixUse::MatrixB>
+struct RegisterCount<char, 8, 32, 16, MatrixUse::MatrixB>
 {
     static constexpr int value = 4;
 };
 template<>
-struct RegisterCount<int8_t, 32, 8, 16, MatrixUse::MatrixA>
+struct RegisterCount<char, 32, 8, 16, MatrixUse::MatrixA>
 {
     static constexpr int value = 4;
 };
 template<>
-struct RegisterCount<int8_t, 32, 8, 16, MatrixUse::MatrixB>
+struct RegisterCount<char, 32, 8, 16, MatrixUse::MatrixB>
 {
     static constexpr int value = 1;
 };
+
+
+// ====================================================================================
+// Saturation at the output for integer MMA
+// ====================================================================================
+template<bool saturatingAccumulation>
+struct IsSaturated;
+
+template<>
+struct IsSaturated<true> { static constexpr const char name[] = ".satfinite"; };
+
+template<>
+struct IsSaturated<false> { static constexpr const char name[] = ""; };
 
 // ====================================================================================
 // WMMA Load - Inline PTX
@@ -5451,12 +5464,12 @@ inline unsigned __device__ Pack32Helper<int>(int value)
     return (unsigned)value;
 };
 template<>
-inline unsigned __device__ Pack32Helper<int8_t>(int8_t value)
+inline unsigned __device__ Pack32Helper<char>(char value)
 {
     return value << 24 | value << 16 | value << 8 | value;
 };
 template<>
-inline unsigned __device__ Pack32Helper<uint8_t>(uint8_t value)
+inline unsigned __device__ Pack32Helper<unsigned char>(unsigned char value)
 {
     return value << 24 | value << 16 | value << 8 | value;
 };
@@ -5953,12 +5966,12 @@ struct Fp16MMAHelper<float, float, M, N, K, LayoutA, LayoutB>
 //       C and D always use 8 registers (int32).
 // ====================================================================================
 
-template<typename AType, typename BType, ShapeCombination shape, Layout LayoutA, Layout LayoutB>
+template<typename AType, typename BType, ShapeCombination shape, Layout LayoutA, Layout LayoutB, bool saturatingAccumulation>
 struct IntegerMMAHelper;
 
 // Specialization: m16n16k16 (a=2 regs, b=2 regs)
-template<typename AType, typename BType, Layout LayoutA, Layout LayoutB>
-struct IntegerMMAHelper<AType, BType, ShapeCombination::m16n16k16, LayoutA, LayoutB>
+template<typename AType, typename BType, Layout LayoutA, Layout LayoutB, bool saturatingAccumulation>
+struct IntegerMMAHelper<AType, BType, ShapeCombination::m16n16k16, LayoutA, LayoutB, saturatingAccumulation>
 {
     __device__ static void eval(
         WmmaFragment<int, 16, 16, 16, MatrixUse::MatrixC>& d,
@@ -5966,11 +5979,11 @@ struct IntegerMMAHelper<AType, BType, ShapeCombination::m16n16k16, LayoutA, Layo
         const WmmaFragment<BType, 16, 16, 16, MatrixUse::MatrixB>& b,
         const WmmaFragment<int, 16, 16, 16, MatrixUse::MatrixC>& c)
     {
-        asm volatile("wmma.mma.sync.aligned.%8.%9.%10.s32.%11.%12.s32 "
+        asm volatile("wmma.mma.sync.aligned.%8.%9.%10.s32.%11.%12.s32%13 "
                      "{%0, %1, %2, %3, %4, %5, %6, %7}, "
-                     "{%13, %14}, "
-                     "{%15, %16}, "
-                     "{%17, %18, %19, %20, %21, %22, %23, %24};\n"
+                     "{%14, %15}, "
+                     "{%16, %17}, "
+                     "{%18, %19, %20, %21, %22, %23, %24, %25};\n"
                      : "=r"(d.regs[0]),
                        "=r"(d.regs[1]),
                        "=r"(d.regs[2]),
@@ -5984,6 +5997,7 @@ struct IntegerMMAHelper<AType, BType, ShapeCombination::m16n16k16, LayoutA, Layo
                        "C"(PtxShapeName<16, 16, 16>::name),
                        "C"(PtxTypeName<AType>::name),
                        "C"(PtxTypeName<BType>::name),
+                       "C"(IsSaturated<saturatingAccumulation>::name),
                        "r"(a.regs[0]),
                        "r"(a.regs[1]),
                        "r"(b.regs[0]),
@@ -6000,8 +6014,8 @@ struct IntegerMMAHelper<AType, BType, ShapeCombination::m16n16k16, LayoutA, Layo
 };
 
 // Specialization: m8n32k16 (a=1 reg, b=4 regs)
-template<typename AType, typename BType, Layout LayoutA, Layout LayoutB>
-struct IntegerMMAHelper<AType, BType, ShapeCombination::m8n32k16, LayoutA, LayoutB>
+template<typename AType, typename BType, Layout LayoutA, Layout LayoutB, bool saturatingAccumulation>
+struct IntegerMMAHelper<AType, BType, ShapeCombination::m8n32k16, LayoutA, LayoutB, saturatingAccumulation>
 {
     __device__ static void eval(
         WmmaFragment<int, 8, 32, 16, MatrixUse::MatrixC>& d,
@@ -6009,11 +6023,11 @@ struct IntegerMMAHelper<AType, BType, ShapeCombination::m8n32k16, LayoutA, Layou
         const WmmaFragment<BType, 8, 32, 16, MatrixUse::MatrixB>& b,
         const WmmaFragment<int, 8, 32, 16, MatrixUse::MatrixC>& c)
     {
-        asm volatile("wmma.mma.sync.aligned.%8.%9.%10.s32.%11.%12.s32 "
+        asm volatile("wmma.mma.sync.aligned.%8.%9.%10.s32.%11.%12.s32%13 "
                      "{%0, %1, %2, %3, %4, %5, %6, %7}, "
-                     "{%13}, "
-                     "{%14, %15, %16, %17}, "
-                     "{%18, %19, %20, %21, %22, %23, %24, %25};\n"
+                     "{%14}, "
+                     "{%15, %16, %17, %18}, "
+                     "{%19, %20, %21, %22, %23, %24, %25, %26};\n"
                      : "=r"(d.regs[0]),
                        "=r"(d.regs[1]),
                        "=r"(d.regs[2]),
@@ -6027,6 +6041,7 @@ struct IntegerMMAHelper<AType, BType, ShapeCombination::m8n32k16, LayoutA, Layou
                        "C"(PtxShapeName<8, 32, 16>::name),
                        "C"(PtxTypeName<AType>::name),
                        "C"(PtxTypeName<BType>::name),
+                       "C"(IsSaturated<saturatingAccumulation>::name),
                        "r"(a.regs[0]),
                        "r"(b.regs[0]),
                        "r"(b.regs[1]),
@@ -6044,8 +6059,8 @@ struct IntegerMMAHelper<AType, BType, ShapeCombination::m8n32k16, LayoutA, Layou
 };
 
 // Specialization: m32n8k16 (a=4 regs, b=1 reg)
-template<typename AType, typename BType, Layout LayoutA, Layout LayoutB>
-struct IntegerMMAHelper<AType, BType, ShapeCombination::m32n8k16, LayoutA, LayoutB>
+template<typename AType, typename BType, Layout LayoutA, Layout LayoutB, bool saturatingAccumulation>
+struct IntegerMMAHelper<AType, BType, ShapeCombination::m32n8k16, LayoutA, LayoutB, saturatingAccumulation>
 {
     __device__ static void eval(
         WmmaFragment<int, 32, 8, 16, MatrixUse::MatrixC>& d,
@@ -6053,11 +6068,11 @@ struct IntegerMMAHelper<AType, BType, ShapeCombination::m32n8k16, LayoutA, Layou
         const WmmaFragment<BType, 32, 8, 16, MatrixUse::MatrixB>& b,
         const WmmaFragment<int, 32, 8, 16, MatrixUse::MatrixC>& c)
     {
-        asm volatile("wmma.mma.sync.aligned.%8.%9.%10.s32.%11.%12.s32 "
+        asm volatile("wmma.mma.sync.aligned.%8.%9.%10.s32.%11.%12.s32%13 "
                      "{%0, %1, %2, %3, %4, %5, %6, %7}, "
-                     "{%13, %14, %15, %16}, "
-                     "{%17}, "
-                     "{%18, %19, %20, %21, %22, %23, %24, %25};\n"
+                     "{%14, %15, %16, %17}, "
+                     "{%18}, "
+                     "{%19, %20, %21, %22, %23, %24, %25, %26};\n"
                      : "=r"(d.regs[0]),
                        "=r"(d.regs[1]),
                        "=r"(d.regs[2]),
@@ -6071,6 +6086,7 @@ struct IntegerMMAHelper<AType, BType, ShapeCombination::m32n8k16, LayoutA, Layou
                        "C"(PtxShapeName<32, 8, 16>::name),
                        "C"(PtxTypeName<AType>::name),
                        "C"(PtxTypeName<BType>::name),
+                       "C"(IsSaturated<saturatingAccumulation>::name),
                        "r"(a.regs[0]),
                        "r"(a.regs[1]),
                        "r"(a.regs[2]),
@@ -6099,7 +6115,8 @@ template<
     typename DType,
     ShapeCombination shape,
     Layout LayoutA,
-    Layout LayoutB>
+    Layout LayoutB,
+    bool saturatingAccumulation>
 struct MMAHelper
 {
     static constexpr int M = ShapeToMNK<shape>::M;
@@ -6122,12 +6139,11 @@ struct MMAHelper
         else
         {
             // Integer inputs (int8/uint8): dispatch to IntegerMMAHelper
-            IntegerMMAHelper<AType, BType, shape, LayoutA, LayoutB>::eval(d, a, b, c);
+            IntegerMMAHelper<AType, BType, shape, LayoutA, LayoutB, saturatingAccumulation>::eval(d, a, b, c);
         }
     }
 };
-template<typename AType, typename CDType, int M, int N, int K, Layout layoutA, Layout layoutB>
-struct PtxMatMulAdd;
+
 //
 template<
     typename AType,
@@ -6138,7 +6154,8 @@ template<
     int N,
     int K,
     Layout layoutA,
-    Layout layoutB>
+    Layout layoutB,
+    bool saturatingAccumulation>
 WmmaFragment<DType, M, N, K, MatrixC> __device__ coopMatMulAdd(
     WmmaFragment<AType, M, N, K, MatrixUse::MatrixA, layoutA> matA,
     WmmaFragment<BType, M, N, K, MatrixUse::MatrixB, layoutB> matB,
@@ -6150,7 +6167,7 @@ WmmaFragment<DType, M, N, K, MatrixC> __device__ coopMatMulAdd(
                                            : ShapeCombination::m32n8k16;
 
     WmmaFragment<DType, M, N, K, MatrixC> matD;
-    MMAHelper<AType, BType, CType, DType, shape, layoutA, layoutB>::eval(matD, matA, matB, matC);
+    MMAHelper<AType, BType, CType, DType, shape, layoutA, layoutB, saturatingAccumulation>::eval(matD, matA, matB, matC);
 
     return matD;
 }
