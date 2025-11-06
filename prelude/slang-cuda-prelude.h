@@ -5306,10 +5306,16 @@ template<bool saturatingAccumulation>
 struct IsSaturated;
 
 template<>
-struct IsSaturated<true> { static constexpr const char name[] = ".satfinite"; };
+struct IsSaturated<true>
+{
+    static constexpr const char name[] = ".satfinite";
+};
 
 template<>
-struct IsSaturated<false> { static constexpr const char name[] = ""; };
+struct IsSaturated<false>
+{
+    static constexpr const char name[] = "";
+};
 
 // ====================================================================================
 // WMMA Load - Inline PTX
@@ -5966,12 +5972,29 @@ struct Fp16MMAHelper<float, float, M, N, K, LayoutA, LayoutB>
 //       C and D always use 8 registers (int32).
 // ====================================================================================
 
-template<typename AType, typename BType, ShapeCombination shape, Layout LayoutA, Layout LayoutB, bool saturatingAccumulation>
+template<
+    typename AType,
+    typename BType,
+    ShapeCombination shape,
+    Layout LayoutA,
+    Layout LayoutB,
+    bool saturatingAccumulation>
 struct IntegerMMAHelper;
 
 // Specialization: m16n16k16 (a=2 regs, b=2 regs)
-template<typename AType, typename BType, Layout LayoutA, Layout LayoutB, bool saturatingAccumulation>
-struct IntegerMMAHelper<AType, BType, ShapeCombination::m16n16k16, LayoutA, LayoutB, saturatingAccumulation>
+template<
+    typename AType,
+    typename BType,
+    Layout LayoutA,
+    Layout LayoutB,
+    bool saturatingAccumulation>
+struct IntegerMMAHelper<
+    AType,
+    BType,
+    ShapeCombination::m16n16k16,
+    LayoutA,
+    LayoutB,
+    saturatingAccumulation>
 {
     __device__ static void eval(
         WmmaFragment<int, 16, 16, 16, MatrixUse::MatrixC>& d,
@@ -6014,8 +6037,19 @@ struct IntegerMMAHelper<AType, BType, ShapeCombination::m16n16k16, LayoutA, Layo
 };
 
 // Specialization: m8n32k16 (a=1 reg, b=4 regs)
-template<typename AType, typename BType, Layout LayoutA, Layout LayoutB, bool saturatingAccumulation>
-struct IntegerMMAHelper<AType, BType, ShapeCombination::m8n32k16, LayoutA, LayoutB, saturatingAccumulation>
+template<
+    typename AType,
+    typename BType,
+    Layout LayoutA,
+    Layout LayoutB,
+    bool saturatingAccumulation>
+struct IntegerMMAHelper<
+    AType,
+    BType,
+    ShapeCombination::m8n32k16,
+    LayoutA,
+    LayoutB,
+    saturatingAccumulation>
 {
     __device__ static void eval(
         WmmaFragment<int, 8, 32, 16, MatrixUse::MatrixC>& d,
@@ -6059,8 +6093,19 @@ struct IntegerMMAHelper<AType, BType, ShapeCombination::m8n32k16, LayoutA, Layou
 };
 
 // Specialization: m32n8k16 (a=4 regs, b=1 reg)
-template<typename AType, typename BType, Layout LayoutA, Layout LayoutB, bool saturatingAccumulation>
-struct IntegerMMAHelper<AType, BType, ShapeCombination::m32n8k16, LayoutA, LayoutB, saturatingAccumulation>
+template<
+    typename AType,
+    typename BType,
+    Layout LayoutA,
+    Layout LayoutB,
+    bool saturatingAccumulation>
+struct IntegerMMAHelper<
+    AType,
+    BType,
+    ShapeCombination::m32n8k16,
+    LayoutA,
+    LayoutB,
+    saturatingAccumulation>
 {
     __device__ static void eval(
         WmmaFragment<int, 32, 8, 16, MatrixUse::MatrixC>& d,
@@ -6139,7 +6184,11 @@ struct MMAHelper
         else
         {
             // Integer inputs (int8/uint8): dispatch to IntegerMMAHelper
-            IntegerMMAHelper<AType, BType, shape, LayoutA, LayoutB, saturatingAccumulation>::eval(d, a, b, c);
+            IntegerMMAHelper<AType, BType, shape, LayoutA, LayoutB, saturatingAccumulation>::eval(
+                d,
+                a,
+                b,
+                c);
         }
     }
 };
@@ -6167,7 +6216,11 @@ WmmaFragment<DType, M, N, K, MatrixC> __device__ coopMatMulAdd(
                                            : ShapeCombination::m32n8k16;
 
     WmmaFragment<DType, M, N, K, MatrixC> matD;
-    MMAHelper<AType, BType, CType, DType, shape, layoutA, layoutB, saturatingAccumulation>::eval(matD, matA, matB, matC);
+    MMAHelper<AType, BType, CType, DType, shape, layoutA, layoutB, saturatingAccumulation>::eval(
+        matD,
+        matA,
+        matB,
+        matC);
 
     return matD;
 }

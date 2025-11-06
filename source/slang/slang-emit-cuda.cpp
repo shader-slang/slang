@@ -1253,8 +1253,8 @@ SlangResult CUDASourceEmitter::emitWMMAFragmentType(
         return SLANG_FAIL;
     }
 
-    outStr << typeName << "," << shape.m << ", " << shape.n << ", "
-           << shape.k << ", " << getMatrixUseName(matrixUse) << ">";
+    outStr << typeName << "," << shape.m << ", " << shape.n << ", " << shape.k << ", "
+           << getMatrixUseName(matrixUse) << ">";
 
     return SLANG_OK;
 }
