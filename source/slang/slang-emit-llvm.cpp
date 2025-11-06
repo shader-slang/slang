@@ -1,6 +1,7 @@
 #include "compiler-core/slang-artifact-associated-impl.h"
 #include "compiler-core/slang-artifact-desc-util.h"
 #include "core/slang-char-util.h"
+#include "core/slang-type-text-util.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-lower-buffer-element-type.h"
@@ -233,6 +234,7 @@ public:
         case kIROp_FloatType:
         case kIROp_DoubleType:
             llvmType = builder->getFloatType(getTypeBits(type));
+            break;
 
         case kIROp_BoolType:
         case kIROp_Int8Type:
@@ -1172,7 +1174,7 @@ struct LLVMEmitter
     // Global instructions that have been promoted into global variables. That
     // happens when they get referenced. Later on, constructors for these must
     // be generated.
-    Dictionary<IRInst*, LLVMInst*> promotedGlobalInsts;
+    Dictionary<IRInst*, LLVMInst*> deferredGlobalInsts;
 
     // Map of debug instructions to LLVM debug nodes.
     Dictionary<IRInst*, LLVMDebugNode*> instToDebugLLVM;
@@ -1187,6 +1189,10 @@ struct LLVMEmitter
     LLVMType* int32Type = nullptr;
     LLVMType* int64Type = nullptr;
 
+    // List of global variables whose initializers could not be emitted as
+    // constants. They need to be initialized during runtime.
+    List<IRGlobalVar*> deferredGlobalVars;
+
     // Used to add code in in front of return in a function. If it returns
     // nullptr, the LLVM return instruction is generated "normally". Otherwise,
     // it's expected that you generated it in this function.
@@ -1195,9 +1201,30 @@ struct LLVMEmitter
     // requires RTTI which sadly is not available when linking to LLVM.
     using FuncEpilogueCallback = std::function<LLVMInst*(IRReturn*)>;
 
-    LLVMEmitter(CodeGenContext* codeGenContext, bool useJIT = false)
-        : codeGenContext(codeGenContext)
+    SlangResult init(CodeGenContext* codeGenContext, bool useJIT = false)
     {
+        this->codeGenContext = codeGenContext;
+
+        ISlangSharedLibrary* library = codeGenContext->getSession()->getOrLoadSlangLLVM();
+        if (!library)
+        {
+            codeGenContext->getSink()->diagnose(
+                SourceLoc(),
+                Diagnostics::unableToGenerateCodeForTarget,
+                TypeTextUtil::getCompileTargetName(SlangCompileTarget(codeGenContext->getTargetFormat())));
+            return SLANG_FAIL;
+        }
+
+        using BuilderFuncV1 = SlangResult (*)(
+            const SlangUUID& intfGuid,
+            Slang::ILLVMBuilder** out,
+            Slang::LLVMBuilderOptions options,
+            Slang::IArtifact** outErrorArtifact);
+        
+        auto builderFunc = (BuilderFuncV1)library->findFuncByName("createLLVMBuilder_V1");
+        if (!builderFunc)
+            return SLANG_FAIL;
+
         auto targetTripleOption =
             getOptions().getStringOption(CompilerOptionName::LLVMTargetTriple).getUnownedSlice();
         auto cpuOption =
@@ -1217,14 +1244,26 @@ struct LLVMEmitter
         builderOpt.cpu = TerminatedCharSlice(cpuOption.begin(), cpuOption.getLength());
         builderOpt.features = TerminatedCharSlice(featOption.begin(), featOption.getLength());
         builderOpt.debugCommandLineArgs = TerminatedCharSlice(params.begin(), params.getLength());
-
         builderOpt.debugLevel = (SlangDebugInfoLevel)getOptions().getDebugInfoLevel();
         builderOpt.optLevel = (SlangOptimizationLevel)getOptions().getOptimizationLevel();
         builderOpt.fp32DenormalMode = (SlangFpDenormalMode)getOptions().getDenormalModeFp32();
         builderOpt.fp64DenormalMode = (SlangFpDenormalMode)getOptions().getDenormalModeFp64();
         builderOpt.fpMode = (SlangFloatingPointMode)getOptions().getFloatingPointMode();
+        builderOpt.useJIT = useJIT;
 
-        // TODO: Create ILLVMBuilder
+        ComPtr<IArtifact> errorArtifact;
+        SLANG_RETURN_ON_FAIL(builderFunc(ILLVMBuilder::getTypeGuid(), builder.writeRef(), builderOpt, errorArtifact.writeRef()));
+
+        auto diagnostics = findAssociatedRepresentation<IArtifactDiagnostics>(errorArtifact);
+        if (diagnostics)
+        {
+            for (Int i = 0; i < diagnostics->getCount(); ++i)
+            {
+                auto diag = diagnostics->getAt(i);
+                getSink()->diagnoseRaw(Severity(diag->severity), diag->text);
+            }
+            return SLANG_FAIL;
+        }
 
         debug = getOptions().getDebugInfoLevel() != DebugInfoLevel::None;
 
@@ -1245,6 +1284,7 @@ struct LLVMEmitter
 
         int32Type = builder->getIntType(32);
         int64Type = builder->getIntType(64);
+        return SLANG_OK;
     }
 
     DiagnosticSink* getSink() { return codeGenContext->getSink(); }
@@ -1290,38 +1330,48 @@ struct LLVMEmitter
                 SLANG_UNEXPECTED(e.getBuffer());
             }
         default:
-            if (globalInstruction && inlineGlobalInstructions)
+            if (globalInstruction)
             {
-                return emitLLVMInstruction(inst);
-            }
-            else if (globalInstruction && !inlineGlobalInstructions)
-            {
+                if (inlineGlobalInstructions)
+                    return emitLLVMInstruction(inst);
+
                 // This is a global instruction getting referenced. So, we generate
                 // a global variable for it (if we don't have one yet) and report
                 // this incident.
-                LLVMInst* llvmVar = nullptr;
                 auto type = inst->getDataType();
                 IRSizeAndAlignment sizeAndAlignment =
                     types->getSizeAndAlignment(type, defaultPointerRules);
-                if (promotedGlobalInsts.containsKey(inst))
+                bool deferred = false;
+                if (auto constVal = types->maybeEmitConstant(inst))
                 {
-                    llvmVar = promotedGlobalInsts.getValue(inst);
+                    llvmValue = builder->declareGlobalVariable(constVal, sizeAndAlignment.alignment, false);
+                }
+                else if (deferredGlobalInsts.containsKey(inst))
+                {
+                    llvmValue = deferredGlobalInsts.getValue(inst);
+                    deferred = true;
                 }
                 else
                 {
-                    if (auto constVal = types->maybeEmitConstant(inst))
-                        llvmVar = builder->declareGlobalVariable(constVal, false);
-                    else
-                        llvmVar = builder->declareGlobalVariable(sizeAndAlignment.size, sizeAndAlignment.alignment, false);
-                    promotedGlobalInsts[inst] = llvmVar;
+                    llvmValue = builder->declareGlobalVariable(sizeAndAlignment.size, sizeAndAlignment.alignment, false);
+                    deferredGlobalInsts[inst] = llvmValue;
+                    deferred = true;
                 }
 
-                // Aggregates are passed around as pointers.
-                if (types->isAggregateType(type))
-                    return llvmVar;
+                // Global variables are pointers to the actual data. If the type
+                // is not an aggregate, we need to load to get the value.
+                // Aggregates are passed around as pointers so they don't need
+                // to be loaded.
+                if (!types->isAggregateType(type))
+                    llvmValue = builder->emitLoad(types->getType(type), llvmValue, sizeAndAlignment.alignment);
 
-                // Otherwise, we'll need a load instruction to get the value.
-                return builder->emitLoad(types->getType(type), llvmVar, sizeAndAlignment.alignment);
+                if (deferred)
+                {
+                    // Don't cache result if the emitted instruction was
+                    // deferred, we'll need to be able to generate the inlined
+                    // version later!
+                    return llvmValue;
+                }
             }
             else
             {
@@ -1389,9 +1439,11 @@ struct LLVMEmitter
             {
             case kIROp_Neg:
                 op = LLVMUnaryOp::Negate;
+                break;
             case kIROp_Not:
             case kIROp_BitNot:
                 op = LLVMUnaryOp::Not;
+                break;
             default:
                 SLANG_UNEXPECTED("Unsupported unary arithmetic op");
                 break;
@@ -2399,14 +2451,13 @@ struct LLVMEmitter
         return false;
     }
 
-    /*
-    llvm::DISubprogram* ensureDebugFunc(IRGlobalValueWithCode* func, IRDebugFunction* debugFunc)
+    LLVMDebugNode* ensureDebugFunc(IRGlobalValueWithCode* func, IRDebugFunction* debugFunc)
     {
         if (instToDebugLLVM.containsKey(func))
             return instToDebugLLVM[func];
 
         IRType* funcType = as<IRType>(func->getDataType());
-        llvm::DIFile* file = nullptr;
+        LLVMDebugNode* file = nullptr;
         int line = 0;
         if (debugFunc)
         {
@@ -2420,30 +2471,15 @@ struct LLVMEmitter
             file = instToDebugLLVM.getValue(debugFunc->getFile());
             line = getIntVal(debugFunc->getLine());
         }
-        else
-        {
-            file = compileUnit->getFile();
-        }
 
-        llvm::StringRef linkageName, prettyName;
-
+        TerminatedCharSlice linkageName, prettyName;
         maybeGetName(&linkageName, &prettyName, func);
 
-        llvm::DIType* llvmFuncType = types->getDebugType(funcType, defaultPointerRules);
-        auto sp = llvmDebugBuilder->createFunction(
-            file,
-            prettyName,
-            linkageName,
-            file,
-            line,
-            llvm::cast<llvm::DISubroutineType>(llvmFuncType),
-            line,
-            llvm::DINode::FlagPrototyped,
-            llvm::DISubprogram::SPFlagDefinition);
+        LLVMDebugNode* llvmFuncType = types->getDebugType(funcType, defaultPointerRules);
+        LLVMDebugNode* sp = builder->getDebugFunction(llvmFuncType, prettyName, linkageName, file, line);
         instToDebugLLVM[func] = sp;
         return sp;
     }
-    */
 
     LLVMInst* ensureFuncDecl(IRFunc* func)
     {
@@ -2511,15 +2547,17 @@ struct LLVMEmitter
         return llvmFunc;
     }
 
-    /*
     // Declares the global variable in LLVM IR and sets an initializer for it
     // if it is trivial.
-    llvm::Value* emitGlobalVarDecl(IRGlobalVar* var)
+    LLVMInst* emitGlobalVarDecl(IRGlobalVar* var)
     {
         IRPtrType* ptrType = var->getDataType();
 
-        llvm::GlobalVariable* llvmVar = nullptr;
+        IRSizeAndAlignment sizeAndAlignment =
+            types->getSizeAndAlignment(ptrType->getValueType(), defaultPointerRules);
+
         auto firstBlock = var->getFirstBlock();
+        LLVMInst* llvmVar = nullptr;
 
         if (firstBlock)
         {
@@ -2532,93 +2570,28 @@ struct LLVMEmitter
                 if (auto constantValue = types->maybeEmitConstant(val))
                 {
                     // Easy case, it's just a constant in LLVM.
-                    llvmVar = new llvm::GlobalVariable(
-                        constantValue->getType(),
-                        false,
-                        getLinkageType(var));
-                    llvmVar->setInitializer(constantValue);
+                    llvmVar = builder->declareGlobalVariable(constantValue, sizeAndAlignment.alignment, isDeclExternallyVisible(var));
                 }
             }
         }
 
-        IRSizeAndAlignment sizeAndAlignment =
-            types->getSizeAndAlignment(ptrType->getValueType(), defaultPointerRules);
-
         if (!llvmVar)
         {
-            // No initializer, let's just skip the type, no-one cares anyway :)
-            llvmVar = new llvm::GlobalVariable(
-                llvm::ArrayType::get(llvmBuilder->getInt8Ty(), sizeAndAlignment.getStride()),
-                false,
-                getLinkageType(var));
+            // No initializer, so emit it untyped.
+            llvmVar = builder->declareGlobalVariable(
+                sizeAndAlignment.getStride(),
+                sizeAndAlignment.alignment,
+                isDeclExternallyVisible(var));
+            if (firstBlock)
+                deferredGlobalVars.add(var);
         }
-        llvmVar->setAlignment(llvm::Align(sizeAndAlignment.alignment));
 
-        llvm::StringRef linkageName, prettyName;
+        TerminatedCharSlice linkageName, prettyName;
         if (maybeGetName(&linkageName, &prettyName, var))
-            llvmVar->setName(linkageName);
+            builder->setName(llvmVar, linkageName);
 
-        llvmModule->insertGlobalVariable(llvmVar);
         mapInstToLLVM[var] = llvmVar;
         return llvmVar;
-    }
-
-    void emitGlobalVarCtor(IRGlobalVar* var)
-    {
-        llvm::GlobalVariable* llvmVar =
-            llvm::cast<llvm::GlobalVariable>(mapInstToLLVM.getValue(var));
-
-        // If there's already an initializer, there's nothing more to do here.
-        // This happens when the initializer is a constant and is set in
-        // emitGlobalVarDecl.
-        if (llvmVar->hasInitializer())
-            return;
-
-        auto firstBlock = var->getFirstBlock();
-
-        if (!firstBlock)
-            return;
-
-        // Poison and add a global ctor.
-        llvmVar->setInitializer(llvm::PoisonValue::get(llvmVar->getValueType()));
-
-        llvm::FunctionType* ctorType = llvm::FunctionType::get(llvmBuilder->getVoidTy(), {}, false);
-
-        std::string ctorName = "__slang_init_";
-
-        llvm::StringRef linkageName, prettyName;
-        maybeGetName(&linkageName, &prettyName, var);
-        ctorName += linkageName;
-
-        llvmBuilder->SetCurrentDebugLocation(llvm::DebugLoc());
-        llvm::Function* llvmCtor = llvm::Function::Create(
-            ctorType,
-            llvm::GlobalValue::InternalLinkage,
-            ctorName,
-            *llvmModule);
-
-        // The return instruction of a global value initializer is supposed to
-        // set the global value, so we intercept that return and turn it into a
-        // store.
-        auto epilogue = [&](IRReturn* ret) -> llvm::Value*
-        {
-            auto val = ret->getVal();
-            types->emitStore(llvmVar, findValue(val), val->getDataType(), defaultPointerRules);
-            return llvmBuilder->CreateRetVoid();
-        };
-        emitGlobalValueWithCode(var, llvmCtor, epilogue);
-
-        llvm::Constant* ctorData[3] = {
-            // Leave some room for other global constructors to run first.
-            llvmBuilder->getInt32(globalCtors.getCount() + 16),
-            llvmCtor,
-            llvmVar};
-
-        llvm::Constant* ctorEntry = llvm::ConstantStruct::get(
-            llvmCtorType,
-            llvm::ArrayRef(ctorData, llvmCtorType->getNumElements()));
-
-        globalCtors.add(ctorEntry);
     }
 
     void emitGlobalDebugInfo(IRModule* irModule)
@@ -2630,11 +2603,11 @@ struct LLVMEmitter
                 auto filename = as<IRStringLit>(debugSource->getFileName())->getStringSlice();
 
                 std::filesystem::path path(std::string(filename.begin(), filename.getLength()));
-                instToDebugLLVM[inst] = llvmDebugBuilder->createFile(
-                    path.filename().string().c_str(),
-                    path.parent_path().string().c_str(),
-                    std::nullopt,
-                    getStringLitAsLLVMString(debugSource->getSource()));
+                instToDebugLLVM[inst] = builder->getDebugFile(
+                    TerminatedCharSlice(path.filename().string().c_str()),
+                    TerminatedCharSlice(path.parent_path().string().c_str()),
+                    getStringLitAsSlice(debugSource->getSource())
+                );
             }
         }
     }
@@ -2649,12 +2622,10 @@ struct LLVMEmitter
                 emitGlobalVarDecl(globalVar);
         }
     }
-    */
 
     // Using std::string as the LLVM API works with that. It's not to be
     // ingested by Slang.
     String expandIntrinsic(
-        LLVMInst* llvmFunc,
         IRInst* intrinsicInst,
         IRFunc* parentFunc,
         UnownedStringSlice intrinsicText)
@@ -2862,147 +2833,114 @@ struct LLVMEmitter
         IRInst* intrinsicInst,
         UnownedStringSlice intrinsicDef)
     {
-        String llvmTextIR = expandIntrinsic(llvmFunc, intrinsicInst, func, intrinsicDef);
+        String llvmTextIR = expandIntrinsic(intrinsicInst, func, intrinsicDef);
 
         mapInstToLLVM[func] = builder->emitInlineIRFunction(
             llvmFunc, TerminatedCharSlice(llvmTextIR.begin(), llvmTextIR.getLength()));
     }
 
-    /*
     void emitGlobalValueWithCode(
         IRGlobalValueWithCode* code,
-        llvm::Function* llvmFunc,
+        LLVMInst* llvmFunc,
         FuncEpilogueCallback epilogueCallback)
     {
-        llvmBuilder->SetCurrentDebugLocation(llvm::DebugLoc());
-        debugInlinedScope = false;
-
-        auto func = as<IRFunc>(code);
-        bool intrinsic = false;
-        if (func)
+        // Create all blocks first, so that branch instructions can refer
+        // to blocks that haven't been filled in yet.
+        for (auto irBlock : code->getBlocks())
         {
-            UnownedStringSlice intrinsicDef;
-            IRInst* intrinsicInst;
-            intrinsic = Slang::findTargetIntrinsicDefinition(
-                func,
-                codeGenContext->getTargetReq()->getTargetCaps(),
-                intrinsicDef,
-                intrinsicInst);
-            if (intrinsic)
-            {
-                emitTargetIntrinsicFunction(func, llvmFunc, intrinsicInst, intrinsicDef);
-            }
+            LLVMInst* llvmBlock = builder->emitBlock(llvmFunc);
+            mapInstToLLVM[irBlock] = llvmBlock;
         }
 
-        llvm::DISubprogram* sp = nullptr;
+        // Then, fill in the blocks. Lucky for us, there is pretty much a
+        // 1:1 correspondence between Slang IR blocks and LLVM IR blocks, so
+        // this is straightforward.
+        for (auto irBlock : code->getBlocks())
+        {
+            LLVMInst* llvmBlock = mapInstToLLVM.getValue(irBlock);
+            builder->insertIntoBlock(llvmBlock);
+
+            // Then, add the regular instructions.
+            for (auto irInst : irBlock->getOrdinaryInsts())
+            {
+                auto llvmInst = emitLLVMInstruction(irInst, epilogueCallback);
+                if (llvmInst)
+                    mapInstToLLVM[irInst] = llvmInst;
+            }
+        }
+    }
+
+    void emitFuncDefinition(IRFunc* func)
+    {
+        LLVMInst* llvmFunc = ensureFuncDecl(func);
+        debugInlinedScope = false;
+
+        UnownedStringSlice intrinsicDef;
+        IRInst* intrinsicInst;
+        bool intrinsic = Slang::findTargetIntrinsicDefinition(
+            func,
+            codeGenContext->getTargetReq()->getTargetCaps(),
+            intrinsicDef,
+            intrinsicInst);
+        if (intrinsic)
+            emitTargetIntrinsicFunction(func, llvmFunc, intrinsicInst, intrinsicDef);
+
+        LLVMDebugNode* llvmDebugFunc = nullptr;
         if (debug)
         {
             IRDebugFunction* debugFunc = nullptr;
-            if (auto debugFuncDecoration = code->findDecoration<IRDebugFuncDecoration>())
+            if (auto debugFuncDecoration = func->findDecoration<IRDebugFuncDecoration>())
                 debugFunc = as<IRDebugFunction>(debugFuncDecoration->getDebugFunc());
-            sp = ensureDebugFunc(code, debugFunc);
+            llvmDebugFunc = ensureDebugFunc(func, debugFunc);
         }
 
-        if (sp != nullptr)
-        {
-            llvmFunc->setSubprogram(sp);
-            currentLocalScope = sp;
-        }
+        builder->beginFunction(llvmFunc, llvmDebugFunc);
 
         if (!intrinsic)
         {
-            // Create all blocks first, so that branch instructions can refer
-            // to blocks that haven't been filled in yet.
-            for (auto irBlock : code->getBlocks())
-            {
-                llvm::BasicBlock* llvmBlock = llvm::BasicBlock::Create(*llvmContext, "", llvmFunc);
-                mapInstToLLVM[irBlock] = llvmBlock;
-            }
+            // Aggregate return types are turned into an extra parameter instead of
+            // a return value, so `storeArg` and `epilogue` are used to route the
+            // ostensible return value into that parameter.
+            LLVMInst* storeArg = nullptr;
+            if (types->isAggregateType(func->getResultType()))
+                storeArg = builder->getFunctionArg(llvmFunc, func->getParamCount());
 
-            // Then, fill in the blocks. Lucky for us, there is pretty much a
-            // 1:1 correspondence between Slang IR blocks and LLVM IR blocks, so
-            // this is straightforward.
-            for (auto irBlock : code->getBlocks())
+            auto epilogue = [&](IRReturn* ret) -> LLVMInst*
             {
-                llvm::BasicBlock* llvmBlock =
-                    llvm::cast<llvm::BasicBlock>(mapInstToLLVM.getValue(irBlock));
-                llvmBuilder->SetInsertPoint(llvmBlock);
-
-                // If we are emitting debug data and are starting the first
-                // block, set the debug location at the start of the function.
-                if (sp && irBlock == code->getFirstBlock())
+                if (storeArg)
                 {
-                    llvmBuilder->SetCurrentDebugLocation(
-                        llvm::DILocation::get(*llvmContext, sp->getLine(), 0, sp));
+                    auto val = ret->getVal();
+                    types->emitStore(storeArg, findValue(val), val->getDataType(), defaultPointerRules);
+                    return builder->emitReturn();
                 }
 
-                // Then, add the regular instructions.
-                for (auto irInst : irBlock->getOrdinaryInsts())
-                {
-                    auto llvmInst = emitLLVMInstruction(irInst, epilogueCallback);
-                    if (llvmInst)
-                        mapInstToLLVM[irInst] = llvmInst;
-                }
-            }
+                return nullptr;
+            };
+
+            emitGlobalValueWithCode(func, llvmFunc, epilogue);
         }
 
-        currentLocalScope = nullptr;
-    }
-    */
-
-    void emitComputeEntryPointDispatcher(
-        IRFunc* entryPoint,
-        LLVMInst* llvmEntryPoint,
-        IREntryPointDecoration* entryPointDecor)
-    {
-        auto groupName = String(entryPointDecor->getName()->getStringSlice());
-        auto numThreadsDecor = entryPoint->findDecoration<IRNumThreadsDecoration>();
-
-        LLVMInst* groupFunc = builder->emitComputeEntryPointWorkGroup(
-            llvmEntryPoint,
-            getStringLitAsSlice(entryPointDecor->getName()),
-            numThreadsDecor ? getIntVal(numThreadsDecor->getX()) : 1,
-            numThreadsDecor ? getIntVal(numThreadsDecor->getY()) : 1,
-            numThreadsDecor ? getIntVal(numThreadsDecor->getZ()) : 1,
-            32
-        );
-
-        auto entryPointName = entryPointDecor->getName();
-        builder->emitComputeEntryPointDispatcher(groupFunc, getStringLitAsSlice(entryPointName));
-    }
-
-    /*
-    void emitFuncDefinition(IRFunc* func)
-    {
-        llvm::Function* llvmFunc = ensureFuncDecl(func);
-
-        // Aggregate return types are turned into an extra parameter instead of
-        // a return value, so `storeArg` and `epilogue` are used to route the
-        // ostensible return value into that parameter.
-        llvm::Value* storeArg = nullptr;
-        if (types->isAggregateType(func->getResultType()))
-            storeArg = llvmFunc->getArg(llvmFunc->arg_size() - 1);
-
-        auto epilogue = [&](IRReturn* ret) -> llvm::Value*
-        {
-            if (storeArg)
-            {
-                auto val = ret->getVal();
-                types->emitStore(storeArg, findValue(val), val->getDataType(), defaultPointerRules);
-                return llvmBuilder->CreateRetVoid();
-            }
-
-            return nullptr;
-        };
-
-        emitGlobalValueWithCode(func, llvmFunc, epilogue);
+        builder->endFunction(llvmFunc);
 
         // We need to emit the dispatching functions for entry points so that
         // they can be called.
         auto entryPointDecor = func->findDecoration<IREntryPointDecoration>();
         if (entryPointDecor && entryPointDecor->getProfile().getStage() == Stage::Compute)
         {
-            emitComputeEntryPointDispatcher(func, llvmFunc, entryPointDecor);
+            auto groupName = String(entryPointDecor->getName()->getStringSlice());
+            auto numThreadsDecor = func->findDecoration<IRNumThreadsDecoration>();
+
+            LLVMInst* groupFunc = builder->emitComputeEntryPointWorkGroup(
+                llvmFunc,
+                getStringLitAsSlice(entryPointDecor->getName()),
+                numThreadsDecor ? getIntVal(numThreadsDecor->getX()) : 1,
+                numThreadsDecor ? getIntVal(numThreadsDecor->getY()) : 1,
+                numThreadsDecor ? getIntVal(numThreadsDecor->getZ()) : 1,
+                32
+            );
+
+            auto entryPointName = entryPointDecor->getName();
+            builder->emitComputeEntryPointDispatcher(groupFunc, getStringLitAsSlice(entryPointName));
         }
     }
 
@@ -3024,62 +2962,59 @@ struct LLVMEmitter
                 if (isDefinition(func))
                     emitFuncDefinition(func);
             }
-            else if (auto globalVar = as<IRGlobalVar>(inst))
-            {
-                // Globals may have initializer blocks with code, so they're
-                // also handled in this pass.
-                emitGlobalVarCtor(globalVar);
-            }
         }
     }
 
-    // Emits all remaining global instructions within a function that gets
-    // called during the initialization of the program / library (llvm.global_ctors).
+    // Emits all global initializers within a function that gets called during
+    // the initialization of the program / library (llvm.global_ctors).
     void emitGlobalInstructionCtor()
     {
-        if (promotedGlobalInsts.getCount() == 0)
+        if (deferredGlobalInsts.getCount() == 0 && deferredGlobalVars.getCount() == 0)
             return;
 
-        llvm::FunctionType* ctorType = llvm::FunctionType::get(llvmBuilder->getVoidTy(), {}, false);
+        LLVMInst* globalConstructor = builder->declareGlobalConstructor();
 
-        std::string ctorName = "__slang_global_insts";
-
-        llvmBuilder->SetCurrentDebugLocation(llvm::DebugLoc());
-        llvm::Function* llvmCtor = llvm::Function::Create(
-            ctorType,
-            llvm::GlobalValue::InternalLinkage,
-            ctorName,
-            *llvmModule);
-
-        llvm::BasicBlock* entryBlock = llvm::BasicBlock::Create(*llvmContext, "", llvmCtor);
-        llvmBuilder->SetInsertPoint(entryBlock);
-
+        // First emit promoted global instructions.
+        LLVMInst* block = builder->emitBlock(globalConstructor);
+        builder->insertIntoBlock(block);
         inlineGlobalInstructions = true;
 
-        for (auto [inst, globalVar] : promotedGlobalInsts)
+        for (auto [inst, globalVar] : deferredGlobalInsts)
         {
-            if (globalVar->hasInitializer())
-                continue;
-
-            // Emit the instructions needed to construct the value.
+            // Emit the instructions needed to construct the value, and store
+            // the results into the variable as appropriate.
             auto llvmInst = emitLLVMInstruction(inst);
-            globalVar->setInitializer(llvm::PoisonValue::get(globalVar->getValueType()));
             types->emitStore(globalVar, llvmInst, inst->getDataType(), defaultPointerRules);
         }
 
+        LLVMInst* prevBlock = block;
+
+        // Then, emit the global variables with non-trivial initializers.
         inlineGlobalInstructions = false;
-        llvmBuilder->CreateRetVoid();
 
-        llvm::Constant* ctorData[3] = {
-            llvmBuilder->getInt32(0),
-            llvmCtor,
-            llvm::ConstantPointerNull::get(llvm::PointerType::get(*llvmContext, 0))};
+        for (auto globalVar : deferredGlobalVars)
+        {
+            LLVMInst* llvmVar = mapInstToLLVM.getValue(globalVar);
 
-        llvm::Constant* ctorEntry = llvm::ConstantStruct::get(
-            llvmCtorType,
-            llvm::ArrayRef(ctorData, llvmCtorType->getNumElements()));
+            LLVMInst* afterBlock = builder->emitBlock(globalConstructor);
 
-        globalCtors.add(ctorEntry);
+            auto epilogue = [&](IRReturn* ret) -> LLVMInst*
+            {
+                auto val = ret->getVal();
+                types->emitStore(llvmVar, findValue(val), val->getDataType(), defaultPointerRules);
+                return builder->emitBranch(afterBlock);
+            };
+            emitGlobalValueWithCode(globalVar, globalConstructor, epilogue);
+            // Generate jump from prevBlock to firstBlock
+            LLVMInst* llvmFirstBlock = mapInstToLLVM.getValue(globalVar->getFirstBlock());
+            builder->insertIntoBlock(prevBlock);
+            builder->emitBranch(llvmFirstBlock);
+
+            prevBlock = afterBlock;
+        }
+
+        builder->insertIntoBlock(prevBlock);
+        builder->emitReturn();
     }
 
     void processModule(IRModule* irModule)
@@ -3089,7 +3024,6 @@ struct LLVMEmitter
         emitGlobalFunctions(irModule);
         emitGlobalInstructionCtor();
     }
-*/
 };
 
 SlangResult emitLLVMAssemblyFromIR(
@@ -3097,8 +3031,9 @@ SlangResult emitLLVMAssemblyFromIR(
     IRModule* irModule,
     IArtifact** outArtifact)
 {
-    LLVMEmitter emitter(codeGenContext);
-    //emitter.processModule(irModule);
+    LLVMEmitter emitter;
+    SLANG_RETURN_ON_FAIL(emitter.init(codeGenContext));
+    emitter.processModule(irModule);
     return emitter.builder->generateAssembly(outArtifact);
 }
 
@@ -3107,8 +3042,9 @@ SlangResult emitLLVMObjectFromIR(
     IRModule* irModule,
     IArtifact** outArtifact)
 {
-    LLVMEmitter emitter(codeGenContext);
-    //emitter.processModule(irModule);
+    LLVMEmitter emitter;
+    SLANG_RETURN_ON_FAIL(emitter.init(codeGenContext));
+    emitter.processModule(irModule);
     return emitter.builder->generateObjectCode(outArtifact);
 }
 
@@ -3117,8 +3053,9 @@ SlangResult emitLLVMJITFromIR(
     IRModule* irModule,
     IArtifact** outArtifact)
 {
-    LLVMEmitter emitter(codeGenContext, true);
-    //emitter.processModule(irModule);
+    LLVMEmitter emitter;
+    SLANG_RETURN_ON_FAIL(emitter.init(codeGenContext, true));
+    emitter.processModule(irModule);
     return emitter.builder->generateJITLibrary(outArtifact);
 }
 

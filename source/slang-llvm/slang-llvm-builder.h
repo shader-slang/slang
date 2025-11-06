@@ -40,6 +40,7 @@
 
 #ifdef SLANG_LLVM_IMPL
 #include "llvm/IR/Value.h"
+#include <llvm/IR/DebugInfoMetadata.h>
 #endif
 
 namespace Slang
@@ -57,6 +58,7 @@ struct LLVMDebugNode;
 
 struct LLVMBuilderOptions
 {
+    SlangCompileTarget target;
     TerminatedCharSlice targetTriple;
     TerminatedCharSlice cpu;
     TerminatedCharSlice features;
@@ -65,9 +67,10 @@ struct LLVMBuilderOptions
     SlangDebugInfoLevel debugLevel;
     SlangFpDenormalMode fp32DenormalMode;
     SlangFpDenormalMode fp64DenormalMode;
-    bool useJIT;
     SlangFloatingPointMode fpMode;
-    SlangCompileTarget target;
+    // TODO: Check if this can be removed. It should be possible on the emitter
+    // side if targetTriple can be set to host in string form.
+    bool useJIT;
 };
 
 enum LLVMAttribute : uint32_t
@@ -124,7 +127,7 @@ enum class LLVMBinaryOp : uint32_t
     LeftShift
 };
 
-class ILLVMBuilder : public ISlangUnknown
+class ILLVMBuilder : public ICastable
 {
 public:
     SLANG_COM_INTERFACE(0xc426a086, 0xd334, 0x43bd, {0xb7, 0x80, 0x4e, 0x1a, 0xfa, 0x97, 0x21, 0x88})
@@ -133,7 +136,7 @@ public:
     // Introspection
     //==========================================================================
     virtual SLANG_NO_THROW int SLANG_MCALL getPointerSizeInBits() = 0;
-    virtual int SLANG_MCALL getStoreSizeOf(LLVMInst* value) = 0;
+    virtual SLANG_NO_THROW int SLANG_MCALL getStoreSizeOf(LLVMInst* value) = 0;
 
     virtual SLANG_NO_THROW void SLANG_MCALL printType(String& outStr, LLVMType* type) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL printValue(String& outStr, LLVMInst* value, bool withType = true) = 0;
@@ -160,11 +163,21 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL setArgInfo(LLVMInst* arg, TerminatedCharSlice name, uint32_t attributes) = 0;
     virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL declareGlobalVariable(
         LLVMInst* initializer,
+        int alignment,
         bool externallyVisible = false) = 0;
     virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL declareGlobalVariable(
         int size,
         int alignment,
         bool externallyVisible = false) = 0;
+    virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL declareGlobalConstructor() = 0;
+
+    //==========================================================================
+    // Blocks 
+    //==========================================================================
+    virtual SLANG_NO_THROW void SLANG_MCALL beginFunction(LLVMInst* func, LLVMDebugNode* debugFunc) = 0;
+    virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL emitBlock(LLVMInst* func) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL insertIntoBlock(LLVMInst* block) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL endFunction(LLVMInst* func) = 0;
 
     //==========================================================================
     // Instructions
@@ -253,9 +266,20 @@ public:
         int line
     ) = 0;
     virtual SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugFunctionType(LLVMDebugNode* returnType, Slice<LLVMDebugNode*> paramTypes) = 0;
+    virtual SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugFunction(
+        LLVMDebugNode* funcType,
+        TerminatedCharSlice name,
+        TerminatedCharSlice linkageName,
+        LLVMDebugNode* file,
+        int line
+    ) = 0;
 
     virtual SLANG_NO_THROW void SLANG_MCALL setDebugLocation(int line, int column) = 0;
-    virtual SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugLocation() = 0;
+    virtual SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugFile(
+        TerminatedCharSlice filename,
+        TerminatedCharSlice directory,
+        TerminatedCharSlice source
+    ) = 0;
 
     virtual SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL emitDebugVar(
         TerminatedCharSlice name,

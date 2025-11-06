@@ -15,7 +15,6 @@
 #include "core/slang-com-object.h"
 #include "slang-llvm-jit-shared-library.h"
 
-#include <filesystem>
 #include <llvm/AsmParser/Parser.h>
 #include <llvm/ExecutionEngine/Orc/LLJIT.h>
 #include <llvm/IR/BasicBlock.h>
@@ -160,15 +159,10 @@ class LLVMBuilder : public ComBaseObject, public ILLVMBuilder
 public:
     typedef ComBaseObject Super;
 
-    // IUnknown
-    SLANG_COM_BASE_IUNKNOWN_ALL
-
     LLVMBuilder(
         LLVMBuilderOptions options,
         IArtifact** outErrorArtifact);
     ~LLVMBuilder();
-
-    void* getInterface(const Guid& guid);
 
     IArtifact* createErrorArtifact(const ArtifactDiagnostic& diagnostic);
 
@@ -185,6 +179,19 @@ public:
         Slice<LLVMInst*> args,
         Slice<bool> argIsSigned,
         List<LLVMInst*>& outArgs);
+
+
+    //==========================================================================
+    // IUnknown
+    //==========================================================================
+    SLANG_COM_BASE_IUNKNOWN_ALL
+
+    void* getInterface(const Guid& guid);
+
+    //==========================================================================
+    // ICastable
+    //==========================================================================
+    SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) override;
 
     //==========================================================================
     // ILLVMBuilder
@@ -207,8 +214,14 @@ public:
     SLANG_NO_THROW LLVMInst* SLANG_MCALL declareFunction(LLVMType* funcType, TerminatedCharSlice name, uint32_t attributes) override;
     SLANG_NO_THROW LLVMInst* SLANG_MCALL getFunctionArg(LLVMInst* funcDecl, int argIndex) override;
     SLANG_NO_THROW void SLANG_MCALL setArgInfo(LLVMInst* arg, TerminatedCharSlice name, uint32_t attribute) override;
-    SLANG_NO_THROW LLVMInst* SLANG_MCALL declareGlobalVariable(LLVMInst* initializer, bool externallyVisible) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL declareGlobalVariable(LLVMInst* initializer, int alignment, bool externallyVisible) override;
     SLANG_NO_THROW LLVMInst* SLANG_MCALL declareGlobalVariable(int size, int alignment, bool externallyVisible) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL declareGlobalConstructor() override;
+
+    SLANG_NO_THROW void SLANG_MCALL beginFunction(LLVMInst* func, LLVMDebugNode* debugFunc) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitBlock(LLVMInst* func) override;
+    SLANG_NO_THROW void SLANG_MCALL insertIntoBlock(LLVMInst* func) override;
+    SLANG_NO_THROW void SLANG_MCALL endFunction(LLVMInst* func) override;
 
     SLANG_NO_THROW LLVMInst* SLANG_MCALL emitAlloca(int size, int alignment) override;
     SLANG_NO_THROW LLVMInst* SLANG_MCALL emitGetElementPtr(LLVMInst* ptr, int stride, LLVMInst* index) override;
@@ -290,7 +303,20 @@ public:
         int line
     ) override;
     SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugFunctionType(LLVMDebugNode* returnType, Slice<LLVMDebugNode*> paramTypes) override;
+    SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugFunction(
+        LLVMDebugNode* funcType,
+        TerminatedCharSlice name,
+        TerminatedCharSlice linkageName,
+        LLVMDebugNode* file,
+        int line
+    ) override;
     SLANG_NO_THROW void SLANG_MCALL setDebugLocation(int line, int column) override;
+    SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugFile(
+        TerminatedCharSlice filename,
+        TerminatedCharSlice directory,
+        TerminatedCharSlice source
+    ) override;
+
     SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL emitDebugVar(
         TerminatedCharSlice name,
         LLVMDebugNode* type,
@@ -473,15 +499,6 @@ LLVMBuilder::~LLVMBuilder()
     delete targetMachine;
 }
 
-void* LLVMBuilder::getInterface(const Guid& guid)
-{
-    if (guid == ISlangUnknown::getTypeGuid() || guid == ILLVMBuilder::getTypeGuid())
-    {
-        return static_cast<ILLVMBuilder*>(this);
-    }
-    return nullptr;
-}
-
 IArtifact* LLVMBuilder::createErrorArtifact(const ArtifactDiagnostic& diagnostic)
 {
     ComPtr<IArtifactDiagnostics> diagnostics(new ArtifactDiagnostics);
@@ -662,6 +679,22 @@ void LLVMBuilder::makeVariadicArgsCCompatible(
     }
 }
 
+void* LLVMBuilder::getInterface(const Guid& guid)
+{
+    if (guid == ISlangUnknown::getTypeGuid() || guid == ILLVMBuilder::getTypeGuid())
+    {
+        return static_cast<ILLVMBuilder*>(this);
+    }
+    return nullptr;
+}
+
+void* LLVMBuilder::castAs(const Guid& guid)
+{
+    if (auto ptr = getInterface(guid))
+        return ptr;
+    return nullptr;
+}
+
 int LLVMBuilder::getPointerSizeInBits()
 {
     return targetDataLayout.getPointerSizeInBits();
@@ -789,6 +822,7 @@ void LLVMBuilder::setArgInfo(LLVMInst* arg, TerminatedCharSlice name, uint32_t a
 
 LLVMInst* LLVMBuilder::declareGlobalVariable(
     LLVMInst* initializer,
+    int alignment,
     bool externallyVisible)
 {
     auto llvmVal = llvm::cast<llvm::Constant>(initializer);
@@ -797,6 +831,7 @@ LLVMInst* LLVMBuilder::declareGlobalVariable(
         false,
         llvm::GlobalValue::PrivateLinkage);
     llvmVar->setInitializer(llvmVal);
+    llvmVar->setAlignment(llvm::Align(alignment));
     llvmModule->insertGlobalVariable(llvmVar);
     return llvmVar;
 }
@@ -811,9 +846,71 @@ LLVMInst* LLVMBuilder::declareGlobalVariable(
         llvmType,
         false,
         externallyVisible ? llvm::GlobalValue::ExternalLinkage : llvm::GlobalValue::PrivateLinkage);
+    llvmVar->setInitializer(llvm::PoisonValue::get(llvmType));
     llvmVar->setAlignment(llvm::Align(alignment));
     llvmModule->insertGlobalVariable(llvmVar);
     return llvmVar;
+}
+
+LLVMInst* LLVMBuilder::declareGlobalConstructor()
+{
+    llvm::FunctionType* ctorType = llvm::FunctionType::get(llvmBuilder->getVoidTy(), {}, false);
+
+    std::string ctorName = "__slang_global_constructor";
+
+    llvmBuilder->SetCurrentDebugLocation(llvm::DebugLoc());
+    llvm::Function* llvmCtor = llvm::Function::Create(
+        ctorType,
+        llvm::GlobalValue::InternalLinkage,
+        ctorName,
+        *llvmModule);
+
+    llvm::Constant* ctorData[3] = {
+        llvmBuilder->getInt32(0),
+        llvmCtor,
+        llvm::ConstantPointerNull::get(llvm::PointerType::get(*llvmContext, 0))};
+
+    llvm::Constant* ctorEntry = llvm::ConstantStruct::get(
+        llvmCtorType,
+        llvm::ArrayRef(ctorData, llvmCtorType->getNumElements()));
+
+    globalCtors.add(ctorEntry);
+    
+    return llvmCtor;
+}
+
+void LLVMBuilder::beginFunction(LLVMInst* func, LLVMDebugNode* debugFunc)
+{
+    if (debugFunc != nullptr)
+    {
+        auto llvmFunc = llvm::cast<llvm::Function>(func);
+        auto llvmDebugFunc = llvm::cast<llvm::DISubprogram>(debugFunc);
+        llvmFunc->setSubprogram(llvmDebugFunc);
+        currentLocalScope = llvmDebugFunc;
+        llvmBuilder->SetCurrentDebugLocation(
+            llvm::DILocation::get(*llvmContext, llvmDebugFunc->getLine(), 0, llvmDebugFunc));
+    }
+    else
+    {
+        currentLocalScope = nullptr;
+        llvmBuilder->SetCurrentDebugLocation(llvm::DebugLoc());
+    }
+}
+
+LLVMInst* LLVMBuilder::emitBlock(LLVMInst* func)
+{
+    auto llvmFunc = llvm::cast<llvm::Function>(func);
+    return llvm::BasicBlock::Create(*llvmContext, "", llvmFunc);
+}
+
+void LLVMBuilder::insertIntoBlock(LLVMInst* block)
+{
+    llvmBuilder->SetInsertPoint(llvm::cast<llvm::BasicBlock>(block));
+}
+
+void LLVMBuilder::endFunction(LLVMInst* func)
+{
+    currentLocalScope = nullptr;
 }
 
 LLVMInst* LLVMBuilder::emitAlloca(int size, int alignment)
@@ -1512,12 +1609,46 @@ LLVMDebugNode* LLVMBuilder::getDebugFunctionType(LLVMDebugNode* returnType, Slic
         llvm::ArrayRef<llvm::Metadata*>(elements.begin(), elements.end())));
 }
 
+LLVMDebugNode* LLVMBuilder::getDebugFunction(
+    LLVMDebugNode* funcType,
+    TerminatedCharSlice name,
+    TerminatedCharSlice linkageName,
+    LLVMDebugNode* file,
+    int line
+){
+    if (!file)
+        file = compileUnit->getFile();
+
+    return llvmDebugBuilder->createFunction(
+        llvm::cast<llvm::DIScope>(file),
+        charSliceToLLVM(name),
+        charSliceToLLVM(linkageName),
+        llvm::cast<llvm::DIFile>(file),
+        line,
+        llvm::cast<llvm::DISubroutineType>(funcType),
+        line,
+        llvm::DINode::FlagPrototyped,
+        llvm::DISubprogram::SPFlagDefinition);
+}
+
 void LLVMBuilder::setDebugLocation(int line, int column)
 {
     if (!currentLocalScope)
         return;
     llvmBuilder->SetCurrentDebugLocation(
         llvm::DILocation::get(*llvmContext, line, column, currentLocalScope));
+}
+
+LLVMDebugNode* LLVMBuilder::getDebugFile(
+    TerminatedCharSlice filename,
+    TerminatedCharSlice directory,
+    TerminatedCharSlice source
+){
+    return llvmDebugBuilder->createFile(
+        charSliceToLLVM(filename),
+        charSliceToLLVM(directory),
+        std::nullopt,
+        charSliceToLLVM(source));
 }
 
 LLVMDebugNode* LLVMBuilder::emitDebugVar(
@@ -1565,7 +1696,7 @@ LLVMDebugNode* LLVMBuilder::emitDebugVar(
 void LLVMBuilder::emitDebugValue(LLVMDebugNode* debugVar, LLVMInst* value)
 {
     llvm::DILocalVariable* var = llvm::cast<llvm::DILocalVariable>(debugVar);
-    if (!currentLocalScope || !variableDebugInfoMap.containsKey(debugVar))
+    if (!currentLocalScope || !variableDebugInfoMap.containsKey(var))
         return;
 
     VariableDebugInfo& debugInfo = variableDebugInfoMap.getValue(var);
@@ -1631,6 +1762,7 @@ LLVMInst* LLVMBuilder::emitInlineIRFunction(LLVMInst* func, TerminatedCharSlice 
     // Intrinsic functions usually do nothing other than call a single
     // instruction; we can just inline them by default.
     llvmFunc->addFnAttr(llvm::Attribute::AttrKind::AlwaysInline);
+    return llvmFunc;
 }
 
 LLVMInst* LLVMBuilder::emitComputeEntryPointWorkGroup(
@@ -1916,6 +2048,7 @@ LLVMInst* LLVMBuilder::emitComputeEntryPointDispatcher(LLVMInst* workGroupFunc, 
 
     llvmBuilder->SetInsertPoint(endBlock);
     llvmBuilder->CreateRetVoid();
+    return dispatcher;
 }
 
 SlangResult LLVMBuilder::generateAssembly(IArtifact** outArtifact)
@@ -2017,3 +2150,23 @@ SlangResult LLVMBuilder::generateJITLibrary(IArtifact** outArtifact)
 }
 
 } // namespace slang_llvm
+
+extern "C" SLANG_DLL_EXPORT SlangResult
+createLLVMBuilder_V1(
+    const SlangUUID& intfGuid,
+    Slang::ILLVMBuilder** out,
+    Slang::LLVMBuilderOptions options,
+    Slang::IArtifact** outErrorArtifact
+){
+    Slang::ComPtr<slang_llvm::LLVMBuilder> builder(
+        new slang_llvm::LLVMBuilder(options, outErrorArtifact));
+
+    if (auto ptr = builder->castAs(intfGuid))
+    {
+        builder.detach();
+        *out = (Slang::ILLVMBuilder*)ptr;
+        return SLANG_OK;
+    }
+
+    return SLANG_E_NO_INTERFACE;
+}
