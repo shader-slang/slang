@@ -1,6 +1,7 @@
 name: Falcor Tests
 
 on:
+  workflow_dispatch:
   pull_request:
     branches: [master]
     paths-ignore:
@@ -28,7 +29,7 @@ jobs:
           - warnings-as-errors: true
             test-category: full
             full-gpu-tests: false
-            runs-on: [Windows, self-hosted, falcor]
+            runs-on: [Windows, self-hosted, falcor-debug]
     runs-on: ${{ matrix.runs-on }}
     defaults:
       run:
@@ -74,14 +75,35 @@ jobs:
       - name: falcor-unit-test
         shell: pwsh
         run: |
-          $ErrorActionPreference = "SilentlyContinue"
+          $ErrorActionPreference = "Continue"
+          $VerbosePreference = "Continue"
+          echo "Current directory: $(Get-Location)"
+          echo "Slang repo root: $env:GITHUB_WORKSPACE"
           cd .\FalcorBin\tests
-          python ./testing/run_unit_tests.py --config windows-vs2022-Release -t "-slow"
+          echo "Changed to: $(Get-Location)"
+          echo "Contents of current directory:"
+          Get-ChildItem -Recurse -Depth 2 | Select-Object FullName
+          echo "`nContents of build directory:"
+          Get-ChildItem ..\build\windows-vs2022\bin\Release -ErrorAction SilentlyContinue | Select-Object Name
+          echo "`nAdding debug output to run_unit_tests.py..."
+          $content = Get-Content ./testing/run_unit_tests.py -Raw
+          $content = $content -replace '(\s+)(p = subprocess\.Popen\(args\))', '$1print(f"DEBUG: Attempting to execute: {args}", file=sys.stderr)$1sys.stderr.flush()$1$2'
+          $content | Set-Content ./testing/run_unit_tests_debug.py
+          echo "`nRunning tests with debug output..."
+          python ./testing/run_unit_tests_debug.py --config windows-vs2022-Release -t "-slow"
+          $exitCode = $LASTEXITCODE
           cd ../../
+          exit $exitCode
       - name: falcor-image-test
         shell: pwsh
         run: |
-          $ErrorActionPreference = "SilentlyContinue"
+          $ErrorActionPreference = "Continue"
+          $VerbosePreference = "Continue"
+          echo "Current directory: $(Get-Location)"
           cd .\FalcorBin\tests
-          python ./testing/run_image_tests.py --config windows-vs2022-Release --run-only
+          echo "Changed to: $(Get-Location)"
+          echo "Running image tests..."
+          python ./testing/run_image_tests.py --config windows-vs2022-Release --run-only --verbose
+          $exitCode = $LASTEXITCODE
           cd ../../
+          exit $exitCode
