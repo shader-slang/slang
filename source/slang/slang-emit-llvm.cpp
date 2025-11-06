@@ -68,6 +68,12 @@ static bool isPtrVolatile(IRInst* value)
     return false;
 }
 
+static bool isSigned(IRInst* value)
+{
+    IRType* elementType = getVectorOrCoopMatrixElementType(value->getDataType());
+    return isSignedType(elementType);
+}
+
 // Tries to determine a debug location for a given inst. E.g. if given a struct,
 // it'll first try to check if it has explicit debug location information, and
 // if not, it'll give the module's beginning at least.
@@ -1171,17 +1177,6 @@ struct LLVMEmitter
     // Map of debug instructions to LLVM debug nodes.
     Dictionary<IRInst*, LLVMDebugNode*> instToDebugLLVM;
 
-    // These enums represent built-in functions whose implementations must be
-    // externally provided.
-    enum class ExternalFunc
-    {
-        Printf
-        // TODO: Texture sampling, RT functions?
-    };
-    // Map of external builtins. These are only forward-declared in the emitted
-    // LLVM IR.
-    Dictionary<ExternalFunc, LLVMInst*> externalFuncs;
-
     // Used to skip some instructions whose value is derived from DebugVar.
     HashSet<IRInst*> debugInsts;
 
@@ -1255,39 +1250,6 @@ struct LLVMEmitter
     DiagnosticSink* getSink() { return codeGenContext->getSink(); }
 
     CompilerOptionSet& getOptions() { return codeGenContext->getTargetProgram()->getOptionSet(); }
-
-    LLVMInst* getExternalBuiltin(ExternalFunc extFunc)
-    {
-        if (externalFuncs.containsKey(extFunc))
-            return externalFuncs.getValue(extFunc);
-
-        LLVMInst* func = nullptr;
-        auto emitDecl = [&](const char* name,
-                            LLVMType* result,
-                            Slice<LLVMType*> params,
-                            bool isVarArgs)
-        {
-            auto funcType = builder->getFunctionType(result, params, isVarArgs);
-            return builder->declareFunction(funcType, TerminatedCharSlice(name), SLANG_LLVM_FUNC_ATTR_EXTERNALLYVISIBLE);
-        };
-
-        switch (extFunc)
-        {
-        case ExternalFunc::Printf:
-            LLVMType* params[1] = {builder->getPointerType()};
-            func = emitDecl("printf", int32Type, {params, 1}, true);
-
-            builder->setArgInfo(
-                builder->getFunctionArg(func, 0),
-                TerminatedCharSlice("format"),
-                SLANG_LLVM_ATTR_NOALIAS | SLANG_LLVM_ATTR_NOCAPTURE
-            );
-            break;
-        }
-
-        externalFuncs[extFunc] = func;
-        return func;
-    }
 
     // Finds the value of an instruction that has already been emitted, OR
     // creates the value if it's a constant. Also, if inlineGlobalInstructions
@@ -1380,10 +1342,8 @@ struct LLVMEmitter
     {
         SLANG_ASSERT(inst->getOperandCount() == 2);
 
-        IRType* aElementType = getVectorOrCoopMatrixElementType(inst->getOperand(0)->getDataType());
-        IRType* bElementType = getVectorOrCoopMatrixElementType(inst->getOperand(1)->getDataType());
-        bool aSigned = isSignedType(aElementType);
-        bool bSigned = isSignedType(bElementType);
+        bool aSigned = isSigned(inst->getOperand(0));
+        bool bSigned = isSigned(inst->getOperand(1));
 
         auto a = findValue(inst->getOperand(0));
         auto b = findValue(inst->getOperand(1));
@@ -1420,8 +1380,6 @@ struct LLVMEmitter
     LLVMInst* emitArithmetic(IRInst* inst)
     {
         auto resultType = types->getType(inst->getDataType());
-
-        bool isSigned = isSignedType(inst->getDataType());
 
         if (inst->getOperandCount() == 1)
         {
@@ -1483,7 +1441,12 @@ struct LLVMEmitter
                 break;
             }
 
-            return builder->emitBinaryOp(op, findValue(inst->getOperand(0)), findValue(inst->getOperand(1)), resultType, isSigned);
+            return builder->emitBinaryOp(
+                op,
+                findValue(inst->getOperand(0)),
+                findValue(inst->getOperand(1)),
+                resultType,
+                isSigned(inst->getDataType()));
         }
         else
         {
@@ -1925,14 +1888,10 @@ struct LLVMEmitter
         case kIROp_CastPtrToInt:
         case kIROp_CastPtrToBool:
         case kIROp_CastIntToPtr:
-            {
-                auto fromTypeV = inst->getOperand(0)->getDataType();
-                auto fromType = getVectorOrCoopMatrixElementType(fromTypeV);
-                llvmInst = builder->emitCast(
-                    findValue(inst->getOperand(0)),
-                    types->getType(inst->getDataType()),
-                    isSignedType(fromType));
-            }
+            llvmInst = builder->emitCast(
+                findValue(inst->getOperand(0)),
+                types->getType(inst->getDataType()),
+                isSigned(inst->getOperand(0)));
             break;
 
         case kIROp_PtrCast:
@@ -2081,19 +2040,12 @@ struct LLVMEmitter
             break;
 
         case kIROp_BitfieldExtract:
-            {
-                IRType* elementType =
-                    getVectorOrCoopMatrixElementType(inst->getOperand(0)->getDataType());
-                IRBasicType* basicType = as<IRBasicType>(elementType);
-                bool isSigned = isSignedType(basicType);
-
-                llvmInst = builder->emitBitfieldExtract(
-                    findValue(inst->getOperand(0)),
-                    findValue(inst->getOperand(1)),
-                    findValue(inst->getOperand(2)),
-                    types->getType(inst->getDataType()),
-                    isSigned);
-            }
+            llvmInst = builder->emitBitfieldExtract(
+                findValue(inst->getOperand(0)),
+                findValue(inst->getOperand(1)),
+                findValue(inst->getOperand(2)),
+                types->getType(inst->getDataType()),
+                isSigned(inst->getOperand(0)));
             break;
 
         case kIROp_BitfieldInsert:
@@ -2152,13 +2104,10 @@ struct LLVMEmitter
             }
             break;
 
-            /*
         case kIROp_Printf:
             {
-                auto llvmFunc = getExternalBuiltin(ExternalFunc::Printf);
-
-                List<llvm::Value*> args;
-                args.add(findValue(inst->getOperand(0)));
+                List<LLVMInst*> args;
+                List<bool> argIsSigned;
                 if (inst->getOperandCount() == 2)
                 {
                     auto operand = inst->getOperand(1);
@@ -2168,34 +2117,20 @@ struct LLVMEmitter
                         for (UInt bb = 0; bb < makeStruct->getOperandCount(); ++bb)
                         {
                             auto op = makeStruct->getOperand(bb);
+                            op->getDataType();
                             auto llvmValue = findValue(op);
-                            auto valueType = llvmValue->getType();
 
-                            if (valueType->isFloatingPointTy() &&
-                                valueType->getScalarSizeInBits() < 64)
-                            {
-                                // Floats need to get up-casted to at least f64
-                                llvmValue = llvmBuilder->CreateCast(
-                                    llvm::Instruction::CastOps::FPExt,
-                                    llvmValue,
-                                    llvmBuilder->getDoubleTy());
-                            }
-                            else if (
-                                valueType->isIntegerTy() && valueType->getScalarSizeInBits() < 32)
-                            {
-                                // Ints are upcasted to at least i32.
-                                llvmValue = llvmBuilder->CreateCast(
-                                    getLLVMIntExtensionOp(op->getDataType()),
-                                    llvmValue,
-                                    llvmBuilder->getInt32Ty());
-                            }
                             args.add(llvmValue);
+                            argIsSigned.add(isSigned(op));
                         }
                     }
                 }
 
-                llvmInst =
-                    llvmBuilder->CreateCall(llvmFunc, llvm::ArrayRef(args.begin(), args.end()));
+                llvmInst = builder->emitPrintf(
+                    findValue(inst->getOperand(0)),
+                    Slice(args.begin(), args.getCount()),
+                    Slice(argIsSigned.begin(), argIsSigned.getCount())
+                );
             }
             break;
 
@@ -2208,7 +2143,7 @@ struct LLVMEmitter
                 auto llvmBase = findValue(gepInst->getBase());
                 auto llvmIndex = findValue(gepInst->getIndex());
 
-                auto llvmPtr = llvmBuilder->CreateExtractValue(llvmBase, 0);
+                auto llvmPtr = builder->emitGetBufferPtr(llvmBase);
 
                 IRTypeLayoutRules* rules = getBufferLayoutRules(baseType);
                 llvmInst = types->emitArrayGetElementPtr(
@@ -2228,7 +2163,7 @@ struct LLVMEmitter
 
                 auto baseType = cast<IRHLSLStructuredBufferTypeBase>(base->getDataType());
 
-                auto llvmBasePtr = llvmBuilder->CreateExtractValue(llvmBase, 0);
+                auto llvmBasePtr = builder->emitGetBufferPtr(llvmBase);
                 IRTypeLayoutRules* rules = getBufferLayoutRules(baseType);
 
                 auto llvmPtr = types->emitArrayGetElementPtr(
@@ -2249,7 +2184,7 @@ struct LLVMEmitter
 
                 auto baseType = cast<IRHLSLStructuredBufferTypeBase>(base->getDataType());
 
-                auto llvmBasePtr = llvmBuilder->CreateExtractValue(llvmBase, 0);
+                auto llvmBasePtr = builder->emitGetBufferPtr(llvmBase);
                 IRTypeLayoutRules* rules = getBufferLayoutRules(baseType);
 
                 auto llvmPtr = types->emitArrayGetElementPtr(
@@ -2266,9 +2201,8 @@ struct LLVMEmitter
                 auto llvmBase = findValue(inst->getOperand(0));
                 auto llvmIndex = findValue(inst->getOperand(1));
 
-                auto llvmBasePtr = llvmBuilder->CreateExtractValue(llvmBase, 0);
-                auto llvmPtr =
-                    llvmBuilder->CreateGEP(llvmBuilder->getInt8Ty(), llvmBasePtr, llvmIndex);
+                auto llvmBasePtr = builder->emitGetBufferPtr(llvmBase);
+                auto llvmPtr = builder->emitGetElementPtr(llvmBasePtr, 1, llvmIndex);
 
                 llvmInst = types->emitLoad(llvmPtr, inst->getDataType(), defaultPointerRules);
             }
@@ -2279,10 +2213,8 @@ struct LLVMEmitter
                 auto llvmBase = findValue(inst->getOperand(0));
                 auto llvmIndex = findValue(inst->getOperand(1));
 
-                llvm::Value* indices[] = {llvmIndex};
-                auto llvmBasePtr = llvmBuilder->CreateExtractValue(llvmBase, 0);
-                auto llvmPtr =
-                    llvmBuilder->CreateGEP(llvmBuilder->getInt8Ty(), llvmBasePtr, indices);
+                auto llvmBasePtr = builder->emitGetBufferPtr(llvmBase);
+                auto llvmPtr = builder->emitGetElementPtr(llvmBasePtr, 1, llvmIndex);
                 auto val = inst->getOperand(inst->getOperandCount() - 1);
                 llvmInst = types->emitStore(
                     llvmPtr,
@@ -2301,20 +2233,18 @@ struct LLVMEmitter
 
                 IRTypeLayoutRules* layout = getBufferLayoutRules(bufferType);
 
-                auto llvmUintType = llvmBuilder->getInt32Ty();
-                auto llvmBaseCount = llvmBuilder->CreateExtractValue(llvmBuffer, 1);
-                llvmBaseCount = llvmBuilder->CreateZExtOrTrunc(llvmBaseCount, llvmUintType);
+                auto llvmBaseCount = builder->emitGetBufferSize(llvmBuffer);
+                llvmBaseCount = builder->emitCast(llvmBaseCount, int32Type, false);
 
-                auto returnType =
-                    llvm::VectorType::get(llvmUintType, llvm::ElementCount::getFixed(2));
-                llvmInst = llvm::PoisonValue::get(returnType);
-                llvmInst = llvmBuilder->CreateInsertElement(llvmInst, llvmBaseCount, uint64_t(0));
+                auto returnType = builder->getVectorType(2, int32Type);
+                llvmInst = builder->getPoison(returnType);
+                llvmInst = builder->emitInsertElement(llvmInst, llvmBaseCount, builder->getConstantInt(int32Type, 0));
 
                 auto stride = types->getSizeAndAlignment(bufferType->getElementType(), layout).size;
-                llvmInst = llvmBuilder->CreateInsertElement(
+                llvmInst = builder->emitInsertElement(
                     llvmInst,
-                    llvmBuilder->getInt32(stride),
-                    uint64_t(1));
+                    builder->getConstantInt(int32Type, stride),
+                    builder->getConstantInt(int32Type, 1));
             }
             break;
 
@@ -2322,17 +2252,11 @@ struct LLVMEmitter
             {
                 auto bufferType = as<IRHLSLStructuredBufferTypeBase>(inst->getDataType());
                 auto llvmByteBuffer = findValue(inst->getOperand(0));
-                auto llvmByteCount = llvmBuilder->CreateExtractValue(llvmByteBuffer, 1);
-
                 IRTypeLayoutRules* layout = getBufferLayoutRules(bufferType);
                 auto stride = types->getSizeAndAlignment(bufferType->getElementType(), layout).size;
-                auto llvmElementCount = llvmBuilder->CreateUDiv(
-                    llvmByteCount,
-                    llvm::ConstantInt::get(llvmBuilder->getIntPtrTy(targetDataLayout), stride));
-                llvmInst = llvmBuilder->CreateInsertValue(llvmByteBuffer, llvmElementCount, 1);
+                llvmInst = builder->emitChangeBufferStride(llvmByteBuffer, 1, stride);
             }
             break;
-            */
 
         case kIROp_Unreachable:
             return builder->emitUnreachable();

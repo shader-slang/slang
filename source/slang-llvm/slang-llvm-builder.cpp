@@ -146,6 +146,17 @@ class LLVMBuilder : public ComBaseObject, public ILLVMBuilder
     };
     Dictionary<llvm::DILocalVariable*, VariableDebugInfo> variableDebugInfoMap;
 
+    // These enums represent built-in functions whose implementations must be
+    // externally provided.
+    enum class ExternalFunc
+    {
+        Printf
+        // TODO: Texture sampling, RT functions?
+    };
+    // Map of external builtins. These are only forward-declared in the emitted
+    // LLVM IR.
+    Dictionary<ExternalFunc, llvm::Function*> externalFuncs;
+
 public:
     typedef ComBaseObject Super;
 
@@ -167,6 +178,13 @@ public:
     // This function inserts the given LLVM IR in the global scope.
     // Uses std::string due to that being what LLVM emits and ingests.
     void emitGlobalLLVMIR(const std::string& textIR);
+
+    llvm::Function* getExternalBuiltin(ExternalFunc extFunc);
+
+    void makeVariadicArgsCCompatible(
+        Slice<LLVMInst*> args,
+        Slice<bool> argIsSigned,
+        List<LLVMInst*>& outArgs);
 
     //==========================================================================
     // ILLVMBuilder
@@ -222,6 +240,11 @@ public:
 
     SLANG_NO_THROW LLVMInst* SLANG_MCALL emitCast(LLVMInst* src, LLVMType* dstType, bool valueIsSigned) override;
     SLANG_NO_THROW LLVMInst* SLANG_MCALL emitBitCast(LLVMInst* src, LLVMType* dstType) override;
+
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitPrintf(LLVMInst* format, Slice<LLVMInst*> args, Slice<bool> argIsSigned) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitGetBufferPtr(LLVMInst* buffer) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitGetBufferSize(LLVMInst* buffer) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitChangeBufferStride(LLVMInst* buffer, int prevStride, int newStride) override;
 
     // Some operations in Slang IR may have mixed scalar and vector parameters,
     // whereas LLVM IR requires only scalars or only vectors. This function
@@ -573,6 +596,70 @@ void LLVMBuilder::emitGlobalLLVMIR(const std::string& textIR)
     // Finally, we merge the contents of the temporary module back to the
     // main llvmModule.
     llvmLinker->linkInModule(std::move(sourceModule), llvm::Linker::OverrideFromSrc);
+}
+
+llvm::Function* LLVMBuilder::getExternalBuiltin(ExternalFunc extFunc)
+{
+    if (externalFuncs.containsKey(extFunc))
+        return externalFuncs.getValue(extFunc);
+
+    llvm::Function* func = nullptr;
+    auto emitDecl = [&](const char* name,
+                        llvm::Type* result,
+                        llvm::ArrayRef<llvm::Type*> params,
+                        bool isVarArgs)
+    {
+        llvm::FunctionType* funcType = llvm::FunctionType::get(result, params, isVarArgs);
+        return llvm::Function::Create(
+            funcType,
+            llvm::GlobalValue::ExternalLinkage,
+            name,
+            *llvmModule);
+    };
+
+    switch (extFunc)
+    {
+    case ExternalFunc::Printf:
+        func = emitDecl("printf", llvmBuilder->getInt32Ty(), {llvmBuilder->getPtrTy()}, true);
+        llvm::AttrBuilder attrs(*llvmContext);
+        attrs.addCapturesAttr(llvm::CaptureInfo::none());
+        attrs.addAttribute(llvm::Attribute::NoAlias);
+        func->getArg(0)->addAttrs(attrs);
+        break;
+    }
+
+    externalFuncs[extFunc] = func;
+    return func;
+}
+
+void LLVMBuilder::makeVariadicArgsCCompatible(
+    Slice<LLVMInst*> args,
+    Slice<bool> argIsSigned,
+    List<LLVMInst*>& outArgs
+){
+    // Flatten the tuple resulting from the variadic pack.
+    for (Int i = 0; i < args.count; ++i)
+    {
+        auto llvmValue = args[i];
+        auto valueType = llvmValue->getType();
+
+        if (valueType->isFloatingPointTy() &&
+            valueType->getScalarSizeInBits() < 64)
+        {
+            // Floats need to get up-casted to at least f64
+            llvmValue = llvmBuilder->CreateCast(
+                llvm::Instruction::CastOps::FPExt,
+                llvmValue,
+                llvmBuilder->getDoubleTy());
+        }
+        else if (
+            valueType->isIntegerTy() && valueType->getScalarSizeInBits() < 32)
+        {
+            // Ints are upcasted to at least i32.
+            llvmValue = emitCast(llvmValue, llvmBuilder->getInt32Ty(), argIsSigned[i]);
+        }
+        outArgs.add(llvmValue);
+    }
 }
 
 int LLVMBuilder::getPointerSizeInBits()
@@ -1132,6 +1219,48 @@ LLVMInst* LLVMBuilder::emitBitCast(LLVMInst* src, LLVMType* dstType)
         op = llvm::Instruction::CastOps::IntToPtr;
     }
     return llvmBuilder->CreateCast(op, src, dstType);
+}
+
+LLVMInst* LLVMBuilder::emitPrintf(LLVMInst* format, Slice<LLVMInst*> args, Slice<bool> argIsSigned)
+{
+    auto llvmFunc = getExternalBuiltin(ExternalFunc::Printf);
+
+    List<llvm::Value*> legalizedArgs;
+    legalizedArgs.add(format);
+    LLVMBuilder::makeVariadicArgsCCompatible(args, argIsSigned, legalizedArgs);
+
+    return llvmBuilder->CreateCall(
+        llvmFunc,
+        llvm::ArrayRef(legalizedArgs.begin(), legalizedArgs.end())
+    );
+}
+
+LLVMInst* LLVMBuilder::emitGetBufferPtr(LLVMInst* buffer)
+{
+    return llvmBuilder->CreateExtractValue(buffer, 0);
+}
+
+LLVMInst* LLVMBuilder::emitGetBufferSize(LLVMInst* buffer)
+{
+    return llvmBuilder->CreateExtractValue(buffer, 1);
+}
+
+LLVMInst* LLVMBuilder::emitChangeBufferStride(LLVMInst* buffer, int prevStride, int newStride)
+{
+    auto size = llvmBuilder->CreateExtractValue(buffer, 1);
+    if (prevStride != 1)
+    {
+        size = llvmBuilder->CreateMul(
+            size,
+            llvm::ConstantInt::get(llvmBuilder->getIntPtrTy(targetDataLayout), prevStride));
+    }
+    if (newStride != 1)
+    {
+        size = llvmBuilder->CreateUDiv(
+            size,
+            llvm::ConstantInt::get(llvmBuilder->getIntPtrTy(targetDataLayout), newStride));
+    }
+    return llvmBuilder->CreateInsertValue(buffer, size, 1);
 }
 
 void LLVMBuilder::operationPromote(LLVMInst** aValInOut, bool aIsSigned, LLVMInst** bValInOut, bool bIsSigned)

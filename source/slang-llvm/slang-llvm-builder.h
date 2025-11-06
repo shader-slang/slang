@@ -29,10 +29,10 @@
 //   cover general GPU concepts (e.g. buffers, textures etc.).
 //
 // A general rule of thumb is: you should be able to use Builder to generate
-// code for _any_ GPU language, not just what Slang currently is. Even though
-// the LLVM target only considers CPUs for now, this may not always be the case
-// in the future, so it's good to retain the option to also emit GPU-specific
-// things correctly.
+// code for _any_ GPU-targeting language, not just what Slang currently is. Even
+// though the LLVM target only considers CPUs for now, this may not always be
+// the case in the future, so it's good to retain the option to also emit
+// GPU-specific things correctly.
 
 #include "core/slang-common.h"
 #include "compiler-core/slang-artifact.h"
@@ -167,7 +167,7 @@ public:
         bool externallyVisible = false) = 0;
 
     //==========================================================================
-    // Instruction emitting
+    // Instructions
     //==========================================================================
     virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL emitAlloca(int size, int alignment) = 0;
     virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL emitGetElementPtr(LLVMInst* ptr, int stride, LLVMInst* index) = 0;
@@ -202,6 +202,11 @@ public:
     // signed is passed separately. This only affects integer extension.
     virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL emitCast(LLVMInst* src, LLVMType* dstType, bool valueIsSigned) = 0;
     virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL emitBitCast(LLVMInst* src, LLVMType* dstType) = 0;
+
+    virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL emitPrintf(LLVMInst* format, Slice<LLVMInst*> args, Slice<bool> argIsSigned) = 0;
+    virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL emitGetBufferPtr(LLVMInst* buffer) = 0;
+    virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL emitGetBufferSize(LLVMInst* buffer) = 0;
+    virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL emitChangeBufferStride(LLVMInst* buffer, int prevStride, int newStride) = 0;
 
     //==========================================================================
     // Constant values
