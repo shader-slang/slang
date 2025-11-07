@@ -11515,7 +11515,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             // The paramters of the entry block are used to encode the
             // parameters of the function itself, so we will create them
-            // passed on the `parameterLists` that were collected.
+            // based on the `parameterLists` that were collected.
             //
             UInt paramTypeIndex = 0;
             for (auto paramInfo : parameterLists.params)
