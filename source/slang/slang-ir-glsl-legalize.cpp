@@ -1671,7 +1671,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         break;
     }
 
-    // Now that we've done all that setup, we are close the point where we'll actually
+    // Now that we've done all that setup, we are near the point where we'll actually
     // create a representation of the value of the legalized parameter, along with
     // whatever IR instructions are needed by that representation.
     //
