@@ -1426,7 +1426,7 @@ SLANG_API size_t spReflectionTypeLayout_GetElementStride(
             vectorTypeLayout->elementTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform);
         if (!resInfo)
             return 0;
-        return getReflectionSize(resInfo->count);
+        return resInfo->count.getFiniteValue();
     }
 
     return 0;

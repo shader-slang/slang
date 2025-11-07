@@ -2932,7 +2932,7 @@ static ParameterBindingAndKindInfo _assignConstantBufferBinding(
                               context->layoutContext.objectLayoutOptions)
                           .getSimple();
 
-    const LayoutIndex count = LayoutIndex::fromSize(layoutInfo.size);
+    const Index count = Index(layoutInfo.size.getFiniteValue());
 
     auto existingParam =
         usedRangeSet->usedResourceRanges[(int)layoutInfo.kind].Add(varLayout, index, index + count);
@@ -3197,7 +3197,7 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
             {
                 auto entryPointRes = paramsStructLayout->findOrAddResourceInfo(rr.kind);
                 resultLayout->findOrAddResourceInfo(rr.kind)->index =
-                    LayoutIndex::fromSize(entryPointRes->count);
+                    entryPointRes->count.getFiniteValue();
                 entryPointRes->count += rr.count;
             }
         }

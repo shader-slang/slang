@@ -154,160 +154,8 @@ struct LayoutSize
             *this = LayoutSize(raw / right);
         }
     }
-
     RawValue raw;
 };
-
-//
-// LayoutIndex is like LayoutSize but it can't be infinite
-//
-struct LayoutIndex
-{
-    typedef size_t RawValue;
-
-    // LayoutIndex()
-    //     : raw(0)
-    // {
-    // }
-
-    LayoutIndex(RawValue index)
-        : raw(index)
-    {
-        SLANG_ASSERT(index >= 0);
-    }
-
-    static LayoutIndex fromRaw(RawValue raw)
-    {
-        LayoutIndex size{0};
-        size.raw = raw;
-        return size;
-    }
-
-    static LayoutIndex fromSize(LayoutSize size)
-    {
-        if (size.isInfinite())
-            return invalid();
-        else
-            return LayoutIndex{size.getFiniteValue()};
-    }
-
-    static LayoutIndex invalid() { return LayoutIndex{s_invalid}; }
-
-    // static LayoutIndex infinite()
-    // {
-    //     LayoutIndex result;
-    //     result.raw = RawValue(-1);
-    //     return result;
-    // }
-    //
-    // bool isInfinite() const { return raw == RawValue(-1); }
-    //
-    // bool isFinite() const { return raw != RawValue(-1); }
-    // RawValue getFiniteValue() const
-    // {
-    //     SLANG_ASSERT(isFinite());
-    //     return raw;
-    // }
-    //
-    // bool operator==(LayoutIndex that) const { return raw == that.raw; }
-    //
-    // bool operator!=(LayoutIndex that) const { return raw != that.raw; }
-    //
-    // bool operator>(LayoutIndex that) const
-    // {
-    //     if (that.isFinite())
-    //     {
-    //         if (this->isFinite())
-    //             return this->raw > that.raw;
-    //         return true;
-    //     }
-    //     else
-    //     {
-    //         if (that.isInfinite())
-    //             return false;
-    //         return true;
-    //     }
-    // }
-    //
-    // void operator+=(LayoutIndex right)
-    // {
-    //     if (isInfinite())
-    //     {
-    //     }
-    //     else if (right.isInfinite())
-    //     {
-    //         *this = LayoutIndex::infinite();
-    //     }
-    //     else
-    //     {
-    //         *this = LayoutIndex(raw + right.raw);
-    //     }
-    // }
-    //
-    // void operator*=(LayoutIndex right)
-    // {
-    //     // Deal with zero first, so that anything (even the "infinite" value) times zero is zero.
-    //     if (raw == 0)
-    //     {
-    //         return;
-    //     }
-    //
-    //     if (right.raw == 0)
-    //     {
-    //         raw = 0;
-    //         return;
-    //     }
-    //
-    //     // Next we deal with infinite cases, so that infinite times anything non-zero is infinite
-    //     if (isInfinite())
-    //     {
-    //         return;
-    //     }
-    //
-    //     if (right.isInfinite())
-    //     {
-    //         *this = LayoutIndex::infinite();
-    //         return;
-    //     }
-    //
-    //     // Finally deal with the case where both sides are finite
-    //     *this = LayoutIndex(raw * right.raw);
-    // }
-    //
-    // void operator-=(RawValue right)
-    // {
-    //     if (isInfinite())
-    //     {
-    //     }
-    //     else
-    //     {
-    //         *this = LayoutIndex(raw - right);
-    //     }
-    // }
-    //
-    // void operator/=(RawValue right)
-    // {
-    //     if (isInfinite())
-    //     {
-    //     }
-    //     else
-    //     {
-    //         *this = LayoutIndex(raw / right);
-    //     }
-    // }
-
-    RawValue raw;
-
-private:
-    const static RawValue s_invalid = -1;
-};
-
-inline LayoutSize max(LayoutSize left, LayoutSize right)
-{
-    if (left.isInfinite() || right.isInfinite())
-        return LayoutSize::infinite();
-    return LayoutSize{max(left.raw, right.raw)};
-}
 
 inline LayoutSize operator+(LayoutSize left, LayoutSize right)
 {
@@ -712,8 +560,8 @@ public:
 
         // What is our starting register in that space?
         //
-        // (In the case of uniform data, this is a non-infinite byte offset)
-        LayoutIndex index;
+        // (In the case of uniform data, this is a byte offset)
+        UInt index;
     };
     List<ResourceInfo> resourceInfos;
 
