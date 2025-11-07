@@ -11669,7 +11669,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         //
                         // There is logic elsewhere in the lowering pass that tries
                         // to detect entry-point varying `in` parameters, and converts
-                        // then to use `borrow in` as their mode instead. The problem
+                        // them to use `borrow in` as their mode instead. The problem
                         // in that case is that logic inside the function body might
                         // still be using the parameter as a mutable temporary inside the
                         // function body (as is allowed by the language; see the
