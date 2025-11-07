@@ -2933,7 +2933,7 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
     case CodeGenTarget::LLVMShaderObjectCode:
         {
             IArtifact* artifact = nullptr;
-            emitLLVMAssemblyFromIR(codeGenContext, irModule, &artifact);
+            emitLLVMObjectFromIR(codeGenContext, irModule, &artifact);
             outArtifact = ComPtr<IArtifact>(artifact);
         }
         break;
