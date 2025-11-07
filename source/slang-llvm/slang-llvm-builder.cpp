@@ -8,11 +8,11 @@
 #include "slang-llvm-builder.h"
 
 #include "compiler-core/slang-artifact-associated-impl.h"
-#include "compiler-core/slang-artifact-desc-util.h"
 #include "compiler-core/slang-artifact-associated.h"
+#include "compiler-core/slang-artifact-desc-util.h"
 #include "core/slang-blob.h"
-#include "core/slang-list.h"
 #include "core/slang-com-object.h"
+#include "core/slang-list.h"
 #include "slang-llvm-jit-shared-library.h"
 
 #include <llvm/AsmParser/Parser.h>
@@ -159,9 +159,7 @@ class LLVMBuilder : public ComBaseObject, public ILLVMBuilder
 public:
     typedef ComBaseObject Super;
 
-    LLVMBuilder(
-        LLVMBuilderOptions options,
-        IArtifact** outErrorArtifact);
+    LLVMBuilder(LLVMBuilderOptions options, IArtifact** outErrorArtifact);
     ~LLVMBuilder();
 
     IArtifact* createErrorArtifact(const ArtifactDiagnostic& diagnostic);
@@ -201,68 +199,116 @@ public:
     SLANG_NO_THROW int SLANG_MCALL getStoreSizeOf(LLVMInst* value) override;
 
     SLANG_NO_THROW void SLANG_MCALL printType(String& outStr, LLVMType* type) override;
-    SLANG_NO_THROW void SLANG_MCALL printValue(String& outStr, LLVMInst* value, bool withType) override;
+    SLANG_NO_THROW void SLANG_MCALL
+    printValue(String& outStr, LLVMInst* value, bool withType) override;
 
     SLANG_NO_THROW LLVMType* SLANG_MCALL getVoidType() override;
     SLANG_NO_THROW LLVMType* SLANG_MCALL getIntType(int bitSize) override;
     SLANG_NO_THROW LLVMType* SLANG_MCALL getFloatType(int bitSize) override;
     SLANG_NO_THROW LLVMType* SLANG_MCALL getPointerType() override;
-    SLANG_NO_THROW LLVMType* SLANG_MCALL getVectorType(int elementCount, LLVMType* elementType) override;
+    SLANG_NO_THROW LLVMType* SLANG_MCALL
+    getVectorType(int elementCount, LLVMType* elementType) override;
     SLANG_NO_THROW LLVMType* SLANG_MCALL getBufferType() override;
-    SLANG_NO_THROW LLVMType* SLANG_MCALL getFunctionType(LLVMType* returnType, Slice<LLVMType*> paramTypes, bool variadic) override;
+    SLANG_NO_THROW LLVMType* SLANG_MCALL
+    getFunctionType(LLVMType* returnType, Slice<LLVMType*> paramTypes, bool variadic) override;
 
-    SLANG_NO_THROW LLVMInst* SLANG_MCALL declareFunction(LLVMType* funcType, CharSlice name, uint32_t attributes) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL
+    declareFunction(LLVMType* funcType, CharSlice name, uint32_t attributes) override;
     SLANG_NO_THROW LLVMInst* SLANG_MCALL getFunctionArg(LLVMInst* funcDecl, int argIndex) override;
-    SLANG_NO_THROW void SLANG_MCALL setArgInfo(LLVMInst* arg, CharSlice name, uint32_t attribute) override;
-    SLANG_NO_THROW LLVMInst* SLANG_MCALL declareGlobalVariable(LLVMInst* initializer, int alignment, bool externallyVisible) override;
-    SLANG_NO_THROW LLVMInst* SLANG_MCALL declareGlobalVariable(int size, int alignment, bool externallyVisible) override;
+    SLANG_NO_THROW void SLANG_MCALL
+    setArgInfo(LLVMInst* arg, CharSlice name, uint32_t attribute) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL
+    declareGlobalVariable(LLVMInst* initializer, int alignment, bool externallyVisible) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL
+    declareGlobalVariable(int size, int alignment, bool externallyVisible) override;
     SLANG_NO_THROW LLVMInst* SLANG_MCALL declareGlobalConstructor() override;
 
-    SLANG_NO_THROW void SLANG_MCALL beginFunction(LLVMInst* func, LLVMDebugNode* debugFunc) override;
+    SLANG_NO_THROW void SLANG_MCALL
+    beginFunction(LLVMInst* func, LLVMDebugNode* debugFunc) override;
     SLANG_NO_THROW LLVMInst* SLANG_MCALL emitBlock(LLVMInst* func) override;
     SLANG_NO_THROW void SLANG_MCALL insertIntoBlock(LLVMInst* func) override;
     SLANG_NO_THROW void SLANG_MCALL endFunction(LLVMInst* func) override;
 
-    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitAlloca(int size, int alignment) override;
-    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitGetElementPtr(LLVMInst* ptr, int stride, LLVMInst* index) override;
-    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitStore(LLVMInst* value, LLVMInst* ptr, int alignment, bool isVolatile) override;
-    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitLoad(LLVMType* type, LLVMInst* ptr, int alignment, bool isVolatile) override;
-    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitIntResize(LLVMInst* value, LLVMType* into, bool isSigned) override;
-    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitCopy(LLVMInst* dstPtr, int dstAlign, LLVMInst* srcPtr, int srcAlign, int bytes, bool isVolatile) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitAlloca(int64_t size, int64_t alignment) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL
+    emitGetElementPtr(LLVMInst* ptr, int64_t stride, LLVMInst* index) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL
+    emitStore(LLVMInst* value, LLVMInst* ptr, int64_t alignment, bool isVolatile) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL
+    emitLoad(LLVMType* type, LLVMInst* ptr, int64_t alignment, bool isVolatile) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL
+    emitIntResize(LLVMInst* value, LLVMType* into, bool isSigned) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitCopy(
+        LLVMInst* dstPtr,
+        int64_t dstAlign,
+        LLVMInst* srcPtr,
+        int64_t srcAlign,
+        int64_t bytes,
+        bool isVolatile) override;
 
     SLANG_NO_THROW LLVMInst* SLANG_MCALL emitCall(LLVMInst* func, Slice<LLVMInst*> params) override;
 
-    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitExtractElement(LLVMInst* vector, LLVMInst* index) override;
-    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitInsertElement(LLVMInst* vector, LLVMInst* element, LLVMInst* index) override;
-    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitVectorSplat(LLVMInst* element, int count) override;
-    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitVectorShuffle(LLVMInst* vector, Slice<int> mask) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL
+    emitExtractElement(LLVMInst* vector, LLVMInst* index) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL
+    emitInsertElement(LLVMInst* vector, LLVMInst* element, LLVMInst* index) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitVectorSplat(LLVMInst* element, int64_t count) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL
+    emitVectorShuffle(LLVMInst* vector, Slice<int> mask) override;
 
-    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitBitfieldExtract(LLVMInst* value, LLVMInst* offset, LLVMInst* bits, LLVMType* resultType, bool isSigned) override;
-    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitBitfieldInsert(LLVMInst* value, LLVMInst* insert, LLVMInst* offset, LLVMInst* bits, LLVMType* resultType) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitBitfieldExtract(
+        LLVMInst* value,
+        LLVMInst* offset,
+        LLVMInst* bits,
+        LLVMType* resultType,
+        bool isSigned) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitBitfieldInsert(
+        LLVMInst* value,
+        LLVMInst* insert,
+        LLVMInst* offset,
+        LLVMInst* bits,
+        LLVMType* resultType) override;
 
-    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitCompareOp(LLVMCompareOp op, LLVMInst* a, bool aIsSigned, LLVMInst* b, bool bIsSigned) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL
+    emitCompareOp(LLVMCompareOp op, LLVMInst* a, bool aIsSigned, LLVMInst* b, bool bIsSigned)
+        override;
     SLANG_NO_THROW LLVMInst* SLANG_MCALL emitUnaryOp(LLVMUnaryOp op, LLVMInst* val) override;
-    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitBinaryOp(LLVMBinaryOp op, LLVMInst* a, LLVMInst* b, LLVMType* resultType, bool resultIsSigned) override;
-    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitSelect(LLVMInst* cond, LLVMInst* trueValue, LLVMInst* falseValue) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitBinaryOp(
+        LLVMBinaryOp op,
+        LLVMInst* a,
+        LLVMInst* b,
+        LLVMType* resultType,
+        bool resultIsSigned) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL
+    emitSelect(LLVMInst* cond, LLVMInst* trueValue, LLVMInst* falseValue) override;
 
     SLANG_NO_THROW LLVMInst* SLANG_MCALL emitReturn(LLVMInst* returnValue) override;
     SLANG_NO_THROW LLVMInst* SLANG_MCALL emitBranch(LLVMInst* targetBlock) override;
-    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitCondBranch(LLVMInst* cond, LLVMInst* trueBlock, LLVMInst* falseBlock) override;
-    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitSwitch(LLVMInst* cond, Slice<LLVMInst*> values, Slice<LLVMInst*> blocks, LLVMInst* defaultBlock) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL
+    emitCondBranch(LLVMInst* cond, LLVMInst* trueBlock, LLVMInst* falseBlock) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitSwitch(
+        LLVMInst* cond,
+        Slice<LLVMInst*> values,
+        Slice<LLVMInst*> blocks,
+        LLVMInst* defaultBlock) override;
     SLANG_NO_THROW LLVMInst* SLANG_MCALL emitUnreachable() override;
 
-    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitCast(LLVMInst* src, LLVMType* dstType, bool valueIsSigned) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL
+    emitCast(LLVMInst* src, LLVMType* dstType, bool valueIsSigned) override;
     SLANG_NO_THROW LLVMInst* SLANG_MCALL emitBitCast(LLVMInst* src, LLVMType* dstType) override;
 
-    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitPrintf(LLVMInst* format, Slice<LLVMInst*> args, Slice<bool> argIsSigned) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL
+    emitPrintf(LLVMInst* format, Slice<LLVMInst*> args, Slice<bool> argIsSigned) override;
     SLANG_NO_THROW LLVMInst* SLANG_MCALL emitGetBufferPtr(LLVMInst* buffer) override;
     SLANG_NO_THROW LLVMInst* SLANG_MCALL emitGetBufferSize(LLVMInst* buffer) override;
-    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitChangeBufferStride(LLVMInst* buffer, int prevStride, int newStride) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL
+    emitChangeBufferStride(LLVMInst* buffer, int64_t prevStride, int64_t newStride) override;
 
     // Some operations in Slang IR may have mixed scalar and vector parameters,
     // whereas LLVM IR requires only scalars or only vectors. This function
     // helps you promote each type as required.
-    SLANG_NO_THROW void SLANG_MCALL operationPromote(LLVMInst** aVal, bool aIsSigned, LLVMInst** bVal, bool bIsSigned);
+    SLANG_NO_THROW void SLANG_MCALL
+    operationPromote(LLVMInst** aVal, bool aIsSigned, LLVMInst** bVal, bool bIsSigned);
 
     SLANG_NO_THROW LLVMInst* SLANG_MCALL getPoison(LLVMType* type) override;
     SLANG_NO_THROW LLVMInst* SLANG_MCALL getConstantInt(LLVMType* type, uint64_t value) override;
@@ -273,76 +319,83 @@ public:
     SLANG_NO_THROW LLVMInst* SLANG_MCALL getConstantStruct(Slice<LLVMInst*> values) override;
     SLANG_NO_THROW LLVMInst* SLANG_MCALL getConstantVector(Slice<LLVMInst*> values) override;
     SLANG_NO_THROW LLVMInst* SLANG_MCALL getConstantVector(LLVMInst* value, int count) override;
-    SLANG_NO_THROW LLVMInst* SLANG_MCALL getConstantExtractElement(LLVMInst* value, int index) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL
+    getConstantExtractElement(LLVMInst* value, int index) override;
 
     SLANG_NO_THROW void SLANG_MCALL setName(LLVMInst* inst, CharSlice) override;
     SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugFallbackType(CharSlice name) override;
     SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugVoidType() override;
-    SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugIntType(const char* name, bool isSigned, int bitSize) override;
-    SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugFloatType(const char* name, int bitSize) override;
+    SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL
+    getDebugIntType(const char* name, bool isSigned, int bitSize) override;
+    SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL
+    getDebugFloatType(const char* name, int bitSize) override;
     SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugPointerType(LLVMDebugNode* pointee) override;
-    SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugReferenceType(LLVMDebugNode* pointee) override;
+    SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL
+    getDebugReferenceType(LLVMDebugNode* pointee) override;
     SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugStringType() override;
-    SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugVectorType(int sizeBytes, int alignBytes, int elementCount, LLVMDebugNode* elementType) override;
-    SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugArrayType(int sizeBytes, int alignBytes, int elementCount, LLVMDebugNode* elementType) override;
+    SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugVectorType(
+        int64_t sizeBytes,
+        int64_t alignBytes,
+        int64_t elementCount,
+        LLVMDebugNode* elementType) override;
+    SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugArrayType(
+        int64_t sizeBytes,
+        int64_t alignBytes,
+        int64_t elementCount,
+        LLVMDebugNode* elementType) override;
     SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugStructField(
         LLVMDebugNode* type,
         CharSlice name,
-        int offset,
-        int size,
-        int alignment,
+        int64_t offset,
+        int64_t size,
+        int64_t alignment,
         LLVMDebugNode* file,
-        int line
-    ) override;
+        int line) override;
     SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugStructType(
         Slice<LLVMDebugNode*> fields,
         CharSlice name,
-        int size,
-        int alignment,
+        int64_t size,
+        int64_t alignment,
         LLVMDebugNode* file,
-        int line
-    ) override;
-    SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugFunctionType(LLVMDebugNode* returnType, Slice<LLVMDebugNode*> paramTypes) override;
+        int line) override;
+    SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL
+    getDebugFunctionType(LLVMDebugNode* returnType, Slice<LLVMDebugNode*> paramTypes) override;
     SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugFunction(
         LLVMDebugNode* funcType,
         CharSlice name,
         CharSlice linkageName,
         LLVMDebugNode* file,
-        int line
-    ) override;
+        int line) override;
     SLANG_NO_THROW void SLANG_MCALL setDebugLocation(int line, int column) override;
-    SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugFile(
-        CharSlice filename,
-        CharSlice directory,
-        CharSlice source
-    ) override;
+    SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL
+    getDebugFile(CharSlice filename, CharSlice directory, CharSlice source) override;
 
-    SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL emitDebugVar(
-        CharSlice name,
-        LLVMDebugNode* type,
-        LLVMDebugNode* file,
-        int line,
-        int argIndex
-    ) override;
-    SLANG_NO_THROW void SLANG_MCALL emitDebugValue(LLVMDebugNode* debugVar, LLVMInst* value) override;
+    SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL
+    emitDebugVar(CharSlice name, LLVMDebugNode* type, LLVMDebugNode* file, int line, int argIndex)
+        override;
+    SLANG_NO_THROW void SLANG_MCALL
+    emitDebugValue(LLVMDebugNode* debugVar, LLVMInst* value) override;
 
-    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitInlineIRFunction(LLVMInst* func, CharSlice content) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL
+    emitInlineIRFunction(LLVMInst* func, CharSlice content) override;
 
     SLANG_NO_THROW LLVMInst* SLANG_MCALL emitComputeEntryPointWorkGroup(
         LLVMInst* entryPointFunc,
         CharSlice name,
-        int xSize, int ySize, int zSize, int subgroupSize) override;
-    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitComputeEntryPointDispatcher(LLVMInst* workGroupFunc, CharSlice name) override;
+        int xSize,
+        int ySize,
+        int zSize,
+        int subgroupSize) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL
+    emitComputeEntryPointDispatcher(LLVMInst* workGroupFunc, CharSlice name) override;
 
     SLANG_NO_THROW SlangResult SLANG_MCALL generateAssembly(IArtifact** outArtifact) override;
     SLANG_NO_THROW SlangResult SLANG_MCALL generateObjectCode(IArtifact** outArtifact) override;
     SLANG_NO_THROW SlangResult SLANG_MCALL generateJITLibrary(IArtifact** outArtifact) override;
 };
 
-LLVMBuilder::LLVMBuilder(
-    LLVMBuilderOptions options,
-    IArtifact** outErrorArtifact
-): options(options)
+LLVMBuilder::LLVMBuilder(LLVMBuilderOptions options, IArtifact** outErrorArtifact)
+    : options(options)
 {
     llvmContext.reset(new llvm::LLVMContext());
     llvmModule.reset(new llvm::Module("module", *llvmContext));
@@ -505,8 +558,8 @@ IArtifact* LLVMBuilder::createErrorArtifact(const ArtifactDiagnostic& diagnostic
     diagnostics->add(diagnostic);
     diagnostics->setResult(SLANG_FAIL);
 
-    auto artifact = ArtifactUtil::createArtifact(
-        ArtifactDesc::make(ArtifactKind::None, ArtifactPayload::None));
+    auto artifact =
+        ArtifactUtil::createArtifact(ArtifactDesc::make(ArtifactKind::None, ArtifactPayload::None));
     ArtifactUtil::addAssociated(artifact, diagnostics);
     return artifact.detach();
 }
@@ -572,10 +625,10 @@ void LLVMBuilder::finalize()
             "llvm.global_ctors");
     }
 
-    //std::string out;
-    //llvm::raw_string_ostream rso(out);
-    //llvmModule->print(rso, nullptr);
-    //printf("%s\n", out.c_str());
+    // std::string out;
+    // llvm::raw_string_ostream rso(out);
+    // llvmModule->print(rso, nullptr);
+    // printf("%s\n", out.c_str());
 
     llvm::verifyModule(*llvmModule, &llvm::errs());
 
@@ -652,16 +705,15 @@ llvm::Function* LLVMBuilder::getExternalBuiltin(ExternalFunc extFunc)
 void LLVMBuilder::makeVariadicArgsCCompatible(
     Slice<LLVMInst*> args,
     Slice<bool> argIsSigned,
-    List<LLVMInst*>& outArgs
-){
+    List<LLVMInst*>& outArgs)
+{
     // Flatten the tuple resulting from the variadic pack.
     for (Int i = 0; i < args.count; ++i)
     {
         auto llvmValue = args[i];
         auto valueType = llvmValue->getType();
 
-        if (valueType->isFloatingPointTy() &&
-            valueType->getScalarSizeInBits() < 64)
+        if (valueType->isFloatingPointTy() && valueType->getScalarSizeInBits() < 64)
         {
             // Floats need to get up-casted to at least f64
             llvmValue = llvmBuilder->CreateCast(
@@ -669,8 +721,7 @@ void LLVMBuilder::makeVariadicArgsCCompatible(
                 llvmValue,
                 llvmBuilder->getDoubleTy());
         }
-        else if (
-            valueType->isIntegerTy() && valueType->getScalarSizeInBits() < 32)
+        else if (valueType->isIntegerTy() && valueType->getScalarSizeInBits() < 32)
         {
             // Ints are upcasted to at least i32.
             llvmValue = emitCast(llvmValue, llvmBuilder->getInt32Ty(), argIsSigned[i]);
@@ -758,19 +809,21 @@ LLVMType* LLVMBuilder::getPointerType()
 
 LLVMType* LLVMBuilder::getVectorType(int elementCount, LLVMType* elementType)
 {
-    auto type = llvm::VectorType::get(
-        elementType,
-        llvm::ElementCount::getFixed(elementCount)
-    );
+    auto type = llvm::VectorType::get(elementType, llvm::ElementCount::getFixed(elementCount));
     return type;
 }
 
 LLVMType* LLVMBuilder::getBufferType()
 {
-    return llvm::StructType::get(llvmBuilder->getPtrTy(0), llvmBuilder->getIntPtrTy(targetDataLayout));
+    return llvm::StructType::get(
+        llvmBuilder->getPtrTy(0),
+        llvmBuilder->getIntPtrTy(targetDataLayout));
 }
 
-LLVMType* LLVMBuilder::getFunctionType(LLVMType* returnType, Slice<LLVMType*> paramTypes, bool variadic)
+LLVMType* LLVMBuilder::getFunctionType(
+    LLVMType* returnType,
+    Slice<LLVMType*> paramTypes,
+    bool variadic)
 {
     return llvm::FunctionType::get(returnType, sliceToArrayRef<llvm::Type>(paramTypes), variadic);
 }
@@ -826,20 +879,15 @@ LLVMInst* LLVMBuilder::declareGlobalVariable(
     bool externallyVisible)
 {
     auto llvmVal = llvm::cast<llvm::Constant>(initializer);
-    auto llvmVar = new llvm::GlobalVariable(
-        llvmVal->getType(),
-        false,
-        llvm::GlobalValue::PrivateLinkage);
+    auto llvmVar =
+        new llvm::GlobalVariable(llvmVal->getType(), false, llvm::GlobalValue::PrivateLinkage);
     llvmVar->setInitializer(llvmVal);
     llvmVar->setAlignment(llvm::Align(alignment));
     llvmModule->insertGlobalVariable(llvmVar);
     return llvmVar;
 }
 
-LLVMInst* LLVMBuilder::declareGlobalVariable(
-    int size,
-    int alignment,
-    bool externallyVisible)
+LLVMInst* LLVMBuilder::declareGlobalVariable(int size, int alignment, bool externallyVisible)
 {
     auto llvmType = llvm::ArrayType::get(llvmBuilder->getInt8Ty(), size);
     auto llvmVar = new llvm::GlobalVariable(
@@ -859,11 +907,8 @@ LLVMInst* LLVMBuilder::declareGlobalConstructor()
     std::string ctorName = "__slang_global_constructor";
 
     llvmBuilder->SetCurrentDebugLocation(llvm::DebugLoc());
-    llvm::Function* llvmCtor = llvm::Function::Create(
-        ctorType,
-        llvm::GlobalValue::InternalLinkage,
-        ctorName,
-        *llvmModule);
+    llvm::Function* llvmCtor =
+        llvm::Function::Create(ctorType, llvm::GlobalValue::InternalLinkage, ctorName, *llvmModule);
 
     llvm::Constant* ctorData[3] = {
         llvmBuilder->getInt32(0),
@@ -875,7 +920,7 @@ LLVMInst* LLVMBuilder::declareGlobalConstructor()
         llvm::ArrayRef(ctorData, llvmCtorType->getNumElements()));
 
     globalCtors.add(ctorEntry);
-    
+
     return llvmCtor;
 }
 
@@ -913,46 +958,51 @@ void LLVMBuilder::endFunction(LLVMInst* func)
     currentLocalScope = nullptr;
 }
 
-LLVMInst* LLVMBuilder::emitAlloca(int size, int alignment)
+LLVMInst* LLVMBuilder::emitAlloca(int64_t size, int64_t alignment)
 {
     return llvmBuilder->Insert(new llvm::AllocaInst(
         byteType,
         0,
-        llvmBuilder->getInt32(size),
+        size > int64_t(INT32_MAX) ? llvmBuilder->getInt64(size) : llvmBuilder->getInt32(size),
         llvm::Align(alignment)));
 }
 
-LLVMInst* LLVMBuilder::emitGetElementPtr(LLVMInst* ptr, int stride, LLVMInst* index)
+LLVMInst* LLVMBuilder::emitGetElementPtr(LLVMInst* ptr, int64_t stride, LLVMInst* index)
 {
     SLANG_ASSERT(ptr->getType()->isPointerTy());
     return llvmBuilder->CreateGEP(
-        stride == 1 ? byteType : llvm::ArrayType::get(byteType, stride), ptr, index);
+        stride == 1 ? byteType : llvm::ArrayType::get(byteType, stride),
+        ptr,
+        index);
 }
 
-LLVMInst* LLVMBuilder::emitStore(LLVMInst* value, LLVMInst* ptr, int alignment, bool isVolatile)
+LLVMInst* LLVMBuilder::emitStore(LLVMInst* value, LLVMInst* ptr, int64_t alignment, bool isVolatile)
 {
     SLANG_ASSERT(ptr->getType()->isPointerTy());
-    return llvmBuilder->CreateAlignedStore(
-        value, ptr, llvm::MaybeAlign(alignment), isVolatile);
+    return llvmBuilder->CreateAlignedStore(value, ptr, llvm::MaybeAlign(alignment), isVolatile);
 }
 
-LLVMInst* LLVMBuilder::emitLoad(LLVMType* type, LLVMInst* ptr, int alignment, bool isVolatile)
+LLVMInst* LLVMBuilder::emitLoad(LLVMType* type, LLVMInst* ptr, int64_t alignment, bool isVolatile)
 {
     SLANG_ASSERT(ptr->getType()->isPointerTy());
-    return llvmBuilder->CreateAlignedLoad(
-        type, ptr, llvm::MaybeAlign(alignment), isVolatile);
+    return llvmBuilder->CreateAlignedLoad(type, ptr, llvm::MaybeAlign(alignment), isVolatile);
 }
 
 LLVMInst* LLVMBuilder::emitIntResize(LLVMInst* value, LLVMType* into, bool isSigned)
 {
     auto llvmValue = value;
     auto llvmType = into;
-    return isSigned ? 
-        llvmBuilder->CreateSExtOrTrunc(llvmValue, llvmType) :
-        llvmBuilder->CreateZExtOrTrunc(llvmValue, llvmType);
+    return isSigned ? llvmBuilder->CreateSExtOrTrunc(llvmValue, llvmType)
+                    : llvmBuilder->CreateZExtOrTrunc(llvmValue, llvmType);
 }
 
-LLVMInst* LLVMBuilder::emitCopy(LLVMInst* dstPtr, int dstAlign, LLVMInst* srcPtr, int srcAlign, int bytes, bool isVolatile)
+LLVMInst* LLVMBuilder::emitCopy(
+    LLVMInst* dstPtr,
+    int64_t dstAlign,
+    LLVMInst* srcPtr,
+    int64_t srcAlign,
+    int64_t bytes,
+    bool isVolatile)
 {
     return llvmBuilder->CreateMemCpyInline(
         dstPtr,
@@ -980,31 +1030,31 @@ LLVMInst* LLVMBuilder::emitInsertElement(LLVMInst* vector, LLVMInst* element, LL
     return llvmBuilder->CreateInsertElement(vector, element, index);
 }
 
-LLVMInst* LLVMBuilder::emitVectorSplat(LLVMInst* element, int count)
+LLVMInst* LLVMBuilder::emitVectorSplat(LLVMInst* element, int64_t count)
 {
     return llvmBuilder->CreateVectorSplat(count, element);
 }
 
 LLVMInst* LLVMBuilder::emitVectorShuffle(LLVMInst* vector, Slice<int> mask)
 {
-    return llvmBuilder->CreateShuffleVector(
-        vector,
-        llvm::ArrayRef<int>(mask.begin(), mask.end()));
+    return llvmBuilder->CreateShuffleVector(vector, llvm::ArrayRef<int>(mask.begin(), mask.end()));
 }
 
-LLVMInst* LLVMBuilder::emitBitfieldExtract(LLVMInst* value, LLVMInst* offset, LLVMInst* bits, LLVMType* resultType, bool isSigned)
+LLVMInst* LLVMBuilder::emitBitfieldExtract(
+    LLVMInst* value,
+    LLVMInst* offset,
+    LLVMInst* bits,
+    LLVMType* resultType,
+    bool isSigned)
 {
     value = emitCast(value, resultType, false);
     offset = emitCast(offset, resultType, false);
     bits = emitCast(bits, resultType, false);
 
-    auto shiftedVal =
-        llvmBuilder->CreateLShr(value, emitCast(offset, value->getType(), false));
+    auto shiftedVal = llvmBuilder->CreateLShr(value, emitCast(offset, value->getType(), false));
 
-    auto numBits = emitCast(
-        llvmBuilder->getInt32(resultType->getScalarSizeInBits()),
-        value->getType(),
-        false);
+    auto numBits =
+        emitCast(llvmBuilder->getInt32(resultType->getScalarSizeInBits()), value->getType(), false);
     auto highBits = llvmBuilder->CreateSub(numBits, bits);
     shiftedVal = llvmBuilder->CreateShl(shiftedVal, highBits);
     if (isSigned)
@@ -1013,7 +1063,12 @@ LLVMInst* LLVMBuilder::emitBitfieldExtract(LLVMInst* value, LLVMInst* offset, LL
         return llvmBuilder->CreateLShr(shiftedVal, highBits);
 }
 
-LLVMInst* LLVMBuilder::emitBitfieldInsert(LLVMInst* value, LLVMInst* insert, LLVMInst* offset, LLVMInst* bits, LLVMType* resultType)
+LLVMInst* LLVMBuilder::emitBitfieldInsert(
+    LLVMInst* value,
+    LLVMInst* insert,
+    LLVMInst* offset,
+    LLVMInst* bits,
+    LLVMType* resultType)
 {
     value = emitCast(value, resultType, false);
     insert = emitCast(insert, resultType, false);
@@ -1034,7 +1089,12 @@ LLVMInst* LLVMBuilder::emitBitfieldInsert(LLVMInst* value, LLVMInst* insert, LLV
     return llvmBuilder->CreateOr(value, insert);
 }
 
-LLVMInst* LLVMBuilder::emitCompareOp(LLVMCompareOp op, LLVMInst* a, bool aIsSigned, LLVMInst* b, bool bIsSigned)
+LLVMInst* LLVMBuilder::emitCompareOp(
+    LLVMCompareOp op,
+    LLVMInst* a,
+    bool aIsSigned,
+    LLVMInst* b,
+    bool bIsSigned)
 {
     operationPromote(&a, aIsSigned, &b, bIsSigned);
 
@@ -1084,8 +1144,7 @@ LLVMInst* LLVMBuilder::emitUnaryOp(LLVMUnaryOp op, LLVMInst* val)
     switch (op)
     {
     case Slang::LLVMUnaryOp::Negate:
-        return isFloat ? llvmBuilder->CreateFNeg(val)
-                       : llvmBuilder->CreateNeg(val);
+        return isFloat ? llvmBuilder->CreateFNeg(val) : llvmBuilder->CreateNeg(val);
     case Slang::LLVMUnaryOp::Not:
         return llvmBuilder->CreateNot(val);
     default:
@@ -1094,11 +1153,15 @@ LLVMInst* LLVMBuilder::emitUnaryOp(LLVMUnaryOp op, LLVMInst* val)
     }
 }
 
-LLVMInst* LLVMBuilder::emitBinaryOp(LLVMBinaryOp op, LLVMInst* a, LLVMInst* b, LLVMType* resultType, bool resultIsSigned)
+LLVMInst* LLVMBuilder::emitBinaryOp(
+    LLVMBinaryOp op,
+    LLVMInst* a,
+    LLVMInst* b,
+    LLVMType* resultType,
+    bool resultIsSigned)
 {
-    bool isFloat = resultType ? 
-        resultType->getScalarType()->isFloatingPointTy() : 
-        a->getType()->getScalarType()->isFloatingPointTy();
+    bool isFloat = resultType ? resultType->getScalarType()->isFloatingPointTy()
+                              : a->getType()->getScalarType()->isFloatingPointTy();
     llvm::Instruction::BinaryOps llvmOp;
     switch (op)
     {
@@ -1112,14 +1175,14 @@ LLVMInst* LLVMBuilder::emitBinaryOp(LLVMBinaryOp op, LLVMInst* a, LLVMInst* b, L
         llvmOp = isFloat ? llvm::Instruction::FMul : llvm::Instruction::Mul;
         break;
     case Slang::LLVMBinaryOp::Div:
-        llvmOp = isFloat    ? llvm::Instruction::FDiv
-             : resultIsSigned ? llvm::Instruction::SDiv
-                        : llvm::Instruction::UDiv;
+        llvmOp = isFloat          ? llvm::Instruction::FDiv
+                 : resultIsSigned ? llvm::Instruction::SDiv
+                                  : llvm::Instruction::UDiv;
         break;
     case Slang::LLVMBinaryOp::Rem:
-        llvmOp = isFloat ? llvm::Instruction::FRem :
-            resultIsSigned ? llvm::Instruction::SRem :
-            llvm::Instruction::URem;
+        llvmOp = isFloat          ? llvm::Instruction::FRem
+                 : resultIsSigned ? llvm::Instruction::SRem
+                                  : llvm::Instruction::URem;
         break;
     case Slang::LLVMBinaryOp::And:
         llvmOp = llvm::Instruction::And;
@@ -1149,7 +1212,8 @@ LLVMInst* LLVMBuilder::emitBinaryOp(LLVMBinaryOp op, LLVMInst* a, LLVMInst* b, L
         a = emitCast(a, resultType, resultIsSigned);
         b = emitCast(b, resultType, resultIsSigned);
     }
-    else operationPromote(&a, resultIsSigned, &b, resultIsSigned);
+    else
+        operationPromote(&a, resultIsSigned, &b, resultIsSigned);
 
     return llvmBuilder->CreateBinOp(llvmOp, a, b);
 }
@@ -1177,16 +1241,17 @@ LLVMInst* LLVMBuilder::emitCondBranch(LLVMInst* cond, LLVMInst* trueBlock, LLVMI
     return llvmBuilder->CreateCondBr(
         cond,
         llvm::cast<llvm::BasicBlock>(trueBlock),
-        llvm::cast<llvm::BasicBlock>(falseBlock)
-    );
+        llvm::cast<llvm::BasicBlock>(falseBlock));
 }
 
-LLVMInst* LLVMBuilder::emitSwitch(LLVMInst* cond, Slice<LLVMInst*> values, Slice<LLVMInst*> blocks, LLVMInst* defaultBlock)
+LLVMInst* LLVMBuilder::emitSwitch(
+    LLVMInst* cond,
+    Slice<LLVMInst*> values,
+    Slice<LLVMInst*> blocks,
+    LLVMInst* defaultBlock)
 {
-    auto llvmSwitch = llvmBuilder->CreateSwitch(
-        cond,
-        llvm::cast<llvm::BasicBlock>(defaultBlock),
-        values.count);
+    auto llvmSwitch =
+        llvmBuilder->CreateSwitch(cond, llvm::cast<llvm::BasicBlock>(defaultBlock), values.count);
     for (Int c = 0; c < values.count; c++)
     {
         auto llvmCaseBlock = llvm::cast<llvm::BasicBlock>(blocks[c]);
@@ -1237,19 +1302,17 @@ LLVMInst* LLVMBuilder::emitCast(LLVMInst* src, LLVMType* dstType, bool valueIsSi
         {
             llvm::Constant* zero = llvm::Constant::getNullValue(valType);
             dst = llvmBuilder->CreateCmp(
-                srcIsFloat ?
-                llvm::CmpInst::Predicate::FCMP_UNE :
-                llvm::CmpInst::Predicate::ICMP_NE,
-                src, zero);
+                srcIsFloat ? llvm::CmpInst::Predicate::FCMP_UNE : llvm::CmpInst::Predicate::ICMP_NE,
+                src,
+                zero);
         }
     }
     else if (dstIsFloat)
     {
         if (srcIsInt)
         {
-            dst = valueIsSigned ?
-                llvmBuilder->CreateSIToFP(src, dstType) :
-                llvmBuilder->CreateUIToFP(src, dstType);
+            dst = valueIsSigned ? llvmBuilder->CreateSIToFP(src, dstType)
+                                : llvmBuilder->CreateUIToFP(src, dstType);
         }
         else if (valWidth < targetWidth)
         {
@@ -1264,18 +1327,17 @@ LLVMInst* LLVMBuilder::emitCast(LLVMInst* src, LLVMType* dstType, bool valueIsSi
     {
         if (srcIsFloat)
         {
-            dst = valueIsSigned ?
-                llvmBuilder->CreateFPToSI(src, dstType) :
-                llvmBuilder->CreateFPToUI(src, dstType);
+            dst = valueIsSigned ? llvmBuilder->CreateFPToSI(src, dstType)
+                                : llvmBuilder->CreateFPToUI(src, dstType);
         }
-        else if(srcIsPointer)
+        else if (srcIsPointer)
         {
             dst = llvmBuilder->CreatePtrToInt(src, dstType);
         }
         else if (valWidth != targetWidth)
         {
             dst = valueIsSigned ? llvmBuilder->CreateSExtOrTrunc(src, dstType)
-                            : llvmBuilder->CreateZExtOrTrunc(src, dstType);
+                                : llvmBuilder->CreateZExtOrTrunc(src, dstType);
         }
     }
     else if (dstIsPointer)
@@ -1328,8 +1390,7 @@ LLVMInst* LLVMBuilder::emitPrintf(LLVMInst* format, Slice<LLVMInst*> args, Slice
 
     return llvmBuilder->CreateCall(
         llvmFunc,
-        llvm::ArrayRef(legalizedArgs.begin(), legalizedArgs.end())
-    );
+        llvm::ArrayRef(legalizedArgs.begin(), legalizedArgs.end()));
 }
 
 LLVMInst* LLVMBuilder::emitGetBufferPtr(LLVMInst* buffer)
@@ -1342,7 +1403,10 @@ LLVMInst* LLVMBuilder::emitGetBufferSize(LLVMInst* buffer)
     return llvmBuilder->CreateExtractValue(buffer, 1);
 }
 
-LLVMInst* LLVMBuilder::emitChangeBufferStride(LLVMInst* buffer, int prevStride, int newStride)
+LLVMInst* LLVMBuilder::emitChangeBufferStride(
+    LLVMInst* buffer,
+    int64_t prevStride,
+    int64_t newStride)
 {
     auto size = llvmBuilder->CreateExtractValue(buffer, 1);
     if (prevStride != 1)
@@ -1360,7 +1424,11 @@ LLVMInst* LLVMBuilder::emitChangeBufferStride(LLVMInst* buffer, int prevStride, 
     return llvmBuilder->CreateInsertValue(buffer, size, 1);
 }
 
-void LLVMBuilder::operationPromote(LLVMInst** aValInOut, bool aIsSigned, LLVMInst** bValInOut, bool bIsSigned)
+void LLVMBuilder::operationPromote(
+    LLVMInst** aValInOut,
+    bool aIsSigned,
+    LLVMInst** bValInOut,
+    bool bIsSigned)
 {
     auto aVal = *aValInOut;
     auto bVal = *bValInOut;
@@ -1428,10 +1496,8 @@ LLVMInst* LLVMBuilder::getConstantPtr(uint64_t value)
     else
     {
         return llvm::ConstantExpr::getIntToPtr(
-                    llvm::ConstantInt::get(
-                        llvmBuilder->getIntPtrTy(targetDataLayout),
-                        value),
-                    llvmType);
+            llvm::ConstantInt::get(llvmBuilder->getIntPtrTy(targetDataLayout), value),
+            llvmType);
     }
 }
 
@@ -1447,7 +1513,8 @@ LLVMInst* LLVMBuilder::getConstantArray(Slice<LLVMInst*> values)
     {
         type = llvm::ArrayType::get(values[0]->getType(), values.count);
     }
-    else type = llvm::ArrayType::get(byteType, 0);
+    else
+        type = llvm::ArrayType::get(byteType, 0);
 
     return llvm::ConstantArray::get(type, sliceToArrayRef<llvm::Constant>(values));
 }
@@ -1498,7 +1565,8 @@ LLVMDebugNode* LLVMBuilder::getDebugVoidType()
 LLVMDebugNode* LLVMBuilder::getDebugIntType(const char* name, bool isSigned, int bitSize)
 {
     unsigned encoding = isSigned ? llvm::dwarf::DW_ATE_signed : llvm::dwarf::DW_ATE_unsigned;
-    if (bitSize == 1) encoding = llvm::dwarf::DW_ATE_boolean;
+    if (bitSize == 1)
+        encoding = llvm::dwarf::DW_ATE_boolean;
     return llvmDebugBuilder->createBasicType(name, bitSize, encoding);
 }
 
@@ -1510,7 +1578,9 @@ LLVMDebugNode* LLVMBuilder::getDebugFloatType(const char* name, int bitSize)
 LLVMDebugNode* LLVMBuilder::getDebugPointerType(LLVMDebugNode* pointee)
 {
     llvm::DIType* llvmPointee = llvm::cast<llvm::DIType>(pointee ? pointee : getDebugVoidType());
-    return llvmDebugBuilder->createPointerType(llvmPointee, targetDataLayout.getPointerSizeInBits());
+    return llvmDebugBuilder->createPointerType(
+        llvmPointee,
+        targetDataLayout.getPointerSizeInBits());
 }
 
 LLVMDebugNode* LLVMBuilder::getDebugReferenceType(LLVMDebugNode* pointee)
@@ -1524,11 +1594,15 @@ LLVMDebugNode* LLVMBuilder::getDebugReferenceType(LLVMDebugNode* pointee)
 LLVMDebugNode* LLVMBuilder::getDebugStringType()
 {
     return llvmDebugBuilder->createPointerType(
-            llvmDebugBuilder->createBasicType("char", 8, llvm::dwarf::DW_ATE_signed_char),
-            targetDataLayout.getPointerSizeInBits());
+        llvmDebugBuilder->createBasicType("char", 8, llvm::dwarf::DW_ATE_signed_char),
+        targetDataLayout.getPointerSizeInBits());
 }
 
-LLVMDebugNode* LLVMBuilder::getDebugVectorType(int sizeBytes, int alignBytes, int elementCount, LLVMDebugNode* elementType)
+LLVMDebugNode* LLVMBuilder::getDebugVectorType(
+    int64_t sizeBytes,
+    int64_t alignBytes,
+    int64_t elementCount,
+    LLVMDebugNode* elementType)
 {
     if (sizeBytes < alignBytes)
         sizeBytes = alignBytes;
@@ -1542,7 +1616,11 @@ LLVMDebugNode* LLVMBuilder::getDebugVectorType(int sizeBytes, int alignBytes, in
         subscriptArray);
 }
 
-LLVMDebugNode* LLVMBuilder::getDebugArrayType(int sizeBytes, int alignBytes, int elementCount, LLVMDebugNode* elementType)
+LLVMDebugNode* LLVMBuilder::getDebugArrayType(
+    int64_t sizeBytes,
+    int64_t alignBytes,
+    int64_t elementCount,
+    LLVMDebugNode* elementType)
 {
     llvm::Metadata* subscript = llvmDebugBuilder->getOrCreateSubrange(0, elementCount);
     llvm::DINodeArray subscriptArray = llvmDebugBuilder->getOrCreateArray(subscript);
@@ -1556,12 +1634,12 @@ LLVMDebugNode* LLVMBuilder::getDebugArrayType(int sizeBytes, int alignBytes, int
 LLVMDebugNode* LLVMBuilder::getDebugStructField(
     LLVMDebugNode* type,
     CharSlice name,
-    int offset,
-    int size,
-    int alignment,
+    int64_t offset,
+    int64_t size,
+    int64_t alignment,
     LLVMDebugNode* file,
-    int line
-){
+    int line)
+{
     if (!file)
         file = compileUnit->getFile();
     llvm::DIFile* llvmFile = llvm::cast<llvm::DIFile>(file);
@@ -1580,14 +1658,15 @@ LLVMDebugNode* LLVMBuilder::getDebugStructField(
 LLVMDebugNode* LLVMBuilder::getDebugStructType(
     Slice<LLVMDebugNode*> fields,
     CharSlice name,
-    int size,
-    int alignment,
+    int64_t size,
+    int64_t alignment,
     LLVMDebugNode* file,
-    int line
-){
+    int line)
+{
     if (!file)
         file = compileUnit->getFile();
-    llvm::DINodeArray fieldTypes = llvmDebugBuilder->getOrCreateArray(sliceToArrayRef<llvm::Metadata>(fields));
+    llvm::DINodeArray fieldTypes =
+        llvmDebugBuilder->getOrCreateArray(sliceToArrayRef<llvm::Metadata>(fields));
     llvm::DIFile* llvmFile = llvm::cast<llvm::DIFile>(file);
 
     return llvmDebugBuilder->createStructType(
@@ -1602,7 +1681,9 @@ LLVMDebugNode* LLVMBuilder::getDebugStructType(
         fieldTypes);
 }
 
-LLVMDebugNode* LLVMBuilder::getDebugFunctionType(LLVMDebugNode* returnType, Slice<LLVMDebugNode*> paramTypes)
+LLVMDebugNode* LLVMBuilder::getDebugFunctionType(
+    LLVMDebugNode* returnType,
+    Slice<LLVMDebugNode*> paramTypes)
 {
     List<llvm::Metadata*> elements;
     elements.add(returnType);
@@ -1618,8 +1699,8 @@ LLVMDebugNode* LLVMBuilder::getDebugFunction(
     CharSlice name,
     CharSlice linkageName,
     LLVMDebugNode* file,
-    int line
-){
+    int line)
+{
     if (!file)
         file = compileUnit->getFile();
 
@@ -1643,11 +1724,8 @@ void LLVMBuilder::setDebugLocation(int line, int column)
         llvm::DILocation::get(*llvmContext, line, column, currentLocalScope));
 }
 
-LLVMDebugNode* LLVMBuilder::getDebugFile(
-    CharSlice filename,
-    CharSlice directory,
-    CharSlice source
-){
+LLVMDebugNode* LLVMBuilder::getDebugFile(CharSlice filename, CharSlice directory, CharSlice source)
+{
     return llvmDebugBuilder->createFile(
         charSliceToLLVM(filename),
         charSliceToLLVM(directory),
@@ -1660,8 +1738,8 @@ LLVMDebugNode* LLVMBuilder::emitDebugVar(
     LLVMDebugNode* type,
     LLVMDebugNode* file,
     int line,
-    int argIndex
-){
+    int argIndex)
+{
     if (!currentLocalScope)
         return nullptr;
 
@@ -1707,11 +1785,7 @@ void LLVMBuilder::emitDebugValue(LLVMDebugNode* debugVar, LLVMInst* value)
 
     llvm::DILocation* loc = llvmBuilder->getCurrentDebugLocation();
     if (!loc)
-        loc = llvm::DILocation::get(
-            *llvmContext,
-            var->getLine(),
-            0,
-            var->getScope());
+        loc = llvm::DILocation::get(*llvmContext, var->getLine(), 0, var->getScope());
 
     llvm::AllocaInst* alloca = llvm::dyn_cast<llvm::AllocaInst>(value);
     if (!debugInfo.attached && alloca)
@@ -1774,8 +1848,8 @@ LLVMInst* LLVMBuilder::emitComputeEntryPointWorkGroup(
     int xSize,
     int ySize,
     int zSize,
-    int subgroupSize
-){
+    int subgroupSize)
+{
     // TODO: Currently unused, but will be needed for warp operations some day
     // in the future, so it's already in the API.
     (void)subgroupSize;
@@ -1968,8 +2042,7 @@ LLVMInst* LLVMBuilder::emitComputeEntryPointDispatcher(LLVMInst* workGroupFunc, 
             llvmBuilder->getInt32(i),
         };
 
-        auto startGroupPtr =
-            llvmBuilder->CreateGEP(varyingInputType, varyingInput, varyingIndices);
+        auto startGroupPtr = llvmBuilder->CreateGEP(varyingInputType, varyingInput, varyingIndices);
         startGroupID[i] = llvmBuilder->CreateLoad(
             uintType,
             startGroupPtr,
@@ -1982,8 +2055,7 @@ LLVMInst* LLVMBuilder::emitComputeEntryPointDispatcher(LLVMInst* workGroupFunc, 
             groupIndices,
             llvm::Twine("groupID").concat(llvm::Twine(i)));
         varyingIndices[1] = llvmBuilder->getInt32(1);
-        auto endGroupPtr =
-            llvmBuilder->CreateGEP(varyingInputType, varyingInput, varyingIndices);
+        auto endGroupPtr = llvmBuilder->CreateGEP(varyingInputType, varyingInput, varyingIndices);
         endGroupID[i] = llvmBuilder->CreateLoad(
             uintType,
             endGroupPtr,
@@ -2025,8 +2097,7 @@ LLVMInst* LLVMBuilder::emitComputeEntryPointDispatcher(LLVMInst* workGroupFunc, 
         llvmBuilder->CreateBr(wgEntryBlocks[i]);
         llvmBuilder->SetInsertPoint(wgEntryBlocks[i]);
         auto id = llvmBuilder->CreateLoad(uintType, groupID[i]);
-        auto cond =
-            llvmBuilder->CreateCmp(llvm::CmpInst::Predicate::ICMP_ULT, id, endGroupID[i]);
+        auto cond = llvmBuilder->CreateCmp(llvm::CmpInst::Predicate::ICMP_ULT, id, endGroupID[i]);
 
         auto merge = i == 0 ? endBlock : wgEndBlocks[i - 1];
 
@@ -2158,13 +2229,12 @@ SlangResult LLVMBuilder::generateJITLibrary(IArtifact** outArtifact)
 
 } // namespace slang_llvm
 
-extern "C" SLANG_DLL_EXPORT SlangResult
-createLLVMBuilder_V1(
+extern "C" SLANG_DLL_EXPORT SlangResult createLLVMBuilder_V1(
     const SlangUUID& intfGuid,
     Slang::ILLVMBuilder** out,
     Slang::LLVMBuilderOptions options,
-    Slang::IArtifact** outErrorArtifact
-){
+    Slang::IArtifact** outErrorArtifact)
+{
     Slang::ComPtr<slang_llvm::LLVMBuilder> builder(
         new slang_llvm::LLVMBuilder(options, outErrorArtifact));
 
