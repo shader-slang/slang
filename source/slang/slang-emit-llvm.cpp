@@ -19,12 +19,12 @@ namespace Slang
 // `linkageName` is the name actually used as a symbol in object code and LLVM
 // IR, while `prettyName` is shown to the user in a debugger.
 static bool maybeGetName(
-    TerminatedCharSlice* linkageNameOut,
-    TerminatedCharSlice* prettyNameOut,
+    CharSlice* linkageNameOut,
+    CharSlice* prettyNameOut,
     IRInst* irInst)
 {
-    *linkageNameOut = TerminatedCharSlice();
-    *prettyNameOut = TerminatedCharSlice();
+    *linkageNameOut = CharSlice();
+    *prettyNameOut = CharSlice();
 
     UnownedStringSlice linkageName;
     UnownedStringSlice prettyName;
@@ -52,8 +52,8 @@ static bool maybeGetName(
     if (prettyName.getLength() == 0 || linkageName.getLength() == 0)
         return false;
 
-    *linkageNameOut = TerminatedCharSlice(linkageName.begin(), linkageName.getLength());
-    *prettyNameOut = TerminatedCharSlice(prettyName.begin(), prettyName.getLength());
+    *linkageNameOut = CharSlice(linkageName.begin(), linkageName.getLength());
+    *prettyNameOut = CharSlice(prettyName.begin(), prettyName.getLength());
     return true;
 }
 
@@ -98,10 +98,10 @@ static void findDebugLocation(
         findDebugLocation(instToDebugLLVM, inst->getParent(), file, line);
 }
 
-static TerminatedCharSlice getStringLitAsSlice(IRInst* inst)
+static CharSlice getStringLitAsSlice(IRInst* inst)
 {
     auto source = as<IRStringLit>(inst)->getStringSlice();
-    return TerminatedCharSlice(source.begin(), source.getLength());
+    return CharSlice(source.begin(), source.getLength());
 }
 
 // This class helps with converting types from Slang IR to LLVM IR. It can
@@ -470,7 +470,7 @@ public:
                     IRIntegerValue offset = getOffset(field, rules);
 
                     IRStructKey* key = field->getKey();
-                    TerminatedCharSlice linkageName, prettyName;
+                    CharSlice linkageName, prettyName;
                     maybeGetName(&linkageName, &prettyName, key);
 
                     types.add(builder->getDebugStructField(
@@ -482,7 +482,7 @@ public:
                         file,
                         line));
                 }
-                TerminatedCharSlice linkageName, prettyName;
+                CharSlice linkageName, prettyName;
                 maybeGetName(&linkageName, &prettyName, legalizedType);
                 sizeAndAlignment.size = align(sizeAndAlignment.size, sizeAndAlignment.alignment);
 
@@ -521,7 +521,7 @@ public:
 
         default:
             {
-                TerminatedCharSlice linkageName, prettyName;
+                CharSlice linkageName, prettyName;
                 maybeGetName(&linkageName, &prettyName, legalizedType);
                 llvmType = builder->getDebugFallbackType(prettyName);
             }
@@ -1240,10 +1240,10 @@ struct LLVMEmitter
 
         LLVMBuilderOptions builderOpt;
         builderOpt.target = asExternal(codeGenContext->getTargetFormat());
-        builderOpt.targetTriple = TerminatedCharSlice(targetTripleOption.begin(), targetTripleOption.getLength());
-        builderOpt.cpu = TerminatedCharSlice(cpuOption.begin(), cpuOption.getLength());
-        builderOpt.features = TerminatedCharSlice(featOption.begin(), featOption.getLength());
-        builderOpt.debugCommandLineArgs = TerminatedCharSlice(params.begin(), params.getLength());
+        builderOpt.targetTriple = CharSlice(targetTripleOption.begin(), targetTripleOption.getLength());
+        builderOpt.cpu = CharSlice(cpuOption.begin(), cpuOption.getLength());
+        builderOpt.features = CharSlice(featOption.begin(), featOption.getLength());
+        builderOpt.debugCommandLineArgs = CharSlice(params.begin(), params.getLength());
         builderOpt.debugLevel = (SlangDebugInfoLevel)getOptions().getDebugInfoLevel();
         builderOpt.optLevel = (SlangOptimizationLevel)getOptions().getOptimizationLevel();
         builderOpt.fp32DenormalMode = (SlangFpDenormalMode)getOptions().getDenormalModeFp32();
@@ -1254,9 +1254,9 @@ struct LLVMEmitter
         ComPtr<IArtifact> errorArtifact;
         SLANG_RETURN_ON_FAIL(builderFunc(ILLVMBuilder::getTypeGuid(), builder.writeRef(), builderOpt, errorArtifact.writeRef()));
 
-        auto diagnostics = findAssociatedRepresentation<IArtifactDiagnostics>(errorArtifact);
-        if (diagnostics)
+        if (errorArtifact)
         {
+            auto diagnostics = findAssociatedRepresentation<IArtifactDiagnostics>(errorArtifact);
             for (Int i = 0; i < diagnostics->getCount(); ++i)
             {
                 auto diag = diagnostics->getAt(i);
@@ -1301,84 +1301,86 @@ struct LLVMEmitter
 
         bool globalInstruction = inst->getParent()->getOp() == kIROp_ModuleInst;
 
-        LLVMInst* llvmValue = nullptr;
-        switch (inst->getOp())
-        {
-        case kIROp_VoidLit:
-            return nullptr;
+        auto op = inst->getOp();
 
-        case kIROp_IntLit:
-        case kIROp_BoolLit:
-        case kIROp_FloatLit:
-        case kIROp_StringLit:
-        case kIROp_PtrLit:
-        case kIROp_MakeVector:
-        case kIROp_MakeVectorFromScalar:
+        // Check first if the instruction is a constant expression. If so, we
+        // need not consider any other means of finding its value.
+        LLVMInst* constVal = nullptr;
+        if (op != kIROp_MakeArray && op != kIROp_MakeStruct)
+        {
             // kIROp_MakeArray & kIROp_MakeStruct are intentionally omitted
             // here; they must not be emitted as values in any other context
             // than global vars. `emitGlobalVarDecl` and
             // `emitGlobalInstructionCtor` handle that part.
-            llvmValue = types->maybeEmitConstant(inst);
-            break;
-        case kIROp_Specialize:
+            constVal = types->maybeEmitConstant(inst);
+        }
+
+        LLVMInst* llvmValue = nullptr;
+        if (constVal)
+        {
+            llvmValue = constVal;
+        }
+        else if (op == kIROp_VoidLit)
+        {
+            return nullptr;
+        }
+        else if (op == kIROp_Specialize)
+        {
+            auto s = as<IRSpecialize>(inst);
+            auto g = s->getBase();
+            auto e = "Specialize instruction remains in IR for LLVM emit, is something "
+                     "undefined?\n" +
+                     dumpIRToString(g);
+            SLANG_UNEXPECTED(e.getBuffer());
+        }
+        else if (globalInstruction)
+        {
+            return emitLLVMInstruction(inst);
+
+            /*
+            // This is a non-constant global instruction getting referenced. So,
+            // we generate a global variable for it (if we don't have one yet)
+            // and report this incident.
+            auto type = inst->getDataType();
+            IRSizeAndAlignment sizeAndAlignment =
+                types->getSizeAndAlignment(type, defaultPointerRules);
+            bool deferred = false;
+            if (auto constVal = types->maybeEmitConstant(inst))
             {
-                auto s = as<IRSpecialize>(inst);
-                auto g = s->getBase();
-                auto e = "Specialize instruction remains in IR for LLVM emit, is something "
-                         "undefined?\n" +
-                         dumpIRToString(g);
-                SLANG_UNEXPECTED(e.getBuffer());
+                llvmValue = builder->declareGlobalVariable(constVal, sizeAndAlignment.alignment, false);
             }
-        default:
-            if (globalInstruction)
+            else if (deferredGlobalInsts.containsKey(inst))
             {
-                if (inlineGlobalInstructions)
-                    return emitLLVMInstruction(inst);
-
-                // This is a global instruction getting referenced. So, we generate
-                // a global variable for it (if we don't have one yet) and report
-                // this incident.
-                auto type = inst->getDataType();
-                IRSizeAndAlignment sizeAndAlignment =
-                    types->getSizeAndAlignment(type, defaultPointerRules);
-                bool deferred = false;
-                if (auto constVal = types->maybeEmitConstant(inst))
-                {
-                    llvmValue = builder->declareGlobalVariable(constVal, sizeAndAlignment.alignment, false);
-                }
-                else if (deferredGlobalInsts.containsKey(inst))
-                {
-                    llvmValue = deferredGlobalInsts.getValue(inst);
-                    deferred = true;
-                }
-                else
-                {
-                    llvmValue = builder->declareGlobalVariable(sizeAndAlignment.size, sizeAndAlignment.alignment, false);
-                    deferredGlobalInsts[inst] = llvmValue;
-                    deferred = true;
-                }
-
-                // Global variables are pointers to the actual data. If the type
-                // is not an aggregate, we need to load to get the value.
-                // Aggregates are passed around as pointers so they don't need
-                // to be loaded.
-                if (!types->isAggregateType(type))
-                    llvmValue = builder->emitLoad(types->getType(type), llvmValue, sizeAndAlignment.alignment);
-
-                if (deferred)
-                {
-                    // Don't cache result if the emitted instruction was
-                    // deferred, we'll need to be able to generate the inlined
-                    // version later!
-                    return llvmValue;
-                }
+                llvmValue = deferredGlobalInsts.getValue(inst);
+                deferred = true;
             }
             else
             {
-                SLANG_UNEXPECTED("Unsupported value type for LLVM target, or referring to an "
-                                 "instruction that hasn't been emitted yet!");
+                llvmValue = builder->declareGlobalVariable(sizeAndAlignment.size, sizeAndAlignment.alignment, false);
+                deferredGlobalInsts[inst] = llvmValue;
+                deferred = true;
             }
-            break;
+
+            // Global variables are pointers to the actual data. If the type
+            // is not an aggregate, we need to load to get the value.
+            // Aggregates are passed around as pointers so they don't need
+            // to be loaded.
+            if (!types->isAggregateType(type))
+                llvmValue = builder->emitLoad(types->getType(type), llvmValue, sizeAndAlignment.alignment);
+
+            if (deferred)
+            {
+                // Don't cache result if the emitted instruction was
+                // deferred, we'll need to be able to generate the inlined
+                // version later!
+                return llvmValue;
+            }
+            */
+        }
+        else
+        {
+            SLANG_UNEXPECTED("Unsupported value type for LLVM target, or referring to an "
+                             "instruction that hasn't been emitted yet!");
         }
 
         SLANG_ASSERT(llvmValue);
@@ -1498,7 +1500,7 @@ struct LLVMEmitter
                 findValue(inst->getOperand(0)),
                 findValue(inst->getOperand(1)),
                 resultType,
-                isSigned(inst->getDataType()));
+                isSigned(inst));
         }
         else
         {
@@ -1625,7 +1627,7 @@ struct LLVMEmitter
                 LLVMInst* llvmVar =
                     types->emitAlloca(ptrType->getValueType(), defaultPointerRules);
 
-                TerminatedCharSlice linkageName, prettyName;
+                CharSlice linkageName, prettyName;
                 if (maybeGetName(&linkageName, &prettyName, inst))
                 {
                     builder->setName(llvmVar, linkageName);
@@ -1639,7 +1641,7 @@ struct LLVMEmitter
                         auto varType =
                             types->getDebugType(ptrType->getValueType(), defaultPointerRules);
                         auto debugVar = builder->emitDebugVar(prettyName, varType);
-                        builder->emitDebugValue(debugVar, nullptr);
+                        builder->emitDebugValue(debugVar, llvmVar);
                     }
                 }
 
@@ -1651,7 +1653,7 @@ struct LLVMEmitter
         case kIROp_UnconditionalBranch:
             {
                 auto branch = as<IRUnconditionalBranch>(inst);
-                llvmInst = builder->emitReturn(findValue(branch->getTargetBlock()));
+                llvmInst = builder->emitBranch(findValue(branch->getTargetBlock()));
             }
             break;
 
@@ -2355,11 +2357,11 @@ struct LLVMEmitter
                 auto line = getIntVal(debugVarInst->getLine());
                 IRInst* argIndex = debugVarInst->getArgIndex();
 
-                TerminatedCharSlice linkageName, prettyName;
+                CharSlice linkageName, prettyName;
                 maybeGetName(&linkageName, &prettyName, inst);
 
                 int arg = argIndex && !debugInlinedScope ? getIntVal(argIndex) : -1;
-                builder->emitDebugVar(prettyName, varType, file, line, arg);
+                instToDebugLLVM[inst] = builder->emitDebugVar(prettyName, varType, file, line, arg);
             }
             return nullptr;
 
@@ -2369,6 +2371,8 @@ struct LLVMEmitter
             {
                 auto debugValueInst = static_cast<IRDebugValue*>(inst);
                 auto debugVar = debugValueInst->getDebugVar();
+                if (!instToDebugLLVM.containsKey(debugVar))
+                    return nullptr;
                 auto value = findValue(debugValueInst->getValue());
                 builder->emitDebugValue(instToDebugLLVM.getValue(debugVar), value);
             }
@@ -2472,7 +2476,7 @@ struct LLVMEmitter
             line = getIntVal(debugFunc->getLine());
         }
 
-        TerminatedCharSlice linkageName, prettyName;
+        CharSlice linkageName, prettyName;
         maybeGetName(&linkageName, &prettyName, func);
 
         LLVMDebugNode* llvmFuncType = types->getDebugType(funcType, defaultPointerRules);
@@ -2491,14 +2495,14 @@ struct LLVMEmitter
         LLVMType* llvmFuncType = types->getType(funcType);
 
         String tmp;
-        TerminatedCharSlice linkageName, prettyName;
+        CharSlice linkageName, prettyName;
         if (!maybeGetName(&linkageName, &prettyName, func))
         {
             // If the name is missing for whatever reason, just generate one that
             // shouldn't clash with anything else.
             tmp = "__slang_anonymous_func_";
             tmp.append(uniqueIDCounter++);
-            linkageName = TerminatedCharSlice(tmp.begin(), tmp.getLength());
+            linkageName = CharSlice(tmp.begin(), tmp.getLength());
         }
 
         uint32_t funcAttributes = 0;
@@ -2536,7 +2540,7 @@ struct LLVMEmitter
                 attributes = SLANG_LLVM_ATTR_NOALIAS;
             }
 
-            TerminatedCharSlice linkageName, prettyName;
+            CharSlice linkageName, prettyName;
             maybeGetName(&linkageName, &prettyName, pp);
 
             builder->setArgInfo(llvmArg, linkageName, attributes);
@@ -2586,7 +2590,7 @@ struct LLVMEmitter
                 deferredGlobalVars.add(var);
         }
 
-        TerminatedCharSlice linkageName, prettyName;
+        CharSlice linkageName, prettyName;
         if (maybeGetName(&linkageName, &prettyName, var))
             builder->setName(llvmVar, linkageName);
 
@@ -2604,8 +2608,8 @@ struct LLVMEmitter
 
                 std::filesystem::path path(std::string(filename.begin(), filename.getLength()));
                 instToDebugLLVM[inst] = builder->getDebugFile(
-                    TerminatedCharSlice(path.filename().string().c_str()),
-                    TerminatedCharSlice(path.parent_path().string().c_str()),
+                    CharSlice(path.filename().string().c_str()),
+                    CharSlice(path.parent_path().string().c_str()),
                     getStringLitAsSlice(debugSource->getSource())
                 );
             }
@@ -2835,8 +2839,9 @@ struct LLVMEmitter
     {
         String llvmTextIR = expandIntrinsic(intrinsicInst, func, intrinsicDef);
 
-        mapInstToLLVM[func] = builder->emitInlineIRFunction(
-            llvmFunc, TerminatedCharSlice(llvmTextIR.begin(), llvmTextIR.getLength()));
+        llvmFunc = builder->emitInlineIRFunction(
+            llvmFunc, CharSlice(llvmTextIR.begin(), llvmTextIR.getLength()));
+        mapInstToLLVM[func] = llvmFunc;
     }
 
     void emitGlobalValueWithCode(

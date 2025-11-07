@@ -59,10 +59,10 @@ struct LLVMDebugNode;
 struct LLVMBuilderOptions
 {
     SlangCompileTarget target;
-    TerminatedCharSlice targetTriple;
-    TerminatedCharSlice cpu;
-    TerminatedCharSlice features;
-    TerminatedCharSlice debugCommandLineArgs;
+    CharSlice targetTriple;
+    CharSlice cpu;
+    CharSlice features;
+    CharSlice debugCommandLineArgs;
     SlangOptimizationLevel optLevel;
     SlangDebugInfoLevel debugLevel;
     SlangFpDenormalMode fp32DenormalMode;
@@ -157,10 +157,10 @@ public:
     //==========================================================================
     virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL declareFunction(
         LLVMType* funcType,
-        TerminatedCharSlice name,
+        CharSlice name,
         uint32_t attributes) = 0;
     virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL getFunctionArg(LLVMInst* funcDecl, int argIndex) = 0;
-    virtual SLANG_NO_THROW void SLANG_MCALL setArgInfo(LLVMInst* arg, TerminatedCharSlice name, uint32_t attributes) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL setArgInfo(LLVMInst* arg, CharSlice name, uint32_t attributes) = 0;
     virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL declareGlobalVariable(
         LLVMInst* initializer,
         int alignment,
@@ -229,7 +229,7 @@ public:
     virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL getConstantPtr(uint64_t value) = 0;
     virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL getConstantFloat(LLVMType* type, double value) = 0;
     virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL getConstantArray(Slice<LLVMInst*> values) = 0;
-    virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL getConstantString(TerminatedCharSlice literal) = 0;
+    virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL getConstantString(CharSlice literal) = 0;
     virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL getConstantStruct(Slice<LLVMInst*> values) = 0;
     virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL getConstantVector(Slice<LLVMInst*> values) = 0;
     virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL getConstantVector(LLVMInst* value, int count) = 0;
@@ -238,8 +238,8 @@ public:
     //==========================================================================
     // Debug info
     //==========================================================================
-    virtual SLANG_NO_THROW void SLANG_MCALL setName(LLVMInst* inst, TerminatedCharSlice) = 0;
-    virtual SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugFallbackType(TerminatedCharSlice name) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL setName(LLVMInst* inst, CharSlice name) = 0;
+    virtual SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugFallbackType(CharSlice name) = 0;
     virtual SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugVoidType() = 0;
     virtual SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugIntType(const char* name, bool isSigned, int bitSize) = 0;
     virtual SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugFloatType(const char* name, int bitSize) = 0;
@@ -250,7 +250,7 @@ public:
     virtual SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugArrayType(int sizeBytes, int alignBytes, int elementCount, LLVMDebugNode* elementType) = 0;
     virtual SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugStructField(
         LLVMDebugNode* type,
-        TerminatedCharSlice name,
+        CharSlice name,
         int offset,
         int size,
         int alignment,
@@ -259,7 +259,7 @@ public:
     ) = 0;
     virtual SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugStructType(
         Slice<LLVMDebugNode*> fields,
-        TerminatedCharSlice name,
+        CharSlice name,
         int size,
         int alignment,
         LLVMDebugNode* file,
@@ -268,21 +268,21 @@ public:
     virtual SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugFunctionType(LLVMDebugNode* returnType, Slice<LLVMDebugNode*> paramTypes) = 0;
     virtual SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugFunction(
         LLVMDebugNode* funcType,
-        TerminatedCharSlice name,
-        TerminatedCharSlice linkageName,
+        CharSlice name,
+        CharSlice linkageName,
         LLVMDebugNode* file,
         int line
     ) = 0;
 
     virtual SLANG_NO_THROW void SLANG_MCALL setDebugLocation(int line, int column) = 0;
     virtual SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugFile(
-        TerminatedCharSlice filename,
-        TerminatedCharSlice directory,
-        TerminatedCharSlice source
+        CharSlice filename,
+        CharSlice directory,
+        CharSlice source
     ) = 0;
 
     virtual SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL emitDebugVar(
-        TerminatedCharSlice name,
+        CharSlice name,
         LLVMDebugNode* type,
         LLVMDebugNode* file = nullptr,
         int line = -1,
@@ -294,19 +294,19 @@ public:
     // Code generation
     //==========================================================================
 
-    virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL emitInlineIRFunction(LLVMInst* func, TerminatedCharSlice content) = 0;
+    virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL emitInlineIRFunction(LLVMInst* func, CharSlice content) = 0;
 
     // Creates a function that runs a whole workgroup of the entry point.
     // TODO: Ideally, this should vectorize over the workgroup.
     virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL emitComputeEntryPointWorkGroup(
         LLVMInst* entryPointFunc,
-        TerminatedCharSlice name,
+        CharSlice name,
         int xSize, int ySize, int zSize, int subgroupSize) = 0;
     // This generates a dispatching function for a given compute entry
     // point. It runs workgroups serially.
     virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL emitComputeEntryPointDispatcher(
         LLVMInst* workGroupFunc,
-        TerminatedCharSlice name) = 0;
+        CharSlice name) = 0;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL generateAssembly(IArtifact** outArtifact) = 0;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL generateObjectCode(IArtifact** outArtifact) = 0;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL generateJITLibrary(IArtifact** outArtifact) = 0;

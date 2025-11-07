@@ -95,7 +95,7 @@ static llvm::ArrayRef<T*> sliceToArrayRef(Slice<U> slice)
     return llvm::ArrayRef(reinterpret_cast<T* const*>(slice.begin()), slice.count);
 }
 
-llvm::StringRef charSliceToLLVM(TerminatedCharSlice slice)
+llvm::StringRef charSliceToLLVM(CharSlice slice)
 {
     return llvm::StringRef(slice.begin(), slice.count);
 }
@@ -211,9 +211,9 @@ public:
     SLANG_NO_THROW LLVMType* SLANG_MCALL getBufferType() override;
     SLANG_NO_THROW LLVMType* SLANG_MCALL getFunctionType(LLVMType* returnType, Slice<LLVMType*> paramTypes, bool variadic) override;
 
-    SLANG_NO_THROW LLVMInst* SLANG_MCALL declareFunction(LLVMType* funcType, TerminatedCharSlice name, uint32_t attributes) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL declareFunction(LLVMType* funcType, CharSlice name, uint32_t attributes) override;
     SLANG_NO_THROW LLVMInst* SLANG_MCALL getFunctionArg(LLVMInst* funcDecl, int argIndex) override;
-    SLANG_NO_THROW void SLANG_MCALL setArgInfo(LLVMInst* arg, TerminatedCharSlice name, uint32_t attribute) override;
+    SLANG_NO_THROW void SLANG_MCALL setArgInfo(LLVMInst* arg, CharSlice name, uint32_t attribute) override;
     SLANG_NO_THROW LLVMInst* SLANG_MCALL declareGlobalVariable(LLVMInst* initializer, int alignment, bool externallyVisible) override;
     SLANG_NO_THROW LLVMInst* SLANG_MCALL declareGlobalVariable(int size, int alignment, bool externallyVisible) override;
     SLANG_NO_THROW LLVMInst* SLANG_MCALL declareGlobalConstructor() override;
@@ -269,14 +269,14 @@ public:
     SLANG_NO_THROW LLVMInst* SLANG_MCALL getConstantPtr(uint64_t value) override;
     SLANG_NO_THROW LLVMInst* SLANG_MCALL getConstantFloat(LLVMType* type, double value) override;
     SLANG_NO_THROW LLVMInst* SLANG_MCALL getConstantArray(Slice<LLVMInst*> values) override;
-    SLANG_NO_THROW LLVMInst* SLANG_MCALL getConstantString(TerminatedCharSlice literal) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL getConstantString(CharSlice literal) override;
     SLANG_NO_THROW LLVMInst* SLANG_MCALL getConstantStruct(Slice<LLVMInst*> values) override;
     SLANG_NO_THROW LLVMInst* SLANG_MCALL getConstantVector(Slice<LLVMInst*> values) override;
     SLANG_NO_THROW LLVMInst* SLANG_MCALL getConstantVector(LLVMInst* value, int count) override;
     SLANG_NO_THROW LLVMInst* SLANG_MCALL getConstantExtractElement(LLVMInst* value, int index) override;
 
-    SLANG_NO_THROW void SLANG_MCALL setName(LLVMInst* inst, TerminatedCharSlice) override;
-    SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugFallbackType(TerminatedCharSlice name) override;
+    SLANG_NO_THROW void SLANG_MCALL setName(LLVMInst* inst, CharSlice) override;
+    SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugFallbackType(CharSlice name) override;
     SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugVoidType() override;
     SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugIntType(const char* name, bool isSigned, int bitSize) override;
     SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugFloatType(const char* name, int bitSize) override;
@@ -287,7 +287,7 @@ public:
     SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugArrayType(int sizeBytes, int alignBytes, int elementCount, LLVMDebugNode* elementType) override;
     SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugStructField(
         LLVMDebugNode* type,
-        TerminatedCharSlice name,
+        CharSlice name,
         int offset,
         int size,
         int alignment,
@@ -296,7 +296,7 @@ public:
     ) override;
     SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugStructType(
         Slice<LLVMDebugNode*> fields,
-        TerminatedCharSlice name,
+        CharSlice name,
         int size,
         int alignment,
         LLVMDebugNode* file,
@@ -305,20 +305,20 @@ public:
     SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugFunctionType(LLVMDebugNode* returnType, Slice<LLVMDebugNode*> paramTypes) override;
     SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugFunction(
         LLVMDebugNode* funcType,
-        TerminatedCharSlice name,
-        TerminatedCharSlice linkageName,
+        CharSlice name,
+        CharSlice linkageName,
         LLVMDebugNode* file,
         int line
     ) override;
     SLANG_NO_THROW void SLANG_MCALL setDebugLocation(int line, int column) override;
     SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugFile(
-        TerminatedCharSlice filename,
-        TerminatedCharSlice directory,
-        TerminatedCharSlice source
+        CharSlice filename,
+        CharSlice directory,
+        CharSlice source
     ) override;
 
     SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL emitDebugVar(
-        TerminatedCharSlice name,
+        CharSlice name,
         LLVMDebugNode* type,
         LLVMDebugNode* file,
         int line,
@@ -326,13 +326,13 @@ public:
     ) override;
     SLANG_NO_THROW void SLANG_MCALL emitDebugValue(LLVMDebugNode* debugVar, LLVMInst* value) override;
 
-    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitInlineIRFunction(LLVMInst* func, TerminatedCharSlice content) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitInlineIRFunction(LLVMInst* func, CharSlice content) override;
 
     SLANG_NO_THROW LLVMInst* SLANG_MCALL emitComputeEntryPointWorkGroup(
         LLVMInst* entryPointFunc,
-        TerminatedCharSlice name,
+        CharSlice name,
         int xSize, int ySize, int zSize, int subgroupSize) override;
-    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitComputeEntryPointDispatcher(LLVMInst* workGroupFunc, TerminatedCharSlice name) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitComputeEntryPointDispatcher(LLVMInst* workGroupFunc, CharSlice name) override;
 
     SLANG_NO_THROW SlangResult SLANG_MCALL generateAssembly(IArtifact** outArtifact) override;
     SLANG_NO_THROW SlangResult SLANG_MCALL generateObjectCode(IArtifact** outArtifact) override;
@@ -572,10 +572,10 @@ void LLVMBuilder::finalize()
             "llvm.global_ctors");
     }
 
-    // std::string out;
-    // llvm::raw_string_ostream rso(out);
-    // llvmModule->print(rso, nullptr);
-    // printf("%s\n", out.c_str());
+    //std::string out;
+    //llvm::raw_string_ostream rso(out);
+    //llvmModule->print(rso, nullptr);
+    //printf("%s\n", out.c_str());
 
     llvm::verifyModule(*llvmModule, &llvm::errs());
 
@@ -775,7 +775,7 @@ LLVMType* LLVMBuilder::getFunctionType(LLVMType* returnType, Slice<LLVMType*> pa
     return llvm::FunctionType::get(returnType, sliceToArrayRef<llvm::Type>(paramTypes), variadic);
 }
 
-LLVMInst* LLVMBuilder::declareFunction(LLVMType* funcType, TerminatedCharSlice name, uint32_t attributes)
+LLVMInst* LLVMBuilder::declareFunction(LLVMType* funcType, CharSlice name, uint32_t attributes)
 {
     llvm::GlobalValue::LinkageTypes linkage = llvm::GlobalValue::PrivateLinkage;
 
@@ -802,7 +802,7 @@ LLVMInst* LLVMBuilder::getFunctionArg(LLVMInst* funcDecl, int argIndex)
     return llvm::cast<llvm::Function>(funcDecl)->getArg(argIndex);
 }
 
-void LLVMBuilder::setArgInfo(LLVMInst* arg, TerminatedCharSlice name, uint32_t attribute)
+void LLVMBuilder::setArgInfo(LLVMInst* arg, CharSlice name, uint32_t attribute)
 {
     auto llvmArg = llvm::cast<llvm::Argument>(arg);
     llvm::AttrBuilder attrs(*llvmContext);
@@ -1452,7 +1452,7 @@ LLVMInst* LLVMBuilder::getConstantArray(Slice<LLVMInst*> values)
     return llvm::ConstantArray::get(type, sliceToArrayRef<llvm::Constant>(values));
 }
 
-LLVMInst* LLVMBuilder::getConstantString(TerminatedCharSlice literal)
+LLVMInst* LLVMBuilder::getConstantString(CharSlice literal)
 {
     return llvmBuilder->CreateGlobalString(charSliceToLLVM(literal));
 }
@@ -1480,12 +1480,12 @@ LLVMInst* LLVMBuilder::getConstantExtractElement(LLVMInst* value, int index)
     return llvm::ConstantExpr::getExtractElement(llvm::cast<llvm::Constant>(value), llvmIndex);
 }
 
-void LLVMBuilder::setName(LLVMInst* inst, TerminatedCharSlice name)
+void LLVMBuilder::setName(LLVMInst* inst, CharSlice name)
 {
     inst->setName(charSliceToLLVM(name));
 }
 
-LLVMDebugNode* LLVMBuilder::getDebugFallbackType(TerminatedCharSlice name)
+LLVMDebugNode* LLVMBuilder::getDebugFallbackType(CharSlice name)
 {
     return llvmDebugBuilder->createUnspecifiedType(charSliceToLLVM(name));
 }
@@ -1555,13 +1555,15 @@ LLVMDebugNode* LLVMBuilder::getDebugArrayType(int sizeBytes, int alignBytes, int
 
 LLVMDebugNode* LLVMBuilder::getDebugStructField(
     LLVMDebugNode* type,
-    TerminatedCharSlice name,
+    CharSlice name,
     int offset,
     int size,
     int alignment,
     LLVMDebugNode* file,
     int line
 ){
+    if (!file)
+        file = compileUnit->getFile();
     llvm::DIFile* llvmFile = llvm::cast<llvm::DIFile>(file);
     return llvmDebugBuilder->createMemberType(
         llvmFile,
@@ -1577,12 +1579,14 @@ LLVMDebugNode* LLVMBuilder::getDebugStructField(
 
 LLVMDebugNode* LLVMBuilder::getDebugStructType(
     Slice<LLVMDebugNode*> fields,
-    TerminatedCharSlice name,
+    CharSlice name,
     int size,
     int alignment,
     LLVMDebugNode* file,
     int line
 ){
+    if (!file)
+        file = compileUnit->getFile();
     llvm::DINodeArray fieldTypes = llvmDebugBuilder->getOrCreateArray(sliceToArrayRef<llvm::Metadata>(fields));
     llvm::DIFile* llvmFile = llvm::cast<llvm::DIFile>(file);
 
@@ -1611,8 +1615,8 @@ LLVMDebugNode* LLVMBuilder::getDebugFunctionType(LLVMDebugNode* returnType, Slic
 
 LLVMDebugNode* LLVMBuilder::getDebugFunction(
     LLVMDebugNode* funcType,
-    TerminatedCharSlice name,
-    TerminatedCharSlice linkageName,
+    CharSlice name,
+    CharSlice linkageName,
     LLVMDebugNode* file,
     int line
 ){
@@ -1640,9 +1644,9 @@ void LLVMBuilder::setDebugLocation(int line, int column)
 }
 
 LLVMDebugNode* LLVMBuilder::getDebugFile(
-    TerminatedCharSlice filename,
-    TerminatedCharSlice directory,
-    TerminatedCharSlice source
+    CharSlice filename,
+    CharSlice directory,
+    CharSlice source
 ){
     return llvmDebugBuilder->createFile(
         charSliceToLLVM(filename),
@@ -1652,7 +1656,7 @@ LLVMDebugNode* LLVMBuilder::getDebugFile(
 }
 
 LLVMDebugNode* LLVMBuilder::emitDebugVar(
-    TerminatedCharSlice name,
+    CharSlice name,
     LLVMDebugNode* type,
     LLVMDebugNode* file,
     int line,
@@ -1709,9 +1713,8 @@ void LLVMBuilder::emitDebugValue(LLVMDebugNode* debugVar, LLVMInst* value)
             0,
             var->getScope());
 
-    llvm::AllocaInst* alloca = value ? 
-        llvm::dyn_cast<llvm::AllocaInst>(value) : nullptr;
-    if (!debugInfo.attached && (alloca || !value))
+    llvm::AllocaInst* alloca = llvm::dyn_cast<llvm::AllocaInst>(value);
+    if (!debugInfo.attached && alloca)
     {
         debugInfo.isStackVar = true;
         llvmDebugBuilder->insertDeclare(
@@ -1733,7 +1736,7 @@ void LLVMBuilder::emitDebugValue(LLVMDebugNode* debugVar, LLVMInst* value)
     debugInfo.attached = true;
 }
 
-LLVMInst* LLVMBuilder::emitInlineIRFunction(LLVMInst* func, TerminatedCharSlice content)
+LLVMInst* LLVMBuilder::emitInlineIRFunction(LLVMInst* func, CharSlice content)
 {
     auto llvmFunc = llvm::cast<llvm::Function>(func);
     llvmFunc->setLinkage(llvm::Function::LinkageTypes::ExternalLinkage);
@@ -1767,7 +1770,7 @@ LLVMInst* LLVMBuilder::emitInlineIRFunction(LLVMInst* func, TerminatedCharSlice 
 
 LLVMInst* LLVMBuilder::emitComputeEntryPointWorkGroup(
     LLVMInst* entryPointFunc,
-    TerminatedCharSlice name,
+    CharSlice name,
     int xSize,
     int ySize,
     int zSize,
@@ -1916,7 +1919,7 @@ LLVMInst* LLVMBuilder::emitComputeEntryPointWorkGroup(
     return dispatcher;
 }
 
-LLVMInst* LLVMBuilder::emitComputeEntryPointDispatcher(LLVMInst* workGroupFunc, TerminatedCharSlice name)
+LLVMInst* LLVMBuilder::emitComputeEntryPointDispatcher(LLVMInst* workGroupFunc, CharSlice name)
 {
     llvmBuilder->SetCurrentDebugLocation(llvm::DebugLoc());
 
