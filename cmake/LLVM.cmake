@@ -57,16 +57,9 @@ function(fetch_or_build_slang_llvm)
         slang_add_target(
             source/slang-llvm
             MODULE
-            # Unfortunately, we need to link to the objects of libslang;
-            # otherwise things like IRBuilder aren't available in
-            # slang-emit-llvm.cpp.
-            LINK_WITH_PRIVATE
-                slang-common-objects
-                slang-no-embedded-core-module
-                slang-no-embedded-core-module-source
-                core
-                compiler-core
-                clang-dep
+            LINK_WITH_PRIVATE core compiler-core clang-dep
+            # We include slang.h, but don't need to link with it
+            INCLUDE_FROM_PRIVATE slang
             # We include tools/slang-test/filecheck.h, but don't need to link
             # with it and it might not be a target if SLANG_ENABLE_TESTS is
             # false, so just include the directory manually here
@@ -77,9 +70,6 @@ function(fetch_or_build_slang_llvm)
             INSTALL
             INSTALL_COMPONENT slang-llvm
             EXPORT_SET_NAME SlangTargets
-            # The slang target must be built first so that fiddle generates the
-            # required headers.
-            REQUIRES slang
         )
 
         llvm_config(slang-llvm ${LLVM_LINK_TYPE} ${LLVM_TARGETS_TO_BUILD} core support filecheck orcjit codegen mc mcparser)

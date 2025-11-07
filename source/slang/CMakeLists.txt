@@ -219,6 +219,17 @@ set(slang_build_args
     copy_slang_headers
     generate_standard_module_config_header
 )
+set(slang_link_args
+    LINK_WITH_PRIVATE
+    core
+    prelude
+    compiler-core
+    slang-capability-defs
+    slang-capability-lookup
+    slang-fiddle-output
+    slang-lookup-tables
+    SPIRV-Headers::SPIRV-Headers
+)
 set(slang_interface_args INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/include)
 set(slang_public_lib_args
     PUBLIC_HEADERS
@@ -233,31 +244,8 @@ set(slang_public_lib_args
 )
 
 #
-# Minimal object library used here and in slang-llvm
+# Minimal static slang used in generating the embedded core module
 #
-
-slang_add_target(
-    .
-    OBJECT
-    ${slang_build_args}
-    LINK_WITH_PUBLIC
-        # Because of CMake shenanigans, transitive dependencies on OBJECT
-        # libraries don't work without that extra $<TARGET_OBJECTS:x>.
-        core
-        prelude
-        $<TARGET_OBJECTS:prelude>
-        compiler-core
-        slang-capability-defs
-        $<TARGET_OBJECTS:slang-capability-defs>
-        slang-capability-lookup
-        $<TARGET_OBJECTS:slang-capability-lookup>
-        slang-fiddle-output
-        slang-lookup-tables
-        $<TARGET_OBJECTS:slang-lookup-tables>
-        SPIRV-Headers::SPIRV-Headers
-    TARGET_NAME slang-common-objects
-    EXCLUDE_FROM_ALL
-)
 
 #
 # Slang itself
@@ -271,10 +259,11 @@ if(NOT SLANG_EMBED_CORE_MODULE)
         .
         ${SLANG_LIB_TYPE}
         OUTPUT_NAME slang-compiler
+        ${slang_build_args}
+        ${slang_link_args}
         ${slang_interface_args}
         ${slang_public_lib_args}
-        LINK_WITH_PRIVATE slang-common-objects
-        NO_SOURCE
+        INSTALL_COMPONENT generators
     )
     add_library(slang-without-embedded-core-module ALIAS slang)
 else()
@@ -283,8 +272,17 @@ else()
     # the shared objects as one target so we don't build them twice.
     slang_add_target(
         .
+        OBJECT
+        ${slang_build_args}
+        ${slang_link_args}
+        TARGET_NAME slang-common-objects
+        EXCLUDE_FROM_ALL
+    )
+    slang_add_target(
+        .
         ${SLANG_LIB_TYPE}
         EXPORT_MACRO_PREFIX SLANG
+        ${slang_link_args}
         ${slang_interface_args}
         NO_SOURCE
         TARGET_NAME slang-without-embedded-core-module
@@ -303,6 +301,7 @@ else()
         ${SLANG_LIB_TYPE}
         OUTPUT_NAME slang-compiler
         EXPORT_MACRO_PREFIX SLANG
+        ${slang_link_args}
         ${slang_interface_args}
         ${slang_public_lib_args}
         LINK_WITH_PRIVATE slang-common-objects
