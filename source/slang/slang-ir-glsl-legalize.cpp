@@ -1649,7 +1649,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     // When it comes time to actually declare a global shader parameter, it will need
     // to be placed in an appropriate address space, and we will need to use
     // the correct IR pointer type opcode to represent it. The address space is
-    // necessary to emit correct correct code for targets like SPIR-V that care
+    // necessary to emit correct code for targets like SPIR-V that care
     // about address spaces, and the pointer type opcode is necessary so that
     // downstream passes on the IR can understand which of these parameters are
     // guaranteed to be immutable and/or not to alias other storage.
