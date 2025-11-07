@@ -1499,7 +1499,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     // The assumption that will be made after this step is that the
     // `leafUserDeclaredParamType` and the `peeledRequiredParamType` are
     // supposed to correspond to one another (even if one is an array
-    // and the other isn't). If their types to not match, then code will
+    // and the other isn't). If their types do not match, then code will
     // be introduced at use sites to adapt between them.
     //
     IRType* peeledRequiredParamType = requiredParamType;
