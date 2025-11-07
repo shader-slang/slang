@@ -1486,7 +1486,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         requiredParamType = builder->getUInt64Type();
     }
 
-    // The recursive walk that lead us to this function has already "peeled"
+    // The recursive walk that led us to this function has already "peeled"
     // away any array types that were wrapping the `leafUserDeclaredType`,
     // but it is possible that the `requiredType` is itself an array type.
     // In such a case we want to check how the layers of array-ness wrapping
