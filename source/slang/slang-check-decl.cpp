@@ -9564,7 +9564,7 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
             {
                 // TODO(tfoley): The diagnostic in this case should probably not refer
                 // to the `const` modifier at all (since that is not actually what is
-                // required), and should instead node that a paraemter pack may only
+                // required), and should instead note that a parameter pack may only
                 // be declared as a pure input parameter to a function (`in` or
                 // `borrow`).
                 //
