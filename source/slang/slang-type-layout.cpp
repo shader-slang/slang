@@ -582,6 +582,14 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
         SimpleLayoutInfo elementInfo,
         size_t elementCount) override
     {
+        if (elementInfo.size.isInfinite())
+        {
+            SimpleLayoutInfo vectorInfo;
+            vectorInfo.kind = elementInfo.kind;
+            vectorInfo.size = LayoutSize::infinite();
+            vectorInfo.alignment = elementInfo.alignment;
+            return vectorInfo;
+        }
 
         const auto elementSize = elementInfo.size.getFiniteValue();
 
@@ -645,6 +653,15 @@ struct MetalLayoutRulesImpl : public CPULayoutRulesImpl
         size_t elementCount) override
     {
         SLANG_UNUSED(elementType);
+
+        if (elementInfo.size.isInfinite())
+        {
+            SimpleLayoutInfo vectorInfo;
+            vectorInfo.kind = elementInfo.kind;
+            vectorInfo.size = LayoutSize::infinite();
+            vectorInfo.alignment = elementInfo.alignment;
+            return vectorInfo;
+        }
 
         const auto elementSize = elementInfo.size.getFiniteValue();
         auto alignedElementCount = 1 << Math::Log2Ceil((uint32_t)elementCount);
