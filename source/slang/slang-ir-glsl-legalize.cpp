@@ -1532,8 +1532,8 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     }
 
     // Now that we've computed the required type (if any) and tried to
-    // peel it so taht it aligns it with the array layers (if any) of
-    // the user-declared type, its time to work on constructing the
+    // peel it so that it aligns with the array layers (if any) of
+    // the user-declared type, it's time to work on constructing the
     // actual type for the legalized global varying shader parameter
     // we are going to create/declare, along with the necessary type layout.
     //
