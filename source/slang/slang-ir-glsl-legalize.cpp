@@ -1600,7 +1600,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
                     // We end up re-building type layout information here, which
                     // is kind of gross since we don't have all the required logic
                     // at this point to make sure our computations are consistent
-                    // with what the front-end assigne to a given shader parameter.
+                    // with what the front-end assigned to a given shader parameter.
                     //
                     // TODO: Find a way to not have to manually do layout computation
                     // here, and instead re-use the layout information that is already
