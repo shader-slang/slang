@@ -265,7 +265,7 @@ Val::OperandView<Val> findInnerMostGenericArgs(SubstitutionSet subst);
 
 /// Get the parameter-passing mode explicitly declared for a parameter.
 ///
-/// The paramter-passing mode this function computes is the one
+/// The parameter-passing mode this function computes is the one
 /// that is superficially implied by the modifiers on the parameters
 /// alone, without consideration of the type of the parameter, or
 /// any other context.
