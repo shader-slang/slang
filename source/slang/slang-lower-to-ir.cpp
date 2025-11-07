@@ -11717,7 +11717,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 //
                 // Now that we've created a `paramVal` to represent the
                 // parameter and emitted any required prologue code, we
-                // will can move on to registering that value as necessary
+                // can move on to registering that value as necessary
                 // for subsequence code generation steps.
                 //
 
