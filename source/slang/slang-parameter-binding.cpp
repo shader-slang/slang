@@ -1456,17 +1456,7 @@ static void completeBindingsForParameterImpl(
             // an unbounded number of spaces.
             // TODO: we should enforce that somewhere with an error.
             //
-            if (typeRes.count.isInfinite())
-            {
-                // For now, assert to catch this case during development
-                SLANG_ASSERT(!"Infinite space count not supported");
-                // In release, treat as zero to avoid crash
-                // spacesToAllocateCount += 0;
-            }
-            else
-            {
-                spacesToAllocateCount += typeRes.count.getFiniteValue();
-            }
+            spacesToAllocateCount += typeRes.count.getFiniteValue();
             break;
 
         case LayoutResourceKind::Uniform:
@@ -1600,10 +1590,9 @@ static void completeBindingsForParameterImpl(
             RefPtr<UsedRangeSet> usedRangeSet = _getOrCreateUsedRangeSetForSpace(context, space);
 
             bindingInfo.count = count;
-            auto layoutCount = LayoutIndex::fromSize(count);
-            bindingInfo.index = layoutCount.isValid()
-                ? usedRangeSet->usedResourceRanges[(int)kind].Allocate(firstVarLayout, layoutCount.getValue())
-                : LayoutIndex::invalid();
+            bindingInfo.index = usedRangeSet->usedResourceRanges[(int)kind].Allocate(
+                firstVarLayout,
+                count.getFiniteValue());
             bindingInfo.space = space;
         }
     }
@@ -2393,7 +2382,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                     auto kind = fieldTypeResInfo.kind;
                     auto structTypeResInfo = structLayout->findOrAddResourceInfo(kind);
                     auto fieldResInfo = fieldVarLayout->findOrAddResourceInfo(kind);
-                    fieldResInfo->index = LayoutIndex::fromSize(structTypeResInfo->count);
+                    fieldResInfo->index = structTypeResInfo->count.getFiniteValue();
                     structTypeResInfo->count += fieldTypeResInfo.count;
                 }
             }
@@ -2491,7 +2480,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                             // have preceded it.
                             //
                             fieldResInfo = fieldVarLayout->findOrAddResourceInfo(kind);
-                            fieldResInfo->index = LayoutIndex::fromSize(structTypeResInfo->count);
+                            fieldResInfo->index = structTypeResInfo->count.getFiniteValue();
                             structTypeResInfo->count += fieldTypeResInfo.count;
                         }
                         else
@@ -2721,7 +2710,7 @@ struct ScopeLayoutBuilder
             LayoutSize uniformOffset = rules->AddStructField(&m_structLayoutInfo, fieldInfo);
 
             varLayout->findOrAddResourceInfo(LayoutResourceKind::Uniform)->index =
-                LayoutIndex::fromSize(uniformOffset);
+                uniformOffset.getFiniteValue();
         }
 
         m_structLayout->fields.add(varLayout);
@@ -2857,10 +2846,9 @@ struct SimpleScopeLayoutBuilder : ScopeLayoutBuilder
                     continue;
                 paramResInfo = paramVarLayout->findOrAddResourceInfo(kind);
 
-                auto paramCount = LayoutIndex::fromSize(paramTypeResInfo.count);
-                paramResInfo->index = paramCount.isValid()
-                    ? usedRangeSet[int(kind)].Allocate(paramVarLayout, paramCount.getValue())
-                    : LayoutIndex::invalid();
+                paramResInfo->index = usedRangeSet[int(kind)].Allocate(
+                    paramVarLayout,
+                    paramTypeResInfo.count.getFiniteValue());
             }
         }
         //
@@ -2920,10 +2908,9 @@ static ParameterBindingAndKindInfo _allocateConstantBufferBinding(ParameterBindi
     ParameterBindingAndKindInfo info;
     info.kind = layoutInfo.kind;
     info.count = layoutInfo.size;
-    auto layoutCount = LayoutIndex::fromSize(layoutInfo.size);
-    info.index = layoutCount.isValid() 
-        ? usedRangeSet->usedResourceRanges[(int)layoutInfo.kind].Allocate(nullptr, layoutCount.getValue())
-        : LayoutIndex::invalid();
+    info.index = usedRangeSet->usedResourceRanges[(int)layoutInfo.kind].Allocate(
+        nullptr,
+        layoutInfo.size.getFiniteValue());
     info.space = space;
     return info;
 }
