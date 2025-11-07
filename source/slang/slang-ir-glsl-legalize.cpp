@@ -1861,7 +1861,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     // that will set about replacing use sites of a user-declared
     // parameter to use the new legalized representation.
     //
-    // The final detail we need to deal with before we can hand of
+    // The final detail we need to deal with before we can hand off
     // the value that we've created is that the Slang IR type of
     // the parameter we created (`legalizedParamType`) might not
     // match the Slang IR type that the user declared
