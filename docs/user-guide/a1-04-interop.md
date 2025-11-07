@@ -135,10 +135,34 @@ uint2 getRealtimeClock()
 }
 ```
 This definition causes `getRealtimeClock()` to translate to a call to NVAPI when targeting HLSL, to `clockRealtime2x32EXT()` when targeting
-GLSL, and to the `OpReadClockKHR` instruction when compiling directly to SPIRV through the inline SPIRV assembly block. The `default` case is
-used for target not specified in the `__target_switch` statement.
+GLSL, and to the `OpReadClockKHR` instruction when compiling directly to SPIRV through the inline SPIRV assembly block.
 
-Currently, the following target names are supported in a `case` statement: `cpp`, `cuda`, `glsl`, `hlsl`, and `spirv`.
+A `case` label may be a target base capability atom or a capability atom inheriting the target base. The latter allows targeting for a specific target capability or capability level. Note that aliases or compound capabilities are not allowed as `case` labels.
+
+The `default` case is used for targets not specified in the `__target_switch` statement. However, when any target-specific `case` label is specified, the target is no longer included in the `default` case. For example:
+
+```hlsl
+[ForceInline]
+bool __targetHasImplicitDerivativesInComputeStage()
+{
+    __target_switch
+    {
+    case _GL_NV_compute_shader_derivatives:
+    case SPV_KHR_compute_shader_derivatives:
+    case _sm_6_6:
+        return true;
+
+    case hlsl:
+    case glsl:
+    case spirv:
+    default:
+        return false;
+    }
+}
+```
+In this example, case `hlsl` is required, since capability `_sm_6_6` inherits the base capability `hlsl`. Otherwise, this function would not be well-formed for HLSL capability level `_sm_6_5` and below. Similarly, `_GL_NV_compute_shader_derivatives` and `SPV_KHR_compute_shader_derivatives` inherit from `glsl` and `spirv`, respectively, and hence, the `glsl` and `spirv` cases are also required as the target-specific catch-alls. The rationale for this behavior is that when a feature requires specific handling by one or more targets, the default case will no longer provide a possibly unintended fallback in case of unmet requirements.
+
+Currently, the following targets are supported in a `case` statement: `cpp`, `cuda`, `glsl`, `hlsl`, `metal`, `spirv`, and `wgsl`.
 
 ## Inline SPIRV Assembly
 

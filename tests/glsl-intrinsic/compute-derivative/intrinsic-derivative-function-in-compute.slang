@@ -1,21 +1,21 @@
 #version 450 core
 #extension GL_EXT_texture_shadow_lod : enable
 
-//TEST:SIMPLE(filecheck=CHECK_GLSL_QUAD_C): -allow-glsl -stage compute -entry computeMain -target glsl -DCOMPUTE -DQUAD
+//TEST:SIMPLE(filecheck=CHECK_GLSL_QUAD_C): -allow-glsl -stage compute -entry computeMain -target glsl -DCOMPUTE -DQUAD -capability GL_NV_compute_shader_derivatives
 // CHECK_GLSL_QUAD_C: GL_NV_compute_shader_derivatives
 // CHECK_GLSL_QUAD_C: layout(derivative_group_quadsNV)
 
-//TEST:SIMPLE(filecheck=CHECK_GLSL_LINEAR_C): -allow-glsl -stage compute -entry computeMain -target glsl -DCOMPUTE -DLINEAR
+//TEST:SIMPLE(filecheck=CHECK_GLSL_LINEAR_C): -allow-glsl -stage compute -entry computeMain -target glsl -DCOMPUTE -DLINEAR -capability GL_NV_compute_shader_derivatives
 // CHECK_GLSL_LINEAR_C: GL_NV_compute_shader_derivatives
 // CHECK_GLSL_LINEAR_C: layout(derivative_group_linearNV)
 
-//TEST:SIMPLE(filecheck=CHECK_SPV_QUAD_C): -allow-glsl -stage compute -entry computeMain -target spirv -DQUAD -DCOMPUTE
+//TEST:SIMPLE(filecheck=CHECK_SPV_QUAD_C): -allow-glsl -stage compute -entry computeMain -target spirv -DQUAD -DCOMPUTE -capability GL_NV_compute_shader_derivatives
 // CHECK_SPV_QUAD_C: DerivativeGroupQuads{{NV|KHR}}
 // CHECK_SPV_QUAD_C-NOT: DerivativeGroupQuads{{NV|KHR}}
 // CHECK_SPV_QUAD_C: "SPV_KHR_compute_shader_derivatives"
 // CHECK_SPV_QUAD_C-NOT: "SPV_KHR_compute_shader_derivatives"
 
-//TEST:SIMPLE(filecheck=CHECK_SPV_LINEAR_C): -allow-glsl -stage compute -entry computeMain -target spirv -DLINEAR -DCOMPUTE
+//TEST:SIMPLE(filecheck=CHECK_SPV_LINEAR_C): -allow-glsl -stage compute -entry computeMain -target spirv -DLINEAR -DCOMPUTE -capability GL_NV_compute_shader_derivatives
 // CHECK_SPV_LINEAR_C: DerivativeGroupLinear{{NV|KHR}}
 // CHECK_SPV_LINEAR_C-NOT: DerivativeGroupLinear{{NV|KHR}}
 // CHECK_SPV_LINEAR_C: "SPV_KHR_compute_shader_derivatives"

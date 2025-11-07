@@ -1105,7 +1105,7 @@ static Index _addRequirements(Decl* decl, List<DocMarkdownWriter::Requirement>& 
 
     if (auto capAttr = decl->findModifier<RequireCapabilityAttribute>())
     {
-        return _addRequirement(capAttr->capabilitySet, ioReqs);
+        return _addRequirement(CapabilitySet{capAttr->capabilitySet}, ioReqs);
     }
     return -1;
 }

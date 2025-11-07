@@ -59,6 +59,7 @@ enum Extension : uint32_t {
   kSPV_EXT_physical_storage_buffer,
   kSPV_EXT_relaxed_printf_string_address_space,
   kSPV_EXT_replicated_composites,
+  kSPV_EXT_shader_64bit_indexing,
   kSPV_EXT_shader_atomic_float16_add,
   kSPV_EXT_shader_atomic_float_add,
   kSPV_EXT_shader_atomic_float_min_max,
