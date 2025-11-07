@@ -961,6 +961,9 @@ Compound Capabilities
 `cooperative_matrix_tensor_addressing`
 > Capabilities needed to load or store with tensor_addressing extension
 
+`cooperative_matrix_vk`
+> Capabilities needed to use reduction operations with cooperative matrix
+
 `cooperative_vector`
 > Capabilities needed to use cooperative vectors
 > Note that cpp and cuda are supported via a fallback non-cooperative implementation
@@ -1022,9 +1025,6 @@ Compound Capabilities
 
 `cpp_hlsl`
 > CPP, and HLSL code-gen targets
-
-`cuda_cooperative_matrix`
-> Capabilities needed to use reduction operations with cooperative matrix
 
 `cuda_glsl_hlsl`
 > CUDA, GLSL, and HLSL code-gen targets

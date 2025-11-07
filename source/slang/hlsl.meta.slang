@@ -23816,7 +23816,7 @@ should only perform uniform operations for portability.
 @category matrix_types
 */
 __intrinsic_type($(kIROp_CoopMatrixType))
-[require(cuda_cooperative_matrix)]
+[require(cooperative_matrix)]
 __generic<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,
@@ -23834,7 +23834,7 @@ struct CoopMat
 
     /// Default constructor. Creates an uninitialized cooperative matrix.
     [ForceInline]
-    [require(cuda_cooperative_matrix)]
+    [require(cooperative_matrix)]
     __init()
     {
     }
@@ -23842,7 +23842,7 @@ struct CoopMat
     /// Constructs a cooperative matrix and fills all elements with the specified value.
     /// @param t The value to fill the matrix with.
     [ForceInline]
-    [require(cuda_cooperative_matrix)]
+    [require(cooperative_matrix)]
     __init(T t)
     {
         this.fill(t);
@@ -23863,7 +23863,7 @@ struct CoopMat
     /// Copy constructor. Creates a cooperative matrix from another matrix of the same type.
     /// @param x The cooperative matrix to copy from.
     [ForceInline]
-    [require(cuda_cooperative_matrix)]
+    [require(cooperative_matrix)]
     __init(This x)
     {
         this = x;
@@ -23873,7 +23873,7 @@ struct CoopMat
     /// @param i The integer value to convert to the element type and fill the matrix with.
     [ForceInline]
     [OverloadRank(-10)]
-    [require(cuda_cooperative_matrix)]
+    [require(cooperative_matrix)]
     __init(int i)
     {
         this = CoopMat<T, S, M, N, R>(T(i));
@@ -23887,7 +23887,7 @@ struct CoopMat
     /// @param t The value to fill the matrix with.
     [ForceInline]
     [mutating]
-    [require(cuda_cooperative_matrix)]
+    [require(cooperative_matrix)]
     void fill(T t)
     {
         __target_switch
@@ -23949,7 +23949,7 @@ struct CoopMat
     ///
     /// @remarks The return value is unlikely to be same to M * N.
     [ForceInline]
-    [require(cuda_cooperative_matrix)]
+    [require(cooperative_matrix)]
     [__NoSideEffect]
     int getCount()
     {
@@ -24002,7 +24002,7 @@ struct CoopMat
     ///
     /// @remarks The return value is unlikely to be same to M * N.
     [ForceInline]
-    [require(cuda_cooperative_matrix)]
+    [require(cooperative_matrix)]
     static uint GetLength()
     {
         __target_switch
@@ -24170,7 +24170,7 @@ struct CoopMat
     /// @param element The starting element index in the buffer to store the matrix into.
     /// @param stride The stride in elements between consecutive rows (for row major layout) or columns (for column major layout)
     ///        and must be a multiple of 8 for __half element type or multiple of 4 for float element type. (i.e., multiple of 16 bytes in both cases)
-    [require(cuda_cooperative_matrix, byteaddressbuffer)]
+    [require(cooperative_matrix, byteaddressbuffer)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout
     >(RWByteAddressBuffer buffer, uint element, uint stride)
@@ -24184,7 +24184,7 @@ struct CoopMat
     /// @param stride The stride in elements between consecutive rows (for row major layout) or
     ///        columns (for column major layout) and must be a multiple of 8 for __half element type
     ///        or multiple of 4 for float element type. (i.e., multiple of 16 bytes in both cases)
-    [require(cuda_cooperative_matrix)]
+    [require(cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout
     >(RWStructuredBuffer<T> buffer, uint element, uint stride)
@@ -24192,7 +24192,7 @@ struct CoopMat
         __store<matrixLayout>(buffer, element, stride);
     }
 
-    [require(cuda_cooperative_matrix)]
+    [require(cooperative_matrix)]
     internal void __store<
         let matrixLayout : CoopMatMatrixLayout
     >(RWStructuredBuffer<T> buffer, uint element, uint stride)
@@ -24221,7 +24221,7 @@ struct CoopMat
     /// @param buffer The pointer to the buffer to store the matrix into.
     /// @param element The starting element index in the buffer.
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
-    [require(cuda_cooperative_matrix)]
+    [require(cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout
     >(T* buffer, uint element, uint stride)
@@ -24251,7 +24251,7 @@ struct CoopMat
     /// @param element The starting element index in the buffer.
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     /// @param memoryScope The scope across which the write should be made visible (e.g., Device, Workgroup).
-    [require(cooperative_matrix, vk_mem_model)]
+    [require(cooperative_matrix_vk, vk_mem_model)]
     void StoreCoherent<
         let matrixLayout : CoopMatMatrixLayout
     >(T* buffer, uint element, uint stride, constexpr MemoryScope memoryScope)
@@ -24273,7 +24273,7 @@ struct CoopMat
     /// @param element The starting element index in the array.
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     [ForceInline]
-    [require(cuda_cooperative_matrix)]
+    [require(cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout,
         let V : int
@@ -24306,7 +24306,7 @@ struct CoopMat
     /// @param element The starting element index in the array.
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     [ForceInline]
-    [require(cooperative_matrix)]
+    [require(cooperative_matrix_vk)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -24360,7 +24360,7 @@ ${{{{
 }}}}
 
     [__NoSideEffect]
-    [require(cuda_cooperative_matrix, byteaddressbuffer)]
+    [require(cooperative_matrix, byteaddressbuffer)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout
     >(
@@ -24372,7 +24372,7 @@ ${{{{
     }
 
     [__NoSideEffect]
-    [require(cuda_cooperative_matrix)]
+    [require(cooperative_matrix)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout
     >(
@@ -24411,7 +24411,7 @@ ${{{{
     /// @return A cooperative matrix loaded from the buffer.
     [ForceInline]
     [__NoSideEffect]
-    [require(cuda_cooperative_matrix)]
+    [require(cooperative_matrix)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout
     >(T* buffer, uint element, uint stride)
@@ -24444,7 +24444,7 @@ ${{{{
     /// @return A cooperative matrix loaded from the buffer.
     [ForceInline]
     [__NoSideEffect]
-    [require(cooperative_matrix, vk_mem_model)]
+    [require(cooperative_matrix_vk, vk_mem_model)]
     static This LoadCoherent<
         let matrixLayout : CoopMatMatrixLayout
     >(T* buffer, uint element, uint stride, constexpr MemoryScope memoryScope)
@@ -24467,7 +24467,7 @@ ${{{{
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     /// @return A cooperative matrix loaded from the groupshared array.
     [ForceInline]
-    [require(cuda_cooperative_matrix)]
+    [require(cooperative_matrix)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
         let V : int
@@ -24501,7 +24501,7 @@ ${{{{
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     /// @return A cooperative matrix loaded from the groupshared array.
     [ForceInline]
-    [require(cooperative_matrix)]
+    [require(cooperative_matrix_vk)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -24528,7 +24528,7 @@ ${{{{
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     /// @return A cooperative matrix loaded from the groupshared vector array.
     [ForceInline]
-    [require(cooperative_matrix)]
+    [require(cooperative_matrix_vk)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -25003,7 +25003,7 @@ ${{{{
 /// @param stride The stride in elements between consecutive rows or columns.
 /// @return A cooperative matrix loaded from the buffer.
 [ForceInline]
-[require(cuda_cooperative_matrix, byteaddressbuffer)]
+[require(cooperative_matrix, byteaddressbuffer)]
 CoopMat<T, S, M, N, R> coopMatLoad<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,
@@ -25032,7 +25032,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 /// @param stride The stride in elements between consecutive rows or columns.
 /// @return A cooperative matrix loaded from the buffer.
 [ForceInline]
-[require(cuda_cooperative_matrix, byteaddressbuffer)]
+[require(cooperative_matrix, byteaddressbuffer)]
 CoopMat<T, S, M, N, R> coopMatLoad<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,
@@ -25061,7 +25061,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 /// @param stride The stride in elements between consecutive rows or columns.
 /// @return A cooperative matrix loaded from the buffer.
 [ForceInline]
-[require(cuda_cooperative_matrix)]
+[require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,
@@ -25090,7 +25090,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 /// @param stride The stride in elements between consecutive rows or columns.
 /// @return A cooperative matrix loaded from the buffer.
 [ForceInline]
-[require(cuda_cooperative_matrix)]
+[require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,
@@ -25119,7 +25119,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 /// @param stride The stride in elements between consecutive rows or columns.
 /// @return A cooperative matrix loaded from the buffer.
 [ForceInline]
-[require(cuda_cooperative_matrix)]
+[require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,
@@ -25150,7 +25150,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 /// @param memoryScope The scope from which writes should be visible (e.g., Device, Workgroup).
 /// @return A cooperative matrix loaded from the buffer.
 [ForceInline]
-[require(cooperative_matrix, vk_mem_model)]
+[require(cooperative_matrix_vk, vk_mem_model)]
 CoopMat<T, S, M, N, R> coopMatLoadCoherent<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,
@@ -25181,7 +25181,7 @@ CoopMat<T, S, M, N, R> coopMatLoadCoherent<
 /// @param stride The stride in elements between consecutive rows or columns.
 /// @return A cooperative matrix loaded from the groupshared array.
 [ForceInline]
-[require(cuda_cooperative_matrix)]
+[require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,
@@ -25261,7 +25261,7 @@ CoopMat<T,S,M,N,R> __float_to_int_cast<
 /// @param lhs The cooperative matrix to multiply.
 /// @param rhs The scalar value to multiply each element by.
 /// @return A new cooperative matrix with all elements multiplied by the scalar.
-[require(cuda_cooperative_matrix)]
+[require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> operator *<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,
@@ -25324,7 +25324,7 @@ CoopMat<T, S, M, N, R> operator *<
 /// @param matB Matrix B with dimensions K×N (MatrixB use).
 /// @param matC Accumulator matrix C with dimensions M×N to add to the product.
 /// @return Result accumulator matrix D = A * B + C with dimensions M×N.
-[require(cuda_cooperative_matrix)]
+[require(cooperative_matrix)]
 CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> coopMatMulAdd<
     T : __BuiltinArithmeticType,
     let saturatingAccumulation : bool,
