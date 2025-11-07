@@ -1806,7 +1806,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         // parameter that we are legalizing.
         //
         // To ensure that we only emit the indexing operation when and where it is
-        // needed, we will encode the indexing as specialized form of `ScalarizedVal`.
+        // needed, we will encode the indexing as a specialized form of `ScalarizedVal`.
         //
         {
             auto sharedGlobalArrayPtr = sharedGlobalArrayInfoForSystemValue->globalParam;
