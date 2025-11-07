@@ -217,10 +217,12 @@ public:
     SLANG_NO_THROW LLVMInst* SLANG_MCALL getFunctionArg(LLVMInst* funcDecl, int argIndex) override;
     SLANG_NO_THROW void SLANG_MCALL
     setArgInfo(LLVMInst* arg, CharSlice name, uint32_t attribute) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL declareGlobalVariable(
+        LLVMInst* initializer,
+        int64_t alignment,
+        bool externallyVisible) override;
     SLANG_NO_THROW LLVMInst* SLANG_MCALL
-    declareGlobalVariable(LLVMInst* initializer, int alignment, bool externallyVisible) override;
-    SLANG_NO_THROW LLVMInst* SLANG_MCALL
-    declareGlobalVariable(int size, int alignment, bool externallyVisible) override;
+    declareGlobalVariable(int64_t size, int64_t alignment, bool externallyVisible) override;
     SLANG_NO_THROW LLVMInst* SLANG_MCALL declareGlobalConstructor() override;
 
     SLANG_NO_THROW void SLANG_MCALL
@@ -875,7 +877,7 @@ void LLVMBuilder::setArgInfo(LLVMInst* arg, CharSlice name, uint32_t attribute)
 
 LLVMInst* LLVMBuilder::declareGlobalVariable(
     LLVMInst* initializer,
-    int alignment,
+    int64_t alignment,
     bool externallyVisible)
 {
     auto llvmVal = llvm::cast<llvm::Constant>(initializer);
@@ -887,7 +889,10 @@ LLVMInst* LLVMBuilder::declareGlobalVariable(
     return llvmVar;
 }
 
-LLVMInst* LLVMBuilder::declareGlobalVariable(int size, int alignment, bool externallyVisible)
+LLVMInst* LLVMBuilder::declareGlobalVariable(
+    int64_t size,
+    int64_t alignment,
+    bool externallyVisible)
 {
     auto llvmType = llvm::ArrayType::get(llvmBuilder->getInt8Ty(), size);
     auto llvmVar = new llvm::GlobalVariable(

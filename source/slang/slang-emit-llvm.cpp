@@ -206,7 +206,6 @@ public:
 
         default:
             SLANG_ASSERT_FAILURE("Unexpected type in getTypeBits!");
-            return 0;
         }
     }
 
@@ -534,25 +533,25 @@ public:
         if (legalizedResourceTypeMap.containsKey(type))
             return legalizedResourceTypeMap.getValue(type);
 
-        IRBuilder builder(type->getModule());
+        IRBuilder irBuilder(type->getModule());
 
         IRType* legalizedType = type;
         switch (type->getOp())
         {
         case kIROp_ConstantBufferType:
         case kIROp_ParameterBlockType:
-            legalizedType = builder.getRawPointerType();
+            legalizedType = irBuilder.getRawPointerType();
             break;
         case kIROp_HLSLStructuredBufferType:
         case kIROp_HLSLRWStructuredBufferType:
         case kIROp_HLSLByteAddressBufferType:
         case kIROp_HLSLRWByteAddressBufferType:
             {
-                IRStructType* s = builder.createStructType();
-                auto ptrKey = builder.createStructKey();
-                auto sizeKey = builder.createStructKey();
-                builder.createStructField(s, ptrKey, builder.getRawPointerType());
-                builder.createStructField(s, sizeKey, builder.getType(kIROp_UIntPtrType));
+                IRStructType* s = irBuilder.createStructType();
+                auto ptrKey = irBuilder.createStructKey();
+                auto sizeKey = irBuilder.createStructKey();
+                irBuilder.createStructField(s, ptrKey, irBuilder.getRawPointerType());
+                irBuilder.createStructField(s, sizeKey, irBuilder.getType(kIROp_UIntPtrType));
                 legalizedType = s;
             }
             break;
@@ -570,12 +569,12 @@ public:
 
                 if (illegal)
                 {
-                    IRStructType* s = builder.createStructType();
+                    IRStructType* s = irBuilder.createStructType();
                     for (auto field : structType->getFields())
                     {
                         auto fieldType = field->getFieldType();
                         auto legalizedFieldType = legalizeResourceTypes(fieldType);
-                        builder.createStructField(s, field->getKey(), legalizedFieldType);
+                        irBuilder.createStructField(s, field->getKey(), legalizedFieldType);
                     }
                     legalizedType = s;
                 }
@@ -588,7 +587,7 @@ public:
                 auto legalizedElemType = legalizeResourceTypes(elemType);
                 if (elemType != legalizedElemType)
                     legalizedType =
-                        builder.getArrayType(legalizedElemType, arrayType->getElementCount());
+                        irBuilder.getArrayType(legalizedElemType, arrayType->getElementCount());
             }
             break;
         default:
@@ -1062,7 +1061,6 @@ private:
                 }
                 return last;
             }
-            break;
         case kIROp_StructType:
             {
                 auto structType = as<IRStructType>(type);
@@ -1087,7 +1085,6 @@ private:
                 }
                 return last;
             }
-            break;
         default:
             // Assume that there are no substantial layout differences (aside
             // from trailing padding, which is skipped via minSize), so copying
@@ -1100,7 +1097,6 @@ private:
                 minSize,
                 isVolatile);
         }
-        return nullptr;
     }
 
     UInt getVectorAlignedCount(IRVectorType* vecType, IRTypeLayoutRules* rules)
@@ -1497,8 +1493,6 @@ struct LLVMEmitter
         {
             SLANG_UNEXPECTED("Unexpected number of operands for arithmetic op");
         }
-
-        return nullptr;
     }
 
     IRTypeLayoutRules* getBufferLayoutRules(IRType* bufferType)
@@ -1544,7 +1538,6 @@ struct LLVMEmitter
     static LLVMInst* _defaultOnReturnHandler(IRReturn*)
     {
         SLANG_ASSERT_FAILURE("Unexpected terminator in global scope!");
-        return nullptr;
     }
 
     // Caution! This is only for emitting things which are considered
@@ -1880,7 +1873,7 @@ struct LLVMEmitter
                     mask.reserve(swizzleInst->getElementCount());
                     for (UInt i = 0; i < swizzleInst->getElementCount(); ++i)
                     {
-                        int val = as<IRIntLit>(swizzleInst->getElementIndex(i))->getValue();
+                        int val = int(as<IRIntLit>(swizzleInst->getElementIndex(i))->getValue());
                         mask.add(val);
                     }
                     llvmInst = builder->emitVectorShuffle(
@@ -2039,9 +2032,9 @@ struct LLVMEmitter
                 {
                     baseType = ptrType->getValueType();
                 }
-                else if (auto ptrType = as<IRPointerLikeType>(baseInst->getDataType()))
+                else if (auto ptrLikeType = as<IRPointerLikeType>(baseInst->getDataType()))
                 {
-                    baseType = as<IRType>(ptrType->getOperand(0));
+                    baseType = as<IRType>(ptrLikeType->getOperand(0));
                 }
                 else
                     SLANG_ASSERT_FAILURE("Unknown pointer type for GetElementPtr!");
@@ -2357,13 +2350,13 @@ struct LLVMEmitter
                 auto varType = types->getDebugType(ptrType->getValueType(), defaultPointerRules);
 
                 auto file = instToDebugLLVM.getValue(debugVarInst->getSource());
-                auto line = getIntVal(debugVarInst->getLine());
+                int line = int(getIntVal(debugVarInst->getLine()));
                 IRInst* argIndex = debugVarInst->getArgIndex();
 
                 CharSlice linkageName, prettyName;
                 maybeGetName(&linkageName, &prettyName, inst);
 
-                int arg = argIndex && !debugInlinedScope ? getIntVal(argIndex) : -1;
+                int arg = argIndex && !debugInlinedScope ? int(getIntVal(argIndex)) : -1;
                 instToDebugLLVM[inst] = builder->emitDebugVar(prettyName, varType, file, line, arg);
             }
             return nullptr;
@@ -2388,8 +2381,8 @@ struct LLVMEmitter
                 auto debugLineInst = static_cast<IRDebugLine*>(inst);
 
                 // auto file = instToDebugLLVM.getValue(debugLineInst->getSource());
-                auto line = getIntVal(debugLineInst->getLineStart());
-                auto col = getIntVal(debugLineInst->getColStart());
+                auto line = int(getIntVal(debugLineInst->getLineStart()));
+                auto col = int(getIntVal(debugLineInst->getColStart()));
 
                 builder->setDebugLocation(line, col);
             }
@@ -2526,7 +2519,7 @@ struct LLVMEmitter
         UInt i = 0;
         for (auto pp = func->getFirstParam(); pp; pp = pp->getNextParam(), ++i)
         {
-            auto llvmArg = builder->getFunctionArg(llvmFunc, i);
+            auto llvmArg = builder->getFunctionArg(llvmFunc, int(i));
 
             // Aliasing out and reference parameters are UB in Slang, and
             // telling this to LLVM should help with optimization.
@@ -2915,7 +2908,7 @@ struct LLVMEmitter
             // ostensible return value into that parameter.
             LLVMInst* storeArg = nullptr;
             if (types->isAggregateType(func->getResultType()))
-                storeArg = builder->getFunctionArg(llvmFunc, func->getParamCount());
+                storeArg = builder->getFunctionArg(llvmFunc, int(func->getParamCount()));
 
             auto epilogue = [&](IRReturn* ret) -> LLVMInst*
             {
@@ -2949,9 +2942,9 @@ struct LLVMEmitter
             LLVMInst* groupFunc = builder->emitComputeEntryPointWorkGroup(
                 llvmFunc,
                 getStringLitAsSlice(entryPointDecor->getName()),
-                numThreadsDecor ? getIntVal(numThreadsDecor->getX()) : 1,
-                numThreadsDecor ? getIntVal(numThreadsDecor->getY()) : 1,
-                numThreadsDecor ? getIntVal(numThreadsDecor->getZ()) : 1,
+                numThreadsDecor ? int(getIntVal(numThreadsDecor->getX())) : 1,
+                numThreadsDecor ? int(getIntVal(numThreadsDecor->getY())) : 1,
+                numThreadsDecor ? int(getIntVal(numThreadsDecor->getZ())) : 1,
                 32);
 
             auto entryPointName = entryPointDecor->getName();

@@ -169,10 +169,12 @@ public:
     getFunctionArg(LLVMInst* funcDecl, int argIndex) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL
     setArgInfo(LLVMInst* arg, CharSlice name, uint32_t attributes) = 0;
+    virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL declareGlobalVariable(
+        LLVMInst* initializer,
+        int64_t alignment,
+        bool externallyVisible = false) = 0;
     virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL
-    declareGlobalVariable(LLVMInst* initializer, int alignment, bool externallyVisible = false) = 0;
-    virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL
-    declareGlobalVariable(int size, int alignment, bool externallyVisible = false) = 0;
+    declareGlobalVariable(int64_t size, int64_t alignment, bool externallyVisible = false) = 0;
     virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL declareGlobalConstructor() = 0;
 
     //==========================================================================
