@@ -3244,7 +3244,7 @@ static void replaceAllUsesOfMeshOutputValWithLegalizedVal(
                 // The case for forming a reference to an element of a value
                 // with a mesh-output type is similar in spirit to the case
                 // for setting an element, except that we will need to
-                // make a recurisve call to replace the subsequent uses of
+                // make a recursive call to replace the subsequent uses of
                 // the pointer value that gets returned.
                 //
                 auto elementPtrType = cast<IRPtrTypeBase>(refElementInst->getDataType());
