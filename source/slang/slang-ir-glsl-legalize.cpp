@@ -3356,7 +3356,7 @@ static void replaceAllUsesOfMeshOutputValWithLegalizedVal(
                 // that the corresponding parameter for this argument was an `out`
                 // parameter, so it will be sufficient to pass in a pointer to
                 // an uninitialized temporary (for the callee to initialize) and
-                // then write the resulting value back to the `reaplacementVal`
+                // then write the resulting value back to the `replacementArgVal`
                 // at the end.
                 //
                 auto tmpVarPtr = builder->emitVar(argValType);
