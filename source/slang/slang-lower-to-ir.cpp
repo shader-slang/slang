@@ -11523,7 +11523,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 // Note that the IR-level type of a parameter may include
                 // a wrapper type to represent a non-default parameter-passing
                 // mode. Thus, the `irParamType` here may actually be a pointer
-                // to what the conceptual type of the parameter was as the
+                // to what the conceptual type of the parameter was at the
                 // source/AST level.
                 //
                 auto irParamType = paramTypes[paramTypeIndex++];
