@@ -2139,6 +2139,10 @@ SlangResult LLVMBuilder::generateJITLibrary(IArtifact** outArtifact)
         return SLANG_FAIL;
     }
 
+    if (auto err = jit->initialize(jit->getMainJITDylib()))
+    {
+        return SLANG_FAIL;
+    }
     ComPtr<ISlangSharedLibrary> sharedLibrary(new LLVMJITSharedLibrary(std::move(jit)));
 
     const auto targetDesc = ArtifactDescUtil::makeDescForCompileTarget(options.target);

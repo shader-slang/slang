@@ -1335,9 +1335,11 @@ struct LLVMEmitter
         }
         else if (globalInstruction)
         {
-            return emitLLVMInstruction(inst);
+            // We also inline everything that is not an aggregate, as they're
+            // generally unproblematic to inline.
+            if (inlineGlobalInstructions || !types->isAggregateType(inst->getDataType()))
+                return emitLLVMInstruction(inst);
 
-            /*
             // This is a non-constant global instruction getting referenced. So,
             // we generate a global variable for it (if we don't have one yet)
             // and report this incident.
@@ -1375,7 +1377,6 @@ struct LLVMEmitter
                 // version later!
                 return llvmValue;
             }
-            */
         }
         else
         {
