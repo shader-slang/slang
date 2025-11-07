@@ -1395,7 +1395,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     // We start by checking if the context of this leaf field/value
     // tells us that it should use a system-value semantic.
     //
-    // Such a semantic should come from the `inVarLayout` that was
+    // Such a semantic should come from the `userDeclaredParamVarLayout` that was
     // passed in, although that layout might have been applied to
     // a parameter or field that does not exactly match the
     // `leafUserDeclaredType` that this function has received, because
