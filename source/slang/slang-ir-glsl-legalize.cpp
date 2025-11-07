@@ -3369,7 +3369,7 @@ static void replaceAllUsesOfMeshOutputValWithLegalizedVal(
                     call->setOperand(i, tmpVarPtr);
                 }
 
-                // We will insert our write-basck logic after the call:
+                // We will insert our write-back logic after the call:
                 //
                 builder->setInsertAfter(call);
                 auto replacementArgVal = dereferenceVal(builder, replacement);
