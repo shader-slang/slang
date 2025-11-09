@@ -1,6 +1,7 @@
 #include "compiler-core/slang-artifact-associated-impl.h"
 #include "compiler-core/slang-artifact-desc-util.h"
 #include "core/slang-char-util.h"
+#include "core/slang-func-ptr.h"
 #include "core/slang-io.h"
 #include "core/slang-type-text-util.h"
 #include "slang-ir-insts.h"
@@ -737,10 +738,7 @@ struct LLVMEmitter
     // Used to add code in in front of return in a function. If it returns
     // nullptr, the LLVM return instruction is generated "normally". Otherwise,
     // it's expected that you generated it in this function.
-    //
-    // This uses std::function instead of Slang::Func, because Slang::Func
-    // requires RTTI which sadly is not available when linking to LLVM.
-    using FuncEpilogueCallback = std::function<LLVMInst*(IRReturn*)>;
+    using FuncEpilogueCallback = Slang::Func<LLVMInst*, IRReturn*>;
 
     SlangResult init(CodeGenContext* context, bool useJIT = false)
     {
@@ -2415,7 +2413,6 @@ struct LLVMEmitter
         case kIROp_DebugInlinedAt:
         case kIROp_DebugInlinedVariable:
             debugInsts.add(inst);
-            // TODO: Unhandled debug insts
             return nullptr;
 
         default:
