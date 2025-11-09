@@ -88,7 +88,10 @@ function(fetch_or_build_slang_llvm)
 
         # The LLVM headers need a warning disabling, which somehow slips through \external
         if(MSVC)
-            target_compile_options(slang-llvm PRIVATE -wd4244 -wd4267 /Zc:preprocessor)
+            target_compile_options(
+                slang-llvm
+                PRIVATE -wd4244 -wd4267 /Zc:preprocessor
+            )
         endif()
 
         if(NOT LLVM_ENABLE_RTTI)
