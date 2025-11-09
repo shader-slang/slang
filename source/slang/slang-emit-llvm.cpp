@@ -1,6 +1,7 @@
 #include "compiler-core/slang-artifact-associated-impl.h"
 #include "compiler-core/slang-artifact-desc-util.h"
 #include "core/slang-char-util.h"
+#include "core/slang-io.h"
 #include "core/slang-type-text-util.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
@@ -8,9 +9,38 @@
 #include "slang-ir-util.h"
 #include "slang-llvm/slang-llvm-builder.h"
 
-#include <filesystem>
-
 using namespace slang;
+
+// This file converts a Slang IR module into LLVM IR, optionally optimizing it
+// and generating object code. LLVM's IRBuilder is used through our own COM
+// interface ILLVMBuilder; see `slang-llvm-builder.h` for more context on what
+// that is and why.
+//
+// One overarching design choice is that all memory-related LLVM instructions
+// (e.g. getelementptr and alloca) are emitted with byte arrays (with proper
+// alignment annotations) instead of their actual types. There are two reasons
+// for this:
+//
+// 1. LLVM is undergoing a transition to a more type-agnostic form:
+//    https://www.npopov.com/2025/01/05/This-year-in-LLVM-2024.html#ptradd
+//    In short, there is no longer any reason to specify the real type to
+//    getelementptr; LLVM already canonicalizes it to use `i8` and byte offsets
+//    anyway, and the type-based getelementptr itself may be removed in a
+//    future version.
+//
+// 2. This allows us to entirely ignore LLVM's ideas of how structs are laid
+//    out in memory. We can fully control the memory layout of our own structs
+//    with no limitations from LLVM, which is great, because we already have
+//    IRTypeLayoutRules.
+//
+// Furthermore, struct and array types are only passed around as pointers to
+// memory in stack. That's because using aggregate types in values is
+// "officially" discouraged:
+// https://llvm.org/docs/Frontend/PerformanceTips.html#avoid-creating-values-of-aggregate-type
+//
+// With these design choices, only global struct/array constants need to be
+// given an actual aggregate type in LLVM. So they build the type on-demand in
+// `maybeEmitConstant`.
 
 namespace Slang
 {
@@ -110,70 +140,23 @@ static CharSlice getStringLitAsSlice(IRInst* inst)
 // * getDebugType(): "pretty" types with correct offset annotations so that
 //   debuggers can show the contents of variables.
 //
-// One design choice here is that all memory-related LLVM instructions (e.g.
-// getelementptr and alloca) are emitted with byte arrays (with proper alignment
-// annotations) instead of their actual types. There are two reasons for this:
-//
-// 1. LLVM is undergoing a transition to a more type-agnostic form:
-//    https://www.npopov.com/2025/01/05/This-year-in-LLVM-2024.html#ptradd
-//    In short, there is no longer any reason to specify the real type to
-//    getelementptr; LLVM already canonicalizes it to use `i8` and byte offsets
-//    anyway, and the type-based getelementptr itself may be removed in a
-//    future version.
-//
-// 2. This allows us to entirely ignore LLVM's ideas of how structs are laid
-//    out in memory. We can fully control the memory layout of our own structs
-//    with no limitations from LLVM, which is great, because we already have
-//    IRTypeLayoutRules.
-//
-// Furthermore, struct and array types are only passed around as pointers to
-// memory in stack. That's because using aggregate types in values is
-// "officially" discouraged:
-// https://llvm.org/docs/Frontend/PerformanceTips.html#avoid-creating-values-of-aggregate-type
-//
-// With these design choices, only global struct/array constants need to be
-// given an actual aggregate type in LLVM. So they build the type on-demand in
-// `emitConstant`.
 class LLVMTypeTranslator
 {
 private:
     ILLVMBuilder* builder;
     CompilerOptionSet* compilerOptions;
     const Dictionary<IRInst*, LLVMDebugNode*>* instToDebugLLVM;
-    IRTypeLayoutRules* defaultPointerRules;
 
     Dictionary<IRType*, LLVMType*> valueTypeMap;
     Dictionary<IRTypeLayoutRules*, Dictionary<IRType*, LLVMDebugNode*>> debugTypeMap;
     Dictionary<IRType*, IRType*> legalizedResourceTypeMap;
 
-    struct ConstantInfo
-    {
-        // Includes trailing padding
-        LLVMInst* padded = nullptr;
-
-        // Excludes trailing padding
-        LLVMInst* unpadded = nullptr;
-
-        LLVMInst* get(bool withTrailingPadding) { return withTrailingPadding ? padded : unpadded; }
-
-        ConstantInfo& operator=(LLVMInst* constant)
-        {
-            padded = unpadded = constant;
-            return *this;
-        }
-    };
-    Dictionary<IRInst*, ConstantInfo> constantMap;
-
 public:
     LLVMTypeTranslator(
         ILLVMBuilder* builder,
         CompilerOptionSet& compilerOptions,
-        const Dictionary<IRInst*, LLVMDebugNode*>& instToDebugLLVM,
-        IRTypeLayoutRules* rules)
-        : builder(builder)
-        , compilerOptions(&compilerOptions)
-        , instToDebugLLVM(&instToDebugLLVM)
-        , defaultPointerRules(rules)
+        const Dictionary<IRInst*, LLVMDebugNode*>& instToDebugLLVM)
+        : builder(builder), compilerOptions(&compilerOptions), instToDebugLLVM(&instToDebugLLVM)
     {
     }
 
@@ -636,369 +619,6 @@ public:
         return sizeAlignment;
     }
 
-    // Allocates stack memory for given type. Returns a pointer to the start of
-    // that memory.
-    LLVMInst* emitAlloca(IRType* type, IRTypeLayoutRules* rules)
-    {
-        IRSizeAndAlignment sizeAlignment = getSizeAndAlignment(type, rules);
-        return builder->emitAlloca(sizeAlignment.getStride(), sizeAlignment.alignment);
-    }
-
-    // llvmVal must be using `getType(valType)`. It will be stored in
-    // llvmPtr. Returns the store instruction.
-    LLVMInst* emitStore(
-        LLVMInst* llvmPtr,
-        LLVMInst* llvmVal,
-        IRType* valType,
-        IRTypeLayoutRules* rules,
-        bool isVolatile = false)
-    {
-        IRSizeAndAlignment sizeAlignment = getSizeAndAlignment(valType, rules);
-        switch (valType->getOp())
-        {
-        case kIROp_BoolType:
-            {
-                // Booleans are i1 in values, but something larger in memory.
-                auto storageType = builder->getIntType(int(sizeAlignment.size * 8));
-                auto expanded = builder->emitIntResize(llvmVal, storageType);
-                return builder->emitStore(expanded, llvmPtr, sizeAlignment.alignment, isVolatile);
-            }
-            break;
-        case kIROp_ArrayType:
-        case kIROp_StructType:
-            // Arrays and struct values are always represented with an alloca
-            // pointer.
-            if (rules == defaultPointerRules)
-            {
-                // Equal memory layout, so we can just memcpy.
-                return builder->emitCopy(
-                    llvmPtr,
-                    sizeAlignment.alignment,
-                    llvmVal,
-                    sizeAlignment.alignment,
-                    sizeAlignment.size,
-                    isVolatile);
-            }
-            else
-            {
-                return crossLayoutMemCpy(
-                    llvmPtr,
-                    llvmVal,
-                    valType,
-                    rules,
-                    defaultPointerRules,
-                    isVolatile);
-            }
-        default:
-            return builder->emitStore(llvmVal, llvmPtr, sizeAlignment.alignment, isVolatile);
-        }
-    }
-
-    // Returns the loaded data using `getType(valType)` from llvmPtr.
-    // Returns the load instruction (= loaded value)
-    LLVMInst* emitLoad(
-        LLVMInst* llvmPtr,
-        IRType* valType,
-        IRTypeLayoutRules* rules,
-        bool isVolatile = false)
-    {
-        IRSizeAndAlignment sizeAlignment = getSizeAndAlignment(valType, rules);
-
-        switch (valType->getOp())
-        {
-        case kIROp_BoolType:
-            {
-                // Booleans are i1 in values, but something larger in memory.
-                auto llvmType = getType(valType);
-                auto storageType = builder->getIntType(int(sizeAlignment.size * 8));
-                auto storageBool =
-                    builder->emitLoad(storageType, llvmPtr, sizeAlignment.alignment, isVolatile);
-                return builder->emitIntResize(storageBool, llvmType);
-            }
-            break;
-        case kIROp_ArrayType:
-        case kIROp_StructType:
-            if (rules == defaultPointerRules)
-            {
-                // Equal memory layout, so we can just memcpy.
-                LLVMInst* llvmVar = emitAlloca(valType, defaultPointerRules);
-
-                // Pointer-to-pointer copy, so generate inline memcpy.
-                builder->emitCopy(
-                    llvmVar,
-                    sizeAlignment.alignment,
-                    llvmPtr,
-                    sizeAlignment.alignment,
-                    sizeAlignment.size,
-                    isVolatile);
-                return llvmVar;
-            }
-            else
-            {
-                LLVMInst* llvmVar = emitAlloca(valType, defaultPointerRules);
-                crossLayoutMemCpy(
-                    llvmVar,
-                    llvmPtr,
-                    valType,
-                    defaultPointerRules,
-                    rules,
-                    isVolatile);
-                return llvmVar;
-            }
-        default:
-            {
-                auto llvmType = getType(valType);
-                return builder->emitLoad(llvmType, llvmPtr, sizeAlignment.alignment, isVolatile);
-            }
-        }
-    }
-
-    // Computes an offset with `indexInst` based on `llvmPtr`. `indexInst` need
-    // not be constant.
-    LLVMInst* emitArrayGetElementPtr(
-        LLVMInst* llvmPtr,
-        LLVMInst* indexInst,
-        IRType* elemType,
-        IRTypeLayoutRules* rules)
-    {
-        IRSizeAndAlignment sizeAndAlignment = getSizeAndAlignment(elemType, rules);
-        return builder->emitGetElementPtr(llvmPtr, sizeAndAlignment.getStride(), indexInst);
-    }
-
-    // Computes a pointer to a struct field.
-    LLVMInst* emitStructGetElementPtr(
-        LLVMInst* llvmPtr,
-        IRStructField* field,
-        IRTypeLayoutRules* rules)
-    {
-        IRIntegerValue offset = getOffset(field, rules);
-        return builder->emitGetElementPtr(
-            llvmPtr,
-            1,
-            builder->getConstantInt(builder->getIntType(32), offset));
-    }
-
-    // Emits zero padding as much as needed to make curSize == targetSize.
-    UInt emitPaddingConstant(List<LLVMInst*>& fields, UInt& curSize, UInt targetSize)
-    {
-        SLANG_ASSERT(curSize <= targetSize);
-
-        if (curSize < targetSize)
-        {
-            UInt bytes = targetSize - curSize;
-            curSize = targetSize;
-
-            auto zero = builder->getConstantInt(builder->getIntType(8), 0);
-            auto zeros = List<LLVMInst*>::makeRepeated(zero, bytes);
-            fields.add(builder->getConstantArray(Slice(zeros.begin(), zeros.getCount())));
-
-            return bytes;
-        }
-        return 0;
-    }
-
-    // Tries to emit the given value as a constant, but may return nullptr if
-    // that is not possible.
-    LLVMInst* maybeEmitConstant(
-        IRInst* inst,
-        bool inAggregate = false,
-        bool withTrailingPadding = true)
-    {
-        if (constantMap.containsKey(inst) && !inAggregate)
-            return constantMap.getValue(inst).get(withTrailingPadding);
-
-        ConstantInfo llvmConstant;
-        switch (inst->getOp())
-        {
-        case kIROp_IntLit:
-        case kIROp_BoolLit:
-            {
-                auto litInst = static_cast<IRConstant*>(inst);
-                IRBasicType* type = as<IRBasicType>(inst->getDataType());
-                if (type)
-                    llvmConstant = builder->getConstantInt(getType(type), litInst->value.intVal);
-                break;
-            }
-
-        case kIROp_FloatLit:
-            {
-                auto litInst = static_cast<IRConstant*>(inst);
-                IRBasicType* type = as<IRBasicType>(inst->getDataType());
-                if (type)
-                    llvmConstant =
-                        builder->getConstantFloat(getType(type), litInst->value.floatVal);
-            }
-            break;
-
-        case kIROp_StringLit:
-            llvmConstant = builder->getConstantString(getStringLitAsSlice(inst));
-            break;
-
-        case kIROp_PtrLit:
-            {
-                auto ptrLit = static_cast<IRPtrLit*>(inst);
-                llvmConstant = builder->getConstantPtr((uintptr_t)ptrLit->getValue());
-            }
-            break;
-        case kIROp_MakeVector:
-            {
-                List<LLVMInst*> values;
-                for (UInt aa = 0; aa < inst->getOperandCount(); ++aa)
-                {
-                    auto partInst = inst->getOperand(aa);
-                    auto constVal = maybeEmitConstant(partInst, inAggregate);
-                    if (!constVal)
-                        return nullptr;
-                    if (auto subvectorType = as<IRVectorType>(partInst->getDataType()))
-                    {
-                        auto elemCount = getIntVal(subvectorType->getElementCount());
-                        for (IRIntegerValue j = 0; j < elemCount; ++j)
-                            values.add(builder->getConstantExtractElement(constVal, int(j)));
-                    }
-                    else
-                        values.add(constVal);
-                }
-
-                auto vectorType = as<IRVectorType>(inst->getDataType());
-
-                // So apparently, at least autodiff can generate MakeVectors
-                // which actually just make a float. Interesting.
-                if (!vectorType)
-                {
-                    llvmConstant = values[0];
-                    break;
-                }
-
-                if (inAggregate)
-                {
-                    // To remove padding and alignment requirements from the
-                    // vector, lower it as an array.
-                    auto elemType = getType(vectorType->getElementType());
-                    llvmConstant =
-                        builder->getConstantArray(Slice(values.begin(), values.getCount()));
-
-                    Int alignedCount = Int(getVectorAlignedCount(vectorType, defaultPointerRules));
-                    if (alignedCount != values.getCount())
-                    {
-                        // Fill padding with poison, nobody should use it in
-                        // computations.
-                        while (values.getCount() < alignedCount)
-                            values.add(builder->getPoison(elemType));
-                        llvmConstant.padded =
-                            builder->getConstantArray(Slice(values.begin(), values.getCount()));
-                    }
-                }
-                else
-                {
-                    llvmConstant =
-                        builder->getConstantVector(Slice(values.begin(), values.getCount()));
-                }
-            }
-            break;
-        case kIROp_MakeVectorFromScalar:
-            {
-                auto vectorType = cast<IRVectorType>(inst->getDataType());
-                int elemCount = int(getIntVal(vectorType->getElementCount()));
-                LLVMInst* value = maybeEmitConstant(inst->getOperand(0), inAggregate);
-                if (!value)
-                    return nullptr;
-
-                if (inAggregate)
-                {
-                    auto elemType = getType(vectorType->getElementType());
-                    auto values = List<LLVMInst*>::makeRepeated(value, elemCount);
-                    llvmConstant =
-                        builder->getConstantArray(Slice(values.begin(), values.getCount()));
-
-                    Int alignedCount = Int(getVectorAlignedCount(vectorType, defaultPointerRules));
-                    if (alignedCount != values.getCount())
-                    {
-                        while (values.getCount() < alignedCount)
-                            values.add(builder->getPoison(elemType));
-
-                        llvmConstant.padded =
-                            builder->getConstantArray(Slice(values.begin(), values.getCount()));
-                    }
-                }
-                else
-                {
-                    llvmConstant = builder->getConstantVector(value, elemCount);
-                }
-            }
-            break;
-        case kIROp_MakeArray:
-            {
-                auto arrayType = cast<IRArrayTypeBase>(inst->getDataType());
-                List<LLVMInst*> values;
-
-                for (UInt aa = 0; aa < inst->getOperandCount(); ++aa)
-                {
-                    auto constVal = maybeEmitConstant(inst->getOperand(aa), true, true);
-                    if (!constVal)
-                        return nullptr;
-                    values.add(constVal);
-                }
-
-                llvmConstant = builder->getConstantArray(Slice(values.begin(), values.getCount()));
-
-                if (needsUnpaddedArrayTypeWorkaround(arrayType, defaultPointerRules))
-                {
-                    auto lastPart = maybeEmitConstant(
-                        inst->getOperand(inst->getOperandCount() - 1),
-                        true,
-                        false);
-
-                    auto initPart =
-                        builder->getConstantArray(Slice(values.begin(), values.getCount() - 1));
-
-                    // This should be a struct for the workaround.
-                    LLVMInst* fields[2] = {initPart, lastPart};
-                    llvmConstant.unpadded = builder->getConstantStruct(Slice(fields, 2));
-                }
-            }
-            break;
-        case kIROp_MakeStruct:
-            {
-                auto structType = cast<IRStructType>(inst->getDataType());
-
-                UInt llvmSize = 0;
-                IRSizeAndAlignment sizeAndAlignment =
-                    getSizeAndAlignment(structType, defaultPointerRules);
-
-                List<LLVMInst*> values;
-                auto field = structType->getFields().begin();
-                for (UInt aa = 0; aa < inst->getOperandCount(); ++aa, ++field)
-                {
-                    auto constVal = maybeEmitConstant(inst->getOperand(aa), true, false);
-                    if (!constVal)
-                        return nullptr;
-
-                    IRIntegerValue offset = getOffset(*field, defaultPointerRules);
-                    // Insert padding until we're at the requested offset.
-                    emitPaddingConstant(values, llvmSize, offset);
-
-                    values.add(constVal);
-                    llvmSize += builder->getStoreSizeOf(constVal);
-                }
-
-                llvmConstant.unpadded =
-                    builder->getConstantStruct(Slice<LLVMInst*>(values.begin(), values.getCount()));
-
-                emitPaddingConstant(values, llvmSize, sizeAndAlignment.getStride());
-
-                llvmConstant.padded =
-                    builder->getConstantStruct(Slice<LLVMInst*>(values.begin(), values.getCount()));
-            }
-            break;
-        default:
-            break;
-        }
-
-        if ((llvmConstant.padded || llvmConstant.unpadded) && !inAggregate)
-            constantMap[inst] = llvmConstant;
-        return llvmConstant.get(withTrailingPadding);
-    }
-
     // Returns true for any type that translates into an aggregate type in LLVM.
     bool isAggregateType(IRType* type)
     {
@@ -1010,92 +630,6 @@ public:
             return true;
         default:
             return false;
-        }
-    }
-
-private:
-    // Copies data from a pointer to another, taking layout differences into
-    // account.
-    LLVMInst* crossLayoutMemCpy(
-        LLVMInst* dstPtr,
-        LLVMInst* srcPtr,
-        IRType* type,
-        IRTypeLayoutRules* dstLayout,
-        IRTypeLayoutRules* srcLayout,
-        bool isVolatile)
-    {
-        IRSizeAndAlignment dstSizeAlignment = getSizeAndAlignment(type, dstLayout);
-        IRSizeAndAlignment srcSizeAlignment = getSizeAndAlignment(type, srcLayout);
-
-        auto minSize = std::min(dstSizeAlignment.size, srcSizeAlignment.size);
-
-        switch (type->getOp())
-        {
-        case kIROp_ArrayType:
-            {
-                auto arrayType = as<IRArrayTypeBase>(type);
-                auto elemType = arrayType->getElementType();
-                auto irElemCount = arrayType->getElementCount();
-                auto elemCount = getIntVal(irElemCount);
-
-                LLVMInst* last = nullptr;
-                for (int elem = 0; elem < elemCount; ++elem)
-                {
-                    auto dstElemPtr = emitArrayGetElementPtr(
-                        dstPtr,
-                        builder->getConstantInt(builder->getIntType(32), elem),
-                        elemType,
-                        dstLayout);
-                    auto srcElemPtr = emitArrayGetElementPtr(
-                        srcPtr,
-                        builder->getConstantInt(builder->getIntType(32), elem),
-                        elemType,
-                        srcLayout);
-                    last = crossLayoutMemCpy(
-                        dstElemPtr,
-                        srcElemPtr,
-                        elemType,
-                        dstLayout,
-                        srcLayout,
-                        isVolatile);
-                }
-                return last;
-            }
-        case kIROp_StructType:
-            {
-                auto structType = as<IRStructType>(type);
-
-                LLVMInst* last = nullptr;
-                for (auto field : structType->getFields())
-                {
-                    auto fieldType = field->getFieldType();
-                    if (as<IRVoidType>(fieldType))
-                        continue;
-
-                    auto dstElemPtr = emitStructGetElementPtr(dstPtr, field, dstLayout);
-                    auto srcElemPtr = emitStructGetElementPtr(srcPtr, field, srcLayout);
-
-                    last = crossLayoutMemCpy(
-                        dstElemPtr,
-                        srcElemPtr,
-                        fieldType,
-                        dstLayout,
-                        srcLayout,
-                        isVolatile);
-                }
-                return last;
-            }
-        default:
-            // Assume that there are no substantial layout differences (aside
-            // from trailing padding, which is skipped via minSize), so copying
-            // is safe.
-            return builder->emitCopy(
-                dstPtr,
-                dstSizeAlignment.alignment,
-                srcPtr,
-                srcSizeAlignment.alignment,
-                minSize,
-                isVolatile);
         }
     }
 
@@ -1182,6 +716,24 @@ struct LLVMEmitter
     // constants. They need to be initialized during runtime.
     List<IRGlobalVar*> deferredGlobalVars;
 
+    struct ConstantInfo
+    {
+        // Includes trailing padding
+        LLVMInst* padded = nullptr;
+
+        // Excludes trailing padding
+        LLVMInst* unpadded = nullptr;
+
+        LLVMInst* get(bool withTrailingPadding) { return withTrailingPadding ? padded : unpadded; }
+
+        ConstantInfo& operator=(LLVMInst* constant)
+        {
+            padded = unpadded = constant;
+            return *this;
+        }
+    };
+    Dictionary<IRInst*, ConstantInfo> constantMap;
+
     // Used to add code in in front of return in a function. If it returns
     // nullptr, the LLVM return instruction is generated "normally". Otherwise,
     // it's expected that you generated it in this function.
@@ -1228,10 +780,17 @@ struct LLVMEmitter
         getOptions().writeCommandLineArgs(codeGenContext->getSession(), sb);
         auto params = sb.toString();
 
+        // TODO: Should probably complain here if the target machine's pointer
+        // size doesn't match SLANG_PTR_IS_32 & SLANG_PTR_IS_64. Although, I'd
+        // rather just fix the whole pointer size mechanism in Slang.
+
         LLVMBuilderOptions builderOpt;
         builderOpt.target = asExternal(codeGenContext->getTargetFormat());
-        builderOpt.targetTriple =
-            CharSlice(targetTripleOption.begin(), targetTripleOption.getLength());
+        builderOpt.targetTriple = CharSlice();
+        // For JIT, we must always use the host target triple
+        if (!useJIT)
+            builderOpt.targetTriple =
+                CharSlice(targetTripleOption.begin(), targetTripleOption.getLength());
         builderOpt.cpu = CharSlice(cpuOption.begin(), cpuOption.getLength());
         builderOpt.features = CharSlice(featOption.begin(), featOption.getLength());
         builderOpt.debugCommandLineArgs = CharSlice(params.begin(), params.getLength());
@@ -1240,7 +799,6 @@ struct LLVMEmitter
         builderOpt.fp32DenormalMode = (SlangFpDenormalMode)getOptions().getDenormalModeFp32();
         builderOpt.fp64DenormalMode = (SlangFpDenormalMode)getOptions().getDenormalModeFp64();
         builderOpt.fpMode = (SlangFloatingPointMode)getOptions().getFloatingPointMode();
-        builderOpt.useJIT = useJIT;
 
         ComPtr<IArtifact> errorArtifact;
         SLANG_RETURN_ON_FAIL(builderFunc(
@@ -1271,8 +829,7 @@ struct LLVMEmitter
         else
             defaultPointerRules = IRTypeLayoutRules::get(IRTypeLayoutRuleName::LLVM);
 
-        types.reset(
-            new LLVMTypeTranslator(builder, getOptions(), instToDebugLLVM, defaultPointerRules));
+        types.reset(new LLVMTypeTranslator(builder, getOptions(), instToDebugLLVM));
 
         int32Type = builder->getIntType(32);
         int64Type = builder->getIntType(64);
@@ -1282,6 +839,231 @@ struct LLVMEmitter
     DiagnosticSink* getSink() { return codeGenContext->getSink(); }
 
     CompilerOptionSet& getOptions() { return codeGenContext->getTargetProgram()->getOptionSet(); }
+
+    // Emits zero padding as much as needed to make curSize == targetSize.
+    UInt emitPaddingConstant(List<LLVMInst*>& fields, UInt& curSize, UInt targetSize)
+    {
+        SLANG_ASSERT(curSize <= targetSize);
+
+        if (curSize < targetSize)
+        {
+            UInt bytes = targetSize - curSize;
+            curSize = targetSize;
+
+            auto zero = builder->getConstantInt(builder->getIntType(8), 0);
+            auto zeros = List<LLVMInst*>::makeRepeated(zero, bytes);
+            fields.add(builder->getConstantArray(Slice(zeros.begin(), zeros.getCount())));
+
+            return bytes;
+        }
+        return 0;
+    }
+
+    // Tries to emit the given value as a constant, but may return nullptr if
+    // that is not possible.
+    LLVMInst* maybeEmitConstant(
+        IRInst* inst,
+        bool inAggregate = false,
+        bool withTrailingPadding = true)
+    {
+        if (constantMap.containsKey(inst) && !inAggregate)
+            return constantMap.getValue(inst).get(withTrailingPadding);
+
+        ConstantInfo llvmConstant;
+        switch (inst->getOp())
+        {
+        case kIROp_IntLit:
+        case kIROp_BoolLit:
+            {
+                auto litInst = static_cast<IRConstant*>(inst);
+                IRBasicType* type = as<IRBasicType>(inst->getDataType());
+                if (type)
+                    llvmConstant =
+                        builder->getConstantInt(types->getType(type), litInst->value.intVal);
+                break;
+            }
+
+        case kIROp_FloatLit:
+            {
+                auto litInst = static_cast<IRConstant*>(inst);
+                IRBasicType* type = as<IRBasicType>(inst->getDataType());
+                if (type)
+                    llvmConstant =
+                        builder->getConstantFloat(types->getType(type), litInst->value.floatVal);
+            }
+            break;
+
+        case kIROp_StringLit:
+            llvmConstant = builder->getConstantString(getStringLitAsSlice(inst));
+            break;
+
+        case kIROp_PtrLit:
+            {
+                auto ptrLit = static_cast<IRPtrLit*>(inst);
+                llvmConstant = builder->getConstantPtr((uintptr_t)ptrLit->getValue());
+            }
+            break;
+        case kIROp_MakeVector:
+            {
+                List<LLVMInst*> values;
+                for (UInt aa = 0; aa < inst->getOperandCount(); ++aa)
+                {
+                    auto partInst = inst->getOperand(aa);
+                    auto constVal = maybeEmitConstant(partInst, inAggregate);
+                    if (!constVal)
+                        return nullptr;
+                    if (auto subvectorType = as<IRVectorType>(partInst->getDataType()))
+                    {
+                        auto elemCount = getIntVal(subvectorType->getElementCount());
+                        for (IRIntegerValue j = 0; j < elemCount; ++j)
+                            values.add(builder->getConstantExtractElement(constVal, int(j)));
+                    }
+                    else
+                        values.add(constVal);
+                }
+
+                auto vectorType = as<IRVectorType>(inst->getDataType());
+
+                // So apparently, at least autodiff can generate MakeVectors
+                // which actually just make a float. Interesting.
+                if (!vectorType)
+                {
+                    llvmConstant = values[0];
+                    break;
+                }
+
+                if (inAggregate)
+                {
+                    // To remove padding and alignment requirements from the
+                    // vector, lower it as an array.
+                    auto elemType = types->getType(vectorType->getElementType());
+                    llvmConstant =
+                        builder->getConstantArray(Slice(values.begin(), values.getCount()));
+
+                    Int alignedCount =
+                        Int(types->getVectorAlignedCount(vectorType, defaultPointerRules));
+                    if (alignedCount != values.getCount())
+                    {
+                        // Fill padding with poison, nobody should use it in
+                        // computations.
+                        while (values.getCount() < alignedCount)
+                            values.add(builder->getPoison(elemType));
+                        llvmConstant.padded =
+                            builder->getConstantArray(Slice(values.begin(), values.getCount()));
+                    }
+                }
+                else
+                {
+                    llvmConstant =
+                        builder->getConstantVector(Slice(values.begin(), values.getCount()));
+                }
+            }
+            break;
+        case kIROp_MakeVectorFromScalar:
+            {
+                auto vectorType = cast<IRVectorType>(inst->getDataType());
+                int elemCount = int(getIntVal(vectorType->getElementCount()));
+                LLVMInst* value = maybeEmitConstant(inst->getOperand(0), inAggregate);
+                if (!value)
+                    return nullptr;
+
+                if (inAggregate)
+                {
+                    auto elemType = types->getType(vectorType->getElementType());
+                    auto values = List<LLVMInst*>::makeRepeated(value, elemCount);
+                    llvmConstant =
+                        builder->getConstantArray(Slice(values.begin(), values.getCount()));
+
+                    Int alignedCount =
+                        Int(types->getVectorAlignedCount(vectorType, defaultPointerRules));
+                    if (alignedCount != values.getCount())
+                    {
+                        while (values.getCount() < alignedCount)
+                            values.add(builder->getPoison(elemType));
+
+                        llvmConstant.padded =
+                            builder->getConstantArray(Slice(values.begin(), values.getCount()));
+                    }
+                }
+                else
+                {
+                    llvmConstant = builder->getConstantVector(value, elemCount);
+                }
+            }
+            break;
+        case kIROp_MakeArray:
+            {
+                auto arrayType = cast<IRArrayTypeBase>(inst->getDataType());
+                List<LLVMInst*> values;
+
+                for (UInt aa = 0; aa < inst->getOperandCount(); ++aa)
+                {
+                    auto constVal = maybeEmitConstant(inst->getOperand(aa), true, true);
+                    if (!constVal)
+                        return nullptr;
+                    values.add(constVal);
+                }
+
+                llvmConstant = builder->getConstantArray(Slice(values.begin(), values.getCount()));
+
+                if (types->needsUnpaddedArrayTypeWorkaround(arrayType, defaultPointerRules))
+                {
+                    auto lastPart = maybeEmitConstant(
+                        inst->getOperand(inst->getOperandCount() - 1),
+                        true,
+                        false);
+
+                    auto initPart =
+                        builder->getConstantArray(Slice(values.begin(), values.getCount() - 1));
+
+                    // This should be a struct for the workaround.
+                    LLVMInst* fields[2] = {initPart, lastPart};
+                    llvmConstant.unpadded = builder->getConstantStruct(Slice(fields, 2));
+                }
+            }
+            break;
+        case kIROp_MakeStruct:
+            {
+                auto structType = cast<IRStructType>(inst->getDataType());
+
+                UInt llvmSize = 0;
+                IRSizeAndAlignment sizeAndAlignment =
+                    types->getSizeAndAlignment(structType, defaultPointerRules);
+
+                List<LLVMInst*> values;
+                auto field = structType->getFields().begin();
+                for (UInt aa = 0; aa < inst->getOperandCount(); ++aa, ++field)
+                {
+                    auto constVal = maybeEmitConstant(inst->getOperand(aa), true, false);
+                    if (!constVal)
+                        return nullptr;
+
+                    IRIntegerValue offset = types->getOffset(*field, defaultPointerRules);
+                    // Insert padding until we're at the requested offset.
+                    emitPaddingConstant(values, llvmSize, offset);
+
+                    values.add(constVal);
+                    llvmSize += builder->getStoreSizeOf(constVal);
+                }
+
+                llvmConstant.unpadded =
+                    builder->getConstantStruct(Slice<LLVMInst*>(values.begin(), values.getCount()));
+
+                emitPaddingConstant(values, llvmSize, sizeAndAlignment.getStride());
+
+                llvmConstant.padded =
+                    builder->getConstantStruct(Slice<LLVMInst*>(values.begin(), values.getCount()));
+            }
+            break;
+        default:
+            break;
+        }
+
+        if ((llvmConstant.padded || llvmConstant.unpadded) && !inAggregate)
+            constantMap[inst] = llvmConstant;
+        return llvmConstant.get(withTrailingPadding);
+    }
+
 
     // Finds the value of an instruction that has already been emitted, OR
     // creates the value if it's a constant. Also, if inlineGlobalInstructions
@@ -1304,7 +1086,7 @@ struct LLVMEmitter
             // here; they must not be emitted as values in any other context
             // than global vars. `emitGlobalVarDecl` and
             // `emitGlobalInstructionCtor` handle that part.
-            constVal = types->maybeEmitConstant(inst);
+            constVal = maybeEmitConstant(inst);
         }
 
         LLVMInst* llvmValue = nullptr;
@@ -1375,6 +1157,233 @@ struct LLVMEmitter
         if (llvmValue)
             mapInstToLLVM[inst] = llvmValue;
         return llvmValue;
+    }
+
+    // Allocates stack memory for given type. Returns a pointer to the start of
+    // that memory.
+    LLVMInst* emitAlloca(IRType* type, IRTypeLayoutRules* rules)
+    {
+        IRSizeAndAlignment sizeAlignment = types->getSizeAndAlignment(type, rules);
+        return builder->emitAlloca(sizeAlignment.getStride(), sizeAlignment.alignment);
+    }
+
+    // Computes an offset with `indexInst` based on `llvmPtr`. `indexInst` need
+    // not be constant.
+    LLVMInst* emitArrayGetElementPtr(
+        LLVMInst* llvmPtr,
+        LLVMInst* indexInst,
+        IRType* elemType,
+        IRTypeLayoutRules* rules)
+    {
+        IRSizeAndAlignment sizeAndAlignment = types->getSizeAndAlignment(elemType, rules);
+        return builder->emitGetElementPtr(llvmPtr, sizeAndAlignment.getStride(), indexInst);
+    }
+
+    // Computes a pointer to a struct field.
+    LLVMInst* emitStructGetElementPtr(
+        LLVMInst* llvmPtr,
+        IRStructField* field,
+        IRTypeLayoutRules* rules)
+    {
+        IRIntegerValue offset = types->getOffset(field, rules);
+        return builder->emitGetElementPtr(
+            llvmPtr,
+            1,
+            builder->getConstantInt(builder->getIntType(32), offset));
+    }
+
+    // Copies data from a pointer to another, taking layout differences into
+    // account.
+    LLVMInst* crossLayoutMemCpy(
+        LLVMInst* dstPtr,
+        LLVMInst* srcPtr,
+        IRType* type,
+        IRTypeLayoutRules* dstLayout,
+        IRTypeLayoutRules* srcLayout,
+        bool isVolatile)
+    {
+        IRSizeAndAlignment dstSizeAlignment = types->getSizeAndAlignment(type, dstLayout);
+        IRSizeAndAlignment srcSizeAlignment = types->getSizeAndAlignment(type, srcLayout);
+
+        auto minSize = std::min(dstSizeAlignment.size, srcSizeAlignment.size);
+
+        switch (type->getOp())
+        {
+        case kIROp_ArrayType:
+            {
+                auto arrayType = as<IRArrayTypeBase>(type);
+                auto elemType = arrayType->getElementType();
+                auto irElemCount = arrayType->getElementCount();
+                auto elemCount = getIntVal(irElemCount);
+
+                LLVMInst* last = nullptr;
+                for (int elem = 0; elem < elemCount; ++elem)
+                {
+                    auto dstElemPtr = emitArrayGetElementPtr(
+                        dstPtr,
+                        builder->getConstantInt(builder->getIntType(32), elem),
+                        elemType,
+                        dstLayout);
+                    auto srcElemPtr = emitArrayGetElementPtr(
+                        srcPtr,
+                        builder->getConstantInt(builder->getIntType(32), elem),
+                        elemType,
+                        srcLayout);
+                    last = crossLayoutMemCpy(
+                        dstElemPtr,
+                        srcElemPtr,
+                        elemType,
+                        dstLayout,
+                        srcLayout,
+                        isVolatile);
+                }
+                return last;
+            }
+        case kIROp_StructType:
+            {
+                auto structType = as<IRStructType>(type);
+
+                LLVMInst* last = nullptr;
+                for (auto field : structType->getFields())
+                {
+                    auto fieldType = field->getFieldType();
+                    if (as<IRVoidType>(fieldType))
+                        continue;
+
+                    auto dstElemPtr = emitStructGetElementPtr(dstPtr, field, dstLayout);
+                    auto srcElemPtr = emitStructGetElementPtr(srcPtr, field, srcLayout);
+
+                    last = crossLayoutMemCpy(
+                        dstElemPtr,
+                        srcElemPtr,
+                        fieldType,
+                        dstLayout,
+                        srcLayout,
+                        isVolatile);
+                }
+                return last;
+            }
+        default:
+            // Assume that there are no substantial layout differences (aside
+            // from trailing padding, which is skipped via minSize), so copying
+            // is safe.
+            return builder->emitCopy(
+                dstPtr,
+                dstSizeAlignment.alignment,
+                srcPtr,
+                srcSizeAlignment.alignment,
+                minSize,
+                isVolatile);
+        }
+    }
+
+    // llvmVal must be using `getType(valType)`. It will be stored in
+    // llvmPtr. Returns the store instruction.
+    LLVMInst* emitStore(
+        LLVMInst* llvmPtr,
+        LLVMInst* llvmVal,
+        IRType* valType,
+        IRTypeLayoutRules* rules,
+        bool isVolatile = false)
+    {
+        IRSizeAndAlignment sizeAlignment = types->getSizeAndAlignment(valType, rules);
+        switch (valType->getOp())
+        {
+        case kIROp_BoolType:
+            {
+                // Booleans are i1 in values, but something larger in memory.
+                auto storageType = builder->getIntType(int(sizeAlignment.size * 8));
+                auto expanded = builder->emitIntResize(llvmVal, storageType);
+                return builder->emitStore(expanded, llvmPtr, sizeAlignment.alignment, isVolatile);
+            }
+            break;
+        case kIROp_ArrayType:
+        case kIROp_StructType:
+            // Arrays and struct values are always represented with an alloca
+            // pointer.
+            if (rules == defaultPointerRules)
+            {
+                // Equal memory layout, so we can just memcpy.
+                return builder->emitCopy(
+                    llvmPtr,
+                    sizeAlignment.alignment,
+                    llvmVal,
+                    sizeAlignment.alignment,
+                    sizeAlignment.size,
+                    isVolatile);
+            }
+            else
+            {
+                return crossLayoutMemCpy(
+                    llvmPtr,
+                    llvmVal,
+                    valType,
+                    rules,
+                    defaultPointerRules,
+                    isVolatile);
+            }
+        default:
+            return builder->emitStore(llvmVal, llvmPtr, sizeAlignment.alignment, isVolatile);
+        }
+    }
+
+    // Returns the loaded data using `getType(valType)` from llvmPtr.
+    // Returns the load instruction (= loaded value)
+    LLVMInst* emitLoad(
+        LLVMInst* llvmPtr,
+        IRType* valType,
+        IRTypeLayoutRules* rules,
+        bool isVolatile = false)
+    {
+        IRSizeAndAlignment sizeAlignment = types->getSizeAndAlignment(valType, rules);
+
+        switch (valType->getOp())
+        {
+        case kIROp_BoolType:
+            {
+                // Booleans are i1 in values, but something larger in memory.
+                auto llvmType = types->getType(valType);
+                auto storageType = builder->getIntType(int(sizeAlignment.size * 8));
+                auto storageBool =
+                    builder->emitLoad(storageType, llvmPtr, sizeAlignment.alignment, isVolatile);
+                return builder->emitIntResize(storageBool, llvmType);
+            }
+            break;
+        case kIROp_ArrayType:
+        case kIROp_StructType:
+            if (rules == defaultPointerRules)
+            {
+                // Equal memory layout, so we can just memcpy.
+                LLVMInst* llvmVar = emitAlloca(valType, defaultPointerRules);
+
+                // Pointer-to-pointer copy, so generate inline memcpy.
+                builder->emitCopy(
+                    llvmVar,
+                    sizeAlignment.alignment,
+                    llvmPtr,
+                    sizeAlignment.alignment,
+                    sizeAlignment.size,
+                    isVolatile);
+                return llvmVar;
+            }
+            else
+            {
+                LLVMInst* llvmVar = emitAlloca(valType, defaultPointerRules);
+                crossLayoutMemCpy(
+                    llvmVar,
+                    llvmPtr,
+                    valType,
+                    defaultPointerRules,
+                    rules,
+                    isVolatile);
+                return llvmVar;
+            }
+        default:
+            {
+                auto llvmType = types->getType(valType);
+                return builder->emitLoad(llvmType, llvmPtr, sizeAlignment.alignment, isVolatile);
+            }
+        }
     }
 
     LLVMInst* emitCompare(IRInst* inst)
@@ -1554,7 +1563,7 @@ struct LLVMEmitter
         case kIROp_FloatLit:
         case kIROp_StringLit:
         case kIROp_PtrLit:
-            llvmInst = types->maybeEmitConstant(inst);
+            llvmInst = maybeEmitConstant(inst);
             break;
 
         case kIROp_Less:
@@ -1608,7 +1617,7 @@ struct LLVMEmitter
                 auto var = static_cast<IRVar*>(inst);
                 auto ptrType = var->getDataType();
 
-                LLVMInst* llvmVar = types->emitAlloca(ptrType->getValueType(), defaultPointerRules);
+                LLVMInst* llvmVar = emitAlloca(ptrType->getValueType(), defaultPointerRules);
 
                 CharSlice linkageName, prettyName;
                 if (maybeGetName(&linkageName, &prettyName, inst))
@@ -1668,7 +1677,7 @@ struct LLVMEmitter
                     auto intLit = as<IRIntLit>(value);
                     SLANG_ASSERT(intLit);
 
-                    values.add(types->maybeEmitConstant(intLit));
+                    values.add(maybeEmitConstant(intLit));
                     blocks.add(findValue(switchInst->getCaseLabel(c)));
                 }
                 llvmInst = builder->emitSwitch(
@@ -1695,7 +1704,7 @@ struct LLVMEmitter
                 auto ptr = storeInst->getPtr();
                 auto val = storeInst->getVal();
 
-                llvmInst = types->emitStore(
+                llvmInst = emitStore(
                     findValue(ptr),
                     findValue(val),
                     val->getDataType(),
@@ -1709,7 +1718,7 @@ struct LLVMEmitter
                 auto loadInst = static_cast<IRLoad*>(inst);
                 auto ptr = loadInst->getPtr();
 
-                llvmInst = types->emitLoad(
+                llvmInst = emitLoad(
                     findValue(ptr),
                     loadInst->getDataType(),
                     getPtrLayoutRules(ptr),
@@ -1725,7 +1734,7 @@ struct LLVMEmitter
                 {
                     // Aggregates are always stack-allocated; we need to give a
                     // valid pointer even if the value is undefined.
-                    llvmInst = types->emitAlloca(type, defaultPointerRules);
+                    llvmInst = emitAlloca(type, defaultPointerRules);
                 }
                 else
                 {
@@ -1751,30 +1760,29 @@ struct LLVMEmitter
             break;
 
         case kIROp_MakeArray:
-            llvmInst = types->emitAlloca(inst->getDataType(), defaultPointerRules);
+            llvmInst = emitAlloca(inst->getDataType(), defaultPointerRules);
             for (UInt aa = 0; aa < inst->getOperandCount(); ++aa)
             {
                 auto op = inst->getOperand(aa);
-                LLVMInst* ptr = types->emitArrayGetElementPtr(
+                LLVMInst* ptr = emitArrayGetElementPtr(
                     llvmInst,
                     builder->getConstantInt(int32Type, aa),
                     op->getDataType(),
                     defaultPointerRules);
-                types->emitStore(ptr, findValue(op), op->getDataType(), defaultPointerRules);
+                emitStore(ptr, findValue(op), op->getDataType(), defaultPointerRules);
             }
             break;
 
         case kIROp_MakeStruct:
             {
                 IRStructType* type = as<IRStructType>(inst->getDataType());
-                llvmInst = types->emitAlloca(type, defaultPointerRules);
+                llvmInst = emitAlloca(type, defaultPointerRules);
                 auto field = type->getFields().begin();
                 for (UInt aa = 0; aa < inst->getOperandCount(); ++aa, ++field)
                 {
-                    LLVMInst* ptr =
-                        types->emitStructGetElementPtr(llvmInst, *field, defaultPointerRules);
+                    LLVMInst* ptr = emitStructGetElementPtr(llvmInst, *field, defaultPointerRules);
                     auto op = inst->getOperand(aa);
-                    types->emitStore(ptr, findValue(op), op->getDataType(), defaultPointerRules);
+                    emitStore(ptr, findValue(op), op->getDataType(), defaultPointerRules);
                 }
             }
             break;
@@ -1783,23 +1791,23 @@ struct LLVMEmitter
             {
                 auto arrayType = cast<IRArrayType>(inst->getDataType());
                 auto elementCount = getIntVal(arrayType->getElementCount());
-                llvmInst = types->emitAlloca(inst->getDataType(), defaultPointerRules);
+                llvmInst = emitAlloca(inst->getDataType(), defaultPointerRules);
                 auto element = inst->getOperand(0);
                 auto llvmElement = findValue(element);
                 for (IRIntegerValue i = 0; i < elementCount; ++i)
                 {
-                    LLVMInst* ptr = types->emitArrayGetElementPtr(
+                    LLVMInst* ptr = emitArrayGetElementPtr(
                         llvmInst,
                         builder->getConstantInt(int32Type, i),
                         element->getDataType(),
                         defaultPointerRules);
-                    types->emitStore(ptr, llvmElement, element->getDataType(), defaultPointerRules);
+                    emitStore(ptr, llvmElement, element->getDataType(), defaultPointerRules);
                 }
             }
             break;
 
         case kIROp_MakeVector:
-            llvmInst = types->maybeEmitConstant(inst);
+            llvmInst = maybeEmitConstant(inst);
             if (!llvmInst)
             {
                 auto llvmType = types->getType(inst->getDataType());
@@ -1846,7 +1854,7 @@ struct LLVMEmitter
             break;
 
         case kIROp_MakeVectorFromScalar:
-            llvmInst = types->maybeEmitConstant(inst);
+            llvmInst = maybeEmitConstant(inst);
             if (!llvmInst)
             {
                 auto val = findValue(inst->getOperand(0));
@@ -1893,7 +1901,7 @@ struct LLVMEmitter
                 for (UInt i = 0; i < swizzledInst->getElementCount(); ++i)
                 {
                     IRInst* irElementIndex = swizzledInst->getElementIndex(i);
-                    auto index = types->maybeEmitConstant(irElementIndex);
+                    auto index = maybeEmitConstant(irElementIndex);
                     auto llvmSrcElement =
                         builder->emitExtractElement(llvmSrc, builder->getConstantInt(int32Type, i));
                     llvmInst = builder->emitInsertElement(llvmInst, llvmSrcElement, index);
@@ -1920,14 +1928,14 @@ struct LLVMEmitter
                 {
                     IRInst* irElementIndex = swizzledInst->getElementIndex(i);
 
-                    auto llvmDstElement = types->emitArrayGetElementPtr(
+                    auto llvmDstElement = emitArrayGetElementPtr(
                         llvmDst,
-                        types->maybeEmitConstant(irElementIndex),
+                        maybeEmitConstant(irElementIndex),
                         elementType,
                         rules);
                     auto llvmSrcElement =
                         builder->emitExtractElement(llvmSrc, builder->getConstantInt(int32Type, i));
-                    llvmInst = types->emitStore(llvmDstElement, llvmSrcElement, elementType, rules);
+                    llvmInst = emitStore(llvmDstElement, llvmSrcElement, elementType, rules);
                 }
             }
             break;
@@ -1987,7 +1995,7 @@ struct LLVMEmitter
                 auto field = findStructField(baseStructType, key);
                 auto llvmBase = findValue(base);
 
-                llvmInst = types->emitStructGetElementPtr(llvmBase, field, rules);
+                llvmInst = emitStructGetElementPtr(llvmBase, field, rules);
             }
             break;
 
@@ -2009,9 +2017,9 @@ struct LLVMEmitter
                 auto key = as<IRStructKey>(fieldExtractInst->getField());
                 auto field = findStructField(structType, key);
 
-                LLVMInst* ptr = types->emitStructGetElementPtr(llvmBase, field, rules);
+                LLVMInst* ptr = emitStructGetElementPtr(llvmBase, field, rules);
 
-                llvmInst = types->emitLoad(ptr, field->getFieldType(), rules);
+                llvmInst = emitLoad(ptr, field->getFieldType(), rules);
             }
             break;
 
@@ -2044,7 +2052,7 @@ struct LLVMEmitter
                 IRBuilder irBuilder(inst->getModule());
                 IRType* elemType = getElementType(irBuilder, baseType);
 
-                llvmInst = types->emitArrayGetElementPtr(
+                llvmInst = emitArrayGetElementPtr(
                     findValue(baseInst),
                     findValue(indexInst),
                     elemType,
@@ -2077,12 +2085,9 @@ struct LLVMEmitter
                     // emitGEP + emitLoad.
                     auto rules = getPtrLayoutRules(baseInst);
                     auto elemType = arrayType->getElementType();
-                    LLVMInst* ptr = types->emitArrayGetElementPtr(
-                        llvmVal,
-                        findValue(indexInst),
-                        elemType,
-                        rules);
-                    llvmInst = types->emitLoad(ptr, elemType, rules);
+                    LLVMInst* ptr =
+                        emitArrayGetElementPtr(llvmVal, findValue(indexInst), elemType, rules);
+                    llvmInst = emitLoad(ptr, elemType, rules);
                 }
                 else
                     SLANG_ASSERT_FAILURE("Unknown data type for GetElement!");
@@ -2143,7 +2148,7 @@ struct LLVMEmitter
                 // output parameter that is passed with a pointer.
                 if (types->isAggregateType(inst->getDataType()))
                 {
-                    allocValue = types->emitAlloca(inst->getDataType(), defaultPointerRules);
+                    allocValue = emitAlloca(inst->getDataType(), defaultPointerRules);
                     args.add(allocValue);
                 }
                 auto returnVal =
@@ -2193,11 +2198,8 @@ struct LLVMEmitter
                 auto llvmPtr = builder->emitGetBufferPtr(llvmBase);
 
                 IRTypeLayoutRules* rules = getBufferLayoutRules(baseType);
-                llvmInst = types->emitArrayGetElementPtr(
-                    llvmPtr,
-                    llvmIndex,
-                    baseType->getElementType(),
-                    rules);
+                llvmInst =
+                    emitArrayGetElementPtr(llvmPtr, llvmIndex, baseType->getElementType(), rules);
             }
             break;
 
@@ -2213,12 +2215,12 @@ struct LLVMEmitter
                 auto llvmBasePtr = builder->emitGetBufferPtr(llvmBase);
                 IRTypeLayoutRules* rules = getBufferLayoutRules(baseType);
 
-                auto llvmPtr = types->emitArrayGetElementPtr(
+                auto llvmPtr = emitArrayGetElementPtr(
                     llvmBasePtr,
                     llvmIndex,
                     baseType->getElementType(),
                     rules);
-                llvmInst = types->emitLoad(llvmPtr, inst->getDataType(), rules);
+                llvmInst = emitLoad(llvmPtr, inst->getDataType(), rules);
             }
             break;
 
@@ -2234,12 +2236,12 @@ struct LLVMEmitter
                 auto llvmBasePtr = builder->emitGetBufferPtr(llvmBase);
                 IRTypeLayoutRules* rules = getBufferLayoutRules(baseType);
 
-                auto llvmPtr = types->emitArrayGetElementPtr(
+                auto llvmPtr = emitArrayGetElementPtr(
                     llvmBasePtr,
                     llvmIndex,
                     baseType->getElementType(),
                     rules);
-                llvmInst = types->emitStore(llvmPtr, findValue(val), val->getDataType(), rules);
+                llvmInst = emitStore(llvmPtr, findValue(val), val->getDataType(), rules);
             }
             break;
 
@@ -2251,7 +2253,7 @@ struct LLVMEmitter
                 auto llvmBasePtr = builder->emitGetBufferPtr(llvmBase);
                 auto llvmPtr = builder->emitGetElementPtr(llvmBasePtr, 1, llvmIndex);
 
-                llvmInst = types->emitLoad(llvmPtr, inst->getDataType(), defaultPointerRules);
+                llvmInst = emitLoad(llvmPtr, inst->getDataType(), defaultPointerRules);
             }
             break;
 
@@ -2263,11 +2265,8 @@ struct LLVMEmitter
                 auto llvmBasePtr = builder->emitGetBufferPtr(llvmBase);
                 auto llvmPtr = builder->emitGetElementPtr(llvmBasePtr, 1, llvmIndex);
                 auto val = inst->getOperand(inst->getOperandCount() - 1);
-                llvmInst = types->emitStore(
-                    llvmPtr,
-                    findValue(val),
-                    val->getDataType(),
-                    defaultPointerRules);
+                llvmInst =
+                    emitStore(llvmPtr, findValue(val), val->getDataType(), defaultPointerRules);
             }
             break;
 
@@ -2568,7 +2567,7 @@ struct LLVMEmitter
                 // If the initializer is constant, we can emit that to the
                 // variable directly.
                 IRInst* val = returnInst->getVal();
-                if (auto constantValue = types->maybeEmitConstant(val))
+                if (auto constantValue = maybeEmitConstant(val))
                 {
                     // Easy case, it's just a constant in LLVM.
                     llvmVar = builder->declareGlobalVariable(
@@ -2606,10 +2605,12 @@ struct LLVMEmitter
             {
                 auto filename = as<IRStringLit>(debugSource->getFileName())->getStringSlice();
 
-                std::filesystem::path path(std::string(filename.begin(), filename.getLength()));
+                String path = Path::getParentDirectory(filename);
+                String file = Path::getFileName(filename);
+
                 instToDebugLLVM[inst] = builder->getDebugFile(
-                    CharSlice(path.filename().string().c_str()),
-                    CharSlice(path.parent_path().string().c_str()),
+                    CharSlice(file),
+                    CharSlice(path),
                     getStringLitAsSlice(debugSource->getSource()));
             }
         }
@@ -2626,8 +2627,6 @@ struct LLVMEmitter
         }
     }
 
-    // Using std::string as the LLVM API works with that. It's not to be
-    // ingested by Slang.
     String expandIntrinsic(
         IRInst* intrinsicInst,
         IRFunc* parentFunc,
@@ -2829,7 +2828,6 @@ struct LLVMEmitter
     }
 
     // This function inserts the given LLVM IR in the global scope.
-    // Uses std::string due to that being what LLVM emits and ingests.
     void emitTargetIntrinsicFunction(
         IRFunc* func,
         LLVMInst*& llvmFunc,
@@ -2915,11 +2913,7 @@ struct LLVMEmitter
                 if (storeArg)
                 {
                     auto val = ret->getVal();
-                    types->emitStore(
-                        storeArg,
-                        findValue(val),
-                        val->getDataType(),
-                        defaultPointerRules);
+                    emitStore(storeArg, findValue(val), val->getDataType(), defaultPointerRules);
                     return builder->emitReturn();
                 }
 
@@ -2994,7 +2988,7 @@ struct LLVMEmitter
             // Emit the instructions needed to construct the value, and store
             // the results into the variable as appropriate.
             auto llvmInst = emitLLVMInstruction(inst);
-            types->emitStore(globalVar, llvmInst, inst->getDataType(), defaultPointerRules);
+            emitStore(globalVar, llvmInst, inst->getDataType(), defaultPointerRules);
         }
 
         LLVMInst* prevBlock = block;
@@ -3011,7 +3005,7 @@ struct LLVMEmitter
             auto epilogue = [&](IRReturn* ret) -> LLVMInst*
             {
                 auto val = ret->getVal();
-                types->emitStore(llvmVar, findValue(val), val->getDataType(), defaultPointerRules);
+                emitStore(llvmVar, findValue(val), val->getDataType(), defaultPointerRules);
                 return builder->emitBranch(afterBlock);
             };
             emitGlobalValueWithCode(globalVar, globalConstructor, epilogue);

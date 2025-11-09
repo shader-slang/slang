@@ -1,42 +1,36 @@
-#ifdef _MSC_VER
-// A narrowing conversion is caused inside an LLVM header, which we can't fix
-// now. So let's just disable the warning.
-#pragma warning(disable : 4267)
-#endif
-
 #define SLANG_LLVM_IMPL
 #include "slang-llvm-builder.h"
 
-#include "compiler-core/slang-artifact-associated-impl.h"
-#include "compiler-core/slang-artifact-associated.h"
-#include "compiler-core/slang-artifact-desc-util.h"
-#include "core/slang-blob.h"
-#include "core/slang-com-object.h"
-#include "core/slang-list.h"
 #include "slang-llvm-jit-shared-library.h"
 
-#include <llvm/AsmParser/Parser.h>
-#include <llvm/ExecutionEngine/Orc/LLJIT.h>
-#include <llvm/IR/BasicBlock.h>
-#include <llvm/IR/Constants.h>
-#include <llvm/IR/DIBuilder.h>
-#include <llvm/IR/DerivedTypes.h>
-#include <llvm/IR/Function.h>
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/LegacyPassManager.h>
-#include <llvm/IR/Module.h>
-#include <llvm/IR/ModuleSummaryIndex.h>
-#include <llvm/IR/NoFolder.h>
-#include <llvm/IR/Verifier.h>
-#include <llvm/Linker/Linker.h>
-#include <llvm/MC/TargetRegistry.h>
-#include <llvm/Passes/PassBuilder.h>
-#include <llvm/Support/TargetSelect.h>
-#include <llvm/Support/raw_ostream.h>
-#include <llvm/Target/TargetMachine.h>
-#include <llvm/Target/TargetOptions.h>
-#include <llvm/TargetParser/Host.h>
+#include "llvm/AsmParser/Parser.h"
+#include "llvm/ExecutionEngine/Orc/LLJIT.h"
+#include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/DIBuilder.h"
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/NoFolder.h"
+#include "llvm/IR/Verifier.h"
+#include "llvm/Linker/Linker.h"
+#include "llvm/MC/TargetRegistry.h"
+#include "llvm/Passes/PassBuilder.h"
+#include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Target/TargetMachine.h"
+#include "llvm/Target/TargetOptions.h"
+#include "llvm/TargetParser/Host.h"
+
+#include <compiler-core/slang-artifact-associated-impl.h>
+#include <compiler-core/slang-artifact-associated.h>
+#include <compiler-core/slang-artifact-desc-util.h>
+#include <core/slang-blob.h>
+#include <core/slang-com-object.h>
+#include <core/slang-list.h>
 
 using namespace slang;
 
@@ -431,11 +425,8 @@ LLVMBuilder::LLVMBuilder(LLVMBuilderOptions options, IArtifact** outErrorArtifac
         llvmBuilder->getPtrTy(0),
         llvmBuilder->getPtrTy(0));
 
-    // TODO: Should probably complain here if the target machine's pointer
-    // size doesn't match SLANG_PTR_IS_32 & SLANG_PTR_IS_64. Although, I'd
-    // rather just fix the whole pointer size mechanism in Slang.
     std::string targetTripleStr = llvm::sys::getDefaultTargetTriple();
-    if (options.targetTriple.count != 0 && !options.useJIT)
+    if (options.targetTriple.count != 0)
         targetTripleStr = std::string(options.targetTriple.begin(), options.targetTriple.count);
 
     std::string error;
@@ -518,8 +509,6 @@ LLVMBuilder::LLVMBuilder(LLVMBuilderOptions options, IArtifact** outErrorArtifac
             "Debug Info Version",
             llvm::DEBUG_METADATA_VERSION);
 
-        // TODO: Support separate debug info - that'll need to use the SplitName
-        // parameter!
         compileUnit = llvmDebugBuilder->createCompileUnit(
             // TODO: We should probably apply for a language ID in DWARF? Not
             // sure how that process goes. Anyway, let's just use C++ as the
@@ -550,7 +539,7 @@ LLVMBuilder::LLVMBuilder(LLVMBuilderOptions options, IArtifact** outErrorArtifac
 
 LLVMBuilder::~LLVMBuilder()
 {
-    // Everything else is managed and automatically free'd by llvmModule.
+    // Everything else is managed and automatically freed by llvmModule.
     delete targetMachine;
 }
 
@@ -1063,9 +1052,13 @@ LLVMInst* LLVMBuilder::emitBitfieldExtract(
     auto highBits = llvmBuilder->CreateSub(numBits, bits);
     shiftedVal = llvmBuilder->CreateShl(shiftedVal, highBits);
     if (isSigned)
+    {
         return llvmBuilder->CreateAShr(shiftedVal, highBits);
+    }
     else
+    {
         return llvmBuilder->CreateLShr(shiftedVal, highBits);
+    }
 }
 
 LLVMInst* LLVMBuilder::emitBitfieldInsert(
@@ -1218,7 +1211,9 @@ LLVMInst* LLVMBuilder::emitBinaryOp(
         b = emitCast(b, resultType, resultIsSigned);
     }
     else
+    {
         operationPromote(&a, resultIsSigned, &b, resultIsSigned);
+    }
 
     return llvmBuilder->CreateBinOp(llvmOp, a, b);
 }
@@ -1360,9 +1355,13 @@ LLVMInst* LLVMBuilder::emitBitCast(LLVMInst* src, LLVMType* dstType)
     // It appears that sometimes casts between ints and ptrs occur
     // as bitcasts. Fix the operation in that case.
     if (llvmFromType->isPointerTy() && dstType->isIntegerTy())
+    {
         op = llvm::Instruction::CastOps::PtrToInt;
+    }
     else if (llvmFromType->isIntegerTy() && dstType->isPointerTy())
+    {
         op = llvm::Instruction::CastOps::IntToPtr;
+    }
     else if (llvmFromType->isPointerTy() && !dstType->isPointerTy())
     {
         // Cast from pointer to ???, so first cast to int and then
@@ -1519,7 +1518,9 @@ LLVMInst* LLVMBuilder::getConstantArray(Slice<LLVMInst*> values)
         type = llvm::ArrayType::get(values[0]->getType(), values.count);
     }
     else
+    {
         type = llvm::ArrayType::get(byteType, 0);
+    }
 
     return llvm::ConstantArray::get(type, sliceToArrayRef<llvm::Constant>(values));
 }

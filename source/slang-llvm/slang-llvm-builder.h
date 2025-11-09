@@ -34,14 +34,14 @@
 // the case in the future, so it's good to retain the option to also emit
 // GPU-specific things correctly.
 
-#include "compiler-core/slang-artifact.h"
-#include "core/slang-common.h"
 #include "slang.h"
 
-#ifdef SLANG_LLVM_IMPL
-#include "llvm/IR/Value.h"
+#include <compiler-core/slang-artifact.h>
+#include <core/slang-common.h>
 
-#include <llvm/IR/DebugInfoMetadata.h>
+#ifdef SLANG_LLVM_IMPL
+#include "llvm/IR/DebugInfoMetadata.h"
+#include "llvm/IR/Value.h"
 #endif
 
 namespace Slang
@@ -60,6 +60,7 @@ struct LLVMDebugNode;
 struct LLVMBuilderOptions
 {
     SlangCompileTarget target;
+    // Leave empty for default target (host)
     CharSlice targetTriple;
     CharSlice cpu;
     CharSlice features;
@@ -69,9 +70,6 @@ struct LLVMBuilderOptions
     SlangFpDenormalMode fp32DenormalMode;
     SlangFpDenormalMode fp64DenormalMode;
     SlangFloatingPointMode fpMode;
-    // TODO: Check if this can be removed. It should be possible on the emitter
-    // side if targetTriple can be set to host in string form.
-    bool useJIT;
 };
 
 enum LLVMAttribute : uint32_t
