@@ -11551,11 +11551,13 @@ List<ExtensionDecl*> const& SharedSemanticsContext::getCandidateExtensionsForTyp
     // not been built before, or if some code caused the lists to
     // be invalidated.
     //
-    // TODO: Similar to the rebuilding of lookup tables in `ContainerDecl`s,
-    // we probably want to optimize this logic to gracefully handle new
-    // extensions encountered during checking instead of tearing the whole
-    // thing down. For now this potentially-quadratic behavior is acceptable
-    // because there just aren't that many extension declarations being used.
+    // For API/reflection contexts (when m_module is null), we use an
+    // incremental update strategy similar to ContainerDecl's lookup
+    // accelerators: we track how many modules we've processed and only
+    // add extensions from newly-loaded modules.
+    //
+    // For module-scoped contexts (when m_module is set), we don't need this
+    // check because all imports are processed upfront before the cache is built.
     //
     if (!m_candidateExtensionListsBuilt)
     {
@@ -11616,7 +11618,28 @@ List<ExtensionDecl*> const& SharedSemanticsContext::getCandidateExtensionsForTyp
             {
                 _addCandidateExtensionsFromModule(module->getModuleDecl());
             }
+            m_candidateExtensionListsBuiltForModuleCount = m_linkage->loadedModulesList.getCount();
         }
+    }
+    else if (!m_module)
+    {
+        // For reflection/API contexts, incrementally add extensions from
+        // any modules that have been loaded since we last updated the cache.
+        // This follows the same pattern as ContainerDecl's lookup accelerators.
+        //
+        Index currentModuleCount = m_linkage->loadedModulesList.getCount();
+        Index processedModuleCount = m_candidateExtensionListsBuiltForModuleCount;
+
+        SLANG_ASSERT(processedModuleCount >= 0 && processedModuleCount <= currentModuleCount);
+
+        // Only process NEW modules (incremental update)
+        for (Index i = processedModuleCount; i < currentModuleCount; ++i)
+        {
+            auto module = m_linkage->loadedModulesList[i];
+            _addCandidateExtensionsFromModule(module->getModuleDecl());
+        }
+
+        m_candidateExtensionListsBuiltForModuleCount = currentModuleCount;
     }
 
     // Once we are sure that the dictionary-of-arrays of extensions
