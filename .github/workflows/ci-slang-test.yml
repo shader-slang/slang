@@ -215,7 +215,7 @@ jobs:
             OLD_SLANGLIB=$(find "$SITE_PACKAGES/slangpy/" -type f -name libslang-compiler.\*)
             # Find the name of the new libslang-compiler library via symlink
             NEW_SLANGLIB=$(find "$lib_dir" -type l -name libslang-compiler.\* | xargs realpath)
-            cp "$OLD_SLANGLIB" "$NEW_SLANGLIB" || { echo "Failed to copy main library file"; exit 1; }
+            cp "$NEW_SLANGLIB" "$OLD_SLANGLIB" || { echo "Failed to copy main library file"; exit 1; }
 
             # Copy the rest of the library files
             cp "$lib_dir"/libslang*.* "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy library files"; exit 1; }
