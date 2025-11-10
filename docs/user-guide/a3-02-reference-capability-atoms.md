@@ -958,11 +958,11 @@ Compound Capabilities
 `cooperative_matrix_reduction`
 > Capabilities needed to use reduction operations with cooperative matrix
 
+`cooperative_matrix_spirv`
+> Capabilities needed to use reduction operations with cooperative matrix
+
 `cooperative_matrix_tensor_addressing`
 > Capabilities needed to load or store with tensor_addressing extension
-
-`cooperative_matrix_vk`
-> Capabilities needed to use reduction operations with cooperative matrix
 
 `cooperative_vector`
 > Capabilities needed to use cooperative vectors
