@@ -879,6 +879,7 @@ struct ByteAddressBufferLegalizationContext
         case kIROp_Int16Type:
         case kIROp_UInt16Type:
         case kIROp_HalfType:
+        case kIROp_BFloat16Type:
             return BaseType::UInt16;
         case kIROp_Int64Type:
         case kIROp_UInt64Type:

@@ -2369,6 +2369,9 @@ IRInst* IRBuilder::getFloatValue(IRType* type, IRFloatingPointValue inValue)
     case kIROp_HalfType:
         keyInst.value.floatVal = HalfToFloat(FloatToHalf((float)inValue));
         break;
+    case kIROp_BFloat16Type:
+        keyInst.value.floatVal = Bfloat16ToFloat(FloatToBfloat16((float)inValue));
+        break;
     default:
         keyInst.value.floatVal = inValue;
         break;
@@ -3697,6 +3700,7 @@ IRInst* IRBuilder::emitDefaultConstruct(IRType* type, bool fallback)
         return getBoolValue(false);
     case kIROp_FloatType:
     case kIROp_HalfType:
+    case kIROp_BFloat16Type:
     case kIROp_DoubleType:
         return getFloatValue(type, 0.0);
     case kIROp_VoidType:
@@ -3856,6 +3860,7 @@ static TypeCastStyle _getTypeStyleId(IRType* type)
         return TypeCastStyle::Int;
     case kIROp_FloatType:
     case kIROp_HalfType:
+    case kIROp_BFloat16Type:
     case kIROp_DoubleType:
         return TypeCastStyle::Float;
     case kIROp_BoolType:
@@ -7613,6 +7618,7 @@ bool isFloatingType(IRType* t)
         {
         case BaseType::Float:
         case BaseType::Half:
+        case BaseType::BFloat16:
         case BaseType::Double:
             return true;
         default:
@@ -7712,6 +7718,8 @@ FloatInfo getFloatingTypeInfo(const IRType* floatType)
     switch (floatType->getOp())
     {
     case kIROp_HalfType:
+        return {16};
+    case kIROp_BFloat16Type:
         return {16};
     case kIROp_FloatType:
         return {32};

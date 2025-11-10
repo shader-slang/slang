@@ -50,6 +50,7 @@ The following floating-point types are provided:
 | Name          | Description                  |
 |---------------|------------------------------|
 | `half`        | 16-bit floating-point number |
+| `bfloat16_t`  | 16-bit brain floating-point number |
 | `float`       | 32-bit floating-point number |
 | `double`      | 64-bit floating-point number |
 

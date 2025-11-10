@@ -179,6 +179,9 @@ void emitBaseType(ManglingContext* context, BaseType baseType)
     case BaseType::Half:
         emitRaw(context, "h");
         break;
+    case BaseType::BFloat16:
+        emitRaw(context, "bf16");
+        break;
     case BaseType::Float:
         emitRaw(context, "f");
         break;

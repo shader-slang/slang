@@ -23763,7 +23763,7 @@ ${{{{
 __intrinsic_type($(kIROp_CoopMatrixType))
 [require(cooperative_matrix)]
 __generic<
-    T : __BuiltinArithmeticType,
+    T : __BuiltinMLElementType,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -23771,7 +23771,6 @@ __generic<
 >
 struct CoopMat
     : IArray<T>
-    , IArithmetic
 {
     //
     // Initialization
@@ -23793,7 +23792,7 @@ struct CoopMat
     [ForceInline]
     [require(cooperative_matrix_conversion)]
     __init<
-        U : __BuiltinArithmeticType
+        U : __BuiltinMLElementType
     >(CoopMat<U, S, M, N, R> other)
     {
         this.copyFrom(other);
@@ -23804,15 +23803,6 @@ struct CoopMat
     __init(This x)
     {
         this = x;
-    }
-
-    // Required for `IArithmetic`.
-    [ForceInline]
-    [OverloadRank(-10)]
-    [require(cooperative_matrix)]
-    __init(int i)
-    {
-        this = CoopMat<T, S, M, N, R>(T(i));
     }
 
     //
@@ -23839,7 +23829,7 @@ struct CoopMat
     [mutating]
     [require(cooperative_matrix_conversion)]
     void copyFrom<
-        U : __BuiltinArithmeticType
+        U : __BuiltinMLElementType
     >(CoopMat<U, S, M, N, R> other)
     {
         if (__isFloat<T>() && __isInt<U>())
@@ -24260,83 +24250,6 @@ ${{{{
     }
 
     //
-    // Arithmetic
-    //
-
-    __intrinsic_op($(kIROp_Add))
-    This add(This other);
-
-    __intrinsic_op($(kIROp_Sub))
-    This sub(This other);
-
-    __intrinsic_op($(kIROp_Mul))
-    This mul(This other);
-
-    __intrinsic_op($(kIROp_Div))
-    This div(This other);
-
-    __intrinsic_op($(kIROp_Neg))
-    This neg();
-
-    This mod(This other)
-    {
-        This ret;
-        for (int i = 0; i < GetLength(); ++i)
-        {
-            ret[i] = this[i] % other[i];
-        }
-        return ret;
-    }
-
-    //
-    // Equality and ordering
-    //
-
-    bool equals(This other)
-    {
-        for (int i = 0; i < GetLength(); i++)
-        {
-            if (this[i] != other[i])
-            {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    bool lessThan(This other)
-    {
-        for (int i = 0; i < GetLength(); i++)
-        {
-            if (this[i] < other[i])
-            {
-                return true;
-            }
-            else if (this[i] > other[i])
-            {
-                return false;
-            }
-        }
-        return false;
-    }
-
-    bool lessThanOrEquals(This other)
-    {
-        for (int i = 0; i < GetLength(); i++)
-        {
-            if (this[i] < other[i])
-            {
-                return true;
-            }
-            else if (this[i] > other[i])
-            {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    //
     // Load with TensorLayout and TensorView
     //
 
@@ -24672,6 +24585,103 @@ ${{{{
 
 } // struct CoopMat
 
+__intrinsic_type($(kIROp_CoopMatrixType))
+[require(cooperative_matrix)]
+__generic<
+    T : __BuiltinArithmeticType,
+    let S : MemoryScope,
+    let M : int,
+    let N : int,
+    let R : CoopMatMatrixUse
+>
+extension CoopMat<T, S, M, N, R> : IArithmetic
+{
+    // Required for `IArithmetic`.
+    [ForceInline]
+    [OverloadRank(-10)]
+    [require(cooperative_matrix)]
+    __init(int i)
+    {
+        this = CoopMat<T, S, M, N, R>(T(i));
+    }
+
+    //
+    // Arithmetic
+    //
+
+    __intrinsic_op($(kIROp_Add))
+    This add(This other);
+
+    __intrinsic_op($(kIROp_Sub))
+    This sub(This other);
+
+    __intrinsic_op($(kIROp_Mul))
+    This mul(This other);
+
+    __intrinsic_op($(kIROp_Div))
+    This div(This other);
+
+    __intrinsic_op($(kIROp_Neg))
+    This neg();
+
+    This mod(This other)
+    {
+        This ret;
+        for (int i = 0; i < GetLength(); ++i)
+        {
+            ret[i] = this[i] % other[i];
+        }
+        return ret;
+    }
+
+    //
+    // Equality and ordering
+    //
+
+    bool equals(This other)
+    {
+        for (int i = 0; i < GetLength(); i++)
+        {
+            if (this[i] != other[i])
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool lessThan(This other)
+    {
+        for (int i = 0; i < GetLength(); i++)
+        {
+            if (this[i] < other[i])
+            {
+                return true;
+            }
+            else if (this[i] > other[i])
+            {
+                return false;
+            }
+        }
+        return false;
+    }
+
+    bool lessThanOrEquals(This other)
+    {
+        for (int i = 0; i < GetLength(); i++)
+        {
+            if (this[i] < other[i])
+            {
+                return true;
+            }
+            else if (this[i] > other[i])
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+} // TODO
 
 //
 // Convenience loading functions for cooperative matrices which infer the
@@ -24681,7 +24691,7 @@ ${{{{
 [ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
-    T : __BuiltinArithmeticType,
+    T : __BuiltinMLElementType,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -24698,7 +24708,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 [ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
-    T : __BuiltinArithmeticType,
+    T : __BuiltinMLElementType,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -24715,7 +24725,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 [ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
-    T : __BuiltinArithmeticType,
+    T : __BuiltinMLElementType,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -24732,7 +24742,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 [ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
-    T : __BuiltinArithmeticType,
+    T : __BuiltinMLElementType,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -24749,7 +24759,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 [ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
-    T : __BuiltinArithmeticType,
+    T : __BuiltinMLElementType,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -24766,7 +24776,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 [ForceInline]
 [require(cooperative_matrix, vk_mem_model)]
 CoopMat<T, S, M, N, R> coopMatLoadCoherent<
-    T : __BuiltinArithmeticType,
+    T : __BuiltinMLElementType,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -24784,7 +24794,7 @@ CoopMat<T, S, M, N, R> coopMatLoadCoherent<
 [ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
-    T : __BuiltinArithmeticType,
+    T : __BuiltinMLElementType,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -24807,8 +24817,8 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 [require(cooperative_matrix_conversion)]
 __intrinsic_op($(kIROp_IntCast))
 CoopMat<T,S,M,N,R> __int_cast<
-    T : __BuiltinArithmeticType,
-    U : __BuiltinArithmeticType,
+    T : __BuiltinMLElementType,
+    U : __BuiltinMLElementType,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -24818,8 +24828,8 @@ CoopMat<T,S,M,N,R> __int_cast<
 [require(cooperative_matrix_conversion)]
 __intrinsic_op($(kIROp_FloatCast))
 CoopMat<T,S,M,N,R> __real_cast<
-    T : __BuiltinArithmeticType,
-    U : __BuiltinArithmeticType,
+    T : __BuiltinMLElementType,
+    U : __BuiltinMLElementType,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -24829,8 +24839,8 @@ CoopMat<T,S,M,N,R> __real_cast<
 [require(cooperative_matrix_conversion)]
 __intrinsic_op($(kIROp_CastIntToFloat))
 CoopMat<T,S,M,N,R> __int_to_float_cast<
-    T : __BuiltinArithmeticType,
-    U : __BuiltinArithmeticType,
+    T : __BuiltinMLElementType,
+    U : __BuiltinMLElementType,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -24840,8 +24850,8 @@ CoopMat<T,S,M,N,R> __int_to_float_cast<
 [require(cooperative_matrix_conversion)]
 __intrinsic_op($(kIROp_CastFloatToInt))
 CoopMat<T,S,M,N,R> __float_to_int_cast<
-    T : __BuiltinArithmeticType,
-    U : __BuiltinArithmeticType,
+    T : __BuiltinMLElementType,
+    U : __BuiltinMLElementType,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -24885,11 +24895,11 @@ CoopMat<T, S, M, N, R> operator *<
 
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> coopMatMulAdd<
-    T : __BuiltinArithmeticType,
+    T : __BuiltinMLElementType,
     let saturatingAccumulation : bool,
-    U : __BuiltinArithmeticType,
-    V : __BuiltinArithmeticType,
-    W : __BuiltinArithmeticType,
+    U : __BuiltinMLElementType,
+    V : __BuiltinMLElementType,
+    W : __BuiltinMLElementType,
     let S : MemoryScope,
     let M : int,
     let K : int,
@@ -24929,12 +24939,12 @@ CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> coopMatMulAdd<
 }
 
 extension<
-    T : __BuiltinArithmeticType,
+    T : __BuiltinMLElementType,
     let S : MemoryScope,
     let M : int,
     let N : int,
     let R : linalg.CoopMatMatrixUse,
-    each Ts : __BuiltinArithmeticType
+    each Ts : __BuiltinMLElementType
 > Tuple<linalg.CoopMat<T, S, M, N, R>, expand linalg.CoopMat<each Ts, S, M, N, R>>
 {
     __intrinsic_op($(kIROp_CoopMatMapElementIFunc))
@@ -24969,7 +24979,7 @@ extension<
 /// @param N The vector size.
 __intrinsic_type($(kIROp_CoopVectorType))
 [require(cooperative_vector)]
-struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmetic
+struct CoopVec<T : __BuiltinMLElementType, let N : int> : IArray<T>
 {
     //
     // Initialization
@@ -24980,7 +24990,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     [require(hlsl_coopvec_poc)]
     __init()
     {
-        this = CoopVec<T, N>(T(0));
     }
 
     [ForceInline]
@@ -24998,23 +25007,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     __init<U : __BuiltinArithmeticType>(CoopVec<U, N> other)
     {
         this.copyFrom(other);
-    }
-
-    [ForceInline]
-    [require(cooperative_vector)]
-    __init<each U : __BuiltinArithmeticType>(expand each U args)
-    {
-        static_assert(countof(U) == N, "number of arguments to CoopVec constructor must match number of elements");
-        this = __makeCoopVec<T, N>(expand (__arithmetic_cast<T>(each args)));
-    }
-
-    [OverloadRank(-10)]
-    [ForceInline]
-    [require(cooperative_vector)]
-    [require(hlsl_coopvec_poc)]
-    __init(int i)
-    {
-        this = CoopVec<T, N>(T(i));
     }
 
     [ForceInline]
@@ -25484,6 +25476,210 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     }
 
     //
+    // Internal utilities for loading and storing
+    //
+
+    [mutating]
+    [ForceInline]
+    [require(hlsl, byteaddressbuffer)]
+    [require(hlsl_coopvec_poc, byteaddressbuffer)]
+    void __Load(const ByteAddressBuffer buffer, uint byteOffset, uint alignment = 0)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "$0 = $1.Load< vector<$[0], $[1]> >($2)", T, N;
+        case hlsl_coopvec_poc:
+            __intrinsic_asm ".Load";
+        }
+    }
+
+    [mutating]
+    [ForceInline]
+    [require(hlsl, byteaddressbuffer_rw)]
+    [require(hlsl_coopvec_poc, byteaddressbuffer_rw)]
+    void __Load(const RWByteAddressBuffer buffer, uint byteOffset, uint alignment = 0)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "$0 = $1.Load< vector<$[0], $[1]> >($2)", T, N;
+        case hlsl_coopvec_poc:
+            __intrinsic_asm ".Load";
+        }
+    }
+
+    __generic<let M : int>
+    [mutating]
+    // Careful, this takes the offset in elements
+    [ForceInline]
+    [require(hlsl)]
+    [require(hlsl_coopvec_poc_sm_6_9)]
+    void __Load(__constref groupshared T buffer[M], uint elemOffset)
+    {
+        static_assert(N <= M, "The given groupshared array is smaller than the given CoopVec");
+        __target_switch
+        {
+        case hlsl:
+            [ForceUnroll]
+            for(int i = 0; i < N; ++i)
+                this[i] = buffer[i + elemOffset];
+            return;
+        case hlsl_coopvec_poc_sm_6_9:
+            __intrinsic_asm ".Load";
+        }
+    }
+
+    [require(hlsl, byteaddressbuffer_rw)]
+    [require(hlsl_coopvec_poc, byteaddressbuffer_rw)]
+    void __Store(RWByteAddressBuffer buffer, uint byteOffset, uint alignment = 0)
+    {
+        __target_switch
+        {
+        case hlsl: static_assert(false, "Not supported");
+        case hlsl_coopvec_poc: __intrinsic_asm ".Store";
+        }
+    }
+
+    __generic<let M : int>
+    [require(hlsl)]
+    [require(hlsl_coopvec_poc)]
+    // Careful, this takes the offset in elements
+    void __Store(__ref groupshared T buffer[M], uint elemOffset)
+    {
+        __target_switch
+        {
+        case hlsl: static_assert(false, "Not supported");
+        case hlsl_coopvec_poc: __intrinsic_asm ".Store";
+        }
+    }
+
+${{{{
+{
+static const struct {
+    bool isRW;
+    char const* type;
+} kByteAddressBufferCases[] =
+{
+    {true, "RWByteAddressBuffer"},
+    {false, "ByteAddressBuffer"}
+};
+for(auto buffer : kByteAddressBufferCases) {
+}}}}
+    [mutating]
+    [ForceInline]
+    [require(hlsl, byteaddressbuffer_rw)]
+    [require(hlsl_coopvec_poc, byteaddressbuffer_rw)]
+    void __mutMatMul<U : __BuiltinMLElementType, let K : int>(
+        CoopVec<U, K> input, uint inputInterpretationHLSL,
+        $(buffer.type) matrix, uint matrixOffset, uint matrixInterpretationHLSL,
+        uint m, uint k, uint memoryLayoutHLSL, bool transpose, uint matrixStride)
+    {
+        __target_switch
+        {
+        case hlsl:
+            if (__isFloat<T>() || __isSignedInt<T>())
+            {
+                if (__isFloat<U>() || __isSignedInt<U>())
+                    __intrinsic_asm "__builtin_MatVecMul($0, false,  $1, false, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
+                else
+                    __intrinsic_asm "__builtin_MatVecMul($0, false,  $1,  true, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
+            }
+            else
+            {
+                if (__isFloat<U>() || __isSignedInt<U>())
+                    __intrinsic_asm "__builtin_MatVecMul($0, true,  $1, false, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
+                else
+                    __intrinsic_asm "__builtin_MatVecMul($0, true,  $1,  true, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
+            }
+        case hlsl_coopvec_poc:
+            __intrinsic_asm ".MatMul";
+        }
+    }
+
+    [mutating]
+    [ForceInline]
+    [require(hlsl, byteaddressbuffer_rw)]
+    [require(hlsl_coopvec_poc, byteaddressbuffer_rw)]
+    void __mutMatMulAdd<U : __BuiltinMLElementType, let K : int>(
+        CoopVec<U, K> input, uint inputInterpretationHLSL,
+        $(buffer.type) matrix, uint matrixOffset, uint matrixInterpretationHLSL,
+        $(buffer.type) bias, uint biasOffset, uint biasInterpretationHLSL,
+        uint m, uint k, uint memoryLayoutHLSL, bool transpose, uint matrixStride)
+    {
+        __target_switch
+        {
+        case hlsl:
+            if (__isFloat<T>() || __isSignedInt<T>())
+            {
+                if (__isFloat<U>() || __isSignedInt<U>())
+                    __intrinsic_asm "__builtin_MatVecMulAdd($0, false,  $1, false, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
+                else
+                    __intrinsic_asm "__builtin_MatVecMulAdd($0, false,  $1,  true, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
+            }
+            else
+            {
+                if (__isFloat<U>() || __isSignedInt<U>())
+                    __intrinsic_asm "__builtin_MatVecMulAdd($0, true,  $1, false, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
+                else
+                    __intrinsic_asm "__builtin_MatVecMulAdd($0, true,  $1,  true, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
+            }
+        case hlsl_coopvec_poc:
+            __intrinsic_asm ".MatMulAdd";
+        }
+    }
+
+    [ForceInline]
+    [require(hlsl, byteaddressbuffer_rw)]
+    void __OuterProductAccumulate<let K : int>(
+        CoopVec<T, K> b,
+        $(buffer.type) matrix,
+        int32_t matrixOffset,
+        uint matrixStride,
+        uint memoryLayout,
+        uint matrixInterpretation,
+    )
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "__builtin_OuterProductAccumulate($0, $1, $2, $3, $6, $5, $4)";
+        }
+    }
+
+
+${{{{
+} // end of loop
+}
+}}}}
+} // struct CoopVec
+
+__intrinsic_type($(kIROp_CoopVectorType))
+[require(cooperative_vector)]
+extension<T : __BuiltinArithmeticType, let N : int> CoopVec<T, N> : IArithmetic
+{
+    //
+    // Initialization
+    //
+
+    [ForceInline]
+    [require(cooperative_vector)]
+    __init<each U : __BuiltinArithmeticType>(expand each U args)
+    {
+        static_assert(countof(U) == N, "number of arguments to CoopVec constructor must match number of elements");
+        this = __makeCoopVec<T, N>(expand (__arithmetic_cast<T>(each args)));
+    }
+
+    [OverloadRank(-10)]
+    [ForceInline]
+    [require(cooperative_vector)]
+    [require(hlsl_coopvec_poc)]
+    __init(int i)
+    {
+        this = CoopVec<T, N>(T(i));
+    }
+
+    //
     // IComparable
     //
 
@@ -25810,86 +26006,8 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         }
     }
 
-    //
-    // Internal utilities for loading and storing
-    //
-
-    [mutating]
-    [ForceInline]
-    [require(hlsl, byteaddressbuffer)]
-    [require(hlsl_coopvec_poc, byteaddressbuffer)]
-    void __Load(const ByteAddressBuffer buffer, uint byteOffset, uint alignment = 0)
-    {
-        __target_switch
-        {
-        case hlsl:
-            __intrinsic_asm "$0 = $1.Load< vector<$[0], $[1]> >($2)", T, N;
-        case hlsl_coopvec_poc:
-            __intrinsic_asm ".Load";
-        }
-    }
-
-    [mutating]
-    [ForceInline]
-    [require(hlsl, byteaddressbuffer_rw)]
-    [require(hlsl_coopvec_poc, byteaddressbuffer_rw)]
-    void __Load(const RWByteAddressBuffer buffer, uint byteOffset, uint alignment = 0)
-    {
-        __target_switch
-        {
-        case hlsl:
-            __intrinsic_asm "$0 = $1.Load< vector<$[0], $[1]> >($2)", T, N;
-        case hlsl_coopvec_poc:
-            __intrinsic_asm ".Load";
-        }
-    }
-
-    __generic<let M : int>
-    [mutating]
-    // Careful, this takes the offset in elements
-    [ForceInline]
-    [require(hlsl)]
-    [require(hlsl_coopvec_poc_sm_6_9)]
-    void __Load(__constref groupshared T buffer[M], uint elemOffset)
-    {
-        static_assert(N <= M, "The given groupshared array is smaller than the given CoopVec");
-        __target_switch
-        {
-        case hlsl:
-            [ForceUnroll]
-            for(int i = 0; i < N; ++i)
-                this[i] = buffer[i + elemOffset];
-            return;
-        case hlsl_coopvec_poc_sm_6_9:
-            __intrinsic_asm ".Load";
-        }
-    }
-
-    [require(hlsl, byteaddressbuffer_rw)]
-    [require(hlsl_coopvec_poc, byteaddressbuffer_rw)]
-    void __Store(RWByteAddressBuffer buffer, uint byteOffset, uint alignment = 0)
-    {
-        __target_switch
-        {
-        case hlsl: static_assert(false, "Not supported");
-        case hlsl_coopvec_poc: __intrinsic_asm ".Store";
-        }
-    }
-
-    __generic<let M : int>
-    [require(hlsl)]
-    [require(hlsl_coopvec_poc)]
-    // Careful, this takes the offset in elements
-    void __Store(__ref groupshared T buffer[M], uint elemOffset)
-    {
-        __target_switch
-        {
-        case hlsl: static_assert(false, "Not supported");
-        case hlsl_coopvec_poc: __intrinsic_asm ".Store";
-        }
-    }
-
 ${{{{
+{
 static const struct {
     bool isRW;
     char const* type;
@@ -25900,69 +26018,6 @@ static const struct {
 };
 for(auto buffer : kByteAddressBufferCases) {
 }}}}
-    [mutating]
-    [ForceInline]
-    [require(hlsl, byteaddressbuffer_rw)]
-    [require(hlsl_coopvec_poc, byteaddressbuffer_rw)]
-    void __mutMatMul<U : __BuiltinArithmeticType, let K : int>(
-        CoopVec<U, K> input, uint inputInterpretationHLSL,
-        $(buffer.type) matrix, uint matrixOffset, uint matrixInterpretationHLSL,
-        uint m, uint k, uint memoryLayoutHLSL, bool transpose, uint matrixStride)
-    {
-        __target_switch
-        {
-        case hlsl:
-            if (__isFloat<T>() || __isSignedInt<T>())
-            {
-                if (__isFloat<U>() || __isSignedInt<U>())
-                    __intrinsic_asm "__builtin_MatVecMul($0, false,  $1, false, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
-                else
-                    __intrinsic_asm "__builtin_MatVecMul($0, false,  $1,  true, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
-            }
-            else
-            {
-                if (__isFloat<U>() || __isSignedInt<U>())
-                    __intrinsic_asm "__builtin_MatVecMul($0, true,  $1, false, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
-                else
-                    __intrinsic_asm "__builtin_MatVecMul($0, true,  $1,  true, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
-            }
-        case hlsl_coopvec_poc:
-            __intrinsic_asm ".MatMul";
-        }
-    }
-
-    [mutating]
-    [ForceInline]
-    [require(hlsl, byteaddressbuffer_rw)]
-    [require(hlsl_coopvec_poc, byteaddressbuffer_rw)]
-    void __mutMatMulAdd<U : __BuiltinArithmeticType, let K : int>(
-        CoopVec<U, K> input, uint inputInterpretationHLSL,
-        $(buffer.type) matrix, uint matrixOffset, uint matrixInterpretationHLSL,
-        $(buffer.type) bias, uint biasOffset, uint biasInterpretationHLSL,
-        uint m, uint k, uint memoryLayoutHLSL, bool transpose, uint matrixStride)
-    {
-        __target_switch
-        {
-        case hlsl:
-            if (__isFloat<T>() || __isSignedInt<T>())
-            {
-                if (__isFloat<U>() || __isSignedInt<U>())
-                    __intrinsic_asm "__builtin_MatVecMulAdd($0, false,  $1, false, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
-                else
-                    __intrinsic_asm "__builtin_MatVecMulAdd($0, false,  $1,  true, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
-            }
-            else
-            {
-                if (__isFloat<U>() || __isSignedInt<U>())
-                    __intrinsic_asm "__builtin_MatVecMulAdd($0, true,  $1, false, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
-                else
-                    __intrinsic_asm "__builtin_MatVecMulAdd($0, true,  $1,  true, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
-            }
-        case hlsl_coopvec_poc:
-            __intrinsic_asm ".MatMulAdd";
-        }
-    }
-
     /// Multiply the given input Cooperative vector with the given matrix and accumulate the result into this vector.
     /// @param input The input Cooperative vector to multiply with the matrix.
     /// @param inputInterpretation Specifies how to interpret the values in the input vector (e.g. as packed values).
@@ -26189,49 +26244,31 @@ for(auto buffer : kByteAddressBufferCases) {
         );
     }
 
-    [ForceInline]
-    [require(hlsl, byteaddressbuffer_rw)]
-    void __OuterProductAccumulate<let K : int>(
-        CoopVec<T, K> b,
-        $(buffer.type) matrix,
-        int32_t matrixOffset,
-        uint matrixStride,
-        uint memoryLayout,
-        uint matrixInterpretation,
-    )
-    {
-        __target_switch
-        {
-        case hlsl:
-            __intrinsic_asm "__builtin_OuterProductAccumulate($0, $1, $2, $3, $6, $5, $4)";
-        }
-    }
-
-
 ${{{{
+} // end of loop
 }
 }}}}
-}
+} // extension CoopVec
 
 __intrinsic_op($(kIROp_MakeCoopVectorFromValuePack))
-CoopVec<T, N> __makeCoopVec<T : __BuiltinArithmeticType, let N : int, each U>(expand each U args);
+CoopVec<T, N> __makeCoopVec<T : __BuiltinMLElementType, let N : int, each U>(expand each U args);
 
-__generic<T:__BuiltinArithmeticType, U:__BuiltinArithmeticType, let N : int>
+__generic<T:__BuiltinMLElementType, U:__BuiltinMLElementType, let N : int>
 __intrinsic_op($(kIROp_IntCast))
 [require(cooperative_vector)]
 CoopVec<T,N> __int_cast(CoopVec<U,N> val);
 
-__generic<T:__BuiltinArithmeticType, U:__BuiltinArithmeticType, let N : int>
+__generic<T:__BuiltinMLElementType, U:__BuiltinMLElementType, let N : int>
 __intrinsic_op($(kIROp_FloatCast))
 [require(cooperative_vector)]
 CoopVec<T,N> __real_cast(CoopVec<U,N> val);
 
-__generic<T:__BuiltinArithmeticType, U:__BuiltinArithmeticType, let N : int>
+__generic<T:__BuiltinMLElementType, U:__BuiltinMLElementType, let N : int>
 __intrinsic_op($(kIROp_CastIntToFloat))
 [require(cooperative_vector)]
 CoopVec<T,N> __int_to_float_cast(CoopVec<U,N> val);
 
-__generic<T:__BuiltinArithmeticType, U:__BuiltinArithmeticType, let N : int>
+__generic<T:__BuiltinMLElementType, U:__BuiltinMLElementType, let N : int>
 __intrinsic_op($(kIROp_CastFloatToInt))
 [require(cooperative_vector)]
 CoopVec<T,N> __float_to_int_cast(CoopVec<U,N> val);

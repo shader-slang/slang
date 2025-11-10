@@ -369,6 +369,7 @@ struct DifferentiableTypeConformanceContext
             {
             case kIROp_FloatType:
             case kIROp_HalfType:
+            case kIROp_BFloat16Type:
             case kIROp_DoubleType:
             case kIROp_DifferentialPairType:
             case kIROp_DifferentialPairUserCodeType:

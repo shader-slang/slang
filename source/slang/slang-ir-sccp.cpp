@@ -329,6 +329,7 @@ struct SCCPContext
         case kIROp_FloatType:
         case kIROp_DoubleType:
         case kIROp_HalfType:
+        case kIROp_BFloat16Type:
             switch (irConstant->getOp())
             {
             case kIROp_FloatLit:
@@ -388,6 +389,7 @@ struct SCCPContext
         case kIROp_FloatType:
         case kIROp_DoubleType:
         case kIROp_HalfType:
+        case kIROp_BFloat16Type:
             resultVal = getBuilder()->getFloatValue(type, (IRFloatingPointValue)0.0);
             break;
 
@@ -432,6 +434,7 @@ struct SCCPContext
         case kIROp_FloatType:
         case kIROp_DoubleType:
         case kIROp_HalfType:
+        case kIROp_BFloat16Type:
             resultVal = getBuilder()->getFloatValue(
                 type,
                 floatFunc(c0->value.floatVal, c1->value.floatVal));
@@ -530,7 +533,10 @@ struct SCCPContext
 
         // Helper function to check if a type is floating-point
         auto isFloatingPointType = [](IROp op) -> bool
-        { return op == kIROp_FloatType || op == kIROp_DoubleType || op == kIROp_HalfType; };
+        {
+            return op == kIROp_FloatType || op == kIROp_DoubleType || op == kIROp_HalfType ||
+                   op == kIROp_BFloat16Type;
+        };
 
         IROp op0 = operandType0->getOp();
         IROp op1 = operandType1->getOp();
@@ -756,6 +762,7 @@ struct SCCPContext
         case kIROp_FloatType:
         case kIROp_DoubleType:
         case kIROp_HalfType:
+        case kIROp_BFloat16Type:
             resultVal = getBuilder()->getFloatValue(type, -c0->value.floatVal);
             break;
         default:

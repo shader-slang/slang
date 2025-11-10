@@ -133,6 +133,7 @@ IROp getTypeStyle(IROp op)
             return kIROp_IntType;
         }
     case kIROp_HalfType:
+    case kIROp_BFloat16Type:
     case kIROp_FloatType:
     case kIROp_DoubleType:
         {
@@ -165,6 +166,7 @@ IROp getTypeStyle(BaseType op)
     case BaseType::UIntPtr:
         return kIROp_IntType;
     case BaseType::Half:
+    case BaseType::BFloat16:
     case BaseType::Float:
     case BaseType::Double:
         return kIROp_FloatType;
@@ -469,6 +471,9 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
         break;
     case kIROp_HalfType:
         sb << "half";
+        break;
+    case kIROp_BFloat16Type:
+        sb << "bfloat16";
         break;
     case kIROp_DoubleType:
         sb << "double";
@@ -2161,6 +2166,8 @@ UnownedStringSlice getBasicTypeNameHint(IRType* basicType)
         return UnownedStringSlice::fromLiteral("float");
     case kIROp_HalfType:
         return UnownedStringSlice::fromLiteral("half");
+    case kIROp_BFloat16Type:
+        return UnownedStringSlice::fromLiteral("bfloat16");
     case kIROp_DoubleType:
         return UnownedStringSlice::fromLiteral("double");
     case kIROp_BoolType:

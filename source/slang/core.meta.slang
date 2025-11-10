@@ -344,12 +344,20 @@ interface __BuiltinType
 {
 }
 
+/// Represents types that can be used on CoopMat / CoopVec.
+/// Implemented by some builtin types which will be used on ML extensions.
+[sealed]
+[builtin]
+interface __BuiltinMLElementType : __BuiltinType
+{
+}
+
 /// A type that can be used for arithmetic operations. For defining generic functions that work with builtin scalar arithmetic types only.
 /// Builtin types implementing this interface: `int`, `uint`, `int64_t`, `uint64_t`, `int8_t`, `uint8_t`, `int16_t`, `uint16_t`, `float`, `half`, `double`.
 /// To define generic functions that work with both scalar and vector types, use `IInteger` or `IFloat` instead.
 [sealed]
 [builtin]
-interface __BuiltinArithmeticType : __BuiltinType, IArithmetic
+interface __BuiltinArithmeticType : __BuiltinType, __BuiltinMLElementType, IArithmetic
 {
 }
 
@@ -1038,6 +1046,7 @@ ${{{{
     ,  __BuiltinRealType
     ,  __BuiltinSignedArithmeticType
     ,  __BuiltinArithmeticType
+    , __BuiltinMLElementType
 ${{{{
         break;
     case BaseType::Int8:
@@ -1066,10 +1075,18 @@ ${{{{
 }}}}
     ,  __BuiltinInt64Type
 ${{{{
+    if (kBaseTypes[tt].tag != BaseType::IntPtr && kBaseTypes[tt].tag != BaseType::UIntPtr)
+}}}}
+    ,  __BuiltinMLElementType
+${{{{
         ; // fall through
     case BaseType::Bool:
 }}}}
     ,  __BuiltinLogicalType
+${{{{
+    case BaseType::BFloat16:
+}}}}
+    ,  __BuiltinMLElementType
 ${{{{
         break;
 
@@ -1238,6 +1255,25 @@ ${{{{
         {
             return __realCast<Differential, U>(a) * b;
         }
+${{{{
+        break;
+    }
+
+    // If this is a ML element type.
+    //
+    switch (kBaseTypes[tt].tag)
+    {
+    default:
+        break;
+    case BaseType::BFloat16:
+}}}}
+        [__unsafeForceInlineEarly]
+        __init(int value)
+        {
+            this = $(kBaseTypes[tt].name)(float(value));
+        }
+
+         __intrinsic_op($(kIROp_FloatCast)) float toFloat();
 ${{{{
         break;
     }
@@ -2013,6 +2049,12 @@ extension half : IRangedValue
     static const half minValue = half(-65504);
 }
 
+extension bfloat16_t : IRangedValue
+{
+    static const bfloat16_t maxValue = bfloat16_t(338953140000000000000000000000000000000.0f);
+    static const bfloat16_t minValue = bfloat16_t(-338953140000000000000000000000000000000.0f);
+}
+
 extension float : IRangedValue
 {
     static const float maxValue = 340282346638528859811704183484516925440.0f;
@@ -2356,6 +2398,7 @@ static const struct {
 } kTypes[] =
 {
     {"half",        "f16"},
+    {"bfloat16_t",  "bf16"},
     {"float",       ""},
     {"double",      "d"},
 
@@ -3596,6 +3639,10 @@ __intrinsic_op($(kIROp_IsHalf))
 bool __isHalf_impl(T t);
 
 __generic<T>
+__intrinsic_op($(kIROp_IsBFloat16))
+bool __isBFloat16_impl(T t);
+
+__generic<T>
 [__unsafeForceInlineEarly]
 bool __isFloat()
 {
@@ -3607,6 +3654,13 @@ __generic<T>
 bool __isHalf()
 {
     return __isHalf_impl(__declVal<T>());
+}
+
+__generic<T>
+[__unsafeForceInlineEarly]
+bool __isBFloat16()
+{
+    return __isBFloat16_impl(__declVal<T>());
 }
 
 __generic<T>

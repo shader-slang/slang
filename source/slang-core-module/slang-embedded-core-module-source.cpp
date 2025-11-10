@@ -23,11 +23,12 @@ enum
     BOOL_RESULT = 1 << 2,
     BOOL_MASK = 1 << 3,
     UINT_MASK = 1 << 4,
+    ML_ELEMENT_MASK = 1 << 5,
 
     INT_MASK = SINT_MASK | UINT_MASK,
     ARITHMETIC_MASK = INT_MASK | FLOAT_MASK,
     LOGICAL_MASK = INT_MASK | BOOL_MASK,
-    ANY_MASK = INT_MASK | FLOAT_MASK | BOOL_MASK,
+    ANY_MASK = INT_MASK | FLOAT_MASK | BOOL_MASK | ML_ELEMENT_MASK,
 };
 
 // We are going to declare initializers that allow for conversion between
@@ -111,6 +112,11 @@ static const BaseTypeConversionInfo kBaseTypes[] = {
     {"half",
      BaseType::Half,
      FLOAT_MASK,
+     kBaseTypeConversionKind_Float,
+     kBaseTypeConversionRank_Int16},
+    {"bfloat16_t",
+     BaseType::BFloat16,
+     ML_ELEMENT_MASK,
      kBaseTypeConversionKind_Float,
      kBaseTypeConversionRank_Int16},
     {"float",

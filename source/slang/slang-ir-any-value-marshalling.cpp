@@ -149,6 +149,7 @@ struct AnyValueMarshallingContext
         case kIROp_UInt8Type:
         case kIROp_UInt16Type:
         case kIROp_HalfType:
+        case kIROp_BFloat16Type:
         case kIROp_BoolType:
         case kIROp_IntPtrType:
         case kIROp_UIntPtrType:
@@ -336,12 +337,14 @@ struct AnyValueMarshallingContext
             case kIROp_Int16Type:
             case kIROp_UInt16Type:
             case kIROp_HalfType:
+            case kIROp_BFloat16Type:
                 {
                     ensureOffsetAt2ByteBoundary();
                     if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
                     {
                         auto srcVal = builder->emitLoad(concreteVar);
-                        if (dataType->getOp() == kIROp_HalfType)
+                        if (dataType->getOp() == kIROp_HalfType ||
+                            dataType->getOp() == kIROp_BFloat16Type)
                         {
                             srcVal =
                                 builder->emitBitCast(builder->getType(kIROp_UInt16Type), srcVal);
@@ -605,6 +608,7 @@ struct AnyValueMarshallingContext
             case kIROp_Int16Type:
             case kIROp_UInt16Type:
             case kIROp_HalfType:
+            case kIROp_BFloat16Type:
                 {
                     ensureOffsetAt2ByteBoundary();
                     if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
@@ -636,7 +640,8 @@ struct AnyValueMarshallingContext
                         {
                             srcVal = builder->emitCast(builder->getType(kIROp_UInt16Type), srcVal);
                         }
-                        if (dataType->getOp() == kIROp_HalfType)
+                        if (dataType->getOp() == kIROp_HalfType ||
+                            dataType->getOp() == kIROp_BFloat16Type)
                         {
                             srcVal = builder->emitBitCast(dataType, srcVal);
                         }
@@ -933,6 +938,7 @@ SlangInt _getAnyValueSizeRaw(IRType* type, SlangInt offset)
     case kIROp_Int16Type:
     case kIROp_UInt16Type:
     case kIROp_HalfType:
+    case kIROp_BFloat16Type:
         return alignUp(offset, 2) + 2;
     case kIROp_UInt8Type:
     case kIROp_Int8Type:

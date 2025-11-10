@@ -154,6 +154,7 @@ IRInst* getDefaultInitVal(IRBuilder* builder, IRType* type)
         return builder->getIntValue(type, 0);
 
     case kIROp_HalfType:
+    case kIROp_BFloat16Type:
     case kIROp_FloatType:
     case kIROp_DoubleType:
         return builder->getFloatValue(type, 0.0);

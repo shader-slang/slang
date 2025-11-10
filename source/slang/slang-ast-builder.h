@@ -448,6 +448,10 @@ public:
     {
         return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Half)];
     }
+    SLANG_FORCE_INLINE Type* getBFloat16Type()
+    {
+        return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::BFloat16)];
+    }
     SLANG_FORCE_INLINE Type* getFloatType()
     {
         return m_sharedASTBuilder->m_builtinTypes[Index(BaseType::Float)];

@@ -56,6 +56,7 @@ The following floating-point type are defined:
 | Name          | Description                   |
 |---------------|-------------------------------|
 | `half`        | 16-bit floating-point number (1 sign bit, 5 exponent bits, 10 fraction bits) |
+| `bfloat16_t`  | 16-bit floating-point number (1 sign bit, 8 exponent bits, 7 fraction bits) |
 | `float`       | 32-bit floating-point number (1 sign bit, 8 exponent bits, 23 fraction bits) |
 | `double`      | 64-bit floating-point number (1 sign bit, 11 exponent bits, 52 fraction bits) |
 
