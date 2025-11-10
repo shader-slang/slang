@@ -67,6 +67,30 @@ runs:
         echo "Contents of lib_dir ($lib_dir):"
         ls -a "$lib_dir" 2>/dev/null || echo "lib_dir not found"
 
+    - name: Debug environment (self-hosted runners)
+      if: ${{ runner.environment == 'self-hosted' }}
+      shell: bash
+      run: |
+        echo "=== Debug Environment Information ==="
+        echo "Runner environment: ${{ runner.environment }}"
+        echo "OS: ${{ inputs.os }}"
+        echo ""
+        echo "PATH=$PATH"
+        echo ""
+        echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
+        echo ""
+        echo "Checking for nvcc:"
+        which nvcc && nvcc --version || echo "❌ nvcc not found in PATH"
+        echo ""
+        echo "Checking for nvidia-smi:"
+        which nvidia-smi && nvidia-smi || echo "❌ nvidia-smi not found"
+        echo ""
+        echo "Checking for vulkaninfo:"
+        which vulkaninfo && vulkaninfo --summary || echo "❌ vulkaninfo not found"
+        echo ""
+        echo "CUDA_HOME=${CUDA_HOME:-<not set>}"
+        echo "=== End Debug ==="
+
     - name: Check runtime environment
       shell: bash
       run: |
