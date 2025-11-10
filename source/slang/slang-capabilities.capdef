@@ -1230,7 +1230,7 @@ alias cooperative_vector_training = spvCooperativeVectorTrainingNV | _GL_NV_coop
 alias cooperative_matrix = spvCooperativeMatrixKHR | cuda;
 /// Capabilities needed to use reduction operations with cooperative matrix
 /// [Compound]
-alias cooperative_matrix_vk = spvCooperativeMatrixKHR;
+alias cooperative_matrix_spirv = spvCooperativeMatrixKHR;
 /// Capabilities needed to use reduction operations with cooperative matrix
 /// [Compound]
 alias cooperative_matrix_reduction = spvCooperativeMatrixReductionsNV;

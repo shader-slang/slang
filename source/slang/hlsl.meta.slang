@@ -24251,7 +24251,7 @@ struct CoopMat
     /// @param element The starting element index in the buffer.
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     /// @param memoryScope The scope across which the write should be made visible (e.g., Device, Workgroup).
-    [require(cooperative_matrix_vk, vk_mem_model)]
+    [require(cooperative_matrix_spirv, vk_mem_model)]
     void StoreCoherent<
         let matrixLayout : CoopMatMatrixLayout
     >(T* buffer, uint element, uint stride, constexpr MemoryScope memoryScope)
@@ -24306,7 +24306,7 @@ struct CoopMat
     /// @param element The starting element index in the array.
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     [ForceInline]
-    [require(cooperative_matrix_vk)]
+    [require(cooperative_matrix_spirv)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -24444,7 +24444,7 @@ ${{{{
     /// @return A cooperative matrix loaded from the buffer.
     [ForceInline]
     [__NoSideEffect]
-    [require(cooperative_matrix_vk, vk_mem_model)]
+    [require(cooperative_matrix_spirv, vk_mem_model)]
     static This LoadCoherent<
         let matrixLayout : CoopMatMatrixLayout
     >(T* buffer, uint element, uint stride, constexpr MemoryScope memoryScope)
@@ -24501,7 +24501,7 @@ ${{{{
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     /// @return A cooperative matrix loaded from the groupshared array.
     [ForceInline]
-    [require(cooperative_matrix_vk)]
+    [require(cooperative_matrix_spirv)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -24528,7 +24528,7 @@ ${{{{
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     /// @return A cooperative matrix loaded from the groupshared vector array.
     [ForceInline]
-    [require(cooperative_matrix_vk)]
+    [require(cooperative_matrix_spirv)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -25150,7 +25150,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 /// @param memoryScope The scope from which writes should be visible (e.g., Device, Workgroup).
 /// @return A cooperative matrix loaded from the buffer.
 [ForceInline]
-[require(cooperative_matrix_vk, vk_mem_model)]
+[require(cooperative_matrix_spirv, vk_mem_model)]
 CoopMat<T, S, M, N, R> coopMatLoadCoherent<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,
