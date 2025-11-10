@@ -769,7 +769,7 @@ For example:
 
 ```c++
 Slang::ComPtr<IBlob> diagnostics;
-Slang::ComPtr<IModule> module = session->loadModule("MyShaders", diagnostics.writeRef());
+IModule* module = session->loadModule("MyShaders", diagnostics.writeRef());
 ```
 
 In this example, if any diagnostic messages were produced when loading `MyShaders`, then the `diagnostics` pointer will be set to a blob that contains the textual content of those diagnostics.
