@@ -3507,6 +3507,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     AdvanceRawToken(context);
 
     Token pathToken;
+    IncludeSystem::Mode includeMode = IncludeSystem::Mode::Quote;
     String path;
     if (PeekRawTokenType(context) == TokenType::OpLess)
     {
@@ -3527,6 +3528,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
                 Diagnostics::expectedTokenInPreprocessorDirective))
             return;
         path = pathSB.produceString();
+        includeMode = IncludeSystem::Mode::System;
     }
     else
     {
@@ -3554,7 +3556,8 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
 
     /* Find the path relative to the foundPath */
     PathInfo filePathInfo;
-    if (SLANG_FAILED(includeSystem->findFile(path, includedFromPathInfo.foundPath, filePathInfo)))
+    if (SLANG_FAILED(includeSystem->findFile(
+            path, includedFromPathInfo.foundPath, filePathInfo, includeMode)))
     {
         GetSink(context)->diagnose(pathToken.loc, Diagnostics::includeFailed, path);
         return;
