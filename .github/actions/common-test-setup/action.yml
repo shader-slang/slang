@@ -122,6 +122,16 @@ runs:
           nvidia-smi -q | grep Version || (echo "ERROR: NVIDIA driver (nvidia-smi) not available on Windows" && exit 1)
           echo "Printing Vulkan SDK version: ..."
           vulkaninfo | grep -i version || (echo "ERROR: Vulkan SDK (vulkaninfo) not available on Windows" && exit 1)
+        elif [[ "${{ inputs.os }}" == "linux" ]] && [[ "${{ runner.environment }}" == "self-hosted" ]]; then
+          # Linux GPU checks only for self-hosted runners
+          check_api_support "vk,vulkan" "cuda"
+
+          echo "Printing CUDA compiler version: ..."
+          nvcc --version || (echo "ERROR: CUDA compiler (nvcc) not available on Linux" && exit 1)
+          echo "Printing GPU driver version: ..."
+          nvidia-smi || (echo "ERROR: NVIDIA driver (nvidia-smi) not available on Linux" && exit 1)
+          echo "Printing Vulkan SDK version: ..."
+          vulkaninfo --summary || (echo "ERROR: Vulkan SDK (vulkaninfo) not available on Linux" && exit 1)
         fi        
         echo "All environment variables:"
         env | sort
