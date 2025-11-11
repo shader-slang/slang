@@ -1577,10 +1577,9 @@ SlangResult EndToEndCompileRequest::compile()
     if (reflectionPath.getLength() != 0)
     {
         auto bufferWriter = PrettyWriter();
-        auto* reflection = this->getReflection();
-        if (reflection)
+        if (auto* reflection = this->getReflection())
         {
-            emitReflectionJSON(this, this->getReflection(), bufferWriter);
+            emitReflectionJSON(this, reflection, bufferWriter);
             if (reflectionPath == "-")
             {
                 auto builder = bufferWriter.getBuilder();
