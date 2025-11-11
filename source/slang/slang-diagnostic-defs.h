@@ -2940,6 +2940,11 @@ DIAGNOSTIC(
     dynamicDispatchOnSpecializeOnlyInterface,
     "type '$0' is marked for specialization only, but dynamic dispatch is needed for the call.")
 DIAGNOSTIC(
+    52009,
+    Error,
+    cannotEmitReflectionWithoutTarget,
+    "cannot emit reflection JSON; no compilation target available")
+DIAGNOSTIC(
     53001,
     Error,
     invalidTypeMarshallingForImportedDLLSymbol,
@@ -3185,4 +3190,18 @@ DIAGNOSTIC(
     "invalid stage name '$0' in ray payload access qualifier; valid stages are 'anyhit', "
     "'closesthit', 'miss', and 'caller'")
 
+//
+// Cooperative Matrix
+//
+DIAGNOSTIC(
+    50000,
+    Error,
+    cooperativeMatrixUnsupportedElementType,
+    "Element type '$0' is not supported for matrix'$1'.")
+
+DIAGNOSTIC(
+    50000,
+    Error,
+    cooperativeMatrixInvalidShape,
+    "Invalid shape ['$0', '$1'] for cooperative matrix'$2'.")
 #undef DIAGNOSTIC

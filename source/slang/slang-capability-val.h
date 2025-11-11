@@ -4,11 +4,11 @@
 // includes due to the use of capabilty sets somewhere underneath
 // slang-ast-val.h (in slang-profile.h specifically)
 
+#include "core/slang-performance-profiler.h"
 #include "slang-ast-val.h"
 #include "slang-capability.h"
 
-
-//
+// empty comment to preserve the order with clang-format
 #include "slang-capability-val.h.fiddle"
 
 FIDDLE()
@@ -106,7 +106,11 @@ class CapabilitySetVal : public Val
     CapabilitySet thaw() const;
 
     /// Check if this capability set is empty (no target sets)
-    bool isEmpty() const { return getTargetSetCount() == 0; }
+    bool isEmpty() const
+    {
+        SLANG_PROFILE_CAPABILITY_SETS;
+        return getTargetSetCount() == 0;
+    }
 
     /// Check if this capability set is invalid
     bool isInvalid() const;
@@ -114,82 +118,88 @@ class CapabilitySetVal : public Val
     // Const member functions from CapabilitySet (dummy implementations using thaw())
 
     /// Is this capability set incompatible with the given `other` atom.
-    bool isIncompatibleWith(CapabilityAtom other) const
-    {
-        return CapabilitySet{this}.isIncompatibleWith(other);
-    }
+    bool isIncompatibleWith(CapabilityAtom other) const;
 
     /// Is this capability set incompatible with the given `other` name.
-    bool isIncompatibleWith(CapabilityName other) const
-    {
-        return CapabilitySet{this}.isIncompatibleWith(other);
-    }
+    bool isIncompatibleWith(CapabilityName other) const;
 
     /// Is this capability set incompatible with the given `other` set.
-    bool isIncompatibleWith(CapabilitySet const& other) const
-    {
-        return CapabilitySet{this}.isIncompatibleWith(other);
-    }
-    bool isIncompatibleWith(CapabilitySetVal const* other) const
-    {
-        return CapabilitySet{this}.isIncompatibleWith(CapabilitySet{other});
-    }
+    bool isIncompatibleWith(CapabilitySet const& other) const;
+
+    /// Is this capability set incompatible with the given `other` set.
+    bool isIncompatibleWith(CapabilitySetVal const* other) const;
 
     /// Does this capability set imply all the capabilities in `other`?
-    bool implies(CapabilitySet const& other) const { return CapabilitySet{this}.implies(other); }
+    bool implies(CapabilitySet const& other) const;
     bool implies(CapabilitySetVal const* other) const
     {
-        return CapabilitySet{this}.implies(CapabilitySet{other});
+        SLANG_PROFILE_CAPABILITY_SETS;
+        return (int)_implies(other, CapabilitySet::ImpliesFlags::None) &
+               (int)CapabilitySet::ImpliesReturnFlags::Implied;
     }
 
     /// Does this capability set imply at least 1 set in other.
-    CapabilitySet::ImpliesReturnFlags atLeastOneSetImpliedInOther(CapabilitySet const& other) const
-    {
-        return CapabilitySet{this}.atLeastOneSetImpliedInOther(other);
-    }
+    CapabilitySet::ImpliesReturnFlags atLeastOneSetImpliedInOther(CapabilitySet const& other) const;
     CapabilitySet::ImpliesReturnFlags atLeastOneSetImpliedInOther(
         CapabilitySetVal const* other) const
     {
-        return CapabilitySet{this}.atLeastOneSetImpliedInOther(CapabilitySet{other});
+        SLANG_PROFILE_CAPABILITY_SETS;
+        return _implies(other, CapabilitySet::ImpliesFlags::OnlyRequireASingleValidImply);
     }
 
     /// Will a `join` with `other` change `this`?
     bool joinWithOtherWillChangeThis(CapabilitySet const& other) const
     {
+        SLANG_PROFILE_CAPABILITY_SETS;
         return CapabilitySet{this}.joinWithOtherWillChangeThis(other);
     }
     bool joinWithOtherWillChangeThis(CapabilitySetVal const* other) const
     {
-        return CapabilitySet{this}.joinWithOtherWillChangeThis(CapabilitySet{other});
+        return !(
+            (int)_implies(other, CapabilitySet::ImpliesFlags::CannotHaveMoreTargetAndStageSets) &
+            (int)CapabilitySet::ImpliesReturnFlags::Implied);
     }
 
     /// Does this capability set imply the atomic capability `other`?
-    bool implies(CapabilityAtom other) const { return CapabilitySet{this}.implies(other); }
+    bool implies(CapabilityAtom other) const
+    {
+        SLANG_PROFILE_CAPABILITY_SETS;
+        return CapabilitySet{this}.implies(other);
+    }
 
     /// Return a capability set of 'target' atoms 'this' has, but 'other' does not.
     CapabilitySet getTargetsThisHasButOtherDoesNot(const CapabilitySet& other) const
     {
+        SLANG_PROFILE_CAPABILITY_SETS;
         return CapabilitySet{this}.getTargetsThisHasButOtherDoesNot(other);
     }
     CapabilitySet getTargetsThisHasButOtherDoesNot(CapabilitySetVal const* other) const
     {
+        SLANG_PROFILE_CAPABILITY_SETS;
         return CapabilitySet{this}.getTargetsThisHasButOtherDoesNot(CapabilitySet{other});
     }
 
     /// Return a capability set of 'stage' atoms 'this' has, but 'other' does not.
     CapabilitySet getStagesThisHasButOtherDoesNot(const CapabilitySet& other) const
     {
+        SLANG_PROFILE_CAPABILITY_SETS;
         return CapabilitySet{this}.getStagesThisHasButOtherDoesNot(other);
     }
     CapabilitySet getStagesThisHasButOtherDoesNot(CapabilitySetVal const* other) const
     {
+        SLANG_PROFILE_CAPABILITY_SETS;
         return CapabilitySet{this}.getStagesThisHasButOtherDoesNot(CapabilitySet{other});
     }
 
     /// Are these two capability sets equal?
-    bool operator==(CapabilitySet const& that) const { return CapabilitySet{this} == that; }
+    bool operator==(CapabilitySet const& that) const
+    {
+        SLANG_PROFILE_CAPABILITY_SETS;
+        return CapabilitySet{this} == that;
+    }
     bool operator==(CapabilitySetVal const* that) const
     {
+        SLANG_PROFILE_CAPABILITY_SETS;
         return CapabilitySet{this} == CapabilitySet{that};
     }
 
@@ -200,6 +210,7 @@ class CapabilitySetVal : public Val
         CapabilitySet const& targetCaps,
         bool& isEqual) const
     {
+        SLANG_PROFILE_CAPABILITY_SETS;
         return CapabilitySet{this}.isBetterForTarget(that, targetCaps, isEqual);
     }
     bool isBetterForTarget(
@@ -207,6 +218,7 @@ class CapabilitySetVal : public Val
         CapabilitySetVal const* targetCaps,
         bool& isEqual) const
     {
+        SLANG_PROFILE_CAPABILITY_SETS;
         return CapabilitySet{this}.isBetterForTarget(
             CapabilitySet{that},
             CapabilitySet{targetCaps},
@@ -217,20 +229,34 @@ class CapabilitySetVal : public Val
     // CapabilityAtom::Invalid.
     CapabilityAtom getUniquelyImpliedStageAtom() const
     {
+        SLANG_PROFILE_CAPABILITY_SETS;
         return CapabilitySet{this}.getUniquelyImpliedStageAtom();
     }
 
     /// Gets the first valid compile-target found in the CapabilitySet
-    CapabilityAtom getCompileTarget() const { return CapabilitySet{this}.getCompileTarget(); }
+    CapabilityAtom getCompileTarget() const
+    {
+        SLANG_PROFILE_CAPABILITY_SETS;
+        return CapabilitySet{this}.getCompileTarget();
+    }
 
     /// Gets the first valid stage found in the CapabilitySet
-    CapabilityAtom getTargetStage() const { return CapabilitySet{this}.getTargetStage(); }
+    CapabilityAtom getTargetStage() const
+    {
+        SLANG_PROFILE_CAPABILITY_SETS;
+        return CapabilitySet{this}.getTargetStage();
+    }
 
     void _toTextOverride(StringBuilder& out);
     Val* _resolveImplOverride() { return this; }
 
 private:
     friend struct CapabilitySet;
+
+    /// Helper method for implies operations
+    CapabilitySet::ImpliesReturnFlags _implies(
+        CapabilitySetVal const* other,
+        CapabilitySet::ImpliesFlags flags) const;
 
     // It's a lot quicker to cache and copy the Capability set, thawing is done
     // about 130000 times for the core module, but only 360 unique results are

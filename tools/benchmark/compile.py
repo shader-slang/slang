@@ -63,7 +63,10 @@ def parse(results):
     results = [ r.split() for r in results ]
     profile = {}
     for r in results:
-        profile[r[1]] = float(r[-1][:-2])
+        for token in reversed(r):
+            if token.endswith('ms'):
+                profile[r[1]] = float(token[:-2])
+                break
     return profile
 
 timings = {}

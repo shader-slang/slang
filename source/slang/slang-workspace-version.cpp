@@ -575,7 +575,7 @@ void WorkspaceVersion::ensureWorkspaceFlavor(UnownedStringSlice path)
     if (flavor != WorkspaceFlavor::Standard)
         return;
 
-    if (path.endsWithCaseInsensitive(".vfx"))
+    if (workspace->workspaceFlavor == WorkspaceFlavor::VFX || path.endsWithCaseInsensitive(".vfx"))
     {
         // Setup linkage for vfx files.
         // TODO: consider supporting this as an external config file.

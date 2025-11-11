@@ -1576,6 +1576,12 @@ SlangResult EndToEndCompileRequest::compile()
     auto reflectionPath = getOptionSet().getStringOption(CompilerOptionName::EmitReflectionJSON);
     if (reflectionPath.getLength() != 0)
     {
+        auto reflection = this->getReflection();
+        if (!reflection)
+        {
+            getSink()->diagnose(SourceLoc(), Diagnostics::cannotEmitReflectionWithoutTarget);
+            return SLANG_FAIL;
+        }
         auto bufferWriter = PrettyWriter();
         if (auto* reflection = this->getReflection())
         {
