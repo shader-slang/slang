@@ -10,6 +10,7 @@
 #include "slang-ir-bit-field-accessors.h"
 #include "slang-ir-check-differentiability.h"
 #include "slang-ir-check-recursion.h"
+#include "slang-ir-check-specialize-generic-with-existential.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-constexpr.h"
 #include "slang-ir-dce.h"
@@ -1487,6 +1488,108 @@ static void addLinkageDecoration(IRGenContext* context, IRInst* inst, Decl* decl
     }
 }
 
+static String getNameForNameHint(IRGenContext* context, Decl* decl)
+{
+    // We will use a bit of an ad hoc convention here for now.
+
+    Name* leafName = decl->getName();
+
+    // Handle custom name for a global parameter group (e.g., a `cbuffer`)
+    if (auto reflectionNameModifier = decl->findModifier<ParameterGroupReflectionName>())
+    {
+        leafName = reflectionNameModifier->nameAndLoc.name;
+    }
+
+    // There is no point in trying to provide a name hint for something with no name,
+    // or with an empty name
+    if (!leafName)
+        return String();
+    if (leafName->text.getLength() == 0)
+        return String();
+
+
+    if (const auto varDecl = as<VarDeclBase>(decl))
+    {
+        // For an ordinary local variable, global variable,
+        // parameter, or field, we will just use the name
+        // as declared, and now work in anything from
+        // its parent declaration(s).
+        //
+        // TODO: consider whether global/static variables should
+        // follow different rules.
+        //
+        return leafName->text;
+    }
+
+    // For other cases of declaration, we want to consider
+    // merging its name with the name of its parent declaration.
+    auto parentDecl = decl->parentDecl;
+
+    // Skip past a generic parent, if we are a declaration nested in a generic.
+    if (auto genericParentDecl = as<GenericDecl>(parentDecl))
+        parentDecl = genericParentDecl->parentDecl;
+
+    // Skip past a FileDecl parent.
+    if (auto fileParentDecl = as<FileDecl>(parentDecl))
+        parentDecl = fileParentDecl->parentDecl;
+
+    // A `ModuleDecl` can have a name too, but in the common case
+    // we don't want to generate name hints that include the module
+    // name, simply because they would lead to every global symbol
+    // getting a much longer name.
+    //
+    // TODO: We should probably include the module name for symbols
+    // being `import`ed, and not for symbols being compiled directly
+    // (those coming from a module that had no name given to it).
+    //
+    // For now we skip past a `ModuleDecl` parent.
+    //
+    if (auto moduleParentDecl = as<ModuleDecl>(parentDecl))
+        parentDecl = moduleParentDecl->parentDecl;
+
+    if (!parentDecl)
+    {
+        return leafName->text;
+    }
+
+    auto parentName = getNameForNameHint(context, parentDecl);
+    if (parentName.getLength() == 0)
+    {
+        return leafName->text;
+    }
+
+    // We will now construct a new `Name` to use as the hint,
+    // combining the name of the parent and the leaf declaration.
+
+    StringBuilder sb;
+    sb.append(parentName);
+    sb.append(".");
+    sb.append(leafName->text);
+
+    return sb.produceString();
+}
+
+/// Try to add an appropriate name hint to the instruction,
+/// that can be used for back-end code emission or debug info.
+static void addNameHint(IRGenContext* context, IRInst* inst, Decl* decl)
+{
+    String name = getNameForNameHint(context, decl);
+    if (name.getLength() == 0)
+        return;
+    context->irBuilder->addNameHintDecoration(inst, name.getUnownedSlice());
+}
+
+/// Add a name hint based on a fixed string.
+static void addNameHint(IRGenContext* context, IRInst* inst, char const* text)
+{
+    if (context->shared->m_obfuscateCode)
+    {
+        return;
+    }
+
+    context->irBuilder->addNameHintDecoration(inst, UnownedTerminatedStringSlice(text));
+}
+
 bool shouldDeclBeTreatedAsInterfaceRequirement(Decl* requirementDecl)
 {
     if (const auto funcDecl = as<CallableDecl>(requirementDecl))
@@ -1559,6 +1662,7 @@ IRStructKey* getInterfaceRequirementKey(IRGenContext* context, Decl* requirement
     requirementKey = builder->createStructKey();
 
     addLinkageDecoration(context, requirementKey, requirementDecl);
+    addNameHint(context, requirementKey, requirementDecl);
 
     context->shared->interfaceRequirementKeys.add(requirementDecl, requirementKey);
 
@@ -2573,107 +2677,6 @@ void maybeSetRate(IRGenContext* context, IRInst* inst, Decl* decl)
     }
 }
 
-static String getNameForNameHint(IRGenContext* context, Decl* decl)
-{
-    // We will use a bit of an ad hoc convention here for now.
-
-    Name* leafName = decl->getName();
-
-    // Handle custom name for a global parameter group (e.g., a `cbuffer`)
-    if (auto reflectionNameModifier = decl->findModifier<ParameterGroupReflectionName>())
-    {
-        leafName = reflectionNameModifier->nameAndLoc.name;
-    }
-
-    // There is no point in trying to provide a name hint for something with no name,
-    // or with an empty name
-    if (!leafName)
-        return String();
-    if (leafName->text.getLength() == 0)
-        return String();
-
-
-    if (const auto varDecl = as<VarDeclBase>(decl))
-    {
-        // For an ordinary local variable, global variable,
-        // parameter, or field, we will just use the name
-        // as declared, and now work in anything from
-        // its parent declaration(s).
-        //
-        // TODO: consider whether global/static variables should
-        // follow different rules.
-        //
-        return leafName->text;
-    }
-
-    // For other cases of declaration, we want to consider
-    // merging its name with the name of its parent declaration.
-    auto parentDecl = decl->parentDecl;
-
-    // Skip past a generic parent, if we are a declaration nested in a generic.
-    if (auto genericParentDecl = as<GenericDecl>(parentDecl))
-        parentDecl = genericParentDecl->parentDecl;
-
-    // Skip past a FileDecl parent.
-    if (auto fileParentDecl = as<FileDecl>(parentDecl))
-        parentDecl = fileParentDecl->parentDecl;
-
-    // A `ModuleDecl` can have a name too, but in the common case
-    // we don't want to generate name hints that include the module
-    // name, simply because they would lead to every global symbol
-    // getting a much longer name.
-    //
-    // TODO: We should probably include the module name for symbols
-    // being `import`ed, and not for symbols being compiled directly
-    // (those coming from a module that had no name given to it).
-    //
-    // For now we skip past a `ModuleDecl` parent.
-    //
-    if (auto moduleParentDecl = as<ModuleDecl>(parentDecl))
-        parentDecl = moduleParentDecl->parentDecl;
-
-    if (!parentDecl)
-    {
-        return leafName->text;
-    }
-
-    auto parentName = getNameForNameHint(context, parentDecl);
-    if (parentName.getLength() == 0)
-    {
-        return leafName->text;
-    }
-
-    // We will now construct a new `Name` to use as the hint,
-    // combining the name of the parent and the leaf declaration.
-
-    StringBuilder sb;
-    sb.append(parentName);
-    sb.append(".");
-    sb.append(leafName->text);
-
-    return sb.produceString();
-}
-
-/// Try to add an appropriate name hint to the instruction,
-/// that can be used for back-end code emission or debug info.
-static void addNameHint(IRGenContext* context, IRInst* inst, Decl* decl)
-{
-    String name = getNameForNameHint(context, decl);
-    if (name.getLength() == 0)
-        return;
-    context->irBuilder->addNameHintDecoration(inst, name.getUnownedSlice());
-}
-
-/// Add a name hint based on a fixed string.
-static void addNameHint(IRGenContext* context, IRInst* inst, char const* text)
-{
-    if (context->shared->m_obfuscateCode)
-    {
-        return;
-    }
-
-    context->irBuilder->addNameHintDecoration(inst, UnownedTerminatedStringSlice(text));
-}
 
 LoweredValInfo createVar(IRGenContext* context, IRType* type, Decl* decl = nullptr)
 {
@@ -12073,7 +12076,8 @@ static void lowerFrontEndEntryPointToIR(
         // then we make sure to add one here, so the lowering logic knows it is an
         // entry point.
         auto entryPointAttr = context->astBuilder->create<EntryPointAttribute>();
-        entryPointAttr->capabilitySet = entryPoint->getProfile().getCapabilityName();
+        entryPointAttr->capabilitySet =
+            entryPoint->getProfile().getCapabilityName().freeze(context->astBuilder);
         addModifier(entryPointFuncDecl, entryPointAttr);
     }
 
@@ -12236,6 +12240,10 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     context->includeDebugInfo =
         compileRequest->getLinkage()->m_optionSet.getDebugInfoLevel() != DebugInfoLevel::None;
 
+    if (translationUnit->getModuleDecl()->findModifier<ExperimentalModuleAttribute>())
+    {
+        builder->addDecoration(module->getModuleInst(), kIROp_ExperimentalModuleDecoration);
+    }
     // We need to emit IR for all public/exported symbols
     // in the translation unit.
     //
@@ -12472,6 +12480,15 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         checkAutoDiffUsages(module, compileRequest->getSink());
 
         checkForOperatorShiftOverflow(module, linkage->m_optionSet, compileRequest->getSink());
+
+        if (translationUnit->getModuleDecl()->languageVersion >=
+            SlangLanguageVersion::SLANG_LANGUAGE_VERSION_2025)
+        {
+            // We do not allow specializing a generic function with an existential type.
+            checkForIllegalGenericSpecializationWithExistentialType(
+                module,
+                compileRequest->getSink());
+        }
     }
 
     // The "mandatory" optimization passes may make use of the
@@ -12792,22 +12809,14 @@ IRVarLayout* lowerVarLayout(IRLayoutGenContext* context, VarLayout* varLayout);
 
 /// Shared code for most `lowerTypeLayout` cases.
 ///
-/// Handles copying of resource usage and pending data type layout
-/// from the AST `typeLayout` to the specified `builder`.
+/// Handles copying of resource usage from the AST `typeLayout` to the
+/// specified `builder`.
 ///
-static IRTypeLayout* _lowerTypeLayoutCommon(
-    IRLayoutGenContext* context,
-    IRTypeLayout::Builder* builder,
-    TypeLayout* typeLayout)
+static IRTypeLayout* _lowerTypeLayoutCommon(IRTypeLayout::Builder* builder, TypeLayout* typeLayout)
 {
     for (auto resInfo : typeLayout->resourceInfos)
     {
         builder->addResourceUsage(resInfo.kind, resInfo.count);
-    }
-
-    if (auto pendingTypeLayout = typeLayout->pendingDataTypeLayout)
-    {
-        builder->setPendingTypeLayout(lowerTypeLayout(context, pendingTypeLayout));
     }
 
     return builder->build();
@@ -12835,14 +12844,14 @@ IRTypeLayout* lowerTypeLayout(IRLayoutGenContext* context, TypeLayout* typeLayou
         builder.setOffsetElementTypeLayout(
             lowerTypeLayout(context, paramGroupTypeLayout->offsetElementTypeLayout));
 
-        return _lowerTypeLayoutCommon(context, &builder, paramGroupTypeLayout);
+        return _lowerTypeLayoutCommon(&builder, paramGroupTypeLayout);
     }
     else if (auto structuredBufferTypeLayout = as<StructuredBufferTypeLayout>(typeLayout))
     {
         auto irElementTypeLayout =
             lowerTypeLayout(context, structuredBufferTypeLayout->elementTypeLayout);
         IRStructuredBufferTypeLayout::Builder builder(context->irBuilder, irElementTypeLayout);
-        return _lowerTypeLayoutCommon(context, &builder, structuredBufferTypeLayout);
+        return _lowerTypeLayoutCommon(&builder, structuredBufferTypeLayout);
     }
     else if (auto structTypeLayout = as<StructTypeLayout>(typeLayout))
     {
@@ -12918,13 +12927,13 @@ IRTypeLayout* lowerTypeLayout(IRLayoutGenContext* context, TypeLayout* typeLayou
             builder.addField(irFieldKey, irFieldLayout);
         }
 
-        return _lowerTypeLayoutCommon(context, &builder, structTypeLayout);
+        return _lowerTypeLayoutCommon(&builder, structTypeLayout);
     }
     else if (auto arrayTypeLayout = as<ArrayTypeLayout>(typeLayout))
     {
         auto irElementTypeLayout = lowerTypeLayout(context, arrayTypeLayout->elementTypeLayout);
         IRArrayTypeLayout::Builder builder(context->irBuilder, irElementTypeLayout);
-        return _lowerTypeLayoutCommon(context, &builder, arrayTypeLayout);
+        return _lowerTypeLayoutCommon(&builder, arrayTypeLayout);
     }
     else if (auto ptrTypeLayout = as<PointerTypeLayout>(typeLayout))
     {
@@ -12934,7 +12943,7 @@ IRTypeLayout* lowerTypeLayout(IRLayoutGenContext* context, TypeLayout* typeLayou
 
         // auto irValueTypeLayout = lowerTypeLayout(context, ptrTypeLayout->valueTypeLayout);
         IRPointerTypeLayout::Builder builder(context->irBuilder);
-        return _lowerTypeLayoutCommon(context, &builder, ptrTypeLayout);
+        return _lowerTypeLayoutCommon(&builder, ptrTypeLayout);
     }
     else if (auto streamOutputTypeLayout = as<StreamOutputTypeLayout>(typeLayout))
     {
@@ -12942,7 +12951,7 @@ IRTypeLayout* lowerTypeLayout(IRLayoutGenContext* context, TypeLayout* typeLayou
             lowerTypeLayout(context, streamOutputTypeLayout->elementTypeLayout);
 
         IRStreamOutputTypeLayout::Builder builder(context->irBuilder, irElementTypeLayout);
-        return _lowerTypeLayoutCommon(context, &builder, streamOutputTypeLayout);
+        return _lowerTypeLayoutCommon(&builder, streamOutputTypeLayout);
     }
     else if (auto matrixTypeLayout = as<MatrixTypeLayout>(typeLayout))
     {
@@ -12955,19 +12964,19 @@ IRTypeLayout* lowerTypeLayout(IRLayoutGenContext* context, TypeLayout* typeLayou
         // along this data as best we can for now.
 
         IRMatrixTypeLayout::Builder builder(context->irBuilder, matrixTypeLayout->mode);
-        return _lowerTypeLayoutCommon(context, &builder, matrixTypeLayout);
+        return _lowerTypeLayoutCommon(&builder, matrixTypeLayout);
     }
     else if (auto existentialTypeLayout = as<ExistentialTypeLayout>(typeLayout))
     {
         IRExistentialTypeLayout::Builder builder(context->irBuilder);
-        return _lowerTypeLayoutCommon(context, &builder, existentialTypeLayout);
+        return _lowerTypeLayoutCommon(&builder, existentialTypeLayout);
     }
     else
     {
         // If no special case applies we will build a generic `IRTypeLayout`.
         //
         IRTypeLayout::Builder builder(context->irBuilder);
-        return _lowerTypeLayoutCommon(context, &builder, typeLayout);
+        return _lowerTypeLayoutCommon(&builder, typeLayout);
     }
 }
 
@@ -12985,10 +12994,6 @@ IRVarLayout* lowerVarLayout(
         irResInfo->space = resInfo.space;
     }
 
-    if (auto pendingVarLayout = varLayout->pendingVarLayout)
-    {
-        irLayoutBuilder.setPendingVarLayout(lowerVarLayout(context, pendingVarLayout));
-    }
 
     // We will only generate layout information with *either* a system-value
     // semantic or a user-defined semantic, and we will always check for
@@ -13126,7 +13131,7 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         globalStructTypeLayoutBuilder.addField(irVar, irLayout);
     }
     auto irGlobalStructTypeLayout =
-        _lowerTypeLayoutCommon(context, &globalStructTypeLayoutBuilder, globalStructLayout);
+        _lowerTypeLayoutCommon(&globalStructTypeLayoutBuilder, globalStructLayout);
 
     auto globalScopeVarLayout = programLayout->parametersLayout;
     auto globalScopeTypeLayout = globalScopeVarLayout->typeLayout;
@@ -13145,10 +13150,8 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         globalParameterGroupTypeLayoutBuilder.setOffsetElementTypeLayout(
             lowerTypeLayout(context, paramGroupTypeLayout->offsetElementTypeLayout));
 
-        auto irParamGroupTypeLayout = _lowerTypeLayoutCommon(
-            context,
-            &globalParameterGroupTypeLayoutBuilder,
-            paramGroupTypeLayout);
+        auto irParamGroupTypeLayout =
+            _lowerTypeLayoutCommon(&globalParameterGroupTypeLayoutBuilder, paramGroupTypeLayout);
 
         irGlobalScopeTypeLayout = irParamGroupTypeLayout;
     }
@@ -13181,8 +13184,10 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
                 getMangledName(astBuilder, funcDeclRef).getUnownedSlice());
         }
 
-        for (auto atomSet :
-             as<FuncDecl>(funcDeclRef.getDecl())->inferredCapabilityRequirements.getAtomSets())
+        auto asFuncDecl = as<FuncDecl>(funcDeclRef.getDecl());
+        SLANG_ASSERT(asFuncDecl);
+        CapabilitySet set{asFuncDecl->inferredCapabilityRequirements};
+        for (auto atomSet : set.getAtomSets())
         {
             for (auto atomVal : atomSet)
             {

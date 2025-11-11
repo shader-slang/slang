@@ -301,6 +301,12 @@ DIAGNOSTIC(96, Error, kindNotLinkable, "not a known linkable kind '$0'")
 DIAGNOSTIC(97, Error, libraryDoesNotExist, "library '$0' does not exist")
 DIAGNOSTIC(98, Error, cannotAccessAsBlob, "cannot access as a blob")
 DIAGNOSTIC(99, Error, unknownDebugOption, "unknown debug option, known options are ($0)")
+DIAGNOSTIC(
+    104,
+    Error,
+    needToEnableExperimentFeature,
+    "'$0' is an experimental module, need to enable"
+    "'-experimental-feature' to load this module")
 
 //
 // 001xx - Downstream Compilers
@@ -390,7 +396,14 @@ DIAGNOSTIC(
     Error,
     noUniqueIdentity,
     "`#include` handler didn't generate a unique identity for file '$0'")
-
+DIAGNOSTIC(
+    15303,
+    Error,
+    cannotResolveImportedDecl,
+    "cannot resolve imported declaration '$0' from precompiled module '$1'. Make sure "
+    "module '$1' is up-to-date. If you suspect this to be a compiler bug, file an issue "
+    "on GitHub (https://github.com/shader-slang/slang/issues) or join the Slang Discord for "
+    "assistance")
 
 // 154xx - macro definition
 DIAGNOSTIC(15400, Warning, macroRedefinition, "redefinition of macro '$0'")
@@ -845,6 +858,12 @@ DIAGNOSTIC(
     cannotTakeConstantPointers,
     "Not allowed to take the address of an immutable object")
 DIAGNOSTIC(
+    33180,
+    Error,
+    cannotSpecializeGenericWithExistential,
+    "specializing '$0' with an existential type is not allowed. All generic arguments "
+    "must be statically resolvable at compile time.")
+DIAGNOSTIC(
     30100,
     Error,
     staticRefToNonStaticMember,
@@ -1240,11 +1259,20 @@ DIAGNOSTIC(
     subTypeHasSubsetOfAbstractAtomsToSuperType,
     "subtype '$0' must have the same target/stage support as the supertype; '$0' is missing '$1'")
 DIAGNOSTIC(
-    36118,
+    36119,
     Error,
     requirmentHasSubsetOfAbstractAtomsToImplementation,
     "requirement '$0' must have the same target/stage support as the implementation; '$0' is "
     "missing '$1'")
+
+DIAGNOSTIC(
+    36120,
+    Error,
+    targetSwitchCapCasesConflict,
+    "the capability for case '$0' is '$1', which is conflicts with previous case which requires "
+    "'$2'."
+    "In target_switch, if two cases are belong to the same target, then one capability set has to "
+    "be a subset of the other.")
 
 // Attributes
 DIAGNOSTIC(31000, Warning, unknownAttributeName, "unknown attribute '$0'")
@@ -2903,6 +2931,11 @@ DIAGNOSTIC(
     dynamicDispatchOnSpecializeOnlyInterface,
     "type '$0' is marked for specialization only, but dynamic dispatch is needed for the call.")
 DIAGNOSTIC(
+    52009,
+    Error,
+    cannotEmitReflectionWithoutTarget,
+    "cannot emit reflection JSON; no compilation target available")
+DIAGNOSTIC(
     53001,
     Error,
     invalidTypeMarshallingForImportedDLLSymbol,
@@ -3148,4 +3181,18 @@ DIAGNOSTIC(
     "invalid stage name '$0' in ray payload access qualifier; valid stages are 'anyhit', "
     "'closesthit', 'miss', and 'caller'")
 
+//
+// Cooperative Matrix
+//
+DIAGNOSTIC(
+    50000,
+    Error,
+    cooperativeMatrixUnsupportedElementType,
+    "Element type '$0' is not supported for matrix'$1'.")
+
+DIAGNOSTIC(
+    50000,
+    Error,
+    cooperativeMatrixInvalidShape,
+    "Invalid shape ['$0', '$1'] for cooperative matrix'$2'.")
 #undef DIAGNOSTIC

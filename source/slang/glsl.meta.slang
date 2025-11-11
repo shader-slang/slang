@@ -1676,6 +1676,8 @@ public vec2 textureQueryLod(_Texture<
         format
     > sampler, float p)
 {
+    static_assert(__targetHasImplicitDerivatives(),
+                 "GLSL: textureQueryLod() may be invoked only on a stage that has implicit derivatives.");
     __requireComputeDerivative();
     __target_switch
     {
@@ -1709,6 +1711,8 @@ public vec2 textureQueryLod(_Texture<
         format
     > sampler, vector<float,Shape.dimensions> p)
 {
+    static_assert(__targetHasImplicitDerivatives(),
+                 "GLSL: textureQueryLod() may be invoked only on a stage that has implicit derivatives.");
     __requireComputeDerivative();
     __target_switch
     {
@@ -1909,7 +1913,10 @@ __generic<T:ITexelElement>
 [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> texture(Sampler1D<T> sampler, float p)
 {
-    return __vectorReshape2<T.Element, 4>(sampler.Sample(p));
+    if (__targetHasImplicitDerivatives())
+        return __vectorReshape2<T.Element, 4>(sampler.Sample(p));
+    else
+        return __vectorReshape2<T.Element, 4>(sampler.SampleLevelZero(p));
 }
 
 __generic<T:ITexelElement>
@@ -1917,7 +1924,10 @@ __generic<T:ITexelElement>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> texture(Sampler1D<T> sampler, float p, float bias)
 {
-    return __vectorReshape2<T.Element, 4>(sampler.SampleBias(p, bias));
+    if (__targetHasImplicitDerivatives())
+        return __vectorReshape2<T.Element, 4>(sampler.SampleBias(p, bias));
+    else
+        return __vectorReshape2<T.Element, 4>(sampler.SampleLevelZero(p));
 }
 
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let format:int>
@@ -1935,7 +1945,10 @@ public vector<T.Element,4> texture(_Texture<
         format
     > sampler, vector<float,Shape.dimensions+isArray> p)
 {
-    return __vectorReshape2<T.Element, 4>(sampler.Sample(p));
+    if (__targetHasImplicitDerivatives())
+        return __vectorReshape2<T.Element, 4>(sampler.Sample(p));
+    else
+        return __vectorReshape2<T.Element, 4>(sampler.SampleLevelZero(p));
 }
 
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let format:int>
@@ -1953,14 +1966,20 @@ public vector<T.Element,4> texture(_Texture<
         format
     > sampler, vector<float,Shape.dimensions+isArray> p, float bias)
 {
-    return __vectorReshape2<T.Element,4>(sampler.SampleBias(p, bias));
+    if (__targetHasImplicitDerivatives())
+        return __vectorReshape2<T.Element,4>(sampler.SampleBias(p, bias));
+    else
+        return __vectorReshape2<T.Element,4>(sampler.SampleLevelZero(p));
 }
 
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float texture(sampler1DShadow sampler, vec3 p)
 {
-    return sampler.SampleCmp(p.x, p.z);
+    if (__targetHasImplicitDerivatives())
+        return sampler.SampleCmp(p.x, p.z);
+    else
+        return sampler.SampleCmpLevelZero(p.x, p.z);
 }
 
 [ForceInline]
@@ -1969,6 +1988,9 @@ public float texture(sampler1DShadow sampler, vec3 p, float bias)
 {
     float location = p.x;
     float compareValue = p.z;
+
+    if (!__targetHasImplicitDerivatives())
+        return sampler.SampleCmpLevelZero(location, compareValue);
 
     __requireComputeDerivative();
     __target_switch
@@ -1989,7 +2011,10 @@ public float texture(sampler1DShadow sampler, vec3 p, float bias)
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float texture(sampler2DShadow sampler, vec3 p)
 {
-    return sampler.SampleCmp(p.xy, p.z);
+    if (__targetHasImplicitDerivatives())
+       return sampler.SampleCmp(p.xy, p.z);
+    else
+       return sampler.SampleCmpLevelZero(p.xy, p.z);
 }
 
 [ForceInline]
@@ -1999,6 +2024,9 @@ public float texture(sampler2DShadow sampler, vec3 p, float bias)
     vec2 location = p.xy;
     float compareValue = p.z;
 
+    if (!__targetHasImplicitDerivatives())
+        return sampler.SampleCmpLevelZero(location, compareValue);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2008,7 +2036,7 @@ public float texture(sampler2DShadow sampler, vec3 p, float bias)
         {
             result:$$float = OpImageSampleDrefImplicitLod $sampler $location $compareValue Bias $bias;
         };
-    default: 
+    default:
         // TODO: Need to apply bias
         return sampler.SampleCmp(location, compareValue);
     }
@@ -2018,7 +2046,10 @@ public float texture(sampler2DShadow sampler, vec3 p, float bias)
 [ForceInline]
 public float texture(samplerCubeShadow sampler, vec4 p)
 {
-    return sampler.SampleCmp(p.xyz, p.w);
+    if (__targetHasImplicitDerivatives())
+        return sampler.SampleCmp(p.xyz, p.w);
+    else
+        return sampler.SampleCmpLevelZero(p.xyz, p.w);
 }
 
 [require(glsl_hlsl_spirv, texture_shadowlod)]
@@ -2028,6 +2059,9 @@ public float texture(samplerCubeShadow sampler, vec4 p, float bias)
     vec3 location = p.xyz;
     float compareValue = p.w;
 
+    if (!__targetHasImplicitDerivatives())
+        return sampler.SampleCmpLevelZero(location, compareValue);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2037,7 +2071,7 @@ public float texture(samplerCubeShadow sampler, vec4 p, float bias)
         {
             result:$$float = OpImageSampleDrefImplicitLod $sampler $location $compareValue Bias $bias;
         };
-    default: 
+    default:
         // TODO: Need to apply bias
         return sampler.SampleCmp(location, compareValue);
     }
@@ -2047,7 +2081,10 @@ public float texture(samplerCubeShadow sampler, vec4 p, float bias)
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float texture(sampler1DArrayShadow sampler, vec3 p)
 {
-    return sampler.SampleCmp(p.xy, p.z);
+    if (__targetHasImplicitDerivatives())
+        return sampler.SampleCmp(p.xy, p.z);
+    else
+        return sampler.SampleCmpLevelZero(p.xy, p.z);
 }
 
 [ForceInline]
@@ -2056,6 +2093,9 @@ public float texture(sampler1DArrayShadow sampler, vec3 p, float bias)
 {
     vec2 location = p.xy;
     float compareValue = p.z;
+
+    if (!__targetHasImplicitDerivatives())
+        return sampler.SampleCmpLevelZero(location, compareValue);
 
     __requireComputeDerivative();
     __target_switch
@@ -2066,7 +2106,7 @@ public float texture(sampler1DArrayShadow sampler, vec3 p, float bias)
         {
             result:$$float = OpImageSampleDrefImplicitLod $sampler $location $compareValue Bias $bias;
         };
-    default: 
+    default:
         // TODO: Need to apply bias
         return sampler.SampleCmp(location, compareValue);
     }
@@ -2076,14 +2116,20 @@ public float texture(sampler1DArrayShadow sampler, vec3 p, float bias)
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float texture(sampler2DArrayShadow sampler, vec4 p)
 {
-    return sampler.SampleCmp(p.xyz, p.w);
+    if (__targetHasImplicitDerivatives())
+        return sampler.SampleCmp(p.xyz, p.w);
+    else
+        return sampler.SampleCmpLevelZero(p.xyz, p.w);
 }
 
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float texture(samplerCubeArrayShadow sampler, vec4 p, float compare)
 {
-    return sampler.SampleCmp(p, compare);
+    if (__targetHasImplicitDerivatives())
+        return sampler.SampleCmp(p, compare);
+    else
+        return sampler.SampleCmpLevelZero(p, compare);
 }
 
 // -------------------
@@ -2095,6 +2141,9 @@ __generic<T:ITexelElement>
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProj(Sampler1D<T> sampler, vec2 p)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLod(sampler, p, 0.0f);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2112,6 +2161,9 @@ __generic<T:ITexelElement>
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProj(Sampler1D<T> sampler, vec2 p, float bias)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLod(sampler, p, 0.0f);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2129,6 +2181,9 @@ __generic<T:ITexelElement>
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProj(Sampler1D<T> sampler, vec4 p)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLod(sampler, p, 0.0f);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2146,6 +2201,9 @@ __generic<T:ITexelElement>
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProj(Sampler1D<T> sampler, vec4 p, float bias)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLod(sampler, p, 0.0f);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2163,6 +2221,9 @@ __generic<T:ITexelElement>
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProj(Sampler2D<T> sampler, vec3 p)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLod(sampler, p, 0.0f);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2180,6 +2241,9 @@ __generic<T:ITexelElement>
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProj(Sampler2D<T> sampler, vec3 p, float bias)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLod(sampler, p, 0.0f);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2197,6 +2261,9 @@ __generic<T:ITexelElement>
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProj(Sampler2D<T> sampler, vec4 p)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLod(sampler, p, 0.0f);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2214,6 +2281,9 @@ __generic<T:ITexelElement>
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProj(Sampler2D<T> sampler, vec4 p, float bias)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLod(sampler, p, 0.0f);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2231,6 +2301,9 @@ __generic<T:ITexelElement>
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProj(Sampler3D<T> sampler, vec4 p)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLod(sampler, p, 0.0f);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2248,6 +2321,9 @@ __generic<T:ITexelElement>
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProj(Sampler3D<T> sampler, vec4 p, float bias)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLod(sampler, p, 0.0f);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2264,6 +2340,9 @@ public vector<T.Element,4> textureProj(Sampler3D<T> sampler, vec4 p, float bias)
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProj(sampler1DShadow sampler, vec4 p)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLod(sampler, p, 0.0f);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2285,6 +2364,9 @@ public float textureProj(sampler1DShadow sampler, vec4 p)
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProj(sampler1DShadow sampler, vec4 p, float bias)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLod(sampler, p, 0.0f);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2306,6 +2388,9 @@ public float textureProj(sampler1DShadow sampler, vec4 p, float bias)
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProj(sampler2DShadow sampler, vec4 p)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLod(sampler, p, 0.0f);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2327,6 +2412,9 @@ public float textureProj(sampler2DShadow sampler, vec4 p)
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProj(sampler2DShadow sampler, vec4 p, float bias)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLod(sampler, p, 0.0f);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2459,7 +2547,10 @@ __generic<T:ITexelElement>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureOffset(Sampler1D<T> sampler, float p, constexpr int offset, float bias = 0.0)
 {
-    return __vectorReshape2<T.Element,4>(sampler.SampleBias(p, bias, offset));
+    if (__targetHasImplicitDerivatives())
+        return __vectorReshape2<T.Element,4>(sampler.SampleBias(p, bias, offset));
+    else
+        return __vectorReshape2<T.Element,4>(sampler.SampleLevelZero(p, offset));
 }
 
 __generic<T:ITexelElement>
@@ -2467,7 +2558,10 @@ __generic<T:ITexelElement>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureOffset(Sampler2D<T> sampler, vec2 p, constexpr ivec2 offset, float bias = 0.0)
 {
-    return __vectorReshape2<T.Element,4>(sampler.SampleBias(p, bias, offset));
+    if (__targetHasImplicitDerivatives())
+        return __vectorReshape2<T.Element,4>(sampler.SampleBias(p, bias, offset));
+    else
+        return __vectorReshape2<T.Element,4>(sampler.SampleLevelZero(p, offset));
 }
 
 __generic<T:ITexelElement>
@@ -2475,7 +2569,10 @@ __generic<T:ITexelElement>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureOffset(Sampler3D<T> sampler, vec3 p, constexpr ivec3 offset, float bias = 0.0)
 {
-    return __vectorReshape2<T.Element,4>(sampler.SampleBias(p, bias, offset));
+    if (__targetHasImplicitDerivatives())
+        return __vectorReshape2<T.Element,4>(sampler.SampleBias(p, bias, offset));
+    else
+        return __vectorReshape2<T.Element,4>(sampler.SampleLevelZero(p, offset));
 }
 
 [ForceInline]
@@ -2484,6 +2581,9 @@ public float textureOffset(sampler2DShadow sampler, vec3 p, constexpr ivec2 offs
 {
     vec2 location = p.xy;
     float compareValue = p.z;
+
+    if (!__targetHasImplicitDerivatives())
+        return sampler.SampleCmpLevelZero(location, compareValue, offset);
 
     __requireComputeDerivative();
     __target_switch
@@ -2507,6 +2607,9 @@ public float textureOffset(sampler1DShadow sampler, vec3 p, constexpr int offset
     float location = p.x;
     float compareValue = p.z;
 
+    if (!__targetHasImplicitDerivatives())
+        return sampler.SampleCmpLevelZero(location, compareValue, offset);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2529,6 +2632,9 @@ public float textureOffset(sampler1DShadow sampler, vec3 p, constexpr int offset
     float location = p.x;
     float compareValue = p.z;
 
+    if (!__targetHasImplicitDerivatives())
+        return sampler.SampleCmpLevelZero(location, compareValue, offset);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2549,7 +2655,11 @@ __generic<T:ITexelElement>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureOffset(Sampler1DArray<T> sampler, vec2 p, constexpr int offset, float bias = 0.0)
 {
-    return __vectorReshape2<T.Element,4>(sampler.SampleBias(p, bias, offset));
+
+    if (__targetHasImplicitDerivatives())
+        return __vectorReshape2<T.Element,4>(sampler.SampleBias(p, bias, offset));
+    else
+        return __vectorReshape2<T.Element,4>(sampler.SampleLevelZero(p, offset));
 }
 
 __generic<T:ITexelElement>
@@ -2557,7 +2667,10 @@ __generic<T:ITexelElement>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureOffset(Sampler2DArray<T> sampler, vec3 p, constexpr ivec2 offset, float bias = 0.0)
 {
-    return __vectorReshape2<T.Element,4>(sampler.SampleBias(p, bias, offset));
+    if (__targetHasImplicitDerivatives())
+        return __vectorReshape2<T.Element,4>(sampler.SampleBias(p, bias, offset));
+    else
+        return __vectorReshape2<T.Element,4>(sampler.SampleLevelZero(p, offset));
 }
 
 [ForceInline]
@@ -2566,6 +2679,9 @@ public float textureOffset(sampler1DArrayShadow sampler, vec3 p, constexpr int o
 {
     vec2 location = p.xy;
     float compareValue = p.z;
+
+    if (!__targetHasImplicitDerivatives())
+        return sampler.SampleCmpLevelZero(location, compareValue, vector<int,1>(offset));
 
     __requireComputeDerivative();
     __target_switch
@@ -2589,6 +2705,9 @@ public float textureOffset(sampler1DArrayShadow sampler, vec3 p, constexpr int o
     vec2 location = p.xy;
     float compareValue = p.z;
 
+    if (!__targetHasImplicitDerivatives())
+        return sampler.SampleCmpLevelZero(location, compareValue, vector<int,1>(offset));
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2608,7 +2727,10 @@ public float textureOffset(sampler1DArrayShadow sampler, vec3 p, constexpr int o
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureOffset(sampler2DArrayShadow sampler, vec4 p, constexpr ivec2 offset)
 {
-    return sampler.SampleCmp(p.xyz, p.w, offset);
+    if (__targetHasImplicitDerivatives())
+        return sampler.SampleCmp(p.xyz, p.w, offset);
+    else
+        return sampler.SampleCmpLevelZero(p.xyz, p.w, offset);
 }
 
 // -------------------
@@ -2728,6 +2850,9 @@ __generic<T:ITexelElement>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProjOffset(Sampler1D<T> sampler, vec2 p, constexpr int offset)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLodOffset(sampler, p, 0.0f, offset);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2745,6 +2870,9 @@ __generic<T:ITexelElement>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProjOffset(Sampler1D<T> sampler, vec2 p, constexpr int offset, float bias)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLodOffset(sampler, p, 0.0f, offset);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2762,6 +2890,9 @@ __generic<T:ITexelElement>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProjOffset(Sampler1D<T> sampler, vec4 p, constexpr int offset)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLodOffset(sampler, p, 0.0f, offset);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2783,6 +2914,9 @@ __generic<T:ITexelElement>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProjOffset(Sampler1D<T> sampler, vec4 p, constexpr int offset, float bias)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLodOffset(sampler, p, 0.0f, offset);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2804,6 +2938,9 @@ __generic<T:ITexelElement>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProjOffset(Sampler2D<T> sampler, vec3 p, constexpr ivec2 offset)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLodOffset(sampler, p, 0.0f, offset);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2821,6 +2958,9 @@ __generic<T:ITexelElement>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProjOffset(Sampler2D<T> sampler, vec3 p, constexpr ivec2 offset, float bias)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLodOffset(sampler, p, 0.0f, offset);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2838,6 +2978,9 @@ __generic<T:ITexelElement>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProjOffset(Sampler2D<T> sampler, vec4 p, constexpr ivec2 offset)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLodOffset(sampler, p, 0.0f, offset);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2859,6 +3002,9 @@ __generic<T:ITexelElement>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProjOffset(Sampler2D<T> sampler, vec4 p, constexpr ivec2 offset, float bias)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLodOffset(sampler, p, 0.0f, offset);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2880,6 +3026,9 @@ __generic<T:ITexelElement>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProjOffset(Sampler3D<T> sampler, vec4 p, constexpr ivec3 offset)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLodOffset(sampler, p, 0.0f, offset);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2897,6 +3046,9 @@ __generic<T:ITexelElement>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProjOffset(Sampler3D<T> sampler, vec4 p, constexpr ivec3 offset, float bias)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLodOffset(sampler, p, 0.0f, offset);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2913,6 +3065,9 @@ public vector<T.Element,4> textureProjOffset(Sampler3D<T> sampler, vec4 p, const
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProjOffset(sampler1DShadow sampler, vec4 p, constexpr int offset)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLodOffset(sampler, p, 0.0f, offset);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2934,6 +3089,9 @@ public float textureProjOffset(sampler1DShadow sampler, vec4 p, constexpr int of
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProjOffset(sampler1DShadow sampler, vec4 p, constexpr int offset, float bias)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLodOffset(sampler, p, 0.0f, offset);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2955,6 +3113,9 @@ public float textureProjOffset(sampler1DShadow sampler, vec4 p, constexpr int of
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProjOffset(sampler2DShadow sampler, vec4 p, constexpr ivec2 offset)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLodOffset(sampler, p, 0.0f, offset);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2976,6 +3137,9 @@ public float textureProjOffset(sampler2DShadow sampler, vec4 p, constexpr ivec2 
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProjOffset(sampler2DShadow sampler, vec4 p, constexpr ivec2 offset, float bias)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLodOffset(sampler, p, 0.0f, offset);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -3221,7 +3385,7 @@ public float textureProjLod(sampler2DShadow sampler, vec4 p, float lod)
 
 __generic<T:ITexelElement>
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProjLodOffset(Sampler1D<T> sampler, vec2 p, float lod, constexpr int offset)
 {
     __target_switch
@@ -3237,7 +3401,7 @@ public vector<T.Element,4> textureProjLodOffset(Sampler1D<T> sampler, vec2 p, fl
 
 __generic<T:ITexelElement>
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProjLodOffset(Sampler1D<T> sampler, vec4 p, float lod, constexpr int offset)
 {
     __target_switch
@@ -3257,7 +3421,7 @@ public vector<T.Element,4> textureProjLodOffset(Sampler1D<T> sampler, vec4 p, fl
 
 __generic<T:ITexelElement>
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProjLodOffset(Sampler2D<T> sampler, vec3 p, float lod, constexpr ivec2 offset)
 {
     __target_switch
@@ -3273,7 +3437,7 @@ public vector<T.Element,4> textureProjLodOffset(Sampler2D<T> sampler, vec3 p, fl
 
 __generic<T:ITexelElement>
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProjLodOffset(Sampler2D<T> sampler, vec4 p, float lod, constexpr ivec2 offset)
 {
     __target_switch
@@ -3293,7 +3457,7 @@ public vector<T.Element,4> textureProjLodOffset(Sampler2D<T> sampler, vec4 p, fl
 
 __generic<T:ITexelElement>
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProjLodOffset(Sampler3D<T> sampler, vec4 p, float lod, constexpr ivec3 offset)
 {
     __target_switch
@@ -4522,7 +4686,7 @@ ${{{{
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
                     %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomicExchange %ptr Device ImageMemory $data
+                    result:$$$(targetType.type) = OpAtomicExchange %ptr Device Relaxed $data
                 };
             }
             }
@@ -4545,7 +4709,7 @@ ${{{{
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
                     %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Min$(targetType.SPVAtomicSuffix) %ptr Device ImageMemory $data
+                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Min$(targetType.SPVAtomicSuffix) %ptr Device Relaxed $data
                 };
             }
             }
@@ -4568,7 +4732,7 @@ ${{{{
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
                     %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Max$(targetType.SPVAtomicSuffix) %ptr Device ImageMemory $data
+                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Max$(targetType.SPVAtomicSuffix) %ptr Device Relaxed $data
                 };
             }
             }
@@ -4594,7 +4758,7 @@ ${{{{
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
                     %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomicAnd %ptr Device ImageMemory $data
+                    result:$$$(targetType.type) = OpAtomicAnd %ptr Device Relaxed $data
                 };
             }
             }
@@ -4616,7 +4780,7 @@ ${{{{
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
                     %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomicOr %ptr Device ImageMemory $data
+                    result:$$$(targetType.type) = OpAtomicOr %ptr Device Relaxed $data
                 };
             }
             }
@@ -4639,7 +4803,7 @@ ${{{{
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
                     %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomicXor %ptr Device ImageMemory $data
+                    result:$$$(targetType.type) = OpAtomicXor %ptr Device Relaxed $data
                 };
             }
             }
@@ -4661,7 +4825,7 @@ ${{{{
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
                     %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomicCompareExchange %ptr Device ImageMemory ImageMemory $data $compare
+                    result:$$$(targetType.type) = OpAtomicCompareExchange %ptr Device Relaxed Relaxed $data $compare
                 };
             }
             }
@@ -9062,7 +9226,7 @@ public uint atomicCounterIncrement(atomic_uint c)
     {
         return spirv_asm
         {
-            OpAtomicIIncrement $$uint result $c Device UniformMemory
+            OpAtomicIIncrement $$uint result $c Device AtomicCounterMemory
         };
     }
     }
@@ -9121,7 +9285,7 @@ public uint atomicCounterDecrement(atomic_uint c)
         // we want a discarded side effect and then return the new value
         return spirv_asm
         {
-            %discardedValue:$$uint = OpAtomicIDecrement $c Device UniformMemory;
+            %discardedValue:$$uint = OpAtomicIDecrement $c Device AtomicCounterMemory;
             OpLoad $$uint result $c
         };
     }
@@ -9141,7 +9305,7 @@ public uint atomicCounterAdd(atomic_uint c, uint data)
     {
         return spirv_asm
         {
-            OpAtomicIAdd $$uint result $c Device UniformMemory $data
+            OpAtomicIAdd $$uint result $c Device AtomicCounterMemory $data
         };
     }
     }
@@ -9163,7 +9327,7 @@ public uint atomicCounterSubtract(atomic_uint c, uint data)
     {
         return spirv_asm
         {
-            OpAtomicISub $$uint result $c Device UniformMemory $data
+            OpAtomicISub $$uint result $c Device AtomicCounterMemory $data
         };
     }
     }   
@@ -9182,7 +9346,7 @@ public uint atomicCounterMin(atomic_uint c, uint data)
     {
         return spirv_asm
         {
-            OpAtomicUMin $$uint result $c Device UniformMemory $data
+            OpAtomicUMin $$uint result $c Device AtomicCounterMemory $data
         };
     }
     }
@@ -9201,7 +9365,7 @@ public uint atomicCounterMax(atomic_uint c, uint data)
     {
         return spirv_asm
         {
-            OpAtomicUMax $$uint result $c Device UniformMemory $data
+            OpAtomicUMax $$uint result $c Device AtomicCounterMemory $data
         };
     }
     }
@@ -9220,7 +9384,7 @@ public uint atomicCounterAnd(atomic_uint c, uint data)
     {
         return spirv_asm
         {
-            OpAtomicAnd $$uint result $c Device UniformMemory $data
+            OpAtomicAnd $$uint result $c Device AtomicCounterMemory $data
         };
     }
     }   
@@ -9239,7 +9403,7 @@ public uint atomicCounterOr(atomic_uint c, uint data)
     {
         return spirv_asm
         {
-            OpAtomicOr $$uint result $c Device UniformMemory $data
+            OpAtomicOr $$uint result $c Device AtomicCounterMemory $data
         };
     }
     }
@@ -9258,7 +9422,7 @@ public uint atomicCounterXor(atomic_uint c, uint data)
     {
         return spirv_asm
         {
-            OpAtomicXor $$uint result $c Device UniformMemory $data
+            OpAtomicXor $$uint result $c Device AtomicCounterMemory $data
         };
     }
     }
@@ -9277,7 +9441,7 @@ public uint atomicCounterExchange(atomic_uint c, uint data)
     {
         return spirv_asm
         {
-            OpAtomicExchange $$uint result $c Device UniformMemory $data
+            OpAtomicExchange $$uint result $c Device AtomicCounterMemory $data
         };
     }
     }
@@ -9296,7 +9460,7 @@ public uint atomicCounterCompSwap(atomic_uint c, uint compare, uint data)
     {
         return spirv_asm
         {
-            OpAtomicCompareExchange $$uint result $c Device UniformMemory UniformMemory $data $compare
+            OpAtomicCompareExchange $$uint result $c Device AtomicCounterMemory AtomicCounterMemory $data $compare
         };
     }
     }

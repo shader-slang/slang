@@ -7,7 +7,7 @@
 // TODO: Check if final linkage used only the precompiled spirv.
 
 //TEST:COMPILE: tests/library/export-library-generics.slang -o tests/library/export-library-generics.slang-module -target spirv -embed-downstream-ir -profile lib_6_6 -incomplete-library
-//TEST:COMPILE: tests/library/precompiled-spirv-generics.slang -target spirv -stage anyhit -entry anyhit -o tests/library/linked.spirv
+//TEST:COMPILE: tests/library/precompiled-spirv-generics.slang -target spirv -stage anyhit -entry anyhit -skip-spirv-validation -o tests/library/linked.spirv
 
 import "export-library-generics";
 

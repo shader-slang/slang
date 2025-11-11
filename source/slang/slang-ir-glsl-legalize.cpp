@@ -32,23 +32,6 @@ void moveValueBefore(IRInst* valueToMove, IRInst* placeBefore)
     valueToMove->insertBefore(placeBefore);
 }
 
-IRType* getFieldType(IRType* baseType, IRStructKey* fieldKey)
-{
-    if (auto structType = as<IRStructType>(baseType))
-    {
-        for (auto ff : structType->getFields())
-        {
-            if (ff->getKey() == fieldKey)
-                return ff->getFieldType();
-        }
-        SLANG_UNEXPECTED("no such field");
-        UNREACHABLE_RETURN(nullptr);
-    }
-    SLANG_UNEXPECTED("not a struct");
-    UNREACHABLE_RETURN(nullptr);
-}
-
-
 // When scalarizing shader inputs/outputs for GLSL, we need a way
 // to refer to a conceptual "value" that might comprise multiple
 // IR-level values. We could in principle introduce tuple types
@@ -1326,6 +1309,19 @@ static bool targetBuiltinRequiresLegalization(IRTargetBuiltinVarName builtinVarN
            (builtinVarName == IRTargetBuiltinVarName::HlslVertexID);
 }
 
+// Wrap `type` into arrays according to `declarator`.
+IRType* maybeWrapIntoArray(IRBuilder* builder, IRType* type, GlobalVaryingDeclarator* declarator)
+{
+    if (!declarator)
+        return type;
+    if (declarator->flavor == GlobalVaryingDeclarator::Flavor::array)
+    {
+        auto inner = maybeWrapIntoArray(builder, type, declarator->next);
+        return builder->getArrayType(inner, declarator->elementCount);
+    }
+    return type;
+}
+
 ScalarizedVal createSimpleGLSLGlobalVarying(
     GLSLLegalizationContext* context,
     CodeGenContext* codeGenContext,
@@ -1393,11 +1389,25 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     IRType* peeledRequiredType = nullptr;
     ShortList<IRInst*> peeledRequiredArraySizes;
     bool peeledRequiredArrayLevelMatchesUserDeclaredType = false;
+
+    // If we are request to declare the global variable with a different type to conform to
+    // downstream restrictions, `requiredType` will be set to that type, otherwise it will be
+    // `nullptr`.
+    IRType* requiredType = systemValueInfo ? systemValueInfo->requiredType : nullptr;
+
+    // Another case where we need to declare the global variable with a different type is when
+    // the global varying is a user pointer. In that case we must declare it as a uint64_t, and
+    // translate it to a pointer at use sites.
+    if (!requiredType && isUserPointerType(type))
+    {
+        requiredType = maybeWrapIntoArray(builder, builder->getUInt64Type(), declarator);
+    }
+
     // A system-value semantic might end up needing to override the type
     // that the user specified.
-    if (systemValueInfo && systemValueInfo->requiredType)
+    if (requiredType)
     {
-        type = systemValueInfo->requiredType;
+        type = requiredType;
         peeledRequiredType = type;
         peeledRequiredArrayLevelMatchesUserDeclaredType = true;
         // Unpeel `type` using declarators so that it matches `inType`.
@@ -1616,23 +1626,23 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
 
     ScalarizedVal val = ScalarizedVal::address(globalParam);
 
-    if (systemValueInfo)
+    if (requiredType)
     {
-        if (systemValueInfo->requiredType)
+        // We may need to adapt from the declared type to/from
+        // the actual type of the GLSL global.
+        auto fullPretendType = maybeWrapIntoArray(builder, inType, declarator);
+        if (!isTypeEqual(type, fullPretendType))
         {
-            // We may need to adapt from the declared type to/from
-            // the actual type of the GLSL global.
-            if (!isTypeEqual(peeledRequiredType, inType))
-            {
-                RefPtr<ScalarizedTypeAdapterValImpl> typeAdapter = new ScalarizedTypeAdapterValImpl;
-                typeAdapter->actualType = peeledRequiredType;
-                typeAdapter->pretendType = inType;
-                typeAdapter->val = val;
+            RefPtr<ScalarizedTypeAdapterValImpl> typeAdapter = new ScalarizedTypeAdapterValImpl;
+            typeAdapter->actualType = type;
+            typeAdapter->pretendType = fullPretendType;
+            typeAdapter->val = val;
 
-                val = ScalarizedVal::typeAdapter(typeAdapter);
-            }
-
-            if (auto requiredArrayType = as<IRArrayTypeBase>(systemValueInfo->requiredType))
+            // If the variable is a system value, and the required (system-provided) array size
+            // is smaller than the user-declared array size, we need to issue an error, since
+            // we don't have a way to fill in the additional elements.
+            //
+            if (auto requiredArrayType = as<IRArrayTypeBase>(requiredType))
             {
                 // Find first array declarator and handle size mismatch
                 for (auto dd = declarator; dd; dd = dd->next)
@@ -1656,26 +1666,15 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
                             fromSize,
                             toSize);
                     }
-
-                    // Array sizes differ, need type adapter
-                    RefPtr<ScalarizedTypeAdapterValImpl> typeAdapter =
-                        new ScalarizedTypeAdapterValImpl;
-                    typeAdapter->actualType = systemValueInfo->requiredType;
-                    typeAdapter->pretendType = builder->getArrayType(inType, declaredArraySize);
-                    typeAdapter->val = val;
-
-                    val = ScalarizedVal::typeAdapter(typeAdapter);
-                    break;
                 }
             }
+            val = ScalarizedVal::typeAdapter(typeAdapter);
         }
     }
-    else
+
+    if (!systemValueInfo && nameHintSB.getLength())
     {
-        if (nameHintSB.getLength())
-        {
-            builder->addNameHintDecoration(globalParam, nameHintSB.getUnownedSlice());
-        }
+        builder->addNameHintDecoration(globalParam, nameHintSB.getUnownedSlice());
     }
 
     createVarLayoutForLegalizedGlobalParam(
@@ -2082,7 +2081,7 @@ ScalarizedVal extractField(
     }
 }
 
-ScalarizedVal adaptType(IRBuilder* builder, IRInst* val, IRType* toType, IRType* fromType)
+IRInst* convertMaterializedValue(IRBuilder* builder, IRInst* val, IRType* toType, IRType* fromType)
 {
     if (auto fromVector = as<IRVectorType>(fromType))
     {
@@ -2113,41 +2112,43 @@ ScalarizedVal adaptType(IRBuilder* builder, IRInst* val, IRType* toType, IRType*
         }
         else if (auto toArray = as<IRArrayTypeBase>(toType))
         {
-            // If array sizes differ, we need to reshape the array
-            if (fromArray->getElementCount() != toArray->getElementCount())
+            // If array sizes or element types differ, we need to reshape the array
+            List<IRInst*> elements;
+
+            // Get array sizes once
+            auto fromSize = getIntVal(fromArray->getElementCount());
+            auto toSize = getIntVal(toArray->getElementCount());
+
+            // Extract elements one at a time up to the minimum
+            // size, between the source and destination.
+            //
+            auto limit = fromSize < toSize ? fromSize : toSize;
+            for (Index i = 0; i < limit; i++)
             {
-                List<IRInst*> elements;
-
-                // Get array sizes once
-                auto fromSize = getIntVal(fromArray->getElementCount());
-                auto toSize = getIntVal(toArray->getElementCount());
-
-                // Extract elements one at a time up to the minimum
-                // size, between the source and destination.
-                //
-                auto limit = fromSize < toSize ? fromSize : toSize;
-                for (Index i = 0; i < limit; i++)
-                {
-                    auto element = builder->emitElementExtract(
-                        fromArray->getElementType(),
-                        val,
-                        builder->getIntValue(builder->getIntType(), i));
-                    elements.add(element);
-                }
-
-                if (fromSize < toSize)
-                {
-                    // Fill remaining elements with default value up to target size
-                    auto elementType = toArray->getElementType();
-                    auto defaultValue = builder->emitDefaultConstruct(elementType);
-                    for (Index i = fromSize; i < toSize; i++)
-                    {
-                        elements.add(defaultValue);
-                    }
-                }
-
-                val = builder->emitMakeArray(toType, elements.getCount(), elements.getBuffer());
+                auto element = builder->emitElementExtract(
+                    fromArray->getElementType(),
+                    val,
+                    builder->getIntValue(builder->getIntType(), i));
+                element = convertMaterializedValue(
+                    builder,
+                    element,
+                    toArray->getElementType(),
+                    fromArray->getElementType());
+                elements.add(element);
             }
+
+            if (fromSize < toSize)
+            {
+                // Fill remaining elements with default value up to target size
+                auto elementType = toArray->getElementType();
+                auto defaultValue = builder->emitDefaultConstruct(elementType);
+                for (Index i = fromSize; i < toSize; i++)
+                {
+                    elements.add(defaultValue);
+                }
+            }
+
+            val = builder->emitMakeArray(toType, elements.getCount(), elements.getBuffer());
         }
     }
     else if (auto toArray = as<IRArrayType>(toType))
@@ -2159,11 +2160,15 @@ ScalarizedVal adaptType(IRBuilder* builder, IRInst* val, IRType* toType, IRType*
             auto arrayElementType = toArray->getElementType();
             auto convertedVal = builder->emitCast(arrayElementType, val);
             val = builder->emitMakeArrayFromElement(toType, convertedVal);
-            return ScalarizedVal::value(val);
+            return val;
         }
     }
-    // TODO: actually consider what needs to go on here...
-    return ScalarizedVal::value(builder->emitCast(toType, val));
+    return builder->emitCast(toType, val);
+}
+
+ScalarizedVal adaptType(IRBuilder* builder, IRInst* val, IRType* toType, IRType* fromType)
+{
+    return ScalarizedVal::value(convertMaterializedValue(builder, val, toType, fromType));
 }
 
 ScalarizedVal adaptType(
@@ -2180,8 +2185,11 @@ ScalarizedVal adaptType(
 
     case ScalarizedVal::Flavor::address:
         {
-            auto loaded = builder->emitLoad(val.irValue);
-            return adaptType(builder, loaded, toType, fromType);
+            RefPtr<ScalarizedTypeAdapterValImpl> impl = new ScalarizedTypeAdapterValImpl;
+            impl->actualType = fromType;
+            impl->pretendType = toType;
+            impl->val = val;
+            return ScalarizedVal::typeAdapter(impl);
         }
         break;
     case ScalarizedVal::Flavor::arrayIndex:
@@ -2240,12 +2248,6 @@ void assign(
                     builder->emitStore(address, right.irValue);
                     break;
                 }
-            case ScalarizedVal::Flavor::address:
-                {
-                    auto val = builder->emitLoad(right.irValue);
-                    builder->emitStore(left.irValue, val);
-                    break;
-                }
             case ScalarizedVal::Flavor::tuple:
                 {
                     // We are assigning from a tuple to a destination
@@ -2264,7 +2266,10 @@ void assign(
                 }
 
             default:
-                SLANG_UNEXPECTED("unimplemented");
+                {
+                    auto materializedVal = materializeValue(builder, right);
+                    assign(builder, left, ScalarizedVal::value(materializedVal), index);
+                }
                 break;
             }
             break;
@@ -2355,14 +2360,19 @@ ScalarizedVal getSubscriptVal(
     case ScalarizedVal::Flavor::typeAdapter:
         {
             auto inputAdapter = val.impl.as<ScalarizedTypeAdapterValImpl>();
-            RefPtr<ScalarizedTypeAdapterValImpl> resultAdapter = new ScalarizedTypeAdapterValImpl();
-
-            resultAdapter->pretendType = elementType;
-            resultAdapter->actualType = getElementType(*builder, inputAdapter->actualType);
-
-            resultAdapter->val =
-                getSubscriptVal(builder, resultAdapter->actualType, inputAdapter->val, indexVal);
-            return ScalarizedVal::typeAdapter(resultAdapter);
+            auto pretendType = elementType;
+            auto actualType = getElementType(*builder, inputAdapter->actualType);
+            auto subscriptVal = getSubscriptVal(builder, actualType, inputAdapter->val, indexVal);
+            if (pretendType != actualType)
+            {
+                RefPtr<ScalarizedTypeAdapterValImpl> resultAdapter =
+                    new ScalarizedTypeAdapterValImpl();
+                resultAdapter->pretendType = pretendType;
+                resultAdapter->actualType = actualType;
+                resultAdapter->val = subscriptVal;
+                subscriptVal = ScalarizedVal::typeAdapter(resultAdapter);
+            }
+            return subscriptVal;
         }
 
     default:
@@ -2477,12 +2487,12 @@ IRInst* materializeValue(IRBuilder* builder, ScalarizedVal const& val)
             // work we need to adapt the type from its actual type over
             // to its pretend type.
             auto typeAdapter = as<ScalarizedTypeAdapterValImpl>(val.impl);
-            auto adapted = adaptType(
+            auto materializedInner = materializeValue(builder, typeAdapter->val);
+            return convertMaterializedValue(
                 builder,
-                typeAdapter->val,
+                materializedInner,
                 typeAdapter->pretendType,
                 typeAdapter->actualType);
-            return materializeValue(builder, adapted);
         }
         break;
 
@@ -2515,6 +2525,8 @@ void handleSingleParam(
     //
     auto globalParam = addGlobalParam(builder->getModule(), paramType);
     builder->addLayoutDecoration(globalParam, paramLayout);
+    if (auto nameDecor = pp->findDecoration<IRNameHintDecoration>())
+        builder->addNameHintDecoration(globalParam, nameDecor->getName());
     moveValueBefore(globalParam, builder->getFunc());
     pp->replaceUsesWith(globalParam);
 
@@ -3205,27 +3217,44 @@ void tryReplaceUsesOfStageInput(
                         break;
                     case kIROp_GetElementPtr:
                         {
-                            auto targetType = typeAdapter->pretendType;
-                            auto elementType = getElementType(builder, targetType);
-                            SLANG_ASSERT(elementType);
+                            auto actualElementType =
+                                getElementType(builder, typeAdapter->actualType);
+                            auto pretendElementType =
+                                getElementType(builder, typeAdapter->pretendType);
+                            SLANG_ASSERT(actualElementType && pretendElementType);
                             auto subscriptVal = getSubscriptVal(
                                 &builder,
-                                (IRType*)elementType,
-                                val,
+                                (IRType*)actualElementType,
+                                typeAdapter->val,
                                 user->getOperand(1));
+                            if (actualElementType != pretendElementType)
+                            {
+                                subscriptVal = adaptType(
+                                    &builder,
+                                    subscriptVal,
+                                    pretendElementType,
+                                    actualElementType);
+                            }
                             tryReplaceUsesOfStageInput(context, subscriptVal, user);
                         }
                         break;
                     case kIROp_FieldAddress:
                         {
-                            auto targetType = as<IRStructType>(typeAdapter->pretendType);
-                            SLANG_ASSERT(targetType);
-                            auto subscriptVal = extractField(
-                                &builder,
-                                val,
-                                kMaxUInt,
-                                (IRStructKey*)user->getOperand(1));
-                            tryReplaceUsesOfStageInput(context, subscriptVal, user);
+                            auto key = (IRStructKey*)user->getOperand(1);
+                            auto pretendFieldType = getFieldType(typeAdapter->pretendType, key);
+                            auto actualFieldType = getFieldType(typeAdapter->actualType, key);
+                            SLANG_ASSERT(pretendFieldType && actualFieldType);
+                            auto newFieldVal =
+                                extractField(&builder, typeAdapter->val, kMaxUInt, key);
+                            if (pretendFieldType != actualFieldType)
+                            {
+                                newFieldVal = adaptType(
+                                    &builder,
+                                    newFieldVal,
+                                    pretendFieldType,
+                                    actualFieldType);
+                            }
+                            tryReplaceUsesOfStageInput(context, newFieldVal, user);
                         }
                         break;
                     default:

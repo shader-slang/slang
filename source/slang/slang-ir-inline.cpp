@@ -1002,12 +1002,20 @@ struct TypeInliningPass : InliningPassBase
 {
     typedef InliningPassBase Super;
 
-    TypeInliningPass(IRModule* module)
-        : Super(module)
+    TargetProgram* targetProgram;
+
+    bool shouldInlineBorrowRefTypesForSPIRV = false;
+
+    TypeInliningPass(IRModule* module, TargetProgram* inTargetProgram)
+        : Super(module), targetProgram(inTargetProgram)
     {
+        if (targetProgram->shouldEmitSPIRVDirectly())
+        {
+            shouldInlineBorrowRefTypesForSPIRV = true;
+        }
     }
 
-    bool doesTypeRequireInline(IRType* type, IRFunc* callee)
+    bool doesTypeRequireInline(IRType* type, IRInst* arg, IRFunc* callee)
     {
         // TODO(JS):
         // I guess there is a question here about what type around string requires
@@ -1022,6 +1030,37 @@ struct TypeInliningPass : InliningPassBase
                 if (callee->findDecoration<IRNoRefInlineDecoration>())
                     return false;
                 return true;
+            }
+        case kIROp_BorrowInParamType:
+        case kIROp_BorrowInOutParamType:
+            {
+                if (shouldInlineBorrowRefTypesForSPIRV)
+                {
+                    if (!arg)
+                        return true;
+
+                    // If the argument is a refernece to a local variable "memory object",
+                    // we don't need to inline.
+                    auto rootAddr = getRootAddr(arg);
+                    if (as<IRVar>(rootAddr) || as<IRGlobalVar>(rootAddr))
+                        return false;
+
+                    // Otherwise, we should inline the function before emitting SPIR-V,
+                    // because:
+                    // 1) SPIRV does not support expressing a function that takes a pointer
+                    // parameter whose address space is not Function or Private.
+                    // 2) SPIRV does not allow passing a pointer-typed argument that isn't a direct
+                    // reference to a variable "memory object". For example, you cannot pass the
+                    // result of an access chain to a pointer-typed parameter.
+                    //
+                    // Note that despite restriction rule (2) above, we still allow passing
+                    // an access chain to a local variable to a function in the Slang IR, and we
+                    // will introduce an additional copy when we emit SPIR-V. We do this to minimize
+                    // inlining in the Slang IR, and introducing additional copy for things already
+                    // in Function address space is generally less harmful.
+                    return true;
+                }
+                return false;
             }
         case kIROp_StringType:
         case kIROp_NativeStringType:
@@ -1039,7 +1078,7 @@ struct TypeInliningPass : InliningPassBase
     {
         auto callee = info.callee;
 
-        if (doesTypeRequireInline(callee->getResultType(), callee))
+        if (doesTypeRequireInline(callee->getResultType(), nullptr, callee))
         {
             return true;
         }
@@ -1047,7 +1086,7 @@ struct TypeInliningPass : InliningPassBase
         const auto count = Count(callee->getParamCount());
         for (Index i = 0; i < count; ++i)
         {
-            if (doesTypeRequireInline(callee->getParamType(UInt(i)), callee))
+            if (doesTypeRequireInline(callee->getParamType(UInt(i)), info.call->getArg(i), callee))
             {
                 return true;
             }
@@ -1059,36 +1098,12 @@ struct TypeInliningPass : InliningPassBase
 
 } // namespace
 
-Result performTypeInlining(IRModule* module, DiagnosticSink* sink)
+Result performTypeInlining(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
     SLANG_UNUSED(sink);
 
-    // TODO(JS):
-    // This is perhaps not as efficient as might be desirable.
-    // A more optimized version might not need to pass over all of the module
-    // to find new call sites.
-    //
-    // Another problem here is recursion. Right now Slang compiler doesn't accept recursive input,
-    // but the Slang language is supposed to support recursion on targets that support it.
-    // There are GPU targets that allow recursion such as CUDA.
-    //
-    // Another approach would be (when enabled) when inlining occurs, would be instead of continuing
-    // *after*, to start the checks/inlining from where the inline took place.
-    //
-    while (true)
-    {
-        TypeInliningPass pass(module);
-        if (pass.considerAllCallSites())
-        {
-            // If there was a change try inlining again
-            continue;
-        }
-
-        // Done.
-        break;
-    }
-
-
+    TypeInliningPass pass(module, targetProgram);
+    pass.considerAllCallSites();
     return SLANG_OK;
 }
 

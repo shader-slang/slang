@@ -820,6 +820,11 @@ Enable experimental dynamic dispatch features
 Embed downstream IR into emitted slang IR 
 
 
+<a id="experimental-feature"></a>
+### -experimental-feature
+Enable experimental features (loading builtin neural module) 
+
+
 
 <a id="Internal"></a>
 ## Internal
@@ -1262,6 +1267,7 @@ A capability describes an optional feature that a target may or may not support.
 * `spvVulkanMemoryModelDeviceScopeKHR` 
 * `spvBindlessTextureNV` 
 * `metallib_latest` 
+* `hlsl_coopvec_poc_sm_6_9` 
 * `dxil_lib` 
 * `any_target` 
 * `any_textual_target` 
@@ -1388,6 +1394,7 @@ A capability describes an optional feature that a target may or may not support.
 * `cooperative_vector` 
 * `cooperative_vector_training` 
 * `cooperative_matrix` 
+* `cooperative_matrix_spirv` 
 * `cooperative_matrix_reduction` 
 * `cooperative_matrix_conversion` 
 * `cooperative_matrix_map_element` 

@@ -12,10 +12,10 @@ Slang enables you to do many powerful things with shader code, including compili
 The easiest way to start using Slang is to download a [binary release](https://github.com/shader-slang/slang/releases/) from the GitHub repository. Once you have downloaded and extracted the files from a release package, you can find the `slangc.exe` or `slangc` executable under `/bin`. In this tutorial we will use the `slangc` standalone Slang compiler included in a release package.
 
 > #### Note: Required Dependencies ####
-> For Windows, `slang.dll` and `slang-glslang.dll` must be placed in the same directory as `slangc.exe` as they are required by the standalone executable.
+> For Windows, `slang-compiler.dll` and `slang-glslang.dll` must be placed in the same directory as `slangc.exe` as they are required by the standalone executable.
 
 > #### Note: Multiple Slang Installations ####
-> If you have multiple versions of Slang installed on your system (such as Slang from the Vulkan SDK), ensure that the correct dynamic libraries are being loaded. On Linux, the `LD_LIBRARY_PATH` environment variable will override the `RUNPATH` embedded in the `slangc` executable, causing it to load `libslang.so` from the path specified in `LD_LIBRARY_PATH` first. This can lead to version mismatches and unexpected behavior.
+> If you have multiple versions of Slang installed on your system (such as Slang from the Vulkan SDK), ensure that the correct dynamic libraries are being loaded. On Linux, the `LD_LIBRARY_PATH` environment variable will override the `RUNPATH` embedded in the `slangc` executable, causing it to load `libslang-compiler.so` from the path specified in `LD_LIBRARY_PATH` first. This can lead to version mismatches and unexpected behavior.
 
 If you are interested in building from source, please refer to the [documentation on building Slang](../building.md). 
 

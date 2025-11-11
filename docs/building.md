@@ -147,6 +147,28 @@ See the [documentation on testing](../tools/slang-test/README.md) for more infor
 
 See the [documentation on debugging](/docs/debugging.md).
 
+## Distributing
+
+### Versioned Libraries
+
+As of v2025.21, the Slang libraries on **Mac** and **Linux** use versioned
+filenames. The public ABI for Slang libraries in general is not currently
+stable, so in accordance with semantic versioning conventions, the major
+version number for dynamically linkable libraries is currently 0. Due to the
+unstable ABI, releases are designed so that downstream users will be linked
+against the fully versioned library filenames (e.g.,
+`libslang-compiler.so.0.2025.21` instead of `libslang-compiler.so`).
+
+Slang libraries for **Windows** do not have an explicit version in the
+filename, but the same guidance about stability of the ABI applies.
+
+Downstream users of Slang distributing their products as binaries should
+therefor **on all platforms, including Windows** redistribute the Slang
+libraries they linked against, or otherwise communicate the specific version
+dependency to their users. It is *not the case* that a user of your product can
+just install any recent Slang release and have an installation of Slang that
+works for any given binary.
+
 ## More niche topics
 
 ### CMake options
@@ -158,6 +180,7 @@ See the [documentation on debugging](/docs/debugging.md).
 | `SLANG_EMBED_CORE_MODULE_SOURCE`  | `TRUE`                     | Embed the core module source in the binary                                                   |
 | `SLANG_ENABLE_DXIL`               | `TRUE`                     | Enable generating DXIL using DXC                                                             |
 | `SLANG_ENABLE_ASAN`               | `FALSE`                    | Enable ASAN (address sanitizer)                                                              |
+| `SLANG_ENABLE_COVERAGE`           | `FALSE`                    | Enable code coverage instrumentation                                                         |
 | `SLANG_ENABLE_FULL_IR_VALIDATION` | `FALSE`                    | Enable full IR validation (SLOW!)                                                            |
 | `SLANG_ENABLE_IR_BREAK_ALLOC`     | `FALSE`                    | Enable IR BreakAlloc functionality for debugging.                                            |
 | `SLANG_ENABLE_GFX`                | `TRUE`                     | Enable gfx targets                                                                           |
@@ -213,13 +236,13 @@ There are several options for getting llvm-support:
       containing such a file
     - If this isn't set then the build system tries to download it from the
       release on github matching the current tag. If such a tag doesn't exist
-      or doesn't have the correct os*arch combination then the latest release
+      or doesn't have the correct os\*arch combination then the latest release
       will be tried.
     - If `SLANG_SLANG_LLVM_BINARY_URL` is `FETCH_BINARY_IF_POSSIBLE` then in
       the case that a prebuilt binary can't be found then the build will proceed
       as though `DISABLE` was chosen
 - Use a system supplied LLVM: `-DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM`, you
-  must have llvm-14.0 and a matching libclang installed. It's important that
+  must have llvm-21.1 and a matching libclang installed. It's important that
   either:
     - You don't end up linking to a dynamic libllvm.so, this will almost
       certainly cause multiple versions of LLVM to be loaded at runtime,
@@ -355,20 +378,51 @@ _MSVC_ 19 is tested in CI and is the recommended minimum version.
 
 _Clang_ 17.0 is tested in CI and is the recommended minimum version.
 
-## Static linking against libslang
+## Static linking against libslang-compiler
 
-If linking against a static `libslang.a` you will need to link against some
+To build statically, set the `SLANG_LIB_TYPE` flag in CMake to `STATIC`.
+
+If linking against a static `libslang-compiler.a` you will need to link against some
 dependencies also if you're not already incorporating them into your project.
 
-You will need to link against:
-
 ```
-${SLANG_DIR}/build/Release/lib/libslang.a
+${SLANG_DIR}/build/Release/lib/libslang-compiler.a
 ${SLANG_DIR}/build/Release/lib/libcompiler-core.a
 ${SLANG_DIR}/build/Release/lib/libcore.a
 ${SLANG_DIR}/build/external/miniz/libminiz.a
 ${SLANG_DIR}/build/external/lz4/build/cmake/liblz4.a
 ```
+
+## Deprecation of libslang and slang.dll filenames
+
+In Slang v2025.21, the primary library for Slang was renamed, from
+`libslang.so` and `slang.dll` to `libslang-compiler.so` and
+`slang-compiler.dll`. (A similar change was made for macOS.) The reason behind
+this change was to address a conflict on the Linux target, where the S-Lang
+library of the same name is commonly preinstalled on Linux distributions. The
+same issue affected macOS, to a lesser extent, where the S-Lang library could
+be installed via `brew`. To make the Slang library name predictable and
+simplify downstream build logic, the Slang library name was changed on all
+platforms.
+
+A change like this requires a period of transition, so on a **temporary**
+basis: Linux and macOS packages now include symlinks from the old filename to
+the new one. For Windows, a proxy library is provided with the old name, that
+redirects all functions to the new `slang-compiler.dll`. The rationale here is
+that applications with a complex dependency graph may have some components
+still temporarily using `slang.dll`, while others have been updated to use
+`slang-compiler.dll`. Using a proxy library for `slang.dll` ensures that all
+components are using the same library, and avoids any potential state or
+heap-related issues from an executable sharing data structures between the two
+libraries.
+
+These backwards compatability affordances, namely the proxy `slang.dll` and
+`slang.lib` (for Windows) and the `libslang.so` and `libslang.dylib` symlinks
+(for Linux and macOS), **will be removed at the end of 2026**. Until that time,
+they will be present in the github release packages for downstream use.
+Downstream packaging may or may not choose to distribute them, at their
+discretion. **We strongly encourage downstream users of Slang to move to the
+new library names as soon as they are able.**
 
 ## Notes
 

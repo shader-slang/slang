@@ -12,7 +12,7 @@ struct B {
 struct FIn
 {
     Ptr<B> i0;
-    Ptr<B> i1;
+    Ptr<B> i1[2][3];
     float c;
     float d;
 }
@@ -29,7 +29,7 @@ FOut fragmentMain(FIn input)
 {
 
 	FOut output;
-	output.outputColor = float4(input.i0.a.f, input.i0.b, input.i1.a.f, input.i1.b)+input.c-input.d;
+	output.outputColor = float4(input.i0.a.f, input.i0.b, input.i1[0][1].a.f, input.i1[0][1].b)+input.c-input.d;
     output.outputColor += testBuffer[0].b;
 	return output;
 }
@@ -38,8 +38,8 @@ FOut fragmentMain(FIn input)
 // SPIRV: OpDecorate %input_i0 Flat
 // SPIRV: OpDecorate %input_i1 Location 1
 // SPIRV: OpDecorate %input_i1 Flat
-// SPIRV: OpDecorate %input_c Location 2
-// SPIRV: OpDecorate %input_d Location 3
+// SPIRV: OpDecorate %input_c Location 7
+// SPIRV: OpDecorate %input_d Location 8
 // SPIRV: OpMemberDecorate %A_c 0 Offset 0
 // SPIRV: OpMemberDecorate %A_c 1 Offset 8
 // SPIRV: OpMemberDecorate %B_c 0 Offset 0
