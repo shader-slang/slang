@@ -305,6 +305,24 @@ jobs:
             echo "Assuming dependencies are already available"
           fi
 
+      - name: Install Bash 4+ on macOS
+        if: inputs.os == 'macos'
+        run: |
+          echo "Installing Bash 4+ via Homebrew..."
+          brew install bash
+          echo "Installed Bash version:"
+          /usr/local/bin/bash --version || /opt/homebrew/bin/bash --version
+
       - name: Run slangpy-samples examples
         run: |
-          bash extras/run-slangpy-examples.sh "${{ inputs.os }}" slangpy-samples "$SITE_PACKAGES"
+          # Use Bash 4+ on macOS (script requires associative arrays)
+          if [[ "${{ inputs.os }}" == "macos" ]]; then
+            # Try both possible locations for homebrew bash
+            if [ -f /opt/homebrew/bin/bash ]; then
+              /opt/homebrew/bin/bash extras/run-slangpy-examples.sh "${{ inputs.os }}" slangpy-samples "$SITE_PACKAGES"
+            else
+              /usr/local/bin/bash extras/run-slangpy-examples.sh "${{ inputs.os }}" slangpy-samples "$SITE_PACKAGES"
+            fi
+          else
+            bash extras/run-slangpy-examples.sh "${{ inputs.os }}" slangpy-samples "$SITE_PACKAGES"
+          fi

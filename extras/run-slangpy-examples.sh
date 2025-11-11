@@ -13,6 +13,17 @@
 
 set -euo pipefail
 
+# Check Bash version (associative arrays require Bash 4+)
+if [ "${BASH_VERSINFO[0]}" -lt 4 ]; then
+  echo "Error: Bash 4 or newer is required. Current version: $BASH_VERSION" >&2
+  if [[ "$(uname)" == "Darwin" ]]; then
+    echo "Please install a newer version of Bash using Homebrew:" >&2
+    echo "  brew install bash" >&2
+    echo "Then use /usr/local/bin/bash or /opt/homebrew/bin/bash" >&2
+  fi
+  exit 1
+fi
+
 # Parse arguments
 if [ $# -ne 3 ]; then
   echo "Usage: $0 <platform> <slangpy-samples-dir> <site-packages>"
@@ -51,6 +62,11 @@ if [ -f "$SKIPLIST_FILE" ]; then
     if [[ "$line" =~ ^([^(]+)(\(([^)]+)\))?[[:space:]]*$ ]]; then
       example_name=$(echo "${BASH_REMATCH[1]}" | xargs)
       platforms="${BASH_REMATCH[3]}"
+
+      # Skip if example name is empty
+      if [[ -z "$example_name" ]]; then
+        continue
+      fi
 
       # If no platforms specified, skip on all platforms
       if [[ -z "$platforms" ]]; then
@@ -93,7 +109,8 @@ for example_dir in examples/*/; do
   fi
 
   # Check if example is in skiplist
-  if [[ -n "${skip_examples[$example_name]}" ]]; then
+  # Use ${skip_examples[$example_name]:-} to safely handle missing keys
+  if [[ -n "${skip_examples[$example_name]:-}" ]]; then
     echo ""
     echo "[SKIP] $example_name (in skiplist)"
     skipped_examples+=("$example_name")
