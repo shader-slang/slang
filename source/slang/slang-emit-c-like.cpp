@@ -4011,11 +4011,6 @@ bool shouldWrapInExternCBlock(IRFunc* func)
 
 void CLikeSourceEmitter::emitFunc(IRFunc* func)
 {
-    if (!func->findDecoration<IRExternCppDecoration>())
-    {
-        return;
-    }
-
     // Target-intrinsic functions should never be emitted
     // even if they happen to have a body.
     //
@@ -4429,11 +4424,6 @@ void CLikeSourceEmitter::emitBitfieldInsertImpl(IRInst* inst)
 
 void CLikeSourceEmitter::emitStruct(IRStructType* structType)
 {
-    if (!structType->findDecoration<IRExternCppDecoration>())
-    {
-        return;
-    }
-
     ensureTypePrelude(structType);
 
     // If the selected `struct` type is actually an intrinsic
@@ -5363,6 +5353,12 @@ void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& 
     }
     for (auto inst : module->getGlobalInsts())
     {
+        if (shouldEmitOnlyHeader()) {
+            // Don't emit types without ExternCppDecoration in the header
+            if (!inst->findDecoration<IRExternCppDecoration>())
+                continue;
+        }
+
         if (as<IRType>(inst))
         {
             // Don't emit a type unless it is actually used or is marked exported.
