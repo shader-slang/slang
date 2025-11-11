@@ -1095,6 +1095,18 @@ SlangResult NVRTCDownstreamCompiler::compile(
         return SLANG_FAIL;
     }
 
+    // Previously, we relied on `_maybeAddHalfSupport` to find the cuda include path, but
+    // that was incorrect. Because if there is no half support needed, we will not add the
+    // CUDA include path at all. So we always try to find and add the CUDA include path here.
+    String includePath;
+    if (_getCUDAIncludePath(includePath) == SLANG_OK)
+    {
+        // Add the found include path
+        cmdLine.addArg("-I");
+        cmdLine.addArg(includePath);
+    }
+
+
     // Neither of these options are strictly required, for general use of nvrtc,
     // but are enabled to make use withing Slang work more smoothly
     {

@@ -4,6 +4,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -Xslang -DTEST_MODE=3 -render-feature cooperative-matrix-per-element-operations
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -Xslang -DTEST_MODE=4 -render-feature cooperative-matrix-per-element-operations
 
+//
 //CHECK: type: int32_t
 //CHECK-NEXT: 8
 //CHECK-NEXT: 10
@@ -25,6 +26,7 @@ int MapOp(uint32_t row, uint32_t col, int value)
     return value * 2 + 1 + 2 + 3;
 }
 
+[shader("compute")]
 [numthreads(32, 1, 1)]
 void computeMain()
 {

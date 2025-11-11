@@ -1,4 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
 
 // CHECK: type: int32_t
 // CHECK-NEXT: 2
@@ -19,6 +20,7 @@ using namespace linalg;
 
 typealias CoopMatType = CoopMat<int32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>;
 
+[shader("compute")]
 [numthreads(32, 1, 1)]
 void computeMain()
 {
