@@ -2525,6 +2525,8 @@ void handleSingleParam(
     //
     auto globalParam = addGlobalParam(builder->getModule(), paramType);
     builder->addLayoutDecoration(globalParam, paramLayout);
+    if (auto nameDecor = pp->findDecoration<IRNameHintDecoration>())
+        builder->addNameHintDecoration(globalParam, nameDecor->getName());
     moveValueBefore(globalParam, builder->getFunc());
     pp->replaceUsesWith(globalParam);
 
