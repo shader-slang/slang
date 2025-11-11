@@ -11575,7 +11575,7 @@ List<ExtensionDecl*> const& SharedSemanticsContext::getCandidateExtensionsForTyp
         // There are two primary modes in which the `SharedSemanticsContext`
         // gets used.
         //
-        // In the first mode, we are checking an entire `ModuelDecl`, and we
+        // In the first mode, we are checking an entire `ModuleDecl`, and we
         // need to always check things from the "point of view" of that module
         // (so that the extensions that should be visible are based on what
         // that module can access via `import`s).
@@ -11623,9 +11623,10 @@ List<ExtensionDecl*> const& SharedSemanticsContext::getCandidateExtensionsForTyp
     }
     else if (!m_module)
     {
-        // For reflection/API contexts, incrementally add extensions from
-        // any modules that have been loaded since we last updated the cache.
-        // This follows the same pattern as ContainerDecl's lookup accelerators.
+        // For ad hoc contexts without a primary module, incrementally add
+        // extensions from any modules that have been loaded since we last
+        // updated the cache. This follows the same pattern as ContainerDecl's
+        // lookup accelerators.
         //
         Index currentModuleCount = m_linkage->loadedModulesList.getCount();
         Index processedModuleCount = m_candidateExtensionListsBuiltForModuleCount;
