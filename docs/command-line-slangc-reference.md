@@ -1394,6 +1394,7 @@ A capability describes an optional feature that a target may or may not support.
 * `cooperative_vector` 
 * `cooperative_vector_training` 
 * `cooperative_matrix` 
+* `cooperative_matrix_spirv` 
 * `cooperative_matrix_reduction` 
 * `cooperative_matrix_conversion` 
 * `cooperative_matrix_map_element` 
