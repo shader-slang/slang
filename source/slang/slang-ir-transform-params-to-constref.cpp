@@ -222,6 +222,11 @@ struct TransformParamsToConstRefContext
             if (as<IREntryPointDecoration>(decoration) || as<IRCudaKernelDecoration>(decoration) ||
                 as<IRAutoPyBindCudaDecoration>(decoration))
                 return false;
+
+            // Skip functions with CudaDeviceExport decoration.
+            // These functions have externally visible signatures that should not be changed.
+            if (func->findDecorationImpl(kIROp_CudaDeviceExportDecoration))
+                return false;
         }
 
         // Skip functions with `kIROp_GenericAsm` since

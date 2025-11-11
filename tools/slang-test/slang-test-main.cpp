@@ -4864,6 +4864,19 @@ template<typename F>
 void runTestsInParallel(TestContext* context, int count, const F& f)
 {
     auto originalReporter = context->getTestReporter();
+
+    // Pre-create test-server processes sequentially to avoid concurrent fork() issues.
+    // This eliminates the thundering herd problem when all threads start simultaneously.
+    if (context->options.defaultSpawnType == SpawnType::UseTestServer ||
+        context->options.defaultSpawnType == SpawnType::UseFullyIsolatedTestServer)
+    {
+        for (int threadId = 0; threadId < context->options.serverCount; threadId++)
+        {
+            context->setThreadIndex(threadId);
+            context->getOrCreateJSONRPCConnection();
+        }
+    }
+
     std::atomic<int> consumePtr;
     consumePtr = 0;
     auto threadFunc = [&](int threadId)
