@@ -1467,9 +1467,33 @@ Result linkAndOptimizeIR(
         break;
     case CodeGenTarget::Metal:
     case CodeGenTarget::MetalLib:
-        // Metal does not allow `ConstantBuffer<StructuredBuffer<T>>`, so we need to create
-        // a wrapper struct for the `StructuredBuffer<T>`.
-        wrapCBufferElementsForMetal(irModule);
+        // Metal does not allow `ConstantBuffer<StructuredBuffer<T>>` or nested parameter blocks
+        // like `ParameterBlock<ParameterBlock<T>>`, so we need to create wrapper structs.
+        // Run iteratively to handle deeply nested parameter blocks (e.g., 3+ levels).
+        for (int i = 0; i < 10; ++i)  // Max 10 levels of nesting
+        {
+            // Count how many types exist before wrapping
+            int typeCountBefore = 0;
+            for (auto globalInst : irModule->getGlobalInsts())
+            {
+                if (as<IRParameterGroupType>(globalInst))
+                    typeCountBefore++;
+            }
+            
+            wrapCBufferElementsForMetal(irModule);
+            
+            // Count how many types exist after wrapping
+            int typeCountAfter = 0;
+            for (auto globalInst : irModule->getGlobalInsts())
+            {
+                if (as<IRParameterGroupType>(globalInst))
+                    typeCountAfter++;
+            }
+            
+            // If no new types were created, we're done
+            if (typeCountAfter == typeCountBefore)
+                break;
+        }
         break;
     default:
         break;

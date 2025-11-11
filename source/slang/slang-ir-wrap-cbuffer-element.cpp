@@ -36,50 +36,58 @@ void wrapCBufferElements(IRModule* module, WrapCBufferElementPolicy* policy)
 
     IRBuilder builder(module);
 
-    List<WorkItem> workList;
+    // Collect all parameter group types that need wrapping first, to avoid
+    // issues with modifying the global insts list while iterating.
+    List<IRParameterGroupType*> typesToWrap;
     for (auto globalInst : module->getGlobalInsts())
     {
-        // Discover all insts whose type is a parameter group type.
         if (auto paramGroupType = as<IRParameterGroupType>(globalInst))
         {
-            if (!policy->shouldWrapBufferElementInStruct(paramGroupType))
-                continue;
-
-            // Create the wrapper struct.
-            builder.setInsertBefore(paramGroupType);
-            auto structType = builder.createStructType();
-            maybeProvideNameHint(builder, structType, paramGroupType);
-            auto fieldKey = builder.createStructKey();
-            builder.addNameHintDecoration(fieldKey, toSlice("inner"));
-            builder.createStructField(structType, fieldKey, paramGroupType->getElementType());
-
-            // Create the new parameter group type whose element is the wrapper struct.
-            List<IRInst*> bufferTypeOperands;
-            bufferTypeOperands.add(structType);
-            for (UInt i = 1; i < paramGroupType->getOperandCount(); ++i)
+            if (policy->shouldWrapBufferElementInStruct(paramGroupType))
             {
-                bufferTypeOperands.add(paramGroupType->getOperand(i));
+                typesToWrap.add(paramGroupType);
             }
-            auto newParameterGroupType = builder.getType(
-                paramGroupType->getOp(),
-                (UInt)bufferTypeOperands.getCount(),
-                bufferTypeOperands.getArrayView().getBuffer());
-
-            // Traverse all uses of the parameter group type, and add them to the work list
-            // for further processing.
-            traverseUses(
-                paramGroupType,
-                [&](IRUse* use)
-                {
-                    if (use->getUser()->getFullType() != paramGroupType)
-                        return;
-                    WorkItem item;
-                    item.wrappedFieldKey = fieldKey;
-                    item.inst = use->getUser();
-                    workList.add(item);
-                });
-            paramGroupType->replaceUsesWith(newParameterGroupType);
         }
+    }
+
+    // Now process each type that needs wrapping
+    List<WorkItem> workList;
+    for (auto paramGroupType : typesToWrap)
+    {
+        // Create the wrapper struct.
+        builder.setInsertBefore(paramGroupType);
+        auto structType = builder.createStructType();
+        maybeProvideNameHint(builder, structType, paramGroupType);
+        auto fieldKey = builder.createStructKey();
+        builder.addNameHintDecoration(fieldKey, toSlice("inner"));
+        builder.createStructField(structType, fieldKey, paramGroupType->getElementType());
+
+        // Create the new parameter group type whose element is the wrapper struct.
+        List<IRInst*> bufferTypeOperands;
+        bufferTypeOperands.add(structType);
+        for (UInt i = 1; i < paramGroupType->getOperandCount(); ++i)
+        {
+            bufferTypeOperands.add(paramGroupType->getOperand(i));
+        }
+        auto newParameterGroupType = builder.getType(
+            paramGroupType->getOp(),
+            (UInt)bufferTypeOperands.getCount(),
+            bufferTypeOperands.getArrayView().getBuffer());
+
+        // Traverse all uses of the parameter group type, and add them to the work list
+        // for further processing.
+        traverseUses(
+            paramGroupType,
+            [&](IRUse* use)
+            {
+                if (use->getUser()->getFullType() != paramGroupType)
+                    return;
+                WorkItem item;
+                item.wrappedFieldKey = fieldKey;
+                item.inst = use->getUser();
+                workList.add(item);
+            });
+        paramGroupType->replaceUsesWith(newParameterGroupType);
     }
 
     // Now we have a work list of all instructions that uses a parameter group.
@@ -119,7 +127,12 @@ public:
         if (as<IRVectorType>(cbufferType->getElementType()))
             return false;
 
-        // Wrap everything else in a struct.
+        // Metal does not allow pointer-to-pointer in [[buffer()]] attributes.
+        // For nested parameter blocks (ParameterBlock<ParameterBlock<T>>), we must wrap
+        // each level in a struct to create: struct { struct { T* }* }* instead of T**.
+        // The wrapping pass will be applied recursively to handle all nesting levels.
+        
+        // Wrap everything else in a struct (including nested parameter blocks).
         return true;
     }
 };
