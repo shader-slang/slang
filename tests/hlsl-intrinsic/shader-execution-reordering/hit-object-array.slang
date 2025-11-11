@@ -1,6 +1,6 @@
 // hit-object-array.slang
 
-//TEST:SIMPLE: -target dxil -entry rayGenerationMain -stage raygeneration -profile sm_6_5 -DNV_SHADER_EXTN_SLOT=u0 
+//TEST:SIMPLE: -target dxil -entry rayGenerationMain -stage raygeneration -profile sm_6_5 
 
 /* This doesn't work correctly currently because it produces assignments to the HitObject array in GLSL output. 
 But that is not valid for hitObjectNV int he extension */
