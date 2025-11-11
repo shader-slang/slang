@@ -8895,7 +8895,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     line,
                     col,
                     builder.getIntValue(builder.getUIntType(), offset * 8),
-                    builder.getIntValue(builder.getUIntType(), sizeAlignment.size * 8),
+                    builder.getIntValue(
+                        builder.getUIntType(),
+                        static_cast<uint64_t>(sizeAlignment.size) * 8),
                     builder.getIntValue(builder.getUIntType(), 0));
                 members.add(memberType);
             }
@@ -9173,7 +9175,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 [this](SpvOp opcode, SpvInstParent* defaultParent) -> SpvInstParent*
             {
                 const auto info = m_grammarInfo->opInfos.lookup(opcode);
-                SLANG_ASSERT(info.has_value());
+                // TODO(ncelik): tests/spirv/unknown-opcode.slang results in this func being called
+                // with opcode=SpvOpMax (0x7fffffff). Release/RelWithDebInfo builds would just
+                // invoke UB (call a [noreturn] func that does in fact return) in this case. The
+                // best solution would be to emit a proper diagnostic here.
+                SLANG_RELEASE_ASSERT(info.has_value());
                 switch (info->class_)
                 {
                 case SPIRVCoreGrammarInfo::OpInfo::TypeDeclaration:

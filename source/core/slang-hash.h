@@ -188,7 +188,7 @@ auto combineHash(H1 n, H2 m, Hs... args)
     // unhashed integers in here along with proper hashes of objects.
     static_assert(std::is_convertible_v<H1, HashCode64> || std::is_convertible_v<H1, HashCode32>);
     static_assert(std::is_convertible_v<H2, HashCode64> || std::is_convertible_v<H2, HashCode32>);
-    return combineHash((n * 16777619) ^ m, args...);
+    return combineHash((n * 16777619U) ^ m, args...);
 }
 
 template<typename I>

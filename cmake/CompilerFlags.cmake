@@ -159,11 +159,17 @@ function(set_default_compile_options target)
         add_supported_cxx_linker_flags(
             ${target}
             PRIVATE
-            # Don't assume that symbols will be resolved at runtime
-            "-Wl,--no-undefined"
             # No reason not to do this? Useful when using split debug info
             "-Wl,--build-id"
         )
+        if(NOT ${target} STREQUAL slang-llvm)
+            add_supported_cxx_linker_flags(
+                ${target}
+                PRIVATE
+                # Don't assume that symbols will be resolved at runtime
+                "-Wl,--no-undefined"
+            )
+        endif()
     endif()
 
     set_target_properties(
@@ -214,19 +220,30 @@ function(set_default_compile_options target)
     )
 
     if(SLANG_ENABLE_ASAN)
-        add_supported_cxx_flags(
-            ${target}
-            PRIVATE
-            /fsanitize=address
-            -fsanitize=address
-        )
-        add_supported_cxx_linker_flags(
-            ${target}
-            BEFORE
-            PUBLIC
-            /INCREMENTAL:NO
-            -fsanitize=address
-        )
+        if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+            # Clang defaults to statically linking the sanitizer runtime (except on macOS/Darwin),
+            # which is not compatible with -Wl,--no-undefined, so we need to use dynamic linking
+            # instead (-shared-libsan).
+            target_compile_options(
+                ${target}
+                PRIVATE -fsanitize=address,undefined -shared-libsan
+            )
+            target_link_options(
+                ${target}
+                PUBLIC -fsanitize=address,undefined -shared-libsan
+            )
+        elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+            target_compile_options(
+                ${target}
+                PRIVATE -fsanitize=address,undefined
+            )
+            target_link_options(${target} PUBLIC -fsanitize=address,undefined)
+        elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+            target_compile_options(${target} PRIVATE /fsanitize=address)
+            target_link_options(${target} PRIVATE /INCREMENTAL:NO)
+        else()
+            message(WARNING "Not enabling sanitizers: unsupported C++ compiler")
+        endif()
     endif()
 
     if(SLANG_ENABLE_COVERAGE)

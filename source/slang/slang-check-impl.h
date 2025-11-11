@@ -55,7 +55,7 @@ Type* getPointedToTypeIfCanImplicitDeref(Type* type);
 
 inline int getIntValueBitSize(IntegerLiteralValue val)
 {
-    uint64_t v = val > 0 ? (uint64_t)val : (uint64_t)-val;
+    uint64_t v = val > 0 ? (uint64_t)val : -(uint64_t)val;
     int result = 1;
     while (v >>= 1)
     {

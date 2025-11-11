@@ -467,7 +467,11 @@ class SLANG_RT_API String
     friend class StringBuilder;
 
 private:
-    char* getData() const { return m_buffer ? m_buffer->getData() : (char*)""; }
+    char* getData() const
+    {
+        static char empty[] = "";
+        return m_buffer ? m_buffer->getData() : empty;
+    }
 
 
     void ensureUniqueStorageWithCapacity(Index capacity);

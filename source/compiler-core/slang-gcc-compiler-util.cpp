@@ -620,11 +620,33 @@ static SlangResult _parseGCCFamilyLine(
         {
             // Don't link, just produce object file
             cmdLine.addArg("-c");
+
+            if (PlatformUtil::isFamily(PlatformFamily::Unix, platformKind))
+            {
+                // Position independent
+                cmdLine.addArg("-fPIC");
+            }
             break;
         }
     default:
         break;
     }
+
+#if defined(__has_feature)
+#if __has_feature(address_sanitizer)
+    if (options.targetType != SLANG_OBJECT_CODE)
+    {
+#if SLANG_CLANG || SLANG_GCC
+        // Assume ASan was enabled through the SLANG_ENABLE_ASAN CMake option, meaning UBSan was
+        // enabled as well.
+        cmdLine.addArg("-fsanitize=address,undefined");
+#endif
+#if SLANG_CLANG
+        cmdLine.addArg("-shared-libsan");
+#endif
+    }
+#endif
+#endif
 
     // Add defines
     for (const auto& define : options.defines)
@@ -678,14 +700,18 @@ static SlangResult _parseGCCFamilyLine(
         cmdLine.addArg(fileRep->getPath());
     }
 
-    // Add the library paths
-
-    if (options.libraryPaths.count && (options.targetType == SLANG_HOST_EXECUTABLE))
+    // Add linker-specific options only when not compiling to object code
+    if (options.targetType != SLANG_OBJECT_CODE)
     {
-        if (PlatformUtil::isFamily(PlatformFamily::Apple, platformKind))
-            cmdLine.addArg("-Wl,-rpath,@loader_path,-rpath,@loader_path/../lib");
-        else
-            cmdLine.addArg("-Wl,-rpath,$ORIGIN,-rpath,$ORIGIN/../lib");
+        // Add the library paths
+
+        if (options.libraryPaths.count && (options.targetType == SLANG_HOST_EXECUTABLE))
+        {
+            if (PlatformUtil::isFamily(PlatformFamily::Apple, platformKind))
+                cmdLine.addArg("-Wl,-rpath,@loader_path,-rpath,@loader_path/../lib");
+            else
+                cmdLine.addArg("-Wl,-rpath,$ORIGIN,-rpath,$ORIGIN/../lib");
+        }
     }
 
     StringSlicePool libPathPool(StringSlicePool::Style::Default);
@@ -711,13 +737,17 @@ static SlangResult _parseGCCFamilyLine(
             const UnownedStringSlice path(fileRep->getPath());
             libPathPool.add(Path::getParentDirectory(path));
 
-            cmdLine.addPrefixPathArg(
-                "-l",
-                ArtifactDescUtil::getBaseNameFromPath(artifact->getDesc(), path));
+            if (options.targetType != SLANG_OBJECT_CODE)
+            {
+                cmdLine.addPrefixPathArg(
+                    "-l",
+                    ArtifactDescUtil::getBaseNameFromPath(artifact->getDesc(), path));
+            }
         }
     }
 
     if (options.sourceLanguage == SLANG_SOURCE_LANGUAGE_CPP &&
+        options.targetType != SLANG_OBJECT_CODE &&
         !PlatformUtil::isFamily(PlatformFamily::Windows, platformKind))
     {
         // Make STD libs available
@@ -728,9 +758,12 @@ static SlangResult _parseGCCFamilyLine(
 
     for (const auto& libPath : libPathPool.getAdded())
     {
-        // Note that any escaping of the path is handled in the ProcessUtil::
-        cmdLine.addArg("-L");
-        cmdLine.addArg(libPath);
+        if (options.targetType != SLANG_OBJECT_CODE)
+        {
+            // Note that any escaping of the path is handled in the ProcessUtil::
+            cmdLine.addArg("-L");
+            cmdLine.addArg(libPath);
+        }
         cmdLine.addArg("-F");
         cmdLine.addArg(libPath);
     }

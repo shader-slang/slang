@@ -348,6 +348,7 @@ function(slang_add_target dir type)
                     VERBATIM
                 )
             else()
+                # NOTE(ncelik): I had disabled these, iirc it was because GDB/LLDB couldn't find some debug symbols.
                 add_custom_command(
                     TARGET ${target}
                     POST_BUILD

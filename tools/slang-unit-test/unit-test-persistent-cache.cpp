@@ -27,8 +27,11 @@ inline ComPtr<ISlangBlob> createRandomBlob(size_t size)
 
 inline bool isBlobEqual(ISlangBlob* a, ISlangBlob* b)
 {
-    return a->getBufferSize() == b->getBufferSize() &&
-           ::memcmp(a->getBufferPointer(), b->getBufferPointer(), a->getBufferSize()) == 0;
+    if (!a->getBufferPointer() || !b->getBufferPointer())
+    {
+        return a->getBufferSize() == b->getBufferSize();
+    }
+    return ::memcmp(a->getBufferPointer(), b->getBufferPointer(), a->getBufferSize()) == 0;
 }
 
 class Barrier

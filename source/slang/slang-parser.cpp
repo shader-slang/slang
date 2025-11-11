@@ -8227,7 +8227,7 @@ static IRIntegerValue _foldIntegerPrefixOp(TokenType tokenType, IRIntegerValue v
     case TokenType::OpAdd:
         return value;
     case TokenType::OpSub:
-        return -value;
+        return -static_cast<uint64_t>(value);
     default:
         {
             SLANG_ASSERT(!"Unexpected op");
@@ -8455,7 +8455,9 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
 
     const auto& opcodeWord = spirvInfo->opcodes.lookup(ret.opcode.token.getContent());
     const auto& opInfo = opcodeWord ? spirvInfo->opInfos.lookup(*opcodeWord) : std::nullopt;
-    ret.opcode.knownValue = opcodeWord.value_or(SpvOp(0xffffffff));
+    // UBSan: load of value 4294967295, which is not a valid value for type 'const SpvOp' (aka
+    // 'const SpvOp_')
+    ret.opcode.knownValue = opcodeWord.value_or(SpvOpMax);
 
     // If we couldn't find any info, but used this assignment syntax, raise
     // an error

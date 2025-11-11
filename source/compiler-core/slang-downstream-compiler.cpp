@@ -74,11 +74,7 @@ SlangResult CommandLineDownstreamCompiler::compile(
 
     CompileOptions options = getCompatibleVersion(&inOptions);
 
-    // Copy the command line options
-    CommandLine cmdLine(m_cmdLine);
-
-    // Work out the ArtifactDesc
-    const auto targetDesc = ArtifactDescUtil::makeDescForCompileTarget(options.targetType);
+    bool shouldSeparateCompileAndLink = options.targetType != SLANG_OBJECT_CODE;
 
     auto helper = DefaultArtifactHelper::getSingleton();
 
@@ -110,9 +106,61 @@ SlangResult CommandLineDownstreamCompiler::compile(
         options.modulePath = SliceUtil::asTerminatedCharSlice(modulePath);
     }
 
-    // Append command line args to the end of cmdLine using the target specific function for the
-    // specified options
-    SLANG_RETURN_ON_FAIL(calcArgs(options, cmdLine));
+    // Compile stage: compile source to object code
+    ComPtr<IArtifact> objectArtifact;
+    auto compileDiagnostics = ArtifactDiagnostics::create();
+
+    if (shouldSeparateCompileAndLink)
+    {
+        CompileOptions compileOptions = options;
+        compileOptions.targetType = SLANG_OBJECT_CODE;
+
+        CommandLine compileCmdLine(m_cmdLine);
+        SLANG_RETURN_ON_FAIL(calcArgs(compileOptions, compileCmdLine));
+
+        List<ComPtr<IArtifact>> compileArtifacts;
+        SLANG_RETURN_ON_FAIL(calcCompileProducts(
+            compileOptions,
+            DownstreamProductFlag::All,
+            lockFile,
+            compileArtifacts));
+
+        // There should only be one object file (.o/.obj) as artifact
+        SLANG_ASSERT(compileArtifacts.getCount() == 1);
+        SLANG_ASSERT(compileArtifacts[0]->getDesc().kind == ArtifactKind::ObjectCode);
+        objectArtifact = compileArtifacts[0];
+
+        ExecuteResult compileResult;
+        SLANG_RETURN_ON_FAIL(ProcessUtil::execute(compileCmdLine, compileResult));
+
+        SLANG_RETURN_ON_FAIL(parseOutput(compileResult, compileDiagnostics));
+
+        // If compilation failed, return the diagnostics
+        if (compileResult.resultCode != 0 || !objectArtifact->exists())
+        {
+            auto artifact = ArtifactUtil::createArtifact(
+                ArtifactDescUtil::makeDescForCompileTarget(options.targetType));
+            ArtifactUtil::addAssociated(artifact, compileDiagnostics);
+            *outArtifact = artifact.detach();
+            return SLANG_OK;
+        }
+    }
+
+    // Link stage (or single-stage compile for object code targets)
+    CommandLine cmdLine(m_cmdLine);
+    const auto targetDesc = ArtifactDescUtil::makeDescForCompileTarget(options.targetType);
+
+    if (shouldSeparateCompileAndLink)
+    {
+        // Build link command line
+        options.sourceArtifacts = makeSlice(objectArtifact.readRef(), 1);
+        SLANG_RETURN_ON_FAIL(calcArgs(options, cmdLine));
+    }
+    else
+    {
+        // Single-stage compilation
+        SLANG_RETURN_ON_FAIL(calcArgs(options, cmdLine));
+    }
 
     // The 'productArtifact' is the main product produced from the compilation - the
     // executable/sharedlibrary/object etc
@@ -143,22 +191,7 @@ SlangResult CommandLineDownstreamCompiler::compile(
     }
 
     ExecuteResult exeRes;
-
-#if 0
-    // Test
-    {
-        String line = ProcessUtil::getCommandLineString(cmdLine);
-        printf("%s", line.getBuffer());
-    }
-#endif
-
     SLANG_RETURN_ON_FAIL(ProcessUtil::execute(cmdLine, exeRes));
-
-#if 0
-    {
-        printf("stdout=\"%s\"\nstderr=\"%s\"\nret=%d\n", exeRes.standardOutput.getBuffer(), exeRes.standardError.getBuffer(), int(exeRes.resultCode));
-    }
-#endif
 
     // Go through the list of artifacts in the artifactList and check if they exist.
     //
@@ -233,10 +266,11 @@ SlangResult CommandLineDownstreamCompiler::compile(
     {
         // Holds all of the artifacts that are relatated to the final artifact - such as debug
         // files, ancillary file and lock files
-        auto artifactContainer = ArtifactUtil::createArtifact(ArtifactDesc::make(
-            ArtifactKind::Container,
-            ArtifactPayload::Unknown,
-            ArtifactStyle::Unknown));
+        auto artifactContainer = ArtifactUtil::createArtifact(
+            ArtifactDesc::make(
+                ArtifactKind::Container,
+                ArtifactPayload::Unknown,
+                ArtifactStyle::Unknown));
 
         auto slice = SliceUtil::asSlice(artifactList);
 

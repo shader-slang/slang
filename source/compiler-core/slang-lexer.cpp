@@ -743,7 +743,7 @@ IntegerLiteralValue getIntegerLiteralValue(
         if (digit < 0)
             break;
 
-        value = value * base + digit;
+        value = static_cast<uint64_t>(value) * base + digit;
     }
 
     if (outSuffix)

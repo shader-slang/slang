@@ -143,7 +143,10 @@ struct GetRttiTypeFuncsForZeroPod
     {
         SLANG_UNUSED(typeMap);
         SLANG_UNUSED(rttiInfo);
-        ::memcpy(dst, src, sizeof(T) * count);
+        if (src)
+        {
+            ::memcpy(dst, src, sizeof(T) * count);
+        }
     }
 
     static RttiTypeFuncs getFuncs()
