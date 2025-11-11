@@ -836,7 +836,8 @@ Result readSerializedModuleInfo(
         serialize(serializer, info);
     }
 #endif
-    SLANG_ASSERT(info.module);
+    if (!info.module)
+        return SLANG_FAIL;
     outIRModule = info.module;
     if (sharedDecodingContext->_foundUnrecognizedInstructions)
         return SLANG_FAIL;

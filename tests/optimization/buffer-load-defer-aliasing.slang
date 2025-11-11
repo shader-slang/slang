@@ -33,6 +33,6 @@ RWStructuredBuffer<float> outputBuffer;
 [numthreads(1, 1, 1)]
 void compute_main(uint3 tid: SV_DispatchThreadID)
 {
-    // SPV: OpLoad %_arr_float_int_1024
+    // SPV: OpLoad %Bottom_natural
     outputBuffer[0] = gRoot.bottom1.bottomGetValue(0);
 }

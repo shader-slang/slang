@@ -10,6 +10,10 @@ Reference other instruction files as well:
 
 - @.github/copilot-instructions.md
 
+User-specific instructions for Slang:
+
+- @~/.claude/slang-instructions.md
+
 ## Build System and Common Commands
 
 **IMPORTANT:** On Windows, always use `cmake.exe` (not `cmake`) to ensure proper GPU test execution. Using `cmake` without the `.exe` extension may invoke WSL's cmake, which cannot run GPU tests.
@@ -108,6 +112,7 @@ slang-test must run from repository root
 - `examples/`: - Sample programs demonstrating Slang usage
 - `tests/`: - Comprehensive test suite
 - `docs/`: - Project documentation
+- `build/source/slang/fiddle/`: Generated code from FIDDLE macros (created during build)
 
 ### Compilation Model
 
@@ -221,6 +226,7 @@ This can be useful when we want to generate a reference spirv code for a compari
 ### Generated files
 
 - The enum values starting with `kIROp_` are defined in a generated file, `build/source/slang/fiddle/slang-ir-insts-enum.h.fiddle`
+- `FIDDLE()` and `FIDDLE(...)` statements in AST node declarations indicate that additional source is generated and included from `build/source/slang/fiddle`, providing static type system and reflection metadata, visitor support, and serialization support.
 
 ### Git commit message
 

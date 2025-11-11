@@ -1227,7 +1227,7 @@ IRInst* emitLoopBlocks(
     auto ifBreakBlock = loopBuilder.emitBlock();
     loopBreakBlock = loopBuilder.emitBlock();
     auto loopContinueBlock = loopBuilder.emitBlock();
-    builder->emitLoop(loopHeadBlock, loopBreakBlock, loopHeadBlock, 1, &initVal);
+    builder->emitLoop(loopHeadBlock, loopBreakBlock, loopContinueBlock, 1, &initVal);
     loopBuilder.setInsertInto(loopHeadBlock);
     auto loopParam = loopBuilder.emitParam(initVal->getFullType());
     auto cmpResult = loopBuilder.emitLess(loopParam, finalVal);
@@ -2752,8 +2752,13 @@ bool isIROpaqueType(IRType* type)
     switch (type->getOp())
     {
     case kIROp_TextureType:
+    case kIROp_GLSLImageType:
     case kIROp_SamplerStateType:
     case kIROp_SamplerComparisonStateType:
+    case kIROp_SubpassInputType:
+    case kIROp_RaytracingAccelerationStructureType:
+    case kIROp_RayQueryType:
+    case kIROp_HitObjectType:
         return true;
     default:
         return false;

@@ -293,12 +293,12 @@ enum_option(
     SLANG_LIB_TYPE
     # Default
     SHARED
-    "How to build the slang lib:"
+    "How to build the slang-compiler lib:"
     # Options
     SHARED
-    "Build slang as a shared library (default)"
+    "Build slang-compiler as a shared library (default)"
     STATIC
-    "Build slang as a static library"
+    "Build slang-compiler as a static library"
 )
 
 option(
@@ -502,6 +502,7 @@ add_subdirectory(source/slang-core-module)
 add_subdirectory(source/slang-glsl-module)
 add_subdirectory(source/slang)
 add_subdirectory(source/slangc)
+add_subdirectory(source/standard-modules)
 add_subdirectory(examples)
 
 #

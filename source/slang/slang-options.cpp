@@ -934,6 +934,10 @@ void initCommandOptions(CommandOptions& options)
          "-embed-downstream-ir",
          nullptr,
          "Embed downstream IR into emitted slang IR"},
+        {OptionKind::ExperimentalFeature,
+         "-experimental-feature",
+         nullptr,
+         "Enable experimental features (loading builtin neural module)"},
     };
     _addOptions(makeConstArrayView(experimentalOpts), options);
 
@@ -2283,6 +2287,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::UnscopedEnum:
         case OptionKind::PreserveParameters:
         case OptionKind::UseMSVCStyleBitfieldPacking:
+        case OptionKind::ExperimentalFeature:
             linkage->m_optionSet.set(optionKind, true);
             break;
         case OptionKind::MatrixLayoutRow:

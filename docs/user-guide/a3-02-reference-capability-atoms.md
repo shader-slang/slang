@@ -525,6 +525,15 @@ Extensions
 
 `GL_NV_compute_shader_derivatives`
 > Represents the GL_NV_compute_shader_derivatives extension.
+> 
+> This capability enables the use of implicit derivatives in compute, ray tracing, and mesh stages.
+> 
+> This capability changes the interpretation of GLSL implicit-LOD texture sampling functions as follows, matching
+> the GLSL shader specification:
+> - Derivatives enabled: Implicit-LOD `texture()` functions are assumed to use implicit LOD.
+> - Derivatives disabled: Implicit-LOD `texture()` functions are assumed to use the base texture.
+> 
+> This applies to GLSL as both source and target.
 
 `GL_NV_cooperative_vector`
 > Represents the GL_NV_cooperative_vector extension.
@@ -941,12 +950,15 @@ Compound Capabilities
 > Capabilities needed to use decodeFunc with cooperative matrix load
 
 `cooperative_matrix_conversion`
-> Capabilities needed to convert cooperative matrices
+> Capabilities needed to convert cooperative matrices, all the conversions can be supported by cuda
 
 `cooperative_matrix_map_element`
 > Capabilities needed to use MapElement operation with cooperative matrix
 
 `cooperative_matrix_reduction`
+> Capabilities needed to use reduction operations with cooperative matrix
+
+`cooperative_matrix_spirv`
 > Capabilities needed to use reduction operations with cooperative matrix
 
 `cooperative_matrix_tensor_addressing`
@@ -1094,6 +1106,11 @@ Compound Capabilities
 
 `helper_lane`
 > Capabilities required to enable helper-lane demotion
+
+`hlsl_coopvec_poc_sm_6_9`
+> Represent compatibility support for the deprecated POC DXC, but we need to use
+> this capability to be compatible with cooperative_vector in target_switch, so
+> join '_sm_6_9' here.
 
 `hlsl_spirv`
 > HLSL, and SPIRV code-gen targets
