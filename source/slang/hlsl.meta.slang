@@ -21848,6 +21848,7 @@ void debugBreak()
 
 // https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GL_EXT_shader_realtime_clock.txt
 
+[__requiresNVAPI]
 __glsl_extension(GL_EXT_shader_realtime_clock)
 [NonUniformReturn]
 [require(cpp_cuda_glsl_hlsl_spirv, shaderclock)]
@@ -21879,6 +21880,7 @@ int64_t __cudaCppGetRealtimeClock()
     }
 }
 
+[__requiresNVAPI]
 __glsl_extension(GL_EXT_shader_realtime_clock)
 [NonUniformReturn]
 [require(cpp_cuda_glsl_hlsl_spirv, shaderclock)]
@@ -22114,6 +22116,7 @@ ${{{{
 }}}}
 
 [__NoSideEffect]
+[__requiresNVAPI]
 [require(glsl_hlsl_spirv, texturefootprint)]
 vector<uint, ND> __textureFootprintGetAnchor<let ND:int>(__TextureFootprintData<ND> data, int nd)
 {
@@ -22131,6 +22134,7 @@ vector<uint, ND> __textureFootprintGetAnchor<let ND:int>(__TextureFootprintData<
 }
 
 [__NoSideEffect]
+[__requiresNVAPI]
 [require(glsl_hlsl_spirv, texturefootprint)]
 vector<uint, ND> __textureFootprintGetOffset<let ND:int>(__TextureFootprintData<ND> data, int nd)
 {
@@ -22161,6 +22165,7 @@ struct __TextureFootprintData<let ND:int>
     property anchor : Anchor
     {
         [__NoSideEffect]
+        [__requiresNVAPI]
         [ForceInline]
         get { return __textureFootprintGetAnchor(this, ND); }
     }
@@ -22168,6 +22173,7 @@ struct __TextureFootprintData<let ND:int>
     property offset : Offset
     {
         [__NoSideEffect]
+        [__requiresNVAPI]
         [ForceInline]
         get { return __textureFootprintGetOffset(this, ND); }
     }
@@ -22175,6 +22181,7 @@ struct __TextureFootprintData<let ND:int>
     property mask : Mask
     {
         [__NoSideEffect]
+        [__requiresNVAPI]
         get
         {
             __target_switch
@@ -22194,6 +22201,7 @@ struct __TextureFootprintData<let ND:int>
     property lod : LOD
     {
         [__NoSideEffect]
+        [__requiresNVAPI]
         get
         {
             __target_switch
@@ -22213,6 +22221,7 @@ struct __TextureFootprintData<let ND:int>
     property granularity : Granularity
     {
         [__NoSideEffect]
+        [__requiresNVAPI]
         get
         {
             __target_switch
@@ -22411,6 +22420,7 @@ ${
     [__NoSideEffect]
     __glsl_version(450)
     __glsl_extension(GL_NV_shader_texture_footprint)
+    [__requiresNVAPI]
     [require(glsl_spirv, texturefootprint)]
     bool __queryFootprintLodGLSL(
             SamplerState            sampler,
@@ -22443,6 +22453,7 @@ ${{{
     [__NoSideEffect]
     __glsl_version(450)
     __glsl_extension(GL_NV_shader_texture_footprint)
+    [__requiresNVAPI]
     [require(glsl_spirv, texturefootprint)]
     bool __queryFootprintGradGLSL(
             SamplerState    sampler,
@@ -22540,6 +22551,7 @@ for(auto levelChoice : kLevelChoices)
 }}}}
 
     [__NoSideEffect]
+    [__requiresNVAPI]
     [require(hlsl, texturefootprint)]
     static __FootprintData __queryFootprint$(CoarseOrFine)NVAPI(
         int                     nd,
@@ -22558,6 +22570,7 @@ for(auto levelChoice : kLevelChoices)
     }
 
     [__NoSideEffect]
+    [__requiresNVAPI]
     [require(hlsl, texturefootprint)]
     static __FootprintData __queryFootprint$(CoarseOrFine)BiasNVAPI(
         int                     nd,
@@ -22577,6 +22590,7 @@ for(auto levelChoice : kLevelChoices)
     }
 
     [__NoSideEffect]
+    [__requiresNVAPI]
     [require(hlsl, texturefootprint)]
     static __FootprintData __queryFootprint$(CoarseOrFine)LevelNVAPI(
         int                     nd,
@@ -22596,6 +22610,7 @@ for(auto levelChoice : kLevelChoices)
     }
 
     [__NoSideEffect]
+    [__requiresNVAPI]
     [require(hlsl, texturefootprint)]
     static __FootprintData __queryFootprint$(CoarseOrFine)GradNVAPI(
         int                     nd,
@@ -22864,6 +22879,7 @@ ${{{{
 __generic<Shape:__ITextureShape1D2D3D, let format : int>
 extension _Texture<float, Shape, 0, 0, 0, $(kCoreModule_ResourceAccessReadWrite), 0, 0, format>
 {
+    [__requiresNVAPI]
     [ForceInline]
     __glsl_extension(GL_EXT_shader_atomic_float)
     [require(glsl_hlsl_metal_spirv, atomic_glsl_hlsl_nvapi_cuda_metal_float1)]
