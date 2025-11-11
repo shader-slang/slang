@@ -5354,7 +5354,7 @@ void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& 
     for (auto inst : module->getGlobalInsts())
     {
         if (shouldEmitOnlyHeader()) {
-            // Don't emit types without ExternCppDecoration in the header
+            // Don't emit types without ExternCppDecoration in a header
             if (!inst->findDecoration<IRExternCppDecoration>())
                 continue;
         }
