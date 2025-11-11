@@ -25,6 +25,9 @@ void foo(Ptr<Data, Access::ReadWrite, AddressSpace::GroupShared> ptr)
 [numthreads(3, 1, 1)]
 void computeMain(uint3 group_thread_id: SV_GroupThreadID)
 {
+    spirv_asm { OpCapability VariablePointers; };
+    spirv_asm { OpExtension "SPV_KHR_variable_pointers"; };
+
     shared = Data(1, 2);
     foo(__getAddress(shared));
 }
