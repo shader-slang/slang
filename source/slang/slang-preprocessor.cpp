@@ -3556,8 +3556,9 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
 
     /* Find the path relative to the foundPath */
     PathInfo filePathInfo;
-    if (SLANG_FAILED(includeSystem->findFile(
-            path, includedFromPathInfo.foundPath, filePathInfo, includeMode)))
+    if (SLANG_FAILED(
+            includeSystem
+                ->findFile(path, includedFromPathInfo.foundPath, filePathInfo, includeMode)))
     {
         GetSink(context)->diagnose(pathToken.loc, Diagnostics::includeFailed, path);
         return;
