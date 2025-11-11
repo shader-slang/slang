@@ -9,8 +9,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-// #include "../../source/core/slang-downstream-compiler.h"
 
 #include "../../source/compiler-core/slang-command-line-args.h"
 #include "../../source/core/slang-type-text-util.h"
