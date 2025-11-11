@@ -9194,7 +9194,7 @@ T dot(vector<T, N> x, vector<T, N> y)
     {
         return x[0] * y[0];
     }
-    
+
     __target_switch
     {
     case glsl: __intrinsic_asm "dot";
@@ -9222,7 +9222,7 @@ T dot(vector<T, N> x, vector<T, N> y)
     {
         return x[0] * y[0];
     }
-    
+
     __target_switch
     {
     case hlsl: __intrinsic_asm "dot";
@@ -24035,6 +24035,61 @@ ${{{{
 // Cooperative Matrix type
 //
 
+//@public:
+/**
+Represents a cooperative matrix for efficient warp/subgroup-level matrix operations on GPU hardware.
+CoopMat enables high-performance matrix multiply-accumulate operations by distributing matrix
+fragments across threads within a warp or subgroup. This type leverages specialized hardware
+instructions such as CUDA's WMMA (Warp Matrix Multiply-Accumulate) or Vulkan cooperative
+matrix extensions.
+
+@param T The element type of the matrix. Must be a built-in arithmetic type.
+@param S The memory scope defining the cooperative group (e.g., device, workgroup, subgroup).
+@param M The number of rows in the matrix fragment.
+@param N The number of columns in the matrix fragment.
+@param R The matrix use specifier indicating whether this is a Matrix A, Matrix B, or accumulator matrix.
+
+@remarks
+The dimensions M and N must match hardware-supported fragment shapes. For CUDA WMMA,
+valid shape combinations are (where k is always 16):
+- Shape m16n16k16: Matrix A (16×16), Matrix B (16×16), Accumulator (16×16)
+- Shape m8n32k16:  Matrix A (8×16),  Matrix B (16×32), Accumulator (8×32)
+- Shape m32n8k16:  Matrix A (32×16), Matrix B (16×8),  Accumulator (32×8)
+
+Matrix A dimensions are (m×k), Matrix B dimensions are (k×n), and Accumulator dimensions are (m×n).
+For all CUDA WMMA shapes listed above:
+- Matrix A and B support: half, uint8, int8
+- Accumulator (Matrix C) supports: float, half, int
+
+All matrices involved in a multiply-accumulate operation must use the same shape combination.
+The actual physical layout and distribution of elements across threads is hardware-specific.
+
+When targeting Vulkan/SPIR-V, this type uses the SPV_KHR_cooperative_matrix extension (and optionally
+SPV_NV_cooperative_matrix2 for advanced features like transpose, reductions, and per-element operations).
+Valid shape combinations for Vulkan cooperative matrices (example device properties):
+
+With float16 elements (A/B/C element types):
+- Shape m16n16k16: Matrix A (16×16), Matrix B (16×16), Accumulator (16×16) - half/half/half
+- Shape m16n8k16:  Matrix A (16×16), Matrix B (16×8),  Accumulator (16×8)  - half/half/half
+- Shape m16n8k8:   Matrix A (16×8),  Matrix B (8×8),   Accumulator (16×8)  - half/half/half
+- Shape m16n16k16: Matrix A (16×16), Matrix B (16×16), Accumulator (16×16) - half/half/float
+- Shape m16n8k16:  Matrix A (16×16), Matrix B (16×8),  Accumulator (16×8)  - half/half/float
+- Shape m16n8k8:   Matrix A (16×8),  Matrix B (8×8),   Accumulator (16×8)  - half/half/float
+
+With 8-bit integer elements (A/B/C element types):
+- Shape m16n16k32: Matrix A (16×32), Matrix B (32×16), Accumulator (16×16) - uint8/uint8/uint32
+- Shape m16n16k32: Matrix A (16×32), Matrix B (32×16), Accumulator (16×16) - int8/int8/int32
+- Shape m16n8k32:  Matrix A (16×32), Matrix B (32×8),  Accumulator (16×8)  - uint8/uint8/uint32
+- Shape m16n8k32:  Matrix A (16×32), Matrix B (32×8),  Accumulator (16×8)  - int8/int8/int32
+
+Note: Vulkan's supported shapes are device-specific and can be queried at runtime using
+VkPhysicalDeviceCooperativeMatrixPropertiesKHR. The above list represents common configurations
+but may vary by GPU vendor and driver. The element distribution across threads in a subgroup
+may differ between CUDA and Vulkan implementations, so code using the subscript operator
+should only perform uniform operations for portability.
+
+@category matrix_types
+*/
 __intrinsic_type($(kIROp_CoopMatrixType))
 [require(cooperative_matrix)]
 __generic<
@@ -24052,12 +24107,15 @@ struct CoopMat
     // Initialization
     //
 
+    /// Default constructor. Creates an uninitialized cooperative matrix.
     [ForceInline]
     [require(cooperative_matrix)]
     __init()
     {
     }
 
+    /// Constructs a cooperative matrix and fills all elements with the specified value.
+    /// @param t The value to fill the matrix with.
     [ForceInline]
     [require(cooperative_matrix)]
     __init(T t)
@@ -24065,6 +24123,9 @@ struct CoopMat
         this.fill(t);
     }
 
+    /// Constructs a cooperative matrix by copying and converting from another cooperative matrix.
+    /// @param U The element type of the source cooperative matrix.
+    /// @param other The source cooperative matrix to copy from.
     [ForceInline]
     [require(cooperative_matrix_conversion)]
     __init<
@@ -24074,6 +24135,8 @@ struct CoopMat
         this.copyFrom(other);
     }
 
+    /// Copy constructor. Creates a cooperative matrix from another matrix of the same type.
+    /// @param x The cooperative matrix to copy from.
     [ForceInline]
     [require(cooperative_matrix)]
     __init(This x)
@@ -24081,7 +24144,8 @@ struct CoopMat
         this = x;
     }
 
-    // Required for `IArithmetic`.
+    /// Constructs a cooperative matrix from an integer value. Required for `IArithmetic` conformance.
+    /// @param i The integer value to convert to the element type and fill the matrix with.
     [ForceInline]
     [OverloadRank(-10)]
     [require(cooperative_matrix)]
@@ -24101,10 +24165,16 @@ struct CoopMat
     [require(cooperative_matrix)]
     void fill(T t)
     {
-        this = spirv_asm
+        __target_switch
         {
-            result:$$CoopMat<T, S, M, N, R> = OpConstantComposite $t;
-        };
+        case spirv:
+            this = spirv_asm
+            {
+                result:$$CoopMat<T, S, M, N, R> = OpConstantComposite $t;
+            };
+        case cuda:
+            __intrinsic_asm "($0)->fill($1)";
+        }
     }
 
     /// Copies the contents from another cooperative matrix into this matrix.
@@ -24117,6 +24187,9 @@ struct CoopMat
         U : __BuiltinArithmeticType
     >(CoopMat<U, S, M, N, R> other)
     {
+    __target_switch
+    {
+    case spirv:
         if (__isFloat<T>() && __isInt<U>())
             this = __int_to_float_cast<T>(other);
         else if (__isInt<T>() && __isFloat<U>())
@@ -24125,6 +24198,10 @@ struct CoopMat
             this = __real_cast<T>(other);
         else if (__isInt<T>() && __isInt<U>())
             this = __int_cast<T>(other);
+    case cuda:
+        __intrinsic_asm "($0)->copyFrom<$T1::ElementType>($1)";
+    }
+
     }
 
     //
@@ -24140,7 +24217,12 @@ struct CoopMat
     [__NoSideEffect]
     Ref<T> __indexRef(int index);
 
-    /// Returns the count as an integer value.
+    /// Returns the number of elements for accessible by the current thread.
+    /// The number of components accessible by current thread is implementation-dependent.
+    /// @return The number of elements accessible by the current thread.
+    ///
+    ///
+    /// @remarks The return value is unlikely to be same to M * N.
     [ForceInline]
     [require(cooperative_matrix)]
     [__NoSideEffect]
@@ -24149,19 +24231,38 @@ struct CoopMat
         return GetLength();
     }
 
+    /// Subscript operator to access elements in the cooperative matrix.
+    /// The components of a cooperative matrix are spread cross the threads in its scope,
+    /// it's implementation-dependent manner. Therefore, Vulkan and CUDA could have different
+    /// distributions. The subscript operator only provides the access to the elements that
+    /// belong to the current thread, but the locations of those elements on the matrix is
+    /// unspecified. It indicates that user can only use this operator to perform uniform
+    /// operations.
     __subscript(int index) -> T
     {
         [__NoSideEffect]
         [nonmutating]
         get
         {
-            return __indexRead(index);
+            __target_switch
+            {
+            case spirv:
+                return __indexRead(index);
+            case cuda:
+                __intrinsic_asm "($0).get($1)";
+            }
         }
 
         [mutating]
         set
         {
-            __indexRef(index) = newValue;
+            __target_switch
+            {
+            case spirv:
+                __indexRef(index) = newValue;
+            case cuda:
+                __intrinsic_asm "($0)->set($1, $2)";
+            }
         }
     }
 
@@ -24169,19 +24270,33 @@ struct CoopMat
     // CoopMat operations
     //
 
-    /// Returns the number of elements for the current thread.
-    /// Depending on the number of threads for the given matrix, each
-    /// thread will get smaller length.
+    /// Returns the number of elements for accessible by the current thread.
+    /// The number of components accessible by current thread is implementation-dependent.
+    /// @return The number of elements accessible by the current thread.
+    ///
     ///
     /// @remarks The return value is unlikely to be same to M * N.
     [ForceInline]
     [require(cooperative_matrix)]
     static uint GetLength()
     {
-        return spirv_asm
+        __target_switch
         {
-            result:$$uint = OpCooperativeMatrixLengthKHR $$CoopMat<T, S, M, N, R>;
-        };
+        case spirv:
+            return spirv_asm
+            {
+                result:$$uint = OpCooperativeMatrixLengthKHR $$CoopMat<T, S, M, N, R>;
+            };
+        case cuda:
+            This result;
+            return __getNumElementsPerThread(result);
+        }
+    }
+
+    [require(cuda_sm_8_0)]
+    internal static uint __getNumElementsPerThread(__ref This coopMat)
+    {
+        __intrinsic_asm "($0)->GetLength()";
     }
 
     /// Returns the number of rows in the matrix.
@@ -24200,6 +24315,8 @@ struct CoopMat
         return N;
     }
 
+    /// Transposes the cooperative matrix. Requires Vulkan with SPV_NV_cooperative_matrix2 extension.
+    /// @return A transposed cooperative matrix with dimensions N×M and MatrixB usage.
     [require(cooperative_matrix_conversion)]
     CoopMat<T, S, N, M, CoopMatMatrixUse.MatrixB> Transpose()
     {
@@ -24211,6 +24328,11 @@ struct CoopMat
         };
     }
 
+    /// Reduces the matrix along rows using the specified combining operation.
+    /// Requires Vulkan with SPV_NV_cooperative_matrix2 extension.
+    /// @param RN The number of columns in the resulting reduced matrix.
+    /// @param combineOp The binary function used to combine elements (e.g., addition, multiplication).
+    /// @return A reduced accumulator matrix with dimensions M×RN.
     [require(cooperative_matrix_reduction)]
     CoopMat<T, S, M, RN, CoopMatMatrixUse.MatrixAccumulator> ReduceRow<
         let RN : int
@@ -24224,6 +24346,11 @@ struct CoopMat
         };
     }
 
+    /// Reduces the matrix along columns using the specified combining operation.
+    /// Requires Vulkan with SPV_NV_cooperative_matrix2 extension.
+    /// @param RM The number of rows in the resulting reduced matrix.
+    /// @param combineOp The binary function used to combine elements (e.g., addition, multiplication).
+    /// @return A reduced accumulator matrix with dimensions RM×N.
     [require(cooperative_matrix_reduction)]
     CoopMat<T, S, RM, N, CoopMatMatrixUse.MatrixAccumulator> ReduceColumn<
         let RM : int
@@ -24237,6 +24364,12 @@ struct CoopMat
         };
     }
 
+    /// Reduces the matrix along both rows and columns using the specified combining operation.
+    /// Requires Vulkan with SPV_NV_cooperative_matrix2 extension.
+    /// @param RM The number of rows in the resulting reduced matrix.
+    /// @param RN The number of columns in the resulting reduced matrix.
+    /// @param combineOp The binary function used to combine elements (e.g., addition, multiplication).
+    /// @return A reduced accumulator matrix with dimensions RM×RN.
     [require(cooperative_matrix_reduction)]
     CoopMat<T, S, RM, RN, CoopMatMatrixUse.MatrixAccumulator> ReduceRowAndColumn<
         let RM : int,
@@ -24251,6 +24384,10 @@ struct CoopMat
         };
     }
 
+    /// Reduces the matrix in 2×2 blocks using the specified combining operation.
+    /// Requires Vulkan with SPV_NV_cooperative_matrix2 extension.
+    /// @param combineOp The binary function used to combine elements within each 2×2 block.
+    /// @return A reduced accumulator matrix with dimensions (M/2)×(N/2).
     [require(cooperative_matrix_reduction)]
     CoopMat<T, S, M / 2, N / 2, CoopMatMatrixUse.MatrixAccumulator> Reduce2x2(functype(T, T)->T combineOp)
     {
@@ -24262,6 +24399,10 @@ struct CoopMat
         };
     }
 
+    /// Applies a per-element operation to the cooperative matrix.
+    /// Requires Vulkan with SPV_NV_cooperative_matrix2 extension.
+    /// @param mapOp A function that takes (row, column, element) and returns a new element value.
+    /// @return A new cooperative matrix with the operation applied to each element.
     [require(cooperative_matrix_map_element)]
     This MapElement(functype(uint32_t, uint32_t, T)->T mapOp)
     {
@@ -24283,6 +24424,11 @@ struct CoopMat
         TFunc mapObj
     );
 
+    /// Applies a per-element operation to the cooperative matrix using a functor.
+    /// Requires Vulkan with SPV_NV_cooperative_matrix2 extension.
+    /// @param TFunc The functor type implementing IFunc<T, uint32_t, uint32_t, T>.
+    /// @param mapOp A functor object that takes (row, column, element) and returns a new element value.
+    /// @return A new cooperative matrix with the operation applied to each element.
     This MapElement<
         TFunc : IFunc<T, uint32_t, uint32_t, T>
     >(TFunc mapOp)
@@ -24294,7 +24440,12 @@ struct CoopMat
     // Store
     //
 
-    [require(cooperative_matrix)]
+    /// Stores the cooperative matrix into a byte address buffer.
+    /// @param buffer The RWByteAddressBuffer to store the matrix into.
+    /// @param element The starting element index in the buffer to store the matrix into.
+    /// @param stride The stride in elements between consecutive rows (for row major layout) or columns (for column major layout)
+    ///        and must be a multiple of 8 for __half element type or multiple of 4 for float element type. (i.e., multiple of 16 bytes in both cases)
+    [require(cooperative_matrix, byteaddressbuffer)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout
     >(RWByteAddressBuffer buffer, uint element, uint stride)
@@ -24302,6 +24453,12 @@ struct CoopMat
         __store<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
     }
 
+    /// Stores the cooperative matrix into a structured buffer.
+    /// @param buffer The RWStructuredBuffer to store the matrix into.
+    /// @param element The starting element index in the buffer to store the matrix into.
+    /// @param stride The stride in elements between consecutive rows (for row major layout) or
+    ///        columns (for column major layout) and must be a multiple of 8 for __half element type
+    ///        or multiple of 4 for float element type. (i.e., multiple of 16 bytes in both cases)
     [require(cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout
@@ -24317,29 +24474,59 @@ struct CoopMat
     {
         let zero = 0;
         let alignment = 16U;
-        spirv_asm
+        __target_switch
         {
-            %storagePointerType = OpTypePointer StorageBuffer $$T;
-            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-            OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
-        };
+        case spirv:
+            spirv_asm
+            {
+                %storagePointerType = OpTypePointer StorageBuffer $$T;
+                %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
+                OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>($1, $2, $3)";
+            else
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>($1, $2, $3)";
+        }
     }
 
+    /// Stores the cooperative matrix into a pointer buffer.
+    /// @param matrixLayout The memory layout (RowMajor or ColMajor) to use when storing.
+    /// @param buffer The pointer to the buffer to store the matrix into.
+    /// @param element The starting element index in the buffer.
+    /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     [require(cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout
     >(T* buffer, uint element, uint stride)
     {
-        let alignment = 16U;
-        return spirv_asm
+        __target_switch
         {
-            %pointer:$$T* = OpPtrAccessChain $buffer $element;
-            OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
-        };
+        case spirv:
+            let alignment = 16U;
+            return spirv_asm
+            {
+                %pointer:$$T* = OpPtrAccessChain $buffer $element;
+                OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>($1, $2, $3)";
+            else
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>($1, $2, $3)";
+        }
     }
 
     // TODO: make this function an intrinsic and support all types via the single intrinsic
-    [require(cooperative_matrix, vk_mem_model)]
+    /// Stores the cooperative matrix into a pointer buffer with coherent memory access.
+    /// Ensures memory writes are made available across the specified memory scope. Vulkan only.
+    /// @param matrixLayout The memory layout (RowMajor or ColMajor) to use when storing.
+    /// @param buffer The pointer to the buffer to store the matrix into.
+    /// @param element The starting element index in the buffer.
+    /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
+    /// @param memoryScope The scope across which the write should be made visible (e.g., Device, Workgroup).
+    [require(cooperative_matrix_spirv, vk_mem_model)]
     void StoreCoherent<
         let matrixLayout : CoopMatMatrixLayout
     >(T* buffer, uint element, uint stride, constexpr MemoryScope memoryScope)
@@ -24354,6 +24541,12 @@ struct CoopMat
         };
     }
 
+    /// Stores the cooperative matrix into a groupshared (workgroup) memory array.
+    /// @param matrixLayout The memory layout (RowMajor or ColMajor) to use when storing.
+    /// @param V The size of the groupshared array.
+    /// @param data The groupshared array to store the matrix into.
+    /// @param element The starting element index in the array.
+    /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     [ForceInline]
     [require(cooperative_matrix)]
     void Store<
@@ -24361,17 +24554,34 @@ struct CoopMat
         let V : int
     >(__ref groupshared T[V] data, uint element, uint stride)
     {
-        let alignment = 16U;
-        spirv_asm
+        __target_switch
         {
-            %workgroupPointerType = OpTypePointer Workgroup $$T;
-            %pointer:%workgroupPointerType = OpAccessChain &data $element;
-            OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
-        };
+        case spirv:
+            let alignment = 16U;
+            spirv_asm
+            {
+                %workgroupPointerType = OpTypePointer Workgroup $$T;
+                %pointer:%workgroupPointerType = OpAccessChain &data $element;
+                OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>(($1)->m_data, $2, $3)";
+            else
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>(($1)->m_data, $2, $3)";
+        }
     }
 
+    /// Stores the cooperative matrix into a groupshared (workgroup) memory array with a different element type.
+    /// Vulkan only.
+    /// @param matrixLayout The memory layout (RowMajor or ColMajor) to use when storing.
+    /// @param U The element type of the groupshared array (may differ from T).
+    /// @param V The size of the groupshared array.
+    /// @param data The groupshared array to store the matrix into.
+    /// @param element The starting element index in the array.
+    /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     [ForceInline]
-    [require(cooperative_matrix)]
+    [require(cooperative_matrix_spirv)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -24387,6 +24597,15 @@ struct CoopMat
         };
     }
 
+    /// Stores the cooperative matrix into a groupshared (workgroup) memory array of vectors.
+    /// Vulkan only.
+    /// @param matrixLayout The memory layout (RowMajor or ColMajor) to use when storing.
+    /// @param U The element type of the vectors in the groupshared array.
+    /// @param V The size of the groupshared array.
+    /// @param L The length of each vector in the array.
+    /// @param data The groupshared vector array to store the matrix into.
+    /// @param element The starting element index in the array.
+    /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     [ForceInline]
     [require(cooperative_matrix)]
     void Store<
@@ -24416,7 +24635,7 @@ ${{{{
 }}}}
 
     [__NoSideEffect]
-    [require(cooperative_matrix)]
+    [require(cooperative_matrix, byteaddressbuffer)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout
     >(
@@ -24438,18 +24657,33 @@ ${{{{
     {
         let zero = 0;
         let alignment = 16U;
-        return spirv_asm
+        __target_switch
         {
-            %storagePointerType = OpTypePointer StorageBuffer $$T;
-            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
-        };
+        case spirv:
+            return spirv_asm
+            {
+                %storagePointerType = OpTypePointer StorageBuffer $$T;
+                %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
+                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>($0, $1, $2)";
+            else
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>($0, $1, $2)";
+        }
     }
 
 ${{{{
     } // RW
 }}}}
 
+    /// Loads a cooperative matrix from a pointer buffer.
+    /// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the buffer.
+    /// @param buffer The pointer to the buffer to load from.
+    /// @param element The starting element index in the buffer.
+    /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
+    /// @return A cooperative matrix loaded from the buffer.
     [ForceInline]
     [__NoSideEffect]
     [require(cooperative_matrix)]
@@ -24457,18 +24691,35 @@ ${{{{
         let matrixLayout : CoopMatMatrixLayout
     >(T* buffer, uint element, uint stride)
     {
-        let alignment = 16;
-        return spirv_asm
+        __target_switch
         {
-            %pointer:$$T* = OpPtrAccessChain $buffer $element;
-            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
-        };
+        case spirv:
+            let alignment = 16;
+            return spirv_asm
+            {
+                %pointer:$$T* = OpPtrAccessChain $buffer $element;
+                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>($0, $1, $2)";
+            else
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>($0, $1, $2)";
+        }
     }
 
     // TODO: make this function an intrinsic and support all types via the single intrinsic
+    /// Loads a cooperative matrix from a pointer buffer with coherent memory access.
+    /// Ensures memory reads observe writes made visible across the specified memory scope. Vulkan only.
+    /// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the buffer.
+    /// @param buffer The pointer to the buffer to load from.
+    /// @param element The starting element index in the buffer.
+    /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
+    /// @param memoryScope The scope from which writes should be visible (e.g., Device, Workgroup).
+    /// @return A cooperative matrix loaded from the buffer.
     [ForceInline]
     [__NoSideEffect]
-    [require(cooperative_matrix, vk_mem_model)]
+    [require(cooperative_matrix_spirv, vk_mem_model)]
     static This LoadCoherent<
         let matrixLayout : CoopMatMatrixLayout
     >(T* buffer, uint element, uint stride, constexpr MemoryScope memoryScope)
@@ -24483,6 +24734,13 @@ ${{{{
         };
     }
 
+    /// Loads a cooperative matrix from a groupshared (workgroup) memory array.
+    /// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the array.
+    /// @param V The size of the groupshared array.
+    /// @param data The groupshared array to load from.
+    /// @param element The starting element index in the array.
+    /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
+    /// @return A cooperative matrix loaded from the groupshared array.
     [ForceInline]
     [require(cooperative_matrix)]
     static This Load<
@@ -24490,17 +24748,35 @@ ${{{{
         let V : int
     >(__constref groupshared T[V] data, uint element, uint stride)
     {
-        let alignment = 16U;
-        return spirv_asm
+        __target_switch
         {
-            %workgroupPointerType = OpTypePointer Workgroup $$T;
-            %pointer:%workgroupPointerType = OpAccessChain &data $element;
-            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
-        };
+        case spirv:
+            let alignment = 16U;
+            return spirv_asm
+            {
+                %workgroupPointerType = OpTypePointer Workgroup $$T;
+                %pointer:%workgroupPointerType = OpAccessChain &data $element;
+                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>(($0)->m_data, $1, $2)";
+            else
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>(($0)->m_data, $1, $2)";
+        }
     }
 
+    /// Loads a cooperative matrix from a groupshared (workgroup) memory array with a different element type.
+    /// Vulkan only.
+    /// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the array.
+    /// @param U The element type of the groupshared array (may differ from T).
+    /// @param V The size of the groupshared array.
+    /// @param data The groupshared array to load from.
+    /// @param element The starting element index in the array.
+    /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
+    /// @return A cooperative matrix loaded from the groupshared array.
     [ForceInline]
-    [require(cooperative_matrix)]
+    [require(cooperative_matrix_spirv)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -24516,8 +24792,18 @@ ${{{{
         };
     }
 
+    /// Loads a cooperative matrix from a groupshared (workgroup) memory array of vectors.
+    /// Vulkan only.
+    /// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the array.
+    /// @param U The element type of the vectors in the groupshared array.
+    /// @param V The size of the groupshared array.
+    /// @param L The length of each vector in the array.
+    /// @param data The groupshared vector array to load from.
+    /// @param element The starting element index in the array.
+    /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
+    /// @return A cooperative matrix loaded from the groupshared vector array.
     [ForceInline]
-    [require(cooperative_matrix)]
+    [require(cooperative_matrix_spirv)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -24538,21 +24824,38 @@ ${{{{
     // Arithmetic
     //
 
+    /// Performs element-wise addition of two cooperative matrices.
+    /// @param other The cooperative matrix to add.
+    /// @return A new cooperative matrix containing the element-wise sum.
     __intrinsic_op($(kIROp_Add))
     This add(This other);
 
+    /// Performs element-wise subtraction of two cooperative matrices.
+    /// @param other The cooperative matrix to subtract.
+    /// @return A new cooperative matrix containing the element-wise difference.
     __intrinsic_op($(kIROp_Sub))
     This sub(This other);
 
+    /// Performs element-wise multiplication of two cooperative matrices.
+    /// @param other The cooperative matrix to multiply with.
+    /// @return A new cooperative matrix containing the element-wise product.
     __intrinsic_op($(kIROp_Mul))
     This mul(This other);
 
+    /// Performs element-wise division of two cooperative matrices.
+    /// @param other The cooperative matrix to divide by.
+    /// @return A new cooperative matrix containing the element-wise quotient.
     __intrinsic_op($(kIROp_Div))
     This div(This other);
 
+    /// Negates all elements in the cooperative matrix.
+    /// @return A new cooperative matrix with all elements negated.
     __intrinsic_op($(kIROp_Neg))
     This neg();
 
+    /// Performs element-wise modulo operation of two cooperative matrices.
+    /// @param other The cooperative matrix to compute modulo with.
+    /// @return A new cooperative matrix containing the element-wise remainder.
     This mod(This other)
     {
         This ret;
@@ -24567,6 +24870,9 @@ ${{{{
     // Equality and ordering
     //
 
+    /// Tests if two cooperative matrices are equal by comparing all elements.
+    /// @param other The cooperative matrix to compare with.
+    /// @return True if all corresponding elements are equal, false otherwise.
     bool equals(This other)
     {
         for (int i = 0; i < GetLength(); i++)
@@ -24579,6 +24885,9 @@ ${{{{
         return true;
     }
 
+    /// Performs lexicographic comparison to test if this matrix is less than another.
+    /// @param other The cooperative matrix to compare with.
+    /// @return True if this matrix is lexicographically less than other, false otherwise.
     bool lessThan(This other)
     {
         for (int i = 0; i < GetLength(); i++)
@@ -24595,6 +24904,9 @@ ${{{{
         return false;
     }
 
+    /// Performs lexicographic comparison to test if this matrix is less than or equal to another.
+    /// @param other The cooperative matrix to compare with.
+    /// @return True if this matrix is lexicographically less than or equal to other, false otherwise.
     bool lessThanOrEquals(This other)
     {
         for (int i = 0; i < GetLength(); i++)
@@ -24953,8 +25265,20 @@ ${{{{
 // element type for structured buffers, pointers and groupshared arrays.
 //
 
+/// Loads a cooperative matrix from a ByteAddressBuffer.
+/// Convenience function that simplifies template argument resolution by inferring the element type.
+/// @param T The element type of the cooperative matrix.
+/// @param S The memory scope defining the cooperative group.
+/// @param M The number of rows in the matrix fragment.
+/// @param N The number of columns in the matrix fragment.
+/// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
+/// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the buffer.
+/// @param buffer The ByteAddressBuffer to load from.
+/// @param element The starting element index in the buffer.
+/// @param stride The stride in elements between consecutive rows or columns.
+/// @return A cooperative matrix loaded from the buffer.
 [ForceInline]
-[require(cooperative_matrix)]
+[require(cooperative_matrix, byteaddressbuffer)]
 CoopMat<T, S, M, N, R> coopMatLoad<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,
@@ -24970,8 +25294,20 @@ CoopMat<T, S, M, N, R> coopMatLoad<
     return CoopMat<T, S, M, N, R>.Load<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
 }
 
+/// Loads a cooperative matrix from an RWByteAddressBuffer.
+/// Convenience function that simplifies template argument resolution by inferring the element type.
+/// @param T The element type of the cooperative matrix.
+/// @param S The memory scope defining the cooperative group.
+/// @param M The number of rows in the matrix fragment.
+/// @param N The number of columns in the matrix fragment.
+/// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
+/// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the buffer.
+/// @param buffer The RWByteAddressBuffer to load from.
+/// @param element The starting element index in the buffer.
+/// @param stride The stride in elements between consecutive rows or columns.
+/// @return A cooperative matrix loaded from the buffer.
 [ForceInline]
-[require(cooperative_matrix)]
+[require(cooperative_matrix, byteaddressbuffer)]
 CoopMat<T, S, M, N, R> coopMatLoad<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,
@@ -24987,6 +25323,18 @@ CoopMat<T, S, M, N, R> coopMatLoad<
     return CoopMat<T, S, M, N, R>.Load<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
 }
 
+/// Loads a cooperative matrix from a StructuredBuffer.
+/// Convenience function that simplifies template argument resolution by inferring the element type.
+/// @param T The element type of the cooperative matrix.
+/// @param S The memory scope defining the cooperative group.
+/// @param M The number of rows in the matrix fragment.
+/// @param N The number of columns in the matrix fragment.
+/// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
+/// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the buffer.
+/// @param buffer The StructuredBuffer to load from.
+/// @param element The starting element index in the buffer.
+/// @param stride The stride in elements between consecutive rows or columns.
+/// @return A cooperative matrix loaded from the buffer.
 [ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
@@ -25004,6 +25352,18 @@ CoopMat<T, S, M, N, R> coopMatLoad<
     return CoopMat<T, S, M, N, R>.Load<matrixLayout>(buffer, element, stride);
 }
 
+/// Loads a cooperative matrix from an RWStructuredBuffer.
+/// Convenience function that simplifies template argument resolution by inferring the element type.
+/// @param T The element type of the cooperative matrix.
+/// @param S The memory scope defining the cooperative group.
+/// @param M The number of rows in the matrix fragment.
+/// @param N The number of columns in the matrix fragment.
+/// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
+/// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the buffer.
+/// @param buffer The RWStructuredBuffer to load from.
+/// @param element The starting element index in the buffer.
+/// @param stride The stride in elements between consecutive rows or columns.
+/// @return A cooperative matrix loaded from the buffer.
 [ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
@@ -25021,6 +25381,18 @@ CoopMat<T, S, M, N, R> coopMatLoad<
     return CoopMat<T, S, M, N, R>.Load<matrixLayout>(buffer, element, stride);
 }
 
+/// Loads a cooperative matrix from a pointer buffer.
+/// Convenience function that simplifies template argument resolution by inferring the element type.
+/// @param T The element type of the cooperative matrix.
+/// @param S The memory scope defining the cooperative group.
+/// @param M The number of rows in the matrix fragment.
+/// @param N The number of columns in the matrix fragment.
+/// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
+/// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the buffer.
+/// @param buffer The pointer to the buffer to load from.
+/// @param element The starting element index in the buffer.
+/// @param stride The stride in elements between consecutive rows or columns.
+/// @return A cooperative matrix loaded from the buffer.
 [ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
@@ -25038,8 +25410,22 @@ CoopMat<T, S, M, N, R> coopMatLoad<
     return CoopMat<T, S, M, N, R>.Load<matrixLayout>(buffer, element, stride);
 }
 
+/// Loads a cooperative matrix from a pointer buffer with coherent memory access. Vulkan only.
+/// Ensures memory reads observe writes made visible across the specified memory scope.
+/// Convenience function that simplifies template argument resolution by inferring the element type.
+/// @param T The element type of the cooperative matrix.
+/// @param S The memory scope defining the cooperative group.
+/// @param M The number of rows in the matrix fragment.
+/// @param N The number of columns in the matrix fragment.
+/// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
+/// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the buffer.
+/// @param buffer The pointer to the buffer to load from.
+/// @param element The starting element index in the buffer.
+/// @param stride The stride in elements between consecutive rows or columns.
+/// @param memoryScope The scope from which writes should be visible (e.g., Device, Workgroup).
+/// @return A cooperative matrix loaded from the buffer.
 [ForceInline]
-[require(cooperative_matrix, vk_mem_model)]
+[require(cooperative_matrix_spirv, vk_mem_model)]
 CoopMat<T, S, M, N, R> coopMatLoadCoherent<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,
@@ -25056,6 +25442,19 @@ CoopMat<T, S, M, N, R> coopMatLoadCoherent<
     return CoopMat<T, S, M, N, R>.LoadCoherent<matrixLayout>(buffer, element, stride, memoryScope);
 }
 
+/// Loads a cooperative matrix from a groupshared (workgroup) memory array.
+/// Convenience function that simplifies template argument resolution by inferring the element type.
+/// @param T The element type of the cooperative matrix.
+/// @param S The memory scope defining the cooperative group.
+/// @param M The number of rows in the matrix fragment.
+/// @param N The number of columns in the matrix fragment.
+/// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
+/// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the array.
+/// @param U The size of the groupshared array.
+/// @param data The groupshared array to load from.
+/// @param element The starting element index in the array.
+/// @param stride The stride in elements between consecutive rows or columns.
+/// @return A cooperative matrix loaded from the groupshared array.
 [ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
@@ -25127,6 +25526,16 @@ CoopMat<T,S,M,N,R> __float_to_int_cast<
 // Cooperative Matrix multiplication with scalar
 //
 
+/// Multiplies a cooperative matrix by a scalar value: CoopMat * scalar
+/// Performs element-wise multiplication of each element in the matrix by the scalar.
+/// @param T The element type of the cooperative matrix.
+/// @param S The memory scope defining the cooperative group.
+/// @param M The number of rows in the matrix fragment.
+/// @param N The number of columns in the matrix fragment.
+/// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
+/// @param lhs The cooperative matrix to multiply.
+/// @param rhs The scalar value to multiply each element by.
+/// @return A new cooperative matrix with all elements multiplied by the scalar.
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> operator *<
     T : __BuiltinArithmeticType,
@@ -25136,12 +25545,28 @@ CoopMat<T, S, M, N, R> operator *<
     let R : CoopMatMatrixUse
 >(CoopMat<T, S, M, N, R> lhs, const T rhs)
 {
-    return spirv_asm
+    __target_switch
     {
-        result:$$CoopMat<T, S, M, N, R> = OpMatrixTimesScalar $lhs $rhs;
-    };
+    case spirv:
+        return spirv_asm
+        {
+            result:$$CoopMat<T, S, M, N, R> = OpMatrixTimesScalar $lhs $rhs;
+        };
+    case cuda:
+        __intrinsic_asm "$0 * $1";
+    }
 }
 
+/// Multiplies a scalar value by a cooperative matrix: scalar * CoopMat
+/// Performs element-wise multiplication of each element in the matrix by the scalar.
+/// @param T The element type of the cooperative matrix.
+/// @param S The memory scope defining the cooperative group.
+/// @param M The number of rows in the matrix fragment.
+/// @param N The number of columns in the matrix fragment.
+/// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
+/// @param lhs The scalar value to multiply each element by.
+/// @param rhs The cooperative matrix to multiply.
+/// @return A new cooperative matrix with all elements multiplied by the scalar.
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> operator *<
     T : __BuiltinArithmeticType,
@@ -25158,6 +25583,22 @@ CoopMat<T, S, M, N, R> operator *<
 // Cooperative Matrix Multiply-Accumulate
 //
 
+/// Performs cooperative matrix multiply-accumulate operation: D = A * B + C
+/// This is the fundamental operation for hardware-accelerated matrix multiplication.
+/// All threads in the warp/subgroup cooperate to compute the result.
+/// @param T The element type of the result accumulator matrix.
+/// @param saturatingAccumulation If true, uses saturating accumulation (clamps to representable range).
+/// @param U The element type of Matrix A.
+/// @param V The element type of Matrix B.
+/// @param W The element type of the input accumulator Matrix C.
+/// @param S The memory scope defining the cooperative group.
+/// @param M The number of rows in Matrix A and the result (shared dimension).
+/// @param K The number of columns in Matrix A and rows in Matrix B (reduction dimension).
+/// @param N The number of columns in Matrix B and the result (shared dimension).
+/// @param matA Matrix A with dimensions M×K (MatrixA use).
+/// @param matB Matrix B with dimensions K×N (MatrixB use).
+/// @param matC Accumulator matrix C with dimensions M×N to add to the product.
+/// @return Result accumulator matrix D = A * B + C with dimensions M×N.
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> coopMatMulAdd<
     T : __BuiltinArithmeticType,
@@ -25174,33 +25615,65 @@ CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> coopMatMulAdd<
     CoopMat<V, S, K, N, CoopMatMatrixUse.MatrixB> matB,
     CoopMat<W, S, M, N, CoopMatMatrixUse.MatrixAccumulator> matC)
 {
-    // https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/KHR/SPV_KHR_cooperative_matrix.asciidoc#3x-cooperative-matrix-operands
-    int operands = 0; // NoneKHR
-    if (__isSignedInt<U>())
+    __target_switch
     {
-        operands |= 0x01; // MatrixASignedComponentsKHR
-    }
-    if (__isSignedInt<V>())
-    {
-        operands |= 0x02; // MatrixBSignedComponentsKHR
-    }
-    if (__isSignedInt<W>())
-    {
-        operands |= 0x04; // MatrixCSignedComponentsKHR
-    }
-    if (__isSignedInt<T>())
-    {
-        operands |= 0x08; // MatrixResultSignedComponentsKHR
-    }
-    if (saturatingAccumulation)
-    {
-        operands |= 0x10; // SaturatingAccumulationKHR
-    }
+    case spirv:
+        // https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/KHR/SPV_KHR_cooperative_matrix.asciidoc#3x-cooperative-matrix-operands
+        int operands = 0; // NoneKHR
+        if (__isSignedInt<U>())
+        {
+            operands |= 0x01; // MatrixASignedComponentsKHR
+        }
+        if (__isSignedInt<V>())
+        {
+            operands |= 0x02; // MatrixBSignedComponentsKHR
+        }
+        if (__isSignedInt<W>())
+        {
+            operands |= 0x04; // MatrixCSignedComponentsKHR
+        }
+        if (__isSignedInt<T>())
+        {
+            operands |= 0x08; // MatrixResultSignedComponentsKHR
+        }
+        if (saturatingAccumulation)
+        {
+            operands |= 0x10; // SaturatingAccumulationKHR
+        }
 
-    return spirv_asm
-    {
-        result:$$CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> = OpCooperativeMatrixMulAddKHR $matA $matB $matC !operands;
-    };
+        return spirv_asm
+        {
+            result:$$CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> = OpCooperativeMatrixMulAddKHR $matA $matB $matC !operands;
+        };
+    case cuda:
+        if (saturatingAccumulation)
+            __intrinsic_asm R"(Slang_CUDA_WMMA::coopMatMulAdd<
+                                                         $T0::ElementType,
+                                                         $T1::ElementType,
+                                                         $T2::ElementType,
+                                                         $TR::ElementType,
+                                                         $T0::m_M,
+                                                         $T0::m_N,
+                                                         $T0::m_K,
+                                                         $T0::m_layout,
+                                                         $T1::m_layout,
+                                                         true
+                                                        >($0, $1, $2))";
+        else
+            __intrinsic_asm R"(Slang_CUDA_WMMA::coopMatMulAdd<
+                                                         $T0::ElementType,
+                                                         $T1::ElementType,
+                                                         $T2::ElementType,
+                                                         $TR::ElementType,
+                                                         $T0::m_M,
+                                                         $T0::m_N,
+                                                         $T0::m_K,
+                                                         $T0::m_layout,
+                                                         $T1::m_layout,
+                                                         false
+                                                        >($0, $1, $2))";
+
+    }
 }
 
 extension<

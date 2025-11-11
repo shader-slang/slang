@@ -340,10 +340,29 @@ static void _appendTime(double timeInSec, StringBuilder& out)
 
 void TestReporter::_addResult(TestInfo info)
 {
+    // If test result is still uninitialized, no result was ever set for this test
+    // This likely indicates a bug in the test framework usage
+    if (info.testResult == TestResult::Uninitialized)
+    {
+        assert(!"Test ended without setting a result - this is likely a bug");
+        // Don't count uninitialized tests in statistics
+        return;
+    }
+
     if (info.testResult == TestResult::Ignored && m_hideIgnored)
     {
         return;
     }
+
+    // If test is pending retry, don't count it in any statistics yet
+    // The test will be re-run and reported again with a final result
+    if (info.testResult == TestResult::PendingRetry)
+    {
+        printf("failed(pending retry) '%S'\n", info.name.toWString().begin());
+        fflush(stdout);
+        return;
+    }
+
     info.testResult = adjustResult(info.name.getUnownedSlice(), info.testResult);
 
     m_totalTestCount++;

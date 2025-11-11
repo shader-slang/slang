@@ -1977,6 +1977,11 @@ Result linkAndOptimizeIR(
         simplifyIR(targetProgram, irModule, simplificationOptions, sink);
     }
 
+    if (isKhronosTarget(targetRequest) && !emitSpirvDirectly)
+    {
+        legalizeModesOfNonCopyableOpaqueTypedParamsForGLSL(codeGenContext, irModule);
+    }
+
     // As a late step, we need to take the SSA-form IR and move things *out*
     // of SSA form, by eliminating all "phi nodes" (block parameters) and
     // introducing explicit temporaries instead. Doing this at the IR level

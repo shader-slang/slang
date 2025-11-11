@@ -4861,6 +4861,11 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         //
         auto typeLayout = createParameterGroupTypeLayout(context, parameterGroupType);
 
+        // Set the uniform alignment for the parameter group type based on the
+        // alignment required for the container itself (e.g., pointer alignment
+        // for CUDA/CPU targets where parameter blocks are represented as pointers).
+        typeLayout->uniformAlignment = info.alignment;
+
         return TypeLayoutResult(typeLayout, info);
     }
     else if (const auto samplerStateType = as<SamplerStateType>(type))
