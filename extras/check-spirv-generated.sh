@@ -114,9 +114,11 @@ echo_success "Build completed successfully"
 echo_info "Comparing generated files..."
 TEMP_DIR=$(mktemp -d)
 
-# Copy generated files to temp directory
-cp "$BUILD_DIR"/*.inc "$TEMP_DIR/" 2>/dev/null || true
-cp "$BUILD_DIR"/*.h "$TEMP_DIR/" 2>/dev/null || true
+# Copy generated files to temp directory (allow glob to expand to nothing)
+shopt -s nullglob
+cp "$BUILD_DIR"/*.inc "$TEMP_DIR/" 2>/dev/null
+cp "$BUILD_DIR"/*.h "$TEMP_DIR/" 2>/dev/null
+shopt -u nullglob
 
 # Count files for verification
 GENERATED_COUNT=$(ls -1 "$TEMP_DIR" 2>/dev/null | wc -l)
@@ -190,8 +192,10 @@ if [ "$DIFF_FOUND" = true ]; then
   echo_info "Saving generated files for artifact upload..."
   ARTIFACT_DIR="external/spirv-tools/artifacts-for-upload"
   mkdir -p "$ARTIFACT_DIR"
-  cp "$BUILD_DIR"/*.inc "$ARTIFACT_DIR/" 2>/dev/null || true
-  cp "$BUILD_DIR"/*.h "$ARTIFACT_DIR/" 2>/dev/null || true
+  shopt -s nullglob
+  cp "$BUILD_DIR"/*.inc "$ARTIFACT_DIR/" 2>/dev/null
+  cp "$BUILD_DIR"/*.h "$ARTIFACT_DIR/" 2>/dev/null
+  shopt -u nullglob
 
   ARTIFACT_COUNT=$(ls -1 "$ARTIFACT_DIR" 2>/dev/null | wc -l)
   echo_info "Saved $ARTIFACT_COUNT generated files for CI artifact upload"
