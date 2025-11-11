@@ -662,7 +662,6 @@ struct IRInst
             m_decorationsAndChildren.first,
             m_decorationsAndChildren.last);
     }
-    void removeAndDeallocateAllChildren();
     void removeAndDeallocateAllDecorationsAndChildren();
     bool hasDecorationOrChild() { return m_decorationsAndChildren.first != nullptr; }
 

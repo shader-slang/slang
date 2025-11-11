@@ -8243,16 +8243,6 @@ void IRInst::removeAndDeallocate()
     removeFromParent();
 }
 
-void IRInst::removeAndDeallocateAllChildren()
-{
-    IRInst* nextChild = nullptr;
-    for (IRInst* child = getFirstChild(); child; child = nextChild)
-    {
-        nextChild = child->getNextInst();
-        child->removeAndDeallocate();
-    }
-}
-
 void IRInst::removeAndDeallocateAllDecorationsAndChildren()
 {
     IRInst* nextChild = nullptr;

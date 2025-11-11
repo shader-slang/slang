@@ -4891,7 +4891,6 @@ void CLikeSourceEmitter::emitGlobalVar(IRGlobalVar* varDecl)
 
             m_writer->emit("\n");
             emitType(varType, initFuncName);
-            
             m_writer->emit("()\n{\n");
             m_writer->indent();
             emitFunctionBody(varDecl);
@@ -5313,11 +5312,18 @@ void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& 
 
     if (shouldEmitOnlyHeader()) 
     {
+        // remove body from all functions when emitting a header
         for (auto inst : module->getGlobalInsts())
         {
             if (as<IRFunc>(inst)) 
             {
-                inst->removeAndDeallocateAllChildren();
+                for (auto child : inst->getModifiableChildren())
+                {
+                    if (as<IRBlock>(child))
+                    {
+                        child->removeAndDeallocate();
+                    }
+                }
             }
         }
     }
