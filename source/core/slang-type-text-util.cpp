@@ -52,7 +52,7 @@ static const TypeTextUtil::CompileTargetInfo s_compileTargetInfos[] = {
     {SLANG_SPIRV_ASM, "spv-asm", "spirv-asm,spirv-assembly", "SPIR-V assembly"},
     {SLANG_C_SOURCE, "c", "c", "C source code"},
     {SLANG_CPP_SOURCE, "cpp,c++,cxx", "cpp,c++,cxx", "C++ source code"},
-    {SLANG_CPP_HEADER, "hpp,hxx", "hpp,hxx", "C++ source header"},
+    {SLANG_CPP_HEADER, "hpp", "hpp", "C++ source header"},
     {SLANG_CPP_PYTORCH_BINDING,
      "cpp,c++,cxx",
      "torch,torch-binding,torch-cpp,torch-cpp-binding",

@@ -55,7 +55,7 @@ Using the `-target` command line option
 
 * `C_SOURCE`: c
 * `CPP_SOURCE`: cpp,c++,cxx
-* `CPP_HEADER`: hpp,hxx
+* `CPP_HEADER`: hpp
 * `HOST_CPP_SOURCE`: host-cpp,host-c++,host-cxx
 
 Note! Output of C source is not currently supported.
