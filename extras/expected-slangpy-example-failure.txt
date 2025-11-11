@@ -1,0 +1,15 @@
+# Slangpy examples that are expected to fail or should be skipped on CI
+#
+# Format: example_name (platform1, platform2, ...)
+# Where platform can be: windows, macos, linux
+#
+# Lines starting with # are comments
+# Empty lines are ignored
+#
+# Examples:
+# window (windows, macos)           # Skip window example on Windows and macOS
+# jupyter (linux)                    # Skip jupyter only on Linux
+# pathtracer (windows, macos, linux) # Skip pathtracer on all platforms
+#
+# If no platform is specified, the example is skipped on all platforms
+
