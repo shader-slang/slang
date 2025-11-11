@@ -52,6 +52,9 @@ public:
     /// Disconnect. May block while server shuts down
     void disconnect();
 
+    /// Get the backing process (if any)
+    Process* getProcess() const { return m_process; }
+
     SlangResult checkArrayObjectWrap(
         const JSONValue& srcArgs,
         const RttiInfo* dstArgsRttiInfo,
