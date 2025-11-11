@@ -23,9 +23,17 @@
 #endif
 
 #include <time.h>
+#include <mutex>
 
 namespace Slang
 {
+
+// On macOS, pipe() + fcntl(FD_CLOEXEC) is not atomic, creating a race window
+// where concurrent forks can inherit pipes without CLOEXEC.
+// This mutex serializes Process::create() to prevent that race.
+#if SLANG_APPLE_FAMILY
+static std::mutex g_forkMutex;
+#endif
 
 class UnixProcess : public Process
 {
@@ -429,6 +437,13 @@ static int pipeCLOEXEC(int pipefd[2])
     // Terminate with a null
     argPtrs.add(nullptr);
 
+#if SLANG_APPLE_FAMILY
+    // Lock to prevent concurrent pipe creation + fork operations
+    // This prevents the race where pipe() creates FDs without CLOEXEC,
+    // and another thread forks before fcntl() can set CLOEXEC
+    std::lock_guard<std::mutex> forkLock(g_forkMutex);
+#endif
+
     //
     // Set up pipes
     //
@@ -440,8 +455,10 @@ static int pipeCLOEXEC(int pipefd[2])
     // automatically if the child's exec succeeds
     int execWatchPipe[2] = {-1, -1};
 
-    if (pipe(stdinPipe) == -1 || pipe(stdoutPipe) == -1 || pipe(stderrPipe) == -1 ||
-        pipeCLOEXEC(execWatchPipe) == -1)
+    // Create ALL pipes with CLOEXEC to prevent FD corruption across forks
+    // The child will clear CLOEXEC on the fds it needs before dup2
+    if (pipeCLOEXEC(stdinPipe) == -1 || pipeCLOEXEC(stdoutPipe) == -1 || 
+        pipeCLOEXEC(stderrPipe) == -1 || pipeCLOEXEC(execWatchPipe) == -1)
     {
         whatFailed = "pipe";
         goto reportErr;
@@ -572,6 +589,9 @@ static int pipeCLOEXEC(int pipefd[2])
         const int readRes = ::read(execWatchPipe[0], &execErrCode, sizeof(execErrCode));
         if (readRes < 0)
         {
+            fprintf(stderr, 
+                    "DEBUGGING: read() on execWatchPipe[0]=%d failed with readRes=%d, errno=%d (%s), childPid=%d, command='%s'\n",
+                    execWatchPipe[0], readRes, errno, strerror(errno), childPid, argPtrs[0]);
             whatFailed = "read from forked process";
             goto reportErr;
         }

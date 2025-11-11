@@ -1113,8 +1113,22 @@ SlangResult File::readAllText(const Slang::String& fileName, String& outText)
         stream->init(fileName, FileMode::Open, FileAccess::Read, FileShare::ReadWrite));
 
     StreamReader reader;
-    SLANG_RETURN_ON_FAIL(reader.init(stream));
-    SLANG_RETURN_ON_FAIL(reader.readToEnd(outText));
+    if (SLANG_FAILED(reader.init(stream)))
+    {
+        fprintf(
+            stderr,
+            "DEBUGGING: Failed to initialize reader for file '%s'\n",
+            fileName.getBuffer());
+        return SLANG_FAIL;
+    }
+    if (SLANG_FAILED(reader.readToEnd(outText)))
+    {
+        fprintf(
+            stderr,
+            "DEBUGGING: Failed to read to end of file '%s'\n",
+            fileName.getBuffer());
+        return SLANG_FAIL;
+    }
 
     return SLANG_OK;
 }

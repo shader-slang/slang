@@ -7,9 +7,18 @@
 
 #include <stdio.h>
 #include <thread>
+#include <atomic>
+
+#ifndef _WIN32
+#include <unistd.h>
+#include <fcntl.h>
+#endif
 
 namespace Slang
 {
+
+// DEBUG: Track ferror count to avoid log spam
+static std::atomic<int> g_ferrorCount(0);
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FileStream !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -58,7 +67,15 @@ SlangResult FileStream::_init(
         return SLANG_E_INVALID_ARG;
     }
 
-    const char* mode = "rt";
+    // On non-Windows, append 'e' to mode to set O_CLOEXEC atomically
+    // This prevents FD corruption when another thread forks
+#ifndef _WIN32
+    #define MODE_CLOEXEC "e"
+#else
+    #define MODE_CLOEXEC ""
+#endif
+
+    const char* mode = "rt" MODE_CLOEXEC;
     switch (fileMode)
     {
     case FileMode::Create:
@@ -69,25 +86,25 @@ SlangResult FileStream::_init(
         }
         else if (access == FileAccess::ReadWrite)
         {
-            mode = "w+b";
+            mode = "w+b" MODE_CLOEXEC;
         }
         else
         {
-            mode = "wb";
+            mode = "wb" MODE_CLOEXEC;
         }
         break;
     case FileMode::Open:
         if (access == FileAccess::Read)
         {
-            mode = "rb";
+            mode = "rb" MODE_CLOEXEC;
         }
         else if (access == FileAccess::ReadWrite)
         {
-            mode = "r+b";
+            mode = "r+b" MODE_CLOEXEC;
         }
         else
         {
-            mode = "wb";
+            mode = "wb" MODE_CLOEXEC;
         }
         break;
     case FileMode::CreateNew:
@@ -102,11 +119,11 @@ SlangResult FileStream::_init(
         }
         else if (access == FileAccess::ReadWrite)
         {
-            mode = "w+b";
+            mode = "w+b" MODE_CLOEXEC;
         }
         else
         {
-            mode = "wb";
+            mode = "wb" MODE_CLOEXEC;
         }
         break;
     case FileMode::Append:
@@ -117,16 +134,18 @@ SlangResult FileStream::_init(
         }
         else if (access == FileAccess::ReadWrite)
         {
-            mode = "a+b";
+            mode = "a+b" MODE_CLOEXEC;
         }
         else
         {
-            mode = "ab";
+            mode = "ab" MODE_CLOEXEC;
         }
         break;
     default:
         break;
     }
+
+#undef MODE_CLOEXEC
 #ifdef _WIN32
 
     // NOTE! This works because we know all the characters in the mode
@@ -251,6 +270,24 @@ SlangResult FileStream::read(void* buffer, size_t length, size_t& outBytesRead)
             // If we are not at the end of the file we should be able to read some bytes
             if (!feof(m_handle))
             {
+#ifndef _WIN32
+                // DEBUG: Check for ferror to see what's wrong
+                if (ferror(m_handle))
+                {
+                    int count = ++g_ferrorCount;
+                    // Only print first 10 occurrences to avoid log spam
+                    if (count <= 10)
+                    {
+                        int fd = fileno(m_handle);
+                        fprintf(stderr, "DEBUGGING: ferror() #%d triggered during read, errno=%d, fd=%d\n", 
+                                count, errno, fd);
+                    }
+                    else if (count == 11)
+                    {
+                        fprintf(stderr, "DEBUGGING: ferror() suppressing further messages (count=%d)\n", count);
+                    }
+                }
+#endif
                 return SLANG_FAIL;
             }
             m_endReached = true;

@@ -563,31 +563,7 @@ static SlangResult _gatherTestsForFile(
 
     // Try reading the file with retries on failure to handle intermittent I/O errors
     // (commonly seen on macOS in CI environments)
-    SlangResult readResult = SLANG_FAIL;
-    for (int retryCount = 0; retryCount < 3 && SLANG_FAILED(readResult); ++retryCount)
-    {
-        if (retryCount)
-        {
-            if (testReporter)
-            {
-                testReporter->messageFormat(
-                    TestMessageType::Info,
-                    "Retrying to read test file '%s' (attempt %d)",
-                    filePath.getBuffer(),
-                    retryCount + 1);
-            }
-            else
-            {
-                fprintf(
-                    stderr,
-                    "Retrying to read test file '%s' (attempt %d)\n",
-                    filePath.getBuffer(),
-                    retryCount + 1);
-            }
-            std::this_thread::sleep_for(std::chrono::milliseconds(retryCount * 100));
-        }
-        readResult = Slang::File::readAllText(filePath, fileContents);
-    }
+    SlangResult readResult = Slang::File::readAllText(filePath, fileContents);
     if (SLANG_FAILED(readResult))
     {
         // Log file reading failure with details (thread-safe)
@@ -595,7 +571,7 @@ static SlangResult _gatherTestsForFile(
         {
             testReporter->messageFormat(
                 TestMessageType::RunError,
-                "Failed to read test file '%s' (error: 0x%08X)",
+                "DEBUGGING: Failed to read test file '%s' (error: 0x%08X)",
                 filePath.getBuffer(),
                 (unsigned int)readResult);
         }
