@@ -3865,7 +3865,7 @@ void CLikeSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
     emitSemantics(func);
 
     // TODO: encode declaration vs. definition
-    if (!shouldEmitOnlyHeader() && isDefinition(func))
+    if (isDefinition(func))
     {
         m_writer->emit("\n{\n");
         m_writer->indent();
@@ -4011,7 +4011,7 @@ bool shouldWrapInExternCBlock(IRFunc* func)
 
 void CLikeSourceEmitter::emitFunc(IRFunc* func)
 {
-    if (shouldEmitOnlyHeader() && !func->findDecoration<IRExternCppDecoration>())
+    if (!func->findDecoration<IRExternCppDecoration>())
     {
         return;
     }
@@ -4429,7 +4429,7 @@ void CLikeSourceEmitter::emitBitfieldInsertImpl(IRInst* inst)
 
 void CLikeSourceEmitter::emitStruct(IRStructType* structType)
 {
-    if (shouldEmitOnlyHeader() && !structType->findDecoration<IRExternCppDecoration>())
+    if (!structType->findDecoration<IRExternCppDecoration>())
     {
         return;
     }
@@ -4892,19 +4892,11 @@ void CLikeSourceEmitter::emitGlobalVar(IRGlobalVar* varDecl)
             m_writer->emit("\n");
             emitType(varType, initFuncName);
             
-            // When emiting header, emit only declaration.
-            if (shouldEmitOnlyHeader())
-            {
-                m_writer->emit(";\n");
-            }
-            else
-            {
-                m_writer->emit("()\n{\n");
-                m_writer->indent();
-                emitFunctionBody(varDecl);
-                m_writer->dedent();
-                m_writer->emit("}\n");
-            }
+            m_writer->emit("()\n{\n");
+            m_writer->indent();
+            emitFunctionBody(varDecl);
+            m_writer->dedent();
+            m_writer->emit("}\n");
         }
     }
 
@@ -5318,6 +5310,17 @@ void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& 
     ctx.moduleInst = module->getModuleInst();
     ctx.actions = &ioActions;
     ctx.openInsts = InstHashSet(module);
+
+    if (shouldEmitOnlyHeader()) 
+    {
+        for (auto inst : module->getGlobalInsts())
+        {
+            if (as<IRFunc>(inst)) 
+            {
+                inst->removeAndDeallocateAllChildren();
+            }
+        }
+    }
 
     for (auto inst : module->getGlobalInsts())
     {

@@ -1050,7 +1050,7 @@ void CPPSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
     emitSemantics(func);
 
     // TODO: encode declaration vs. definition
-    if (!shouldEmitOnlyHeader() && isDefinition(func))
+    if (isDefinition(func))
     {
         m_writer->emit("\n{\n");
         m_writer->indent();
