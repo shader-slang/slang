@@ -46,6 +46,13 @@ echo "Site packages: $SITE_PACKAGES"
 # Set PYTHONPATH
 export PYTHONPATH="$SITE_PACKAGES"
 
+# Determine timeout command (gtimeout on macOS, timeout elsewhere)
+if [[ "$PLATFORM" == "macos" ]]; then
+  TIMEOUT_CMD="gtimeout"
+else
+  TIMEOUT_CMD="timeout"
+fi
+
 # Change to samples directory
 cd "$SAMPLES_DIR"
 
@@ -129,7 +136,7 @@ for example_dir in examples/*/; do
     echo "Running example: $example_name"
     echo "=========================================="
 
-    if timeout 60 python "$example_script"; then
+    if $TIMEOUT_CMD 60 python "$example_script"; then
       echo "[PASS] $example_name succeeded"
       successful_examples+=("$example_name")
     else

@@ -305,13 +305,15 @@ jobs:
             echo "Assuming dependencies are already available"
           fi
 
-      - name: Install Bash 4+ on macOS
+      - name: Install Bash 4+ and coreutils on macOS
         if: inputs.os == 'macos'
         run: |
-          echo "Installing Bash 4+ via Homebrew..."
-          brew install bash
+          echo "Installing Bash 4+ and coreutils via Homebrew..."
+          brew install bash coreutils
           echo "Installed Bash version:"
           /usr/local/bin/bash --version || /opt/homebrew/bin/bash --version
+          echo "Installed gtimeout version:"
+          gtimeout --version
 
       - name: Run slangpy-samples examples
         run: |

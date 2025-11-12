@@ -6,10 +6,16 @@
 # Lines starting with # are comments
 # Empty lines are ignored
 #
-# Examples:
-# window (windows, macos)           # Skip window example on Windows and macOS
-# jupyter (linux)                    # Skip jupyter only on Linux
-# pathtracer (windows, macos, linux) # Skip pathtracer on all platforms
-#
-# If no platform is specified, the example is skipped on all platforms
+# Examples that require windowing/display (CI environments are headless)
+# These fail with surface.configure() errors on headless runners
+window
+fwd-rasterizer
+bitmap
+render_pipeline
+raytracing
 
+# Examples that are computationally expensive or may timeout
+pathtracer
+
+# Jupyter examples require Jupyter kernel
+jupyter
