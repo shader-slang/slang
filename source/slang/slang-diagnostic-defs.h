@@ -3184,7 +3184,8 @@ DIAGNOSTIC(
     40002,
     Error,
     emptyRayPayloadNotSupported,
-    "ray payload struct '$0' cannot be empty for this target; SPIR-V and DXR do not support empty ray payloads (OptiX/CUDA does)")
+    "ray payload struct '$0' cannot be empty for this target; SPIR-V and DXR do not support empty "
+    "ray payloads (OptiX/CUDA does)")
 
 //
 // Cooperative Matrix
