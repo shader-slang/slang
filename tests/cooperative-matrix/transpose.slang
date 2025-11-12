@@ -1,3 +1,4 @@
+// Requires GPU with int32_t cooperative matrix support in CI (RTX 30+ series or equivalent)
 //DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix
 
 //CHECK: type: int32_t
