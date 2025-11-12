@@ -231,14 +231,11 @@ String ZipFileSystemImpl::_getPathAtIndex(Index index)
 
     mz_zip_archive_file_stat fileStat;
     // Check it's added at the end
-    // TODO(ncelik): What does the comment above mean?
     if (!mz_zip_reader_file_stat(&m_archive, mz_uint(index), &fileStat))
     {
         return String();
     }
 
-    // AddressSanitizer: stack-use-after-return
-    // (/home/ncelik/projects/slang/source/core/slang-string.cpp:766:12)
     return String(UnownedStringSlice(fileStat.m_filename).trim('/'));
 }
 

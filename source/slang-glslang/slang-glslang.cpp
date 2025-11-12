@@ -533,8 +533,6 @@ static int spirv_Optimize_1_2(const glslang_CompileRequest_1_2& request)
     std::vector<SPIRVOptimizationDiagnostic> diagnostics;
     std::vector<uint32_t> spirvBuffer;
     size_t inputBlobSize = (char*)request.inputEnd - (char*)request.inputBegin;
-    // TODO(ncelik): Are any diagnostics emitted in this case or should `inputBlobSize == 0` cause
-    // an early return?
     if (inputBlobSize > 0)
     {
         spirvBuffer.resize(inputBlobSize / sizeof(uint32_t));

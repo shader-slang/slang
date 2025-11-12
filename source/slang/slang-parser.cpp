@@ -8455,8 +8455,6 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
 
     const auto& opcodeWord = spirvInfo->opcodes.lookup(ret.opcode.token.getContent());
     const auto& opInfo = opcodeWord ? spirvInfo->opInfos.lookup(*opcodeWord) : std::nullopt;
-    // UBSan: load of value 4294967295, which is not a valid value for type 'const SpvOp' (aka
-    // 'const SpvOp_')
     ret.opcode.knownValue = opcodeWord.value_or(SpvOpMax);
 
     // If we couldn't find any info, but used this assignment syntax, raise
