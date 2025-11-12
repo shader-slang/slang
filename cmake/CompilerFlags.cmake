@@ -178,10 +178,22 @@ function(set_default_compile_options target)
             # C++ standard
             CXX_STANDARD
             20
+            CXX_STANDARD_REQUIRED
+            ON
             # pic
             POSITION_INDEPENDENT_CODE
             ON
     )
+
+    # Explicitly set C++20 flag for clang-cl on Windows
+    # clang-cl sometimes needs explicit /std:c++20 flag when CMake doesn't set it automatically
+    if(
+        CMAKE_CXX_COMPILER_ID MATCHES "Clang"
+        AND WIN32
+        AND CMAKE_CXX_SIMULATE_ID MATCHES "MSVC"
+    )
+        target_compile_options(${target} PRIVATE /std:c++20)
+    endif()
 
     target_compile_definitions(
         ${target}

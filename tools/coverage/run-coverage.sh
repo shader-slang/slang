@@ -20,11 +20,19 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
   LLVM_PROFDATA="${LLVM_PROFDATA:-xcrun llvm-profdata}"
   LLVM_COV="${LLVM_COV:-xcrun llvm-cov}"
   LIB_EXT="dylib"
+  EXE_EXT=""
+elif [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "cygwin"* || "$OSTYPE" == "win32" || "$(uname -s)" == MINGW* ]]; then
+  # Windows (Git Bash, MSYS2, Cygwin, MinGW)
+  LLVM_PROFDATA="${LLVM_PROFDATA:-llvm-profdata}"
+  LLVM_COV="${LLVM_COV:-llvm-cov}"
+  LIB_EXT="dll"
+  EXE_EXT=".exe"
 else
   # Linux/Unix - use system tools
   LLVM_PROFDATA="${LLVM_PROFDATA:-llvm-profdata}"
   LLVM_COV="${LLVM_COV:-llvm-cov}"
   LIB_EXT="so"
+  EXE_EXT=""
 fi
 
 # Determine paths
@@ -35,7 +43,7 @@ BUILD_DIR="${BUILD_DIR:-$REPO_ROOT/build}"
 CONFIG="${CONFIG:-RelWithDebInfo}"
 
 # Coverage binary and library paths
-SLANG_TEST="$BUILD_DIR/$CONFIG/bin/slang-test"
+SLANG_TEST="$BUILD_DIR/$CONFIG/bin/slang-test$EXE_EXT"
 LIBSLANG="$BUILD_DIR/$CONFIG/lib/libslang.$LIB_EXT"
 
 # Coverage output directory (use build dir to keep repo clean)
