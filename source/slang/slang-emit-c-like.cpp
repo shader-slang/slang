@@ -5302,12 +5302,12 @@ void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& 
     ctx.actions = &ioActions;
     ctx.openInsts = InstHashSet(module);
 
-    if (shouldEmitOnlyHeader()) 
+    if (shouldEmitOnlyHeader())
     {
         // remove body from all functions when emitting a header
         for (auto inst : module->getGlobalInsts())
         {
-            if (as<IRFunc>(inst)) 
+            if (as<IRFunc>(inst))
             {
                 for (auto child : inst->getModifiableChildren())
                 {
@@ -5316,7 +5316,8 @@ void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& 
                         child->removeAndDeallocate();
                     }
                 }
-                if (inst->findDecoration<IRCudaKernelDecoration>() || inst->findDecoration<IREntryPointDecoration>())
+                if (inst->findDecoration<IRCudaKernelDecoration>() ||
+                    inst->findDecoration<IREntryPointDecoration>())
                 {
                     ensureGlobalInst(&ctx, inst, EmitAction::Level::Definition);
                 }
@@ -5359,7 +5360,8 @@ void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& 
     }
     for (auto inst : module->getGlobalInsts())
     {
-        if (shouldEmitOnlyHeader()) {
+        if (shouldEmitOnlyHeader())
+        {
             // Don't emit types without ExternCppDecoration in a header
             if (!inst->findDecoration<IRExternCppDecoration>())
                 continue;
