@@ -193,6 +193,7 @@ namespace Slang
     }
 }
 
+#if SLANG_BYTE_ENCODE_USE_UNALIGNED_ACCESS
 static const uint32_t s_unalignedUInt32Mask[5] = {
     0x00000000,
     0x000000ff,
@@ -200,6 +201,7 @@ static const uint32_t s_unalignedUInt32Mask[5] = {
     0x00ffffff,
     0xffffffff,
 };
+#endif
 
 // Decode the >= kLiteCut2.
 // in is pointing past the first byte.
