@@ -62,6 +62,33 @@ int test(int val)
     return result;
 }
 
+struct OuterGeneric<T>
+{
+    enum Channel
+    {
+        Red,
+        Green,
+        Blue,
+        Alpha,
+    };
+    T value;
+    Channel channel;
+}
+
+int testGeneric(int val)
+{
+    OuterGeneric<int> outer;
+    outer.value = val;
+    outer.channel = OuterGeneric<int>.Channel(val);
+    int result = 0;
+    if (outer.channel == OuterGeneric<int>.Channel.Red) result += 1;
+    if (outer.channel == OuterGeneric<int>.Channel.Green) result += 16;
+    if (outer.channel == OuterGeneric<int>.Channel.Blue) result += 16*16;
+    if (outer.channel == OuterGeneric<int>.Channel.Alpha) result += 16*16*16;
+
+    return result;
+}
+
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
@@ -80,5 +107,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
     int tid = dispatchThreadID.x;
     int inVal = tid;
     int outVal = test(inVal) + value * 2 + int(anotherValue) * 4;
+
+    outVal += testGeneric(inVal);
     outputBuffer[tid] = outVal;
 }
