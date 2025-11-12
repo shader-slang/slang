@@ -22,10 +22,12 @@ soft-rasterizer-pytorch
 soft-rasterizer
 
 # Examples requiring additional dependencies or complex setup
-ray-casting              # Requires imageio (may not install on self-hosted)
-sdf-match                # Rendering/graphics dependencies
-simplified-splatting     # Rendering/graphics dependencies
-toy-restir               # Rendering/graphics dependencies
+# Requires imageio (may not install on self-hosted)
+ray-casting
+# Rendering/graphics dependencies
+sdf-match
+simplified-splatting
+toy-restir
 
 # Examples that are computationally expensive or may timeout
 pathtracer

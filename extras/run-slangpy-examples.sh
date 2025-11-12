@@ -74,6 +74,9 @@ if [ -f "$SKIPLIST_FILE" ]; then
     # Skip empty lines and comments
     [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
 
+    # Strip inline comments (everything after #)
+    line="${line%%#*}"
+
     # Extract example name and platform list
     # Format: example_name (platform1, platform2, ...)
     if [[ "$line" =~ ^([^(]+)(\(([^)]+)\))?[[:space:]]*$ ]]; then
