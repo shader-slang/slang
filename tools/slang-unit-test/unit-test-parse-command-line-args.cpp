@@ -44,6 +44,22 @@ struct ParseCommandLineArgsTestContext
         SLANG_RETURN_ON_FAIL(slangSession->parseCommandLineArguments(
             argc, argv, &sessionDesc, allocation.writeRef()));
 
+        const auto findCompilerOptionEntry =
+            [](const slang::TargetDesc& targetDesc,
+               slang::CompilerOptionName optionName) -> const slang::CompilerOptionEntry*
+        {
+            if (!targetDesc.compilerOptionEntries)
+                return nullptr;
+
+            for (SlangInt i = 0; i < targetDesc.compilerOptionEntryCount; ++i)
+            {
+                const auto& entry = targetDesc.compilerOptionEntries[i];
+                if (entry.name == optionName)
+                    return &entry;
+            }
+            return nullptr;
+        };
+
         // Verify we have 2 targets
         SLANG_CHECK(sessionDesc.targetCount == 2);
         if (sessionDesc.targetCount != 2)
@@ -60,6 +76,24 @@ struct ParseCommandLineArgsTestContext
         if (target0.profile != profile_sm_5_0)
             return SLANG_FAIL;
 
+        const auto* targetOption0 =
+            findCompilerOptionEntry(target0, slang::CompilerOptionName::Target);
+        SLANG_CHECK(targetOption0 != nullptr);
+        if (!targetOption0)
+            return SLANG_FAIL;
+        SLANG_CHECK(targetOption0->value.intValue0 == static_cast<int32_t>(target0.format));
+        if (targetOption0->value.intValue0 != static_cast<int32_t>(target0.format))
+            return SLANG_FAIL;
+
+        const auto* profileOption0 =
+            findCompilerOptionEntry(target0, slang::CompilerOptionName::Profile);
+        SLANG_CHECK(profileOption0 != nullptr);
+        if (!profileOption0)
+            return SLANG_FAIL;
+        SLANG_CHECK(profileOption0->value.intValue0 == static_cast<int32_t>(profile_sm_5_0));
+        if (profileOption0->value.intValue0 != static_cast<int32_t>(profile_sm_5_0))
+            return SLANG_FAIL;
+
         // Verify second target is DXIL with sm_6_0
         const auto& target1 = sessionDesc.targets[1];
         SLANG_CHECK(target1.format == SLANG_DXIL);
@@ -69,6 +103,24 @@ struct ParseCommandLineArgsTestContext
         auto profile_sm_6_0 = slangSession->findProfile("sm_6_0");
         SLANG_CHECK(target1.profile == profile_sm_6_0);
         if (target1.profile != profile_sm_6_0)
+            return SLANG_FAIL;
+
+        const auto* targetOption1 =
+            findCompilerOptionEntry(target1, slang::CompilerOptionName::Target);
+        SLANG_CHECK(targetOption1 != nullptr);
+        if (!targetOption1)
+            return SLANG_FAIL;
+        SLANG_CHECK(targetOption1->value.intValue0 == static_cast<int32_t>(target1.format));
+        if (targetOption1->value.intValue0 != static_cast<int32_t>(target1.format))
+            return SLANG_FAIL;
+
+        const auto* profileOption1 =
+            findCompilerOptionEntry(target1, slang::CompilerOptionName::Profile);
+        SLANG_CHECK(profileOption1 != nullptr);
+        if (!profileOption1)
+            return SLANG_FAIL;
+        SLANG_CHECK(profileOption1->value.intValue0 == static_cast<int32_t>(profile_sm_6_0));
+        if (profileOption1->value.intValue0 != static_cast<int32_t>(profile_sm_6_0))
             return SLANG_FAIL;
 
         return SLANG_OK;
