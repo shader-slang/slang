@@ -60,6 +60,8 @@ void stripImportedWitnessTable(IRModule* module)
         switch (globalInst->getOp())
         {
         case kIROp_Generic:
+            // inst might be nullptr when a generic doesn't have a proper return value structure
+            // e.g. when dealing with enum types
             inst = findInnerMostGenericReturnVal(as<IRGeneric>(globalInst));
             break;
         case kIROp_WitnessTable:
@@ -67,7 +69,7 @@ void stripImportedWitnessTable(IRModule* module)
         default:
             continue;
         }
-        if (inst->getOp() != kIROp_WitnessTable)
+        if (!inst || inst->getOp() != kIROp_WitnessTable)
             continue;
         if (!globalInst->findDecoration<IRImportDecoration>())
             continue;
