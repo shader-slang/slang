@@ -24,8 +24,9 @@ soft-rasterizer
 # Examples requiring additional dependencies or complex setup
 # Requires imageio (may not install on self-hosted)
 ray-casting
-# Rendering/graphics dependencies
+# Rendering/graphics/visualization dependencies (imageio, tev viewer, etc)
 sdf-match
+signed_distance_field
 simplified-splatting
 toy-restir
 
