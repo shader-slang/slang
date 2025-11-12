@@ -3943,6 +3943,8 @@ void CLikeSourceEmitter::emitFuncDecl(IRFunc* func, const String& name)
     auto funcType = func->getDataType();
     auto resultType = func->getResultType();
 
+    emitFunctionPreambleImpl(func);
+
     emitFuncDecorations(func);
     emitType(resultType, name);
 
@@ -5313,6 +5315,10 @@ void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& 
                     {
                         child->removeAndDeallocate();
                     }
+                }
+                if (inst->findDecoration<IRCudaKernelDecoration>() || inst->findDecoration<IREntryPointDecoration>())
+                {
+                    ensureGlobalInst(&ctx, inst, EmitAction::Level::Definition);
                 }
             }
         }
