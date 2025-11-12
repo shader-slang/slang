@@ -19,6 +19,9 @@ uniform RaytracingAccelerationStructure scene;
 // HitObject intrinsics - uses generic templated call, not individual _N functions
 //CHECK-DAG: optixHitObjectGetAttribute<CustomAttributes_0>
 //CHECK-DAG: slangOptixHitObjectIsMiss
+//CHECK-DAG: optixHitObjectGetHitKind()
+//CHECK-DAG: optixGetObjectRayOrigin()
+//CHECK-DAG: optixGetObjectRayDirection()
 
 // Control flow intrinsics
 //CHECK-DAG: optixTerminateRay
@@ -32,7 +35,7 @@ uniform RaytracingAccelerationStructure scene;
 // PTX intrinsics validation - using actual PTX names (order independent)
 //CHECK_PTX-DAG: _optix_get_hit_kind
 //CHECK_PTX-DAG: _optix_read_instance_idx
-//CHECK_PTX-DAG: _optix_read_instance_id  
+//CHECK_PTX-DAG: _optix_read_instance_id
 //CHECK_PTX-DAG: _optix_get_object_ray_direction_x
 //CHECK_PTX-DAG: _optix_get_object_ray_origin_x
 //CHECK_PTX-DAG: _optix_read_primitive_idx
@@ -45,6 +48,7 @@ uniform RaytracingAccelerationStructure scene;
 //CHECK_PTX-DAG: _optix_hitobject_get_traverse_data
 //CHECK_PTX-DAG: _optix_hitobject_make_with_traverse_data
 //CHECK_PTX-DAG: _optix_get_sbt_data_ptr_64
+//CHECK_PTX-DAG: _optix_hitobject_get_hitkind
 
 struct CustomAttributes
 {
@@ -244,5 +248,15 @@ void rayGenShader()
         CustomAttributes retrievedAttrs = customHit.GetAttributes<CustomAttributes>();
         payload.data.hitObjAttr0 = retrievedAttrs.attr0;
         payload.data.hitObjAttr1 = retrievedAttrs.attr1;
+
+        // Test HitObject.GetHitKind() - should generate optixHitObjectGetHitKind()
+        uint hitObjKind = customHit.GetHitKind();
+        payload.data.hitKind = hitObjKind;
+
+        // Test HitObject.GetObjectRayOrigin() and GetObjectRayDirection()
+        float3 objOrigin = customHit.GetObjectRayOrigin();
+        float3 objDirection = customHit.GetObjectRayDirection();
+        payload.data.objectRayOrigin = objOrigin;
+        payload.data.objectRayDirection = objDirection;
     }
 }

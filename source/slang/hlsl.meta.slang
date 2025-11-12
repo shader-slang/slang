@@ -21105,7 +21105,7 @@ struct HitObject
         {
         case hlsl: __intrinsic_asm ".GetHitKind";
         case glsl: __intrinsic_asm "hitObjectGetHitKindNV($0)";
-        case cuda: __intrinsic_asm "optixHitObjectGetHitKind";
+        case cuda: __intrinsic_asm "optixHitObjectGetHitKind()";
         case spirv:
             return spirv_asm
             {
@@ -21304,7 +21304,7 @@ struct HitObject
         case hlsl: __intrinsic_asm "ObjectRayOrigin";
         case glsl:
             __intrinsic_asm "hitObjectGetObjectRayOriginNV($0)";
-        case cuda: __intrinsic_asm "optixGetObjectRayOrigin";
+        case cuda: __intrinsic_asm "optixGetObjectRayOrigin()";
         case spirv:
             return spirv_asm
             {
@@ -21323,7 +21323,7 @@ struct HitObject
         case hlsl: __intrinsic_asm "ObjectRayDirection";
         case glsl:
             __intrinsic_asm "hitObjectGetObjectRayDirectionNV($0)";
-        case cuda: __intrinsic_asm "optixGetObjectRayDirection";
+        case cuda: __intrinsic_asm "optixGetObjectRayDirection()";
         case spirv:
             return spirv_asm
             {
