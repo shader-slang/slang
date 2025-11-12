@@ -6086,7 +6086,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return false;
         if (irInst->getOp() != kIROp_GlobalVar && irInst->getOp() != kIROp_GlobalParam)
             return false;
-        auto ptrType = as<IRPtrType>(irInst->getDataType());
+        auto ptrType = as<IRPtrTypeBase>(irInst->getDataType());
         if (!ptrType)
             return false;
         auto addrSpace = ptrType->getAddressSpace();

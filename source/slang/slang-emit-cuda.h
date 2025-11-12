@@ -125,6 +125,7 @@ protected:
     void _emitInitializerListContent(IRType* elementType, IRUse* operands, Index operandCount);
     void _emitInitializerListValue(IRType* elementType, IRInst* value);
 
+    SlangResult emitWMMAFragmentType(IRCoopMatrixType* coopMatType, StringBuilder& outName);
     RefPtr<CUDAExtensionTracker> m_extensionTracker;
 };
 

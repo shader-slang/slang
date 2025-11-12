@@ -1,4 +1,4 @@
-//TEST:SIMPLE:
+//TEST:SIMPLE: -Itests/preprocessor
 // #include support
 
 int foo() { return 0; }
