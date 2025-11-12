@@ -2308,6 +2308,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return emitGlobalParam(as<IRGlobalParam>(inst));
         case kIROp_GlobalVar:
             return emitGlobalVar(as<IRGlobalVar>(inst));
+        case kIROp_GlobalConstant:
+            return emitGlobalConstant(as<IRGlobalConstant>(inst));
         case kIROp_SPIRVAsmOperandBuiltinVar:
             return emitBuiltinVar(inst);
         case kIROp_Var:
@@ -3349,6 +3351,31 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return varInst;
     }
 
+    /// Emit a global constant definition.
+    SpvInst* emitGlobalConstant(IRGlobalConstant* globalConst)
+    {
+        auto layout = getVarLayout(globalConst);
+
+        SpvInst* constInst = nullptr;
+        if (as<IRBasicType>(globalConst->getDataType()))
+        {
+            constInst = emitOpConstant(
+                globalConst,
+                globalConst->getDataType(),
+                getLiteralBits(globalConst->getDataType(), globalConst->getValue()));
+        }
+        else
+        {
+            constInst = emitCompositeConstruct(getSection(SpvLogicalSectionID::ConstantsAndTypes), globalConst);
+        }
+        maybeEmitPointerDecoration(constInst, globalConst);
+        if (layout)
+            emitVarLayout(globalConst, constInst, layout);
+        emitDecorations(globalConst, getID(constInst));
+        maybeEmitDebugGlobalVariable(globalConst, constInst);
+        return constInst;
+    }
+
     SpvInst* emitBuiltinVar(IRInst* spvAsmBuiltinVar)
     {
         const auto kind = (SpvBuiltIn)(getIntVal(spvAsmBuiltinVar->getOperand(0)));
@@ -4019,6 +4046,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto name = getName(globalInst);
         IRBuilder builder(globalInst);
         auto varType = tryGetPointedToType(&builder, globalInst->getDataType());
+        if (varType == nullptr) varType = globalInst->getDataType();
         auto debugType = emitDebugType(varType);
 
         // Use default debug source and line info similar to struct debug type emission
@@ -9910,9 +9938,12 @@ SlangResult emitSPIRVFromIR(
             // forward-declared pointer types, so we need to
             // keep iterating until we have emitted all of them.
             context.ensureInst(ptrType.value->getValueType());
-            auto parent = spvPtrType->parent;
-            spvPtrType->removeFromParent();
-            parent->addInst(spvPtrType);
+
+            if (auto parent = spvPtrType->parent)
+            {
+                spvPtrType->removeFromParent();
+                parent->addInst(spvPtrType);
+            }
         }
     } while (context.m_forwardDeclaredPointers.getCount() != 0);
 

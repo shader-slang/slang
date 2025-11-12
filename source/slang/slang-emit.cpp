@@ -753,9 +753,12 @@ Result linkAndOptimizeIR(
 
     SLANG_PASS(fixEntryPointCallsites);
 
-    // Replace any global constants with their values.
-    //
-    SLANG_PASS(replaceGlobalConstants);
+    if (targetProgram->getOptionSet().getOptimizationLevel() != OptimizationLevel::None)
+    {
+        // Replace any global constants with their values.
+        //
+        SLANG_PASS(replaceGlobalConstants);
+    }
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
 

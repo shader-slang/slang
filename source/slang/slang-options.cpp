@@ -655,7 +655,7 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::Optimization,
          "-O...",
          "-O<optimization-level>",
-         "Set the optimization level."},
+         "Set the optimization level. -O0 implies -minimum-slang-optimization and -preserve-params"},
         {OptionKind::Obfuscate,
          "-obfuscate",
          nullptr,
@@ -2986,6 +2986,12 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 }
 
                 m_compileRequest->setOptimizationLevel(level);
+
+                if (level == SLANG_OPTIMIZATION_LEVEL_NONE)
+                {
+                    getCurrentTarget()->optionSet.set(OptionKind::MinimumSlangOptimization, true);
+                    linkage->m_optionSet.set(OptionKind::PreserveParameters, true);
+                }
                 break;
             }
         case OptionKind::DebugInformation:
