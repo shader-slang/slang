@@ -17,8 +17,15 @@ raytracing
 # Examples that require PyTorch (not installed in CI due to size/time constraints)
 # PyTorch is ~1-2GB and takes 2-5 minutes to install, which would slow down every CI run
 # These are integration examples rather than core slangpy functionality tests
-pytorch                  # Requires torch (PyTorch)
-soft-rasterizer-pytorch  # Requires torch (PyTorch)
+pytorch
+soft-rasterizer-pytorch
+soft-rasterizer
+
+# Examples requiring additional dependencies or complex setup
+ray-casting              # Requires imageio (may not install on self-hosted)
+sdf-match                # Rendering/graphics dependencies
+simplified-splatting     # Rendering/graphics dependencies
+toy-restir               # Rendering/graphics dependencies
 
 # Examples that are computationally expensive or may timeout
 pathtracer
