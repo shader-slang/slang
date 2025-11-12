@@ -292,42 +292,13 @@ jobs:
 
       - name: Install slangpy-samples dependencies
         run: |
-          # Try to install dependencies, but don't fail if there are permission issues on self-hosted runners
-          if [[ ! "${{ inputs.runs-on }}" =~ self-hosted ]]; then
-            echo "Installing slangpy-samples dependencies..."
-            python -m pip install -r slangpy-samples/requirements.txt --user
+          echo "Installing slangpy-samples dependencies..."
+          python -m pip install -r slangpy-samples/requirements.txt --user
 
-            # Install pytest dependencies if not already present
-            python -m pip install pytest-github-actions-annotate-failures --user
-            python -m pip install pytest-xdist --user
-          else
-            echo "Self-hosted runner detected, attempting to install dependencies..."
-            # Try to install, but don't fail the job if there are permission issues
-            python -m pip install -r slangpy-samples/requirements.txt --user || echo "Warning: Could not install all dependencies (permission issues or already installed)"
-            python -m pip install pytest-github-actions-annotate-failures --user || true
-            python -m pip install pytest-xdist --user || true
-          fi
-
-      - name: Install Bash 4+ and coreutils on macOS
-        if: inputs.os == 'macos'
-        run: |
-          echo "Installing Bash 4+ and coreutils via Homebrew..."
-          brew install bash coreutils
-          echo "Installed Bash version:"
-          /usr/local/bin/bash --version || /opt/homebrew/bin/bash --version
-          echo "Installed gtimeout version:"
-          gtimeout --version
+          # Install pytest dependencies if not already present
+          python -m pip install pytest-github-actions-annotate-failures --user
+          python -m pip install pytest-xdist --user
 
       - name: Run slangpy-samples examples
         run: |
-          # Use Bash 4+ on macOS (script requires associative arrays)
-          if [[ "${{ inputs.os }}" == "macos" ]]; then
-            # Try both possible locations for homebrew bash
-            if [ -f /opt/homebrew/bin/bash ]; then
-              /opt/homebrew/bin/bash extras/run-slangpy-examples.sh "${{ inputs.os }}" slangpy-samples "$SITE_PACKAGES"
-            else
-              /usr/local/bin/bash extras/run-slangpy-examples.sh "${{ inputs.os }}" slangpy-samples "$SITE_PACKAGES"
-            fi
-          else
-            bash extras/run-slangpy-examples.sh "${{ inputs.os }}" slangpy-samples "$SITE_PACKAGES"
-          fi
+          bash extras/run-slangpy-examples.sh "${{ inputs.os }}" slangpy-samples "$SITE_PACKAGES"

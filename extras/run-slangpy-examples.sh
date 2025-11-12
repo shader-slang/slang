@@ -13,17 +13,6 @@
 
 set -euo pipefail
 
-# Check Bash version (associative arrays require Bash 4+)
-if [ "${BASH_VERSINFO[0]}" -lt 4 ]; then
-  echo "Error: Bash 4 or newer is required. Current version: $BASH_VERSION" >&2
-  if [[ "$(uname)" == "Darwin" ]]; then
-    echo "Please install a newer version of Bash using Homebrew:" >&2
-    echo "  brew install bash" >&2
-    echo "Then use /usr/local/bin/bash or /opt/homebrew/bin/bash" >&2
-  fi
-  exit 1
-fi
-
 # Parse arguments
 if [ $# -ne 3 ]; then
   echo "Usage: $0 <platform> <slangpy-samples-dir> <site-packages>"
@@ -46,18 +35,39 @@ echo "Site packages: $SITE_PACKAGES"
 # Set PYTHONPATH
 export PYTHONPATH="$SITE_PACKAGES"
 
-# Determine timeout command (gtimeout on macOS, timeout elsewhere)
-if [[ "$PLATFORM" == "macos" ]]; then
-  TIMEOUT_CMD="gtimeout"
-else
-  TIMEOUT_CMD="timeout"
-fi
+# Helper function for timeout (works on all platforms without external tools)
+run_with_timeout() {
+  local timeout_duration=$1
+  shift
+
+  # Run command in background
+  "$@" &
+  local pid=$!
+
+  # Wait for timeout duration
+  local count=0
+  while [ $count -lt $timeout_duration ]; do
+    # Check if process is still running
+    if ! kill -0 $pid 2>/dev/null; then
+      # Process finished, get exit code
+      wait $pid
+      return $?
+    fi
+    sleep 1
+    count=$((count + 1))
+  done
+
+  # Timeout reached, kill process
+  kill $pid 2>/dev/null
+  wait $pid 2>/dev/null
+  return 124 # Standard timeout exit code
+}
 
 # Change to samples directory
 cd "$SAMPLES_DIR"
 
-# Load skiplist with platform filtering
-declare -A skip_examples
+# Load skiplist with platform filtering (using simple string to avoid Bash 4+ requirement)
+skip_examples=""
 if [ -f "$SKIPLIST_FILE" ]; then
   echo "Loading skiplist from $SKIPLIST_FILE for platform: $PLATFORM"
   while IFS= read -r line || [ -n "$line" ]; do
@@ -77,14 +87,14 @@ if [ -f "$SKIPLIST_FILE" ]; then
 
       # If no platforms specified, skip on all platforms
       if [[ -z "$platforms" ]]; then
-        skip_examples["$example_name"]=1
+        skip_examples="${skip_examples}${example_name}|"
         echo "  Will skip: $example_name (all platforms)"
         continue
       fi
 
       # Check if current platform is in the list
       if [[ "$platforms" =~ (^|[,[:space:]])$PLATFORM([,[:space:]]|$) ]]; then
-        skip_examples["$example_name"]=1
+        skip_examples="${skip_examples}${example_name}|"
         echo "  Will skip: $example_name ($platforms)"
       fi
     fi
@@ -115,9 +125,8 @@ for example_dir in examples/*/; do
     continue
   fi
 
-  # Check if example is in skiplist
-  # Use ${skip_examples[$example_name]:-} to safely handle missing keys
-  if [[ -n "${skip_examples[$example_name]:-}" ]]; then
+  # Check if example is in skiplist (using simple string match)
+  if [[ "$skip_examples" == *"|${example_name}|"* ]]; then
     echo ""
     echo "[SKIP] $example_name (in skiplist)"
     skipped_examples+=("$example_name")
@@ -136,7 +145,7 @@ for example_dir in examples/*/; do
     echo "Running example: $example_name"
     echo "=========================================="
 
-    if $TIMEOUT_CMD 60 python "$example_script"; then
+    if run_with_timeout 60 python "$example_script"; then
       echo "[PASS] $example_name succeeded"
       successful_examples+=("$example_name")
     else
