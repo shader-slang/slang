@@ -292,7 +292,7 @@ jobs:
 
       - name: Install slangpy-samples dependencies
         run: |
-          # Skip package installation on self-hosted runners to avoid permission issues
+          # Try to install dependencies, but don't fail if there are permission issues on self-hosted runners
           if [[ ! "${{ inputs.runs-on }}" =~ self-hosted ]]; then
             echo "Installing slangpy-samples dependencies..."
             python -m pip install -r slangpy-samples/requirements.txt --user
@@ -301,8 +301,11 @@ jobs:
             python -m pip install pytest-github-actions-annotate-failures --user
             python -m pip install pytest-xdist --user
           else
-            echo "Self-hosted runner detected, skipping package installation"
-            echo "Assuming dependencies are already available"
+            echo "Self-hosted runner detected, attempting to install dependencies..."
+            # Try to install, but don't fail the job if there are permission issues
+            python -m pip install -r slangpy-samples/requirements.txt --user || echo "Warning: Could not install all dependencies (permission issues or already installed)"
+            python -m pip install pytest-github-actions-annotate-failures --user || true
+            python -m pip install pytest-xdist --user || true
           fi
 
       - name: Install Bash 4+ and coreutils on macOS
