@@ -23,26 +23,34 @@ struct ParseCommandLineArgsTestContext
     SlangResult runTests()
     {
         slang::IGlobalSession* slangSession = m_unitTestContext->slangGlobalSession;
-        
+
         // Test multiple targets with different formats and profiles
         // Note: parseCommandLineArguments expects arguments WITHOUT the program name
         const char* argv[] = {
-            "-target", "spirv",
-            "-o", "out1.spv",
-            "-profile", "sm_5_0",
-            "-target", "dxil",
-            "-o", "out2.dxil",
-            "-profile", "sm_6_0",
+            "-target",
+            "spirv",
+            "-o",
+            "out1.spv",
+            "-profile",
+            "sm_5_0",
+            "-target",
+            "dxil",
+            "-o",
+            "out2.dxil",
+            "-profile",
+            "sm_6_0",
             "--",
-            "shader.slang"
-        };
+            "shader.slang"};
         int argc = SLANG_COUNT_OF(argv);
 
         slang::SessionDesc sessionDesc{};
         ComPtr<ISlangUnknown> allocation;
-        
+
         SLANG_RETURN_ON_FAIL(slangSession->parseCommandLineArguments(
-            argc, argv, &sessionDesc, allocation.writeRef()));
+            argc,
+            argv,
+            &sessionDesc,
+            allocation.writeRef()));
 
         // Verify we have 2 targets
         SLANG_CHECK(sessionDesc.targetCount == 2);
