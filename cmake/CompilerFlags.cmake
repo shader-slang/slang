@@ -162,7 +162,18 @@ function(set_default_compile_options target)
             # No reason not to do this? Useful when using split debug info
             "-Wl,--build-id"
         )
-        if(NOT ${target} STREQUAL slang-llvm)
+        # Workaround for slang-llvm's own classes needing RTTI for UBSan's type checks but LLVM not
+        # supporting RTTI, meaning slang-llvm built with RTTI will fail to link due to undefined
+        # LLVM typeinfo symbols
+        if(${target} STREQUAL slang-llvm)
+            if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+                add_supported_cxx_linker_flags(
+                    ${target}
+                    PRIVATE
+                    "-Wl,-undefined,suppress"
+                )
+            endif()
+        else()
             add_supported_cxx_linker_flags(
                 ${target}
                 PRIVATE
