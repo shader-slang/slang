@@ -9,6 +9,7 @@
 // focused on `[attributes]`.
 
 #include "slang-lookup.h"
+#include "slang-target.h"
 
 namespace Slang
 {
@@ -2237,11 +2238,27 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
     auto fields = structDecl->getDirectMemberDeclsOfType<VarDeclBase>();
     if (fields.getCount() == 0)
     {
-        getSink()->diagnose(
-            structDecl,
-            Diagnostics::emptyRayPayloadNotSupported,
-            structDecl->getName());
-        return;
+        // Check if any target requires non-empty ray payloads
+        // OptiX/CUDA allows empty payloads, but SPIR-V, DXR, etc. do not
+        bool requiresNonEmpty = false;
+        auto linkage = getLinkage();
+        for (auto targetReq : linkage->targets)
+        {
+            if (!isCUDATarget(targetReq))
+            {
+                requiresNonEmpty = true;
+                break;
+            }
+        }
+
+        if (requiresNonEmpty)
+        {
+            getSink()->diagnose(
+                structDecl,
+                Diagnostics::emptyRayPayloadNotSupported,
+                structDecl->getName());
+            return;
+        }
     }
 
     // Define valid stage names
