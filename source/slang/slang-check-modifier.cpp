@@ -2233,11 +2233,22 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
         return;
     }
 
+    // Check if the struct is empty
+    auto fields = structDecl->getDirectMemberDeclsOfType<VarDeclBase>();
+    if (fields.getCount() == 0)
+    {
+        getSink()->diagnose(
+            structDecl,
+            Diagnostics::emptyRayPayloadNotSupported,
+            structDecl->getName());
+        return;
+    }
+
     // Define valid stage names
     const HashSet<String> validStages("anyhit", "closesthit", "miss", "caller");
 
     // Check each field in the struct
-    for (auto fieldVarDecl : structDecl->getDirectMemberDeclsOfType<VarDeclBase>())
+    for (auto fieldVarDecl : fields)
     {
         auto readModifier = fieldVarDecl->findModifier<RayPayloadReadSemantic>();
         auto writeModifier = fieldVarDecl->findModifier<RayPayloadWriteSemantic>();
