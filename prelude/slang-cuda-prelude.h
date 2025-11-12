@@ -4154,6 +4154,7 @@ static __forceinline__ __device__ void slangOptixMakeNopHitObject(OptixTraversab
 #endif
 
 #if (OPTIX_VERSION >= 80100)
+// 3-argument version for non-empty payloads
 template<typename T>
 static __forceinline__ __device__ void optixInvoke(
     OptixTraversableHandle AccelerationStructure,
@@ -4162,6 +4163,17 @@ static __forceinline__ __device__ void optixInvoke(
 {
     uint32_t r0, r1;
     packOptiXRayPayloadPointer((void*)Payload, r0, r1);
+    optixInvoke(r0, r1);
+}
+
+// 2-argument overload for empty payloads (no payload parameter)
+static __forceinline__ __device__ void optixInvoke(
+    OptixTraversableHandle AccelerationStructure,
+    OptixTraversableHandle* HitOrMiss)
+{
+    // For empty payloads, invoke with zero payload registers
+    // This tells OptiX there are 2 uint32_t payload registers, both zero
+    unsigned int r0 = 0, r1 = 0;
     optixInvoke(r0, r1);
 }
 #endif
