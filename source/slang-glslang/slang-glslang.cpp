@@ -169,8 +169,7 @@ extern "C"
 #else
     __attribute__((__visibility__("default")))
 #endif
-    bool
-    glslang_validateSPIRV(const uint32_t* contents, int contentsSize)
+        bool glslang_validateSPIRV(const uint32_t* contents, int contentsSize)
 {
     spv_target_env target_env = SPV_ENV_VULKAN_1_4;
 
@@ -191,8 +190,10 @@ extern "C"
 #else
     __attribute__((__visibility__("default")))
 #endif
-    bool
-    glslang_disassembleSPIRVWithResult(const uint32_t* contents, int contentsSize, char** outString)
+        bool glslang_disassembleSPIRVWithResult(
+            const uint32_t* contents,
+            int contentsSize,
+            char** outString)
 {
     static const auto kDefaultEnvironment = SPV_ENV_UNIVERSAL_1_5;
     spv_text text;
@@ -237,8 +238,7 @@ extern "C"
 #else
     __attribute__((__visibility__("default")))
 #endif
-    bool
-    glslang_disassembleSPIRV(const uint32_t* contents, int contentsSize)
+        bool glslang_disassembleSPIRV(const uint32_t* contents, int contentsSize)
 {
     char* result = nullptr;
     auto succ = glslang_disassembleSPIRVWithResult(contents, contentsSize, &result);
@@ -955,8 +955,7 @@ extern "C"
 #else
     __attribute__((__visibility__("default")))
 #endif
-    int
-    glslang_compile_1_2(glslang_CompileRequest_1_2* inRequest)
+        int glslang_compile_1_2(glslang_CompileRequest_1_2* inRequest)
 {
     static ProcessInitializer g_processInitializer;
     if (!g_processInitializer.init())
@@ -995,8 +994,7 @@ extern "C"
 #else
     __attribute__((__visibility__("default")))
 #endif
-    int
-    glslang_compile_1_1(glslang_CompileRequest_1_1* inRequest)
+        int glslang_compile_1_1(glslang_CompileRequest_1_1* inRequest)
 {
     glslang_CompileRequest_1_2 request;
     memset(&request, 0, sizeof(request));
@@ -1011,8 +1009,7 @@ extern "C"
 #else
     __attribute__((__visibility__("default")))
 #endif
-    int
-    glslang_compile(glslang_CompileRequest_1_0* inRequest)
+        int glslang_compile(glslang_CompileRequest_1_0* inRequest)
 {
     glslang_CompileRequest_1_1 request;
     memset(&request, 0, sizeof(request));
@@ -1027,8 +1024,7 @@ extern "C"
 #else
     __attribute__((__visibility__("default")))
 #endif
-    int
-    glslang_linkSPIRV(glslang_LinkRequest* request)
+        int glslang_linkSPIRV(glslang_LinkRequest* request)
 {
     if (!request || !request->modules || request->linkResult)
         return false;
