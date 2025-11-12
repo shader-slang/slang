@@ -662,7 +662,11 @@ public:
 #endif
         }
     }
-    bool operator==(const char* strbuffer) const { return (strcmp(begin(), strbuffer) == 0); }
+    bool operator==(const char* strbuffer) const
+    {
+        const char* volatile b = begin();
+        return (strcmp(b, strbuffer) == 0);
+    }
 
     bool operator==(const String& str) const { return (strcmp(begin(), str.begin()) == 0); }
     bool operator!=(const char* strbuffer) const { return (strcmp(begin(), strbuffer) != 0); }
