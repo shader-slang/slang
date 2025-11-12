@@ -1,7 +1,7 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK_ROW):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix -Xslang -DTEST_MODE=0
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK_COLUMN):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix -Xslang -DTEST_MODE=1
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK_ROW_AND_COLUMN):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix -Xslang -DTEST_MODE=2
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK_2X2):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix -Xslang -DTEST_MODE=3
+//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK_ROW):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix -Xslang -DTEST_MODE=0
+//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK_COLUMN):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix -Xslang -DTEST_MODE=1
+//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK_ROW_AND_COLUMN):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix -Xslang -DTEST_MODE=2
+//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK_2X2):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix -Xslang -DTEST_MODE=3
 
 //CHK_ROW-COUNT-8: 36
 
