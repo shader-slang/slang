@@ -18,7 +18,10 @@ namespace renderer_test
 using namespace Slang;
 
 // Helper function to check if a feature name is valid
-static bool isValidFeatureName(const UnownedStringSlice& featureName, DiagnosticSink* sink, SourceLoc loc)
+static bool isValidFeatureName(
+    const UnownedStringSlice& featureName,
+    DiagnosticSink* sink,
+    SourceLoc loc)
 {
     // WAR: Accept cooperative-matrix-2 sub-features until RHI backend supports them
     // These features will be gracefully skipped at runtime if hardware doesn't support them
@@ -28,7 +31,8 @@ static bool isValidFeatureName(const UnownedStringSlice& featureName, Diagnostic
         {
             sink->diagnoseRaw(
                 Severity::Warning,
-                "Using cooperative-matrix-2 feature that is not yet fully supported in RHI backend. "
+                "Using cooperative-matrix-2 feature that is not yet fully supported "
+                "in RHI backend. "
                 "Test will be skipped if hardware doesn't support it.");
         }
         return true;
