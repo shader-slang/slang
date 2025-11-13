@@ -1,0 +1,48 @@
+name: Check SPIRV Generated Files
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - "external/spirv-tools/**"
+      - "external/spirv-headers/**"
+      - "external/spirv-tools-generated/**"
+      - ".github/workflows/check-spirv-generated.yml"
+      - "extras/check-spirv-generated.sh"
+
+jobs:
+  check-spirv-generated:
+    runs-on: ubuntu-latest
+    name: Verify SPIRV Generated Files
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Need full history for git diff
+          submodules: false # We'll init them selectively in the script
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential
+
+      - name: Run SPIRV generated files check
+        run: |
+          bash extras/check-spirv-generated.sh
+
+      - name: Upload build artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spirv-tools-generated-files-expected
+          path: |
+            external/spirv-tools/artifacts-for-upload/*.inc
+            external/spirv-tools/artifacts-for-upload/*.h
+          if-no-files-found: ignore
+          retention-days: 1
