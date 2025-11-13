@@ -5316,11 +5316,6 @@ void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& 
                         child->removeAndDeallocate();
                     }
                 }
-                if (inst->findDecoration<IRCudaKernelDecoration>() ||
-                    inst->findDecoration<IREntryPointDecoration>())
-                {
-                    ensureGlobalInst(&ctx, inst, EmitAction::Level::Definition);
-                }
             }
         }
     }
