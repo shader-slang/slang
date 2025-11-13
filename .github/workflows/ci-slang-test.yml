@@ -155,10 +155,11 @@ jobs:
         run: |
           "$bin_dir/slang-rhi-tests" -check-devices -optix-version=80100 -tc="ray-tracing-*.cuda"
 
-  # Run slangpy tests when:
+  # Run slangpy tests and examples when:
   # 1. full-gpu-tests is enabled AND
   # 2. Either it's a pull request OR config is release
   # This is to reduce the CI load but do some check on pull requests.
+  # Includes both slangpy pytest tests and slangpy-samples examples.
   test-slangpy:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
     timeout-minutes: 30
@@ -210,6 +211,9 @@ jobs:
           echo "Listing files in slangpy directory..."
           ls -la "$SITE_PACKAGES/slangpy/"
 
+          # Export SITE_PACKAGES for use in slangpy-samples step
+          echo "SITE_PACKAGES=$SITE_PACKAGES" >> $GITHUB_ENV
+
           # Skip package installation on self-hosted runners to avoid permission issues
           if [[ ! "${{ inputs.runs-on }}" =~ self-hosted ]]; then
             echo "Installing python packages..."
@@ -223,82 +227,17 @@ jobs:
           export PYTHONPATH="$SITE_PACKAGES"
           python -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n auto --maxprocesses=3
 
-  # Run slangpy examples tests when:
-  # 1. full-gpu-tests is enabled AND
-  # 2. Either it's a pull request OR config is release
-  # This provides integration testing with real-world slangpy examples.
-  test-slangpy-examples:
-    runs-on: ${{ fromJSON(inputs.runs-on) }}
-    timeout-minutes: 30
-    if: inputs.full-gpu-tests && (github.event_name == 'pull_request' || inputs.config == 'release')
-    defaults:
-      run:
-        shell: bash
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Common Test Setup
-        uses: ./.github/actions/common-test-setup
-        with:
-          os: ${{ inputs.os }}
-          compiler: ${{ inputs.compiler }}
-          platform: ${{ inputs.platform }}
-          config: ${{ inputs.config }}
-
-      - name: Setup Python
-        if: ${{ runner.environment != 'self-hosted' }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
-
-      - name: Install slangpy
-        run: |
-          python --version
-          echo "Cleaning up existing installations and installing slangpy..."
-
-          # Try to uninstall existing slangpy
-          python -m pip uninstall -y slangpy || echo "slangpy not found or already removed"
-
-          # Install slangpy
-          python -m pip install --verbose slangpy --user
-
-          # Get site packages directory
-          SITE_PACKAGES=$(python -c "import slangpy; import os; print(os.path.dirname(os.path.dirname(slangpy.__file__)))" | tail -n 1)
-          echo "Site packages directory: $SITE_PACKAGES"
-          echo "bin_dir location: $bin_dir"
-          echo "lib_dir location: $lib_dir"
-
-          # Copy library files
-          if [[ "${{ inputs.os }}" == "windows" ]]; then
-            cp "$bin_dir"/slang*.dll "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy library files"; exit 1; }
-          else
-            cp "$lib_dir"/libslang*.* "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy library files"; exit 1; }
-          fi
-
-          echo "Listing files in slangpy directory..."
-          ls -la "$SITE_PACKAGES/slangpy/"
-
-          # Export SITE_PACKAGES for use in next steps
-          echo "SITE_PACKAGES=$SITE_PACKAGES" >> $GITHUB_ENV
-
       - name: Clone slangpy-samples
         run: |
           echo "Cloning slangpy-samples repository..."
           git clone --depth 1 https://github.com/shader-slang/slangpy-samples.git
-
-          echo "Contents of slangpy-samples:"
-          ls -la slangpy-samples/
 
       - name: Install slangpy-samples dependencies
         run: |
           echo "Installing slangpy-samples dependencies..."
           python -m pip install -r slangpy-samples/requirements.txt --user
 
-          # Install pytest dependencies if not already present
-          python -m pip install pytest-github-actions-annotate-failures --user
-          python -m pip install pytest-xdist --user
-
-      - name: Run slangpy-samples examples
+      - name: Run slangpy-samples tests
         run: |
-          bash extras/run-slangpy-examples.sh "${{ inputs.os }}" slangpy-samples "$SITE_PACKAGES"
+          echo "Running slangpy-samples tests..."
+          python -m pytest -n 4 slangpy-samples/tests
