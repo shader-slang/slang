@@ -582,6 +582,14 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
         SimpleLayoutInfo elementInfo,
         size_t elementCount) override
     {
+        if (elementInfo.size.isInfinite())
+        {
+            SimpleLayoutInfo vectorInfo;
+            vectorInfo.kind = elementInfo.kind;
+            vectorInfo.size = LayoutSize::infinite();
+            vectorInfo.alignment = elementInfo.alignment;
+            return vectorInfo;
+        }
 
         const auto elementSize = elementInfo.size.getFiniteValue();
 
@@ -645,6 +653,15 @@ struct MetalLayoutRulesImpl : public CPULayoutRulesImpl
         size_t elementCount) override
     {
         SLANG_UNUSED(elementType);
+
+        if (elementInfo.size.isInfinite())
+        {
+            SimpleLayoutInfo vectorInfo;
+            vectorInfo.kind = elementInfo.kind;
+            vectorInfo.size = LayoutSize::infinite();
+            vectorInfo.alignment = elementInfo.alignment;
+            return vectorInfo;
+        }
 
         const auto elementSize = elementInfo.size.getFiniteValue();
         auto alignedElementCount = 1 << Math::Log2Ceil((uint32_t)elementCount);
@@ -4557,6 +4574,11 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         //    to the top level.
         //
         auto typeLayout = createParameterGroupTypeLayout(context, parameterGroupType);
+
+        // Set the uniform alignment for the parameter group type based on the
+        // alignment required for the container itself (e.g., pointer alignment
+        // for CUDA/CPU targets where parameter blocks are represented as pointers).
+        typeLayout->uniformAlignment = info.alignment;
 
         return TypeLayoutResult(typeLayout, info);
     }

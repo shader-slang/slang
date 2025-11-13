@@ -25,6 +25,7 @@ float16_t MapOp(uint32_t row, uint32_t col, float16_t value)
     return value * 2.0 + 1.0 + 2.0 + 3.0;
 }
 
+[shader("compute")]
 [numthreads(32, 1, 1)]
 void computeMain()
 {

@@ -950,12 +950,15 @@ Compound Capabilities
 > Capabilities needed to use decodeFunc with cooperative matrix load
 
 `cooperative_matrix_conversion`
-> Capabilities needed to convert cooperative matrices
+> Capabilities needed to convert cooperative matrices, all the conversions can be supported by cuda
 
 `cooperative_matrix_map_element`
 > Capabilities needed to use MapElement operation with cooperative matrix
 
 `cooperative_matrix_reduction`
+> Capabilities needed to use reduction operations with cooperative matrix
+
+`cooperative_matrix_spirv`
 > Capabilities needed to use reduction operations with cooperative matrix
 
 `cooperative_matrix_tensor_addressing`
