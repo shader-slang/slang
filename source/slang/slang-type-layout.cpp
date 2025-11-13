@@ -4210,7 +4210,7 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
             // entry to tell that the field is introducing a new space for itself.
             //
             fieldLayout->findOrAddResourceInfo(LayoutResourceKind::RegisterSpace)->index =
-                spaceOffset.getFiniteValue();
+                spaceOffset;
             fieldResourceInfo->space = 0;
             fieldResourceInfo->index = 0;
         }
@@ -4223,7 +4223,7 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
             //
             auto structTypeResourceInfo =
                 m_typeLayout->findOrAddResourceInfo(fieldTypeResourceInfo.kind);
-            fieldResourceInfo->index = structTypeResourceInfo->count.getFiniteValue();
+            fieldResourceInfo->index = structTypeResourceInfo->count;
             structTypeResourceInfo->count += fieldTypeResourceInfo.count;
             if (fieldTypeResourceInfo.kind == LayoutResourceKind::SubElementRegisterSpace &&
                 canTypeDirectlyUseRegisterSpace(fieldTypeLayout))
