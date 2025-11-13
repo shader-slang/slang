@@ -1,8 +1,7 @@
-// Requires GPU with int32_t cooperative matrix support in CI (RTX 30+ series or equivalent)
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK_ROW):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix -Xslang -DTEST_MODE=0
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK_COLUMN):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix -Xslang -DTEST_MODE=1
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK_ROW_AND_COLUMN):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix -Xslang -DTEST_MODE=2
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK_2X2):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix -Xslang -DTEST_MODE=3
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK_ROW):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix -Xslang -DTEST_MODE=0
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK_COLUMN):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix -Xslang -DTEST_MODE=1
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK_ROW_AND_COLUMN):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix -Xslang -DTEST_MODE=2
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK_2X2):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix -Xslang -DTEST_MODE=3
 
 //CHK_ROW-COUNT-8: 36
 
@@ -22,15 +21,15 @@
 //CHK_2X2:11
 //CHK_2X2:15
 
-//TEST_INPUT:ubuffer(data=[1 2 3 4 5 6 7 8], stride=4, count=256),name=buf
-StructuredBuffer<int32_t> inputBuffer;
+//TEST_INPUT:ubuffer(data=[1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0], stride=2, count=256),name=buf
+StructuredBuffer<float16_t> inputBuffer;
 
-//TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer
-RWStructuredBuffer<int32_t> outputBuffer;
+//TEST_INPUT:ubuffer(stride=2, count=256):out,name=outputBuffer
+RWStructuredBuffer<float16_t> outputBuffer;
 
 using namespace linalg;
 
-int32_t CombineOp(int32_t lhs, int32_t rhs)
+float16_t CombineOp(float16_t lhs, float16_t rhs)
 {
     return lhs + rhs;
 }
@@ -39,7 +38,7 @@ int32_t CombineOp(int32_t lhs, int32_t rhs)
 void computeMain()
 {
     let stride = 16;
-    let mat = coopMatLoad<int32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator, CoopMatMatrixLayout.RowMajor>(inputBuffer, 0, stride);
+    let mat = coopMatLoad<float16_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator, CoopMatMatrixLayout.RowMajor>(inputBuffer, 0, stride);
 #if TEST_MODE == 0
     let result = mat.ReduceRow<8>(CombineOp);
 #elif TEST_MODE == 1

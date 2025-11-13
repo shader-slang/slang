@@ -1,13 +1,11 @@
 //TEST(compute):SIMPLE(filecheck=SPIRV):-target spirv-asm -entry computeMain -stage compute
 //TEST(compute):SIMPLE(filecheck=SPIRV_BL):-target spirv-asm -entry computeMain -stage compute -DBLOCK_LOAD
 
-// Requires GPU with int32_t cooperative matrix support in CI (RTX 30+ series or equivalent)
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix -Xslang -DRW
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix -Xslang -DRW
 
-// Requires GPU with int32_t cooperative matrix support in CI (RTX 30+ series or equivalent)
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_BL):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix -Xslang -DBLOCK_LOAD
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_BL):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix -Xslang -DBLOCK_LOAD -Xslang -DRW
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_BL):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix -Xslang -DBLOCK_LOAD
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_BL):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix -Xslang -DBLOCK_LOAD -Xslang -DRW
 
 //CHECK: 0
 //CHECK-NEXT: 0
@@ -32,7 +30,7 @@
 //CHECK_BL-NEXT: 0
 //CHECK_BL-NEXT: 0
 
-//TEST_INPUT:ubuffer(data=[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24], stride=4, count=256),name=buf
+//TEST_INPUT:ubuffer(data=[1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0 10.0 11.0 12.0 13.0 14.0 15.0 16.0 17.0 18.0 19.0 20.0 21.0 22.0 23.0 24.0], stride=4, count=256),name=buf
 
 #if defined(RW)
     RWByteAddressBuffer inputBuffer;
@@ -45,13 +43,13 @@ RWByteAddressBuffer outputBuffer;
 
 using namespace linalg;
 
-typealias CoopMatType = CoopMat<int32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator>;
+typealias CoopMatType = CoopMat<float16_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator>;
 
-int32_t decodeFunc(uint32_t* encoded, uint32_t blockCoord[2], uint32_t coordInBlock[2])
+float16_t decodeFunc(uint32_t* encoded, uint32_t blockCoord[2], uint32_t coordInBlock[2])
 {
     uint32_t coord = blockCoord[1] * 4 + blockCoord[0];
     uint32_t mask = (0xff << (coordInBlock[0] * 8));
-    return int32_t(encoded[coord] & mask) + 1;
+    return float16_t(encoded[coord] & mask) + 1.0;
 }
 
 [numthreads(32, 1, 1)]
