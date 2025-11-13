@@ -23,6 +23,10 @@ uniform RaytracingAccelerationStructure scene;
 //CHECK-DAG: optixGetObjectRayOrigin()
 //CHECK-DAG: optixGetObjectRayDirection()
 
+// PTX checks for HitObject methods in raygen
+//CHECK_PTX-DAG: _optix_get_object_ray_origin_x
+//CHECK_PTX-DAG: _optix_get_object_ray_direction_x
+
 // Control flow intrinsics
 //CHECK-DAG: optixTerminateRay
 //CHECK-DAG: optixTraverse
