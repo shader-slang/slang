@@ -1,4 +1,3 @@
-// Requires VK_NV_cooperative_matrix2 extension (cooperativeMatrixReductions)
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK_ROW):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix-reductions -Xslang -DTEST_MODE=0
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK_COLUMN):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix-reductions -Xslang -DTEST_MODE=1
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK_ROW_AND_COLUMN):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix-reductions -Xslang -DTEST_MODE=2
@@ -23,14 +22,14 @@
 //CHK_2X2:15
 
 //TEST_INPUT:ubuffer(data=[1 2 3 4 5 6 7 8], stride=4, count=256),name=buf
-StructuredBuffer<int> inputBuffer;
+StructuredBuffer<int32_t> inputBuffer;
 
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer
-RWStructuredBuffer<int> outputBuffer;
+RWStructuredBuffer<int32_t> outputBuffer;
 
 using namespace linalg;
 
-int CombineOp(int lhs, int rhs)
+int32_t CombineOp(int32_t lhs, int32_t rhs)
 {
     return lhs + rhs;
 }
@@ -39,7 +38,7 @@ int CombineOp(int lhs, int rhs)
 void computeMain()
 {
     let stride = 16;
-    let mat = coopMatLoad<int, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator, CoopMatMatrixLayout.RowMajor>(inputBuffer, 0, stride);
+    let mat = coopMatLoad<int32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator, CoopMatMatrixLayout.RowMajor>(inputBuffer, 0, stride);
 #if TEST_MODE == 0
     let result = mat.ReduceRow<8>(CombineOp);
 #elif TEST_MODE == 1

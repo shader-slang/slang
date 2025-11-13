@@ -1,4 +1,3 @@
-// Requires VK_NV_cooperative_matrix2 extension (cooperativeMatrixPerElementOperations)
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -Xslang -DTEST_MODE=0 -render-feature cooperative-matrix-per-element-operations
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -Xslang -DTEST_MODE=1 -render-feature cooperative-matrix-per-element-operations
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -Xslang -DTEST_MODE=2 -render-feature cooperative-matrix-per-element-operations
@@ -15,7 +14,7 @@
 StructuredBuffer<int> input1;
 
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer
-RWStructuredBuffer<int> outputBuffer;
+RWStructuredBuffer<int32_t> outputBuffer;
 
 using namespace linalg;
 
@@ -26,7 +25,6 @@ int MapOp(uint32_t row, uint32_t col, int value)
     return value * 2 + 1 + 2 + 3;
 }
 
-[shader("compute")]
 [numthreads(32, 1, 1)]
 void computeMain()
 {

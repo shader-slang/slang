@@ -1,13 +1,11 @@
 //TEST(compute):SIMPLE(filecheck=SPIRV):-target spirv-asm -entry computeMain -stage compute
 //TEST(compute):SIMPLE(filecheck=SPIRV_BL):-target spirv-asm -entry computeMain -stage compute -DBLOCK_LOAD
 
-// Requires VK_NV_cooperative_matrix2 extension (cooperativeMatrixTensorAddressing)
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix-tensor-addressing
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix-tensor-addressing -Xslang -DRW
 
-// Requires VK_NV_cooperative_matrix2 extension (cooperativeMatrixTensorAddressing, cooperativeMatrixBlockLoads)
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_BL):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix-tensor-addressing,cooperative-matrix-block-loads -Xslang -DBLOCK_LOAD
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_BL):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix-tensor-addressing,cooperative-matrix-block-loads -Xslang -DBLOCK_LOAD -Xslang -DRW
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_BL):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix-block-loads -Xslang -DBLOCK_LOAD
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_BL):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix-block-loads -Xslang -DBLOCK_LOAD -Xslang -DRW
 
 //CHECK: 0
 //CHECK-NEXT: 0
@@ -45,13 +43,13 @@ RWByteAddressBuffer outputBuffer;
 
 using namespace linalg;
 
-typealias CoopMatType = CoopMat<int, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator>;
+typealias CoopMatType = CoopMat<int32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator>;
 
-int decodeFunc(uint32_t* encoded, uint32_t blockCoord[2], uint32_t coordInBlock[2])
+int32_t decodeFunc(uint32_t* encoded, uint32_t blockCoord[2], uint32_t coordInBlock[2])
 {
     uint32_t coord = blockCoord[1] * 4 + blockCoord[0];
     uint32_t mask = (0xff << (coordInBlock[0] * 8));
-    return int(encoded[coord] & mask) + 1;
+    return int32_t(encoded[coord] & mask) + 1;
 }
 
 [numthreads(32, 1, 1)]
