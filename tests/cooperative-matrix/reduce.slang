@@ -22,15 +22,15 @@
 //CHK_2X2:11
 //CHK_2X2:15
 
-//TEST_INPUT:ubuffer(data=[1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0], stride=2, count=256),name=buf
-StructuredBuffer<float16_t> inputBuffer;
+//TEST_INPUT:ubuffer(data=[1 2 3 4 5 6 7 8], stride=4, count=256),name=buf
+StructuredBuffer<int> inputBuffer;
 
-//TEST_INPUT:ubuffer(stride=2, count=256):out,name=outputBuffer
-RWStructuredBuffer<float16_t> outputBuffer;
+//TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer
+RWStructuredBuffer<int> outputBuffer;
 
 using namespace linalg;
 
-float16_t CombineOp(float16_t lhs, float16_t rhs)
+int CombineOp(int lhs, int rhs)
 {
     return lhs + rhs;
 }
@@ -39,7 +39,7 @@ float16_t CombineOp(float16_t lhs, float16_t rhs)
 void computeMain()
 {
     let stride = 16;
-    let mat = coopMatLoad<float16_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator, CoopMatMatrixLayout.RowMajor>(inputBuffer, 0, stride);
+    let mat = coopMatLoad<int, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator, CoopMatMatrixLayout.RowMajor>(inputBuffer, 0, stride);
 #if TEST_MODE == 0
     let result = mat.ReduceRow<8>(CombineOp);
 #elif TEST_MODE == 1
