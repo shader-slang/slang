@@ -45,7 +45,7 @@ struct LayoutSize
     LayoutSize(RawValue size)
         : raw(size)
     {
-        SLANG_ASSERT(size != RawValue(-1));
+        SLANG_ASSERT(size != s_infiniteValue);
     }
 
     static LayoutSize fromRaw(RawValue raw)
@@ -58,17 +58,35 @@ struct LayoutSize
     static LayoutSize infinite()
     {
         LayoutSize result;
-        result.raw = RawValue(-1);
+        result.raw = s_infiniteValue;
         return result;
     }
 
-    bool isInfinite() const { return raw == RawValue(-1); }
+    template<typename F1, typename F2>
+    auto visit(F1&& infiniteCase, F2&& finiteCase) const -> decltype(infiniteCase())
+    {
+        if (isInfinite())
+        {
+            return infiniteCase();
+        }
+        else
+        {
+            return finiteCase(raw);
+        }
+    }
 
-    bool isFinite() const { return raw != RawValue(-1); }
+
+    bool isInfinite() const { return raw == s_infiniteValue; }
+
+    bool isFinite() const { return raw != s_infiniteValue; }
     RawValue getFiniteValue() const
     {
         SLANG_ASSERT(isFinite());
         return raw;
+    }
+    RawValue getFiniteValueOr(RawValue infiniteMarker) const
+    {
+        return isFinite() ? raw : infiniteMarker;
     }
 
     bool operator==(LayoutSize that) const { return raw == that.raw; }
@@ -158,6 +176,7 @@ struct LayoutSize
         }
     }
     RawValue raw;
+    const static RawValue s_infiniteValue = ~0;
 };
 
 inline LayoutSize operator+(LayoutSize left, LayoutSize right)
@@ -218,11 +237,18 @@ struct LayoutOffset
     {
     }
 
-    LayoutOffset(RawValue offset)
+    explicit LayoutOffset(RawValue offset)
         : raw(offset)
     {
         SLANG_ASSERT(offset != s_invalidValue);
     }
+
+    explicit LayoutOffset(LayoutSize size)
+        : raw(size.isFinite() ? size.raw : s_invalidValue)
+    {
+    }
+
+    operator bool() const { return !isInvalid(); }
 
     static LayoutOffset invalid()
     {
@@ -239,6 +265,10 @@ struct LayoutOffset
         SLANG_ASSERT(isValid());
         return raw;
     }
+    RawValue getValidValueOr(RawValue invalidMarker) const
+    {
+        return isValid() ? raw : invalidMarker;
+    }
 
     std::partial_ordering compare(LayoutOffset that) const
     {
@@ -253,37 +283,82 @@ struct LayoutOffset
             return std::partial_ordering::equivalent;
     }
 
-    void operator+=(LayoutOffset right)
+    LayoutOffset operator++(int)
     {
-        if (isInvalid() || right.isInvalid())
+        LayoutOffset oldValue = *this;
+
+        if (isInvalid())
         {
-            *this = LayoutOffset::invalid();
+            return oldValue;
         }
-        else if (raw > s_maxValidValue - right.raw)
+        else if (raw >= s_maxValidValue)
         {
             // Check for overflow
             *this = LayoutOffset::invalid();
         }
         else
         {
-            *this = LayoutOffset(raw + right.raw);
+            raw = raw + 1;
+        }
+
+        return oldValue;
+    }
+
+    void operator+=(LayoutOffset right)
+    {
+        if (right.isInvalid())
+        {
+            *this = LayoutOffset::invalid();
+        }
+        else
+        {
+            return *this += right.getValidValue();
+        }
+    }
+
+    void operator+=(RawValue right)
+    {
+        if (isInvalid())
+        {
+            return;
+        }
+        else if (raw > s_maxValidValue - right)
+        {
+            // Check for overflow
+            *this = LayoutOffset::invalid();
+        }
+        else
+        {
+            *this = LayoutOffset(raw + right);
         }
     }
 
     void operator*=(LayoutOffset right)
     {
-        if (isInvalid() || right.isInvalid())
+        if (right.isInvalid())
         {
             *this = LayoutOffset::invalid();
         }
-        else if (right.raw != 0 && raw > s_maxValidValue / right.raw)
+        else
+        {
+            *this *= right.getValidValue();
+        }
+    }
+
+    void operator*=(RawValue right)
+    {
+        if (isInvalid())
+        {
+            return;
+        }
+        else if (right != 0 && raw > s_maxValidValue / right)
         {
             // Check for overflow
             *this = LayoutOffset::invalid();
         }
         else
         {
-            *this = LayoutOffset(raw * right.raw);
+            *this = LayoutOffset(raw * right);
         }
     }
 
@@ -329,12 +404,29 @@ private:
 
 inline LayoutOffset operator+(LayoutOffset left, LayoutOffset right)
 {
-    LayoutOffset result(left);
-    result += right;
-    return result;
+    left += right;
+    return left;
+}
+
+inline LayoutOffset operator+(LayoutOffset left, LayoutOffset::RawValue right)
+{
+    left += right;
+    return left;
+}
+
+inline LayoutOffset operator+(LayoutOffset::RawValue left, LayoutOffset right)
+{
+    return right + left;
 }
 
 inline LayoutOffset operator*(LayoutOffset left, LayoutOffset right)
+{
+    LayoutOffset result(left);
+    result *= right;
+    return result;
+}
+
+inline LayoutOffset operator*(LayoutOffset left, UInt right)
 {
     LayoutOffset result(left);
     result *= right;
@@ -565,7 +657,8 @@ public:
         LayoutResourceKind kind = LayoutResourceKind::None;
 
         // How many registers of the above kind did we use?
-        LayoutSize count;
+        // This may be invalid if we don't know
+        LayoutOffset count;
     };
 
     List<ResourceInfo> resourceInfos;
@@ -594,7 +687,7 @@ public:
 
         ResourceInfo info;
         info.kind = kind;
-        info.count = 0;
+        info.count = LayoutOffset{0};
         resourceInfos.add(info);
         return &resourceInfos.getLast();
     }
@@ -611,7 +704,7 @@ public:
     {
         ResourceInfo info;
         info.kind = kind;
-        info.count = count;
+        info.count = LayoutOffset{count};
         addResourceUsage(info);
     }
 
@@ -634,7 +727,7 @@ public:
         {
             SlangBindingType bindingType;
             LayoutResourceKind kind;
-            LayoutSize count;
+            LayoutOffset count;
             Int indexOffset;
         };
 
@@ -649,7 +742,7 @@ public:
             VarDeclBase* leafVariable;
             TypeLayout* leafTypeLayout;
             SlangBindingType bindingType;
-            LayoutSize count;
+            LayoutOffset count;
             Int descriptorSetIndex;
             Int firstDescriptorRangeIndex;
             Int descriptorRangeCount;
@@ -722,7 +815,7 @@ public:
         // What is our starting register in that space?
         //
         // (In the case of uniform data, this is a byte offset)
-        UInt index;
+        LayoutOffset index;
     };
     List<ResourceInfo> resourceInfos;
 
@@ -741,7 +834,7 @@ public:
         ResourceInfo info;
         info.kind = kind;
         info.space = 0;
-        info.index = 0;
+        info.index = LayoutOffset{0};
 
         resourceInfos.add(info);
         return &resourceInfos.getLast();
@@ -1152,7 +1245,7 @@ struct SimpleLayoutRulesImpl
     virtual UniformLayoutInfo BeginStructLayout() = 0;
 
     // Add a field to a `struct` type, and return the offset for the field
-    virtual LayoutSize AddStructField(
+    virtual LayoutOffset AddStructField(
         UniformLayoutInfo* ioStructInfo,
         UniformLayoutInfo fieldInfo) = 0;
 
@@ -1216,7 +1309,7 @@ struct LayoutRulesImpl
         return simpleRules->BeginStructLayout();
     }
 
-    LayoutSize AddStructField(UniformLayoutInfo* ioStructInfo, UniformLayoutInfo fieldInfo)
+    LayoutOffset AddStructField(UniformLayoutInfo* ioStructInfo, UniformLayoutInfo fieldInfo)
     {
         SLANG_ASSERT(simpleRules);
         return simpleRules->AddStructField(ioStructInfo, fieldInfo);
