@@ -1,5 +1,5 @@
 // Requires VK_NV_cooperative_matrix2 extension (Transpose operation)
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix-conversions
 
 //CHECK: type: int32_t
 //CHECK: 1
