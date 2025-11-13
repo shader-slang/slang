@@ -21,8 +21,8 @@ struct UsedRange
     VarLayout* parameter;
 
     // Begin/end of the range (half-open interval)
-    UInt begin;
-    UInt end;
+    LayoutOffset begin;
+    LayoutOffset end;
 };
 bool operator<(UsedRange left, UsedRange right)
 {
@@ -214,21 +214,12 @@ struct UsedRanges
         return existingParam;
     }
 
-    VarLayout* Add(VarLayout* param, UInt begin, UInt end)
+    VarLayout* Add(VarLayout* param, LayoutOffset begin, LayoutOffset end)
     {
         UsedRange range;
         range.parameter = param;
         range.begin = begin;
         range.end = end;
-        return Add(range);
-    }
-
-    VarLayout* Add(VarLayout* param, UInt begin, LayoutSize end)
-    {
-        UsedRange range;
-        range.parameter = param;
-        range.begin = begin;
-        range.end = end.isFinite() ? end.getFiniteValue() : UInt(-1);
         return Add(range);
     }
 
@@ -312,7 +303,7 @@ struct UsedRanges
             if (end >= begin + count)
             {
                 // ... then claim it and be done
-                Add(param, begin, begin + count);
+                Add(param, LayoutOffset{begin}, LayoutOffset{begin + count});
                 return begin;
             }
 
@@ -323,7 +314,7 @@ struct UsedRanges
 
         // We've run out of ranges to check, so we
         // can safely go after the last one!
-        Add(param, begin, begin + count);
+        Add(param, LayoutOffset{begin}, LayoutOffset{begin + count});
         return begin;
     }
 };
@@ -332,7 +323,7 @@ struct ParameterBindingInfo
 {
     size_t space = 0;
     size_t index = 0;
-    LayoutSize count = 0;
+    LayoutOffset count = LayoutOffset{0};
 };
 
 struct ParameterBindingAndKindInfo : ParameterBindingInfo
@@ -467,8 +458,8 @@ static DiagnosticSink* getSink(ParameterBindingContext* context)
 struct LayoutSemanticInfo
 {
     LayoutResourceKind kind; // the register kind
-    UInt space;
-    UInt index;
+    LayoutOffset space;
+    LayoutOffset index;
 
     // TODO: need to deal with component-granularity binding...
 };
@@ -545,8 +536,8 @@ LayoutSemanticInfo extractHLSLLayoutSemanticInfo(
     DiagnosticSink* sink)
 {
     LayoutSemanticInfo info;
-    info.space = 0;
-    info.index = 0;
+    info.space = LayoutOffset{0};
+    info.index = LayoutOffset{0};
     info.kind = LayoutResourceKind::None;
 
     if (registerName.getLength() == 0)
@@ -617,8 +608,8 @@ LayoutSemanticInfo extractHLSLLayoutSemanticInfo(
     }
 
     info.kind = kind;
-    info.index = (int)index;
-    info.space = space;
+    info.index = LayoutOffset{index};
+    info.space = LayoutOffset{space};
     return info;
 }
 
@@ -834,9 +825,12 @@ static UsedRangeSet* _getUsedRangeSetForSpace(ParameterBindingContext* context, 
 // has been used in at least one binding, and so it should not
 // be used by auto-generated bindings that need to claim entire
 // spaces.
-static VarLayout* markSpaceUsed(ParameterBindingContext* context, VarLayout* varLayout, UInt space)
+static VarLayout* markSpaceUsed(
+    ParameterBindingContext* context,
+    VarLayout* varLayout,
+    LayoutOffset space)
 {
-    return context->shared->usedSpaces.Add(varLayout, space, space + 1);
+    return context->shared->usedSpaces.Add(varLayout, space, space + LayoutOffset{1});
 }
 
 static UInt allocateUnusedSpaces(ParameterBindingContext* context, UInt count)
@@ -866,7 +860,7 @@ static void addExplicitParameterBinding(
     RefPtr<ParameterInfo> parameterInfo,
     VarDeclBase* varDecl,
     LayoutSemanticInfo const& semanticInfo,
-    LayoutSize count)
+    LayoutOffset count)
 {
     auto kind = semanticInfo.kind;
 
@@ -876,8 +870,8 @@ static void addExplicitParameterBinding(
         // We already have a binding here, so we want to
         // confirm that it matches the new one that is
         // incoming...
-        if (bindingInfo.count != count || bindingInfo.index != semanticInfo.index ||
-            bindingInfo.space != semanticInfo.space)
+        if (bindingInfo.count.compare(count) != std::partial_ordering::equivalent ||
+            bindingInfo.index != semanticInfo.index || bindingInfo.space != semanticInfo.space)
         {
             getSink(context)->diagnose(
                 varDecl,
@@ -999,8 +993,8 @@ static void addExplicitParameterBindings_HLSL(
             varDecl.getDecl()->findModifier<GLSLInputAttachmentIndexLayoutAttribute>())
     {
         LayoutSemanticInfo semanticInfo;
-        semanticInfo.index = (UInt)inputAttachmentIndexLayoutAttribute->location;
-        semanticInfo.space = 0;
+        semanticInfo.index = LayoutOffset{(UInt)inputAttachmentIndexLayoutAttribute->location};
+        semanticInfo.space = LayoutOffset{0};
         semanticInfo.kind = LayoutResourceKind::InputAttachmentIndex;
 
         if (auto varDeclBase = varDecl.as<VarDeclBase>())
@@ -1009,7 +1003,7 @@ static void addExplicitParameterBindings_HLSL(
                 parameterInfo,
                 varDeclBase.getDecl(),
                 semanticInfo,
-                1);
+                LayoutOffset{1});
     }
 
     // Look for HLSL `register` or `packoffset` semantics.
@@ -1042,7 +1036,7 @@ static void addExplicitParameterBindings_HLSL(
             }
         }
 
-        LayoutSize count = 0;
+        LayoutOffset count{0};
         if (typeRes)
         {
             count = typeRes->count;
@@ -1136,8 +1130,8 @@ static void addExplicitParameterBindings_GLSL(
         LayoutSemanticInfo semanticInfo;
         ResAndSemanticInfo()
         {
-            semanticInfo.index = 0;
-            semanticInfo.space = 0;
+            semanticInfo.index = LayoutOffset{0};
+            semanticInfo.space = LayoutOffset{0};
         }
     };
     ResAndSemanticInfo info[kMaxResCount] = {};
@@ -1153,7 +1147,7 @@ static void addExplicitParameterBindings_GLSL(
         info[kResInfo].resInfo = foundSpecializationConstant;
 
         if (auto layoutAttr = varDecl.getDecl()->findModifier<VkConstantIdAttribute>())
-            info[kResInfo].semanticInfo.index = layoutAttr->location;
+            info[kResInfo].semanticInfo.index = LayoutOffset{(UInt)layoutAttr->location};
         else
             return;
     }
@@ -1163,7 +1157,7 @@ static void addExplicitParameterBindings_GLSL(
         info[kResInfo].resInfo = foundVaryingInput;
 
         if (auto layoutAttr = varDecl.getDecl()->findModifier<GLSLLocationAttribute>())
-            info[kResInfo].semanticInfo.index = layoutAttr->value;
+            info[kResInfo].semanticInfo.index = LayoutOffset{(UInt)layoutAttr->value};
         else
             return;
     }
@@ -1172,7 +1166,7 @@ static void addExplicitParameterBindings_GLSL(
         info[kResInfo].resInfo = foundVaryingOutput;
 
         if (auto layoutAttr = varDecl.getDecl()->findModifier<GLSLLocationAttribute>())
-            info[kResInfo].semanticInfo.index = layoutAttr->value;
+            info[kResInfo].semanticInfo.index = LayoutOffset{(UInt)layoutAttr->value};
         else
             return;
     }
@@ -1202,8 +1196,9 @@ static void addExplicitParameterBindings_GLSL(
             {
                 info[kSubpassResInfo].resInfo = foundResInfo;
                 // Subpass fills semantic info of a descriptor and subpass
-                info[kSubpassResInfo].semanticInfo.index = (UInt)glslAttachmentIndexAttr->location;
-                info[kSubpassResInfo].semanticInfo.space = 0;
+                info[kSubpassResInfo].semanticInfo.index =
+                    LayoutOffset{(UInt)glslAttachmentIndexAttr->location};
+                info[kSubpassResInfo].semanticInfo.space = LayoutOffset{0};
             }
         }
 
@@ -1215,8 +1210,8 @@ static void addExplicitParameterBindings_GLSL(
             if (auto glslBindingAttr = varDecl.getDecl()->findModifier<GLSLBindingAttribute>())
             {
                 info[kResInfo].resInfo = foundResInfo;
-                info[kResInfo].semanticInfo.index = glslBindingAttr->binding;
-                info[kResInfo].semanticInfo.space = glslBindingAttr->set;
+                info[kResInfo].semanticInfo.index = LayoutOffset{(UInt)glslBindingAttr->binding};
+                info[kResInfo].semanticInfo.space = LayoutOffset{(UInt)glslBindingAttr->set};
             }
         }
         else if (
@@ -1236,8 +1231,8 @@ static void addExplicitParameterBindings_GLSL(
                         varDecl.getName(),
                         attr->binding);
                 }
-                info[kResInfo].semanticInfo.index = attr->set;
-                info[kResInfo].semanticInfo.space = 0;
+                info[kResInfo].semanticInfo.index = LayoutOffset{(UInt)attr->set};
+                info[kResInfo].semanticInfo.space = LayoutOffset{0};
             }
         }
     }
@@ -1345,7 +1340,7 @@ static void addExplicitParameterBindings_GLSL(
         {
             info[kResInfo].resInfo =
                 typeLayout->findOrAddResourceInfo(LayoutResourceKind::DescriptorTableSlot);
-            info[kResInfo].resInfo->count = 1;
+            info[kResInfo].resInfo->count = LayoutOffset{1};
         }
         else
         {
@@ -1359,9 +1354,9 @@ static void addExplicitParameterBindings_GLSL(
         info[kResInfo].resInfo = typeLayout->findOrAddResourceInfo(hlslInfo.kind);
 
     info[kResInfo].semanticInfo.kind = info[kResInfo].resInfo->kind;
-    info[kResInfo].semanticInfo.index = UInt(hlslInfo.index);
-    info[kResInfo].semanticInfo.space = UInt(hlslInfo.space);
-    const LayoutSize count = info[kResInfo].resInfo->count;
+    info[kResInfo].semanticInfo.index = LayoutOffset{UInt(hlslInfo.index)};
+    info[kResInfo].semanticInfo.space = LayoutOffset{UInt(hlslInfo.space)};
+    const LayoutOffset count = info[kResInfo].resInfo->count;
 
     addExplicitParameterBinding(
         context,
@@ -1417,7 +1412,7 @@ static void completeBindingsForParameterImpl(
     // consumes, so that we can allocate a contiguous range of
     // spaces.
     //
-    UInt spacesToAllocateCount = 0;
+    LayoutOffset spacesToAllocateCount{0};
     for (auto typeRes : firstTypeLayout->resourceInfos)
     {
         auto kind = typeRes.kind;
@@ -1440,7 +1435,7 @@ static void completeBindingsForParameterImpl(
         default:
             // An unbounded-size array will need its own space.
             //
-            if (typeRes.count.isInfinite())
+            if (typeRes.count.isInvalid())
             {
                 spacesToAllocateCount++;
             }
@@ -1456,7 +1451,7 @@ static void completeBindingsForParameterImpl(
             // an unbounded number of spaces.
             // TODO: we should enforce that somewhere with an error.
             //
-            spacesToAllocateCount += typeRes.count.getFiniteValue();
+            spacesToAllocateCount += typeRes.count;
             break;
 
         case LayoutResourceKind::Uniform:
@@ -1486,7 +1481,7 @@ static void completeBindingsForParameterImpl(
     // We'll then dole the allocated spaces (if any) out to the resource
     // categories that need them.
     //
-    UInt currentAllocatedSpace = firstAllocatedSpace;
+    LayoutOffset currentAllocatedSpace{firstAllocatedSpace};
 
     for (auto typeRes : firstTypeLayout->resourceInfos)
     {
@@ -1524,7 +1519,6 @@ static void completeBindingsForParameterImpl(
                 // As always, we can't handle the case of a parameter that needs
                 // an infinite number of spaces.
                 //
-                SLANG_ASSERT(count.isFinite());
                 bindingInfo.count = count;
 
                 // We will use the spaces we've allocated, and bump
@@ -1532,7 +1526,7 @@ static void completeBindingsForParameterImpl(
                 // the number of spaces consumed.
                 //
                 bindingInfo.index = currentAllocatedSpace;
-                currentAllocatedSpace += count.getFiniteValue();
+                currentAllocatedSpace += count;
 
                 // TODO: what should we store as the "space" for
                 // an allocation of register spaces? Either zero
@@ -1553,7 +1547,7 @@ static void completeBindingsForParameterImpl(
                 // really possible.
                 //
                 bindingInfo.space = 0;
-                bindingInfo.count = 1;
+                bindingInfo.count = LayoutOffset{1};
                 bindingInfo.index = 0;
                 continue;
             }
@@ -1573,7 +1567,7 @@ static void completeBindingsForParameterImpl(
         // number of `t` regisers in D3D), then we will go ahead
         // and assign a full space:
         //
-        if (count.isInfinite())
+        if (count.isInvalid())
         {
             bindingInfo.count = count;
             bindingInfo.index = 0;
@@ -1592,7 +1586,7 @@ static void completeBindingsForParameterImpl(
             bindingInfo.count = count;
             bindingInfo.index = usedRangeSet->usedResourceRanges[(int)kind].Allocate(
                 firstVarLayout,
-                count.getFiniteValue());
+                count.getValidValue());
             bindingInfo.space = space;
         }
     }
@@ -1614,7 +1608,7 @@ static void applyBindingInfoToParameter(
         // Add a record to the variable layout
         auto varRes = varLayout->AddResourceInfo(kind);
         varRes->space = (int)bindingInfo.space;
-        varRes->index = (int)bindingInfo.index;
+        varRes->index = LayoutOffset{(UInt)bindingInfo.index};
     }
 }
 
@@ -1697,13 +1691,13 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
     Type* type,
     EntryPointParameterState const& inState,
     RefPtr<VarLayout> varLayout,
-    int semanticSlotCount = 1)
+    UInt semanticSlotCount = 1)
 {
     EntryPointParameterState state = inState;
     state.semanticSlotCount = semanticSlotCount;
 
     auto optSemanticName = state.optSemanticName;
-    auto semanticIndex = *state.ioSemanticIndex;
+    UInt semanticIndex = *state.ioSemanticIndex;
 
     String semanticName = optSemanticName ? *optSemanticName : "";
     String sn = semanticName.toLower();
@@ -1749,7 +1743,10 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
                     //
                     auto usedResourceSet = _getOrCreateUsedRangeSetForSpace(context, 0);
                     usedResourceSet->usedResourceRanges[int(LayoutResourceKind::UnorderedAccess)]
-                        .Add(nullptr, semanticIndex, semanticIndex + semanticSlotCount);
+                        .Add(
+                            nullptr,
+                            LayoutOffset{semanticIndex},
+                            LayoutOffset{semanticIndex + semanticSlotCount});
                 }
             }
 
@@ -1988,7 +1985,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
                     continue;
 
                 auto varResInfo = varLayout->findOrAddResourceInfo(kind);
-                varResInfo->index = location;
+                varResInfo->index = LayoutOffset{(UInt)location};
 
                 // Note: OpenGL and Vulkan represent dual-source color blending
                 // differently from multiple render targets (MRT) at the source
@@ -2382,7 +2379,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                     auto kind = fieldTypeResInfo.kind;
                     auto structTypeResInfo = structLayout->findOrAddResourceInfo(kind);
                     auto fieldResInfo = fieldVarLayout->findOrAddResourceInfo(kind);
-                    fieldResInfo->index = structTypeResInfo->count.getFiniteValue();
+                    fieldResInfo->index = structTypeResInfo->count;
                     structTypeResInfo->count += fieldTypeResInfo.count;
                 }
             }
@@ -2480,7 +2477,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                             // have preceded it.
                             //
                             fieldResInfo = fieldVarLayout->findOrAddResourceInfo(kind);
-                            fieldResInfo->index = structTypeResInfo->count.getFiniteValue();
+                            fieldResInfo->index = structTypeResInfo->count;
                             structTypeResInfo->count += fieldTypeResInfo.count;
                         }
                         else
@@ -2699,18 +2696,18 @@ struct ScopeLayoutBuilder
     {
         // Does the parameter have any uniform data?
         auto layoutInfo = varLayout->typeLayout->FindResourceInfo(LayoutResourceKind::Uniform);
-        LayoutSize uniformSize = layoutInfo ? layoutInfo->count : 0;
-        if (uniformSize != 0)
+        if (layoutInfo)
         {
             // Make sure uniform fields get laid out properly...
 
-            UniformLayoutInfo fieldInfo(uniformSize, varLayout->typeLayout->uniformAlignment);
+            UniformLayoutInfo fieldInfo(
+                LayoutSize{layoutInfo->count},
+                varLayout->typeLayout->uniformAlignment);
 
             auto rules = m_layoutContext.rules;
-            LayoutSize uniformOffset = rules->AddStructField(&m_structLayoutInfo, fieldInfo);
+            LayoutOffset uniformOffset = rules->AddStructField(&m_structLayoutInfo, fieldInfo);
 
-            varLayout->findOrAddResourceInfo(LayoutResourceKind::Uniform)->index =
-                uniformOffset.getFiniteValue();
+            varLayout->findOrAddResourceInfo(LayoutResourceKind::Uniform)->index = uniformOffset;
         }
 
         m_structLayout->fields.add(varLayout);
@@ -2846,9 +2843,8 @@ struct SimpleScopeLayoutBuilder : ScopeLayoutBuilder
                     continue;
                 paramResInfo = paramVarLayout->findOrAddResourceInfo(kind);
 
-                paramResInfo->index = usedRangeSet[int(kind)].Allocate(
-                    paramVarLayout,
-                    paramTypeResInfo.count.getFiniteValue());
+                paramResInfo->index = LayoutOffset{
+                    usedRangeSet[int(kind)].Allocate(paramVarLayout, paramTypeResInfo.count)};
             }
         }
         //
@@ -2907,7 +2903,7 @@ static ParameterBindingAndKindInfo _allocateConstantBufferBinding(ParameterBindi
 
     ParameterBindingAndKindInfo info;
     info.kind = layoutInfo.kind;
-    info.count = layoutInfo.size;
+    info.count = LayoutOffset{layoutInfo.size};
     info.index = usedRangeSet->usedResourceRanges[(int)layoutInfo.kind].Allocate(
         nullptr,
         layoutInfo.size.getFiniteValue());
@@ -2919,7 +2915,7 @@ static ParameterBindingAndKindInfo _assignConstantBufferBinding(
     ParameterBindingContext* context,
     VarLayout* varLayout,
     UInt space,
-    UInt index)
+    LayoutOffset index)
 {
     auto usedRangeSet = _getOrCreateUsedRangeSetForSpace(context, space);
 
@@ -2932,7 +2928,7 @@ static ParameterBindingAndKindInfo _assignConstantBufferBinding(
                               context->layoutContext.objectLayoutOptions)
                           .getSimple();
 
-    const Index count = Index(layoutInfo.size.getFiniteValue());
+    const auto count = LayoutOffset{layoutInfo.size};
 
     auto existingParam =
         usedRangeSet->usedResourceRanges[(int)layoutInfo.kind].Add(varLayout, index, index + count);
@@ -3196,8 +3192,7 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
             for (auto rr : resultTypeLayout->resourceInfos)
             {
                 auto entryPointRes = paramsStructLayout->findOrAddResourceInfo(rr.kind);
-                resultLayout->findOrAddResourceInfo(rr.kind)->index =
-                    entryPointRes->count.getFiniteValue();
+                resultLayout->findOrAddResourceInfo(rr.kind)->index = entryPointRes->count;
                 entryPointRes->count += rr.count;
             }
         }
@@ -3924,7 +3919,7 @@ static void _maybeApplyHLSLToVulkanShifts(
                         auto curVar = parameterInfo->varLayout->getVariable();
 
                         StringBuilder curRangeBuf;
-                        _appendRange(bindingInfo.index, resInfo->count, curRangeBuf);
+                        _appendRange(bindingInfo.index, LayoutSize{resInfo->count}, curRangeBuf);
 
                         StringBuilder clashRangeBuf;
                         _appendRange(clashRange.begin, LayoutSize(clashRange.end), clashRangeBuf);
@@ -4066,7 +4061,7 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
 
             // The NVAPI parameter always uses a single register.
             //
-            LayoutSize count = 1;
+            LayoutOffset count{1};
 
             // We are going to mark the register range declared for the
             // NVAPI parameter as used.
@@ -4127,14 +4122,14 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
             globalScopeVarLayout = new VarLayout;
 
             // Allocate the set
-            markSpaceUsed(&context, nullptr, globalBinding.set);
+            markSpaceUsed(&context, nullptr, LayoutOffset{(UInt)globalBinding.set});
 
             // Mark the use of this binding
             globalConstantBufferBinding = _assignConstantBufferBinding(
                 &context,
                 globalScopeVarLayout,
                 globalBinding.set,
-                globalBinding.index);
+                LayoutOffset{(UInt)globalBinding.index});
         }
     }
 
@@ -4274,7 +4269,7 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
         auto cbInfo = globalScopeVarLayout->findOrAddResourceInfo(globalConstantBufferBinding.kind);
 
         cbInfo->space = globalConstantBufferBinding.space;
-        cbInfo->index = globalConstantBufferBinding.index;
+        cbInfo->index = LayoutOffset{globalConstantBufferBinding.index};
     }
 
     programLayout->parametersLayout = globalScopeVarLayout;
