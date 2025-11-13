@@ -1027,6 +1027,31 @@ bool SemanticsVisitor::TryUnifyIntParam(
     }
 }
 
+bool SemanticsVisitor::TryUnifyFuncTypesByStructuralMatch(
+    ConstraintSystem& constraints,
+    ValUnificationContext unifyCtx,
+    FuncType* fstFunType,
+    FuncType* sndFunType)
+{
+    const Index numParams = fstFunType->getParamCount();
+    if (numParams != sndFunType->getParamCount())
+        return false;
+    for (Index i = 0; i < numParams; ++i)
+    {
+        if (!TryUnifyTypes(
+                constraints,
+                unifyCtx,
+                fstFunType->getParamTypeWithModeWrapper(i),
+                sndFunType->getParamTypeWithModeWrapper(i)))
+            return false;
+    }
+    return TryUnifyTypes(
+        constraints,
+        unifyCtx,
+        fstFunType->getResultType(),
+        sndFunType->getResultType());
+}
+
 bool SemanticsVisitor::TryUnifyTypesByStructuralMatch(
     ConstraintSystem& constraints,
     ValUnificationContext unifyCtx,
@@ -1036,6 +1061,18 @@ bool SemanticsVisitor::TryUnifyTypesByStructuralMatch(
     if (auto fstDeclRefType = as<DeclRefType>(fst))
     {
         auto fstDeclRef = fstDeclRefType->getDeclRef();
+
+        if (auto fstLambdaDeclRef = as<LambdaDecl>(fstDeclRef))
+        {
+            if (auto sndFunType = as<FuncType>(snd))
+                return TryUnifyFuncTypesByStructuralMatch(
+                    constraints,
+                    unifyCtx,
+                    getFuncType(
+                        this->getASTBuilder(),
+                        fstLambdaDeclRef.getDecl()->funcDecl),
+                    sndFunType);
+        }
 
         if (auto typeParamDecl = as<GenericTypeParamDecl>(fstDeclRef.getDecl()))
             if (typeParamDecl->parentDecl == constraints.genericDecl)
@@ -1102,23 +1139,10 @@ bool SemanticsVisitor::TryUnifyTypesByStructuralMatch(
     {
         if (auto sndFunType = as<FuncType>(snd))
         {
-            const Index numParams = fstFunType->getParamCount();
-            if (numParams != sndFunType->getParamCount())
-                return false;
-            for (Index i = 0; i < numParams; ++i)
-            {
-                if (!TryUnifyTypes(
-                        constraints,
-                        unifyCtx,
-                        fstFunType->getParamTypeWithModeWrapper(i),
-                        sndFunType->getParamTypeWithModeWrapper(i)))
-                    return false;
-            }
-            return TryUnifyTypes(
-                constraints,
+            return TryUnifyFuncTypesByStructuralMatch(constraints,
                 unifyCtx,
-                fstFunType->getResultType(),
-                sndFunType->getResultType());
+                fstFunType,
+                sndFunType);
         }
     }
     else if (auto expandType = as<ExpandType>(fst))
