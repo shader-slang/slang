@@ -3,7 +3,6 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
-#include "slang-ir-lower-witness-lookup.h"
 #include "slang-ir-reachability.h"
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-util.h"

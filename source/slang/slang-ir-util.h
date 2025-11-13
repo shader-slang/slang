@@ -11,6 +11,11 @@ namespace Slang
 struct GenericChildrenMigrationContextImpl;
 struct IRCloneEnv;
 
+constexpr IRIntegerValue kInvalidAnyValueSize = 0xFFFFFFFF;
+constexpr IRIntegerValue kDefaultAnyValueSize = 16;
+constexpr SlangInt kRTTIHeaderSize = 16;
+constexpr SlangInt kRTTIHandleSize = 8;
+
 // A helper class to clone children insts to a different generic parent that has equivalent set of
 // generic parameters. The clone will take care of substitution of equivalent generic parameters and
 // intermediate values between the two generic parents.
@@ -459,6 +464,8 @@ bool isGenericParameter(IRInst* inst);
 // if the use is a generic parameter, we can relax this rule when the instruction is the data type
 // of the generic parameter.
 bool canRelaxInstOrderRule(IRInst* instToCheck, IRInst* otherInst);
+
+IRIntegerValue getInterfaceAnyValueSize(IRInst* type, SourceLoc usageLoc);
 
 } // namespace Slang
 

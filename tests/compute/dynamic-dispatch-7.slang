@@ -1,7 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE:-dx11 -shaderobj
 //TEST(compute):COMPARE_COMPUTE:-vk -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-cpu -xslang -disable-specialization -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-cuda -xslang -disable-specialization -shaderobj
+//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
+//TEST(compute):COMPARE_COMPUTE:-cuda -shaderobj
 
 // Test dynamic dispatch code gen for associated-typed return values
 // and local variables.

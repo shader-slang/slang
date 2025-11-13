@@ -1,6 +1,6 @@
-//DIAGNOSTIC_TEST:COMMAND_LINE_SIMPLE:-target hlsl -entry computeMain -stage compute -o no-type-conformance.hlsl
-// no type conformance linked
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute -o no-type-conformance.hlsl
 
+//CHECK: error 50100: No type conformances are found for interface 'IFoo'
 interface IFoo
 {
 	float get();
@@ -8,7 +8,7 @@ interface IFoo
 
 void foo()
 {
-	IFoo obj;
+	IFoo obj = createDynamicObject<IFoo>(0, 0);
 	obj.get();
 }
 

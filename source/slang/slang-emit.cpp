@@ -22,6 +22,7 @@
 #include "slang-emit-vm.h"
 #include "slang-emit-wgsl.h"
 #include "slang-ir-any-value-inference.h"
+#include "slang-ir-any-value-marshalling.h"
 #include "slang-ir-autodiff.h"
 #include "slang-ir-bind-existentials.h"
 #include "slang-ir-byte-address-legalize.h"
@@ -77,9 +78,9 @@
 #include "slang-ir-lower-buffer-element-type.h"
 #include "slang-ir-lower-combined-texture-sampler.h"
 #include "slang-ir-lower-coopvec.h"
+#include "slang-ir-lower-dynamic-dispatch-insts.h"
 #include "slang-ir-lower-dynamic-resource-heap.h"
 #include "slang-ir-lower-enum-type.h"
-#include "slang-ir-lower-generics.h"
 #include "slang-ir-lower-glsl-ssbo-types.h"
 #include "slang-ir-lower-l-value-cast.h"
 #include "slang-ir-lower-optional-type.h"
@@ -114,6 +115,7 @@
 #include "slang-ir-synthesize-active-mask.h"
 #include "slang-ir-transform-params-to-constref.h"
 #include "slang-ir-translate-global-varying-var.h"
+#include "slang-ir-typeflow-specialize.h"
 #include "slang-ir-undo-param-copy.h"
 #include "slang-ir-uniformity.h"
 #include "slang-ir-user-type-hint.h"
@@ -894,6 +896,12 @@ Result linkAndOptimizeIR(
     // Lower all the LValue implict casts (used for out/inout/ref scenarios)
     lowerLValueCast(targetProgram, irModule);
 
+    // Lower enum types early since enums and enum casts may appear in
+    // specialization & not resolving them here would block specialization.
+    //
+    if (requiredLoweringPassSet.enumType)
+        lowerEnumType(irModule, sink);
+
     IRSimplificationOptions defaultIRSimplificationOptions =
         IRSimplificationOptions::getDefault(targetProgram);
     IRSimplificationOptions fastIRSimplificationOptions =
@@ -1142,15 +1150,12 @@ Result linkAndOptimizeIR(
         SLANG_RETURN_ON_FAIL(performTypeInlining(irModule, targetProgram, sink));
     }
 
-    if (requiredLoweringPassSet.reinterpret)
-        lowerReinterpret(targetProgram, irModule, sink);
-
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    inferAnyValueSizeWhereNecessary(targetProgram, irModule);
+    inferAnyValueSizeWhereNecessary(targetProgram, irModule, sink);
 
     // If we have any witness tables that are marked as `KeepAlive`,
     // but are not used for dynamic dispatch, unpin them so we don't
@@ -1166,6 +1171,26 @@ Result linkAndOptimizeIR(
         eliminateDeadCode(irModule, fastIRSimplificationOptions.deadCodeElimOptions);
     }
 
+    // Tagged union type lowering typically generates more reinterpret instructions.
+    if (lowerTaggedUnionTypes(irModule, sink))
+        requiredLoweringPassSet.reinterpret = true;
+
+    lowerUntaggedUnionTypes(irModule, targetProgram, sink);
+
+    if (requiredLoweringPassSet.reinterpret)
+        lowerReinterpret(targetProgram, irModule, sink);
+
+    lowerSequentialIDTagCasts(irModule, codeGenContext->getLinkage(), sink);
+    lowerTagInsts(irModule, sink);
+    lowerTagTypes(irModule);
+
+    eliminateDeadCode(irModule, fastIRSimplificationOptions.deadCodeElimOptions);
+
+    lowerExistentials(irModule, targetProgram, sink);
+
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
+
     if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc) &&
         targetProgram->getOptionSet().shouldRunNonEssentialValidation())
     {
@@ -1174,18 +1199,13 @@ Result linkAndOptimizeIR(
         SLANG_RETURN_ON_FAIL(checkGetStringHashInsts(irModule, sink));
     }
 
-    // For targets that supports dynamic dispatch, we need to lower the
-    // generics / interface types to ordinary functions and types using
-    // function pointers.
-    dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-LOWER-GENERICS");
-    if (requiredLoweringPassSet.generics)
-        lowerGenerics(targetProgram, irModule, sink);
-    else
-        cleanupGenerics(targetProgram, irModule, sink);
-    dumpIRIfEnabled(codeGenContext, irModule, "AFTER-LOWER-GENERICS");
+    lowerTuples(irModule, sink);
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
 
-    if (requiredLoweringPassSet.enumType)
-        lowerEnumType(irModule, sink);
+    generateAnyValueMarshallingFunctions(irModule);
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
 
     // Don't need to run any further target-dependent passes if we are generating code
     // for host vm.
