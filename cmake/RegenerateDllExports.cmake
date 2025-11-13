@@ -136,6 +136,3 @@ endforeach()
 # Write the .def file
 file(WRITE "${OUTPUT_DEF}" "${DEF_CONTENT}")
 message(STATUS "Generated DEF file: ${OUTPUT_DEF}")
-message(STATUS "")
-message(STATUS "IMPORTANT: Review the generated .def file before committing!")
-message(STATUS "Make sure all exports are appropriate for the public API.")
