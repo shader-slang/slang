@@ -249,7 +249,8 @@ struct IntroduceExplicitGlobalContextPass
                     // For CUDA output, we want to leave the global uniform
                     // parameter where it is, because it will translate to
                     // a global `__constant__` variable.
-                    if (m_target == CodeGenTarget::CUDASource || m_target == CodeGenTarget::CUDAHeader)
+                    if (m_target == CodeGenTarget::CUDASource ||
+                        m_target == CodeGenTarget::CUDAHeader)
                         continue;
 
                     GlobalParamInfo globalParamInfo;
@@ -446,7 +447,9 @@ struct IntroduceExplicitGlobalContextPass
         // Clone all original decorations to the new struct key.
         IRCloneEnv cloneEnv;
         cloneInstDecorationsAndChildren(&cloneEnv, m_module, originalInst, key);
-        builder.addExternCppDecoration(key, originalInst->findDecoration<IRNameHintDecoration>()->getName());
+        builder.addExternCppDecoration(
+            key,
+            originalInst->findDecoration<IRNameHintDecoration>()->getName());
 
         // We end by making note of the key that was created
         // for the instruction, so that we can use the key
@@ -504,7 +507,8 @@ struct IntroduceExplicitGlobalContextPass
             globalParam.entryPointParam->insertBefore(firstOrdinary);
         }
 
-        if ((m_target == CodeGenTarget::CPPSource || m_target == CodeGenTarget::CPPHeader) && m_globalParams.getCount() == 0)
+        if ((m_target == CodeGenTarget::CPPSource || m_target == CodeGenTarget::CPPHeader) &&
+            m_globalParams.getCount() == 0)
         {
             // The nature of our current ABI for entry points on CPU
             // means that we need an explicit parameter to be *declared*

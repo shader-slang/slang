@@ -67,7 +67,8 @@ public:
     }
 
 protected:
-    virtual bool shouldEmitOnlyHeader() SLANG_OVERRIDE {
+    virtual bool shouldEmitOnlyHeader() SLANG_OVERRIDE
+    {
         return m_target == CodeGenTarget::CUDAHeader;
     }
     virtual void emitLayoutSemanticsImpl(

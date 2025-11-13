@@ -172,7 +172,10 @@ void Session::_initCodeGenTransitionMap()
 
     // For C and C++ we default to use the 'genericCCpp' compiler
     {
-        const CodeGenTarget sources[] = {CodeGenTarget::CSource, CodeGenTarget::CPPSource, CodeGenTarget::CPPHeader};
+        const CodeGenTarget sources[] = {
+            CodeGenTarget::CSource,
+            CodeGenTarget::CPPSource,
+            CodeGenTarget::CPPHeader};
         for (auto source : sources)
         {
             // We *don't* add a default for host callable, as we will determine what is suitable
@@ -1015,7 +1018,8 @@ SlangPassThrough Session::getDownstreamCompilerForTransition(
 
     // Special case host-callable
     if ((desc.kind == ArtifactKind::HostCallable) &&
-        (source == CodeGenTarget::CSource || source == CodeGenTarget::CPPSource || source == CodeGenTarget::CPPHeader))
+        (source == CodeGenTarget::CSource || source == CodeGenTarget::CPPSource ||
+         source == CodeGenTarget::CPPHeader))
     {
         // We prefer LLVM if it's available
         if (const auto llvm = getOrLoadDownstreamCompiler(PassThroughMode::LLVM, nullptr))
