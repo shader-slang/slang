@@ -1058,6 +1058,21 @@ bool SemanticsVisitor::TryUnifyTypesByStructuralMatch(
     QualType fst,
     QualType snd)
 {
+    if (auto sndDeclRefType = as<DeclRefType>(snd))
+    {
+        auto sndDeclRef = sndDeclRefType->getDeclRef();
+
+        if (auto sndLambdaDeclRef = as<LambdaDecl>(sndDeclRef))
+        {
+            if (auto fstFunType = as<FuncType>(fst))
+                return TryUnifyFuncTypesByStructuralMatch(
+                    constraints,
+                    unifyCtx,
+                    getFuncType(this->getASTBuilder(), sndLambdaDeclRef.getDecl()->funcDecl),
+                    fstFunType);
+        }
+    }
+
     if (auto fstDeclRefType = as<DeclRefType>(fst))
     {
         auto fstDeclRef = fstDeclRefType->getDeclRef();
@@ -1068,9 +1083,7 @@ bool SemanticsVisitor::TryUnifyTypesByStructuralMatch(
                 return TryUnifyFuncTypesByStructuralMatch(
                     constraints,
                     unifyCtx,
-                    getFuncType(
-                        this->getASTBuilder(),
-                        fstLambdaDeclRef.getDecl()->funcDecl),
+                    getFuncType(this->getASTBuilder(), fstLambdaDeclRef.getDecl()->funcDecl),
                     sndFunType);
         }
 
@@ -1139,7 +1152,8 @@ bool SemanticsVisitor::TryUnifyTypesByStructuralMatch(
     {
         if (auto sndFunType = as<FuncType>(snd))
         {
-            return TryUnifyFuncTypesByStructuralMatch(constraints,
+            return TryUnifyFuncTypesByStructuralMatch(
+                constraints,
                 unifyCtx,
                 fstFunType,
                 sndFunType);
