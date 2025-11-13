@@ -380,6 +380,12 @@ SlangResult Session::compileBuiltinModule(
 
     // TODO(JS): Could make this return a SlangResult as opposed to exception
     auto moduleSrcBlob = StringBlob::moveCreate(moduleSrcBuilder.produceString());
+
+    FILE* fh;
+    fopen_s(&fh, "dump.slang", (moduleName == slang::BuiltinModuleName::Core) ? "w" : "a");
+    fwrite(moduleSrcBlob->getBufferPointer(), 1, moduleSrcBlob->getBufferSize(), fh);
+    fclose(fh);
+
     Module* compiledModule = nullptr;
     addBuiltinSource(
         builtinModuleInfo.languageScope,
