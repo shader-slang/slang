@@ -2772,6 +2772,12 @@ public:
         DeclRef<VarDeclBase> const& varRef,
         IntVal* val);
 
+    bool TryUnifyFunctorByStructuralMatch(
+        ConstraintSystem& constraints,
+        ValUnificationContext unifyCtx,
+        StructDecl* fst,
+        FuncType* snd);
+
     bool TryUnifyFuncTypesByStructuralMatch(
         ConstraintSystem& constraints,
         ValUnificationContext unifyCtx,

@@ -8,6 +8,16 @@ RWStructuredBuffer<int> outputBuffer;
 // generic-parameters can be infered.
 func foo<let N : int>(f: functype()->vector<float, N>)->vector<float, N> { return f(); }
 
+struct Functor : IFunc<vector<float, 1>>
+{
+    vector<float, 1> operator()()
+    {
+        return 4.0;
+    }
+}
+
+func foo3<let N:int>(f: IFunc<vector<float, N>>) {}
+
 [numthreads(1,1,1)]
 func computeMain()->void
 {
@@ -15,4 +25,7 @@ func computeMain()->void
     outputBuffer[0] = (int)foo(() => 2);
     //CHECK: 3
     outputBuffer[1] = (int)foo(() => vector<float, 1>(3));
+    //CHECK: 4
+    Functor f;
+    outputBuffer[2] = (int)foo(f);
 }

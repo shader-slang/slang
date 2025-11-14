@@ -1027,6 +1027,28 @@ bool SemanticsVisitor::TryUnifyIntParam(
     }
 }
 
+bool SemanticsVisitor::TryUnifyFunctorByStructuralMatch(
+    ConstraintSystem& constraints,
+    ValUnificationContext unifyCtx,
+    StructDecl* fstStructDecl,
+    FuncType* sndFuncType)
+{
+    // Here we just need to find an invocation method for our functor
+    // to perform unification with.
+    // We do not validate the validity of the functor at this step,
+    // we only need to perform a reasonable unification so that constraints
+    // can correctly solve.
+    FuncDecl* functorInvokeMethod = as<FuncDecl>(fstStructDecl->findLastDirectMemberDeclOfName(getName("()")));
+    if (!functorInvokeMethod)
+        return false;
+
+    return TryUnifyFuncTypesByStructuralMatch(
+        constraints,
+        unifyCtx,
+        getFuncType(this->getASTBuilder(), functorInvokeMethod),
+        sndFuncType);
+}
+
 bool SemanticsVisitor::TryUnifyFuncTypesByStructuralMatch(
     ConstraintSystem& constraints,
     ValUnificationContext unifyCtx,
@@ -1062,14 +1084,10 @@ bool SemanticsVisitor::TryUnifyTypesByStructuralMatch(
     {
         auto sndDeclRef = sndDeclRefType->getDeclRef();
 
-        if (auto sndLambdaDeclRef = as<LambdaDecl>(sndDeclRef))
+        if (auto sndStructDecl = as<StructDecl>(sndDeclRef))
         {
             if (auto fstFunType = as<FuncType>(fst))
-                return TryUnifyFuncTypesByStructuralMatch(
-                    constraints,
-                    unifyCtx,
-                    getFuncType(this->getASTBuilder(), sndLambdaDeclRef.getDecl()->funcDecl),
-                    fstFunType);
+                return TryUnifyFunctorByStructuralMatch(constraints, unifyCtx, sndStructDecl.getDecl(), fstFunType);
         }
     }
 
@@ -1077,13 +1095,13 @@ bool SemanticsVisitor::TryUnifyTypesByStructuralMatch(
     {
         auto fstDeclRef = fstDeclRefType->getDeclRef();
 
-        if (auto fstLambdaDeclRef = as<LambdaDecl>(fstDeclRef))
+        if (auto fstStructDecl = as<StructDecl>(fstDeclRef))
         {
             if (auto sndFunType = as<FuncType>(snd))
-                return TryUnifyFuncTypesByStructuralMatch(
+                return TryUnifyFunctorByStructuralMatch(
                     constraints,
                     unifyCtx,
-                    getFuncType(this->getASTBuilder(), fstLambdaDeclRef.getDecl()->funcDecl),
+                    fstStructDecl.getDecl(),
                     sndFunType);
         }
 
