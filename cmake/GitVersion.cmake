@@ -63,7 +63,7 @@ function(get_git_version var_numeric var dir)
             endif()
         endif()
 
-        # Parse the version string (from either VERSION file or git describe)
+        # Parse the version string (from either SLANG_VERSION file or git describe)
         if(
             version_out
             AND "${version_out}" MATCHES "^v(([0-9]+(\\.[0-9]+)*).*)"
