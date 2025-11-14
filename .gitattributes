@@ -4,5 +4,5 @@
 # Set the line endings to LF for shell scripts
 *.sh text eol=lf
 
-# Enable git archive substitution for VERSION file
-VERSION export-subst
+# Enable git archive substitution for SLANG_VERSION file
+SLANG_VERSION export-subst

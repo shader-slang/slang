@@ -7,8 +7,8 @@ function(get_git_version var_numeric var dir)
         set(version "0.0.0-unknown")
         set(version_out "")
 
-        # First, try reading from VERSION file
-        set(version_file "${dir}/VERSION")
+        # First, try reading from SLANG_VERSION file
+        set(version_file "${dir}/SLANG_VERSION")
         if(EXISTS "${version_file}")
             file(READ "${version_file}" version_file_content)
             string(STRIP "${version_file_content}" version_file_content)
@@ -16,11 +16,11 @@ function(get_git_version var_numeric var dir)
             if(NOT version_file_content MATCHES "^\\$Format:" AND
                version_file_content MATCHES "^v20[2-9][0-9]\\.[0-9]")
                 set(version_out "${version_file_content}")
-                message(STATUS "Using version from VERSION file: ${version_out}")
+                message(STATUS "Using version from SLANG_VERSION file: ${version_out}")
             endif()
         endif()
 
-        # If VERSION file didn't provide a valid version, try git describe
+        # If SLANG_VERSION file didn't provide a valid version, try git describe
         if(NOT version_out)
             if(GIT_EXECUTABLE AND EXISTS "${dir}/.git")
                 set(command
