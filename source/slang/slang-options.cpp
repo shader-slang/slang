@@ -333,7 +333,7 @@ void initCommandOptions(CommandOptions& options)
             {"spv-asm", "SPIR-V assembly"},
             {"c", nullptr},
             {"cpp,c++,cxx", "C++"},
-            {"cpp,c++,cxx", "C++ Header"},
+            {"hpp", "C++ Header"},
             {"exe", "executable"},
             {"dll,so", "sharedlibrary/dll"},
             {"cu", "CUDA"},
