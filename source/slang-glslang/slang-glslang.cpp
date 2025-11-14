@@ -557,6 +557,70 @@ static int spirv_Optimize_1_2(const glslang_CompileRequest_1_2& request)
     return SLANG_OK;
 }
 
+static int spirv_StripDebugNonsemantic_1_2(const glslang_CompileRequest_1_2& request)
+{
+    std::vector<SPIRVOptimizationDiagnostic> diagnostics;
+    std::vector<uint32_t> spirvBuffer;
+    size_t inputBlobSize = (char*)request.inputEnd - (char*)request.inputBegin;
+    spirvBuffer.resize(inputBlobSize / sizeof(uint32_t));
+    memcpy(spirvBuffer.data(), request.inputBegin, inputBlobSize);
+
+    spvtools::Optimizer optimizer(SPV_ENV_UNIVERSAL_1_5);
+
+    optimizer.SetMessageConsumer(
+        [&](spv_message_level_t level,
+            const char* source,
+            const spv_position_t& position,
+            const char* message)
+        {
+            SPIRVOptimizationDiagnostic diag;
+            diag.level = level;
+            if (source)
+            {
+                diag.source = source;
+            }
+            diag.position = position;
+            if (message)
+            {
+                diag.message = message;
+            }
+            diagnostics.push_back(diag);
+        });
+
+    // Register the strip passes from spirv-opt
+    optimizer.RegisterPass(spvtools::CreateStripDebugInfoPass());
+    optimizer.RegisterPass(spvtools::CreateStripNonSemanticInfoPass());
+
+    spvtools::OptimizerOptions spvOptOptions;
+    spvOptOptions.set_run_validator(false);
+
+    std::vector<uint32_t> strippedSpirv;
+    if (optimizer.Run(spirvBuffer.data(), spirvBuffer.size(), &strippedSpirv, spvOptOptions))
+    {
+        spirvBuffer.swap(strippedSpirv);
+    }
+
+    if (request.outputFunc)
+    {
+        request.outputFunc(
+            spirvBuffer.data(),
+            spirvBuffer.size() * sizeof(uint32_t),
+            request.outputUserData);
+    }
+    if (request.diagnosticFunc)
+    {
+        for (auto& diagnostic : diagnostics)
+        {
+            request.diagnosticFunc(
+                (void*)diagnostic.message.c_str(),
+                diagnostic.message.size() * sizeof(char),
+                request.diagnosticUserData);
+        }
+    }
+    return SLANG_OK;
+}
+
+
 static glslang::EShTargetLanguageVersion _makeTargetLanguageVersion(
     int majorVersion,
     int minorVersion)
@@ -939,6 +1003,10 @@ static int _compile(const glslang_CompileRequest_1_2& request)
     case GLSLANG_ACTION_OPTIMIZE_SPIRV:
         result = spirv_Optimize_1_2(request);
         break;
+
+    case GLSLANG_ACTION_STRIP_DEBUG_NONSEMANTIC:
+        result = spirv_StripDebugNonsemantic_1_2(request);
+        break;
     }
 
     return result;
@@ -1077,4 +1145,26 @@ extern "C"
     {
         return false;
     }
+}
+
+extern "C"
+#ifdef _MSC_VER
+    _declspec(dllexport)
+#else
+    __attribute__((__visibility__("default")))
+#endif
+        int glslang_stripDebugAndNonsemantic(glslang_CompileRequest_1_2* request)
+{
+    static ProcessInitializer g_processInitializer;
+    if (!g_processInitializer.init())
+    {
+        // Failed
+        return 1;
+    }
+
+    glslang_CompileRequest_1_2 actualRequest;
+    actualRequest = *request;
+    actualRequest.action = GLSLANG_ACTION_STRIP_DEBUG_NONSEMANTIC;
+
+    return _compile(actualRequest);
 }

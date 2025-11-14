@@ -78,6 +78,7 @@ protected:
     glslang_DisassembleSPIRVFunc m_disassemble = nullptr;
     glslang_DisassembleSPIRVWithResultFunc m_disassembleWithResult = nullptr;
     glslang_LinkSPIRVFunc m_link = nullptr;
+    glslang_StripDebugNonsemanticFunc m_stripDebugNonsemantic = nullptr;
 
     ComPtr<ISlangSharedLibrary> m_sharedLibrary;
 
@@ -95,6 +96,8 @@ SlangResult GlslangDownstreamCompiler::init(ISlangSharedLibrary* library)
     m_disassembleWithResult = (glslang_DisassembleSPIRVWithResultFunc)library->findFuncByName(
         "glslang_disassembleSPIRVWithResult");
     m_link = (glslang_LinkSPIRVFunc)library->findFuncByName("glslang_linkSPIRV");
+    m_stripDebugNonsemantic = (glslang_StripDebugNonsemanticFunc)library->findFuncByName(
+        "glslang_stripDebugAndNonsemantic");
 
     if (m_compile_1_0 == nullptr && m_compile_1_1 == nullptr && m_compile_1_2 == nullptr)
     {
