@@ -13,10 +13,15 @@ function(get_git_version var_numeric var dir)
             file(READ "${version_file}" version_file_content)
             string(STRIP "${version_file_content}" version_file_content)
             # Check if it's not a git archive format string and matches expected pattern
-            if(NOT version_file_content MATCHES "^\\$Format:" AND
-               version_file_content MATCHES "^v20[2-9][0-9]\\.[0-9]")
+            if(
+                NOT version_file_content MATCHES "^\\$Format:"
+                AND version_file_content MATCHES "^v20[2-9][0-9]\\.[0-9]"
+            )
                 set(version_out "${version_file_content}")
-                message(STATUS "Using version from SLANG_VERSION file: ${version_out}")
+                message(
+                    STATUS
+                    "Using version from SLANG_VERSION file: ${version_out}"
+                )
             endif()
         endif()
 
@@ -40,7 +45,10 @@ function(get_git_version var_numeric var dir)
                 )
                 if(result EQUAL 0)
                     set(version_out "${git_describe_out}")
-                    message(STATUS "Using version from git describe: ${version_out}")
+                    message(
+                        STATUS
+                        "Using version from git describe: ${version_out}"
+                    )
                 else()
                     message(
                         WARNING
@@ -56,7 +64,10 @@ function(get_git_version var_numeric var dir)
         endif()
 
         # Parse the version string (from either VERSION file or git describe)
-        if(version_out AND "${version_out}" MATCHES "^v(([0-9]+(\\.[0-9]+)*).*)")
+        if(
+            version_out
+            AND "${version_out}" MATCHES "^v(([0-9]+(\\.[0-9]+)*).*)"
+        )
             set(version "${CMAKE_MATCH_1}")
             set(version_numeric "${CMAKE_MATCH_2}")
         elseif(version_out)
