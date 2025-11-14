@@ -16,6 +16,7 @@ jobs:
         with:
           submodules: "recursive"
           fetch-depth: "0"
+          fetch-tags: true
 
       # build the binary in docker image
       - name: Run the build process with Docker

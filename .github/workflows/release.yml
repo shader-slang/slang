@@ -95,6 +95,7 @@ jobs:
         with:
           submodules: "recursive"
           fetch-depth: "0"
+          fetch-tags: true
 
       - name: Setup
         uses: ./.github/actions/common-setup
