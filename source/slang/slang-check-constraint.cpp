@@ -1038,7 +1038,8 @@ bool SemanticsVisitor::TryUnifyFunctorByStructuralMatch(
     // We do not validate the validity of the functor at this step,
     // we only need to perform a reasonable unification so that constraints
     // can correctly solve.
-    FuncDecl* functorInvokeMethod = as<FuncDecl>(fstStructDecl->findLastDirectMemberDeclOfName(getName("()")));
+    FuncDecl* functorInvokeMethod =
+        as<FuncDecl>(fstStructDecl->findLastDirectMemberDeclOfName(getName("()")));
     if (!functorInvokeMethod)
         return false;
 
@@ -1087,7 +1088,11 @@ bool SemanticsVisitor::TryUnifyTypesByStructuralMatch(
         if (auto sndStructDecl = as<StructDecl>(sndDeclRef))
         {
             if (auto fstFunType = as<FuncType>(fst))
-                return TryUnifyFunctorByStructuralMatch(constraints, unifyCtx, sndStructDecl.getDecl(), fstFunType);
+                return TryUnifyFunctorByStructuralMatch(
+                    constraints,
+                    unifyCtx,
+                    sndStructDecl.getDecl(),
+                    fstFunType);
         }
     }
 
