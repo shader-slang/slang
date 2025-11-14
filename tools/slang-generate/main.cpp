@@ -387,6 +387,12 @@ Node* readBody(Reader& reader, NodeReadFlags flags, char openChar, int openCount
                 }
                 else if (atStartOfLine && isIdentifierChar(peek(reader)))
                 {
+                    // We should allow something like this to work:
+                    // $T0::SomeTypeDefine
+                    // As in C++/CUDA target, it's not allowed to write this:
+                    // (SomeTemplate<...>::SomeTypeDefine).
+                    // We cannot add parentheses around type expression.
+
                     // This is a statement splice, which will use a {}-enclosed
                     // body for the template to generate.
 
@@ -404,8 +410,6 @@ Node* readBody(Reader& reader, NodeReadFlags flags, char openChar, int openCount
                     skipHorizontalSpace(reader);
                     skipOptionalNewline(reader);
                     skipHorizontalSpace(reader);
-
-                    throw 99;
                 }
                 else
                 {

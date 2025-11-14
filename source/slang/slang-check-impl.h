@@ -821,6 +821,10 @@ private:
     /// Is the `m_mapTypeDeclToCandidateExtensions` dictionary valid and up to date?
     bool m_candidateExtensionListsBuilt = false;
 
+    /// The count of loadedModulesList when the candidate extension cache was last built.
+    /// Used to detect when loadedModulesList has changed and the cache needs updating.
+    Index m_candidateExtensionListsBuiltForModuleCount = 0;
+
     /// Add candidate extensions declared in `moduleDecl` to `m_mapTypeDeclToCandidateExtensions`
     void _addCandidateExtensionsFromModule(ModuleDecl* moduleDecl);
 
@@ -3238,7 +3242,7 @@ void diagnoseMissingCapabilityProvenance(
     CompilerOptionSet& optionSet,
     DiagnosticSink* sink,
     Decl* decl,
-    CapabilitySet& setToFind);
+    CapabilitySet const& setToFind);
 void diagnoseCapabilityProvenance(
     CompilerOptionSet& optionSet,
     DiagnosticSink* sink,
