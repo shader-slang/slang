@@ -337,7 +337,7 @@ void initCommandOptions(CommandOptions& options)
             {"exe", "executable"},
             {"dll,so", "sharedlibrary/dll"},
             {"cu", "CUDA"},
-            {"cu", "CUDA Header"},
+            {"cuh", "CUDA Header"},
             {"ptx", "PTX"},
             {"obj,o", "object-code"},
             {"zip", "container"},
