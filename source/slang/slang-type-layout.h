@@ -17,8 +17,10 @@ namespace Slang
 
 enum class BaseType;
 class Type;
+class DescriptorHandleType;
 
 struct IRLayout;
+struct TypeLayoutContext;
 
 //
 
@@ -1162,6 +1164,10 @@ struct SimpleLayoutRulesImpl
     // Do structured buffers need a separate binding for the counter buffer?
     // (DirectX is the exception in managing these together)
     virtual bool DoStructuredBuffersNeedSeparateCounterBuffer() = 0;
+
+    // Get layout for a descriptor handle type
+    virtual SimpleLayoutInfo GetDescriptorHandleLayout(
+        DescriptorHandleType* descriptorHandleType) = 0;
 };
 
 struct ObjectLayoutRulesImpl
@@ -1233,6 +1239,11 @@ struct LayoutRulesImpl
     bool DoStructuredBuffersNeedSeparateCounterBuffer()
     {
         return simpleRules->DoStructuredBuffersNeedSeparateCounterBuffer();
+    }
+
+    SimpleLayoutInfo GetDescriptorHandleLayout(DescriptorHandleType* descriptorHandleType)
+    {
+        return simpleRules->GetDescriptorHandleLayout(descriptorHandleType);
     }
 
     // Forward `ObjectLayoutRulesImpl` interface
