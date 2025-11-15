@@ -8798,16 +8798,23 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return ensureInst(m_voidType);
 
         IRBuilder builder(type);
-        if (as<IRFuncType>(type))
+        if (IRFuncType* funcType = as<IRFuncType>(type))
         {
+            SpvInst* returnType = emitDebugType(funcType->getResultType());
+
             List<SpvInst*> argTypes;
+            for (UInt i = 0; i < funcType->getParamCount(); ++i)
+            {
+                argTypes.add(emitDebugType(funcType->getParamType(i)));
+            }
+
             return emitOpDebugTypeFunction(
                 getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 nullptr,
                 m_voidType,
                 getNonSemanticDebugInfoExtInst(),
                 builder.getIntValue(builder.getUIntType(), 0),
-                ensureInst(m_voidType),
+                returnType,
                 argTypes);
         }
 
