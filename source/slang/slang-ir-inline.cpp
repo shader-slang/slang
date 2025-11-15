@@ -346,9 +346,7 @@ struct InliningPassBase
             if (as<IRDebugScope>(inst))
             {
                 callDebugScope = as<IRDebugScope>(inst);
-                builder.emitDebugScope(
-                    callDebugScope->getScope(),
-                    callDebugScope->getInlinedAt());
+                builder.emitDebugScope(callDebugScope->getScope(), callDebugScope->getInlinedAt());
                 break;
             }
         }
