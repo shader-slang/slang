@@ -11,7 +11,7 @@ void main(uint2 pixelIndex : SV_DispatchThreadID)
 {
     // CHECK0: texelFetch({{.*}}[nonuniformEXT({{.*}})])
 
-    // CHECK1: [NonUniformResourceIndex(_{{.*}})].Load(_{{.*}})
+    // CHECK1: [NonUniformResourceIndex({{.*}})].Load(_{{.*}})
 
     // CHECK2: OpDecorate %[[VAR1:[a-zA-Z0-9_]+]] NonUniform
     // CHECK2: OpDecorate %[[VAR2:[a-zA-Z0-9_]+]] NonUniform

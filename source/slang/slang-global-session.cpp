@@ -1112,6 +1112,8 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::parseCommandLineArguments(
         tempReq->getTargetOptionSet(target).serialize(&targetOptionData);
         tdesc.compilerOptionEntryCount = (uint32_t)targetOptionData.entries.getCount();
         tdesc.compilerOptionEntries = targetOptionData.entries.getBuffer();
+        tdesc.format = (SlangCompileTarget)target->getTarget();
+        tdesc.profile = (SlangProfileID)target->getOptionSet().getProfile().raw;
         outData->targets.add(tdesc);
     }
     outDesc->compilerOptionEntryCount = (uint32_t)optionData.entries.getCount();
@@ -1173,8 +1175,14 @@ void Session::addBuiltinSource(
         SLANG_UNEXPECTED("error in Slang core module");
     }
 
-    // Compiling the core module should not yield any warnings.
-    SLANG_ASSERT(sink.outputBuffer.getLength() == 0);
+    if (sink.outputBuffer.getLength())
+    {
+        char const* diagnostics = sink.outputBuffer.getBuffer();
+        fprintf(stderr, "%s", diagnostics);
+
+        PlatformUtil::outputDebugMessage(diagnostics);
+        SLANG_UNEXPECTED("Compiling the core module should not yield any warnings");
+    }
 
     // Extract the AST for the code we just parsed
     auto module = compileRequest->translationUnits[translationUnitIndex]->getModule();

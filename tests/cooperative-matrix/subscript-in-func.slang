@@ -1,4 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
 
 // CHECK: type: float
 // CHECK-NEXT: 1.000000
@@ -28,6 +29,7 @@ void squareCoopMatElements(CoopMatType mat)
     mat.Store<CoopMatMatrixLayout::RowMajor>(outputBuffer, 0, stride);
 }
 
+[shader("compute")]
 [numthreads(32, 1, 1)]
 void computeMain()
 {
