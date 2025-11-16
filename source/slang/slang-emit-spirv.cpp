@@ -8782,6 +8782,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return nameOperand;
 
         IRBuilder builder(inst);
+        if (as<IRType>(inst))
+        {
+            StringBuilder sbName;
+            getTypeNameHint(sbName, inst);
+
+            if (sbName.getUnownedSlice() != "")
+            {
+                return builder.getStringValue(sbName.getUnownedSlice());
+            }
+        }
+
         return builder.getStringValue(toSlice("unamed"));
     }
 
