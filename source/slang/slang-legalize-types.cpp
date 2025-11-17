@@ -494,11 +494,11 @@ struct TupleTypeBuilder
 
     LegalType getResult()
     {
-        // If this is an empty struct, return a none type
+        // If this is an empty struct, return a simple type
         // This helps get rid of emtpy structs that often trips up the
         // downstream compiler
         if (!anyOrdinary && !anySpecial && !anyComplex)
-            return LegalType();
+            return LegalType::simple(type);
 
         // If we didn't see anything "special"
         // then we can use the type as-is.
