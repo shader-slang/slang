@@ -191,7 +191,22 @@ SlangResult CommandLineDownstreamCompiler::compile(
     }
 
     ExecuteResult exeRes;
+
+#if 0
+    // Test
+    {
+        String line = ProcessUtil::getCommandLineString(cmdLine);
+        printf("%s", line.getBuffer());
+    }
+#endif
+
     SLANG_RETURN_ON_FAIL(ProcessUtil::execute(cmdLine, exeRes));
+
+#if 0
+    {
+        printf("stdout=\"%s\"\nstderr=\"%s\"\nret=%d\n", exeRes.standardOutput.getBuffer(), exeRes.standardError.getBuffer(), int(exeRes.resultCode));
+    }
+#endif
 
     // Go through the list of artifacts in the artifactList and check if they exist.
     //
