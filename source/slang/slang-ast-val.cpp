@@ -2139,6 +2139,7 @@ void UIntSet::unionWith(const UIntSetVal& set)
     // UIntSetVal has getBitmask accessor that returns Elements
     const Index setCount = set.getBitmaskCount();
     const Index minCount = Math::Min(setCount, m_buffer.getCount());
+    m_buffer.reserve(setCount);
 
     for (Index i = 0; i < minCount; ++i)
     {
