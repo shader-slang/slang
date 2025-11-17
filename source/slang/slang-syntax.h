@@ -157,14 +157,34 @@ inline Type* getType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> declRef)
     return declRef.substitute(astBuilder, declRef.getDecl()->type.Ptr());
 }
 
-/// same as getType, but take into account the additional type modifiers from the parameter's
-/// modifier list and return a ModifiedType if such modifiers exist.
-Type* getParamType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> paramDeclRef);
+/// Get the user-perceived type of a parameters.
+///
+/// This type will use the declared type of the parameter, as well as modifiers
+/// on the parameter, such as `no_diff`, that are semantically relevant to the
+/// parameter's type as perceived by a user.
+///
+/// The type returned by this function does not take into account the parameter-passing
+/// mode of the parameter; if a type that includes a mode is desired then
+/// `getParamTypeWithModeWrapper` should be used instead.
+///
+Type* getParamValueType(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef);
 
-/// Get the parameter type, wrapped with `Out<>`, `InOut<>` or `Ref<>` if the parameter has
-/// an non-trivial direction.
-Type* getParamTypeWithDirectionWrapper(ASTBuilder* astBuilder, DeclRef<VarDeclBase> paramDeclRef);
+/// Get the type of a parameter including any wrapper type necessary to convey its parameter-passing
+/// mode.
+///
+/// The underlying value type will be the same as returned from `getParamValueType()`, but
+/// may be wrapped in a type to represent, e.g., an `out int` parameter using the type
+/// `OutParam<int>`.
+///
+Type* getParamTypeWithModeWrapper(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef);
 
+/// If necessary, wrap the value type of a parameter up with the wrapper type corresponding to its
+/// mode.
+///
+Type* getParamTypeWithModeWrapper(
+    ASTBuilder* astBuilder,
+    Type* paramValueType,
+    ParamPassingMode paramMode);
 
 inline SubstExpr<Expr> getInitExpr(ASTBuilder* astBuilder, DeclRef<VarDeclBase> declRef)
 {
@@ -243,7 +263,24 @@ SubstitutionSet makeSubstitutionFromIncompleteSet(
 
 Val::OperandView<Val> findInnerMostGenericArgs(SubstitutionSet subst);
 
-ParamPassingMode getParameterDirection(VarDeclBase* varDecl);
+/// Get the parameter-passing mode explicitly declared for a parameter.
+///
+/// The parameter-passing mode this function computes is the one
+/// that is superficially implied by the modifiers on the parameters
+/// alone, without consideration of the type of the parameter, or
+/// any other context.
+///
+ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl);
+
+/// Get the parameter-passing mode to use for a parameter.
+///
+/// The actual mode to use takes into account both the explicit
+/// modifiers on the declaration, as well as the declared type
+/// of the parameter. In cases where the parameter's type
+/// is not copyable, the mode implied by its declaration may be
+/// adjusted to something else.
+///
+ParamPassingMode getParamPassingMode(ParamDecl* paramDecl);
 
 inline Type* getTagType(ASTBuilder* astBuilder, DeclRef<EnumDecl> declRef)
 {

@@ -829,7 +829,7 @@ Name* getReflectionName(VarDeclBase* varDecl)
     return varDecl->getName();
 }
 
-Type* getParamType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> paramDeclRef)
+Type* getParamValueType(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef)
 {
     auto paramType = getType(astBuilder, paramDeclRef);
     if (paramDeclRef.getDecl()->findModifier<NoDiffModifier>())
@@ -840,24 +840,33 @@ Type* getParamType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> paramDeclRef)
     return paramType;
 }
 
-Type* getParamTypeWithDirectionWrapper(ASTBuilder* astBuilder, DeclRef<VarDeclBase> paramDeclRef)
+Type* getParamTypeWithModeWrapper(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef)
 {
-    auto result = getParamType(astBuilder, paramDeclRef);
-    auto direction = getParameterDirection(paramDeclRef.getDecl());
-    switch (direction)
+    auto paramValueType = getParamValueType(astBuilder, paramDeclRef);
+    auto paramMode = getParamPassingMode(paramDeclRef.getDecl());
+    return getParamTypeWithModeWrapper(astBuilder, paramValueType, paramMode);
+}
+
+Type* getParamTypeWithModeWrapper(
+    ASTBuilder* astBuilder,
+    Type* paramValueType,
+    ParamPassingMode paramMode)
+{
+    switch (paramMode)
     {
     case ParamPassingMode::In:
-        return result;
+        return paramValueType;
     case ParamPassingMode::BorrowIn:
-        return astBuilder->getConstRefParamType(result);
+        return astBuilder->getConstRefParamType(paramValueType);
     case ParamPassingMode::Out:
-        return astBuilder->getOutParamType(result);
+        return astBuilder->getOutParamType(paramValueType);
     case ParamPassingMode::BorrowInOut:
-        return astBuilder->getBorrowInOutParamType(result);
+        return astBuilder->getBorrowInOutParamType(paramValueType);
     case ParamPassingMode::Ref:
-        return astBuilder->getRefParamType(result);
+        return astBuilder->getRefParamType(paramValueType);
     default:
-        return result;
+        SLANG_UNEXPECTED("unhandled parameter-passing mode");
+        UNREACHABLE_RETURN(paramValueType);
     }
 }
 

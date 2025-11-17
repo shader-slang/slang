@@ -122,6 +122,7 @@ struct GenericFunctionLoweringContext
             }
         }
         cloneInstDecorationsAndChildren(&cloneEnv, sharedContext->module, func, loweredFunc);
+        fixUpDebugFuncType(loweredFunc);
 
         auto block = as<IRBlock>(loweredFunc->getFirstChild());
         for (auto param : clonedParams)

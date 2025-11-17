@@ -29,7 +29,7 @@ class TestReporter : public ITestReporter
 public:
     struct TestInfo
     {
-        TestResult testResult = TestResult::Ignored;
+        TestResult testResult = TestResult::Uninitialized;
         Slang::String name;
         Slang::String message;      ///< Message that is specific for the testResult
         double executionTime = 0.0; ///< <= 0.0 if not defined. Time is in seconds.

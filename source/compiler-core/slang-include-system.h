@@ -35,10 +35,17 @@ struct SearchDirectoryList
  * optionally a sourceManager */
 struct IncludeSystem
 {
+    enum class Mode
+    {
+        Quote,
+        System,
+    };
+
     SlangResult findFile(
         const String& pathToInclude,
         const String& pathIncludedFrom,
-        PathInfo& outPathInfo);
+        PathInfo& outPathInfo,
+        Mode mode = Mode::Quote);
     SlangResult findFile(
         SlangPathType fromPathType,
         const String& fromPath,
@@ -59,7 +66,8 @@ struct IncludeSystem
         const String& pathToInclude,
         const String& pathIncludedFrom,
         PathInfo& outPathInfo,
-        ComPtr<ISlangBlob>& outBlob);
+        ComPtr<ISlangBlob>& outBlob,
+        Mode mode = Mode::Quote);
 
     SearchDirectoryList* getSearchDirectoryList() const { return m_searchDirectories; }
     ISlangFileSystemExt* getFileSystem() const { return m_fileSystemExt; }

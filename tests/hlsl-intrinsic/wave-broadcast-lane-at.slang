@@ -4,7 +4,7 @@
 TEST:COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -shaderobj
 // Disabled on VK because glsl can't do WaveReadLaneAt on matrix. 
 //DISABLE_TEST(vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
-TEST:COMPARE_COMPUTE_EX:-cuda -compute -render-features cuda_sm_7_0 -shaderobj
+TEST:COMPARE_COMPUTE_EX:-cuda -compute -capability cuda_sm_7_0 -shaderobj
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;

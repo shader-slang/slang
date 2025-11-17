@@ -15,7 +15,7 @@ struct RayHitInfoPacked_0
     vec4 PackedHitInfoA_0;
 };
 
-rayPayloadInEXT RayHitInfoPacked_0 _S1;
+rayPayloadInEXT RayHitInfoPacked_0 RayData_0;
 
 struct BuiltInTriangleIntersectionAttributes_0
 {
@@ -27,23 +27,23 @@ hitAttributeEXT BuiltInTriangleIntersectionAttributes_0 _S2;
 void main()
 {
     float HitT_0 = ((gl_RayTmaxEXT));
-    _S1.PackedHitInfoA_0[0] = HitT_0;
+    RayData_0.PackedHitInfoA_0[0] = HitT_0;
 
     float offsfloat_0 = gParamBlock_sbuf_0._data[0];
     uint use_rcp_0 = 0U | uint(HitT_0 > 0.0);
     if(use_rcp_0 != 0U)
     {
-        _S1.PackedHitInfoA_0[1] = rcp_0(offsfloat_0);
+        RayData_0.PackedHitInfoA_0[1] = rcp_0(offsfloat_0);
     }
     else
     {
         if(use_rcp_0 > 0U&&offsfloat_0 == 0.0)
         {
-            _S1.PackedHitInfoA_0[1] = (inversesqrt((offsfloat_0 + 1.0)));
+            RayData_0.PackedHitInfoA_0[1] = (inversesqrt((offsfloat_0 + 1.0)));
         }
         else
         {
-            _S1.PackedHitInfoA_0[1] = (inversesqrt((offsfloat_0)));
+            RayData_0.PackedHitInfoA_0[1] = (inversesqrt((offsfloat_0)));
         }
     }
     return;

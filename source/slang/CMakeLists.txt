@@ -208,7 +208,7 @@ set(slang_build_args
     $<$<CXX_COMPILER_ID:GNU>:-Wno-error=stringop-overflow>
     INCLUDE_DIRECTORIES_PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR}/slang-version-header
-    ${CMAKE_BINARY_DIR}/source/standard-modules/slang-standard-module-config-header
+    ${CMAKE_CURRENT_BINARY_DIR}/../standard-modules/slang-standard-module-config-header
     EXPORT_MACRO_PREFIX
     SLANG
     EXPORT_TYPE_AS

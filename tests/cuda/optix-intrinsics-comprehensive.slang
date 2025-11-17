@@ -26,6 +26,12 @@ uniform RaytracingAccelerationStructure scene;
 //CHECK-DAG: optixMakeHitObject
 //CHECK-DAG: optixIgnoreIntersection
 
+// Transform matrix intrinsics
+//CHECK-DAG: slangOptixGetObjectToWorldTransformMatrix
+//CHECK-DAG: slangOptixGetWorldToObjectTransformMatrix
+//CHECK-DAG: slangOptixGetObjectToWorldTransformMatrix4x3
+//CHECK-DAG: slangOptixGetWorldToObjectTransformMatrix4x3
+
 // Traditional SBT data access
 //CHECK-DAG: optixGetSbtDataPointer
 
@@ -71,7 +77,13 @@ struct IntrinsicData
     float3 worldRayOrigin;
     float rayTmin;
     uint rayFlags;
-    
+
+    // Transform matrices
+    float3x4 objectToWorld3x4;
+    float3x4 worldToObject3x4;
+    float4x3 objectToWorld4x3;
+    float4x3 worldToObject4x3;
+
     // HitObject attributes
     float hitObjAttr0;
     uint hitObjAttr1;
@@ -81,7 +93,7 @@ struct IntrinsicData
     uint hitObjAttr5;
     float hitObjAttr6;
     uint hitObjAttr7;
-    
+
     // HitObject state
     bool isMiss;
 };
@@ -124,6 +136,12 @@ void closestHitShader(
     payload.data.worldRayOrigin = WorldRayOrigin();
     payload.data.rayTmin = RayTMin();
     payload.data.rayFlags = RayFlags();
+
+    // Test transform matrix intrinsics (now support CUDA via OptiX)
+    payload.data.objectToWorld3x4 = ObjectToWorld3x4();
+    payload.data.worldToObject3x4 = WorldToObject3x4();
+    payload.data.objectToWorld4x3 = ObjectToWorld4x3();
+    payload.data.worldToObject4x3 = WorldToObject4x3();
     
     // Test HitObject operations (using a NOP HitObject for simplicity)
     HitObject hitObj = HitObject::MakeNop();

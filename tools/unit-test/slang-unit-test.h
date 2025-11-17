@@ -8,10 +8,18 @@ enum class TestResult
     // NOTE! Must keep in order such that combine is meaningful. That is larger values are higher
     // precident - and a series of tests that has lots of passes and a fail, is still a fail
     // overall.
-    Ignored,
-    Pass,
-    ExpectedFail,
-    Fail,
+    // NOTE! Do NOT reorder or change values 0-3. The slang-llvm prebuilt library depends on these.
+
+    // Special states with negative values (lowest precedence)
+    Uninitialized = -2, ///< Test result not yet set - initial state before any results are added
+    PendingRetry =
+        -1, ///< Test failed and is scheduled for retry - not counted in any statistics yet
+
+    // Normal test results (NOTE! Do NOT CHANGE - binary compatibility!)
+    Ignored = 0,      ///< Test was explicitly skipped/ignored
+    Pass = 1,         ///< Test passed
+    ExpectedFail = 2, ///< Test expected to fail based on expected failure list
+    Fail = 3,         ///< Test failed
 };
 
 enum class TestMessageType

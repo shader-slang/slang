@@ -16,14 +16,14 @@ struct ShadowRay_0
     float hitDistance_0;
 };
 
-rayPayloadInEXT ShadowRay_0 _S1;
+rayPayloadInEXT ShadowRay_0 ray_0;
 
 void main()
 {
     const vec2 _S2 = vec2(0.0, 0.0);
 
-    vec4 val_0 = (textureGradOffsetClampARB(sampler2DArray(t2D_0,samplerState_0), (vec3(_S1.hitDistance_0 * 0.20000000298023223877, _S1.hitDistance_0 * 0.30000001192092895508, 0.20000000298023223877)), (_S2), (_S2), (ivec2(0)), (0.5)));
+    vec4 val_0 = (textureGradOffsetClampARB(sampler2DArray(t2D_0,samplerState_0), (vec3(ray_0.hitDistance_0 * 0.20000000298023223877, ray_0.hitDistance_0 * 0.30000001192092895508, 0.20000000298023223877)), (_S2), (_S2), (ivec2(0)), (0.5)));
 
-    _S1.hitDistance_0 = dot(val_0, val_0);
+    ray_0.hitDistance_0 = dot(val_0, val_0);
     return;
 }

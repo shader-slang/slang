@@ -395,7 +395,7 @@ class AggTypeDecl : public AggTypeDeclBase
     // `aliasedType` is used to store the alised type (in this case `Foo`)
     // when the agg type decl is declared in the link-time alias syntax.
     //
-    TypeExp aliasedType;
+    FIDDLE() TypeExp aliasedType;
 
     bool hasBody = true;
 

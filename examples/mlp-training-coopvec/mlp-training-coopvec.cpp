@@ -165,7 +165,7 @@ struct ExampleProgram : public TestBase
         std::vector<float> inputBufferData;
         for (int i = 0; i < inputCount; i++)
         {
-            inputBufferData.push_back((float)rand() / RAND_MAX);
+            inputBufferData.push_back(rand() / static_cast<float>(RAND_MAX));
         }
         auto inputBuffer = createBuffer(inputCount * sizeof(float), inputBufferData.data());
 

@@ -8,11 +8,11 @@ struct ShadowRay_0
 	float hitDistance_0;
 };
 
-rayPayloadInEXT ShadowRay_0 _S1;
+rayPayloadInEXT ShadowRay_0 ray_0;
 
 void main()
 {
-    (_S1.hitDistance_0) = 10000.0f;
+    (ray_0.hitDistance_0) = 10000.0f;
     return;
 }
- 
+
