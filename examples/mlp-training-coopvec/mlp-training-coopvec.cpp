@@ -201,29 +201,35 @@ struct ExampleProgram : public TestBase
             // Copy weight gradients from training-optimal layout to row-major layout,
             // so we can read them in the `adjustParameters` kernel.
             {
-                std::vector<rhi::ConvertCooperativeVectorMatrixDesc> matrixDescs;
+                rhi::CooperativeVectorMatrixDesc srcDescs[kLayerCount];
+                rhi::CooperativeVectorMatrixDesc dstDescs[kLayerCount];
                 for (int i = 0; i < kLayerCount; i++)
                 {
-                    rhi::ConvertCooperativeVectorMatrixDesc desc = {};
-                    desc.rowCount = kLayerSizes[i + 1];
-                    desc.colCount = kLayerSizes[i];
-                    desc.dstComponentType = rhi::CooperativeVectorComponentType::Float16;
-                    desc.dstSize = &layerAllocations[i].weightsSize;
-                    desc.dstData.deviceAddress = networkParamsBuffer->getDeviceAddress() +
-                                                 layerAllocations[i].weightsGradOffset;
-                    desc.dstLayout = rhi::CooperativeVectorMatrixLayout::RowMajor;
-                    desc.dstStride = getNetworkLayerWeightStride(i);
-                    desc.srcComponentType = rhi::CooperativeVectorComponentType::Float16;
-                    desc.srcSize = layerAllocations[i].weightsGradTrainingSize;
-                    desc.srcData.deviceAddress = networkParamsBuffer->getDeviceAddress() +
-                                                 layerAllocations[i].weightsGradTrainingOffset;
-                    desc.srcLayout = rhi::CooperativeVectorMatrixLayout::TrainingOptimal;
-                    matrixDescs.push_back(desc);
+                    rhi::CooperativeVectorMatrixDesc& srcDesc = srcDescs[i];
+                    srcDesc = {};
+                    srcDesc.rowCount = kLayerSizes[i + 1];
+                    srcDesc.colCount = kLayerSizes[i];
+                    srcDesc.componentType = rhi::CooperativeVectorComponentType::Float16;
+                    srcDesc.layout = rhi::CooperativeVectorMatrixLayout::TrainingOptimal;
+                    srcDesc.size = layerAllocations[i].weightsGradTrainingSize;
+                    srcDesc.offset = layerAllocations[i].weightsGradTrainingOffset;
+                    rhi::CooperativeVectorMatrixDesc& dstDesc = dstDescs[i];
+                    dstDesc = {};
+                    dstDesc.rowCount = kLayerSizes[i + 1];
+                    dstDesc.colCount = kLayerSizes[i];
+                    dstDesc.componentType = rhi::CooperativeVectorComponentType::Float16;
+                    dstDesc.layout = rhi::CooperativeVectorMatrixLayout::RowMajor;
+                    dstDesc.size = layerAllocations[i].weightsSize;
+                    dstDesc.offset = layerAllocations[i].weightsGradOffset;
+                    dstDesc.rowColumnStride = getNetworkLayerWeightStride(i);
                 }
                 auto encoder = queue->createCommandEncoder();
                 encoder->convertCooperativeVectorMatrix(
-                    matrixDescs.data(),
-                    (uint32_t)matrixDescs.size());
+                    networkParamsBuffer,
+                    dstDescs,
+                    networkParamsBuffer,
+                    srcDescs,
+                    kLayerCount);
                 ComPtr<rhi::ICommandBuffer> commandBuffer;
                 encoder->finish(commandBuffer.writeRef());
                 queue->submit(commandBuffer);
@@ -296,20 +302,13 @@ struct ExampleProgram : public TestBase
         for (int i = 0; i < kLayerCount; i++)
         {
             // Allocate space for gradients in training-optimal layout.
-            rhi::ConvertCooperativeVectorMatrixDesc matrixDesc = {};
-            matrixDesc.srcComponentType = rhi::CooperativeVectorComponentType::Float16;
-            matrixDesc.srcSize = paramStorage[i].weightsSize;
-            matrixDesc.srcData.hostAddress = nullptr;
-            matrixDesc.srcLayout = rhi::CooperativeVectorMatrixLayout::RowMajor;
-            matrixDesc.srcStride = getNetworkLayerWeightStride(i);
-            matrixDesc.dstComponentType = rhi::CooperativeVectorComponentType::Float16;
-            matrixDesc.dstSize = &paramStorage[i].weightsGradTrainingSize;
-            matrixDesc.dstData.hostAddress = nullptr;
-            matrixDesc.dstLayout = rhi::CooperativeVectorMatrixLayout::TrainingOptimal;
-            matrixDesc.dstStride = 0;
-            matrixDesc.rowCount = kLayerSizes[i + 1];
-            matrixDesc.colCount = kLayerSizes[i];
-            gDevice->convertCooperativeVectorMatrix(&matrixDesc, 1);
+            gDevice->getCooperativeVectorMatrixSize(
+                kLayerSizes[i + 1],
+                kLayerSizes[i],
+                rhi::CooperativeVectorComponentType::Float16,
+                rhi::CooperativeVectorMatrixLayout::TrainingOptimal,
+                0,
+                &paramStorage[i].weightsGradTrainingSize);
             paramStorage[i].weightsGradTrainingOffset =
                 allocRowMajorStorage(paramStorage[i].weightsGradTrainingSize);
         }
