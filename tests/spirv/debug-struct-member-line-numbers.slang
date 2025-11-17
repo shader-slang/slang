@@ -3,8 +3,11 @@
 // Structure for shader parameters
 struct ShaderParameters
 {
+    // CHECK-DAG: DebugTypeMember %{{.*}} %{{.*}} %{{.*}} %uint_[[# @LINE+1 ]]
     float4 fillColor;
+    // CHECK-DAG: DebugTypeMember %{{.*}} %{{.*}} %{{.*}} %uint_[[# @LINE+1 ]]
     float edgeThickness;
+    // CHECK-DAG: DebugTypeMember %{{.*}} %{{.*}} %{{.*}} %uint_[[# @LINE+1 ]]
     float4 edgeColor;
 };
 
@@ -36,7 +39,7 @@ PSOutput main(VSOutput input)
     float distance = length(uv);
 
     // Create circular shape with edge
-    float circle = 1.0 - step(0.4, distance);         // Circle with radius 0.4
+    float circle =1.0 - step(0.4, distance);         // Circle with radius 0.4
     float edge = step(0.4 - params.edgeThickness, distance) * circle; // Edge of the circle
 
     // Combine fill and edge colors
@@ -51,9 +54,6 @@ PSOutput main(VSOutput input)
 }
 
 // Check that DebugTypeMember instructions for ShaderParameters_std140 have correct line numbers
-// CHECK: OpString "fillColor"
-// CHECK: OpString "edgeThickness"
-// CHECK: OpString "edgeColor"
-// CHECK: DebugTypeMember %{{.*}} %{{.*}} %{{.*}} %uint_6
-// CHECK: DebugTypeMember %{{.*}} %{{.*}} %{{.*}} %uint_7
-// CHECK: DebugTypeMember %{{.*}} %{{.*}} %{{.*}} %uint_8
+// CHECK-DAG: OpString "fillColor"
+// CHECK-DAG: OpString "edgeThickness"
+// CHECK-DAG: OpString "edgeColor"
