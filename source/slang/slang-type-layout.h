@@ -45,7 +45,7 @@ struct LayoutSize
     LayoutSize(RawValue size)
         : raw(size)
     {
-        SLANG_ASSERT(size != s_infiniteValue);
+        SLANG_ASSERT(size != s_infiniteValue && size != s_invalidValue);
     }
 
     static LayoutSize fromRaw(RawValue raw)
@@ -59,6 +59,13 @@ struct LayoutSize
     {
         LayoutSize result;
         result.raw = s_infiniteValue;
+        return result;
+    }
+
+    static LayoutSize invalid()
+    {
+        LayoutSize result;
+        result.raw = s_invalidValue;
         return result;
     }
 
@@ -77,8 +84,10 @@ struct LayoutSize
 
 
     bool isInfinite() const { return raw == s_infiniteValue; }
+    bool isInvalid() const { return raw == s_invalidValue; }
 
-    bool isFinite() const { return raw != s_infiniteValue; }
+    bool isFinite() const { return raw != s_infiniteValue && raw != s_invalidValue; }
+    bool isValid() const { return raw != s_invalidValue; }
     RawValue getFiniteValue() const
     {
         SLANG_ASSERT(isFinite());
@@ -95,6 +104,9 @@ struct LayoutSize
 
     bool operator>(LayoutSize that) const
     {
+        if (this->isInvalid() || that.isInvalid())
+            return false; // Invalid values are not comparable
+            
         if (that.isFinite())
         {
             if (this->isFinite())
@@ -111,7 +123,11 @@ struct LayoutSize
 
     void operator+=(LayoutSize right)
     {
-        if (isInfinite())
+        if (isInvalid() || right.isInvalid())
+        {
+            *this = LayoutSize::invalid();
+        }
+        else if (isInfinite())
         {
         }
         else if (right.isInfinite())
@@ -126,6 +142,13 @@ struct LayoutSize
 
     void operator*=(LayoutSize right)
     {
+        // Deal with invalid first
+        if (isInvalid() || right.isInvalid())
+        {
+            *this = LayoutSize::invalid();
+            return;
+        }
+
         // Deal with zero first, so that anything (even the "infinite" value) times zero is zero.
         if (raw == 0)
         {
@@ -156,7 +179,10 @@ struct LayoutSize
 
     void operator-=(RawValue right)
     {
-        if (isInfinite())
+        if (isInvalid())
+        {
+        }
+        else if (isInfinite())
         {
         }
         else
@@ -167,7 +193,10 @@ struct LayoutSize
 
     void operator/=(RawValue right)
     {
-        if (isInfinite())
+        if (isInvalid())
+        {
+        }
+        else if (isInfinite())
         {
         }
         else
@@ -177,6 +206,7 @@ struct LayoutSize
     }
     RawValue raw;
     const static RawValue s_infiniteValue = ~0;
+    const static RawValue s_invalidValue = ~0 - 1;
 };
 
 inline LayoutSize operator+(LayoutSize left, LayoutSize right)
