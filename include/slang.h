@@ -464,7 +464,7 @@ convention for interface methods.
 // Processor features
 #if SLANG_PROCESSOR_FAMILY_X86
     #define SLANG_LITTLE_ENDIAN 1
-    #define SLANG_UNALIGNED_ACCESS 0
+    #define SLANG_UNALIGNED_ACCESS 1
 #elif SLANG_PROCESSOR_FAMILY_ARM
     #if defined(__ARMEB__)
         #define SLANG_BIG_ENDIAN 1

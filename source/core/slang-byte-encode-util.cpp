@@ -213,13 +213,9 @@ SLANG_FORCE_INLINE static uint32_t _decodeLiteCut2UInt32(const uint8_t* in, int 
     switch (numBytesRemaining)
     {
     case 2:
-        value = *(const uint16_t*)in;
-        break;
     case 3:
-        value = (uint32_t(in[2]) << 16) | (uint32_t(in[1]) << 8) | uint32_t(in[0]);
-        break;
     case 4:
-        value = *(const uint32_t*)in;
+        memcpy(&value, in, numBytesRemaining);
         break;
     default:
         break;
@@ -296,7 +292,9 @@ SLANG_FORCE_INLINE static uint32_t _decodeLiteCut2UInt32(const uint8_t* in, int 
             {
                 const uint32_t mask = s_unalignedUInt32Mask[numBytesRemaining];
                 // const uint32_t mask = ~(uint32_t(0xffffff00) << ((numBytesRemaining - 1) * 8));
-                valuesOut[i] = (*(const uint32_t*)encodeIn) & mask;
+                uint32_t temp;
+                memcpy(&temp, encodeIn, sizeof(temp));
+                valuesOut[i] = temp & mask;
             }
             else
 #endif
