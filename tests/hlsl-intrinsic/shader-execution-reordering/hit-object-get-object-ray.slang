@@ -1,4 +1,3 @@
-//TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry rayGenShader -stage raygeneration
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry rayGenShader -stage raygeneration
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry rayGenShader -stage raygeneration
 
@@ -36,14 +35,13 @@ void rayGenShader()
     HitObject hitobj = HitObject::TraceRay(sceneBVH, RAY_FLAG_NONE, ~0, 0, 0, 0, ray, payload);
 
     // Test HitObject.GetObjectRayOrigin() and GetObjectRayDirection() in raygen stage
-    // These should compile successfully for HLSL, SPIRV, and CUDA targets
+    // These should compile successfully for SPIRV and CUDA targets
+    // Note: HLSL does not have these methods on HitObject (no NVAPI support)
 
-    // HLSL: ObjectRayOrigin
     // SPIRV: OpHitObjectGetObjectRayOriginNV
     // CUDA: optixGetObjectRayOrigin
     resultBuffer[0].rayOrigin = hitobj.GetObjectRayOrigin();
 
-    // HLSL: ObjectRayDirection
     // SPIRV: OpHitObjectGetObjectRayDirectionNV
     // CUDA: optixGetObjectRayDirection
     resultBuffer[0].rayDirection = hitobj.GetObjectRayDirection();
