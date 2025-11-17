@@ -1,0 +1,141 @@
+name: Fix User Guide Redirects
+on:
+  repository_dispatch:
+    types: [fix-redirects-command]
+jobs:
+  fix-redirects:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.SLANGBOT_PAT }}
+          repository: ${{ github.event.client_payload.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.client_payload.pull_request.head.ref }}
+          path: pr-branch
+          submodules: "recursive"
+
+      - name: Checkout target branch
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.SLANGBOT_PAT }}
+          repository: ${{ github.event.client_payload.pull_request.base.repo.full_name }}
+          ref: ${{ github.event.client_payload.pull_request.base.ref }}
+          path: target-branch
+          submodules: "recursive"
+
+      - name: Fix User Guide Redirects
+        id: fix
+        run: |
+          cd pr-branch
+
+          echo "Fixing redirect_to links in ${READTHEDOCS_USER_GUIDE_PATH}..."
+
+          # Load shared redirect configuration
+          source .github/workflows/redirect-config.sh
+
+          # Find all .md files recursively in the user guide directory
+          find "${READTHEDOCS_USER_GUIDE_PATH}" -name "*.md" -type f | while read -r file; do
+            if [ ! -f "$file" ]; then
+              continue
+            fi
+
+            echo "Processing $file..."
+
+            # Expected URL (dynamically construct from file path)
+            # Replace .md with .html and prepend the base URL components
+            file_path_no_ext=${file%.md}
+            expected_url="${READTHEDOCS_DOMAIN}${READTHEDOCS_VERSION}${READTHEDOCS_USER_GUIDE_PREFIX}${file_path_no_ext}.html"
+
+            # Check if file already has redirect_to
+            if grep -q "^redirect_to:" "$file"; then
+              # Update existing redirect_to
+              sed -i "s|^redirect_to:.*|redirect_to: $expected_url|" "$file"
+              echo "Updated redirect_to in $file"
+            else
+              # Need to add redirect_to after the front matter
+              if grep -q "^---" "$file"; then
+                # File has front matter, add redirect_to before closing ---
+                awk -v url="$expected_url" '
+                  /^---/ && !frontmatter_started { 
+                    frontmatter_started = 1; 
+                    print; 
+                    next 
+                  }
+                  /^---/ && frontmatter_started && !redirect_added {
+                    print "redirect_to: " url;
+                    redirect_added = 1;
+                    print;
+                    next
+                  }
+                  { print }
+                ' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
+                echo "Added redirect_to to $file"
+              else
+                # File has no front matter, add it
+                {
+                  echo "---"
+                  echo "layout: user-guide"
+                  echo "redirect_to: $expected_url"
+                  echo "---"
+                  echo ""
+                  cat "$file"
+                } > "$file.tmp" && mv "$file.tmp" "$file"
+                echo "Added front matter with redirect_to to $file"
+              fi
+            fi
+          done
+
+      - name: Configure Git commit signing
+        id: git-info
+        run: |
+          echo "${{ secrets.SLANGBOT_SIGNING_KEY }}" > "${{runner.temp}}"/signing_key
+          chmod 600 "${{runner.temp}}"/signing_key
+          git -C pr-branch config commit.gpgsign true
+          git -C pr-branch config gpg.format ssh
+          git -C pr-branch config user.signingkey "${{runner.temp}}"/signing_key
+          bot_info=$(curl -s -H "Authorization: Bearer ${{ secrets.SLANGBOT_PAT }}" \
+            "https://api.github.com/user")
+          echo "bot_identity=$(echo $bot_info | jq --raw-output '.login + " <" + (.id|tostring) + "+" + .login + "@users.noreply.github.com>"')" >> $GITHUB_OUTPUT
+          echo "bot_name=$(echo $bot_info | jq --raw-output '.login')" >> $GITHUB_OUTPUT
+
+      - name: Create Pull Request
+        id: create-pr
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.SLANGBOT_PAT }}
+          path: pr-branch
+          commit-message: "fix user guide redirect_to links"
+          title: "Fix user guide redirects for PR #${{ github.event.client_payload.pull_request.number }}"
+          body: "Automated redirect_to link fixes for ${{ github.event.client_payload.pull_request.html_url }}"
+          committer: ${{ steps.git-info.outputs.bot_identity }}
+          author: ${{ steps.git-info.outputs.bot_identity }}
+          branch: fix-redirects-${{ github.event.client_payload.pull_request.number }}-${{ github.event.client_payload.pull_request.head.ref }}
+          base: ${{ github.event.client_payload.pull_request.head.ref }}
+          push-to-fork: ${{ steps.git-info.outputs.bot_name }}/slang
+          delete-branch: true
+
+      - name: Comment on PR
+        uses: peter-evans/create-or-update-comment@v4
+        if: always()
+        with:
+          token: ${{ secrets.SLANGBOT_PAT }}
+          repository: ${{ github.event.client_payload.github.payload.repository.full_name }}
+          issue-number: ${{ github.event.client_payload.pull_request.number }}
+          body: |
+            ${{ 
+              steps.fix.conclusion == 'failure'
+              && format('❌ Redirect fixing failed. Please check the [workflow run](https://github.com/{0}/actions/runs/{1})', github.repository, github.run_id)
+              || (steps.create-pr.conclusion == 'failure' 
+                  && format('❌ Failed to create redirect fix pull request. Please check the [workflow run](https://github.com/{0}/actions/runs/{1})', github.repository, github.run_id)
+                  || format('🌈 Fixed user guide redirects, please merge the changes from [this PR]({0})', steps.create-pr.outputs.pull-request-url))
+            }}
+
+      - name: Add reaction
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          token: ${{ secrets.SLANGBOT_PAT }}
+          repository: ${{ github.event.client_payload.github.payload.repository.full_name }}
+          comment-id: ${{ github.event.client_payload.github.payload.comment.id }}
+          reactions-edit-mode: replace
+          reactions: hooray

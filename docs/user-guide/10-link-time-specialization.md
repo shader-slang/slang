@@ -1,6 +1,7 @@
 ---
 layout: user-guide
 permalink: /user-guide/link-time-specialization
+redirect_to: https://docs.shader-slang.org/en/latest/external/slang/docs/user-guide/10-link-time-specialization.html
 ---
 
 # Link-time Specialization and Module Precompilation
