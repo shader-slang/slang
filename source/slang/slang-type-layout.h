@@ -93,9 +93,18 @@ struct LayoutSize
         SLANG_ASSERT(isFinite());
         return raw;
     }
+    RawValue getValidValue() const
+    {
+        SLANG_ASSERT(isValid());
+        return raw;
+    }
     RawValue getFiniteValueOr(RawValue infiniteMarker) const
     {
         return isFinite() ? raw : infiniteMarker;
+    }
+    RawValue getValidValueOr(RawValue invalidMarker) const
+    {
+        return isValid() ? raw : invalidMarker;
     }
 
     bool operator==(LayoutSize that) const { return raw == that.raw; }
@@ -239,6 +248,9 @@ inline LayoutSize operator/(LayoutSize left, LayoutSize::RawValue right)
 
 inline LayoutSize maximum(LayoutSize left, LayoutSize right)
 {
+    if (left.isInvalid() || right.isInvalid())
+        return LayoutSize::invalid();
+    
     if (left.isInfinite() || right.isInfinite())
         return LayoutSize::infinite();
 
@@ -247,11 +259,15 @@ inline LayoutSize maximum(LayoutSize left, LayoutSize right)
 
 inline bool operator>(LayoutSize left, LayoutSize::RawValue right)
 {
+    if (left.isInvalid())
+        return false;
     return left.isInfinite() || (left.getFiniteValue() > right);
 }
 
 inline bool operator<=(LayoutSize left, LayoutSize::RawValue right)
 {
+    if (left.isInvalid())
+        return false;
     return left.isFinite() && (left.getFiniteValue() <= right);
 }
 
