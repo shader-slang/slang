@@ -6,6 +6,8 @@
 //TEST(smoke,compute):COMPARE_COMPUTE_EX:-cuda -compute  -shaderobj -output-using-type
 //TEST(smoke,compute):COMPARE_COMPUTE:-slang -shaderobj -mtl -output-using-type
 //TEST(smoke,compute):COMPARE_COMPUTE:-wgpu -slang -compute -shaderobj -output-using-type
+// Not supported in LLVM: textures are not currently available
+//DISABLE_TEST(smoke,compute):COMPARE_COMPUTE: -slang -shaderobj -llvm
 
 //TEST_INPUT: Texture2D(size=4, content = one):name t2D
 Texture2D<float> t2D;

@@ -2184,13 +2184,14 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
     {
         return IRTypeLayoutRuleName::MetalParameterBlock;
     }
-    if (target->getTargetReq()->getTarget() != CodeGenTarget::WGSL)
+    auto targetReq = target->getTargetReq();
+    if (targetReq->getTarget() != CodeGenTarget::WGSL)
     {
-        if (!isKhronosTarget(target->getTargetReq()))
+        if (!isKhronosTarget(target->getTargetReq()) && !isLLVMTarget(targetReq))
             return IRTypeLayoutRuleName::Natural;
 
         // If we are just emitting GLSL, we can just use the general layout rule.
-        if (!target->shouldEmitSPIRVDirectly())
+        if (!target->shouldEmitSPIRVDirectly() && !isLLVMTarget(targetReq))
             return IRTypeLayoutRuleName::Natural;
 
         // If the user specified a C-compatible buffer layout, then do that.
@@ -2676,6 +2677,23 @@ struct WGSLBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPol
     }
 };
 
+struct LLVMBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPolicy
+{
+    LLVMBufferElementTypeLoweringPolicy(
+        TargetProgram* inTarget,
+        BufferElementTypeLoweringOptions inOptions)
+        : DefaultBufferElementTypeLoweringPolicy(inTarget, inOptions)
+    {
+    }
+
+    virtual bool shouldLowerMatrixType(IRMatrixType* matrixType, TypeLoweringConfig config) override
+    {
+        SLANG_UNUSED(matrixType);
+        SLANG_UNUSED(config);
+        return true;
+    }
+};
+
 BufferElementTypeLoweringPolicy* getBufferElementTypeLoweringPolicy(
     BufferElementTypeLoweringPolicyKind kind,
     TargetProgram* target,
@@ -2691,6 +2709,8 @@ BufferElementTypeLoweringPolicy* getBufferElementTypeLoweringPolicy(
         return new MetalParameterBlockElementTypeLoweringPolicy(target, options);
     case BufferElementTypeLoweringPolicyKind::WGSL:
         return new WGSLBufferElementTypeLoweringPolicy(target, options);
+    case BufferElementTypeLoweringPolicyKind::LLVM:
+        return new LLVMBufferElementTypeLoweringPolicy(target, options);
     }
     SLANG_UNREACHABLE("unknown buffer element type lowering policy");
 }

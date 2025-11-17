@@ -9,6 +9,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-slang -vk -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -cuda -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -llvm -compute -shaderobj
 
 // Note: This input should really be just a `ByteAddressBuffer`,
 // so that we can confirm that the functionality works in the
