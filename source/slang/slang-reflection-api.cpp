@@ -3001,7 +3001,7 @@ SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeObjectCount(SlangRefl
     if(!typeLayout) return 0;
 
     auto count = Slang::_findSubObjectRange(typeLayout, index).count;
-    return count.isFinite() ? SlangInt(count.getFiniteValue()) : -1;
+    return count.isValid() ? SlangInt(count.getValidValue()) : -1;
 }
 
 SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeBindingRangeIndex(SlangReflectionTypeLayout* inTypeLayout, SlangInt index)
@@ -3046,7 +3046,7 @@ SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeDescriptorRangeBindin
 
     auto subObjectRange = Slang::_findSubObjectRange(typeLayout, subObjectRangeIndex);
     auto count = Slang::_getSubObjectDescriptorRange(subObjectRange, bindingRangeIndexInSubObject).count;
-    return count.isFinite() ? count.getFiniteValue() : -1;
+    return count.isValid() ? count.getValidValue() : -1;
 }
 
 SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeDescriptorRangeIndexOffset(SlangReflectionTypeLayout* inTypeLayout, SlangInt subObjectRangeIndex, SlangInt bindingRangeIndexInSubObject)

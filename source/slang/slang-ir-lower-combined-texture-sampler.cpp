@@ -136,7 +136,7 @@ IRTypeLayout* maybeCreateArrayLayout(
             arrayTypeLayoutBuilder.addResourceUsage(
                 sizeAttr->getResourceKind(),
                 sizeAttr->getSize().isFinite() && elementCount != -1
-                    ? sizeAttr->getSize().getFiniteValue() * elementCount
+                    ? LayoutSize(sizeAttr->getSize().getFiniteValue()) * elementCount
                     : LayoutSize::infinite());
         }
         return arrayTypeLayoutBuilder.build();
