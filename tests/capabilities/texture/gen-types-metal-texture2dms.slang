@@ -11,6 +11,7 @@
 // Test disabled, see https://github.com/shader-slang/slang/issues/8457
 //DISABLE_TEST:SIMPLE(filecheck=POSITIVE): -entry fragMain -stage fragment -target metal -profile metallib_2_3
 //DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_RESULT): -mtl
+//DISABLE_TEST:SIMPLE(filecheck=NEGATIVE): -entry fragMain -stage fragment -target None
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -26,6 +27,9 @@ void fragMain()
 // POSITIVE-NOT: {{(error|warning).*}}:
 // POSITIVE-LABEL: fragMain
 // POSITIVE-NOT: {{(error|warning).*}}:
+
+// Expect either a compilation error or warning 41012 for upgraded profile to support functionality
+// NEGATIVE: {{error [[:digit:]]+|warning 41012}}:
 
     int ret = 0;
     ret = int((texHandle.Load(int3(0, 0, 0))).x);
