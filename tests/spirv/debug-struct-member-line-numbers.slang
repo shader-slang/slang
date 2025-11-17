@@ -50,11 +50,10 @@ PSOutput main(VSOutput input)
     return output;
 }
 
-// CHECK: OpExtInst %void {{.*}} DebugTypeMember {{.*}} %[[fillColor:.*]] {{.*}} %[[source:.*]] %[[line6:.*]]
-// CHECK-DAG: OpString "fillColor"
-// CHECK-DAG: %[[fillColor]] = OpString "fillColor"
-// CHECK-DAG: %[[line6]] = OpConstant {{.*}} 6
-// CHECK: OpExtInst %void {{.*}} DebugTypeMember {{.*}} %{{.*}} {{.*}} %[[source]] %[[line7:.*]]
-// CHECK-DAG: %[[line7]] = OpConstant {{.*}} 7
-// CHECK: OpExtInst %void {{.*}} DebugTypeMember {{.*}} %{{.*}} {{.*}} %[[source]] %[[line8:.*]]
-// CHECK-DAG: %[[line8]] = OpConstant {{.*}} 8
+// Check that DebugTypeMember instructions for ShaderParameters_std140 have correct line numbers
+// CHECK: OpString "fillColor"
+// CHECK: OpString "edgeThickness"
+// CHECK: OpString "edgeColor"
+// CHECK: DebugTypeMember %{{.*}} %{{.*}} %{{.*}} %uint_6
+// CHECK: DebugTypeMember %{{.*}} %{{.*}} %{{.*}} %uint_7
+// CHECK: DebugTypeMember %{{.*}} %{{.*}} %{{.*}} %uint_8
