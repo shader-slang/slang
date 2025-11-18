@@ -381,7 +381,7 @@ private:
     RawValue raw;
 };
 
-LayoutOffset LayoutSize::getFiniteValue() const
+inline LayoutOffset LayoutSize::getFiniteValue() const
 {
     return LayoutOffset{*this};
 }
