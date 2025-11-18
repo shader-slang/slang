@@ -70,6 +70,121 @@ def extract_keywords(text: str) -> List[str]:
 
     return keywords
 
+def is_feature(item: Dict[str, Any]) -> bool:
+    """Determine if an issue/PR is a feature addition."""
+    title = item.get("title", "").lower()
+    body = (item.get("body") or "").lower()
+    labels = [label["name"].lower() for label in item.get("labels", [])]
+    
+    # Check labels first (most reliable)
+    feature_labels = ["feature", "enhancement", "new feature", "feature request"]
+    if any(label in feature_labels for label in labels):
+        return True
+    
+    # Check title/body for feature keywords
+    feature_patterns = [
+        r"\b(add|implement|introduce|support|enable)\s+(new\s+)?feature",
+        r"\benhancement\b",
+        r"\bnew\s+(functionality|capability|support|API|feature)",
+        r"\bimplement\s+(support\s+for|new)",
+        r"\bintroduce\s+",
+    ]
+    
+    combined = f"{title} {body}"
+    for pattern in feature_patterns:
+        if re.search(pattern, combined, re.IGNORECASE):
+            return True
+    
+    return False
+
+def is_bug_fix(item: Dict[str, Any]) -> bool:
+    """Determine if an issue/PR is a bug fix."""
+    title = item.get("title", "").lower()
+    body = (item.get("body") or "").lower()
+    labels = [label["name"].lower() for label in item.get("labels", [])]
+    
+    # Check labels for bugs (including infrastructure bugs like CI Bug)
+    bug_labels = ["regression", "known_issues"]
+    if any(bug_label in label for label in labels for bug_label in bug_labels):
+        return True
+    
+    # "bug" in label (includes "CI Bug", "Vendor Driver Bug", etc.)
+    for label in labels:
+        # Match any label with "bug" but exclude "GoodFirstBug" (that's a difficulty marker, not bug type)
+        if "bug" in label and "goodfirstbug" not in label:
+            return True
+    
+    # Check title/body for bug fix patterns (IMPROVED!)
+    # Primary pattern: Look for "bug" or "fix" combinations
+    combined = f"{title} {body}"
+    
+    # Pattern 1: Explicit bug mentions
+    bug_patterns = [
+        r"\bbugfix\b",                    # "bugfix" as single word
+        r"\bbug[\s-]fix",                 # "bug fix" or "bug-fix"
+        r"\bfix\b.*\bbug\b",              # "fix ... bug" anywhere in text
+        r"\bbug\b.*\bfix",                # "bug ... fix" anywhere in text
+    ]
+    
+    for pattern in bug_patterns:
+        if re.search(pattern, combined, re.IGNORECASE):
+            return True
+    
+    # Pattern 2: References to issue numbers (usually bug fixes)
+    issue_ref_patterns = [
+        r"\bfix(es|ed|ing)?\s+#\d+",      # "fix #123", "fixes #456"
+        r"\bresolve(s|d)?\s+#\d+",        # "resolve #123", "resolved #456"
+        r"\bclose(s|d)?\s+#\d+",          # "close #123", "closes #456"
+    ]
+    
+    for pattern in issue_ref_patterns:
+        if re.search(pattern, combined, re.IGNORECASE):
+            return True
+    
+    # Pattern 2b: "Fix X" at start of title (common bug fix pattern)
+    # But exclude obvious features: "Fix formatting", "Fix typo", "Fix comment"
+    title_only = title.strip()
+    if re.match(r"^fix(es|ed|ing)?\s+", title_only, re.IGNORECASE):
+        # Exclude non-bug fixes
+        non_bugs = [r"typo", r"comment", r"formatting", r"whitespace", r"style", 
+                    r"documentation", r"readme", r"license"]
+        if not any(re.search(nb, title_only, re.IGNORECASE) for nb in non_bugs):
+            return True
+    
+    # Pattern 3: Critical error keywords (these are always bugs)
+    critical_patterns = [
+        r"\bcrash(es|ed|ing)?\b",         # crash, crashes, crashing
+        r"\bsegfault",                    # segmentation fault
+        r"\bsegmentation\s+fault",        # segmentation fault
+        r"\bassert(ion)?\s+fail",         # assertion fail, assertion failed
+        r"\binternal\s+compiler\s+error", # ICE long form
+        r"\bICE\b",                       # ICE abbreviation
+        r"\bnull\s+pointer",              # null pointer issues
+        r"\bmemory\s+leak",               # memory leaks
+        r"\buse[\s-]after[\s-]free",      # use-after-free
+        r"\binfinite\s+loop",             # infinite loops
+        r"\bhang(s|ing)?\b",              # hangs, hanging
+    ]
+    
+    for pattern in critical_patterns:
+        if re.search(pattern, combined, re.IGNORECASE):
+            return True
+    
+    # Pattern 4: Correctness issues (these are bugs)
+    correctness_patterns = [
+        r"\bincorrect\s+(output|code|behavior|result|codegen)",
+        r"\binvalid\s+(code|output|spirv|hlsl|glsl)",
+        r"\bwrong\s+(output|code|result)",
+        r"\bvalidation\s+(error|fail)",
+        r"\bmiscompil",                   # miscompile, miscompilation
+    ]
+    
+    for pattern in correctness_patterns:
+        if re.search(pattern, combined, re.IGNORECASE):
+            return True
+    
+    return False
+
 def categorize_issues(issues: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Categorize issues by various dimensions."""
 
@@ -78,11 +193,13 @@ def categorize_issues(issues: List[Dict[str, Any]]) -> Dict[str, Any]:
         "by_component": Counter(),
         "by_state": Counter(),
         "by_year": Counter(),
+        "by_type": {"features": 0, "bugs": 0, "other": 0},  # NEW: Issue type breakdown
         "bugs_by_component": Counter(),
         "open_bugs_by_component": Counter(),
     }
 
     bug_issues = []
+    feature_issues = []  # NEW
     crash_issues = []
     compiler_errors = []
     codegen_issues = []
@@ -112,22 +229,30 @@ def categorize_issues(issues: List[Dict[str, Any]]) -> Dict[str, Any]:
         for keyword in keywords:
             categories["by_component"][keyword] += 1
 
-        # Identify bugs (Slang repo uses specific bug labels)
-        is_bug = any(
-            "bug" in label.lower() or
-            label.lower() in ["regression", "known_issues"]
-            for label in labels
-        )
-        is_crash = "crash" in combined_text.lower()
-        has_error = re.search(r"error|fail|invalid|incorrect", combined_text, re.IGNORECASE)
-        is_codegen = any(k in keywords for k in ["spirv", "dxil", "cuda", "metal", "glsl", "hlsl", "wgsl"])
-
-        if is_bug:
+        # Classify issue type (NEW!)
+        is_feat = is_feature(issue)
+        is_bug_issue = is_bug_fix(issue)
+        
+        if is_feat:
+            issue_type = "features"
+            feature_issues.append(issue)
+        elif is_bug_issue:
+            issue_type = "bugs"
             bug_issues.append(issue)
+            # Track bugs by component
             for keyword in keywords:
                 categories["bugs_by_component"][keyword] += 1
                 if state == "open":
                     categories["open_bugs_by_component"][keyword] += 1
+        else:
+            issue_type = "other"
+        
+        categories["by_type"][issue_type] += 1
+        
+        # Additional classifications
+        is_crash = "crash" in combined_text.lower()
+        has_error = re.search(r"error|fail|invalid|incorrect", combined_text, re.IGNORECASE)
+        is_codegen = any(k in keywords for k in ["spirv", "dxil", "cuda", "metal", "glsl", "hlsl", "wgsl"])
 
         if is_crash:
             crash_issues.append(issue)
@@ -141,6 +266,7 @@ def categorize_issues(issues: List[Dict[str, Any]]) -> Dict[str, Any]:
     return {
         "categories": categories,
         "bug_issues": bug_issues,
+        "feature_issues": feature_issues,  # NEW
         "crash_issues": crash_issues,
         "compiler_errors": compiler_errors,
         "codegen_issues": codegen_issues,
@@ -181,15 +307,23 @@ def analyze_prs(prs: List[Dict[str, Any]]) -> Dict[str, Any]:
         "by_state": Counter(),
         "by_component": Counter(),
         "by_year": Counter(),
+        "by_type": {"bug_fixes": 0, "other": 0},  # PR type breakdown: bugs vs other
         "files_by_component": Counter(),
         "most_changed_files": Counter(),
         "test_coverage": {"with_tests": 0, "without_tests": 0},
+        "test_coverage_by_type": {  # Test coverage per type
+            "bug_fixes": {"with_tests": 0, "without_tests": 0},
+            "other": {"with_tests": 0, "without_tests": 0},
+        },
         "avg_time_to_merge": {},
     }
 
     component_merge_times = defaultdict(list)
     files_changed_count = []
     all_merge_times = []
+    
+    bug_fix_prs = []
+    other_prs = []
 
     for pr in prs:
         # Basic stats
@@ -201,6 +335,18 @@ def analyze_prs(prs: List[Dict[str, Any]]) -> Dict[str, Any]:
         if created_at:
             year = created_at[:4]
             pr_analysis["by_year"][year] += 1
+
+        # Classify PR type: bug fix or other
+        is_bug = is_bug_fix(pr)
+        
+        if is_bug:
+            pr_type = "bug_fixes"
+            bug_fix_prs.append(pr)
+        else:
+            pr_type = "other"
+            other_prs.append(pr)
+        
+        pr_analysis["by_type"][pr_type] += 1
 
         # Extract components from title and body
         title = pr.get("title", "")
@@ -220,8 +366,10 @@ def analyze_prs(prs: List[Dict[str, Any]]) -> Dict[str, Any]:
             has_test = any("test" in f["filename"].lower() for f in files)
             if has_test:
                 pr_analysis["test_coverage"]["with_tests"] += 1
+                pr_analysis["test_coverage_by_type"][pr_type]["with_tests"] += 1
             else:
                 pr_analysis["test_coverage"]["without_tests"] += 1
+                pr_analysis["test_coverage_by_type"][pr_type]["without_tests"] += 1
 
             # Track file changes
             for file_info in files:
@@ -290,6 +438,27 @@ def print_report(analysis: Dict[str, Any], issues: List[Dict[str, Any]]):
     print(f"\nTotal issues analyzed: {len(issues)}")
     print(f"Open issues: {cats['by_state']['open']}")
     print(f"Closed issues: {cats['by_state']['closed']}")
+    
+    # Issue Type Breakdown (NEW!)
+    print("\n" + "-"*70)
+    print("ISSUE TYPE BREAKDOWN")
+    print("-"*70)
+    by_type = cats.get("by_type", {})
+    total_typed = sum(by_type.values())
+    if total_typed > 0:
+        feat_count = by_type.get("features", 0)
+        bug_count = by_type.get("bugs", 0)
+        other_count = by_type.get("other", 0)
+        
+        feat_pct = (feat_count / total_typed) * 100
+        bug_pct = (bug_count / total_typed) * 100
+        other_pct = (other_count / total_typed) * 100
+        
+        print(f"Feature Requests:  {feat_count:4} issues  ({feat_pct:5.1f}%)")
+        print(f"Bug Reports:       {bug_count:4} issues  ({bug_pct:5.1f}%)")
+        print(f"Other:             {other_count:4} issues  ({other_pct:5.1f}%)")
+        print(f"\nBug report rate:   {bug_pct:.1f}% of all issues")
+        print(f"Feature req rate:  {feat_pct:.1f}% of all issues")
 
     print("\n" + "-"*70)
     print("TOP 15 COMPONENTS BY ISSUE COUNT (Quality Gap Indicators)")
@@ -359,6 +528,37 @@ def print_pr_report(pr_analysis: Dict[str, Any], prs: List[Dict[str, Any]]):
     print(f"\nTotal PRs analyzed: {len(prs)}")
     print(f"Merged PRs: {pr_analysis['by_state'].get('closed', 0)}")
     print(f"Open PRs: {pr_analysis['by_state'].get('open', 0)}")
+    
+    # PR Type Breakdown
+    print("\n" + "-"*70)
+    print("PR TYPE BREAKDOWN")
+    print("-"*70)
+    by_type = pr_analysis.get("by_type", {})
+    total_classified = sum(by_type.values())
+    if total_classified > 0:
+        bug_count = by_type.get("bug_fixes", 0)
+        other_count = by_type.get("other", 0)
+        
+        bug_pct = (bug_count / total_classified) * 100
+        other_pct = (other_count / total_classified) * 100
+        
+        print(f"Bug Fixes:         {bug_count:4} PRs  ({bug_pct:5.1f}%)")
+        print(f"Other:             {other_count:4} PRs  ({other_pct:5.1f}%)")
+        print(f"\nBug fix rate:      {bug_pct:.1f}% of all PRs")
+        
+        # Test coverage by type
+        print("\n" + "-"*70)
+        print("TEST COVERAGE BY PR TYPE")
+        print("-"*70)
+        test_by_type = pr_analysis.get("test_coverage_by_type", {})
+        for pr_type in ["bug_fixes", "other"]:
+            type_name = pr_type.replace("_", " ").title()
+            with_tests = test_by_type.get(pr_type, {}).get("with_tests", 0)
+            without_tests = test_by_type.get(pr_type, {}).get("without_tests", 0)
+            total = with_tests + without_tests
+            if total > 0:
+                pct = (with_tests / total) * 100
+                print(f"{type_name:15} {with_tests:4} / {total:4} ({pct:5.1f}% with tests)")
 
     # Merge time stats
     if pr_analysis.get("overall_avg_merge_time"):

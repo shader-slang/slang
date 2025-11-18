@@ -59,11 +59,43 @@ def categorize_file(filename):
 
 def get_component_from_file(filename):
     """Extract component from filename."""
-    if "slang-emit-spirv" in filename:
+    # Check for tests FIRST (before other patterns)
+    if "test" in filename.lower() or filename.startswith("tests/"):
+        return "test"
+    
+    # Build system and CI
+    if any(pattern in filename for pattern in ["CMakeLists.txt", "premake", ".github/workflows", 
+                                                 "build/visual-studio", ".vcxproj", "cmake/",
+                                                 ".gitignore", "slang.sln", "CMakePresets.json",
+                                                 "_build.sh", ".sh"]):
+        return "build-system"
+    
+    # Documentation
+    elif filename.startswith("docs/") or filename.endswith(".md"):
+        return "docs"
+    
+    # Examples
+    elif filename.startswith("examples/"):
+        return "examples"
+    
+    # External dependencies
+    elif filename.startswith("external/"):
+        return "external"
+    
+    # Prelude/runtime
+    elif filename.startswith("prelude/") or "prelude.h" in filename:
+        return "prelude"
+    
+    # Graphics/RHI layer
+    elif "tools/gfx/" in filename or "slang-gfx" in filename or "slang-rhi" in filename:
+        return "gfx-rhi"
+    
+    # Backend-specific emitters
+    elif "slang-emit-spirv" in filename:
         return "spirv-emit"
     elif "slang-emit-dxil" in filename:
         return "dxil-emit"
-    elif "slang-emit-cuda" in filename:
+    elif "slang-emit-cuda" in filename or "slang-emit-c-like" in filename:
         return "cuda-emit"
     elif "slang-emit-metal" in filename:
         return "metal-emit"
@@ -71,30 +103,113 @@ def get_component_from_file(filename):
         return "glsl-emit"
     elif "slang-emit-hlsl" in filename:
         return "hlsl-emit"
-    elif "slang-emit" in filename:
-        return "other-emit"
-    elif "slang-lower-to-ir" in filename:
+    elif "slang-emit" in filename or "emit.cpp" in filename:
+        return "emit-common"
+    
+    # IR generation and lowering
+    elif "slang-lower-to-ir" in filename or "lower-to-ir.cpp" in filename or "lower.cpp" in filename:
         return "ir-generation"
+    
+    # Specific IR passes
     elif "slang-ir-inline" in filename:
         return "ir-inlining"
     elif "slang-ir-specialize" in filename:
         return "ir-specialization"
-    elif "slang-ir-legalize" in filename:
+    elif ("slang-ir-legalize" in filename or "slang-legalize-types" in filename or 
+          "ir-legalize-types" in filename or "legalize-types.cpp" in filename):
         return "ir-legalization"
     elif "slang-ir-autodiff" in filename:
         return "ir-autodiff"
-    elif "slang-ir" in filename:
+    elif ("slang-ir" in filename or "ir.cpp" in filename or "ir.h" in filename or 
+          "ir-insts.h" in filename or "ir-inst-defs.h" in filename or "ir-ssa.cpp" in filename):
         return "ir-passes"
-    elif "slang-check" in filename:
+    
+    # Frontend components
+    elif "slang-check" in filename or "check.cpp" in filename:
         return "semantic-check"
-    elif "slang-parser" in filename:
+    elif "slang-parser" in filename or "parser.cpp" in filename:
         return "parser"
-    elif "slang-type" in filename:
+    elif ("slang-type" in filename or "type-layout.cpp" in filename or 
+          "type-defs.h" in filename):
         return "type-system"
-    elif "slang-preprocessor" in filename:
+    elif "slang-preprocessor" in filename or "preprocessor.cpp" in filename:
         return "preprocessor"
-    elif "slang-test" in filename:
-        return "test-infrastructure"
+    elif "slang-syntax" in filename or "syntax.cpp" in filename or "syntax.h" in filename:
+        return "syntax"
+    
+    # AST-related
+    elif "slang-ast" in filename or "ast-legalize" in filename:
+        return "ast"
+    
+    # Lookup and name resolution
+    elif "slang-lookup" in filename:
+        return "lookup"
+    
+    # Reflection and parameter binding
+    elif ("slang-reflection" in filename or "slang-parameter-binding" in filename or
+          "parameter-binding.cpp" in filename or "reflection.cpp" in filename):
+        return "reflection"
+    
+    # Mangling
+    elif "slang-mangle" in filename or "mangle.cpp" in filename:
+        return "mangling"
+    
+    # Language server
+    elif "slang-language-server" in filename:
+        return "language-server"
+    
+    # Special features
+    elif "slang-intrinsic" in filename:
+        return "intrinsics"
+    elif "slang-capability" in filename or "slang-capabilities" in filename:
+        return "capabilities"
+    elif "slang-serialize" in filename:
+        return "serialization"
+    elif "slang-repro" in filename:
+        return "repro"
+    elif "slang-workspace-version" in filename:
+        return "versioning"
+    elif "slang-doc-markdown" in filename:
+        return "doc-generation"
+    elif "slang-spirv-val" in filename:
+        return "spirv-validation"
+    
+    # Standard library
+    elif "slang-stdlib" in filename:
+        return "stdlib"
+    
+    # Core slang files
+    elif "hlsl.meta.slang" in filename:
+        return "hlsl-stdlib"
+    elif "core.meta.slang" in filename:
+        return "core-stdlib"
+    elif filename.endswith(".meta.slang"):
+        return "stdlib"
+    elif "slang.cpp" in filename or "slang.h" in filename:
+        return "compiler-core"
+    elif "slang-compiler" in filename or "compiler.cpp" in filename or "compiler.h" in filename:
+        return "compiler-core"
+    elif "slang-diagnostic" in filename or "diagnostic-defs.h" in filename or "modifier-defs.h" in filename:
+        return "diagnostics"
+    elif "slang-options" in filename:
+        return "options"
+    elif ".natvis" in filename:
+        return "debugging-tools"
+    
+    # Tools
+    elif "source/slangc/" in filename:
+        return "slangc-tool"
+    elif "tools/slang-generate/" in filename:
+        return "code-generation-tool"
+    elif "tools/platform/" in filename:
+        return "platform-tools"
+    
+    # Core utilities
+    elif filename.startswith("source/core/"):
+        return "core-utilities"
+    elif filename.startswith("source/compiler-core/"):
+        return "compiler-core"
+    
     else:
         return "other"
 
@@ -109,6 +224,7 @@ def analyze_bugfix_files(prs):
         "files_by_changes": Counter(),
         "component_bugfix_count": Counter(),
         "file_type_distribution": Counter(),
+        "source_by_component": Counter(),  # NEW: Track source files by component
         "top_changed_per_component": defaultdict(Counter),
     }
     
@@ -147,6 +263,10 @@ def analyze_bugfix_files(prs):
             # Component
             component = get_component_from_file(filename)
             analysis["component_bugfix_count"][component] += 1
+            
+            # Track source files by component (NEW!)
+            if file_type == "source":
+                analysis["source_by_component"][component] += 1
             
             # Track per-component files
             if file_type in ["source", "header"]:
@@ -192,6 +312,13 @@ def print_report(analysis):
     for file_type, count in analysis["file_type_distribution"].most_common():
         pct = (count / sum(analysis["file_type_distribution"].values()) * 100)
         print(f"{file_type:15} {count:4} files ({pct:5.1f}%)")
+        
+        # Show second-level breakdown for source files
+        if file_type == "source" and analysis["source_by_component"]:
+            print(f"  Source files by component (top 15):")
+            for component, src_count in analysis["source_by_component"].most_common(15):
+                src_pct = (src_count / count * 100)
+                print(f"    {component:28} {src_count:4} files ({src_pct:5.1f}%)")
     
     # Top changed files per critical component
     critical_components = ["spirv-emit", "ir-generation", "semantic-check", "ir-specialization", "type-system"]

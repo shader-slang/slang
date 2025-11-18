@@ -1,12 +1,60 @@
-# GitHub Issues Analysis for Quality Gap Identification
+# GitHub Issues Analysis Tools
 
-This directory contains scripts to analyze Slang's GitHub issues and identify quality gaps in the codebase.
+Tools to analyze Slang's GitHub issues and pull requests for identifying quality gaps, bug-prone components, and areas needing improvement.
+
+## Purpose
+
+These scripts help answer questions like:
+- Which components have the most bugs?
+- What files are changed most often for bug fixes?
+- Where should we focus testing efforts?
+- Which areas take longest to fix (complexity indicators)?
+- What's the bug fix rate and test coverage?
+- Are there patterns in crashes, ICEs, or validation errors?
+
+## Available Scripts
+
+### 1. `fetch_github_issues.py`
+Downloads issue and PR data from GitHub API with full historical data.
+
+**Features:**
+- Fetches all open and closed issues and PRs
+- Extracts issue references from PR titles/bodies (e.g., "fixes #123")
+- Downloads file changes for each PR
+- Supports incremental updates (only fetch new/updated items)
+
+### 2. `analyze_issues.py`
+General quality analysis across all issues and PRs.
+
+**Reports on:**
+- Bug rate: 16.2% of issues, 35.5% of PRs
+- Component-level bug distribution
+- Time to close by component
+- Test coverage by PR type
+- Most frequently changed files
+- Development velocity
+
+### 3. `analyze_critical_issues.py`
+Deep dive into critical issues (crashes, ICEs, validation errors).
+
+**Reports on:**
+- Critical issue categorization
+- Root cause component analysis
+- File-level hotspots for critical bugs
+- Open critical issues ranked by urgency
+
+### 4. `analyze_bugfix_files.py`
+File-level bug fix analysis.
+
+**Reports on:**
+- Most bug-prone files and components
+- Source file breakdown by component (30+ categories)
+- Bug fix frequency by file type
+- Top files per component
 
 ## Quick Start
 
-### 1. Fetch Data
-
-First, fetch all issues and PRs from GitHub:
+### Step 1: Fetch Data
 
 ```bash
 cd tools/issue-analysis
@@ -14,155 +62,52 @@ cd tools/issue-analysis
 # Optional: Set GitHub token to avoid rate limits
 export GITHUB_TOKEN="your_github_token_here"
 
-# Basic fetch (fast, ~2-3 minutes)
+# Full fetch (~15-20 minutes, first time)
 python3 fetch_github_issues.py
 
-# Fetch with PR relationships (~20-30 minutes)
-python3 fetch_github_issues.py --enrich
-
-# Fetch with PR file changes (~15-20 minutes)
-python3 fetch_github_issues.py --pr-files
-
-# Full enrichment: both PR relationships and files (slowest, ~40-50 minutes)
-python3 fetch_github_issues.py --full
+# Incremental update (~30 seconds, subsequent runs)
+python3 fetch_github_issues.py --incremental
 ```
 
-This will download all issues and PRs to `data/` subdirectory.
+**Note**: Without a GitHub token, you may hit rate limits (60 requests/hour). With a token, you get 5000 requests/hour. Create a token at: https://github.com/settings/tokens (only needs public repo read access)
 
-**Fetch modes:**
-- **Basic mode** (default): Fetches issue and PR metadata only
-- **--enrich**: Also fetches which PRs fixed each issue
-- **--pr-files**: Also fetches which files were changed in each PR
-- **--full**: Both issue-PR links and PR file changes (most complete)
-
-**Note**: Without a GitHub token, you may hit rate limits (60 requests/hour). With a token, you get 5000 requests/hour.
-Create a token at: https://github.com/settings/tokens (only needs public repo read access)
-
-### 2. Analyze Data
-
-Run the general analysis:
+### Step 2: Run Analysis
 
 ```bash
+# General analysis (bugs, components, files, coverage)
 python3 analyze_issues.py
-```
 
-This will:
-- Generate a comprehensive report on terminal
-- Export detailed CSV to `data/issues_detailed.csv`
-
-### 3. Analyze Critical Issues (Crashes, ICEs)
-
-For deep dive into crashes and critical bugs:
-
-```bash
+# Critical issues (crashes, ICEs, validation errors)
 python3 analyze_critical_issues.py
-```
 
-This will:
-- Identify all crashes, ICEs, and validation errors
-- Show root cause components
-- List open critical issues by urgency
-- Export critical issues CSV
-
-See `CRITICAL_FINDINGS.md` for detailed critical issues analysis.
-
-### 4. Analyze Bug-Fix Files
-
-For file-level hotspot analysis:
-
-```bash
+# Bug-fix file hotspots
 python3 analyze_bugfix_files.py
 ```
 
-This will:
-- Show which files are changed most often for bug fixes
-- Identify file-level quality hotspots
-- Categorize by component
+## Data Format
 
-See `GENERAL_FINDINGS.md` for comprehensive overview of all analyses.
+### Fetched Data
 
-## 📄 Key Findings Documents
-
-After running the analyses, you'll have comprehensive reports:
-
-### ⚡ SUMMARY.md - **Start Here!**
-Executive summary with key findings and immediate actions:
-- Top 3 critical quality gaps
-- Critical file hotspots (top 5)
-- Backend quality comparison
-- Immediate action items with priorities
-- 12-month success metrics
-- Strategic recommendations
-- **Quick read**: ~5 minutes
-
-### 📊 GENERAL_FINDINGS.md
-Complete overview of Slang quality based on all 3,535 issues and 5,392 PRs:
-- Overall quality trends and metrics
-- Issue and PR velocity analysis
-- Backend quality comparison (SPIRV, HLSL, GLSL, etc.)
-- File-level bug hotspots (top 30 files)
-- Component-level bug distribution
-- Test coverage analysis
-- Development velocity trends
-- Actionable recommendations
-- **Detailed read**: ~20 minutes
-
-### 🔥 CRITICAL_FINDINGS.md
-Deep dive into critical issues (crashes, ICEs, validation errors):
-- Analysis of 1,049 critical issues
-- 699 critical bug-fix PRs analyzed
-- Top 10 critical file hotspots
-- Root cause analysis by component
-- Immediate action items
-- Success criteria and metrics
-- **Detailed read**: ~15 minutes
-
-## What the Analysis Reveals
-
-The analysis identifies quality gaps by examining:
-
-1. **Component-level Issue Distribution**: Which parts of Slang have the most issues
-2. **Bug Concentration**: Where bugs cluster (IR passes, emitters, checker, etc.)
-3. **File-Level Hotspots**: Exact source files requiring most bug fixes
-4. **Time to Resolution**: Components that take longer to fix (complexity indicators)
-5. **Target-specific Issues**: SPIRV, DXIL, CUDA, Metal, etc.
-6. **Feature Areas**: Autodiff, generics, cooperative matrix, etc.
-7. **Test Coverage Gaps**: Which PRs lack tests
-8. **Development Velocity**: PR merge times and throughput
-
-## Output Files
-
-After running the scripts, you'll have:
+After running `fetch_github_issues.py`, you'll have:
 
 ```
 tools/issue-analysis/data/
-├── issues.json              # Raw issue data
-├── pull_requests.json       # Raw PR data
-├── metadata.json            # Fetch metadata
-└── issues_detailed.csv      # Processed data for Excel/analysis tools
+├── issues.json           # All issues with full metadata
+├── pull_requests.json    # All PRs with files changed and issue references
+├── metadata.json         # Fetch timestamp and enrichment info
+└── issues_detailed.csv   # Generated by analyze_issues.py
 ```
 
-### Issue-PR Relationships
+### PR Data Structure
 
-When you use `--enrich`, each issue in `issues.json` will have an additional field:
-
-```json
-{
-  "number": 9030,
-  "title": "Some bug",
-  "state": "closed",
-  "related_prs": [8999, 9001]  // PRs that fixed this issue
-}
-```
-
-### PR File Changes
-
-When you use `--pr-files` or `--full`, each PR in `pull_requests.json` will have:
+Each PR includes:
 
 ```json
 {
   "number": 8999,
   "title": "Fix SPIRV emission bug",
+  "state": "closed",
+  "referenced_issues": [123, 456],  // Extracted from title/body
   "files_changed": [
     {
       "filename": "source/slang/slang-emit-spirv.cpp",
@@ -170,101 +115,166 @@ When you use `--pr-files` or `--full`, each PR in `pull_requests.json` will have
       "additions": 25,
       "deletions": 10,
       "changes": 35
-    },
-    {
-      "filename": "tests/spirv/test-case.slang",
-      "status": "added",
-      "additions": 50,
-      "deletions": 0,
-      "changes": 50
     }
   ]
 }
 ```
 
-### Powerful Analysis Enabled
+## Incremental Updates
 
-With both enrichments (`--full`), you can analyze:
-- **Which files have most bugs?** Track issues → PRs → files
-- **Component complexity**: Files that change frequently to fix bugs
-- **Test coverage gaps**: Issues without corresponding test files
-- **Fix quality**: How many PRs touch the same files for same issue?
-- **Hot spots**: Files involved in many bug fixes
-- **IR pass problems**: Which `slang-ir-*.cpp` files need most fixes?
-- **Backend quality**: Compare file changes across SPIRV, DXIL, Metal emitters
-
-## Component Categories
-
-The analysis tracks these key areas:
-
-- **Compiler Pipeline**: parser, lexer, preprocessor, checker
-- **IR System**: slang-ir-* passes
-- **Code Generation**: slang-emit-* backends
-- **Targets**: SPIRV, DXIL, CUDA, Metal, GLSL, HLSL, WGSL
-- **Features**: autodiff, generics, cooperative-matrix
-
-## Further Analysis
-
-The CSV file can be imported into:
-- **Excel/Google Sheets**: For pivot tables and charts
-- **Jupyter Notebook**: For custom Python analysis
-- **SQL Database**: For complex queries
-- **Pandas**: For data science workflows
-
-Example follow-up analyses:
-- Correlation between issue comments and time-to-close
-- Bug introduction rate over time
-- Most affected users/reporters
-- Seasonal patterns in bug reports
-- Effectiveness of different bug-fix strategies
-
-## Updating Data
-
-To refresh the analysis with latest data:
+The `--incremental` flag makes subsequent fetches much faster:
 
 ```bash
-# Re-fetch data
-python3 fetch_github_issues.py
-
-# Re-run analysis
-python3 analyze_issues.py
+# After initial full fetch, use incremental for updates
+python3 fetch_github_issues.py --incremental
 ```
 
-## Customization
+**How it works:**
+- Uses GitHub's `since` parameter to fetch only items updated after last fetch
+- Automatically enriches only new/updated PRs (skips already-enriched data)
+- Typically <100 API calls for weekly updates vs ~5,500 for full fetch
 
-Edit `analyze_issues.py` to:
-- Add new component patterns to `SOURCE_PATTERNS`
-- Change categorization logic
-- Add custom metrics
-- Export different formats
+**When to use:**
+- ✅ Daily/weekly updates
+- ✅ After checking out fresh code (if data exists)
+- ❌ First time setup (no existing data)
 
-## Example Output
+## Analysis Output
 
-The report will show sections like:
+### Console Reports
+
+Each analysis script prints a comprehensive report to the console with sections like:
 
 ```
 TOP 15 COMPONENTS BY ISSUE COUNT (Quality Gap Indicators)
 ----------------------------------------------------------------------
-spirv                      234 issues  ( 89 bugs,  34 open bugs)
-slang-ir                   187 issues  ( 67 bugs,  23 open bugs)
-dxil                       156 issues  ( 54 bugs,  19 open bugs)
+spirv                      827 issues  (233 bugs,  54 open bugs)
+hlsl                       703 issues  (120 bugs,  18 open bugs)
+glsl                       661 issues  (144 bugs,  29 open bugs)
 ...
 
 BUGS BY COMPONENT (Areas needing attention)
 ----------------------------------------------------------------------
-spirv                       89 bugs total  ( 34 open,  55 closed)
-slang-ir                    67 bugs total  ( 23 open,  44 closed)
+spirv                      233 bugs total  ( 54 open, 179 closed)
+glsl                       144 bugs total  ( 29 open, 115 closed)
+hlsl                       120 bugs total  ( 18 open, 102 closed)
 ...
 
-AVERAGE TIME TO CLOSE (days) BY COMPONENT
+TOP 20 MOST FREQUENTLY CHANGED FILES (Quality Hot Spots)
 ----------------------------------------------------------------------
-autodiff                   125.3 days  (45 issues)
-generics                    98.7 days  (67 issues)
+548x  source/slang/hlsl.meta.slang
+505x  source/slang/slang-lower-to-ir.cpp
+502x  source/slang/slang.cpp
 ...
 ```
 
-This helps identify:
-- **High issue count** → Areas with many problems
-- **High open bug count** → Current quality gaps
-- **Long time to close** → Complex/difficult areas
+### CSV Export
 
+`analyze_issues.py` exports `data/issues_detailed.csv` which can be imported into:
+- Excel/Google Sheets for pivot tables and charts
+- Jupyter Notebook for custom Python analysis
+- SQL Database for complex queries
+- Pandas for data science workflows
+
+## Component Categories
+
+The analysis automatically categorizes issues/PRs into 30+ components:
+
+**Compiler Pipeline:**
+- `semantic-check` - Type checking and validation
+- `parser` - Source code parsing
+- `ir-generation` - AST to IR lowering
+- `ir-passes` - IR transformations
+- `compiler-core` - Core infrastructure
+
+**Code Generation:**
+- `spirv-emit`, `hlsl-emit`, `glsl-emit`, `cuda-emit`, `metal-emit`, `dxil-emit`
+- `emit-common` - Shared code generation logic
+
+**Standard Libraries:**
+- `hlsl-stdlib`, `core-stdlib`, `stdlib`
+
+**Special Features:**
+- `ir-autodiff` - Automatic differentiation
+- `ir-legalization` - Type and layout legalization
+- `ir-specialization` - Generic specialization
+- `reflection` - Parameter binding and reflection
+
+**Infrastructure:**
+- `test` - Test infrastructure
+- `build-system` - CMake, CI/CD
+- `gfx-rhi` - Graphics RHI layer
+- `docs` - Documentation
+
+## Customization
+
+### Add New Component Patterns
+
+Edit `analyze_issues.py` or `analyze_bugfix_files.py`:
+
+```python
+def extract_keywords(text):
+    # Add patterns here
+    patterns = {
+        'my-component': [r'\bmy-keyword\b', r'\bother-keyword\b'],
+        ...
+    }
+```
+
+### Change Bug Detection
+
+Edit `analyze_issues.py`:
+
+```python
+def is_bug_fix(item):
+    # Customize bug detection logic
+    # Currently looks for: labels, title patterns, critical keywords
+```
+
+### Export Different Formats
+
+Modify `print_report()` functions to export JSON, HTML, or other formats.
+
+## Workflow Examples
+
+### Weekly Quality Review
+
+```bash
+# Update data (fast)
+python3 fetch_github_issues.py --incremental
+
+# Generate reports
+python3 analyze_issues.py > weekly-report.txt
+python3 analyze_critical_issues.py > critical-issues.txt
+```
+
+## Tips
+
+1. **First run**: Use full fetch without `--incremental` (~15-20 minutes)
+2. **Regular updates**: Use `--incremental` for speed (~30 seconds)
+3. **Rate limits**: Set `GITHUB_TOKEN` to avoid hitting API limits
+4. **Large output**: Pipe to file or `less` for easier browsing
+5. **CSV analysis**: Import `issues_detailed.csv` into Excel for custom pivots
+
+## Requirements
+
+- Python 3.6+
+- No external dependencies (uses standard library only)
+- GitHub token recommended (not required)
+
+## Troubleshooting
+
+**SSL Certificate Error:**
+```bash
+# macOS: Install certificates
+pip3 install --upgrade certifi
+```
+
+**Rate Limit Error:**
+- Set `GITHUB_TOKEN` environment variable
+- Wait for rate limit reset (shown in error message)
+- Use `--incremental` for subsequent runs
+
+**Missing Data:**
+- Run `fetch_github_issues.py` first to download data
+- Check `data/metadata.json` for fetch timestamp

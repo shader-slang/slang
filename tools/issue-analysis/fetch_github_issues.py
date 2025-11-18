@@ -9,7 +9,7 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Tuple
 import urllib.request
 import urllib.error
 import time
@@ -61,7 +61,7 @@ def make_github_request(url: str) -> Dict[str, Any]:
             print("Rate limit likely exceeded. Set GITHUB_TOKEN environment variable.")
         raise
 
-def fetch_all_pages(base_url: str, params: Dict[str, str]) -> List[Dict[str, Any]]:
+def fetch_all_pages(base_url: str, params: Dict[str, str], since: str = None) -> List[Dict[str, Any]]:
     """Fetch all pages of results from GitHub API."""
     all_items = []
     page = 1
@@ -69,6 +69,8 @@ def fetch_all_pages(base_url: str, params: Dict[str, str]) -> List[Dict[str, Any
 
     while True:
         params_with_page = {**params, "page": str(page), "per_page": str(per_page)}
+        if since:
+            params_with_page["since"] = since
         query_string = "&".join(f"{k}={v}" for k, v in params_with_page.items())
         url = f"{base_url}?{query_string}"
 
@@ -90,10 +92,14 @@ def fetch_all_pages(base_url: str, params: Dict[str, str]) -> List[Dict[str, Any
 
     return all_items
 
-def fetch_issues_and_prs():
-    """Fetch all issues and pull requests."""
+def fetch_issues_and_prs(since: str = None):
+    """Fetch all issues and pull requests, optionally since a specific date."""
     base_url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/issues"
 
+    if since:
+        print("\n=== Fetching Updated Issues and Pull Requests (Incremental) ===")
+        print(f"Fetching items updated since: {since}")
+    else:
     print("\n=== Fetching Issues and Pull Requests ===")
     print("Note: GitHub API returns both issues and PRs in the /issues endpoint")
 
@@ -101,7 +107,7 @@ def fetch_issues_and_prs():
     all_items = []
     for state in ["open", "closed"]:
         print(f"\nFetching {state} items...")
-        items = fetch_all_pages(base_url, {"state": state})
+        items = fetch_all_pages(base_url, {"state": state}, since=since)
         all_items.extend(items)
 
     # Separate issues from PRs
@@ -115,33 +121,33 @@ def fetch_issues_and_prs():
 
     return issues, prs
 
-def fetch_comments_for_issue(issue_number: int) -> List[Dict[str, Any]]:
-    """Fetch all comments for a specific issue."""
-    url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/issues/{issue_number}/comments"
-    try:
-        return fetch_all_pages(url, {})
-    except Exception as e:
-        print(f"Error fetching comments for issue #{issue_number}: {e}")
-        return []
-
-def fetch_timeline_for_issue(issue_number: int) -> List[Dict[str, Any]]:
-    """Fetch timeline events for a specific issue to find related PRs."""
-    url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/issues/{issue_number}/timeline"
-    headers = {
-        "Accept": "application/vnd.github.mockingbird-preview+json",  # Required for timeline
-        "User-Agent": "Slang-Issue-Analyzer"
-    }
-    if GITHUB_TOKEN:
-        headers["Authorization"] = f"token {GITHUB_TOKEN}"
-
-    request = urllib.request.Request(url, headers=headers)
-    try:
-        ssl_context = get_ssl_context()
-        with urllib.request.urlopen(request, context=ssl_context) as response:
-            return json.loads(response.read().decode())
-    except Exception as e:
-        print(f"Error fetching timeline for issue #{issue_number}: {e}")
-        return []
+def extract_issues_from_pr(pr: Dict[str, Any]) -> List[int]:
+    """
+    Extract issue numbers referenced in PR title and body.
+    Looks for patterns like: fixes #123, closes #456, resolves #789
+    
+    This matches GitHub's own issue linking behavior.
+    """
+    import re
+    
+    title = pr.get("title", "")
+    body = pr.get("body") or ""
+    text = f"{title} {body}"
+    
+    # Pattern matches: fix/fixes/fixed/close/closes/closed/resolve/resolves/resolved #NUMBER
+    # Also matches bare #NUMBER references
+    pattern = r'(?:fix(?:es|ed)?|close(?:s|d)?|resolve(?:s|d)?)\s*#(\d+)|(?:^|\s)#(\d+)'
+    
+    issue_numbers = []
+    for match in re.finditer(pattern, text, re.IGNORECASE):
+        # match.group(1) is from fix/close/resolve pattern
+        # match.group(2) is from bare # pattern
+        num = match.group(1) or match.group(2)
+        if num:
+            issue_numbers.append(int(num))
+    
+    # Remove duplicates and sort
+    return sorted(list(set(issue_numbers)))
 
 def fetch_pr_files(pr_number: int) -> List[Dict[str, Any]]:
     """Fetch list of files changed in a PR."""
@@ -160,30 +166,44 @@ def fetch_pr_files(pr_number: int) -> List[Dict[str, Any]]:
         print(f"Error fetching files for PR #{pr_number}: {e}")
         return []
 
-def extract_related_prs_from_issue(issue: Dict[str, Any]) -> List[int]:
-    """Extract PR numbers that are related to this issue."""
-    related_prs = []
 
-    # Method 1: Check if closed by a PR via timeline
-    if issue.get("state") == "closed":
-        timeline = fetch_timeline_for_issue(issue["number"])
-        for event in timeline:
-            if event.get("event") == "closed" and event.get("source"):
-                source = event["source"]
-                if source.get("type") == "issue" and "pull_request" in source.get("issue", {}):
-                    pr_number = source["issue"]["number"]
-                    related_prs.append(pr_number)
+def load_existing_data() -> Tuple[List[Dict], List[Dict], Dict]:
+    """Load existing data if available."""
+    issues_file = OUTPUT_DIR / "issues.json"
+    prs_file = OUTPUT_DIR / "pull_requests.json"
+    metadata_file = OUTPUT_DIR / "metadata.json"
 
-    # Method 2: Parse body and comments for "fixes #123" patterns
-    body = issue.get("body") or ""
-    # Common patterns: "fixes #123", "closes #123", "resolves #123"
-    import re
-    # Look for PR references (issues that reference this issue)
-    # This is a bit backwards - we're looking for mentions in the body
+    issues = []
+    prs = []
+    metadata = {}
 
-    return list(set(related_prs))  # Remove duplicates
+    if issues_file.exists():
+        with open(issues_file, "r") as f:
+            issues = json.load(f)
 
-def save_data(issues: List[Dict], prs: List[Dict]):
+    if prs_file.exists():
+        with open(prs_file, "r") as f:
+            prs = json.load(f)
+
+    if metadata_file.exists():
+        with open(metadata_file, "r") as f:
+            metadata = json.load(f)
+
+    return issues, prs, metadata
+
+def merge_data(existing: List[Dict], new: List[Dict]) -> List[Dict]:
+    """Merge new data with existing data, avoiding duplicates."""
+    # Create a dictionary keyed by issue/PR number for fast lookup
+    merged = {item["number"]: item for item in existing}
+
+    # Update or add new items
+    for item in new:
+        merged[item["number"]] = item
+
+    # Return as list, sorted by number
+    return sorted(merged.values(), key=lambda x: x["number"])
+
+def save_data(issues: List[Dict], prs: List[Dict], enrichments: Dict[str, bool] = None):
     """Save fetched data to JSON files."""
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -192,7 +212,8 @@ def save_data(issues: List[Dict], prs: List[Dict]):
         "fetched_at": timestamp,
         "repo": f"{REPO_OWNER}/{REPO_NAME}",
         "issue_count": len(issues),
-        "pr_count": len(prs)
+        "pr_count": len(prs),
+        "enrichments": enrichments or {}
     }
 
     # Save issues
@@ -213,63 +234,68 @@ def save_data(issues: List[Dict], prs: List[Dict]):
         json.dump(metadata, f, indent=2)
     print(f"Saved metadata to {metadata_file}")
 
-def enrich_issues_with_pr_links(issues: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def add_issue_references_to_prs(prs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
-    Enrich issues with related PR information.
-    WARNING: This makes additional API calls and can be slow!
-    Only run this for detailed analysis.
+    Extract issue references from PR titles and bodies.
+    This is fast (no API calls) and matches GitHub's linking behavior.
     """
-    print("\n=== Enriching Issues with PR Links ===")
-    print(f"This will fetch timeline data for {len(issues)} issues...")
-    print("This may take a while and consume API rate limit.")
+    print("\n=== Extracting Issue References from PRs ===")
+    
+    total_refs = 0
+    for pr in prs:
+        issue_refs = extract_issues_from_pr(pr)
+        pr["referenced_issues"] = issue_refs
+        total_refs += len(issue_refs)
+    
+    print(f"✓ Found {total_refs} issue references across {len(prs)} PRs")
+    return prs
 
-    enriched_issues = []
-    for i, issue in enumerate(issues):
-        if (i + 1) % 50 == 0:
-            print(f"Processed {i + 1}/{len(issues)} issues...")
-
-        # Add related PRs to issue
-        related_prs = extract_related_prs_from_issue(issue)
-        issue_copy = issue.copy()
-        issue_copy["related_prs"] = related_prs
-        enriched_issues.append(issue_copy)
-
-        # Rate limiting protection
-        if (i + 1) % 100 == 0:
-            print("Pausing to respect rate limits...")
-            time.sleep(2)
-
-    print(f"✓ Enriched all {len(enriched_issues)} issues")
-    return enriched_issues
-
-def enrich_prs_with_files(prs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def enrich_prs_with_files(prs: List[Dict[str, Any]], only_new: bool = False) -> List[Dict[str, Any]]:
     """
     Enrich PRs with file change information.
     WARNING: This makes additional API calls and can be slow!
     Only run this for detailed analysis.
+    
+    Args:
+        prs: List of PRs to enrich
+        only_new: If True, only enrich PRs that don't already have files_changed
     """
+    # Filter to only PRs that need enrichment
+    if only_new:
+        prs_to_enrich = [pr for pr in prs if "files_changed" not in pr]
+        already_enriched = len(prs) - len(prs_to_enrich)
+    else:
+        prs_to_enrich = prs
+        already_enriched = 0
+    
+    if not prs_to_enrich:
+        print("\n=== All PRs Already Have File Changes ===")
+        return prs
+    
     print("\n=== Enriching PRs with File Changes ===")
-    print(f"This will fetch file changes for {len(prs)} PRs...")
+    print(f"PRs to enrich: {len(prs_to_enrich)}")
+    if already_enriched > 0:
+        print(f"Already enriched: {already_enriched}")
     print("This may take a while and consume API rate limit.")
 
-    enriched_prs = []
-    for i, pr in enumerate(prs):
+    # Create a mapping for quick lookup
+    pr_map = {pr["number"]: pr for pr in prs}
+    
+    for i, pr in enumerate(prs_to_enrich):
         if (i + 1) % 50 == 0:
-            print(f"Processed {i + 1}/{len(prs)} PRs...")
+            print(f"Processed {i + 1}/{len(prs_to_enrich)} PRs...")
 
         # Fetch files changed in this PR
         files = fetch_pr_files(pr["number"])
-        pr_copy = pr.copy()
-        pr_copy["files_changed"] = files
-        enriched_prs.append(pr_copy)
+        pr_map[pr["number"]]["files_changed"] = files
 
         # Rate limiting protection
         if (i + 1) % 100 == 0:
             print("Pausing to respect rate limits...")
             time.sleep(2)
 
-    print(f"✓ Enriched all {len(enriched_prs)} PRs")
-    return enriched_prs
+    print(f"✓ Enriched {len(prs_to_enrich)} PRs (skipped {already_enriched} already enriched)")
+    return list(pr_map.values())
 
 def main():
     """Main entry point."""
@@ -277,26 +303,11 @@ def main():
 
     parser = argparse.ArgumentParser(description="Fetch Slang GitHub issues and PRs")
     parser.add_argument(
-        "--enrich",
+        "--incremental",
         action="store_true",
-        help="Enrich issues with PR relationships (slow, uses more API calls)"
-    )
-    parser.add_argument(
-        "--pr-files",
-        action="store_true",
-        help="Fetch file changes for each PR (slow, uses more API calls)"
-    )
-    parser.add_argument(
-        "--full",
-        action="store_true",
-        help="Full enrichment: both issue-PR links and PR files (very slow!)"
+        help="Incremental update: fetch only items updated since last fetch"
     )
     args = parser.parse_args()
-
-    # --full implies both --enrich and --pr-files
-    if args.full:
-        args.enrich = True
-        args.pr_files = True
 
     if not GITHUB_TOKEN:
         print("WARNING: GITHUB_TOKEN environment variable not set.")
@@ -310,26 +321,76 @@ def main():
     print(f"Output directory: {OUTPUT_DIR}\n")
 
     try:
-        issues, prs = fetch_issues_and_prs()
+        # Check for incremental update
+        since = None
+        existing_issues = []
+        existing_prs = []
+        previous_enrichments = {}
 
-        # Optionally enrich with PR links
-        if args.enrich:
-            issues = enrich_issues_with_pr_links(issues)
+        if args.incremental:
+            existing_issues, existing_prs, metadata = load_existing_data()
+            if metadata and "fetched_at" in metadata:
+                since = metadata["fetched_at"]
+                previous_enrichments = metadata.get("enrichments", {})
+                
+                print(f"=== Incremental Update Mode ===")
+                print(f"Existing data: {len(existing_issues)} issues, {len(existing_prs)} PRs")
+                print(f"Last fetch: {since}")
+                
+                # Show previous enrichments info
+                if previous_enrichments:
+                    print(f"Previous enrichments detected: {', '.join(k for k, v in previous_enrichments.items() if v)}")
+                
+                print(f"Fetching updates since then...\n")
+            else:
+                print("No existing data found. Performing full fetch.")
+                args.incremental = False
 
-        # Optionally enrich PRs with file changes
-        if args.pr_files:
-            prs = enrich_prs_with_files(prs)
+        # Fetch new/updated data
+        new_issues, new_prs = fetch_issues_and_prs(since=since if args.incremental else None)
 
-        save_data(issues, prs)
+        # Merge with existing data if incremental
+        if args.incremental and existing_issues:
+            print(f"\n=== Merging Data ===")
+            print(f"New items fetched: {len(new_issues)} issues, {len(new_prs)} PRs")
+            issues = merge_data(existing_issues, new_issues)
+            prs = merge_data(existing_prs, new_prs)
+            print(f"After merge: {len(issues)} issues, {len(prs)} PRs")
+        else:
+            issues = new_issues
+            prs = new_prs
+
+        # Always add issue references from PRs (fast, no API calls!)
+        prs = add_issue_references_to_prs(prs)
+
+        # Always enrich PRs with file changes (only new ones in incremental mode)
+        if args.incremental and existing_prs:
+            # In incremental mode, only enrich PRs that don't have files yet
+            print(f"\n→ Smart enrichment: Only fetching files for new/updated PRs")
+            prs = enrich_prs_with_files(prs, only_new=True)
+        else:
+            prs = enrich_prs_with_files(prs, only_new=False)
+
+        # Track which enrichments were applied
+        enrichments = {
+            "pr_files": True,  # Always included now
+            "issue_references": True  # Always included now
+        }
+
+        save_data(issues, prs, enrichments)
         print("\n✓ Data fetch complete!")
 
-        if args.enrich:
-            print("\nNote: Issues have been enriched with 'related_prs' field")
-        if args.pr_files:
-            print("Note: PRs have been enriched with 'files_changed' field")
+        if args.incremental:
+            print("\nIncremental update successful! Data merged with existing.")
+        
+        print("\nData enrichments:")
+        print("  ✓ PRs include 'referenced_issues' field (issue numbers from PR title/body)")
+        print("  ✓ PRs include 'files_changed' field (detailed file change information)")
 
     except Exception as e:
         print(f"\n✗ Error: {e}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
 
 if __name__ == "__main__":
