@@ -1100,6 +1100,9 @@ struct ByteAddressBufferLegalizationContext
         IRType* elementType,
         IRType* byteAddressBufferType)
     {
+        if (as<IRHLSLStructuredBufferTypeBase>(byteAddressBufferType))
+            return byteAddressBufferType;
+
         // Our task in this function is to compute the type for
         // a structure buffer that is equivalent to `byteAddressBufferType`,
         // but with the given `elementType`.
