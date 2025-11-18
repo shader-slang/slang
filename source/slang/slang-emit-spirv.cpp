@@ -8891,6 +8891,18 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     spvFieldType = emitDebugType(fieldType);
                 }
 
+                // Check if the field key has a debug location decoration
+                // If so, use it; otherwise fall back to the struct type's location
+                IRInst* fieldSource = source;
+                IRInst* fieldLine = line;
+                IRInst* fieldCol = col;
+                if (auto fieldLoc = field->getKey()->findDecoration<IRDebugLocationDecoration>())
+                {
+                    fieldSource = fieldLoc->getSource();
+                    fieldLine = fieldLoc->getLine();
+                    fieldCol = fieldLoc->getCol();
+                }
+
                 auto memberType = emitOpDebugTypeMember(
                     getSection(SpvLogicalSectionID::ConstantsAndTypes),
                     nullptr,
@@ -8898,9 +8910,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     getNonSemanticDebugInfoExtInst(),
                     getName(field->getKey()),
                     spvFieldType,
-                    source,
-                    line,
-                    col,
+                    fieldSource,
+                    fieldLine,
+                    fieldCol,
                     builder.getIntValue(builder.getUIntType(), offset * 8),
                     builder.getIntValue(builder.getUIntType(), sizeAlignment.size * 8),
                     builder.getIntValue(builder.getUIntType(), 0));
