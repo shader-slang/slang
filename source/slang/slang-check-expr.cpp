@@ -2131,7 +2131,7 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
             if (argCount != 2)
                 return nullptr;
             resultValue =
-                static_cast<uint64_t>(constArgVals[0]) >>
+                constArgVals[0] >>
                 std::min(static_cast<uint64_t>(constArgVals[1]), static_cast<uint64_t>(64 - 1));
         }
 #undef CASE
