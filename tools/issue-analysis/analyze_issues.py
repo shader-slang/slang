@@ -13,6 +13,17 @@ import sys
 
 DATA_DIR = Path(__file__).parent / "data"
 
+def get_file_loc(filepath):
+    """Get lines of code for a file."""
+    try:
+        full_path = Path(__file__).parent.parent.parent / filepath
+        if full_path.exists() and full_path.is_file():
+            with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
+                return len(f.readlines())
+    except:
+        pass
+    return None
+
 # Common source paths in Slang
 SOURCE_PATTERNS = {
     "compiler-core": r"source/compiler-core/",
@@ -75,12 +86,12 @@ def is_feature(item: Dict[str, Any]) -> bool:
     title = item.get("title", "").lower()
     body = (item.get("body") or "").lower()
     labels = [label["name"].lower() for label in item.get("labels", [])]
-    
+
     # Check labels first (most reliable)
     feature_labels = ["feature", "enhancement", "new feature", "feature request"]
     if any(label in feature_labels for label in labels):
         return True
-    
+
     # Check title/body for feature keywords
     feature_patterns = [
         r"\b(add|implement|introduce|support|enable)\s+(new\s+)?feature",
@@ -89,12 +100,12 @@ def is_feature(item: Dict[str, Any]) -> bool:
         r"\bimplement\s+(support\s+for|new)",
         r"\bintroduce\s+",
     ]
-    
+
     combined = f"{title} {body}"
     for pattern in feature_patterns:
         if re.search(pattern, combined, re.IGNORECASE):
             return True
-    
+
     return False
 
 def is_bug_fix(item: Dict[str, Any]) -> bool:
@@ -102,22 +113,22 @@ def is_bug_fix(item: Dict[str, Any]) -> bool:
     title = item.get("title", "").lower()
     body = (item.get("body") or "").lower()
     labels = [label["name"].lower() for label in item.get("labels", [])]
-    
+
     # Check labels for bugs (including infrastructure bugs like CI Bug)
     bug_labels = ["regression", "known_issues"]
     if any(bug_label in label for label in labels for bug_label in bug_labels):
         return True
-    
+
     # "bug" in label (includes "CI Bug", "Vendor Driver Bug", etc.)
     for label in labels:
         # Match any label with "bug" but exclude "GoodFirstBug" (that's a difficulty marker, not bug type)
         if "bug" in label and "goodfirstbug" not in label:
             return True
-    
+
     # Check title/body for bug fix patterns (IMPROVED!)
     # Primary pattern: Look for "bug" or "fix" combinations
     combined = f"{title} {body}"
-    
+
     # Pattern 1: Explicit bug mentions
     bug_patterns = [
         r"\bbugfix\b",                    # "bugfix" as single word
@@ -125,32 +136,32 @@ def is_bug_fix(item: Dict[str, Any]) -> bool:
         r"\bfix\b.*\bbug\b",              # "fix ... bug" anywhere in text
         r"\bbug\b.*\bfix",                # "bug ... fix" anywhere in text
     ]
-    
+
     for pattern in bug_patterns:
         if re.search(pattern, combined, re.IGNORECASE):
             return True
-    
+
     # Pattern 2: References to issue numbers (usually bug fixes)
     issue_ref_patterns = [
         r"\bfix(es|ed|ing)?\s+#\d+",      # "fix #123", "fixes #456"
         r"\bresolve(s|d)?\s+#\d+",        # "resolve #123", "resolved #456"
         r"\bclose(s|d)?\s+#\d+",          # "close #123", "closes #456"
     ]
-    
+
     for pattern in issue_ref_patterns:
         if re.search(pattern, combined, re.IGNORECASE):
             return True
-    
+
     # Pattern 2b: "Fix X" at start of title (common bug fix pattern)
     # But exclude obvious features: "Fix formatting", "Fix typo", "Fix comment"
     title_only = title.strip()
     if re.match(r"^fix(es|ed|ing)?\s+", title_only, re.IGNORECASE):
         # Exclude non-bug fixes
-        non_bugs = [r"typo", r"comment", r"formatting", r"whitespace", r"style", 
+        non_bugs = [r"typo", r"comment", r"formatting", r"whitespace", r"style",
                     r"documentation", r"readme", r"license"]
         if not any(re.search(nb, title_only, re.IGNORECASE) for nb in non_bugs):
             return True
-    
+
     # Pattern 3: Critical error keywords (these are always bugs)
     critical_patterns = [
         r"\bcrash(es|ed|ing)?\b",         # crash, crashes, crashing
@@ -165,11 +176,11 @@ def is_bug_fix(item: Dict[str, Any]) -> bool:
         r"\binfinite\s+loop",             # infinite loops
         r"\bhang(s|ing)?\b",              # hangs, hanging
     ]
-    
+
     for pattern in critical_patterns:
         if re.search(pattern, combined, re.IGNORECASE):
             return True
-    
+
     # Pattern 4: Correctness issues (these are bugs)
     correctness_patterns = [
         r"\bincorrect\s+(output|code|behavior|result|codegen)",
@@ -178,11 +189,11 @@ def is_bug_fix(item: Dict[str, Any]) -> bool:
         r"\bvalidation\s+(error|fail)",
         r"\bmiscompil",                   # miscompile, miscompilation
     ]
-    
+
     for pattern in correctness_patterns:
         if re.search(pattern, combined, re.IGNORECASE):
             return True
-    
+
     return False
 
 def categorize_issues(issues: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -232,7 +243,7 @@ def categorize_issues(issues: List[Dict[str, Any]]) -> Dict[str, Any]:
         # Classify issue type (NEW!)
         is_feat = is_feature(issue)
         is_bug_issue = is_bug_fix(issue)
-        
+
         if is_feat:
             issue_type = "features"
             feature_issues.append(issue)
@@ -246,9 +257,9 @@ def categorize_issues(issues: List[Dict[str, Any]]) -> Dict[str, Any]:
                     categories["open_bugs_by_component"][keyword] += 1
         else:
             issue_type = "other"
-        
+
         categories["by_type"][issue_type] += 1
-        
+
         # Additional classifications
         is_crash = "crash" in combined_text.lower()
         has_error = re.search(r"error|fail|invalid|incorrect", combined_text, re.IGNORECASE)
@@ -310,6 +321,8 @@ def analyze_prs(prs: List[Dict[str, Any]]) -> Dict[str, Any]:
         "by_type": {"bug_fixes": 0, "other": 0},  # PR type breakdown: bugs vs other
         "files_by_component": Counter(),
         "most_changed_files": Counter(),
+        "bugfix_files": Counter(),  # Track files changed in bug fix PRs
+        "file_loc": {},  # Lines of code per file
         "test_coverage": {"with_tests": 0, "without_tests": 0},
         "test_coverage_by_type": {  # Test coverage per type
             "bug_fixes": {"with_tests": 0, "without_tests": 0},
@@ -321,7 +334,7 @@ def analyze_prs(prs: List[Dict[str, Any]]) -> Dict[str, Any]:
     component_merge_times = defaultdict(list)
     files_changed_count = []
     all_merge_times = []
-    
+
     bug_fix_prs = []
     other_prs = []
 
@@ -338,14 +351,14 @@ def analyze_prs(prs: List[Dict[str, Any]]) -> Dict[str, Any]:
 
         # Classify PR type: bug fix or other
         is_bug = is_bug_fix(pr)
-        
+
         if is_bug:
             pr_type = "bug_fixes"
             bug_fix_prs.append(pr)
         else:
             pr_type = "other"
             other_prs.append(pr)
-        
+
         pr_analysis["by_type"][pr_type] += 1
 
         # Extract components from title and body
@@ -375,6 +388,14 @@ def analyze_prs(prs: List[Dict[str, Any]]) -> Dict[str, Any]:
             for file_info in files:
                 filename = file_info["filename"]
                 pr_analysis["most_changed_files"][filename] += 1
+
+                # Track bug fix files specifically
+                if is_bug:
+                    pr_analysis["bugfix_files"][filename] += 1
+
+                    # Get LOC for this file (cache it)
+                    if filename not in pr_analysis["file_loc"]:
+                        pr_analysis["file_loc"][filename] = get_file_loc(filename)
 
                 # Categorize by component
                 for keyword in keywords:
@@ -438,7 +459,7 @@ def print_report(analysis: Dict[str, Any], issues: List[Dict[str, Any]]):
     print(f"\nTotal issues analyzed: {len(issues)}")
     print(f"Open issues: {cats['by_state']['open']}")
     print(f"Closed issues: {cats['by_state']['closed']}")
-    
+
     # Issue Type Breakdown (NEW!)
     print("\n" + "-"*70)
     print("ISSUE TYPE BREAKDOWN")
@@ -449,11 +470,11 @@ def print_report(analysis: Dict[str, Any], issues: List[Dict[str, Any]]):
         feat_count = by_type.get("features", 0)
         bug_count = by_type.get("bugs", 0)
         other_count = by_type.get("other", 0)
-        
+
         feat_pct = (feat_count / total_typed) * 100
         bug_pct = (bug_count / total_typed) * 100
         other_pct = (other_count / total_typed) * 100
-        
+
         print(f"Feature Requests:  {feat_count:4} issues  ({feat_pct:5.1f}%)")
         print(f"Bug Reports:       {bug_count:4} issues  ({bug_pct:5.1f}%)")
         print(f"Other:             {other_count:4} issues  ({other_pct:5.1f}%)")
@@ -528,7 +549,7 @@ def print_pr_report(pr_analysis: Dict[str, Any], prs: List[Dict[str, Any]]):
     print(f"\nTotal PRs analyzed: {len(prs)}")
     print(f"Merged PRs: {pr_analysis['by_state'].get('closed', 0)}")
     print(f"Open PRs: {pr_analysis['by_state'].get('open', 0)}")
-    
+
     # PR Type Breakdown
     print("\n" + "-"*70)
     print("PR TYPE BREAKDOWN")
@@ -538,14 +559,14 @@ def print_pr_report(pr_analysis: Dict[str, Any], prs: List[Dict[str, Any]]):
     if total_classified > 0:
         bug_count = by_type.get("bug_fixes", 0)
         other_count = by_type.get("other", 0)
-        
+
         bug_pct = (bug_count / total_classified) * 100
         other_pct = (other_count / total_classified) * 100
-        
+
         print(f"Bug Fixes:         {bug_count:4} PRs  ({bug_pct:5.1f}%)")
         print(f"Other:             {other_count:4} PRs  ({other_pct:5.1f}%)")
         print(f"\nBug fix rate:      {bug_pct:.1f}% of all PRs")
-        
+
         # Test coverage by type
         print("\n" + "-"*70)
         print("TEST COVERAGE BY PR TYPE")
@@ -603,6 +624,28 @@ def print_pr_report(pr_analysis: Dict[str, Any], prs: List[Dict[str, Any]]):
         print("-"*70)
         for filename, count in pr_analysis["most_changed_files"].most_common(20):
             print(f"{count:3}x  {filename}")
+
+    # Bug fix frequency analysis
+    if pr_analysis.get("bugfix_files") and pr_analysis.get("file_loc"):
+        print("\n" + "-"*70)
+        print("TOP 20 FILES BY BUG FIX FREQUENCY (bug fix PRs per 1000 LOC) - source/ only")
+        print("-"*70)
+
+        # Calculate bug fix frequency for files with known LOC
+        bug_density = []
+        for filename, bugfix_count in pr_analysis["bugfix_files"].items():
+            loc = pr_analysis["file_loc"].get(filename)
+            if loc and loc > 0:
+                # Only include source files under source/ directory
+                if filename.startswith('source/') and filename.endswith(('.cpp', '.h', '.hpp', '.c')):
+                    density = (bugfix_count / loc) * 1000  # bug fix PRs per 1000 LOC
+                    bug_density.append((filename, bugfix_count, loc, density))
+
+        # Sort by density (highest first)
+        bug_density.sort(key=lambda x: x[3], reverse=True)
+
+        for filename, bugfix_count, loc, density in bug_density[:20]:
+            print(f"{density:5.2f}  {bugfix_count:3}x fixes  {loc:6} LOC  {filename}")
 
     print("\n" + "-"*70)
     print("PRs BY YEAR")
