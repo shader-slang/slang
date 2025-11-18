@@ -2721,8 +2721,9 @@ struct ScopeLayoutBuilder
             auto rules = m_layoutContext.rules;
             LayoutSize uniformOffset = rules->AddStructField(&m_structLayoutInfo, fieldInfo);
 
+            auto offset = uniformOffset.getFiniteValue();
             varLayout->findOrAddResourceInfo(LayoutResourceKind::Uniform)->index =
-                uniformOffset.getFiniteValue();
+                offset.isValid() ? offset.getValidValue() : 0;
         }
 
         m_structLayout->fields.add(varLayout);
@@ -2858,9 +2859,10 @@ struct SimpleScopeLayoutBuilder : ScopeLayoutBuilder
                     continue;
                 paramResInfo = paramVarLayout->findOrAddResourceInfo(kind);
 
+                auto offset = paramTypeResInfo.count.getFiniteValue();
                 paramResInfo->index = usedRangeSet[int(kind)].Allocate(
                     paramVarLayout,
-                    paramTypeResInfo.count.getFiniteValue());
+                    offset.isValid() ? offset.getValidValue() : 0);
             }
         }
         //
@@ -2920,9 +2922,10 @@ static ParameterBindingAndKindInfo _allocateConstantBufferBinding(ParameterBindi
     ParameterBindingAndKindInfo info;
     info.kind = layoutInfo.kind;
     info.count = layoutInfo.size;
+    auto offset = layoutInfo.size.getFiniteValue();
     info.index = usedRangeSet->usedResourceRanges[(int)layoutInfo.kind].Allocate(
         nullptr,
-        layoutInfo.size.getFiniteValue());
+        offset.isValid() ? offset.getValidValue() : 0);
     info.space = space;
     return info;
 }
@@ -2944,7 +2947,8 @@ static ParameterBindingAndKindInfo _assignConstantBufferBinding(
                               context->layoutContext.objectLayoutOptions)
                           .getSimple();
 
-    const Index count = Index(layoutInfo.size.getFiniteValue());
+    auto sizeOffset = layoutInfo.size.getFiniteValue();
+    const Index count = sizeOffset.isValid() ? Index(sizeOffset.getValidValue()) : 0;
 
     auto existingParam =
         usedRangeSet->usedResourceRanges[(int)layoutInfo.kind].Add(varLayout, index, index + count);
@@ -3208,8 +3212,9 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
             for (auto rr : resultTypeLayout->resourceInfos)
             {
                 auto entryPointRes = paramsStructLayout->findOrAddResourceInfo(rr.kind);
+                auto offset = entryPointRes->count.getFiniteValue();
                 resultLayout->findOrAddResourceInfo(rr.kind)->index =
-                    entryPointRes->count.getFiniteValue();
+                    offset.isValid() ? offset.getValidValue() : 0;
                 entryPointRes->count += rr.count;
             }
         }
@@ -3737,7 +3742,8 @@ static bool _calcNeedsDefaultSpace(SharedParameterBindingContext& sharedContext)
             // the space from the explicit binding will be used, so
             // that a default space isn't needed.
             //
-            if (parameterInfo->bindingInfo[resInfo.kind].count != 0)
+            if (parameterInfo->bindingInfo[resInfo.kind].count.compare(LayoutSize(0)) !=
+                std::partial_ordering::equivalent)
                 continue;
 
             // We also want to exclude certain resource kinds from
@@ -3809,7 +3815,7 @@ static bool _calcNeedsDefaultSpace(SharedParameterBindingContext& sharedContext)
 
 static void _appendRange(Index start, LayoutSize size, StringBuilder& ioBuf)
 {
-    if (size == 1)
+    if (size.compare(LayoutSize(1)) == std::partial_ordering::equivalent)
     {
         // If it's in effect a single index, just append like that.
         ioBuf << start;
@@ -3819,7 +3825,15 @@ static void _appendRange(Index start, LayoutSize size, StringBuilder& ioBuf)
         ioBuf << "[ " << start << " ... ";
         if (size.isFinite())
         {
-            ioBuf << start + (Index)size.getFiniteValue() << ")";
+            auto offset = size.getFiniteValue();
+            if (offset.isValid())
+            {
+                ioBuf << start + (Index)offset.getValidValue() << ")";
+            }
+            else
+            {
+                ioBuf << start << "+invalid)";
+            }
         }
         else
         {
@@ -4281,7 +4295,8 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
 
     globalScopeVarLayout = globalScopeLayoutBuilder.endLayout(globalScopeVarLayout);
 
-    if (globalConstantBufferBinding.count != 0)
+    if (globalConstantBufferBinding.count.compare(LayoutSize(0)) !=
+        std::partial_ordering::equivalent)
     {
         auto cbInfo = globalScopeVarLayout->findOrAddResourceInfo(globalConstantBufferBinding.kind);
 

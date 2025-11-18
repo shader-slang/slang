@@ -31,7 +31,7 @@ static LayoutSize _roundToAlignment(LayoutSize offset, size_t alignment)
     // An infinite size is assumed to be maximally aligned.
     if (offset.isInfinite())
         return LayoutSize::infinite();
-        
+
     // An invalid size stays invalid
     if (offset.isInvalid())
         return LayoutSize::invalid();
@@ -39,7 +39,7 @@ static LayoutSize _roundToAlignment(LayoutSize offset, size_t alignment)
     auto finiteOffset = offset.getFiniteValue();
     if (!finiteOffset.isValid())
         return LayoutSize::invalid();
-        
+
     return LayoutSize(_roundToAlignment(finiteOffset.getValidValue(), alignment));
 }
 
@@ -144,9 +144,10 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         SLANG_RELEASE_ASSERT(elementInfo.size.isFinite());
         auto elementSize = elementInfo.size.getFiniteValue();
         auto elementAlignment = elementInfo.alignment;
-        auto elementStride = elementSize.isValid() ? 
-            _roundToAlignment(LayoutSize(elementSize.getValidValue()), elementAlignment) :
-            LayoutSize::invalid();
+        auto elementStride =
+            elementSize.isValid()
+                ? _roundToAlignment(LayoutSize(elementSize.getValidValue()), elementAlignment)
+                : LayoutSize::invalid();
 
         // An array with no elements will have zero size.
         //
