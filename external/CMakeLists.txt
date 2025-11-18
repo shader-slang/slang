@@ -239,29 +239,31 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
     endif()
 endif()
 
-# imgui
-add_library(imgui INTERFACE)
-if(NOT SLANG_OVERRIDE_IMGUI_PATH)
+if((SLANG_ENABLE_GFX) OR (SLANG_ENABLE_RHI AND SLANG_ENABLE_TESTS))
+    # imgui
+    add_library(imgui INTERFACE)
+    if(NOT SLANG_OVERRIDE_IMGUI_PATH)
+        target_include_directories(
+            imgui
+            ${system}
+            INTERFACE "${CMAKE_CURRENT_LIST_DIR}/imgui"
+        )
+    else()
+        target_include_directories(
+            imgui
+            ${system}
+            INTERFACE "${SLANG_OVERRIDE_IMGUI_PATH}/imgui"
+        )
+    endif()
+    
+    # stb
+    add_library(stb INTERFACE)
     target_include_directories(
-        imgui
+        stb
         ${system}
-        INTERFACE "${CMAKE_CURRENT_LIST_DIR}/imgui"
-    )
-else()
-    target_include_directories(
-        imgui
-        ${system}
-        INTERFACE "${SLANG_OVERRIDE_IMGUI_PATH}/imgui"
+        INTERFACE "${CMAKE_CURRENT_LIST_DIR}/stb"
     )
 endif()
-
-# stb
-add_library(stb INTERFACE)
-target_include_directories(
-    stb
-    ${system}
-    INTERFACE "${CMAKE_CURRENT_LIST_DIR}/stb"
-)
 
 # slang-rhi
 if(SLANG_ENABLE_SLANG_RHI)
