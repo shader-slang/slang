@@ -1261,7 +1261,11 @@ namespace
 static size_t getReflectionSize(LayoutSize size)
 {
     if (size.isFinite())
-        return size.getFiniteValue();
+    {
+        auto offset = size.getFiniteValue();
+        if (offset.isValid())
+            return offset.getValidValue();
+    }
 
     return SLANG_UNBOUNDED_SIZE;
 }
@@ -1288,7 +1292,10 @@ static size_t getStride(TypeLayout* typeLayout, SlangParameterCategory category)
     if (size.isInfinite())
         return SLANG_UNBOUNDED_SIZE;
 
-    size_t finiteSize = size.getFiniteValue();
+    auto offset = size.getFiniteValue();
+    if (!offset.isValid())
+        return 0;
+    size_t finiteSize = offset.getValidValue();
     size_t alignment = getAlignment(typeLayout, category);
     SLANG_ASSERT(alignment >= 1);
 
@@ -2280,8 +2287,8 @@ struct ExtendedTypeLayoutContext
             // Note that we don't use resInfo.count here, as each
             // structuredBufferType is essentially a struct of 2 fields
             // (elements, counter) and not an array of length 2.
-            SLANG_ASSERT(resInfo.count != 2 || structuredBufferTypeLayout->counterVarLayout);
-            SLANG_ASSERT(resInfo.count != 1 || !structuredBufferTypeLayout->counterVarLayout);
+            SLANG_ASSERT(resInfo.count.compare(LayoutSize(2)) != std::partial_ordering::equivalent || structuredBufferTypeLayout->counterVarLayout);
+            SLANG_ASSERT(resInfo.count.compare(LayoutSize(1)) != std::partial_ordering::equivalent || !structuredBufferTypeLayout->counterVarLayout);
             descriptorRange.count = multiplier;
             descriptorRange.indexOffset = _calcIndexOffset(path.primary, resInfo.kind);
 

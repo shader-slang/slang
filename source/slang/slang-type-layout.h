@@ -394,8 +394,12 @@ inline LayoutSize maximum(LayoutSize left, LayoutSize right)
     if (left.isInfinite() || right.isInfinite())
         return LayoutSize::infinite();
 
-    return LayoutSize(
-        Math::Max(left.getFiniteValue().getValidValue(), right.getFiniteValue().getValidValue()));
+    auto leftOffset = left.getFiniteValue();
+    auto rightOffset = right.getFiniteValue();
+    if (leftOffset.isInvalid() || rightOffset.isInvalid())
+        return LayoutSize::invalid();
+
+    return LayoutSize(Math::Max(leftOffset.getValidValue(), rightOffset.getValidValue()));
 }
 
 
@@ -673,7 +677,7 @@ public:
 
     void addResourceUsage(ResourceInfo info)
     {
-        if (info.count == 0)
+        if (info.count.compare(LayoutSize(0)) == std::partial_ordering::equivalent)
             return;
 
         findOrAddResourceInfo(info.kind)->count += info.count;

@@ -228,7 +228,8 @@ struct UsedRanges
         UsedRange range;
         range.parameter = param;
         range.begin = begin;
-        range.end = end.isFinite() ? end.getFiniteValue() : UInt(-1);
+        auto endOffset = end.getFiniteValue();
+        range.end = end.isFinite() && endOffset.isValid() ? endOffset.getValidValue() : UInt(-1);
         return Add(range);
     }
 
@@ -272,10 +273,10 @@ struct UsedRanges
         if (size.isFinite())
         {
             const auto count = size.getFiniteValue();
-            if (count > 0)
+            if (count.isValid() && count.getValidValue() > 0)
             {
-                return (count == 1) ? findRangeContaining(index)
-                                    : findRangeContaining(index, count);
+                return (count.isValid() && count.getValidValue() == 1) ? findRangeContaining(index)
+                                    : findRangeContaining(index, count.getValidValue());
             }
         }
         else
