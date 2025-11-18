@@ -30,6 +30,8 @@ enum class LayoutRulesFamily
 };
 #endif
 
+struct LayoutOffset;
+
 // A "size" that can either be a simple finite size,
 // the special case of an infinite/unbounded size, or
 // the special case of an invalid size.
@@ -74,11 +76,7 @@ struct LayoutSize
     bool isInvalid() const { return raw == s_invalidValue; }
 
     bool isFinite() const { return raw != s_infiniteValue && raw != s_invalidValue; }
-    LayoutOffset getFiniteValue() const
-    {
-        SLANG_ASSERT(isFinite());
-        return LayoutOffset(raw);
-    }
+    LayoutOffset getFiniteValue() const;
 
     std::partial_ordering compare(LayoutSize that) const
     {
@@ -222,6 +220,7 @@ private:
     static const RawValue s_infiniteValue = RawValue(-1);
     static const RawValue s_invalidValue = RawValue(-2);
     static const RawValue s_maxFiniteValue = s_invalidValue - 1;
+    friend struct LayoutOffset;
     RawValue raw;
 };
 
@@ -253,17 +252,6 @@ inline LayoutSize operator/(LayoutSize left, LayoutSize::RawValue right)
     return result;
 }
 
-inline LayoutSize maximum(LayoutSize left, LayoutSize right)
-{
-    if (left.isInvalid() || right.isInvalid())
-        return LayoutSize::invalid();
-
-    if (left.isInfinite() || right.isInfinite())
-        return LayoutSize::infinite();
-
-    return LayoutSize(Math::Max(left.getFiniteValue().getValidValue(), right.getFiniteValue().getValidValue()));
-}
-
 
 // An offset that can either be a valid finite offset or
 // the special case of an invalid offset.
@@ -277,10 +265,17 @@ struct LayoutOffset
     {
     }
 
-    LayoutOffset(RawValue offset)
+    explicit LayoutOffset(RawValue offset)
         : raw(offset)
     {
         SLANG_ASSERT(offset != s_invalidValue);
+    }
+
+    explicit LayoutOffset(LayoutSize size)
+    {
+        if (size.isInfinite() || size.isInvalid())
+            *this = LayoutOffset::invalid();
+        raw = size.raw;
     }
 
     static LayoutOffset invalid()
@@ -385,6 +380,24 @@ private:
     static const RawValue s_maxValidValue = s_invalidValue - 1;
     RawValue raw;
 };
+
+LayoutOffset LayoutSize::getFiniteValue() const
+{
+    return LayoutOffset{*this};
+}
+
+inline LayoutSize maximum(LayoutSize left, LayoutSize right)
+{
+    if (left.isInvalid() || right.isInvalid())
+        return LayoutSize::invalid();
+
+    if (left.isInfinite() || right.isInfinite())
+        return LayoutSize::infinite();
+
+    return LayoutSize(
+        Math::Max(left.getFiniteValue().getValidValue(), right.getFiniteValue().getValidValue()));
+}
+
 
 inline LayoutOffset operator+(LayoutOffset left, LayoutOffset right)
 {
