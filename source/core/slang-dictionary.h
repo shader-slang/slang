@@ -621,7 +621,7 @@ public:
     {
         m_count = 0;
         m_kvPairs.clear();
-        m_marks.clear();
+        m_marks.resize(0);
     }
     template<typename T>
     bool containsKey(const T& key) const

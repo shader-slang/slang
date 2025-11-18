@@ -206,7 +206,7 @@ void ZipFileSystemImpl::_rebuildMap()
 
     const mz_uint entryCount = mz_zip_reader_get_num_files(&m_archive);
 
-    m_removedSet.resizeAndClear(0);
+    m_removedSet.resize(0);
 
     for (mz_uint i = 0; i < entryCount; ++i)
     {

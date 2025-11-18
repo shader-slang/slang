@@ -65,8 +65,7 @@ void UIntSet::resize(UInt size)
 
 void UIntSet::clear()
 {
-    if (auto* buffer = m_buffer.getBuffer())
-        ::memset(buffer, 0, m_buffer.getCount() * sizeof(Element));
+    ::memset(m_buffer.getBuffer(), 0, m_buffer.getCount() * sizeof(Element));
 }
 
 bool UIntSet::isEmpty() const
