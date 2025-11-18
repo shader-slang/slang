@@ -2287,8 +2287,12 @@ struct ExtendedTypeLayoutContext
             // Note that we don't use resInfo.count here, as each
             // structuredBufferType is essentially a struct of 2 fields
             // (elements, counter) and not an array of length 2.
-            SLANG_ASSERT(resInfo.count.compare(LayoutSize(2)) != std::partial_ordering::equivalent || structuredBufferTypeLayout->counterVarLayout);
-            SLANG_ASSERT(resInfo.count.compare(LayoutSize(1)) != std::partial_ordering::equivalent || !structuredBufferTypeLayout->counterVarLayout);
+            SLANG_ASSERT(
+                resInfo.count.compare(LayoutSize(2)) != std::partial_ordering::equivalent ||
+                structuredBufferTypeLayout->counterVarLayout);
+            SLANG_ASSERT(
+                resInfo.count.compare(LayoutSize(1)) != std::partial_ordering::equivalent ||
+                !structuredBufferTypeLayout->counterVarLayout);
             descriptorRange.count = multiplier;
             descriptorRange.indexOffset = _calcIndexOffset(path.primary, resInfo.kind);
 
@@ -2586,7 +2590,12 @@ SLANG_API SlangInt spReflectionTypeLayout_getBindingRangeBindingCount(
     auto& bindingRange = extTypeLayout->m_bindingRanges[index];
 
     auto count = bindingRange.count;
-    return count.isFinite() ? SlangInt(count.getFiniteValue()) : -1;
+    if (count.isFinite())
+    {
+        auto offset = count.getFiniteValue();
+        return offset.isValid() ? SlangInt(offset.getValidValue()) : -1;
+    }
+    return -1;
 }
 
 #if 0
@@ -2821,7 +2830,12 @@ SLANG_API SlangInt spReflectionTypeLayout_getDescriptorSetDescriptorRangeDescrip
     auto& range = descriptorSet->descriptorRanges[rangeIndex];
 
     auto count = range.count;
-    return count.isFinite() ? count.getFiniteValue() : -1;
+    if (count.isFinite())
+    {
+        auto offset = count.getFiniteValue();
+        return offset.isValid() ? offset.getValidValue() : -1;
+    }
+    return -1;
 }
 
 SLANG_API SlangBindingType spReflectionTypeLayout_getDescriptorSetDescriptorRangeType(
@@ -3005,7 +3019,11 @@ SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeObjectCount(SlangRefl
     if(!typeLayout) return 0;
 
     auto count = Slang::_findSubObjectRange(typeLayout, index).count;
-    return count.isFinite() ? SlangInt(count.getFiniteValue()) : -1;
+    if (count.isFinite()) {
+        auto offset = count.getFiniteValue();
+        return offset.isValid() ? SlangInt(offset.getValidValue()) : -1;
+    }
+    return -1;
 }
 
 SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeBindingRangeIndex(SlangReflectionTypeLayout* inTypeLayout, SlangInt index)

@@ -31,8 +31,16 @@ static LayoutSize _roundToAlignment(LayoutSize offset, size_t alignment)
     // An infinite size is assumed to be maximally aligned.
     if (offset.isInfinite())
         return LayoutSize::infinite();
+        
+    // An invalid size stays invalid
+    if (offset.isInvalid())
+        return LayoutSize::invalid();
 
-    return _roundToAlignment(offset.getFiniteValue(), alignment);
+    auto finiteOffset = offset.getFiniteValue();
+    if (!finiteOffset.isValid())
+        return LayoutSize::invalid();
+        
+    return LayoutSize(_roundToAlignment(finiteOffset.getValidValue(), alignment));
 }
 
 static size_t _roundUpToPowerOfTwo(size_t value)
@@ -136,7 +144,9 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         SLANG_RELEASE_ASSERT(elementInfo.size.isFinite());
         auto elementSize = elementInfo.size.getFiniteValue();
         auto elementAlignment = elementInfo.alignment;
-        auto elementStride = _roundToAlignment(elementSize, elementAlignment);
+        auto elementStride = elementSize.isValid() ? 
+            _roundToAlignment(LayoutSize(elementSize.getValidValue()), elementAlignment) :
+            LayoutSize::invalid();
 
         // An array with no elements will have zero size.
         //
@@ -147,7 +157,7 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         // the constraints that there must be `elementStride` bytes
         // between consecutive elements.
         //
-        if (elementCount > 0)
+        if (elementCount.compare(LayoutSize(0)) == std::partial_ordering::greater)
         {
             // We can think of this as either allocating (N-1)
             // chunks of size `elementStride` (for most of the elements)
@@ -205,7 +215,7 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
     LayoutSize AddStructField(UniformLayoutInfo* ioStructInfo, UniformLayoutInfo fieldInfo) override
     {
         // Skip zero-size fields
-        if (fieldInfo.size == 0)
+        if (fieldInfo.size.compare(LayoutSize(0)) == std::partial_ordering::equivalent)
             return ioStructInfo->size;
 
         // A struct type must be at least as aligned as its most-aligned field.
@@ -402,7 +412,7 @@ struct HLSLConstantBufferLayoutRulesImpl : DefaultLayoutRulesImpl
     LayoutSize AddStructField(UniformLayoutInfo* ioStructInfo, UniformLayoutInfo fieldInfo) override
     {
         // Skip zero-size fields
-        if (fieldInfo.size == 0)
+        if (fieldInfo.size.compare(LayoutSize(0)) == std::partial_ordering::equivalent)
             return ioStructInfo->size;
 
         ioStructInfo->alignment = std::max(ioStructInfo->alignment, fieldInfo.alignment);
@@ -4139,7 +4149,7 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
     // fields to be safe...
     //
     LayoutSize uniformOffset = m_info.size;
-    if (fieldInfo.size == 0)
+    if (fieldInfo.size.compare(LayoutSize(0)) == std::partial_ordering::equivalent)
     {
         // In case the field has a mixed resource usage,
         // the simple view will not be able to represent the uniform usage.

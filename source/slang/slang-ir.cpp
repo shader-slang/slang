@@ -6435,7 +6435,7 @@ IRLayoutDecoration* IRBuilder::addLayoutDecoration(IRInst* value, IRLayout* layo
 IRTypeSizeAttr* IRBuilder::getTypeSizeAttr(LayoutResourceKind kind, LayoutSize size)
 {
     auto kindInst = getIntValue(getIntType(), IRIntegerValue(kind));
-    
+
     // Handle size safely by checking its state
     IRIntegerValue sizeValue;
     if (size.isFinite())
@@ -6461,7 +6461,7 @@ IRTypeSizeAttr* IRBuilder::getTypeSizeAttr(LayoutResourceKind kind, LayoutSize s
         // Invalid size - use a different sentinel value
         sizeValue = IRIntegerValue(-2);
     }
-    
+
     auto sizeInst = getIntValue(getIntType(), sizeValue);
 
     IRInst* operands[] = {kindInst, sizeInst};

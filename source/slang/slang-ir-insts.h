@@ -1027,8 +1027,9 @@ struct IRTypeSizeAttr : public IRLayoutResourceInfoAttr
     {
         return LayoutSize::fromRaw(LayoutSize::RawValue(getIntVal(getSizeInst())));
     }
-    size_t getFiniteSize() { 
-        auto offset = getSize().getFiniteValue(); 
+    size_t getFiniteSize()
+    {
+        auto offset = getSize().getFiniteValue();
         return offset.isValid() ? offset.getValidValue() : 0;
     }
 };
