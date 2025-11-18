@@ -1327,44 +1327,9 @@ public typealias usamplerCube = SamplerCube<uint4>;
 public typealias isamplerCube = SamplerCube<int4>;
 public typealias samplerCube = SamplerCube<float4>;
 
-__generic<let sampleCount:int=0, let format:int=0>
-public typealias sampler1DShadow = _Texture<
-    float,
-    __Shape1D,
-    0, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    1, // isCombined
-    format
->;
-
-__generic<let sampleCount:int=0, let format:int=0>
-public typealias sampler2DShadow = _Texture<
-    float,
-    __Shape2D,
-    0, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    1, // isCombined
-    format
->;
-
-__generic<let sampleCount:int=0, let format:int=0>
-public typealias samplerCubeShadow = _Texture<
-    float,
-    __ShapeCube,
-    0, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    1, // isCombined
-    format
->;
+public typealias sampler1DShadow = Sampler1DShadow;
+public typealias sampler2DShadow = Sampler2DShadow;
+public typealias samplerCubeShadow = SamplerCubeShadow;
 
 public typealias usampler1DArray = Sampler1DArray<uint4>;
 public typealias isampler1DArray = Sampler1DArray<int4>;
@@ -1378,44 +1343,9 @@ public typealias usamplerCubeArray = SamplerCubeArray<uint4>;
 public typealias isamplerCubeArray = SamplerCubeArray<int4>;
 public typealias samplerCubeArray = SamplerCubeArray<float4>;
 
-__generic<let sampleCount:int=0, let format:int=0>
-public typealias sampler1DArrayShadow = _Texture<
-    float,
-    __Shape1D,
-    1, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    1, // isCombined
-    format
->;
-
-__generic<let sampleCount:int=0, let format:int=0>
-public typealias sampler2DArrayShadow = _Texture<
-    float,
-    __Shape2D,
-    1, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    1, // isCombined
-    format
->;
-
-__generic<let sampleCount:int=0, let format:int=0>
-public typealias samplerCubeArrayShadow = _Texture<
-    float,
-    __ShapeCube,
-    1, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    1, // isCombined
-    format
->;
+public typealias sampler1DArrayShadow = Sampler1DArrayShadow;
+public typealias sampler2DArrayShadow = Sampler2DArrayShadow;
+public typealias samplerCubeArrayShadow = SamplerCubeArrayShadow;
 
 public typealias sampler2DMS = Sampler2DMS<float4>;
 public typealias isampler2DMS = Sampler2DMS<int4>;
