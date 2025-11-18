@@ -1610,8 +1610,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(hlsl_spirv, texture_shadowgrad)]
     float SampleCmpGrad(vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset)
     {
-        static_assert(!(Shape is __ShapeCube), "SampleCmpGrad with offset is not supported for TextureCube or TextureCubeArray");
         static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
+        static_assert(!(Shape is __ShapeCube), "SampleCmpGrad with offset is not supported for TextureCube or TextureCubeArray");
         __target_switch
         {
         case hlsl:
@@ -1632,8 +1632,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(hlsl_spirv, texture_shadowgrad)]
     float SampleCmpGrad(vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
     {
-        static_assert(!(Shape is __ShapeCube), "SampleCmpGrad with offset is not supported for TextureCube or TextureCubeArray");
         static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
+        static_assert(!(Shape is __ShapeCube), "SampleCmpGrad with offset is not supported for TextureCube or TextureCubeArray");
         __target_switch
         {
         case hlsl:
@@ -2954,8 +2954,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(hlsl_spirv, texture_shadowgrad)]
     float SampleCmpGrad(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset)
     {
-        static_assert(!(Shape is __ShapeCube), "SampleCmpGrad with offset is not supported for TextureCube or TextureCubeArray");
         static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
+        static_assert(!(Shape is __ShapeCube), "SampleCmpGrad with offset is not supported for TextureCube or TextureCubeArray");
         __target_switch
         {
         case hlsl:
@@ -2977,8 +2977,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(hlsl_spirv, texture_shadowgrad)]
     float SampleCmpGrad(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
     {
-        static_assert(!(Shape is __ShapeCube), "SampleCmpGrad with offset is not supported for TextureCube or TextureCubeArray");
         static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
+        static_assert(!(Shape is __ShapeCube), "SampleCmpGrad with offset is not supported for TextureCube or TextureCubeArray");
         __target_switch
         {
         case hlsl:
