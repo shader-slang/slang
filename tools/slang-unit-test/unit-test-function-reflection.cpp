@@ -392,7 +392,8 @@ SLANG_UNIT_TEST(findFunctionByNameGenericOverload)
             auto myStructType = module->getLayout()->findTypeByName("MyType<float>");
             SLANG_CHECK_ABORT(myStructType != nullptr);
 
-            myFunctionType = module->getLayout()->findFunctionByNameInType(myStructType, "myFunc<int>");
+            myFunctionType =
+                module->getLayout()->findFunctionByNameInType(myStructType, "myFunc<int>");
             SLANG_CHECK_ABORT(myFunctionType != nullptr);
         }
 
@@ -421,7 +422,8 @@ SLANG_UNIT_TEST(findFunctionByNameGenericOverload)
         {
             // The function should be overloaded since there are multiple functions with different
             // signatures. If it's not overloaded, the fix didn't work properly.
-            SLANG_CHECK_ABORT(false && "Expected function to be overloaded with multiple signatures");
+            SLANG_CHECK_ABORT(
+                false && "Expected function to be overloaded with multiple signatures");
         }
     }
 }

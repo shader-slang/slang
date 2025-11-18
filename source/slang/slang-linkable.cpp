@@ -813,7 +813,9 @@ Expr* ComponentType::tryResolveOverloadedExpr(Expr* exprIn)
     return visitor.maybeResolveOverloadedExpr(exprIn, LookupMask::Function, nullptr);
 }
 
-static OverloadedExpr* convertOverloadExpr2(OverloadedExpr2* overloadedExpr2, ASTBuilder* astBuilder)
+static OverloadedExpr* convertOverloadExpr2(
+    OverloadedExpr2* overloadedExpr2,
+    ASTBuilder* astBuilder)
 {
     if (!overloadedExpr2->candidateExprs.getCount())
         return nullptr;
