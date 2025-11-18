@@ -214,14 +214,11 @@ jobs:
           # Export SITE_PACKAGES for use in slangpy-samples step
           echo "SITE_PACKAGES=$SITE_PACKAGES" >> $GITHUB_ENV
 
-          # Skip package installation on self-hosted runners to avoid permission issues
-          if [[ ! "${{ inputs.runs-on }}" =~ self-hosted ]]; then
-            echo "Installing python packages..."
-            curl -fsSL https://raw.githubusercontent.com/shader-slang/slangpy/main/requirements-dev.txt -o requirements-dev.txt
-            python -m pip install -r requirements-dev.txt --user
-            python -m pip install pytest-github-actions-annotate-failures --user
-            python -m pip install pytest-xdist --user
-          fi
+          echo "Installing python packages..."
+          curl -fsSL https://raw.githubusercontent.com/shader-slang/slangpy/main/requirements-dev.txt -o requirements-dev.txt
+          python -m pip install -r requirements-dev.txt --user
+          python -m pip install pytest-github-actions-annotate-failures --user
+          python -m pip install pytest-xdist --user
 
           echo "Running pytest on slangpy tests..."
           export PYTHONPATH="$SITE_PACKAGES"
