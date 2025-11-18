@@ -813,20 +813,40 @@ Expr* ComponentType::tryResolveOverloadedExpr(Expr* exprIn)
     return visitor.maybeResolveOverloadedExpr(exprIn, LookupMask::Function, nullptr);
 }
 
-// We perform a conservative conversion from OverloadedExpr2 to OverloadedExpr here, it will
-// only convert the expression when all candidates are DeclRefExpr and share the same originalExpr
-// as that will be what OverloadedExpr expects
-static OverloadedExpr* convertOverloadExpr2(
-    OverloadedExpr2* overloadedExpr2,
-    ASTBuilder* astBuilder)
+// This function tries to simplify an overloaded expr into OverloadedExpr for reflection API usage.
+// There are two kinds of overloaded expr in the AST: OverloadedExpr and OverloadedExpr2.
+//
+// OverloadedExpr stores candidates in LookupResult, where a list of `DeclRef<Decl>` hold
+// the properly-specialized reference to the declaration that was found. And all the candidates
+// must share a same base (if it is coming from a member-reference), and same orignalExpr.
+//
+// While OverloadedExpr2 stores candidates in a list of Expr, which is not necessary to be
+// DeclRefExpr.
+//
+// When the input orignalExpr is already OverloadedExpr, we can directly return it. But when
+// the input orignalExpr is OverloadedExpr2, we need to simplify it by converting it into
+// OverloadedExpr. The conversion routine conservatively performs the conversion when each Expr
+// candidates of OverloadedExpr2 is DeclRefExpr and all the candidates DeclRefExpr share the same
+// orignalExpr. If such condition is not met, it will return nullptr to indicated failed conversion.
+static Expr* maybeSimplifyExprForReflectionAPIUsage(Expr* originalExpr, ASTBuilder* astBuilder)
 {
+    // return directly if it is already OverloadedExpr
+    if (as<OverloadedExpr>(originalExpr))
+        return originalExpr;
+
+    OverloadedExpr2* overloadedExpr2 = as<OverloadedExpr2>(originalExpr);
+    // Don't perform any conversion if it is not OverloadedExpr2
+    if (!overloadedExpr2)
+        return originalExpr;
+
     if (!overloadedExpr2->candidateExprs.getCount())
         return nullptr;
 
     auto overloadedExpr = astBuilder->create<OverloadedExpr>();
 
-    Expr* originalExpr = nullptr;
+    Expr* sharedOriginalExpr = nullptr;
 
+    // Start the conversion
     for (auto candidate : overloadedExpr2->candidateExprs)
     {
         if (auto declRefExpr = as<DeclRefExpr>(candidate))
@@ -835,11 +855,11 @@ static OverloadedExpr* convertOverloadExpr2(
             item.declRef = declRefExpr->declRef;
             overloadedExpr->lookupResult2.items.add(item);
 
-            if (!originalExpr)
+            if (!sharedOriginalExpr)
             {
-                originalExpr = declRefExpr->originalExpr;
+                sharedOriginalExpr = declRefExpr->originalExpr;
             }
-            else if (originalExpr != declRefExpr->originalExpr)
+            else if (sharedOriginalExpr != declRefExpr->originalExpr)
             {
                 return nullptr;
             }
@@ -854,7 +874,7 @@ static OverloadedExpr* convertOverloadExpr2(
     {
         overloadedExpr->lookupResult2.item = overloadedExpr->lookupResult2.items[0];
         overloadedExpr->base = overloadedExpr2->base;
-        overloadedExpr->originalExpr = originalExpr;
+        overloadedExpr->originalExpr = sharedOriginalExpr;
         return overloadedExpr;
     }
 
@@ -903,10 +923,7 @@ Expr* ComponentType::findDeclFromString(String const& name, DiagnosticSink* sink
     {
         result = checkedExpr;
     }
-    else if (auto overloadExpr2 = as<OverloadedExpr2>(checkedExpr))
-    {
-        result = convertOverloadExpr2(overloadExpr2, astBuilder);
-    }
+    result = maybeSimplifyExprForReflectionAPIUsage(checkedExpr, astBuilder);
 
     m_decls[name] = result;
     return result;
@@ -998,10 +1015,7 @@ Expr* ComponentType::findDeclFromStringInType(
 
     auto checkedTerm = visitor.CheckTerm(expr);
 
-    if (auto overloadedExpr2 = as<OverloadedExpr2>(checkedTerm))
-    {
-        checkedTerm = convertOverloadExpr2(overloadedExpr2, astBuilder);
-    }
+    checkedTerm = maybeSimplifyExprForReflectionAPIUsage(checkedTerm, astBuilder);
 
     if (auto overloadedExpr = as<OverloadedExpr>(checkedTerm))
     {
