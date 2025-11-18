@@ -29,7 +29,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       # Meson build system
       - name: Install Meson
@@ -115,7 +115,7 @@ jobs:
             exit 1
           }
 
-          Write-Host "" 
+          Write-Host ""
           Write-Host "✓ RTX Remix shader compilation successful!" -ForegroundColor Green
           Write-Host "  All $headers shader variants compiled correctly" -ForegroundColor Green
         shell: pwsh
@@ -134,7 +134,7 @@ jobs:
       - name: Report results
         if: always()
         run: |
-          Write-Host "" 
+          Write-Host ""
           Write-Host "================================================" -ForegroundColor Cyan
           if ($env:BUILD_RESULT -eq "0" -or $LASTEXITCODE -eq 0) {
             Write-Host "✓ RTX Remix shader test PASSED" -ForegroundColor Green
@@ -158,13 +158,13 @@ jobs:
       #     script: |
       #       const title = `RTX Remix Shader Test Failed - ${new Date().toISOString().split('T')[0]}`;
       #       const body = `The nightly RTX Remix shader compilation test has failed.
-      #       
+      #
       #       **Workflow Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       #       **Commit:** ${{ github.sha }}
-      #       
+      #
       #       This may indicate a breaking change in the Slang compiler that affects RTX Remix shaders.
       #       Please review the build logs and coordinate with the RTX Remix team if needed.`;
-      #       
+      #
       #       github.rest.issues.create({
       #         owner: context.repo.owner,
       #         repo: context.repo.repo,
@@ -172,4 +172,3 @@ jobs:
       #         body: body,
       #         labels: ['rtx-remix-shaders', 'ci-failure']
       #       });
-
