@@ -51,6 +51,8 @@ struct LayoutSize
         SLANG_ASSERT(size != s_infiniteValue && size != s_invalidValue);
     }
 
+    explicit LayoutSize(LayoutOffset offset);
+
     static LayoutSize fromRaw(RawValue raw)
     {
         LayoutSize size;
@@ -376,14 +378,20 @@ struct LayoutOffset
     }
 
 private:
-    static const RawValue s_invalidValue = RawValue(~0);
+    static const RawValue s_invalidValue = LayoutSize::s_invalidValue;
     static const RawValue s_maxValidValue = s_invalidValue - 1;
+    friend struct LayoutSize;
     RawValue raw;
 };
 
 inline LayoutOffset LayoutSize::getFiniteValue() const
 {
     return LayoutOffset{*this};
+}
+
+inline LayoutSize::LayoutSize(LayoutOffset offset)
+{
+    *this = LayoutSize{offset.raw};
 }
 
 inline LayoutSize maximum(LayoutSize left, LayoutSize right)

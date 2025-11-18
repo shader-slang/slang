@@ -4335,17 +4335,8 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addExplicitUniformField(
     auto fieldSizeOffset =
         fieldResult.layout->FindResourceInfo(LayoutResourceKind::Uniform)->count.getFiniteValue();
 
-    if (currentSizeOffset.isValid() && fieldSizeOffset.isValid())
-    {
-        size_t newSize = Math::Max(
-            currentSizeOffset.getValidValue(),
-            uniformOffset + fieldSizeOffset.getValidValue());
-        m_info.size = LayoutSize(newSize);
-    }
-    else
-    {
-        m_info.size = LayoutSize::invalid();
-    }
+    m_info.size =
+        LayoutSize{maximum(currentSizeOffset, LayoutOffset{uniformOffset} + fieldSizeOffset)};
     return fieldLayout;
 }
 
