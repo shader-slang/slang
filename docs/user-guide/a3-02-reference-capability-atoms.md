@@ -1464,3 +1464,6 @@ Other
 
 `optix_coopvec`
 > Represents capabilities required for optix cooperative vector support.
+
+`optix_multilevel_traversal`
+> Represents capabilities required for optix multi-level traversal support.
