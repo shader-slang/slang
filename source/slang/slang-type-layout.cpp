@@ -2552,15 +2552,15 @@ static LayoutSize GetElementCount(IntVal* val)
         // cases where a generic bound might work (because
         // any concrete specialization will have a finite bound...)
         //
-        return 0;
+        return LayoutSize::invalid();
     }
     else if (const auto polyIntVal = as<PolynomialIntVal>(val))
     {
-        return 0;
+        return LayoutSize::invalid();
     }
     else if (as<FuncCallIntVal>(val))
     {
-        return 0;
+        return LayoutSize::invalid();
     }
     SLANG_UNEXPECTED("unhandled integer literal kind");
     UNREACHABLE_RETURN(LayoutSize(0));
