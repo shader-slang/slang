@@ -813,6 +813,9 @@ Expr* ComponentType::tryResolveOverloadedExpr(Expr* exprIn)
     return visitor.maybeResolveOverloadedExpr(exprIn, LookupMask::Function, nullptr);
 }
 
+// We perform a conservative conversion from OverloadedExpr2 to OverloadedExpr here, it will
+// only convert the expression when all candidates are DeclRefExpr and share the same originalExpr
+// as that will be what OverloadedExpr expects
 static OverloadedExpr* convertOverloadExpr2(
     OverloadedExpr2* overloadedExpr2,
     ASTBuilder* astBuilder)
