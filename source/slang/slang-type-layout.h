@@ -30,8 +30,9 @@ enum class LayoutRulesFamily
 };
 #endif
 
-// A "size" that can either be a simple finite size or
-// the special case of an infinite/unbounded size.
+// A "size" that can either be a simple finite size,
+// the special case of an infinite/unbounded size, or
+// the special case of an invalid size.
 //
 struct LayoutSize
 {
@@ -69,64 +70,41 @@ struct LayoutSize
         return result;
     }
 
-    template<typename F1, typename F2>
-    auto visit(F1&& infiniteCase, F2&& finiteCase) const -> decltype(infiniteCase())
-    {
-        if (isInfinite())
-        {
-            return infiniteCase();
-        }
-        else
-        {
-            return finiteCase(raw);
-        }
-    }
-
-
     bool isInfinite() const { return raw == s_infiniteValue; }
     bool isInvalid() const { return raw == s_invalidValue; }
 
     bool isFinite() const { return raw != s_infiniteValue && raw != s_invalidValue; }
-    bool isValid() const { return raw != s_invalidValue; }
-    RawValue getFiniteValue() const
+    LayoutOffset getFiniteValue() const
     {
         SLANG_ASSERT(isFinite());
-        return raw;
-    }
-    RawValue getValidValue() const
-    {
-        SLANG_ASSERT(isValid());
-        return raw;
-    }
-    RawValue getFiniteValueOr(RawValue infiniteMarker) const
-    {
-        return isFinite() ? raw : infiniteMarker;
-    }
-    RawValue getValidValueOr(RawValue invalidMarker) const
-    {
-        return isValid() ? raw : invalidMarker;
+        return LayoutOffset(raw);
     }
 
-    bool operator==(LayoutSize that) const { return raw == that.raw; }
-
-    bool operator!=(LayoutSize that) const { return raw != that.raw; }
-
-    bool operator>(LayoutSize that) const
+    std::partial_ordering compare(LayoutSize that) const
     {
         if (this->isInvalid() || that.isInvalid())
-            return false; // Invalid values are not comparable
-            
-        if (that.isFinite())
+            return std::partial_ordering::unordered;
+
+        if (this->isInfinite())
         {
-            if (this->isFinite())
-                return this->raw > that.raw;
-            return true;
+            if (that.isInfinite())
+                return std::partial_ordering::equivalent;
+            else
+                return std::partial_ordering::greater;
+        }
+        else if (that.isInfinite())
+        {
+            return std::partial_ordering::less;
         }
         else
         {
-            if (that.isInfinite())
-                return false;
-            return true;
+            // Both are finite
+            if (this->raw < that.raw)
+                return std::partial_ordering::less;
+            else if (this->raw > that.raw)
+                return std::partial_ordering::greater;
+            else
+                return std::partial_ordering::equivalent;
         }
     }
 
@@ -138,10 +116,16 @@ struct LayoutSize
         }
         else if (isInfinite())
         {
+            // Infinite + anything = infinite
         }
         else if (right.isInfinite())
         {
             *this = LayoutSize::infinite();
+        }
+        else if (raw > s_maxFiniteValue - right.raw)
+        {
+            // Check for overflow
+            *this = LayoutSize::invalid();
         }
         else
         {
@@ -151,7 +135,6 @@ struct LayoutSize
 
     void operator*=(LayoutSize right)
     {
-        // Deal with invalid first
         if (isInvalid() || right.isInvalid())
         {
             *this = LayoutSize::invalid();
@@ -182,17 +165,31 @@ struct LayoutSize
             return;
         }
 
-        // Finally deal with the case where both sides are finite
-        *this = LayoutSize(raw * right.raw);
+        // Finally deal with the case where both sides are finite - check for overflow
+        if (right.raw != 0 && raw > s_maxFiniteValue / right.raw)
+        {
+            *this = LayoutSize::invalid();
+        }
+        else
+        {
+            *this = LayoutSize(raw * right.raw);
+        }
     }
 
     void operator-=(RawValue right)
     {
         if (isInvalid())
         {
+            // Invalid remains invalid
         }
         else if (isInfinite())
         {
+            // Infinite - anything = infinite
+        }
+        else if (raw < right)
+        {
+            // Check for underflow
+            *this = LayoutSize::invalid();
         }
         else
         {
@@ -204,18 +201,28 @@ struct LayoutSize
     {
         if (isInvalid())
         {
+            // Invalid remains invalid
+        }
+        else if (right == 0)
+        {
+            // Division by zero
+            *this = LayoutSize::invalid();
         }
         else if (isInfinite())
         {
+            // Infinite / anything non-zero = infinite
         }
         else
         {
             *this = LayoutSize(raw / right);
         }
     }
+
+private:
+    static const RawValue s_infiniteValue = RawValue(-1);
+    static const RawValue s_invalidValue = RawValue(-2);
+    static const RawValue s_maxFiniteValue = s_invalidValue - 1;
     RawValue raw;
-    const static RawValue s_infiniteValue = ~0;
-    const static RawValue s_invalidValue = ~0 - 1;
 };
 
 inline LayoutSize operator+(LayoutSize left, LayoutSize right)
@@ -250,26 +257,13 @@ inline LayoutSize maximum(LayoutSize left, LayoutSize right)
 {
     if (left.isInvalid() || right.isInvalid())
         return LayoutSize::invalid();
-    
+
     if (left.isInfinite() || right.isInfinite())
         return LayoutSize::infinite();
 
-    return LayoutSize(Math::Max(left.getFiniteValue(), right.getFiniteValue()));
+    return LayoutSize(Math::Max(left.getFiniteValue().getValidValue(), right.getFiniteValue().getValidValue()));
 }
 
-inline bool operator>(LayoutSize left, LayoutSize::RawValue right)
-{
-    if (left.isInvalid())
-        return false;
-    return left.isInfinite() || (left.getFiniteValue() > right);
-}
-
-inline bool operator<=(LayoutSize left, LayoutSize::RawValue right)
-{
-    if (left.isInvalid())
-        return false;
-    return left.isFinite() && (left.getFiniteValue() <= right);
-}
 
 // An offset that can either be a valid finite offset or
 // the special case of an invalid offset.
@@ -283,18 +277,11 @@ struct LayoutOffset
     {
     }
 
-    explicit LayoutOffset(RawValue offset)
+    LayoutOffset(RawValue offset)
         : raw(offset)
     {
         SLANG_ASSERT(offset != s_invalidValue);
     }
-
-    explicit LayoutOffset(LayoutSize size)
-        : raw(size.isFinite() ? size.raw : s_invalidValue)
-    {
-    }
-
-    operator bool() const { return !isInvalid(); }
 
     static LayoutOffset invalid()
     {
@@ -311,10 +298,6 @@ struct LayoutOffset
         SLANG_ASSERT(isValid());
         return raw;
     }
-    RawValue getValidValueOr(RawValue invalidMarker) const
-    {
-        return isValid() ? raw : invalidMarker;
-    }
 
     std::partial_ordering compare(LayoutOffset that) const
     {
@@ -329,82 +312,37 @@ struct LayoutOffset
             return std::partial_ordering::equivalent;
     }
 
-    LayoutOffset operator++(int)
-    {
-        LayoutOffset oldValue = *this;
-
-        if (isInvalid())
-        {
-            return oldValue;
-        }
-        else if (raw >= s_maxValidValue)
-        {
-            // Check for overflow
-            *this = LayoutOffset::invalid();
-        }
-        else
-        {
-            raw = raw + 1;
-        }
-
-        return oldValue;
-    }
-
     void operator+=(LayoutOffset right)
     {
-        if (right.isInvalid())
+        if (isInvalid() || right.isInvalid())
         {
             *this = LayoutOffset::invalid();
         }
-        else
-        {
-            return *this += right.getValidValue();
-        }
-    }
-
-    void operator+=(RawValue right)
-    {
-        if (isInvalid())
-        {
-            return;
-        }
-        else if (raw > s_maxValidValue - right)
+        else if (raw > s_maxValidValue - right.raw)
         {
             // Check for overflow
             *this = LayoutOffset::invalid();
         }
         else
         {
-            *this = LayoutOffset(raw + right);
+            *this = LayoutOffset(raw + right.raw);
         }
     }
 
     void operator*=(LayoutOffset right)
     {
-        if (right.isInvalid())
+        if (isInvalid() || right.isInvalid())
         {
             *this = LayoutOffset::invalid();
         }
-        else
-        {
-            *this *= right.getValidValue();
-        }
-    }
-
-    void operator*=(RawValue right)
-    {
-        if (isInvalid())
-        {
-            return;
-        }
-        else if (right != 0 && raw > s_maxValidValue / right)
+        else if (right.raw != 0 && raw > s_maxValidValue / right.raw)
         {
             // Check for overflow
             *this = LayoutOffset::invalid();
         }
         else
         {
-            *this = LayoutOffset(raw * right);
+            *this = LayoutOffset(raw * right.raw);
         }
     }
 
@@ -450,29 +388,12 @@ private:
 
 inline LayoutOffset operator+(LayoutOffset left, LayoutOffset right)
 {
-    left += right;
-    return left;
-}
-
-inline LayoutOffset operator+(LayoutOffset left, LayoutOffset::RawValue right)
-{
-    left += right;
-    return left;
-}
-
-inline LayoutOffset operator+(LayoutOffset::RawValue left, LayoutOffset right)
-{
-    return right + left;
-}
-
-inline LayoutOffset operator*(LayoutOffset left, LayoutOffset right)
-{
     LayoutOffset result(left);
-    result *= right;
+    result += right;
     return result;
 }
 
-inline LayoutOffset operator*(LayoutOffset left, UInt right)
+inline LayoutOffset operator*(LayoutOffset left, LayoutOffset right)
 {
     LayoutOffset result(left);
     result *= right;
@@ -703,8 +624,7 @@ public:
         LayoutResourceKind kind = LayoutResourceKind::None;
 
         // How many registers of the above kind did we use?
-        // This may be invalid if we don't know
-        LayoutOffset count;
+        LayoutSize count;
     };
 
     List<ResourceInfo> resourceInfos;
@@ -733,7 +653,7 @@ public:
 
         ResourceInfo info;
         info.kind = kind;
-        info.count = LayoutOffset{0};
+        info.count = 0;
         resourceInfos.add(info);
         return &resourceInfos.getLast();
     }
@@ -750,7 +670,7 @@ public:
     {
         ResourceInfo info;
         info.kind = kind;
-        info.count = LayoutOffset{count};
+        info.count = count;
         addResourceUsage(info);
     }
 
@@ -773,7 +693,7 @@ public:
         {
             SlangBindingType bindingType;
             LayoutResourceKind kind;
-            LayoutOffset count;
+            LayoutSize count;
             Int indexOffset;
         };
 
@@ -788,7 +708,7 @@ public:
             VarDeclBase* leafVariable;
             TypeLayout* leafTypeLayout;
             SlangBindingType bindingType;
-            LayoutOffset count;
+            LayoutSize count;
             Int descriptorSetIndex;
             Int firstDescriptorRangeIndex;
             Int descriptorRangeCount;
@@ -861,7 +781,7 @@ public:
         // What is our starting register in that space?
         //
         // (In the case of uniform data, this is a byte offset)
-        LayoutOffset index;
+        UInt index;
     };
     List<ResourceInfo> resourceInfos;
 
@@ -880,7 +800,7 @@ public:
         ResourceInfo info;
         info.kind = kind;
         info.space = 0;
-        info.index = LayoutOffset{0};
+        info.index = 0;
 
         resourceInfos.add(info);
         return &resourceInfos.getLast();
@@ -1291,7 +1211,7 @@ struct SimpleLayoutRulesImpl
     virtual UniformLayoutInfo BeginStructLayout() = 0;
 
     // Add a field to a `struct` type, and return the offset for the field
-    virtual LayoutOffset AddStructField(
+    virtual LayoutSize AddStructField(
         UniformLayoutInfo* ioStructInfo,
         UniformLayoutInfo fieldInfo) = 0;
 
@@ -1355,7 +1275,7 @@ struct LayoutRulesImpl
         return simpleRules->BeginStructLayout();
     }
 
-    LayoutOffset AddStructField(UniformLayoutInfo* ioStructInfo, UniformLayoutInfo fieldInfo)
+    LayoutSize AddStructField(UniformLayoutInfo* ioStructInfo, UniformLayoutInfo fieldInfo)
     {
         SLANG_ASSERT(simpleRules);
         return simpleRules->AddStructField(ioStructInfo, fieldInfo);

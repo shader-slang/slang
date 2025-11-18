@@ -28,15 +28,11 @@ static size_t _roundToAlignment(size_t offset, size_t alignment)
 
 static LayoutSize _roundToAlignment(LayoutSize offset, size_t alignment)
 {
-    // An invalid size remains invalid.
-    if (offset.isInvalid())
-        return LayoutSize::invalid();
-        
     // An infinite size is assumed to be maximally aligned.
     if (offset.isInfinite())
         return LayoutSize::infinite();
 
-    return LayoutSize(_roundToAlignment(offset.getFiniteValue(), alignment));
+    return _roundToAlignment(offset.getFiniteValue(), alignment);
 }
 
 static size_t _roundUpToPowerOfTwo(size_t value)
@@ -287,8 +283,8 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
         SLANG_RELEASE_ASSERT(elementInfo.kind == LayoutResourceKind::Uniform);
         SLANG_RELEASE_ASSERT(elementInfo.size.isFinite());
 
-        auto size = LayoutSize(elementInfo.size.getFiniteValue()) * elementCount;
-        SimpleLayoutInfo vectorInfo(LayoutResourceKind::Uniform, size, _roundUpToPowerOfTwo(size.getFiniteValue()));
+        auto size = elementInfo.size.getFiniteValue() * elementCount;
+        SimpleLayoutInfo vectorInfo(LayoutResourceKind::Uniform, size, _roundUpToPowerOfTwo(size));
         return vectorInfo;
     }
 
@@ -601,9 +597,9 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
         // 'vector_types.h' in the CUDA SDK
 
         // Size in bytes of vector
-        auto size = LayoutSize(elementSize) * elementCount;
+        size_t size = elementSize * elementCount;
         // Special case 3, as uses alignment of the elementSize
-        size_t alignment = (elementCount == 3) ? elementSize : size.getFiniteValue();
+        size_t alignment = (elementCount == 3) ? elementSize : size;
 
         // special case half
         if (elementType == BaseType::Half && elementCount >= 3)
@@ -671,7 +667,7 @@ struct MetalLayoutRulesImpl : public CPULayoutRulesImpl
         auto alignedElementCount = 1 << Math::Log2Ceil((uint32_t)elementCount);
 
         // Metal aligns vectors to 2/4 element boundaries.
-        auto size = LayoutSize(alignedElementCount * elementSize);
+        size_t size = alignedElementCount * elementSize;
         size_t alignment = alignedElementCount * elementSize;
 
         SimpleLayoutInfo vectorInfo;
@@ -3404,8 +3400,8 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
         //
         if (auto containerTypeResInfo = containerTypeLayout->FindResourceInfo(kind))
         {
-            SLANG_RELEASE_ASSERT(containerTypeResInfo->count.isValid());
-            elementVarResInfo->index += LayoutOffset(containerTypeResInfo->count.getValidValue());
+            SLANG_RELEASE_ASSERT(containerTypeResInfo->count.isFinite());
+            elementVarResInfo->index += containerTypeResInfo->count.getFiniteValue();
         }
     }
 
@@ -3634,7 +3630,7 @@ RefPtr<StructuredBufferTypeLayout> createStructuredBufferWithCounterTypeLayout(
     {
         auto counterResourceInfo = counterVarLayout->findOrAddResourceInfo(typeResourceInfo.kind);
         // We expect this index to be 1
-        counterResourceInfo->index = LayoutOffset(typeResourceInfo.count.getValidValue());
+        counterResourceInfo->index = typeResourceInfo.count.getFiniteValue();
     }
 
     typeLayout->counterVarLayout = counterVarLayout;
@@ -3988,7 +3984,7 @@ static RefPtr<TypeLayout> maybeAdjustLayoutForArrayElementType(
                         // is just going to be strided by the array size since we
                         // are effectively doing AoS to SoA conversion.
                         //
-                        resInfo.index *= LayoutOffset::RawValue(elementCount.getFiniteValue());
+                        resInfo.index *= elementCount.getFiniteValue();
                     }
                     else
                     {
@@ -4005,7 +4001,7 @@ static RefPtr<TypeLayout> maybeAdjustLayoutForArrayElementType(
             if (requireNewSpace)
             {
                 adjustedField->findOrAddResourceInfo(LayoutResourceKind::RegisterSpace)->index =
-                    LayoutOffset(spaceOffsetForField.getFiniteValue());
+                    spaceOffsetForField.getFiniteValue();
             }
 
             adjustedStructTypeLayout->fields.add(adjustedField);
@@ -4175,7 +4171,7 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
     if (fieldTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform))
     {
         fieldLayout->AddResourceInfo(LayoutResourceKind::Uniform)->index =
-            LayoutOffset(uniformOffset.getFiniteValue());
+            uniformOffset.getFiniteValue();
     }
 
     // Add offset information for any other resource kinds
@@ -4214,7 +4210,7 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
             // entry to tell that the field is introducing a new space for itself.
             //
             fieldLayout->findOrAddResourceInfo(LayoutResourceKind::RegisterSpace)->index =
-                spaceOffset;
+                spaceOffset.getFiniteValue();
             fieldResourceInfo->space = 0;
             fieldResourceInfo->index = 0;
         }
@@ -4227,7 +4223,7 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
             //
             auto structTypeResourceInfo =
                 m_typeLayout->findOrAddResourceInfo(fieldTypeResourceInfo.kind);
-            fieldResourceInfo->index = structTypeResourceInfo->count;
+            fieldResourceInfo->index = structTypeResourceInfo->count.getFiniteValue();
             structTypeResourceInfo->count += fieldTypeResourceInfo.count;
             if (fieldTypeResourceInfo.kind == LayoutResourceKind::SubElementRegisterSpace &&
                 canTypeDirectlyUseRegisterSpace(fieldTypeLayout))
@@ -4266,10 +4262,10 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addExplicitUniformField(
     auto uniformInfo = m_info;
     m_rules->AddStructField(&uniformInfo, fieldInfo);
     m_info.alignment = uniformInfo.alignment;
-    m_info.size = LayoutSize(Math::Max(
+    m_info.size.raw = Math::Max(
         m_info.size.getFiniteValue(),
         (size_t)(uniformOffset + fieldResult.layout->FindResourceInfo(LayoutResourceKind::Uniform)
-                                     ->count.getValidValue())));
+                                     ->count.getFiniteValue()));
     return fieldLayout;
 }
 
@@ -4956,7 +4952,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             Int baseExistentialSlotIndex = 0;
             if (auto resInfo =
                     typeLayout->FindResourceInfo(LayoutResourceKind::ExistentialTypeParam))
-                baseExistentialSlotIndex = Int(resInfo->count.getValidValue());
+                baseExistentialSlotIndex = Int(resInfo->count.getFiniteValue());
             //
             // When computing the layout for the field, we will give it access
             // to all the incoming specialized type slots that haven't already
@@ -5046,7 +5042,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
                 Int baseExistentialSlotIndex = 0;
                 if (auto resInfo =
                         typeLayout->FindResourceInfo(LayoutResourceKind::ExistentialTypeParam))
-                    baseExistentialSlotIndex = Int(resInfo->count.getValidValue());
+                    baseExistentialSlotIndex = Int(resInfo->count.getFiniteValue());
                 //
                 // When computing the layout for the field, we will give it access
                 // to all the incoming specialized type slots that haven't already

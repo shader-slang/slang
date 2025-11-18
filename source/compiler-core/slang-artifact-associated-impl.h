@@ -101,11 +101,9 @@ struct ShaderBindingRange
     slang::ParameterCategory category = slang::ParameterCategory::None;
     UInt spaceIndex = 0;
     UInt registerIndex = 0;
-    UInt registerCount = k_unsizedRegisterCount; // 0 for unsized
+    UInt registerCount = 0; // 0 for unsized
 
-    const static UInt k_unsizedRegisterCount = 0;
-
-    bool isInfinite() const { return registerCount == k_unsizedRegisterCount; }
+    bool isInfinite() const { return registerCount == 0; }
 
     bool containsBinding(slang::ParameterCategory _category, UInt _spaceIndex, UInt _registerIndex)
         const
@@ -146,7 +144,7 @@ struct ShaderBindingRange
         UInt newRegisterIndex = Math::Min(registerIndex, other.registerIndex);
 
         if (other.isInfinite())
-            registerCount = k_unsizedRegisterCount;
+            registerCount = 0;
         else if (!isInfinite())
             registerCount = Math::Max(
                                 registerIndex + registerCount,

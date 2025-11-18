@@ -2167,7 +2167,6 @@ public:                                                              \
     };
 
 #define SLANG_UNBOUNDED_SIZE (~size_t(0))
-#define SLANG_UNKNOWN_SIZE (~size_t(0)) // intentionally the same for now 
 
     // Shader Parameter Reflection
 

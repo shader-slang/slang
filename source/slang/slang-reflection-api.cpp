@@ -1260,12 +1260,10 @@ namespace
 {
 static size_t getReflectionSize(LayoutSize size)
 {
-    return size.getFiniteValueOr(SLANG_UNBOUNDED_SIZE);
-}
+    if (size.isFinite())
+        return size.getFiniteValue();
 
-static size_t getReflectionOffset(LayoutOffset offset)
-{
-    return offset.getValidValueOr(SLANG_UNKNOWN_SIZE);
+    return SLANG_UNBOUNDED_SIZE;
 }
 
 static int32_t getAlignment(TypeLayout* typeLayout, SlangParameterCategory category)
@@ -1286,19 +1284,16 @@ static size_t getStride(TypeLayout* typeLayout, SlangParameterCategory category)
     if (!info)
         return 0;
 
-    if (const auto size = LayoutOffset{info->count})
-    {
-        size_t finiteSize = size.getValidValue();
-        size_t alignment = getAlignment(typeLayout, category);
-        SLANG_ASSERT(alignment >= 1);
-
-        auto stride = (finiteSize + (alignment - 1)) & ~(alignment - 1);
-        return stride;
-    }
-    else
-    {
+    auto size = info->count;
+    if (size.isInfinite())
         return SLANG_UNBOUNDED_SIZE;
-    }
+
+    size_t finiteSize = size.getFiniteValue();
+    size_t alignment = getAlignment(typeLayout, category);
+    SLANG_ASSERT(alignment >= 1);
+
+    auto stride = (finiteSize + (alignment - 1)) & ~(alignment - 1);
+    return stride;
 }
 } // namespace
 
@@ -1314,7 +1309,7 @@ SLANG_API size_t spReflectionTypeLayout_GetSize(
     if (!info)
         return 0;
 
-    return getReflectionOffset(info->count);
+    return getReflectionSize(info->count);
 }
 
 SLANG_API size_t spReflectionTypeLayout_GetStride(
@@ -1415,7 +1410,7 @@ SLANG_API size_t spReflectionTypeLayout_GetElementStride(
                 auto info = elementTypeLayout->FindResourceInfo(LayoutResourceKind(category));
                 if (!info)
                     return 0;
-                return getReflectionOffset(info->count);
+                return getReflectionSize(info->count);
             }
 
         // An important special case, though, is Vulkan descriptor-table slots,
@@ -1431,7 +1426,7 @@ SLANG_API size_t spReflectionTypeLayout_GetElementStride(
             vectorTypeLayout->elementTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform);
         if (!resInfo)
             return 0;
-        return getReflectionOffset(resInfo->count);
+        return getReflectionSize(resInfo->count);
     }
 
     return 0;
@@ -1678,9 +1673,9 @@ struct ExtendedBindingRangePath : BindingRangePath
 };
 
 /// Calculate the offset for resources of the given `kind` in the `path`.
-LayoutOffset _calcIndexOffset(BindingRangePathLink* path, LayoutResourceKind kind)
+Int _calcIndexOffset(BindingRangePathLink* path, LayoutResourceKind kind)
 {
-    LayoutOffset result{0};
+    Int result = 0;
     for (auto link = path; link; link = link->parent)
     {
         if (auto resInfo = link->var->FindResourceInfo(kind))
@@ -1931,7 +1926,7 @@ struct ExtendedTypeLayoutContext
         return primaryVarLayout;
     }
 
-    void addRangesRec(TypeLayout* typeLayout, BindingRangePath const& path, LayoutOffset multiplier)
+    void addRangesRec(TypeLayout* typeLayout, BindingRangePath const& path, LayoutSize multiplier)
     {
         if (auto structTypeLayout = as<StructTypeLayout>(typeLayout))
         {
@@ -1974,7 +1969,7 @@ struct ExtendedTypeLayoutContext
                     elementCount = LayoutSize::RawValue(getIntVal(arrayType->getElementCount()));
                 }
             }
-            addRangesRec(elementTypeLayout, path, multiplier * LayoutOffset{elementCount});
+            addRangesRec(elementTypeLayout, path, multiplier * elementCount);
             return;
         }
         else if (auto parameterGroupTypeLayout = as<ParameterGroupTypeLayout>(typeLayout))
@@ -2467,7 +2462,7 @@ struct ExtendedTypeLayoutContext
                 // We now expect to allocate a descriptor range for this
                 // `resInfo` representing resouce usage.
                 //
-                auto count = resInfo.count * LayoutOffset{multiplier};
+                auto count = resInfo.count * multiplier;
                 auto indexOffset = _calcIndexOffset(path.primary, kind);
                 auto spaceOffset = _calcSpaceOffset(path.primary, kind);
 
@@ -2507,7 +2502,7 @@ TypeLayout::ExtendedInfo* getExtendedTypeLayout(TypeLayout* typeLayout)
         context.m_extendedInfo = extendedInfo;
 
         BindingRangePath rootPath;
-        context.addRangesRec(typeLayout, rootPath, LayoutOffset{1});
+        context.addRangesRec(typeLayout, rootPath, 1);
 
         typeLayout->m_extendedInfo = extendedInfo;
     }
@@ -2583,7 +2578,8 @@ SLANG_API SlangInt spReflectionTypeLayout_getBindingRangeBindingCount(
         return 0;
     auto& bindingRange = extTypeLayout->m_bindingRanges[index];
 
-    return getReflectionOffset(bindingRange.count);
+    auto count = bindingRange.count;
+    return count.isFinite() ? SlangInt(count.getFiniteValue()) : -1;
 }
 
 #if 0
@@ -2817,7 +2813,8 @@ SLANG_API SlangInt spReflectionTypeLayout_getDescriptorSetDescriptorRangeDescrip
         return 0;
     auto& range = descriptorSet->descriptorRanges[rangeIndex];
 
-    return getReflectionOffset(range.count);
+    auto count = range.count;
+    return count.isFinite() ? count.getFiniteValue() : -1;
 }
 
 SLANG_API SlangBindingType spReflectionTypeLayout_getDescriptorSetDescriptorRangeType(
@@ -3001,7 +2998,7 @@ SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeObjectCount(SlangRefl
     if(!typeLayout) return 0;
 
     auto count = Slang::_findSubObjectRange(typeLayout, index).count;
-    return count.isValid() ? SlangInt(count.getValidValue()) : -1;
+    return count.isFinite() ? SlangInt(count.getFiniteValue()) : -1;
 }
 
 SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeBindingRangeIndex(SlangReflectionTypeLayout* inTypeLayout, SlangInt index)
@@ -3046,7 +3043,7 @@ SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeDescriptorRangeBindin
 
     auto subObjectRange = Slang::_findSubObjectRange(typeLayout, subObjectRangeIndex);
     auto count = Slang::_getSubObjectDescriptorRange(subObjectRange, bindingRangeIndexInSubObject).count;
-    return count.isValid() ? count.getValidValue() : -1;
+    return count.isFinite() ? count.getFiniteValue() : -1;
 }
 
 SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeDescriptorRangeIndexOffset(SlangReflectionTypeLayout* inTypeLayout, SlangInt subObjectRangeIndex, SlangInt bindingRangeIndexInSubObject)
@@ -4431,7 +4428,7 @@ SLANG_API size_t spReflection_getGlobalConstantBufferSize(SlangReflection* inPro
     auto uniform = structLayout->FindResourceInfo(LayoutResourceKind::Uniform);
     if (!uniform)
         return 0;
-    return getReflectionOffset(uniform->count);
+    return getReflectionSize(uniform->count);
 }
 
 SLANG_API SlangReflectionType* spReflection_specializeType(

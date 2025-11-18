@@ -15,7 +15,6 @@ namespace Slang
 
 // Inserts a single resource binding (which takes `count` slots, where 0 means unbounded) into the
 // list of resource ranges.
-// count may be ShaderBindingRange::k_unsizedRegisterCount
 static void _insertBinding(
     List<ShaderBindingRange>& ranges,
     LayoutResourceKind kind,
@@ -74,7 +73,7 @@ void collectMetadataFromInst(IRInst* param, ArtifactPostEmitMetadata& outMetadat
             auto spaceIndex = spaceOffset + offsetAttr->getSpace();
             auto registerIndex = offsetAttr->getOffset();
             auto size = sizeAttr->getSize();
-            auto count = size.getFiniteValueOr(ShaderBindingRange::k_unsizedRegisterCount);
+            auto count = size.isFinite() ? size.getFiniteValue() : 0;
             _insertBinding(outMetadata.m_usedBindings, kind, spaceIndex, registerIndex, count);
         }
     }
@@ -106,7 +105,7 @@ void collectMetadataFromInst(IRInst* param, ArtifactPostEmitMetadata& outMetadat
             auto spaceIndex = spaceOffset + offsetAttr->getSpace();
             auto registerIndex = offsetAttr->getOffset();
             auto size = sizeAttr->getSize();
-            auto count = size.getFiniteValueOr(ShaderBindingRange::k_unsizedRegisterCount);
+            auto count = size.isFinite() ? size.getFiniteValue() : 0;
             _insertBinding(outMetadata.m_usedBindings, kind, spaceIndex, registerIndex, count);
         }
     }
