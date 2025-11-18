@@ -252,6 +252,8 @@ def _cuda_sm_8_0 : _cuda_sm_7_0;
 def _cuda_sm_9_0 : _cuda_sm_8_0;
 /// Represents capabilities required for optix cooperative vector support.
 def optix_coopvec : _cuda_sm_9_0;
+/// Represents capabilities required for optix multi-level traversal support.
+def optix_multilevel_traversal : _cuda_sm_5_0;
 
 /// All code-gen targets
 /// [Compound]
@@ -2107,6 +2109,10 @@ alias texture_querylevels = texture_sm_4_1 | GL_ARB_texture_query_levels;
 /// [Compound]
 alias texture_shadowlod = texture_sm_4_1 | GL_EXT_texture_shadow_lod
                         | texture_sm_4_1;
+/// Capabilities required for shadow texture sampling with bias and gradients.
+/// New in HLSL SM6.8 but existed in older GLSL and SPIRV targets.
+/// [Compound]
+alias texture_shadowgrad = _sm_6_8 | _GLSL_150 | spirv_1_0 | GL_EXT_texture_shadow_lod;
 
 /// (GLSL/SPIRV) Capabilities required to use GLSL-tier-1 float-atomic operations
 /// [Compound]
