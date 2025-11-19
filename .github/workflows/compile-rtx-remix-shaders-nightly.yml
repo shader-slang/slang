@@ -23,6 +23,7 @@ jobs:
       - name: Checkout Slang repository
         uses: actions/checkout@v4
         with:
+          submodules: "recursive"
           fetch-depth: 1 # Shallow clone for speed
 
       # Python 3.9+ required by Meson
