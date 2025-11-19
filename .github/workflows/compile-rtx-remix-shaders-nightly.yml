@@ -41,6 +41,10 @@ jobs:
         run: ninja --version
         shell: pwsh
 
+      # Set up MSVC environment (required even for Ninja builds on Windows)
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
       # Cache Slang build artifacts to speed up subsequent runs
       - name: Cache Slang build
         uses: actions/cache@v4
