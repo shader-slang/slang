@@ -128,13 +128,17 @@ jobs:
           # Verify which slangc will be used
           $whichSlangc = (Get-Command slangc.exe -ErrorAction SilentlyContinue).Source
           Write-Host "Using slangc from: $whichSlangc" -ForegroundColor Yellow
-          & slangc.exe --version
 
           Write-Host "Start time: $(Get-Date -Format 'HH:mm:ss')" -ForegroundColor Gray
           $startTime = Get-Date
 
           cd dxvk-remix
           .\build_shaders_only.ps1
+
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "RTX Remix shader build failed with exit code $LASTEXITCODE"
+            exit $LASTEXITCODE
+          }
 
           $endTime = Get-Date
           $duration = $endTime - $startTime
@@ -196,27 +200,3 @@ jobs:
         shell: pwsh
         env:
           BUILD_RESULT: ${{ job.status }}
-
-      # Optional: Create GitHub issue on failure to track
-      # Uncomment when moving to required checks
-      # - name: Create issue on failure
-      #   if: failure()
-      #   uses: actions/github-script@v7
-      #   with:
-      #     script: |
-      #       const title = `RTX Remix Shader Test Failed - ${new Date().toISOString().split('T')[0]}`;
-      #       const body = `The nightly RTX Remix shader compilation test has failed.
-      #
-      #       **Workflow Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-      #       **Commit:** ${{ github.sha }}
-      #
-      #       This may indicate a breaking change in the Slang compiler that affects RTX Remix shaders.
-      #       Please review the build logs and coordinate with the RTX Remix team if needed.`;
-      #
-      #       github.rest.issues.create({
-      #         owner: context.repo.owner,
-      #         repo: context.repo.repo,
-      #         title: title,
-      #         body: body,
-      #         labels: ['rtx-remix-shaders', 'ci-failure']
-      #       });
