@@ -3,11 +3,200 @@ name: RTX Remix Shaders (Nightly)
 on:
   workflow_dispatch:
   schedule:
+    # Run daily at 3 AM UTC (after coverage runs)
     - cron: "0 3 * * *"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read # Read slang repo
+  issues: write # To create issues on failure (optional)
 
 jobs:
   rtx-remix-shader-test:
     runs-on: windows-2022
+    timeout-minutes: 45 # Slang build ~10-15 min + RTX Remix shaders ~10-15 min + buffer
+
     steps:
-      - name: Placeholder
-        run: echo "Workflow framework placeholder. Real implementation in PR."
+      - name: Checkout Slang repository
+        uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          fetch-depth: 1 # Shallow clone for speed
+
+      # Python 3.9+ required by Meson
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Meson build system
+      - name: Install Meson
+        run: pip install meson==1.9.1
+        shell: pwsh
+
+      # Ninja should be pre-installed on windows-2022
+      - name: Verify Ninja
+        run: ninja --version
+        shell: pwsh
+
+      # Set up MSVC environment (required even for Ninja builds on Windows)
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      # Cache Slang build artifacts to speed up subsequent runs
+      - name: Cache Slang build
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/
+          key: slang-build-${{ runner.os }}-${{ hashFiles('source/**', 'CMakeLists.txt', 'cmake/**') }}
+          restore-keys: |
+            slang-build-${{ runner.os }}-
+
+      # Build Slang from checked-out source
+      # Uses the same approach as CI: cmake --preset default + cmake --workflow --preset release
+      - name: Build Slang
+        run: |
+          Write-Host "Building Slang (Release)..." -ForegroundColor Cyan
+          Write-Host "CMake version: $(cmake --version | Select-Object -First 1)" -ForegroundColor Gray
+
+          $startTime = Get-Date
+
+          # Configure with default preset (Ninja Multi-Config)
+          cmake --preset default --fresh -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
+
+          # Build using workflow preset (configure + build + package)
+          cmake --workflow --preset release
+
+          $duration = (Get-Date) - $startTime
+          Write-Host "Slang build completed in $($duration.TotalMinutes.ToString('0.00')) minutes" -ForegroundColor Green
+
+          # Verify slangc was built
+          $slangcPath = "build/Release/bin/slangc.exe"
+          if (Test-Path $slangcPath) {
+            Write-Host "✓ slangc built successfully at: $slangcPath" -ForegroundColor Green
+            & $slangcPath -version
+          } else {
+            Write-Error "Failed to build slangc"
+            exit 1
+          }
+        shell: pwsh
+
+      # Clone dxvk-remix with all submodules (pinned to specific commit for stability)
+      - name: Clone dxvk-remix repository
+        run: |
+          Write-Host "Cloning dxvk-remix repository..." -ForegroundColor Cyan
+          git clone --recursive --depth 1 https://github.com/NVIDIAGameWorks/dxvk-remix.git
+          cd dxvk-remix
+          $commit = git rev-parse HEAD
+          Write-Host "Using dxvk-remix commit: $commit" -ForegroundColor Yellow
+        shell: pwsh
+
+      # Cache packman packages between runs to save ~2-5 minutes
+      - name: Cache Packman packages
+        uses: actions/cache@v4
+        with:
+          path: C:\packman-repo
+          key: packman-${{ hashFiles('dxvk-remix/packman-external.xml') }}
+          restore-keys: |
+            packman-
+
+      # Download shader compilation tools via packman
+      # First run: ~2-5 min (downloads ~340MB)
+      # Cached run: ~30 seconds
+      - name: Download external dependencies (packman)
+        run: |
+          Write-Host "Downloading packman dependencies..." -ForegroundColor Cyan
+          cd dxvk-remix
+          .\scripts-common\packman\packman.cmd pull packman-external.xml
+        shell: pwsh
+
+      # Build shaders using build_shaders_only.ps1
+      # This script handles both configuration and compilation
+      - name: Build shaders using build_shaders_only.ps1
+        run: |
+          Write-Host "Building RTX Remix shaders using build_shaders_only.ps1..." -ForegroundColor Cyan
+
+          # Add our built Slang to PATH so dxvk-remix uses it instead of packman version
+          $slangBinPath = Resolve-Path "$PWD\build\Release\bin"
+          Write-Host "Adding Slang build to PATH: $slangBinPath" -ForegroundColor Yellow
+          $env:PATH = "$slangBinPath;$env:PATH"
+
+          # Verify which slangc will be used
+          $whichSlangc = (Get-Command slangc.exe -ErrorAction SilentlyContinue).Source
+          Write-Host "Using slangc from: $whichSlangc" -ForegroundColor Yellow
+
+          Write-Host "Start time: $(Get-Date -Format 'HH:mm:ss')" -ForegroundColor Gray
+          $startTime = Get-Date
+
+          cd dxvk-remix
+          .\build_shaders_only.ps1
+
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "RTX Remix shader build failed with exit code $LASTEXITCODE"
+            exit $LASTEXITCODE
+          }
+
+          $endTime = Get-Date
+          $duration = $endTime - $startTime
+          Write-Host "End time: $(Get-Date -Format 'HH:mm:ss')" -ForegroundColor Gray
+          Write-Host "Build duration: $($duration.TotalMinutes.ToString('0.00')) minutes" -ForegroundColor Green
+        shell: pwsh
+
+      # Verify build output
+      - name: Verify shader compilation
+        run: |
+          Write-Host "Verifying shader compilation output..." -ForegroundColor Cyan
+          cd dxvk-remix\_BuildShadersOnly\src\dxvk\rtx_shaders
+
+          $headers = (Get-ChildItem -Filter "*.h" -ErrorAction Stop).Count
+          $spvFiles = (Get-ChildItem -Filter "*.spv" -ErrorAction Stop).Count
+          $totalSize = [math]::Round((Get-ChildItem -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB, 2)
+
+          Write-Host "Compiled shader headers (.h): $headers" -ForegroundColor Cyan
+          Write-Host "SPIR-V binary files (.spv): $spvFiles" -ForegroundColor Cyan
+          Write-Host "Total output size: $totalSize MB" -ForegroundColor Cyan
+
+          # Validate minimum expected output (based on testing: 195 headers, 187 spv)
+          if ($headers -lt 100 -or $spvFiles -lt 100) {
+            Write-Error "Expected at least 100 shader files, but got $headers headers and $spvFiles .spv files"
+            Write-Error "This may indicate a shader compilation failure or incomplete build"
+            exit 1
+          }
+
+          Write-Host ""
+          Write-Host "✓ RTX Remix shader compilation successful!" -ForegroundColor Green
+          Write-Host "  All $headers shader variants compiled correctly" -ForegroundColor Green
+        shell: pwsh
+
+      # Upload build logs on failure for debugging
+      - name: Upload build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rtx-remix-shader-build-logs
+          path: |
+            dxvk-remix/_BuildShadersOnly/meson-logs/
+          retention-days: 7
+
+      # Report results
+      - name: Report results
+        if: always()
+        run: |
+          Write-Host ""
+          Write-Host "================================================" -ForegroundColor Cyan
+          if ($env:BUILD_RESULT -eq "0" -or $LASTEXITCODE -eq 0) {
+            Write-Host "✓ RTX Remix shader test PASSED" -ForegroundColor Green
+            Write-Host "  Slang compiler changes are compatible with RTX Remix shaders" -ForegroundColor Green
+          } else {
+            Write-Host "✗ RTX Remix shader test FAILED" -ForegroundColor Red
+            Write-Host "  Slang compiler changes may have broken RTX Remix shader compilation" -ForegroundColor Red
+            Write-Host "  Review build logs for details" -ForegroundColor Yellow
+          }
+          Write-Host "================================================" -ForegroundColor Cyan
+        shell: pwsh
+        env:
+          BUILD_RESULT: ${{ job.status }}
