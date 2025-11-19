@@ -3456,7 +3456,7 @@ static RefPtr<TypeLayout> _createParameterGroupTypeLayout(
             auto offset = containerTypeResInfo->count.getFiniteValue();
             if (offset.isValid())
             {
-                elementVarResInfo->index += offset.getValidValue();
+                elementVarResInfo->index += LayoutOffset(offset.getValidValue());
             }
         }
     }
@@ -3687,7 +3687,7 @@ RefPtr<StructuredBufferTypeLayout> createStructuredBufferWithCounterTypeLayout(
         auto counterResourceInfo = counterVarLayout->findOrAddResourceInfo(typeResourceInfo.kind);
         // We expect this index to be 1
         auto offset = typeResourceInfo.count.getFiniteValue();
-        counterResourceInfo->index = offset.isValid() ? offset.getValidValue() : 0;
+        counterResourceInfo->index = offset.isValid() ? LayoutOffset(offset.getValidValue()) : LayoutOffset::invalid();
     }
 
     typeLayout->counterVarLayout = counterVarLayout;
@@ -4044,11 +4044,11 @@ static RefPtr<TypeLayout> maybeAdjustLayoutForArrayElementType(
                         auto countOffset = elementCount.getFiniteValue();
                         if (countOffset.isValid())
                         {
-                            resInfo.index *= countOffset.getValidValue();
+                            resInfo.index *= LayoutOffset(countOffset.getValidValue());
                         }
                         else
                         {
-                            resInfo.index = 0;
+                            resInfo.index = LayoutOffset(0);
                         }
                     }
                     else
@@ -4058,7 +4058,7 @@ static RefPtr<TypeLayout> maybeAdjustLayoutForArrayElementType(
                         // and it will start at register zero in that space.
                         //
                         requireNewSpace = true;
-                        resInfo.index = 0;
+                        resInfo.index = LayoutOffset(0);
                         resInfo.space = 0;
                     }
                 }
@@ -4067,7 +4067,7 @@ static RefPtr<TypeLayout> maybeAdjustLayoutForArrayElementType(
             {
                 auto offset = spaceOffsetForField.getFiniteValue();
                 adjustedField->findOrAddResourceInfo(LayoutResourceKind::RegisterSpace)->index =
-                    offset.isValid() ? offset.getValidValue() : 0;
+                    offset.isValid() ? LayoutOffset(offset.getValidValue()) : LayoutOffset::invalid();
             }
 
             adjustedStructTypeLayout->fields.add(adjustedField);
@@ -4238,7 +4238,7 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
     {
         auto offset = uniformOffset.getFiniteValue();
         fieldLayout->AddResourceInfo(LayoutResourceKind::Uniform)->index =
-            offset.isValid() ? offset.getValidValue() : 0;
+            offset.isValid() ? LayoutOffset(offset.getValidValue()) : LayoutOffset::invalid();
     }
 
     // Add offset information for any other resource kinds
@@ -4278,9 +4278,9 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
             //
             auto offset = spaceOffset.getFiniteValue();
             fieldLayout->findOrAddResourceInfo(LayoutResourceKind::RegisterSpace)->index =
-                offset.isValid() ? offset.getValidValue() : 0;
+                offset.isValid() ? LayoutOffset(offset.getValidValue()) : LayoutOffset::invalid();
             fieldResourceInfo->space = 0;
-            fieldResourceInfo->index = 0;
+            fieldResourceInfo->index = LayoutOffset(0);
         }
         else
         {
@@ -4292,7 +4292,7 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
             auto structTypeResourceInfo =
                 m_typeLayout->findOrAddResourceInfo(fieldTypeResourceInfo.kind);
             auto offset = structTypeResourceInfo->count.getFiniteValue();
-            fieldResourceInfo->index = offset.isValid() ? offset.getValidValue() : 0;
+            fieldResourceInfo->index = offset.isValid() ? LayoutOffset(offset.getValidValue()) : LayoutOffset::invalid();
             structTypeResourceInfo->count += fieldTypeResourceInfo.count;
             if (fieldTypeResourceInfo.kind == LayoutResourceKind::SubElementRegisterSpace &&
                 canTypeDirectlyUseRegisterSpace(fieldTypeLayout))
@@ -4325,7 +4325,7 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addExplicitUniformField(
     UInt uniformOffset = packoffsetModifier->uniformOffset;
     if (fieldResult.layout->FindResourceInfo(LayoutResourceKind::Uniform))
     {
-        fieldLayout->AddResourceInfo(LayoutResourceKind::Uniform)->index = uniformOffset;
+        fieldLayout->AddResourceInfo(LayoutResourceKind::Uniform)->index = LayoutOffset(uniformOffset);
     }
     UniformLayoutInfo fieldInfo = fieldResult.info.getUniformLayout();
     auto uniformInfo = m_info;

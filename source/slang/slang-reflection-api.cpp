@@ -1266,8 +1266,19 @@ static size_t getReflectionSize(LayoutSize size)
         if (offset.isValid())
             return offset.getValidValue();
     }
+    
+    if (size.isInfinite())
+        return SLANG_UNBOUNDED_SIZE;
 
-    return SLANG_UNBOUNDED_SIZE;
+    return SLANG_UNKNOWN_SIZE;
+}
+
+static size_t getReflectionOffset(LayoutOffset offset)
+{
+    if (offset.isValid())
+        return offset.getValidValue();
+    else
+        return SLANG_UNKNOWN_SIZE;
 }
 
 static int32_t getAlignment(TypeLayout* typeLayout, SlangParameterCategory category)
@@ -1687,7 +1698,8 @@ Int _calcIndexOffset(BindingRangePathLink* path, LayoutResourceKind kind)
     {
         if (auto resInfo = link->var->FindResourceInfo(kind))
         {
-            result += resInfo->index;
+            if (resInfo->index.isValid())
+                result += resInfo->index.getValidValue();
         }
     }
     return result;
@@ -1915,7 +1927,7 @@ struct ExtendedTypeLayoutContext
         {
             auto kind = typeResInfo.kind;
             auto varResInfo = varLayout->findOrAddResourceInfo(kind);
-            varResInfo->index = _calcIndexOffset(path, kind);
+            varResInfo->index = LayoutOffset(_calcIndexOffset(path, kind));
             varResInfo->space = _calcSpaceOffset(path, kind);
         }
 
@@ -2060,7 +2072,7 @@ struct ExtendedTypeLayoutContext
                 if (auto resInfo = path.primary->var->FindResourceInfo(
                         LayoutResourceKind::SubElementRegisterSpace))
                 {
-                    subObjectRange.spaceOffset = resInfo->index;
+                    subObjectRange.spaceOffset = resInfo->index.isValid() ? resInfo->index.getValidValue() : 0;
                 }
             }
             // It is possible that the sub-object has descriptor ranges
@@ -3285,7 +3297,7 @@ SLANG_API size_t spReflectionVariableLayout_GetOffset(
 {
     auto varLayout = convert(inVarLayout);
     if (!varLayout)
-        return 0;
+        return SLANG_UNKNOWN_SIZE;
 
     auto info = varLayout->FindResourceInfo(LayoutResourceKind(category));
 
@@ -3297,9 +3309,9 @@ SLANG_API size_t spReflectionVariableLayout_GetOffset(
     }
 
     if (!info)
-        return 0;
+        return SLANG_UNKNOWN_SIZE;
 
-    return info->index;
+    return getReflectionOffset(info->index);
 }
 
 SLANG_API size_t spReflectionVariableLayout_GetSpace(
@@ -3328,7 +3340,8 @@ SLANG_API size_t spReflectionVariableLayout_GetSpace(
     }
 
     if (auto regSpaceInfo = varLayout->FindResourceInfo(LayoutResourceKind::RegisterSpace))
-        space += regSpaceInfo->index;
+        if (regSpaceInfo->index.isValid())
+            space += regSpaceInfo->index.getValidValue();
 
     // Note: this code used to try and take a variable with
     // an offset for `LayoutResourceKind::RegisterSpace` and
@@ -4441,7 +4454,7 @@ SLANG_API SlangUInt spReflection_getGlobalConstantBufferBinding(SlangReflection*
     auto cb = program->parametersLayout->FindResourceInfo(LayoutResourceKind::ConstantBuffer);
     if (!cb)
         return 0;
-    return cb->index;
+    return cb->index.isValid() ? cb->index.getValidValue() : SLANG_UNKNOWN_SIZE;
 }
 
 SLANG_API size_t spReflection_getGlobalConstantBufferSize(SlangReflection* inProgram)

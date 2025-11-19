@@ -1623,7 +1623,7 @@ static void applyBindingInfoToParameter(
         // Add a record to the variable layout
         auto varRes = varLayout->AddResourceInfo(kind);
         varRes->space = (int)bindingInfo.space;
-        varRes->index = (int)bindingInfo.index;
+        varRes->index = LayoutOffset((int)bindingInfo.index);
     }
 }
 
@@ -1997,7 +1997,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
                     continue;
 
                 auto varResInfo = varLayout->findOrAddResourceInfo(kind);
-                varResInfo->index = location;
+                varResInfo->index = LayoutOffset(location);
 
                 // Note: OpenGL and Vulkan represent dual-source color blending
                 // differently from multiple render targets (MRT) at the source
@@ -2392,7 +2392,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                     auto structTypeResInfo = structLayout->findOrAddResourceInfo(kind);
                     auto fieldResInfo = fieldVarLayout->findOrAddResourceInfo(kind);
                     auto offset = structTypeResInfo->count.getFiniteValue();
-                    fieldResInfo->index = offset.isValid() ? offset.getValidValue() : 0;
+                    fieldResInfo->index = offset.isValid() ? LayoutOffset(offset.getValidValue()) : LayoutOffset::invalid();
                     structTypeResInfo->count += fieldTypeResInfo.count;
                 }
             }
@@ -2492,7 +2492,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                             //
                             fieldResInfo = fieldVarLayout->findOrAddResourceInfo(kind);
                             auto offset = structTypeResInfo->count.getFiniteValue();
-                            fieldResInfo->index = offset.isValid() ? offset.getValidValue() : 0;
+                            fieldResInfo->index = offset.isValid() ? LayoutOffset(offset.getValidValue()) : LayoutOffset::invalid();
                             structTypeResInfo->count += fieldTypeResInfo.count;
                         }
                         else
@@ -2723,7 +2723,7 @@ struct ScopeLayoutBuilder
 
             auto offset = uniformOffset.getFiniteValue();
             varLayout->findOrAddResourceInfo(LayoutResourceKind::Uniform)->index =
-                offset.isValid() ? offset.getValidValue() : 0;
+                offset.isValid() ? LayoutOffset(offset.getValidValue()) : LayoutOffset::invalid();
         }
 
         m_structLayout->fields.add(varLayout);
@@ -2833,7 +2833,9 @@ struct SimpleScopeLayoutBuilder : ScopeLayoutBuilder
                 //
                 auto startOffset = paramResInfo->index;
                 auto endOffset = startOffset + paramTypeResInfo.count;
-                usedRangeSet[int(kind)].Add(paramVarLayout, startOffset, endOffset);
+                usedRangeSet[int(kind)].Add(paramVarLayout, 
+                    startOffset.isValid() ? startOffset.getValidValue() : 0,
+                    endOffset.isValid() ? endOffset.getValidValue() : 0);
             }
         }
         //
@@ -2860,9 +2862,9 @@ struct SimpleScopeLayoutBuilder : ScopeLayoutBuilder
                 paramResInfo = paramVarLayout->findOrAddResourceInfo(kind);
 
                 auto offset = paramTypeResInfo.count.getFiniteValue();
-                paramResInfo->index = usedRangeSet[int(kind)].Allocate(
+                paramResInfo->index = LayoutOffset(usedRangeSet[int(kind)].Allocate(
                     paramVarLayout,
-                    offset.isValid() ? offset.getValidValue() : 0);
+                    offset.isValid() ? offset.getValidValue() : 0));
             }
         }
         //
@@ -3214,7 +3216,7 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
                 auto entryPointRes = paramsStructLayout->findOrAddResourceInfo(rr.kind);
                 auto offset = entryPointRes->count.getFiniteValue();
                 resultLayout->findOrAddResourceInfo(rr.kind)->index =
-                    offset.isValid() ? offset.getValidValue() : 0;
+                    offset.isValid() ? LayoutOffset(offset.getValidValue()) : LayoutOffset::invalid();
                 entryPointRes->count += rr.count;
             }
         }
@@ -3898,13 +3900,13 @@ static void _maybeApplyHLSLToVulkanShifts(
                 if (shift != HLSLToVulkanLayoutOptions::kInvalidShift)
                 {
                     // Apply the shift
-                    resourceInfo.index += shift;
+                    resourceInfo.index += LayoutOffset(shift);
 
                     // Fix the parameter binding info
                     bindingInfo.index += shift;
 
                     // Presumably they should both match
-                    SLANG_ASSERT(bindingInfo.index == resourceInfo.index);
+                    SLANG_ASSERT(bindingInfo.index == (resourceInfo.index.isValid() ? resourceInfo.index.getValidValue() : 0));
                     SLANG_ASSERT(bindingInfo.space == resourceInfo.space);
                 }
 
@@ -4301,7 +4303,7 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
         auto cbInfo = globalScopeVarLayout->findOrAddResourceInfo(globalConstantBufferBinding.kind);
 
         cbInfo->space = globalConstantBufferBinding.space;
-        cbInfo->index = globalConstantBufferBinding.index;
+        cbInfo->index = LayoutOffset(globalConstantBufferBinding.index);
     }
 
     programLayout->parametersLayout = globalScopeVarLayout;

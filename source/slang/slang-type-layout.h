@@ -461,12 +461,45 @@ inline LayoutOffset operator/(LayoutOffset left, LayoutOffset right)
     return result;
 }
 
+inline LayoutOffset operator+(LayoutOffset offset, LayoutSize size)
+{
+    if (offset.isInvalid() || size.isInvalid())
+        return LayoutOffset::invalid();
+    
+    if (size.isInfinite())
+        return LayoutOffset::invalid(); // Infinite size can't be added to finite offset
+    
+    auto finiteSize = size.getFiniteValue();
+    if (!finiteSize.isValid())
+        return LayoutOffset::invalid();
+    
+    return offset + finiteSize;
+}
+
 inline LayoutOffset maximum(LayoutOffset left, LayoutOffset right)
 {
     if (left.isInvalid() || right.isInvalid())
         return LayoutOffset::invalid();
 
     return LayoutOffset(Math::Max(left.getValidValue(), right.getValidValue()));
+}
+
+inline LayoutSize maximum(LayoutSize left, LayoutOffset right)
+{
+    if (left.isInvalid() || right.isInvalid())
+        return LayoutSize::invalid();
+    
+    if (left.isInfinite())
+        return LayoutSize::infinite();
+    
+    if (!left.isFinite())
+        return LayoutSize::invalid();
+    
+    auto leftOffset = left.getFiniteValue();
+    if (!leftOffset.isValid())
+        return LayoutSize::invalid();
+    
+    return LayoutSize(Math::Max(leftOffset.getValidValue(), right.getValidValue()));
 }
 
 
@@ -828,7 +861,7 @@ public:
         // What is our starting register in that space?
         //
         // (In the case of uniform data, this is a byte offset)
-        UInt index;
+        LayoutOffset index;
     };
     List<ResourceInfo> resourceInfos;
 
@@ -847,7 +880,7 @@ public:
         ResourceInfo info;
         info.kind = kind;
         info.space = 0;
-        info.index = 0;
+        info.index = LayoutOffset(0);
 
         resourceInfos.add(info);
         return &resourceInfos.getLast();
