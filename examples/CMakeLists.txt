@@ -3,9 +3,19 @@ function(example dir)
 
     set(debug_dir ${CMAKE_CURRENT_BINARY_DIR}/${dir})
 
+    # CONFIGURE_DEPENDS removed to prevent intermittent build failures on Windows.
+    #
+    # Root cause: All examples share the same examples/CMakeFiles/generate.stamp file.
+    # When building in parallel, multiple targets trigger simultaneous CMake regenerations,
+    # causing a race condition on the shared stamp file (~10% failure rate).
+    #
+    # Long-term fix: Move each example() call to add_subdirectory() with its own CMakeLists.txt
+    # to isolate generate.stamp files. For now, developers must manually re-run cmake configure
+    # when adding new asset files to example directories.
+    #
+    # See: https://gitlab.kitware.com/cmake/cmake/-/issues/21571
     file(
         GLOB asset_files
-        CONFIGURE_DEPENDS
         "${dir}/*.slang"
         "${dir}/*.jpg"
         "${dir}/*.obj"
