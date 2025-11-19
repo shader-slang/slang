@@ -17175,10 +17175,10 @@ matrix<T,N,M> WaveMultiPrefix$(opName.name)(matrix<T,N,M> value, uint4 mask)
 {
     __target_switch
     {
-    ${{ if(opName.cudaMatrixVariantSupport) { $}
+    ${ if(opName.cudaMatrixVariantSupport) { $}
     case cuda:
         __intrinsic_asm "_wavePrefix$(opName.cudaName)Multiple($1.x, $0) $(opName.cudaExtraOperation)";
-    ${{ } $}
+    ${ } $}
     default:
         matrix<T, N, M> result;
         for (int i = 0; i < N; ++i)
@@ -22543,7 +22543,6 @@ func saturated_cooperation_using<A, B, C>(
 }
 
 
-${
 // The NVAPI operations are defined to take the space/register
 // indices of their texture and sampler parameters, rather than
 // taking the texture/sampler objects directly.
@@ -22555,7 +22554,6 @@ ${
 // have a built-in `interface` that all of the opaque resource
 // types conform to, so that we can define builtins that work
 // for any resource type.
-}
 
 __intrinsic_op($(kIROp_GetRegisterSpace)) uint __getRegisterSpace<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>(_Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> texture);
 __intrinsic_op($(kIROp_GetRegisterSpace)) uint __getRegisterSpace(SamplerState sampler);
@@ -22565,7 +22563,6 @@ __intrinsic_op($(kIROp_GetRegisterIndex)) uint __getRegisterIndex(SamplerState s
 
 //@public:
 
-${
 //
 // Texture Footprint Queries
 //
@@ -22597,7 +22594,6 @@ ${
 // data that is returned by the GLSL API via the
 // function reuslt.
 //
-$}
 
 [__NoSideEffect]
 [__requiresNVAPI]
@@ -22744,46 +22740,40 @@ typealias TextureFootprint2D = TextureFootprint<2>;
 ///@category stage_io
 typealias TextureFootprint3D = TextureFootprint<3>;
 
-${
 // We define the new operations via an `extension`
 // on the relevant texture type(s), rather than
 // further clutter the original type declarations.
-}
 
 __generic<T:ITexelElement, Shape: __ITextureShape, let sampleCount:int, let isShadow:int, let format:int>
 extension _Texture<T,Shape,0,0,sampleCount,0,isShadow,0,format>
 {
-${
-// We introduce a few convenience type aliases here,
-// which both keep our declarations simpler and easier
-// to understand, but which might *also* be useful to
-// users of the standard module, so that they can write things
-// like `Texture2D.Footprint`, and also have auto-complete
-// help them find such members.
-//
-// TODO: The `Coords` type really ought to be something
-// defined on the base texture types, rather than via
-// this `extension`.
-}
+    // We introduce a few convenience type aliases here,
+    // which both keep our declarations simpler and easier
+    // to understand, but which might *also* be useful to
+    // users of the standard module, so that they can write things
+    // like `Texture2D.Footprint`, and also have auto-complete
+    // help them find such members.
+    //
+    // TODO: The `Coords` type really ought to be something
+    // defined on the base texture types, rather than via
+    // this `extension`.
+
     typealias Coords = vector<float, Shape.dimensions>;
     typealias Footprint = TextureFootprint<Shape.dimensions>;
     typealias __FootprintData = __TextureFootprintData<Shape.dimensions>;
     typealias FootprintGranularity = Footprint.Granularity;
 
-${
-// For the GLSL extension, the choice between the
-// coarse and fine level is modeled as a `bool`
-// parameter to the query operation(s). We define
-// the GLSL functions here as intrinsics, so that
-// we can refer to them later in the definitions
-// of our standard module operaitons; not just in glsl module.
-//
-// Note: despite the GLSL extension defining the `granularity`
-// member of the query result as having type `uint`, the
-// function signatures all take `int` parameters for the
-// granularity instead.
-//
-}
+    // For the GLSL extension, the choice between the
+    // coarse and fine level is modeled as a `bool`
+    // parameter to the query operation(s). We define
+    // the GLSL functions here as intrinsics, so that
+    // we can refer to them later in the definitions
+    // of our standard module operaitons; not just in glsl module.
+    //
+    // Note: despite the GLSL extension defining the `granularity`
+    // member of the query result as having type `uint`, the
+    // function signatures all take `int` parameters for the
+    // granularity instead.
 
     [__NoSideEffect]
     __glsl_version(450)
@@ -22931,9 +22921,8 @@ ${
     }
 
 
-${
     // Texture sampling with gradient is only available for 2D textures.
-$}
+
     [__NoSideEffect]
     __glsl_version(450)
     __glsl_extension(GL_NV_shader_texture_footprint)
@@ -22995,9 +22984,8 @@ $}
             };
         }
     }
-${
+
     // End texture2D specific functions.
-$}
 
 
 ${
@@ -23114,24 +23102,21 @@ $}
         }
     }
 
-${
-// We now define the portable operations that will be officially
-// supported by the standard module. For each operation, we
-// need to provide both a version that maps to the GLSL extension,
-// and a version that uses the NVAPI functions.
-//
-// Some function variations are only available with one extension
-// or the other, so we try our best to only define them where
-// each is available.
-//
-// Note that these functions cannot be marked as [ForceInline] for now
-// because the texture resource may get removed after DCE, since the only
-// use of those resources are done through __GetRegisterIndex/Space, which is
-// replaced early with their binding slot in the compilation process.
-// Not inlining these function is a quick way to make sure the texture always
-// has live uses.
-//
-}
+    // We now define the portable operations that will be officially
+    // supported by the standard module. For each operation, we
+    // need to provide both a version that maps to the GLSL extension,
+    // and a version that uses the NVAPI functions.
+    //
+    // Some function variations are only available with one extension
+    // or the other, so we try our best to only define them where
+    // each is available.
+    //
+    // Note that these functions cannot be marked as [ForceInline] for now
+    // because the texture resource may get removed after DCE, since the only
+    // use of those resources are done through __GetRegisterIndex/Space, which is
+    // replaced early with their binding slot in the compilation process.
+    // Not inlining these function is a quick way to make sure the texture always
+    // has live uses.
 
     /// Query the footprint that would be accessed by a texture sampling operation.
     ///
@@ -23284,9 +23269,7 @@ ${
         }
     }
 
-${
     // TODO: Texture sampling with gradient is only available for 2D textures.
-$}
 
     /// Query the footprint that would be accessed by a texture sampling operation.
     ///
@@ -23349,12 +23332,10 @@ $}
         }
     }
 
-${
     // TODO: end texture2D specific functions.
-$}
 
 ${
-}
+} // for(auto levelChoice : kLevelChoices)
 $}
 
 } // extension
@@ -23619,7 +23600,7 @@ extension $(typeName) : __IDynamicResourceCastable<__DynamicResourceKind.$(dynam
 }
 
 ${
-}
+} // for (auto type : kDynamicResourceCastableTypes) {
 $}
 
 
