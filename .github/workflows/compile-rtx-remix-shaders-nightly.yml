@@ -70,23 +70,16 @@ jobs:
           .\scripts-common\packman\packman.cmd pull packman-external.xml
         shell: pwsh
 
-      # Configure the build (Meson setup)
-      - name: Configure shader-only build
+      # Build shaders using build_shaders_only.ps1
+      # This script handles both configuration and compilation
+      - name: Build shaders using build_shaders_only.ps1
         run: |
-          Write-Host "Configuring shader-only build with Meson..." -ForegroundColor Cyan
-          cd dxvk-remix
-          meson setup --buildtype release --backend ninja -Denable_tracy=False -Ddownload_apics=False _BuildShadersOnly
-        shell: pwsh
-
-      # Compile shaders (~3.20 minutes observed locally)
-      - name: Compile shaders
-        run: |
-          Write-Host "Compiling RTX Remix shaders..." -ForegroundColor Cyan
+          Write-Host "Building RTX Remix shaders using build_shaders_only.ps1..." -ForegroundColor Cyan
           Write-Host "Start time: $(Get-Date -Format 'HH:mm:ss')" -ForegroundColor Gray
           $startTime = Get-Date
 
-          cd dxvk-remix\_BuildShadersOnly
-          meson compile rtx_shaders
+          cd dxvk-remix
+          .\build_shaders_only.ps1
 
           $endTime = Get-Date
           $duration = $endTime - $startTime
