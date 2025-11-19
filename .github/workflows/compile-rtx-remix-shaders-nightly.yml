@@ -1,0 +1,13 @@
+name: RTX Remix Shaders (Nightly)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * *"
+
+jobs:
+  rtx-remix-shader-test:
+    runs-on: windows-2022
+    steps:
+      - name: Placeholder
+        run: echo "Workflow framework placeholder. Real implementation in PR."

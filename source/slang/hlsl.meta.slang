@@ -1062,7 +1062,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     ///
     /// For HLSL/D3D targets, the texture element type must be a scalar or vector of float or half types.
     ///
-    ///@see `SampleBias`, `SampleLevel`, `SampleLevelZero`, `SampleGrad`, `SampleCmp`, `SampleCmpLevelZero`, `SampleCmpLevel`.
+    ///@see `SampleBias`, `SampleLevel`, `SampleLevelZero`, `SampleGrad`, `SampleCmp`, `SampleCmpLevelZero`, `SampleCmpLevel`, `SampleCmpBias`, `SampleCmpGrad`.
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0_fragment)]
@@ -1576,6 +1576,150 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 %sparseResultType = OpTypeStruct $$uint $$float;
 
                 %sparseResult:%sparseResultType = OpImageSparseSampleDrefExplicitLod $this $location $compareValue Lod|ConstOffset $level $offset;
+
+                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                OpStore &status %residentCode;
+                result:$$float = OpCompositeExtract %sparseResult 1;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpGrad(vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
+    {
+        static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmpGrad(__getComparisonSampler(), location, compareValue, gradX, gradY);
+        case spirv:
+            return spirv_asm
+            {
+                result:$$float = OpImageSampleDrefExplicitLod $this $location $compareValue Grad $gradX $gradY;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpGrad(vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
+        static_assert(!(Shape is __ShapeCube), "SampleCmpGrad with offset is not supported for TextureCube or TextureCubeArray");
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmpGrad(__getComparisonSampler(), location, compareValue, gradX, gradY, offset);
+        case spirv:
+            return spirv_asm
+            {
+                result:$$float = OpImageSampleDrefExplicitLod $this $location $compareValue Grad|ConstOffset $gradX $gradY $offset;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpGrad(vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
+    {
+        static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
+        static_assert(!(Shape is __ShapeCube), "SampleCmpGrad with offset is not supported for TextureCube or TextureCubeArray");
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmpGrad(__getComparisonSampler(), location, compareValue, gradX, gradY, offset, status);
+        case spirv:
+            return spirv_asm
+            {
+                OpCapability SparseResidency;
+                %sparseResultType = OpTypeStruct $$uint $$float;
+
+                %sparseResult:%sparseResultType = OpImageSparseSampleDrefExplicitLod $this $location $compareValue Grad|ConstOffset $gradX $gradY $offset;
+
+                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                OpStore &status %residentCode;
+                result:$$float = OpCompositeExtract %sparseResult 1;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpBias(vector<float, Shape.dimensions+isArray> location, float compareValue, float bias)
+    {
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmpBias(__getComparisonSampler(), location, compareValue, bias);
+        case spirv:
+            return spirv_asm
+            {
+                result:$$float = OpImageSampleDrefImplicitLod $this $location $compareValue Bias $bias;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpBias(vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmpBias(__getComparisonSampler(), location, compareValue, bias, offset);
+        case spirv:
+            return spirv_asm
+            {
+                result:$$float = OpImageSampleDrefImplicitLod $this $location $compareValue Bias|ConstOffset $bias $offset;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpBias(vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
+    {
+        static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmpBias(__getComparisonSampler(), location, compareValue, bias, offset, status);
+        case spirv:
+            return spirv_asm
+            {
+                OpCapability SparseResidency;
+                %sparseResultType = OpTypeStruct $$uint $$float;
+
+                %sparseResult:%sparseResultType = OpImageSparseSampleDrefImplicitLod $this $location $compareValue Bias|ConstOffset $bias $offset;
 
                 %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
                 OpStore &status %residentCode;
@@ -2775,6 +2919,156 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 %sampledImage:__sampledImageType(this) = OpSampledImage $this $s;
 
                 %sparseResult:%sparseResultType = OpImageSparseSampleDrefExplicitLod %sampledImage $location $compareValue Lod|ConstOffset $level $offset;
+
+                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                OpStore &status %residentCode;
+                result:$$float = OpCompositeExtract %sparseResult 1;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpGrad(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
+    {
+        static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleCmpGrad";
+        case spirv:
+            return spirv_asm
+            {
+                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
+                result:$$float = OpImageSampleDrefExplicitLod %sampledImage $location $compareValue Grad $gradX $gradY;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpGrad(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
+        static_assert(!(Shape is __ShapeCube), "SampleCmpGrad with offset is not supported for TextureCube or TextureCubeArray");
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleCmpGrad";
+        case spirv:
+            return spirv_asm
+            {
+                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
+                result:$$float = OpImageSampleDrefExplicitLod %sampledImage $location $compareValue Grad|ConstOffset $gradX $gradY $offset;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpGrad(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
+    {
+        static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
+        static_assert(!(Shape is __ShapeCube), "SampleCmpGrad with offset is not supported for TextureCube or TextureCubeArray");
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleCmpGrad";
+        case spirv:
+            return spirv_asm
+            {
+                OpCapability SparseResidency;
+                %sparseResultType = OpTypeStruct $$uint $$float;
+                %sampledImage:__sampledImageType(this) = OpSampledImage $this $s;
+
+                %sparseResult:%sparseResultType = OpImageSparseSampleDrefExplicitLod %sampledImage $location $compareValue Grad|ConstOffset $gradX $gradY $offset;
+
+                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                OpStore &status %residentCode;
+                result:$$float = OpCompositeExtract %sparseResult 1;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpBias(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float bias)
+    {
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleCmpBias";
+        case spirv:
+            return spirv_asm
+            {
+                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
+                result:$$float = OpImageSampleDrefImplicitLod %sampledImage $location $compareValue Bias $bias;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpBias(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleCmpBias";
+        case spirv:
+            return spirv_asm
+            {
+                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
+                result:$$float = OpImageSampleDrefImplicitLod %sampledImage $location $compareValue Bias|ConstOffset $bias $offset;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpBias(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
+    {
+        static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleCmpBias";
+        case spirv:
+            return spirv_asm
+            {
+                OpCapability SparseResidency;
+                %sparseResultType = OpTypeStruct $$uint $$float;
+                %sampledImage:__sampledImageType(this) = OpSampledImage $this $s;
+
+                %sparseResult:%sparseResultType = OpImageSparseSampleDrefImplicitLod %sampledImage $location $compareValue Bias|ConstOffset $bias $offset;
 
                 %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
                 OpStore &status %residentCode;
@@ -18338,13 +18632,14 @@ float3 ObjectRayDirection()
 /// @remarks Includes position and orientation of the current instance
 /// @category raytracing
 [NonUniformReturn]
-[require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
+[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float3x4 ObjectToWorld3x4()
 {
     __target_switch
     {
     case hlsl:  __intrinsic_asm "ObjectToWorld3x4";
     case glsl: __intrinsic_asm "transpose(gl_ObjectToWorldEXT)";
+    case cuda: __intrinsic_asm "slangOptixGetObjectToWorldTransformMatrix";
     case spirv:
         return spirv_asm
         {
@@ -18359,13 +18654,14 @@ float3x4 ObjectToWorld3x4()
 /// @remarks Inverse of the object-to-world transform
 /// @category raytracing
 [NonUniformReturn]
-[require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
+[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float3x4 WorldToObject3x4()
 {
     __target_switch
     {
     case hlsl:  __intrinsic_asm "WorldToObject3x4";
     case glsl: __intrinsic_asm "transpose(gl_WorldToObjectEXT)";
+    case cuda: __intrinsic_asm "slangOptixGetWorldToObjectTransformMatrix";
     case spirv:
         return spirv_asm
         {
@@ -18380,13 +18676,14 @@ float3x4 WorldToObject3x4()
 /// @remarks Transposed version of ObjectToWorld3x4
 /// @category raytracing
 [NonUniformReturn]
-[require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
+[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float4x3 ObjectToWorld4x3()
 {
     __target_switch
     {
     case hlsl:  __intrinsic_asm "ObjectToWorld4x3";
     case glsl: __intrinsic_asm "(gl_ObjectToWorldEXT)";
+    case cuda: __intrinsic_asm "slangOptixGetObjectToWorldTransformMatrix4x3";
     case spirv:
         return spirv_asm
         {
@@ -18400,13 +18697,14 @@ float4x3 ObjectToWorld4x3()
 /// @remarks Transposed version of WorldToObject3x4
 /// @category raytracing
 [NonUniformReturn]
-[require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
+[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float4x3 WorldToObject4x3()
 {
     __target_switch
     {
     case hlsl:  __intrinsic_asm "WorldToObject4x3";
     case glsl: __intrinsic_asm "(gl_WorldToObjectEXT)";
+    case cuda: __intrinsic_asm "slangOptixGetWorldToObjectTransformMatrix4x3";
     case spirv:
         return spirv_asm
         {
@@ -18615,6 +18913,159 @@ static const uint HIT_KIND_TRIANGLE_FRONT_FACE = 254;
 /// Predefined hit kind value for back-facing triangle intersections.
 /// @category raytracing
 static const uint HIT_KIND_TRIANGLE_BACK_FACE = 255;
+
+//
+// Multi-level Traversal Intrinsics
+//
+
+/// Type representing transform types in multi-level traversal.
+/// @category raytracing
+enum TRAVERSABLE_TRANSFORM_TYPE : uint
+{
+    /// No transformation applied
+    TRAVERSABLE_TRANSFORM_TYPE_NONE = 0,
+
+    /// Static matrix transformation
+    TRAVERSABLE_TRANSFORM_TYPE_STATIC = 1,
+
+    /// Matrix motion transformation
+    TRAVERSABLE_TRANSFORM_TYPE_MATRIX_MOTION = 2,
+
+    /// SRT (scale/rotation/translation) motion transformation
+    TRAVERSABLE_TRANSFORM_TYPE_SRT_MOTION = 3,
+
+    /// Instance transformation
+    TRAVERSABLE_TRANSFORM_TYPE_INSTANCE = 4
+};
+
+/// Returns the transform type of a traversable handle from a transform list.
+/// @param handle Traversable handle to query
+/// @return Transform type enumeration value
+/// @remarks Currently only supported on CUDA/OptiX
+/// @category raytracing
+[NonUniformReturn]
+[__readNone]
+[require(optix_multilevel_traversal, raytracing_stages)]
+TRAVERSABLE_TRANSFORM_TYPE GetTraversableTransformType(uint64_t handle)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "optixGetTransformTypeFromHandle";
+    }
+}
+
+/// Returns an instance traversable from an IAS by index.
+/// @param ias Instance acceleration structure handle
+/// @param instIdx Instance index
+/// @return Traversable handle for the specified instance
+/// @remarks IAS must be built with OPTIX_BUILD_FLAG_ALLOW_RANDOM_INSTANCE_ACCESS
+/// @remarks Currently only supported on CUDA/OptiX
+/// @category raytracing
+[NonUniformReturn]
+[__readNone]
+[require(optix_multilevel_traversal, raytracing_stages)]
+uint64_t GetInstanceTraversable(uint64_t ias, uint instIdx)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "optixGetInstanceTraversableFromIAS";
+    }
+}
+
+/// Returns the instance ID from a traversable handle.
+/// @param handle Traversable handle to query
+/// @return Instance ID, or 0 if handle does not reference an instance
+/// @remarks Currently only supported on CUDA/OptiX
+/// @category raytracing
+[NonUniformReturn]
+[__readNone]
+[require(optix_multilevel_traversal, raytracing_stages)]
+uint GetTraversableInstanceId(uint64_t handle)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "optixGetInstanceIdFromHandle";
+    }
+}
+
+/// Returns the child traversable handle from an instance traversable.
+/// @param handle Instance traversable handle to query
+/// @return Child traversable handle, or 0 if handle does not reference an instance
+/// @remarks Currently only supported on CUDA/OptiX
+/// @category raytracing
+[NonUniformReturn]
+[__readNone]
+[require(optix_multilevel_traversal, raytracing_stages)]
+uint64_t GetTraversableChild(uint64_t handle)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "optixGetInstanceChildFromHandle";
+    }
+}
+
+/// Returns the object-to-world transform from an instance traversable.
+/// @param handle Instance traversable handle to query
+/// @return 3x4 transform matrix representing the object-to-world transformation
+/// @remarks Currently only supported on CUDA/OptiX
+/// @category raytracing
+[NonUniformReturn]
+[__readNone]
+[require(optix_multilevel_traversal, raytracing_stages)]
+float3x4 GetTraversableObjectToWorld(uint64_t handle)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "_slang_optixGetInstanceTransformFromHandle";
+    }
+}
+
+/// Returns the world-to-object transform from an instance traversable.
+/// @param handle Instance traversable handle to query
+/// @return 3x4 transform matrix representing the world-to-object transformation
+/// @remarks Currently only supported on CUDA/OptiX
+/// @category raytracing
+[NonUniformReturn]
+[__readNone]
+[require(optix_multilevel_traversal, raytracing_stages)]
+float3x4 GetTraversableWorldToObject(uint64_t handle)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "_slang_optixGetInstanceInverseTransformFromHandle";
+    }
+}
+
+/// Returns the number of transforms in the path from root to the current primitive.
+/// @return Number of transforms from root traversable to current primitive
+/// @remarks Currently only supported on CUDA/OptiX. Can only be called from intersection, any-hit, or closest-hit programs.
+/// @category raytracing
+[NonUniformReturn]
+[__readNone]
+[require(optix_multilevel_traversal, raytracing_anyhit_closesthit_intersection)]
+uint GetTransformListSize()
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "optixGetTransformListSize";
+    }
+}
+
+/// Returns the traversable handle at a specific index in the transform path.
+/// @param index Index in the transform list (0 = root, GetTransformListSize()-1 = closest to primitive)
+/// @return Traversable handle at the specified index
+/// @remarks Currently only supported on CUDA/OptiX. Can only be called from intersection, any-hit, or closest-hit programs.
+/// @category raytracing
+[NonUniformReturn]
+[__readNone]
+[require(optix_multilevel_traversal, raytracing_anyhit_closesthit_intersection)]
+uint64_t GetTransformListHandle(uint index)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "optixGetTransformListHandle";
+    }
+}
 
 //
 // Shader Model 6.4
@@ -21098,13 +21549,14 @@ struct HitObject
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetHitKind()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".GetHitKind";
         case glsl: __intrinsic_asm "hitObjectGetHitKindNV($0)";
+        case cuda: __intrinsic_asm "optixHitObjectGetHitKind()";
         case spirv:
             return spirv_asm
             {
@@ -21296,12 +21748,13 @@ struct HitObject
     }
 
     [ForceInline]
-    [require(glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
     float3 GetObjectRayOrigin() {
         __target_switch
         {
         case glsl:
             __intrinsic_asm "hitObjectGetObjectRayOriginNV($0)";
+        case cuda: __intrinsic_asm "optixGetObjectRayOrigin()";
         case spirv:
             return spirv_asm
             {
@@ -21313,12 +21766,13 @@ struct HitObject
     }
 
     [ForceInline]
-    [require(glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
     float3 GetObjectRayDirection() {
         __target_switch
         {
         case glsl:
             __intrinsic_asm "hitObjectGetObjectRayDirectionNV($0)";
+        case cuda: __intrinsic_asm "optixGetObjectRayDirection()";
         case spirv:
             return spirv_asm
             {

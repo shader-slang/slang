@@ -4209,8 +4209,8 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
     {
         auto requiredParam = requiredParams[paramIndex];
         auto satisfyingParam = satisfyingParams[paramIndex];
-        if (getParameterDirection(requiredParam.getDecl()) !=
-            getParameterDirection(satisfyingParam.getDecl()))
+        if (getParamPassingMode(requiredParam.getDecl()) !=
+            getParamPassingMode(satisfyingParam.getDecl()))
             return false;
         auto requiredParamType = getType(m_astBuilder, requiredParam);
         auto satisfyingParamType = getType(m_astBuilder, satisfyingParam);
@@ -5697,16 +5697,16 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                     auto synParam = *synParamIter;
                     auto calleeParam = *calleeParamIter;
                     if (!matchParamDirection(
-                            getParameterDirection(calleeParam),
-                            getParameterDirection(synParam)))
+                            getParamPassingMode(calleeParam),
+                            getParamPassingMode(synParam)))
                     {
                         if (outFailureDetails)
                         {
                             outFailureDetails->reason =
                                 WitnessSynthesisFailureReason::ParameterDirMismatch;
                             outFailureDetails->candidateMethod = declRefExpr->declRef;
-                            outFailureDetails->actualDir = getParameterDirection(calleeParam);
-                            outFailureDetails->expectedDir = getParameterDirection(synParam);
+                            outFailureDetails->actualDir = getParamPassingMode(calleeParam);
+                            outFailureDetails->expectedDir = getParamPassingMode(synParam);
                             outFailureDetails->paramDecl = calleeParam;
                         }
                         return false;
@@ -9553,50 +9553,7 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
         checkMeshOutputDecl(paramDecl);
     }
 
-    if (auto declRefType = as<DeclRefType>(paramDecl->type.type))
-    {
-        if (declRefType->getDeclRef().getDecl()->findModifier<NonCopyableTypeAttribute>())
-        {
-            // Always pass a non-copyable type by reference.
-            // Remove all existing direction modifiers, and replace them with a single Ref modifier.
-            List<Modifier*> newModifiers;
-            bool hasRefModifier = false;
-            bool isMutable = false;
-            for (auto modifier : paramDecl->modifiers)
-            {
-                if (as<InModifier>(modifier))
-                {
-                    continue;
-                }
-                else if (as<InOutModifier>(modifier) || as<OutModifier>(modifier))
-                {
-                    isMutable = true;
-                    continue;
-                }
-                if (as<RefModifier>(modifier) || as<BorrowModifier>(modifier))
-                {
-                    hasRefModifier = true;
-                }
-                newModifiers.add(modifier);
-            }
-            if (!hasRefModifier)
-            {
-                if (isMutable)
-                    newModifiers.add(this->getASTBuilder()->create<RefModifier>());
-                else
-                    newModifiers.add(this->getASTBuilder()->create<BorrowModifier>());
-            }
-            paramDecl->modifiers.first = newModifiers.getFirst();
-            for (Index i = 0; i < newModifiers.getCount(); i++)
-            {
-                if (i < newModifiers.getCount() - 1)
-                    newModifiers[i]->next = newModifiers[i + 1];
-                else
-                    newModifiers[i]->next = nullptr;
-            }
-        }
-    }
-    else if (isTypePack(paramDecl->type.type))
+    if (isTypePack(paramDecl->type.type))
     {
         // For now, we only allow parameter packs to be `const`.
         bool hasConstModifier = false;
@@ -9605,6 +9562,12 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
             if (as<OutModifier>(modifier) || as<InOutModifier>(modifier) ||
                 as<RefModifier>(modifier) || as<BorrowModifier>(modifier))
             {
+                // TODO(tfoley): The diagnostic in this case should probably not refer
+                // to the `const` modifier at all (since that is not actually what is
+                // required), and should instead note that a parameter pack may only
+                // be declared as a pure input parameter to a function (`in` or
+                // `borrow`).
+                //
                 getSink()->diagnose(modifier, Diagnostics::parameterPackMustBeConst);
             }
             else if (as<ConstModifier>(modifier))
@@ -9612,6 +9575,13 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
                 hasConstModifier = true;
             }
         }
+
+        // TODO(tfoley): Rather than actually changing the modifiers
+        // on the parameter itself, this kind of logic should probably
+        // be folded into whatever logic computes the `QualType` for a
+        // parameter, and ensure that parameter packs are never treated
+        // as l-values.
+        //
         if (!hasConstModifier)
         {
             auto constModifier = this->getASTBuilder()->create<ConstModifier>();
@@ -10093,7 +10063,7 @@ void SemanticsDeclHeaderVisitor::setFuncTypeIntoRequirementDecl(
     {
         auto paramInfo = funcType->getParamInfo(i);
         auto paramType = paramInfo.type;
-        auto paramDir = paramInfo.direction;
+        auto paramDir = paramInfo.mode;
 
         auto param = m_astBuilder->create<ParamDecl>();
         param->type.type = paramType;
@@ -11551,11 +11521,13 @@ List<ExtensionDecl*> const& SharedSemanticsContext::getCandidateExtensionsForTyp
     // not been built before, or if some code caused the lists to
     // be invalidated.
     //
-    // TODO: Similar to the rebuilding of lookup tables in `ContainerDecl`s,
-    // we probably want to optimize this logic to gracefully handle new
-    // extensions encountered during checking instead of tearing the whole
-    // thing down. For now this potentially-quadratic behavior is acceptable
-    // because there just aren't that many extension declarations being used.
+    // For API/reflection contexts (when m_module is null), we use an
+    // incremental update strategy similar to ContainerDecl's lookup
+    // accelerators: we track how many modules we've processed and only
+    // add extensions from newly-loaded modules.
+    //
+    // For module-scoped contexts (when m_module is set), we don't need this
+    // check because all imports are processed upfront before the cache is built.
     //
     if (!m_candidateExtensionListsBuilt)
     {
@@ -11573,7 +11545,7 @@ List<ExtensionDecl*> const& SharedSemanticsContext::getCandidateExtensionsForTyp
         // There are two primary modes in which the `SharedSemanticsContext`
         // gets used.
         //
-        // In the first mode, we are checking an entire `ModuelDecl`, and we
+        // In the first mode, we are checking an entire `ModuleDecl`, and we
         // need to always check things from the "point of view" of that module
         // (so that the extensions that should be visible are based on what
         // that module can access via `import`s).
@@ -11616,7 +11588,29 @@ List<ExtensionDecl*> const& SharedSemanticsContext::getCandidateExtensionsForTyp
             {
                 _addCandidateExtensionsFromModule(module->getModuleDecl());
             }
+            m_candidateExtensionListsBuiltForModuleCount = m_linkage->loadedModulesList.getCount();
         }
+    }
+    else if (!m_module)
+    {
+        // For ad hoc contexts without a primary module, incrementally add
+        // extensions from any modules that have been loaded since we last
+        // updated the cache. This follows the same pattern as ContainerDecl's
+        // lookup accelerators.
+        //
+        Index currentModuleCount = m_linkage->loadedModulesList.getCount();
+        Index processedModuleCount = m_candidateExtensionListsBuiltForModuleCount;
+
+        SLANG_ASSERT(processedModuleCount >= 0 && processedModuleCount <= currentModuleCount);
+
+        // Only process NEW modules (incremental update)
+        for (Index i = processedModuleCount; i < currentModuleCount; ++i)
+        {
+            auto module = m_linkage->loadedModulesList[i];
+            _addCandidateExtensionsFromModule(module->getModuleDecl());
+        }
+
+        m_candidateExtensionListsBuiltForModuleCount = currentModuleCount;
     }
 
     // Once we are sure that the dictionary-of-arrays of extensions
@@ -12720,14 +12714,14 @@ void checkDerivativeAttributeImpl(
                 //
                 if (resolvedInvoke->arguments[ii]->type.type->equals(
                         ctx.getASTBuilder()->getErrorType()) ||
-                    funcType->getParamDirection(ii) != paramDirections[ii])
+                    funcType->getParamPassingMode(ii) != paramDirections[ii])
                 {
                     visitor->getSink()->diagnose(
                         attr,
                         Diagnostics::customDerivativeSignatureMismatchAtPosition,
                         ii,
                         qualTypeToString(argList[ii]->type),
-                        funcType->getParamTypeWithDirectionWrapper(ii)->toString());
+                        funcType->getParamTypeWithModeWrapper(ii)->toString());
                 }
             }
             // The `imaginaryArguments` list does not include the `this` parameter.
@@ -12885,7 +12879,7 @@ ArgsWithDirectionInfo getImaginaryArgsToFunc(
         arg->type.type = param->getType();
         arg->loc = loc;
         imaginaryArguments.add(arg);
-        directions.add(getParameterDirection(param));
+        directions.add(getParamPassingMode(param));
     }
     return {imaginaryArguments, directions, nullptr, ParamPassingMode::In};
 }
@@ -12941,7 +12935,7 @@ ArgsWithDirectionInfo getImaginaryArgsToForwardDerivative(
     List<ParamPassingMode> expectedParamDirections;
     for (auto param : originalFuncDecl->getParameters())
     {
-        expectedParamDirections.add(getParameterDirection(param));
+        expectedParamDirections.add(getParamPassingMode(param));
     }
 
     return {imaginaryArguments, expectedParamDirections, thisArgExpr, thisTypeDirection};
@@ -12998,7 +12992,7 @@ ArgsWithDirectionInfo getImaginaryArgsToBackwardDerivative(
         arg->type.type = param->getType();
         arg->loc = loc;
 
-        ParamPassingMode direction = getParameterDirection(param);
+        ParamPassingMode direction = getParamPassingMode(param);
 
         bool isDiffParam = (!param->findModifier<NoDiffModifier>());
         if (isDiffParam)

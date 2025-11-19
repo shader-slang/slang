@@ -1120,6 +1120,8 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::parseCommandLineArguments(
         tempReq->getTargetOptionSet(target).serialize(&targetOptionData);
         tdesc.compilerOptionEntryCount = (uint32_t)targetOptionData.entries.getCount();
         tdesc.compilerOptionEntries = targetOptionData.entries.getBuffer();
+        tdesc.format = (SlangCompileTarget)target->getTarget();
+        tdesc.profile = (SlangProfileID)target->getOptionSet().getProfile().raw;
         outData->targets.add(tdesc);
     }
     outDesc->compilerOptionEntryCount = (uint32_t)optionData.entries.getCount();
