@@ -375,8 +375,7 @@ static SlangResult _parseGCCFamilyLine(
 
     SliceAllocator allocator;
 
-    diagnostics->reset();
-    diagnostics->setRaw(SliceUtil::asCharSlice(exeRes.standardError));
+    diagnostics->appendRaw(SliceUtil::asCharSlice(exeRes.standardError));
 
     // We hold in workDiagnostics so as it is more convenient to append to the last with a
     // continuation also means we don't hold the allocations of building up continuations, just the
