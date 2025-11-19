@@ -1,7 +1,10 @@
 #!/usr/bin/python3
 
+import os
 import sys
 
+# Directory for generated files relative to slang top
+genTargetDirectory = "tests/capabilities/texture/"
 
 # Table of test input types with the appropriate Slang texture types
 #
@@ -549,6 +552,13 @@ def main():
         print("")
         print("The pattern for generated tests is: gen-types-<backend>-<texture-type>.slang")
         sys.exit(1)
+
+    # switch to target directory
+    global genTargetDirectory;
+
+    slangTopDirectory = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    genTestDirectory = os.path.join(slangTopDirectory, genTargetDirectory)
+    os.chdir(genTestDirectory)
 
     generateTests(getWgslTests())
     generateTests(getMetalTests())
