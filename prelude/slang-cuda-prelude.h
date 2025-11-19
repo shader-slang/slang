@@ -281,10 +281,18 @@ typedef unsigned int uint32_t;
 typedef unsigned long long uint64_t;
 typedef size_t uintptr_t;
 
-#endif
-
 typedef long long longlong;
 typedef unsigned long long ulonglong;
+
+#else
+
+// When not using NVRTC, match the platform's int64_t definition for signed type
+// On Linux: int64_t is 'long', on Windows: int64_t is 'long long'
+typedef int64_t longlong;
+// ulonglong must remain 'unsigned long long' to match CUDA's atomic operations
+typedef unsigned long long ulonglong;
+
+#endif
 
 typedef unsigned char uchar;
 typedef unsigned short ushort;
