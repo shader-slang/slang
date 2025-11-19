@@ -17,6 +17,7 @@ function(example dir)
     # See: https://gitlab.kitware.com/cmake/cmake/-/issues/21571
     file(
         GLOB asset_files
+        # CONFIGURE_DEPENDS
         "${dir}/*.slang"
         "${dir}/*.jpg"
         "${dir}/*.obj"
