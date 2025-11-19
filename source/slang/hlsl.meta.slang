@@ -551,7 +551,7 @@ extension<T:__BuiltinArithmeticType> T : ITexelElement
     __intrinsic_op(0) __init(Element x);
 }
 
-${{{
+${
 // Scalar types that can be used as texel element.
 const char* texeElementScalarTypes[] = {
     "half",
@@ -565,16 +565,16 @@ const char* texeElementScalarTypes[] = {
 };
 for (auto elementType : texeElementScalarTypes)
 {
-}}}
+$}
 extension<int N> vector<$(elementType), N> : ITexelElement
 {
     typealias Element = $(elementType);
     static const int elementCount = N;
     __intrinsic_op($(kIROp_MakeVectorFromScalar)) __init(Element x);
 }
-${{{
+${
 } // end for texelElementScalarTypes.
-}}}
+$}
 
 // Additional 64-bit types that can be used as texel element.
 extension double:ITexelElement
@@ -3478,7 +3478,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 }
 
 // Texture.GetDimensions and Sampler.GetDimensions
-${{{{
+${
 const char* kTextureShapeTypeNames[] = {
     "__Shape1D", "__Shape2D", "__Shape3D", "__ShapeCube"};
 for (int shapeIndex = 0; shapeIndex < 4; shapeIndex++)
@@ -3496,19 +3496,19 @@ for (int isMS = 0; isMS <= 1; isMS++) {
     }
     auto shapeTypeName = kTextureShapeTypeNames[shapeIndex];
     TextureTypeInfo textureTypeInfo(kBaseTextureShapes[shapeIndex], isArray, isMS, 0, sb, path);
-}}}}
+$}
 
 __generic<T:ITexelElement, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
 extension _Texture<T,$(shapeTypeName),$(isArray),$(isMS),sampleCount,access,isShadow,isCombined,format>
 {
-    ${{{{
+    ${
     textureTypeInfo.writeGetDimensionFunctions();
-    }}}}
+    $}
 }
 
-${{{{
+${
 }
-}}}}
+$}
 
 // Texture.GetSamplePosition(int s);
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
@@ -3962,16 +3962,16 @@ vector<T.Element,4> __texture_gatherCmp_offsets(
     }
 }
 
-${{{{
+${
 for (int isCombined = 0; isCombined < 2; isCombined++)
 {
-}}}}
+$}
 // Gather for [isCombined = $(isCombined)]
 
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
 extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,$(isCombined),format>
 {
-${{{{
+${
     for (int isShadow = 0; isShadow < 2; isShadow++)
     for (auto componentId = 0;  componentId < 5; componentId++)
     {
@@ -3989,7 +3989,7 @@ ${{{{
         const char* componentArgString[] = { ", 0", ", 0", ", 1", ", 2", ", 3" };
         const char* componentFunc = componentFuncString[componentId];
         const char* componentArg = (isShadow ? "" : componentArgString[componentId]);
-}}}}
+$}
     [ForceInline]
     [require(cuda_glsl_hlsl_metal_spirv_wgsl, texture_gather)]
     vector<T.Element,4> Gather$(compareFunc)$(componentFunc)(
@@ -4132,14 +4132,14 @@ ${{{{
         }
     }
 
-${{{{
+${
     } // for (componentId)
-}}}}
+$}
 } // End of: Gather for [isCombined = $(isCombined)]
 
-${{{{
+${
 } // for (isScalarTexture)
-}}}}
+$}
 
 // End of all Texture Gather
 
@@ -4651,13 +4651,13 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
 }
 
 // Load/Subscript for readwrite textures
-${{{{
+${
     for (int access = kCoreModule_ResourceAccessReadWrite; access <= kCoreModule_ResourceAccessRasterizerOrdered; access++) {
         const char* glslIntrinsic = "$cimageLoad($0, $1)$z";
         const char* glslIntrinsicOffset = "$cimageLoad($0, ($1)+($2))$z";
         const char* glslIntrinsicMS = "$cimageLoad($0, $1, $2)$z";
         const char* glslIntrinsicMSOffset = "$cimageLoad($0, ($1)+($3), $2)$z";
-}}}}
+$}
 
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
 extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
@@ -4668,10 +4668,10 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
 
     //@public:
 
-    ${{{{
+    ${
         if (access != kCoreModule_ResourceAccessWriteOnly)
         {
-    }}}}
+    $}
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1)]
@@ -4838,9 +4838,9 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
         }
     }
 
-    ${{{{
+    ${
         } // if (access != kCoreModule_ResourceAccessWriteOnly)
-    }}}}
+    $}
     [require(glsl, texture_sm_4_1)]
     void __glslImageStore(vector<int, Shape.dimensions+isArray> location, T value)
     {
@@ -4950,10 +4950,10 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
         }
     }
 
-    ${{{{
+    ${
         if (access != kCoreModule_ResourceAccessWriteOnly)
         {
-    }}}}
+    $}
     __subscript(vector<uint, Shape.dimensions+isArray> location) -> T
     {
         [__readNone]
@@ -4989,15 +4989,15 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
         [nonmutating]
         ref;
     }
-    ${{{{
+    ${
         } // if (access != kCoreModule_ResourceAccessWriteOnly)
-    }}}}
+    $}
 
 }
 
-${{{{
+${
 if (access == kCoreModule_ResourceAccessReadWrite) {
-}}}}
+$}
 
 // RW MS textures.
 
@@ -5152,10 +5152,10 @@ extension _Texture<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,format>
     }
 }
 
-${{{{
+${
 } // if (access == kCoreModule_ResourceAccessReadWrite) // for RW MS textures.
 } // for (access).
-}}}}
+$}
 
 // Definitions to support the legacy texture .mips[][] operator.
 struct __TextureMip<T:ITexelElement, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
@@ -5226,7 +5226,7 @@ extension _Texture<T, Shape, isArray, 1 /*isMS*/, 0 /*sampleCount*/, 0 /*access*
 
 // Texture type aliases.
 // T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int
-${{{{
+${
     const char* shapeTypeNames[] = {"1D", "2D", "3D", "Cube"};
     const char* accessPrefix[] = {"", "RW", "W", "RasterizerOrdered", "Feedback"};
     const char* accessDocumentation[] = {"read-only", "read-write", "write-only", "rasterizer-ordered", "feedback"};
@@ -5262,7 +5262,7 @@ ${{{{
         if (shape == kCoreModule_ShapeIndex3D && isArray == 1)
             continue;
         const char* textureTypeName = isCombined ? "Sampler" : "Texture";
-}}}}
+$}
 /// Represents a handle to a $(accessDocumentation[access])$(isMS?", multisampled": "") $(shapeTypeNames[shape]) $(isCombined?"combined texture-sampler": "texture")$(isArray?" array":"").
 /// @param T The texel type of the texture.
 /// @param sampleCount The number of samples in the texture, when the texture is multisampled.
@@ -5270,12 +5270,12 @@ ${{{{
 /// @see Please refer to `_Texture` for more information about texture types.
 /// @category texture_types
 typealias $(accessPrefix[access])$(textureTypeName)$(shapeTypeNames[shape])$(msPostFix[isMS])$(arrayPostFix[isArray])<T:ITexelElement=float4, let sampleCount:int=0, let format:int=0> = _Texture<T, __Shape$(shapeTypeNames[shape]), $(isArray), $(isMS), sampleCount, $(access), 0, $(isCombined), format>;
-${{{{
+${
 }
-}}}}
+$}
 
 // Declare DepthTexture* and Sampler*Shadow type aliases.
-${{{{
+${
     for (int shape = 0; shape < 4; shape++)
     for (int isArray : { 0, 1 })
     for (int isMS : { 0, 1 })
@@ -5290,7 +5290,7 @@ ${{{{
         // No 3D Array.
         if (shape == kCoreModule_ShapeIndex3D && isArray == 1)
             continue;
-}}}}
+$}
 /// Represents a handle to a$(isMS?" multisampled": "") $(shapeTypeNames[shape]) depth texture$(isArray?" array":"").
 /// @param format The storage format of the texture.
 /// @see Please refer to `_Texture` for more information about texture types.
@@ -5303,9 +5303,9 @@ typealias DepthTexture$(shapeTypeNames[shape])$(msPostFix[isMS])$(arrayPostFix[i
 /// @category texture_types
 typealias Sampler$(shapeTypeNames[shape])$(msPostFix[isMS])$(arrayPostFix[isArray])Shadow<int format=0> = _Texture<float, __Shape$(shapeTypeNames[shape]), $(isArray), $(isMS), 0, 0, 1, 1, format>;
 
-${{{{
+${
     }
-}}}}
+$}
 
 // Atomic intrinsic insts.
 
@@ -5557,7 +5557,7 @@ struct OutputPatch
     }
 };
 
-${{{{
+${
 static const struct {
     IROp op;
     char const* name;
@@ -5567,7 +5567,7 @@ static const struct {
     { kIROp_HLSLRasterizerOrderedByteAddressBufferType, "RasterizerOrderedByteAddressBuffer" },
 };
 for(auto item : kMutableByteAddressBufferCases) {
-}}}}
+$}
 
 //@public:
 /**
@@ -5874,7 +5874,7 @@ struct $(item.name)
         return __byteAddressBufferLoad<T>(this, location, __naturalStrideOf<T>());
     }
 
-${{{{
+${
     struct BufferAtomicOps
     {
         const char* name;
@@ -5891,7 +5891,7 @@ ${{{{
     };
     if (item.op == kIROp_HLSLRWByteAddressBufferType)
     {
-}}}}
+$}
 
     // float32 and int64 atomic support. This is a Slang specific extension, it uses
     // GL_EXT_shader_atomic_float on Vulkan
@@ -6130,9 +6130,9 @@ ${{{{
     // SM6.6 6 64bit atomics.
 
     // InterlockedMax64, InterlockedMin64, InterlockedAdd64, InterlockedAnd64, InterlockedOr64, InterlockedXor64, InterlockedExchange64
-${{{{
+${
     for (auto op : bufferAtomicOps) {
-}}}}
+$}
 
     /// Perform a 64-bit unsigned integer atomic $(op.internalName) operation at `byteAddress`.
     /// @param byteAddress The address at which to perform the atomic $(op.internalName) operation.
@@ -6171,9 +6171,9 @@ ${{{{
             return;
         }
     }
-${{{{
+${
 } // for (each bufferOps)
-}}}}
+$}
 
     /// Perform a 64-bit integer atomic compare-and-exchange operation at `byteAddress`.
     /// @param byteAddress The address at which to perform the atomic compare-and-exchange operation.
@@ -6286,15 +6286,15 @@ ${{{{
         }
     }
 
-${{{{
+${
     } // endif (type == RWByteAddressBuffer)
-}}}}
+$}
 
     // 32-bit atomic operations:
     // InterlockedMax, InterlockedMin, InterlockedAdd, InterlockedAnd, InterlockedOr, InterlockedXor, InterlockedExchange
-${{{{
+${
     for (auto op : bufferAtomicOps) {
-}}}}
+$}
 
     /// Perform an atomic $(op.internalName) operation at the specified byte
     /// location of the byte address buffer.
@@ -6331,9 +6331,9 @@ ${{{{
             ::Interlocked$(op.name)(buf[dest / 4], value);
         }
     }
-${{{{
+${
 } // for (buffer atomic ops)
-}}}}
+$}
 
     /// Perform a 32-bit integer atomic compare-and-exchange operation at
     /// the specified byte address within the `RWByteAddressBuffer`.
@@ -6564,11 +6564,11 @@ ${{{{
     }
 };
 
-${{{{
+${
 }
-}}}}
+$}
 
-${{{{
+${
 static const struct {
     IROp op;
     char const* name;
@@ -6578,7 +6578,7 @@ static const struct {
     { kIROp_HLSLRasterizerOrderedStructuredBufferType, "RasterizerOrderedStructuredBuffer" },
 };
 for(auto item : kMutableStructuredBufferCases) {
-}}}}
+$}
 
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
 __magic_type(HLSL$(item.name)Type)
@@ -6670,9 +6670,9 @@ struct $(item.name)
     }
 };
 
-${{{{
+${
 }
-}}}}
+$}
 
 /// @category stage_io
 __generic<T>
@@ -8905,10 +8905,10 @@ int4 D3DCOLORtoUBYTE4(float4 color)
 }
 
 // Partial-difference derivatives
-${{{{
+${
 const char* diffDimensions[2] = {"x", "y"};
 for (auto xOrY : diffDimensions) {
-}}}}
+$}
 /// Take the partial derivative of `p` with respect to $(xOrY) in screen space.
 /// @param p The value to take partial derivative for.
 /// @return The partial derivative of `p`.
@@ -9075,9 +9075,9 @@ matrix<T, N, M> dd$(xOrY)_fine(matrix<T, N, M> p)
     }
 }
 
-${{{{
+${
 } // for (xOrY)
-}}}}
+$}
 
 
 /// Convert radians to degrees.
@@ -11108,7 +11108,7 @@ __generic<TextureAccess>
 __intrinsic_op($(kIROp_ExtractArrayCoordFromTextureAccess))
 uint __extractArrayCoordFromTextureAccess(__ref TextureAccess x);
 
-${{{{
+${
 // Generates code for:
 // InterlockedAdd, InterlockedAnd, InterlockedOr, InterlockedXor,
 // InterlockedMax, InterlockedMin, InterlockedExchange
@@ -11131,7 +11131,7 @@ SlangAtomicOperationInfo slangAtomicOperationInfo[7] = {
 
 for (SlangAtomicOperationInfo atomicOp : slangAtomicOperationInfo)
 {
-}}}}
+$}
 
 /// Perform an atomic $(atomicOp.internalCallSuffix) operation on `dest`.
 /// @param T The type of the value to perform the atomic operation on.
@@ -11168,9 +11168,9 @@ void Interlocked$(atomicOp.slangCallSuffix)(__ref uint dest, int value)
     __atomic_$(atomicOp.internalCallSuffix)(dest, (uint)value);
 }
 
-${{{{
+${
 } // for (SlangAtomicOperationInfo atomicOp : slangAtomicOperationInfo)
-}}}}
+$}
 
 /// Perform an atomic compare and exchange operation on `dest`.
 /// @param T The type of the value to perform the atomic operation on.
@@ -15699,11 +15699,11 @@ vector<T,N> QuadReadAcrossDiagonal(vector<T,N> localValue)
 __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadAcrossDiagonal(matrix<T,N,M> localValue);
 
 // WaveActiveBitAnd, WaveActiveBitOr, WaveActiveBitXor
-${{{{
+${
 struct WaveActiveBitOpEntry { const char* hlslName; const char* glslName; const char* spirvName; const char* metalName; };
 const WaveActiveBitOpEntry kWaveActiveBitOpEntries[] = {{"BitAnd", "And", "BitwiseAnd", "and"}, {"BitOr", "Or", "BitwiseOr", "or"}, {"BitXor", "Xor", "BitwiseXor", "xor"}};
 for (auto opName : kWaveActiveBitOpEntries) {
-}}}}
+$}
 /// @category wave Wave and quad functions
 __generic<T : __BuiltinLogicalType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
@@ -15769,16 +15769,16 @@ matrix<T, N, M> WaveActive$(opName.hlslName)(matrix<T, N, M> expr)
         return result;
     }
 }
-${{{{
+${
 } // WaveActiveBitAnd, WaveActiveBitOr, WaveActiveBitXor
-}}}}
+$}
 
 // WaveActiveMin/Max
-${{{{
+${
 struct WaveActiveMinMaxEntry { const char* name; const char* metalName; };
 const WaveActiveMinMaxEntry kWaveActiveMinMaxNames[] = {{"Min", "min"}, {"Max", "max"}};
 for (const auto opName : kWaveActiveMinMaxNames) {
-}}}}
+$}
 /// @category wave
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
@@ -15855,16 +15855,16 @@ matrix<T, N, M> WaveActive$(opName.name)(matrix<T, N, M> expr)
     }
 }
 
-${{{{
+${
 } // WaveActiveMinMax.
-}}}}
+$}
 
 // WaveActiveProduct/Sum
-${{{{
+${
 struct WaveActiveProductSumEntry { const char* hlslName; const char* glslName; const char* metalName; };
 const WaveActiveProductSumEntry kWaveActivProductSumNames[] = {{"Product", "Mul", "product"}, {"Sum", "Add", "sum"}};
 for (auto opName : kWaveActivProductSumNames) {
-}}}}
+$}
 /// @category wave
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
@@ -15954,9 +15954,9 @@ matrix<T, N, M> WaveActive$(opName.hlslName)(matrix<T, N, M> expr)
         return result;
     }
 }
-${{{{
+${
 } // WaveActiveProduct/WaveActiveProductSum.
-}}}}
+$}
 
 /// @category wave
 __generic<T : __BuiltinType>
@@ -17008,11 +17008,11 @@ void __shaderSubgroupPartitionedPreamble()
 //
 // WaveMultiSum/WaveMultiProduct.
 //
-${{{{
+${
 struct WaveMultiSumProductEntry { const char* name; const char* spirvName; };
 const WaveMultiSumProductEntry kWaveMultiSumProductNames[] = { {"Sum", "Add"}, {"Product", "Mul"} };
 for (auto opName : kWaveMultiSumProductNames) {
-}}}}
+$}
 
 __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
@@ -17076,9 +17076,9 @@ matrix<T,N,M> WaveMulti$(opName.name)(matrix<T,N,M> value, uint4 mask)
     }
 }
 
-${{{{
+${
 } // WaveMultiSum/WaveMultiProduct.
-}}}}
+$}
 
 
 //
@@ -17086,7 +17086,7 @@ ${{{{
 // WaveMultiPrefixExclusiveSum/WaveMultiPrefixExclusiveProduct.
 // WaveMultiPrefixSum/WaveMultiPrefixProduct.
 //
-${{{{
+${
 struct WaveMultiPrefixSumProductEntry
 {
     const char* name;
@@ -17117,7 +17117,7 @@ const WaveMultiPrefixSumProductEntry kWaveMultiPrefixSumProductNames[] =
 };
 
 for (auto opName : kWaveMultiPrefixSumProductNames) {
-}}}}
+$}
 
 __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
@@ -17175,10 +17175,10 @@ matrix<T,N,M> WaveMultiPrefix$(opName.name)(matrix<T,N,M> value, uint4 mask)
 {
     __target_switch
     {
-    ${{{{ if(opName.cudaMatrixVariantSupport) { }}}}
+    ${{ if(opName.cudaMatrixVariantSupport) { $}
     case cuda:
         __intrinsic_asm "_wavePrefix$(opName.cudaName)Multiple($1.x, $0) $(opName.cudaExtraOperation)";
-    ${{{{ } }}}}
+    ${{ } $}
     default:
         matrix<T, N, M> result;
         for (int i = 0; i < N; ++i)
@@ -17187,22 +17187,22 @@ matrix<T,N,M> WaveMultiPrefix$(opName.name)(matrix<T,N,M> value, uint4 mask)
     }
 }
 
-${{{{
+${
 }
 // WaveMultiPrefixInclusiveSum/WaveMultiPrefixInclusiveProduct.
 // WaveMultiPrefixExclusiveSum/WaveMultiPrefixExclusiveProduct.
 // WaveMultiPrefixSum/WaveMultiPrefixProduct.
-}}}}
+$}
 
 
 //
 // WaveMultiMin/WaveMultiMax.
 //
-${{{{
+${
 struct WaveMultiMinMaxEntry { const char* name; };
 const WaveMultiMinMaxEntry kWaveMultiMinMaxNames[] = { {"Min"}, {"Max"} };
 for (auto opName : kWaveMultiMinMaxNames) {
-}}}}
+$}
 
 __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
@@ -17271,16 +17271,16 @@ matrix<T, N, M> WaveMulti$(opName.name)(matrix<T, N, M> value, uint4 mask)
     }
 }
 
-${{{{
+${
 } // WaveMultiMin/WaveMultiMax.
-}}}}
+$}
 
 
 //
 // WaveMultiPrefixInclusiveMin/WaveMultiPrefixInclusiveMax.
 // WaveMultiPrefixExclusiveMin/WaveMultiPrefixExclusiveMax.
 //
-${{{{
+${
 struct WaveMultiPrefixMinMaxEntry
 {
     const char* name;
@@ -17299,7 +17299,7 @@ const WaveMultiPrefixMinMaxEntry kWaveMultiPrefixMinMaxNames[] =
 };
 
 for (auto opName : kWaveMultiPrefixMinMaxNames) {
-}}}}
+$}
 
 __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
@@ -17362,21 +17362,21 @@ matrix<T, N, M> WaveMultiPrefix$(opName.name)(matrix<T, N, M> value, uint4 mask)
     return result;
 }
 
-${{{{
+${
 }
 // WaveMultiPrefixInclusiveMin/WaveMultiPrefixInclusiveMax.
 // WaveMultiPrefixExclusiveMin/WaveMultiPrefixExclusiveMax.
-}}}}
+$}
 
 
 //
 // WaveMultiBitAnd/WaveMultiBitOr/WaveMultiBitXor.
 //
-${{{{
+${
 struct WaveMultiBitsEntry { const char* name; };
 const WaveMultiBitsEntry kWaveMultiBitsNames[] = { {"And"}, {"Or"} , {"Xor"} };
 for (auto opName : kWaveMultiBitsNames) {
-}}}}
+$}
 
 __generic<T : __BuiltinLogicalType>
 __spirv_version(1.3)
@@ -17437,9 +17437,9 @@ matrix<T, N, M> WaveMultiBit$(opName.name)(matrix<T, N, M> value, uint4 mask)
     }
 }
 
-${{{{
+${
 } // WaveMultiBitAnd/WaveMultiBitOr/WaveMultiBitXor.
-}}}}
+$}
 
 
 //
@@ -17447,7 +17447,7 @@ ${{{{
 // WaveMultiPrefixExclusiveBitAnd/WaveMultiPrefixExclusiveBitXor/WaveMultiExclusiveBitXor.
 // WaveMultiPrefixBitAnd/WaveMultiPrefixBitOr/WaveMultiBitXor.
 //
-${{{{
+${
 struct WaveMultiPrefixBitwiseEntry
 {
     const char* name;
@@ -17477,7 +17477,7 @@ const WaveMultiPrefixBitwiseEntry kWaveMultiPrefixBitwiseNames[] =
 };
 
 for (auto opName : kWaveMultiPrefixBitwiseNames) {
-}}}}
+$}
 
 __generic<T : __BuiltinLogicalType>
 __spirv_version(1.3)
@@ -17531,14 +17531,14 @@ matrix<T, N, M> WaveMultiPrefix$(opName.name)(matrix<T, N, M> value, uint4 mask)
 {
     __target_switch
     {
-${{{{
+${
     if (opName.cudaMatrixVariantSupport) {
-}}}}
+$}
     case cuda:
         __intrinsic_asm "_wavePrefix$(opName.spirvName)Multiple($1.x, $0) $(opName.cudaExtraOperation)";
-${{{{
+${
     }
-}}}}
+$}
     default:
         matrix<T,N,M> result;
         [ForceUnroll]
@@ -17547,12 +17547,12 @@ ${{{{
         return result;
     }
 }
-${{{{
+${
 }
 // WaveMultiPrefixInclusiveBitAnd/WaveMultiPrefixInclusiveBitOr/WaveMultiInclusiveBitXor.
 // WaveMultiPrefixExclusiveBitAnd/WaveMultiPrefixExclusiveBitXor/WaveMultiExclusiveBitXor.
 // WaveMultiPrefixBitAnd/WaveMultiPrefixBitOr/WaveMultiBitXor.
-}}}}
+$}
 
 
 //
@@ -17621,7 +17621,7 @@ bool QuadAll(bool expr)
 typedef Texture2D texture2D;
 //@public:
 
-${{{{
+${
 
 // Buffer types
 
@@ -17652,7 +17652,7 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
     char const* requireToSetQuery = (isReadOnly) ? "[require(glsl_hlsl_metal_spirv, texture_size)]" : "[require(glsl_hlsl_metal_spirv, image_size)]";
     char const* requireToSet = (isReadOnly) ? "[require(glsl_hlsl_metal_spirv, texture_sm_4_1)]" : "[require(glsl_hlsl_metal_spirv, texture_sm_4_1_compute_fragment)]";
     char const* requireToSet_onlyHLSL = (isReadOnly) ? "[require(hlsl, texture_sm_4_1)]" : "[require(hlsl, texture_sm_4_1_compute_fragment)]";
-}}}}
+$}
 
 __generic<T:ITexelElement, let format:int>
 extension _Texture<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
@@ -17710,9 +17710,9 @@ extension _Texture<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
         [ForceInline]
         $(requireToSet)
         get { return Load((int)index); }
-${{{{
+${
         if (access != SLANG_RESOURCE_ACCESS_READ) {
-}}}}
+$}
             [nonmutating]
             $(requireToSet)
             set
@@ -17733,17 +17733,17 @@ ${{{{
             __intrinsic_op($(kIROp_ImageSubscript))
             [nonmutating]
             ref;
-${{{{
+${
         } // access != SLANG_RESOURCE_ACCESS_READ
-}}}}
+$}
 
         }
 
 
     };  // end extension
-${{{{
+${
 }
-}}}}
+$}
 
 
 // DirectX Raytracing (DXR) Support
@@ -20285,7 +20285,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     }
 ///~
 
-${{{{
+${
     const char* kCandidateCommitted[] = {"Candidate", "Committed"};
 
     // Access Candidate and Committed Matrices.
@@ -20293,7 +20293,7 @@ ${{{{
     {
         auto ccName = kCandidateCommitted[candidateOrCommitted];
         auto ccTF = candidateOrCommitted == 0 ? "false" : "true";
-}}}}
+$}
 
     __glsl_extension(GL_EXT_ray_query)
     __glsl_extension(GL_EXT_ray_tracing_position_fetch)
@@ -20335,10 +20335,10 @@ ${{{{
 
     // CandidateObjectToWorld3x4, CandidateWorldToObject4x3
     // CommittedObjectToWorld3x4, CommittedObjectToWorld4x3
-    ${{{{
+    ${
     const char* kRayQueryMatrixNames[] = {"ObjectToWorld", "WorldToObject"};
     for (auto matName : kRayQueryMatrixNames) {
-    }}}}
+    $}
 
     /// Gets the object-to-world transform as a 3x4 matrix.
     /// @return 3x4 matrix transforming from object to world space
@@ -20385,7 +20385,7 @@ ${{{{
         }
     }
 
-${{{{
+${
     } // ObjectToWorld/WorldToObject.
 
     // Access Candidate and Committed properties.
@@ -20407,7 +20407,7 @@ ${{{{
         {"float2", "TriangleBarycentrics", "Barycentrics"},
     };
     for (auto method : rayQueryMethods) {
-}}}}
+$}
 
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
@@ -20427,10 +20427,10 @@ ${{{{
             };
         }
     }
-${{{{
+${
     } // Candidate/Committed properties.
     } // for ("Candidate", "Committed")
-}}}}
+$}
 
     // Access properties of the ray being traced.
 
@@ -22565,7 +22565,7 @@ __intrinsic_op($(kIROp_GetRegisterIndex)) uint __getRegisterIndex(SamplerState s
 
 //@public:
 
-${{{{
+${
 //
 // Texture Footprint Queries
 //
@@ -22597,7 +22597,7 @@ ${{{{
 // data that is returned by the GLSL API via the
 // function reuslt.
 //
-}}}}
+$}
 
 [__NoSideEffect]
 [__requiresNVAPI]
@@ -22931,9 +22931,9 @@ ${
     }
 
 
-${{{
+${
     // Texture sampling with gradient is only available for 2D textures.
-}}}
+$}
     [__NoSideEffect]
     __glsl_version(450)
     __glsl_extension(GL_NV_shader_texture_footprint)
@@ -22995,12 +22995,12 @@ ${{{
             };
         }
     }
-${{{
+${
     // End texture2D specific functions.
-}}}
+$}
 
 
-${{{{
+${
 // The NVAPI texture query operations encode the choice
 // between coarse and fine levels as part of the function
 // name, and so we are forced to match this convention
@@ -23032,7 +23032,7 @@ for(auto levelChoice : kLevelChoices)
 // with that parameter, since they have no equivalent in
 // the GLSL extension.
 //
-}}}}
+$}
 
     [__NoSideEffect]
     [__requiresNVAPI]
@@ -23284,9 +23284,9 @@ ${
         }
     }
 
-${{{
+${
     // TODO: Texture sampling with gradient is only available for 2D textures.
-}}}
+$}
 
     /// Query the footprint that would be accessed by a texture sampling operation.
     ///
@@ -23349,13 +23349,13 @@ ${{{
         }
     }
 
-${{{
+${
     // TODO: end texture2D specific functions.
-}}}
+$}
 
-${{{{
+${
 }
-}}}}
+$}
 
 } // extension
 
@@ -23563,7 +23563,7 @@ extension _Texture<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCom
     }
 }
 
-${{{{
+${
 struct DynamicResourceTypeInfo
 {
     const char* name;
@@ -23597,7 +23597,7 @@ for (auto type : kDynamicResourceCastableTypes) {
         sb << "__generic<T, L : IBufferDataLayout>\n";
     else if (strstr(typeName, "<T>"))
         sb << "__generic<T>\n";
-}}}}
+$}
 
 extension $(typeName) : __IDynamicResourceCastable<__DynamicResourceKind.$(dynamicKind)>
 {
@@ -23618,9 +23618,9 @@ extension $(typeName) : __IDynamicResourceCastable<__DynamicResourceKind.$(dynam
     }
 }
 
-${{{{
+${
 }
-}}}}
+$}
 
 
 /// Represents a bindless handle to a descriptor. A descriptor handle is always an ordinary data type and can be
@@ -23792,7 +23792,7 @@ T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handle
 
         switch(bindlessOptions)
         {
-${{{{
+${
 {
     static const struct
     {
@@ -23811,7 +23811,7 @@ ${{{{
 
         bindlessOptionIfElsePre << "case BindlessDescriptorOptions." << bindlessOption.option <<":\n{\n";
         bindlessOptionIfElsePost << "}\n";
-}}}}
+$}
     $(bindlessOptionIfElsePre.toString())
     switch(T.kind)
     {
@@ -23851,10 +23851,10 @@ ${{{{
         return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Unknown)[((uint2)handleValue).x];
     }
     $(bindlessOptionIfElsePost.toString())
-${{{{
+${
     }
 }
-}}}}
+$}
     default:
     {
         static_assert(false, "Impossible to end up here unless something went very wrong");
@@ -23973,7 +23973,7 @@ enum CoopMatClampMode
 };
 
 
-${{{{
+${
 // SPIRV described that the max value for `Dim` is 5.
 //
 // https://github.khronos.org/SPIRV-Registry/extensions/NV/SPV_NV_tensor_addressing.html#OpTypeTensorLayoutNV
@@ -23989,7 +23989,7 @@ ${{{{
 // zero and less than or equal to 5.
 //
 const int kMaxCoopMatTensorDimension = 5;
-}}}}
+$}
 
 //
 // TensorLayout
@@ -24008,7 +24008,7 @@ struct TensorLayout
 };
 
 
-${{{{
+${
     for (int iDim = 1; iDim < kMaxCoopMatTensorDimension; ++iDim)
     {
         StringBuilder dimParams;
@@ -24030,7 +24030,7 @@ ${{{{
             blockSizeParams << ", uint32_t blockSize" << j;
             blockSizeAsms << " $blockSize" << j;
         }
-}}}}
+$}
 
 
 extension<
@@ -24103,15 +24103,15 @@ extension<
     }
 };
 
-${{{{
+${
     } // iDim
-}}}}
+$}
 
 //
 // TensorView
 //
 
-${{{{
+${
     StringBuilder tensorViewStruct;
     for (int j = 0; j < kMaxCoopMatTensorDimension; ++j)
     {
@@ -24120,7 +24120,7 @@ ${{{{
         // is explicitly set by the user or not.
         tensorViewStruct << ", let p" << j << " : uint32_t = 0xff";
     }
-}}}}
+$}
 
 __intrinsic_type($(kIROp_TensorAddressingTensorViewType))
 __generic<
@@ -24134,7 +24134,7 @@ struct TensorView
     __init();
 };
 
-${{{{
+${
     for (int iDim = 1; iDim < kMaxCoopMatTensorDimension; ++iDim)
     {
         StringBuilder tensorViewTypes;
@@ -24156,7 +24156,7 @@ ${{{{
         {
             tensorViewExtensions << ", 0xff";
         }
-}}}}
+$}
 
 [require(tensor_addressing)]
 extension<
@@ -24205,9 +24205,9 @@ extension<
     }
 };
 
-${{{{
+${
     } // iDim
-}}}}
+$}
 
 
 //
@@ -24808,10 +24808,10 @@ struct CoopMat
     // Load
     //
 
-${{{{
+${
     for (const char* RW : { "", "RW" })
     {
-}}}}
+$}
 
     [__NoSideEffect]
     [require(cooperative_matrix, byteaddressbuffer)]
@@ -24853,9 +24853,9 @@ ${{{{
         }
     }
 
-${{{{
+${
     } // RW
-}}}}
+$}
 
     /// Loads a cooperative matrix from a pointer buffer.
     /// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the buffer.
@@ -25106,7 +25106,7 @@ ${{{{
     // Load with TensorLayout and TensorView
     //
 
-${{{{
+${
     StringBuilder tensorViewTypes;
     StringBuilder tensorViewParams;
     for (int j = 0; j < kMaxCoopMatTensorDimension; ++j)
@@ -25117,7 +25117,7 @@ ${{{{
 
     for (const char* RW : { "", "RW" })
     {
-}}}}
+$}
 
     [require(cooperative_matrix_tensor_addressing)]
     static This Load<
@@ -25348,9 +25348,9 @@ ${{{{
         };
     }
 
-${{{{
+${
     } // RW
-}}}}
+$}
 
     [require(cooperative_matrix_tensor_addressing)]
     void Store<
@@ -26816,7 +26816,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         }
     }
 
-${{{{
+${
 static const struct {
     bool isRW;
     char const* type;
@@ -26826,7 +26826,7 @@ static const struct {
     {false, "ByteAddressBuffer"}
 };
 for(auto buffer : kByteAddressBufferCases) {
-}}}}
+$}
     [mutating]
     [ForceInline]
     [require(hlsl, byteaddressbuffer_rw)]
@@ -27135,9 +27135,9 @@ for(auto buffer : kByteAddressBufferCases) {
     }
 
 
-${{{{
+${
 }
-}}}}
+$}
 }
 
 __intrinsic_op($(kIROp_MakeCoopVectorFromValuePack))
@@ -27983,7 +27983,7 @@ uint32_t __coopVecComponentTypeStride(CoopVecComponentType componentType)
     return 0xffffffff;
 }
 
-${{{{
+${
 static const struct {
     bool isRW;
     char const* type;
@@ -27993,7 +27993,7 @@ static const struct {
     {false, "ByteAddressBuffer"},
 };
 for(auto buffer : kByteAddressBufferCases_) {
-}}}}
+$}
 
 // Internal implementation without static_assert; github issue 8620
 [ForceInline]
@@ -28494,10 +28494,10 @@ CoopVec<T, M> coopVecMatMulAdd(
 // Coop Vector accumulation
 //
 
-${{{{
+${
 if(buffer.isRW)
 {
-}}}}
+$}
 /// Atomically accumulates the outer product of two cooperative vectors into a matrix. Given an M-element vector `a`, and an N-element vector `b`,
 /// compute the outer product of `a` and `b`, forming a M-row by N-col matrix. The elements in the matrix is then atomically accumulated
 /// to memory location represented by `matrix`.
@@ -28656,12 +28656,12 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int>(
     }
 }
 
-${{{{
+${
 } // if rw
 } // buffer type loop
-}}}}
+$}
 
-${{{{
+${
 static const struct {
     bool isRW;
     char const* type;
@@ -28671,7 +28671,7 @@ static const struct {
     {false, "StructuredBuffer<IgnoredBufferElementType>"},
 };
 for(auto buffer : kStructuredBufferCases_) {
-}}}}
+$}
 
 // Internal implementation without static_assert; github issue 8620
 [ForceInline]
@@ -28886,10 +28886,10 @@ CoopVec<T, M> coopVecMatMulAdd<T : __BuiltinArithmeticType, let M : int, let K :
 // Coop Vector accumulation
 //
 
-${{{{
+${
 if(buffer.isRW)
 {
-}}}}
+$}
 [require(spirv, cooperative_vector_training)]
 void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let N : int, IgnoredBufferElementType>(
     CoopVec<T, M> a,
@@ -28934,10 +28934,10 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int, Ignore
     }
 }
 
-${{{{
+${
 } // if rw
 } // buffer type loop
-}}}}
+$}
 
 
 [require(spirv, cooperative_vector_training)]
