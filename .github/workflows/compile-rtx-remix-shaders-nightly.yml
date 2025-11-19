@@ -23,6 +23,7 @@ jobs:
       - name: Checkout Slang repository
         uses: actions/checkout@v4
         with:
+          submodules: "recursive"
           fetch-depth: 1 # Shallow clone for speed
 
       # Python 3.9+ required by Meson
@@ -77,7 +78,7 @@ jobs:
           $slangcPath = "build/Release/bin/slangc.exe"
           if (Test-Path $slangcPath) {
             Write-Host "✓ slangc built successfully at: $slangcPath" -ForegroundColor Green
-            & $slangcPath --version
+            & $slangcPath -version
           } else {
             Write-Error "Failed to build slangc"
             exit 1
