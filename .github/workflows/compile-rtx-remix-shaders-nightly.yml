@@ -78,7 +78,7 @@ jobs:
           $slangcPath = "build/Release/bin/slangc.exe"
           if (Test-Path $slangcPath) {
             Write-Host "✓ slangc built successfully at: $slangcPath" -ForegroundColor Green
-            & $slangcPath --version
+            & $slangcPath -version
           } else {
             Write-Error "Failed to build slangc"
             exit 1
