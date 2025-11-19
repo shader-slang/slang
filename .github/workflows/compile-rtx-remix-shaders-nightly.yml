@@ -17,7 +17,7 @@ permissions:
 jobs:
   rtx-remix-shader-test:
     runs-on: windows-2022
-    timeout-minutes: 25 # Build takes ~10-15 min, add buffer
+    timeout-minutes: 45 # Slang build ~10-15 min + RTX Remix shaders ~10-15 min + buffer
 
     steps:
       - name: Checkout Slang repository
@@ -39,6 +39,42 @@ jobs:
       # Ninja should be pre-installed on windows-2022
       - name: Verify Ninja
         run: ninja --version
+        shell: pwsh
+
+      # Cache Slang build artifacts to speed up subsequent runs
+      - name: Cache Slang build
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/
+          key: slang-build-${{ runner.os }}-${{ hashFiles('source/**', 'CMakeLists.txt', 'cmake/**') }}
+          restore-keys: |
+            slang-build-${{ runner.os }}-
+
+      # Build Slang from checked-out source
+      - name: Configure Slang build
+        run: |
+          Write-Host "Configuring Slang build..." -ForegroundColor Cyan
+          cmake --preset vs2022
+        shell: pwsh
+
+      - name: Build Slang
+        run: |
+          Write-Host "Building Slang (Release)..." -ForegroundColor Cyan
+          $startTime = Get-Date
+          cmake --build --preset release --target slangc
+          $duration = (Get-Date) - $startTime
+          Write-Host "Slang build completed in $($duration.TotalMinutes.ToString('0.00')) minutes" -ForegroundColor Green
+
+          # Verify slangc was built
+          $slangcPath = "build/Release/bin/slangc.exe"
+          if (Test-Path $slangcPath) {
+            Write-Host "✓ slangc built successfully at: $slangcPath" -ForegroundColor Green
+            & $slangcPath --version
+          } else {
+            Write-Error "Failed to build slangc"
+            exit 1
+          }
         shell: pwsh
 
       # Clone dxvk-remix with all submodules (pinned to specific commit for stability)
@@ -70,23 +106,27 @@ jobs:
           .\scripts-common\packman\packman.cmd pull packman-external.xml
         shell: pwsh
 
-      # Configure the build (Meson setup)
-      - name: Configure shader-only build
+      # Build shaders using build_shaders_only.ps1
+      # This script handles both configuration and compilation
+      - name: Build shaders using build_shaders_only.ps1
         run: |
-          Write-Host "Configuring shader-only build with Meson..." -ForegroundColor Cyan
-          cd dxvk-remix
-          meson setup --buildtype release --backend ninja -Denable_tracy=False -Ddownload_apics=False _BuildShadersOnly
-        shell: pwsh
+          Write-Host "Building RTX Remix shaders using build_shaders_only.ps1..." -ForegroundColor Cyan
 
-      # Compile shaders (~3.20 minutes observed locally)
-      - name: Compile shaders
-        run: |
-          Write-Host "Compiling RTX Remix shaders..." -ForegroundColor Cyan
+          # Add our built Slang to PATH so dxvk-remix uses it instead of packman version
+          $slangBinPath = Resolve-Path "$PWD\build\Release\bin"
+          Write-Host "Adding Slang build to PATH: $slangBinPath" -ForegroundColor Yellow
+          $env:PATH = "$slangBinPath;$env:PATH"
+
+          # Verify which slangc will be used
+          $whichSlangc = (Get-Command slangc.exe -ErrorAction SilentlyContinue).Source
+          Write-Host "Using slangc from: $whichSlangc" -ForegroundColor Yellow
+          & slangc.exe --version
+
           Write-Host "Start time: $(Get-Date -Format 'HH:mm:ss')" -ForegroundColor Gray
           $startTime = Get-Date
 
-          cd dxvk-remix\_BuildShadersOnly
-          meson compile rtx_shaders
+          cd dxvk-remix
+          .\build_shaders_only.ps1
 
           $endTime = Get-Date
           $duration = $endTime - $startTime
