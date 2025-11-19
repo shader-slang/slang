@@ -10526,6 +10526,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             addNameHint(context, irFieldKey, fieldDecl);
             addVarDecorations(context, irFieldKey, fieldDecl);
             addLinkageDecoration(context, irFieldKey, fieldDecl);
+            maybeAddDebugLocationDecoration(context, irFieldKey);
         }
 
         if (auto semanticModifier = fieldDecl->findModifier<HLSLSimpleSemantic>())
