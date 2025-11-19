@@ -41,6 +41,10 @@ jobs:
         run: ninja --version
         shell: pwsh
 
+      # Set up Visual Studio environment for Slang build
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
       # Cache Slang build artifacts to speed up subsequent runs
       - name: Cache Slang build
         uses: actions/cache@v4
@@ -62,7 +66,7 @@ jobs:
         run: |
           Write-Host "Building Slang (Release)..." -ForegroundColor Cyan
           $startTime = Get-Date
-          cmake --build --preset release --target slangc
+          cmake --build --preset vs2022-release --target slangc
           $duration = (Get-Date) - $startTime
           Write-Host "Slang build completed in $($duration.TotalMinutes.ToString('0.00')) minutes" -ForegroundColor Green
 
