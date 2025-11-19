@@ -1104,7 +1104,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     {
         for (auto attr : typeLayout->getSizeAttrs())
         {
-            if (attr->getSize().compare(LayoutSize(0)) != std::partial_ordering::equivalent)
+            if (attr->getSize().compare(0) == std::partial_ordering::greater)
                 return attr->getResourceKind();
         }
         return LayoutResourceKind::None;

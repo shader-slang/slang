@@ -80,6 +80,26 @@ struct LayoutSize
     bool isFinite() const { return raw != s_infiniteValue && raw != s_invalidValue; }
     LayoutOffset getFiniteValue() const;
 
+    std::partial_ordering compare(RawValue that) const
+    {
+        if (this->isInvalid())
+            return std::partial_ordering::unordered;
+
+        if (this->isInfinite())
+        {
+            return std::partial_ordering::greater;
+        }
+        else
+        {
+            if (this->raw < that)
+                return std::partial_ordering::less;
+            else if (this->raw > that)
+                return std::partial_ordering::greater;
+            else
+                return std::partial_ordering::equivalent;
+        }
+    }
+
     std::partial_ordering compare(LayoutSize that) const
     {
         if (this->isInvalid() || that.isInvalid())
@@ -107,6 +127,7 @@ struct LayoutSize
                 return std::partial_ordering::equivalent;
         }
     }
+
 
     void operator+=(LayoutSize right)
     {
@@ -386,6 +407,7 @@ private:
 
 inline LayoutOffset LayoutSize::getFiniteValue() const
 {
+    SLANG_ASSERT(!isInfinite());
     return LayoutOffset{*this};
 }
 
