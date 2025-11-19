@@ -55,19 +55,21 @@ jobs:
           restore-keys: |
             slang-build-${{ runner.os }}-
 
-      # Build Slang from checked-out source using default (Ninja) preset
-      # This is simpler and doesn't require Visual Studio setup
-      - name: Configure Slang build
-        run: |
-          Write-Host "Configuring Slang build with Ninja..." -ForegroundColor Cyan
-          cmake --preset default
-        shell: pwsh
-
+      # Build Slang from checked-out source
+      # Uses the same approach as CI: cmake --preset default + cmake --workflow --preset release
       - name: Build Slang
         run: |
           Write-Host "Building Slang (Release)..." -ForegroundColor Cyan
+          Write-Host "CMake version: $(cmake --version | Select-Object -First 1)" -ForegroundColor Gray
+
           $startTime = Get-Date
-          cmake --build --preset release --target slangc
+
+          # Configure with default preset (Ninja Multi-Config)
+          cmake --preset default --fresh -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
+
+          # Build using workflow preset (configure + build + package)
+          cmake --workflow --preset release
+
           $duration = (Get-Date) - $startTime
           Write-Host "Slang build completed in $($duration.TotalMinutes.ToString('0.00')) minutes" -ForegroundColor Green
 
