@@ -144,8 +144,25 @@ Byte StreamReader::readBufferByte()
 SlangResult StreamReader::readToEnd(String& outString)
 {
     StringBuilder sb(16384);
+
+    // DIAGNOSTIC: Count iterations to detect spinning
+    extern bool isDiagnosticEnabled(const char*);
+    size_t iterationCount = 0;
+    size_t lastWarning = 0;
+
     while (!isEnd())
     {
+        iterationCount++;
+
+        if (isDiagnosticEnabled("feof") && iterationCount > lastWarning + 1000000)
+        {
+            lastWarning = iterationCount;
+            fprintf(
+                stderr,
+                "[FEOF-SPIN] readToEnd() iteration %zu (spinning in loop)\n",
+                iterationCount);
+        }
+
         auto ch = read();
         if (isEnd())
             break;
@@ -157,6 +174,14 @@ SlangResult StreamReader::readToEnd(String& outString)
         }
         else
             sb.append(ch);
+    }
+
+    if (isDiagnosticEnabled("feof") && iterationCount > 10000)
+    {
+        fprintf(
+            stderr,
+            "[FEOF-SPIN] readToEnd() completed after %zu iterations (normal is <5000)\n",
+            iterationCount);
     }
 
     outString = sb.produceString();

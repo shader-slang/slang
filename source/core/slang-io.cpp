@@ -1108,14 +1108,32 @@ static String _getExecutablePath()
 
 SlangResult File::readAllText(const Slang::String& fileName, String& outText)
 {
+    // DIAGNOSTIC: Log which file we're reading
+    extern bool isDiagnosticEnabled(const char*);
+    if (isDiagnosticEnabled("feof"))
+    {
+        fprintf(stderr, "[FEOF-FILE] Reading file: %s\n", fileName.getBuffer());
+    }
+
     RefPtr<FileStream> stream(new FileStream);
     SLANG_RETURN_ON_FAIL(
         stream->init(fileName, FileMode::Open, FileAccess::Read, FileShare::ReadWrite));
 
     StreamReader reader;
     SLANG_RETURN_ON_FAIL(reader.init(stream));
-    SLANG_RETURN_ON_FAIL(reader.readToEnd(outText));
+    SlangResult result = reader.readToEnd(outText);
 
+    if (isDiagnosticEnabled("feof"))
+    {
+        fprintf(
+            stderr,
+            "[FEOF-FILE] Finished reading: %s (result=%d, size=%lld)\n",
+            fileName.getBuffer(),
+            result,
+            (long long)outText.getLength());
+    }
+
+    SLANG_RETURN_ON_FAIL(result);
     return SLANG_OK;
 }
 
