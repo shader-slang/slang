@@ -31,11 +31,11 @@ jobs:
           fetch-depth: 1 # Shallow clone for speed
 
       # Add bash to PATH on Windows (for consistency with main CI)
+      # Only add Git\bin, not usr\bin which contains GNU tools that conflict with MSVC
       - name: Add bash to PATH
         shell: pwsh
         run: |
           Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
-          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\usr\\bin"
 
       # Python 3.9+ required by Meson
       - name: Set up Python
