@@ -155,10 +155,11 @@ jobs:
         run: |
           "$bin_dir/slang-rhi-tests" -check-devices -optix-version=80100 -tc="ray-tracing-*.cuda"
 
-  # Run slangpy tests when:
+  # Run slangpy tests and examples when:
   # 1. full-gpu-tests is enabled AND
   # 2. Either it's a pull request OR config is release
   # This is to reduce the CI load but do some check on pull requests.
+  # Includes both slangpy pytest tests and slangpy-samples examples.
   test-slangpy:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
     timeout-minutes: 30
@@ -231,15 +232,30 @@ jobs:
           echo "Listing files in slangpy directory..."
           ls -la "$SITE_PACKAGES/slangpy/"
 
-          # Skip package installation on self-hosted runners to avoid permission issues
-          if [[ ! "${{ inputs.runs-on }}" =~ self-hosted ]]; then
-            echo "Installing python packages..."
-            curl -fsSL https://raw.githubusercontent.com/shader-slang/slangpy/main/requirements-dev.txt -o requirements-dev.txt
-            python -m pip install -r requirements-dev.txt --user
-            python -m pip install pytest-github-actions-annotate-failures --user
-            python -m pip install pytest-xdist --user
-          fi
+          # Export SITE_PACKAGES for use in slangpy-samples step
+          echo "SITE_PACKAGES=$SITE_PACKAGES" >> $GITHUB_ENV
+
+          echo "Installing python packages..."
+          curl -fsSL https://raw.githubusercontent.com/shader-slang/slangpy/main/requirements-dev.txt -o requirements-dev.txt
+          python -m pip install -r requirements-dev.txt --user
+          python -m pip install pytest-github-actions-annotate-failures --user
+          python -m pip install pytest-xdist --user
 
           echo "Running pytest on slangpy tests..."
           export PYTHONPATH="$SITE_PACKAGES"
           python -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n auto --maxprocesses=3
+
+      - name: Clone slangpy-samples
+        run: |
+          echo "Cloning slangpy-samples repository..."
+          git clone --depth 1 https://github.com/shader-slang/slangpy-samples.git
+
+      - name: Install slangpy-samples dependencies
+        run: |
+          echo "Installing slangpy-samples dependencies..."
+          python -m pip install -r slangpy-samples/requirements.txt --user
+
+      - name: Run slangpy-samples tests
+        run: |
+          echo "Running slangpy-samples tests..."
+          python -m pytest -n 4 slangpy-samples/tests

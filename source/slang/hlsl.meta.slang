@@ -21549,13 +21549,14 @@ struct HitObject
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetHitKind()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".GetHitKind";
         case glsl: __intrinsic_asm "hitObjectGetHitKindNV($0)";
+        case cuda: __intrinsic_asm "optixHitObjectGetHitKind()";
         case spirv:
             return spirv_asm
             {
@@ -21747,12 +21748,13 @@ struct HitObject
     }
 
     [ForceInline]
-    [require(glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
     float3 GetObjectRayOrigin() {
         __target_switch
         {
         case glsl:
             __intrinsic_asm "hitObjectGetObjectRayOriginNV($0)";
+        case cuda: __intrinsic_asm "optixGetObjectRayOrigin()";
         case spirv:
             return spirv_asm
             {
@@ -21764,12 +21766,13 @@ struct HitObject
     }
 
     [ForceInline]
-    [require(glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
     float3 GetObjectRayDirection() {
         __target_switch
         {
         case glsl:
             __intrinsic_asm "hitObjectGetObjectRayDirectionNV($0)";
+        case cuda: __intrinsic_asm "optixGetObjectRayDirection()";
         case spirv:
             return spirv_asm
             {
