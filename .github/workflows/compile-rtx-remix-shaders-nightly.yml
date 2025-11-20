@@ -19,6 +19,10 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 45 # Slang build ~10-15 min + RTX Remix shaders ~10-15 min + buffer
 
+    defaults:
+      run:
+        shell: bash
+
     steps:
       - name: Checkout Slang repository
         uses: actions/checkout@v4
@@ -42,12 +46,10 @@ jobs:
       # Meson build system
       - name: Install Meson
         run: pip install meson==1.9.1
-        shell: bash
 
       # Ninja should be pre-installed on windows-2022
       - name: Verify Ninja
         run: ninja --version
-        shell: bash
 
       # Set up MSVC environment (required even for Ninja builds on Windows)
       - name: Setup MSVC
@@ -91,7 +93,6 @@ jobs:
             echo "Failed to build slangc"
             exit 1
           fi
-        shell: bash
 
       # Clone dxvk-remix with all submodules (pinned to specific commit for stability)
       - name: Clone dxvk-remix repository
@@ -101,7 +102,6 @@ jobs:
           cd dxvk-remix
           commit=$(git rev-parse HEAD)
           echo "Using dxvk-remix commit: $commit"
-        shell: bash
 
       # Cache packman packages between runs to save ~2-5 minutes
       - name: Cache Packman packages
@@ -141,7 +141,7 @@ jobs:
           startTime=$(date +%s)
 
           cd dxvk-remix
-          ./build_shaders_only.ps1
+          powershell.exe -File ./build_shaders_only.ps1
 
           exitCode=$?
           if [ $exitCode -ne 0 ]; then
@@ -153,7 +153,6 @@ jobs:
           duration=$(( (endTime - startTime) / 60 ))
           echo "End time: $(date '+%H:%M:%S')"
           echo "Build duration: $duration minutes"
-        shell: bash
 
       # Verify build output
       - name: Verify shader compilation
@@ -161,16 +160,17 @@ jobs:
           echo "Verifying shader compilation output..."
           cd dxvk-remix/_BuildShadersOnly/src/dxvk/rtx_shaders
 
-          headers=$(find . -maxdepth 1 -name "*.h" | wc -l)
-          spvFiles=$(find . -maxdepth 1 -name "*.spv" | wc -l)
-          totalSize=$(du -sm . | cut -f1)
+          # Trim whitespace from wc output using xargs
+          headers=$(find . -maxdepth 1 -name "*.h" | wc -l | xargs)
+          spvFiles=$(find . -maxdepth 1 -name "*.spv" | wc -l | xargs)
+          totalSize=$(du -sm . 2>/dev/null | cut -f1 || echo "unknown")
 
           echo "Compiled shader headers (.h): $headers"
           echo "SPIR-V binary files (.spv): $spvFiles"
           echo "Total output size: $totalSize MB"
 
           # Validate minimum expected output (based on testing: 195 headers, 187 spv)
-          if [ "$headers" -lt 100 ] || [ "$spvFiles" -lt 100 ]; then
+          if [ "${headers:-0}" -lt 100 ] || [ "${spvFiles:-0}" -lt 100 ]; then
             echo "Expected at least 100 shader files, but got $headers headers and $spvFiles .spv files"
             echo "This may indicate a shader compilation failure or incomplete build"
             exit 1
@@ -179,7 +179,6 @@ jobs:
           echo ""
           echo "✓ RTX Remix shader compilation successful!"
           echo "  All $headers shader variants compiled correctly"
-        shell: bash
 
       # Upload build logs on failure for debugging
       - name: Upload build logs on failure
@@ -206,7 +205,6 @@ jobs:
             echo "  Review build logs for details"
           fi
           echo "================================================"
-        shell: bash
         env:
           BUILD_RESULT: ${{ job.status }}
 
