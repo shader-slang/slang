@@ -185,11 +185,18 @@ struct MyObject : IFoo
     property int count
     {
         get { return myCount; }
-        set { myCount = newValue; }
+        set { myCount = newValue; } 
     }
 }
 ```
-The above listing declares that any conforming type must define a property named `count` with both a `getter` and a `setter` method.
+The above listing declares that any conforming type must define a property named `count` with both a `getter` and a `setter` method. You can then access the concrete value stored in the property as you would normally. 
+
+```csharp
+MyObject obj;
+obj.count = 2; 
+
+int count2 = obj.count; // count2 =  2
+```
 
 ### Generic Methods
 
