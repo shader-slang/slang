@@ -1327,6 +1327,10 @@ Compound Capabilities
 `texture_querylod`
 > Capabilities required to query texture LOD info
 
+`texture_shadowgrad`
+> Capabilities required for shadow texture sampling with bias and gradients.
+> New in HLSL SM6.8 but existed in older GLSL and SPIRV targets.
+
 `texture_shadowlod`
 > Capabilities required to query shadow texture lod info
 
