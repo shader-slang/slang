@@ -3964,14 +3964,20 @@ void legalizeEntryPointParameterForGLSL(
     // which is what current emit code assumes, but may not be more generally applicable.
     if (auto geomDecor = pp->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
     {
-        if (!func->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
+        if (auto existingDecor = func->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
         {
-            builder->addDecoration(func, geomDecor->getOp());
+            // If the function already has a geometry input primitive type decoration,
+            // verify that it's the same type. This can happen when parameters are reordered
+            // or when multiple parameters reference the same geometry input type.
+            if (existingDecor->getOp() != geomDecor->getOp())
+            {
+                SLANG_UNEXPECTED("Multiple parameters have different IRGeometryInputPrimitiveTypeDecoration decorations");
+            }
+            // If it's the same decoration, we can safely continue without adding it again
         }
         else
         {
-            SLANG_UNEXPECTED("Only expected a single parameter to have "
-                             "IRGeometryInputPrimitiveTypeDecoration decoration");
+            builder->addDecoration(func, geomDecor->getOp());
         }
     }
 
