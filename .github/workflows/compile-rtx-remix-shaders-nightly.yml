@@ -42,10 +42,12 @@ jobs:
       # Meson build system
       - name: Install Meson
         run: pip install meson==1.9.1
+        shell: bash
 
       # Ninja should be pre-installed on windows-2022
       - name: Verify Ninja
         run: ninja --version
+        shell: bash
 
       # Set up MSVC environment (required even for Ninja builds on Windows)
       - name: Setup MSVC
@@ -89,6 +91,7 @@ jobs:
             echo "Failed to build slangc"
             exit 1
           fi
+        shell: bash
 
       # Clone dxvk-remix with all submodules (pinned to specific commit for stability)
       - name: Clone dxvk-remix repository
@@ -98,6 +101,7 @@ jobs:
           cd dxvk-remix
           commit=$(git rev-parse HEAD)
           echo "Using dxvk-remix commit: $commit"
+        shell: bash
 
       # Cache packman packages between runs to save ~2-5 minutes
       - name: Cache Packman packages
@@ -116,6 +120,7 @@ jobs:
           echo "Downloading packman dependencies..."
           cd dxvk-remix
           ./scripts-common/packman/packman.cmd pull packman-external.xml
+        shell: bash
 
       # Build shaders using build_shaders_only.ps1
       # This script handles both configuration and compilation
@@ -148,6 +153,7 @@ jobs:
           duration=$(( (endTime - startTime) / 60 ))
           echo "End time: $(date '+%H:%M:%S')"
           echo "Build duration: $duration minutes"
+        shell: bash
 
       # Verify build output
       - name: Verify shader compilation
@@ -173,6 +179,7 @@ jobs:
           echo ""
           echo "✓ RTX Remix shader compilation successful!"
           echo "  All $headers shader variants compiled correctly"
+        shell: bash
 
       # Upload build logs on failure for debugging
       - name: Upload build logs on failure
@@ -199,6 +206,7 @@ jobs:
             echo "  Review build logs for details"
           fi
           echo "================================================"
+        shell: bash
         env:
           BUILD_RESULT: ${{ job.status }}
 
