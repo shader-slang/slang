@@ -148,6 +148,7 @@ jobs:
       config: release
       runs-on: '["ubuntu-22.04"]'
       test-category: full
+      full-gpu-tests: true
       server-count: 1
 
   # macOS tests
