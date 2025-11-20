@@ -831,6 +831,26 @@ float __glsl_texture_level_offset_1d_shadow<TSampler, TCoord, TOffset>(TSampler 
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
 [require(glsl, texture_shadowgrad)]
+float __glsl_texture_bias_shadow<TSampler, TCoord>(TSampler s, TCoord value, float bias)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "texture($0, $1, $2)";
+    }
+}
+
+__glsl_extension(GL_EXT_texture_shadow_lod)
+[require(glsl, texture_shadowgrad)]
+float __glsl_texture_bias_offset_shadow<TSampler, TCoord, TOffset>(TSampler s, TCoord value, float bias, constexpr TOffset offset)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureOffset($0, $1, $2, $3)";
+    }
+}
+
+__glsl_extension(GL_EXT_texture_shadow_lod)
+[require(glsl, texture_shadowgrad)]
 float __glsl_texture_grad_shadow<TSampler, TCoord, TGrad>(TSampler s, TCoord value, TGrad gradX, TGrad gradY)
 {
     __target_switch
@@ -1689,7 +1709,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         __target_switch
         {
         case glsl:
-            __intrinsic_asm "texture";
+            return __glsl_texture_bias_shadow(this, __makeVector(location, compareValue), bias);
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                 || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
@@ -1713,7 +1733,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         __target_switch
         {
         case glsl:
-            __intrinsic_asm "textureOffset";
+            return __glsl_texture_bias_offset_shadow(this, __makeVector(location, compareValue), bias, offset);
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                 || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
