@@ -124,35 +124,37 @@ jobs:
 
       # Build shaders using build_shaders_only.ps1
       # This script handles both configuration and compilation
+      # Must use PowerShell directly to avoid bash PATH interfering with MSVC tools
       - name: Build shaders using build_shaders_only.ps1
+        shell: pwsh
         run: |
-          echo "Building RTX Remix shaders using build_shaders_only.ps1..."
+          Write-Host "Building RTX Remix shaders using build_shaders_only.ps1..."
 
           # Add our built Slang to PATH so dxvk-remix uses it instead of packman version
-          slangBinPath="$(pwd)/build/Release/bin"
-          echo "Adding Slang build to PATH: $slangBinPath"
-          export PATH="$slangBinPath:$PATH"
+          $slangBinPath = Resolve-Path "$PWD\build\Release\bin"
+          Write-Host "Adding Slang build to PATH: $slangBinPath"
+          $env:PATH = "$slangBinPath;$env:PATH"
 
           # Verify which slangc will be used
-          whichSlangc=$(which slangc.exe 2>/dev/null || echo "not found")
-          echo "Using slangc from: $whichSlangc"
+          $whichSlangc = (Get-Command slangc.exe -ErrorAction SilentlyContinue).Source
+          if ($whichSlangc) {
+            Write-Host "Using slangc from: $whichSlangc"
+          }
 
-          echo "Start time: $(date '+%H:%M:%S')"
-          startTime=$(date +%s)
+          Write-Host "Start time: $(Get-Date -Format 'HH:mm:ss')"
+          $startTime = Get-Date
 
           cd dxvk-remix
-          powershell.exe -File ./build_shaders_only.ps1
+          .\build_shaders_only.ps1
 
-          exitCode=$?
-          if [ $exitCode -ne 0 ]; then
-            echo "RTX Remix shader build failed with exit code $exitCode"
-            exit $exitCode
-          fi
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "RTX Remix shader build failed with exit code $LASTEXITCODE"
+            exit $LASTEXITCODE
+          }
 
-          endTime=$(date +%s)
-          duration=$(( (endTime - startTime) / 60 ))
-          echo "End time: $(date '+%H:%M:%S')"
-          echo "Build duration: $duration minutes"
+          $duration = (Get-Date) - $startTime
+          Write-Host "End time: $(Get-Date -Format 'HH:mm:ss')"
+          Write-Host "Build duration: $($duration.TotalMinutes.ToString('0.00')) minutes"
 
       # Verify build output
       - name: Verify shader compilation
