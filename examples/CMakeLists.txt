@@ -3,9 +3,21 @@ function(example dir)
 
     set(debug_dir ${CMAKE_CURRENT_BINARY_DIR}/${dir})
 
+    # CONFIGURE_DEPENDS is removed to prevent intermittent build failures on Windows.
+    # See: https://github.com/shader-slang/slang/issues/9037
+    #
+    # Root cause: All examples share the same examples/CMakeFiles/generate.stamp file.
+    # When building in parallel, multiple targets trigger simultaneous CMake regenerations,
+    # causing a race condition on the shared stamp file (~10% failure rate).
+    #
+    # An alternative solution is to add CMakeFiles.txt for each and every examples.
+    # This will allow the build to run concurrently with their own generate.stamp file.
+    # But it may add unnecessary maintained cost when we need to add new examples.
+    #
+    # See: https://gitlab.kitware.com/cmake/cmake/-/issues/21571
     file(
         GLOB asset_files
-        CONFIGURE_DEPENDS
+        # CONFIGURE_DEPENDS
         "${dir}/*.slang"
         "${dir}/*.jpg"
         "${dir}/*.obj"
