@@ -2231,6 +2231,24 @@ bool SemanticsVisitor::canCoerce(
     return rs;
 }
 
+bool SemanticsVisitor::canCoerce(
+    CoercionSite site,
+    Type* toType,
+    QualType fromType,
+    Expr* fromExpr,
+    ConversionCost* outCost)
+{
+    // For site-specific coercion, we bypass the cache since the cache
+    // doesn't account for CoercionSite differences
+    ConversionCost cost;
+    bool rs = _coerce(site, toType, nullptr, fromType, fromExpr, getSink(), &cost);
+
+    if (outCost)
+        *outCost = cost;
+
+    return rs;
+}
+
 TypeCastExpr* SemanticsVisitor::createImplicitCastExpr()
 {
     return m_astBuilder->create<ImplicitCastExpr>();

@@ -1775,6 +1775,10 @@ public:
     ///
     bool canCoerce(Type* toType, QualType fromType, Expr* fromExpr, ConversionCost* outCost = 0);
 
+    /// Version of `canCoerce` that accepts a `CoercionSite` parameter.
+    /// This allows for site-specific conversion rules (e.g., sized array to unsized array conversion for function arguments).
+    bool canCoerce(CoercionSite site, Type* toType, QualType fromType, Expr* fromExpr, ConversionCost* outCost = 0);
+
     TypeCastExpr* createImplicitCastExpr();
 
     Expr* CreateImplicitCastExpr(Type* toType, Expr* fromExpr);
