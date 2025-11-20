@@ -178,6 +178,16 @@ interface IFoo
 {
     property int count {get; set;}
 }
+
+struct MyObject : IFoo
+{
+    int myCount = 0;
+    property int count
+    {
+        get { return myCount; }
+        set { myCount = newValue; }
+    }
+}
 ```
 The above listing declares that any conforming type must define a property named `count` with both a `getter` and a `setter` method.
 
