@@ -685,5 +685,5 @@ return {
 	["StoreBase.copyLogical"] = 681,
 	["MakeStorageTypeLoweringConfig"] = 682,
 	["Decoration.experimentalModule"] = 683,
-	["Undefined.DeliberatelyUninitialized"] = 680,
+	["Undefined.DeliberatelyUninitialized"] = 684,
 }
