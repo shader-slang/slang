@@ -3687,7 +3687,8 @@ RefPtr<StructuredBufferTypeLayout> createStructuredBufferWithCounterTypeLayout(
         auto counterResourceInfo = counterVarLayout->findOrAddResourceInfo(typeResourceInfo.kind);
         // We expect this index to be 1
         auto offset = typeResourceInfo.count.getFiniteValue();
-        counterResourceInfo->index = offset.isValid() ? LayoutOffset(offset.getValidValue()) : LayoutOffset::invalid();
+        counterResourceInfo->index =
+            offset.isValid() ? LayoutOffset(offset.getValidValue()) : LayoutOffset::invalid();
     }
 
     typeLayout->counterVarLayout = counterVarLayout;
@@ -4067,7 +4068,8 @@ static RefPtr<TypeLayout> maybeAdjustLayoutForArrayElementType(
             {
                 auto offset = spaceOffsetForField.getFiniteValue();
                 adjustedField->findOrAddResourceInfo(LayoutResourceKind::RegisterSpace)->index =
-                    offset.isValid() ? LayoutOffset(offset.getValidValue()) : LayoutOffset::invalid();
+                    offset.isValid() ? LayoutOffset(offset.getValidValue())
+                                     : LayoutOffset::invalid();
             }
 
             adjustedStructTypeLayout->fields.add(adjustedField);
@@ -4292,7 +4294,8 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
             auto structTypeResourceInfo =
                 m_typeLayout->findOrAddResourceInfo(fieldTypeResourceInfo.kind);
             auto offset = structTypeResourceInfo->count.getFiniteValue();
-            fieldResourceInfo->index = offset.isValid() ? LayoutOffset(offset.getValidValue()) : LayoutOffset::invalid();
+            fieldResourceInfo->index =
+                offset.isValid() ? LayoutOffset(offset.getValidValue()) : LayoutOffset::invalid();
             structTypeResourceInfo->count += fieldTypeResourceInfo.count;
             if (fieldTypeResourceInfo.kind == LayoutResourceKind::SubElementRegisterSpace &&
                 canTypeDirectlyUseRegisterSpace(fieldTypeLayout))
@@ -4325,7 +4328,8 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addExplicitUniformField(
     UInt uniformOffset = packoffsetModifier->uniformOffset;
     if (fieldResult.layout->FindResourceInfo(LayoutResourceKind::Uniform))
     {
-        fieldLayout->AddResourceInfo(LayoutResourceKind::Uniform)->index = LayoutOffset(uniformOffset);
+        fieldLayout->AddResourceInfo(LayoutResourceKind::Uniform)->index =
+            LayoutOffset(uniformOffset);
     }
     UniformLayoutInfo fieldInfo = fieldResult.info.getUniformLayout();
     auto uniformInfo = m_info;
