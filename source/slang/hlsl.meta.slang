@@ -829,6 +829,26 @@ float __glsl_texture_level_offset_1d_shadow<TSampler, TCoord, TOffset>(TSampler 
     }
 }
 
+__glsl_extension(GL_EXT_texture_shadow_lod)
+[require(glsl, texture_shadowgrad)]
+float __glsl_texture_grad_shadow<TSampler, TCoord, TGrad>(TSampler s, TCoord value, TGrad gradX, TGrad gradY)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureGrad($0, $1, $2, $3)";
+    }
+}
+
+__glsl_extension(GL_EXT_texture_shadow_lod)
+[require(glsl, texture_shadowgrad)]
+float __glsl_texture_grad_offset_shadow<TSampler, TCoord, TGrad, TOffset>(TSampler s, TCoord value, TGrad gradX, TGrad gradY, constexpr TOffset offset)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureGradOffset($0, $1, $2, $3, $4)";
+    }
+}
+
 [require(glsl, texture_sm_4_1)]
 float __glsl_texture<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value)
 {
@@ -1593,7 +1613,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         __target_switch
         {
         case glsl:
-            __intrinsic_asm "textureGrad";
+            return __glsl_texture_grad_shadow(this, __makeVector(location, compareValue), gradX, gradY);
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                 || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
@@ -1617,7 +1637,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         __target_switch
         {
         case glsl:
-            __intrinsic_asm "textureGradOffset";
+            return __glsl_texture_grad_offset_shadow(this, __makeVector(location, compareValue), gradX, gradY, offset);
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                 || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
