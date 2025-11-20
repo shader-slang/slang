@@ -21,5 +21,6 @@ In this chapter:
 SPIR-V target specific <a2-01-spirv-target-specific>
 Metal target specific <a2-02-metal-target-specific>
 WGSL target specific <a2-03-wgsl-target-specific>
+GLSL target specific <a2-04-glsl-target-specific>
 ```
 RTD-TOC-END -->
