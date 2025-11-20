@@ -6192,6 +6192,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 }
                 else if (semanticName == "sv_clipdistance")
                 {
+                    requireSPIRVCapability(SpvCapabilityClipDistance);
                     return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInClipDistance, inst);
                 }
                 else if (semanticName == "sv_culldistance")
