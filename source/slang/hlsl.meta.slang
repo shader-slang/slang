@@ -761,7 +761,7 @@ float __glsl_texture_1d_shadow<TSampler, TCoord>(TSampler s, TCoord value)
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
 [require(glsl, texture_shadowlod)]
-float __glsl_texture_3d_array_shadow<TSampler, TCoord>(TSampler s, TCoord value, float compare)
+float __glsl_texture_cube_array_shadow<TSampler, TCoord>(TSampler s, TCoord value, float compare)
 {
     __target_switch
     {
@@ -811,6 +811,16 @@ float __glsl_texture_level_1d_shadow<TSampler, TCoord>(TSampler s, TCoord value,
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
 [require(glsl, texture_shadowlod)]
+float __glsl_texture_level_cube_array_shadow<TSampler, TCoord>(TSampler s, TCoord value, float comparison, float level)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureLod($0, $1, $2, $3)";
+    }
+}
+
+__glsl_extension(GL_EXT_texture_shadow_lod)
+[require(glsl, texture_shadowlod)]
 float __glsl_texture_level_offset<TSampler, TCoord, TOffset>(TSampler s, TCoord value, float level, constexpr TOffset offset)
 {
     __target_switch
@@ -850,7 +860,7 @@ float __glsl_texture_1d_shadow<TTexture, TCoord>(TTexture t, SamplerComparisonSt
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
 [require(glsl, texture_shadowlod)]
-float __glsl_texture_3d_array_shadow<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value, float compare)
+float __glsl_texture_cube_array_shadow<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value, float compare)
 {
     __target_switch
     {
@@ -893,6 +903,16 @@ float __glsl_texture_level_1d_shadow<TTexture, TCoord>(TTexture t,SamplerCompari
     __target_switch
     {
     case glsl: __intrinsic_asm "textureLod($p, $2, $3)";
+    }
+}
+
+__glsl_extension(GL_EXT_texture_shadow_lod)
+[require(glsl, texture_shadowlod)]
+float __glsl_texture_level_cube_array_shadow<TTexture, TCoord>(TTexture t,SamplerComparisonState s, TCoord value, float compare, float level)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureLod($p, $2, $3, $4)";
     }
 }
 
@@ -1315,7 +1335,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             }
             else if (Shape.dimensions == 3 && isArray == 1)
             {
-                return __glsl_texture_3d_array_shadow(this, location, compareValue);
+                return __glsl_texture_cube_array_shadow(this, location, compareValue);
             }
             else
             {
@@ -1361,7 +1381,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 }
                 else if (Shape.dimensions == 3 && isArray == 1)
                 {
-                    return __glsl_texture_3d_array_shadow(this, location, compareValue);
+                    return __glsl_texture_cube_array_shadow(this, location, compareValue);
                 }
                 else
                 {
@@ -1506,9 +1526,12 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             {
                 return __glsl_texture_level_1d_shadow(this, __makeVector(__makeVector(location, 0.0), compareValue), level);
             }
+            else if (Shape.dimensions == 3 && isArray == 1)
+            {
+                return __glsl_texture_level_cube_array_shadow(this, location, compareValue, level);
+            }
             else
             {
-                static_assert(Shape.dimensions < 3 || isArray == 0, "GLSL: textureLod() does not support cube map arrays");
                 return __glsl_texture_level(this, __makeVector(location, compareValue), level);
             }
         case hlsl:
@@ -2639,7 +2662,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             }
             else if (Shape.dimensions == 3 && isArray == 1)
             {
-                return __glsl_texture_3d_array_shadow(this, s, location, compareValue);
+                return __glsl_texture_cube_array_shadow(this, s, location, compareValue);
             }
             else
             {
@@ -2846,6 +2869,10 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             if (Shape.dimensions == 1 && isArray == 0)
             {
                 return __glsl_texture_level_1d_shadow(this, s, __makeVector(__makeVector(location, 0.0), compareValue), level);
+            }
+            else if (Shape.dimensions == 3 && isArray == 1)
+            {
+                return __glsl_texture_level_cube_array_shadow(this, s, location, compareValue, level);
             }
             else
             {
