@@ -69,7 +69,7 @@ jobs:
       # Uses the same approach as CI: cmake --preset default + cmake --workflow --preset release
       - name: Build Slang
         run: |
-          echo "Building Slang (Release)..."
+          echo "Building Slang..."
           echo "CMake version: $(cmake --version | head -1)"
 
           startTime=$(date +%s)
@@ -122,37 +122,62 @@ jobs:
           ./scripts-common/packman/packman.cmd pull packman-external.xml
         shell: bash
 
+      # Replace packman's Slang with locally built version
+      # This is needed because meson.build uses:
+      # find_program('external/slang/slangc')
+      # which looks for a relative path, not PATH
+      - name: Replace packman Slang with built version
+        shell: pwsh
+        run: |
+          Write-Host "Replacing packman Slang with locally built version..."
+
+          $remixSlangDir = "dxvk-remix\external\slang"
+
+          if (-not (Test-Path $remixSlangDir)) {
+            Write-Error "Packman Slang directory not found at: $remixSlangDir"
+            exit 1
+          }
+
+          Write-Host "Found packman Slang at: $remixSlangDir"
+
+          # Show original version
+          $originalSlangc = Join-Path $remixSlangDir "slangc.exe"
+          if (Test-Path $originalSlangc) {
+            Write-Host "`nOriginal packman slangc version:"
+            & $originalSlangc -version 2>&1 | Write-Host
+          }
+
+          # Copy our built Slang binaries (overwrites packman version)
+          $builtSlangBin = Resolve-Path "build\Release\bin"
+          Write-Host "`nCopying built Slang from: $builtSlangBin"
+          Copy-Item -Path "$builtSlangBin\*" -Destination $remixSlangDir -Recurse -Force
+
+          # Verify replacement
+          Write-Host "`nVerifying replacement - new slangc version:"
+          & $originalSlangc -version
+          Write-Host "`n✓ dxvk-remix will use the locally built Slang"
+
       # Build shaders using build_shaders_only.ps1
       # This script handles both configuration and compilation
       - name: Build shaders using build_shaders_only.ps1
+        shell: pwsh
+        env:
+          SLANG_RUN_SPIRV_VALIDATION: 1
+          SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN: 1
         run: |
-          echo "Building RTX Remix shaders using build_shaders_only.ps1..."
+          $ErrorActionPreference = 'Stop'
+          Write-Host "Building RTX Remix shaders using build_shaders_only.ps1..."
+          Write-Host "SPIRV validation enabled via SLANG_RUN_SPIRV_VALIDATION=1"
 
-          # Add our built Slang to PATH so dxvk-remix uses it instead of packman version
-          slangBinPath="$(pwd)/build/Release/bin"
-          echo "Adding Slang build to PATH: $slangBinPath"
-          export PATH="$slangBinPath:$PATH"
-
-          # Verify which slangc will be used
-          whichSlangc=$(which slangc.exe 2>/dev/null || echo "not found")
-          echo "Using slangc from: $whichSlangc"
-
-          echo "Start time: $(date '+%H:%M:%S')"
-          startTime=$(date +%s)
+          Write-Host "Start time: $(Get-Date -Format 'HH:mm:ss')"
+          $startTime = Get-Date
 
           cd dxvk-remix
-          powershell.exe -File ./build_shaders_only.ps1
+          .\build_shaders_only.ps1
 
-          exitCode=$?
-          if [ $exitCode -ne 0 ]; then
-            echo "RTX Remix shader build failed with exit code $exitCode"
-            exit $exitCode
-          fi
-
-          endTime=$(date +%s)
-          duration=$(( (endTime - startTime) / 60 ))
-          echo "End time: $(date '+%H:%M:%S')"
-          echo "Build duration: $duration minutes"
+          $duration = (Get-Date) - $startTime
+          Write-Host "End time: $(Get-Date -Format 'HH:mm:ss')"
+          Write-Host "Build duration: $($duration.TotalMinutes.ToString('0.00')) minutes"
 
       # Verify build output
       - name: Verify shader compilation
@@ -169,10 +194,19 @@ jobs:
           echo "SPIR-V binary files (.spv): $spvFiles"
           echo "Total output size: $totalSize MB"
 
-          # Validate minimum expected output (based on testing: 195 headers, 187 spv)
+          # Validate that shaders were actually generated
+          # Note: Exact counts may vary as RTX Remix evolves
+          if [ "${headers:-0}" -eq 0 ] || [ "${spvFiles:-0}" -eq 0 ]; then
+            echo "ERROR: No shader files generated"
+            echo "This indicates shader compilation failed completely"
+            exit 1
+          fi
+
+          # Sanity check: RTX Remix should have at least some reasonable number of shaders
+          # Shader count is expected to stay stable or increase over time
           if [ "${headers:-0}" -lt 100 ] || [ "${spvFiles:-0}" -lt 100 ]; then
-            echo "Expected at least 100 shader files, but got $headers headers and $spvFiles .spv files"
-            echo "This may indicate a shader compilation failure or incomplete build"
+            echo "ERROR: Unexpectedly low shader count: $headers headers, $spvFiles .spv files"
+            echo "Expected at least 100 shaders - this may indicate a partial build failure"
             exit 1
           fi
 
