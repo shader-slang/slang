@@ -780,7 +780,7 @@ public:
             SlangBindingType bindingType;
             LayoutResourceKind kind;
             LayoutSize count;
-            Int indexOffset;
+            LayoutOffset indexOffset;
         };
 
         struct DescriptorSetInfo : public RefObject

@@ -2158,7 +2158,7 @@ struct ExtendedTypeLayoutContext
                                 _calcBindingType(typeLayout, resInfo.kind);
                             descriptorRange.count = multiplier;
                             descriptorRange.indexOffset =
-                                _calcIndexOffset(path.primary, resInfo.kind).getValidValue();
+                                _calcIndexOffset(path.primary, resInfo.kind);
                             descriptorSet->descriptorRanges.add(descriptorRange);
                         }
                     }
@@ -2300,8 +2300,7 @@ struct ExtendedTypeLayoutContext
                 resInfo.count.compare(LayoutSize(1)) != std::partial_ordering::equivalent ||
                 !structuredBufferTypeLayout->counterVarLayout);
             descriptorRange.count = multiplier;
-            descriptorRange.indexOffset =
-                _calcIndexOffset(path.primary, resInfo.kind).getValidValue();
+            descriptorRange.indexOffset = _calcIndexOffset(path.primary, resInfo.kind);
 
             Int descriptorSetIndex =
                 _findOrAddDescriptorSet(_calcSpaceOffset(path.primary, resInfo.kind));
@@ -2488,7 +2487,7 @@ struct ExtendedTypeLayoutContext
                 descriptorRange.kind = kind;
                 descriptorRange.bindingType = kindBindingType;
                 descriptorRange.count = count;
-                descriptorRange.indexOffset = indexOffset.getValidValue();
+                descriptorRange.indexOffset = indexOffset;
 
                 if (!descriptorSet)
                 {
@@ -2804,7 +2803,7 @@ SLANG_API SlangInt spReflectionTypeLayout_getDescriptorSetDescriptorRangeIndexOf
         return 0;
     auto& range = descriptorSet->descriptorRanges[rangeIndex];
 
-    return range.indexOffset;
+    return getReflectionOffset(range.indexOffset);
 }
 
 SLANG_API SlangInt spReflectionTypeLayout_getDescriptorSetDescriptorRangeDescriptorCount(
