@@ -3057,6 +3057,12 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
     //
     TypeLayoutContext layoutContext = context->layoutContext;
 
+    // Use entry point parameter layout rules for target-specific cases,
+    // such as CUDA, where cuLaunchKernel expects an unpadded entry point parameter buffer size
+    // so we do not add trailing padding to parameter structs
+    layoutContext =
+        layoutContext.with(layoutContext.getRulesFamily()->getEntryPointParameterRules());
+
     if (isKhronosTarget(context->getTargetRequest()))
     {
         // For Vulkan/SPIR-V targets, there are various cases for
