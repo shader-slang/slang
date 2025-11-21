@@ -54,6 +54,59 @@ public struct StructuredBufferStorage<T> : IStorage<T>
         return m_buffer[address + m_baseAddress];
     }
 
+    public uint4 readUint4(Address address)
+    {
+        const int nBytes = sizeof(T);
+        uint4 result = uint4(0, 0, 0, 0);
+        switch (nBytes)
+        {
+        case 1:
+            return uint4(
+                bit_cast<uint>(m_buffer[address + m_baseAddress]) << 24    |
+                bit_cast<uint>(m_buffer[address + m_baseAddress + 1]) << 16|
+                bit_cast<uint>(m_buffer[address + m_baseAddress + 2]) << 8 |
+                bit_cast<uint>(m_buffer[address + m_baseAddress + 3]),
+
+                bit_cast<uint>(m_buffer[address + m_baseAddress + 4]) << 24 |
+                bit_cast<uint>(m_buffer[address + m_baseAddress + 5]) << 16 |
+                bit_cast<uint>(m_buffer[address + m_baseAddress + 6]) << 8  |
+                bit_cast<uint>(m_buffer[address + m_baseAddress + 7]),
+
+                bit_cast<uint>(m_buffer[address + m_baseAddress + 8]) << 24 |
+                bit_cast<uint>(m_buffer[address + m_baseAddress + 9]) << 16 |
+                bit_cast<uint>(m_buffer[address + m_baseAddress + 10]) << 8 |
+                bit_cast<uint>(m_buffer[address + m_baseAddress + 11]),
+
+                bit_cast<uint>(m_buffer[address + m_baseAddress + 12]) << 24 |
+                bit_cast<uint>(m_buffer[address + m_baseAddress + 13]) << 16 |
+                bit_cast<uint>(m_buffer[address + m_baseAddress + 14]) << 8  |
+                bit_cast<uint>(m_buffer[address + m_baseAddress + 15]),
+        );
+
+        case 2:
+            return uint4(
+                bit_cast<uint>(m_buffer[address + m_baseAddress]) << 16 |
+                bit_cast<uint>(m_buffer[address + m_baseAddress + 1]),
+
+                bit_cast<uint>(m_buffer[address + m_baseAddress + 2]) << 16 |
+                bit_cast<uint>(m_buffer[address + m_baseAddress + 3]),
+
+                bit_cast<uint>(m_buffer[address + m_baseAddress + 4]) << 16 |
+                bit_cast<uint>(m_buffer[address + m_baseAddress + 5]),
+
+                bit_cast<uint>(m_buffer[address + m_baseAddress + 6]) << 16 |
+                bit_cast<uint>(m_buffer[address + m_baseAddress + 7]),
+            );
+        case 4:
+            return uint4(
+                bit_cast<uint>(m_buffer[address + m_baseAddress]),
+                bit_cast<uint>(m_buffer[address + m_baseAddress + 1]),
+                bit_cast<uint>(m_buffer[address + m_baseAddress + 2]),
+                bit_cast<uint>(m_buffer[address + m_baseAddress + 3]),
+            );
+        }
+    }
+
     /**
     Atomically adds a value (for gradient accumulation).
     @param[in] address The address relative to base address.

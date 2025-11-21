@@ -25709,6 +25709,28 @@ struct CoopMat
         }
     }
 
+    [ForceInline]
+    [require(cooperative_matrix)]
+    void Store<
+        let matrixLayout : CoopMatMatrixLayout,
+    >(Ptr<T, Access::ReadWrite, AddressSpace::GroupShared> data, uint stride)
+    {
+        __target_switch
+        {
+        case spirv:
+            let alignment = 16U;
+            spirv_asm
+            {
+                OpCooperativeMatrixStoreKHR $data $this $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>(($1)->m_data, 0, $2)";
+            else
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>(($1)->m_data, 0, $2)";
+        }
+    }
+
     /// Stores the cooperative matrix into a groupshared (workgroup) memory array with a different element type.
     /// Vulkan only.
     /// @param matrixLayout The memory layout (RowMajor or ColMajor) to use when storing.
@@ -25734,6 +25756,29 @@ struct CoopMat
         };
     }
 
+    [ForceInline]
+    [require(cooperative_matrix)]
+    void Store<
+        let matrixLayout : CoopMatMatrixLayout,
+        U,
+    >(Ptr<U, Access::ReadWrite, AddressSpace::GroupShared> data, uint stride)
+    {
+        __target_switch
+        {
+        case spirv:
+            let alignment = 16U;
+            spirv_asm
+            {
+                OpCooperativeMatrixStoreKHR $data $this $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor, $T1>(($1), $2)";
+            else
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor, $T1>(($1), $2)";
+        }
+    }
+
     /// Stores the cooperative matrix into a groupshared (workgroup) memory array of vectors.
     /// Vulkan only.
     /// @param matrixLayout The memory layout (RowMajor or ColMajor) to use when storing.
@@ -25744,7 +25789,7 @@ struct CoopMat
     /// @param element The starting element index in the array.
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     [ForceInline]
-    [require(cooperative_matrix)]
+    [require(cooperative_matrix_spirv)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -25903,6 +25948,28 @@ $}
         }
     }
 
+    [ForceInline]
+    [require(cooperative_matrix)]
+    static This Load<
+        let matrixLayout : CoopMatMatrixLayout,
+    >(Ptr<T, Access::ReadWrite, AddressSpace::GroupShared> data, uint stride)
+    {
+        __target_switch
+        {
+        case spirv:
+            let alignment = 16U;
+            return spirv_asm
+            {
+                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR $data $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>($0, 0, $1)";
+            else
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>($0, 0, $1)";
+        }
+    }
+
     /// Loads a cooperative matrix from a groupshared (workgroup) memory array with a different element type.
     /// Vulkan only.
     /// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the array.
@@ -25927,6 +25994,29 @@ $}
             %pointer:%workgroupPointerType = OpAccessChain &data $element;
             result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
         };
+    }
+
+    [ForceInline]
+    [require(cooperative_matrix)]
+    static This Load<
+        let matrixLayout : CoopMatMatrixLayout,
+        U,
+    >(Ptr<U, Access::ReadWrite, AddressSpace::GroupShared> data, uint stride)
+    {
+        __target_switch
+        {
+        case spirv:
+            let alignment = 16U;
+            return spirv_asm
+            {
+                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR $data $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor, $T0>($0, $1)";
+            else
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor, $T0>($0, $1)";
+        }
     }
 
     /// Loads a cooperative matrix from a groupshared (workgroup) memory array of vectors.
