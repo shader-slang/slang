@@ -6462,7 +6462,7 @@ struct IsSaturated<false>
 // ====================================================================================
 
 template<typename ElemT, int M, int N, int K, MatrixUse use, Layout layout>
-__device__ inline void wmmaLoad(uint32_t* regs, const ElemT* ptr, int stride)
+__device__ inline void wmmaLoad(uint32_t* regs, const void* ptr, int stride)
 {
     constexpr int nregs = RegisterCount<ElemT, M, N, K, use>::value;
 
@@ -6527,7 +6527,7 @@ __device__ inline void wmmaLoad(uint32_t* regs, const ElemT* ptr, int stride)
 // ====================================================================================
 
 template<typename ElemT, int M, int N, int K, Layout layout>
-__device__ inline void wmmaStore(ElemT* ptr, const uint32_t* regs, int stride)
+__device__ inline void wmmaStore(void* ptr, const uint32_t* regs, int stride)
 {
     constexpr int nregs = RegisterCount<ElemT, M, N, K, MatrixUse::MatrixD>::value;
 
@@ -6848,6 +6848,14 @@ struct WmmaFragment
         wmmaStore<T, M, N, K, layout>(buffer + element, regs, stride);
     }
 
+    template<Layout layout, typename PtrU>
+    void __device__ Store(PtrU buffer, uint stride)
+    {
+        // Force compile-time check, so we know the template parameter comibination is valid.
+        (void)RegisterCount<T, M, N, K, R>::value;
+        wmmaStore<T, M, N, K, layout>(buffer, regs, stride);
+    }
+
     template<Layout layout>
     static This __device__ Load(T* buffer, uint element, uint stride)
     {
@@ -6856,6 +6864,18 @@ struct WmmaFragment
         // Force compile-time check, so we know the template parameter comibination is valid.
         (void)RegisterCount<T, M, N, K, R>::value;
         wmmaLoad<T, M, N, K, R, layout>(fragment.regs, buffer + element, stride);
+
+        return fragment;
+    }
+
+    template<Layout layout, typename PtrU>
+    static This __device__ Load(PtrU buffer, uint stride)
+    {
+        WmmaFragment<T, M, N, K, R, layout> fragment;
+
+        // Force compile-time check, so we know the template parameter comibination is valid.
+        (void)RegisterCount<T, M, N, K, R>::value;
+        wmmaLoad<T, M, N, K, R, layout>(fragment.regs, buffer, stride);
 
         return fragment;
     }

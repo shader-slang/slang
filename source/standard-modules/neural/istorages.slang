@@ -29,6 +29,12 @@ public interface IStorage<T> : IDifferentiablePtrType
     public T read(Address address);
 
     /**
+    Reads sequential 4 elements starting from the given address and packed into a uint4.
+    */
+    public uint4 readUint4(Address address);
+
+
+    /**
     Atomically adds a value to storage (for gradient accumulation).
     @param[in] address The address to add to.
     @param[in] value The value to add.

@@ -37,3 +37,4 @@ __include "inline-vector";
 __include "istorages";
 __include "bindless-storage";
 __include "buffer-storage";
+__include "accelerate-vector-coopmat";
