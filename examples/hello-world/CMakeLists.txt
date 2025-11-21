@@ -5,6 +5,7 @@ set(debug_dir ${CMAKE_CURRENT_BINARY_DIR})
 # Copy example assets
 file(
     GLOB asset_files
+    CONFIGURE_DEPENDS
     "./*.slang"
     "./*.jpg"
     "./*.obj"

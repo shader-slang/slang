@@ -6,6 +6,7 @@ if(SLANG_ENABLE_SLANG_RHI)
     # Copy example assets
     file(
         GLOB asset_files
+        CONFIGURE_DEPENDS
         "./*.slang"
         "./*.jpg"
         "./*.obj"
