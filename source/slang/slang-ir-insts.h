@@ -1027,8 +1027,11 @@ struct IRTypeSizeAttr : public IRLayoutResourceInfoAttr
     {
         return LayoutSize::fromRaw(LayoutSize::RawValue(getIntVal(getSizeInst())));
     }
-    // TODO: Remove this
-    LayoutOffset getFiniteSize() { return getSize().getFiniteValue(); }
+    UInt getFiniteSize()
+    {
+        SLANG_ASSERT(getSize().isFinite());
+        return getSize().getFiniteValue().getValidValue();
+    }
 };
 
 // Layout

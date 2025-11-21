@@ -380,7 +380,8 @@ struct LayoutOffset
         }
     }
 
-    void operator+=(ssize_t right)
+    // Signed addition
+    void operator+=(Index right)
     {
         if (isInvalid())
         {
@@ -391,7 +392,7 @@ struct LayoutOffset
             // Check for positive overflow
             *this = LayoutOffset::invalid();
         }
-        else if (right < 0 && (ssize_t)raw < 0 - right)
+        else if (right < 0 && (Index)raw < 0 - right)
         {
             // Check for negative overflow (underflow)
             *this = LayoutOffset::invalid();
