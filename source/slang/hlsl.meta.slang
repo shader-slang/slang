@@ -700,7 +700,7 @@ struct _Texture<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let is
 //@hidden:
 
 // Returns true when the stage supports implicit derivatives on the
-// target. This must match with compound capability `fragmentprocessing`.
+// target. This must match with capability `implicit_derivatives_sampling`.
 //
 [__readNone]
 [ForceInline]

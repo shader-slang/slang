@@ -281,10 +281,18 @@ typedef unsigned int uint32_t;
 typedef unsigned long long uint64_t;
 typedef size_t uintptr_t;
 
-#endif
-
 typedef long long longlong;
 typedef unsigned long long ulonglong;
+
+#else
+
+// When not using NVRTC, match the platform's int64_t definition for signed type
+// On Linux: int64_t is 'long', on Windows: int64_t is 'long long'
+typedef int64_t longlong;
+// ulonglong must remain 'unsigned long long' to match CUDA's atomic operations
+typedef unsigned long long ulonglong;
+
+#endif
 
 typedef unsigned char uchar;
 typedef unsigned short ushort;
@@ -2245,17 +2253,23 @@ struct ByteAddressBuffer
 
 // Signed 64-bit atomic wrappers
 // CUDA only supports unsigned long long atomics, so we cast signed to unsigned
-__device__ __forceinline__ long long atomicExch(long long* address, long long val)
+// Use longlong type with explicit unsigned long long casts for platform portability
+__device__ __forceinline__ longlong atomicExch(longlong* address, longlong val)
 {
-    return (long long)atomicExch((unsigned long long*)address, (unsigned long long)val);
+    return (longlong)atomicExch((unsigned long long*)address, (unsigned long long)val);
 }
 
-__device__ __forceinline__ long long atomicCAS(long long* address, long long compare, long long val)
+__device__ __forceinline__ longlong atomicCAS(longlong* address, longlong compare, longlong val)
 {
-    return (long long)atomicCAS(
+    return (longlong)atomicCAS(
         (unsigned long long*)address,
         (unsigned long long)compare,
         (unsigned long long)val);
+}
+
+__device__ __forceinline__ longlong atomicAdd(longlong* address, longlong val)
+{
+    return (longlong)atomicAdd((unsigned long long*)address, (unsigned long long)val);
 }
 
 // Float bitwise atomic compare-and-swap
