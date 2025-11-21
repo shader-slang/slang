@@ -26,21 +26,22 @@ static size_t _roundToAlignment(size_t offset, size_t alignment)
     return (offset + mask) & ~mask;
 }
 
+static LayoutOffset _roundToAlignment(LayoutOffset offset, size_t alignment)
+{
+    // An invalid size stays invalid
+    if (offset.isInvalid())
+        return LayoutOffset::invalid();
+
+    return LayoutOffset{_roundToAlignment(offset.getValidValue(), alignment)};
+}
+
 static LayoutSize _roundToAlignment(LayoutSize offset, size_t alignment)
 {
     // An infinite size is assumed to be maximally aligned.
     if (offset.isInfinite())
         return LayoutSize::infinite();
 
-    // An invalid size stays invalid
-    if (offset.isInvalid())
-        return LayoutSize::invalid();
-
-    auto finiteOffset = offset.getFiniteValue();
-    if (!finiteOffset.isValid())
-        return LayoutSize::invalid();
-
-    return LayoutSize(_roundToAlignment(finiteOffset.getValidValue(), alignment));
+    return LayoutSize{_roundToAlignment(offset.getFiniteValue(), alignment)};
 }
 
 static size_t _roundUpToPowerOfTwo(size_t value)
@@ -144,10 +145,7 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         SLANG_RELEASE_ASSERT(elementInfo.size.isFinite());
         auto elementSize = elementInfo.size.getFiniteValue();
         auto elementAlignment = elementInfo.alignment;
-        auto elementStride =
-            elementSize.isValid()
-                ? _roundToAlignment(LayoutSize(elementSize.getValidValue()), elementAlignment)
-                : LayoutSize::invalid();
+        auto elementStride = _roundToAlignment(elementSize, elementAlignment);
 
         // An array with no elements will have zero size.
         //
@@ -167,24 +165,15 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
             // N chunks of size `elementStride` and then "giving back"
             // the final `elementStride - elementSize` bytes.
             //
-            if (elementSize.isValid())
-            {
-                arraySize =
-                    (elementStride * (elementCount - 1)) + LayoutSize(elementSize.getValidValue());
-            }
-            else
-            {
-                arraySize = LayoutSize::invalid();
-            }
+            arraySize = (LayoutSize{elementStride} * (elementCount - 1)) + LayoutSize{elementSize};
         }
 
         SimpleArrayLayoutInfo arrayInfo;
         arrayInfo.kind = elementInfo.kind;
         arrayInfo.size = arraySize;
         arrayInfo.alignment = elementAlignment;
-        auto elementStrideOffset = elementStride.getFiniteValue();
-        arrayInfo.elementStride =
-            elementStrideOffset.isValid() ? elementStrideOffset.getValidValue() : 0;
+        // TOOD: Make this LayoutOffset
+        arrayInfo.elementStride = elementStride.getValidValue();
         return arrayInfo;
     }
 

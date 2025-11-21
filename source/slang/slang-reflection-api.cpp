@@ -1260,14 +1260,11 @@ namespace
 {
 static size_t getReflectionSize(LayoutSize size)
 {
-    if (size.isFinite())
-    {
-        auto offset = size.getFiniteValue();
-        if (offset.isValid())
-            return offset.getValidValue();
-    }
-
-    return SLANG_UNBOUNDED_SIZE;
+    if (size.isInfinite())
+        return SLANG_UNBOUNDED_SIZE;
+    if (size.isInvalid())
+        return SLANG_INVALID_SIZE;
+    return size.getFiniteValue().getValidValue();
 }
 
 static int32_t getAlignment(TypeLayout* typeLayout, SlangParameterCategory category)
@@ -1294,7 +1291,7 @@ static size_t getStride(TypeLayout* typeLayout, SlangParameterCategory category)
 
     auto offset = size.getFiniteValue();
     if (!offset.isValid())
-        return 0;
+        return SLANG_INVALID_SIZE;
     size_t finiteSize = offset.getValidValue();
     size_t alignment = getAlignment(typeLayout, category);
     SLANG_ASSERT(alignment >= 1);
@@ -2589,13 +2586,7 @@ SLANG_API SlangInt spReflectionTypeLayout_getBindingRangeBindingCount(
         return 0;
     auto& bindingRange = extTypeLayout->m_bindingRanges[index];
 
-    auto count = bindingRange.count;
-    if (count.isFinite())
-    {
-        auto offset = count.getFiniteValue();
-        return offset.isValid() ? SlangInt(offset.getValidValue()) : -1;
-    }
-    return -1;
+    return getReflectionSize(bindingRange.count);
 }
 
 #if 0
@@ -2829,13 +2820,7 @@ SLANG_API SlangInt spReflectionTypeLayout_getDescriptorSetDescriptorRangeDescrip
         return 0;
     auto& range = descriptorSet->descriptorRanges[rangeIndex];
 
-    auto count = range.count;
-    if (count.isFinite())
-    {
-        auto offset = count.getFiniteValue();
-        return offset.isValid() ? offset.getValidValue() : -1;
-    }
-    return -1;
+    return getReflectionSize(range.count);
 }
 
 SLANG_API SlangBindingType spReflectionTypeLayout_getDescriptorSetDescriptorRangeType(
@@ -3019,11 +3004,7 @@ SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeObjectCount(SlangRefl
     if(!typeLayout) return 0;
 
     auto count = Slang::_findSubObjectRange(typeLayout, index).count;
-    if (count.isFinite()) {
-        auto offset = count.getFiniteValue();
-        return offset.isValid() ? SlangInt(offset.getValidValue()) : -1;
-    }
-    return -1;
+    return getReflectionSize(count);
 }
 
 SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeBindingRangeIndex(SlangReflectionTypeLayout* inTypeLayout, SlangInt index)

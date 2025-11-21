@@ -6435,34 +6435,7 @@ IRLayoutDecoration* IRBuilder::addLayoutDecoration(IRInst* value, IRLayout* layo
 IRTypeSizeAttr* IRBuilder::getTypeSizeAttr(LayoutResourceKind kind, LayoutSize size)
 {
     auto kindInst = getIntValue(getIntType(), IRIntegerValue(kind));
-
-    // Handle size safely by checking its state
-    IRIntegerValue sizeValue;
-    if (size.isFinite())
-    {
-        auto offset = size.getFiniteValue();
-        if (offset.isValid())
-        {
-            sizeValue = IRIntegerValue(offset.getValidValue());
-        }
-        else
-        {
-            // Invalid finite size - use 0 as fallback
-            sizeValue = IRIntegerValue(0);
-        }
-    }
-    else if (size.isInfinite())
-    {
-        // Use the infinite representation
-        sizeValue = IRIntegerValue(-1);
-    }
-    else
-    {
-        // Invalid size - use a different sentinel value
-        sizeValue = IRIntegerValue(-2);
-    }
-
-    auto sizeInst = getIntValue(getIntType(), sizeValue);
+    auto sizeInst = getIntValue(getIntType(), IRIntegerValue(size.unsafeGetRaw()));
 
     IRInst* operands[] = {kindInst, sizeInst};
 

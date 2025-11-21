@@ -869,7 +869,7 @@ static void addExplicitParameterBinding(
     auto kind = semanticInfo.kind;
 
     auto& bindingInfo = parameterInfo->bindingInfo[(int)kind];
-    if (bindingInfo.count.compare(LayoutSize(0)) != std::partial_ordering::equivalent)
+    if (bindingInfo.count.compare(0) == std::partial_ordering::greater)
     {
         // We already have a binding here, so we want to
         // confirm that it matches the new one that is
@@ -1401,6 +1401,8 @@ static void completeBindingsForParameterImpl(
     RefPtr<VarLayout> firstVarLayout,
     ParameterBindingInfo bindingInfos[kLayoutResourceKindCount])
 {
+    // TODO: check bindingInfos for finite/validity
+
     // For any resource kind used by the parameter
     // we need to update its layout information
     // to include a binding for that resource kind.
@@ -1425,7 +1427,7 @@ static void completeBindingsForParameterImpl(
         // go into our contiguously allocated range.
         //
         auto& bindingInfo = bindingInfos[(int)kind];
-        if (bindingInfo.count.compare(LayoutSize(0)) != std::partial_ordering::equivalent)
+        if (bindingInfo.count.compare(0) != std::partial_ordering::equivalent)
         {
             continue;
         }
@@ -1455,9 +1457,8 @@ static void completeBindingsForParameterImpl(
                 // an unbounded number of spaces.
                 // TODO: we should enforce that somewhere with an error.
                 //
-                auto offset = typeRes.count.getFiniteValue();
-                if (offset.isValid())
-                    spacesToAllocateCount += offset.getValidValue();
+                // TODO: Make this LayoutOffset
+                spacesToAllocateCount += typeRes.count.getFiniteValue().getValidValue();
                 break;
             }
 
@@ -1496,7 +1497,7 @@ static void completeBindingsForParameterImpl(
         // for this resource kind?
         auto kind = typeRes.kind;
         auto& bindingInfo = bindingInfos[(int)kind];
-        if (bindingInfo.count.compare(LayoutSize(0)) != std::partial_ordering::equivalent)
+        if (bindingInfo.count.compare(0) != std::partial_ordering::equivalent)
         {
             // If things have already been bound, our work is done.
             //
@@ -1534,9 +1535,7 @@ static void completeBindingsForParameterImpl(
                 // the number of spaces consumed.
                 //
                 bindingInfo.index = currentAllocatedSpace;
-                auto offset = count.getFiniteValue();
-                if (offset.isValid())
-                    currentAllocatedSpace += offset.getValidValue();
+                currentAllocatedSpace += count.getFiniteValue().getValidValue();
 
                 // TODO: what should we store as the "space" for
                 // an allocation of register spaces? Either zero
@@ -1594,10 +1593,9 @@ static void completeBindingsForParameterImpl(
             RefPtr<UsedRangeSet> usedRangeSet = _getOrCreateUsedRangeSetForSpace(context, space);
 
             bindingInfo.count = count;
-            auto offset = count.getFiniteValue();
             bindingInfo.index = usedRangeSet->usedResourceRanges[(int)kind].Allocate(
                 firstVarLayout,
-                offset.isValid() ? offset.getValidValue() : 0);
+                count.getFiniteValue().getValidValue());
             bindingInfo.space = space;
         }
     }
@@ -1613,7 +1611,7 @@ static void applyBindingInfoToParameter(
         auto& bindingInfo = bindingInfos[k];
 
         // skip resources we aren't consuming
-        if (bindingInfo.count.compare(LayoutSize(0)) == std::partial_ordering::equivalent)
+        if (bindingInfo.count.compare(0) == std::partial_ordering::equivalent)
             continue;
 
         // Add a record to the variable layout
@@ -2387,8 +2385,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                     auto kind = fieldTypeResInfo.kind;
                     auto structTypeResInfo = structLayout->findOrAddResourceInfo(kind);
                     auto fieldResInfo = fieldVarLayout->findOrAddResourceInfo(kind);
-                    auto offset = structTypeResInfo->count.getFiniteValue();
-                    fieldResInfo->index = offset.isValid() ? offset.getValidValue() : 0;
+                    fieldResInfo->index = structTypeResInfo->count.getFiniteValue().getValidValue();
                     structTypeResInfo->count += fieldTypeResInfo.count;
                 }
             }
@@ -2468,8 +2465,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                     {
                         // If the field is a Conditional<T, false> type, then it could have 0 size.
                         // We should skip this field if it has no use of layout units.
-                        if (fieldTypeResInfo.count.compare(LayoutSize(0)) ==
-                            std::partial_ordering::equivalent)
+                        if (fieldTypeResInfo.count.compare(0) == std::partial_ordering::equivalent)
                             continue;
 
                         auto kind = fieldTypeResInfo.kind;
@@ -2487,8 +2483,8 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                             // have preceded it.
                             //
                             fieldResInfo = fieldVarLayout->findOrAddResourceInfo(kind);
-                            auto offset = structTypeResInfo->count.getFiniteValue();
-                            fieldResInfo->index = offset.isValid() ? offset.getValidValue() : 0;
+                            fieldResInfo->index =
+                                structTypeResInfo->count.getFiniteValue().getValidValue();
                             structTypeResInfo->count += fieldTypeResInfo.count;
                         }
                         else
@@ -2708,7 +2704,7 @@ struct ScopeLayoutBuilder
         // Does the parameter have any uniform data?
         auto layoutInfo = varLayout->typeLayout->FindResourceInfo(LayoutResourceKind::Uniform);
         LayoutSize uniformSize = layoutInfo ? layoutInfo->count : LayoutSize(0);
-        if (uniformSize.compare(LayoutSize(0)) != std::partial_ordering::equivalent)
+        if (uniformSize.compare(0) == std::partial_ordering::greater)
         {
             // Make sure uniform fields get laid out properly...
 
@@ -2717,9 +2713,8 @@ struct ScopeLayoutBuilder
             auto rules = m_layoutContext.rules;
             LayoutSize uniformOffset = rules->AddStructField(&m_structLayoutInfo, fieldInfo);
 
-            auto offset = uniformOffset.getFiniteValue();
             varLayout->findOrAddResourceInfo(LayoutResourceKind::Uniform)->index =
-                offset.isValid() ? offset.getValidValue() : 0;
+                uniformOffset.getFiniteValue().getValidValue();
         }
 
         m_structLayout->fields.add(varLayout);
@@ -2855,10 +2850,9 @@ struct SimpleScopeLayoutBuilder : ScopeLayoutBuilder
                     continue;
                 paramResInfo = paramVarLayout->findOrAddResourceInfo(kind);
 
-                auto offset = paramTypeResInfo.count.getFiniteValue();
                 paramResInfo->index = usedRangeSet[int(kind)].Allocate(
                     paramVarLayout,
-                    offset.isValid() ? offset.getValidValue() : 0);
+                    paramTypeResInfo.count.getFiniteValue().getValidValue());
             }
         }
         //
@@ -2918,10 +2912,9 @@ static ParameterBindingAndKindInfo _allocateConstantBufferBinding(ParameterBindi
     ParameterBindingAndKindInfo info;
     info.kind = layoutInfo.kind;
     info.count = layoutInfo.size;
-    auto offset = layoutInfo.size.getFiniteValue();
     info.index = usedRangeSet->usedResourceRanges[(int)layoutInfo.kind].Allocate(
         nullptr,
-        offset.isValid() ? offset.getValidValue() : 0);
+        layoutInfo.size.getFiniteValue().getValidValue());
     info.space = space;
     return info;
 }
@@ -2943,8 +2936,7 @@ static ParameterBindingAndKindInfo _assignConstantBufferBinding(
                               context->layoutContext.objectLayoutOptions)
                           .getSimple();
 
-    auto sizeOffset = layoutInfo.size.getFiniteValue();
-    const Index count = sizeOffset.isValid() ? Index(sizeOffset.getValidValue()) : 0;
+    const Index count = Index(layoutInfo.size.getFiniteValue().getValidValue());
 
     auto existingParam =
         usedRangeSet->usedResourceRanges[(int)layoutInfo.kind].Add(varLayout, index, index + count);
@@ -3208,9 +3200,8 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
             for (auto rr : resultTypeLayout->resourceInfos)
             {
                 auto entryPointRes = paramsStructLayout->findOrAddResourceInfo(rr.kind);
-                auto offset = entryPointRes->count.getFiniteValue();
                 resultLayout->findOrAddResourceInfo(rr.kind)->index =
-                    offset.isValid() ? offset.getValidValue() : 0;
+                    entryPointRes->count.getFiniteValue().getValidValue();
                 entryPointRes->count += rr.count;
             }
         }
@@ -3738,8 +3729,8 @@ static bool _calcNeedsDefaultSpace(SharedParameterBindingContext& sharedContext)
             // the space from the explicit binding will be used, so
             // that a default space isn't needed.
             //
-            if (parameterInfo->bindingInfo[resInfo.kind].count.compare(LayoutSize(0)) !=
-                std::partial_ordering::equivalent)
+            if (parameterInfo->bindingInfo[resInfo.kind].count.compare(0) ==
+                std::partial_ordering::greater)
                 continue;
 
             // We also want to exclude certain resource kinds from
@@ -3811,7 +3802,7 @@ static bool _calcNeedsDefaultSpace(SharedParameterBindingContext& sharedContext)
 
 static void _appendRange(Index start, LayoutSize size, StringBuilder& ioBuf)
 {
-    if (size.compare(LayoutSize(1)) == std::partial_ordering::equivalent)
+    if (size.compare(1) == std::partial_ordering::equivalent)
     {
         // If it's in effect a single index, just append like that.
         ioBuf << start;
@@ -3819,21 +3810,17 @@ static void _appendRange(Index start, LayoutSize size, StringBuilder& ioBuf)
     else
     {
         ioBuf << "[ " << start << " ... ";
-        if (size.isFinite())
+        if (size.isInfinite())
         {
-            auto offset = size.getFiniteValue();
-            if (offset.isValid())
-            {
-                ioBuf << start + (Index)offset.getValidValue() << ")";
-            }
-            else
-            {
-                ioBuf << start << "+invalid)";
-            }
+            ioBuf << "inf )";
+        }
+        else if (size.isInvalid())
+        {
+            ioBuf << start << "invalid )";
         }
         else
         {
-            ioBuf << "inf )";
+            ioBuf << start + (Index)size.getFiniteValue().getValidValue() << ")";
         }
     }
 }
@@ -4291,8 +4278,7 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
 
     globalScopeVarLayout = globalScopeLayoutBuilder.endLayout(globalScopeVarLayout);
 
-    if (globalConstantBufferBinding.count.compare(LayoutSize(0)) !=
-        std::partial_ordering::equivalent)
+    if (globalConstantBufferBinding.count.compare(0) != std::partial_ordering::equivalent)
     {
         auto cbInfo = globalScopeVarLayout->findOrAddResourceInfo(globalConstantBufferBinding.kind);
 
