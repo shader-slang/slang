@@ -287,7 +287,7 @@ struct UsedRanges
             // We know that size is not infinite, and it's greater than 0 so it's not invalid
             return size.compare(1) == std::partial_ordering::equivalent
                        ? findRangeContaining(index)
-                       : findRangeContaining(index, LayoutSize{size.getFiniteValue()});
+                       : findRangeContaining(index, size.getFiniteValue().getValidValue());
         }
         return -1;
     }
