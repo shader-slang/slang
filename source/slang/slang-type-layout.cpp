@@ -638,6 +638,7 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
             return vectorInfo;
         }
 
+        // We just checked it wasn't infinite or invalid
         auto elementSize = elementInfo.size.getFiniteValue().getValidValue();
 
         // These rules can largely be determines by looking at

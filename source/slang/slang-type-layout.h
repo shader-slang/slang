@@ -7,6 +7,7 @@
 #include "slang-syntax.h"
 #include "slang.h"
 
+#include <algorithm>
 #include <compare>
 #include <limits>
 
@@ -452,7 +453,7 @@ inline LayoutSize maximum(LayoutSize left, LayoutSize right)
     if (leftOffset.isInvalid() || rightOffset.isInvalid())
         return LayoutSize::invalid();
 
-    return LayoutSize(Math::Max(leftOffset.getValidValue(), rightOffset.getValidValue()));
+    return LayoutSize(std::max(leftOffset.getValidValue(), rightOffset.getValidValue()));
 }
 
 
@@ -495,7 +496,7 @@ inline LayoutOffset maximum(LayoutOffset left, LayoutOffset right)
     if (left.isInvalid() || right.isInvalid())
         return LayoutOffset::invalid();
 
-    return LayoutOffset(Math::Max(left.getValidValue(), right.getValidValue()));
+    return LayoutOffset(std::max(left.getValidValue(), right.getValidValue()));
 }
 
 
@@ -803,7 +804,7 @@ public:
         struct SubObjectRangeInfo
         {
             Int bindingRangeIndex = 0;
-            Int spaceOffset = 0;
+            LayoutOffset spaceOffset = LayoutOffset{0};
             RefPtr<VarLayout> offsetVarLayout;
         };
 

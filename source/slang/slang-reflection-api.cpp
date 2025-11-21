@@ -2060,13 +2060,13 @@ struct ExtendedTypeLayoutContext
             TypeLayout::ExtendedInfo::SubObjectRangeInfo subObjectRange;
             subObjectRange.bindingRangeIndex = bindingRangeIndex;
             subObjectRange.offsetVarLayout = createOffsetVarLayout(typeLayout, path);
-            subObjectRange.spaceOffset = 0;
+            subObjectRange.spaceOffset = LayoutOffset{0};
             if (kind == LayoutResourceKind::SubElementRegisterSpace && path.primary)
             {
                 if (auto resInfo = path.primary->var->FindResourceInfo(
                         LayoutResourceKind::SubElementRegisterSpace))
                 {
-                    subObjectRange.spaceOffset = resInfo->index.getValidValue();
+                    subObjectRange.spaceOffset = resInfo->index;
                 }
             }
             // It is possible that the sub-object has descriptor ranges
@@ -2326,7 +2326,7 @@ struct ExtendedTypeLayoutContext
             TypeLayout::ExtendedInfo::SubObjectRangeInfo subObjectRange;
             subObjectRange.bindingRangeIndex = bindingRangeIndex;
             subObjectRange.offsetVarLayout = createOffsetVarLayout(typeLayout, path);
-            subObjectRange.spaceOffset = 0;
+            subObjectRange.spaceOffset = LayoutOffset{0};
             m_extendedInfo->m_subObjectRanges.add(subObjectRange);
 
             // If we have an associated counter for this structured buffer,
@@ -2929,7 +2929,7 @@ SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeSpaceOffset(
     if (subObjectRangeIndex >= extTypeLayout->m_subObjectRanges.getCount())
         return 0;
 
-    return extTypeLayout->m_subObjectRanges[subObjectRangeIndex].spaceOffset;
+    return getReflectionOffset(extTypeLayout->m_subObjectRanges[subObjectRangeIndex].spaceOffset);
 }
 
 SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_getSubObjectRangeOffset(
