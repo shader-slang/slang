@@ -7910,7 +7910,7 @@ matrix<uint,N,M> asuint(matrix<uint,N,M> x)
 // Float->unsigned cases:
 
 [__readNone]
-[require(cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 uint16_t asuint16(float16_t value)
 {
     __target_switch
@@ -7921,11 +7921,13 @@ uint16_t asuint16(float16_t value)
     case spirv: return spirv_asm {
         OpBitcast $$uint16_t result $value
     };
+    default:
+        return bit_cast<uint16_t>(value);
     }
 }
 
 [__readNone]
-[require(cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 vector<uint16_t,N> asuint16<let N : int>(vector<float16_t,N> value)
 {
     __target_switch
@@ -7940,14 +7942,14 @@ vector<uint16_t,N> asuint16<let N : int>(vector<float16_t,N> value)
 }
 
 [__readNone]
-[require(cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 matrix<uint16_t,R,C> asuint16<let R : int, let C : int>(matrix<float16_t,R,C> value)
 { MATRIX_MAP_UNARY(uint16_t, R, C, asuint16, value); }
 
 // Unsigned->float cases:
 
 [__readNone]
-[require(cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 float16_t asfloat16(uint16_t value)
 {
     __target_switch
@@ -7958,6 +7960,8 @@ float16_t asfloat16(uint16_t value)
     case spirv: return spirv_asm {
         OpBitcast $$float16_t result $value
     };
+    default:
+        return bit_cast<float16_t>(value);
     }
 }
 
