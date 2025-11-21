@@ -76,9 +76,16 @@ jobs:
       - name: falcor-unit-test
         shell: pwsh
         run: |
-          $ErrorActionPreference = "SilentlyContinue"
+          $ErrorActionPreference = "Continue"
+          Write-Host "=== Listing FalcorBin structure ==="
+          Get-ChildItem -Recurse -Force .\FalcorBin | Where-Object { $_.Extension -eq ".exe" -or $_.Extension -eq ".dll" -or $_.Name -eq ".git" } | Select-Object FullName
+          Write-Host "=== Checking for FalcorTest.exe ==="
+          Get-ChildItem -Recurse .\FalcorBin\build -Filter "FalcorTest.exe" -ErrorAction SilentlyContinue | Select-Object FullName
+          Write-Host "=== Checking .git directory ==="
+          Test-Path .\FalcorBin\.git
+          Write-Host "=== Running unit tests ==="
           cd .\FalcorBin\tests
-          python ./testing/run_unit_tests.py --config windows-vs2022-Release --tags="-slow"
+          python -u ./testing/run_unit_tests.py --config windows-vs2022-Release --tags="-slow"
           cd ../../
       - name: falcor-image-test
         shell: pwsh
