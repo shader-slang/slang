@@ -2035,6 +2035,23 @@ alias structuredbuffer = sm_4_0_version;
 /// [Compound]
 alias structuredbuffer_rw = sm_4_0_version;
 
+/// Capabilities required for implicit derivatives sampling.
+///
+/// This capability is required by texture sampling functions such as `_Texture.Sample()`
+/// where the level of detail is determined by implicit derivatives.
+///
+/// @remark In GLSL, implicit level-of-detail `texture()` functions use the base texture when
+/// the implicit derivatives are unavailable. When this capability is not present, invocations of
+/// these functions are translated to invocations of `_Texture.SampleLevelZero()`.
+///
+/// @remark Implicit derivatives for the compute stage can be enabled by declaring capability `GL_NV_compute_shader_derivatives` (GLSL),
+/// `SPV_KHR_compute_shader_derivatives` (SPIR-V), or profile `cs_6_6` (HLSL).
+///
+/// [compound]
+alias implicit_derivatives_sampling = fragment
+                                    | raytracingstages_compute_amplification_mesh + GL_NV_compute_shader_derivatives
+                                    ;
+
 /// Capabilities required to use fragment derivative operations (without GLSL derivativecontrol)
 /// [Compound]
 alias fragmentprocessing = fragment + _sm_5_0

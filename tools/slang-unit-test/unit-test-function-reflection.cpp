@@ -326,3 +326,104 @@ SLANG_UNIT_TEST(findFunctionByNameInType)
         SLANG_CHECK_ABORT(false && "Expected function to be overloaded with multiple signatures");
     }
 }
+
+
+SLANG_UNIT_TEST(findFunctionByNameGenericOverload)
+{
+    // Test shader with extensions that have functions with same name but different signatures
+    const char* userSourceBody = R"(
+
+        void myFunc<T>(T value)
+        {}
+
+        void myFunc<T>(T value, T value1)
+        {}
+
+        struct MyType<U>
+        {
+            void myFunc<T>(T value)
+            {}
+
+            void myFunc<T>(T value, T value1)
+            {}
+        }
+
+        [shader("compute")]
+        void computeMain(uint3 tid: SV_DispatchThreadID)
+        {
+        }
+        )";
+
+    auto moduleName = "moduleH" + String(Process::getId());
+    String userSource = "import " + moduleName + ";\n" + userSourceBody;
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_HLSL;
+    targetDesc.profile = globalSession->findProfile("sm_5_0");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnosticBlob;
+    auto module = session->loadModuleFromSourceString(
+        "test_module",
+        "test_module.slang",
+        userSourceBody,
+        diagnosticBlob.writeRef());
+    SLANG_CHECK(module != nullptr);
+
+    int testCount = 2;
+    for (int i = 0; i < testCount; i++)
+    {
+        slang::FunctionReflection* myFunctionType = nullptr;
+        if (i == 0)
+        {
+            // test the global generic function overloads
+            myFunctionType = module->getLayout()->findFunctionByName("myFunc<int>");
+            SLANG_CHECK_ABORT(myFunctionType != nullptr);
+        }
+        else
+        {
+
+            // test the generic function overloads inside a generic struct
+            auto myStructType = module->getLayout()->findTypeByName("MyType<float>");
+            SLANG_CHECK_ABORT(myStructType != nullptr);
+
+            myFunctionType =
+                module->getLayout()->findFunctionByNameInType(myStructType, "myFunc<int>");
+            SLANG_CHECK_ABORT(myFunctionType != nullptr);
+        }
+
+        // The function should be overloaded since there are multiple functions with different
+        // signatures
+        if (myFunctionType->isOverloaded())
+        {
+            // If it's overloaded, verify we can access both variants
+            SLANG_CHECK(myFunctionType->getOverloadCount() >= 2);
+
+            for (int i = 0; i < myFunctionType->getOverloadCount(); i++)
+            {
+                auto overload = myFunctionType->getOverload(i);
+
+                for (int j = 0; j < overload->getParameterCount(); j++)
+                {
+                    auto paramTypeName = overload->getParameterByIndex(j)->getType()->getName();
+                    if (strcmp(paramTypeName, "int") != 0)
+                    {
+                        SLANG_CHECK(false && "Expected different parameter signatures");
+                    }
+                }
+            }
+        }
+        else
+        {
+            // The function should be overloaded since there are multiple functions with different
+            // signatures. If it's not overloaded, the fix didn't work properly.
+            SLANG_CHECK_ABORT(
+                false && "Expected function to be overloaded with multiple signatures");
+        }
+    }
+}
