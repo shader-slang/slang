@@ -81,11 +81,11 @@ SlangResult CommandLineDownstreamCompiler::compile(
     const auto targetDesc = ArtifactDescUtil::makeDescForCompileTarget(options.targetType);
 
     // Create the result artifact
-    auto artifact = ArtifactUtil::createArtifact(targetDesc);
+    auto resultArtifact = ArtifactUtil::createArtifact(targetDesc);
 
     // Create the diagnostics
     auto diagnostics = ArtifactDiagnostics::create();
-    ArtifactUtil::addAssociated(artifact, diagnostics);
+    ArtifactUtil::addAssociated(resultArtifact, diagnostics);
 
     // If Slang was built with Clang or GCC and sanitizers were enabled, the same `-fsanitize=...`
     // flag must be passed when linking an executable or shared library with a Slang library, or
@@ -113,7 +113,7 @@ SlangResult CommandLineDownstreamCompiler::compile(
                 asCharSlice(toSlice("slang-generated")),
                 lockFile.writeRef())))
         {
-            *outArtifact = artifact.detach();
+            *outArtifact = resultArtifact.detach();
             return SLANG_FAIL;
         }
 
@@ -140,7 +140,7 @@ SlangResult CommandLineDownstreamCompiler::compile(
         CommandLine compileCmdLine(m_cmdLine);
         if (SLANG_FAILED(calcArgs(compileOptions, compileCmdLine)))
         {
-            *outArtifact = artifact.detach();
+            *outArtifact = resultArtifact.detach();
             return SLANG_FAIL;
         }
 
@@ -151,7 +151,7 @@ SlangResult CommandLineDownstreamCompiler::compile(
                 lockFile,
                 compileArtifacts)))
         {
-            *outArtifact = artifact.detach();
+            *outArtifact = resultArtifact.detach();
             return SLANG_FAIL;
         }
 
@@ -164,14 +164,14 @@ SlangResult CommandLineDownstreamCompiler::compile(
         if (SLANG_FAILED(ProcessUtil::execute(compileCmdLine, compileResult)) ||
             SLANG_FAILED(parseOutput(compileResult, diagnostics)))
         {
-            *outArtifact = artifact.detach();
+            *outArtifact = resultArtifact.detach();
             return SLANG_FAIL;
         }
 
         // If compilation failed, return the diagnostics
         if (compileResult.resultCode != 0 || !objectArtifact->exists())
         {
-            *outArtifact = artifact.detach();
+            *outArtifact = resultArtifact.detach();
             return SLANG_FAIL;
         }
     }
@@ -189,7 +189,7 @@ SlangResult CommandLineDownstreamCompiler::compile(
     // specified options
     if (SLANG_FAILED(calcArgs(options, cmdLine)))
     {
-        *outArtifact = artifact.detach();
+        *outArtifact = resultArtifact.detach();
         return SLANG_FAIL;
     }
 
@@ -201,7 +201,7 @@ SlangResult CommandLineDownstreamCompiler::compile(
         if (SLANG_FAILED(
                 calcCompileProducts(options, DownstreamProductFlag::All, lockFile, artifacts)))
         {
-            *outArtifact = artifact.detach();
+            *outArtifact = resultArtifact.detach();
             return SLANG_FAIL;
         }
 
@@ -222,7 +222,7 @@ SlangResult CommandLineDownstreamCompiler::compile(
     // Somethings gone wrong if we don't find the main artifact
     if (!productArtifact)
     {
-        *outArtifact = artifact.detach();
+        *outArtifact = resultArtifact.detach();
         return SLANG_FAIL;
     }
 
@@ -240,7 +240,7 @@ SlangResult CommandLineDownstreamCompiler::compile(
         SLANG_FAILED(parseOutput(exeRes, diagnostics)))
     {
         // If the process failed or the output parsing failed, return the diagnostics
-        *outArtifact = artifact.detach();
+        *outArtifact = resultArtifact.detach();
         return SLANG_FAIL;
     }
 
@@ -305,7 +305,7 @@ SlangResult CommandLineDownstreamCompiler::compile(
                            ? findRepresentation<IOSFileArtifactRepresentation>(productArtifact)
                            : nullptr)
     {
-        artifact->addRepresentation(fileRep);
+        resultArtifact->addRepresentation(fileRep);
     }
 
     // Add the artifact list if there is anything in it
@@ -322,10 +322,10 @@ SlangResult CommandLineDownstreamCompiler::compile(
 
         artifactContainer->setChildren(slice.data, slice.count);
 
-        artifact->addAssociated(artifactContainer);
+        resultArtifact->addAssociated(artifactContainer);
     }
 
-    *outArtifact = artifact.detach();
+    *outArtifact = resultArtifact.detach();
     return SLANG_OK;
 }
 
