@@ -28,7 +28,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: "recursive"
-          fetch-depth: 1 # Shallow clone for speed
+          fetch-depth: 0 # Need full history for version tags
+          fetch-tags: true
 
       # Add bash to PATH on Windows (for consistency with main CI)
       # Only add Git\bin, not usr\bin which contains GNU tools that conflict with MSVC
@@ -176,6 +177,13 @@ jobs:
             exit 1
           }
 
+          # Check that version looks valid (not just a timestamp)
+          if ($newVersion -match '^\d{10,}$') {
+            Write-Error "ERROR: Slangc version appears invalid (timestamp only: $newVersion)"
+            Write-Error "This suggests the build failed to detect Git version tags"
+            exit 1
+          }
+
           Write-Host "`nVerified: dxvk-remix will use the locally built Slang"
 
       # Build shaders using build_shaders_only.ps1
@@ -195,6 +203,10 @@ jobs:
 
           cd dxvk-remix
           .\build_shaders_only.ps1
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Shader build failed with exit code $LASTEXITCODE"
+          }
 
           $duration = (Get-Date) - $startTime
           Write-Host "End time: $(Get-Date -Format 'HH:mm:ss')"
