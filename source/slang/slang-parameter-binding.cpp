@@ -227,7 +227,7 @@ struct UsedRanges
     {
         UsedRange range;
         range.parameter = param;
-        range.begin = begin.getValidValueOr(-1);
+        range.begin = begin.getValidValueOr((UInt)-1);
         range.end = end.getFiniteValueOr((UInt)-1);
         return Add(range);
     }
@@ -3132,9 +3132,9 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
                                          .withSpecializationArgs(
                                              existentialSpecializationArgs.getBuffer(),
                                              existentialSpecializationArgs.getCount())
-                                         .withSpecializationArgsOffsetBy(
+                                         .withSpecializationArgsOffsetBy(LayoutOffset{UInt(
                                              shaderParamInfo.firstSpecializationParamIndex -
-                                             genericSpecializationParamCount);
+                                             genericSpecializationParamCount)});
         }
 
         // Any error messages we emit during the process should

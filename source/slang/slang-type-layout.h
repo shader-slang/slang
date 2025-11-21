@@ -1545,13 +1545,13 @@ struct TypeLayoutContext
         return result;
     }
 
-    TypeLayoutContext withSpecializationArgsOffsetBy(Int offset) const
+    TypeLayoutContext withSpecializationArgsOffsetBy(LayoutOffset offset) const
     {
         TypeLayoutContext result = *this;
-        if (specializationArgCount > offset)
+        if (offset.compare(specializationArgCount) == std::partial_ordering::less)
         {
-            result.specializationArgCount = specializationArgCount - offset;
-            result.specializationArgs = specializationArgs + offset;
+            result.specializationArgCount = specializationArgCount - offset.getValidValue();
+            result.specializationArgs = specializationArgs + offset.getValidValue();
         }
         else
         {

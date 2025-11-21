@@ -5011,11 +5011,11 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             // the slots its will consume by looking at the layout we've
             // computed so far.
             //
-            Int baseExistentialSlotIndex = 0;
+            LayoutOffset baseExistentialSlotIndex{0};
             if (auto resInfo =
                     typeLayout->FindResourceInfo(LayoutResourceKind::ExistentialTypeParam))
             {
-                baseExistentialSlotIndex = resInfo->count.getFiniteValue().getValidValue();
+                baseExistentialSlotIndex = resInfo->count.getFiniteValue();
             }
             //
             // When computing the layout for the field, we will give it access
@@ -5103,12 +5103,11 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
                 // the slots its will consume by looking at the layout we've
                 // computed so far.
                 //
-                Int baseExistentialSlotIndex = 0;
+                LayoutOffset baseExistentialSlotIndex{0};
                 if (auto resInfo =
                         typeLayout->FindResourceInfo(LayoutResourceKind::ExistentialTypeParam))
                 {
-                    auto offset = resInfo->count.getFiniteValue();
-                    baseExistentialSlotIndex = offset.isValid() ? Int(offset.getValidValue()) : 0;
+                    baseExistentialSlotIndex = resInfo->count.getFiniteValue();
                 }
                 //
                 // When computing the layout for the field, we will give it access
