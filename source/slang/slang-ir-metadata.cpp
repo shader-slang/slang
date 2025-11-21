@@ -73,8 +73,7 @@ void collectMetadataFromInst(IRInst* param, ArtifactPostEmitMetadata& outMetadat
             auto spaceIndex = spaceOffset + offsetAttr->getSpace();
             auto registerIndex = offsetAttr->getOffset();
             auto size = sizeAttr->getSize();
-            auto finiteValue = size.getFiniteValue();
-            auto count = size.isFinite() && finiteValue.isValid() ? finiteValue.getValidValue() : 0;
+            auto count = size.getFiniteValueOr(0);
             _insertBinding(outMetadata.m_usedBindings, kind, spaceIndex, registerIndex, count);
         }
     }
@@ -106,8 +105,7 @@ void collectMetadataFromInst(IRInst* param, ArtifactPostEmitMetadata& outMetadat
             auto spaceIndex = spaceOffset + offsetAttr->getSpace();
             auto registerIndex = offsetAttr->getOffset();
             auto size = sizeAttr->getSize();
-            auto finiteValue = size.getFiniteValue();
-            auto count = size.isFinite() && finiteValue.isValid() ? finiteValue.getValidValue() : 0;
+            auto count = size.getFiniteValueOr(0);
             _insertBinding(outMetadata.m_usedBindings, kind, spaceIndex, registerIndex, count);
         }
     }

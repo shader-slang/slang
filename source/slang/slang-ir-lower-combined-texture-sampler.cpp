@@ -133,12 +133,9 @@ IRTypeLayout* maybeCreateArrayLayout(
         IRArrayTypeLayout::Builder arrayTypeLayoutBuilder(builder, newElementTypeLayout);
         for (auto sizeAttr : newElementTypeLayout->getSizeAttrs())
         {
-            auto sizeOffset = sizeAttr->getSize().getFiniteValue();
             arrayTypeLayoutBuilder.addResourceUsage(
                 sizeAttr->getResourceKind(),
-                sizeAttr->getSize().isFinite() && elementCount != -1 && sizeOffset.isValid()
-                    ? LayoutSize(sizeOffset.getValidValue() * elementCount)
-                    : LayoutSize::infinite());
+                elementCount == -1 ? LayoutSize::infinite() : sizeAttr->getSize() * elementCount);
         }
         return arrayTypeLayoutBuilder.build();
     }

@@ -228,8 +228,8 @@ struct UsedRanges
         UsedRange range;
         range.parameter = param;
         range.begin = begin;
-        auto endOffset = end.getFiniteValue();
-        range.end = end.isFinite() && endOffset.isValid() ? endOffset.getValidValue() : UInt(-1);
+        // TODO: Make the end member a LayoutOffset
+        range.end = end.getFiniteValueOr((UInt)-1);
         return Add(range);
     }
 
@@ -270,17 +270,13 @@ struct UsedRanges
 
     Index findRangeContaining(UInt index, LayoutSize size) const
     {
-        if (size.isFinite())
+        if (size.compare(0) == std::partial_ordering::greater)
         {
-            const auto count = size.getFiniteValue();
-            if (count.isValid() && count.getValidValue() > 0)
-            {
-                return (count.isValid() && count.getValidValue() == 1)
-                           ? findRangeContaining(index)
-                           : findRangeContaining(index, count.getValidValue());
-            }
+            return size.compare(1) == std::partial_ordering::equivalent
+                       ? findRangeContaining(index)
+                       : findRangeContaining(index, size.getFiniteValue().getValidValue());
         }
-        else
+        else if (size.isInfinite())
         {
             // The size is infinite...
             const auto rangeCount = ranges.getCount();

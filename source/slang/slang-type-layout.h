@@ -79,6 +79,9 @@ struct LayoutSize
 
     bool isFinite() const { return raw != s_infiniteValue && raw != s_invalidValue; }
     LayoutOffset getFiniteValue() const;
+    RawValue getFiniteValueOr(RawValue fallback) const;
+
+    RawValue unsafeGetRaw() const { return raw; }
 
     std::partial_ordering compare(RawValue that) const
     {
@@ -409,6 +412,13 @@ inline LayoutOffset LayoutSize::getFiniteValue() const
 {
     SLANG_ASSERT(!isInfinite());
     return LayoutOffset{*this};
+}
+
+inline LayoutSize::RawValue LayoutSize::getFiniteValueOr(RawValue fallback) const
+{
+    if (isInfinite() || isInvalid())
+        return fallback;
+    return raw;
 }
 
 inline LayoutSize::LayoutSize(LayoutOffset offset)
