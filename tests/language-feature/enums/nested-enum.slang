@@ -82,9 +82,9 @@ int testGeneric(int val)
     outer.channel = OuterGeneric<int>.Channel(val);
     int result = 0;
     if (outer.channel == OuterGeneric<int>.Channel.Red) result += 1;
-    if (outer.channel == OuterGeneric<int>.Channel.Green) result += 16;
-    if (outer.channel == OuterGeneric<int>.Channel.Blue) result += 16*16;
-    if (outer.channel == OuterGeneric<int>.Channel.Alpha) result += 16*16*16;
+    if (outer.channel == OuterGeneric<int>.Channel.Green) result += 2;
+    if (outer.channel == OuterGeneric<int>.Channel.Blue) result += 3;
+    if (outer.channel == OuterGeneric<int>.Channel.Alpha) result += 4;
 
     return result;
 }
