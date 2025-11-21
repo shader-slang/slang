@@ -17,14 +17,25 @@
 #include "test-server-diagnostics.h"
 #include "unit-test/slang-unit-test.h"
 
+#include <chrono>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifndef _WIN32
+#include <unistd.h>
+#endif
 
 #if defined(_WIN32)
 #include <slang-rhi/agility-sdk.h>
 SLANG_RHI_EXPORT_AGILITY_SDK
 #endif
+
+namespace Slang
+{
+// Forward declaration for diagnostic function in slang-stream.cpp
+bool isDiagnosticEnabled(const char* category);
+} // namespace Slang
 
 namespace TestServer
 {
@@ -348,6 +359,14 @@ TestServer::InnerMainFunc TestServer::getToolFunction(const String& name, Diagno
 
 SlangResult TestServer::_executeSingle()
 {
+    // Debug logging for test-server operations (writes to stderr, not RPC stdout)
+    auto startTime = std::chrono::steady_clock::now();
+
+    if (isDiagnosticEnabled("rpc"))
+    {
+        fprintf(stderr, "[TEST-SERVER] Waiting for RPC message (pid=%d)\n", getpid());
+    }
+
     // Block waiting for content (or error/closed)
     SLANG_RETURN_ON_FAIL(m_connection->waitForResult());
 
@@ -366,20 +385,70 @@ SlangResult TestServer::_executeSingle()
             JSONRPCCall call;
             SLANG_RETURN_ON_FAIL(m_connection->getRPCOrSendError(&call));
 
+            if (isDiagnosticEnabled("rpc"))
+            {
+                fprintf(
+                    stderr,
+                    "[TEST-SERVER] Received call: %s (pid=%d)\n",
+                    String(call.method).getBuffer(),
+                    getpid());
+            }
+
             // Do different things
             if (call.method == TestServerProtocol::QuitArgs::g_methodName)
             {
+                if (isDiagnosticEnabled("rpc"))
+                {
+                    fprintf(stderr, "[TEST-SERVER] Quit request received (pid=%d)\n", getpid());
+                }
                 m_quit = true;
                 return SLANG_OK;
             }
             else if (call.method == TestServerProtocol::ExecuteUnitTestArgs::g_methodName)
             {
                 SLANG_RETURN_ON_FAIL(_executeUnitTest(call));
+
+                if (isDiagnosticEnabled("rpc"))
+                {
+                    auto endTime = std::chrono::steady_clock::now();
+                    auto duration =
+                        std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime)
+                            .count();
+                    fprintf(
+                        stderr,
+                        "[TEST-SERVER] ExecuteUnitTest completed in %lldms (pid=%d)\n",
+                        (long long)duration,
+                        getpid());
+                }
+
                 return SLANG_OK;
             }
             else if (call.method == TestServerProtocol::ExecuteToolTestArgs::g_methodName)
             {
                 SLANG_RETURN_ON_FAIL(_executeTool(call));
+
+                if (isDiagnosticEnabled("rpc"))
+                {
+                    auto endTime = std::chrono::steady_clock::now();
+                    auto duration =
+                        std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime)
+                            .count();
+                    fprintf(
+                        stderr,
+                        "[TEST-SERVER] ExecuteTool completed in %lldms (pid=%d)\n",
+                        (long long)duration,
+                        getpid());
+
+                    // Warn if test took more than 5 seconds
+                    if (duration > 5000)
+                    {
+                        fprintf(
+                            stderr,
+                            "[TEST-SERVER-WARNING] Slow test execution: %lldms\n",
+                            (long long)duration);
+                    }
+                }
+
                 break;
             }
             else
