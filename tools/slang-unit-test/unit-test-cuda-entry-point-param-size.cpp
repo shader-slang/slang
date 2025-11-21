@@ -12,13 +12,13 @@
 using namespace Slang;
 
 // Test that CUDA entry point parameter layout does not include trailing padding.
-// This is a regression test for issue #9007.
 
 SLANG_UNIT_TEST(CudaEntryPointParamSizeWithoutPadding)
 {
     // Shader with entry point parameters where the last parameter (uint) comes after
-    // buffer handles. Without the fix, the parameter struct would have 4 bytes of
-    // trailing padding to align to 8 bytes, causing cuLaunchKernel to fail.
+    // buffer handles with a larger size. Normally with a CUDA struct the layout would
+    // have trailing padding to align to the larger size, but using that padding with
+    // entry point parameters would cause cuLaunchKernel to fail.
     const char* userSourceBody = R"(
         [shader("compute")]
         [numthreads(4, 1, 1)]
@@ -35,7 +35,7 @@ SLANG_UNIT_TEST(CudaEntryPointParamSizeWithoutPadding)
         )";
 
     ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    SLANG_CHECK_ABORT(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
 
     slang::TargetDesc targetDesc = {};
     targetDesc.format = SLANG_CUDA_SOURCE;
@@ -44,7 +44,7 @@ SLANG_UNIT_TEST(CudaEntryPointParamSizeWithoutPadding)
     sessionDesc.targets = &targetDesc;
 
     ComPtr<slang::ISession> session;
-    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
 
     ComPtr<slang::IBlob> diagnosticBlob;
     auto module = session->loadModuleFromSourceString(
@@ -52,7 +52,7 @@ SLANG_UNIT_TEST(CudaEntryPointParamSizeWithoutPadding)
         "m.slang",
         userSourceBody,
         diagnosticBlob.writeRef());
-    SLANG_CHECK(module != nullptr);
+    SLANG_CHECK_ABORT(module != nullptr);
 
     ComPtr<slang::IEntryPoint> entryPoint;
     module->findAndCheckEntryPoint(
@@ -60,7 +60,7 @@ SLANG_UNIT_TEST(CudaEntryPointParamSizeWithoutPadding)
         SLANG_STAGE_COMPUTE,
         entryPoint.writeRef(),
         diagnosticBlob.writeRef());
-    SLANG_CHECK(entryPoint != nullptr);
+    SLANG_CHECK_ABORT(entryPoint != nullptr);
 
     ComPtr<slang::IComponentType> compositeProgram;
     slang::IComponentType* components[] = {module, entryPoint.get()};
@@ -69,27 +69,27 @@ SLANG_UNIT_TEST(CudaEntryPointParamSizeWithoutPadding)
         2,
         compositeProgram.writeRef(),
         diagnosticBlob.writeRef());
-    SLANG_CHECK(compositeProgram != nullptr);
+    SLANG_CHECK_ABORT(compositeProgram != nullptr);
 
     ComPtr<slang::IComponentType> linkedProgram;
     compositeProgram->link(linkedProgram.writeRef(), nullptr);
-    SLANG_CHECK(linkedProgram != nullptr);
+    SLANG_CHECK_ABORT(linkedProgram != nullptr);
 
     // Get program reflection
     auto programLayout = linkedProgram->getLayout();
-    SLANG_CHECK(programLayout != nullptr);
+    SLANG_CHECK_ABORT(programLayout != nullptr);
 
     // Get entry point reflection
-    SLANG_CHECK(programLayout->getEntryPointCount() == 1);
+    SLANG_CHECK_ABORT(programLayout->getEntryPointCount() == 1);
     auto entryPointLayout = programLayout->getEntryPointByIndex(0);
-    SLANG_CHECK(entryPointLayout != nullptr);
+    SLANG_CHECK_ABORT(entryPointLayout != nullptr);
 
     // Get the entry point parameter type layout
     auto entryPointTypeLayout = entryPointLayout->getTypeLayout();
-    SLANG_CHECK(entryPointTypeLayout != nullptr);
+    SLANG_CHECK_ABORT(entryPointTypeLayout != nullptr);
 
     auto elementTypeLayout = entryPointTypeLayout->getElementTypeLayout();
-    SLANG_CHECK(elementTypeLayout != nullptr);
+    SLANG_CHECK_ABORT(elementTypeLayout != nullptr);
 
     // Get the size of the parameter struct (this is what CUDA kernel launch uses)
     size_t paramStructSize = elementTypeLayout->getSize();
