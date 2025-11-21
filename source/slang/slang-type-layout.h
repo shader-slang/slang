@@ -312,6 +312,13 @@ struct LayoutOffset
         return result;
     }
 
+    static LayoutOffset fromRaw(RawValue raw)
+    {
+        LayoutOffset ret;
+        ret.raw = raw;
+        return ret;
+    }
+
     bool isInvalid() const { return raw == s_invalidValue; }
 
     bool isValid() const { return raw != s_invalidValue; }
@@ -327,6 +334,8 @@ struct LayoutOffset
             return raw;
         return other;
     }
+
+    RawValue unsafeGetRaw() const { return raw; }
 
     std::partial_ordering compare(RawValue that) const
     {

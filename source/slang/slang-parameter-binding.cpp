@@ -223,12 +223,11 @@ struct UsedRanges
         return Add(range);
     }
 
-    VarLayout* Add(VarLayout* param, UInt begin, LayoutSize end)
+    VarLayout* Add(VarLayout* param, LayoutOffset begin, LayoutSize end)
     {
         UsedRange range;
         range.parameter = param;
-        range.begin = begin;
-        // TODO: Make the end member a LayoutOffset
+        range.begin = begin.getValidValueOr(-1);
         range.end = end.getFiniteValueOr((UInt)-1);
         return Add(range);
     }
@@ -920,7 +919,7 @@ static void addExplicitParameterBinding(
 
             overlappedVarLayout = usedRangeSet->usedResourceRanges[(int)semanticInfo.kind].Add(
                 parameterInfo->varLayout,
-                semanticInfo.index,
+                LayoutOffset{semanticInfo.index},
                 semanticInfo.index + count);
         }
 
@@ -2827,7 +2826,7 @@ struct SimpleScopeLayoutBuilder : ScopeLayoutBuilder
                 //
                 auto startOffset = paramResInfo->index;
                 auto endOffset = LayoutSize{startOffset} + paramTypeResInfo.count;
-                usedRangeSet[int(kind)].Add(paramVarLayout, startOffset.getValidValue(), endOffset);
+                usedRangeSet[int(kind)].Add(paramVarLayout, startOffset, endOffset);
             }
         }
         //
@@ -2943,7 +2942,7 @@ static ParameterBindingAndKindInfo _assignConstantBufferBinding(
 
     auto existingParam = usedRangeSet->usedResourceRanges[(int)layoutInfo.kind].Add(
         varLayout,
-        index,
+        LayoutOffset{index},
         LayoutSize{count + index});
     SLANG_UNUSED(existingParam);
     SLANG_ASSERT(existingParam == nullptr);
@@ -4118,7 +4117,7 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
             markSpaceUsed(&context, nullptr, info.space);
             usedRangeSet->usedResourceRanges[(int)kind].Add(
                 nullptr,
-                info.index,
+                LayoutOffset{info.index},
                 info.index + count);
         }
     }
