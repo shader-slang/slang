@@ -36,13 +36,13 @@ SLANG_UNIT_TEST(CudaEntryPointParamSizeWithoutPadding)
 
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-    
+
     slang::TargetDesc targetDesc = {};
     targetDesc.format = SLANG_CUDA_SOURCE;
     slang::SessionDesc sessionDesc = {};
     sessionDesc.targetCount = 1;
     sessionDesc.targets = &targetDesc;
-    
+
     ComPtr<slang::ISession> session;
     SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
 
@@ -78,22 +78,22 @@ SLANG_UNIT_TEST(CudaEntryPointParamSizeWithoutPadding)
     // Get program reflection
     auto programLayout = linkedProgram->getLayout();
     SLANG_CHECK(programLayout != nullptr);
-    
+
     // Get entry point reflection
     SLANG_CHECK(programLayout->getEntryPointCount() == 1);
     auto entryPointLayout = programLayout->getEntryPointByIndex(0);
     SLANG_CHECK(entryPointLayout != nullptr);
-    
+
     // Get the entry point parameter type layout
     auto entryPointTypeLayout = entryPointLayout->getTypeLayout();
     SLANG_CHECK(entryPointTypeLayout != nullptr);
-    
+
     auto elementTypeLayout = entryPointTypeLayout->getElementTypeLayout();
     SLANG_CHECK(elementTypeLayout != nullptr);
-    
+
     // Get the size of the parameter struct (this is what CUDA kernel launch uses)
     size_t paramStructSize = elementTypeLayout->getSize();
-    
+
     // The parameter struct should be 36 bytes:
     //   - input:  offset 0,  size 16 (CUDA buffer handle)
     //   - output: offset 16, size 16 (CUDA buffer handle)
