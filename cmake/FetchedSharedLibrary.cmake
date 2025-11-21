@@ -27,6 +27,10 @@ function(download_and_extract archive_name url)
                 "Using existing archive for ${archive_name}: ${archive_path}"
             )
         else()
+            message(
+                STATUS
+                "Downloading ${archive_name} from ${url} ..."
+            )
             set(download_args ${url} ${archive_path} STATUS status)
             if(ARG_SLANG_GITHUB_TOKEN)
                 list(
