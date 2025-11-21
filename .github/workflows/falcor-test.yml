@@ -77,7 +77,7 @@ jobs:
         run: |
           $ErrorActionPreference = "SilentlyContinue"
           cd .\FalcorBin\tests
-          python ./testing/run_unit_tests.py --config windows-vs2022-Release -t "-slow"
+          python ./testing/run_unit_tests.py --config windows-vs2022-Release --tags="-slow"
           cd ../../
       - name: falcor-image-test
         shell: pwsh
