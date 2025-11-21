@@ -76,7 +76,7 @@ struct LayoutSize
 
     bool isInfinite() const { return raw == s_infiniteValue; }
     bool isInvalid() const { return raw == s_invalidValue; }
-
+    bool isValid() const { return raw != s_invalidValue; }
     bool isFinite() const { return raw != s_infiniteValue && raw != s_invalidValue; }
     LayoutOffset getFiniteValue() const;
     RawValue getFiniteValueOr(RawValue fallback) const;
@@ -320,6 +320,19 @@ struct LayoutOffset
         return raw;
     }
 
+    std::partial_ordering compare(RawValue that) const
+    {
+        if (this->isInvalid())
+            return std::partial_ordering::unordered;
+
+        if (this->raw < that)
+            return std::partial_ordering::less;
+        else if (this->raw > that)
+            return std::partial_ordering::greater;
+        else
+            return std::partial_ordering::equivalent;
+    }
+
     std::partial_ordering compare(LayoutOffset that) const
     {
         if (this->isInvalid() || that.isInvalid())
@@ -457,6 +470,12 @@ inline LayoutOffset operator*(LayoutOffset left, LayoutOffset right)
     return result;
 }
 
+inline LayoutOffset operator*(LayoutOffset left, LayoutOffset::RawValue right)
+{
+    return left * LayoutOffset{right};
+}
+
+
 inline LayoutOffset operator-(LayoutOffset left, LayoutOffset right)
 {
     LayoutOffset result(left);
@@ -485,14 +504,19 @@ inline LayoutOffset maximum(LayoutOffset left, LayoutOffset right)
 struct UniformLayoutInfo
 {
     LayoutSize size;
-    size_t alignment;
+    LayoutOffset alignment;
 
     UniformLayoutInfo()
         : size(0), alignment(1)
     {
     }
 
-    UniformLayoutInfo(LayoutSize size, size_t alignment)
+    UniformLayoutInfo(LayoutSize size, LayoutOffset alignment)
+        : size(size), alignment(alignment)
+    {
+    }
+
+    UniformLayoutInfo(LayoutSize size, UInt alignment)
         : size(size), alignment(alignment)
     {
     }
@@ -503,14 +527,14 @@ struct UniformLayoutInfo
 // consecutive elements).
 struct UniformArrayLayoutInfo : UniformLayoutInfo
 {
-    size_t elementStride;
+    LayoutOffset elementStride;
 
     UniformArrayLayoutInfo()
         : elementStride(0)
     {
     }
 
-    UniformArrayLayoutInfo(LayoutSize size, size_t alignment, size_t elementStride)
+    UniformArrayLayoutInfo(LayoutSize size, LayoutOffset alignment, LayoutOffset elementStride)
         : UniformLayoutInfo(size, alignment), elementStride(elementStride)
     {
     }
@@ -591,7 +615,7 @@ struct SimpleLayoutInfo
     LayoutSize size;
 
     // only useful in the uniform case
-    size_t alignment;
+    LayoutOffset alignment;
 
     SimpleLayoutInfo()
         : kind(LayoutResourceKind::None), size(0), alignment(1)
@@ -605,7 +629,12 @@ struct SimpleLayoutInfo
     {
     }
 
-    SimpleLayoutInfo(LayoutResourceKind kind, LayoutSize size, size_t alignment = 1)
+    SimpleLayoutInfo(LayoutResourceKind kind, LayoutSize size, UInt alignment = 1)
+        : kind(kind), size(size), alignment(alignment)
+    {
+    }
+
+    SimpleLayoutInfo(LayoutResourceKind kind, LayoutSize size, LayoutOffset alignment)
         : kind(kind), size(size), alignment(alignment)
     {
     }
@@ -619,7 +648,7 @@ struct SimpleLayoutInfo
         }
         else
         {
-            return UniformLayoutInfo(0, 1);
+            return UniformLayoutInfo(0, LayoutOffset{1});
         }
     }
 };
@@ -628,7 +657,7 @@ struct SimpleLayoutInfo
 struct SimpleArrayLayoutInfo : SimpleLayoutInfo
 {
     // This field is only useful in the uniform case
-    size_t elementStride;
+    LayoutOffset elementStride;
 
     // Convert to layout for uniform data
     UniformArrayLayoutInfo getUniformLayout()
@@ -639,7 +668,7 @@ struct SimpleArrayLayoutInfo : SimpleLayoutInfo
         }
         else
         {
-            return UniformArrayLayoutInfo(0, 1, 0);
+            return UniformArrayLayoutInfo(0, LayoutOffset{1}, LayoutOffset{0});
         }
     }
 };
@@ -689,7 +718,7 @@ public:
     // For uniform data, alignment matters, but not for
     // any other resource category, so we don't waste
     // the space storing it in the above array
-    UInt uniformAlignment = 1;
+    LayoutOffset uniformAlignment = LayoutOffset{1};
 
 
     ResourceInfo* FindResourceInfo(LayoutResourceKind kind)
@@ -838,7 +867,7 @@ public:
         // What is our starting register in that space?
         //
         // (In the case of uniform data, this is a byte offset)
-        UInt index;
+        LayoutOffset index;
     };
     List<ResourceInfo> resourceInfos;
 
@@ -857,7 +886,7 @@ public:
         ResourceInfo info;
         info.kind = kind;
         info.space = 0;
-        info.index = 0;
+        info.index = LayoutOffset{0};
 
         resourceInfos.add(info);
         return &resourceInfos.getLast();
@@ -932,7 +961,7 @@ public:
     RefPtr<TypeLayout> elementTypeLayout;
 
     /// The stride in bytes between elements.
-    size_t uniformStride = 0;
+    LayoutOffset uniformStride = LayoutOffset{0};
 };
 
 /// Type layout for an array type

@@ -270,13 +270,7 @@ struct UsedRanges
 
     Index findRangeContaining(UInt index, LayoutSize size) const
     {
-        if (size.compare(0) == std::partial_ordering::greater)
-        {
-            return size.compare(1) == std::partial_ordering::equivalent
-                       ? findRangeContaining(index)
-                       : findRangeContaining(index, size.getFiniteValue().getValidValue());
-        }
-        else if (size.isInfinite())
+        if (size.isInfinite())
         {
             // The size is infinite...
             const auto rangeCount = ranges.getCount();
@@ -288,6 +282,13 @@ struct UsedRanges
                     return i;
                 }
             }
+        }
+        else if (size.compare(0) == std::partial_ordering::greater)
+        {
+            // We know that size is not infinite, and it's greater than 0 so it's not invalid
+            return size.compare(1) == std::partial_ordering::equivalent
+                       ? findRangeContaining(index)
+                       : findRangeContaining(index, size.getFiniteValue().getValidValue());
         }
         return -1;
     }
@@ -1617,7 +1618,7 @@ static void applyBindingInfoToParameter(
         // Add a record to the variable layout
         auto varRes = varLayout->AddResourceInfo(kind);
         varRes->space = (int)bindingInfo.space;
-        varRes->index = (int)bindingInfo.index;
+        varRes->index = LayoutOffset{bindingInfo.index};
     }
 }
 
@@ -1991,7 +1992,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
                     continue;
 
                 auto varResInfo = varLayout->findOrAddResourceInfo(kind);
-                varResInfo->index = location;
+                varResInfo->index = LayoutOffset{(UInt)location};
 
                 // Note: OpenGL and Vulkan represent dual-source color blending
                 // differently from multiple render targets (MRT) at the source
@@ -2385,7 +2386,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                     auto kind = fieldTypeResInfo.kind;
                     auto structTypeResInfo = structLayout->findOrAddResourceInfo(kind);
                     auto fieldResInfo = fieldVarLayout->findOrAddResourceInfo(kind);
-                    fieldResInfo->index = structTypeResInfo->count.getFiniteValue().getValidValue();
+                    fieldResInfo->index = structTypeResInfo->count.getFiniteValue();
                     structTypeResInfo->count += fieldTypeResInfo.count;
                 }
             }
@@ -2483,8 +2484,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                             // have preceded it.
                             //
                             fieldResInfo = fieldVarLayout->findOrAddResourceInfo(kind);
-                            fieldResInfo->index =
-                                structTypeResInfo->count.getFiniteValue().getValidValue();
+                            fieldResInfo->index = structTypeResInfo->count.getFiniteValue();
                             structTypeResInfo->count += fieldTypeResInfo.count;
                         }
                         else
@@ -2496,7 +2496,8 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                             // information, and we just need to update the computed
                             // size of the `struct` type to account for the field.
                             //
-                            auto fieldEndOffset = fieldResInfo->index + fieldTypeResInfo.count;
+                            auto fieldEndOffset =
+                                LayoutSize{fieldResInfo->index} + fieldTypeResInfo.count;
                             structTypeResInfo->count =
                                 maximum(structTypeResInfo->count, fieldEndOffset);
                         }
@@ -2708,13 +2709,15 @@ struct ScopeLayoutBuilder
         {
             // Make sure uniform fields get laid out properly...
 
-            UniformLayoutInfo fieldInfo(uniformSize, varLayout->typeLayout->uniformAlignment);
+            UniformLayoutInfo fieldInfo(
+                uniformSize,
+                LayoutOffset{varLayout->typeLayout->uniformAlignment});
 
             auto rules = m_layoutContext.rules;
             LayoutSize uniformOffset = rules->AddStructField(&m_structLayoutInfo, fieldInfo);
 
             varLayout->findOrAddResourceInfo(LayoutResourceKind::Uniform)->index =
-                uniformOffset.getFiniteValue().getValidValue();
+                uniformOffset.getFiniteValue();
         }
 
         m_structLayout->fields.add(varLayout);
@@ -2823,8 +2826,8 @@ struct SimpleScopeLayoutBuilder : ScopeLayoutBuilder
                 // to add it to our set for tracking.
                 //
                 auto startOffset = paramResInfo->index;
-                auto endOffset = startOffset + paramTypeResInfo.count;
-                usedRangeSet[int(kind)].Add(paramVarLayout, startOffset, endOffset);
+                auto endOffset = LayoutSize{startOffset} + paramTypeResInfo.count;
+                usedRangeSet[int(kind)].Add(paramVarLayout, startOffset.getValidValue(), endOffset);
             }
         }
         //
@@ -2850,9 +2853,9 @@ struct SimpleScopeLayoutBuilder : ScopeLayoutBuilder
                     continue;
                 paramResInfo = paramVarLayout->findOrAddResourceInfo(kind);
 
-                paramResInfo->index = usedRangeSet[int(kind)].Allocate(
+                paramResInfo->index = LayoutOffset{usedRangeSet[int(kind)].Allocate(
                     paramVarLayout,
-                    paramTypeResInfo.count.getFiniteValue().getValidValue());
+                    paramTypeResInfo.count.getFiniteValue().getValidValue())};
             }
         }
         //
@@ -2875,7 +2878,7 @@ struct SimpleScopeLayoutBuilder : ScopeLayoutBuilder
                     continue;
 
                 auto startOffset = paramResInfo->index;
-                auto endOffset = startOffset + paramTypeResInfo.count;
+                auto endOffset = LayoutSize{startOffset} + paramTypeResInfo.count;
 
                 auto scopeResInfo = m_structLayout->findOrAddResourceInfo(paramTypeResInfo.kind);
                 scopeResInfo->count = maximum(scopeResInfo->count, endOffset);
@@ -3201,7 +3204,7 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
             {
                 auto entryPointRes = paramsStructLayout->findOrAddResourceInfo(rr.kind);
                 resultLayout->findOrAddResourceInfo(rr.kind)->index =
-                    entryPointRes->count.getFiniteValue().getValidValue();
+                    entryPointRes->count.getFiniteValue();
                 entryPointRes->count += rr.count;
             }
         }
@@ -3881,13 +3884,15 @@ static void _maybeApplyHLSLToVulkanShifts(
                 if (shift != HLSLToVulkanLayoutOptions::kInvalidShift)
                 {
                     // Apply the shift
-                    resourceInfo.index += shift;
+                    resourceInfo.index += LayoutOffset{(UInt)shift};
 
                     // Fix the parameter binding info
                     bindingInfo.index += shift;
 
                     // Presumably they should both match
-                    SLANG_ASSERT(bindingInfo.index == resourceInfo.index);
+                    SLANG_ASSERT(
+                        resourceInfo.index.compare(bindingInfo.index) ==
+                        std::partial_ordering::equivalent);
                     SLANG_ASSERT(bindingInfo.space == resourceInfo.space);
                 }
 
@@ -4283,7 +4288,7 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
         auto cbInfo = globalScopeVarLayout->findOrAddResourceInfo(globalConstantBufferBinding.kind);
 
         cbInfo->space = globalConstantBufferBinding.space;
-        cbInfo->index = globalConstantBufferBinding.index;
+        cbInfo->index = LayoutOffset{globalConstantBufferBinding.index};
     }
 
     programLayout->parametersLayout = globalScopeVarLayout;
