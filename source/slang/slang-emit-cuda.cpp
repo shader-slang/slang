@@ -1039,24 +1039,6 @@ void CUDASourceEmitter::emitSimpleFuncImpl(IRFunc* func)
     CLikeSourceEmitter::emitSimpleFuncImpl(func);
 }
 
-void CUDASourceEmitter::emitSimpleValueImpl(IRInst* inst)
-{
-    // Make sure we convert float to half when emitting a half literal to avoid
-    // overload ambiguity errors from CUDA.
-    if (inst->getOp() == kIROp_FloatLit)
-    {
-        if (inst->getDataType()->getOp() == kIROp_HalfType)
-        {
-            m_writer->emit("__half(");
-            CLikeSourceEmitter::emitSimpleValueImpl(inst);
-            m_writer->emit(")");
-            return;
-        }
-    }
-    Super::emitSimpleValueImpl(inst);
-}
-
-
 void CUDASourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsetLayout)
 {
     Super::emitSemanticsImpl(inst, allowOffsetLayout);
