@@ -8227,7 +8227,14 @@ static IRIntegerValue _foldIntegerPrefixOp(TokenType tokenType, IRIntegerValue v
     case TokenType::OpAdd:
         return value;
     case TokenType::OpSub:
+#if SLANG_VC
+#pragma warning(push)
+#pragma warning(disable : 4146)
+#endif
         return -static_cast<uint64_t>(value);
+#if SLANG_VC
+#pragma warning(pop)
+#endif
     default:
         {
             SLANG_ASSERT(!"Unexpected op");
