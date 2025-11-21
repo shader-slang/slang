@@ -43,10 +43,38 @@ struct TransformParamsToConstRefContext
 
     void rewriteValueUsesToAddrUses(IRInst* newAddrInst)
     {
+        // The overall strategy here is as follows:
+        //
+        // Phase 1
+        // - Add IRLoad in front of the uses of newAddrInst, since the users need the
+        //   value of the address. Except:
+        //   - In case the user is IRFieldExtract/IRGetElement, rewrite those as
+        //     IRFieldAddress and IRGetElementPtr and consume the base pointer as is
+        //   - Scan transitively the uses of the transformed ops, and add IRLoad
+        //     in front of them as well.
+        //
+        // Phase 2 (post-fixup)
+        // - Check all translated IRGetElementPtr instructions. If the index is
+        //   a newly translated IRGetElementPtr or IRFieldAddress, add an IRLoad
+        //   to fetch the value of the pointer. This load was omitted in Phase 1
+        //   due to the exception.
+        //   - Note that the post-fixup phase avoids problems with rewrite
+        //     ordering, so we don't try to fuse this in Phase 1
+        //
+        // In addition, IRStore instructions are attempted to also optimize. See
+        // the related comment below.
+
         HashSet<IRInst*> workListSet;
         workListSet.add(newAddrInst);
         List<IRInst*> workList;
         workList.add(newAddrInst);
+
+        // List of IR instructions that may require a fixup after the rewrite
+        // pass. In particular, the index of IRGetElementPtr might use another
+        // IRGetElementPtr or IRFieldAddress, in which case we need to load the
+        // value of the pointer
+        List<IRInst*> postFixList;
+
         auto _addToWorkList = [&](IRInst* inst)
         {
             if (workListSet.add(inst))
@@ -90,6 +118,7 @@ struct TransformParamsToConstRefContext
                                 getElement->getIndex());
                             getElement->replaceUsesWith(elemAddr);
                             _addToWorkList(elemAddr);
+                            postFixList.add(elemAddr);
                             return;
                         }
                     case kIROp_Store:
@@ -116,6 +145,30 @@ struct TransformParamsToConstRefContext
                     auto loadInst = builder.emitLoad(inst);
                     use->set(loadInst);
                 });
+        }
+
+        for (IRInst *inst : postFixList)
+        {
+            auto getElementPtr = as<IRGetElementPtr>(inst);
+            IRInst *indexInst = getElementPtr->getOperand(1);
+
+            // In the postfix phase, we'll only consider index instructions if
+            // they were transformed previously by this function. This is an
+            // extra precaution to avoid hiding bugs by other passes, should
+            // they also pass pointers directly as the index.
+            if (workListSet.contains(indexInst))
+            {
+                switch (indexInst->getOp())
+                {
+                    case kIROp_FieldAddress:
+                    case kIROp_GetElementPtr:
+                        // post-fix needed
+                        builder.setInsertBefore(getElementPtr);
+                        auto loadInst = builder.emitLoad(indexInst);
+                        getElementPtr->setOperand(1, loadInst);
+                        break;
+                }
+            }
         }
     }
 
