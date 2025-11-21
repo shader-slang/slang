@@ -6604,6 +6604,7 @@ struct $(item.name)
     /// @return The post-decremented counter value.
     /// @remarks
     /// This function is not implemented when targeting non-HLSL.
+    [require(hlsl)]
     uint DecrementCounter();
 
     /// Get the dimensions of the buffer.
@@ -6630,6 +6631,7 @@ struct $(item.name)
     /// @return The pre-incremented counter value.
     /// @remarks
     /// This function is not implemented when targeting non-HLSL.
+    [require(hlsl)]
     uint IncrementCounter();
 
     /// Load a element from the buffer at the specified location.
