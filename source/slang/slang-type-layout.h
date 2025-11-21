@@ -191,7 +191,7 @@ struct LayoutSize
         }
 
         // Finally deal with the case where both sides are finite - check for overflow
-        if (right.raw != 0 && raw > s_maxFiniteValue / right.raw)
+        if (raw > s_maxFiniteValue / right.raw)
         {
             *this = LayoutSize::invalid();
         }
@@ -377,23 +377,6 @@ struct LayoutOffset
         else
         {
             *this = LayoutOffset(raw + right.raw);
-        }
-    }
-
-    void operator+=(RawValue right)
-    {
-        if (isInvalid())
-        {
-            *this = LayoutOffset::invalid();
-        }
-        else if (raw > s_maxValidValue - right)
-        {
-            // Check for overflow
-            *this = LayoutOffset::invalid();
-        }
-        else
-        {
-            *this = LayoutOffset(raw + right);
         }
     }
 

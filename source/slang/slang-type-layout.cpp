@@ -631,7 +631,7 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
             vectorInfo.alignment = elementInfo.alignment;
             return vectorInfo;
         }
-        if (!elementInfo.size.isInvalid())
+        if (elementInfo.size.isInvalid())
         {
             SimpleLayoutInfo vectorInfo;
             vectorInfo.kind = elementInfo.kind;
