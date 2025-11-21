@@ -372,7 +372,7 @@ Node* readBody(Reader& reader, NodeReadFlags flags, char openChar, int openCount
                                     // Found the closing $}
                                     char const* bodyEnd = reader.cursor - 1;
                                     addTextSpan(bodyLink, bodyBegin, bodyEnd);
-                                    get(reader);  // consume the '}'
+                                    get(reader); // consume the '}'
 
                                     addEscapeSpan(link, nodes);
 
