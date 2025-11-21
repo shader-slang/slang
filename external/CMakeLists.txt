@@ -255,7 +255,7 @@ if((SLANG_ENABLE_GFX) OR (SLANG_ENABLE_RHI AND SLANG_ENABLE_TESTS))
             INTERFACE "${SLANG_OVERRIDE_IMGUI_PATH}/imgui"
         )
     endif()
-    
+
     # stb
     add_library(stb INTERFACE)
     target_include_directories(
