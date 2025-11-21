@@ -87,7 +87,7 @@ jobs:
           # Verify slangc was built
           slangcPath="build/Release/bin/slangc.exe"
           if [ -f "$slangcPath" ]; then
-            echo "✓ slangc built successfully at: $slangcPath"
+            echo "slangc built successfully at: $slangcPath"
             "$slangcPath" -version
           else
             echo "Failed to build slangc"
@@ -144,7 +144,8 @@ jobs:
           $originalSlangc = Join-Path $remixSlangDir "slangc.exe"
           if (Test-Path $originalSlangc) {
             Write-Host "`nOriginal packman slangc version:"
-            & $originalSlangc -version 2>&1 | Write-Host
+            $originalVersion = (& $originalSlangc -version 2>&1 | Out-String).Trim()
+            Write-Host $originalVersion
           }
 
           # Copy our built Slang binaries (overwrites packman version)
@@ -152,10 +153,30 @@ jobs:
           Write-Host "`nCopying built Slang from: $builtSlangBin"
           Copy-Item -Path "$builtSlangBin\*" -Destination $remixSlangDir -Recurse -Force
 
-          # Verify replacement
-          Write-Host "`nVerifying replacement - new slangc version:"
-          & $originalSlangc -version
-          Write-Host "`n✓ dxvk-remix will use the locally built Slang"
+          # Verify replacement succeeded
+          Write-Host "`nVerifying replacement..."
+
+          # Check that key files exist
+          $requiredFiles = @("slangc.exe", "slang.dll", "slang-glslang.dll")
+          foreach ($file in $requiredFiles) {
+            $filePath = Join-Path $remixSlangDir $file
+            if (-not (Test-Path $filePath)) {
+              Write-Error "ERROR: Required file not found after copy: $file"
+              exit 1
+            }
+          }
+
+          # Verify version changed
+          $newVersion = (& $originalSlangc -version 2>&1 | Out-String).Trim()
+          Write-Host "New slangc version:"
+          Write-Host $newVersion
+
+          if ($originalVersion -and ($newVersion -eq $originalVersion)) {
+            Write-Error "ERROR: Slangc version unchanged after replacement!"
+            exit 1
+          }
+
+          Write-Host "`nVerified: dxvk-remix will use the locally built Slang"
 
       # Build shaders using build_shaders_only.ps1
       # This script handles both configuration and compilation
@@ -211,8 +232,8 @@ jobs:
           fi
 
           echo ""
-          echo "✓ RTX Remix shader compilation successful!"
-          echo "  All $headers shader variants compiled correctly"
+          echo "RTX Remix shader compilation successful!"
+          echo "All $headers shader variants compiled correctly"
 
       # Upload build logs on failure for debugging
       - name: Upload build logs on failure
@@ -231,12 +252,12 @@ jobs:
           echo ""
           echo "================================================"
           if [ "$BUILD_RESULT" = "success" ]; then
-            echo "✓ RTX Remix shader test PASSED"
-            echo "  Slang compiler changes are compatible with RTX Remix shaders"
+            echo "RTX Remix shader test PASSED"
+            echo "Slang compiler changes are compatible with RTX Remix shaders"
           else
-            echo "✗ RTX Remix shader test FAILED"
-            echo "  Slang compiler changes may have broken RTX Remix shader compilation"
-            echo "  Review build logs for details"
+            echo "RTX Remix shader test FAILED"
+            echo "Slang compiler changes may have broken RTX Remix shader compilation"
+            echo "Review build logs for details"
           fi
           echo "================================================"
         env:
