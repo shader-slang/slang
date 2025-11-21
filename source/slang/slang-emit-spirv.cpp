@@ -3993,7 +3993,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         getNaturalSizeAndAlignment(this->m_targetRequest->getOptionSet(), varType, &sizeAlignment);
         if (sizeAlignment.size != IRSizeAndAlignment::kIndeterminateSize)
         {
+            requireVariableBufferCapabilityIfNeeded(varType);
+
             auto debugVarPtrType = builder.getPtrType(varType, AddressSpace::Function);
+
             auto actualHelperVar =
                 emitOpVariable(parent, debugVar, debugVarPtrType, SpvStorageClassFunction);
             maybeEmitName(actualHelperVar, debugVar, toSlice("_dbgvar_"));
@@ -6189,6 +6192,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 }
                 else if (semanticName == "sv_clipdistance")
                 {
+                    requireSPIRVCapability(SpvCapabilityClipDistance);
                     return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInClipDistance, inst);
                 }
                 else if (semanticName == "sv_culldistance")
@@ -6578,6 +6582,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto ptrType = as<IRPtrTypeBase>(inst->getDataType());
         SLANG_ASSERT(ptrType);
         SpvStorageClass storageClass = getSpvStorageClass(ptrType);
+
+        requireVariableBufferCapabilityIfNeeded(ptrType->getValueType());
 
         auto varSpvInst = emitOpVariable(parent, inst, inst->getFullType(), storageClass);
         maybeEmitName(varSpvInst, inst);
@@ -7357,8 +7363,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitStore(SpvInstParent* parent, IRInst* inst, IRInst* ptr, IRInst* val)
     {
-        requireVariableBufferCapabilityIfNeeded(inst->getDataType());
-
         IRBuilder builder(inst);
         int memoryAccessMask = 0;
         int alignment = -1;

@@ -2007,6 +2007,28 @@ public float texture(samplerCubeShadow sampler, vec4 p, float bias)
     }
 }
 
+[require(glsl_hlsl_spirv, texture_shadowlod)]
+[ForceInline]
+public float texture(samplerCubeArrayShadow sampler, vec4 location, float compareValue, float bias)
+{
+    if (!__targetHasImplicitDerivatives())
+        return sampler.SampleCmpLevelZero(location, compareValue);
+
+    __requireComputeDerivative();
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "texture";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$float = OpImageSampleDrefImplicitLod $sampler $location $compareValue Bias $bias;
+        };
+    default:
+        // TODO: Need to apply bias
+        return sampler.SampleCmp(location, compareValue);
+    }
+}
+
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float texture(sampler1DArrayShadow sampler, vec3 p)
@@ -2407,7 +2429,7 @@ public float textureLod(sampler2DShadow sampler, vec3 p, float lod)
         };
     }
     default:
-        return sampler.SampleCmp(p.xy, p.z);
+        return sampler.SampleCmpLevel(p.xy, p.z, lod);
     }
 }
 
@@ -2426,8 +2448,22 @@ public float textureLod(sampler2DArrayShadow sampler, vec4 p, float lod)
         };
     }
     default:
-        return sampler.SampleCmp(p.xyz, p.w);
+        return sampler.SampleCmpLevel(p.xyz, p.w, lod);
     }
+}
+
+[ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
+public float textureLod(samplerCubeShadow sampler, vec4 p, float lod)
+{
+    return sampler.SampleCmpLevel(p.xyz, p.w, lod);
+}
+
+[ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
+public float textureLod(samplerCubeArrayShadow sampler, vec4 p, float compareValue, float lod)
+{
+    return sampler.SampleCmpLevel(p, compareValue, lod);
 }
 
 [ForceInline]
@@ -2445,7 +2481,7 @@ public float textureLod(sampler1DShadow sampler, vec3 p, float lod)
         };
     }
     default:
-        return sampler.SampleCmp(p.x, p.z);
+        return sampler.SampleCmpLevel(p.x, p.z, lod);
     }
 }
 
@@ -2464,7 +2500,7 @@ public float textureLod(sampler1DArrayShadow sampler, vec3 p, float lod)
         };
     }
     default:
-        return sampler.SampleCmp(p.xy, p.z);
+        return sampler.SampleCmpLevel(p.xy, p.z, lod);
     }
 }
 
