@@ -52,6 +52,7 @@ jobs:
           mkdir FalcorBin
           cd FalcorBin
           Copy-Item -Path 'C:\Falcor\build\windows-vs2022\bin' -Destination '.\build\windows-vs2022\bin' -Recurse -Exclude ("*.pdb")
+          Copy-Item -Path 'C:\Falcor\.git' -Destination '.\' -Recurse
           Copy-Item -Path 'C:\Falcor\tests' -Destination '.\' -Recurse
           Copy-Item -Path 'C:\Falcor\tools' -Destination '.\' -Recurse
           Copy-Item -Path 'C:\Falcor\media' -Destination '.\' -Recurse
