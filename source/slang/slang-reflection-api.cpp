@@ -1344,7 +1344,9 @@ SLANG_API int32_t spReflectionTypeLayout_getAlignment(
     if (!typeLayout)
         return 0;
 
-    return getReflectionOffset(getAlignment(typeLayout, category));
+    // We would like to use this but this function doesn't return size_t
+    // return getReflectionOffset(getAlignment(typeLayout, category));
+    return int32_t(getAlignment(typeLayout, category).getValidValueOr(0));
 }
 
 SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_GetFieldByIndex(

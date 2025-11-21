@@ -1924,7 +1924,7 @@ private:
                         UInt parentSpace = parentOffsetAttr ? parentOffsetAttr->getSpace() : 0;
                         auto resInfo =
                             varLayoutBuilder.findOrAddResourceInfo(offsetAttr->getResourceKind());
-                        resInfo->offset = parentOffset + offsetAttr->getOffset();
+                        resInfo->offset = LayoutOffset{parentOffset + offsetAttr->getOffset()};
                         resInfo->space = parentSpace + offsetAttr->getSpace();
                     }
                     builder.addLayoutDecoration(fieldParam, varLayoutBuilder.build());
@@ -3356,7 +3356,7 @@ protected:
                 resourceKind = LayoutResourceKind::MetalAttribute;
             }
             auto resInfo = elementVarLayoutBuilder.findOrAddResourceInfo(resourceKind);
-            resInfo->offset = offsetAttr->getOffset();
+            resInfo->offset = LayoutOffset{offsetAttr->getOffset()};
             resInfo->space = offsetAttr->getSpace();
         }
 

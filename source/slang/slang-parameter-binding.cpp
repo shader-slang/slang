@@ -288,7 +288,7 @@ struct UsedRanges
             // We know that size is not infinite, and it's greater than 0 so it's not invalid
             return size.compare(1) == std::partial_ordering::equivalent
                        ? findRangeContaining(index)
-                       : findRangeContaining(index, size.getFiniteValue().getValidValue());
+                       : findRangeContaining(index, LayoutSize{size.getFiniteValue()});
         }
         return -1;
     }
@@ -296,8 +296,11 @@ struct UsedRanges
     bool contains(UInt index) const { return findRangeContaining(index) >= 0; }
 
     // Try to find space for `count` entries
-    UInt Allocate(VarLayout* param, UInt count)
+    UInt Allocate(VarLayout* param, const LayoutOffset count)
     {
+        if (count.isInvalid())
+            return 0;
+
         UInt begin = 0;
 
         UInt rangeCount = ranges.getCount();
@@ -308,10 +311,10 @@ struct UsedRanges
             UInt end = ranges[rr].begin;
 
             // If there is enough space...
-            if (end >= begin + count)
+            if (end >= begin + count.getValidValue())
             {
                 // ... then claim it and be done
-                Add(param, begin, begin + count);
+                Add(param, begin, begin + count.getValidValue());
                 return begin;
             }
 
@@ -322,7 +325,7 @@ struct UsedRanges
 
         // We've run out of ranges to check, so we
         // can safely go after the last one!
-        Add(param, begin, begin + count);
+        Add(param, begin, begin + count.getValidValue());
         return begin;
     }
 };
@@ -838,7 +841,7 @@ static VarLayout* markSpaceUsed(ParameterBindingContext* context, VarLayout* var
     return context->shared->usedSpaces.Add(varLayout, space, space + 1);
 }
 
-static UInt allocateUnusedSpaces(ParameterBindingContext* context, UInt count)
+static UInt allocateUnusedSpaces(ParameterBindingContext* context, const LayoutOffset count)
 {
     return context->shared->usedSpaces.Allocate(nullptr, count);
 }
@@ -1418,7 +1421,7 @@ static void completeBindingsForParameterImpl(
     // consumes, so that we can allocate a contiguous range of
     // spaces.
     //
-    UInt spacesToAllocateCount = 0;
+    LayoutOffset spacesToAllocateCount{0};
     for (auto typeRes : firstTypeLayout->resourceInfos)
     {
         auto kind = typeRes.kind;
@@ -1443,7 +1446,7 @@ static void completeBindingsForParameterImpl(
             //
             if (typeRes.count.isInfinite())
             {
-                spacesToAllocateCount++;
+                spacesToAllocateCount += 1;
             }
             break;
 
@@ -1454,12 +1457,9 @@ static void completeBindingsForParameterImpl(
                 // for fields), then we will include those spaces in
                 // our allocaiton.
                 //
-                // We assume/require here that we never end up needing
-                // an unbounded number of spaces.
-                // TODO: we should enforce that somewhere with an error.
-                //
-                // TODO: Make this LayoutOffset
-                spacesToAllocateCount += typeRes.count.getFiniteValue().getValidValue();
+                // This will be set to invalid() should we be handling an
+                // unbounded number of spaces;
+                spacesToAllocateCount += typeRes.count.getFiniteValue();
                 break;
             }
 
@@ -1482,7 +1482,7 @@ static void completeBindingsForParameterImpl(
     // contiguous spaces here.
     //
     UInt firstAllocatedSpace = 0;
-    if (spacesToAllocateCount)
+    if (spacesToAllocateCount.compare(0) == std::partial_ordering::greater)
     {
         firstAllocatedSpace = allocateUnusedSpaces(context, spacesToAllocateCount);
     }
@@ -1596,7 +1596,7 @@ static void completeBindingsForParameterImpl(
             bindingInfo.count = count;
             bindingInfo.index = usedRangeSet->usedResourceRanges[(int)kind].Allocate(
                 firstVarLayout,
-                count.getFiniteValue().getValidValue());
+                count.getFiniteValue());
             bindingInfo.space = space;
         }
     }
@@ -2855,7 +2855,7 @@ struct SimpleScopeLayoutBuilder : ScopeLayoutBuilder
 
                 paramResInfo->index = LayoutOffset{usedRangeSet[int(kind)].Allocate(
                     paramVarLayout,
-                    paramTypeResInfo.count.getFiniteValue().getValidValue())};
+                    paramTypeResInfo.count.getFiniteValue())};
             }
         }
         //
@@ -2917,7 +2917,7 @@ static ParameterBindingAndKindInfo _allocateConstantBufferBinding(ParameterBindi
     info.count = layoutInfo.size;
     info.index = usedRangeSet->usedResourceRanges[(int)layoutInfo.kind].Allocate(
         nullptr,
-        layoutInfo.size.getFiniteValue().getValidValue());
+        layoutInfo.size.getFiniteValue());
     info.space = space;
     return info;
 }
@@ -2939,16 +2939,18 @@ static ParameterBindingAndKindInfo _assignConstantBufferBinding(
                               context->layoutContext.objectLayoutOptions)
                           .getSimple();
 
-    const Index count = Index(layoutInfo.size.getFiniteValue().getValidValue());
+    const auto count = layoutInfo.size.getFiniteValue();
 
-    auto existingParam =
-        usedRangeSet->usedResourceRanges[(int)layoutInfo.kind].Add(varLayout, index, index + count);
+    auto existingParam = usedRangeSet->usedResourceRanges[(int)layoutInfo.kind].Add(
+        varLayout,
+        index,
+        LayoutSize{count + index});
     SLANG_UNUSED(existingParam);
     SLANG_ASSERT(existingParam == nullptr);
 
     ParameterBindingAndKindInfo info;
     info.kind = layoutInfo.kind;
-    info.count = count;
+    info.count = LayoutSize{count};
     info.index = index;
     info.space = space;
     return info;
@@ -4239,7 +4241,7 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
         {
             // Nobody has used space zero yet, so we need
             // to make sure to reserve it for defaults.
-            defaultSpace = allocateUnusedSpaces(&context, 1);
+            defaultSpace = allocateUnusedSpaces(&context, LayoutOffset{1});
 
             // The result of this allocation had better be that
             // we got space #0, or else something has gone wrong.

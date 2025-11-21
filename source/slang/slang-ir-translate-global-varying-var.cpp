@@ -82,7 +82,7 @@ struct GlobalVarTranslationContext
             // We'll also need to fix up the offsets of the global varing inputs
             // being added if we have any varing input entry point params. Set
             // these to some defaults for now.
-            UInt nextOffset = 0;
+            LayoutOffset nextOffset{0};
             IRVarLayout* lastFieldVarLayout = nullptr;
 
             // If we have an existing entry point struct layout, we need to go through it and
@@ -126,7 +126,7 @@ struct GlobalVarTranslationContext
                             if (auto sizeAttr = lastFieldVarLayout->getTypeLayout()->findSizeAttr(
                                     LayoutResourceKind::VaryingInput))
                             {
-                                size_t finiteSize = sizeAttr->getFiniteSize();
+                                const auto finiteSize = sizeAttr->getFiniteSize();
                                 if (auto offsetAttr = lastFieldVarLayout->findOffsetAttr(
                                         LayoutResourceKind::VaryingInput))
                                 {
@@ -188,14 +188,14 @@ struct GlobalVarTranslationContext
                     // offsetAttr's, we will add the offsets from those as well.
                     auto resInfo =
                         varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::VaryingInput);
-                    resInfo->offset = nextOffset;
+                    resInfo->offset = LayoutOffset{nextOffset};
 
                     if (auto layoutDecor = findVarLayout(input))
                     {
                         if (auto offsetAttr =
                                 layoutDecor->findOffsetAttr(LayoutResourceKind::VaryingInput))
                         {
-                            resInfo->offset += (UInt)offsetAttr->getOffset();
+                            resInfo->offset += LayoutOffset{(UInt)offsetAttr->getOffset()};
                         }
                     }
                     if (entryPointDecor->getProfile().getStage() == Stage::Fragment)
@@ -320,7 +320,7 @@ struct GlobalVarTranslationContext
                             {
                                 varLayoutBuilder
                                     .findOrAddResourceInfo(LayoutResourceKind::VaryingOutput)
-                                    ->offset = (UInt)offsetAttr->getOffset();
+                                    ->offset = LayoutOffset{(UInt)offsetAttr->getOffset()};
                             }
                         }
                         if (entryPointDecor->getProfile().getStage() == Stage::Fragment)

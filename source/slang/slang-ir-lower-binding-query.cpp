@@ -375,7 +375,8 @@ struct BindingQueryLoweringContext : public WorkListPass
                     }
 
                     // TODO(JS): Perhaps we have to do something else if not finite?
-                    stride = sizeAttr->getFiniteSize();
+                    // TODO(EH): Perhaps we have to do something else if not valid?
+                    stride = sizeAttr->getFiniteSize().getValidValue();
                 }
             }
 

@@ -609,9 +609,11 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
         // It's fine to use the Default impl, as long as any elements size is alignment rounded (as
         // happen in EndStructLayout). If that weren't the case the array may be smaller than
         // elementSize * elementCount which would be wrong for CUDA.
-        SLANG_ASSERT(_isAligned(
-            elementInfo.size.getFiniteValue().getValidValue(),
-            elementInfo.alignment.getValidValue()));
+        SLANG_ASSERT(
+            elementInfo.alignment.isInvalid() ||
+            _isAligned(
+                elementInfo.size.getFiniteValue().getValidValue(),
+                elementInfo.alignment.getValidValue()));
 
         return Super::GetArrayLayout(elementInfo, elementCount);
     }
@@ -3094,11 +3096,11 @@ IRTypeLayout* applyOffsetToTypeLayout(
             {
                 auto kind = oldResInfo->getResourceKind();
                 auto newResInfo = newFieldBuilder.findOrAddResourceInfo(kind);
-                newResInfo->offset = oldResInfo->getOffset();
+                newResInfo->offset = LayoutOffset{oldResInfo->getOffset()};
                 newResInfo->space = oldResInfo->getSpace();
                 if (auto offsetResInfo = offsetVarLayout->findOffsetAttr(kind))
                 {
-                    newResInfo->offset += offsetResInfo->getOffset();
+                    newResInfo->offset += LayoutOffset{offsetResInfo->getOffset()};
                 }
             }
 
@@ -3132,12 +3134,12 @@ IRVarLayout* applyOffsetToVarLayout(
     {
         auto kind = baseResInfo->getResourceKind();
         auto adjustedResInfo = adjustedLayoutBuilder.findOrAddResourceInfo(kind);
-        adjustedResInfo->offset = baseResInfo->getOffset();
+        adjustedResInfo->offset = LayoutOffset{baseResInfo->getOffset()};
         adjustedResInfo->space = baseResInfo->getSpace();
 
         if (auto offsetResInfo = offsetLayout->findOffsetAttr(baseResInfo->getResourceKind()))
         {
-            adjustedResInfo->offset += offsetResInfo->getOffset();
+            adjustedResInfo->offset += LayoutOffset{offsetResInfo->getOffset()};
             adjustedResInfo->space += offsetResInfo->getSpace();
         }
     }

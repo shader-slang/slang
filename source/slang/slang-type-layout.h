@@ -321,6 +321,13 @@ struct LayoutOffset
         return raw;
     }
 
+    RawValue getValidValueOr(RawValue other) const
+    {
+        if (isValid())
+            return raw;
+        return other;
+    }
+
     std::partial_ordering compare(RawValue that) const
     {
         if (this->isInvalid())
@@ -361,6 +368,23 @@ struct LayoutOffset
         else
         {
             *this = LayoutOffset(raw + right.raw);
+        }
+    }
+
+    void operator+=(RawValue right)
+    {
+        if (isInvalid())
+        {
+            *this = LayoutOffset::invalid();
+        }
+        else if (raw > s_maxValidValue - right)
+        {
+            // Check for overflow
+            *this = LayoutOffset::invalid();
+        }
+        else
+        {
+            *this = LayoutOffset(raw + right);
         }
     }
 
@@ -462,6 +486,11 @@ inline LayoutOffset operator+(LayoutOffset left, LayoutOffset right)
     LayoutOffset result(left);
     result += right;
     return result;
+}
+
+inline LayoutOffset operator+(LayoutOffset left, LayoutOffset::RawValue right)
+{
+    return left + LayoutOffset{right};
 }
 
 inline LayoutOffset operator*(LayoutOffset left, LayoutOffset right)
