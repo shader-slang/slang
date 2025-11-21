@@ -397,6 +397,28 @@ struct LayoutOffset
         }
     }
 
+    void operator+=(ssize_t right)
+    {
+        if (isInvalid())
+        {
+            *this = LayoutOffset::invalid();
+        }
+        else if (right > 0 && raw > s_maxValidValue - right)
+        {
+            // Check for positive overflow
+            *this = LayoutOffset::invalid();
+        }
+        else if (right < 0 && (ssize_t)raw < 0 - right)
+        {
+            // Check for negative overflow (underflow)
+            *this = LayoutOffset::invalid();
+        }
+        else
+        {
+            *this = LayoutOffset(raw + right);
+        }
+    }
+
     void operator*=(LayoutOffset right)
     {
         if (isInvalid() || right.isInvalid())

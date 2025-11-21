@@ -3885,7 +3885,7 @@ static void _maybeApplyHLSLToVulkanShifts(
                 if (shift != HLSLToVulkanLayoutOptions::kInvalidShift)
                 {
                     // Apply the shift
-                    resourceInfo.index += LayoutOffset{(UInt)shift};
+                    resourceInfo.index += shift;
 
                     // Fix the parameter binding info
                     bindingInfo.index += shift;
