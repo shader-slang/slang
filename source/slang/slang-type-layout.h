@@ -30,8 +30,11 @@ enum class LayoutRulesFamily
 };
 #endif
 
-// A "size" that can either be a simple finite size or
-// the special case of an infinite/unbounded size.
+struct LayoutOffset;
+
+// A "size" that can either be a simple finite size,
+// the special case of an infinite/unbounded size, or
+// the special case of an invalid size.
 //
 struct LayoutSize
 {
@@ -45,8 +48,10 @@ struct LayoutSize
     LayoutSize(RawValue size)
         : raw(size)
     {
-        SLANG_ASSERT(size != RawValue(-1));
+        SLANG_ASSERT(size != s_infiniteValue && size != s_invalidValue);
     }
+
+    explicit LayoutSize(LayoutOffset offset);
 
     static LayoutSize fromRaw(RawValue raw)
     {
@@ -58,47 +63,90 @@ struct LayoutSize
     static LayoutSize infinite()
     {
         LayoutSize result;
-        result.raw = RawValue(-1);
+        result.raw = s_infiniteValue;
         return result;
     }
 
-    bool isInfinite() const { return raw == RawValue(-1); }
-
-    bool isFinite() const { return raw != RawValue(-1); }
-    RawValue getFiniteValue() const
+    static LayoutSize invalid()
     {
-        SLANG_ASSERT(isFinite());
-        return raw;
+        LayoutSize result;
+        result.raw = s_invalidValue;
+        return result;
     }
 
-    bool operator==(LayoutSize that) const { return raw == that.raw; }
+    bool isInfinite() const { return raw == s_infiniteValue; }
+    bool isInvalid() const { return raw == s_invalidValue; }
 
-    bool operator!=(LayoutSize that) const { return raw != that.raw; }
+    bool isFinite() const { return raw != s_infiniteValue && raw != s_invalidValue; }
+    LayoutOffset getFiniteValue() const;
 
-    bool operator>(LayoutSize that) const
+    std::partial_ordering compare(RawValue that) const
     {
-        if (that.isFinite())
+        if (this->isInvalid())
+            return std::partial_ordering::unordered;
+
+        if (this->isInfinite())
         {
-            if (this->isFinite())
-                return this->raw > that.raw;
-            return true;
+            return std::partial_ordering::greater;
         }
         else
         {
-            if (that.isInfinite())
-                return false;
-            return true;
+            if (this->raw < that)
+                return std::partial_ordering::less;
+            else if (this->raw > that)
+                return std::partial_ordering::greater;
+            else
+                return std::partial_ordering::equivalent;
         }
     }
 
+    std::partial_ordering compare(LayoutSize that) const
+    {
+        if (this->isInvalid() || that.isInvalid())
+            return std::partial_ordering::unordered;
+
+        if (this->isInfinite())
+        {
+            if (that.isInfinite())
+                return std::partial_ordering::equivalent;
+            else
+                return std::partial_ordering::greater;
+        }
+        else if (that.isInfinite())
+        {
+            return std::partial_ordering::less;
+        }
+        else
+        {
+            // Both are finite
+            if (this->raw < that.raw)
+                return std::partial_ordering::less;
+            else if (this->raw > that.raw)
+                return std::partial_ordering::greater;
+            else
+                return std::partial_ordering::equivalent;
+        }
+    }
+
+
     void operator+=(LayoutSize right)
     {
-        if (isInfinite())
+        if (isInvalid() || right.isInvalid())
         {
+            *this = LayoutSize::invalid();
+        }
+        else if (isInfinite())
+        {
+            // Infinite + anything = infinite
         }
         else if (right.isInfinite())
         {
             *this = LayoutSize::infinite();
+        }
+        else if (raw > s_maxFiniteValue - right.raw)
+        {
+            // Check for overflow
+            *this = LayoutSize::invalid();
         }
         else
         {
@@ -108,6 +156,12 @@ struct LayoutSize
 
     void operator*=(LayoutSize right)
     {
+        if (isInvalid() || right.isInvalid())
+        {
+            *this = LayoutSize::invalid();
+            return;
+        }
+
         // Deal with zero first, so that anything (even the "infinite" value) times zero is zero.
         if (raw == 0)
         {
@@ -132,14 +186,31 @@ struct LayoutSize
             return;
         }
 
-        // Finally deal with the case where both sides are finite
-        *this = LayoutSize(raw * right.raw);
+        // Finally deal with the case where both sides are finite - check for overflow
+        if (right.raw != 0 && raw > s_maxFiniteValue / right.raw)
+        {
+            *this = LayoutSize::invalid();
+        }
+        else
+        {
+            *this = LayoutSize(raw * right.raw);
+        }
     }
 
     void operator-=(RawValue right)
     {
-        if (isInfinite())
+        if (isInvalid())
         {
+            // Invalid remains invalid
+        }
+        else if (isInfinite())
+        {
+            // Infinite - anything = infinite
+        }
+        else if (raw < right)
+        {
+            // Check for underflow
+            *this = LayoutSize::invalid();
         }
         else
         {
@@ -149,14 +220,30 @@ struct LayoutSize
 
     void operator/=(RawValue right)
     {
-        if (isInfinite())
+        if (isInvalid())
         {
+            // Invalid remains invalid
+        }
+        else if (right == 0)
+        {
+            // Division by zero
+            *this = LayoutSize::invalid();
+        }
+        else if (isInfinite())
+        {
+            // Infinite / anything non-zero = infinite
         }
         else
         {
             *this = LayoutSize(raw / right);
         }
     }
+
+private:
+    static const RawValue s_infiniteValue = RawValue(-1);
+    static const RawValue s_invalidValue = RawValue(-2);
+    static const RawValue s_maxFiniteValue = s_invalidValue - 1;
+    friend struct LayoutOffset;
     RawValue raw;
 };
 
@@ -188,23 +275,6 @@ inline LayoutSize operator/(LayoutSize left, LayoutSize::RawValue right)
     return result;
 }
 
-inline LayoutSize maximum(LayoutSize left, LayoutSize right)
-{
-    if (left.isInfinite() || right.isInfinite())
-        return LayoutSize::infinite();
-
-    return LayoutSize(Math::Max(left.getFiniteValue(), right.getFiniteValue()));
-}
-
-inline bool operator>(LayoutSize left, LayoutSize::RawValue right)
-{
-    return left.isInfinite() || (left.getFiniteValue() > right);
-}
-
-inline bool operator<=(LayoutSize left, LayoutSize::RawValue right)
-{
-    return left.isFinite() && (left.getFiniteValue() <= right);
-}
 
 // An offset that can either be a valid finite offset or
 // the special case of an invalid offset.
@@ -218,10 +288,17 @@ struct LayoutOffset
     {
     }
 
-    LayoutOffset(RawValue offset)
+    explicit LayoutOffset(RawValue offset)
         : raw(offset)
     {
         SLANG_ASSERT(offset != s_invalidValue);
+    }
+
+    explicit LayoutOffset(LayoutSize size)
+    {
+        if (size.isInfinite() || size.isInvalid())
+            *this = LayoutOffset::invalid();
+        raw = size.raw;
     }
 
     static LayoutOffset invalid()
@@ -322,10 +399,39 @@ struct LayoutOffset
     }
 
 private:
-    static const RawValue s_invalidValue = RawValue(~0);
+    static const RawValue s_invalidValue = LayoutSize::s_invalidValue;
     static const RawValue s_maxValidValue = s_invalidValue - 1;
+    friend struct LayoutSize;
     RawValue raw;
 };
+
+inline LayoutOffset LayoutSize::getFiniteValue() const
+{
+    SLANG_ASSERT(!isInfinite());
+    return LayoutOffset{*this};
+}
+
+inline LayoutSize::LayoutSize(LayoutOffset offset)
+{
+    *this = LayoutSize{offset.raw};
+}
+
+inline LayoutSize maximum(LayoutSize left, LayoutSize right)
+{
+    if (left.isInvalid() || right.isInvalid())
+        return LayoutSize::invalid();
+
+    if (left.isInfinite() || right.isInfinite())
+        return LayoutSize::infinite();
+
+    auto leftOffset = left.getFiniteValue();
+    auto rightOffset = right.getFiniteValue();
+    if (leftOffset.isInvalid() || rightOffset.isInvalid())
+        return LayoutSize::invalid();
+
+    return LayoutSize(Math::Max(leftOffset.getValidValue(), rightOffset.getValidValue()));
+}
+
 
 inline LayoutOffset operator+(LayoutOffset left, LayoutOffset right)
 {
@@ -355,12 +461,45 @@ inline LayoutOffset operator/(LayoutOffset left, LayoutOffset right)
     return result;
 }
 
+inline LayoutOffset operator+(LayoutOffset offset, LayoutSize size)
+{
+    if (offset.isInvalid() || size.isInvalid())
+        return LayoutOffset::invalid();
+    
+    if (size.isInfinite())
+        return LayoutOffset::invalid(); // Infinite size can't be added to finite offset
+    
+    auto finiteSize = size.getFiniteValue();
+    if (!finiteSize.isValid())
+        return LayoutOffset::invalid();
+    
+    return offset + finiteSize;
+}
+
 inline LayoutOffset maximum(LayoutOffset left, LayoutOffset right)
 {
     if (left.isInvalid() || right.isInvalid())
         return LayoutOffset::invalid();
 
     return LayoutOffset(Math::Max(left.getValidValue(), right.getValidValue()));
+}
+
+inline LayoutSize maximum(LayoutSize left, LayoutOffset right)
+{
+    if (left.isInvalid() || right.isInvalid())
+        return LayoutSize::invalid();
+    
+    if (left.isInfinite())
+        return LayoutSize::infinite();
+    
+    if (!left.isFinite())
+        return LayoutSize::invalid();
+    
+    auto leftOffset = left.getFiniteValue();
+    if (!leftOffset.isValid())
+        return LayoutSize::invalid();
+    
+    return LayoutSize(Math::Max(leftOffset.getValidValue(), right.getValidValue()));
 }
 
 
@@ -601,7 +740,7 @@ public:
 
     void addResourceUsage(ResourceInfo info)
     {
-        if (info.count == 0)
+        if (info.count.compare(LayoutSize(0)) == std::partial_ordering::equivalent)
             return;
 
         findOrAddResourceInfo(info.kind)->count += info.count;
@@ -722,7 +861,7 @@ public:
         // What is our starting register in that space?
         //
         // (In the case of uniform data, this is a byte offset)
-        UInt index;
+        LayoutOffset index;
     };
     List<ResourceInfo> resourceInfos;
 
@@ -741,7 +880,7 @@ public:
         ResourceInfo info;
         info.kind = kind;
         info.space = 0;
-        info.index = 0;
+        info.index = LayoutOffset(0);
 
         resourceInfos.add(info);
         return &resourceInfos.getLast();

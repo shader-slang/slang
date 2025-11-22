@@ -13657,7 +13657,7 @@ IRVarLayout* lowerVarLayout(
     for (auto resInfo : varLayout->resourceInfos)
     {
         auto irResInfo = irLayoutBuilder.findOrAddResourceInfo(resInfo.kind);
-        irResInfo->offset = resInfo.index;
+        irResInfo->offset = resInfo.index.isValid() ? resInfo.index.getValidValue() : 0;
         irResInfo->space = resInfo.space;
     }
 

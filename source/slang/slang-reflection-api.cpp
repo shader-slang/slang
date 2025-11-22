@@ -1261,9 +1261,24 @@ namespace
 static size_t getReflectionSize(LayoutSize size)
 {
     if (size.isFinite())
-        return size.getFiniteValue();
+    {
+        auto offset = size.getFiniteValue();
+        if (offset.isValid())
+            return offset.getValidValue();
+    }
+    
+    if (size.isInfinite())
+        return SLANG_UNBOUNDED_SIZE;
 
-    return SLANG_UNBOUNDED_SIZE;
+    return SLANG_UNKNOWN_SIZE;
+}
+
+static size_t getReflectionOffset(LayoutOffset offset)
+{
+    if (offset.isValid())
+        return offset.getValidValue();
+    else
+        return SLANG_UNKNOWN_SIZE;
 }
 
 static int32_t getAlignment(TypeLayout* typeLayout, SlangParameterCategory category)
@@ -1288,7 +1303,10 @@ static size_t getStride(TypeLayout* typeLayout, SlangParameterCategory category)
     if (size.isInfinite())
         return SLANG_UNBOUNDED_SIZE;
 
-    size_t finiteSize = size.getFiniteValue();
+    auto offset = size.getFiniteValue();
+    if (!offset.isValid())
+        return 0;
+    size_t finiteSize = offset.getValidValue();
     size_t alignment = getAlignment(typeLayout, category);
     SLANG_ASSERT(alignment >= 1);
 
@@ -1680,7 +1698,8 @@ Int _calcIndexOffset(BindingRangePathLink* path, LayoutResourceKind kind)
     {
         if (auto resInfo = link->var->FindResourceInfo(kind))
         {
-            result += resInfo->index;
+            if (resInfo->index.isValid())
+                result += resInfo->index.getValidValue();
         }
     }
     return result;
@@ -1908,7 +1927,7 @@ struct ExtendedTypeLayoutContext
         {
             auto kind = typeResInfo.kind;
             auto varResInfo = varLayout->findOrAddResourceInfo(kind);
-            varResInfo->index = _calcIndexOffset(path, kind);
+            varResInfo->index = LayoutOffset(_calcIndexOffset(path, kind));
             varResInfo->space = _calcSpaceOffset(path, kind);
         }
 
@@ -2053,7 +2072,7 @@ struct ExtendedTypeLayoutContext
                 if (auto resInfo = path.primary->var->FindResourceInfo(
                         LayoutResourceKind::SubElementRegisterSpace))
                 {
-                    subObjectRange.spaceOffset = resInfo->index;
+                    subObjectRange.spaceOffset = resInfo->index.isValid() ? resInfo->index.getValidValue() : 0;
                 }
             }
             // It is possible that the sub-object has descriptor ranges
@@ -2280,8 +2299,12 @@ struct ExtendedTypeLayoutContext
             // Note that we don't use resInfo.count here, as each
             // structuredBufferType is essentially a struct of 2 fields
             // (elements, counter) and not an array of length 2.
-            SLANG_ASSERT(resInfo.count != 2 || structuredBufferTypeLayout->counterVarLayout);
-            SLANG_ASSERT(resInfo.count != 1 || !structuredBufferTypeLayout->counterVarLayout);
+            SLANG_ASSERT(
+                resInfo.count.compare(LayoutSize(2)) != std::partial_ordering::equivalent ||
+                structuredBufferTypeLayout->counterVarLayout);
+            SLANG_ASSERT(
+                resInfo.count.compare(LayoutSize(1)) != std::partial_ordering::equivalent ||
+                !structuredBufferTypeLayout->counterVarLayout);
             descriptorRange.count = multiplier;
             descriptorRange.indexOffset = _calcIndexOffset(path.primary, resInfo.kind);
 
@@ -2579,7 +2602,12 @@ SLANG_API SlangInt spReflectionTypeLayout_getBindingRangeBindingCount(
     auto& bindingRange = extTypeLayout->m_bindingRanges[index];
 
     auto count = bindingRange.count;
-    return count.isFinite() ? SlangInt(count.getFiniteValue()) : -1;
+    if (count.isFinite())
+    {
+        auto offset = count.getFiniteValue();
+        return offset.isValid() ? SlangInt(offset.getValidValue()) : -1;
+    }
+    return -1;
 }
 
 #if 0
@@ -2814,7 +2842,12 @@ SLANG_API SlangInt spReflectionTypeLayout_getDescriptorSetDescriptorRangeDescrip
     auto& range = descriptorSet->descriptorRanges[rangeIndex];
 
     auto count = range.count;
-    return count.isFinite() ? count.getFiniteValue() : -1;
+    if (count.isFinite())
+    {
+        auto offset = count.getFiniteValue();
+        return offset.isValid() ? offset.getValidValue() : -1;
+    }
+    return -1;
 }
 
 SLANG_API SlangBindingType spReflectionTypeLayout_getDescriptorSetDescriptorRangeType(
@@ -2998,7 +3031,11 @@ SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeObjectCount(SlangRefl
     if(!typeLayout) return 0;
 
     auto count = Slang::_findSubObjectRange(typeLayout, index).count;
-    return count.isFinite() ? SlangInt(count.getFiniteValue()) : -1;
+    if (count.isFinite()) {
+        auto offset = count.getFiniteValue();
+        return offset.isValid() ? SlangInt(offset.getValidValue()) : -1;
+    }
+    return -1;
 }
 
 SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeBindingRangeIndex(SlangReflectionTypeLayout* inTypeLayout, SlangInt index)
@@ -3260,7 +3297,7 @@ SLANG_API size_t spReflectionVariableLayout_GetOffset(
 {
     auto varLayout = convert(inVarLayout);
     if (!varLayout)
-        return 0;
+        return SLANG_UNKNOWN_SIZE;
 
     auto info = varLayout->FindResourceInfo(LayoutResourceKind(category));
 
@@ -3272,9 +3309,9 @@ SLANG_API size_t spReflectionVariableLayout_GetOffset(
     }
 
     if (!info)
-        return 0;
+        return SLANG_UNKNOWN_SIZE;
 
-    return info->index;
+    return getReflectionOffset(info->index);
 }
 
 SLANG_API size_t spReflectionVariableLayout_GetSpace(
@@ -3303,7 +3340,8 @@ SLANG_API size_t spReflectionVariableLayout_GetSpace(
     }
 
     if (auto regSpaceInfo = varLayout->FindResourceInfo(LayoutResourceKind::RegisterSpace))
-        space += regSpaceInfo->index;
+        if (regSpaceInfo->index.isValid())
+            space += regSpaceInfo->index.getValidValue();
 
     // Note: this code used to try and take a variable with
     // an offset for `LayoutResourceKind::RegisterSpace` and
@@ -4416,7 +4454,7 @@ SLANG_API SlangUInt spReflection_getGlobalConstantBufferBinding(SlangReflection*
     auto cb = program->parametersLayout->FindResourceInfo(LayoutResourceKind::ConstantBuffer);
     if (!cb)
         return 0;
-    return cb->index;
+    return cb->index.isValid() ? cb->index.getValidValue() : SLANG_UNKNOWN_SIZE;
 }
 
 SLANG_API size_t spReflection_getGlobalConstantBufferSize(SlangReflection* inProgram)
