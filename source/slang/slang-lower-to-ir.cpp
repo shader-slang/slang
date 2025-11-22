@@ -9060,34 +9060,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 break;
             }
 
-            // If the witness table's concrete type is a specialization (e.g., specialize(SomeGeneric, T)),
-            // and the satisfying value is itself a generic, then we need to specialize the satisfying
-            // value with the same generic arguments.
-            //
-            // This handles cases like nested enums in generic types, where the enum's witness table
-            // needs specialized versions of the generic functions (e.g., $init).
-            //
-            auto concreteType = irWitnessTable->getConcreteType();
-            if (auto specializeInst = as<IRSpecialize>(concreteType))
-            {
-                if (auto genericSatisfyingVal = as<IRGeneric>(irSatisfyingVal))
-                {
-                    // Extract the generic arguments from the specialization
-                    List<IRInst*> args;
-                    for (UInt i = 0; i < specializeInst->getArgCount(); i++)
-                    {
-                        args.add(specializeInst->getArg(i));
-                    }
-
-                    // Create a specialized version of the generic satisfying value
-                    irSatisfyingVal = subBuilder->emitSpecializeInst(
-                        subBuilder->getTypeKind(),
-                        genericSatisfyingVal,
-                        args.getCount(),
-                        args.getBuffer());
-                }
-            }
-
             subBuilder->createWitnessTableEntry(irWitnessTable, irRequirementKey, irSatisfyingVal);
         }
     }
