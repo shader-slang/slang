@@ -82,7 +82,7 @@ struct GlobalVarTranslationContext
             // We'll also need to fix up the offsets of the global varing inputs
             // being added if we have any varing input entry point params. Set
             // these to some defaults for now.
-            LayoutOffset nextOffset{0};
+            UInt nextOffset = 0;
             IRVarLayout* lastFieldVarLayout = nullptr;
 
             // If we have an existing entry point struct layout, we need to go through it and
