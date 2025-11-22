@@ -1,1 +1,1 @@
-// Empty lib file for basic test
+export static const int ARRAY_SIZE = 3;
