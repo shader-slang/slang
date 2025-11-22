@@ -1104,7 +1104,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     {
         for (auto attr : typeLayout->getSizeAttrs())
         {
-            if (attr->getSize() != 0)
+            if (attr->getSize().compare(0) == std::partial_ordering::greater)
                 return attr->getResourceKind();
         }
         return LayoutResourceKind::None;
@@ -1924,7 +1924,7 @@ private:
                         UInt parentSpace = parentOffsetAttr ? parentOffsetAttr->getSpace() : 0;
                         auto resInfo =
                             varLayoutBuilder.findOrAddResourceInfo(offsetAttr->getResourceKind());
-                        resInfo->offset = parentOffset + offsetAttr->getOffset();
+                        resInfo->offset = LayoutOffset{parentOffset + offsetAttr->getOffset()};
                         resInfo->space = parentSpace + offsetAttr->getSpace();
                     }
                     builder.addLayoutDecoration(fieldParam, varLayoutBuilder.build());
@@ -3356,7 +3356,7 @@ protected:
                 resourceKind = LayoutResourceKind::MetalAttribute;
             }
             auto resInfo = elementVarLayoutBuilder.findOrAddResourceInfo(resourceKind);
-            resInfo->offset = offsetAttr->getOffset();
+            resInfo->offset = LayoutOffset{offsetAttr->getOffset()};
             resInfo->space = offsetAttr->getSpace();
         }
 

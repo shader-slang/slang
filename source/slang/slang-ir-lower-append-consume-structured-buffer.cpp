@@ -73,12 +73,12 @@ static void lowerStructuredBufferType(TargetProgram* target, IRHLSLStructuredBuf
 
     IRVarLayout::Builder elementBufferVarLayoutBuilder(&builder, elementBufferTypeLayout);
     elementBufferVarLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::DescriptorTableSlot)
-        ->offset = 0;
+        ->offset = LayoutOffset{0};
     auto elementBufferVarLayout = elementBufferVarLayoutBuilder.build();
 
     IRVarLayout::Builder counterBufferVarLayoutBuilder(&builder, counterBufferTypeLayout);
     counterBufferVarLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::DescriptorTableSlot)
-        ->offset = 1;
+        ->offset = LayoutOffset{1};
     auto counterBufferVarLayout = counterBufferVarLayoutBuilder.build();
 
     IRStructTypeLayout::Builder layoutBuilder(&builder);
@@ -245,7 +245,7 @@ static void lowerStructuredBufferType(TargetProgram* target, IRHLSLStructuredBuf
                             descriptorTableSlotOffsetAttr = offsetAttr;
                         auto info = newVarLayoutBuilder.findOrAddResourceInfo(
                             offsetAttr->getResourceKind());
-                        info->offset = offsetAttr->getOffset();
+                        info->offset = LayoutOffset{offsetAttr->getOffset()};
                         info->space = offsetAttr->getSpace();
                         info->kind = offsetAttr->getResourceKind();
                     }
@@ -255,7 +255,7 @@ static void lowerStructuredBufferType(TargetProgram* target, IRHLSLStructuredBuf
                     {
                         auto info = newVarLayoutBuilder.findOrAddResourceInfo(
                             LayoutResourceKind::DescriptorTableSlot);
-                        info->offset = uavOffsetAttr->getOffset();
+                        info->offset = LayoutOffset{uavOffsetAttr->getOffset()};
                         info->space = uavOffsetAttr->getSpace();
                         info->kind = LayoutResourceKind::DescriptorTableSlot;
                     }

@@ -1258,23 +1258,29 @@ SLANG_API SlangTypeKind spReflectionTypeLayout_getKind(SlangReflectionTypeLayout
 
 namespace
 {
-static size_t getReflectionSize(LayoutSize size)
+static size_t getReflectionOffset(LayoutOffset size)
 {
-    if (size.isFinite())
-        return size.getFiniteValue();
-
-    return SLANG_UNBOUNDED_SIZE;
+    if (size.isInvalid())
+        return SLANG_INVALID_SIZE;
+    return size.getValidValue();
 }
 
-static int32_t getAlignment(TypeLayout* typeLayout, SlangParameterCategory category)
+static size_t getReflectionSize(LayoutSize size)
+{
+    if (size.isInfinite())
+        return SLANG_UNBOUNDED_SIZE;
+    return getReflectionOffset(size.getFiniteValue());
+}
+
+static LayoutOffset getAlignment(TypeLayout* typeLayout, SlangParameterCategory category)
 {
     if (category == SLANG_PARAMETER_CATEGORY_UNIFORM)
     {
-        return int32_t(typeLayout->uniformAlignment);
+        return typeLayout->uniformAlignment;
     }
     else
     {
-        return 1;
+        return LayoutOffset{1};
     }
 }
 
@@ -1288,11 +1294,18 @@ static size_t getStride(TypeLayout* typeLayout, SlangParameterCategory category)
     if (size.isInfinite())
         return SLANG_UNBOUNDED_SIZE;
 
-    size_t finiteSize = size.getFiniteValue();
-    size_t alignment = getAlignment(typeLayout, category);
-    SLANG_ASSERT(alignment >= 1);
+    auto offset = size.getFiniteValue();
+    if (!offset.isValid())
+        return SLANG_INVALID_SIZE;
+    size_t finiteSize = offset.getValidValue();
+    const auto alignment = getAlignment(typeLayout, category);
 
-    auto stride = (finiteSize + (alignment - 1)) & ~(alignment - 1);
+    if (alignment.isInvalid())
+        return SLANG_INVALID_SIZE;
+
+    SLANG_ASSERT(alignment.compare(1) != std::partial_ordering::less);
+
+    auto stride = (finiteSize + (alignment.getValidValue() - 1)) & ~(alignment.getValidValue() - 1);
     return stride;
 }
 } // namespace
@@ -1331,7 +1344,9 @@ SLANG_API int32_t spReflectionTypeLayout_getAlignment(
     if (!typeLayout)
         return 0;
 
-    return getAlignment(typeLayout, category);
+    // We would like to use this but this function doesn't return size_t
+    // return getReflectionOffset(getAlignment(typeLayout, category));
+    return int32_t(getAlignment(typeLayout, category).getValidValueOr(0));
 }
 
 SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_GetFieldByIndex(
@@ -1399,7 +1414,7 @@ SLANG_API size_t spReflectionTypeLayout_GetElementStride(
         {
         // We store the stride explicitly for the uniform case
         case SLANG_PARAMETER_CATEGORY_UNIFORM:
-            return arrayTypeLayout->uniformStride;
+            return getReflectionOffset(arrayTypeLayout->uniformStride);
 
         // For most other cases (resource registers), the "stride"
         // of an array is simply the number of resources (if any)
@@ -1673,9 +1688,9 @@ struct ExtendedBindingRangePath : BindingRangePath
 };
 
 /// Calculate the offset for resources of the given `kind` in the `path`.
-Int _calcIndexOffset(BindingRangePathLink* path, LayoutResourceKind kind)
+LayoutOffset _calcIndexOffset(BindingRangePathLink* path, LayoutResourceKind kind)
 {
-    Int result = 0;
+    LayoutOffset result{0};
     for (auto link = path; link; link = link->parent)
     {
         if (auto resInfo = link->var->FindResourceInfo(kind))
@@ -2047,7 +2062,7 @@ struct ExtendedTypeLayoutContext
             TypeLayout::ExtendedInfo::SubObjectRangeInfo subObjectRange;
             subObjectRange.bindingRangeIndex = bindingRangeIndex;
             subObjectRange.offsetVarLayout = createOffsetVarLayout(typeLayout, path);
-            subObjectRange.spaceOffset = 0;
+            subObjectRange.spaceOffset = LayoutOffset{0};
             if (kind == LayoutResourceKind::SubElementRegisterSpace && path.primary)
             {
                 if (auto resInfo = path.primary->var->FindResourceInfo(
@@ -2280,8 +2295,12 @@ struct ExtendedTypeLayoutContext
             // Note that we don't use resInfo.count here, as each
             // structuredBufferType is essentially a struct of 2 fields
             // (elements, counter) and not an array of length 2.
-            SLANG_ASSERT(resInfo.count != 2 || structuredBufferTypeLayout->counterVarLayout);
-            SLANG_ASSERT(resInfo.count != 1 || !structuredBufferTypeLayout->counterVarLayout);
+            SLANG_ASSERT(
+                resInfo.count.compare(LayoutSize(2)) != std::partial_ordering::equivalent ||
+                structuredBufferTypeLayout->counterVarLayout);
+            SLANG_ASSERT(
+                resInfo.count.compare(LayoutSize(1)) != std::partial_ordering::equivalent ||
+                !structuredBufferTypeLayout->counterVarLayout);
             descriptorRange.count = multiplier;
             descriptorRange.indexOffset = _calcIndexOffset(path.primary, resInfo.kind);
 
@@ -2309,7 +2328,7 @@ struct ExtendedTypeLayoutContext
             TypeLayout::ExtendedInfo::SubObjectRangeInfo subObjectRange;
             subObjectRange.bindingRangeIndex = bindingRangeIndex;
             subObjectRange.offsetVarLayout = createOffsetVarLayout(typeLayout, path);
-            subObjectRange.spaceOffset = 0;
+            subObjectRange.spaceOffset = LayoutOffset{0};
             m_extendedInfo->m_subObjectRanges.add(subObjectRange);
 
             // If we have an associated counter for this structured buffer,
@@ -2578,8 +2597,7 @@ SLANG_API SlangInt spReflectionTypeLayout_getBindingRangeBindingCount(
         return 0;
     auto& bindingRange = extTypeLayout->m_bindingRanges[index];
 
-    auto count = bindingRange.count;
-    return count.isFinite() ? SlangInt(count.getFiniteValue()) : -1;
+    return getReflectionSize(bindingRange.count);
 }
 
 #if 0
@@ -2787,7 +2805,7 @@ SLANG_API SlangInt spReflectionTypeLayout_getDescriptorSetDescriptorRangeIndexOf
         return 0;
     auto& range = descriptorSet->descriptorRanges[rangeIndex];
 
-    return range.indexOffset;
+    return getReflectionOffset(range.indexOffset);
 }
 
 SLANG_API SlangInt spReflectionTypeLayout_getDescriptorSetDescriptorRangeDescriptorCount(
@@ -2813,8 +2831,7 @@ SLANG_API SlangInt spReflectionTypeLayout_getDescriptorSetDescriptorRangeDescrip
         return 0;
     auto& range = descriptorSet->descriptorRanges[rangeIndex];
 
-    auto count = range.count;
-    return count.isFinite() ? count.getFiniteValue() : -1;
+    return getReflectionSize(range.count);
 }
 
 SLANG_API SlangBindingType spReflectionTypeLayout_getDescriptorSetDescriptorRangeType(
@@ -2914,7 +2931,7 @@ SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeSpaceOffset(
     if (subObjectRangeIndex >= extTypeLayout->m_subObjectRanges.getCount())
         return 0;
 
-    return extTypeLayout->m_subObjectRanges[subObjectRangeIndex].spaceOffset;
+    return getReflectionOffset(extTypeLayout->m_subObjectRanges[subObjectRangeIndex].spaceOffset);
 }
 
 SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_getSubObjectRangeOffset(
@@ -2998,7 +3015,7 @@ SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeObjectCount(SlangRefl
     if(!typeLayout) return 0;
 
     auto count = Slang::_findSubObjectRange(typeLayout, index).count;
-    return count.isFinite() ? SlangInt(count.getFiniteValue()) : -1;
+    return getReflectionSize(count);
 }
 
 SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeBindingRangeIndex(SlangReflectionTypeLayout* inTypeLayout, SlangInt index)
@@ -3274,7 +3291,7 @@ SLANG_API size_t spReflectionVariableLayout_GetOffset(
     if (!info)
         return 0;
 
-    return info->index;
+    return getReflectionOffset(info->index);
 }
 
 SLANG_API size_t spReflectionVariableLayout_GetSpace(
@@ -3294,12 +3311,12 @@ SLANG_API size_t spReflectionVariableLayout_GetSpace(
         info = varLayout->FindResourceInfo(LayoutResourceKind(category));
     }
 
-    UInt space = 0;
+    LayoutOffset space{0};
 
     // First, deal with any offset applied to the specific resource kind specified
     if (info)
     {
-        space += info->space;
+        space += LayoutOffset{info->space};
     }
 
     if (auto regSpaceInfo = varLayout->FindResourceInfo(LayoutResourceKind::RegisterSpace))
@@ -3332,7 +3349,7 @@ SLANG_API size_t spReflectionVariableLayout_GetSpace(
     // There is no policy we can apply locally in this function that
     // will Just Work, so the best we can do is try to not lie.
 
-    return space;
+    return getReflectionOffset(space);
 }
 
 SLANG_API SlangImageFormat
@@ -4416,7 +4433,7 @@ SLANG_API SlangUInt spReflection_getGlobalConstantBufferBinding(SlangReflection*
     auto cb = program->parametersLayout->FindResourceInfo(LayoutResourceKind::ConstantBuffer);
     if (!cb)
         return 0;
-    return cb->index;
+    return getReflectionOffset(cb->index);
 }
 
 SLANG_API size_t spReflection_getGlobalConstantBufferSize(SlangReflection* inProgram)

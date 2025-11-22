@@ -1586,7 +1586,7 @@ void buildSimpleVarLayout(
         {
             if (auto parentResInfo = vv->varLayout->findOffsetAttr(kind))
             {
-                resInfo->offset += parentResInfo->getOffset();
+                resInfo->offset += LayoutOffset{parentResInfo->getOffset()};
                 resInfo->space += parentResInfo->getSpace();
             }
         }
@@ -1628,7 +1628,8 @@ void buildSimpleVarLayout(
         // If there were non-zero contributions, then add an entry to represent them.
         if (space)
         {
-            builder->findOrAddResourceInfo(LayoutResourceKind::RegisterSpace)->offset = space;
+            builder->findOrAddResourceInfo(LayoutResourceKind::RegisterSpace)->offset =
+                LayoutOffset{space};
         }
     }
 }
