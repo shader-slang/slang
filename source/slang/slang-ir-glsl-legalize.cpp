@@ -1150,7 +1150,7 @@ IRTypeLayout* createPatchConstantFuncResultTypeLayout(
 
                 auto unusedBinding =
                     context->usedBindingIndex[LayoutResourceKind::VaryingOutput].getLSBZero();
-                varLayoutForKind->offset = unusedBinding;
+                varLayoutForKind->offset = (UInt)unusedBinding;
                 context->usedBindingIndex[LayoutResourceKind::VaryingOutput].add(unusedBinding);
             }
             builder.addField(field->getKey(), fieldVarLayoutBuilder.build());
