@@ -132,10 +132,10 @@ runs:
           linux*) echo "${{github.workspace}}/external/slang-binaries/spirv-tools/$(uname -m)-linux/bin" >> "$GITHUB_PATH";;
         esac
 
-      # Setup ccache for local compilation speedup (Windows self-hosted only)
+      # Setup ccache for local compilation speedup (self-hosted runners only)
       # Only use ccache if already installed - don't attempt installation
     - name: Setup ccache (if available, local only, no GitHub uploads)
-      if: ${{ inputs.os == 'windows' && runner.environment == 'self-hosted' }}
+      if: ${{ (inputs.os == 'windows' || inputs.os == 'linux') && runner.environment == 'self-hosted' }}
       shell: bash
       run: |
         # Check if ccache is available
