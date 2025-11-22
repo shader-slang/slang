@@ -268,7 +268,7 @@ static void glslang_optimizeSPIRV(
 
     spvtools::Optimizer optimizer(targetEnv);
 
-    optimizer.SetMessageConsumer(
+    auto messageConsumer =
         [&](spv_message_level_t level,
             const char* source,
             const spv_position_t& position,
@@ -286,7 +286,8 @@ static void glslang_optimizeSPIRV(
                 diag.message = message;
             }
             outDiags.push_back(diag);
-        });
+        };
+    optimizer.SetMessageConsumer(messageConsumer);
 
     // If debug info is being generated, propagate
     // line information into all SPIR-V instructions. This avoids loss of
@@ -307,8 +308,9 @@ static void glslang_optimizeSPIRV(
     //
     // If a compilation produces a warning like
     // `0:0: ID overflow. Try running compact-ids.`
-    // it might be fixable by raising the multiplier to a larger value.
-    spvOptOptions.set_max_id_bound(kDefaultMaxIdBound * 4);
+    // it might be fixable by raising value to a larger value.
+    spvOptOptions.set_max_id_bound(0x3FFFFFFF);
+    bool compactPassRun = false;
 
     // TODO confirm which passes we want to invoke for each level
     switch (optimizationLevel)
@@ -502,6 +504,7 @@ static void glslang_optimizeSPIRV(
             // We again run compaction to try and ensure the final output uses ids that are in
             // range. On a complex shader, this reduced the amount ids by 5.
             optimizer.RegisterPass(spvtools::CreateCompactIdsPass());
+            compactPassRun = true;
 
             break;
         }
@@ -522,8 +525,24 @@ static void glslang_optimizeSPIRV(
         if (optimizer.Run(ioSpirv.data(), ioSpirv.size(), &optSpirv, spvOptOptions))
         {
             assert(optSpirv.size() > 0);
-            // Make the ioSpirv the optimized spirv
-            ioSpirv.swap(optSpirv);
+
+            // If a CompactIdsPass wasn't run, then we should run one if the
+            // generated SPIRV is using IDs beyond kDefaultMaxIdBound.
+            // The 4th entry in the header is the bound of the module.
+            if (!compactPassRun &&
+                optSpirv.size() > 3 && optSpirv[3] > kDefaultMaxIdBound)
+            {
+                spvtools::Optimizer optimizer2(targetEnv);
+                optimizer2.SetMessageConsumer(messageConsumer);
+                optimizer2.RegisterPass(spvtools::CreateCompactIdsPass());
+                optimizer2.Run(optSpirv.data(), optSpirv.size(), &ioSpirv, spvOptOptions);
+            }
+            else
+            {
+                // Make the ioSpirv the optimized spirv
+                ioSpirv.swap(optSpirv);
+            }
+            assert(ioSpirv.size() > 0);
         }
     }
 }
