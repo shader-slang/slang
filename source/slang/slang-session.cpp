@@ -349,23 +349,35 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompositeComponentType(
 
     SLANG_AST_BUILDER_RAII(getASTBuilder());
 
+    DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
+    applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
+
     // Attempting to create a "composite" of just one component type should
     // just return the component type itself, to avoid redundant work.
     //
     if (componentTypeCount == 1)
     {
         auto componentType = componentTypes[0];
+        if (componentType == nullptr)
+        {
+            sink.diagnose(SourceLoc{}, Diagnostics::nullComponentType, 0);
+            sink.getBlobIfNeeded(outDiagnostics);
+            return SLANG_E_INVALID_ARG;
+        }
         componentType->addRef();
         *outCompositeComponentType = componentType;
         return SLANG_OK;
     }
 
-    DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
-    applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
-
     List<RefPtr<ComponentType>> childComponents;
     for (Int cc = 0; cc < componentTypeCount; ++cc)
     {
+        if (componentTypes[cc] == nullptr)
+        {
+            sink.diagnose(SourceLoc{}, Diagnostics::nullComponentType, cc);
+            sink.getBlobIfNeeded(outDiagnostics);
+            return SLANG_E_INVALID_ARG;
+        }
         childComponents.add(asInternal(componentTypes[cc]));
     }
 
