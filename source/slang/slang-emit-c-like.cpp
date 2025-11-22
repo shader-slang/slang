@@ -79,12 +79,14 @@ struct CLikeSourceEmitter::ComputeEmitActionsContext
             return SourceLanguage::C;
         }
     case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
     case CodeGenTarget::HostCPPSource:
     case CodeGenTarget::PyTorchCppBinding:
         {
             return SourceLanguage::CPP;
         }
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
         {
             return SourceLanguage::CUDA;
         }
@@ -123,6 +125,10 @@ SlangResult CLikeSourceEmitter::init()
 void CLikeSourceEmitter::emitFrontMatterImpl(TargetRequest* targetReq)
 {
     SLANG_UNUSED(targetReq);
+    if (shouldEmitOnlyHeader())
+    {
+        m_writer->emit("#pragma once\n\n");
+    }
 }
 
 void CLikeSourceEmitter::emitPreModuleImpl()
@@ -3937,6 +3943,8 @@ void CLikeSourceEmitter::emitFuncDecl(IRFunc* func, const String& name)
     auto funcType = func->getDataType();
     auto resultType = func->getResultType();
 
+    emitFunctionPreambleImpl(func);
+
     emitFuncDecorations(func);
     emitType(resultType, name);
 
@@ -5294,6 +5302,24 @@ void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& 
     ctx.actions = &ioActions;
     ctx.openInsts = InstHashSet(module);
 
+    if (shouldEmitOnlyHeader())
+    {
+        // remove body from all functions when emitting a header
+        for (auto inst : module->getGlobalInsts())
+        {
+            if (as<IRFunc>(inst))
+            {
+                for (auto child : inst->getModifiableChildren())
+                {
+                    if (as<IRBlock>(child))
+                    {
+                        child->removeAndDeallocate();
+                    }
+                }
+            }
+        }
+    }
+
     for (auto inst : module->getGlobalInsts())
     {
         // Emit all resource-typed objects first. This is to avoid an odd scenario in HLSL
@@ -5329,6 +5355,13 @@ void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& 
     }
     for (auto inst : module->getGlobalInsts())
     {
+        if (shouldEmitOnlyHeader())
+        {
+            // Don't emit types without ExternCppDecoration in a header
+            if (!inst->findDecoration<IRExternCppDecoration>())
+                continue;
+        }
+
         if (as<IRType>(inst))
         {
             // Don't emit a type unless it is actually used or is marked exported.

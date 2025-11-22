@@ -289,6 +289,8 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
         return Desc::make(Kind::Source, Payload::C, Style::Kernel, 0);
     case SLANG_CPP_SOURCE:
         return Desc::make(Kind::Source, Payload::Cpp, Style::Kernel, 0);
+    case SLANG_CPP_HEADER:
+        return Desc::make(Kind::Source, Payload::Cpp, Style::Kernel, 0);
     case SLANG_HOST_CPP_SOURCE:
         return Desc::make(Kind::Source, Payload::Cpp, Style::Host, 0);
     case SLANG_CPP_PYTORCH_BINDING:
@@ -302,6 +304,8 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
     case SLANG_SHADER_HOST_CALLABLE:
         return Desc::make(Kind::HostCallable, Payload::HostCPU, Style::Kernel, 0);
     case SLANG_CUDA_SOURCE:
+        return Desc::make(Kind::Source, Payload::CUDA, Style::Kernel, 0);
+    case SLANG_CUDA_HEADER:
         return Desc::make(Kind::Source, Payload::CUDA, Style::Kernel, 0);
         // TODO(JS):
         // Not entirely clear how best to represent PTX here. We could mark as 'Assembly'.

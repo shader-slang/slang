@@ -67,6 +67,10 @@ public:
     }
 
 protected:
+    virtual bool shouldEmitOnlyHeader() SLANG_OVERRIDE
+    {
+        return m_target == CodeGenTarget::CUDAHeader;
+    }
     virtual void emitLayoutSemanticsImpl(
         IRInst* inst,
         char const* uniformSemanticSpelling,

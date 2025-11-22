@@ -540,6 +540,7 @@ public:
     static IRWaveSizeDecoration* getComputeWaveSize(IRFunc* func, Int* outWaveSize);
 
 protected:
+    virtual bool shouldEmitOnlyHeader() { return false; }
     virtual void emitGlobalParamDefaultVal(IRGlobalParam* inst) { SLANG_UNUSED(inst); }
     virtual void emitPostDeclarationAttributesForType(IRInst* type) { SLANG_UNUSED(type); }
     virtual String getTargetBuiltinVarName(IRInst* inst, IRTargetBuiltinVarName builtinName);

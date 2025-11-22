@@ -44,6 +44,10 @@ public:
 
 protected:
     // Implement CLikeSourceEmitter interface
+    virtual bool shouldEmitOnlyHeader() SLANG_OVERRIDE
+    {
+        return m_target == CodeGenTarget::CPPHeader;
+    }
     virtual bool isResourceTypeBindless(IRType* type) SLANG_OVERRIDE
     {
         SLANG_UNUSED(type);

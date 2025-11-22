@@ -1821,7 +1821,7 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
 
 void CPPSourceEmitter::emitPreModuleImpl()
 {
-    if (m_target == CodeGenTarget::CPPSource)
+    if (m_target == CodeGenTarget::CPPSource || m_target == CodeGenTarget::CPPHeader)
     {
         // TODO(JS): Previously this opened an anonymous scope for all generated functions
         // Unfortunately this is a problem if we are just emitting code that is externally available
@@ -1844,7 +1844,6 @@ void CPPSourceEmitter::emitPreModuleImpl()
     }
     Super::emitPreModuleImpl();
 }
-
 
 void CPPSourceEmitter::emitGlobalInstImpl(IRInst* inst)
 {
@@ -2274,7 +2273,7 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
     // Now that we can have any function available externally (not just entry points)
     // this doesn't work.
 
-    // if (m_target == CodeGenTarget::CPPSource)
+    // if (m_target == CodeGenTarget::CPPSource || m_target == CodeGenTarget::CPPHeader)
     //{
     //  Need to close the anonymous namespace when outputting for C++ kernel.
     // m_writer->emit("} // anonymous\n\n");
