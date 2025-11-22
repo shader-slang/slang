@@ -546,6 +546,13 @@ static void emitReflectionResourceTypeBaseInfoJSON(
     }
 }
 
+static void emitReflectionSize(PrettyWriter& writer, size_t size)
+{
+    size == SLANG_UNBOUNDED_SIZE ? writer << "\"unbounded\""
+    : size == SLANG_INVALID_SIZE ? writer << "\"unknown\""
+                                 : writer << size;
+}
+
 
 static void emitReflectionTypeInfoJSON(PrettyWriter& writer, slang::TypeReflection* type)
 {
@@ -631,7 +638,7 @@ static void emitReflectionTypeInfoJSON(PrettyWriter& writer, slang::TypeReflecti
         writer << "\"kind\": \"vector\"";
         writer.maybeComma();
         writer << "\"elementCount\": ";
-        writer << int(type->getElementCount());
+        emitReflectionSize(writer, type->getElementCount());
         writer.maybeComma();
         writer << "\"elementType\": ";
         emitReflectionTypeJSON(writer, type->getElementType());
@@ -658,7 +665,7 @@ static void emitReflectionTypeInfoJSON(PrettyWriter& writer, slang::TypeReflecti
             writer << "\"kind\": \"array\"";
             writer.maybeComma();
             writer << "\"elementCount\": ";
-            writer << int(arrayType->getElementCount());
+            emitReflectionSize(writer, arrayType->getElementCount());
             writer.maybeComma();
             writer << "\"elementType\": ";
             emitReflectionTypeJSON(writer, arrayType->getElementType());
@@ -864,7 +871,7 @@ static void emitReflectionTypeLayoutInfoJSON(
 
             writer.maybeComma();
             writer << "\"elementCount\": ";
-            writer << int(arrayTypeLayout->getElementCount());
+            emitReflectionSize(writer, arrayTypeLayout->getElementCount());
 
             writer.maybeComma();
             writer << "\"elementType\": ";
