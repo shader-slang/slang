@@ -35,7 +35,8 @@ SLANG_UNIT_TEST(CudaEntryPointParamSizeWithoutPadding)
         )";
 
     ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
 
     slang::TargetDesc targetDesc = {};
     targetDesc.format = SLANG_CUDA_SOURCE;
