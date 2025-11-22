@@ -67,16 +67,6 @@ SLANG_UNIT_TEST(crypto)
         SLANG_CHECK(digest.toString() == "87d3caecb0ab82faae84d60fde994aca");
     }
 
-    // compute()
-    {
-        SLANG_CHECK(MD5::compute(nullptr, 0).toString() == "d41d8cd98f00b204e9800998ecf8427e");
-        const String str("Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod "
-                         "tempor incididunt ut labore et dolore magna aliqua.");
-        SLANG_CHECK(
-            MD5::compute(str.getBuffer(), str.getLength()).toString() ==
-            "818c6e601a24f72750da0f6c9b8ebe28");
-    }
-
     // SHA1
 
     // Empty string

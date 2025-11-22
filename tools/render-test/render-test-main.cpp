@@ -315,15 +315,18 @@ struct AssignValsFromLayoutContext
         const size_t bufferSize = srcVal->bufferData.getCount() * sizeof(uint32_t);
 
         ShaderCursor dataCursor = dstCursor;
-        switch (dataCursor.getTypeLayout()->getKind())
+        if (auto* typeLayout = dataCursor.getTypeLayout())
         {
-        case slang::TypeReflection::Kind::ConstantBuffer:
-        case slang::TypeReflection::Kind::ParameterBlock:
-            dataCursor = dataCursor.getDereferenced();
-            break;
+            switch (typeLayout->getKind())
+            {
+            case slang::TypeReflection::Kind::ConstantBuffer:
+            case slang::TypeReflection::Kind::ParameterBlock:
+                dataCursor = dataCursor.getDereferenced();
+                break;
 
-        default:
-            break;
+            default:
+                break;
+            }
         }
 
         SLANG_RETURN_ON_FAIL(dataCursor.setData(srcVal->bufferData.getBuffer(), bufferSize));

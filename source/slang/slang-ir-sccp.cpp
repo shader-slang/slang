@@ -559,7 +559,10 @@ struct SCCPContext
             type,
             v0,
             v1,
-            [](IRIntegerValue c0, IRIntegerValue c1) { return c0 + c1; },
+            [](IRIntegerValue c0, IRIntegerValue c1) {
+                return static_cast<IRIntegerValue>(
+                    static_cast<uint64_t>(c0) + static_cast<uint64_t>(c1));
+            },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 + c1; });
     }
     LatticeVal evalSub(IRType* type, LatticeVal v0, LatticeVal v1)
@@ -568,7 +571,10 @@ struct SCCPContext
             type,
             v0,
             v1,
-            [](IRIntegerValue c0, IRIntegerValue c1) { return c0 - c1; },
+            [](IRIntegerValue c0, IRIntegerValue c1) {
+                return static_cast<IRIntegerValue>(
+                    static_cast<uint64_t>(c0) - static_cast<uint64_t>(c1));
+            },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 - c1; });
     }
     LatticeVal evalMul(IRType* type, LatticeVal v0, LatticeVal v1)
@@ -577,7 +583,10 @@ struct SCCPContext
             type,
             v0,
             v1,
-            [](IRIntegerValue c0, IRIntegerValue c1) { return c0 * c1; },
+            [](IRIntegerValue c0, IRIntegerValue c1) {
+                return static_cast<IRIntegerValue>(
+                    static_cast<uint64_t>(c0) * static_cast<uint64_t>(c1));
+            },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 * c1; });
     }
     LatticeVal evalDiv(IRType* type, LatticeVal v0, LatticeVal v1)
@@ -726,7 +735,13 @@ struct SCCPContext
                 type,
                 v0,
                 v1,
-                [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 >> c1; });
+                [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1)
+                {
+                    return c0 >> std::min(
+                                     c1,
+                                     static_cast<IRUnsignedIntegerValue>(
+                                         std::numeric_limits<IRUnsignedIntegerValue>::digits - 1));
+                });
         }
         return evalBinaryIntImpl(
             type,

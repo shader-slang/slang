@@ -69,16 +69,30 @@ SlangResult CommandLineDownstreamCompiler::compile(
     if (!isVersionCompatible(inOptions))
     {
         // Not possible to compile with this version of the interface.
+        // TODO: Fix other `IDownstreamCompiler::compile` implementations not always writing to
+        // `outArtifact` when returning early.
+        const auto targetDesc = ArtifactDescUtil::makeDescForCompileTarget(SLANG_TARGET_UNKNOWN);
+        auto artifact = ArtifactUtil::createArtifact(targetDesc);
+        *outArtifact = artifact.detach();
         return SLANG_E_NOT_IMPLEMENTED;
     }
 
     CompileOptions options = getCompatibleVersion(&inOptions);
-
-    // Copy the command line options
-    CommandLine cmdLine(m_cmdLine);
-
-    // Work out the ArtifactDesc
     const auto targetDesc = ArtifactDescUtil::makeDescForCompileTarget(options.targetType);
+
+    // Create the result artifact
+    auto resultArtifact = ArtifactUtil::createArtifact(targetDesc);
+
+    // Create the diagnostics
+    auto diagnostics = ArtifactDiagnostics::create();
+    ArtifactUtil::addAssociated(resultArtifact, diagnostics);
+
+    // If Slang was built with Clang or GCC and sanitizers were enabled, the same `-fsanitize=...`
+    // flag must be passed when linking an executable or shared library with a Slang library, or
+    // linking will fail. We can't instrument C++ generated from Slang code with sanitizers as they
+    // might report errors that we can't fix, so we separate compilation and linking into two
+    // commands to enable sanitizers only during linking.
+    bool shouldSeparateCompileAndLink = options.targetType != SLANG_OBJECT_CODE;
 
     auto helper = DefaultArtifactHelper::getSingleton();
 
@@ -95,8 +109,13 @@ SlangResult CommandLineDownstreamCompiler::compile(
     {
         // We could use the path to the source, or use the source name/paths as defined on the
         // artifact For now we just go with a lock file based on "slang-generated".
-        SLANG_RETURN_ON_FAIL(
-            helper->createLockFile(asCharSlice(toSlice("slang-generated")), lockFile.writeRef()));
+        if (SLANG_FAILED(helper->createLockFile(
+                asCharSlice(toSlice("slang-generated")),
+                lockFile.writeRef())))
+        {
+            *outArtifact = resultArtifact.detach();
+            return SLANG_FAIL;
+        }
 
         auto lockArtifact = Artifact::create(
             ArtifactDesc::make(ArtifactKind::Base, ArtifactPayload::Lock, ArtifactStyle::None));
@@ -110,17 +129,81 @@ SlangResult CommandLineDownstreamCompiler::compile(
         options.modulePath = SliceUtil::asTerminatedCharSlice(modulePath);
     }
 
+    // Compile stage: compile source to object code
+    ComPtr<IArtifact> objectArtifact;
+
+    if (shouldSeparateCompileAndLink)
+    {
+        CompileOptions compileOptions = options;
+        compileOptions.targetType = SLANG_OBJECT_CODE;
+
+        CommandLine compileCmdLine(m_cmdLine);
+        if (SLANG_FAILED(calcArgs(compileOptions, compileCmdLine)))
+        {
+            *outArtifact = resultArtifact.detach();
+            return SLANG_FAIL;
+        }
+
+        List<ComPtr<IArtifact>> compileArtifacts;
+        if (SLANG_FAILED(calcCompileProducts(
+                compileOptions,
+                DownstreamProductFlag::All,
+                lockFile,
+                compileArtifacts)))
+        {
+            *outArtifact = resultArtifact.detach();
+            return SLANG_FAIL;
+        }
+
+        // There should only be one object file (.o/.obj) as artifact
+        SLANG_ASSERT(compileArtifacts.getCount() == 1);
+        SLANG_ASSERT(compileArtifacts[0]->getDesc().kind == ArtifactKind::ObjectCode);
+        objectArtifact = compileArtifacts[0];
+
+        ExecuteResult compileResult;
+        if (SLANG_FAILED(ProcessUtil::execute(compileCmdLine, compileResult)) ||
+            SLANG_FAILED(parseOutput(compileResult, diagnostics)))
+        {
+            *outArtifact = resultArtifact.detach();
+            return SLANG_FAIL;
+        }
+
+        // If compilation failed, return the diagnostics
+        if (compileResult.resultCode != 0 || !objectArtifact->exists())
+        {
+            *outArtifact = resultArtifact.detach();
+            return SLANG_FAIL;
+        }
+    }
+
+    // Link stage (or single-stage compile for object code targets)
+    CommandLine cmdLine(m_cmdLine);
+
+    if (shouldSeparateCompileAndLink)
+    {
+        // Pass compiled object to linker
+        options.sourceArtifacts = makeSlice(objectArtifact.readRef(), 1);
+    }
+
     // Append command line args to the end of cmdLine using the target specific function for the
     // specified options
-    SLANG_RETURN_ON_FAIL(calcArgs(options, cmdLine));
+    if (SLANG_FAILED(calcArgs(options, cmdLine)))
+    {
+        *outArtifact = resultArtifact.detach();
+        return SLANG_FAIL;
+    }
 
     // The 'productArtifact' is the main product produced from the compilation - the
     // executable/sharedlibrary/object etc
     ComPtr<IArtifact> productArtifact;
     {
         List<ComPtr<IArtifact>> artifacts;
-        SLANG_RETURN_ON_FAIL(
-            calcCompileProducts(options, DownstreamProductFlag::All, lockFile, artifacts));
+        if (SLANG_FAILED(
+                calcCompileProducts(options, DownstreamProductFlag::All, lockFile, artifacts)))
+        {
+            *outArtifact = resultArtifact.detach();
+            return SLANG_FAIL;
+        }
 
         for (IArtifact* artifact : artifacts)
         {
@@ -139,6 +222,7 @@ SlangResult CommandLineDownstreamCompiler::compile(
     // Somethings gone wrong if we don't find the main artifact
     if (!productArtifact)
     {
+        *outArtifact = resultArtifact.detach();
         return SLANG_FAIL;
     }
 
@@ -152,7 +236,13 @@ SlangResult CommandLineDownstreamCompiler::compile(
     }
 #endif
 
-    SLANG_RETURN_ON_FAIL(ProcessUtil::execute(cmdLine, exeRes));
+    if (SLANG_FAILED(ProcessUtil::execute(cmdLine, exeRes)) ||
+        SLANG_FAILED(parseOutput(exeRes, diagnostics)))
+    {
+        // If the process failed or the output parsing failed, return the diagnostics
+        *outArtifact = resultArtifact.detach();
+        return SLANG_FAIL;
+    }
 
 #if 0
     {
@@ -209,23 +299,13 @@ SlangResult CommandLineDownstreamCompiler::compile(
         }
     }
 
-    // Create the result artifact
-    auto artifact = ArtifactUtil::createArtifact(targetDesc);
-
-    // Createa the diagnostics
-    auto diagnostics = ArtifactDiagnostics::create();
-
-    SLANG_RETURN_ON_FAIL(parseOutput(exeRes, diagnostics));
-
-    ArtifactUtil::addAssociated(artifact, diagnostics);
-
     // Find the rep from the 'main' artifact, we'll just use the same representation on the output
     // artifact. Sharing is desirable, because the rep owns the file.
     if (auto fileRep = productArtifact
                            ? findRepresentation<IOSFileArtifactRepresentation>(productArtifact)
                            : nullptr)
     {
-        artifact->addRepresentation(fileRep);
+        resultArtifact->addRepresentation(fileRep);
     }
 
     // Add the artifact list if there is anything in it
@@ -242,10 +322,10 @@ SlangResult CommandLineDownstreamCompiler::compile(
 
         artifactContainer->setChildren(slice.data, slice.count);
 
-        artifact->addAssociated(artifactContainer);
+        resultArtifact->addAssociated(artifactContainer);
     }
 
-    *outArtifact = artifact.detach();
+    *outArtifact = resultArtifact.detach();
     return SLANG_OK;
 }
 

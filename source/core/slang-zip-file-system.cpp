@@ -99,8 +99,8 @@ protected:
 
     void _rebuildMap();
 
-    /// Returns true if the named item is at the index
-    UnownedStringSlice _getPathAtIndex(Index index);
+    /// Returns the path of the named item at the index, or an empty string on error
+    String _getPathAtIndex(Index index);
 
     void* getInterface(const Guid& guid);
     void* getObject(const Guid& guid);
@@ -206,7 +206,7 @@ void ZipFileSystemImpl::_rebuildMap()
 
     const mz_uint entryCount = mz_zip_reader_get_num_files(&m_archive);
 
-    m_removedSet.resizeAndClear(0);
+    m_removedSet.resize(0);
 
     for (mz_uint i = 0; i < entryCount; ++i)
     {
@@ -225,7 +225,7 @@ void ZipFileSystemImpl::_rebuildMap()
     }
 }
 
-UnownedStringSlice ZipFileSystemImpl::_getPathAtIndex(Index index)
+String ZipFileSystemImpl::_getPathAtIndex(Index index)
 {
     SLANG_ASSERT(m_mode != Mode::None);
 
@@ -233,10 +233,10 @@ UnownedStringSlice ZipFileSystemImpl::_getPathAtIndex(Index index)
     // Check it's added at the end
     if (!mz_zip_reader_file_stat(&m_archive, mz_uint(index), &fileStat))
     {
-        return UnownedStringSlice();
+        return String();
     }
 
-    return UnownedStringSlice(fileStat.m_filename).trim('/');
+    return String(UnownedStringSlice(fileStat.m_filename).trim('/'));
 }
 
 void ZipFileSystemImpl::_initReadWrite(mz_zip_archive& outWriter)

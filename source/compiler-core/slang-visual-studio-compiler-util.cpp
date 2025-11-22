@@ -502,9 +502,7 @@ static SlangResult _parseVisualStudioLine(
     const ExecuteResult& exeRes,
     IArtifactDiagnostics* diagnostics)
 {
-    diagnostics->reset();
-
-    diagnostics->setRaw(SliceUtil::asTerminatedCharSlice(exeRes.standardOutput));
+    diagnostics->appendRaw(SliceUtil::asTerminatedCharSlice(exeRes.standardOutput));
 
     SliceAllocator allocator;
 

@@ -63,6 +63,12 @@ void Session::init()
     auto rootASTBuilder = new RootASTBuilder(this);
     m_rootASTBuilder = rootASTBuilder;
 
+    // Set the root AST builder as current AST builder as a workaround for code that would get a
+    // null pointer from getCurrentASTBuilder() and call member functions on it, which is undefined
+    // behavior and is reported as such by UBSan.
+    m_previousASTBuilder = getCurrentASTBuilder();
+    setCurrentASTBuilder(m_rootASTBuilder);
+
     // Make sure our source manager is initialized
     builtinSourceManager.initialize(nullptr, nullptr);
 
@@ -139,6 +145,8 @@ Session::~Session()
     // are still alive.
     //
     coreModules = decltype(coreModules)();
+
+    setCurrentASTBuilder(m_previousASTBuilder);
 }
 
 SharedASTBuilder* Session::getSharedASTBuilder()
