@@ -144,15 +144,19 @@ void ShaderObjectLayoutImpl::Builder::_addDescriptorRangesAsValue(
             }
 
             auto vkDescriptorType = _mapDescriptorType(slangDescriptorType);
+            SlangInt indexOffset = typeLayout->getDescriptorSetDescriptorRangeIndexOffset(
+                slangDescriptorSetIndex,
+                descriptorRangeIndex);
+            SlangInt descriptorCount = typeLayout->getDescriptorSetDescriptorRangeDescriptorCount(
+                slangDescriptorSetIndex,
+                descriptorRangeIndex);
+            SLANG_ASSERT(indexOffset != SLANG_UNKNOWN_SIZE);
+            SLANG_ASSERT(
+                descriptorCount != SLANG_UNKNOWN_SIZE && descriptorCount != SLANG_UNBOUNDED_SIZE);
+
             VkDescriptorSetLayoutBinding vkBindingRangeDesc = {};
-            vkBindingRangeDesc.binding =
-                offset.binding + (uint32_t)typeLayout->getDescriptorSetDescriptorRangeIndexOffset(
-                                     slangDescriptorSetIndex,
-                                     descriptorRangeIndex);
-            vkBindingRangeDesc.descriptorCount =
-                (uint32_t)typeLayout->getDescriptorSetDescriptorRangeDescriptorCount(
-                    slangDescriptorSetIndex,
-                    descriptorRangeIndex);
+            vkBindingRangeDesc.binding = offset.binding + (uint32_t)indexOffset;
+            vkBindingRangeDesc.descriptorCount = (uint32_t)descriptorCount;
             vkBindingRangeDesc.descriptorType = vkDescriptorType;
             vkBindingRangeDesc.stageFlags = VK_SHADER_STAGE_ALL;
 
@@ -329,7 +333,9 @@ void ShaderObjectLayoutImpl::Builder::addBindingRanges(slang::TypeLayoutReflecti
     for (SlangInt r = 0; r < bindingRangeCount; ++r)
     {
         slang::BindingType slangBindingType = typeLayout->getBindingRangeType(r);
-        uint32_t count = (uint32_t)typeLayout->getBindingRangeBindingCount(r);
+        SlangInt count = typeLayout->getBindingRangeBindingCount(r);
+        SLANG_ASSERT(count != SLANG_UNBOUNDED_SIZE && count != SLANG_UNKNOWN_SIZE);
+
         slang::TypeLayoutReflection* slangLeafTypeLayout =
             typeLayout->getBindingRangeLeafTypeLayout(r);
 
