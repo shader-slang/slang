@@ -9,7 +9,7 @@ standard output = {
             "binding": {"kind": "samplerState", "space": 2, "index": 0, "count": "unbounded"},
             "type": {
                 "kind": "array",
-                "elementCount": 0,
+                "elementCount": "unbounded",
                 "elementType": {
                     "kind": "samplerState"
                 }
@@ -20,7 +20,7 @@ standard output = {
             "binding": {"kind": "shaderResource", "index": 2, "count": "unbounded"},
             "type": {
                 "kind": "array",
-                "elementCount": 0,
+                "elementCount": "unbounded",
                 "elementType": {
                     "kind": "resource",
                     "baseShape": "texture2D",
@@ -72,7 +72,7 @@ standard output = {
             "binding": {"kind": "shaderResource", "space": 1, "index": 1, "count": "unbounded"},
             "type": {
                 "kind": "array",
-                "elementCount": 0,
+                "elementCount": "unbounded",
                 "elementType": {
                     "kind": "resource",
                     "baseShape": "textureCube",
@@ -108,7 +108,7 @@ standard output = {
             "binding": {"kind": "subElementRegisterSpace", "index": 3, "count": 2},
             "type": {
                 "kind": "array",
-                "elementCount": 0,
+                "elementCount": "unbounded",
                 "elementType": {
                     "kind": "struct",
                     "name": "X",
