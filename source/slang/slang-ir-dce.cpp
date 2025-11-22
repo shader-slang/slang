@@ -587,17 +587,22 @@ bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions o
                 break;
             }
         }
-        for (auto decor : innerInst->getDecorations())
+
+        if (innerInst)
         {
-            switch (decor->getOp())
+            for (auto decor : innerInst->getDecorations())
             {
-            case kIROp_ForwardDerivativeDecoration:
-            case kIROp_UserDefinedBackwardDerivativeDecoration:
-            case kIROp_PrimalSubstituteDecoration:
-                shouldKeptAliveIfImported = true;
-                break;
+                switch (decor->getOp())
+                {
+                case kIROp_ForwardDerivativeDecoration:
+                case kIROp_UserDefinedBackwardDerivativeDecoration:
+                case kIROp_PrimalSubstituteDecoration:
+                    shouldKeptAliveIfImported = true;
+                    break;
+                }
             }
         }
+
         if (isImported && shouldKeptAliveIfImported)
             return true;
     }
