@@ -194,6 +194,14 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
             //
             arraySize = (LayoutSize{elementStride} * (elementCount - 1)) + LayoutSize{elementSize};
         }
+        else if (elementCount.isInfinite())
+        {
+            arraySize = LayoutSize::infinite();
+        }
+        else if (elementCount.isInvalid())
+        {
+            arraySize = LayoutSize::invalid();
+        }
 
         SimpleArrayLayoutInfo arrayInfo;
         arrayInfo.kind = elementInfo.kind;
@@ -4046,6 +4054,10 @@ static RefPtr<TypeLayout> maybeAdjustLayoutForArrayElementType(
                         //
                         resInfo.index *= elementCount.getFiniteValue();
                     }
+                    else if (elementCount.isInvalid())
+                    {
+                        resInfo.index = LayoutOffset::invalid();
+                    }
                     else
                     {
                         // If we are making an unbounded array, then a `struct`
@@ -4209,7 +4221,7 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
             fieldInfo.size = uniformUsage->count;
         }
     }
-    if (fieldInfo.size.compare(0) == std::partial_ordering::greater)
+    else
     {
         uniformOffset = m_rules->AddStructField(&m_info, fieldInfo);
     }
@@ -4273,6 +4285,10 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
                 spaceOffset.getFiniteValue();
             fieldResourceInfo->space = 0;
             fieldResourceInfo->index = 0;
+        }
+        else if (fieldTypeResourceInfo.count.isInvalid())
+        {
+            SLANG_ASSERT(false);
         }
         else
         {

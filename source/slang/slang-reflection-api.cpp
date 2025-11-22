@@ -1978,12 +1978,12 @@ struct ExtendedTypeLayoutContext
             LayoutSize elementCount = LayoutSize::infinite();
             if (auto arrayType = as<ArrayExpressionType>(arrayTypeLayout->type))
             {
-                const auto isWithoutSize =
-                    arrayType->isUnsized() || arrayType->getElementCount()->isLinkTimeVal();
-                if (!isWithoutSize)
-                {
+                if (arrayType->isUnsized())
+                    elementCount = LayoutSize::infinite();
+                else if (arrayType->getElementCount()->isLinkTimeVal())
+                    elementCount = LayoutSize::invalid();
+                else
                     elementCount = LayoutSize::RawValue(getIntVal(arrayType->getElementCount()));
-                }
             }
             addRangesRec(elementTypeLayout, path, multiplier * elementCount);
             return;

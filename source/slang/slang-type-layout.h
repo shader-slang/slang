@@ -476,7 +476,7 @@ inline LayoutSize::RawValue LayoutSize::getFiniteValueOr(RawValue fallback) cons
 
 inline LayoutSize::LayoutSize(LayoutOffset offset)
 {
-    *this = LayoutSize{offset.raw};
+    *this = LayoutSize::fromRaw(offset.raw);
 }
 
 inline LayoutSize maximum(LayoutSize left, LayoutSize right)
