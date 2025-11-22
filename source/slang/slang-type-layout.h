@@ -1269,6 +1269,8 @@ struct LayoutRulesFamilyImpl
 
     virtual LayoutRulesImpl* getShaderRecordConstantBufferRules() = 0;
 
+    virtual LayoutRulesImpl* getEntryPointParameterRules() = 0;
+
     virtual LayoutRulesImpl* getStructuredBufferRules(CompilerOptionSet& compilerOptions) = 0;
 };
 

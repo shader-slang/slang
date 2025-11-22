@@ -645,6 +645,22 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
     }
 };
 
+struct CUDAEntryPointParameterLayoutRulesImpl : CUDALayoutRulesImpl
+{
+    typedef CUDALayoutRulesImpl Super;
+
+    void EndStructLayout(UniformLayoutInfo* ioStructInfo) override
+    {
+        // Using the layout of the entry point parameter struct to size parameter buffers requires
+        // that the struct not be padded, unlike a normal CUDA struct where the struct must be
+        // padded to its largest alignment, as cuLaunchKernel expects no such padding, and fails
+        // with CUDA_ERROR_LAUNCH_OUT_OF_RESOURCES if padding is present. By not adding this
+        // trailing padding, TypeLayoutReflection::getSize() returns the size appropriate for a
+        // parameter buffer.
+        SLANG_UNUSED(ioStructInfo);
+    }
+};
+
 struct MetalLayoutRulesImpl : public CPULayoutRulesImpl
 {
     SimpleLayoutInfo GetVectorLayout(
@@ -1056,6 +1072,7 @@ struct GLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     LayoutRulesImpl* getHitAttributesParameterRules() override;
 
     LayoutRulesImpl* getShaderRecordConstantBufferRules() override;
+    LayoutRulesImpl* getEntryPointParameterRules() override;
 
     LayoutRulesImpl* getStructuredBufferRules(CompilerOptionSet& compilerOptions) override;
 };
@@ -1080,6 +1097,7 @@ struct HLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     LayoutRulesImpl* getHitAttributesParameterRules() override;
 
     LayoutRulesImpl* getShaderRecordConstantBufferRules() override;
+    LayoutRulesImpl* getEntryPointParameterRules() override;
 
     LayoutRulesImpl* getStructuredBufferRules(CompilerOptionSet& compilerOptions) override;
 };
@@ -1104,6 +1122,7 @@ struct CPULayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     LayoutRulesImpl* getHitAttributesParameterRules() override;
 
     LayoutRulesImpl* getShaderRecordConstantBufferRules() override;
+    LayoutRulesImpl* getEntryPointParameterRules() override;
     LayoutRulesImpl* getStructuredBufferRules(CompilerOptionSet& compilerOptions) override;
 };
 
@@ -1127,6 +1146,7 @@ struct CLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     LayoutRulesImpl* getHitAttributesParameterRules() override;
 
     LayoutRulesImpl* getShaderRecordConstantBufferRules() override;
+    LayoutRulesImpl* getEntryPointParameterRules() override;
     LayoutRulesImpl* getStructuredBufferRules(CompilerOptionSet& compilerOptions) override;
 };
 
@@ -1150,6 +1170,7 @@ struct CUDALayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     LayoutRulesImpl* getHitAttributesParameterRules() override;
 
     LayoutRulesImpl* getShaderRecordConstantBufferRules() override;
+    LayoutRulesImpl* getEntryPointParameterRules() override;
     LayoutRulesImpl* getStructuredBufferRules(CompilerOptionSet& compilerOptions) override;
 };
 
@@ -1173,6 +1194,7 @@ struct MetalLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     LayoutRulesImpl* getHitAttributesParameterRules() override;
 
     LayoutRulesImpl* getShaderRecordConstantBufferRules() override;
+    LayoutRulesImpl* getEntryPointParameterRules() override;
     LayoutRulesImpl* getStructuredBufferRules(CompilerOptionSet& compilerOptions) override;
 };
 
@@ -1204,6 +1226,7 @@ struct WGSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     LayoutRulesImpl* getHitAttributesParameterRules() override;
 
     LayoutRulesImpl* getShaderRecordConstantBufferRules() override;
+    LayoutRulesImpl* getEntryPointParameterRules() override;
     LayoutRulesImpl* getStructuredBufferRules(CompilerOptionSet& compilerOptions) override;
 };
 
@@ -1449,6 +1472,7 @@ LayoutRulesImpl kCHitAttributesParameterLayoutRulesImpl_ = {
 
 static CUDAObjectLayoutRulesImpl kCUDAObjectLayoutRulesImpl;
 static CUDALayoutRulesImpl kCUDALayoutRulesImpl;
+static CUDAEntryPointParameterLayoutRulesImpl kCUDAEntryPointParameterLayoutRulesImpl;
 
 LayoutRulesImpl kCUDALayoutRulesImpl_ = {
     &kCUDALayoutRulesFamilyImpl,
@@ -1459,6 +1483,12 @@ LayoutRulesImpl kCUDALayoutRulesImpl_ = {
 LayoutRulesImpl kCUDAAnyValueLayoutRulesImpl_ = {
     &kCUDALayoutRulesFamilyImpl,
     &kDefaultLayoutRulesImpl,
+    &kCUDAObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kCUDAEntryPointParameterLayoutRulesImpl_ = {
+    &kCUDALayoutRulesFamilyImpl,
+    &kCUDAEntryPointParameterLayoutRulesImpl,
     &kCUDAObjectLayoutRulesImpl,
 };
 
@@ -1686,6 +1716,11 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
     return &kGLSLShaderRecordLayoutRulesImpl_;
 }
 
+LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getEntryPointParameterRules()
+{
+    return &kStd140LayoutRulesImpl_;
+}
+
 LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getTextureBufferRules(
     CompilerOptionSet& compilerOptions)
 {
@@ -1780,6 +1815,11 @@ LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getPushConstantBufferRules()
 }
 
 LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
+{
+    return &kHLSLConstantBufferLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* HLSLLayoutRulesFamilyImpl::getEntryPointParameterRules()
 {
     return &kHLSLConstantBufferLayoutRulesImpl_;
 }
@@ -1890,6 +1930,11 @@ LayoutRulesImpl* CPULayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
     return &kCPULayoutRulesImpl_;
 }
 
+LayoutRulesImpl* CPULayoutRulesFamilyImpl::getEntryPointParameterRules()
+{
+    return &kCPULayoutRulesImpl_;
+}
+
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getStructuredBufferRules(CompilerOptionSet&)
 {
     return &kCPULayoutRulesImpl_;
@@ -1952,6 +1997,11 @@ LayoutRulesImpl* CLayoutRulesFamilyImpl::getHitAttributesParameterRules()
 LayoutRulesImpl* CLayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
 {
     return &kCShaderRecordLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* CLayoutRulesFamilyImpl::getEntryPointParameterRules()
+{
+    return &kCLayoutRulesImpl_;
 }
 
 LayoutRulesImpl* CLayoutRulesFamilyImpl::getStructuredBufferRules(CompilerOptionSet&)
@@ -2019,6 +2069,11 @@ LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
 {
     // Just following HLSLs lead for the moment
     return &kCUDALayoutRulesImpl_;
+}
+
+LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getEntryPointParameterRules()
+{
+    return &kCUDAEntryPointParameterLayoutRulesImpl_;
 }
 
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getStructuredBufferRules(CompilerOptionSet&)
@@ -2242,6 +2297,11 @@ LayoutRulesImpl* MetalLayoutRulesFamilyImpl::getShaderRecordConstantBufferRules(
     return &kMetalConstantBufferLayoutRulesImpl_;
 }
 
+LayoutRulesImpl* MetalLayoutRulesFamilyImpl::getEntryPointParameterRules()
+{
+    return &kMetalConstantBufferLayoutRulesImpl_;
+}
+
 LayoutRulesImpl* MetalLayoutRulesFamilyImpl::getStructuredBufferRules(CompilerOptionSet&)
 {
     return &kMetalStructuredBufferLayoutRulesImpl_;
@@ -2332,6 +2392,11 @@ LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getPushConstantBufferRules()
 LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
 {
     return &kGLSLShaderRecordLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getEntryPointParameterRules()
+{
+    return &kStd140LayoutRulesImpl_;
 }
 
 LayoutRulesImpl* WGSLLayoutRulesFamilyImpl::getTextureBufferRules(CompilerOptionSet&)
