@@ -608,7 +608,7 @@ SLANG_API size_t spReflectionType_GetSpecializedElementCount(
     }
 
     return isUnsized                       ? SLANG_UNBOUNDED_SIZE
-           : elementCount->isLinkTimeVal() ? SLANG_INVALID_SIZE
+           : elementCount->isLinkTimeVal() ? SLANG_UNKNOWN_SIZE
                                            : (size_t)getIntVal(elementCount);
 }
 
@@ -1262,7 +1262,7 @@ namespace
 static size_t getReflectionOffset(LayoutOffset size)
 {
     if (size.isInvalid())
-        return SLANG_INVALID_SIZE;
+        return SLANG_UNKNOWN_SIZE;
     return size.getValidValue();
 }
 
@@ -1297,12 +1297,12 @@ static size_t getStride(TypeLayout* typeLayout, SlangParameterCategory category)
 
     auto offset = size.getFiniteValue();
     if (!offset.isValid())
-        return SLANG_INVALID_SIZE;
+        return SLANG_UNKNOWN_SIZE;
     size_t finiteSize = offset.getValidValue();
     const auto alignment = getAlignment(typeLayout, category);
 
     if (alignment.isInvalid())
-        return SLANG_INVALID_SIZE;
+        return SLANG_UNKNOWN_SIZE;
 
     SLANG_ASSERT(alignment.compare(1) != std::partial_ordering::less);
 

@@ -549,7 +549,7 @@ static void emitReflectionResourceTypeBaseInfoJSON(
 static void emitReflectionSize(PrettyWriter& writer, size_t size)
 {
     size == SLANG_UNBOUNDED_SIZE ? writer << "\"unbounded\""
-    : size == SLANG_INVALID_SIZE ? writer << "\"unknown\""
+    : size == SLANG_UNKNOWN_SIZE ? writer << "\"unknown\""
                                  : writer << size;
 }
 
