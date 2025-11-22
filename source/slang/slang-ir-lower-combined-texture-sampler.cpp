@@ -98,13 +98,12 @@ struct LowerCombinedSamplerContext
         auto samplerTypeLayout = samplerTypeLayoutBuilder.build();
 
         IRVarLayout::Builder textureVarLayoutBuilder(&builder, textureTypeLayout);
-        textureVarLayoutBuilder.findOrAddResourceInfo(textureResourceKind)->offset =
-            LayoutOffset{0};
+        textureVarLayoutBuilder.findOrAddResourceInfo(textureResourceKind)->offset = 0;
         auto textureVarLayout = textureVarLayoutBuilder.build();
 
         IRVarLayout::Builder samplerVarLayoutBuilder(&builder, samplerTypeLayout);
         samplerVarLayoutBuilder.findOrAddResourceInfo(samplerResourceKind)->offset =
-            LayoutOffset{isWGSLTarget ? 1u : 0u};
+            isWGSLTarget ? 1u : 0u;
         auto samplerVarLayout = samplerVarLayoutBuilder.build();
 
         IRStructTypeLayout::Builder layoutBuilder(&builder);
@@ -204,7 +203,7 @@ void lowerCombinedTextureSamplers(
             else if (resKind == LayoutResourceKind::DescriptorTableSlot)
                 descriptorTableSlotOffsetAttr = offsetAttr;
             auto info = newVarLayoutBuilder.findOrAddResourceInfo(resKind);
-            info->offset = LayoutOffset{offsetAttr->getOffset()};
+            info->offset = offsetAttr->getOffset();
             info->space = offsetAttr->getSpace();
             info->kind = offsetAttr->getResourceKind();
         }
@@ -214,7 +213,7 @@ void lowerCombinedTextureSamplers(
         {
             auto info =
                 newVarLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::DescriptorTableSlot);
-            info->offset = LayoutOffset{resOffsetAttr->getOffset()};
+            info->offset = resOffsetAttr->getOffset();
             info->space = resOffsetAttr->getSpace();
             info->kind = LayoutResourceKind::DescriptorTableSlot;
         }

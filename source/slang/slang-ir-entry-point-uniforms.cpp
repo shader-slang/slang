@@ -465,7 +465,7 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
                     if (!originalOffset)
                         continue;
                     auto resInfo = elementVarLayoutBuilder.findOrAddResourceInfo(resKind);
-                    resInfo->offset = LayoutOffset{originalOffset->getOffset()};
+                    resInfo->offset = originalOffset->getOffset();
                     resInfo->space = originalOffset->getSpace();
                 }
                 for (auto resKind : resourceKinds)
@@ -513,7 +513,7 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
             for (auto offset : filteredOffsetAttrs)
             {
                 auto resInfo = varLayoutBuilder.findOrAddResourceInfo(offset->getResourceKind());
-                resInfo->offset = LayoutOffset{offset->getOffset()};
+                resInfo->offset = offset->getOffset();
                 resInfo->space = offset->getSpace();
             }
             auto entryPointUniformsVarLayout = varLayoutBuilder.build();

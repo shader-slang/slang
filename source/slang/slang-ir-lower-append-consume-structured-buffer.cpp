@@ -73,12 +73,12 @@ static void lowerStructuredBufferType(TargetProgram* target, IRHLSLStructuredBuf
 
     IRVarLayout::Builder elementBufferVarLayoutBuilder(&builder, elementBufferTypeLayout);
     elementBufferVarLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::DescriptorTableSlot)
-        ->offset = LayoutOffset{0};
+        ->offset = 0;
     auto elementBufferVarLayout = elementBufferVarLayoutBuilder.build();
 
     IRVarLayout::Builder counterBufferVarLayoutBuilder(&builder, counterBufferTypeLayout);
     counterBufferVarLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::DescriptorTableSlot)
-        ->offset = LayoutOffset{1};
+        ->offset = 1;
     auto counterBufferVarLayout = counterBufferVarLayoutBuilder.build();
 
     IRStructTypeLayout::Builder layoutBuilder(&builder);

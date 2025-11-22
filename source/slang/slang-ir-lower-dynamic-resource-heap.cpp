@@ -71,10 +71,9 @@ IRVarLayout* createResourceHeapVarLayoutWithSpaceAndBinding(
         LayoutSize::infinite());
     auto typeLayout = typeLayoutBuilder.build();
     IRVarLayout::Builder varLayoutBuilder(&builder, typeLayout);
-    varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::RegisterSpace)->offset =
-        LayoutOffset{spaceIndex};
+    varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::RegisterSpace)->offset = spaceIndex;
     varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::DescriptorTableSlot)->offset =
-        LayoutOffset{bindingIndex};
+        bindingIndex;
     return varLayoutBuilder.build();
 }
 

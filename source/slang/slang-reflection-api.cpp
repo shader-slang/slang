@@ -1280,7 +1280,7 @@ static LayoutOffset getAlignment(TypeLayout* typeLayout, SlangParameterCategory 
     }
     else
     {
-        return LayoutOffset{1};
+        return 1;
     }
 }
 
@@ -1690,7 +1690,7 @@ struct ExtendedBindingRangePath : BindingRangePath
 /// Calculate the offset for resources of the given `kind` in the `path`.
 LayoutOffset _calcIndexOffset(BindingRangePathLink* path, LayoutResourceKind kind)
 {
-    LayoutOffset result{0};
+    LayoutOffset result = 0;
     for (auto link = path; link; link = link->parent)
     {
         if (auto resInfo = link->var->FindResourceInfo(kind))
@@ -2062,7 +2062,7 @@ struct ExtendedTypeLayoutContext
             TypeLayout::ExtendedInfo::SubObjectRangeInfo subObjectRange;
             subObjectRange.bindingRangeIndex = bindingRangeIndex;
             subObjectRange.offsetVarLayout = createOffsetVarLayout(typeLayout, path);
-            subObjectRange.spaceOffset = LayoutOffset{0};
+            subObjectRange.spaceOffset = 0;
             if (kind == LayoutResourceKind::SubElementRegisterSpace && path.primary)
             {
                 if (auto resInfo = path.primary->var->FindResourceInfo(
@@ -2328,7 +2328,7 @@ struct ExtendedTypeLayoutContext
             TypeLayout::ExtendedInfo::SubObjectRangeInfo subObjectRange;
             subObjectRange.bindingRangeIndex = bindingRangeIndex;
             subObjectRange.offsetVarLayout = createOffsetVarLayout(typeLayout, path);
-            subObjectRange.spaceOffset = LayoutOffset{0};
+            subObjectRange.spaceOffset = 0;
             m_extendedInfo->m_subObjectRanges.add(subObjectRange);
 
             // If we have an associated counter for this structured buffer,
@@ -3311,12 +3311,12 @@ SLANG_API size_t spReflectionVariableLayout_GetSpace(
         info = varLayout->FindResourceInfo(LayoutResourceKind(category));
     }
 
-    LayoutOffset space{0};
+    LayoutOffset space = 0;
 
     // First, deal with any offset applied to the specific resource kind specified
     if (info)
     {
-        space += LayoutOffset{info->space};
+        space += info->space;
     }
 
     if (auto regSpaceInfo = varLayout->FindResourceInfo(LayoutResourceKind::RegisterSpace))

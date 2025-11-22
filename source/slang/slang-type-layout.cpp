@@ -31,7 +31,7 @@ static LayoutOffset _roundToAlignment(LayoutOffset offset, LayoutOffset alignmen
     if (offset.isInvalid() || alignment.isInvalid())
         return LayoutOffset::invalid();
 
-    return LayoutOffset{_roundToAlignment(offset.getValidValue(), alignment.getValidValue())};
+    return _roundToAlignment(offset.getValidValue(), alignment.getValidValue());
 }
 
 static LayoutSize _roundToAlignment(LayoutSize offset, LayoutOffset alignment)
@@ -70,7 +70,7 @@ static LayoutOffset _roundUpToPowerOfTwo(LayoutOffset value)
 {
     if (value.isInvalid())
         return LayoutOffset::invalid();
-    return LayoutOffset{_roundUpToPowerOfTwo(value.getValidValue())};
+    return _roundUpToPowerOfTwo(value.getValidValue());
 }
 
 static LayoutSize _roundUpToPowerOfTwo(LayoutSize value)
@@ -374,7 +374,7 @@ struct Std140LayoutRulesImpl : GLSLBaseLayoutRulesImpl
         //
         if (elementInfo.kind == LayoutResourceKind::Uniform)
         {
-            elementInfo.alignment = maximum(elementInfo.alignment, LayoutOffset{16});
+            elementInfo.alignment = maximum(elementInfo.alignment, 16);
         }
         return Super::GetArrayLayout(elementInfo, elementCount);
     }
@@ -412,7 +412,7 @@ struct HLSLConstantBufferLayoutRulesImpl : DefaultLayoutRulesImpl
     {
         if (elementInfo.kind == LayoutResourceKind::Uniform)
         {
-            elementInfo.alignment = maximum(elementInfo.alignment, LayoutOffset{16});
+            elementInfo.alignment = maximum(elementInfo.alignment, 16);
         }
         return Super::GetArrayLayout(elementInfo, elementCount);
     }
@@ -454,7 +454,7 @@ struct HLSLConstantBufferLayoutRulesImpl : DefaultLayoutRulesImpl
         auto endRegister = (fieldOffset + fieldSize - 1) / registerSize;
         if (startRegister.compare(endRegister) != std::partial_ordering::equivalent)
         {
-            ioStructInfo->size = _roundToAlignment(ioStructInfo->size, LayoutOffset{registerSize});
+            ioStructInfo->size = _roundToAlignment(ioStructInfo->size, registerSize);
             fieldOffset = ioStructInfo->size;
         }
 
@@ -513,7 +513,7 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
 
             // So it is actually a Array<T> on CPU which is a pointer and a size
             info.size = sizeof(void*) * 2;
-            info.alignment = LayoutOffset{alignof(void*)};
+            info.alignment = alignof(void*);
 
             return info;
         }
@@ -602,7 +602,7 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
 
             // So it is actually a Array<T> on CUDA which is a pointer and a size
             info.size = _roundToAlignment((CUDAPtr) + sizeof(CUDACount), sizeof(CUDAPtr));
-            info.alignment = LayoutOffset{sizeof(CUDAPtr)};
+            info.alignment = sizeof(CUDAPtr);
             return info;
         }
 
@@ -671,7 +671,7 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
         SimpleLayoutInfo vectorInfo;
         vectorInfo.kind = elementInfo.kind;
         vectorInfo.size = LayoutSize{size};
-        vectorInfo.alignment = LayoutOffset{alignment};
+        vectorInfo.alignment = alignment;
 
         return vectorInfo;
     }
@@ -733,7 +733,7 @@ struct MetalLayoutRulesImpl : public CPULayoutRulesImpl
         SimpleLayoutInfo vectorInfo;
         vectorInfo.kind = elementInfo.kind;
         vectorInfo.size = size;
-        vectorInfo.alignment = LayoutOffset{alignment};
+        vectorInfo.alignment = alignment;
 
         return vectorInfo;
     }
@@ -3096,11 +3096,11 @@ IRTypeLayout* applyOffsetToTypeLayout(
             {
                 auto kind = oldResInfo->getResourceKind();
                 auto newResInfo = newFieldBuilder.findOrAddResourceInfo(kind);
-                newResInfo->offset = LayoutOffset{oldResInfo->getOffset()};
+                newResInfo->offset = oldResInfo->getOffset();
                 newResInfo->space = oldResInfo->getSpace();
                 if (auto offsetResInfo = offsetVarLayout->findOffsetAttr(kind))
                 {
-                    newResInfo->offset += LayoutOffset{offsetResInfo->getOffset()};
+                    newResInfo->offset += offsetResInfo->getOffset();
                 }
             }
 
@@ -3134,12 +3134,12 @@ IRVarLayout* applyOffsetToVarLayout(
     {
         auto kind = baseResInfo->getResourceKind();
         auto adjustedResInfo = adjustedLayoutBuilder.findOrAddResourceInfo(kind);
-        adjustedResInfo->offset = LayoutOffset{baseResInfo->getOffset()};
+        adjustedResInfo->offset = baseResInfo->getOffset();
         adjustedResInfo->space = baseResInfo->getSpace();
 
         if (auto offsetResInfo = offsetLayout->findOffsetAttr(baseResInfo->getResourceKind()))
         {
-            adjustedResInfo->offset += LayoutOffset{offsetResInfo->getOffset()};
+            adjustedResInfo->offset += offsetResInfo->getOffset();
             adjustedResInfo->space += offsetResInfo->getSpace();
         }
     }
@@ -4053,7 +4053,7 @@ static RefPtr<TypeLayout> maybeAdjustLayoutForArrayElementType(
                         // and it will start at register zero in that space.
                         //
                         requireNewSpace = true;
-                        resInfo.index = LayoutOffset{0};
+                        resInfo.index = 0;
                         resInfo.space = 0;
                     }
                 }
@@ -4272,7 +4272,7 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
             fieldLayout->findOrAddResourceInfo(LayoutResourceKind::RegisterSpace)->index =
                 spaceOffset.getFiniteValue();
             fieldResourceInfo->space = 0;
-            fieldResourceInfo->index = LayoutOffset{0};
+            fieldResourceInfo->index = 0;
         }
         else
         {
@@ -4316,8 +4316,7 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addExplicitUniformField(
     UInt uniformOffset = packoffsetModifier->uniformOffset;
     if (fieldResult.layout->FindResourceInfo(LayoutResourceKind::Uniform))
     {
-        fieldLayout->AddResourceInfo(LayoutResourceKind::Uniform)->index =
-            LayoutOffset{uniformOffset};
+        fieldLayout->AddResourceInfo(LayoutResourceKind::Uniform)->index = uniformOffset;
     }
     UniformLayoutInfo fieldInfo = fieldResult.info.getUniformLayout();
     auto uniformInfo = m_info;
@@ -4366,7 +4365,7 @@ static TypeLayoutResult _createTypeLayoutForGlobalGenericTypeParam(
     GlobalGenericParamDecl* globalGenericParamDecl)
 {
     SimpleLayoutInfo info;
-    info.alignment = LayoutOffset{0};
+    info.alignment = 0;
     info.size = 0;
     info.kind = LayoutResourceKind::GenericResource;
 
@@ -4867,8 +4866,8 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         LayoutOffset majorStride = info.elementStride;
         LayoutOffset minorStride = elementInfo.getUniformLayout().size.getFiniteValue();
 
-        LayoutOffset rowStride = LayoutOffset{0};
-        LayoutOffset colStride = LayoutOffset{0};
+        LayoutOffset rowStride = 0;
+        LayoutOffset colStride = 0;
         if (matrixLayout == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR)
         {
             colStride = majorStride;

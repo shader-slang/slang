@@ -1012,7 +1012,7 @@ void createVarLayoutForLegalizedGlobalParam(
     IRVarLayout::Builder varLayoutBuilder(builder, typeLayout);
     varLayoutBuilder.cloneEverythingButOffsetsFrom(inVarLayout);
     auto varOffsetInfo = varLayoutBuilder.findOrAddResourceInfo(kind);
-    varOffsetInfo->offset = LayoutOffset{bindingIndex};
+    varOffsetInfo->offset = bindingIndex;
     varOffsetInfo->space = bindingSpace;
     IRVarLayout* varLayout = varLayoutBuilder.build();
     builder->addLayoutDecoration(globalParam, varLayout);
@@ -1150,7 +1150,7 @@ IRTypeLayout* createPatchConstantFuncResultTypeLayout(
 
                 auto unusedBinding =
                     context->usedBindingIndex[LayoutResourceKind::VaryingOutput].getLSBZero();
-                varLayoutForKind->offset = LayoutOffset{(UInt)unusedBinding};
+                varLayoutForKind->offset = (UInt)unusedBinding;
                 context->usedBindingIndex[LayoutResourceKind::VaryingOutput].add(unusedBinding);
             }
             builder.addField(field->getKey(), fieldVarLayoutBuilder.build());

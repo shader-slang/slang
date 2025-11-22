@@ -919,7 +919,7 @@ static void addExplicitParameterBinding(
 
             overlappedVarLayout = usedRangeSet->usedResourceRanges[(int)semanticInfo.kind].Add(
                 parameterInfo->varLayout,
-                LayoutOffset{semanticInfo.index},
+                semanticInfo.index,
                 semanticInfo.index + count);
         }
 
@@ -1420,7 +1420,7 @@ static void completeBindingsForParameterImpl(
     // consumes, so that we can allocate a contiguous range of
     // spaces.
     //
-    LayoutOffset spacesToAllocateCount{0};
+    LayoutOffset spacesToAllocateCount = 0;
     for (auto typeRes : firstTypeLayout->resourceInfos)
     {
         auto kind = typeRes.kind;
@@ -1617,7 +1617,7 @@ static void applyBindingInfoToParameter(
         // Add a record to the variable layout
         auto varRes = varLayout->AddResourceInfo(kind);
         varRes->space = (int)bindingInfo.space;
-        varRes->index = LayoutOffset{bindingInfo.index};
+        varRes->index = bindingInfo.index;
     }
 }
 
@@ -1991,7 +1991,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
                     continue;
 
                 auto varResInfo = varLayout->findOrAddResourceInfo(kind);
-                varResInfo->index = LayoutOffset{(UInt)location};
+                varResInfo->index = (UInt)location;
 
                 // Note: OpenGL and Vulkan represent dual-source color blending
                 // differently from multiple render targets (MRT) at the source
@@ -2852,9 +2852,9 @@ struct SimpleScopeLayoutBuilder : ScopeLayoutBuilder
                     continue;
                 paramResInfo = paramVarLayout->findOrAddResourceInfo(kind);
 
-                paramResInfo->index = LayoutOffset{usedRangeSet[int(kind)].Allocate(
+                paramResInfo->index = usedRangeSet[int(kind)].Allocate(
                     paramVarLayout,
-                    paramTypeResInfo.count.getFiniteValue())};
+                    paramTypeResInfo.count.getFiniteValue());
             }
         }
         //
@@ -2942,7 +2942,7 @@ static ParameterBindingAndKindInfo _assignConstantBufferBinding(
 
     auto existingParam = usedRangeSet->usedResourceRanges[(int)layoutInfo.kind].Add(
         varLayout,
-        LayoutOffset{index},
+        index,
         LayoutSize{count + index});
     SLANG_UNUSED(existingParam);
     SLANG_ASSERT(existingParam == nullptr);
@@ -4117,7 +4117,7 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
             markSpaceUsed(&context, nullptr, info.space);
             usedRangeSet->usedResourceRanges[(int)kind].Add(
                 nullptr,
-                LayoutOffset{info.index},
+                info.index,
                 info.index + count);
         }
     }
@@ -4240,7 +4240,7 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
         {
             // Nobody has used space zero yet, so we need
             // to make sure to reserve it for defaults.
-            defaultSpace = allocateUnusedSpaces(&context, LayoutOffset{1});
+            defaultSpace = allocateUnusedSpaces(&context, 1);
 
             // The result of this allocation had better be that
             // we got space #0, or else something has gone wrong.
@@ -4289,7 +4289,7 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
         auto cbInfo = globalScopeVarLayout->findOrAddResourceInfo(globalConstantBufferBinding.kind);
 
         cbInfo->space = globalConstantBufferBinding.space;
-        cbInfo->index = LayoutOffset{globalConstantBufferBinding.index};
+        cbInfo->index = globalConstantBufferBinding.index;
     }
 
     programLayout->parametersLayout = globalScopeVarLayout;

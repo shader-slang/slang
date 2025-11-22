@@ -292,7 +292,7 @@ struct LayoutOffset
     {
     }
 
-    explicit LayoutOffset(RawValue offset)
+    LayoutOffset(RawValue offset)
         : raw(offset)
     {
         SLANG_ASSERT(offset != s_invalidValue);
@@ -693,7 +693,7 @@ struct SimpleLayoutInfo
         }
         else
         {
-            return UniformLayoutInfo(0, LayoutOffset{1});
+            return UniformLayoutInfo(0, 1);
         }
     }
 };
@@ -713,7 +713,7 @@ struct SimpleArrayLayoutInfo : SimpleLayoutInfo
         }
         else
         {
-            return UniformArrayLayoutInfo(0, LayoutOffset{1}, LayoutOffset{0});
+            return UniformArrayLayoutInfo(0, 1, 0);
         }
     }
 };
@@ -763,7 +763,7 @@ public:
     // For uniform data, alignment matters, but not for
     // any other resource category, so we don't waste
     // the space storing it in the above array
-    LayoutOffset uniformAlignment = LayoutOffset{1};
+    LayoutOffset uniformAlignment = 1;
 
 
     ResourceInfo* FindResourceInfo(LayoutResourceKind kind)
@@ -848,7 +848,7 @@ public:
         struct SubObjectRangeInfo
         {
             Int bindingRangeIndex = 0;
-            LayoutOffset spaceOffset = LayoutOffset{0};
+            LayoutOffset spaceOffset = 0;
             RefPtr<VarLayout> offsetVarLayout;
         };
 
@@ -931,7 +931,7 @@ public:
         ResourceInfo info;
         info.kind = kind;
         info.space = 0;
-        info.index = LayoutOffset{0};
+        info.index = 0;
 
         resourceInfos.add(info);
         return &resourceInfos.getLast();
@@ -1006,7 +1006,7 @@ public:
     RefPtr<TypeLayout> elementTypeLayout;
 
     /// The stride in bytes between elements.
-    LayoutOffset uniformStride = LayoutOffset{0};
+    LayoutOffset uniformStride = 0;
 };
 
 /// Type layout for an array type

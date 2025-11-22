@@ -1602,7 +1602,7 @@ struct IRVarLayout : IRLayout
         struct ResInfo
         {
             LayoutResourceKind kind = LayoutResourceKind::None;
-            LayoutOffset offset = LayoutOffset{0};
+            LayoutOffset offset = 0;
             UInt space = 0;
         };
 

@@ -3135,7 +3135,7 @@ static IRTypeLayout* _createWrappedBufferTypeLayout(
         {
             auto newResInfo =
                 newContainerVarLayoutBuilder.findOrAddResourceInfo(resInfo->getResourceKind());
-            newResInfo->offset = LayoutOffset{resInfo->getOffset()};
+            newResInfo->offset = resInfo->getOffset();
             newResInfo->space = resInfo->getSpace();
         }
 

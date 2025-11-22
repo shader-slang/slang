@@ -188,14 +188,14 @@ struct GlobalVarTranslationContext
                     // offsetAttr's, we will add the offsets from those as well.
                     auto resInfo =
                         varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::VaryingInput);
-                    resInfo->offset = LayoutOffset{nextOffset};
+                    resInfo->offset = nextOffset;
 
                     if (auto layoutDecor = findVarLayout(input))
                     {
                         if (auto offsetAttr =
                                 layoutDecor->findOffsetAttr(LayoutResourceKind::VaryingInput))
                         {
-                            resInfo->offset += LayoutOffset{(UInt)offsetAttr->getOffset()};
+                            resInfo->offset += (UInt)offsetAttr->getOffset();
                         }
                     }
                     if (entryPointDecor->getProfile().getStage() == Stage::Fragment)
@@ -320,7 +320,7 @@ struct GlobalVarTranslationContext
                             {
                                 varLayoutBuilder
                                     .findOrAddResourceInfo(LayoutResourceKind::VaryingOutput)
-                                    ->offset = LayoutOffset{(UInt)offsetAttr->getOffset()};
+                                    ->offset = (UInt)offsetAttr->getOffset();
                             }
                         }
                         if (entryPointDecor->getProfile().getStage() == Stage::Fragment)
