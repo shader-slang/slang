@@ -744,7 +744,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
                 if (!paramType->equals(argType))
                     return {nullptr, nullptr};
             }
-            else if (!canCoerce(paramType, argType, arg.argExpr, &cost))
+            else if (!canCoerce(CoercionSite::Argument, paramType, argType, arg.argExpr, &cost))
             {
                 return {nullptr, nullptr};
             }
