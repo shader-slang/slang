@@ -588,7 +588,8 @@ bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions o
             }
         }
 
-        if (innerInst) {
+        if (innerInst)
+        {
             for (auto decor : innerInst->getDecorations())
             {
                 switch (decor->getOp())

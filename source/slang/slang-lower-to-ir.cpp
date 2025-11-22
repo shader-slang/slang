@@ -9060,6 +9060,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 break;
             }
 
+
             subBuilder->createWitnessTableEntry(irWitnessTable, irRequirementKey, irSatisfyingVal);
         }
     }
