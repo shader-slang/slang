@@ -1381,7 +1381,7 @@ extension Array<T, N> : IDifferentiable
     [__unsafeForceInlineEarly]
     static Differential dadd(Differential a, Differential b)
     {
-        Array<T.Differential, N> result;
+        Array<T.Differential, N> result = __undefined;
         for (int i = 0; i < N; i++)
             result[i] = T.dadd(a[i], b[i]);
         return result;
@@ -1391,7 +1391,7 @@ extension Array<T, N> : IDifferentiable
     [__unsafeForceInlineEarly]
     static Differential dmul(U a, Differential b)
     {
-        Array<T.Differential, N> result;
+        Array<T.Differential, N> result = __undefined;
         for (int i = 0; i < N; i++)
             result[i] = T.dmul<U>(a, b[i]);
         return result;
@@ -1508,8 +1508,8 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [BackwardDifferentiable]
 void __d_mul(inout DifferentialPair<vector<T, N>> left, inout DifferentialPair<matrix<T, N, M>> right, vector<T, M>.Differential dOut)
 {
-    vector<T, N>.Differential left_d_result;
-    matrix<T, N, M>.Differential right_d_result;
+    vector<T, N>.Differential left_d_result = __undefined;
+    matrix<T, N, M>.Differential right_d_result = __undefined;
     [ForceUnroll]
     for (int i = 0; i < N; ++i)
     {
@@ -1545,8 +1545,8 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [BackwardDifferentiable]
 void __d_mul(inout DifferentialPair<matrix<T, N, M>> left, inout DifferentialPair<vector<T, M>> right, vector<T, N>.Differential dOut)
 {
-    matrix<T, N, M>.Differential left_d_result;
-    vector<T, M>.Differential right_d_result;
+    matrix<T, N, M>.Differential left_d_result = __undefined;
+    vector<T, M>.Differential right_d_result = __undefined;
     [ForceUnroll]
     for (int j = 0; j < M; ++j)
     {
@@ -1582,14 +1582,14 @@ __generic<T : __BuiltinFloatingPointType, let R : int, let N : int, let C : int>
 [BackwardDifferentiable]
 void mul(inout DifferentialPair<matrix<T, R, N>> left, inout DifferentialPair<matrix<T, N, C>> right, matrix<T, R, C>.Differential dOut)
 {
-    matrix<T, R, N>.Differential left_d_result;
+    matrix<T, R, N>.Differential left_d_result = __undefined;
     [ForceUnroll]
     for (int r = 0; r < R; ++r)
         [ForceUnroll]
         for (int n = 0; n < N; ++n)
             left_d_result[r][n] = T(0.0);
 
-    matrix<T, N, C>.Differential right_d_result;
+    matrix<T, N, C>.Differential right_d_result = __undefined;
     [ForceUnroll]
     for (int n = 0; n < N; ++n)
         [ForceUnroll]
@@ -1639,7 +1639,7 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [BackwardDifferentiable]
 void __d_dot(inout DifferentialPair<vector<T, N>> dpx, inout DifferentialPair<vector<T, N>> dpy, T.Differential dOut)
 {
-    vector<T, N>.Differential x_d_result, y_d_result;
+    vector<T, N>.Differential x_d_result = __undefined, y_d_result = __undefined;
     [ForceUnroll]
     for (int i = 0; i < N; ++i)
     {
@@ -1710,8 +1710,8 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
     DifferentialPair<vector<T, N>> __d_##NAME##_vector(                                      \
         DifferentialPair<vector<T, N>> dpx, DifferentialPair<vector<T, N>> dpy)              \
     {                                                                                        \
-        vector<T, N> result;                                                                 \
-        vector<T, N>.Differential d_result;                                                  \
+        vector<T, N> result = __undefined;                                                   \
+        vector<T, N>.Differential d_result = __undefined;                                    \
         [ForceUnroll] for (int i = 0; i < N; ++i)                                            \
         {                                                                                    \
             DifferentialPair<T> dp_elem = __d_##NAME(                                        \
@@ -1728,8 +1728,8 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
     DifferentialPair<matrix<T, M, N>> __d_##NAME##_matrix(                                   \
         DifferentialPair<matrix<T, M, N>> dpx, DifferentialPair<matrix<T, M, N>> dpy)        \
     {                                                                                        \
-        matrix<T, M, N> result;                                                              \
-        matrix<T, M, N>.Differential d_result;                                               \
+        matrix<T, M, N> result = __undefined;                                                \
+        matrix<T, M, N>.Differential d_result = __undefined;                                 \
         [ForceUnroll] for (int i = 0; i < M; ++i)                                            \
         [ForceUnroll] for (int j = 0; j < N; ++j)                                            \
         {                                                                                    \
@@ -1749,7 +1749,7 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
             inout DifferentialPair<vector<T, N>> dpy,                                        \
             vector<T, N>.Differential dOut)                                                  \
     {                                                                                        \
-        vector<T, N>.Differential left_d_result, right_d_result;                             \
+        vector<T, N>.Differential left_d_result = __undefined, right_d_result = __undefined; \
         [ForceUnroll] for (int i = 0; i < N; ++i)                                            \
         {                                                                                    \
             DifferentialPair<T> left_dp = diffPair(dpx.p[i], T.dzero());                     \
@@ -1769,7 +1769,8 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
             inout DifferentialPair<matrix<T, M, N>> dpy,                                     \
             matrix<T, M, N>.Differential dOut)                                               \
     {                                                                                        \
-        matrix<T, M, N>.Differential left_d_result, right_d_result;                          \
+        matrix<T, M, N>.Differential left_d_result = __undefined;                            \
+        matrix<T, M, N>.Differential right_d_result = __undefined;                           \
         [ForceUnroll] for (int i = 0; i < M; ++i)                                            \
         [ForceUnroll] for (int j = 0; j < N; ++j)                                            \
         {                                                                                    \
@@ -1792,8 +1793,8 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
         DifferentialPair<vector<T, N>> dpy,                                                  \
         DifferentialPair<vector<T, N>> dpz)                                                  \
     {                                                                                        \
-        vector<T, N> result;                                                                 \
-        vector<T, N>.Differential d_result;                                                  \
+        vector<T, N> result = __undefined;                                                   \
+        vector<T, N>.Differential d_result = __undefined;                                    \
         [ForceUnroll] for (int i = 0; i < N; ++i)                                            \
         {                                                                                    \
             DifferentialPair<T> dp_elem = __d_##NAME(                                        \
@@ -1813,8 +1814,8 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
         DifferentialPair<matrix<T, M, N>> dpy,                                               \
         DifferentialPair<matrix<T, M, N>> dpz)                                               \
     {                                                                                        \
-        matrix<T, M, N> result;                                                              \
-        matrix<T, M, N>.Differential d_result;                                               \
+        matrix<T, M, N> result = __undefined;                                                \
+        matrix<T, M, N>.Differential d_result = __undefined;                                 \
         [ForceUnroll] for (int i = 0; i < M; ++i)                                            \
         [ForceUnroll] for (int j = 0; j < N; ++j)                                            \
         {                                                                                    \
@@ -1836,7 +1837,9 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
             inout DifferentialPair<vector<T, N>> dpz,                                        \
             vector<T, N>.Differential dOut)                                                  \
     {                                                                                        \
-        vector<T, N>.Differential left_d_result, middle_d_result, right_d_result;            \
+        vector<T, N>.Differential left_d_result = __undefined;                               \
+        vector<T, N>.Differential middle_d_result = __undefined;                             \
+        vector<T, N>.Differential right_d_result = __undefined;                              \
         [ForceUnroll] for (int i = 0; i < N; ++i)                                            \
         {                                                                                    \
             DifferentialPair<T> left_dp = diffPair(dpx.p[i], T.dzero());                     \
@@ -1861,7 +1864,9 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
             inout DifferentialPair<matrix<T, M, N>> dpz,                                     \
             matrix<T, M, N>.Differential dOut)                                               \
     {                                                                                        \
-        matrix<T, M, N>.Differential left_d_result, middle_d_result, right_d_result;         \
+        matrix<T, M, N>.Differential left_d_result = __undefined;                            \
+        matrix<T, M, N>.Differential middle_d_result = __undefined;                          \
+        matrix<T, M, N>.Differential right_d_result = __undefined;                           \
         [ForceUnroll] for (int i = 0; i < M; ++i)                                            \
         [ForceUnroll] for (int j = 0; j < N; ++j)                                            \
         {                                                                                    \
@@ -1902,7 +1907,7 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
     DifferentialPair<matrix<T, M, N>> __d_##NAME##_m(DifferentialPair<matrix<T, M, N>> dpm)  \
     {                                                                                        \
         typealias ReturnType = vector<T, N>;                                                 \
-        matrix<T, M, N>.Differential diff;                                                   \
+        matrix<T, M, N>.Differential diff = __undefined;                                     \
         [ForceUnroll] for (int i = 0; i < M; i++)                                            \
         {                                                                                    \
             var dpx = diffPair(dpm.p[i], dpm.d[i]);                                          \
@@ -1934,7 +1939,7 @@ void __d_cross(inout DifferentialPair<vector<T, 3>> a, inout DifferentialPair<ve
         inout DifferentialPair<matrix<T, M, N>> m, matrix<T, M, N>.Differential mdOut)       \
     {                                                                                        \
         typealias ReturnType = vector<T, N>;                                                 \
-        matrix<T, M, N>.Differential diff;                                                   \
+        matrix<T, M, N>.Differential diff = __undefined;                                     \
         [ForceUnroll] for (int i = 0; i < M; i++)                                            \
         {                                                                                    \
             var dpx = diffPair(m.p[i], m.d[i]);                                              \
@@ -2210,8 +2215,8 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 DifferentialPair<vector<T, N>> __d_copysign_vector(
     DifferentialPair<vector<T, N>> dpx, DifferentialPair<vector<T, N>> dpy)
 {
-    vector<T, N> result;
-    vector<T, N>.Differential d_result;
+    vector<T, N> result = __undefined;
+    vector<T, N>.Differential d_result = __undefined;
     [ForceUnroll] for (int i = 0; i < N; ++i)
     {
         DifferentialPair<T> dp_elem = __d_copysign(
@@ -2232,7 +2237,7 @@ void __d_copysign_vector(
     inout DifferentialPair<vector<T, N>> dpy,
     vector<T, N>.Differential dOut)
 {
-    vector<T, N>.Differential x_d_result, y_d_result;
+    vector<T, N>.Differential x_d_result = __undefined, y_d_result = __undefined;
     [ForceUnroll] for (int i = 0; i < N; ++i)
     {
         DifferentialPair<T> x_dp = DifferentialPair<T>(dpx.p[i], __slang_noop_cast<T.Differential>(dpx.d[i]));
@@ -2544,7 +2549,7 @@ __generic<T : __BuiltinFloatingPointType>
 [PrimalSubstituteOf(dst)]
 vector<T, 4> __dst_impl(vector<T, 4> src0, vector<T, 4> src1)
 {
-    vector<T, 4> dest;
+    vector<T, 4> dest = __undefined;
     dest.x = T(1.0);
     dest.y = src0.y * src1.y;
     dest.z = src0.z;

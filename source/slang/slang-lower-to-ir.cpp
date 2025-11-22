@@ -4935,6 +4935,25 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
+    LoweredValInfo visitUndefinedLiteralExpr(UndefinedLiteralExpr* expr)
+    {
+        //
+        // We will lower an undefined-value literal to a
+        // `deliberatelyUninitialized` value of the corresponding type
+        // (the `IRDeliberatelyUninitialized` instruction type
+        // is a subtype of the more general `IRUndefined`, and indicates
+        // the specific semantics of `__undefined` should be used for
+        // this particular value in IR analysis passes).
+        //
+
+        auto builder = context->irBuilder;
+
+        auto type = lowerType(context, expr->type);
+        auto undefinedValue = builder->emitDeliberatelyUninitialized(type);
+
+        return LoweredValInfo::simple(undefinedValue);
+    }
+
     LoweredValInfo visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
     {
         // Although the surface syntax can have an empty ASM block, the IR asm

@@ -2389,6 +2389,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         break;
 
     case kIROp_LoadFromUninitializedMemory:
+    case kIROp_DeliberatelyUninitialized:
     case kIROp_Poison:
     case kIROp_DefaultConstruct:
         m_writer->emit(getName(inst));
@@ -3247,6 +3248,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
         emitLiveness(inst);
         break;
     case kIROp_LoadFromUninitializedMemory:
+    case kIROp_DeliberatelyUninitialized:
     case kIROp_Poison:
     case kIROp_DefaultConstruct:
         {

@@ -769,6 +769,23 @@ local insts = {
 		--
 		{ LoadFromUninitializedMemory = {} },
 
+		-- A value representing a deliberate choice by a programmer to *not* initialize a variable/field/etc.
+		--
+		-- Storing a `DeliberatelyUninitialized` into a variable (or other memory location)
+		-- communicates that a programmer believes their code will fully initialize that
+		-- memory before it is ever read on any execution path, but that the code they
+		-- use to achieve that initialization is beyond the capabilities of the Slang front-end
+		-- initialization checking to validate.
+		--
+		-- If the compiler can prove that some operation *must* (if executed) observe
+		-- this undefined value, when reading from a variable, then the compiler is still
+		-- permitted to diagnose an error.  If, however, the compiler cannot rule out the
+		-- possibility that such an operation would instead observe a different value
+		-- (perhaps a value `store`d to an address that might alias the one being `load`ed
+		-- from), then it should presume that such an alternative value will be observed.
+		--
+		{ DeliberatelyUninitialized = {} },
+
 		-- An undefined value that is infectious.
 		--
 		-- Semantically, a poison value of some type T can be thought of as a

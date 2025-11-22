@@ -494,6 +494,7 @@ public:
         {
         case kIROp_Poison:
         case kIROp_LoadFromUninitializedMemory:
+        case kIROp_DeliberatelyUninitialized:
             {
                 // We basically handle an undefined value by allocating a
                 // temporary and then not initializing it.

@@ -910,4 +910,10 @@ public:
     FIDDLE() List<SPIRVAsmInst> insts;
 };
 
+FIDDLE()
+class UndefinedLiteralExpr : public Expr
+{
+    FIDDLE(...)
+};
+
 } // namespace Slang

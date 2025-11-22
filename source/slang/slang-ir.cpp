@@ -3018,6 +3018,14 @@ IRLoadFromUninitializedMemory* IRBuilder::emitLoadFromUninitializedMemory(IRType
     return inst;
 }
 
+IRDeliberatelyUninitialized* IRBuilder::emitDeliberatelyUninitialized(IRType* type)
+{
+    auto inst =
+        createInst<IRDeliberatelyUninitialized>(this, kIROp_DeliberatelyUninitialized, type);
+    addInst(inst);
+    return inst;
+}
+
 IRPoison* IRBuilder::emitPoison(IRType* type)
 {
     auto inst = createInst<IRPoison>(this, kIROp_Poison, type);
@@ -8346,6 +8354,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
 
         // Undefined values are treated as having no side effects.
     case kIROp_LoadFromUninitializedMemory:
+    case kIROp_DeliberatelyUninitialized:
     case kIROp_Poison:
 
     case kIROp_Nop:
