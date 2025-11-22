@@ -3132,9 +3132,9 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
                                          .withSpecializationArgs(
                                              existentialSpecializationArgs.getBuffer(),
                                              existentialSpecializationArgs.getCount())
-                                         .withSpecializationArgsOffsetBy(LayoutOffset{UInt(
+                                         .withSpecializationArgsOffsetBy(
                                              shaderParamInfo.firstSpecializationParamIndex -
-                                             genericSpecializationParamCount)});
+                                             genericSpecializationParamCount);
         }
 
         // Any error messages we emit during the process should
