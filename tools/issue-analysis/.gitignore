@@ -1,0 +1,6 @@
+# Data directory (large JSON files)
+data/
+
+# Python cache
+__pycache__/
+*.pyc
