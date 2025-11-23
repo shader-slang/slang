@@ -2337,6 +2337,12 @@ struct LLVMEmitter
             }
             break;
 
+        case kIROp_GetNativeStr:
+        case kIROp_MakeString:
+            // For now, String == NativeString on the LLVM target.
+            llvmInst = findValue(inst->getOperand(0));
+            break;
+
         case kIROp_DebugVar:
             debugInsts.add(inst);
             if (debug)
