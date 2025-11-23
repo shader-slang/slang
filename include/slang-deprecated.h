@@ -856,7 +856,16 @@ extern "C"
 
     // Shader Parameter Reflection
 
+    /** Get the binding index for a shader parameter.
+     *
+     * Returns `SLANG_UNKNOWN_SIZE` when the index depends on unresolved generic parameters or link-time constants.
+     */
     SLANG_API unsigned spReflectionParameter_GetBindingIndex(SlangReflectionParameter* parameter);
+    
+    /** Get the binding space for a shader parameter.
+     *
+     * Returns `SLANG_UNKNOWN_SIZE` when the space depends on unresolved generic parameters or link-time constants.
+     */
     SLANG_API unsigned spReflectionParameter_GetBindingSpace(SlangReflectionParameter* parameter);
 
     SLANG_API SlangResult spIsParameterLocationUsed(

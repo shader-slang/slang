@@ -2332,6 +2332,11 @@ struct TypeReflection
         return spReflectionType_GetSpecializedElementCount((SlangReflectionType*)this, reflection);
     }
 
+    /** Get the total number of elements in a multi-dimensional array type.
+     *
+     * Returns `SLANG_UNBOUNDED_SIZE` for unbounded-size arrays.
+     * Returns `SLANG_UNKNOWN_SIZE` when size depends on unresolved generic parameters or link-time constants.
+     */
     size_t getTotalArrayElementCount()
     {
         if (!isArray())
@@ -2600,12 +2605,23 @@ struct TypeLayoutReflection
         return typeLayout;
     }
 
-    // only useful if `getKind() == Kind::Array`
+    /** Get the number of elements in an array variable.
+     * 
+     * Only useful if `getKind() == Kind::Array`.
+     *
+     * Returns `SLANG_UNBOUNDED_SIZE` for unbounded-size arrays.
+     * Returns `SLANG_UNKNOWN_SIZE` when size depends on unresolved generic parameters or link-time constants.
+     */
     size_t getElementCount(ShaderReflection* reflection = nullptr)
     {
         return getType()->getElementCount((SlangReflection*)reflection);
     }
 
+    /** Get the total number of elements in a multi-dimensional array variable.
+     *
+     * Returns `SLANG_UNBOUNDED_SIZE` for unbounded-size arrays.
+     * Returns `SLANG_UNKNOWN_SIZE` when size depends on unresolved generic parameters or link-time constants.
+     */
     size_t getTotalArrayElementCount() { return getType()->getTotalArrayElementCount(); }
 
     /** Get the stride between elements of an array type layout.
@@ -3017,11 +3033,19 @@ struct VariableLayoutReflection
 
     TypeReflection* getType() { return getVariable()->getType(); }
 
+    /** Get the binding index for this variable layout.
+     *
+     * Returns `SLANG_UNKNOWN_SIZE` when the index depends on unresolved generic parameters or link-time constants.
+     */
     unsigned getBindingIndex()
     {
         return spReflectionParameter_GetBindingIndex((SlangReflectionVariableLayout*)this);
     }
 
+    /** Get the binding space for this variable layout.
+     *
+     * Returns `SLANG_UNKNOWN_SIZE` when the space depends on unresolved generic parameters or link-time constants.
+     */
     unsigned getBindingSpace()
     {
         return spReflectionParameter_GetBindingSpace((SlangReflectionVariableLayout*)this);
