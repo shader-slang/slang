@@ -717,6 +717,16 @@ struct LLVMEmitter
     // constants. They need to be initialized during runtime.
     List<IRGlobalVar*> deferredGlobalVars;
 
+    // Stack allocations are done in the function header block. They must be
+    // done in the first block, because LLVM is bad at hoisting allocas from
+    // loops, leading into stack overflows if a long-running loop has local
+    // variables.
+    LLVMInst* stackHeaderBlock = nullptr;
+
+    // This is stored so that we can get back to inserting into the current
+    // block after inserting allocas into the header block.
+    LLVMInst* currentBlock = nullptr;
+
     struct ConstantInfo
     {
         // Includes trailing padding
@@ -1159,10 +1169,18 @@ struct LLVMEmitter
 
     // Allocates stack memory for given type. Returns a pointer to the start of
     // that memory.
-    LLVMInst* emitAlloca(IRType* type, IRTypeLayoutRules* rules)
+    LLVMInst* emitStackVariable(IRType* type, IRTypeLayoutRules* rules)
     {
         IRSizeAndAlignment sizeAlignment = types->getSizeAndAlignment(type, rules);
-        return builder->emitAlloca(sizeAlignment.getStride(), sizeAlignment.alignment);
+
+        // All allocas should occur in the first block:
+        // https://llvm.org/docs/Frontend/PerformanceTips.html#use-of-allocas
+        builder->insertIntoBlock(stackHeaderBlock);
+
+        LLVMInst* alloca = builder->emitAlloca(sizeAlignment.getStride(), sizeAlignment.alignment);
+
+        builder->insertIntoBlock(currentBlock);
+        return alloca;
     }
 
     // Computes an offset with `indexInst` based on `llvmPtr`. `indexInst` need
@@ -1352,7 +1370,7 @@ struct LLVMEmitter
             if (rules == defaultPointerRules)
             {
                 // Equal memory layout, so we can just memcpy.
-                LLVMInst* llvmVar = emitAlloca(valType, defaultPointerRules);
+                LLVMInst* llvmVar = emitStackVariable(valType, defaultPointerRules);
 
                 // Pointer-to-pointer copy, so generate inline memcpy.
                 builder->emitCopy(
@@ -1366,7 +1384,7 @@ struct LLVMEmitter
             }
             else
             {
-                LLVMInst* llvmVar = emitAlloca(valType, defaultPointerRules);
+                LLVMInst* llvmVar = emitStackVariable(valType, defaultPointerRules);
                 crossLayoutMemCpy(
                     llvmVar,
                     llvmPtr,
@@ -1615,7 +1633,7 @@ struct LLVMEmitter
                 auto var = static_cast<IRVar*>(inst);
                 auto ptrType = var->getDataType();
 
-                LLVMInst* llvmVar = emitAlloca(ptrType->getValueType(), defaultPointerRules);
+                LLVMInst* llvmVar = emitStackVariable(ptrType->getValueType(), defaultPointerRules);
 
                 CharSlice linkageName, prettyName;
                 if (maybeGetName(&linkageName, &prettyName, inst))
@@ -1732,7 +1750,7 @@ struct LLVMEmitter
                 {
                     // Aggregates are always stack-allocated; we need to give a
                     // valid pointer even if the value is undefined.
-                    llvmInst = emitAlloca(type, defaultPointerRules);
+                    llvmInst = emitStackVariable(type, defaultPointerRules);
                 }
                 else
                 {
@@ -1758,7 +1776,7 @@ struct LLVMEmitter
             break;
 
         case kIROp_MakeArray:
-            llvmInst = emitAlloca(inst->getDataType(), defaultPointerRules);
+            llvmInst = emitStackVariable(inst->getDataType(), defaultPointerRules);
             for (UInt aa = 0; aa < inst->getOperandCount(); ++aa)
             {
                 auto op = inst->getOperand(aa);
@@ -1774,7 +1792,7 @@ struct LLVMEmitter
         case kIROp_MakeStruct:
             {
                 IRStructType* type = as<IRStructType>(inst->getDataType());
-                llvmInst = emitAlloca(type, defaultPointerRules);
+                llvmInst = emitStackVariable(type, defaultPointerRules);
                 auto field = type->getFields().begin();
                 for (UInt aa = 0; aa < inst->getOperandCount(); ++aa, ++field)
                 {
@@ -1789,7 +1807,7 @@ struct LLVMEmitter
             {
                 auto arrayType = cast<IRArrayType>(inst->getDataType());
                 auto elementCount = getIntVal(arrayType->getElementCount());
-                llvmInst = emitAlloca(inst->getDataType(), defaultPointerRules);
+                llvmInst = emitStackVariable(inst->getDataType(), defaultPointerRules);
                 auto element = inst->getOperand(0);
                 auto llvmElement = findValue(element);
                 for (IRIntegerValue i = 0; i < elementCount; ++i)
@@ -2172,7 +2190,7 @@ struct LLVMEmitter
                 // output parameter that is passed with a pointer.
                 if (types->isAggregateType(inst->getDataType()))
                 {
-                    allocValue = emitAlloca(inst->getDataType(), defaultPointerRules);
+                    allocValue = emitStackVariable(inst->getDataType(), defaultPointerRules);
                     args.add(allocValue);
                 }
                 auto returnVal =
@@ -2889,8 +2907,8 @@ struct LLVMEmitter
         // this is straightforward.
         for (auto irBlock : code->getBlocks())
         {
-            LLVMInst* llvmBlock = mapInstToLLVM.getValue(irBlock);
-            builder->insertIntoBlock(llvmBlock);
+            currentBlock = mapInstToLLVM.getValue(irBlock);
+            builder->insertIntoBlock(currentBlock);
 
             // Then, add the regular instructions.
             for (auto irInst : irBlock->getOrdinaryInsts())
@@ -2900,6 +2918,7 @@ struct LLVMEmitter
                     mapInstToLLVM[irInst] = llvmInst;
             }
         }
+        currentBlock = nullptr;
     }
 
     void emitFuncDefinition(IRFunc* func)
@@ -2949,7 +2968,15 @@ struct LLVMEmitter
                 return nullptr;
             };
 
+            stackHeaderBlock = builder->emitBlock(llvmFunc);
+
             emitGlobalValueWithCode(func, llvmFunc, epilogue);
+
+            // Finally, we need no more stack variables and can make the
+            // alloca header jump into the actual entry block.
+            builder->insertIntoBlock(stackHeaderBlock);
+            builder->emitBranch(mapInstToLLVM.getValue(func->getFirstBlock()));
+            stackHeaderBlock = nullptr;
         }
 
         builder->endFunction(llvmFunc);
@@ -3007,9 +3034,12 @@ struct LLVMEmitter
 
         LLVMInst* globalConstructor = builder->declareGlobalConstructor();
 
+        stackHeaderBlock = builder->emitBlock(globalConstructor);
+
         // First emit promoted global instructions.
-        LLVMInst* block = builder->emitBlock(globalConstructor);
-        builder->insertIntoBlock(block);
+        LLVMInst* initBlock = builder->emitBlock(globalConstructor);
+        builder->insertIntoBlock(initBlock);
+        currentBlock = initBlock;
         inlineGlobalInstructions = true;
 
         for (auto [inst, globalVar] : deferredGlobalInsts)
@@ -3020,7 +3050,7 @@ struct LLVMEmitter
             emitStore(globalVar, llvmInst, inst->getDataType(), defaultPointerRules);
         }
 
-        LLVMInst* prevBlock = block;
+        LLVMInst* prevBlock = initBlock;
 
         // Then, emit the global variables with non-trivial initializers.
         inlineGlobalInstructions = false;
@@ -3048,6 +3078,10 @@ struct LLVMEmitter
 
         builder->insertIntoBlock(prevBlock);
         builder->emitReturn();
+
+        builder->insertIntoBlock(stackHeaderBlock);
+        builder->emitBranch(initBlock);
+        stackHeaderBlock = nullptr;
     }
 
     void processModule(IRModule* irModule)
