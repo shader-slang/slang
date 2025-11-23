@@ -29,7 +29,14 @@ jobs:
         with:
           submodules: "recursive"
           fetch-depth: 0 # Need full history for version tags
-          fetch-tags: true
+
+      # Explicitly fetch tags for version detection
+      # actions/checkout doesn't always fetch tags properly
+      - name: Fetch version tags
+        run: |
+          git fetch --tags --force
+          echo "Available tags:"
+          git tag -l "v20*" | head -10
 
       # Add bash to PATH on Windows (for consistency with main CI)
       # Only add Git\bin, not usr\bin which contains GNU tools that conflict with MSVC
