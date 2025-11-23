@@ -2022,6 +2022,32 @@ struct LLVMEmitter
             break;
 
         case kIROp_GetOffsetPtr:
+            {
+                auto baseInst = inst->getOperand(0);
+                auto indexInst = inst->getOperand(1);
+
+                if (debugInsts.contains(baseInst))
+                {
+                    debugInsts.add(inst);
+                    return nullptr;
+                }
+
+                IRType* baseType = nullptr;
+                if (auto ptrType = as<IRPtrTypeBase>(baseInst->getDataType()))
+                {
+                    baseType = ptrType->getValueType();
+                }
+                else
+                    SLANG_ASSERT_FAILURE("Unknown pointer type for GetOffsetPtr!");
+
+                llvmInst = emitArrayGetElementPtr(
+                    findValue(baseInst),
+                    findValue(indexInst),
+                    baseType,
+                    getPtrLayoutRules(baseInst));
+            }
+            break;
+
         case kIROp_GetElementPtr:
             {
                 auto baseInst = inst->getOperand(0);
