@@ -1,7 +1,8 @@
 // slang-capability.cpp
 #include "slang-capability.h"
 
-#include "../core/slang-dictionary.h"
+#include "core/slang-dictionary.h"
+#include "core/slang-performance-profiler.h"
 #include "slang-ast-builder.h"
 #include "slang-capability-val.h"
 
@@ -665,6 +666,35 @@ void CapabilityTargetSet::unionWith(const CapabilityTargetSet& other)
     }
 }
 
+void CapabilityTargetSet::unionWith(const CapabilityTargetSetVal& other)
+{
+    // Iterate through all stages in the CapabilityTargetSetVal
+    for (Index i = 0; i < other.getStageSetCount(); i++)
+    {
+        auto otherStageSetVal = other.getStageSet(i);
+        auto stageAtom = otherStageSetVal->getStage();
+
+        auto& thisStageSet = this->shaderStageSets[stageAtom];
+        thisStageSet.stage = stageAtom;
+
+        // Union the atom sets if they exist
+        auto otherAtomSetVal = otherStageSetVal->getAtomSet();
+        if (otherAtomSetVal)
+        {
+            if (!thisStageSet.atomSet)
+            {
+                // Convert UIntSetVal to UIntSet
+                thisStageSet.atomSet = otherAtomSetVal->toUIntSet();
+            }
+            else
+            {
+                // Union with the existing UIntSet
+                thisStageSet.atomSet->unionWith(*otherAtomSetVal);
+            }
+        }
+    }
+}
+
 void CapabilitySet::unionWith(const CapabilitySet& other)
 {
     if (this->isInvalid() || other.isInvalid())
@@ -677,6 +707,29 @@ void CapabilitySet::unionWith(const CapabilitySet& other)
         thisTargetSet.target = otherTargetSet.first;
         thisTargetSet.shaderStageSets.reserve(otherTargetSet.second.shaderStageSets.getCount());
         thisTargetSet.unionWith(otherTargetSet.second);
+    }
+}
+
+void CapabilitySet::unionWith(const CapabilitySetVal* other)
+{
+    if (!other)
+        return;
+
+    if (this->isInvalid() || other->isInvalid())
+        return;
+
+    // Iterate through all targets in the CapabilitySetVal
+    for (Index i = 0; i < other->getTargetSetCount(); i++)
+    {
+        auto otherTargetSetVal = other->getTargetSet(i);
+        auto targetAtom = otherTargetSetVal->getTarget();
+
+        CapabilityTargetSet& thisTargetSet = this->m_targetSets[targetAtom];
+        thisTargetSet.target = targetAtom;
+
+        // Estimate stage count for reservation
+        thisTargetSet.shaderStageSets.reserve(otherTargetSetVal->getStageSetCount());
+        thisTargetSet.unionWith(*otherTargetSetVal);
     }
 }
 
@@ -697,6 +750,27 @@ void CapabilitySet::nonDestructiveJoin(const CapabilitySet& other)
     for (auto& thisTargetSet : this->m_targetSets)
     {
         thisTargetSet.second.tryJoin(other.m_targetSets);
+    }
+}
+
+void CapabilitySet::nonDestructiveJoin(const CapabilitySetVal* other)
+{
+    // Treat null pointer as empty set
+    if (!other)
+        return;
+
+    if (this->isInvalid() || other->isInvalid())
+        return;
+
+    if (this->isEmpty())
+    {
+        *this = CapabilitySet(other);
+        return;
+    }
+
+    for (auto& thisTargetSet : this->m_targetSets)
+    {
+        thisTargetSet.second.tryJoin(*other);
     }
 }
 
@@ -798,6 +872,23 @@ bool CapabilityStageSet::tryJoin(const CapabilityTargetSet& other)
     return true;
 }
 
+bool CapabilityStageSet::tryJoin(const CapabilityTargetSetVal& other)
+{
+    // Find the corresponding stage set in the immutable target set
+    CapabilityStageSetVal* otherStageSet = other.findStageSet(this->stage);
+    if (!otherStageSet)
+        return false;
+
+    // Join the atom sets if both exist
+    if (otherStageSet->getAtomSet() && this->atomSet)
+    {
+        UIntSetVal* otherAtomSet = otherStageSet->getAtomSet();
+        this->atomSet->unionWith(*otherAtomSet);
+    }
+
+    return true;
+}
+
 bool CapabilityStageSet::compatibleMerge(const CapabilityStageSet& stageSet)
 {
     CapabilityStageSet tmp = *this;
@@ -835,6 +926,40 @@ bool CapabilityTargetSet::tryJoin(const CapabilityTargetSets& other)
         if (!shaderStageSet.second.tryJoin(*otherTargetSet))
             destroySet.add(shaderStageSet.first);
     }
+    if (destroySet.getCount() == Slang::Index(this->shaderStageSets.getCount()))
+        return false;
+
+    for (const auto& i : destroySet)
+        this->shaderStageSets.remove(i);
+
+    return true;
+}
+
+bool CapabilityTargetSet::tryJoin(const CapabilitySetVal& other)
+{
+    // Find the corresponding target set in the immutable capability set
+    CapabilityTargetSetVal* otherTargetSet = nullptr;
+    for (Index i = 0; i < other.getTargetSetCount(); i++)
+    {
+        CapabilityTargetSetVal* targetSet = other.getTargetSet(i);
+        if (targetSet->getTarget() == this->target)
+        {
+            otherTargetSet = targetSet;
+            break;
+        }
+    }
+
+    if (!otherTargetSet)
+        return false;
+
+    List<CapabilityAtom> destroySet;
+    destroySet.reserve(this->shaderStageSets.getCount());
+    for (auto& shaderStageSet : this->shaderStageSets)
+    {
+        if (!shaderStageSet.second.tryJoin(*otherTargetSet))
+            destroySet.add(shaderStageSet.first);
+    }
+
     if (destroySet.getCount() == Slang::Index(this->shaderStageSets.getCount()))
         return false;
 
@@ -929,6 +1054,41 @@ CapabilitySet& CapabilitySet::join(const CapabilitySet& other)
     for (auto& thisTargetSet : this->m_targetSets)
     {
         if (!thisTargetSet.second.tryJoin(other.m_targetSets))
+        {
+            destroySet.add(thisTargetSet.first);
+        }
+    }
+    for (const auto& i : destroySet)
+    {
+        this->m_targetSets.remove(i);
+    }
+    // join made a invalid CapabilitySet
+    if (this->m_targetSets.getCount() == 0)
+        this->m_targetSets[CapabilityAtom::Invalid].target = CapabilityAtom::Invalid;
+    return *this;
+}
+
+CapabilitySet& CapabilitySet::join(const CapabilitySetVal* other)
+{
+    // Treat null pointer as empty set
+    if (!other)
+        return *this;
+
+    if (this->isEmpty() || other->isInvalid())
+    {
+        *this = CapabilitySet(other);
+        return *this;
+    }
+    if (this->isInvalid())
+        return *this;
+    if (other->isEmpty())
+        return *this;
+
+    List<CapabilityAtom> destroySet;
+    destroySet.reserve(this->m_targetSets.getCount());
+    for (auto& thisTargetSet : this->m_targetSets)
+    {
+        if (!thisTargetSet.second.tryJoin(*other))
         {
             destroySet.add(thisTargetSet.first);
         }
@@ -1536,6 +1696,7 @@ void CapabilitySetVal::_toTextOverride(StringBuilder& out)
 
 CapabilityStageSetVal* CapabilityTargetSetVal::findStageSet(CapabilityAtom stage) const
 {
+    SLANG_PROFILE_CAPABILITY_SETS;
     // Linear search through sorted list - these lists are typically very short (1-4 items)
     for (Index i = 0; i < getStageSetCount(); i++)
     {
@@ -1551,6 +1712,7 @@ CapabilityStageSetVal* CapabilityTargetSetVal::findStageSet(CapabilityAtom stage
 
 CapabilityTargetSetVal* CapabilitySetVal::findTargetSet(CapabilityAtom target) const
 {
+    SLANG_PROFILE_CAPABILITY_SETS;
     // Linear search through sorted list - these lists are typically very short (1-4 items)
     for (Index i = 0; i < getTargetSetCount(); i++)
     {
@@ -1566,6 +1728,7 @@ CapabilityTargetSetVal* CapabilitySetVal::findTargetSet(CapabilityAtom target) c
 
 bool CapabilitySetVal::isInvalid() const
 {
+    SLANG_PROFILE_CAPABILITY_SETS;
     // Check if we have the invalid target atom
     return findTargetSet(CapabilityAtom::Invalid) != nullptr;
 }
@@ -1574,6 +1737,8 @@ CapabilitySet CapabilitySetVal::thaw() const
 {
     if (cachedThawedCapabilitySet.has_value())
         return cachedThawedCapabilitySet.value();
+
+    SLANG_PROFILE_CAPABILITY_SETS;
 
     CapabilitySet result;
     if (isEmpty())
@@ -1621,12 +1786,13 @@ CapabilitySet CapabilitySetVal::thaw() const
     return result;
 }
 
-CapabilitySetVal* CapabilitySet::freeze(ASTBuilder* astBuilder) const
+[[nodiscard]] CapabilitySetVal* CapabilitySet::freeze(ASTBuilder* astBuilder) const
 {
     if (auto cached = astBuilder->m_capabilitySetCache.tryGetValue(*this))
     {
         return *cached;
     }
+    SLANG_PROFILE_CAPABILITY_SETS;
 
     if (isEmpty())
     {
@@ -1663,6 +1829,7 @@ CapabilitySetVal* CapabilitySet::freeze(ASTBuilder* astBuilder) const
 
         // Convert each stage set, maintaining sorted order
         List<CapabilityAtom> sortedStages;
+        sortedStages.reserve(targetSet.shaderStageSets.getCount());
         for (auto& stagePair : targetSet.shaderStageSets)
         {
             sortedStages.add(stagePair.first);
@@ -1694,6 +1861,348 @@ CapabilitySetVal* CapabilitySet::freeze(ASTBuilder* astBuilder) const
     astBuilder->m_capabilitySetCache.add(*this, result);
 
     return result;
+}
+
+//
+// CapabilitySetVal native implementations
+//
+
+/// Generic template function for concurrent iteration over two sorted collections of the same type
+/// Calls callback for all elements, passing nullptr for gaps
+template<typename Collection, typename ElementType, typename KeyType, typename MatchCallback>
+void concurrentIterate(
+    const Collection& left,
+    const Collection& right,
+    Index (Collection::*countGetter)() const,
+    ElementType (Collection::*elementGetter)(Index) const,
+    KeyType (std::remove_pointer_t<ElementType>::*keyGetter)() const,
+    MatchCallback callback)
+{
+    Index leftIndex = 0;
+    Index rightIndex = 0;
+    Index leftSize = (left.*countGetter)();
+    Index rightSize = (right.*countGetter)();
+
+    // Process elements while both collections have remaining items
+    while (leftIndex < leftSize && rightIndex < rightSize)
+    {
+        auto leftElement = (left.*elementGetter)(leftIndex);
+        auto rightElement = (right.*elementGetter)(rightIndex);
+        auto leftKey = (leftElement->*keyGetter)();
+        auto rightKey = (rightElement->*keyGetter)();
+
+        if (leftKey < rightKey)
+        {
+            // Left has element that right doesn't
+            if (callback(leftElement, nullptr))
+                return;
+            leftIndex++;
+        }
+        else if (leftKey > rightKey)
+        {
+            // Right has element that left doesn't
+            if (callback(nullptr, rightElement))
+                return;
+            rightIndex++;
+        }
+        else
+        {
+            // Found matching elements
+            if (callback(leftElement, rightElement))
+                return;
+            leftIndex++;
+            rightIndex++;
+        }
+    }
+
+    // Process remaining elements from left collection (if any)
+    while (leftIndex < leftSize)
+    {
+        auto leftElement = (left.*elementGetter)(leftIndex);
+        if (callback(leftElement, nullptr))
+            return;
+        leftIndex++;
+    }
+
+    // Process remaining elements from right collection (if any)
+    while (rightIndex < rightSize)
+    {
+        auto rightElement = (right.*elementGetter)(rightIndex);
+        if (callback(nullptr, rightElement))
+            return;
+        rightIndex++;
+    }
+}
+
+/// Overload for CapabilitySetVal target iteration
+template<typename MatchCallback>
+void concurrentIterate(
+    const CapabilitySetVal& left,
+    const CapabilitySetVal& right,
+    MatchCallback callback)
+{
+    concurrentIterate(
+        left,
+        right,
+        &CapabilitySetVal::getTargetSetCount,
+        &CapabilitySetVal::getTargetSet,
+        &CapabilityTargetSetVal::getTarget,
+        callback);
+}
+
+/// Overload for CapabilityTargetSetVal stage iteration
+template<typename MatchCallback>
+void concurrentIterate(
+    const CapabilityTargetSetVal& left,
+    const CapabilityTargetSetVal& right,
+    MatchCallback callback)
+{
+    concurrentIterate(
+        left,
+        right,
+        &CapabilityTargetSetVal::getStageSetCount,
+        &CapabilityTargetSetVal::getStageSet,
+        &CapabilityStageSetVal::getStage,
+        callback);
+}
+
+
+bool CapabilitySetVal::isIncompatibleWith(CapabilityAtom other) const
+{
+    SLANG_PROFILE_CAPABILITY_SETS;
+    if (isEmpty())
+        return false;
+
+    // Convert single atom to a capability set and check compatibility
+    auto otherSet = CapabilitySet(CapabilityName(other));
+    return isIncompatibleWith(otherSet);
+}
+
+bool CapabilitySetVal::isIncompatibleWith(CapabilityName other) const
+{
+    SLANG_PROFILE_CAPABILITY_SETS;
+    if (isEmpty())
+        return false;
+
+    // Convert single name to a capability set and check compatibility
+    auto otherSet = CapabilitySet(other);
+    return isIncompatibleWith(otherSet);
+}
+
+bool CapabilitySetVal::isIncompatibleWith(CapabilitySet const& other) const
+{
+    SLANG_PROFILE_CAPABILITY_SETS;
+    if (isEmpty())
+        return false;
+    if (other.isEmpty())
+        return false;
+
+    // Two capability sets are incompatible if there are no intersecting target/stage combinations
+    // Since Dictionary doesn't guarantee order, we iterate through the CapabilitySet's targets
+    // But we can still optimize by avoiding repeated linear searches in this CapabilitySetVal
+    for (auto& otherTargetPair : other.getCapabilityTargetSets())
+    {
+        auto otherTarget = otherTargetPair.first;
+
+        // Use optimized linear search through sorted thisTargetSets
+        auto thisTargetSet = findTargetSet(otherTarget);
+        if (!thisTargetSet)
+            continue;
+
+        // Convert Dictionary to sorted iteration for stages
+        for (auto& otherStagePair : otherTargetPair.second.getShaderStageSets())
+        {
+            auto otherStage = otherStagePair.first;
+
+            // Use optimized linear search through sorted stage sets
+            auto thisStageSet = thisTargetSet->findStageSet(otherStage);
+            if (thisStageSet)
+            {
+                // Found matching target/stage pair - sets are compatible
+                return false;
+            }
+        }
+    }
+
+    // No matching target/stage pairs found - sets are incompatible
+    return true;
+}
+
+bool CapabilitySetVal::isIncompatibleWith(CapabilitySetVal const* other) const
+{
+    SLANG_PROFILE_CAPABILITY_SETS;
+    if (!other)
+        return false;
+    if (isEmpty())
+        return false;
+    if (other->isEmpty())
+        return false;
+
+    // Two capability sets are incompatible if there are no intersecting target/stage combinations
+    // Use concurrent iteration to find any matching target/stage pairs
+    bool foundMatch = false;
+    concurrentIterate(
+        *this,
+        *other,
+        [&](CapabilityTargetSetVal* thisTarget, CapabilityTargetSetVal* otherTarget) -> bool
+        {
+            // Only process matching targets (skip gaps)
+            if (!thisTarget || !otherTarget)
+                return false;
+
+            // Found matching targets - now check if any stages match
+            concurrentIterate(
+                *thisTarget,
+                *otherTarget,
+                [&](CapabilityStageSetVal* thisStage, CapabilityStageSetVal* otherStage) -> bool
+                {
+                    // Only process matching stages (skip gaps)
+                    if (!thisStage || !otherStage)
+                        return false;
+
+                    // Found matching target/stage pair - set flag and exit early
+                    foundMatch = true;
+                    return true;
+                });
+            return foundMatch;
+        });
+
+    // If we found any matching target/stage pairs, sets are compatible
+    return !foundMatch;
+}
+
+CapabilitySet::ImpliesReturnFlags CapabilitySetVal::_implies(
+    CapabilitySetVal const* otherSet,
+    CapabilitySet::ImpliesFlags flags) const
+{
+    SLANG_PROFILE_CAPABILITY_SETS;
+    // By default (`ImpliesFlags::None`): x implies (c | d) only if (x implies c) and (x implies d).
+
+    bool onlyRequireSingleImply =
+        ((int)flags & (int)CapabilitySet::ImpliesFlags::OnlyRequireASingleValidImply);
+    bool cannotHaveMoreTargetAndStageSets =
+        ((int)flags & (int)CapabilitySet::ImpliesFlags::CannotHaveMoreTargetAndStageSets);
+    bool canHaveSubsetOfTargetAndStageSets =
+        ((int)flags & (int)CapabilitySet::ImpliesFlags::CanHaveSubsetOfTargetAndStageSets);
+
+    int flagsCollected = (int)CapabilitySet::ImpliesReturnFlags::NotImplied;
+
+    if (!otherSet || otherSet->isEmpty())
+        return CapabilitySet::ImpliesReturnFlags::Implied;
+
+    // If empty, and the other is not empty, it does not matter what flags are used,
+    // `this` is considered to "not imply" another set. This is important since
+    // `T.join(U)` causes `T == U`.
+    if (this->isEmpty())
+        return CapabilitySet::ImpliesReturnFlags::NotImplied;
+
+    if (cannotHaveMoreTargetAndStageSets &&
+        this->getTargetSetCount() > otherSet->getTargetSetCount())
+    {
+        return CapabilitySet::ImpliesReturnFlags::NotImplied;
+    }
+
+    // Use concurrent iteration to process all target pairs
+    bool impliesAll = true;
+    concurrentIterate(
+        *this,
+        *otherSet,
+        [&](CapabilityTargetSetVal* thisTarget, CapabilityTargetSetVal* otherTarget) -> bool
+        {
+            if (!otherTarget)
+            {
+                // Other doesn't have this target - that's fine for implies
+                return false; // Continue
+            }
+
+            if (!thisTarget)
+            {
+                // 'this' lacks a target 'other' has
+                if (onlyRequireSingleImply || canHaveSubsetOfTargetAndStageSets)
+                {
+                    return false; // Continue
+                }
+                impliesAll = false;
+                return true; // Early exit
+            }
+
+            if (cannotHaveMoreTargetAndStageSets &&
+                thisTarget->getStageSetCount() > otherTarget->getStageSetCount())
+            {
+                impliesAll = false;
+                return true; // Early exit
+            }
+
+            // Process all stage pairs for this target
+            concurrentIterate(
+                *thisTarget,
+                *otherTarget,
+                [&](CapabilityStageSetVal* thisStage, CapabilityStageSetVal* otherStage) -> bool
+                {
+                    if (!otherStage)
+                    {
+                        // Other doesn't have this stage - that's fine for implies
+                        return false; // Continue
+                    }
+
+                    if (!thisStage)
+                    {
+                        // 'this' lacks a stage 'other' has
+                        if (onlyRequireSingleImply || canHaveSubsetOfTargetAndStageSets)
+                        {
+                            return false; // Continue
+                        }
+                        impliesAll = false;
+                        return true; // Early exit
+                    }
+
+                    // Check if all stage sets that are in 'other' are contained by 'this'
+                    auto thisAtomSet = thisStage->getAtomSet();
+                    auto otherAtomSet = otherStage->getAtomSet();
+
+                    if (thisAtomSet && otherAtomSet)
+                    {
+                        auto thisUIntSet = thisAtomSet->toUIntSet();
+                        auto otherUIntSet = otherAtomSet->toUIntSet();
+                        bool contained = thisUIntSet.contains(otherUIntSet);
+
+                        if (!onlyRequireSingleImply && !contained)
+                        {
+                            impliesAll = false;
+                            return true; // Early exit
+                        }
+                        else if (onlyRequireSingleImply && contained)
+                        {
+                            flagsCollected |= (int)CapabilitySet::ImpliesReturnFlags::Implied;
+                            return true; // Early exit - found one match
+                        }
+                    }
+
+                    return false; // Continue
+                });
+
+            return !impliesAll; // Early exit if we failed
+        });
+
+    if (!onlyRequireSingleImply && impliesAll)
+        flagsCollected |= (int)CapabilitySet::ImpliesReturnFlags::Implied;
+
+    return (CapabilitySet::ImpliesReturnFlags)flagsCollected;
+}
+
+bool CapabilitySetVal::implies(CapabilitySet const& other) const
+{
+    SLANG_PROFILE_CAPABILITY_SETS;
+    // For mixed types, convert to CapabilitySet to maintain compatibility
+    return CapabilitySet{this}.implies(other);
+}
+
+CapabilitySet::ImpliesReturnFlags CapabilitySetVal::atLeastOneSetImpliedInOther(
+    CapabilitySet const& other) const
+{
+    SLANG_PROFILE_CAPABILITY_SETS;
+    // For mixed types, convert to CapabilitySet to maintain compatibility
+    return CapabilitySet{this}.atLeastOneSetImpliedInOther(other);
 }
 
 

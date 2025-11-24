@@ -950,12 +950,15 @@ Compound Capabilities
 > Capabilities needed to use decodeFunc with cooperative matrix load
 
 `cooperative_matrix_conversion`
-> Capabilities needed to convert cooperative matrices
+> Capabilities needed to convert cooperative matrices, all the conversions can be supported by cuda
 
 `cooperative_matrix_map_element`
 > Capabilities needed to use MapElement operation with cooperative matrix
 
 `cooperative_matrix_reduction`
+> Capabilities needed to use reduction operations with cooperative matrix
+
+`cooperative_matrix_spirv`
 > Capabilities needed to use reduction operations with cooperative matrix
 
 `cooperative_matrix_tensor_addressing`
@@ -1120,6 +1123,20 @@ Compound Capabilities
 
 `image_size`
 > Capabilities required to query image (RWTexture) size info
+
+`implicit_derivatives_sampling`
+> Capabilities required for implicit derivatives sampling.
+> 
+> This capability is required by texture sampling functions such as `_Texture.Sample()`
+> where the level of detail is determined by implicit derivatives.
+> 
+> @remark In GLSL, implicit level-of-detail `texture()` functions use the base texture when
+> the implicit derivatives are unavailable. When this capability is not present, invocations of
+> these functions are translated to invocations of `_Texture.SampleLevelZero()`.
+> 
+> @remark Implicit derivatives for the compute stage can be enabled by declaring capability `GL_NV_compute_shader_derivatives` (GLSL),
+> `SPV_KHR_compute_shader_derivatives` (SPIR-V), or profile `cs_6_6` (HLSL).
+> 
 
 `memorybarrier`
 > Capabilities required to use sm_5_0 style memory barriers
@@ -1324,6 +1341,10 @@ Compound Capabilities
 `texture_querylod`
 > Capabilities required to query texture LOD info
 
+`texture_shadowgrad`
+> Capabilities required for shadow texture sampling with bias and gradients.
+> New in HLSL SM6.8 but existed in older GLSL and SPIRV targets.
+
 `texture_shadowlod`
 > Capabilities required to query shadow texture lod info
 
@@ -1457,3 +1478,6 @@ Other
 
 `optix_coopvec`
 > Represents capabilities required for optix cooperative vector support.
+
+`optix_multilevel_traversal`
+> Represents capabilities required for optix multi-level traversal support.

@@ -7,6 +7,9 @@
 #include "slang-syntax.h"
 #include "slang.h"
 
+#include <compare>
+#include <limits>
+
 namespace Slang
 {
 
@@ -204,6 +207,164 @@ inline bool operator<=(LayoutSize left, LayoutSize::RawValue right)
 {
     return left.isFinite() && (left.getFiniteValue() <= right);
 }
+
+// An offset that can either be a valid finite offset or
+// the special case of an invalid offset.
+//
+struct LayoutOffset
+{
+    typedef size_t RawValue;
+
+    LayoutOffset()
+        : raw(0)
+    {
+    }
+
+    LayoutOffset(RawValue offset)
+        : raw(offset)
+    {
+        SLANG_ASSERT(offset != s_invalidValue);
+    }
+
+    static LayoutOffset invalid()
+    {
+        LayoutOffset result;
+        result.raw = s_invalidValue;
+        return result;
+    }
+
+    bool isInvalid() const { return raw == s_invalidValue; }
+
+    bool isValid() const { return raw != s_invalidValue; }
+    RawValue getValidValue() const
+    {
+        SLANG_ASSERT(isValid());
+        return raw;
+    }
+
+    std::partial_ordering compare(LayoutOffset that) const
+    {
+        if (this->isInvalid() || that.isInvalid())
+            return std::partial_ordering::unordered;
+
+        if (this->raw < that.raw)
+            return std::partial_ordering::less;
+        else if (this->raw > that.raw)
+            return std::partial_ordering::greater;
+        else
+            return std::partial_ordering::equivalent;
+    }
+
+    void operator+=(LayoutOffset right)
+    {
+        if (isInvalid() || right.isInvalid())
+        {
+            *this = LayoutOffset::invalid();
+        }
+        else if (raw > s_maxValidValue - right.raw)
+        {
+            // Check for overflow
+            *this = LayoutOffset::invalid();
+        }
+        else
+        {
+            *this = LayoutOffset(raw + right.raw);
+        }
+    }
+
+    void operator*=(LayoutOffset right)
+    {
+        if (isInvalid() || right.isInvalid())
+        {
+            *this = LayoutOffset::invalid();
+        }
+        else if (right.raw != 0 && raw > s_maxValidValue / right.raw)
+        {
+            // Check for overflow
+            *this = LayoutOffset::invalid();
+        }
+        else
+        {
+            *this = LayoutOffset(raw * right.raw);
+        }
+    }
+
+    void operator-=(LayoutOffset right)
+    {
+        if (isInvalid() || right.isInvalid())
+        {
+            *this = LayoutOffset::invalid();
+        }
+        else if (raw < right.raw)
+        {
+            // Check for underflow
+            *this = LayoutOffset::invalid();
+        }
+        else
+        {
+            *this = LayoutOffset(raw - right.raw);
+        }
+    }
+
+    void operator/=(LayoutOffset right)
+    {
+        if (isInvalid() || right.isInvalid())
+        {
+            *this = LayoutOffset::invalid();
+        }
+        else if (right.raw == 0)
+        {
+            // Division by zero
+            *this = LayoutOffset::invalid();
+        }
+        else
+        {
+            *this = LayoutOffset(raw / right.raw);
+        }
+    }
+
+private:
+    static const RawValue s_invalidValue = RawValue(~0);
+    static const RawValue s_maxValidValue = s_invalidValue - 1;
+    RawValue raw;
+};
+
+inline LayoutOffset operator+(LayoutOffset left, LayoutOffset right)
+{
+    LayoutOffset result(left);
+    result += right;
+    return result;
+}
+
+inline LayoutOffset operator*(LayoutOffset left, LayoutOffset right)
+{
+    LayoutOffset result(left);
+    result *= right;
+    return result;
+}
+
+inline LayoutOffset operator-(LayoutOffset left, LayoutOffset right)
+{
+    LayoutOffset result(left);
+    result -= right;
+    return result;
+}
+
+inline LayoutOffset operator/(LayoutOffset left, LayoutOffset right)
+{
+    LayoutOffset result(left);
+    result /= right;
+    return result;
+}
+
+inline LayoutOffset maximum(LayoutOffset left, LayoutOffset right)
+{
+    if (left.isInvalid() || right.isInvalid())
+        return LayoutOffset::invalid();
+
+    return LayoutOffset(Math::Max(left.getValidValue(), right.getValidValue()));
+}
+
 
 // Layout appropriate to "just memory" scenarios,
 // such as laying out the members of a constant buffer.

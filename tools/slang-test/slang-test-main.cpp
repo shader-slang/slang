@@ -3941,7 +3941,7 @@ TestResult runComputeComparisonImpl(
                       return SLANG_SUCCEEDED(
                           _compareWithType(a.getUnownedSlice(), e.getUnownedSlice()));
                   });
-    return std::max(compileResult, bufferResult);
+    return TestReporter::combine(compileResult, bufferResult);
 }
 
 TestResult runSlangComputeComparisonTest(TestContext* context, TestInput& input)
@@ -4754,6 +4754,9 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
 
                     std::lock_guard lock(context->mutexFailedTests);
                     context->failedFileTests.add(fileTestInfo);
+
+                    // Mark test as pending retry - it won't be counted in statistics yet
+                    context->getTestReporter()->addResult(TestResult::PendingRetry);
                 }
                 else
                 {
@@ -5149,6 +5152,9 @@ static SlangResult runUnitTestModule(
                 {
                     std::lock_guard lock(context->mutexFailedTests);
                     context->failedUnitTests.add(test.command);
+
+                    // Mark test as pending retry - it won't be counted in statistics yet
+                    reporter->addResult(TestResult::PendingRetry);
                 }
                 else
                 {
@@ -5509,6 +5515,10 @@ SlangResult innerMain(int argc, char** argv)
         else
         {
             // If there are too many failed tests, don't bother retrying.
+            printf(
+                "Too many failed tests for retry(%d) - setting all to failed\n",
+                (int)context.failedFileTests.getCount());
+            fflush(stdout);
             for (auto& test : context.failedFileTests)
             {
                 FileTestInfoImpl* fileTestInfo = static_cast<FileTestInfoImpl*>(test.Ptr());
