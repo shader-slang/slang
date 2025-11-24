@@ -193,6 +193,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
     }
 
     [require(cooperative_matrix, subgroup_basic)]
+    [ForceInline]
     VISIBILITY_LEVEL static void LoadShA<Storage>(
             SPtr<uint4> sharedMemoryA,
             int tileIndex,
@@ -239,6 +240,27 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
             const uint dx = DxPerThreadLoadMatA * ElementCountPerVector;
             const uint dy = DyPerThreadLoadMatA;
             indexInWeight = indexInWeight + dy * ElementCountPerRowA + dx;
+        }
+    }
+
+    [ForceInline]
+    [require(cooperative_matrix, subgroup_basic)]
+    VISIBILITY_LEVEL static void LoadSharedMemoryFromLocalVector(
+        SPtr<uint4> sharedMemoryB,
+        int tileIndex,
+        T[K] inputVector)
+    {
+        const uint xInTile = WaveGetLaneIndex();
+
+        // start index in vectorized tile for current thread: x * column_stride
+        const uint indexInVectorizedTile = xInTile * HeightInVectorTileB;
+        const uint yOffset = (tileIndex * HeightInVectorTileB) * ElementCountPerVector;
+
+        for (uint yInTile = 0; yInTile < HeightInVectorTileB; yInTile++)
+        {
+            // TODO: Bounds check.
+            uint4 value = readUint4(inputVector, yInTile * ElementCountPerVector + yOffset);
+            sharedMemoryB[indexInVectorizedTile + yInTile] = value;
         }
     }
 
