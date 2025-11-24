@@ -147,10 +147,10 @@ struct TransformParamsToConstRefContext
                 });
         }
 
-        for (IRInst *inst : postFixList)
+        for (IRInst* inst : postFixList)
         {
             auto getElementPtr = as<IRGetElementPtr>(inst);
-            IRInst *indexInst = getElementPtr->getOperand(1);
+            IRInst* indexInst = getElementPtr->getOperand(1);
 
             // In the postfix phase, we'll only consider index instructions if
             // they were transformed previously by this function. This is an
@@ -160,13 +160,13 @@ struct TransformParamsToConstRefContext
             {
                 switch (indexInst->getOp())
                 {
-                    case kIROp_FieldAddress:
-                    case kIROp_GetElementPtr:
-                        // post-fix needed
-                        builder.setInsertBefore(getElementPtr);
-                        auto loadInst = builder.emitLoad(indexInst);
-                        getElementPtr->setOperand(1, loadInst);
-                        break;
+                case kIROp_FieldAddress:
+                case kIROp_GetElementPtr:
+                    // post-fix needed
+                    builder.setInsertBefore(getElementPtr);
+                    auto loadInst = builder.emitLoad(indexInst);
+                    getElementPtr->setOperand(1, loadInst);
+                    break;
                 }
             }
         }
