@@ -5191,7 +5191,17 @@ IRInst* IRBuilder::emitElementAddress(IRInst* basePtr, IRInst* index)
     if (auto ptrType = as<IRPtrTypeBase>(basePtrType))
     {
         accessQualifier = ptrType->getAccessQualifier();
-        addrSpace = ptrType->getAddressSpace();
+        if (!ptrType->hasAddressSpace())
+        {
+            if (as<IRGroupSharedRate>(basePtr->getRate()))
+            {
+                addrSpace = AddressSpace::GroupShared;
+            }
+        }
+        else
+        {
+            addrSpace = ptrType->getAddressSpace();
+        }
         valueType = ptrType->getValueType();
     }
     else if (auto ptrLikeType = as<IRPointerLikeType>(basePtrType))
