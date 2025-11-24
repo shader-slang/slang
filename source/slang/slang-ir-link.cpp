@@ -2194,13 +2194,20 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
                     {
                         auto fileName = as<IRStringLit>(debugSource->getFileName());
                         auto source = as<IRStringLit>(debugSource->getSource());
-                        auto newDebugSource = context->builder->emitDebugSource(
-                            fileName->getStringSlice(),
-                            source->getStringSlice(),
-                            true);
-                        // Register this as the clone of the original so that references
-                        // to the original will use the new one with isIncludedFile=true
-                        registerClonedValue(context, newDebugSource, inst);
+                        if (fileName && source)
+                        {
+                            auto newDebugSource = context->builder->emitDebugSource(
+                                fileName->getStringSlice(),
+                                source->getStringSlice(),
+                                true);
+                            // Register this as the clone of the original so that references
+                            // to the original will use the new one with isIncludedFile=true
+                            registerClonedValue(context, newDebugSource, inst);
+                        }
+                        else
+                        {
+                            cloneValue(context, inst);
+                        }
                     }
                     else
                     {

@@ -2360,7 +2360,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
                 auto moduleInst = inst->getModule()->getModuleInst();
                 // Only create DebugCompilationUnit for non-included files
-                auto isIncludedFile = as<IRBoolLit>(debugSource->getIsIncludedFile())->getValue();
+                auto isIncludedFileLit = as<IRBoolLit>(debugSource->getIsIncludedFile());
+                bool isIncludedFile = isIncludedFileLit ? isIncludedFileLit->getValue() : false;
                 // Prefer the entry point's debug source as the default.
                 // Otherwise, only set default debug source to non-included files.
                 if (!m_defaultDebugSource)
