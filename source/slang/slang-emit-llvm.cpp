@@ -1591,7 +1591,6 @@ struct LLVMEmitter
             break;
 
         case kIROp_Specialize:
-        case kIROp_MissingReturn:
         case kIROp_StaticAssert:
         case kIROp_Unmodified:
             return nullptr;
@@ -2348,6 +2347,7 @@ struct LLVMEmitter
             }
             break;
 
+        case kIROp_MissingReturn:
         case kIROp_Unreachable:
             return builder->emitUnreachable();
 
