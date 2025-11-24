@@ -62,40 +62,40 @@ public struct StructuredBufferStorage<T> : IStorage<T>
         {
         case 1:
             return uint4(
-                bit_cast<uint>(m_buffer[address + m_baseAddress]) << 24    |
-                bit_cast<uint>(m_buffer[address + m_baseAddress + 1]) << 16|
-                bit_cast<uint>(m_buffer[address + m_baseAddress + 2]) << 8 |
-                bit_cast<uint>(m_buffer[address + m_baseAddress + 3]),
+                uint(bit_cast<uint8_t>(m_buffer[address + m_baseAddress])) << 24    |
+                uint(bit_cast<uint8_t>(m_buffer[address + m_baseAddress + 1])) << 16|
+                uint(bit_cast<uint8_t>(m_buffer[address + m_baseAddress + 2])) << 8 |
+                uint(bit_cast<uint8_t>(m_buffer[address + m_baseAddress + 3])),
 
-                bit_cast<uint>(m_buffer[address + m_baseAddress + 4]) << 24 |
-                bit_cast<uint>(m_buffer[address + m_baseAddress + 5]) << 16 |
-                bit_cast<uint>(m_buffer[address + m_baseAddress + 6]) << 8  |
-                bit_cast<uint>(m_buffer[address + m_baseAddress + 7]),
+                uint(bit_cast<uint8_t>(m_buffer[address + m_baseAddress + 4])) << 24 |
+                uint(bit_cast<uint8_t>(m_buffer[address + m_baseAddress + 5])) << 16 |
+                uint(bit_cast<uint8_t>(m_buffer[address + m_baseAddress + 6])) << 8  |
+                uint(bit_cast<uint8_t>(m_buffer[address + m_baseAddress + 7])),
 
-                bit_cast<uint>(m_buffer[address + m_baseAddress + 8]) << 24 |
-                bit_cast<uint>(m_buffer[address + m_baseAddress + 9]) << 16 |
-                bit_cast<uint>(m_buffer[address + m_baseAddress + 10]) << 8 |
-                bit_cast<uint>(m_buffer[address + m_baseAddress + 11]),
+                uint(bit_cast<uint8_t>(m_buffer[address + m_baseAddress + 8])) << 24 |
+                uint(bit_cast<uint8_t>(m_buffer[address + m_baseAddress + 9])) << 16 |
+                uint(bit_cast<uint8_t>(m_buffer[address + m_baseAddress + 10])) << 8 |
+                uint(bit_cast<uint8_t>(m_buffer[address + m_baseAddress + 11])),
 
-                bit_cast<uint>(m_buffer[address + m_baseAddress + 12]) << 24 |
-                bit_cast<uint>(m_buffer[address + m_baseAddress + 13]) << 16 |
-                bit_cast<uint>(m_buffer[address + m_baseAddress + 14]) << 8  |
-                bit_cast<uint>(m_buffer[address + m_baseAddress + 15]),
+                uint(bit_cast<uint8_t>(m_buffer[address + m_baseAddress + 12])) << 24 |
+                uint(bit_cast<uint8_t>(m_buffer[address + m_baseAddress + 13])) << 16 |
+                uint(bit_cast<uint8_t>(m_buffer[address + m_baseAddress + 14])) << 8  |
+                uint(bit_cast<uint8_t>(m_buffer[address + m_baseAddress + 15])),
         );
 
         case 2:
             return uint4(
-                bit_cast<uint>(m_buffer[address + m_baseAddress]) << 16 |
-                bit_cast<uint>(m_buffer[address + m_baseAddress + 1]),
+                uint(bit_cast<uint16_t>(m_buffer[address + m_baseAddress])) << 16 |
+                uint(bit_cast<uint16_t>(m_buffer[address + m_baseAddress + 1])),
 
-                bit_cast<uint>(m_buffer[address + m_baseAddress + 2]) << 16 |
-                bit_cast<uint>(m_buffer[address + m_baseAddress + 3]),
+                uint(bit_cast<uint16_t>(m_buffer[address + m_baseAddress + 2])) << 16 |
+                uint(bit_cast<uint16_t>(m_buffer[address + m_baseAddress + 3])),
 
-                bit_cast<uint>(m_buffer[address + m_baseAddress + 4]) << 16 |
-                bit_cast<uint>(m_buffer[address + m_baseAddress + 5]),
+                uint(bit_cast<uint16_t>(m_buffer[address + m_baseAddress + 4])) << 16 |
+                uint(bit_cast<uint16_t>(m_buffer[address + m_baseAddress + 5])),
 
-                bit_cast<uint>(m_buffer[address + m_baseAddress + 6]) << 16 |
-                bit_cast<uint>(m_buffer[address + m_baseAddress + 7]),
+                uint(bit_cast<uint16_t>(m_buffer[address + m_baseAddress + 6])) << 16 |
+                uint(bit_cast<uint16_t>(m_buffer[address + m_baseAddress + 7])),
             );
         case 4:
             return uint4(
@@ -105,6 +105,8 @@ public struct StructuredBufferStorage<T> : IStorage<T>
                 bit_cast<uint>(m_buffer[address + m_baseAddress + 3]),
             );
         }
+        static_assert(false, "Unsupported data type T");
+        return uint4(0);
     }
 
     /**
