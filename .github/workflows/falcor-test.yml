@@ -87,6 +87,16 @@ jobs:
           cd .\FalcorBin\tests
           python -u ./testing/run_unit_tests.py --config windows-vs2022-Release --tags="-slow"
           cd ../../
+      - name: Copy FalcorBin for debugging
+        if: always()
+        shell: pwsh
+        run: |
+          $timestamp = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
+          $debugDir = "C:\FalcorDebug\$timestamp"
+          Write-Host "Copying FalcorBin to $debugDir for debugging"
+          New-Item -ItemType Directory -Force -Path $debugDir
+          Copy-Item -Path .\FalcorBin -Destination $debugDir -Recurse -Force
+          Write-Host "Debug copy saved to: $debugDir"
       - name: falcor-image-test
         shell: pwsh
         run: |
