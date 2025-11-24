@@ -1,0 +1,8 @@
+result code = -1
+standard error = {
+tests/preprocessor/include-search-path.slang(10): error 15300: failed to find include file 'pragma-once-c.h'
+#include <pragma-once-c.h>
+         ^
+}
+standard output = {
+}

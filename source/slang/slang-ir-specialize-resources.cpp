@@ -405,12 +405,6 @@ struct ResourceOutputSpecializationPass
         if (as<IRSamplerStateTypeBase>(type))
             return true;
 
-        if (as<IRRayQueryType>(type))
-            return true;
-
-        if (as<IRHitObjectType>(type))
-            return true;
-
         // TODO: more cases here?
 
         return false;
@@ -1389,6 +1383,64 @@ bool isIllegalSPIRVParameterType(IRType* type, bool isArray)
 bool isIllegalWGSLParameterType(IRType* type)
 {
     return isIllegalGLSLParameterType(type);
+}
+
+void legalizeModesOfNonCopyableOpaqueTypedParamsForGLSL(
+    CodeGenContext* codeGenContext,
+    IRModule* irModule)
+{
+    SLANG_UNUSED(codeGenContext);
+
+    auto isNonCopyableOpaqueType = [](IRType* type) -> bool
+    {
+        type = unwrapArray(type);
+        if (as<IRRayQueryType>(type))
+            return true;
+        if (as<IRHitObjectType>(type))
+            return true;
+        return false;
+    };
+
+    for (auto globalInst : irModule->getGlobalInsts())
+    {
+        // We only care about functions.
+        //
+        auto func = as<IRFunc>(globalInst);
+        if (!func)
+            continue;
+
+        for (auto param : func->getParams())
+        {
+            // We are only interested in `out` or `inout` parameters.
+            //
+            auto paramType = param->getDataType();
+            auto paramPtrType = as<IROutParamTypeBase>(paramType);
+            if (!paramPtrType)
+                continue;
+
+            // We are only interested in parameter that use non-copyable
+            // opaque types.
+            //
+            auto paramValueType = paramPtrType->getValueType();
+            if (!isNonCopyableOpaqueType(paramValueType))
+                continue;
+
+            // Okay, we've got a parameter with a type that needs to be changed.
+            //
+            // We'll change an `out` or `inout` parameter over to a
+            // `borrow in` parameter, so that the levels of indirection
+            // in the IR stay consistent, but the downstream logic to
+            // emit GLSL won't go adding a modifier to the parameter declaration.
+            //
+            IRBuilder builder(irModule);
+            auto newParamPtrType = builder.getPtrType(
+                kIROp_BorrowInParamType,
+                paramValueType,
+                paramPtrType->getAccessQualifier(),
+                paramPtrType->getAddressSpace());
+            builder.setDataType(param, newParamPtrType);
+        }
+    }
 }
 
 } // namespace Slang
