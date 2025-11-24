@@ -72,6 +72,7 @@ jobs:
           key: slang-build-${{ runner.os }}-${{ hashFiles('source/**', 'CMakeLists.txt', 'cmake/**') }}
           restore-keys: |
             slang-build-${{ runner.os }}-
+          enableCrossOsArchive: false
 
       # Build Slang from checked-out source
       # Uses the same approach as CI: cmake --preset default + cmake --workflow --preset release
@@ -119,6 +120,7 @@ jobs:
           key: packman-${{ hashFiles('dxvk-remix/packman-external.xml') }}
           restore-keys: |
             packman-
+          enableCrossOsArchive: false
 
       # Download shader compilation tools via packman
       # First run: ~2-5 min (downloads ~340MB)
@@ -156,7 +158,23 @@ jobs:
             Write-Host $originalVersion
           }
 
-          # Copy our built Slang binaries (overwrites packman version)
+          # Check if it's a junction and remove it properly
+          $item = Get-Item $remixSlangDir
+          if ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+            Write-Host "`nDetected junction at: $remixSlangDir"
+            Write-Host "Removing junction (not following the link)..."
+            # Use cmd /c rmdir to remove junction without deleting target
+            cmd /c rmdir "$remixSlangDir"
+          } else {
+            Write-Host "`nNot a junction, removing directory..."
+            Remove-Item -Path $remixSlangDir -Recurse -Force
+          }
+
+          # Create new regular directory
+          Write-Host "Creating new directory at: $remixSlangDir"
+          New-Item -ItemType Directory -Path $remixSlangDir -Force | Out-Null
+
+          # Copy our built Slang binaries to the new directory
           $builtSlangBin = Resolve-Path "build\Release\bin"
           Write-Host "`nCopying built Slang from: $builtSlangBin"
           Copy-Item -Path "$builtSlangBin\*" -Destination $remixSlangDir -Recurse -Force
@@ -175,7 +193,8 @@ jobs:
           }
 
           # Verify version changed
-          $newVersion = (& $originalSlangc -version 2>&1 | Out-String).Trim()
+          $newSlangc = Join-Path $remixSlangDir "slangc.exe"
+          $newVersion = (& $newSlangc -version 2>&1 | Out-String).Trim()
           Write-Host "New slangc version:"
           Write-Host $newVersion
 
