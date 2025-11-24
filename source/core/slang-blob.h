@@ -280,13 +280,7 @@ public:
 protected:
     // Ctor
     // NOTE! Takes a copy of the input data
-    RawBlob(const void* data, size_t size)
-    {
-        if (data)
-        {
-            memcpy(m_data.allocateTerminated(size), data, size);
-        }
-    }
+    RawBlob(const void* data, size_t size) { memcpy(m_data.allocateTerminated(size), data, size); }
 
     void* getObject(const Guid& guid);
 

@@ -193,7 +193,6 @@ namespace Slang
     }
 }
 
-#if SLANG_BYTE_ENCODE_USE_UNALIGNED_ACCESS
 static const uint32_t s_unalignedUInt32Mask[5] = {
     0x00000000,
     0x000000ff,
@@ -201,7 +200,6 @@ static const uint32_t s_unalignedUInt32Mask[5] = {
     0x00ffffff,
     0xffffffff,
 };
-#endif
 
 // Decode the >= kLiteCut2.
 // in is pointing past the first byte.
@@ -213,9 +211,13 @@ SLANG_FORCE_INLINE static uint32_t _decodeLiteCut2UInt32(const uint8_t* in, int 
     switch (numBytesRemaining)
     {
     case 2:
+        value = *(const uint16_t*)in;
+        break;
     case 3:
+        value = (uint32_t(in[2]) << 16) | (uint32_t(in[1]) << 8) | uint32_t(in[0]);
+        break;
     case 4:
-        memcpy(&value, in, numBytesRemaining);
+        value = *(const uint32_t*)in;
         break;
     default:
         break;
@@ -283,21 +285,17 @@ SLANG_FORCE_INLINE static uint32_t _decodeLiteCut2UInt32(const uint8_t* in, int 
         {
             const int numBytesRemaining = b0 - kLiteCut2 + 2 - 1;
 
-// For unaligned access, do not use unaligned access for the last two values,
-// (3rd last is safe because this value will have at least 2 bytes, followed by at worst
-// two 1-byte values) otherwise we can access outside the bounds of the encoded array
-// This prevents memory validation tools from causing an exception here
-#if SLANG_BYTE_ENCODE_USE_UNALIGNED_ACCESS
-            if (i < numValues - 2)
+            // For unaligned access, do not use unaligned access for the last two values,
+            // (3rd last is safe because this value will have at least 2 bytes, followed by at worst
+            // two 1-byte values) otherwise we can access outside the bounds of the encoded array
+            // This prevents memory validation tools from causing an exception here
+            if (SLANG_BYTE_ENCODE_USE_UNALIGNED_ACCESS && i < numValues - 2)
             {
                 const uint32_t mask = s_unalignedUInt32Mask[numBytesRemaining];
                 // const uint32_t mask = ~(uint32_t(0xffffff00) << ((numBytesRemaining - 1) * 8));
-                uint32_t temp;
-                memcpy(&temp, encodeIn, sizeof(temp));
-                valuesOut[i] = temp & mask;
+                valuesOut[i] = (*(const uint32_t*)encodeIn) & mask;
             }
             else
-#endif
             {
                 valuesOut[i] = _decodeLiteCut2UInt32(encodeIn, numBytesRemaining);
             }

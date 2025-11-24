@@ -17,13 +17,7 @@ ByteCodeInterpreter* convert(IByteCodeRunner* runner)
         template<typename TR, typename T1, typename T2>          \
         static void run(TR* dst, const T1* src1, const T2* src2) \
         {                                                        \
-            T1 tempSrc1;                                         \
-            ::memcpy((void*)&tempSrc1, (void*)src1, sizeof(T1)); \
-            T2 tempSrc2;                                         \
-            ::memcpy((void*)&tempSrc2, (void*)src2, sizeof(T2)); \
-            TR tempDst;                                          \
-            tempDst = (tempSrc1)op(tempSrc2);                    \
-            ::memcpy((void*)dst, (void*)&tempDst, sizeof(TR));   \
+            *dst = (*src1)op(*src2);                             \
         }                                                        \
     }
 
@@ -714,7 +708,7 @@ void copyHandler16(IByteCodeRunner* ctx, VMExecInstHeader* inst, void*)
     SLANG_UNUSED(ctx);
     auto dst = (uint16_t*)inst->getOperand(0).getPtr();
     auto src = (uint16_t*)inst->getOperand(1).getPtr();
-    memcpy((void*)dst, (void*)src, sizeof(*dst));
+    *dst = *src;
 }
 
 void copyHandler32(IByteCodeRunner* ctx, VMExecInstHeader* inst, void*)
@@ -722,7 +716,7 @@ void copyHandler32(IByteCodeRunner* ctx, VMExecInstHeader* inst, void*)
     SLANG_UNUSED(ctx);
     auto dst = (uint32_t*)inst->getOperand(0).getPtr();
     auto src = (uint32_t*)inst->getOperand(1).getPtr();
-    memcpy((void*)dst, (void*)src, sizeof(*dst));
+    *dst = *src;
 }
 
 void copyHandler64(IByteCodeRunner* ctx, VMExecInstHeader* inst, void*)
@@ -730,7 +724,7 @@ void copyHandler64(IByteCodeRunner* ctx, VMExecInstHeader* inst, void*)
     SLANG_UNUSED(ctx);
     auto dst = (uint64_t*)inst->getOperand(0).getPtr();
     auto src = (uint64_t*)inst->getOperand(1).getPtr();
-    memcpy((void*)dst, (void*)src, sizeof(*dst));
+    *dst = *src;
 }
 
 void generalCopyHandler(IByteCodeRunner* ctx, VMExecInstHeader* inst, void*)

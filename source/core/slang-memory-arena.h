@@ -256,12 +256,6 @@ SLANG_FORCE_INLINE bool MemoryArena::isValid(const void* data, size_t size) cons
 SLANG_FORCE_INLINE void* MemoryArena::allocateUnaligned(size_t sizeInBytes)
 {
     assert(sizeInBytes > 0);
-
-    if (!m_current)
-    {
-        return _allocateAlignedFromNewBlock(sizeInBytes, kMinAlignment);
-    }
-
     // Align with the minimum alignment
     uint8_t* mem = m_current;
     uint8_t* end = mem + sizeInBytes;
@@ -297,12 +291,6 @@ SLANG_FORCE_INLINE void* MemoryArena::allocateCurrentUnaligned(size_t sizeInByte
 SLANG_FORCE_INLINE void* MemoryArena::allocate(size_t sizeInBytes)
 {
     assert(sizeInBytes > 0);
-
-    if (!m_current)
-    {
-        return _allocateAlignedFromNewBlock(sizeInBytes, kMinAlignment);
-    }
-
     // Align with the minimum alignment
     const size_t alignMask = kMinAlignment - 1;
     uint8_t* mem = (uint8_t*)((size_t(m_current) + alignMask) & ~alignMask);
@@ -322,12 +310,6 @@ SLANG_FORCE_INLINE void* MemoryArena::allocate(size_t sizeInBytes)
 SLANG_FORCE_INLINE void* MemoryArena::allocateAndZero(size_t sizeInBytes)
 {
     assert(sizeInBytes > 0);
-
-    if (!m_current)
-    {
-        return _allocateAlignedFromNewBlockAndZero(sizeInBytes, kMinAlignment);
-    }
-
     // Align with the minimum alignment
     const size_t alignMask = kMinAlignment - 1;
     // Implement without calling ::allocate, because in most common case we don't need to test for
@@ -352,11 +334,6 @@ SLANG_FORCE_INLINE void* MemoryArena::allocateAligned(size_t sizeInBytes, size_t
     assert(sizeInBytes > 0);
     // Alignment must be a power of 2
     assert(((alignment - 1) & alignment) == 0);
-
-    if (!m_current)
-    {
-        return _allocateAlignedFromNewBlock(sizeInBytes, alignment);
-    }
 
     // Align the pointer
     const size_t alignMask = alignment - 1;

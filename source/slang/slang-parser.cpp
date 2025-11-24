@@ -8227,14 +8227,7 @@ static IRIntegerValue _foldIntegerPrefixOp(TokenType tokenType, IRIntegerValue v
     case TokenType::OpAdd:
         return value;
     case TokenType::OpSub:
-#if SLANG_VC
-#pragma warning(push)
-#pragma warning(disable : 4146)
-#endif
-        return -static_cast<uint64_t>(value);
-#if SLANG_VC
-#pragma warning(pop)
-#endif
+        return -value;
     default:
         {
             SLANG_ASSERT(!"Unexpected op");
@@ -8462,7 +8455,7 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
 
     const auto& opcodeWord = spirvInfo->opcodes.lookup(ret.opcode.token.getContent());
     const auto& opInfo = opcodeWord ? spirvInfo->opInfos.lookup(*opcodeWord) : std::nullopt;
-    ret.opcode.knownValue = opcodeWord.value_or(SpvOpMax);
+    ret.opcode.knownValue = opcodeWord.value_or(SpvOp(0xffffffff));
 
     // If we couldn't find any info, but used this assignment syntax, raise
     // an error
