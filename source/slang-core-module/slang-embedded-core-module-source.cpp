@@ -329,7 +329,9 @@ struct IntrinsicOpInfo
 #if SLANG_CLANG
 // Clang takes around 10 minutes to compile this file with optimizations, with EarlyCSEPass taking
 // ~95% of the execution time. Disabling optimizations here reduces the compilation time to seconds
-// and has no noticeable impact on run-time performance.
+// and has no noticeable impact on run-time performance. These functions are only called once,
+// either at build time by slang-bootstrap, or on the first run of the slang-compiler library,
+// depending on the value of the SLANG_EMBED_CORE_MODULE CMake option.
 #pragma clang optimize off
 #endif
 
