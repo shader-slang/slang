@@ -303,6 +303,20 @@ public:
         return llvmType;
     }
 
+    LLVMDebugNode* getDebugFuncType(IRFuncType* funcType, IRTypeLayoutRules* rules)
+    {
+        List<LLVMDebugNode*> params;
+        for (UInt i = 0; i < funcType->getParamCount(); ++i)
+        {
+            IRType* paramType = funcType->getParamType(i);
+            params.add(getDebugType(paramType, rules));
+        }
+
+        return builder->getDebugFunctionType(
+            getDebugType(funcType->getResultType(), rules),
+            Slice(params.begin(), params.getCount()));
+    }
+
     LLVMDebugNode* getDebugType(IRType* type, IRTypeLayoutRules* rules)
     {
         {
@@ -372,6 +386,7 @@ public:
 
         case kIROp_NativePtrType:
         case kIROp_RawPointerType:
+        case kIROp_FuncType:
             llvmType = builder->getDebugPointerType(nullptr);
             break;
 
@@ -469,23 +484,6 @@ public:
                     sizeAndAlignment.alignment,
                     file,
                     line);
-            }
-            break;
-
-        case kIROp_FuncType:
-            {
-                auto funcType = static_cast<IRFuncType*>(legalizedType);
-
-                List<LLVMDebugNode*> params;
-                for (UInt i = 0; i < funcType->getParamCount(); ++i)
-                {
-                    IRType* paramType = funcType->getParamType(i);
-                    params.add(getDebugType(paramType, rules));
-                }
-
-                llvmType = builder->getDebugFunctionType(
-                    getDebugType(funcType->getResultType(), rules),
-                    Slice(params.begin(), params.getCount()));
             }
             break;
 
@@ -2501,16 +2499,16 @@ struct LLVMEmitter
         if (instToDebugLLVM.containsKey(func))
             return instToDebugLLVM[func];
 
-        IRType* funcType = as<IRType>(func->getDataType());
+        IRFuncType* funcType = as<IRFuncType>(func->getDataType());
         LLVMDebugNode* file = nullptr;
         int line = 0;
         if (debugFunc)
         {
-            auto debugFuncType = as<IRType>(debugFunc->getDebugType());
+            auto debugType = as<IRType>(debugFunc->getDebugType());
 
             // TODO: Debug function types are in a bit of a poor state. Let's
             // only use them if they at least have the right type.
-            if (as<IRFuncType>(debugFuncType))
+            if (auto debugFuncType = as<IRFuncType>(debugType))
                 funcType = debugFuncType;
 
             file = instToDebugLLVM.getValue(debugFunc->getFile());
@@ -2520,7 +2518,7 @@ struct LLVMEmitter
         CharSlice linkageName, prettyName;
         maybeGetName(&linkageName, &prettyName, func);
 
-        LLVMDebugNode* llvmFuncType = types->getDebugType(funcType, defaultPointerRules);
+        LLVMDebugNode* llvmFuncType = types->getDebugFuncType(funcType, defaultPointerRules);
         LLVMDebugNode* sp =
             builder->getDebugFunction(llvmFuncType, prettyName, linkageName, file, line);
         instToDebugLLVM[func] = sp;
