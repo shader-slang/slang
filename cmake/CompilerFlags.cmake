@@ -233,7 +233,7 @@ function(set_default_compile_options target)
             target_compile_options(${target} PRIVATE /fsanitize=address)
             target_link_options(${target} PRIVATE /INCREMENTAL:NO)
         else()
-            message(WARNING "Not enabling sanitizers: unsupported C++ compiler")
+            message(FATAL_ERROR "SLANG_ENABLE_ASAN: unsupported C++ compiler")
         endif()
     endif()
 
