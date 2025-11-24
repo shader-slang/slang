@@ -3,24 +3,12 @@
 Deep analysis of critical issues: crashes, compiler errors, and their root causes.
 """
 
-import json
 import re
+import csv
 from collections import Counter, defaultdict
-from pathlib import Path
 from typing import Dict, List, Any, Tuple
 
-DATA_DIR = Path(__file__).parent / "data"
-
-def get_file_loc(filepath):
-    """Get lines of code for a file."""
-    try:
-        full_path = Path(__file__).parent.parent.parent / filepath
-        if full_path.exists() and full_path.is_file():
-            with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
-                return len(f.readlines())
-    except:
-        pass
-    return None
+from analyze_common import get_file_loc, get_component_from_file, load_all_data, DATA_DIR
 
 # Patterns to identify issue types
 CRASH_PATTERNS = [
@@ -47,37 +35,6 @@ ERROR_PATTERNS = {
     "codegen": r"incorrect.*code|wrong.*code|bad.*codegen",
 }
 
-COMPONENT_PATTERNS = {
-    "spirv-emit": r"source/slang/slang-emit-spirv",
-    "dxil-emit": r"source/slang/slang-emit-dxil",
-    "cuda-emit": r"source/slang/slang-emit-cuda",
-    "metal-emit": r"source/slang/slang-emit-metal",
-    "glsl-emit": r"source/slang/slang-emit-glsl",
-    "hlsl-emit": r"source/slang/slang-emit-hlsl",
-    "ir-generation": r"slang-lower-to-ir\.cpp",
-    "ir-inlining": r"slang-ir-inline",
-    "ir-specialization": r"slang-ir-specialize",
-    "ir-legalization": r"slang-ir-legalize",
-    "ir-autodiff": r"slang-ir-autodiff",
-    "semantic-check": r"slang-check",
-    "parser": r"slang-parser\.cpp",
-    "preprocessor": r"slang-preprocessor\.cpp",
-    "type-system": r"slang-type",
-}
-
-def load_data():
-    """Load issues and PRs."""
-    with open(DATA_DIR / "issues.json") as f:
-        issues = json.load(f)
-
-    try:
-        with open(DATA_DIR / "pull_requests.json") as f:
-            prs = json.load(f)
-    except FileNotFoundError:
-        prs = []
-
-    return issues, prs
-
 def is_critical_issue(issue: Dict[str, Any]) -> Tuple[bool, str]:
     """Check if issue is critical and return the type."""
     title = issue.get("title", "").lower()
@@ -102,12 +59,30 @@ def is_critical_issue(issue: Dict[str, Any]) -> Tuple[bool, str]:
     return False, ""
 
 def extract_component_from_text(text: str) -> List[str]:
-    """Extract component mentions from text."""
-    components = []
-    for component, pattern in COMPONENT_PATTERNS.items():
-        if re.search(pattern, text, re.IGNORECASE):
-            components.append(component)
-    return components
+    """Extract component mentions from text using unified categorization.
+
+    Searches for file paths in issue text and categorizes them using
+    get_component_from_file() for consistency with other analysis scripts.
+    """
+    components = set()
+
+    # Common file path patterns in Slang
+    # Match paths like "source/slang/slang-emit-spirv.cpp" or just "slang-emit-spirv.cpp"
+    file_patterns = [
+        r'source/[\w/\-\.]+\.(?:cpp|h|hpp)',  # Full source paths
+        r'slang-[\w\-]+\.(?:cpp|h|hpp)',       # Slang files by name
+        r'tools/[\w/\-\.]+\.(?:cpp|h|hpp)',    # Tools paths
+    ]
+
+    for pattern in file_patterns:
+        matches = re.findall(pattern, text, re.IGNORECASE)
+        for match in matches:
+            # Use unified component categorization
+            component = get_component_from_file(match)
+            if component != "other":  # Only add if we found a specific component
+                components.add(component)
+
+    return list(components)
 
 def extract_error_messages(body: str) -> List[str]:
     """Extract error messages from issue body."""
@@ -269,17 +244,17 @@ def print_critical_report(analysis: Dict[str, Any]):
     # Show file hotspots first - most actionable info
     if analysis["critical_bug_files"]:
         print("\n" + "-"*70)
-        print("TOP 30 FILES MOST OFTEN FIXED FOR CRITICAL BUGS")
+        print("TOP 40 FILES MOST OFTEN FIXED FOR CRITICAL BUGS")
         print("-"*70)
         changes_by_file = analysis.get("critical_bug_files_by_changes", {})
-        for filename, count in analysis["critical_bug_files"].most_common(30):
+        for filename, count in analysis["critical_bug_files"].most_common(40):
             changes = changes_by_file.get(filename, 0)
             print(f"{count:3}x  {changes:5} changes  {filename}")
 
     # Show critical bug fix frequency
     if analysis["critical_bug_files"] and analysis.get("file_loc"):
         print("\n" + "-"*70)
-        print("TOP 30 FILES BY CRITICAL BUG FIX FREQUENCY (critical fixes per 1000 LOC) - source/ only")
+        print("TOP 40 FILES BY CRITICAL BUG FIX FREQUENCY (critical fixes per 1000 LOC) - source/ only")
         print("-"*70)
 
         # Calculate critical bug fix frequency for files with known LOC
@@ -295,7 +270,7 @@ def print_critical_report(analysis: Dict[str, Any]):
         # Sort by density (highest first)
         critical_density.sort(key=lambda x: x[3], reverse=True)
 
-        for filename, bugfix_count, loc, density in critical_density[:30]:
+        for filename, bugfix_count, loc, density in critical_density[:40]:
             print(f"{density:5.2f}  {bugfix_count:3}x fixes  {loc:6} LOC  {filename}")
 
     print("\n" + "-"*70)
@@ -360,7 +335,7 @@ def export_critical_csv(analysis: Dict[str, Any]):
 def main():
     """Main entry point."""
     print("Loading data...")
-    issues, prs = load_data()
+    issues, prs = load_all_data()
 
     print("Analyzing critical issues...")
     analysis = analyze_critical_issues(issues, prs)

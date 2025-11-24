@@ -3,12 +3,10 @@
 Analyze which files are most frequently changed in bug-fix PRs.
 """
 
-import json
 import re
 from collections import Counter, defaultdict
-from pathlib import Path
 
-DATA_DIR = Path(__file__).parent / "data"
+from analyze_common import get_file_loc, get_component_from_file, load_prs
 
 def is_bugfix_pr(pr):
     """Determine if PR is a bug fix based on title and labels."""
@@ -37,11 +35,6 @@ def is_bugfix_pr(pr):
 
     return False, ""
 
-def load_data():
-    """Load PR data."""
-    with open(DATA_DIR / "pull_requests.json") as f:
-        return json.load(f)
-
 def categorize_file(filename):
     """Categorize file by type."""
     if "test" in filename.lower():
@@ -57,175 +50,6 @@ def categorize_file(filename):
     else:
         return "other"
 
-def get_component_from_file(filename):
-    """Extract component from filename."""
-    # Check for tests FIRST (before other patterns)
-    if "test" in filename.lower() or filename.startswith("tests/"):
-        return "test"
-
-    # Build system and CI
-    if any(pattern in filename for pattern in ["CMakeLists.txt", "premake", ".github/workflows",
-                                                 "build/visual-studio", ".vcxproj", "cmake/",
-                                                 ".gitignore", "slang.sln", "CMakePresets.json",
-                                                 "_build.sh", ".sh"]):
-        return "build-system"
-
-    # Documentation
-    elif filename.startswith("docs/") or filename.endswith(".md"):
-        return "docs"
-
-    # Examples
-    elif filename.startswith("examples/"):
-        return "examples"
-
-    # External dependencies
-    elif filename.startswith("external/"):
-        return "external"
-
-    # Prelude/runtime
-    elif filename.startswith("prelude/") or "prelude.h" in filename:
-        return "prelude"
-
-    # Graphics/RHI layer
-    elif "tools/gfx/" in filename or "slang-gfx" in filename or "slang-rhi" in filename:
-        return "gfx-rhi"
-
-    # Backend-specific emitters
-    elif "slang-emit-spirv" in filename:
-        return "spirv-emit"
-    elif "slang-emit-dxil" in filename:
-        return "dxil-emit"
-    elif "slang-emit-cuda" in filename or "slang-emit-c-like" in filename:
-        return "cuda-emit"
-    elif "slang-emit-metal" in filename:
-        return "metal-emit"
-    elif "slang-emit-glsl" in filename:
-        return "glsl-emit"
-    elif "slang-emit-hlsl" in filename:
-        return "hlsl-emit"
-    elif "slang-emit" in filename or "emit.cpp" in filename:
-        return "emit-common"
-
-    # IR generation and lowering
-    elif "slang-lower-to-ir" in filename or "lower-to-ir.cpp" in filename or "lower.cpp" in filename:
-        return "ir-generation"
-
-    # Specific IR passes
-    elif "slang-ir-inline" in filename:
-        return "ir-inlining"
-    elif "slang-ir-specialize" in filename:
-        return "ir-specialization"
-    elif ("slang-ir-legalize" in filename or "slang-legalize-types" in filename or
-          "ir-legalize-types" in filename or "legalize-types.cpp" in filename):
-        return "ir-legalization"
-    elif "slang-ir-autodiff" in filename:
-        return "ir-autodiff"
-    elif "slang-ir-lower" in filename:
-        return "ir-lower"
-    elif ("slang-ir" in filename or "ir.cpp" in filename or "ir.h" in filename or
-          "ir-insts.h" in filename or "ir-inst-defs.h" in filename or "ir-ssa.cpp" in filename):
-        return "ir-passes"
-
-    # Frontend components
-    elif "slang-check" in filename or "check.cpp" in filename:
-        return "semantic-check"
-    elif "slang-parser" in filename or "parser.cpp" in filename:
-        return "parser"
-    elif ("slang-type" in filename or "type-layout.cpp" in filename or
-          "type-defs.h" in filename):
-        return "type-system"
-    elif "slang-preprocessor" in filename or "preprocessor.cpp" in filename:
-        return "preprocessor"
-    elif "slang-syntax" in filename or "syntax.cpp" in filename or "syntax.h" in filename:
-        return "syntax"
-
-    # AST-related
-    elif "slang-ast" in filename or "ast-legalize" in filename:
-        return "ast"
-
-    # Lookup and name resolution
-    elif "slang-lookup" in filename:
-        return "lookup"
-
-    # Reflection and parameter binding
-    elif ("slang-reflection" in filename or "slang-parameter-binding" in filename or
-          "parameter-binding.cpp" in filename or "reflection.cpp" in filename):
-        return "reflection"
-
-    # Mangling
-    elif "slang-mangle" in filename or "mangle.cpp" in filename:
-        return "mangling"
-
-    # Language server
-    elif "slang-language-server" in filename:
-        return "language-server"
-
-    # Special features
-    elif "slang-intrinsic" in filename:
-        return "intrinsics"
-    elif "slang-capability" in filename or "slang-capabilities" in filename:
-        return "capabilities"
-    elif "slang-serialize" in filename:
-        return "serialization"
-    elif "slang-repro" in filename:
-        return "repro"
-    elif "slang-workspace-version" in filename:
-        return "versioning"
-    elif "slang-doc-markdown" in filename:
-        return "doc-generation"
-    elif "slang-spirv-val" in filename:
-        return "spirv-validation"
-
-    # Standard library
-    elif "slang-stdlib" in filename:
-        return "stdlib"
-
-    # Core slang files
-    elif "hlsl.meta.slang" in filename:
-        return "hlsl-stdlib"
-    elif "core.meta.slang" in filename:
-        return "core-stdlib"
-    elif filename.endswith(".meta.slang"):
-        return "stdlib"
-    elif "slang.cpp" in filename or "slang.h" in filename:
-        return "compiler-core"
-    elif "slang-compiler" in filename or "compiler.cpp" in filename or "compiler.h" in filename:
-        return "compiler-core"
-    elif "slang-diagnostic" in filename or "diagnostic-defs.h" in filename or "modifier-defs.h" in filename:
-        return "diagnostics"
-    elif "slang-options" in filename:
-        return "options"
-    elif ".natvis" in filename:
-        return "debugging-tools"
-
-    # Tools
-    elif "source/slangc/" in filename:
-        return "slangc-tool"
-    elif "tools/slang-generate/" in filename:
-        return "code-generation-tool"
-    elif "tools/platform/" in filename:
-        return "platform-tools"
-
-    # Core utilities
-    elif filename.startswith("source/core/"):
-        return "core-utilities"
-    elif filename.startswith("source/compiler-core/"):
-        return "compiler-core"
-
-    else:
-        return "other"
-
-def get_file_loc(filepath):
-    """Get lines of code for a file."""
-    try:
-        full_path = Path(__file__).parent.parent.parent / filepath
-        if full_path.exists() and full_path.is_file():
-            with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
-                return len(f.readlines())
-    except:
-        pass
-    return None
-
 def analyze_bugfix_files(prs):
     """Analyze files changed in bug fix PRs."""
 
@@ -236,6 +60,8 @@ def analyze_bugfix_files(prs):
         "files_by_bugfix_count": Counter(),
         "files_by_changes": Counter(),
         "component_bugfix_count": Counter(),
+        "component_changes": Counter(),  # Track changes per component
+        "component_loc": Counter(),  # Track LOC per component
         "file_type_distribution": Counter(),
         "source_by_component": Counter(),  # Track source files by component
         "file_loc": {},  # NEW: Lines of code per file
@@ -281,6 +107,12 @@ def analyze_bugfix_files(prs):
             # Component
             component = get_component_from_file(filename)
             analysis["component_bugfix_count"][component] += 1
+            analysis["component_changes"][component] += changes
+
+            # Add LOC to component total
+            loc = analysis["file_loc"].get(filename)
+            if loc:
+                analysis["component_loc"][component] += loc
 
             # Track source files by component
             if file_type == "source":
@@ -311,15 +143,15 @@ def print_report(analysis):
         print(f"{bugfix_type:20} {count:4} ({pct:5.1f}%)")
 
     print("\n" + "-"*70)
-    print("TOP 30 FILES CHANGED IN BUG FIXES (by frequency)")
+    print("TOP 40 FILES CHANGED IN BUG FIXES (by frequency)")
     print("-"*70)
-    for filename, count in analysis["files_by_bugfix_count"].most_common(30):
+    for filename, count in analysis["files_by_bugfix_count"].most_common(40):
         changes = analysis["files_by_changes"][filename]
         component = get_component_from_file(filename)
         print(f"{count:3}x  {changes:5} changes  [{component:20}] {filename}")
 
     print("\n" + "-"*70)
-    print("TOP 30 FILES BY BUG FIX FREQUENCY (bug fix PRs per 1000 LOC) - source/ only")
+    print("TOP 40 FILES BY BUG FIX FREQUENCY (bug fix PRs per 1000 LOC) - source/ only")
     print("-"*70)
 
     # Calculate bug fix frequency for files with known LOC
@@ -336,15 +168,19 @@ def print_report(analysis):
     # Sort by density (highest first)
     bug_density.sort(key=lambda x: x[3], reverse=True)
 
-    for filename, bugfix_count, loc, density in bug_density[:30]:
+    for filename, bugfix_count, loc, density in bug_density[:40]:
         component = get_component_from_file(filename)
         print(f"{density:5.2f}  {bugfix_count:3}x fixes  {loc:6} LOC  [{component:20}] {filename}")
 
     print("\n" + "-"*70)
-    print("COMPONENTS BY BUG-FIX FREQUENCY")
+    print("ALL COMPONENTS BY BUG-FIX FREQUENCY")
     print("-"*70)
-    for component, count in analysis["component_bugfix_count"].most_common(20):
-        print(f"{component:30} {count:4} bug fixes")
+    print(f"{'Component':<30} {'Fixes':>6} {'Changes':>8} {'LOC':>10}")
+    print("-"*70)
+    for component, count in analysis["component_bugfix_count"].most_common():
+        changes = analysis["component_changes"][component]
+        loc = analysis["component_loc"][component]
+        print(f"{component:<30} {count:6} {changes:8} {loc:10}")
 
     print("\n" + "-"*70)
     print("FILE TYPE DISTRIBUTION IN BUG FIXES")
@@ -375,7 +211,7 @@ def print_report(analysis):
 def main():
     """Main entry point."""
     print("Loading PR data...")
-    prs = load_data()
+    prs = load_prs()
 
     print("Analyzing bug-fix files...")
     analysis, bugfix_prs = analyze_bugfix_files(prs)

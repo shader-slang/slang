@@ -1,28 +1,16 @@
 #!/usr/bin/env python3
 """
-Analyze GitHub issues to identify quality gaps in the Slang codebase.
+Analyze GitHub issues and pull requests.
 """
 
-import json
 import re
+import json
 from collections import Counter, defaultdict
 from datetime import datetime
-from pathlib import Path
 from typing import Dict, List, Any, Tuple
-import sys
+import csv
 
-DATA_DIR = Path(__file__).parent / "data"
-
-def get_file_loc(filepath):
-    """Get lines of code for a file."""
-    try:
-        full_path = Path(__file__).parent.parent.parent / filepath
-        if full_path.exists() and full_path.is_file():
-            with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
-                return len(f.readlines())
-    except:
-        pass
-    return None
+from analyze_common import get_file_loc, get_component_from_file, load_issues, load_prs, DATA_DIR
 
 # Common source paths in Slang
 SOURCE_PATTERNS = {
@@ -45,26 +33,6 @@ SOURCE_PATTERNS = {
     "generics": r"generic|template",
     "cooperative-matrix": r"cooperative.matrix|CooperativeMatrix",
 }
-
-def load_issues() -> List[Dict[str, Any]]:
-    """Load issues from JSON file."""
-    issues_file = DATA_DIR / "issues.json"
-    if not issues_file.exists():
-        print(f"Error: {issues_file} not found. Run fetch_github_issues.py first.")
-        sys.exit(1)
-
-    with open(issues_file) as f:
-        return json.load(f)
-
-def load_prs() -> List[Dict[str, Any]]:
-    """Load PRs from JSON file."""
-    prs_file = DATA_DIR / "pull_requests.json"
-    if not prs_file.exists():
-        print(f"Warning: {prs_file} not found. PR analysis will be skipped.")
-        return []
-
-    with open(prs_file) as f:
-        return json.load(f)
 
 def extract_keywords(text: str) -> List[str]:
     """Extract relevant keywords from issue text."""
@@ -310,7 +278,7 @@ def analyze_time_to_close(issues: List[Dict[str, Any]]) -> Dict[str, float]:
     return avg_times
 
 def analyze_prs(prs: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Analyze pull requests for quality insights."""
+    """Analyze pull requests."""
     if not prs:
         return {}
 
@@ -445,7 +413,7 @@ def print_report(analysis: Dict[str, Any], issues: List[Dict[str, Any]]):
     cats = analysis["categories"]
 
     print("\n" + "="*70)
-    print("SLANG GITHUB ISSUES ANALYSIS - QUALITY GAPS REPORT")
+    print("SLANG GITHUB ISSUES AND PULL REQUESTS ANALYSIS")
     print("="*70)
 
     # Load metadata
@@ -482,7 +450,7 @@ def print_report(analysis: Dict[str, Any], issues: List[Dict[str, Any]]):
         print(f"Feature req rate:  {feat_pct:.1f}% of all issues")
 
     print("\n" + "-"*70)
-    print("TOP 15 COMPONENTS BY ISSUE COUNT (Quality Gap Indicators)")
+    print("TOP 15 COMPONENTS BY ISSUE COUNT")
     print("-"*70)
     for component, count in cats["by_component"].most_common(15):
         bugs = cats["bugs_by_component"].get(component, 0)
@@ -490,7 +458,7 @@ def print_report(analysis: Dict[str, Any], issues: List[Dict[str, Any]]):
         print(f"{component:25} {count:4} issues  ({bugs:3} bugs, {open_bugs:3} open bugs)")
 
     print("\n" + "-"*70)
-    print("BUGS BY COMPONENT (Areas needing attention)")
+    print("BUGS BY COMPONENT")
     print("-"*70)
     for component, count in cats["bugs_by_component"].most_common(15):
         open_count = cats["open_bugs_by_component"].get(component, 0)
@@ -527,7 +495,7 @@ def print_report(analysis: Dict[str, Any], issues: List[Dict[str, Any]]):
 
     # Most commented issues (indicates complexity/difficulty)
     print("\n" + "-"*70)
-    print("MOST DISCUSSED OPEN ISSUES (High complexity indicators)")
+    print("MOST DISCUSSED OPEN ISSUES")
     print("-"*70)
     open_issues = [i for i in issues if i.get("state") == "open"]
     top_commented = sorted(open_issues, key=lambda x: x.get("comments", 0), reverse=True)[:10]
@@ -620,15 +588,15 @@ def print_pr_report(pr_analysis: Dict[str, Any], prs: List[Dict[str, Any]]):
     # Most changed files (if available)
     if pr_analysis["most_changed_files"]:
         print("\n" + "-"*70)
-        print("TOP 20 MOST FREQUENTLY CHANGED FILES (Quality Hot Spots)")
+        print("TOP 40 MOST FREQUENTLY CHANGED FILES (Hot Spots)")
         print("-"*70)
-        for filename, count in pr_analysis["most_changed_files"].most_common(20):
+        for filename, count in pr_analysis["most_changed_files"].most_common(40):
             print(f"{count:3}x  {filename}")
 
     # Bug fix frequency analysis
     if pr_analysis.get("bugfix_files") and pr_analysis.get("file_loc"):
         print("\n" + "-"*70)
-        print("TOP 20 FILES BY BUG FIX FREQUENCY (bug fix PRs per 1000 LOC) - source/ only")
+        print("TOP 40 FILES BY BUG FIX FREQUENCY (bug fix PRs per 1000 LOC) - source/ only")
         print("-"*70)
 
         # Calculate bug fix frequency for files with known LOC
@@ -644,7 +612,7 @@ def print_pr_report(pr_analysis: Dict[str, Any], prs: List[Dict[str, Any]]):
         # Sort by density (highest first)
         bug_density.sort(key=lambda x: x[3], reverse=True)
 
-        for filename, bugfix_count, loc, density in bug_density[:20]:
+        for filename, bugfix_count, loc, density in bug_density[:40]:
             print(f"{density:5.2f}  {bugfix_count:3}x fixes  {loc:6} LOC  {filename}")
 
     print("\n" + "-"*70)

@@ -1,6 +1,6 @@
 # GitHub Issues Analysis Tools
 
-Tools to analyze Slang's GitHub issues and pull requests for identifying quality gaps, bug-prone components, and areas needing improvement.
+Tools to analyze Slang's GitHub issues and pull requests for identifying bug-prone components, and areas needing improvement.
 
 ## Purpose
 
@@ -146,21 +146,21 @@ python3 fetch_github_issues.py --incremental
 Each analysis script prints a comprehensive report to the console with sections like:
 
 ```
-TOP 15 COMPONENTS BY ISSUE COUNT (Quality Gap Indicators)
+TOP 15 COMPONENTS BY ISSUE COUNT
 ----------------------------------------------------------------------
 spirv                      827 issues  (233 bugs,  54 open bugs)
 hlsl                       703 issues  (120 bugs,  18 open bugs)
 glsl                       661 issues  (144 bugs,  29 open bugs)
 ...
 
-BUGS BY COMPONENT (Areas needing attention)
+BUGS BY COMPONENT
 ----------------------------------------------------------------------
 spirv                      233 bugs total  ( 54 open, 179 closed)
 glsl                       144 bugs total  ( 29 open, 115 closed)
 hlsl                       120 bugs total  ( 18 open, 102 closed)
 ...
 
-TOP 20 MOST FREQUENTLY CHANGED FILES (Quality Hot Spots)
+TOP 20 MOST FREQUENTLY CHANGED FILES (Hot Spots)
 ----------------------------------------------------------------------
 548x  source/slang/hlsl.meta.slang
 505x  source/slang/slang-lower-to-ir.cpp
@@ -237,7 +237,7 @@ Modify `print_report()` functions to export JSON, HTML, or other formats.
 
 ## Workflow Examples
 
-### Weekly Quality Review
+### Report and Review
 
 ```bash
 # Update data (fast)

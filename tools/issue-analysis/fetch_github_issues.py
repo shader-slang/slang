@@ -100,8 +100,8 @@ def fetch_issues_and_prs(since: str = None):
         print("\n=== Fetching Updated Issues and Pull Requests (Incremental) ===")
         print(f"Fetching items updated since: {since}")
     else:
-    print("\n=== Fetching Issues and Pull Requests ===")
-    print("Note: GitHub API returns both issues and PRs in the /issues endpoint")
+        print("\n=== Fetching Issues and Pull Requests ===")
+        print("Note: GitHub API returns both issues and PRs in the /issues endpoint")
 
     # Fetch all (both open and closed)
     all_items = []
@@ -125,19 +125,19 @@ def extract_issues_from_pr(pr: Dict[str, Any]) -> List[int]:
     """
     Extract issue numbers referenced in PR title and body.
     Looks for patterns like: fixes #123, closes #456, resolves #789
-    
+
     This matches GitHub's own issue linking behavior.
     """
     import re
-    
+
     title = pr.get("title", "")
     body = pr.get("body") or ""
     text = f"{title} {body}"
-    
+
     # Pattern matches: fix/fixes/fixed/close/closes/closed/resolve/resolves/resolved #NUMBER
     # Also matches bare #NUMBER references
     pattern = r'(?:fix(?:es|ed)?|close(?:s|d)?|resolve(?:s|d)?)\s*#(\d+)|(?:^|\s)#(\d+)'
-    
+
     issue_numbers = []
     for match in re.finditer(pattern, text, re.IGNORECASE):
         # match.group(1) is from fix/close/resolve pattern
@@ -145,7 +145,7 @@ def extract_issues_from_pr(pr: Dict[str, Any]) -> List[int]:
         num = match.group(1) or match.group(2)
         if num:
             issue_numbers.append(int(num))
-    
+
     # Remove duplicates and sort
     return sorted(list(set(issue_numbers)))
 
@@ -240,13 +240,13 @@ def add_issue_references_to_prs(prs: List[Dict[str, Any]]) -> List[Dict[str, Any
     This is fast (no API calls) and matches GitHub's linking behavior.
     """
     print("\n=== Extracting Issue References from PRs ===")
-    
+
     total_refs = 0
     for pr in prs:
         issue_refs = extract_issues_from_pr(pr)
         pr["referenced_issues"] = issue_refs
         total_refs += len(issue_refs)
-    
+
     print(f"✓ Found {total_refs} issue references across {len(prs)} PRs")
     return prs
 
@@ -255,7 +255,7 @@ def enrich_prs_with_files(prs: List[Dict[str, Any]], only_new: bool = False) -> 
     Enrich PRs with file change information.
     WARNING: This makes additional API calls and can be slow!
     Only run this for detailed analysis.
-    
+
     Args:
         prs: List of PRs to enrich
         only_new: If True, only enrich PRs that don't already have files_changed
@@ -267,11 +267,11 @@ def enrich_prs_with_files(prs: List[Dict[str, Any]], only_new: bool = False) -> 
     else:
         prs_to_enrich = prs
         already_enriched = 0
-    
+
     if not prs_to_enrich:
         print("\n=== All PRs Already Have File Changes ===")
         return prs
-    
+
     print("\n=== Enriching PRs with File Changes ===")
     print(f"PRs to enrich: {len(prs_to_enrich)}")
     if already_enriched > 0:
@@ -280,7 +280,7 @@ def enrich_prs_with_files(prs: List[Dict[str, Any]], only_new: bool = False) -> 
 
     # Create a mapping for quick lookup
     pr_map = {pr["number"]: pr for pr in prs}
-    
+
     for i, pr in enumerate(prs_to_enrich):
         if (i + 1) % 50 == 0:
             print(f"Processed {i + 1}/{len(prs_to_enrich)} PRs...")
@@ -332,15 +332,15 @@ def main():
             if metadata and "fetched_at" in metadata:
                 since = metadata["fetched_at"]
                 previous_enrichments = metadata.get("enrichments", {})
-                
+
                 print(f"=== Incremental Update Mode ===")
                 print(f"Existing data: {len(existing_issues)} issues, {len(existing_prs)} PRs")
                 print(f"Last fetch: {since}")
-                
+
                 # Show previous enrichments info
                 if previous_enrichments:
                     print(f"Previous enrichments detected: {', '.join(k for k, v in previous_enrichments.items() if v)}")
-                
+
                 print(f"Fetching updates since then...\n")
             else:
                 print("No existing data found. Performing full fetch.")
@@ -382,7 +382,7 @@ def main():
 
         if args.incremental:
             print("\nIncremental update successful! Data merged with existing.")
-        
+
         print("\nData enrichments:")
         print("  ✓ PRs include 'referenced_issues' field (issue numbers from PR title/body)")
         print("  ✓ PRs include 'files_changed' field (detailed file change information)")
