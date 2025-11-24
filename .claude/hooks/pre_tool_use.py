@@ -8,6 +8,9 @@ import os
 
 def main():
     try:
+        # Debug: Print to verify pre_tool_use.py is being executed
+        print("DEBUG: pre_tool_use.py is running!", file=sys.stderr)
+        
         # Read JSON input from stdin
         input_data = json.load(sys.stdin)
 
