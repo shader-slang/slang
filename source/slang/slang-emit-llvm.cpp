@@ -193,6 +193,31 @@ public:
         }
     }
 
+    LLVMType* getFuncType(IRFuncType* funcType)
+    {
+        List<LLVMType*> paramTypes;
+        for (UInt i = 0; i < funcType->getParamCount(); ++i)
+        {
+            IRType* paramType = funcType->getParamType(i);
+            paramTypes.add(getType(paramType));
+        }
+
+        auto resultType = funcType->getResultType();
+        auto llvmReturnType = getType(resultType);
+
+        // If attempting to return an aggregate, turn it into an extra
+        // output parameter that is passed with a pointer.
+        if (isAggregateType(resultType))
+        {
+            paramTypes.add(builder->getPointerType());
+            llvmReturnType = builder->getVoidType();
+        }
+
+        return builder->getFunctionType(
+            llvmReturnType,
+            Slice(paramTypes.begin(), paramTypes.getCount()));
+    }
+
     // Returns the type you must use for passing around SSA values in LLVM IR.
     LLVMType* getType(IRType* type)
     {
@@ -245,6 +270,7 @@ public:
         case kIROp_StructType: // Structs are passed as pointers in SSA values
         case kIROp_ConstantBufferType:
         case kIROp_ParameterBlockType:
+        case kIROp_FuncType:
             // LLVM only has opaque pointers now, so everything that lowers as
             // a pointer is just that same opaque pointer.
             llvmType = builder->getPointerType();
@@ -256,33 +282,6 @@ public:
                 LLVMType* elemType = getType(vecType->getElementType());
                 auto elemCount = int(getIntVal(vecType->getElementCount()));
                 llvmType = builder->getVectorType(elemCount, elemType);
-            }
-            break;
-        case kIROp_FuncType:
-            {
-                auto funcType = static_cast<IRFuncType*>(type);
-
-                List<LLVMType*> paramTypes;
-                for (UInt i = 0; i < funcType->getParamCount(); ++i)
-                {
-                    IRType* paramType = funcType->getParamType(i);
-                    paramTypes.add(getType(paramType));
-                }
-
-                auto resultType = funcType->getResultType();
-                auto llvmReturnType = getType(resultType);
-
-                // If attempting to return an aggregate, turn it into an extra
-                // output parameter that is passed with a pointer.
-                if (isAggregateType(resultType))
-                {
-                    paramTypes.add(builder->getPointerType());
-                    llvmReturnType = builder->getVoidType();
-                }
-
-                llvmType = builder->getFunctionType(
-                    llvmReturnType,
-                    Slice(paramTypes.begin(), paramTypes.getCount()));
             }
             break;
         case kIROp_HLSLStructuredBufferType:
@@ -2535,7 +2534,7 @@ struct LLVMEmitter
 
         auto funcType = static_cast<IRFuncType*>(func->getDataType());
 
-        LLVMType* llvmFuncType = types->getType(funcType);
+        LLVMType* llvmFuncType = types->getFuncType(funcType);
 
         String tmp;
         CharSlice linkageName, prettyName;
