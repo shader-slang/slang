@@ -473,7 +473,7 @@ private:
     inline int getHashPos(T& key) const
     {
         const unsigned int hash = (unsigned int)getHashCode(key);
-        return ((unsigned int)(hash * 2654435761)) % m_bucketCountMinusOne;
+        return hash * 2654435761UL % m_bucketCountMinusOne;
     }
     template<typename T>
     FindPositionResult findPosition(const T& key) const
@@ -621,7 +621,7 @@ public:
     {
         m_count = 0;
         m_kvPairs.clear();
-        m_marks.clear();
+        m_marks.resize(0);
     }
     template<typename T>
     bool containsKey(const T& key) const

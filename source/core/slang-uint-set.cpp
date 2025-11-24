@@ -102,6 +102,9 @@ bool UIntSet::operator==(const UIntSet& set) const
 
     const Index minCount = Math::Min(aCount, bCount);
 
+    if (!aElems || !bElems)
+        return aElems == bElems;
+
     return ::memcmp(aElems, bElems, minCount * sizeof(Element)) == 0 &&
            _areAllZero(aElems + minCount, aCount - minCount) &&
            _areAllZero(bElems + minCount, bCount - minCount);

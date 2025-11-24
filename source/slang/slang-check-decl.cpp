@@ -12747,6 +12747,9 @@ void checkDerivativeAttributeImpl(
 
                 DeclRef<FunctionDeclBase> funcDeclRef = defaultFuncDeclRef.as<FunctionDeclBase>();
                 auto funcThisType = getTypeForThisExpr(visitor, funcDeclRef);
+                if (!funcThisType)
+                    return;
+
                 DeclRef<FunctionDeclBase> calleeFuncDeclRef =
                     calleeDeclRef->declRef.template as<FunctionDeclBase>();
                 auto derivativeFuncThisType = getTypeForThisExpr(visitor, calleeFuncDeclRef);

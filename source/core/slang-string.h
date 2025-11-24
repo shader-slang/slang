@@ -467,7 +467,11 @@ class SLANG_RT_API String
     friend class StringBuilder;
 
 private:
-    char* getData() const { return m_buffer ? m_buffer->getData() : (char*)""; }
+    char* getData() const
+    {
+        static char empty[] = "";
+        return m_buffer ? m_buffer->getData() : empty;
+    }
 
 
     void ensureUniqueStorageWithCapacity(Index capacity);
@@ -658,7 +662,11 @@ public:
 #endif
         }
     }
-    bool operator==(const char* strbuffer) const { return (strcmp(begin(), strbuffer) == 0); }
+    bool operator==(const char* strbuffer) const
+    {
+        const char* volatile b = begin();
+        return (strcmp(b, strbuffer) == 0);
+    }
 
     bool operator==(const String& str) const { return (strcmp(begin(), str.begin()) == 0); }
     bool operator!=(const char* strbuffer) const { return (strcmp(begin(), strbuffer) != 0); }

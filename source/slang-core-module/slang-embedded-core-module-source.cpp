@@ -326,6 +326,13 @@ struct IntrinsicOpInfo
 
 #define EMIT_LINE_DIRECTIVE() sb << "#line " << (__LINE__ + 1) << " \"" << path << "\"\n"
 
+#if SLANG_CLANG
+// Clang takes around 10 minutes to compile this file with optimizations, with EarlyCSEPass taking
+// ~95% of the execution time. Disabling optimizations here reduces the compilation time to seconds
+// and has no noticeable impact on run-time performance.
+#pragma clang optimize off
+#endif
+
 ComPtr<ISlangBlob> Session::getCoreLibraryCode()
 {
 #if SLANG_EMBED_CORE_MODULE_SOURCE
@@ -382,3 +389,7 @@ ComPtr<ISlangBlob> Session::getGLSLLibraryCode()
     return glslLibraryCode;
 }
 } // namespace Slang
+
+#if SLANG_CLANG
+#pragma clang optimize on
+#endif
