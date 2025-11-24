@@ -131,6 +131,8 @@
 #include "slang-visitor.h"
 #include "slang-vm-bytecode.h"
 
+#include "spirv-tools/optimizer.hpp"
+
 #include <assert.h>
 
 Slang::String get_slang_cpp_host_prelude();
@@ -2451,84 +2453,21 @@ private:
 // after the spirv-opt step, and a previously created but empty
 // strippedArtifact. The artifact is unmodified, and the strippedArtifact
 // will contain all the artifact's instructions except for debug instructions.
+// This now uses spirv-opt's built-in strip passes instead of manual filtering.
 static SlangResult stripDbgSpirvFromArtifact(
     ComPtr<IArtifact>& artifact,
     ComPtr<IArtifact>& strippedArtifact)
 {
-    // Standard debug opcodes to strip out. This mimics the behavior of
-    // spirv-opt.
-    static const uint16_t debugOpCodeVals[] = {
-        SpvOpSourceContinued,
-        SpvOpSource,
-        SpvOpSourceExtension,
-        SpvOpString,
-        SpvOpName,
-        SpvOpMemberName,
-        SpvOpModuleProcessed,
-        SpvOpLine,
-        SpvOpNoLine};
-    // If the instruction is an extended instruction, then we also need
-    // to check if the instruction number is for a debug instruction as
-    // listed in slang-emit-spirv-ops-debug-info-ext.h
-    static const uint32_t debugExtInstVals[] = {
-        NonSemanticShaderDebugInfo100DebugCompilationUnit,
-        NonSemanticShaderDebugInfo100DebugTypeBasic,
-        NonSemanticShaderDebugInfo100DebugTypePointer,
-        NonSemanticShaderDebugInfo100DebugTypeQualifier,
-        NonSemanticShaderDebugInfo100DebugTypeArray,
-        NonSemanticShaderDebugInfo100DebugTypeVector,
-        NonSemanticShaderDebugInfo100DebugTypeFunction,
-        NonSemanticShaderDebugInfo100DebugTypeComposite,
-        NonSemanticShaderDebugInfo100DebugTypeMember,
-        NonSemanticShaderDebugInfo100DebugFunction,
-        NonSemanticShaderDebugInfo100DebugScope,
-        NonSemanticShaderDebugInfo100DebugNoScope,
-        NonSemanticShaderDebugInfo100DebugInlinedAt,
-        NonSemanticShaderDebugInfo100DebugLocalVariable,
-        NonSemanticShaderDebugInfo100DebugGlobalVariable,
-        NonSemanticShaderDebugInfo100DebugInlinedVariable,
-        NonSemanticShaderDebugInfo100DebugDeclare,
-        NonSemanticShaderDebugInfo100DebugValue,
-        NonSemanticShaderDebugInfo100DebugExpression,
-        NonSemanticShaderDebugInfo100DebugSource,
-        NonSemanticShaderDebugInfo100DebugFunctionDefinition,
-        NonSemanticShaderDebugInfo100DebugSourceContinued,
-        NonSemanticShaderDebugInfo100DebugLine,
-        NonSemanticShaderDebugInfo100DebugEntryPoint,
-        NonSemanticShaderDebugInfo100DebugTypeMatrix,
-    };
-
-    // Hash sets for easier lookup.
-    HashSet<uint16_t> debugOpCodes;
-    for (auto val : debugOpCodeVals)
-        debugOpCodes.add(val);
-    HashSet<uint32_t> debugExtInstNumbers;
-    for (auto val : debugExtInstVals)
-        debugExtInstNumbers.add(val);
-
+    // First, extract the DebugBuildIdentifier hash before stripping
     SpirvInstructionHelper spirvInstructionHelper;
     SLANG_RETURN_ON_FAIL(spirvInstructionHelper.loadBlob(artifact));
 
-    const auto& headerWords = spirvInstructionHelper.getHeaderWords();
-
-    List<uint8_t> spirvWordsList;
-    if (auto totalWordCapacity = headerWords.getCount() + spirvInstructionHelper.getWordCount())
-    {
-        const Index byteCapacity = totalWordCapacity * sizeof(SpvWord);
-        spirvWordsList.reserve(byteCapacity);
-    }
-
-    spirvWordsList.addRange(
-        reinterpret_cast<const uint8_t*>(headerWords.getBuffer()),
-        headerWords.getCount() * sizeof(SpvWord));
-
-    // First find the DebugBuildIdentifier instruction, and keep track of which string
-    // it refers to, this string needs to be kept in the final output.
+    String debugBuildHash;
     SpvWord debugStringId = 0;
     spirvInstructionHelper.visitInstructions(
         [&](const SpirvInstructionHelper::SpvInstruction& inst)
         {
-            if (inst.getOpCode() == SpvOpExtInst)
+            if (inst.getOpCode() == SpvOpExtInst && inst.getWordCountForInst() >= 5)
             {
                 if (inst.getOperand(3) == NonSemanticShaderDebugInfo100DebugBuildIdentifier)
                 {
@@ -2536,9 +2475,8 @@ static SlangResult stripDbgSpirvFromArtifact(
                     return;
                 }
             }
-            else if (inst.getOpCode() == SpvOpExtInstImport)
+            else if (inst.getOpCode() == SpvOpExtInstImport && inst.getWordCountForInst() >= 2)
             {
-                // looking for result id of "OpExtInstImport "NonSemantic.Shader.DebugInfo.100"
                 auto importName = inst.getStringFromInst();
                 if (importName == "NonSemantic.Shader.DebugInfo.100")
                 {
@@ -2547,50 +2485,58 @@ static SlangResult stripDbgSpirvFromArtifact(
             }
         });
 
-    // Iterate over the instructions from the artifact and add them to the list
-    // only if they are not debug instructions. We also get the debug build hash
-    // to use as the filename for the debug spirv file.
-    String debugBuildHash;
-    spirvInstructionHelper.visitInstructions(
-        [&](const SpirvInstructionHelper::SpvInstruction& inst)
-        {
-            if (debugOpCodes.contains(inst.getOpCode()))
+    // Find the debug build hash string
+    if (debugStringId != 0)
+    {
+        spirvInstructionHelper.visitInstructions(
+            [&](const SpirvInstructionHelper::SpvInstruction& inst)
             {
-                // We can only strip strings if they are not being used by the
-                // DebugBuildIdentifier instruction.
-                bool foundDebugString = false;
-                if (inst.getOpCode() == SpvOpString && inst.getOperand(0) == debugStringId)
+                if (inst.getOpCode() == SpvOpString && inst.getWordCountForInst() >= 2 &&
+                    inst.getOperand(0) == debugStringId)
                 {
                     debugBuildHash = inst.getStringFromInst();
-                    foundDebugString = true;
                 }
-                if (!foundDebugString)
-                {
-                    return;
-                }
-            }
-            // Also check if the instruction is an extended instruction containing DebugInfo.
-            if (inst.getOpCode() == SpvOpExtInst)
-            {
-                // Ignore this if the instruction contains DebugInfo and is from the debug import
-                if (debugExtInstNumbers.contains(inst.getOperand(3)) &&
-                    inst.getOperand(2) == spirvInstructionHelper.m_nonSemanticDebugInfoExtSetId)
-                {
-                    return;
-                }
-            }
-            // Otherwise this is a non-debug instruction and should be included.
-            spirvWordsList.addRange(
-                reinterpret_cast<const uint8_t*>(inst.word),
-                inst.getWordCountForInst() * sizeof(SpvWord));
-        });
+            });
+    }
 
-    // Create the stripped artifact using the above created instruction list.
+    // Get the SPIRV data from the artifact
+    ComPtr<ISlangBlob> blob;
+    SLANG_RETURN_ON_FAIL(artifact->loadBlob(ArtifactKeep::No, blob.writeRef()));
+
+    // Use spirv-opt to strip debug and nonsemantic info
+    const uint32_t* spirvData = (const uint32_t*)blob->getBufferPointer();
+    size_t spirvWordCount = blob->getBufferSize() / sizeof(uint32_t);
+
+    spvtools::Optimizer optimizer(SPV_ENV_UNIVERSAL_1_5);
+    
+    // Register the strip passes from spirv-opt
+    optimizer.RegisterPass(spvtools::CreateStripDebugInfoPass());
+    optimizer.RegisterPass(spvtools::CreateStripNonSemanticInfoPass());
+
+    spvtools::OptimizerOptions spvOptOptions;
+    spvOptOptions.set_run_validator(false);
+
+    std::vector<uint32_t> strippedSpirv;
+    if (!optimizer.Run(spirvData, spirvWordCount, &strippedSpirv, spvOptOptions))
+    {
+        return SLANG_FAIL;
+    }
+
+    // Convert to byte list
+    List<uint8_t> spirvWordsList;
+    size_t byteSize = strippedSpirv.size() * sizeof(uint32_t);
+    spirvWordsList.addRange(
+        reinterpret_cast<const uint8_t*>(strippedSpirv.data()),
+        byteSize);
+
+    // Create the stripped artifact
     strippedArtifact->addRepresentationUnknown(ListBlob::moveCreate(spirvWordsList));
 
-    // Set the name of the artifact to the debug build hash so it can be used
-    // as the filename for the debug spirv file.
-    artifact->setName(debugBuildHash.getBuffer());
+    // Set the name of the artifact to the debug build hash
+    if (debugBuildHash.getLength() > 0)
+    {
+        artifact->setName(debugBuildHash.getBuffer());
+    }
 
     return SLANG_OK;
 }
