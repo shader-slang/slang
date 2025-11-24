@@ -85,8 +85,15 @@ jobs:
           Test-Path .\FalcorBin\.git
           Write-Host "=== Running unit tests ==="
           cd .\FalcorBin\tests
-          python -u ./testing/run_unit_tests.py --config windows-vs2022-Release --tags="-slow"
+          Write-Host "Command: python -u ./testing/run_unit_tests.py --config windows-vs2022-Release --tags=`"-slow`""
+          Write-Host "Working directory: $PWD"
+          $env:PYTHONUNBUFFERED = "1"
+          python -u ./testing/run_unit_tests.py --config windows-vs2022-Release --tags="-slow" 2>&1 | Tee-Object -Variable output
+          $exitCode = $LASTEXITCODE
+          Write-Host "Exit code: $exitCode"
+          Write-Host "Output length: $($output.Length) lines"
           cd ../../
+          if ($exitCode -ne 0) { exit $exitCode }
       - name: Copy FalcorBin for debugging
         if: always()
         shell: pwsh
