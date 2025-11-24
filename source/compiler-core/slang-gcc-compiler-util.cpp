@@ -602,12 +602,6 @@ static SlangResult _parseGCCFamilyLine(
         {
             // Shared library
             cmdLine.addArg("-shared");
-
-            if (PlatformUtil::isFamily(PlatformFamily::Unix, platformKind))
-            {
-                // Position independent
-                cmdLine.addArg("-fPIC");
-            }
             break;
         }
     case SLANG_HOST_EXECUTABLE:
@@ -620,15 +614,16 @@ static SlangResult _parseGCCFamilyLine(
             // Don't link, just produce object file
             cmdLine.addArg("-c");
 
-            if (PlatformUtil::isFamily(PlatformFamily::Unix, platformKind))
-            {
-                // Position independent
-                cmdLine.addArg("-fPIC");
-            }
             break;
         }
     default:
         break;
+    }
+
+    if (PlatformUtil::isFamily(PlatformFamily::Unix, platformKind))
+    {
+        // Position independent
+        cmdLine.addArg("-fPIC");
     }
 
 #if defined(__has_feature)
@@ -697,18 +692,14 @@ static SlangResult _parseGCCFamilyLine(
         cmdLine.addArg(fileRep->getPath());
     }
 
-    // Add linker-specific options only when not compiling to object code
-    if (options.targetType != SLANG_OBJECT_CODE)
-    {
-        // Add the library paths
+    // Add the library paths
 
-        if (options.libraryPaths.count && (options.targetType == SLANG_HOST_EXECUTABLE))
-        {
-            if (PlatformUtil::isFamily(PlatformFamily::Apple, platformKind))
-                cmdLine.addArg("-Wl,-rpath,@loader_path,-rpath,@loader_path/../lib");
-            else
-                cmdLine.addArg("-Wl,-rpath,$ORIGIN,-rpath,$ORIGIN/../lib");
-        }
+    if (options.libraryPaths.count && (options.targetType == SLANG_HOST_EXECUTABLE))
+    {
+        if (PlatformUtil::isFamily(PlatformFamily::Apple, platformKind))
+            cmdLine.addArg("-Wl,-rpath,@loader_path,-rpath,@loader_path/../lib");
+        else
+            cmdLine.addArg("-Wl,-rpath,$ORIGIN,-rpath,$ORIGIN/../lib");
     }
 
     StringSlicePool libPathPool(StringSlicePool::Style::Default);

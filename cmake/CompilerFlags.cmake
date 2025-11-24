@@ -216,8 +216,8 @@ function(set_default_compile_options target)
     if(SLANG_ENABLE_ASAN)
         if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
             # Clang defaults to statically linking the sanitizer runtime (except on macOS/Darwin),
-            # which is not compatible with -Wl,--no-undefined, so we need to use dynamic linking
-            # instead (-shared-libsan).
+            # which is not compatible with `-Wl,--no-undefined`, so we need to use dynamic linking
+            # instead (`-shared-libsan`).
             target_compile_options(
                 ${target}
                 PRIVATE -fsanitize=address -shared-libsan

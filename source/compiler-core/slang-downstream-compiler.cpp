@@ -90,7 +90,7 @@ SlangResult CommandLineDownstreamCompiler::compile(
     // If Slang was built with Clang or GCC and sanitizers were enabled, the same `-fsanitize=...`
     // flag must be passed when linking an executable or shared library with a Slang library, or
     // linking will fail. We can't instrument C++ generated from Slang code with sanitizers as they
-    // might report errors that we can't fix, so we separate compilation and linking into two
+    // might report errors that can't be fixed, so we separate compilation and linking into two
     // commands to enable sanitizers only during linking.
     bool shouldSeparateCompileAndLink = options.targetType != SLANG_OBJECT_CODE;
 
@@ -129,7 +129,8 @@ SlangResult CommandLineDownstreamCompiler::compile(
         options.modulePath = SliceUtil::asTerminatedCharSlice(modulePath);
     }
 
-    // Compile stage: compile source to object code
+    // Compile stage if executable or library target: compile source to object code
+
     ComPtr<IArtifact> objectArtifact;
 
     if (shouldSeparateCompileAndLink)
@@ -176,7 +177,8 @@ SlangResult CommandLineDownstreamCompiler::compile(
         }
     }
 
-    // Link stage (or single-stage compile for object code targets)
+    // Link stage if executable or library target, or single-stage compile if object code target
+
     CommandLine cmdLine(m_cmdLine);
 
     if (shouldSeparateCompileAndLink)
