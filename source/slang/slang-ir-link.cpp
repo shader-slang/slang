@@ -2155,6 +2155,7 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
 
     // Clone additional insts that should be included in the linked IR module
     // even if they are not being directly referenced.
+    bool isFirstUserModule = true;
     for (IRModule* irModule : userModules)
     {
         for (auto inst : irModule->getGlobalInsts())
@@ -2175,11 +2176,37 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
                 // to the relevant parameters and cloned via `cloneExtraDecorations`.
                 // In the long run we do not want to *ever* iterate over all the
                 // instructions in all the input modules.
-                [[fallthrough]];
-            case kIROp_DebugSource:
-                // Need to list all source files in the debug source file list,
-                // regardless if the source files participate in the line table or not.
                 cloneValue(context, inst);
+                break;
+            case kIROp_DebugSource:
+                {
+                    // Need to list all source files in the debug source file list,
+                    // regardless if the source files participate in the line table or not.
+                    // For DebugSource from imported modules (not the first/main module),
+                    // we need to mark them as included files so they don't become the
+                    // default debug source for global variables.
+                    auto debugSource = as<IRDebugSource>(inst);
+                    auto isIncludedFileLit = as<IRBoolLit>(debugSource->getIsIncludedFile());
+
+                    // If this is from an imported module and not already marked as included,
+                    // create a new DebugSource with isIncludedFile=true
+                    if (!isFirstUserModule && isIncludedFileLit && !isIncludedFileLit->getValue())
+                    {
+                        auto fileName = as<IRStringLit>(debugSource->getFileName());
+                        auto source = as<IRStringLit>(debugSource->getSource());
+                        auto newDebugSource = context->builder->emitDebugSource(
+                            fileName->getStringSlice(),
+                            source->getStringSlice(),
+                            true);
+                        // Register this as the clone of the original so that references
+                        // to the original will use the new one with isIncludedFile=true
+                        registerClonedValue(context, newDebugSource, inst);
+                    }
+                    else
+                    {
+                        cloneValue(context, inst);
+                    }
+                }
                 break;
             case kIROp_DebugBuildIdentifier:
                 // The debug build identifier won't be referenced by anything,
@@ -2188,6 +2215,7 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
                 break;
             }
         }
+        isFirstUserModule = false;
     }
 
     bool shouldCopyGlobalParams =
