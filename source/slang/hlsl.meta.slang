@@ -18786,6 +18786,8 @@ int GetClusterID()
     case spirv:
         return spirv_asm
         {
+            OpExtension "SPV_NV_cluster_acceleration_structure";
+            OpCapability RayTracingClusterAccelerationStructureNV;
             result:$$int = OpLoad builtin(ClusterIDNV:int);
         };
     }
