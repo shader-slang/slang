@@ -302,9 +302,11 @@ jobs:
           BUILD_RESULT: ${{ job.status }}
 
       # Slack notification on failure (for scheduled runs only)
+      # Temporarily disabled with "&& false" due to known incompatibility with RTX Remix shaders
+      # Re-enable once RTX Remix updates their shader code and Slang version
       - name: Failure notification
         id: slack-notify-failure
-        if: ${{ github.event_name == 'schedule' && !success() }}
+        if: ${{ github.event_name == 'schedule' && !success() && false }}
         uses: slackapi/slack-github-action@v1.26.0
         with:
           payload: |
