@@ -17,5 +17,8 @@ float4 main(VSOutput input) : SV_TARGET {
     return float4(1.0, 1.0, 1.0, 1.0);
 }
 
+// CHECK: %[[VECTOR:[0-9]+]] = OpExtInst %void %{{[a-zA-Z0-9_]+}} DebugTypeVector
+// CHECK: %[[VSOUTPUT:[0-9]+]] = OpExtInst %void %{{[a-zA-Z0-9_]+}} DebugTypePointer
+// CHECK: {{.*}} = OpExtInst %void %{{[a-zA-Z0-9_]+}} DebugTypeFunction %{{[a-zA-Z0-9_]+}} %[[VECTOR]] %[[VSOUTPUT]]
 // CHECK: %[[MATRIX:[0-9]+]] = OpExtInst %void %{{[a-zA-Z0-9_]+}} DebugTypeMatrix
 // CHECK: {{.*}} = OpExtInst %void %{{[a-zA-Z0-9_]+}} DebugTypeFunction %{{[a-zA-Z0-9_]+}} %[[MATRIX]] %[[MATRIX]]
