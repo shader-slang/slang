@@ -105,7 +105,9 @@ Result ShaderObjectLayoutImpl::Builder::setElementTypeLayout(
     for (SlangInt r = 0; r < bindingRangeCount; ++r)
     {
         slang::BindingType slangBindingType = typeLayout->getBindingRangeType(r);
-        uint32_t count = (uint32_t)typeLayout->getBindingRangeBindingCount(r);
+        SlangInt count = typeLayout->getBindingRangeBindingCount(r);
+        SLANG_ASSERT(count != SLANG_UNBOUNDED_SIZE && count != SLANG_UNKNOWN_SIZE);
+
         slang::TypeLayoutReflection* slangLeafTypeLayout =
             typeLayout->getBindingRangeLeafTypeLayout(r);
 
@@ -216,7 +218,9 @@ Result ShaderObjectLayoutImpl::Builder::setElementTypeLayout(
     {
         SlangInt bindingRangeIndex = typeLayout->getSubObjectRangeBindingRangeIndex(r);
         auto slangBindingType = typeLayout->getBindingRangeType(bindingRangeIndex);
-        auto count = (uint32_t)typeLayout->getBindingRangeBindingCount(bindingRangeIndex);
+        SlangInt count = typeLayout->getBindingRangeBindingCount(bindingRangeIndex);
+        SLANG_ASSERT(count != SLANG_UNBOUNDED_SIZE && count != SLANG_UNKNOWN_SIZE);
+
         slang::TypeLayoutReflection* slangLeafTypeLayout =
             typeLayout->getBindingRangeLeafTypeLayout(bindingRangeIndex);
 
