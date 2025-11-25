@@ -1,5 +1,22 @@
 find_package(Git)
 
+# Helper function to display consistent warning message about missing Slang version from git tags
+function(_warn_missing_git_version var version context_msg)
+    message(
+        WARNING
+        "${context_msg}\n"
+        "Git tags are the AUTHORITATIVE source for version information in this project.\n"
+        "Please fetch tags from the remote repository:\n"
+        "    git fetch --tags\n"
+        "Key implications of using an incorrect version number:\n"
+        "  (a) Version APIs and headers will return incorrect version information\n"
+        "  (b) Versioned filenames will be incorrect\n"
+        "If you cannot fetch tags, you can use -D${var}=<version> as a fallback,\n"
+        "but this is NOT the preferred method.\n"
+        "Falling back to default version: ${version}"
+    )
+endfunction()
+
 # Extract a version from the latest tag matching something like v1.2.3.4
 function(get_git_version var_numeric var dir)
     if(NOT DEFINED ${var})
@@ -50,15 +67,23 @@ function(get_git_version var_numeric var dir)
                         "Using version from git describe: ${version_out}"
                     )
                 else()
-                    message(
-                        WARNING
-                        "Getting ${var} failed: ${command} returned ${result}\nIs this a Git repo with tags?\nConsider settings -D${var} to specify a version manually"
+                    _warn_missing_git_version(
+                        "${var}"
+                        "${version}"
+                        "Failed to get version information from git tags."
                     )
                 endif()
             elseif(NOT GIT_EXECUTABLE)
-                message(
-                    WARNING
-                    "Couldn't find git executable to get ${var}, please use -D${var}, using ${version} for now"
+                _warn_missing_git_version(
+                    "${var}"
+                    "${version}"
+                    "Git executable not found - unable to get version information from git tags.\nPlease install git and fetch tags from the remote repository."
+                )
+            elseif(NOT EXISTS "${dir}/.git")
+                _warn_missing_git_version(
+                    "${var}"
+                    "${version}"
+                    "Git repository not found - unable to get version information from git tags.\nIf you cloned this repository, please fetch tags from the remote."
                 )
             endif()
         endif()
