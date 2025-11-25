@@ -26,22 +26,58 @@ static size_t _roundToAlignment(size_t offset, size_t alignment)
     return (offset + mask) & ~mask;
 }
 
-static LayoutSize _roundToAlignment(LayoutSize offset, size_t alignment)
+static LayoutOffset _roundToAlignment(LayoutOffset offset, LayoutOffset alignment)
+{
+    if (offset.isInvalid() || alignment.isInvalid())
+        return LayoutOffset::invalid();
+
+    return _roundToAlignment(offset.getValidValue(), alignment.getValidValue());
+}
+
+static LayoutSize _roundToAlignment(LayoutSize offset, LayoutOffset alignment)
 {
     // An infinite size is assumed to be maximally aligned.
     if (offset.isInfinite())
         return LayoutSize::infinite();
 
-    return _roundToAlignment(offset.getFiniteValue(), alignment);
+    return LayoutSize{_roundToAlignment(offset.getFiniteValue(), alignment)};
 }
 
 static size_t _roundUpToPowerOfTwo(size_t value)
 {
-    // TODO(tfoley): I know this isn't a fast approach
-    size_t result = 1;
-    while (result < value)
-        result *= 2;
-    return result;
+    if (value <= 1)
+        return 1;
+
+    // Subtract 1 to handle exact powers of two correctly
+    value--;
+#if SLANG_VC
+    return 1ULL << (64 - (size_t)__lzcnt64(value));
+#elif SLANG_GCC || SLANG_CLANG
+    return 1ULL << (sizeof(size_t) * 8 - __builtin_clzll(value));
+#else
+    value |= value >> 1;
+    value |= value >> 2;
+    value |= value >> 4;
+    value |= value >> 8;
+    value |= value >> 16;
+    if constexpr (sizeof(size_t) > 4)
+        value |= value >> 32;
+    return value + 1;
+#endif
+}
+
+static LayoutOffset _roundUpToPowerOfTwo(LayoutOffset value)
+{
+    if (value.isInvalid())
+        return LayoutOffset::invalid();
+    return _roundUpToPowerOfTwo(value.getValidValue());
+}
+
+static LayoutSize _roundUpToPowerOfTwo(LayoutSize value)
+{
+    if (value.isInfinite())
+        return LayoutSize::infinite();
+    return LayoutSize{_roundUpToPowerOfTwo(value.getFiniteValue())};
 }
 
 static bool _isAligned(size_t size, size_t alignment)
@@ -147,7 +183,7 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         // the constraints that there must be `elementStride` bytes
         // between consecutive elements.
         //
-        if (elementCount > 0)
+        if (elementCount.compare(0) == std::partial_ordering::greater)
         {
             // We can think of this as either allocating (N-1)
             // chunks of size `elementStride` (for most of the elements)
@@ -156,7 +192,15 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
             // N chunks of size `elementStride` and then "giving back"
             // the final `elementStride - elementSize` bytes.
             //
-            arraySize = (elementStride * (elementCount - 1)) + elementSize;
+            arraySize = (LayoutSize{elementStride} * (elementCount - 1)) + LayoutSize{elementSize};
+        }
+        else if (elementCount.isInfinite())
+        {
+            arraySize = LayoutSize::infinite();
+        }
+        else if (elementCount.isInvalid())
+        {
+            arraySize = LayoutSize::invalid();
         }
 
         SimpleArrayLayoutInfo arrayInfo;
@@ -205,11 +249,11 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
     LayoutSize AddStructField(UniformLayoutInfo* ioStructInfo, UniformLayoutInfo fieldInfo) override
     {
         // Skip zero-size fields
-        if (fieldInfo.size == 0)
+        if (fieldInfo.size.compare(0) == std::partial_ordering::equivalent)
             return ioStructInfo->size;
 
         // A struct type must be at least as aligned as its most-aligned field.
-        ioStructInfo->alignment = std::max(ioStructInfo->alignment, fieldInfo.alignment);
+        ioStructInfo->alignment = maximum(ioStructInfo->alignment, fieldInfo.alignment);
 
         // The new field will be added to the end of the struct.
         auto fieldBaseOffset = ioStructInfo->size;
@@ -283,8 +327,11 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
         SLANG_RELEASE_ASSERT(elementInfo.kind == LayoutResourceKind::Uniform);
         SLANG_RELEASE_ASSERT(elementInfo.size.isFinite());
 
-        auto size = elementInfo.size.getFiniteValue() * elementCount;
-        SimpleLayoutInfo vectorInfo(LayoutResourceKind::Uniform, size, _roundUpToPowerOfTwo(size));
+        auto size = elementInfo.size * elementCount;
+        SimpleLayoutInfo vectorInfo(
+            LayoutResourceKind::Uniform,
+            size,
+            LayoutOffset{_roundUpToPowerOfTwo(size)});
         return vectorInfo;
     }
 
@@ -335,8 +382,7 @@ struct Std140LayoutRulesImpl : GLSLBaseLayoutRulesImpl
         //
         if (elementInfo.kind == LayoutResourceKind::Uniform)
         {
-            if (elementInfo.alignment < 16)
-                elementInfo.alignment = 16;
+            elementInfo.alignment = maximum(elementInfo.alignment, 16);
         }
         return Super::GetArrayLayout(elementInfo, elementCount);
     }
@@ -374,8 +420,7 @@ struct HLSLConstantBufferLayoutRulesImpl : DefaultLayoutRulesImpl
     {
         if (elementInfo.kind == LayoutResourceKind::Uniform)
         {
-            if (elementInfo.alignment < 16)
-                elementInfo.alignment = 16;
+            elementInfo.alignment = maximum(elementInfo.alignment, 16);
         }
         return Super::GetArrayLayout(elementInfo, elementCount);
     }
@@ -402,22 +447,22 @@ struct HLSLConstantBufferLayoutRulesImpl : DefaultLayoutRulesImpl
     LayoutSize AddStructField(UniformLayoutInfo* ioStructInfo, UniformLayoutInfo fieldInfo) override
     {
         // Skip zero-size fields
-        if (fieldInfo.size == 0)
+        if (fieldInfo.size.compare(0) == std::partial_ordering::equivalent)
             return ioStructInfo->size;
 
-        ioStructInfo->alignment = std::max(ioStructInfo->alignment, fieldInfo.alignment);
+        ioStructInfo->alignment = maximum(ioStructInfo->alignment, fieldInfo.alignment);
         ioStructInfo->size = _roundToAlignment(ioStructInfo->size, fieldInfo.alignment);
 
         LayoutSize fieldOffset = ioStructInfo->size;
         LayoutSize fieldSize = fieldInfo.size;
 
         // Would this field cross a 16-byte boundary?
-        auto registerSize = 16;
+        UInt registerSize = 16;
         auto startRegister = fieldOffset / registerSize;
         auto endRegister = (fieldOffset + fieldSize - 1) / registerSize;
-        if (startRegister != endRegister)
+        if (startRegister.compare(endRegister) != std::partial_ordering::equivalent)
         {
-            ioStructInfo->size = _roundToAlignment(ioStructInfo->size, size_t(registerSize));
+            ioStructInfo->size = _roundToAlignment(ioStructInfo->size, registerSize);
             fieldOffset = ioStructInfo->size;
         }
 
@@ -572,7 +617,11 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
         // It's fine to use the Default impl, as long as any elements size is alignment rounded (as
         // happen in EndStructLayout). If that weren't the case the array may be smaller than
         // elementSize * elementCount which would be wrong for CUDA.
-        SLANG_ASSERT(_isAligned(elementInfo.size.getFiniteValue(), elementInfo.alignment));
+        SLANG_ASSERT(
+            elementInfo.alignment.isInvalid() ||
+            _isAligned(
+                elementInfo.size.getFiniteValue().getValidValue(),
+                elementInfo.alignment.getValidValue()));
 
         return Super::GetArrayLayout(elementInfo, elementCount);
     }
@@ -590,16 +639,25 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
             vectorInfo.alignment = elementInfo.alignment;
             return vectorInfo;
         }
+        if (elementInfo.size.isInvalid())
+        {
+            SimpleLayoutInfo vectorInfo;
+            vectorInfo.kind = elementInfo.kind;
+            vectorInfo.size = LayoutSize::invalid();
+            vectorInfo.alignment = elementInfo.alignment;
+            return vectorInfo;
+        }
 
-        const auto elementSize = elementInfo.size.getFiniteValue();
+        // We just checked it wasn't infinite or invalid
+        auto elementSize = elementInfo.size.getFiniteValue().getValidValue();
 
         // These rules can largely be determines by looking at
         // 'vector_types.h' in the CUDA SDK
 
         // Size in bytes of vector
-        size_t size = elementSize * elementCount;
+        auto size = elementSize * elementCount;
         // Special case 3, as uses alignment of the elementSize
-        size_t alignment = (elementCount == 3) ? elementSize : size;
+        auto alignment = (elementCount == 3) ? elementSize : size;
 
         // special case half
         if (elementType == BaseType::Half && elementCount >= 3)
@@ -609,17 +667,18 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
         }
 
         // Nothing is aligned more than 16
-        alignment = std::min(alignment, size_t(16));
+        alignment = std::min(size_t{16}, alignment);
 
         // For CUDA the size must be a multiple of alignment, as this is the amount of bytes used
         // 'exclusively' by the type.
 
         // The size must be a multiple of the alignment
+        // We checked these earlier
         SLANG_ASSERT(_isAligned(size, alignment));
 
         SimpleLayoutInfo vectorInfo;
         vectorInfo.kind = elementInfo.kind;
-        vectorInfo.size = size;
+        vectorInfo.size = LayoutSize{size};
         vectorInfo.alignment = alignment;
 
         return vectorInfo;
@@ -678,8 +737,17 @@ struct MetalLayoutRulesImpl : public CPULayoutRulesImpl
             vectorInfo.alignment = elementInfo.alignment;
             return vectorInfo;
         }
+        if (elementInfo.size.isInvalid())
+        {
+            SimpleLayoutInfo vectorInfo;
+            vectorInfo.kind = elementInfo.kind;
+            vectorInfo.size = LayoutSize::invalid();
+            vectorInfo.alignment = elementInfo.alignment;
+            return vectorInfo;
+        }
 
-        const auto elementSize = elementInfo.size.getFiniteValue();
+        // We checked validity earlier
+        const auto elementSize = elementInfo.size.getFiniteValue().getValidValue();
         auto alignedElementCount = 1 << Math::Log2Ceil((uint32_t)elementCount);
 
         // Metal aligns vectors to 2/4 element boundaries.
@@ -2565,15 +2633,15 @@ static LayoutSize GetElementCount(IntVal* val)
         // cases where a generic bound might work (because
         // any concrete specialization will have a finite bound...)
         //
-        return 0;
+        return LayoutSize::invalid();
     }
     else if (const auto polyIntVal = as<PolynomialIntVal>(val))
     {
-        return 0;
+        return LayoutSize::invalid();
     }
     else if (as<FuncCallIntVal>(val))
     {
-        return 0;
+        return LayoutSize::invalid();
     }
     SLANG_UNEXPECTED("unhandled integer literal kind");
     UNREACHABLE_RETURN(LayoutSize(0));
@@ -3155,7 +3223,7 @@ IRVarLayout* applyOffsetToVarLayout(
 static bool _usesResourceKind(RefPtr<TypeLayout> typeLayout, LayoutResourceKind kind)
 {
     auto resInfo = typeLayout->FindResourceInfo(kind);
-    return resInfo && resInfo->count != 0;
+    return resInfo && resInfo->count.compare(0) == std::partial_ordering::greater;
 }
 
 static bool _usesOrdinaryData(RefPtr<TypeLayout> typeLayout)
@@ -3723,7 +3791,7 @@ RefPtr<StructuredBufferTypeLayout> createStructuredBufferTypeLayout(
 
     typeLayout->uniformAlignment = info.alignment;
 
-    if (info.size != 0)
+    if (info.size.compare(0) == std::partial_ordering::greater)
     {
         typeLayout->addResourceUsage(info.kind, info.size);
     }
@@ -4051,6 +4119,10 @@ static RefPtr<TypeLayout> maybeAdjustLayoutForArrayElementType(
                         //
                         resInfo.index *= elementCount.getFiniteValue();
                     }
+                    else if (elementCount.isInvalid())
+                    {
+                        resInfo.index = LayoutOffset::invalid();
+                    }
                     else
                     {
                         // If we are making an unbounded array, then a `struct`
@@ -4204,7 +4276,7 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
     // fields to be safe...
     //
     LayoutSize uniformOffset = m_info.size;
-    if (fieldInfo.size == 0)
+    if (fieldInfo.size.compare(0) == std::partial_ordering::equivalent)
     {
         // In case the field has a mixed resource usage,
         // the simple view will not be able to represent the uniform usage.
@@ -4214,7 +4286,7 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
             fieldInfo.size = uniformUsage->count;
         }
     }
-    if (fieldInfo.size != 0)
+    else
     {
         uniformOffset = m_rules->AddStructField(&m_info, fieldInfo);
     }
@@ -4279,6 +4351,10 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
             fieldResourceInfo->space = 0;
             fieldResourceInfo->index = 0;
         }
+        else if (fieldTypeResourceInfo.count.isInvalid())
+        {
+            SLANG_ASSERT(false);
+        }
         else
         {
             // In the case where the field consumes a finite number of slots, we
@@ -4327,10 +4403,11 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addExplicitUniformField(
     auto uniformInfo = m_info;
     m_rules->AddStructField(&uniformInfo, fieldInfo);
     m_info.alignment = uniformInfo.alignment;
-    m_info.size.raw = Math::Max(
-        m_info.size.getFiniteValue(),
-        (size_t)(uniformOffset + fieldResult.layout->FindResourceInfo(LayoutResourceKind::Uniform)
-                                     ->count.getFiniteValue()));
+
+    m_info.size = maximum(
+        m_info.size,
+        uniformOffset + fieldResult.layout->FindResourceInfo(LayoutResourceKind::Uniform)->count);
+
     return fieldLayout;
 }
 
@@ -4867,11 +4944,11 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
 
         auto rowInfo = rules->GetVectorLayout(elementBaseType, elementInfo, colCount);
 
-        size_t majorStride = info.elementStride;
-        size_t minorStride = elementInfo.getUniformLayout().size.getFiniteValue();
+        LayoutOffset majorStride = info.elementStride;
+        LayoutOffset minorStride = elementInfo.getUniformLayout().size.getFiniteValue();
 
-        size_t rowStride = 0;
-        size_t colStride = 0;
+        LayoutOffset rowStride = 0;
+        LayoutOffset colStride = 0;
         if (matrixLayout == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR)
         {
             colStride = majorStride;
@@ -5014,10 +5091,12 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             // the slots its will consume by looking at the layout we've
             // computed so far.
             //
-            Int baseExistentialSlotIndex = 0;
+            Int baseExistentialSlotIndex{0};
             if (auto resInfo =
                     typeLayout->FindResourceInfo(LayoutResourceKind::ExistentialTypeParam))
-                baseExistentialSlotIndex = Int(resInfo->count.getFiniteValue());
+            {
+                baseExistentialSlotIndex = resInfo->count.getFiniteValueOr(0);
+            }
             //
             // When computing the layout for the field, we will give it access
             // to all the incoming specialized type slots that haven't already
@@ -5104,10 +5183,12 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
                 // the slots its will consume by looking at the layout we've
                 // computed so far.
                 //
-                Int baseExistentialSlotIndex = 0;
+                Int baseExistentialSlotIndex{0};
                 if (auto resInfo =
                         typeLayout->FindResourceInfo(LayoutResourceKind::ExistentialTypeParam))
-                    baseExistentialSlotIndex = Int(resInfo->count.getFiniteValue());
+                {
+                    baseExistentialSlotIndex = resInfo->count.getFiniteValueOr(0);
+                }
                 //
                 // When computing the layout for the field, we will give it access
                 // to all the incoming specialized type slots that haven't already
@@ -5333,7 +5414,8 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
                         // requires is more than has been reserved, when the
                         // type does not fit.
                         //
-                        if (usage.count > fixedExistentialValueSize)
+                        if (usage.count.compare(fixedExistentialValueSize) ==
+                            std::partial_ordering::greater)
                         {
                             fits = false;
                             break;
@@ -5411,7 +5493,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         typeLayout->baseTypeLayout = baseTypeLayoutResult.layout;
 
         typeLayout->uniformAlignment = info.alignment;
-        if (info.size != 0)
+        if (info.size.compare(0) == std::partial_ordering::greater)
         {
             typeLayout->addResourceUsage(LayoutResourceKind::Uniform, info.size);
         }
