@@ -476,22 +476,16 @@ extern "C"
     When invoked on an unbounded-size array it will return `SLANG_UNBOUNDED_SIZE`,
     which is defined to be `~size_t(0)`.
 
-    When invoked on an array whose size depends on a link-time constant or generic parameter
-    that has not been specialized, this function returns `SLANG_UNKNOWN_SIZE`.
+    If the size of a type cannot be statically computed, perhaps because it depends on
+    a generic parameter that has not been bound to a specific value, this function returns zero.
 
     Use spReflectionType_GetSpecializedElementCount if the size is dependent on
     a link time constant
     */
     SLANG_API size_t spReflectionType_GetElementCount(SlangReflectionType* type);
 
-    /** Returns the number of elements in the given type, with specialization support.
-
-    This operation is valid for vector and array types. For other types it returns zero.
-
-    When invoked on an unbounded-size array it will return `SLANG_UNBOUNDED_SIZE`.
-    When the size depends on unresolved generic parameters or link-time constants,
-    it returns `SLANG_UNKNOWN_SIZE`. The `reflection` parameter can be used to resolve
-    link-time constants if available.
+    /** The same as spReflectionType_GetElementCount except it takes into account specialization
+     * information from the given reflection info
      */
     SLANG_API size_t spReflectionType_GetSpecializedElementCount(
         SlangReflectionType* type,

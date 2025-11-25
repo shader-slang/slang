@@ -608,7 +608,7 @@ SLANG_API size_t spReflectionType_GetSpecializedElementCount(
     }
 
     return isUnsized                       ? SLANG_UNBOUNDED_SIZE
-           : elementCount->isLinkTimeVal() ? SLANG_UNKNOWN_SIZE
+           : elementCount->isLinkTimeVal() ? 0
                                            : (size_t)getIntVal(elementCount);
 }
 
