@@ -1,28 +1,20 @@
+#
+# Helper function to set up a Slang example target
+# Handles common boilerplate for all examples: asset copying, main wrapper selection, and target creation
+#
 function(example dir)
     cmake_parse_arguments(ARG "WIN32_EXECUTABLE" "" "" ${ARGN})
 
-    set(debug_dir ${CMAKE_CURRENT_BINARY_DIR}/${dir})
+    set(debug_dir ${CMAKE_CURRENT_BINARY_DIR})
 
-    # CONFIGURE_DEPENDS is removed to prevent intermittent build failures on Windows.
-    # See: https://github.com/shader-slang/slang/issues/9037
-    #
-    # Root cause: All examples share the same examples/CMakeFiles/generate.stamp file.
-    # When building in parallel, multiple targets trigger simultaneous CMake regenerations,
-    # causing a race condition on the shared stamp file (~10% failure rate).
-    #
-    # An alternative solution is to add CMakeFiles.txt for each and every examples.
-    # This will allow the build to run concurrently with their own generate.stamp file.
-    # But it may add unnecessary maintained cost when we need to add new examples.
-    #
-    # See: https://gitlab.kitware.com/cmake/cmake/-/issues/21571
     file(
         GLOB asset_files
-        # CONFIGURE_DEPENDS
-        "${dir}/*.slang"
-        "${dir}/*.jpg"
-        "${dir}/*.obj"
-        "${dir}/*.mtl"
-        "${dir}/*.h"
+        CONFIGURE_DEPENDS
+        "./*.slang"
+        "./*.jpg"
+        "./*.obj"
+        "./*.mtl"
+        "./*.h"
     )
 
     list(LENGTH asset_files asset_files_length)
@@ -61,7 +53,7 @@ function(example dir)
     endif()
 
     slang_add_target(
-        ${dir}
+        .
         EXECUTABLE
         USE_FEWER_WARNINGS
         LINK_WITH_PRIVATE
@@ -86,7 +78,7 @@ endfunction()
 
 if(SLANG_ENABLE_EXAMPLES AND SLANG_ENABLE_SLANG_RHI)
     #
-    # Examples
+    # Shared libraries for examples
     #
     slang_add_target(
         example-base
@@ -104,31 +96,42 @@ if(SLANG_ENABLE_EXAMPLES AND SLANG_ENABLE_SLANG_RHI)
     slang_add_target(example-winmain STATIC FOLDER examples EXCLUDE_FROM_ALL)
     slang_add_target(stacktrace-windows STATIC FOLDER examples EXCLUDE_FROM_ALL)
 
+    #
+    # Meta target that depends on all examples
+    #
     add_custom_target(
         all-examples
         COMMENT "meta target which depends on all examples"
     )
     set_target_properties(all-examples PROPERTIES FOLDER examples)
-    example(autodiff-texture WIN32_EXECUTABLE)
-    example(cpu-com-example)
-    example(cpu-hello-world)
-    example(gpu-printing)
-    example(hello-world LINK_WITH_PRIVATE Vulkan-Headers)
-    example(model-viewer WIN32_EXECUTABLE)
-    example(platform-test WIN32_EXECUTABLE)
-    example(ray-tracing WIN32_EXECUTABLE)
-    example(ray-tracing-pipeline WIN32_EXECUTABLE)
-    example(reflection-api)
-    example(reflection-parameter-blocks LINK_WITH_PRIVATE Vulkan-Headers)
-    example(shader-object)
-    example(shader-toy WIN32_EXECUTABLE)
-    example(triangle WIN32_EXECUTABLE)
+
+    #
+    # Add individual examples as subdirectories
+    #
+    add_subdirectory(autodiff-texture)
+    add_subdirectory(cpu-com-example)
+    add_subdirectory(cpu-hello-world)
+    add_subdirectory(gpu-printing)
+    add_subdirectory(hello-world)
+    add_subdirectory(model-viewer)
+    add_subdirectory(platform-test)
+    add_subdirectory(ray-tracing)
+    add_subdirectory(ray-tracing-pipeline)
+    add_subdirectory(reflection-api)
+    add_subdirectory(reflection-parameter-blocks)
+    add_subdirectory(shader-object)
+    add_subdirectory(shader-toy)
+    add_subdirectory(triangle)
+
+    #
+    # Conditional examples
+    #
     if(SLANG_ENABLE_AFTERMATH)
-        example(nv-aftermath-example WIN32_EXECUTABLE)
+        add_subdirectory(nv-aftermath-example)
     endif()
 
     if(SLANG_ENABLE_SLANG_RHI)
-        example(mlp-training LINK_WITH_PRIVATE slang-rhi)
-        example(mlp-training-coopvec LINK_WITH_PRIVATE slang-rhi)
+        add_subdirectory(mlp-training)
+        add_subdirectory(mlp-training-coopvec)
     endif()
 endif()
