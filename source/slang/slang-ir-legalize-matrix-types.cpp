@@ -595,18 +595,21 @@ struct MatrixTypeLoweringContext
         IRType* resultType = inst->getDataType();
         if (auto matrixType = as<IRMatrixType>(resultType))
         {
-            // On targets that require matrix lowering, some matrix result types (e.g. float4x4) do not
-            // need to be lowered, but can be cast from a matrix type that does need to be lowered
-            // (e.g. uint4x4), so we need to check if we should lower the operand even if we should
-            // not lower the result
+            // On targets that require matrix lowering, some matrix result types (e.g. float4x4) do
+            // not need to be lowered, but can be cast from a matrix type that does need to be
+            // lowered (e.g. uint4x4), so we need to check if we should lower the operand even if we
+            // should not lower the result
             bool shouldLowerOperandMatrixType = false;
-            if (inst->getOperandCount() > 0) {
+            if (inst->getOperandCount() > 0)
+            {
                 auto operand = inst->getOperand(0);
                 IRType* operandType = nullptr;
-                if (operand) {
+                if (operand)
+                {
                     operandType = operand->getDataType();
                 }
-                if (auto operandMatrixType = as<IRMatrixType>(operandType)) {        
+                if (auto operandMatrixType = as<IRMatrixType>(operandType))
+                {
                     shouldLowerOperandMatrixType = shouldLowerMatrixType(operandMatrixType);
                 }
             }
