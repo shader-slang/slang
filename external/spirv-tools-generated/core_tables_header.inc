@@ -84,6 +84,7 @@ enum Extension : uint32_t {
   kSPV_EXT_shader_atomic_float_add,
   kSPV_EXT_shader_atomic_float_min_max,
   kSPV_EXT_shader_image_int64,
+  kSPV_EXT_shader_invocation_reorder,
   kSPV_EXT_shader_stencil_export,
   kSPV_EXT_shader_tile_image,
   kSPV_EXT_shader_viewport_index_layer,

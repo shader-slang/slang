@@ -1208,9 +1208,13 @@ IRVarLayout* IRVarLayout::Builder::build()
     {
         if (resInfo.kind == LayoutResourceKind::None)
             continue;
+        if (resInfo.offset.isInvalid())
+            continue;
 
-        IRInst* varOffsetAttr =
-            irBuilder->getVarOffsetAttr(resInfo.kind, resInfo.offset, resInfo.space);
+        IRInst* varOffsetAttr = irBuilder->getVarOffsetAttr(
+            resInfo.kind,
+            resInfo.offset.getValidValue(),
+            resInfo.space);
         operands.add(varOffsetAttr);
     }
 
@@ -6445,7 +6449,7 @@ IRLayoutDecoration* IRBuilder::addLayoutDecoration(IRInst* value, IRLayout* layo
 IRTypeSizeAttr* IRBuilder::getTypeSizeAttr(LayoutResourceKind kind, LayoutSize size)
 {
     auto kindInst = getIntValue(getIntType(), IRIntegerValue(kind));
-    auto sizeInst = getIntValue(getIntType(), IRIntegerValue(size.raw));
+    auto sizeInst = getIntValue(getIntType(), IRIntegerValue(size.unsafeGetRaw()));
 
     IRInst* operands[] = {kindInst, sizeInst};
 

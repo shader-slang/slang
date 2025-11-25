@@ -1172,6 +1172,7 @@ A capability describes an optional feature that a target may or may not support.
 * `hlsl_2018` 
 * `hlsl_coopvec_poc` 
 * `optix_coopvec` 
+* `optix_multilevel_traversal` 
 * `vertex` 
 * `fragment` 
 * `compute` 
@@ -1523,6 +1524,7 @@ A capability describes an optional feature that a target may or may not support.
 * `consumestructuredbuffer` 
 * `structuredbuffer` 
 * `structuredbuffer_rw` 
+* `implicit_derivatives_sampling` 
 * `fragmentprocessing` 
 * `fragmentprocessing_derivativecontrol` 
 * `getattributeatvertex` 
@@ -1541,6 +1543,7 @@ A capability describes an optional feature that a target may or may not support.
 * `texture_querylod` 
 * `texture_querylevels` 
 * `texture_shadowlod` 
+* `texture_shadowgrad` 
 * `atomic_glsl_float1` 
 * `atomic_glsl_float2` 
 * `atomic_glsl_halfvec` 

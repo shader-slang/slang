@@ -1605,6 +1605,10 @@ Result linkAndOptimizeIR(
             irModule,
             codeGenContext->getSink(),
             byteAddressBufferOptions);
+
+#if 0
+        dumpIRIfEnabled(codeGenContext, irModule, "AFTER legalizeByteAddressBufferOps");
+#endif
     }
 
     // For SPIR-V, this function is called elsewhere, so that it can happen after address space

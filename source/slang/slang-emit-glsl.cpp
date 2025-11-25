@@ -1063,7 +1063,10 @@ void GLSLSourceEmitter::_emitGLSLTextureOrTextureSamplerType(
     {
         m_writer->emit("Array");
     }
-    if (type->isShadow())
+
+    // Note: we're adding 'Shadow' only for combined texture/sampler types. Plain texture
+    // types don't have depth/shadow variants in GLSL. (Issue #8802)
+    if (type->isCombined() && type->isShadow())
     {
         m_writer->emit("Shadow");
     }
