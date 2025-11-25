@@ -34,6 +34,16 @@ fetch the submodules also.
 git clone https://github.com/shader-slang/slang --recursive
 ```
 
+You will need the git tags from this repository, otherwise versioning
+information (including the Slang modules directory name and the library
+filenames on macOS and Linux) will be incorrect. The above command should fetch
+them for you, but if you're fetching from a fork you may need to explicitly
+fetch the latest tags from the shader-slang repository with:
+
+```bash
+git fetch https://github.com/shader-slang/slang.git 'refs/tags/*:refs/tags/*'
+```
+
 ## Configure and build
 
 > This section assumes cmake 3.25 or greater, if you're on a lower version
@@ -160,7 +170,7 @@ against the fully versioned library filenames (e.g.,
 `libslang-compiler.so.0.2025.21` instead of `libslang-compiler.so`).
 
 Slang libraries for **Windows** do not have an explicit version in the
-filename, but the same guidance about stability of the ABI applies.
+library filename, but the the same guidance about stability of the ABI applies.
 
 Downstream users of Slang distributing their products as binaries should
 therefor **on all platforms, including Windows** redistribute the Slang
@@ -380,10 +390,10 @@ _Clang_ 17.0 is tested in CI and is the recommended minimum version.
 
 ## Static linking against libslang-compiler
 
+To build statically, set the `SLANG_LIB_TYPE` flag in CMake to `STATIC`.
+
 If linking against a static `libslang-compiler.a` you will need to link against some
 dependencies also if you're not already incorporating them into your project.
-
-You will need to link against:
 
 ```
 ${SLANG_DIR}/build/Release/lib/libslang-compiler.a

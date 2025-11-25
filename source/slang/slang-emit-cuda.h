@@ -87,7 +87,6 @@ protected:
         IRType* valueType,
         IRVarLayout* layout) SLANG_OVERRIDE;
     virtual void emitSimpleTypeImpl(IRType* type) SLANG_OVERRIDE;
-    virtual void emitSimpleValueImpl(IRInst* inst) SLANG_OVERRIDE;
     virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
         SLANG_OVERRIDE;
     virtual void emitVarDecorationsImpl(IRInst* varDecl) SLANG_OVERRIDE;
@@ -125,6 +124,7 @@ protected:
     void _emitInitializerListContent(IRType* elementType, IRUse* operands, Index operandCount);
     void _emitInitializerListValue(IRType* elementType, IRInst* value);
 
+    SlangResult emitWMMAFragmentType(IRCoopMatrixType* coopMatType, StringBuilder& outName);
     RefPtr<CUDAExtensionTracker> m_extensionTracker;
 };
 
