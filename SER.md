@@ -2,6 +2,85 @@
 
 This document compares HitObject methods across different APIs: DXR (DirectX Raytracing), NVAPI, SPIRV, and CUDA/OptiX.
 
+---
+
+## Executive Summary (TLDR)
+
+### Goal
+Enable Slang to support **both NVAPI and DXR 1.3 native** SER (Shader Execution Reordering) without breaking existing code. Same Slang shader code should work on both backends.
+
+### Problem Statement
+- Existing HitObject in Slang was **NVAPI-only** for HLSL target
+- DXR 1.3 introduced native SER support with different syntax (`dx::HitObject` vs `NvHitObject`)
+- Some methods have **different signatures** between APIs (e.g., `Invoke`, `MakeMiss`)
+- Some methods are **API-specific** (e.g., `FromRayQuery` is DXR-only, `GetRayDesc` is NVAPI-only)
+
+### Design Approach
+1. **Capability-based selection**: Use `hlsl_nvapi` vs `hlsl + _sm_6_9` capabilities
+2. **`__target_switch` with capability atoms**: `case hlsl_nvapi:` for NVAPI, `case hlsl:` for DXR 1.3
+3. **Multiple `[require]` attributes**: Enable same method to work on different capability paths
+4. **Overloads for signature differences**: Separate overloads for DXR vs NVAPI variants
+
+### Files Modified
+| File | Changes |
+|------|---------|
+| `slang-capabilities.capdef` | Added `ser_nvapi`, `_ser_hlsl_native`, `ser_dxr`, `ser_dxr_raygen_closesthit_miss` |
+| `hlsl.meta.slang` | Updated HitObject methods with dual-API `__target_switch`, added DXR 1.3-only methods |
+| `slang-emit-hlsl.cpp` | Capability-based type emission (`NvHitObject` vs `dx::HitObject`) |
+
+### Key Implementation Pattern
+```slang
+[require(hlsl_nvapi, ser_raygen_closesthit_miss)]  // NVAPI path
+[require(hlsl, ser_dxr_raygen_closesthit_miss)]    // DXR 1.3 path
+static HitObject MakeNop()
+{
+    __target_switch
+    {
+    case hlsl_nvapi: __intrinsic_asm "($0 = NvMakeNop())";
+    case hlsl:       __intrinsic_asm "($0 = dx::HitObject::MakeNop())";
+    // ... other targets
+    }
+}
+```
+
+### Usage
+```bash
+# NVAPI path (requires explicit capability)
+slangc shader.slang -target hlsl -capability hlsl_nvapi -entry main -stage raygeneration
+
+# DXR 1.3 path (SM 6.9, no NVAPI)
+slangc shader.slang -target hlsl -profile sm_6_9 -entry main -stage raygeneration
+```
+
+### Output Comparison
+| Compilation | HitObject Type | Static Methods | Reorder |
+|-------------|----------------|----------------|---------|
+| `-capability hlsl_nvapi` | `NvHitObject` | `NvMakeNop()`, `NvTraceRayHitObject()` | `NvReorderThread()` |
+| `-profile sm_6_9` | `dx::HitObject` | `dx::HitObject::MakeNop()`, `dx::HitObject::TraceRay()` | `dx::MaybeReorderThread()` |
+
+### Method Count: 53 Total
+- **Static Methods**: 14 (TraceRay, MakeHit, MakeMiss, MakeNop, Invoke, FromRayQuery)
+- **Query State**: 3 (IsMiss, IsHit, IsNop)
+- **Ray Properties**: 9 (GetRayFlags, GetRayTMin, GetObjectRayOrigin, etc.)
+- **Transform Matrices**: 6 (GetObjectToWorld variants, GetWorldToObject variants)
+- **Hit Information**: 7 (GetInstanceIndex, GetHitKind, GetAttributes, etc.)
+- **Shader Table**: 4 (GetShaderTableIndex, LoadLocalRootTableConstant, etc.)
+- **Reordering**: 6 (ReorderThread, MaybeReorderThread variants)
+- **LSS/Sphere**: 4 (GetSpherePositionAndRadius, IsSphereHit, etc.)
+
+### Test Files
+Located in `tests/hlsl-intrinsic/shader-execution-reordering/`:
+- `ser-test-static-methods-dxr.slang` / `ser-test-static-methods-nvapi.slang`
+- `ser-test-query-state.slang`
+- `ser-test-ray-properties*.slang`
+- `ser-test-transform-matrices*.slang`
+- `ser-test-hit-information.slang`
+- `ser-test-shader-table.slang`
+- `ser-test-reordering*.slang`
+- `hit-object-from-rayquery.slang`
+
+---
+
 ## Legend
 
 | Symbol | Meaning |
