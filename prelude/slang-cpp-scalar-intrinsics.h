@@ -648,7 +648,9 @@ SLANG_FORCE_INLINE float f16tof32(const uint32_t value)
 #if __cplusplus >= 202302L
 #include <stdfloat> // C++23
 #else
+#ifndef __STDC_WANT_IEC_60559_TYPES_EXT__
 #define __STDC_WANT_IEC_60559_TYPES_EXT__
+#endif
 #include <float.h>
 #endif
 #endif
