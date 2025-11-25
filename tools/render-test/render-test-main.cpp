@@ -209,6 +209,34 @@ struct TestResourceContext
     List<ComPtr<IResource>> resources;
 };
 
+void collectUsedAttributes(slang::VariableLayoutReflection* varLayout, bool* usedAttributes)
+{
+    slang::TypeLayoutReflection* typeLayout = varLayout->getTypeLayout();
+
+    // If it's a struct, recursively check its fields
+    if (typeLayout->getKind() == slang::TypeReflection::Kind::Struct)
+    {
+        unsigned fieldCount = typeLayout->getFieldCount();
+        for (unsigned i = 0; i < fieldCount; i++)
+        {
+            collectUsedAttributes(typeLayout->getFieldByIndex(i), usedAttributes);
+        }
+    }
+    else
+    {
+        // Check if this parameter has the semantic "A" used by render-test
+        const char* semanticName = varLayout->getSemanticName();
+        if (semanticName && strcmp(semanticName, "A") == 0)
+        {
+            unsigned index = varLayout->getSemanticIndex();
+            if (index < 7)
+            {
+                usedAttributes[index] = true;
+            }
+        }
+    }
+}
+
 class RenderTestApp
 {
 public:
@@ -912,16 +940,17 @@ SlangResult RenderTestApp::initialize(
         case Options::ShaderProgramType::Graphics:
         case Options::ShaderProgramType::GraphicsCompute:
             {
-                // TODO: We should conceivably be able to match up the "available" vertex
-                // attributes, as defined by the vertex stream(s) on the model being
-                // renderer, with the "required" vertex attributes as defiend on the
-                // shader.
+                // We define a fixed set of "available" vertex attributes for the single
+                // triangle used by all graphics tests.
                 //
-                // For now we just create a fixed input layout for all graphics tests
-                // since at present they all draw the same single triangle with a
-                // fixed/known set of attributes.
+                // We filter this list to only include attributes actually used by the
+                // vertex shader to avoid validation warnings.
                 //
-                const InputElementDesc inputElements[] = {
+                // TODO: In the future we should be more flexible and support matching
+                // available attributes from arbitrary models/streams with the shader's
+                // requirements.
+                //
+                const InputElementDesc allInputElements[] = {
                     {"A", 0, Format::RGB32Float, offsetof(Vertex, position)},
                     {"A", 1, Format::RGB32Float, offsetof(Vertex, color)},
                     {"A", 2, Format::RG32Float, offsetof(Vertex, uv)},
@@ -931,11 +960,41 @@ SlangResult RenderTestApp::initialize(
                     {"A", 6, Format::RGBA32Float, offsetof(Vertex, customData3)},
                 };
 
+                // Identify which attributes are actually used by the vertex shader
+                bool usedAttributes[7] = {false};
+                slang::ProgramLayout* programLayout =
+                    m_compilationOutput.output.slangProgram->getLayout();
+
+                for (unsigned i = 0; i < programLayout->getEntryPointCount(); i++)
+                {
+                    auto entryPoint = programLayout->getEntryPointByIndex(i);
+                    if (entryPoint->getStage() == SLANG_STAGE_VERTEX)
+                    {
+                        unsigned paramCount = entryPoint->getParameterCount();
+                        for (unsigned j = 0; j < paramCount; j++)
+                        {
+                            collectUsedAttributes(
+                                entryPoint->getParameterByIndex(j),
+                                usedAttributes);
+                        }
+                    }
+                }
+
+                // Build the filtered list of input elements
+                List<InputElementDesc> inputElements;
+                for (unsigned i = 0; i < SLANG_COUNT_OF(allInputElements); i++)
+                {
+                    if (usedAttributes[i])
+                    {
+                        inputElements.add(allInputElements[i]);
+                    }
+                }
+
                 ComPtr<IInputLayout> inputLayout;
                 SLANG_RETURN_ON_FAIL(device->createInputLayout(
                     sizeof(Vertex),
-                    inputElements,
-                    SLANG_COUNT_OF(inputElements),
+                    inputElements.getBuffer(),
+                    inputElements.getCount(),
                     inputLayout.writeRef()));
 
                 BufferDesc vertexBufferDesc;
