@@ -2350,9 +2350,9 @@ struct TypeReflection
                 return result;
 
             const auto c = type->getElementCount();
-            if(c == SLANG_UNKNOWN_SIZE)
+            if (c == SLANG_UNKNOWN_SIZE)
                 return SLANG_UNKNOWN_SIZE;
-            if (c==SLANG_UNBOUNDED_SIZE)
+            if (c == SLANG_UNBOUNDED_SIZE)
                 return SLANG_UNBOUNDED_SIZE;
             result *= c;
             type = type->getElementType();
