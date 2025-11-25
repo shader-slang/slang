@@ -60,7 +60,7 @@ static size_t _roundUpToPowerOfTwo(size_t value)
     value |= value >> 4;
     value |= value >> 8;
     value |= value >> 16;
-    if (sizeof(size_t) > 4)
+    if constexpr (sizeof(size_t) > 4)
         value |= value >> 32;
     return value + 1;
 #endif
