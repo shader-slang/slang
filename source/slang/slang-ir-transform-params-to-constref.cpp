@@ -53,16 +53,16 @@ struct TransformParamsToConstRefContext
         //   - Scan transitively the uses of the transformed ops, and add IRLoad
         //     in front of them as well.
         //
-        // Phase 2 (post-fixup)
+        // Phase 2
         // - Check all translated IRGetElementPtr instructions. If the index is
         //   a newly translated IRGetElementPtr or IRFieldAddress, add an IRLoad
-        //   to fetch the value of the pointer. This load was omitted in Phase 1
-        //   due to the exception.
-        //   - Note that the post-fixup phase avoids problems with rewrite
-        //     ordering, so we don't try to fuse this in Phase 1
+        //   to fetch the value of the pointer. This insertion of load may have
+        //   been omitted in Phase 1 due to the exception.
+        //   - Note that doing a separate phase avoids problems with IR
+        //     op rewrite ordering, since all rewrites are already done in Phase 1
         //
-        // In addition, IRStore instructions are attempted to also optimize. See
-        // the related comment below.
+        // In addition, IRStore instructions are also attempted to be
+        // optimized. See the related comment below.
 
         HashSet<IRInst*> workListSet;
         workListSet.add(newAddrInst);
@@ -152,17 +152,17 @@ struct TransformParamsToConstRefContext
             auto getElementPtr = as<IRGetElementPtr>(inst);
             IRInst* indexInst = getElementPtr->getOperand(1);
 
-            // In the postfix phase, we'll only consider index instructions if
-            // they were transformed previously by this function. This is an
-            // extra precaution to avoid hiding bugs by other passes, should
-            // they also pass pointers directly as the index.
+            // We'll only consider index instructions if they were transformed
+            // previously by this function. This is an extra precaution to avoid
+            // hiding bugs by other passes, should they also pass pointers
+            // directly as the IRGetElementPtr index.
             if (workListSet.contains(indexInst))
             {
                 switch (indexInst->getOp())
                 {
                 case kIROp_FieldAddress:
                 case kIROp_GetElementPtr:
-                    // post-fix needed
+                    // additional IRLoad() needed
                     builder.setInsertBefore(getElementPtr);
                     auto loadInst = builder.emitLoad(indexInst);
                     getElementPtr->setOperand(1, loadInst);

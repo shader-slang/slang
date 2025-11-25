@@ -9,7 +9,46 @@ struct Payload
 
     int GetVolume()
     {
+        // This function exercises the following transformation in
+        // transformParamsToConstRef():
+        //
+        // IRGetElement(
+        //   IRFieldExtract(...),
+        //   IRFieldExtract(...))
+        //
+        //      =>
+        //
+        // IRGetElementPtr(
+        //   IRFieldAddress(...),
+        //   IRLoad(IRFieldAddress(...)))
+        //
+        // That is, that IRLoad() is correctly injected to
+        // IRGetElementPtr() index when IRFieldExtract() is
+        // transformed to IRFieldAddress()
+
         return volumeStack[volumeStackIndex];
+    }
+
+    int GetVolume2()
+    {
+        // This function exercises the following transformation in
+        // transformParamsToConstRef():
+        //
+        // IRGetElement(
+        //   IRFieldExtract(...),
+        //   IRGetElement(...))
+        //
+        //      =>
+        //
+        // IRGetElementPtr(
+        //   IRFieldAddress(...),
+        //   IRLoad(IRGetElementPtr(...)))
+        //
+        // That is, that IRLoad() is correctly injected to
+        // IRGetElementPtr() index when IRGetElement() is
+        // transformed to IRGetElementPtr()
+
+        return volumeStack[volumeStack[volumeStackIndex]];
     }
 }
 
@@ -23,4 +62,6 @@ void main(inout Payload payload)
 // POSITIVE-NOT: {{(error|warning).*}}:
 
     outputBuffer[0] = payload.GetVolume();
+
+    outputBuffer[1] = payload.GetVolume2();
 }
