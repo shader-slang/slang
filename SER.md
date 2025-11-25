@@ -908,3 +908,130 @@ has to be a subset of the other.
 ```
 
 **Solution**: Use separate cases with separate intrinsics, or use single `case hlsl:` when the intrinsic syntax is identical for both paths (the type emission handles the namespace difference).
+
+---
+
+## 10. Testing Instructions
+
+This section provides commands to verify the dual-API implementation for both DXR 1.3 and NVAPI paths.
+
+### 10.1 Build
+
+```bash
+# Configure and build
+cmake --preset default
+cmake --build --preset debug --target slangc
+```
+
+### 10.2 Test Commands by Category
+
+#### Static Methods
+
+```bash
+# DXR 1.3 Path - should emit dx::HitObject::TraceRay, dx::HitObject::MakeHit, etc.
+./build/Debug/bin/slangc tests/hlsl-intrinsic/shader-execution-reordering/ser-test-static-methods-dxr.slang \
+  -target hlsl -profile sm_6_9 -entry rayGenerationMain -stage raygeneration
+
+# NVAPI Path - should emit NvTraceRayHitObject, NvMakeHit, etc.
+./build/Debug/bin/slangc tests/hlsl-intrinsic/shader-execution-reordering/ser-test-static-methods-nvapi.slang \
+  -target hlsl -capability hlsl_nvapi -entry rayGenerationMain -stage raygeneration
+```
+
+#### Query State (IsMiss, IsHit, IsNop)
+
+```bash
+# DXR 1.3 Path
+./build/Debug/bin/slangc tests/hlsl-intrinsic/shader-execution-reordering/ser-test-query-state.slang \
+  -target hlsl -profile sm_6_9 -entry rayGenerationMain -stage raygeneration
+
+# NVAPI Path
+./build/Debug/bin/slangc tests/hlsl-intrinsic/shader-execution-reordering/ser-test-query-state.slang \
+  -target hlsl -capability hlsl_nvapi -entry rayGenerationMain -stage raygeneration
+```
+
+#### Ray Properties
+
+```bash
+# Common methods (GetObjectRayOrigin, GetObjectRayDirection)
+./build/Debug/bin/slangc tests/hlsl-intrinsic/shader-execution-reordering/ser-test-ray-properties.slang \
+  -target hlsl -profile sm_6_9 -entry rayGenerationMain -stage raygeneration
+
+# DXR 1.3-only methods (GetRayFlags, GetRayTMin, GetRayTCurrent, GetWorldRayOrigin, GetWorldRayDirection)
+./build/Debug/bin/slangc tests/hlsl-intrinsic/shader-execution-reordering/ser-test-ray-properties-dxr.slang \
+  -target hlsl -profile sm_6_9 -entry rayGenerationMain -stage raygeneration
+
+# NVAPI-only methods (GetRayDesc)
+./build/Debug/bin/slangc tests/hlsl-intrinsic/shader-execution-reordering/ser-test-ray-properties-nvapi.slang \
+  -target hlsl -capability hlsl_nvapi -entry rayGenerationMain -stage raygeneration
+```
+
+#### Transform Matrices
+
+```bash
+# DXR 1.3 (GetObjectToWorld3x4, GetObjectToWorld4x3, GetWorldToObject3x4, GetWorldToObject4x3)
+./build/Debug/bin/slangc tests/hlsl-intrinsic/shader-execution-reordering/ser-test-transform-matrices-dxr.slang \
+  -target hlsl -profile sm_6_9 -entry rayGenerationMain -stage raygeneration
+
+# NVAPI (GetObjectToWorld, GetWorldToObject)
+./build/Debug/bin/slangc tests/hlsl-intrinsic/shader-execution-reordering/ser-test-transform-matrices-nvapi.slang \
+  -target hlsl -capability hlsl_nvapi -entry rayGenerationMain -stage raygeneration
+```
+
+#### Hit Information
+
+```bash
+# DXR 1.3 Path
+./build/Debug/bin/slangc tests/hlsl-intrinsic/shader-execution-reordering/ser-test-hit-information.slang \
+  -target hlsl -profile sm_6_9 -entry rayGenerationMain -stage raygeneration
+
+# NVAPI Path
+./build/Debug/bin/slangc tests/hlsl-intrinsic/shader-execution-reordering/ser-test-hit-information.slang \
+  -target hlsl -capability hlsl_nvapi -entry rayGenerationMain -stage raygeneration
+```
+
+#### Shader Table
+
+```bash
+# DXR 1.3 Path
+./build/Debug/bin/slangc tests/hlsl-intrinsic/shader-execution-reordering/ser-test-shader-table.slang \
+  -target hlsl -profile sm_6_9 -entry rayGenerationMain -stage raygeneration
+
+# NVAPI Path
+./build/Debug/bin/slangc tests/hlsl-intrinsic/shader-execution-reordering/ser-test-shader-table.slang \
+  -target hlsl -capability hlsl_nvapi -entry rayGenerationMain -stage raygeneration
+```
+
+#### Reordering (ReorderThread / MaybeReorderThread)
+
+```bash
+# ReorderThread with DXR 1.3 (emits dx::MaybeReorderThread)
+./build/Debug/bin/slangc tests/hlsl-intrinsic/shader-execution-reordering/ser-test-reordering.slang \
+  -target hlsl -profile sm_6_9 -entry rayGenerationMain -stage raygeneration
+
+# ReorderThread with NVAPI (emits NvReorderThread)
+./build/Debug/bin/slangc tests/hlsl-intrinsic/shader-execution-reordering/ser-test-reordering.slang \
+  -target hlsl -capability hlsl_nvapi -entry rayGenerationMain -stage raygeneration
+
+# MaybeReorderThread (DXR 1.3 naming)
+./build/Debug/bin/slangc tests/hlsl-intrinsic/shader-execution-reordering/ser-test-reordering-dxr.slang \
+  -target hlsl -profile sm_6_9 -entry rayGenerationMain -stage raygeneration
+```
+
+#### FromRayQuery (DXR 1.3 only)
+
+```bash
+./build/Debug/bin/slangc tests/hlsl-intrinsic/shader-execution-reordering/hit-object-from-rayquery.slang \
+  -target hlsl -profile sm_6_9 -entry rayGenerationMain -stage raygeneration
+```
+
+### 10.3 Expected Output Differences
+
+| Path | HitObject Type | Static Methods | Reorder Function |
+|------|----------------|----------------|------------------|
+| DXR 1.3 (`-profile sm_6_9`) | `dx::HitObject` | `dx::HitObject::*` | `dx::MaybeReorderThread` |
+| NVAPI (`-capability hlsl_nvapi`) | `NvHitObject` | `Nv*` prefix | `NvReorderThread` |
+
+### 10.4 Header Inclusion Check
+
+- **DXR 1.3**: Should NOT have `#define SLANG_HLSL_ENABLE_NVAPI 1`
+- **NVAPI**: Should have `#define SLANG_HLSL_ENABLE_NVAPI 1` and `#include "nvHLSLExtns.h"`
