@@ -84,7 +84,15 @@ jobs:
           startTime=$(date +%s)
 
           # Configure with default preset (Ninja Multi-Config)
-          cmake --preset default --fresh -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
+          # Disable unnecessary components to speed up build
+          cmake --preset default --fresh \
+            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
+            -DSLANG_ENABLE_EXAMPLES=OFF \
+            -DSLANG_ENABLE_REPLAYER=OFF \
+            -DSLANG_ENABLE_SLANGD=OFF \
+            -DSLANG_ENABLE_SLANGRT=OFF \
+            -DSLANG_ENABLE_SLANG_GLSLANG=ON \
+            -DSLANG_ENABLE_TESTS=OFF
 
           # Build using workflow preset (configure + build + package)
           cmake --workflow --preset release
@@ -132,14 +140,13 @@ jobs:
           ./scripts-common/packman/packman.cmd pull packman-external.xml
         shell: bash
 
-      # Replace packman's Slang with locally built version
-      # This is needed because meson.build uses:
-      # find_program('external/slang/slangc')
-      # which looks for a relative path, not PATH
-      - name: Replace packman Slang with built version
+      # Replace packman's Slang binaries with locally built version
+      # Keep packman's directory structure intact (including junctions)
+      # Just overwrite the executables and DLLs
+      - name: Replace packman Slang binaries with built version
         shell: pwsh
         run: |
-          Write-Host "Replacing packman Slang with locally built version..."
+          Write-Host "Replacing packman Slang binaries with locally built version..."
 
           $remixSlangDir = "dxvk-remix\external\slang"
 
@@ -158,32 +165,18 @@ jobs:
             Write-Host $originalVersion
           }
 
-          # Check if it's a junction and remove it properly
-          $item = Get-Item $remixSlangDir
-          if ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
-            Write-Host "`nDetected junction at: $remixSlangDir"
-            Write-Host "Removing junction (not following the link)..."
-            # Use cmd /c rmdir to remove junction without deleting target
-            cmd /c rmdir "$remixSlangDir"
-          } else {
-            Write-Host "`nNot a junction, removing directory..."
-            Remove-Item -Path $remixSlangDir -Recurse -Force
-          }
-
-          # Create new regular directory
-          Write-Host "Creating new directory at: $remixSlangDir"
-          New-Item -ItemType Directory -Path $remixSlangDir -Force | Out-Null
-
-          # Copy our built Slang binaries to the new directory
+          # Copy our built Slang binaries, overwriting packman's files
+          # This preserves the directory structure (including junctions)
           $builtSlangBin = Resolve-Path "build\Release\bin"
-          Write-Host "`nCopying built Slang from: $builtSlangBin"
+          Write-Host "`nOverwriting Slang binaries from: $builtSlangBin"
           Copy-Item -Path "$builtSlangBin\*" -Destination $remixSlangDir -Recurse -Force
 
           # Verify replacement succeeded
           Write-Host "`nVerifying replacement..."
 
           # Check that key files exist
-          $requiredFiles = @("slangc.exe", "slang.dll", "slang-glslang.dll")
+          # Note: slang.dll is deprecated, slang-compiler.dll is the new primary library
+          $requiredFiles = @("slangc.exe", "slang-compiler.dll", "slang-glslang.dll")
           foreach ($file in $requiredFiles) {
             $filePath = Join-Path $remixSlangDir $file
             if (-not (Test-Path $filePath)) {
@@ -191,6 +184,10 @@ jobs:
               exit 1
             }
           }
+
+          # List all copied Slang DLLs for verification
+          Write-Host "`nCopied Slang files:"
+          Get-ChildItem -Path $remixSlangDir -Filter "slang*" | ForEach-Object { Write-Host "  $($_.Name)" }
 
           # Verify version changed
           $newSlangc = Join-Path $remixSlangDir "slangc.exe"
