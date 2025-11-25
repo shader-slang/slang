@@ -22103,8 +22103,8 @@ struct HitObject
         }
     }
 
-    [__requiresNVAPI]
-    [require(hlsl, ser_raygen_closesthit_miss)]
+    [require(hlsl_nvapi, ser_raygen_closesthit_miss)]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
     static void __hlslMakeHitWithRecordIndex<attr_t>(
         uint HitGroupRecordIndex,
         RaytracingAccelerationStructure AccelerationStructure,
@@ -22118,12 +22118,13 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "NvMakeHitWithRecordIndex";
+        case hlsl_nvapi: __intrinsic_asm "NvMakeHitWithRecordIndex";
+        case hlsl: __intrinsic_asm "($8 = dx::HitObject::MakeHit($0, $1, $2, $3, $4, $5, $6, $7))";
         }
     }
 
-    [__requiresNVAPI]
-    [require(hlsl, ser_raygen_closesthit_miss)]
+    [require(hlsl_nvapi, ser_raygen_closesthit_miss)]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
     static void __hlslMakeHit<attr_t>(RaytracingAccelerationStructure AccelerationStructure,
         uint InstanceIndex,
         uint GeometryIndex,
@@ -22137,12 +22138,13 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "NvMakeHit";
+        case hlsl_nvapi: __intrinsic_asm "NvMakeHit";
+        case hlsl: __intrinsic_asm "($9 = dx::HitObject::MakeHit($0, $1, $2, $3, $4, $5, $6, $7, $8))";
         }
     }
 
-    [__requiresNVAPI]
-    [require(hlsl, ser_raygen_closesthit_miss)]
+    [require(hlsl_nvapi, ser_raygen_closesthit_miss)]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
     static void __hlslTraceRay<payload_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         uint RayFlags,
@@ -22156,7 +22158,8 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "NvTraceRayHitObject";
+        case hlsl_nvapi: __intrinsic_asm "NvTraceRayHitObject";
+        case hlsl: __intrinsic_asm "($8 = dx::HitObject::TraceRay($0, $1, $2, $3, $4, $5, $6, $7))";
         }
     }
 
