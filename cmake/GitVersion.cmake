@@ -6,8 +6,10 @@ function(_warn_missing_git_version var version context_msg)
         WARNING
         "${context_msg}\n"
         "Git tags are the AUTHORITATIVE source for version information in this project.\n"
-        "Please fetch tags from the remote repository:\n"
+        "If you cloned from https://github.com/shader-slang/slang.git, fetch tags:\n"
         "    git fetch --tags\n"
+        "If you cloned from a mirror or fork, fetch tags from the official repository:\n"
+        "    git fetch https://github.com/shader-slang/slang.git 'refs/tags/*:refs/tags/*'\n"
         "Key implications of using an incorrect version number:\n"
         "  (a) Version APIs and headers will return incorrect version information\n"
         "  (b) Versioned filenames will be incorrect\n"
@@ -83,7 +85,7 @@ function(get_git_version var_numeric var dir)
                 _warn_missing_git_version(
                     "${var}"
                     "${version}"
-                    "Git repository not found - unable to get version information from git tags.\nIf you cloned this repository, please fetch tags from the remote."
+                    "Git repository not found - unable to get version information from git tags.\nIf you cloned the repository, please fetch tags from the remote."
                 )
             endif()
         endif()
