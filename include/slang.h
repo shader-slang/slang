@@ -2349,7 +2349,12 @@ struct TypeReflection
             if (!type->isArray())
                 return result;
 
-            result *= type->getElementCount();
+            const auto c = type->getElementCount();
+            if(c == SLANG_UNKNOWN_SIZE)
+                return SLANG_UNKNOWN_SIZE;
+            if (c==SLANG_UNBOUNDED_SIZE)
+                return SLANG_UNBOUNDED_SIZE;
+            result *= c;
             type = type->getElementType();
         }
     }
