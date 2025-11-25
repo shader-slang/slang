@@ -81,6 +81,7 @@ jobs:
           cd .\FalcorBin\tests
           python ./testing/run_unit_tests.py --config windows-vs2022-Release -t "-slow"
           cd ../../
+          Get-ChildItem .\FalcorBin\build\windows-vs2022\bin\Release\FalcorTest*.log -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "=== $($_.FullName) ===" ; Get-Content $_ }
       - name: falcor-image-test
         shell: pwsh
         run: |
@@ -88,3 +89,4 @@ jobs:
           cd .\FalcorBin\tests
           python ./testing/run_image_tests.py --config windows-vs2022-Release --run-only
           cd ../../
+          Get-ChildItem .\FalcorBin\build\windows-vs2022\bin\Release\FalcorTest*.log -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "=== $($_.FullName) ===" ; Get-Content $_ }
