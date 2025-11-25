@@ -9,7 +9,7 @@ standard output = {
             "binding": {"kind": "descriptorTableSlot", "space": 1, "index": 0},
             "type": {
                 "kind": "array",
-                "elementCount": "unbounded",
+                "elementCount": 0,
                 "elementType": {
                     "kind": "DynamicResource"
                 }
@@ -20,7 +20,7 @@ standard output = {
             "binding": {"kind": "descriptorTableSlot", "space": 1, "index": 2},
             "type": {
                 "kind": "array",
-                "elementCount": "unbounded",
+                "elementCount": 0,
                 "elementType": {
                     "kind": "DynamicResource"
                 }
