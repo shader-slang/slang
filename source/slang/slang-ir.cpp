@@ -842,7 +842,7 @@ void fixUpDebugFuncType(IRFunc* func)
             oldDebugFunc->getFile(),
             funcType);
         debugFuncDecor->removeAndDeallocate();
-        builder.addDecoration(funcType, kIROp_DebugFuncDecoration, newDebugFunc);
+        builder.addDecoration(func, kIROp_DebugFuncDecoration, newDebugFunc);
     }
 }
 
@@ -1208,9 +1208,13 @@ IRVarLayout* IRVarLayout::Builder::build()
     {
         if (resInfo.kind == LayoutResourceKind::None)
             continue;
+        if (resInfo.offset.isInvalid())
+            continue;
 
-        IRInst* varOffsetAttr =
-            irBuilder->getVarOffsetAttr(resInfo.kind, resInfo.offset, resInfo.space);
+        IRInst* varOffsetAttr = irBuilder->getVarOffsetAttr(
+            resInfo.kind,
+            resInfo.offset.getValidValue(),
+            resInfo.space);
         operands.add(varOffsetAttr);
     }
 
@@ -2303,8 +2307,7 @@ IRConstant* IRBuilder::_findOrEmitConstant(IRConstant& keyInst)
 
 IRInst* IRBuilder::getBoolValue(bool inValue)
 {
-    IRConstant keyInst;
-    memset(&keyInst, 0, sizeof(keyInst));
+    IRConstant keyInst{};
     keyInst.m_op = kIROp_BoolLit;
     keyInst.typeUse.usedValue = getBoolType();
     keyInst.value.intVal = IRIntegerValue(inValue);
@@ -2318,8 +2321,7 @@ IRInst* IRBuilder::getIntValue(IRIntegerValue value)
 
 IRInst* IRBuilder::getIntValue(IRType* type, IRIntegerValue inValue)
 {
-    IRConstant keyInst;
-    memset(&keyInst, 0, sizeof(keyInst));
+    IRConstant keyInst{};
     keyInst.m_op = kIROp_IntLit;
     keyInst.typeUse.usedValue = type;
     // Truncate the input value based on `type`.
@@ -2356,8 +2358,7 @@ IRInst* IRBuilder::getIntValue(IRType* type, IRIntegerValue inValue)
 
 IRInst* IRBuilder::getFloatValue(IRType* type, IRFloatingPointValue inValue)
 {
-    IRConstant keyInst;
-    memset(&keyInst, 0, sizeof(keyInst));
+    IRConstant keyInst{};
     keyInst.m_op = kIROp_FloatLit;
     keyInst.typeUse.usedValue = type;
     // Truncate the input value based on `type`.
@@ -2379,12 +2380,10 @@ IRInst* IRBuilder::getFloatValue(IRType* type, IRFloatingPointValue inValue)
 
 IRStringLit* IRBuilder::getStringValue(const UnownedStringSlice& inSlice)
 {
-    IRConstant keyInst;
-    memset(&keyInst, 0, sizeof(keyInst));
+    IRConstant keyInst{};
 
     // Mark that this is on the stack...
-    IRDecoration stackDecoration;
-    memset(&stackDecoration, 0, sizeof(stackDecoration));
+    IRDecoration stackDecoration{};
     stackDecoration.m_op = kIROp_TransitoryDecoration;
     stackDecoration.insertAtEnd(&keyInst);
 
@@ -2400,8 +2399,7 @@ IRStringLit* IRBuilder::getStringValue(const UnownedStringSlice& inSlice)
 
 IRBlobLit* IRBuilder::getBlobValue(ISlangBlob* blob)
 {
-    IRConstant keyInst;
-    memset(&keyInst, 0, sizeof(keyInst));
+    IRConstant keyInst{};
 
     char* buffer = (char*)(getModule()->getMemoryArena().allocate(blob->getBufferSize()));
     if (!buffer)
@@ -2413,8 +2411,7 @@ IRBlobLit* IRBuilder::getBlobValue(ISlangBlob* blob)
     UnownedStringSlice inSlice(buffer, blob->getBufferSize());
 
     // Mark that this is on the stack...
-    IRDecoration stackDecoration;
-    memset(&stackDecoration, 0, sizeof(stackDecoration));
+    IRDecoration stackDecoration{};
     stackDecoration.m_op = kIROp_TransitoryDecoration;
     stackDecoration.insertAtEnd(&keyInst);
 
@@ -2430,8 +2427,7 @@ IRBlobLit* IRBuilder::getBlobValue(ISlangBlob* blob)
 
 IRPtrLit* IRBuilder::getPtrValue(IRType* type, void* data)
 {
-    IRConstant keyInst;
-    memset(&keyInst, 0, sizeof(keyInst));
+    IRConstant keyInst{};
     keyInst.m_op = kIROp_PtrLit;
     keyInst.typeUse.usedValue = type;
     keyInst.value.ptrVal = data;
@@ -2440,8 +2436,7 @@ IRPtrLit* IRBuilder::getPtrValue(IRType* type, void* data)
 
 IRPtrLit* IRBuilder::getNullPtrValue(IRType* type)
 {
-    IRConstant keyInst;
-    memset(&keyInst, 0, sizeof(keyInst));
+    IRConstant keyInst{};
     keyInst.m_op = kIROp_PtrLit;
     keyInst.typeUse.usedValue = type;
     keyInst.value.ptrVal = nullptr;
@@ -2452,8 +2447,7 @@ IRVoidLit* IRBuilder::getVoidValue()
 {
     IRType* type = getVoidType();
 
-    IRConstant keyInst;
-    memset(&keyInst, 0, sizeof(keyInst));
+    IRConstant keyInst{};
     keyInst.m_op = kIROp_VoidLit;
     keyInst.typeUse.usedValue = type;
     keyInst.value.intVal = 0;
@@ -3142,6 +3136,7 @@ IRInst* IRBuilder::emitDebugInlinedAt(
     IRInst* debugFunc,
     IRInst* outerInlinedAt)
 {
+    SLANG_ASSERT(debugFunc);
     if (outerInlinedAt)
     {
         IRInst* args[] = {line, col, file, debugFunc, outerInlinedAt};
@@ -6444,7 +6439,7 @@ IRLayoutDecoration* IRBuilder::addLayoutDecoration(IRInst* value, IRLayout* layo
 IRTypeSizeAttr* IRBuilder::getTypeSizeAttr(LayoutResourceKind kind, LayoutSize size)
 {
     auto kindInst = getIntValue(getIntType(), IRIntegerValue(kind));
-    auto sizeInst = getIntValue(getIntType(), IRIntegerValue(size.raw));
+    auto sizeInst = getIntValue(getIntType(), IRIntegerValue(size.unsafeGetRaw()));
 
     IRInst* operands[] = {kindInst, sizeInst};
 

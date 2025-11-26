@@ -1585,6 +1585,10 @@ Result linkAndOptimizeIR(
             irModule,
             codeGenContext->getSink(),
             byteAddressBufferOptions);
+
+#if 0
+        dumpIRIfEnabled(codeGenContext, irModule, "AFTER legalizeByteAddressBufferOps");
+#endif
     }
 
     // For SPIR-V, this function is called elsewhere, so that it can happen after address space
@@ -1939,6 +1943,11 @@ Result linkAndOptimizeIR(
         IRSimplificationOptions simplificationOptions = fastIRSimplificationOptions;
         simplificationOptions.cfgOptions.removeTrivialSingleIterationLoops = true;
         simplifyIR(targetProgram, irModule, simplificationOptions, sink);
+    }
+
+    if (isKhronosTarget(targetRequest) && !emitSpirvDirectly)
+    {
+        legalizeModesOfNonCopyableOpaqueTypedParamsForGLSL(codeGenContext, irModule);
     }
 
     // As a late step, we need to take the SSA-form IR and move things *out*

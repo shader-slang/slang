@@ -92,7 +92,8 @@ String IncludeSystem::simplifyPath(const String& path)
 SlangResult IncludeSystem::findFile(
     String const& pathToInclude,
     String const& pathIncludedFrom,
-    PathInfo& outPathInfo)
+    PathInfo& outPathInfo,
+    Mode mode)
 {
     outPathInfo.type = PathInfo::Type::Unknown;
 
@@ -109,6 +110,7 @@ SlangResult IncludeSystem::findFile(
     }
 
     // Try just relative to current path
+    if (mode == Mode::Quote)
     {
         SlangResult res =
             findFile(SLANG_PATH_TYPE_FILE, pathIncludedFrom, pathToInclude, outPathInfo);
@@ -197,9 +199,10 @@ SlangResult IncludeSystem::findAndLoadFile(
     const String& pathToInclude,
     const String& pathIncludedFrom,
     PathInfo& outPathInfo,
-    ComPtr<ISlangBlob>& outBlob)
+    ComPtr<ISlangBlob>& outBlob,
+    Mode mode)
 {
-    SLANG_RETURN_ON_FAIL(findFile(pathToInclude, pathIncludedFrom, outPathInfo));
+    SLANG_RETURN_ON_FAIL(findFile(pathToInclude, pathIncludedFrom, outPathInfo, mode));
     SLANG_RETURN_ON_FAIL(loadFile(outPathInfo, outBlob));
     return SLANG_OK;
 }
