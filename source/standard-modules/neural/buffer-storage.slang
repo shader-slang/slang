@@ -55,99 +55,10 @@ public struct StructuredBufferStorage<T> : IStorage<T>
         return m_buffer[address + m_baseAddress];
     }
 
-    internal uint4 readUint4(Address address)
-    {
-        uint4 result = uint4(0, 0, 0, 0);
-        const int nBytes = sizeof(T);
-        const int ReadPerElement = 4 / nBytes;
-        const int BitsShiftPerRead = 32 / ReadPerElement;
-        [ForceUnroll]
-        for (int i = 0; i < 4; i++)
-        {
-            [ForceUnroll]
-            for (int j = 0; j < ReadPerElement; j++)
-            {
-                switch (nBytes)
-                {
-                case 1:
-                    result[i] |= uint(bit_cast<uint8_t>(m_buffer[address + m_baseAddress + i * ReadPerElement + j]))
-                                    << (BitsShiftPerRead * (ReadPerElement - 1 - j));
-                    break;
-                case 2:
-                    result[i] |= uint(bit_cast<uint16_t>(m_buffer[address + m_baseAddress + i * ReadPerElement + j]))
-                                    << (BitsShiftPerRead * (ReadPerElement - 1 - j));
-                    break;
-                case 4:
-                    result[i] |= uint(bit_cast<uint>(m_buffer[address + m_baseAddress + i * ReadPerElement + j]))
-                                    << (BitsShiftPerRead * (ReadPerElement - 1 - j));
-                    break;
-                default:
-                    static_assert(false, "Unsupported data type T");
-                    return uint4(0);
-                }
-            }
-        }
-        return result;
-    }
 
     internal uint4 readUint4<bool IsAligned, uint ActualBoundary, uint AlignedBoundary>(Address baseAddress, Address address)
     {
-        if (IsAligned)
-        {
-            return readUint4(address);
-        }
-
-        uint4 result = uint4(0, 0, 0, 0);
-        const int nBytes = sizeof(T);
-        const int ReadPerElement = 4 / nBytes;
-        const int BitsShiftPerRead = 32 / ReadPerElement;
-
-        // end address of this read [address+length-1]
-        int endAddress = (address - baseAddress + 4 * ReadPerElement - 1) % AlignedBoundary;
-
-        // this is same as paddingCount = endAddress < ActualBoundary ? 0 : ActualBoundary - endAddress + 1
-        int paddingCount = max(0, endAddress - ActualBoundary + 1);
-        int elementsToRead = (4 * ReadPerElement) - paddingCount;
-
-        [ForceUnroll]
-        for (int i = 0; i < 4; i++)
-        {
-            int offset = i * ReadPerElement;
-            [ForceUnroll]
-            for (int j = 0; j < ReadPerElement; j++)
-            {
-                // 4 * ReadPerElement is the total number of elements we can read from the buffer.
-                // paddingCount is the number of the elements we need to pad.
-                // e.g. if ReadPerElement is 2, paddingCount is 4.Because (4 * 2 - 4 == 4), so we can
-                // just stop reading when offset bigger than 3.
-                offset += j;
-                if (offset >= elementsToRead)
-                {
-                    return result;
-                }
-
-                int index = (address + m_baseAddress + offset);
-                switch (nBytes)
-                {
-                case 1:
-                    result[i] |= uint(bit_cast<uint8_t>(m_buffer[index]))
-                                    << (BitsShiftPerRead * (ReadPerElement - 1 - j));
-                    break;
-                case 2:
-                    result[i] |= uint(bit_cast<uint16_t>(m_buffer[index]))
-                                    << (BitsShiftPerRead * (ReadPerElement - 1 - j));
-                    break;
-                case 4:
-                    result[i] |= uint(bit_cast<uint>(m_buffer[index]))
-                                    << (BitsShiftPerRead * (ReadPerElement - 1 - j));
-                    break;
-                default:
-                    static_assert(false, "Unsupported data type T");
-                    return uint4(0);
-                }
-            }
-        }
-        return result;
+        return readUint4<T, BufferType, IsAligned, ActualBoundary, AlignedBoundary>(m_buffer, baseAddress, address);
     }
 
     /**
