@@ -21884,12 +21884,15 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl:
+        case hlsl_nvapi:
             {
                 attr_t v;
                 __hlslGetAttributesFromHitObject(v);
                 return v;
             }
+        case hlsl:
+            // DXR 1.3 native - direct method call
+            __intrinsic_asm ".GetAttributes";
         case glsl:
             {
                 // Work out the location
@@ -22093,13 +22096,17 @@ struct HitObject
     /// !!!! Internal NVAPI HLSL impl. Not part of interface! !!!!!!!!!!!!
     ///
 
-    [__requiresNVAPI]
-    [require(hlsl, ser_raygen_closesthit_miss)]
+    [require(hlsl_nvapi, ser_raygen_closesthit_miss)]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
     void __hlslGetAttributesFromHitObject<T>(out T t)
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "NvGetAttributesFromHitObject($0, $1)";
+        case hlsl_nvapi:
+            __intrinsic_asm "NvGetAttributesFromHitObject($0, $1)";
+        case hlsl:
+            // DXR 1.3 native path - use method call syntax
+            __intrinsic_asm ".GetAttributes";
         }
     }
 
