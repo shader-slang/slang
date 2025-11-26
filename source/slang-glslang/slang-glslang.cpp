@@ -268,25 +268,24 @@ static void glslang_optimizeSPIRV(
 
     spvtools::Optimizer optimizer(targetEnv);
 
-    auto messageConsumer =
-        [&](spv_message_level_t level,
-            const char* source,
-            const spv_position_t& position,
-            const char* message)
+    auto messageConsumer = [&](spv_message_level_t level,
+                               const char* source,
+                               const spv_position_t& position,
+                               const char* message)
+    {
+        SPIRVOptimizationDiagnostic diag;
+        diag.level = level;
+        if (source)
         {
-            SPIRVOptimizationDiagnostic diag;
-            diag.level = level;
-            if (source)
-            {
-                diag.source = source;
-            }
-            diag.position = position;
-            if (message)
-            {
-                diag.message = message;
-            }
-            outDiags.push_back(diag);
-        };
+            diag.source = source;
+        }
+        diag.position = position;
+        if (message)
+        {
+            diag.message = message;
+        }
+        outDiags.push_back(diag);
+    };
     optimizer.SetMessageConsumer(messageConsumer);
 
     // If debug info is being generated, propagate
@@ -529,8 +528,7 @@ static void glslang_optimizeSPIRV(
             // If a CompactIdsPass wasn't run, then we should run one if the
             // generated SPIRV is using IDs beyond kDefaultMaxIdBound.
             // The 4th entry in the header is the bound of the module.
-            if (!compactPassRun &&
-                optSpirv.size() > 3 && optSpirv[3] > kDefaultMaxIdBound)
+            if (!compactPassRun && optSpirv.size() > 3 && optSpirv[3] > kDefaultMaxIdBound)
             {
                 spvtools::Optimizer optimizer2(targetEnv);
                 optimizer2.SetMessageConsumer(messageConsumer);
