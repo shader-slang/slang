@@ -669,6 +669,9 @@ Extensions
 `SPV_NV_tensor_addressing`
 > Represents the SPIR-V extension for SPV_NV_tensor_addressing.
 
+`ser_hlsl_native`
+> DXR 1.3 native SER support (SM 6.9, no NVAPI required)
+
 `spvAtomicFloat16AddEXT`
 > Represents the SPIR-V capability for atomic float 16 add operations.
 
@@ -1240,7 +1243,7 @@ Compound Capabilities
 > Collection of shader stages
 
 `ser`
-> Capabilities needed for shader-execution-reordering
+> Capabilities needed for shader-execution-reordering (all paths)
 
 `ser_any_closesthit_intersection_miss`
 > Collection of capabilities for raytracing + shader execution reordering and the shader stages of anyhit, closesthit, intersection, and miss.
@@ -1251,6 +1254,15 @@ Compound Capabilities
 `ser_anyhit_closesthit_intersection`
 > Collection of capabilities for raytracing + shader execution reordering and the shader stages of anyhit, closesthit, and intersection.
 
+`ser_dxr`
+> Capabilities needed for shader-execution-reordering (native DXR 1.3 path)
+
+`ser_dxr_raygen`
+> Collection of capabilities for DXR 1.3 native SER (HLSL only) with raygen stage.
+
+`ser_dxr_raygen_closesthit_miss`
+> Collection of capabilities for DXR 1.3 native SER (HLSL only) with raygen, closesthit, miss stages.
+
 `ser_motion`
 > Capabilities needed for shader-execution-reordering and motion-blur
 
@@ -1259,6 +1271,9 @@ Compound Capabilities
 
 `ser_motion_raygen_closesthit_miss`
 > Collection of capabilities for raytracing + motion blur + shader execution reordering and the shader stages of raygen, closesthit, and miss.
+
+`ser_nvapi`
+> Capabilities needed for shader-execution-reordering (NVAPI path for HLSL)
 
 `ser_raygen`
 > Collection of capabilities for raytracing + shader execution reordering and the shader stage of raygen.
