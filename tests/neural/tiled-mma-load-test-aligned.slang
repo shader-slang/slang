@@ -86,10 +86,6 @@ typealias SPtr = Ptr<uint4, Access::ReadWrite, AddressSpace::GroupShared>;
 
 void testLoadShA(uint tid, uint tileIndex)
 {
-    // Only test the within a warp
-    if (tid >= 32)
-        return;
-
     typealias Storage = StructuredBufferStorage<half>;
 
     Storage storage = Storage(inputBuffer);
@@ -101,10 +97,6 @@ void testLoadShA(uint tid, uint tileIndex)
 
 void testLoadShB(uint tid, uint tileIndex)
 {
-    // Only test the within a warp
-    if (tid >= 32)
-        return;
-
     // Construct the input vector as follow:
     // x = tid * 32 + 0, 1, 2, 3 ... 31
     half inputVector[InputSize];
@@ -159,21 +151,23 @@ bool verifiedOutput(uint tid, uint size, SPtr sharedMem, uint tileIndex)
 
 void test1(uint tid)
 {
-    testLoadShA(tid, 0);
-
     if (tid >= SubgroupSize)
         return;
 
+    testLoadShA(tid, 0);
+
     bool res = verifiedOutput(tid, OutputSize, __getAddress(s_sharedMemoryA[0]), 0);
+    res = WaveActiveAllTrue(res);
     if (tid == 0)
-        outputBuffer[0] = WaveActiveAllTrue(res) ? 1 : 0;
+        outputBuffer[0] = res ? 1 : 0;
     // BUFFER: 1
 
     testLoadShB(tid, 0);
 
     bool res1 = verifiedOutput(tid, InputSize, __getAddress(s_sharedMemoryB[0]), 0);
+    res1 = WaveActiveAllTrue(res1);
     if (tid == 0)
-        outputBuffer[1] = WaveActiveAllTrue(res1) ? 1 : 0;
+        outputBuffer[1] = res1 ? 1 : 0;
     // BUFFER-NEXT: 1
 }
 
@@ -184,15 +178,17 @@ void test2(uint tid)
 
     testLoadShA(tid, 1);
     bool res = verifiedOutput(tid, OutputSize, __getAddress(s_sharedMemoryA[0]), 1);
+    res = WaveActiveAllTrue(res);
     if (tid == 0)
-        outputBuffer[2] = WaveActiveAllTrue(res) ? 1 : 0;
+        outputBuffer[2] = res ? 1 : 0;
     // BUFFER-NEXT: 1
 
     testLoadShB(tid, 1);
 
     bool res1 = verifiedOutput(tid, InputSize, __getAddress(s_sharedMemoryB[0]), 1);
+    res1 = WaveActiveAllTrue(res1);
     if (tid == 0)
-        outputBuffer[3] = res1;
+        outputBuffer[3] = res1 ? 1 : 0;
     // BUFFER-NEXT: 1
 }
 

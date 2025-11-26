@@ -129,7 +129,12 @@ public struct BindlessBufferStorage<T> : IStorage<T>
 
     // Following method will not be needed for bindless storage
     public T read(Address address) { return address[0]; }
-    public uint4 readUint4(Address address) { static_assert(false, "Not implemented"); return uint4(0);}
+    internal uint4 readUint4(Address address) { static_assert(false, "Not implemented"); return uint4(0);}
+    internal uint4 readUint4<bool IsAligned, uint ActualBoundary, uint AlignedBoundary>(Address baseAddress, Address address)
+    {
+        static_assert(false, "Not implemented");
+        return uint4(0);
+    }
     public void atomicAdd(Address address, T value) {address.atomicAdd(0, value);}
     public void write(Address address, T value) {address[0] = value;}
     public static Address getOffset(Address base, int elements) { return base.getOffset(elements); }
@@ -144,7 +149,12 @@ public struct PointerStorage<T> : IStorage<T>
 
     // Following method will not be needed for pointer storage
     public T read(Address address) { return address[0]; }
-    public uint4 readUint4(Address address) {static_assert(false, "Not implemented"); return uint4(0);}
+    internal uint4 readUint4(Address address) {static_assert(false, "Not implemented"); return uint4(0);}
+    internal uint4 readUint4<bool IsAligned, uint ActualBoundary, uint AlignedBoundary>(Address baseAddress, Address address)
+    {
+        static_assert(false, "Not implemented");
+        return uint4(0);
+    }
     public void atomicAdd(Address address, T value) {address.atomicAdd(0, value);}
     public void write(Address address, T value) {address[0] = value;}
     public static Address getOffset(Address base, int elements) {return base.getOffset(elements);}

@@ -10,6 +10,7 @@ Supports offset-based addressing and atomic operations for gradient accumulation
 - `T.Differential` must conform to `__BuiltinFloatingPointType` for automatic differentiation
 @category neural
 */
+
 public struct StructuredBufferStorage<T> : IStorage<T>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
@@ -54,59 +55,99 @@ public struct StructuredBufferStorage<T> : IStorage<T>
         return m_buffer[address + m_baseAddress];
     }
 
-    public uint4 readUint4(Address address)
+    internal uint4 readUint4(Address address)
     {
-        const int nBytes = sizeof(T);
         uint4 result = uint4(0, 0, 0, 0);
-        switch (nBytes)
+        const int nBytes = sizeof(T);
+        const int ReadPerElement = 4 / nBytes;
+        const int BitsShiftPerRead = 32 / ReadPerElement;
+        [ForceUnroll]
+        for (int i = 0; i < 4; i++)
         {
-        case 1:
-            return uint4(
-                uint(bit_cast<uint8_t>(m_buffer[address + m_baseAddress])) << 24    |
-                uint(bit_cast<uint8_t>(m_buffer[address + m_baseAddress + 1])) << 16|
-                uint(bit_cast<uint8_t>(m_buffer[address + m_baseAddress + 2])) << 8 |
-                uint(bit_cast<uint8_t>(m_buffer[address + m_baseAddress + 3])),
-
-                uint(bit_cast<uint8_t>(m_buffer[address + m_baseAddress + 4])) << 24 |
-                uint(bit_cast<uint8_t>(m_buffer[address + m_baseAddress + 5])) << 16 |
-                uint(bit_cast<uint8_t>(m_buffer[address + m_baseAddress + 6])) << 8  |
-                uint(bit_cast<uint8_t>(m_buffer[address + m_baseAddress + 7])),
-
-                uint(bit_cast<uint8_t>(m_buffer[address + m_baseAddress + 8])) << 24 |
-                uint(bit_cast<uint8_t>(m_buffer[address + m_baseAddress + 9])) << 16 |
-                uint(bit_cast<uint8_t>(m_buffer[address + m_baseAddress + 10])) << 8 |
-                uint(bit_cast<uint8_t>(m_buffer[address + m_baseAddress + 11])),
-
-                uint(bit_cast<uint8_t>(m_buffer[address + m_baseAddress + 12])) << 24 |
-                uint(bit_cast<uint8_t>(m_buffer[address + m_baseAddress + 13])) << 16 |
-                uint(bit_cast<uint8_t>(m_buffer[address + m_baseAddress + 14])) << 8  |
-                uint(bit_cast<uint8_t>(m_buffer[address + m_baseAddress + 15])),
-        );
-
-        case 2:
-            return uint4(
-                uint(bit_cast<uint16_t>(m_buffer[address + m_baseAddress])) << 16 |
-                uint(bit_cast<uint16_t>(m_buffer[address + m_baseAddress + 1])),
-
-                uint(bit_cast<uint16_t>(m_buffer[address + m_baseAddress + 2])) << 16 |
-                uint(bit_cast<uint16_t>(m_buffer[address + m_baseAddress + 3])),
-
-                uint(bit_cast<uint16_t>(m_buffer[address + m_baseAddress + 4])) << 16 |
-                uint(bit_cast<uint16_t>(m_buffer[address + m_baseAddress + 5])),
-
-                uint(bit_cast<uint16_t>(m_buffer[address + m_baseAddress + 6])) << 16 |
-                uint(bit_cast<uint16_t>(m_buffer[address + m_baseAddress + 7])),
-            );
-        case 4:
-            return uint4(
-                bit_cast<uint>(m_buffer[address + m_baseAddress]),
-                bit_cast<uint>(m_buffer[address + m_baseAddress + 1]),
-                bit_cast<uint>(m_buffer[address + m_baseAddress + 2]),
-                bit_cast<uint>(m_buffer[address + m_baseAddress + 3]),
-            );
+            [ForceUnroll]
+            for (int j = 0; j < ReadPerElement; j++)
+            {
+                switch (nBytes)
+                {
+                case 1:
+                    result[i] |= uint(bit_cast<uint8_t>(m_buffer[address + m_baseAddress + i * ReadPerElement + j]))
+                                    << (BitsShiftPerRead * (ReadPerElement - 1 - j));
+                    break;
+                case 2:
+                    result[i] |= uint(bit_cast<uint16_t>(m_buffer[address + m_baseAddress + i * ReadPerElement + j]))
+                                    << (BitsShiftPerRead * (ReadPerElement - 1 - j));
+                    break;
+                case 4:
+                    result[i] |= uint(bit_cast<uint>(m_buffer[address + m_baseAddress + i * ReadPerElement + j]))
+                                    << (BitsShiftPerRead * (ReadPerElement - 1 - j));
+                    break;
+                default:
+                    static_assert(false, "Unsupported data type T");
+                    return uint4(0);
+                }
+            }
         }
-        static_assert(false, "Unsupported data type T");
-        return uint4(0);
+        return result;
+    }
+
+    internal uint4 readUint4<bool IsAligned, uint ActualBoundary, uint AlignedBoundary>(Address baseAddress, Address address)
+    {
+        if (IsAligned)
+        {
+            return readUint4(address);
+        }
+
+        uint4 result = uint4(0, 0, 0, 0);
+        const int nBytes = sizeof(T);
+        const int ReadPerElement = 4 / nBytes;
+        const int BitsShiftPerRead = 32 / ReadPerElement;
+
+        // end address of this read [address+length-1]
+        int endAddress = (address - baseAddress + 4 * ReadPerElement - 1) % AlignedBoundary;
+
+        // this is same as paddingCount = endAddress < ActualBoundary ? 0 : ActualBoundary - endAddress + 1
+        int paddingCount = max(0, endAddress - ActualBoundary + 1);
+        int elementsToRead = (4 * ReadPerElement) - paddingCount;
+
+        [ForceUnroll]
+        for (int i = 0; i < 4; i++)
+        {
+            int offset = i * ReadPerElement;
+            [ForceUnroll]
+            for (int j = 0; j < ReadPerElement; j++)
+            {
+                // 4 * ReadPerElement is the total number of elements we can read from the buffer.
+                // paddingCount is the number of the elements we need to pad.
+                // e.g. if ReadPerElement is 2, paddingCount is 4.Because (4 * 2 - 4 == 4), so we can
+                // just stop reading when offset bigger than 3.
+                offset += j;
+                if (offset >= elementsToRead)
+                {
+                    return result;
+                }
+
+                int index = (address + m_baseAddress + offset);
+                switch (nBytes)
+                {
+                case 1:
+                    result[i] |= uint(bit_cast<uint8_t>(m_buffer[index]))
+                                    << (BitsShiftPerRead * (ReadPerElement - 1 - j));
+                    break;
+                case 2:
+                    result[i] |= uint(bit_cast<uint16_t>(m_buffer[index]))
+                                    << (BitsShiftPerRead * (ReadPerElement - 1 - j));
+                    break;
+                case 4:
+                    result[i] |= uint(bit_cast<uint>(m_buffer[index]))
+                                    << (BitsShiftPerRead * (ReadPerElement - 1 - j));
+                    break;
+                default:
+                    static_assert(false, "Unsupported data type T");
+                    return uint4(0);
+                }
+            }
+        }
+        return result;
     }
 
     /**
