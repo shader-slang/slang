@@ -1266,7 +1266,7 @@ static size_t getReflectionSize(LayoutSize size)
         if (offset.isValid())
             return offset.getValidValue();
     }
-    
+
     if (size.isInfinite())
         return SLANG_UNBOUNDED_SIZE;
 
@@ -2072,7 +2072,8 @@ struct ExtendedTypeLayoutContext
                 if (auto resInfo = path.primary->var->FindResourceInfo(
                         LayoutResourceKind::SubElementRegisterSpace))
                 {
-                    subObjectRange.spaceOffset = resInfo->index.isValid() ? resInfo->index.getValidValue() : 0;
+                    subObjectRange.spaceOffset =
+                        resInfo->index.isValid() ? resInfo->index.getValidValue() : 0;
                 }
             }
             // It is possible that the sub-object has descriptor ranges

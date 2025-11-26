@@ -2392,7 +2392,8 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                     auto structTypeResInfo = structLayout->findOrAddResourceInfo(kind);
                     auto fieldResInfo = fieldVarLayout->findOrAddResourceInfo(kind);
                     auto offset = structTypeResInfo->count.getFiniteValue();
-                    fieldResInfo->index = offset.isValid() ? LayoutOffset(offset.getValidValue()) : LayoutOffset::invalid();
+                    fieldResInfo->index = offset.isValid() ? LayoutOffset(offset.getValidValue())
+                                                           : LayoutOffset::invalid();
                     structTypeResInfo->count += fieldTypeResInfo.count;
                 }
             }
@@ -2492,7 +2493,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                             //
                             fieldResInfo = fieldVarLayout->findOrAddResourceInfo(kind);
                             auto offset = structTypeResInfo->count.getFiniteValue();
-                            fieldResInfo->index = offset.isValid() ? LayoutOffset(offset.getValidValue()) : LayoutOffset::invalid();
+                            fieldResInfo->index = offset.isValid()
+                                                      ? LayoutOffset(offset.getValidValue())
+                                                      : LayoutOffset::invalid();
                             structTypeResInfo->count += fieldTypeResInfo.count;
                         }
                         else
@@ -2833,7 +2836,8 @@ struct SimpleScopeLayoutBuilder : ScopeLayoutBuilder
                 //
                 auto startOffset = paramResInfo->index;
                 auto endOffset = startOffset + paramTypeResInfo.count;
-                usedRangeSet[int(kind)].Add(paramVarLayout, 
+                usedRangeSet[int(kind)].Add(
+                    paramVarLayout,
                     startOffset.isValid() ? startOffset.getValidValue() : 0,
                     endOffset.isValid() ? endOffset.getValidValue() : 0);
             }
@@ -3216,7 +3220,8 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
                 auto entryPointRes = paramsStructLayout->findOrAddResourceInfo(rr.kind);
                 auto offset = entryPointRes->count.getFiniteValue();
                 resultLayout->findOrAddResourceInfo(rr.kind)->index =
-                    offset.isValid() ? LayoutOffset(offset.getValidValue()) : LayoutOffset::invalid();
+                    offset.isValid() ? LayoutOffset(offset.getValidValue())
+                                     : LayoutOffset::invalid();
                 entryPointRes->count += rr.count;
             }
         }
@@ -3906,7 +3911,9 @@ static void _maybeApplyHLSLToVulkanShifts(
                     bindingInfo.index += shift;
 
                     // Presumably they should both match
-                    SLANG_ASSERT(bindingInfo.index == (resourceInfo.index.isValid() ? resourceInfo.index.getValidValue() : 0));
+                    SLANG_ASSERT(
+                        bindingInfo.index ==
+                        (resourceInfo.index.isValid() ? resourceInfo.index.getValidValue() : 0));
                     SLANG_ASSERT(bindingInfo.space == resourceInfo.space);
                 }
 

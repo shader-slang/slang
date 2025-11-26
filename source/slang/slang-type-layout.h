@@ -465,14 +465,14 @@ inline LayoutOffset operator+(LayoutOffset offset, LayoutSize size)
 {
     if (offset.isInvalid() || size.isInvalid())
         return LayoutOffset::invalid();
-    
+
     if (size.isInfinite())
         return LayoutOffset::invalid(); // Infinite size can't be added to finite offset
-    
+
     auto finiteSize = size.getFiniteValue();
     if (!finiteSize.isValid())
         return LayoutOffset::invalid();
-    
+
     return offset + finiteSize;
 }
 
@@ -488,17 +488,17 @@ inline LayoutSize maximum(LayoutSize left, LayoutOffset right)
 {
     if (left.isInvalid() || right.isInvalid())
         return LayoutSize::invalid();
-    
+
     if (left.isInfinite())
         return LayoutSize::infinite();
-    
+
     if (!left.isFinite())
         return LayoutSize::invalid();
-    
+
     auto leftOffset = left.getFiniteValue();
     if (!leftOffset.isValid())
         return LayoutSize::invalid();
-    
+
     return LayoutSize(Math::Max(leftOffset.getValidValue(), right.getValidValue()));
 }
 
