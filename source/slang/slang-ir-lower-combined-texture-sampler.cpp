@@ -103,7 +103,7 @@ struct LowerCombinedSamplerContext
 
         IRVarLayout::Builder samplerVarLayoutBuilder(&builder, samplerTypeLayout);
         samplerVarLayoutBuilder.findOrAddResourceInfo(samplerResourceKind)->offset =
-            isWGSLTarget ? 1 : 0;
+            isWGSLTarget ? 1u : 0u;
         auto samplerVarLayout = samplerVarLayoutBuilder.build();
 
         IRStructTypeLayout::Builder layoutBuilder(&builder);
@@ -135,9 +135,7 @@ IRTypeLayout* maybeCreateArrayLayout(
         {
             arrayTypeLayoutBuilder.addResourceUsage(
                 sizeAttr->getResourceKind(),
-                sizeAttr->getSize().isFinite() && elementCount != -1
-                    ? sizeAttr->getSize().getFiniteValue() * elementCount
-                    : LayoutSize::infinite());
+                elementCount == -1 ? LayoutSize::infinite() : sizeAttr->getSize() * elementCount);
         }
         return arrayTypeLayoutBuilder.build();
     }

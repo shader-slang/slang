@@ -2167,6 +2167,7 @@ public:                                                              \
     };
 
 #define SLANG_UNBOUNDED_SIZE (~size_t(0))
+#define SLANG_UNKNOWN_SIZE (SLANG_UNBOUNDED_SIZE - 1)
 
     // Shader Parameter Reflection
 
@@ -2318,12 +2319,25 @@ struct TypeReflection
         return type;
     }
 
-    // only useful if `getKind() == Kind::Array`
+    /** Get the number of elements in an array or vector type.
+     *
+     * Only useful if `getKind() == Kind::Array` or `Kind::Vector`.
+     *
+     * Returns `SLANG_UNBOUNDED_SIZE` for unbounded-size arrays.
+     * Returns `SLANG_UNKNOWN_SIZE` when size depends on unresolved generic parameters or link-time
+     * constants. The `reflection` parameter can help resolve link-time constants if available.
+     */
     size_t getElementCount(SlangReflection* reflection = nullptr)
     {
         return spReflectionType_GetSpecializedElementCount((SlangReflectionType*)this, reflection);
     }
 
+    /** Get the total number of elements in a multi-dimensional array type.
+     *
+     * Returns `SLANG_UNBOUNDED_SIZE` for unbounded-size arrays.
+     * Returns `SLANG_UNKNOWN_SIZE` when size depends on unresolved generic parameters or link-time
+     * constants.
+     */
     size_t getTotalArrayElementCount()
     {
         if (!isArray())
@@ -2335,7 +2349,12 @@ struct TypeReflection
             if (!type->isArray())
                 return result;
 
-            result *= type->getElementCount();
+            const auto c = type->getElementCount();
+            if (c == SLANG_UNKNOWN_SIZE)
+                return SLANG_UNKNOWN_SIZE;
+            if (c == SLANG_UNBOUNDED_SIZE)
+                return SLANG_UNBOUNDED_SIZE;
+            result *= c;
             type = type->getElementType();
         }
     }
@@ -2497,11 +2516,23 @@ struct TypeLayoutReflection
             (SlangReflectionTypeLayout*)this);
     }
 
+    /** Get the size of this type layout in the specified parameter category.
+     *
+     * Returns `SLANG_UNBOUNDED_SIZE` for unbounded resources (e.g., unsized arrays).
+     * Returns `SLANG_UNKNOWN_SIZE` when the size depends on unresolved generic parameters or
+     * link-time constants.
+     */
     size_t getSize(SlangParameterCategory category)
     {
         return spReflectionTypeLayout_GetSize((SlangReflectionTypeLayout*)this, category);
     }
 
+    /** Get the stride of this type layout in the specified parameter category.
+     *
+     * Returns `SLANG_UNBOUNDED_SIZE` for unbounded resources.
+     * Returns `SLANG_UNKNOWN_SIZE` when stride depends on unresolved generic parameters or
+     * link-time constants.
+     */
     size_t getStride(SlangParameterCategory category)
     {
         return spReflectionTypeLayout_GetStride((SlangReflectionTypeLayout*)this, category);
@@ -2512,6 +2543,12 @@ struct TypeLayoutReflection
         return spReflectionTypeLayout_getAlignment((SlangReflectionTypeLayout*)this, category);
     }
 
+    /** Get the size of this type layout in the specified parameter category.
+     *
+     * Returns `SLANG_UNBOUNDED_SIZE` for unbounded resources (e.g., unsized arrays).
+     * Returns `SLANG_UNKNOWN_SIZE` when the size depends on unresolved generic parameters or
+     * link-time constants.
+     */
     size_t getSize(slang::ParameterCategory category = slang::ParameterCategory::Uniform)
     {
         return spReflectionTypeLayout_GetSize(
@@ -2519,6 +2556,12 @@ struct TypeLayoutReflection
             (SlangParameterCategory)category);
     }
 
+    /** Get the stride of this type layout in the specified parameter category.
+     *
+     * Returns `SLANG_UNBOUNDED_SIZE` for unbounded resources.
+     * Returns `SLANG_UNKNOWN_SIZE` when stride depends on unresolved generic parameters or
+     * link-time constants.
+     */
     size_t getStride(slang::ParameterCategory category = slang::ParameterCategory::Uniform)
     {
         return spReflectionTypeLayout_GetStride(
@@ -2572,14 +2615,33 @@ struct TypeLayoutReflection
         return typeLayout;
     }
 
-    // only useful if `getKind() == Kind::Array`
+    /** Get the number of elements in an array variable.
+     *
+     * Only useful if `getKind() == Kind::Array`.
+     *
+     * Returns `SLANG_UNBOUNDED_SIZE` for unbounded-size arrays.
+     * Returns `SLANG_UNKNOWN_SIZE` when size depends on unresolved generic parameters or link-time
+     * constants.
+     */
     size_t getElementCount(ShaderReflection* reflection = nullptr)
     {
         return getType()->getElementCount((SlangReflection*)reflection);
     }
 
+    /** Get the total number of elements in a multi-dimensional array variable.
+     *
+     * Returns `SLANG_UNBOUNDED_SIZE` for unbounded-size arrays.
+     * Returns `SLANG_UNKNOWN_SIZE` when size depends on unresolved generic parameters or link-time
+     * constants.
+     */
     size_t getTotalArrayElementCount() { return getType()->getTotalArrayElementCount(); }
 
+    /** Get the stride between elements of an array type layout.
+     *
+     * Returns `SLANG_UNBOUNDED_SIZE` for unbounded resources.
+     * Returns `SLANG_UNKNOWN_SIZE` when element stride depends on unresolved generic parameters or
+     * link-time constants.
+     */
     size_t getElementStride(SlangParameterCategory category)
     {
         return spReflectionTypeLayout_GetElementStride((SlangReflectionTypeLayout*)this, category);
@@ -2674,6 +2736,12 @@ struct TypeLayoutReflection
             index);
     }
 
+    /** Get the binding count for a binding range at the specified index.
+     *
+     * Returns `SLANG_UNBOUNDED_SIZE` for unbounded resources.
+     * Returns `SLANG_UNKNOWN_SIZE` when the count depends on unresolved generic parameters or
+     * link-time constants.
+     */
     SlangInt getBindingRangeBindingCount(SlangInt index)
     {
         return spReflectionTypeLayout_getBindingRangeBindingCount(
@@ -2771,6 +2839,11 @@ struct TypeLayoutReflection
             setIndex);
     }
 
+    /** Get the index offset for a descriptor range within a descriptor set.
+     *
+     * Returns `SLANG_UNKNOWN_SIZE` when the offset depends on unresolved generic parameters or
+     * link-time constants.
+     */
     SlangInt getDescriptorSetDescriptorRangeIndexOffset(SlangInt setIndex, SlangInt rangeIndex)
     {
         return spReflectionTypeLayout_getDescriptorSetDescriptorRangeIndexOffset(
@@ -2779,6 +2852,12 @@ struct TypeLayoutReflection
             rangeIndex);
     }
 
+    /** Get the descriptor count for a descriptor range within a descriptor set.
+     *
+     * Returns `SLANG_UNBOUNDED_SIZE` for unbounded resources.
+     * Returns `SLANG_UNKNOWN_SIZE` when the count depends on unresolved generic parameters or
+     * link-time constants.
+     */
     SlangInt getDescriptorSetDescriptorRangeDescriptorCount(SlangInt setIndex, SlangInt rangeIndex)
     {
         return spReflectionTypeLayout_getDescriptorSetDescriptorRangeDescriptorCount(
@@ -2817,6 +2896,11 @@ struct TypeLayoutReflection
             subObjectRangeIndex);
     }
 
+    /** Get the space offset for a sub-object range.
+     *
+     * Returns `SLANG_UNKNOWN_SIZE` when the offset depends on unresolved generic parameters or
+     * link-time constants.
+     */
     SlangInt getSubObjectRangeSpaceOffset(SlangInt subObjectRangeIndex)
     {
         return spReflectionTypeLayout_getSubObjectRangeSpaceOffset(
@@ -2943,10 +3027,21 @@ struct VariableLayoutReflection
     }
 
 
+    /** Get the offset of this variable in the specified parameter category.
+     *
+     * Returns `SLANG_UNKNOWN_SIZE` when the offset depends on unresolved generic parameters or
+     * link-time constants.
+     */
     size_t getOffset(SlangParameterCategory category)
     {
         return spReflectionVariableLayout_GetOffset((SlangReflectionVariableLayout*)this, category);
     }
+
+    /** Get the offset of this variable in the specified parameter category.
+     *
+     * Returns `SLANG_UNKNOWN_SIZE` when the offset depends on unresolved generic parameters or
+     * link-time constants.
+     */
     size_t getOffset(slang::ParameterCategory category = slang::ParameterCategory::Uniform)
     {
         return spReflectionVariableLayout_GetOffset(
@@ -2957,20 +3052,41 @@ struct VariableLayoutReflection
 
     TypeReflection* getType() { return getVariable()->getType(); }
 
+    /** Get the binding index for this variable layout.
+     *
+     * Returns `SLANG_UNKNOWN_SIZE` when the index depends on unresolved generic parameters or
+     * link-time constants.
+     */
     unsigned getBindingIndex()
     {
         return spReflectionParameter_GetBindingIndex((SlangReflectionVariableLayout*)this);
     }
 
+    /** Get the binding space for this variable layout.
+     *
+     * Returns `SLANG_UNKNOWN_SIZE` when the space depends on unresolved generic parameters or
+     * link-time constants.
+     */
     unsigned getBindingSpace()
     {
         return spReflectionParameter_GetBindingSpace((SlangReflectionVariableLayout*)this);
     }
 
+    /** Get the register space/set of this variable in the specified parameter category.
+     *
+     * Returns `SLANG_UNKNOWN_SIZE` when the space depends on unresolved generic parameters or
+     * link-time constants.
+     */
     size_t getBindingSpace(SlangParameterCategory category)
     {
         return spReflectionVariableLayout_GetSpace((SlangReflectionVariableLayout*)this, category);
     }
+
+    /** Get the register space/set of this variable in the specified parameter category.
+     *
+     * Returns `SLANG_UNKNOWN_SIZE` when the space depends on unresolved generic parameters or
+     * link-time constants.
+     */
     size_t getBindingSpace(slang::ParameterCategory category)
     {
         return spReflectionVariableLayout_GetSpace(
@@ -3332,11 +3448,22 @@ struct ShaderReflection
             EntryPointReflection*)spReflection_getEntryPointByIndex((SlangReflection*)this, index);
     }
 
+    /** Get the binding index for the global constant buffer.
+     *
+     * Returns `SLANG_UNKNOWN_SIZE` when the binding depends on unresolved generic parameters or
+     * link-time constants.
+     */
     SlangUInt getGlobalConstantBufferBinding()
     {
         return spReflection_getGlobalConstantBufferBinding((SlangReflection*)this);
     }
 
+    /** Get the size of the global constant buffer.
+     *
+     * Returns `SLANG_UNBOUNDED_SIZE` for unbounded resources.
+     * Returns `SLANG_UNKNOWN_SIZE` when the size depends on unresolved generic parameters or
+     * link-time constants.
+     */
     size_t getGlobalConstantBufferSize()
     {
         return spReflection_getGlobalConstantBufferSize((SlangReflection*)this);

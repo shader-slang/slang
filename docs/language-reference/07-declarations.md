@@ -309,7 +309,7 @@ An instance method with the `[mutating]` attribute receives a mutable `this` par
 
 ### Inheritance
 
-A structure type declaration may include an _inheritance clause_ that consists of a colon (`:`) followed by a comma-separated list of types that the structure type inherits from:
+A structure type declaration may include an _inheritance clause_ that consists of a colon (`:`) followed by a comma-separated list of interface types that the structure type inherits from:
 
 ```
 struct Person : IHasAge, IHasName
@@ -317,6 +317,12 @@ struct Person : IHasAge, IHasName
 ```
 
 When a structure type declares that it inherits from an interface, the programmer asserts that the structure type implements the required members of the interface.
+
+Currently only interface types may be named in the inheritance clause of a structure type.
+A structure type may inherit from multiple interfaces.
+
+> Note: In language versions prior to Slang 2026, struct-to-struct inheritance was permitted but generates a compiler warning.
+> In Slang 2026 and later, struct-to-struct inheritance is not supported and generates an error.
 
 ### Syntax Details
 

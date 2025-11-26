@@ -477,31 +477,31 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
         sb << "int";
         break;
     case kIROp_Int8Type:
-        sb << "int8";
+        sb << "int8_t";
         break;
     case kIROp_Int16Type:
-        sb << "int16";
+        sb << "int16_t";
         break;
     case kIROp_Int64Type:
-        sb << "int64";
+        sb << "int64_t";
         break;
     case kIROp_IntPtrType:
-        sb << "intptr";
+        sb << "intptr_t";
         break;
     case kIROp_UIntType:
         sb << "uint";
         break;
     case kIROp_UInt8Type:
-        sb << "uint8";
+        sb << "uint8_t";
         break;
     case kIROp_UInt16Type:
-        sb << "uint16";
+        sb << "uint16_t";
         break;
     case kIROp_UInt64Type:
-        sb << "uint64";
+        sb << "uint64_t";
         break;
     case kIROp_UIntPtrType:
-        sb << "uintptr";
+        sb << "uintptr_t";
         break;
     case kIROp_CharType:
         sb << "char";
@@ -642,7 +642,7 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
         sb << "AtomicCounter";
         break;
     case kIROp_RaytracingAccelerationStructureType:
-        sb << "RayTracingAccelerationStructure";
+        sb << "RaytracingAccelerationStructure";
         break;
     case kIROp_HitObjectType:
         sb << "HitObject";
@@ -2140,23 +2140,23 @@ UnownedStringSlice getBasicTypeNameHint(IRType* basicType)
     case kIROp_IntType:
         return UnownedStringSlice::fromLiteral("int");
     case kIROp_Int8Type:
-        return UnownedStringSlice::fromLiteral("int8");
+        return UnownedStringSlice::fromLiteral("int8_t");
     case kIROp_Int16Type:
-        return UnownedStringSlice::fromLiteral("int16");
+        return UnownedStringSlice::fromLiteral("int16_t");
     case kIROp_Int64Type:
-        return UnownedStringSlice::fromLiteral("int64");
+        return UnownedStringSlice::fromLiteral("int64_t");
     case kIROp_IntPtrType:
-        return UnownedStringSlice::fromLiteral("intptr");
+        return UnownedStringSlice::fromLiteral("intptr_t");
     case kIROp_UIntType:
         return UnownedStringSlice::fromLiteral("uint");
     case kIROp_UInt8Type:
-        return UnownedStringSlice::fromLiteral("uint8");
+        return UnownedStringSlice::fromLiteral("uint8_t");
     case kIROp_UInt16Type:
-        return UnownedStringSlice::fromLiteral("uint16");
+        return UnownedStringSlice::fromLiteral("uint16_t");
     case kIROp_UInt64Type:
-        return UnownedStringSlice::fromLiteral("uint64");
+        return UnownedStringSlice::fromLiteral("uint64_t");
     case kIROp_UIntPtrType:
-        return UnownedStringSlice::fromLiteral("uintptr");
+        return UnownedStringSlice::fromLiteral("uintptr_t");
     case kIROp_FloatType:
         return UnownedStringSlice::fromLiteral("float");
     case kIROp_HalfType:
@@ -2752,8 +2752,13 @@ bool isIROpaqueType(IRType* type)
     switch (type->getOp())
     {
     case kIROp_TextureType:
+    case kIROp_GLSLImageType:
     case kIROp_SamplerStateType:
     case kIROp_SamplerComparisonStateType:
+    case kIROp_SubpassInputType:
+    case kIROp_RaytracingAccelerationStructureType:
+    case kIROp_RayQueryType:
+    case kIROp_HitObjectType:
         return true;
     default:
         return false;
