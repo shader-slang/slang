@@ -1182,11 +1182,11 @@ alias ser_nvapi = raytracing + hlsl_nvapi;
 
 /// DXR 1.3 native SER support (SM 6.9, no NVAPI required)
 /// [EXT]
-def _ser_hlsl_native : _sm_6_9;
+def ser_hlsl_native : _sm_6_9;
 
 /// Capabilities needed for shader-execution-reordering (native DXR 1.3 path)
 /// [Compound]
-alias ser_dxr = raytracing + _ser_hlsl_native;
+alias ser_dxr = raytracing + ser_hlsl_native;
 
 /// Capabilities needed for shader-execution-reordering (all paths)
 /// [Compound]

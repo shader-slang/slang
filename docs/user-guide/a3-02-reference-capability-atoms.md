@@ -669,6 +669,9 @@ Extensions
 `SPV_NV_tensor_addressing`
 > Represents the SPIR-V extension for SPV_NV_tensor_addressing.
 
+`ser_hlsl_native`
+> DXR 1.3 native SER support (SM 6.9, no NVAPI required)
+
 `spvAtomicFloat16AddEXT`
 > Represents the SPIR-V capability for atomic float 16 add operations.
 
