@@ -2106,9 +2106,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredValInfo visitNoneWitness(NoneWitness*)
     {
-        auto builder = getBuilder();
-        auto voidType = builder->getVoidType();
-        return LoweredValInfo::simple(builder->createWitnessTable(voidType, voidType));
+        return LoweredValInfo::simple(getBuilder()->getNoneWitnessTable());
     }
 
     LoweredValInfo visitConstantIntVal(ConstantIntVal* val)

@@ -4569,6 +4569,18 @@ IRWitnessTableEntry* IRBuilder::createWitnessTableEntry(
     return entry;
 }
 
+IRInst* IRBuilder::getNoneWitnessTable()
+{
+    IRVoidType* voidType = getVoidType();
+    IRWitnessTable* witnessTable = createInst<IRWitnessTable>(
+        this,
+        kIROp_WitnessTable,
+        getWitnessTableType(voidType),
+        voidType);
+    addHoistableInst(this, witnessTable);
+    return witnessTable;
+}
+
 IRInterfaceRequirementEntry* IRBuilder::createInterfaceRequirementEntry(
     IRInst* requirementKey,
     IRInst* requirementVal)

@@ -3666,6 +3666,8 @@ $(type_info.return_type) $(type_info.method_name)(
         IRInst* requirementKey,
         IRInst* satisfyingVal);
 
+    IRInst* getNoneWitnessTable();
+
     IRInst* createThisTypeWitness(IRType* interfaceType);
 
     IRInst* getTypeEqualityWitness(IRType* witnessType, IRType* type1, IRType* type2);
