@@ -650,7 +650,7 @@ SLANG_FORCE_INLINE float f16tof32(const uint32_t value)
 #else
 // Only define __STDC_WANT_IEC_60559_TYPES_EXT__ if the compiler actually supports _Float16 in C++
 // Modern projects treat GCC 12+ as the baseline where float16 support is available and usable across common platforms
-#if !defined(__GNUC__) || defined(__clang__) || (__GNUC__ >= 12)
+#if (defined(__clang__) && __clang_major__ >= 14) || (defined(__GNUC__) && __GNUC__ >= 12)
 #define __STDC_WANT_IEC_60559_TYPES_EXT__
 #include <float.h>
 #endif // __STDC_WANT_IEC_60559_TYPES_EXT__
