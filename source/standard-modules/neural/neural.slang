@@ -38,3 +38,4 @@ __include "istorages";
 __include "bindless-storage";
 __include "buffer-storage";
 __include "accelerate-vector-coopmat";
+__include "vectorized-reader";

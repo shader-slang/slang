@@ -121,20 +121,6 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
     // So TileHeightBInElement is the number of elements in one column of the tile in original data type.
     static const uint HeightInElementTileB = HeightInVectorTileB * ElementCountPerVector;
 
-    // calculate that how many loads each thread needs to perform.
-    // For matrix A, each iteration we load a column of matrix tile of Matrix A, which is M x 32 bytes.
-    // And each thread can load 16 bytes for each load, so the number of loads each thread needs to
-    // perform is (M * 32) / (warpSize * 16) = M * 2 / warpSize.
-    // Add SubgroupSize - 1 to ensure the result is rounded up to at least 1.
-    static const uint NumLoadsEachThreadMatA = (M * 2 + SubgroupSize - 1) / SubgroupSize;
-
-    // For each thread, if it can load more than one vectorized element, this is the offset between each load.
-    // The reason is same as above, since the whole warp can load warpSize * 16 bytes, and the load is consecutive,
-    // so the offset is the warp size * 16 bytes, and we measure it in uint4 units, so it's WaveGetLaneCount().
-    static const uint OffsetPerThreadLoadMatA = SubgroupSize;
-    static const uint DxPerThreadLoadMatA = (OffsetPerThreadLoadMatA % WidthInVectorTileA) * ElementCountPerVector;
-    static const uint DyPerThreadLoadMatA = OffsetPerThreadLoadMatA / WidthInVectorTileA;
-
     static const uint SharedMemSizeInBytesMatA = M * (T.COLUMN_A * sizeof(T));
     static const uint SharedMemSizeInBytesMatB = N * (T.ROW_B * sizeof(T));
 
@@ -142,103 +128,6 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
     typealias MatA = linalg.CoopMat< half, MemoryScope.Subgroup, T.ROW_A, T.COLUMN_A, linalg.CoopMatMatrixUse.MatrixA>;
     typealias MatB = linalg.CoopMat< half, MemoryScope.Subgroup, T.COLUMN_A, T.COLUMN_B, linalg.CoopMatMatrixUse.MatrixB>;
     typealias MatC = linalg.CoopMat<T, MemoryScope.Subgroup, T.ROW_A, T.COLUMN_B, linalg.CoopMatMatrixUse.MatrixAccumulator>;
-
-    [ForceInline]
-    VISIBILITY_LEVEL static uint4 readUint4<T>(T[InputSize] inputVector, int index)
-    {
-        uint4 result = uint4(0, 0, 0, 0);
-        const int nBytes = sizeof(T);
-        const int ReadPerElement = 4 / nBytes;
-        const int BitsShiftPerRead = 32 / ReadPerElement;
-        [ForceUnroll]
-        for (int i = 0; i < 4; i++)
-        {
-            [ForceUnroll]
-            for (int j = 0; j < ReadPerElement; j++)
-            {
-                switch (nBytes)
-                {
-                case 1:
-                    result[i] |= uint(bit_cast<uint8_t>(inputVector[index + i * ReadPerElement + j]))
-                                    << (BitsShiftPerRead * (ReadPerElement - 1 - j));
-                    break;
-                case 2:
-                    result[i] |= uint(bit_cast<uint16_t>(inputVector[index + i * ReadPerElement + j]))
-                                    << (BitsShiftPerRead * (ReadPerElement - 1 - j));
-                    break;
-                case 4:
-                    result[i] |= uint(bit_cast<uint>(inputVector[index + i * ReadPerElement + j]))
-                                    << (BitsShiftPerRead * (ReadPerElement - 1 - j));
-                    break;
-                default:
-                    static_assert(false, "Unsupported data type T");
-                    return uint4(0);
-                }
-            }
-        }
-        return result;
-    }
-
-    [ForceInline]
-    internal static uint4 readUint4<bool IsAligned, uint ActualBoundary, uint AlignedBoundary>(T[K] inputVector, int startIndex)
-    {
-        if (IsAligned)
-        {
-            return readUint4<T>(inputVector, startIndex);
-        }
-
-        uint4 result = uint4(0, 0, 0, 0);
-        const int nBytes = sizeof(T);
-        const int ReadPerElement = 4 / nBytes;
-        const int BitsShiftPerRead = 32 / ReadPerElement;
-
-        // end address of this read [address+length-1]
-        const int endAddress = (startIndex + 4 * ReadPerElement - 1) % AlignedBoundary;
-
-        // this is same as paddingCount = endAddress < ActualBoundary ? 0 : ActualBoundary - endAddress + 1
-        const int paddingCount = max(0, endAddress - ActualBoundary + 1);
-        const int elementsToRead = (4 * ReadPerElement) - paddingCount;
-
-        [ForceUnroll]
-        for (int i = 0; i < 4; i++)
-        {
-            int offset = i * ReadPerElement;
-            [ForceUnroll]
-            for (int j = 0; j < ReadPerElement; j++)
-            {
-                // 4 * ReadPerElement is the total number of elements we can read from the buffer.
-                // paddingCount is the number of the elements we need to pad.
-                // e.g. if ReadPerElement is 2, paddingCount is 4.Because (4 * 2 - 4 == 4), so we can
-                // just stop reading when offset bigger than 3.
-                offset += j;
-                if (offset >= elementsToRead)
-                {
-                    return result;
-                }
-
-                int index = (startIndex + offset);
-                switch (nBytes)
-                {
-                case 1:
-                    result[i] |= uint(bit_cast<uint8_t>(inputVector[index]))
-                                    << (BitsShiftPerRead * (ReadPerElement - 1 - j));
-                    break;
-                case 2:
-                    result[i] |= uint(bit_cast<uint16_t>(inputVector[index]))
-                                    << (BitsShiftPerRead * (ReadPerElement - 1 - j));
-                    break;
-                case 4:
-                    result[i] |= uint(bit_cast<uint>(inputVector[index]))
-                                    << (BitsShiftPerRead * (ReadPerElement - 1 - j));
-                    break;
-                default:
-                    static_assert(false, "Unsupported data type T");
-                    return uint4(0);
-                }
-            }
-        }
-        return result;
-    }
 
     [require(cooperative_matrix, subgroup_basic)]
     [ForceInline]
@@ -275,13 +164,29 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
 
         uint indexInWeight = ty * Uint4AlignedK + tx;
 
-        for (uint i = 0; i < NumLoadsEachThreadMatA; i++)
+        // In practice, we will always let first warp to load the tile, and it's usually full given the workload is
+        // usually larger than 32 threads. However, the corner case is that user just launch less than 32 threads totally.
+        // Because of this, we calculate the number of loads during run-time.
+        const uint activeThreadCount = WaveActiveCountBits(true);
+
+        // calculate that how many loads each thread needs to perform.
+        // For matrix A, each iteration we load a column of matrix tile of Matrix A, which is M x 32 bytes.
+        // And each thread can load 16 bytes for each load, so the number of loads each thread needs to
+        // (M * 32) / (activeThreadCount * 16)
+        const uint numLoadsEachThreadMatA = (M * 2 + activeThreadCount - 1) / activeThreadCount;
+
+        // offsetPerThreadLoadMatA is the offset between each load.
+        // The reason is same as above, since the whole warp can load warpSize * 16 bytes, and the load is consecutive,
+        // so the offset is the warp size * 16 bytes, and we measure it in uint4 units, so it's activeThreadCount.
+        const uint offsetPerThreadLoadMatA = activeThreadCount;
+
+        for (uint i = 0; i < numLoadsEachThreadMatA; i++)
         {
             // Bounds check on Y direction. If y coordinate is out of range of Matrix A, just padding with 0.
             if (indexInVectorizedTile / WidthInVectorTileA >= M)
             {
                 sharedMemoryA[indexInVectorizedTile] = uint4(0, 0, 0, 0);
-                indexInVectorizedTile += OffsetPerThreadLoadMatA;
+                indexInVectorizedTile += offsetPerThreadLoadMatA;
                 continue;
             }
 
@@ -289,7 +194,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
             uint4 value = weightStorage.readUint4<IsAlignedVector, K, Uint4AlignedK>(weightAddress, offsetAddress);
 
             sharedMemoryA[indexInVectorizedTile] = value;
-            indexInVectorizedTile += OffsetPerThreadLoadMatA;
+            indexInVectorizedTile += offsetPerThreadLoadMatA;
 
             // Given the index in the tile, get the 2-D coordinate in the matrix A.
             tx = (indexInVectorizedTile % WidthInVectorTileA) * ElementCountPerVector;
@@ -326,7 +231,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
                 continue;
             }
 
-            uint4 value = readUint4<IsAlignedVector, K, Uint4AlignedK>(inputVector, startIndex);
+            uint4 value = readUint4<T, T[K], IsAlignedVector, K, Uint4AlignedK>(inputVector, 0, startIndex);
             sharedMemoryB[indexInVectorizedTile + yInTile] = value;
         }
     }
