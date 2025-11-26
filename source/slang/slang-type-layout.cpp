@@ -2626,32 +2626,6 @@ static LayoutSize GetElementCount(IntVal* val)
     }
     else if (const auto varRefVal = as<DeclRefIntVal>(val))
     {
-        // Check if this is a specialization constant
-        if (auto declRef = varRefVal->getDeclRef())
-        {
-            auto varDecl = declRef.as<VarDeclBase>();
-            if (varDecl && (varDecl.getDecl()->hasModifier<SpecializationConstantAttribute>() ||
-                            varDecl.getDecl()->hasModifier<VkConstantIdAttribute>()))
-            {
-                // Specialization constants can be overridden at pipeline-creation time
-                // (e.g., in vkCreateComputePipelines), so we cannot rely on their default values
-                // during layout calculation. The actual runtime value may differ from the default,
-                // and the default itself could even be zero.
-                //
-                // We treat specialization-constant-sized arrays as "unbounded" (infinite) for
-                // layout purposes to ensure descriptor bindings are allocated regardless of the
-                // default value:
-                // - If default is 0 but runtime is 128, we still need the binding
-                // - The containing type must be recognized as having uniform data
-                // - Descriptor set/binding allocation is independent of array size
-                // - Array sizes are expressed symbolically (via OpSpecConstantOp) during SPIR-V
-                //   emission, then evaluated to concrete bytes at pipeline-creation time
-                //
-                // This differs from generic parameters, which are resolved at Slang compile-time
-                return LayoutSize::infinite();
-            }
-        }
-
         // TODO: We want to treat the case where the number of
         // elements in an array depends on a generic parameter
         // much like the case where the number of elements is
