@@ -64,11 +64,13 @@ struct EliminateMultiLevelBreakContext
             exitBlocks.clear();
             exitBlocks.add(getBreakBlock());
 
-            // If this is a loop, add any non-trivial continue block to the exit blocks
+            // Always add continue block to exit blocks for loops.
+            // This prevents child regions from incorrectly including it in their blocks,
+            // which would cause duplicate key errors when the same block appears in both
+            // parent and child region blocks (e.g., continue inside switch inside while loop).
             if (auto loop = as<IRLoop>(headerInst))
                 if (auto continueBlock = getContinueBlock())
-                    if (continueBlock != loop->getTargetBlock())
-                        exitBlocks.add(continueBlock);
+                    exitBlocks.add(continueBlock);
         }
 
         void replaceBreakBlock(IRBuilder* builder, IRBlock* block)
@@ -120,6 +122,21 @@ struct EliminateMultiLevelBreakContext
             // its parent regions.
             for (auto exitBlock : info.exitBlocks)
                 exitBlocks.add(exitBlock);
+
+            // Special case: for loops where continue block equals target block (common with while
+            // loops), we need to ensure the target block is included in this region's blocks even
+            // though the continue block is now in exitBlocks. This is necessary because the target
+            // block is the loop body entry point and must be part of the loop region.
+            if (auto loop = as<IRLoop>(info.headerInst))
+            {
+                auto targetBlock = loop->getTargetBlock();
+                auto continueBlock = loop->getContinueBlock();
+                if (targetBlock == continueBlock && exitBlocks.contains(targetBlock))
+                {
+                    if (info.blockSet.add(targetBlock))
+                        info.blocks.add(targetBlock);
+                }
+            }
 
             auto successors = as<IRBlock>(info.headerInst->getParent())->getSuccessors();
             for (auto successor : successors)
@@ -399,9 +416,21 @@ struct EliminateMultiLevelBreakContext
                         if (multiLevelExitBlocks.getCount() == 0)
                             return;
 
-                        if (multiLevelExitBlocks.getCount() == 1 &&
-                            multiLevelExitBlocks[0] == region->getBreakBlock())
-                            return;
+                        if (multiLevelExitBlocks.getCount() == 1)
+                        {
+                            auto exitBlock = multiLevelExitBlocks[0];
+                            if (exitBlock == region->getBreakBlock())
+                                return;
+                            // For loops where continue block equals target block, multi-level
+                            // branches to the continue block don't need special elimination since
+                            // the continue block is the loop entry point.
+                            if (auto loop = as<IRLoop>(region->headerInst))
+                            {
+                                if (exitBlock == loop->getContinueBlock() &&
+                                    loop->getContinueBlock() == loop->getTargetBlock())
+                                    return;
+                            }
+                        }
 
                         needsContinueElimination = true;
                     });
@@ -424,7 +453,8 @@ struct EliminateMultiLevelBreakContext
         if (funcInfo.multiLevelBranches.getCount() == 0)
             return;
 
-        // Verify that the only multi-level branches we have to handle are into break blocks.
+        // Verify that the only multi-level branches we have to handle are into break blocks
+        // or into continue blocks that equal target blocks (for while loops).
         for (auto& region : funcInfo.regions)
             region->forEach(
                 [&](BreakableRegionInfo* region)
@@ -435,9 +465,20 @@ struct EliminateMultiLevelBreakContext
                     if (multiLevelExitBlocks.getCount() == 0)
                         return;
 
-                    if (multiLevelExitBlocks.getCount() == 1 &&
-                        multiLevelExitBlocks[0] == region->getBreakBlock())
-                        return;
+                    if (multiLevelExitBlocks.getCount() == 1)
+                    {
+                        auto exitBlock = multiLevelExitBlocks[0];
+                        if (exitBlock == region->getBreakBlock())
+                            return;
+                        // For loops where continue block equals target block, multi-level branches
+                        // to the continue block are handled by branching back to the loop entry.
+                        if (auto loop = as<IRLoop>(region->headerInst))
+                        {
+                            if (exitBlock == loop->getContinueBlock() &&
+                                loop->getContinueBlock() == loop->getTargetBlock())
+                                return;
+                        }
+                    }
 
                     SLANG_UNEXPECTED(
                         "Multi-level break elimination failed: unique exit block is not the break "
@@ -459,6 +500,19 @@ struct EliminateMultiLevelBreakContext
         // Rewrite multi-level branches with single level "break" + target-level argument.
         for (auto branchInfo : funcInfo.multiLevelBranches)
         {
+            // For loops where continue block equals target block, multi-level branches
+            // to the continue block don't need transformation - they can branch directly.
+            if (auto targetLoop = as<IRLoop>(branchInfo.branchTargetRegion->headerInst))
+            {
+                if (branchInfo.branchInst->getTargetBlock() == targetLoop->getContinueBlock() &&
+                    targetLoop->getContinueBlock() == targetLoop->getTargetBlock())
+                {
+                    // This is a multi-level continue to a loop where continue == target.
+                    // No transformation needed - the branch already goes to the right place.
+                    continue;
+                }
+            }
+
             auto region = branchInfo.currentRegion;
             while (region)
             {
