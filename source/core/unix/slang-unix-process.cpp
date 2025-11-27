@@ -362,28 +362,29 @@ SlangResult UnixPipeStream::read(void* buffer, size_t length, size_t& outReadByt
         if (isDiagnosticEnabled("pipe") && count > 0)
         {
             auto endTime = std::chrono::steady_clock::now();
-            auto duration =
-                std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime).count();
+            auto durationMs =
+                std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime).count() /
+                1000.0;
             fprintf(
                 stderr,
-                "[PIPE-READ] fd=%d requested=%zu actual=%zd duration=%lldus (thread=%lu)\n",
+                "[PIPE-READ] fd=%d requested=%zu actual=%zd duration=%.3fms (thread=%lu)\n",
                 m_fd,
                 length,
                 count,
-                (long long)duration,
+                durationMs,
                 (unsigned long)pthread_self());
 
             // Log pipe buffer status on Linux
             logPipeBufferInfo(m_fd, "READ");
 
             // Warn if read took more than 50ms
-            if (duration > 50000)
+            if (durationMs > 50.0)
             {
                 fprintf(
                     stderr,
-                    "[PIPE-WARNING] Slow pipe read on fd=%d: %lldus\n",
+                    "[PIPE-WARNING] Slow pipe read on fd=%d: %.3fms\n",
                     m_fd,
-                    (long long)duration);
+                    durationMs);
             }
         }
 
@@ -462,31 +463,32 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
     if (isDiagnosticEnabled("pipe"))
     {
         auto endTime = std::chrono::steady_clock::now();
-        auto duration =
-            std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime).count();
+        auto durationMs =
+            std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime).count() /
+            1000.0;
 
         if (writeResult >= 0)
         {
             fprintf(
                 stderr,
-                "[PIPE-WRITE] fd=%d requested=%zu actual=%zd duration=%lldus (thread=%lu)\n",
+                "[PIPE-WRITE] fd=%d requested=%zu actual=%zd duration=%.3fms (thread=%lu)\n",
                 m_fd,
                 length,
                 writeResult,
-                (long long)duration,
+                durationMs,
                 (unsigned long)pthread_self());
 
             // Log pipe buffer status on Linux
             logPipeBufferInfo(m_fd, "WRITE");
 
             // Warn if write took more than 50ms or didn't complete fully
-            if (duration > 50000)
+            if (durationMs > 50.0)
             {
                 fprintf(
                     stderr,
-                    "[PIPE-WARNING] Slow pipe write on fd=%d: %lldus\n",
+                    "[PIPE-WARNING] Slow pipe write on fd=%d: %.3fms\n",
                     m_fd,
-                    (long long)duration);
+                    durationMs);
             }
             if (size_t(writeResult) != length)
             {
@@ -503,10 +505,10 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
         {
             fprintf(
                 stderr,
-                "[PIPE-ERROR] Write failed on fd=%d: errno=%d duration=%lldus (thread=%lu)\n",
+                "[PIPE-ERROR] Write failed on fd=%d: errno=%d duration=%.3fms (thread=%lu)\n",
                 m_fd,
                 errno,
-                (long long)duration,
+                durationMs,
                 (unsigned long)pthread_self());
         }
     }
