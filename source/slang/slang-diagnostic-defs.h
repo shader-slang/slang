@@ -1770,6 +1770,11 @@ DIAGNOSTIC(
     Error,
     cannotUseInitializerListForCoopVectorOfUnknownSize,
     "cannot use initializer list for CoopVector of statically unknown size '$0'")
+DIAGNOSTIC(
+    30506,
+    Warning,
+    cannotUseInitializerListForResourceType,
+    "cannot use initializer list for resource type '$0'")
 
 // 3062x: variables
 DIAGNOSTIC(

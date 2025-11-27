@@ -127,6 +127,18 @@ bool SemanticsVisitor::_readValueFromInitializerList(
         // on whether the type we are trying to read
         // is default-initializable.
         //
+        // For resource types, this is definitely not true.
+        // Resource types can only ever be bound to parameters.
+        // But there is likely a fair amount of legacy code
+        // out there that depends on it being true. This should
+        // eventually be an error, but for now it's a warning.
+        if (auto resourceType = as<ResourceType>(toType)) {
+            getSink()->diagnose(
+                fromInitializerListExpr->loc,
+                Diagnostics::cannotUseInitializerListForResourceType,
+                toType);
+        }
+
         // For now, we will just pretend like everything
         // is default-initializable and move along.
         return true;
