@@ -1534,7 +1534,7 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
         {
             Decl* parent = getParentDecl(decl);
             return as<FunctionDeclBase>(decl) &&
-                (as<AggTypeDecl>(parent) || as<ExtensionDecl>(parent));
+                   (as<AggTypeDecl>(parent) || as<ExtensionDecl>(parent));
         }
     default:
         return true;
