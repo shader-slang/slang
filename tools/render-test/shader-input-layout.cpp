@@ -1594,4 +1594,71 @@ void generateTextureDataRGB8(TextureData& output, const InputTextureDesc& inputD
         }
     }
 }
+
+void collectUsedAttributes(slang::VariableLayoutReflection* varLayout, bool* usedAttributes)
+{
+    slang::TypeLayoutReflection* typeLayout = varLayout->getTypeLayout();
+
+    // If it's a struct, recursively check its fields
+    if (typeLayout->getKind() == slang::TypeReflection::Kind::Struct)
+    {
+        unsigned fieldCount = typeLayout->getFieldCount();
+        for (unsigned i = 0; i < fieldCount; i++)
+        {
+            collectUsedAttributes(typeLayout->getFieldByIndex(i), usedAttributes);
+        }
+    }
+    else
+    {
+        // Check if this parameter has the semantic "A" used by render-test
+        const char* semanticName = varLayout->getSemanticName();
+        if (semanticName && strcmp(semanticName, "A") == 0)
+        {
+            // Only mark as used if it has a valid binding (meaning it wasn't optimized out)
+            if (varLayout->getBindingIndex() != (unsigned)SLANG_UNKNOWN_SIZE)
+            {
+                unsigned index = varLayout->getSemanticIndex();
+                size_t size = typeLayout->getSize(slang::ParameterCategory::VaryingInput);
+                unsigned slotCount = (unsigned)size;
+                for (unsigned k = 0; (k < slotCount) && (index + k < 7); k++)
+                {
+                    usedAttributes[index + k] = true;
+                }
+            }
+        }
+    }
+}
+
+List<InputElementDesc> filterInputElements(
+    const InputElementDesc* allInputElements,
+    int allInputElementsCount,
+    slang::ProgramLayout* programLayout)
+{
+    // Identify which attributes are actually used by the vertex shader
+    bool usedAttributes[7] = {false};
+    for (unsigned i = 0; i < programLayout->getEntryPointCount(); i++)
+    {
+        auto entryPoint = programLayout->getEntryPointByIndex(i);
+        if (entryPoint->getStage() == SLANG_STAGE_VERTEX)
+        {
+            unsigned paramCount = entryPoint->getParameterCount();
+            for (unsigned j = 0; j < paramCount; j++)
+            {
+                collectUsedAttributes(entryPoint->getParameterByIndex(j), usedAttributes);
+            }
+        }
+    }
+
+    // Build the filtered list of input elements
+    List<InputElementDesc> inputElements;
+    for (int i = 0; i < allInputElementsCount; i++)
+    {
+        if (i < 7 && usedAttributes[i])
+        {
+            inputElements.add(allInputElements[i]);
+        }
+    }
+
+    return inputElements;
+}
 } // namespace renderer_test
