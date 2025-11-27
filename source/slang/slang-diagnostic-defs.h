@@ -1773,8 +1773,8 @@ DIAGNOSTIC(
 DIAGNOSTIC(
     30506,
     Warning,
-    cannotUseInitializerListForResourceType,
-    "cannot use initializer list for resource type '$0'")
+    cannotDefaultInitializeResourceType,
+    "cannot default-initialize resource type '$0', leaving uninitialized")
 
 // 3062x: variables
 DIAGNOSTIC(

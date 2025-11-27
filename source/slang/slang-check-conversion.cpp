@@ -132,11 +132,13 @@ bool SemanticsVisitor::_readValueFromInitializerList(
         // But there is likely a fair amount of legacy code
         // out there that depends on it being true. This should
         // eventually be an error, but for now it's a warning.
+        // Use diagnoseOnce to avoid duplicate warnings when iterating
+        // over array elements or struct fields.
         if (as<ResourceType>(toType))
         {
-            getSink()->diagnose(
+            diagnoseOnce(
                 fromInitializerListExpr->loc,
-                Diagnostics::cannotUseInitializerListForResourceType,
+                Diagnostics::cannotDefaultInitializeResourceType,
                 toType);
         }
 

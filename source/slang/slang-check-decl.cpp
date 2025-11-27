@@ -2646,7 +2646,7 @@ bool isDefaultInitializable(VarDeclBase* varDecl)
     return true;
 }
 
-static Expr* constructDefaultConstructorForType(SemanticsVisitor* visitor, Type* type)
+static Expr* constructDefaultConstructorForType(SemanticsVisitor* visitor, Type* type, SourceLoc loc)
 {
     ConstructorDecl* defaultCtor = nullptr;
     auto declRefType = as<DeclRefType>(type);
@@ -2677,6 +2677,7 @@ static Expr* constructDefaultConstructorForType(SemanticsVisitor* visitor, Type*
     if (visitor->isCStyleType(type, visitSet))
     {
         auto initListExpr = visitor->getASTBuilder()->create<InitializerListExpr>();
+        initListExpr->loc = loc;
         initListExpr->type = visitor->getASTBuilder()->getInitializerListType();
         Expr* outExpr = nullptr;
         auto fromType = type;
@@ -2699,7 +2700,7 @@ static Expr* constructDefaultInitExprForType(SemanticsVisitor* visitor, VarDeclB
     if (!isDefaultInitializable(varDecl))
         return nullptr;
 
-    if (auto defaultInitExpr = constructDefaultConstructorForType(visitor, varDecl->type.type))
+    if (auto defaultInitExpr = constructDefaultConstructorForType(visitor, varDecl->type.type, varDecl->loc))
     {
         return defaultInitExpr;
     }
@@ -13597,9 +13598,8 @@ static Expr* _getParamDefaultValue(SemanticsVisitor* visitor, VarDeclBase* varDe
     if (!isDefaultInitializable(varDecl))
         return nullptr;
 
-    if (auto expr = constructDefaultConstructorForType(visitor, varDecl->type.type))
+    if (auto expr = constructDefaultConstructorForType(visitor, varDecl->type.type, varDecl->loc))
     {
-        expr->loc = varDecl->loc;
         return expr;
     }
 
