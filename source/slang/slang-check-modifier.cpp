@@ -1531,7 +1531,11 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
     case ASTNodeType::DynModifier:
         return as<InterfaceDecl>(decl) || as<VarDecl>(decl) || as<ParamDecl>(decl);
     case ASTNodeType::OverrideModifier:
-        return as<FunctionDeclBase>(decl) && as<AggTypeDecl>(getParentDecl(decl));
+        {
+            Decl* parent = getParentDecl(decl);
+            return as<FunctionDeclBase>(decl) &&
+                (as<AggTypeDecl>(parent) || as<ExtensionDecl>(parent));
+        }
     default:
         return true;
     }
