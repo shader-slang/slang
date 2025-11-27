@@ -316,26 +316,11 @@ static void _appendEncodedTeamCityString(const UnownedStringSlice& in, StringBui
 static void _appendTime(double timeInSec, StringBuilder& out)
 {
     SLANG_ASSERT(timeInSec >= 0.0);
-    if (timeInSec == 0.0 || timeInSec >= 1.0)
-    {
-        out << timeInSec << "s";
-        return;
-    }
-    timeInSec *= 1000.0f;
-    if (timeInSec > 1.0f)
-    {
-        out << timeInSec << "ms";
-        return;
-    }
-    timeInSec *= 1000.0f;
-    if (timeInSec > 1.0f)
-    {
-        out << timeInSec << "us";
-        return;
-    }
-
-    timeInSec *= 1000.0f;
-    out << timeInSec << "ns";
+    // Always output in milliseconds for consistency
+    double timeInMs = timeInSec * 1000.0;
+    char buffer[32];
+    snprintf(buffer, sizeof(buffer), "%.3fms", timeInMs);
+    out << buffer;
 }
 
 void TestReporter::_addResult(TestInfo info)
@@ -425,7 +410,9 @@ void TestReporter::_addResult(TestInfo info)
         StringBuilder buffer;
         if (info.executionTime > 0.0f)
         {
+            buffer << "(";
             _appendTime(info.executionTime, buffer);
+            buffer << ")";
         }
         printf(
             "%s test: '%S' %s\n",

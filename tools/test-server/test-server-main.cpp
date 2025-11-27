@@ -14,6 +14,7 @@
 #include "gfx-unit-test/gfx-test-util.h"
 #include "slang-com-helper.h"
 #include "slang-rhi.h"
+#include "test-server-chronometer.h"
 #include "test-server-diagnostics.h"
 #include "unit-test/slang-unit-test.h"
 
@@ -106,6 +107,9 @@ protected:
 
     RefPtr<JSONRPCConnection> m_connection; ///< RPC connection, recieves calls to execute and
                                             ///< returns results via JSON-RPC
+
+    Chronometer
+        m_chronometer; ///< Timing data for test phases (enabled via SLANG_DIAGNOSTICS=timing)
 };
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!! TestServer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -231,6 +235,9 @@ SlangResult TestServer::init(int argc, const char* const* argv)
 
 TestServer::~TestServer()
 {
+    // Print timing summary before cleanup
+    m_chronometer.printSummary();
+
     for (auto& [_, value] : m_unitTestModules)
         value->destroy();
 }
@@ -485,20 +492,33 @@ static Index _findTestIndex(IUnitTestModule* testModule, const String& name)
 SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
 {
     auto id = m_connection->getPersistentValue(call.id);
+    auto sink = m_connection->getSink();
 
+    // Start timing the entire test
+    auto testStartTime = m_chronometer.beginTest();
+
+    // Phase 1: Argument parsing
     TestServerProtocol::ExecuteUnitTestArgs args;
     SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
 
-    auto sink = m_connection->getSink();
-
-    IUnitTestModule* testModule = getUnitTestModule(args.moduleName, m_connection->getSink());
+    // Phase 2: Module loading
+    IUnitTestModule* testModule;
+    {
+        SCOPED_TIMER(m_chronometer, "unit-test:module-loading");
+        testModule = getUnitTestModule(args.moduleName, sink);
+    }
     if (!testModule)
     {
         sink->diagnose(SourceLoc(), ServerDiagnostics::unableToFindUnitTestModule, args.moduleName);
         return m_connection->sendError(JSONRPC::ErrorCode::InvalidParams, id);
     }
 
-    const Index testIndex = _findTestIndex(testModule, args.testName);
+    // Phase 3: Test lookup
+    Index testIndex;
+    {
+        SCOPED_TIMER(m_chronometer, "unit-test:test-lookup");
+        testIndex = _findTestIndex(testModule, args.testName);
+    }
     if (testIndex < 0)
     {
         sink->diagnose(SourceLoc(), ServerDiagnostics::unableToFindTest, args.testName);
@@ -512,8 +532,12 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
 
     testModule->setTestReporter(&testReporter);
 
-    // Assume we will used the shared session
-    slang::IGlobalSession* session = getOrCreateGlobalSession();
+    // Phase 4: Session creation
+    slang::IGlobalSession* session;
+    {
+        SCOPED_TIMER(m_chronometer, "unit-test:session-creation");
+        session = getOrCreateGlobalSession();
+    }
     if (!session)
     {
         return SLANG_FAIL;
@@ -532,13 +556,17 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
 
     UnitTestFunc testFunc = testModule->getTestFunc(testIndex);
 
-    try
+    // Phase 5: Test execution
     {
-        testFunc(&unitTestContext);
-    }
-    catch (...)
-    {
-        testReporter.m_failCount++;
+        SCOPED_TIMER(m_chronometer, "unit-test:execution");
+        try
+        {
+            testFunc(&unitTestContext);
+        }
+        catch (...)
+        {
+            testReporter.m_failCount++;
+        }
     }
 
     TestServerProtocol::ExecutionResult result;
@@ -555,28 +583,44 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
         result.result = SLANG_E_NOT_AVAILABLE;
     }
 
-    result.returnCode = int32_t(TestToolUtil::getReturnCode(result.result));
-    return m_connection->sendResult(&result, id);
+    // Phase 6: Result sending
+    {
+        SCOPED_TIMER(m_chronometer, "unit-test:result-sending");
+        result.returnCode = int32_t(TestToolUtil::getReturnCode(result.result));
+        result.executionTimeMs = m_chronometer.endTest(testStartTime);
+        return m_connection->sendResult(&result, id);
+    }
 }
 
 SlangResult TestServer::_executeTool(const JSONRPCCall& call)
 {
     auto id = m_connection->getPersistentValue(call.id);
-
-    TestServerProtocol::ExecuteToolTestArgs args;
-
-    SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, id));
-
     auto sink = m_connection->getSink();
 
-    auto func = getToolFunction(args.toolName, sink);
+    // Start timing the entire test
+    auto testStartTime = m_chronometer.beginTest();
+
+    // Phase 1: Argument parsing
+    TestServerProtocol::ExecuteToolTestArgs args;
+    SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, id));
+
+    // Phase 2: Tool function lookup
+    InnerMainFunc func;
+    {
+        SCOPED_TIMER(m_chronometer, "tool:function-lookup");
+        func = getToolFunction(args.toolName, sink);
+    }
     if (!func)
     {
         return m_connection->sendError(JSONRPC::ErrorCode::InvalidParams, id);
     }
 
-    // Assume we will used the shared session
-    slang::IGlobalSession* session = getOrCreateGlobalSession();
+    // Phase 3: Session creation
+    slang::IGlobalSession* session;
+    {
+        SCOPED_TIMER(m_chronometer, "tool:session-creation");
+        session = getOrCreateGlobalSession();
+    }
     if (!session)
     {
         return SLANG_FAIL;
@@ -613,8 +657,12 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
         stdWriters.setWriter(SLANG_WRITER_CHANNEL_DIAGNOSTIC, stdErrorWriter);
     }
 
-    const SlangResult funcRes =
-        func(&stdWriters, session, int(toolArgs.getCount()), toolArgs.begin());
+    // Phase 4: Tool execution
+    SlangResult funcRes;
+    {
+        SCOPED_TIMER(m_chronometer, "tool:execution");
+        funcRes = func(&stdWriters, session, int(toolArgs.getCount()), toolArgs.begin());
+    }
 
     TestServerProtocol::ExecutionResult result;
     result.result = funcRes;
@@ -622,8 +670,13 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
     result.stdOut = stdOut;
     result.debugLayer = debugCallback.getString();
 
-    result.returnCode = int32_t(TestToolUtil::getReturnCode(result.result));
-    return m_connection->sendResult(&result, id);
+    // Phase 5: Result sending
+    {
+        SCOPED_TIMER(m_chronometer, "tool:result-sending");
+        result.returnCode = int32_t(TestToolUtil::getReturnCode(result.result));
+        result.executionTimeMs = m_chronometer.endTest(testStartTime);
+        return m_connection->sendResult(&result, id);
+    }
 }
 
 SlangResult TestServer::execute()
