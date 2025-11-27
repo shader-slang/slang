@@ -4737,7 +4737,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex1Dfetch_int(CUtexObject texObj, int x, i
     SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex1Dfetch_int(CUtexObject texObj, int x, int mip)    \
     {                                                                                          \
         T result;                                                                              \
-        T stub; (void)(stub);                                                                  \
+        [[maybe_unused]] T stub;                                                               \
         asm("tex.level.1d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5}], %6;"                  \
             : c(result), c(stub), c(stub), c(stub)                                             \
             : "l"(texObj), "r"(x), "r"(mip));                                                  \
@@ -4747,7 +4747,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex1Dfetch_int(CUtexObject texObj, int x, i
     SLANG_FORCE_INLINE SLANG_CUDA_CALL T##2 tex1Dfetch_int(CUtexObject texObj, int x, int mip) \
     {                                                                                          \
         T result_x, result_y;                                                                  \
-        T stub; (void)(stub);                                                                  \
+        [[maybe_unused]] T stub;                                                               \
         asm("tex.level.1d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5}], %6;"                  \
             : c(result_x), c(result_y), c(stub), c(stub)                                       \
             : "l"(texObj), "r"(x), "r"(mip));                                                  \
@@ -4776,7 +4776,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex2Dfetch_int(CUtexObject texObj, int x, i
     SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex2Dfetch_int(CUtexObject texObj, int x, int y, int mip) \
     {                                                                                              \
         T result;                                                                                  \
-        T stub; (void)(stub);                                                                      \
+        [[maybe_unused]] T stub;                                                                   \
         asm("tex.level.2d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5, %6}], %7;"                  \
             : c(result), c(stub), c(stub), c(stub)                                                 \
             : "l"(texObj), "r"(x), "r"(y), "r"(mip));                                              \
@@ -4787,7 +4787,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex2Dfetch_int(CUtexObject texObj, int x, i
         T##2 tex2Dfetch_int(CUtexObject texObj, int x, int y, int mip)                             \
     {                                                                                              \
         T result_x, result_y;                                                                      \
-        T stub; (void)(stub);                                                                      \
+        [[maybe_unused]] T stub;                                                                   \
         asm("tex.level.2d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5, %6}], %7;"                  \
             : c(result_x), c(result_y), c(stub), c(stub)                                           \
             : "l"(texObj), "r"(x), "r"(y), "r"(mip));                                              \
@@ -4819,7 +4819,7 @@ tex3Dfetch_int(CUtexObject texObj, int x, int y, int z, int mip);
     tex3Dfetch_int(CUtexObject texObj, int x, int y, int z, int mip)                      \
     {                                                                                     \
         T result;                                                                         \
-        T stub; (void)(stub);                                                             \
+        [[maybe_unused]] T stub;                                                          \
         asm("tex.level.3d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}], %9;" \
             : c(result), c(stub), c(stub), c(stub)                                        \
             : "l"(texObj), "r"(x), "r"(y), "r"(z), "r"(z) /* ignored */, "r"(mip));       \
@@ -4830,7 +4830,7 @@ tex3Dfetch_int(CUtexObject texObj, int x, int y, int z, int mip);
         T##2 tex3Dfetch_int(CUtexObject texObj, int x, int y, int z, int mip)             \
     {                                                                                     \
         T result_x, result_y;                                                             \
-        T stub; (void)(stub);                                                             \
+        [[maybe_unused]] T stub;                                                          \
         asm("tex.level.3d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}], %9;" \
             : c(result_x), c(result_y), c(stub), c(stub)                                  \
             : "l"(texObj), "r"(x), "r"(y), "r"(z), "r"(z) /* ignored */, "r"(mip));       \
@@ -4861,7 +4861,7 @@ tex1DArrayfetch_int(CUtexObject texObj, int x, int layer, int mip);
     tex1DArrayfetch_int(CUtexObject texObj, int x, int layer, int mip)             \
     {                                                                              \
         T result;                                                                  \
-        T stub; (void)(stub);                                                      \
+        [[maybe_unused]] T stub;                                                   \
         asm("tex.level.a1d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5, %6}], %7;" \
             : c(result), c(stub), c(stub), c(stub)                                 \
             : "l"(texObj), "r"(layer), "r"(x), "r"(mip));                          \
@@ -4872,7 +4872,7 @@ tex1DArrayfetch_int(CUtexObject texObj, int x, int layer, int mip);
         T##2 tex1DArrayfetch_int(CUtexObject texObj, int x, int layer, int mip)    \
     {                                                                              \
         T result_x, result_y;                                                      \
-        T stub; (void)(stub);                                                      \
+        [[maybe_unused]] T stub;                                                   \
         asm("tex.level.a1d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5, %6}], %7;" \
             : c(result_x), c(result_y), c(stub), c(stub)                           \
             : "l"(texObj), "r"(layer), "r"(x), "r"(mip));                          \
@@ -4903,7 +4903,7 @@ tex2DArrayfetch_int(CUtexObject texObj, int x, int y, int layer, int mip);
     tex2DArrayfetch_int(CUtexObject texObj, int x, int y, int layer, int mip)               \
     {                                                                                       \
         T result;                                                                           \
-        T stub; (void)(stub);                                                               \
+        [[maybe_unused]] T stub;                                                            \
         asm("tex.level.a2d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}], %9;"  \
             : c(result), c(stub), c(stub), c(stub)                                          \
             : "l"(texObj), "r"(layer), "r"(x), "r"(y), "r"(layer) /* ignored */, "r"(mip)); \
@@ -4914,7 +4914,7 @@ tex2DArrayfetch_int(CUtexObject texObj, int x, int y, int layer, int mip);
         T##2 tex2DArrayfetch_int(CUtexObject texObj, int x, int y, int layer, int mip)      \
     {                                                                                       \
         T result_x, result_y;                                                               \
-        T stub; (void)(stub);                                                               \
+        [[maybe_unused]] T stub;                                                            \
         asm("tex.level.a2d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}], %9;"  \
             : c(result_x), c(result_y), c(stub), c(stub)                                    \
             : "l"(texObj), "r"(layer), "r"(x), "r"(y), "r"(layer) /* ignored */, "r"(mip)); \
