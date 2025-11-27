@@ -132,7 +132,7 @@ bool SemanticsVisitor::_readValueFromInitializerList(
         // But there is likely a fair amount of legacy code
         // out there that depends on it being true. This should
         // eventually be an error, but for now it's a warning.
-        if (auto resourceType = as<ResourceType>(toType))
+        if (as<ResourceType>(toType))
         {
             getSink()->diagnose(
                 fromInitializerListExpr->loc,
