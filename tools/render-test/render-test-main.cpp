@@ -222,8 +222,9 @@ void collectUsedAttributes(slang::VariableLayoutReflection* varLayout, bool* use
             collectUsedAttributes(typeLayout->getFieldByIndex(i), usedAttributes);
         }
     }
-    else if (typeLayout->getKind() == slang::TypeReflection::Kind::Matrix)
+    else
     {
+        // Check if this parameter has the semantic "A" used by render-test
         const char* semanticName = varLayout->getSemanticName();
         if (semanticName && strcmp(semanticName, "A") == 0)
         {
@@ -231,29 +232,12 @@ void collectUsedAttributes(slang::VariableLayoutReflection* varLayout, bool* use
             if (varLayout->getBindingIndex() != SLANG_UNKNOWN_SIZE)
             {
                 unsigned index = varLayout->getSemanticIndex();
-                size_t size = typeLayout->getSize();
-                // Assuming each slot is 16 bytes (float4)
-                unsigned slotCount = (unsigned)((size + 15) / 16);
-                for (unsigned k = 0; k < slotCount; k++)
+                size_t size = typeLayout->getSize(slang::ParameterCategory::VaryingInput);
+                unsigned slotCount = (unsigned)size;
+                for (unsigned k = 0; (k < slotCount) && (index + k < 7); k++)
                 {
-                    if (index + k < 7)
-                    {
-                        usedAttributes[index + k] = true;
-                    }
+                    usedAttributes[index + k] = true;
                 }
-            }
-        }
-    }
-    else
-    {
-        // Check if this parameter has the semantic "A" used by render-test
-        const char* semanticName = varLayout->getSemanticName();
-        if (semanticName && strcmp(semanticName, "A") == 0)
-        {
-            unsigned index = varLayout->getSemanticIndex();
-            if (index < 7)
-            {
-                usedAttributes[index] = true;
             }
         }
     }
