@@ -1258,7 +1258,7 @@ struct GLSLResourceReturnFunctionInliningPass : InliningPassBase
     }
 };
 
-void performGLSLResourceReturnFunctionInlining(TargetProgram* targetProgram, IRModule* module)
+void performGLSLResourceReturnFunctionInlining(IRModule* module, TargetProgram* targetProgram)
 {
     GLSLResourceReturnFunctionInliningPass pass(module);
     bool changed = true;

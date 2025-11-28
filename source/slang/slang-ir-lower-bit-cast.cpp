@@ -376,7 +376,7 @@ struct BitCastLoweringContext
     }
 };
 
-void lowerBitCast(TargetProgram* targetProgram, IRModule* module, DiagnosticSink* sink)
+void lowerBitCast(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
     BitCastLoweringContext context;
     context.module = module;

@@ -1261,7 +1261,7 @@ bool specializeResourceOutputs(
     return pass.processModule();
 }
 
-bool specializeResourceUsage(CodeGenContext* codeGenContext, IRModule* irModule)
+bool specializeResourceUsage(IRModule* irModule, CodeGenContext* codeGenContext)
 {
     bool result = false;
     // We apply two kinds of specialization to clean up resource value usage:
