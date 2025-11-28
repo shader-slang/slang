@@ -14,7 +14,6 @@ internal extension<T> RWStructuredBuffer<T> : IArray<T>
     }
 }
 
-
 [ForceInline]
 internal static uint4 readUint4<T, BufferType>(BufferType buffer, int startIndex)
     where T : __BuiltinFloatingPointType
@@ -55,7 +54,7 @@ internal static uint4 readUint4<T, BufferType>(BufferType buffer, int startIndex
     return result;
 }
 
-internal uint4 readUint4<T, BufferType, bool IsAligned, uint ActualBoundary, uint AlignedBoundary>(BufferType buffer, int baseIndex, int startIndex)
+internal uint4 readUint4<T, BufferType, bool IsAligned, uint Stride, uint AlignedStride>(BufferType buffer, int baseIndex, int startIndex)
     where T : __BuiltinFloatingPointType
     where T.Differential == T
     where BufferType : IArray<T>
@@ -71,12 +70,15 @@ internal uint4 readUint4<T, BufferType, bool IsAligned, uint ActualBoundary, uin
     const int ReadPerElement = 4 / nBytes;
     const int BitsShiftPerRead = 32 / ReadPerElement;
 
-    // end address of this read [address+length-1]
-    const int endAddress = (startIndex - baseIndex + 4 * ReadPerElement - 1) % AlignedBoundary;
+    const int x = (startIndex - baseIndex) % Stride;
 
-    // this is same as paddingCount = endAddress < ActualBoundary ? 0 : ActualBoundary - endAddress + 1
-    const int paddingCount = max(0, endAddress - ActualBoundary + 1);
+    // end address of this read [address+length-1]
+    const int endAddress = (x + 4 * ReadPerElement - 1);
+
+    // this is same as paddingCount = endAddress < AlignedStride ? 0 : AlignedStride - endAddress + 1
+    const int paddingCount = max(0, endAddress - Stride + 1);
     const int elementsToRead = (4 * ReadPerElement) - paddingCount;
+
 
     [ForceUnroll]
     for (int i = 0; i < 4; i++)
