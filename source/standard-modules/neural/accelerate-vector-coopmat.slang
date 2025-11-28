@@ -96,6 +96,8 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
     static const uint ElementCountPerVector = sizeof(uint4) / sizeof(T);
     static const bool IsAlignedVector = (K % ElementCountPerVector) == 0;
 
+    // Size of the Matrix A in original data type without alignment.
+    static const int MatASizeUnaligned = M * K;
 
     static const int NTilesRow = (M + T.ROW_A - 1) / T.ROW_A;
     static const int NTilesColumn = (N + T.COLUMN_B - 1) / T.COLUMN_B;
@@ -127,7 +129,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
     // It's used for column major matrix B.
     static const uint HeightInVectorTileB = (T.ROW_B * sizeof(T)) / sizeof(uint4);
 
-    // So TileHeightBInElement is the number of elements in one column of the tile in original data type.
+    // So TileHeightBInElement is the number of elements in one column of the tile, measured in T.
     static const uint HeightInElementTileB = HeightInVectorTileB * ElementCountPerVector;
 
     // The aligned size of the shared memory for matrix A and B.
@@ -139,6 +141,17 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
     typealias MatB = linalg.CoopMat< half, MemoryScope.Subgroup, T.COLUMN_A, T.COLUMN_B, linalg.CoopMatMatrixUse.MatrixB>;
     typealias MatC = linalg.CoopMat<T, MemoryScope.Subgroup, T.ROW_A, T.COLUMN_B, linalg.CoopMatMatrixUse.MatrixAccumulator>;
 
+    // Load a tiled column of the Matrix A into shared memory.
+    // We load a column of matrix tile of Matrix A each time, because our iteration is over K dimension.
+    // We require the Matrix A is stored as row major in the weight storage.
+    // Also we load the tile into shared memory in row major.
+    // For each workgroup (thread block), we only use the first Subgroup (warp) to load the data.
+    // This is just balanced decision between simplicity and bank conflict. Given that the shared memory tile
+    // is not that large, if the warp is full, then each thread only needs to load 2 twice, therefore there is
+    // no need to use more than one warp. And more warp could also make the algorithm avoiding bank conflict more
+    // complicated.
+    // So implement as this for now. We can profiling the application later, if it turns out to be a bottleneck,
+    // we can consider using more than one warp in the future.
     [require(cooperative_matrix, subgroup_basic)]
     [ForceInline]
     VISIBILITY_LEVEL static void LoadShA<Storage>(
@@ -148,23 +161,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
             Storage.Address weightAddress)
             where Storage : IStorage<T>
     {
-        // pre-load the Matrix A into shared memory.
-        // We load a column of matrix tile of Matrix A each time, because our iteration is over K dimension.
-        //  We require the Matrix A is stored as row major in the weight storage.
-        //  Also we load the tile into shared memory in row major.
-        //  get the 2-D coordinate of the tile in original data type
-
         const uint laneId = WaveGetLaneIndex();
-
-        // For each workgroup (thread block), we only use the first Subgroup (warp) to load the data.
-        // This is just balanced decision between simplicity and bank conflict. Given that the shared memory tile
-        // is not that large, if the warp is full, then each thread only needs to load 2 twice, therefore there is
-        // no need to use more than one warp. And more warp could also make the algorithm avoiding bank conflict more
-        // complicated.
-        // So implement as this for now. We can profiling the application later, if it turns out to be a bottleneck,
-        // we can consider using more than one warp in the future.
-        if (laneId >= WaveGetLaneCount())
-            return;
 
         // get the 2-D coordinate of the tile in the vectorized tile
         const uint xInTile = laneId % WidthInVectorTileA;
@@ -204,8 +201,9 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
             // We only need to provide the actual boundary and the aligned boundary.
             indexInWeight = ty * K + tx;
 
-            // Bounds check on Y direction. If y coordinate is out of range of Matrix A, just padding with 0.
-            if (ty >= M || tx >= K)
+            // Bounds check. If the coordinate is out of range of Matrix A, just padding with 0.
+            bool isOutOfRange = ((ty >= M) | (tx >= K));
+            if (isOutOfRange)
             {
                 value = uint4(0, 0, 0, 0);
             }
@@ -236,12 +234,12 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
         int tileIndex,
         T[K] inputVector)
     {
-        const uint xInTile = WaveGetLaneIndex();
+        const uint laneId = WaveGetLaneIndex();
         const uint subgroupIndex = getWaveId();
         SPtr<uint4> sharedMemoryBSubgroup = sharedMemoryB + subgroupIndex * (SharedMemSizeInBytesMatB / sizeof(uint4));
 
         // start index in vectorized tile for current thread: x * column_stride
-        const uint indexInVectorizedTile = xInTile * HeightInVectorTileB;
+        const uint indexInVectorizedTile = laneId * HeightInVectorTileB;
         const uint yOffset = (tileIndex * HeightInVectorTileB) * ElementCountPerVector;
 
         for (uint yInTile = 0; yInTile < HeightInVectorTileB; yInTile++)
@@ -259,6 +257,31 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
 
             uint4 value = readUint4<T, T[K], IsAlignedVector, K, Uint4AlignedK>(inputVector, 0, startIndex);
             sharedMemoryBSubgroup[indexInVectorizedTile + yInTile] = value;
+        }
+
+        int activeThreadCount = WaveActiveCountBits(true);
+        if (activeThreadCount < AlignedN)
+        {
+            // If the active thread count is less than the aligned N, we need to pad the remaining columns with 0.
+            const uint numPaddingColumns = AlignedN - activeThreadCount;
+
+            // The number of vectors to load == numPaddingColumns * HeightInVectorTileB.
+            // The number of vectors to load per thread == (numPaddingColumns * HeightInVectorTileB / activeThreadCount).
+            const uint numLoadsEachThreadMatB = (numPaddingColumns * HeightInVectorTileB + activeThreadCount - 1) / activeThreadCount;
+            const uint offsetPerThreadLoadMatB = activeThreadCount;
+
+            // Because we already load activeThreadCount columns, the starting index is activeThreadCount * HeightInVectorTileB.
+            SPtr<uint4> paddingShmPtr = sharedMemoryBSubgroup + activeThreadCount * HeightInVectorTileB;
+
+            uint index = laneId;
+            for (uint i = 0; i < numLoadsEachThreadMatB; i++)
+            {
+                const uint xIndex = index / HeightInVectorTileB;
+                if (xIndex >= numPaddingColumns)
+                    break;
+                paddingShmPtr[index] = uint4(0, 0, 0, 0);
+                index += offsetPerThreadLoadMatB;
+            }
         }
     }
 

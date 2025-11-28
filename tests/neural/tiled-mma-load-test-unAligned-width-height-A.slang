@@ -4,9 +4,9 @@
 import neural;
 #pragma warning(disable: 41017)
 
-// This test verifies that the tiled MMA load operations work correctly when the width of the matrix
-// is not aligned with the tile width. The result of the tile will always be aligned with 16 each row
-// with 0 paddings.
+// This test verifies that the tiled MMA load operations work correctly when the width, height of the matrix
+// is not aligned with the tile width, height. The result of the tile will always be aligned with 16 each row
+// and column with 0 paddings.
 
 //
 // ============================================================================
@@ -27,24 +27,33 @@ import neural;
 //   Row 31: 992  993  994  995  ...  1007 1008 1009  ...   1023
 //
 
-// We will test different widths of the matrix, for example, if the width == 27,
-// and if we read the 2nd tile, the result will be:
+// We will test different widths, heights of the matrix, for example,
+// if the width == 19, and height == 3, and if we read the 2nd tile, the result will be:
 //
-//  16   17   18  ...  26 [5 zeros]
-//  48   33   34  ...  46 [5 zeros]
-//  ...
-//  492  493  494 ...  496 [5 zeros]
+//  16   17   18  ...  0 [13 zeros padding]
+//  35   36   37  ...  0 [13 zeros padding]
+//  54   55   56  ...  0 [13 zeros padding]
+// ...
+// [13 zeros padding rows]
+
+// Explanation:
+// Think about the input matrix is a 1-D buffer from 0-1023, since the width of the matrix is 19 now,
+// the stride of the matrix is 19. And height is 3, so the matrix will be:
+// So the matrix will be:
+// 0    1    2    3    4    5    6    7    8    9    10   11   12   13   14   15   16   17   18
+// 19   20   21   22   23   24   25   26   27   28   29   30   31   32   33   34   35   36   37
+// 38   39   40   41   42   43   44   45   46   47   48   49   50   51   52   53   54   55   56
+
+// Because we are reading the 2nd tile, so it will start from the 17th column (index 16), so there
+// will be only 3 elements left in each row, the remaining 13 elements will be padded with 0:
+//
+//  16   17   18  ...  0 [13 zeros padding]
+//  35   36   37  ...  0 [13 zeros padding]
+//  54   55   56  ...  0 [13 zeros padding]
+// ...
+// [13 zeros padding rows]
 
 
-// The reason is that the 2nd tile is starting from the 17th column (index 16), and
-// it has 11 elements each row, the remaining 5 elements will be padded with 0.
-
-// Because in this test, we always using 1024 length buffer as the input buffer.
-// So when K is smaller than 16, we will interpret it as 64 x 16 matrix.
-// When K is larger than 16, we will interpret it as 32 x 32 matrix.
-// This will impact the output verification logic.
-
-// Make the weight matrix as 32x32 matrix in row major order
 // TEST_INPUT:ubuffer(stride=2, count=1024):name=inputBuffer
 RWStructuredBuffer<half> inputBuffer;
 
@@ -75,8 +84,6 @@ void invalidateSharedMemoryA(uint tid)
     GroupMemoryBarrierWithWaveSync();
 }
 
-// InputSize is the K dimension of the matrix A, make it unaligned to test the padding logic.
-static const int InputSize = 27;
 static const int SubgroupSize = 32;
 
 // Tile A is size of 32 * 32 bytes: TileHeight is at least 16.
@@ -105,8 +112,6 @@ bool verifiedOutput<int M, int K>(uint tid, SPtr sharedMem, uint tileIndex)
 
     // We only need to verify alignedM rows
     uint alignedM = ((M + 16 - 1) / 16) * 16;
-    if (tid >= alignedM)
-        return true;
 
     if (tid < alignedM)
     {
@@ -120,7 +125,6 @@ bool verifiedOutput<int M, int K>(uint tid, SPtr sharedMem, uint tileIndex)
                 // Check out-of-boundary for Y direction.
                 if (!values.equals(uint4(0, 0, 0, 0)))
                 {
-                    printf("false 1\n");
                     return false;
                 }
                 continue;
@@ -129,49 +133,27 @@ bool verifiedOutput<int M, int K>(uint tid, SPtr sharedMem, uint tileIndex)
             for (int j = 0; j < 4; j++)
             {
                 uint xIndex = (i * 8 + j * 2) + tileIndex * 16;
-
                 uint value = element[j];
-                if (xIndex >= K)
-                {
-                    if (value != 0)
-                    {
-                        printf("false 2\n");
-                        return false;
-                    }
-                    continue;
-                }
-
                 uint16_t a = (uint16_t)((value >> 16) & 0xFFFF);
                 uint16_t b = (uint16_t)(value & 0xFFFF);
-
-                half aa = bit_cast<half>(a);
-                half bb = bit_cast<half>(b);
-
-                if (aa != expected)
+                half actual[2] = { bit_cast<half>(a), bit_cast<half>(b) };
+                half expectedValues[2] = { expected, expected + 1.0h };
+                for (int verifyIndex = 0; verifyIndex < 2; verifyIndex++)
                 {
-                    printf("false 3\n");
-                    return false;
-                }
-
-                expected += 1.0h;
-                xIndex++;
-
-                if (xIndex >= K)
-                {
-                    if (bb != 0.0h)
+                    if (xIndex++ >= K)
                     {
-                        printf("false 4\n");
+                        if (actual[verifyIndex] != 0.0h)
+                        {
+                            return false;
+                        }
+                        continue;
+                    }
+                    if (actual[verifyIndex] != expectedValues[verifyIndex])
+                    {
                         return false;
                     }
-                    continue;
                 }
-
-                if (bb != expected)
-                {
-                    printf("false 5\n");
-                    return false;
-                }
-                expected += 1.0h;
+                expected += 2.0h;
             }
         }
     }
@@ -244,15 +226,15 @@ void computeMain(uint tid : SV_DispatchThreadID)
 {
     initWeightMatrix(tid);
 
-    Test<3, 19>(tid, 1, 0);
+    Test<3, 19>(tid, 1, 0);         // M == 3, K = 19, read tile 1
     // BUFFER: 1
 
-    Test<5, 32>(tid, 1, 1);      // boundary case, K = 32
+    Test<5, 32>(tid, 1, 1);      // M == 5, K = 32, read tile 1
     // BUFFER-NEXT: 1
 
-    Test<14, 13>(tid, 0, 2);
+    Test<14, 13>(tid, 0, 2);      // M == 14, K = 13, read tile 0
     // BUFFER-NEXT: 1
 
-    Test<25, 16>(tid, 0, 3);     // boundary case, K = 16
+    Test<25, 16>(tid, 0, 3);     // M == 25, K = 16, read tile 0
     // BUFFER-NEXT: 1
 }
