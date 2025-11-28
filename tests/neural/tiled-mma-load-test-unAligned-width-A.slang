@@ -28,11 +28,14 @@ import neural;
 //
 
 // We will test different widths of the matrix, for example, if the width == 27,
-// and we will read the 2nd tile.
+// and if we read the 2nd tile, the result will be:
 //
-//  16   17   18 ... 26 [5 zeros]
-//  48   33   34 ... 46 [5 zeros]
+//  16   17   18  ...  26 [5 zeros]
+//  48   33   34  ...  46 [5 zeros]
 //  ...
+//  492  493  494 ...  496 [5 zeros]
+
+
 // The reason is that the 2nd tile is starting from the 17th column (index 16), and
 // it has 11 elements each row, the remaining 5 elements will be padded with 0.
 
@@ -40,7 +43,6 @@ import neural;
 // So when K is smaller than 16, we will interpret it as 64 x 16 matrix.
 // When K is larger than 16, we will interpret it as 32 x 32 matrix.
 // This will impact the output verification logic.
-
 
 // Make the weight matrix as 32x32 matrix in row major order
 // TEST_INPUT:ubuffer(stride=2, count=1024):name=inputBuffer
@@ -52,6 +54,25 @@ RWStructuredBuffer<uint> outputBuffer;
 void initWeightMatrix(uint tid)
 {
     inputBuffer[tid] = half(tid);
+}
+
+void invalidateSharedMemoryA(uint tid)
+{
+    if (tid >= SubgroupSize)
+        return;
+
+    // Initialize the shared memory with all 1.0h.
+    uint activeThreadCount = WaveActiveCountBits(true);
+    uint numIters = (32 * 2 + activeThreadCount - 1) / activeThreadCount;
+    for (int i = 0; i < numIters; i++)
+    {
+        uint index = tid * numIters + i;
+        if (index >= 32 * 2)
+            break;
+
+        s_sharedMemoryA[index] = uint4(0x3C003C00);
+    }
+    GroupMemoryBarrierWithWaveSync();
 }
 
 // InputSize is the K dimension of the matrix A, make it unaligned to test the padding logic.
@@ -78,75 +99,107 @@ bool verifiedOutput<int M, int K>(uint tid, SPtr sharedMem, uint tileIndex)
 {
     // Verify the output is correct, each thread will verify one row/column of the shared memory.
     // So each thread will check 2 uint4 elements (32 bytes/16 half) in the shared memory.
-    uint rowStride = (K <= 16 ? 16 : 32);
-    half expected = half(tid * rowStride + tileIndex * 16);
+    half expected = half(tid * K + tileIndex * 16);
     bool res = true;
     uint index = tid * 16;  // 16 half per thread
-    for (int i = 0; i < 2; i++)
+
+    // We only need to verify alignedM rows
+    uint alignedM = ((M + 16 - 1) / 16) * 16;
+    if (tid >= alignedM)
+        return true;
+
+    if (tid < alignedM)
     {
-        uint indexInTile = tid * 2 + i;
-        uint4 values = sharedMem[indexInTile];
-        uint4 element = values;
-        if (indexInTile / 2 >= M)
+        for (int i = 0; i < 2; i++)
         {
-            // Check out-of-boundary for Y direction.
-            if (!values.equals(uint4(0, 0, 0, 0)))
+            uint indexInTile = tid * 2 + i;
+            uint4 values = sharedMem[indexInTile];
+            uint4 element = values;
+            if (indexInTile / 2 >= M)
             {
-                return false;
-            }
-            continue;
-        }
-
-        for (int j = 0; j < 4; j++)
-        {
-            uint xIndex = (i * 8 + j * 2) + tileIndex * 16;
-
-            uint value = element[j];
-            if (xIndex >= K)
-            {
-                if (value != 0)
+                // Check out-of-boundary for Y direction.
+                if (!values.equals(uint4(0, 0, 0, 0)))
                 {
+                    printf("false 1\n");
                     return false;
                 }
                 continue;
             }
 
-            uint16_t a = (uint16_t)((value >> 16) & 0xFFFF);
-            uint16_t b = (uint16_t)(value & 0xFFFF);
-
-            half aa = bit_cast<half>(a);
-            half bb = bit_cast<half>(b);
-
-            if (aa != expected)
+            for (int j = 0; j < 4; j++)
             {
-                return false;
-            }
+                uint xIndex = (i * 8 + j * 2) + tileIndex * 16;
 
-            expected += 1.0h;
-            xIndex++;
-
-            if (xIndex >= K)
-            {
-                if (bb != 0.0h)
+                uint value = element[j];
+                if (xIndex >= K)
                 {
+                    if (value != 0)
+                    {
+                        printf("false 2\n");
+                        return false;
+                    }
+                    continue;
+                }
+
+                uint16_t a = (uint16_t)((value >> 16) & 0xFFFF);
+                uint16_t b = (uint16_t)(value & 0xFFFF);
+
+                half aa = bit_cast<half>(a);
+                half bb = bit_cast<half>(b);
+
+                if (aa != expected)
+                {
+                    printf("false 3\n");
                     return false;
                 }
-                continue;
-            }
 
-            if (bb != expected)
-            {
-                return false;
+                expected += 1.0h;
+                xIndex++;
+
+                if (xIndex >= K)
+                {
+                    if (bb != 0.0h)
+                    {
+                        printf("false 4\n");
+                        return false;
+                    }
+                    continue;
+                }
+
+                if (bb != expected)
+                {
+                    printf("false 5\n");
+                    return false;
+                }
+                expected += 1.0h;
             }
-            expected += 1.0h;
         }
     }
-
+    else
+    {
+        // For out-of-range rows, we just check if the values are same as the initialized values.
+        // Because we also need to check if the library accidentally write some values to the out-of-range rows.
+        for (int i = 0; i < 2; i++)
+        {
+            uint indexInTile = tid * 2 + i;
+            uint4 values = sharedMem[indexInTile];
+            if (!values.equals(uint4(0x3C003C00)))
+            {
+                return false;
+            }
+        }
+    }
     return true;
 }
 
 void Test<int M, int K>(uint tid, uint tileIndex, int resIndex)
 {
+    if (tid >= SubgroupSize)
+        return;
+
+    // fill the shared memory with invalid values.
+    invalidateSharedMemoryA(tid);
+
     testLoadShA<M, K>(tid, tileIndex);
     // serialRead(tid, __getAddress(s_sharedMemoryA[0]));
 
@@ -190,9 +243,6 @@ void serialRead(uint tid, SPtr sharedMem)
 void computeMain(uint tid : SV_DispatchThreadID)
 {
     initWeightMatrix(tid);
-
-    if (tid >= SubgroupSize)
-        return;
 
     Test<3, 19>(tid, 1, 0);
     // BUFFER: 1

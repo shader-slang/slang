@@ -14,7 +14,7 @@ import neural;
 #pragma warning(disable: 41017)
 
 
-// This test verifies that if an incomplete warp is launched, the tiled MMA load operations work correctly.
+// This test verifies that if an incomplete warp is launched, the tiled matrix load operations work correctly.
 // We test it by launching arbitrary number of threads that are smaller than 32.
 
 //
@@ -37,15 +37,15 @@ import neural;
 
 
 
-// We will test different heights of the matrix, all the heights are smaller than 16.
-// For example, if we set the height to 3, the matrix will be:
+// We will test different number of threads that are smaller than 32.
+// For example, if we set the number of threads to 7, the matrix will be:
 //
 //   0    1    2 ... 15
 //  32   33   34 ... 47
 //  64   65   66 ... 79
-//  0    0    0 ... 0
-//  0    0    0 ... 0
-//  [paddings for row 4-16]
+// ...
+// 224  225  226 ... 239
+// [paddings for row 7-15]
 
 // Make the weight matrix as 16x32 matrix in row major order
 // TEST_INPUT:ubuffer(stride=2, count=1024):name=inputBuffer
@@ -68,6 +68,25 @@ void initWeightMatrix(uint tid)
 
         inputBuffer[index] = half(index);
     }
+}
+
+void invalidateSharedMemoryA(uint tid)
+{
+    if (tid >= SubgroupSize)
+        return;
+
+    // Initialize the shared memory with all 1.0h.
+    uint activeThreadCount = WaveActiveCountBits(true);
+    uint numIters = (32 * 2 + activeThreadCount - 1) / activeThreadCount;
+    for (int i = 0; i < numIters; i++)
+    {
+        uint index = tid * numIters + i;
+        if (index >= 32 * 2)
+            break;
+
+        s_sharedMemoryA[index] = uint4(0x3C003C00);
+    }
+    GroupMemoryBarrierWithWaveSync();
 }
 
 static const int InputSize = 32;
@@ -96,32 +115,36 @@ bool verifiedOutput<int M>(uint tid, uint size, SPtr sharedMem, uint tileIndex)
     half expected = half(tid * 32 + tileIndex * 16);
     bool res = true;
     uint index = tid * 16;  // 16 half per thread
-    for (int i = 0; i < 2; i++)
+    uint alignedM = ((M + 16 - 1) / 16) * 16;
+
+    // Verify the output is correct for the aligned rows.
+    if (tid < alignedM)
     {
-        uint indexInTile = tid * 2 + i;
-        uint4 values = sharedMem[indexInTile];
-        uint4 element = values;
-        for (int j = 0; j < 4; j++)
+        for (int i = 0; i < 2; i++)
         {
-            uint value = element[j];
-
-            uint16_t a = (uint16_t)((value >> 16) & 0xFFFF);
-            uint16_t b = (uint16_t)(value & 0xFFFF);
-
-            half aa = bit_cast<half>(a);
-            half bb = bit_cast<half>(b);
-
-            if (indexInTile / 2 >= M)
+            uint indexInTile = tid * 2 + i;
+            uint4 values = sharedMem[indexInTile];
+            uint4 element = values;
+            if (tid >= M) // out-of-range for Y direction, it should be all 0s.
             {
                 // Checking paddings are correct for out-of-range elements.
-                if (aa != 0.0h || bb != 0.0h)
+                if (!values.equals(uint4(0, 0, 0, 0)))
                 {
                     return false;
-
                 }
+                continue;
             }
-            else
+
+            for (int j = 0; j < 4; j++)
             {
+                uint value = element[j];
+
+                uint16_t a = (uint16_t)((value >> 16) & 0xFFFF);
+                uint16_t b = (uint16_t)(value & 0xFFFF);
+
+                half aa = bit_cast<half>(a);
+                half bb = bit_cast<half>(b);
+
                 if (aa != expected)
                 {
                     return false;
@@ -137,12 +160,31 @@ bool verifiedOutput<int M>(uint tid, uint size, SPtr sharedMem, uint tileIndex)
             }
         }
     }
-
+    else
+    {
+        // For out-of-range rows, we just check if the values are same as the initialized values.
+        // Because we also need to check if the library accidentally write some values to the out-of-range rows.
+        for (int i = 0; i < 2; i++)
+        {
+            uint indexInTile = tid * 2 + i;
+            uint4 values = sharedMem[indexInTile];
+            if (!values.equals(uint4(0x3C003C00)))
+            {
+                return false;
+            }
+        }
+    }
     return true;
 }
 
 void Test<int M>(uint tid, int resIndex)
 {
+    if (tid >= THREAD_COUNT)
+        return;
+
+    // fill the shared memory with invalid values.
+    invalidateSharedMemoryA(tid);
+
     testLoadShA<M>(tid, 0);
     // serialRead(tid, __getAddress(s_sharedMemoryA[0]));
 
@@ -187,16 +229,16 @@ void computeMain(uint tid : SV_DispatchThreadID)
 {
     initWeightMatrix(tid);
 
-    // Test for different heights of the matrix.
-    Test<7>(tid, 0);
+    // Test for different heights of the matrix A.
+    Test<7>(tid, 0);  // M == 7
     // BUFFER: 1
 
-    Test<16>(tid, 1);
+    Test<16>(tid, 1);  // M == 16
     // BUFFER-NEXT: 1
 
-    Test<23>(tid, 2);
+    Test<23>(tid, 2);  // M == 23
     // BUFFER-NEXT: 1
 
-    Test<32>(tid, 3);
+    Test<32>(tid, 3);  // M == 32
     // BUFFER-NEXT: 1
 }
