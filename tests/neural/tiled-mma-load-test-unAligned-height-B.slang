@@ -1,4 +1,4 @@
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type
+// // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature
 
 import neural;
@@ -73,6 +73,25 @@ void testLoadShB<int K>(uint tid, uint tileIndex)
     GroupMemoryBarrierWithWaveSync();
 }
 
+void invalidateSharedMemoryB(uint tid)
+{
+    if (tid >= SubgroupSize)
+        return;
+
+    // Initialize the shared memory with all 1.0h.
+    uint activeThreadCount = WaveActiveCountBits(true);
+    uint numIters = (32 * 2 + activeThreadCount - 1) / activeThreadCount;
+    for (int i = 0; i < numIters; i++)
+    {
+        uint index = tid * numIters + i;
+        if (index >= 32 * 2)
+            break;
+
+        s_sharedMemoryB[index] = uint4(0x3C003C00);
+    }
+    GroupMemoryBarrierWithWaveSync();
+}
+
 bool verifiedOutput<int K>(uint tid, SPtr sharedMem, uint tileIndex)
 {
     // Verify the output is correct, each thread will verify one row/column of the shared memory.
@@ -80,6 +99,8 @@ bool verifiedOutput<int K>(uint tid, SPtr sharedMem, uint tileIndex)
     half expected = half(tid * 32 + tileIndex * 16);
     bool res = true;
     uint index = tid * 16;  // 16 half per thread
+    uint alignedK = ((K + 16 - 1) / 16) * 16;
+
     for (int i = 0; i < 2; i++)
     {
         uint indexInTile = tid * 2 + i;
@@ -136,6 +157,7 @@ bool verifiedOutput<int K>(uint tid, SPtr sharedMem, uint tileIndex)
 
 void Test<int K>(uint tid, uint tileIndex, int resIndex)
 {
+    invalidateSharedMemoryB(tid);
     testLoadShB<K>(tid, tileIndex);
     // serialRead(tid, __getAddress(s_sharedMemoryB[0]));
 

@@ -67,6 +67,25 @@ void testLoadShA<int M>(uint tid, uint tileIndex)
     GroupMemoryBarrierWithWaveSync();
 }
 
+void invalidateSharedMemoryA(uint tid)
+{
+    if (tid >= SubgroupSize)
+        return;
+
+    // Initialize the shared memory with all 1.0h.
+    uint activeThreadCount = WaveActiveCountBits(true);
+    uint numIters = (32 * 2 + activeThreadCount - 1) / activeThreadCount;
+    for (int i = 0; i < numIters; i++)
+    {
+        uint index = tid * numIters + i;
+        if (index >= 32 * 2)
+            break;
+
+        s_sharedMemoryA[index] = uint4(0x3C003C00);
+    }
+    GroupMemoryBarrierWithWaveSync();
+}
+
 bool verifiedOutput<int M>(uint tid, uint size, SPtr sharedMem, uint tileIndex)
 {
     // Verify the output is correct, each thread will verify one row/column of the shared memory.
@@ -74,44 +93,63 @@ bool verifiedOutput<int M>(uint tid, uint size, SPtr sharedMem, uint tileIndex)
     half expected = half(tid * 32 + tileIndex * 16);
     bool res = true;
     uint index = tid * 16;  // 16 half per thread
-    for (int i = 0; i < 2; i++)
+    uint alignedM = ((M + 16 - 1) / 16) * 16;
+
+    if (tid < alignedM)
     {
-        uint indexInTile = tid * 2 + i;
-        uint4 values = sharedMem[indexInTile];
-        uint4 element = values;
-        for (int j = 0; j < 4; j++)
+        for (int i = 0; i < 2; i++)
         {
-            uint value = element[j];
-
-            uint16_t a = (uint16_t)((value >> 16) & 0xFFFF);
-            uint16_t b = (uint16_t)(value & 0xFFFF);
-
-            half aa = bit_cast<half>(a);
-            half bb = bit_cast<half>(b);
-
-            if (indexInTile / 2 >= M)
+            uint indexInTile = tid * 2 + i;
+            uint4 values = sharedMem[indexInTile];
+            uint4 element = values;
+            for (int j = 0; j < 4; j++)
             {
-                // Checking paddings are correct for out-of-range elements.
-                if (aa != 0.0h || bb != 0.0h)
-                {
-                    return false;
+                uint value = element[j];
 
+                uint16_t a = (uint16_t)((value >> 16) & 0xFFFF);
+                uint16_t b = (uint16_t)(value & 0xFFFF);
+
+                half aa = bit_cast<half>(a);
+                half bb = bit_cast<half>(b);
+
+                if (indexInTile / 2 >= M)
+                {
+                    // Checking paddings are correct for out-of-range elements.
+                    if (aa != 0.0h || bb != 0.0h)
+                    {
+                        return false;
+
+                    }
+                }
+                else
+                {
+                    if (aa != expected)
+                    {
+                        return false;
+                    }
+
+                    expected += 1.0h;
+                    if (bb != expected)
+                    {
+                        return false;
+                    }
+
+                    expected += 1.0h;
                 }
             }
-            else
+        }
+    }
+    else
+    {
+        // For out-of-range rows, we just check if the values are same as the initialized values.
+        // Because we also need to check if the library accidentally write some values to the out-of-range rows.
+        for (int i = 0; i < 2; i++)
+        {
+            uint indexInTile = tid * 2 + i;
+            uint4 values = sharedMem[indexInTile];
+            if (!values.equals(uint4(0x3C003C00)))
             {
-                if (aa != expected)
-                {
-                    return false;
-                }
-
-                expected += 1.0h;
-                if (bb != expected)
-                {
-                    return false;
-                }
-
-                expected += 1.0h;
+                return false;
             }
         }
     }
@@ -121,7 +159,9 @@ bool verifiedOutput<int M>(uint tid, uint size, SPtr sharedMem, uint tileIndex)
 
 void Test<int M>(uint tid, int resIndex)
 {
+    invalidateSharedMemoryA(tid);
     testLoadShA<M>(tid, 0);
+    // serialRead(tid, __getAddress(s_sharedMemoryA[0]));
 
     bool res = verifiedOutput<M>(tid, M, __getAddress(s_sharedMemoryA[0]), 0);
     res = WaveActiveAllTrue(res);
