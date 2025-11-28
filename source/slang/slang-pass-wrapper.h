@@ -19,12 +19,13 @@ struct CodeGenContext;
 void prePassHooks(CodeGenContext* codeGenContext, IRModule* irModule);
 void postPassHooks(CodeGenContext* codeGenContext, IRModule* irModule);
 
-template<typename PassFunc>
-auto PassWrapper(
+template<typename PassFunc, typename... Args>
+auto wrapPass(
     CodeGenContext* codeGenContext,
     const char* passName,
     PassFunc&& passFunc,
-    IRModule* irModule) -> decltype(passFunc(irModule))
+    IRModule* irModule,
+    Args&&... args) -> decltype(passFunc(irModule, std::forward<Args>(args)...))
 {
     auto targetRequest = codeGenContext->getTargetReq();
     auto targetCompilerOptions = targetRequest->getOptionSet();
@@ -37,14 +38,14 @@ auto PassWrapper(
 
     prePassHooks(codeGenContext, irModule);
 
-    if constexpr (std::is_void_v<decltype(passFunc(irModule))>)
+    if constexpr (std::is_void_v<decltype(passFunc(irModule, std::forward<Args>(args)...))>)
     {
-        passFunc(irModule);
+        passFunc(irModule, std::forward<Args>(args)...);
         postPassHooks(codeGenContext, irModule);
     }
     else
     {
-        auto result = passFunc(irModule);
+        auto result = passFunc(irModule, std::forward<Args>(args)...);
         postPassHooks(codeGenContext, irModule);
         return result;
     }
