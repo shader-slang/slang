@@ -85,7 +85,7 @@ bool DebugValueStoreContext::isDebuggableType(IRType* type)
                     break;
                 }
             }
-            debuggable = false; // specTypeDebuggable;
+            debuggable = specTypeDebuggable;
             break;
         }
     default:
