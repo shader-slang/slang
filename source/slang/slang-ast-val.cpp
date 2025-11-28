@@ -1692,10 +1692,10 @@ Val* FuncCallIntVal::tryFoldImpl(
         // Special cases need their "operator" names quoted.
         SPECIAL_OPERATOR_CASE("!", resultValue = ((constArgs[0]->getValue() != 0) ? 1 : 0);)
         SPECIAL_OPERATOR_CASE("~", resultValue = ~constArgs[0]->getValue();)
-        SPECIAL_OPERATOR_CASE("?:",
-                              resultValue = constArgs[0]->getValue() != 0
-                                                ? constArgs[1]->getValue()
-                                                : constArgs[2]->getValue();)
+        SPECIAL_OPERATOR_CASE(
+            "?:",
+            resultValue = constArgs[0]->getValue() != 0 ? constArgs[1]->getValue()
+                                                        : constArgs[2]->getValue();)
         TERMINATING_CASE(SLANG_UNREACHABLE("constant folding of FuncCallIntVal");)
 
         return astBuilder->getIntVal(resultType, resultValue);

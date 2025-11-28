@@ -8,6 +8,7 @@
 #include "../core/slang-castable.h"
 #include "../core/slang-performance-profiler.h"
 #include "../core/slang-type-text-util.h"
+#include "slang-pass-wrapper.h"
 #include "../core/slang-writer.h"
 #include "slang-check-out-of-bound-access.h"
 #include "slang-emit-c-like.h"
@@ -695,6 +696,9 @@ Result linkAndOptimizeIR(
     LinkedIR& outLinkedIR)
 {
     SLANG_PROFILE;
+
+#define SLANG_PASS(passFunc, irModule) \
+    PassWrapper(codeGenContext, #passFunc, passFunc, irModule)
     auto session = codeGenContext->getSession();
     auto sink = codeGenContext->getSink();
     auto target = codeGenContext->getTargetFormat();
@@ -2072,6 +2076,8 @@ Result linkAndOptimizeIR(
         checkUnsupportedInst(codeGenContext->getTargetReq(), irModule, sink);
 
     return sink->getErrorCount() == 0 ? SLANG_OK : SLANG_FAIL;
+
+#undef SLANG_PASS
 }
 
 SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outArtifact)

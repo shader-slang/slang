@@ -516,6 +516,10 @@ void initCommandOptions(CommandOptions& options)
          "-report-perf-benchmark",
          nullptr,
          "Reports compiler performance benchmark results."},
+        {OptionKind::ReportDetailedPerfBenchmark,
+         "-report-detailed-perf-benchmark",
+         nullptr,
+         "Reports detailed compiler performance benchmark results (implies -report-perf-benchmark)."},
         {OptionKind::ReportCheckpointIntermediates,
          "-report-checkpoint-intermediates",
          nullptr,
@@ -2289,6 +2293,11 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::UseMSVCStyleBitfieldPacking:
         case OptionKind::ExperimentalFeature:
             linkage->m_optionSet.set(optionKind, true);
+            break;
+        case OptionKind::ReportDetailedPerfBenchmark:
+            linkage->m_optionSet.set(optionKind, true);
+            // -report-detailed-perf-benchmark implies -report-perf-benchmark
+            linkage->m_optionSet.set(OptionKind::ReportPerfBenchmark, true);
             break;
         case OptionKind::MatrixLayoutRow:
         case OptionKind::MatrixLayoutColumn:
