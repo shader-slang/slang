@@ -5,12 +5,8 @@
 namespace Slang
 {
 
-void prePassHooks(CodeGenContext* codeGenContext, IRModule* irModule)
-{
-}
+void prePassHooks(CodeGenContext* codeGenContext, IRModule* irModule) {}
 
-void postPassHooks(CodeGenContext* codeGenContext, IRModule* irModule)
-{
-}
+void postPassHooks(CodeGenContext* codeGenContext, IRModule* irModule) {}
 
-}
+} // namespace Slang

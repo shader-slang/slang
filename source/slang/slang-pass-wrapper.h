@@ -5,7 +5,9 @@
 
 #include "../core/slang-performance-profiler.h"
 #include "slang-compiler-options.h"
+
 #include <optional>
+#include <type_traits>
 
 namespace Slang
 {
@@ -18,24 +20,34 @@ void prePassHooks(CodeGenContext* codeGenContext, IRModule* irModule);
 void postPassHooks(CodeGenContext* codeGenContext, IRModule* irModule);
 
 template<typename PassFunc>
-auto PassWrapper(CodeGenContext* codeGenContext, const char* passName, PassFunc&& passFunc, IRModule* irModule) -> decltype(passFunc(irModule))
+auto PassWrapper(
+    CodeGenContext* codeGenContext,
+    const char* passName,
+    PassFunc&& passFunc,
+    IRModule* irModule) -> decltype(passFunc(irModule))
 {
     auto targetRequest = codeGenContext->getTargetReq();
     auto targetCompilerOptions = targetRequest->getOptionSet();
-    
+
     std::optional<PerformanceProfilerFuncRAIIContext> perfContext;
     if (targetCompilerOptions.getBoolOption(CompilerOptionName::ReportDetailedPerfBenchmark))
     {
         perfContext.emplace(passName);
     }
-    
+
     prePassHooks(codeGenContext, irModule);
-    
-    auto result = passFunc(irModule);
-    
-    postPassHooks(codeGenContext, irModule);
-    
-    return result;
+
+    if constexpr (std::is_void_v<decltype(passFunc(irModule))>)
+    {
+        passFunc(irModule);
+        postPassHooks(codeGenContext, irModule);
+    }
+    else
+    {
+        auto result = passFunc(irModule);
+        postPassHooks(codeGenContext, irModule);
+        return result;
+    }
 }
 
 } // namespace Slang

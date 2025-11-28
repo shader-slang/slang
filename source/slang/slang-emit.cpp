@@ -8,7 +8,6 @@
 #include "../core/slang-castable.h"
 #include "../core/slang-performance-profiler.h"
 #include "../core/slang-type-text-util.h"
-#include "slang-pass-wrapper.h"
 #include "../core/slang-writer.h"
 #include "slang-check-out-of-bound-access.h"
 #include "slang-emit-c-like.h"
@@ -127,6 +126,7 @@
 #include "slang-legalize-types.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
+#include "slang-pass-wrapper.h"
 #include "slang-syntax.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
@@ -697,8 +697,7 @@ Result linkAndOptimizeIR(
 {
     SLANG_PROFILE;
 
-#define SLANG_PASS(passFunc, irModule) \
-    PassWrapper(codeGenContext, #passFunc, passFunc, irModule)
+#define SLANG_PASS(passFunc) PassWrapper(codeGenContext, #passFunc, passFunc, irModule)
     auto session = codeGenContext->getSession();
     auto sink = codeGenContext->getSink();
     auto target = codeGenContext->getTargetFormat();
@@ -755,7 +754,7 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.debugInfo &&
         (targetCompilerOptions.getIntOption(CompilerOptionName::DebugInformation) ==
          SLANG_DEBUG_INFO_LEVEL_NONE))
-        stripDebugInfo(irModule);
+        SLANG_PASS(stripDebugInfo);
 
     if (!isKhronosTarget(targetRequest) && requiredLoweringPassSet.glslSSBO)
         lowerGLSLShaderStorageBufferObjectsToStructuredBuffers(irModule, sink);
@@ -764,13 +763,13 @@ Result linkAndOptimizeIR(
         translateGlobalVaryingVar(codeGenContext, irModule);
 
     if (requiredLoweringPassSet.resolveVaryingInputRef)
-        resolveVaryingInputRef(irModule);
+        SLANG_PASS(resolveVaryingInputRef);
 
-    fixEntryPointCallsites(irModule);
+    SLANG_PASS(fixEntryPointCallsites);
 
     // Replace any global constants with their values.
     //
-    replaceGlobalConstants(irModule);
+    SLANG_PASS(replaceGlobalConstants);
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "GLOBAL CONSTANTS REPLACED");
 #endif
@@ -843,7 +842,7 @@ Result linkAndOptimizeIR(
         case CodeGenTarget::HostVM:
             break;
         case CodeGenTarget::CUDASource:
-            collectOptiXEntryPointUniformParams(irModule);
+            SLANG_PASS(collectOptiXEntryPointUniformParams);
 #if 0
             dumpIRIfEnabled(codeGenContext, irModule, "OPTIX ENTRY POINT UNIFORMS COLLECTED");
 #endif
@@ -866,7 +865,7 @@ Result linkAndOptimizeIR(
     switch (target)
     {
     default:
-        moveEntryPointUniformParamsToGlobalScope(irModule);
+        SLANG_PASS(moveEntryPointUniformParamsToGlobalScope);
 #if 0
         dumpIRIfEnabled(codeGenContext, irModule, "ENTRY POINT UNIFORMS MOVED");
 #endif
@@ -886,7 +885,7 @@ Result linkAndOptimizeIR(
         break;
 
     default:
-        removeTorchAndCUDAEntryPoints(irModule);
+        SLANG_PASS(removeTorchAndCUDAEntryPoints);
         break;
     }
 
@@ -925,7 +924,7 @@ Result linkAndOptimizeIR(
     // want to be able to easily discover the cooperate and fallback funcitons
     // being passed to saturated_cooperation
     if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
-        fuseCallsToSaturatedCooperation(irModule);
+        SLANG_PASS(fuseCallsToSaturatedCooperation);
 
     switch (target)
     {
@@ -997,7 +996,7 @@ Result linkAndOptimizeIR(
 
         // Inline calls to any functions marked with [__unsafeInlineEarly] again,
         // since we may be missing out cases prevented by the functions that we just specialzied.
-        performMandatoryEarlyInlining(irModule);
+        SLANG_PASS(performMandatoryEarlyInlining);
         eliminateDeadCode(irModule, deadCodeEliminationOptions);
 
         // Unroll loops.
@@ -1055,7 +1054,7 @@ Result linkAndOptimizeIR(
         specializeModule(targetProgram, irModule, codeGenContext->getSink(), specOptions);
     }
 
-    finalizeSpecialization(irModule);
+    SLANG_PASS(finalizeSpecialization);
 
     // Lower `Result<T,E>` types into ordinary struct types. This must happen
     // after specialization, since otherwise incompatible copies of the lowered
@@ -2315,10 +2314,11 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
     if (sourceMap)
     {
-        auto sourceMapArtifact = ArtifactUtil::createArtifact(ArtifactDesc::make(
-            ArtifactKind::Json,
-            ArtifactPayload::SourceMap,
-            ArtifactStyle::None));
+        auto sourceMapArtifact = ArtifactUtil::createArtifact(
+            ArtifactDesc::make(
+                ArtifactKind::Json,
+                ArtifactPayload::SourceMap,
+                ArtifactStyle::None));
 
         sourceMapArtifact->addRepresentation(sourceMap);
 

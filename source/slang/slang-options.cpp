@@ -519,7 +519,8 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::ReportDetailedPerfBenchmark,
          "-report-detailed-perf-benchmark",
          nullptr,
-         "Reports detailed compiler performance benchmark results (implies -report-perf-benchmark)."},
+         "Reports detailed compiler performance benchmark results (implies "
+         "-report-perf-benchmark)."},
         {OptionKind::ReportCheckpointIntermediates,
          "-report-checkpoint-intermediates",
          nullptr,
@@ -2338,10 +2339,11 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 ComPtr<ISlangBlob> blob;
 
                 SLANG_RETURN_ON_FAIL(m_session->saveCoreModule(m_archiveType, blob.writeRef()));
-                SLANG_RETURN_ON_FAIL(File::writeAllBytes(
-                    fileName.value,
-                    blob->getBufferPointer(),
-                    blob->getBufferSize()));
+                SLANG_RETURN_ON_FAIL(
+                    File::writeAllBytes(
+                        fileName.value,
+                        blob->getBufferPointer(),
+                        blob->getBufferSize()));
                 break;
             }
         case OptionKind::SaveCoreModuleBinSource:
@@ -2366,11 +2368,12 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 StringBuilder builder;
                 StringWriter writer(&builder, 0);
 
-                SLANG_RETURN_ON_FAIL(HexDumpUtil::dumpSourceBytes(
-                    (const uint8_t*)blob->getBufferPointer(),
-                    blob->getBufferSize(),
-                    16,
-                    &writer));
+                SLANG_RETURN_ON_FAIL(
+                    HexDumpUtil::dumpSourceBytes(
+                        (const uint8_t*)blob->getBufferPointer(),
+                        blob->getBufferSize(),
+                        16,
+                        &writer));
 
                 File::writeNativeText(fileName.value, builder.getBuffer(), builder.getLength());
                 break;
@@ -3010,9 +3013,10 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 }
 
                 SlangPassThrough compiler;
-                if (SLANG_FAILED(TypeTextUtil::findPassThrough(
-                        compilerArg.value.getUnownedSlice(),
-                        compiler)))
+                if (SLANG_FAILED(
+                        TypeTextUtil::findPassThrough(
+                            compilerArg.value.getUnownedSlice(),
+                            compiler)))
                 {
                     m_sink->diagnose(
                         compilerArg.loc,
