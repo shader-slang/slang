@@ -1,53 +1,53 @@
-// // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature
 
 import neural;
 #pragma warning(disable: 41017)
 
 // This test verifies that the tiled MMA load operations work correctly when the height of the matrix
-// is not aligned with the tile height. The result of the tile will always be aligned with 16 in rows.
-// And we will padding with 0.
+// is not aligned with the tile height. The result of the tile will always be aligned with 16 in columns
+// with 0 paddings.
 //
-// ============================================================================
-// MATRIX A - Loaded from Global Memory
-// ============================================================================
-// We construct a 32x32 matrix in row-major order:
-//
-//   Column:  0    1    2    3   ...  15   16  17   ...   31
-//   Row 0:   0    1    2    3   ...  15  16   17   ...   31
-//   Row 1:  32   33   34   35   ...  47  48   49   ...   63
-//   ...
-//   Row 7:  224  225  226  227  ...  239  240  241   ...   255
-//   Row 8:  256  257  258  259  ...  269  270  271   ...   287
-//   ...
-//   Row 14: 448  449  450  451  ...  459  460  461   ...   479
-//   Row 15: 480  481  482  483  ...  491  492  493   ...   511
-//   ...
-//   Row 31: 992  993  994  995  ...  1007 1008 1009  ...   1023
-//
+// We will construct the input vector as follow:
+// x = tid * 32 + 0, 1, 2, 3 ... 31
 
-// We will test different heights of the matrix, all the heights are smaller than 16.
-// For example, if we set the height to 3, the matrix will be:
+// We will test different heights of the matrix B.
+// For example, if we set the height to 19, and read the second tile, the matrix will be:
 //
-//  16   17   18 ... 26 [5 zeros]
-//  48   33   34 ... 46 [5 zeros]
+//  16  48    80  ... 1008
+//  17  49    81  ... 1009
+//  18  50    82  ... 1010
+//  [zeros rows for height 3-15]
+
+// Explanation: According the way of how we construct the input vector, the matrix will be:
+//
+//  0   32    64  ... 992
+//  1   33    65  ... 993
+//  2   34    66  ... 994
 //  ...
-//  [16 zeros]
-//  [16 zeros]
+//  31  65    97  ... 1023
+// in major column.
 
-// Make the weight matrix as 32x32 matrix in row major order
-// TEST_INPUT:ubuffer(stride=2, count=1024):name=inputBuffer
-RWStructuredBuffer<half> inputBuffer;
+// So if we set height to 19, the matrix will be:
+//
+//  0   32    64  ... 992
+//  1   33    65  ... 993
+//  2   34    66  ... 994
+//  ...
+//  18  48    78  ... 1008
+//  [zeros rows for height 19-31]
+
+// Since we are reading the second tile, it will start from the 16th row, so the matrix will be:
+//
+//  16  48    80  ... 1008
+//  17  49    81  ... 1009
+//  18  50    82  ... 1010
+//  [zeros rows for height 3-15]
+
 
 // TEST_INPUT:ubuffer(stride=4, count=5):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
-void initWeightMatrix(uint tid)
-{
-    inputBuffer[tid] = half(tid);
-}
-
-// InputSize is the K dimension of the matrix A, make it unaligned to test the padding logic.
 static const int OutputSize = 32;
 static const int SubgroupSize = 32;
 
@@ -58,10 +58,6 @@ typealias SPtr = Ptr<uint4, Access::ReadWrite, AddressSpace::GroupShared>;
 
 void testLoadShB<int K>(uint tid, uint tileIndex)
 {
-    typealias Storage = StructuredBufferStorage<half>;
-
-    Storage storage = Storage(inputBuffer);
-
     half inputVector[K];
     for (int i = 0; i < 32; i++)
     {
@@ -73,7 +69,7 @@ void testLoadShB<int K>(uint tid, uint tileIndex)
     GroupMemoryBarrierWithWaveSync();
 }
 
-void invalidateSharedMemoryB(uint tid)
+void invalidateSharedMemory(uint tid, SPtr shmPtr)
 {
     if (tid >= SubgroupSize)
         return;
@@ -87,19 +83,18 @@ void invalidateSharedMemoryB(uint tid)
         if (index >= 32 * 2)
             break;
 
-        s_sharedMemoryB[index] = uint4(0x3C003C00);
+        shmPtr[index] = uint4(0x3C003C00);
     }
     GroupMemoryBarrierWithWaveSync();
 }
 
 bool verifiedOutput<int K>(uint tid, SPtr sharedMem, uint tileIndex)
 {
-    // Verify the output is correct, each thread will verify one row/column of the shared memory.
+    // Verify the output is correct, each thread will verify one column of the shared memory.
     // So each thread will check 2 uint4 elements (32 bytes/16 half) in the shared memory.
     half expected = half(tid * 32 + tileIndex * 16);
     bool res = true;
     uint index = tid * 16;  // 16 half per thread
-    uint alignedK = ((K + 16 - 1) / 16) * 16;
 
     for (int i = 0; i < 2; i++)
     {
@@ -109,55 +104,40 @@ bool verifiedOutput<int K>(uint tid, SPtr sharedMem, uint tileIndex)
 
         for (int j = 0; j < 4; j++)
         {
-            uint xIndex = (i * 8 + j * 2) + tileIndex * 16;
-
+            uint yIndex = (i * 8 + j * 2) + tileIndex * 16;
             uint value = element[j];
-            if (xIndex >= K)
-            {
-                if (value != 0)
-                {
-                    return false;
-                }
-                continue;
-            }
-
             uint16_t a = (uint16_t)((value >> 16) & 0xFFFF);
             uint16_t b = (uint16_t)(value & 0xFFFF);
+            half actual[2] = { bit_cast<half>(a), bit_cast<half>(b) };
+            half expectedValues[2] = { expected, expected + 1.0h };
 
-            half aa = bit_cast<half>(a);
-            half bb = bit_cast<half>(b);
-
-            if (aa != expected)
+            for (int verifyIndex = 0; verifyIndex < 2; verifyIndex++)
             {
-                return false;
-            }
-
-            expected += 1.0h;
-            xIndex++;
-
-            if (xIndex >= K)
-            {
-                if (bb != 0.0h)
+                // Check out-of-boundary for X direction.
+                if (yIndex++ >= K)
+                {
+                    if (actual[verifyIndex] != 0.0h)
+                    {
+                        return false;
+                    }
+                    continue;
+                }
+                if (actual[verifyIndex] != expectedValues[verifyIndex])
                 {
                     return false;
                 }
-                continue;
             }
-
-            if (bb != expected)
-            {
-                return false;
-            }
-            expected += 1.0h;
+            expected += 2.0h;
         }
     }
+
 
     return true;
 }
 
 void Test<int K>(uint tid, uint tileIndex, int resIndex)
 {
-    invalidateSharedMemoryB(tid);
+    invalidateSharedMemory(tid, __getAddress(s_sharedMemoryB[0]));
     testLoadShB<K>(tid, tileIndex);
     // serialRead(tid, __getAddress(s_sharedMemoryB[0]));
 
@@ -200,8 +180,6 @@ void serialRead(uint tid, SPtr sharedMem)
 [shader("compute")]
 void computeMain(uint tid : SV_DispatchThreadID)
 {
-    initWeightMatrix(tid);
-
     if (tid >= SubgroupSize)
         return;
 

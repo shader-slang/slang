@@ -1,12 +1,22 @@
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type
-// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTHREAD_COUNT=7
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTHREAD_COUNT=7
+
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTHREAD_COUNT=14
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTHREAD_COUNT=14
+
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTHREAD_COUNT=23
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTHREAD_COUNT=23
+
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTHREAD_COUNT=32
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTHREAD_COUNT=32
 
 import neural;
 #pragma warning(disable: 41017)
 
-// This test verifies that the tiled MMA load operations work correctly when the height of the matrix
-// is not aligned with the tile height. The result of the tile will always be aligned with 16 in columns
-// with 0 paddings.
+// This test verifies that if an incomplete warp is launched, the tiled matrix load operations work correctly.
+// The load function will distribute the load evenly to each active thread in the warp.
+// But in this case, we can't guarantee the load is always bank-conflict free.
+
 //
 // ============================================================================
 // MATRIX A - Loaded from Global Memory
@@ -15,7 +25,7 @@ import neural;
 //
 //   Column:  0    1    2    3   ...  15   16   17   ...   31
 //   Row 0:   0    1    2    3   ...  15  16   17   ...    31
-//   Row 1:  32   33   34   35   ...  47  48   49   ...   63
+//   Row 1:  32   33   34   35   ...  47  48   49   ...    63
 //   ...
 //   Row 7:  224  225  226  227  ...  239  240  241   ...   255
 //   Row 8:  256  257  258  259  ...  269  270  271   ...   287
@@ -24,27 +34,28 @@ import neural;
 //   Row 15: 480  481  482  483  ...  491  492  493   ...   511
 //   ...
 //   Row 31: 992  993  994  995  ...  1007 1008 1009  ...   1023
-//
 
-// We will test different heights of the matrix, all the heights are smaller than 16.
-// For example, if we set the height to 3, the matrix will be:
+
+// We will test different number of threads that are smaller than 32.
+// For each number of threads, we will configure the height of the matrix
+// to arbitrary value. The result should still be correct, which is same as
+// the case of launching a full warp.
+// For example, if we set the number of threads to 7, and the height of the matrix to 7, the matrix will be:
 //
 //   0    1    2 ... 15
 //  32   33   34 ... 47
 //  64   65   66 ... 79
-//  [paddings for row 3-15]
+//  ...
+//  224  225  226 ... 239
+//  [paddings for row 7-15]
+
 
 // Make the weight matrix as 16x32 matrix in row major order
 // TEST_INPUT:ubuffer(stride=2, count=1024):name=inputBuffer
 RWStructuredBuffer<half> inputBuffer;
 
-// TEST_INPUT:ubuffer(stride=4, count=7):out,name=outputBuffer
+// TEST_INPUT:ubuffer(stride=4, count=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
-
-void initWeightMatrix(uint tid)
-{
-    inputBuffer[tid] = half(tid);
-}
 
 static const int InputSize = 32;
 static const int SubgroupSize = 32;
@@ -54,15 +65,20 @@ groupshared uint4 s_sharedMemoryA[32 * 2];
 
 typealias SPtr = Ptr<uint4, Access::ReadWrite, AddressSpace::GroupShared>;
 
-void testLoadShA<int M>(uint tid, uint tileIndex)
+// Initialize weight matrix from 0-1023
+void initWeightMatrix(uint tid)
 {
-    typealias Storage = StructuredBufferStorage<half>;
+    int activeThreadCount = WaveActiveCountBits(true);
+    int numIters = (1024 + activeThreadCount - 1) / activeThreadCount;
 
-    Storage storage = Storage(inputBuffer);
+    for (int i = 0; i < numIters; i++)
+    {
+        int index = tid * numIters + i;
+        if (index >= 1024)
+            break;
 
-    SPtr sharedMemoryA = __getAddress(s_sharedMemoryA[0]);
-    MMAHelper<half, InputSize, M, SubgroupSize>.LoadShA<Storage>(sharedMemoryA, tileIndex, storage, 0);
-    GroupMemoryBarrierWithWaveSync();
+        inputBuffer[index] = half(index);
+    }
 }
 
 void invalidateSharedMemory(uint tid, SPtr shmPtr)
@@ -84,6 +100,17 @@ void invalidateSharedMemory(uint tid, SPtr shmPtr)
     GroupMemoryBarrierWithWaveSync();
 }
 
+void testLoadShA<int M>(uint tid, uint tileIndex)
+{
+    typealias Storage = StructuredBufferStorage<half>;
+
+    Storage storage = Storage(inputBuffer);
+
+    SPtr sharedMemoryA = __getAddress(s_sharedMemoryA[0]);
+    MMAHelper<half, InputSize, M, SubgroupSize>.LoadShA<Storage>(sharedMemoryA, tileIndex, storage, 0);
+    GroupMemoryBarrierWithWaveSync();
+}
+
 bool verifiedOutput<int M>(uint tid, uint size, SPtr sharedMem, uint tileIndex)
 {
     // Verify the output is correct, each thread will verify one row/column of the shared memory.
@@ -93,6 +120,7 @@ bool verifiedOutput<int M>(uint tid, uint size, SPtr sharedMem, uint tileIndex)
     uint index = tid * 16;  // 16 half per thread
     uint alignedM = ((M + 16 - 1) / 16) * 16;
 
+    // Verify the output is correct for the aligned rows.
     if (tid < alignedM)
     {
         for (int i = 0; i < 2; i++)
@@ -100,7 +128,7 @@ bool verifiedOutput<int M>(uint tid, uint size, SPtr sharedMem, uint tileIndex)
             uint indexInTile = tid * 2 + i;
             uint4 values = sharedMem[indexInTile];
             uint4 element = values;
-            if (indexInTile / 2 >= M)
+            if (tid >= M) // out-of-range for Y direction, it should be all 0s.
             {
                 // Checking paddings are correct for out-of-range elements.
                 if (!values.equals(uint4(0, 0, 0, 0)))
@@ -109,12 +137,12 @@ bool verifiedOutput<int M>(uint tid, uint size, SPtr sharedMem, uint tileIndex)
                 }
                 continue;
             }
+
             for (int j = 0; j < 4; j++)
             {
                 uint value = element[j];
                 uint16_t a = (uint16_t)((value >> 16) & 0xFFFF);
                 uint16_t b = (uint16_t)(value & 0xFFFF);
-
                 half actual[2] = { bit_cast<half>(a), bit_cast<half>(b) };
                 half expectedValues[2] = { expected, expected + 1.0h };
                 for (int verifyIndex = 0; verifyIndex < 2; verifyIndex++)
@@ -142,13 +170,17 @@ bool verifiedOutput<int M>(uint tid, uint size, SPtr sharedMem, uint tileIndex)
             }
         }
     }
-
     return true;
 }
 
 void Test<int M>(uint tid, int resIndex)
 {
+    if (tid >= THREAD_COUNT)
+        return;
+
+    // fill the shared memory with invalid values.
     invalidateSharedMemory(tid, __getAddress(s_sharedMemoryA[0]));
+
     testLoadShA<M>(tid, 0);
     // serialRead(tid, __getAddress(s_sharedMemoryA[0]));
 
@@ -187,29 +219,22 @@ void serialRead(uint tid, SPtr sharedMem)
     }
 }
 
-[numthreads(1024, 1, 1)]
+[numthreads(THREAD_COUNT, 1, 1)]
 [shader("compute")]
 void computeMain(uint tid : SV_DispatchThreadID)
 {
     initWeightMatrix(tid);
 
-    if (tid >= SubgroupSize)
-        return;
-
-    // smaller than 16 cases, it will padded to 16 rows.
-    Test<13>(tid, 0);
-    Test<9>(tid, 1);
-    Test<7>(tid, 2);
-    Test<3>(tid, 3);
-    Test<1>(tid, 4);
-
-    Test<19>(tid, 5); // bigger than 16 case, it will padded to 32 rows.
-    Test<25>(tid, 6);
+    // Test for different heights of the matrix A.
+    Test<7>(tid, 0);  // M == 7
     // BUFFER: 1
+
+    Test<16>(tid, 1);  // M == 16
     // BUFFER-NEXT: 1
+
+    Test<23>(tid, 2);  // M == 23
     // BUFFER-NEXT: 1
-    // BUFFER-NEXT: 1
-    // BUFFER-NEXT: 1
-    // BUFFER-NEXT: 1
+
+    Test<32>(tid, 3);  // M == 32
     // BUFFER-NEXT: 1
 }

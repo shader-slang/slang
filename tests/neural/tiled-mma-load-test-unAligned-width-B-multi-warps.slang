@@ -1,29 +1,54 @@
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTHREAD_COUNT=40
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTHREAD_COUNT=40
 
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTHREAD_COUNT=68
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTHREAD_COUNT=68
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTHREAD_COUNT=68
 
 import neural;
 #pragma warning(disable: 41017)
 
-// This test verifies that the tiled matrix load operations work correctly when the width of the matrix B
-// is not aligned with the tile width. Since the width of the tile B is always
+// Similar to the test tiled-mma-load-test-unAligned-width-B.slang, but this test is testing for multi-warps case.
 
-// So this test is actually testing the case
-// that if an incomplete warp is launched, the tiled matrix load operations work correctly.
+// If we launch N warps, where N > 1, it's sure that the first N-1 warps are full of 32 threads. But the N-th warp
+// may be incomplete, so we will check the last warp to make sure that the tiled matrix load operations work correctly.
+
+// In addition, each subgroup will load its own tile to the shared memory cross the whole workgroup. So each subgroup
+// will own its own contiguous chunk of the shared memory offset by TILE_SIZE. So we also need to check the loading is
+// correct.
+
 //
 // Construct the thread local vector as follow:
 // x = tid * 32 + 0, 1, 2, 3 ... 31
 
-// We will test different width of the matrix by launching different number of threads that are smaller than 32.
-// For example, if we launch 19 threads, the matrix will be:
-// Column   0    1     2   ... 18
-// Row 0    0    32    64  ... 576
-// Row 1    1    33    65  ... 577
-// Row 2    2    34    66  ... 578
-// ...
-// Row 16   16   48    80  ... 592
+// So the whole matrix B (Assume THREAD_COUNT = 40) will be:
+// Column   0    1     2   ... 31   32  ... 39
+//          0    32    64  ... 992 1024 ... 1248
+//          1    33    65  ... 993 1025 ... 1249
+//          2    34    66  ... 994 1026 ... 1250
+//          ...
+//          31   63    95  ... 995 1027 ... 1251
+//          32   64    96  ... 996 1028 ... 1252
+//
+// There are totally 2 warps launched, the first warp will load the first 32 columns, and the second warp will load the remaining 8 columns.
+// The first warp will load the following columns:
+// Column   0    1     2   ... 31
+//          0    32    64  ... 992
+//          1    33    65  ... 993
+//          2    34    66  ... 994
+//          ...
+//          31   63    95  ... 995
+//
+// The second warp will only load 8 columns. And because the alignment requirement (16), it will padding the remaining 8 columns with 0.
+// Column   32   ... 39     ... 63
+//          1024 ... 1248   0 .. 0
+//          1025 ... 1249   0 .. 0
+//          1026 ... 1250   0 .. 0
+//          ...
+//          1031 ... 1251   0 .. 0
+
+// We only need to check the last warp. As long as all the values are correct, we can assume that the first N-1 warps are correct
+// as well.
+
 
 // Make the weight matrix as 32x32 matrix in row major order
 // TEST_INPUT:ubuffer(stride=2, count=1024):name=inputBuffer
@@ -37,15 +62,17 @@ static const int InputSize = 32;                // K
 static const int OutputSize = 32;               // M
 static const int SubgroupSize = 32;             // N - Note, N dimension is up to the subgroup size.
 
+static const int InCompleteSubgroupSize = (THREAD_COUNT) % 32;
 
 static const int SUBGROUP_COUNT = (THREAD_COUNT + 31) / 32;
-// Tile B is size of 32 * 32 bytes.
-static const int TILE_SIZE = 32 * 2;
+
+// Tile B is size of 16 * 32 bytes.
+static const int TILE_SIZE = 16 * 2;
 groupshared uint4 s_sharedMemoryB[SUBGROUP_COUNT * TILE_SIZE];
 
 typealias SPtr = Ptr<uint4, Access::ReadWrite, AddressSpace::GroupShared>;
 
-void initSharedMemoryB(uint tid)
+void invalidateSharedMemory(uint tid, SPtr shmPtr)
 {
     // Initialize the shared memory with all 1.0h.
     // Each subgroup will initialize the shared memory for its own threads.
@@ -60,7 +87,7 @@ void initSharedMemoryB(uint tid)
         if (index >= TILE_SIZE)
             break;
 
-        s_sharedMemoryB[offset + index] = uint4(0x3C003C00);
+        shmPtr[offset + index] = uint4(0x3C003C00);
     }
 
     GroupMemoryBarrierWithWaveSync();
@@ -76,7 +103,16 @@ void testLoadShB(uint tid, uint tileIndex)
     }
 
     SPtr sharedMemoryB = __getAddress(s_sharedMemoryB[0]);
-    MMAHelper<half, InputSize, OutputSize, SubgroupSize>.LoadSharedMemoryFromLocalVector(sharedMemoryB, tileIndex, inputVector);
+
+    uint activeThreadCount = WaveActiveCountBits(true);
+    if (activeThreadCount == InCompleteSubgroupSize)
+    {
+        MMAHelper<half, InputSize, OutputSize, InCompleteSubgroupSize>.LoadSharedMemoryFromLocalVector(sharedMemoryB, tileIndex, inputVector);
+    }
+    else
+    {
+        MMAHelper<half, InputSize, OutputSize, SubgroupSize>.LoadSharedMemoryFromLocalVector(sharedMemoryB, tileIndex, inputVector);
+    }
     GroupMemoryBarrierWithWaveSync();
 }
 
@@ -88,12 +124,12 @@ bool verifiedOutput(uint laneId, uint subgroupIndex, SPtr sharedMem, uint tileIn
     // the half type + 1.0h will always 2048. But by using float, half(2048 + 1.0f) will be 2048.0h, but
     // float(2048 + 2.0f) will be 2050.0f. This is how to construct the input vector in testLoadShB function.
     // So using the same method to verify the output.
-    float expected = subgroupIndex * 1024 + laneId * 32 + tileIndex * 16;
+    float expected = (subgroupIndex * 1024) + laneId * 32 + tileIndex * 16;
     bool res = true;
     uint index = laneId * 16;  // 16 half per thread
     uint alignedN = ((OutputSize + 16 - 1) / 16) * 16;
 
-    if (laneId < alignedN)
+    // Because of our setting, the laneId will never by larger than alignedN
     {
         for (int i = 0; i < 2; i++)
         {
@@ -106,37 +142,57 @@ bool verifiedOutput(uint laneId, uint subgroupIndex, SPtr sharedMem, uint tileIn
                 uint value = element[j];
                 uint16_t a = (uint16_t)((value >> 16) & 0xFFFF);
                 uint16_t b = (uint16_t)(value & 0xFFFF);
-
-                half aa = bit_cast<half>(a);
-                half bb = bit_cast<half>(b);
-
-                if (aa != half(expected))
+                half actual[2] = { bit_cast<half>(a), bit_cast<half>(b) };
+                half expectedValues[2] = { half(expected), half(expected + 1.0f) };
+                for (int verifyIndex = 0; verifyIndex < 2; verifyIndex++)
                 {
-                    printf("tid: %d, expected: %.1f, actual: %.1f\n", laneId, float(expected), float(aa));
-                    return false;
+                    if (actual[verifyIndex] != expectedValues[verifyIndex])
+                    {
+                        return false;
+                    }
                 }
-
-                expected += 1.0h;
-                if (bb != half(expected))
-                {
-                    printf("tid: %d, expected: %.1f, actual: %.1f\n", laneId, float(expected), float(bb));
-                    return false;
-                }
-                expected += 1.0h;
+                expected += 2.0h;
             }
         }
     }
-    else
+
+    // Next we need to check if paddings are correct.
     {
-        // For out-of-range rows, we just check if the values are same as the initialized values.
-        // Because we also need to check if the library accidentally write some values to the out-of-range rows.
-        for (int i = 0; i < 2; i++)
+        uint activeThreadCount = WaveActiveCountBits(true);
+        uint startColumn = activeThreadCount;
+        uint remainningColumns = alignedN - startColumn;
+        // Let each thread check one column.
+        uint columnsPerThread = (remainningColumns + activeThreadCount - 1) / activeThreadCount;
+        for (uint i = 0; i < columnsPerThread; i++)
         {
-            uint indexInTile = laneId * 2 + i;
-            uint4 values = sharedMem[indexInTile];
-            if (!values.equals(uint4(0x3C003C00)))
+            uint columnIndex = startColumn + laneId;
+            if (columnIndex >= alignedN)
+                break;
+
+            uint index = columnIndex * 2;
+            if (!sharedMem[index].equals(uint4(0)) || !sharedMem[index+1].equals(uint4(0)))
             {
-                printf("tid: %d, false 1\n", laneId);
+                return false;
+            }
+        }
+    }
+
+    // Next we need to check if there is any accidental load out of the range.
+    if (alignedN < 32)
+    {
+        uint activeThreadCount = WaveActiveCountBits(true);
+        uint startColumn = alignedN;
+        uint remainningColumns = 32 - startColumn;
+        // Let each thread check one column.
+        uint columnsPerThread = (remainningColumns + activeThreadCount - 1) / activeThreadCount;
+        for (uint i = 0; i < columnsPerThread; i++)
+        {
+            uint columnIndex = startColumn + laneId;
+            if (columnIndex >= 32)
+                break;
+            uint index = columnIndex * 2;
+            if (!sharedMem[index].equals(uint4(0x3C003C00)) || !sharedMem[index+1].equals(uint4(0x3C003C00)))
+            {
                 return false;
             }
         }
@@ -147,18 +203,21 @@ bool verifiedOutput(uint laneId, uint subgroupIndex, SPtr sharedMem, uint tileIn
 
 void Test(uint tid, uint tileIndex, int resIndex)
 {
-    initSharedMemoryB(tid);
+    // Waiting for all threads to finish the previous test as this is multi-warps test.
+    // So need to sync whole workgroup.
+    GroupMemoryBarrierWithGroupSync();
+
+    invalidateSharedMemory(tid, __getAddress(s_sharedMemoryB[0]));
 
     // Each warp will load its own tile.
     testLoadShB(tid, tileIndex);
     // serialRead(tid, __getAddress(s_sharedMemoryB[0]));
 
     // We will only look at the incomplete warp.
-    uint subgroupIndex = tid / 32;
-    uint subgroupSize = (THREAD_COUNT + 31) / 32;
-    if (subgroupIndex < subgroupSize-1)
+    if (WaveActiveCountBits(true) == WaveGetLaneCount())
         return;
 
+    uint subgroupIndex = tid / 32;
     int laneId = WaveGetLaneIndex();
     uint offset = subgroupIndex * TILE_SIZE;
     bool res = verifiedOutput(laneId, subgroupIndex, __getAddress(s_sharedMemoryB[offset]), tileIndex);
