@@ -1708,13 +1708,8 @@ ToolReturnCode spawnAndWait(
     auto durationMs =
         std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime).count() / 1000.0;
 
-    if (SLANG_FAILED(spawnResult))
-    {
-        return ToolReturnCode::FailedToRun;
-    }
-
     // Report execution time - use test-server time if available (more accurate),
-    // otherwise use locally measured time
+    // otherwise use locally measured time. Always report time, even for failures.
     if (outExeRes.executionTimeMs > 0.0)
     {
         context->getTestReporter()->addExecutionTime(outExeRes.executionTimeMs / 1000.0);
@@ -1722,6 +1717,11 @@ ToolReturnCode spawnAndWait(
     else
     {
         context->getTestReporter()->addExecutionTime(durationMs / 1000.0);
+    }
+
+    if (SLANG_FAILED(spawnResult))
+    {
+        return ToolReturnCode::FailedToRun;
     }
 
     return getReturnCode(outExeRes);
