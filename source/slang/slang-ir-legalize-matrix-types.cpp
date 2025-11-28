@@ -459,19 +459,12 @@ struct MatrixTypeLoweringContext
             resultVectors.getBuffer());
     }
 
-    IRInst* legalizeUnaryOperation(IRInst* inst, IROp unaryOp)
+    IRInst* legalizeUnaryOperation(IRInst* inst, IROp unaryOp, IRMatrixType* resultMatrixType)
     {
         IRInst* operand = inst->getOperand(0);
 
         // Get the legalized operand (should be an array of vectors)
         IRInst* legalizedOperand = getReplacement(operand);
-
-        // Get the result matrix type to determine dimensions
-        auto resultMatrixType = as<IRMatrixType>(inst->getDataType());
-        SLANG_ASSERT(resultMatrixType && "Unary operation should have matrix result type");
-        SLANG_ASSERT(
-            shouldLowerMatrixType(resultMatrixType) &&
-            "Result matrix type should need legalization");
 
         auto elementType = resultMatrixType->getElementType();
         auto rowCount = as<IRIntLit>(resultMatrixType->getRowCount());
@@ -506,11 +499,43 @@ struct MatrixTypeLoweringContext
             resultVectors.add(resultVector);
         }
 
-        // Create the result array from the vectors
-        return builder.emitMakeArray(
-            arrayType,
-            resultVectors.getCount(),
-            resultVectors.getBuffer());
+        // Create the result array from the vectors if the result matrix type needs lowering,
+        // otherwise create the result matrix from the vectors
+        if (shouldLowerMatrixType(resultMatrixType))
+        {
+            return builder.emitMakeArray(
+                arrayType,
+                resultVectors.getCount(),
+                resultVectors.getBuffer());
+        }
+        else
+        {
+            return builder.emitMakeMatrix(
+                resultMatrixType,
+                resultVectors.getCount(),
+                resultVectors.getBuffer());
+        }
+    }
+
+    IRInst* legalizeUnaryCastOperation(IRInst* inst, IROp unaryOp)
+    {
+        // Get the result matrix type to determine dimensions
+        auto resultMatrixType = as<IRMatrixType>(inst->getDataType());
+        SLANG_ASSERT(resultMatrixType && "Unary operation should have matrix result type");
+
+        return legalizeUnaryOperation(inst, unaryOp, resultMatrixType);
+    }
+
+    IRInst* legalizeUnaryLogicalOperation(IRInst* inst, IROp unaryOp)
+    {
+        // Get the result matrix type to determine dimensions
+        auto resultMatrixType = as<IRMatrixType>(inst->getDataType());
+        SLANG_ASSERT(resultMatrixType && "Unary operation should have matrix result type");
+        SLANG_ASSERT(
+            shouldLowerMatrixType(resultMatrixType) &&
+            "Result matrix type should need legalization");
+
+        return legalizeUnaryOperation(inst, unaryOp, resultMatrixType);
     }
 
     IRInst* legalizeMatrixProducingInstruction(IRInst* inst)
@@ -545,11 +570,12 @@ struct MatrixTypeLoweringContext
         case kIROp_Not:
         case kIROp_BitNot:
         case kIROp_Neg:
+            return legalizeUnaryLogicalOperation(inst, inst->getOp());
         case kIROp_IntCast:
         case kIROp_FloatCast:
         case kIROp_CastIntToFloat:
         case kIROp_CastFloatToInt:
-            return legalizeUnaryOperation(inst, inst->getOp());
+            return legalizeUnaryCastOperation(inst, inst->getOp());
         default:
             break;
         }
@@ -569,7 +595,26 @@ struct MatrixTypeLoweringContext
         IRType* resultType = inst->getDataType();
         if (auto matrixType = as<IRMatrixType>(resultType))
         {
-            if (shouldLowerMatrixType(matrixType))
+            // On targets that require matrix lowering, some matrix result types (e.g. float4x4) do
+            // not need to be lowered, but can be cast from a matrix type that does need to be
+            // lowered (e.g. uint4x4), so we need to check if we should lower the operand even if we
+            // should not lower the result
+            bool shouldLowerOperandMatrixType = false;
+            if (inst->getOperandCount() > 0)
+            {
+                auto operand = inst->getOperand(0);
+                IRType* operandType = nullptr;
+                if (operand)
+                {
+                    operandType = operand->getDataType();
+                }
+                if (auto operandMatrixType = as<IRMatrixType>(operandType))
+                {
+                    shouldLowerOperandMatrixType = shouldLowerMatrixType(operandMatrixType);
+                }
+            }
+
+            if (shouldLowerMatrixType(matrixType) || shouldLowerOperandMatrixType)
                 newInst = legalizeMatrixProducingInstruction(inst);
         }
 
