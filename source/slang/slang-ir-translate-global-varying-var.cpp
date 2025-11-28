@@ -126,7 +126,7 @@ struct GlobalVarTranslationContext
                             if (auto sizeAttr = lastFieldVarLayout->getTypeLayout()->findSizeAttr(
                                     LayoutResourceKind::VaryingInput))
                             {
-                                size_t finiteSize = sizeAttr->getFiniteSize();
+                                const auto finiteSize = sizeAttr->getFiniteSize();
                                 if (auto offsetAttr = lastFieldVarLayout->findOffsetAttr(
                                         LayoutResourceKind::VaryingInput))
                                 {

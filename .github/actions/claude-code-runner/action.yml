@@ -26,7 +26,7 @@ inputs:
     required: false
     default: "50000"
   timeout-minutes:
-    description: "Timeout for Claude action in minutes"
+    description: "Timeout for Claude action in minutes (v1: configure at job level instead)"
     required: false
     default: "600"
   trigger-phrase:
@@ -267,31 +267,37 @@ runs:
         fi
         echo "- **Security Cleanup**: ✅ Completed" >> $GITHUB_STEP_SUMMARY
 
-    # Execute Claude Code Action
+    # Execute Claude Code Action (v1)
+    # Breaking changes from beta: Parameters consolidated into claude_args and settings
+    # See: https://github.com/anthropics/claude-code-action/blob/main/docs/migration-guide.md
     - name: Execute Claude Code Action
       id: claude-action
-      uses: anthropics/claude-code-action@beta
+      uses: anthropics/claude-code-action@v1
       with:
-        custom_instructions: ${{ inputs.custom-instructions }}
-        mcp_config: ${{ inputs.mcp-config }}
-        allowed_tools: ${{ inputs.allowed-tools }}
-        trigger_phrase: ${{ inputs.trigger-phrase }}
-        assignee_trigger: ${{ inputs.assignee-trigger }}
-        timeout_minutes: ${{ inputs.timeout-minutes }}
         github_token: ${{ steps.auth-config.outputs.github-token }}
         use_bedrock: ${{ inputs.use-bedrock }}
-        model: ${{ inputs.model }}
-        max_turns: ${{ inputs.max-turns }}
-        # Use claude_env for custom environment variables
-        claude_env: |
-          ANTHROPIC_BEDROCK_BASE_URL: ${{ inputs.bedrock-base-url }}
-          ANTHROPIC_SMALL_FAST_MODEL: ${{ inputs.small-fast-model }}
-          AWS_REGION: ${{ inputs.aws-region }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_EVENT_NAME: ${{ github.event_name }}
-          GITHUB_ACTOR: ${{ github.actor }}
-          ANTHROPIC_AUTH_TOKEN: ${{ steps.auth-token.outputs.token }}
-          DISABLE_TELEMETRY: 1
+        trigger_phrase: ${{ inputs.trigger-phrase }}
+        # Consolidated CLI arguments for v1
+        claude_args: |
+          --system-prompt "${{ inputs.custom-instructions }}"
+          --model ${{ inputs.model }}
+          --max-turns ${{ inputs.max-turns }}
+          --allowedTools ${{ inputs.allowed-tools }}
+          --mcp-config '${{ inputs.mcp-config }}'
+        # Environment variables in v1 settings format (JSON)
+        settings: |
+          {
+            "env": {
+              "ANTHROPIC_BEDROCK_BASE_URL": "${{ inputs.bedrock-base-url }}",
+              "ANTHROPIC_SMALL_FAST_MODEL": "${{ inputs.small-fast-model }}",
+              "AWS_REGION": "${{ inputs.aws-region }}",
+              "GITHUB_REPOSITORY": "${{ github.repository }}",
+              "GITHUB_EVENT_NAME": "${{ github.event_name }}",
+              "GITHUB_ACTOR": "${{ github.actor }}",
+              "ANTHROPIC_API_KEY": "${{ steps.auth-token.outputs.token }}",
+              "DISABLE_TELEMETRY": "1"
+            }
+          }
       continue-on-error: true
 
     # Handle Claude results
