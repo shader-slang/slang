@@ -11,22 +11,43 @@ import neural;
 #pragma warning(disable: 41017)
 
 // This test verifies that the tiled matrix load operations work correctly when the width of the matrix B
-// is not aligned with the tile width. Since the width of the tile B is always
+// is not aligned with the tile width with 0 paddings.
+// Notice that the width of matrix B is actually deterrmined by the number of threads in the subgroup, therefore
+// if it's not aligned with the tile width, we're going to reuse the active threads to paddings those extra columns.
 
-// So this test is actually testing the case
-// that if an incomplete warp is launched, the tiled matrix load operations work correctly.
-//
+// Given this fact, this test is actually testing the case that if an incomplete warp is launched, the tiled matrix load
+// operations work correctly for matrix B.
+
+
 // Construct the thread local vector as follow:
 // x = tid * 32 + 0, 1, 2, 3 ... 31
 
 // We will test different width of the matrix by launching different number of threads that are smaller than 32.
-// For example, if we launch 19 threads, the matrix will be:
-// Column   0    1     2   ... 18
-// Row 0    0    32    64  ... 576
-// Row 1    1    33    65  ... 577
-// Row 2    2    34    66  ... 578
+// For example, if we launch 3 threads, the matrix will be:
+// Column   0    1     2   3  ... 15
+// Row 0    0    32    64  0  ... 0
+// Row 1    1    33    65  0  ... 0
+// Row 2    2    34    66  0  ... 0
 // ...
-// Row 16   16   48    80  ... 592
+// Row 16   16   48    80  0  ... 0
+
+// Explanation:
+// Because there are only 3 threads launched, we can only load 3 input vectors into the tiled matrix B,
+// so the matrix will be:
+//
+//  0    1   2   3   ... 15   -> column 0
+//  32   33  34  35  ... 47   -> column 1
+//  64   65  66  67  ... 80   -> column 2
+
+// But the tile matrix B has alignment requirement, so we will pad the remaining columns with 0.
+// So the matrix will be:
+//
+//  0    1   2   3   ... 15   -> column 0
+//  32   33  34  35  ... 47   -> column 1
+//  64   65  66  67  ... 80   -> column 2
+//  0    0   0   0   ... 0    -> columns 3-15, 13 zeros padding
+
+
 
 // Make the weight matrix as 32x32 matrix in row major order
 // TEST_INPUT:ubuffer(stride=2, count=1024):name=inputBuffer
@@ -36,8 +57,8 @@ RWStructuredBuffer<half> inputBuffer;
 RWStructuredBuffer<uint> outputBuffer;
 
 // InputSize is the K dimension of the matrix A, make it unaligned to test the padding logic.
-static const int OutputSize = THREAD_COUNT;
-static const int SubgroupSize = 32;
+static const int OutputSize = 32;
+static const int SubgroupSize = THREAD_COUNT;
 static const int InputSize = 32;
 
 // Tile A is size of 32 * 32 bytes: TileHeight is at least 16.
@@ -85,48 +106,73 @@ bool verifiedOutput(uint tid, SPtr sharedMem, uint tileIndex)
     half expected = half(tid * 32 + tileIndex * 16);
     bool res = true;
     uint index = tid * 16;  // 16 half per thread
-    uint alignedN = ((OutputSize + 16 - 1) / 16) * 16;
+    uint alignedN = ((SubgroupSize + 16 - 1) / 16) * 16;
 
-    if (tid < alignedN)
+    // Because of our setting, the tid will never by larger than alignedN
+    for (int i = 0; i < 2; i++)
     {
-        for (int i = 0; i < 2; i++)
+        uint indexInTile = tid * 2 + i;
+        uint4 values = sharedMem[indexInTile];
+        uint4 element = values;
+
+        for (int j = 0; j < 4; j++)
         {
-            uint indexInTile = tid * 2 + i;
-            uint4 values = sharedMem[indexInTile];
-            uint4 element = values;
+            uint value = element[j];
+            uint16_t a = (uint16_t)((value >> 16) & 0xFFFF);
+            uint16_t b = (uint16_t)(value & 0xFFFF);
 
-            for (int j = 0; j < 4; j++)
+            half aa = bit_cast<half>(a);
+            half bb = bit_cast<half>(b);
+
+            if (aa != expected)
             {
-                uint value = element[j];
-                uint16_t a = (uint16_t)((value >> 16) & 0xFFFF);
-                uint16_t b = (uint16_t)(value & 0xFFFF);
+                return false;
+            }
 
-                half aa = bit_cast<half>(a);
-                half bb = bit_cast<half>(b);
+            expected += 1.0h;
+            if (bb != expected)
+            {
+                return false;
+            }
+            expected += 1.0h;
+        }
+    }
 
-                if (aa != expected)
-                {
-                    return false;
-                }
-
-                expected += 1.0h;
-                if (bb != expected)
-                {
-                    return false;
-                }
-                expected += 1.0h;
+    // Next we need to check if paddings are correct.
+    {
+        uint activeThreadCount = WaveActiveCountBits(true);
+        uint startColumn = activeThreadCount;
+        uint remainningColumns = alignedN - startColumn;
+        // Let each thread check one column.
+        uint columnsPerThread = (remainningColumns + activeThreadCount - 1) / activeThreadCount;
+        for (uint i = 0; i < columnsPerThread; i++)
+        {
+            uint columnIndex = startColumn + tid;
+            if (columnIndex >= alignedN)
+                break;
+            uint index = columnIndex * 2;
+            if (!sharedMem[index].equals(uint4(0)) || !sharedMem[index+1].equals(uint4(0)))
+            {
+                return false;
             }
         }
     }
-    else
+
+    // Next we need to check if there is any accidental load out of the range.
+    if (alignedN < 32)
     {
-        // For out-of-range rows, we just check if the values are same as the initialized values.
-        // Because we also need to check if the library accidentally write some values to the out-of-range rows.
-        for (int i = 0; i < 2; i++)
+        uint activeThreadCount = WaveActiveCountBits(true);
+        uint startColumn = alignedN;
+        uint remainningColumns = 32 - startColumn;
+        // Let each thread check one column.
+        uint columnsPerThread = (remainningColumns + activeThreadCount - 1) / activeThreadCount;
+        for (uint i = 0; i < columnsPerThread; i++)
         {
-            uint indexInTile = tid * 2 + i;
-            uint4 values = sharedMem[indexInTile];
-            if (!values.equals(uint4(0x3C003C00)))
+            uint columnIndex = startColumn + tid;
+            if (columnIndex >= 32)
+                break;
+            uint index = columnIndex * 2;
+            if (!sharedMem[index].equals(uint4(0x3C003C00)) || !sharedMem[index+1].equals(uint4(0x3C003C00)))
             {
                 return false;
             }
@@ -178,7 +224,7 @@ void serialRead(uint tid, SPtr sharedMem)
     }
 }
 
-[numthreads(OutputSize, 1, 1)]
+[numthreads(THREAD_COUNT, 1, 1)]
 [shader("compute")]
 void computeMain(uint tid : SV_DispatchThreadID)
 {
