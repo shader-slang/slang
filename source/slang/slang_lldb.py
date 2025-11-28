@@ -31,8 +31,16 @@ class Children:
 
 
 def IRUse_summary(valobj: lldb.SBValue, dict) -> str:
+    if not valobj.IsValid():
+        return "<invalid>"
     val = valobj.GetNonSyntheticValue()
-    return val.GetChildMemberWithName("usedValue").deref.summary
+    used_value = val.GetChildMemberWithName("usedValue")
+    if not used_value.IsValid() or used_value.GetValueAsUnsigned(0) == 0:
+        return "<null>"
+    deref = used_value.Dereference()
+    if not deref.IsValid():
+        return "<invalid deref>"
+    return deref.summary if deref.summary else "<no summary>"
 
 
 class IRInstListBase_synthetic(lldb.SBSyntheticValueProvider):
@@ -51,11 +59,18 @@ class IRInstListBase_synthetic(lldb.SBSyntheticValueProvider):
     def update(self):
         self.children = Children()
         pointer = self.valobj.GetChildMemberWithName("first")
+        if not pointer.IsValid():
+            return
         i = 0
-        while pointer.unsigned != 0:
-            child = pointer.deref
+        while pointer.IsValid() and pointer.GetValueAsUnsigned(0) != 0:
+            child = pointer.Dereference()
+            if not child.IsValid():
+                break
             self.children.append(child.Clone(f"[{i}]"))
-            pointer = child.GetNonSyntheticValue().GetChildMemberWithName("next")
+            next_ptr = child.GetNonSyntheticValue().GetChildMemberWithName("next")
+            if not next_ptr.IsValid():
+                break
+            pointer = next_ptr
             i += 1
             if i >= 5000:
                 # The debugger can call this function on uninitialized
@@ -87,16 +102,30 @@ class IRInst_synthetic(lldb.SBSyntheticValueProvider):
     def update(self):
         self.children = Children()
 
-        if self.valobj.type.IsPointerType():
-            if self.valobj.unsigned != 0:
-                valobj = self.valobj.deref
-                for i in range(valobj.GetNumChildren()):
-                    self.children.append(valobj.GetChildAtIndex(i))
+        if not self.valobj.IsValid():
             return
 
-        target = self.valobj.target
-        ty = self.valobj.type
+        valobj_type = self.valobj.GetType()
+        if not valobj_type.IsValid():
+            return
+
+        if valobj_type.IsPointerType():
+            if self.valobj.GetValueAsUnsigned(0) != 0:
+                valobj = self.valobj.Dereference()
+                if valobj.IsValid():
+                    for i in range(valobj.GetNumChildren()):
+                        child = valobj.GetChildAtIndex(i)
+                        if child.IsValid():
+                            self.children.append(child)
+            return
+
+        target = self.valobj.GetTarget()
+        if not target.IsValid():
+            return
+
         op = self.valobj.GetChildMemberWithName("m_op")
+        if not op.IsValid():
+            return
 
         # literal values
         value: list[tuple[str, lldb.SBValue]] = []
@@ -106,76 +135,147 @@ class IRInst_synthetic(lldb.SBSyntheticValueProvider):
         # missing in that case. It is possible to fix that by using
         # `EvaluateExpression` instead, but that significantly degrades
         # performance, so we choose not to do it here.
-        if op.value == "kIROp_StringLit":
+        op_value = op.GetValue()
+        if op_value == "kIROp_StringLit":
             string_lit_t = target.FindFirstType("Slang::IRStringLit")
-            string_lit = self.valobj.Cast(string_lit_t)
-            val = string_lit.GetChildMemberWithName("value")
-            value = [("[value]", val.GetChildMemberWithName("stringVal"))]
-        elif op.value == "kIROp_IntLit":
+            if string_lit_t.IsValid():
+                string_lit = self.valobj.Cast(string_lit_t)
+                if string_lit.IsValid():
+                    val = string_lit.GetChildMemberWithName("value")
+                    if val.IsValid():
+                        string_val = val.GetChildMemberWithName("stringVal")
+                        if string_val.IsValid():
+                            value = [("[value]", string_val)]
+        elif op_value == "kIROp_IntLit":
             int_lit_t = target.FindFirstType("Slang::IRIntLit")
-            int_lit = self.valobj.Cast(int_lit_t)
-            val = int_lit.GetChildMemberWithName("value")
-            value = [("[value]", val.GetChildMemberWithName("intVal"))]
+            if int_lit_t.IsValid():
+                int_lit = self.valobj.Cast(int_lit_t)
+                if int_lit.IsValid():
+                    val = int_lit.GetChildMemberWithName("value")
+                    if val.IsValid():
+                        int_val = val.GetChildMemberWithName("intVal")
+                        if int_val.IsValid():
+                            value = [("[value]", int_val)]
 
         # operands
         operands: list[tuple[str, lldb.SBValue]] = []
-        offset = ty.GetByteSize()
+        offset = valobj_type.GetByteSize()
         ir_use_t = target.FindFirstType("Slang::IRUse")
-        ir_use_size = ir_use_t.GetByteSize()
-        operand_count = self.valobj.GetChildMemberWithName("operandCount").unsigned
-        # We must ensure that we don't loop for an unbounded amount of
-        # time, so we cap the number of operands displayed here. Ideally
-        # we'd provide a way to view more in the case of instructions
-        # with more than this many operands, though.
-        for index in range(min(operand_count, 10)):
-            name = f"[operand{index}]"
-            operand = self.valobj.CreateChildAtOffset(
-                name, offset + index * ir_use_size, ir_use_t
-            )
-            operands.append((name, operand))
+        if ir_use_t.IsValid():
+            ir_use_size = ir_use_t.GetByteSize()
+            operand_count_val = self.valobj.GetChildMemberWithName("operandCount")
+            if operand_count_val.IsValid():
+                operand_count = operand_count_val.GetValueAsUnsigned(0)
+                # We must ensure that we don't loop for an unbounded amount of
+                # time, so we cap the number of operands displayed here. Ideally
+                # we'd provide a way to view more in the case of instructions
+                # with more than this many operands, though.
+                for index in range(min(operand_count, 10)):
+                    name = f"[operand{index}]"
+                    operand = self.valobj.CreateChildAtOffset(
+                        name, offset + index * ir_use_size, ir_use_t
+                    )
+                    if operand.IsValid():
+                        operands.append((name, operand))
+
+        # Build children list with validity checks
+        debug_uid = self.valobj.GetChildMemberWithName("_debugUID")
+        type_use = self.valobj.GetChildMemberWithName("typeUse")
+        used_value = type_use.GetChildMemberWithName("usedValue") if type_use.IsValid() else lldb.SBValue()
+        decorations = self.valobj.GetChildMemberWithName("m_decorationsAndChildren")
+        parent = self.valobj.GetChildMemberWithName("parent")
+        first_use = self.valobj.GetChildMemberWithName("firstUse")
 
         for name, child in [
             ("[op]", op),
-            ("[UID]", self.valobj.GetChildMemberWithName("_debugUID")),
-            (
-                "[type]",
-                self.valobj.GetChildMemberWithName("typeUse").GetChildMemberWithName(
-                    "usedValue"
-                ),
-            ),
+            ("[UID]", debug_uid),
+            ("[type]", used_value),
             # TODO: [exportName]
             # TODO: [importName]
             # TODO: [name]
             *value,
             *operands,
-            (
-                "[decorations/children]",
-                self.valobj.GetChildMemberWithName("m_decorationsAndChildren"),
-            ),
-            ("[parent]", self.valobj.GetChildMemberWithName("parent")),
+            ("[decorations/children]", decorations),
+            ("[parent]", parent),
             # TODO: Traverse the linked list to show all uses next to
             # each other, rather than pointing to the first one.
-            ("[uses]", self.valobj.GetChildMemberWithName("firstUse")),
+            ("[uses]", first_use),
         ]:
-            self.children.append(child.Clone(name))
+            if child.IsValid():
+                self.children.append(child.Clone(name))
 
     def has_children(self):
         return True
 
 
 def IRInst_summary(valobj: lldb.SBValue, dict) -> str:
-    if valobj.type.IsPointerType():
-        return "nullptr" if valobj.unsigned == 0 else valobj.deref.summary
+    if not valobj.IsValid():
+        return "<invalid>"
+
+    valobj_type = valobj.GetType()
+    if not valobj_type.IsValid():
+        return "<invalid type>"
+
+    if valobj_type.IsPointerType():
+        if valobj.GetValueAsUnsigned(0) == 0:
+            return "nullptr"
+        deref = valobj.Dereference()
+        if not deref.IsValid():
+            return "<invalid deref>"
+        return deref.GetSummary() if deref.GetSummary() else "<no summary>"
+
     val = valobj.GetNonSyntheticValue()
+    if not val.IsValid():
+        return "<invalid non-synthetic>"
+
     op = val.GetChildMemberWithName("m_op")
-    return f"{{{op.value} {val.address_of.value}}}"
+    if not op.IsValid():
+        return "<invalid op>"
+
+    addr = val.GetAddress()
+    if not addr.IsValid():
+        return f"{{{op.GetValue()}}}"
+
+    return f"{{{op.GetValue()} {addr}}}"
 
 
 def stringval_summary(valobj: lldb.SBValue) -> str:
+    if not valobj.IsValid():
+        return '""'
+
     val = valobj.GetNonSyntheticValue()
-    num_chars = val.GetChildMemberWithName("numChars").unsigned
-    chars = val.GetChildMemberWithName("chars").GetPointeeData(0, num_chars).uint8
-    return json.dumps("".join(chr(chars[i]) for i in range(num_chars)))
+    if not val.IsValid():
+        return '""'
+
+    num_chars_val = val.GetChildMemberWithName("numChars")
+    if not num_chars_val.IsValid():
+        return '""'
+
+    num_chars = num_chars_val.GetValueAsUnsigned(0)
+    if num_chars == 0:
+        return '""'
+
+    chars_val = val.GetChildMemberWithName("chars")
+    if not chars_val.IsValid() or chars_val.GetValueAsUnsigned(0) == 0:
+        return '""'
+
+    chars_data = chars_val.GetPointeeData(0, num_chars)
+    if not chars_data.IsValid():
+        return '""'
+
+    try:
+        chars = chars_data.GetUnsignedInt8(lldb.SBError(), 0)
+        char_list = []
+        for i in range(num_chars):
+            error = lldb.SBError()
+            char_val = chars_data.GetUnsignedInt8(error, i)
+            if error.Success():
+                char_list.append(chr(char_val))
+            else:
+                break
+        return json.dumps("".join(char_list))
+    except:
+        return '""'
 
 
 def StringValue_summary(valobj: lldb.SBValue, dict) -> str:
