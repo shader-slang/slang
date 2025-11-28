@@ -314,8 +314,8 @@ static void lowerStructuredBufferType(TargetProgram* target, IRHLSLStructuredBuf
 }
 
 void lowerAppendConsumeStructuredBuffers(
-    TargetProgram* target,
     IRModule* module,
+    TargetProgram* target,
     DiagnosticSink* sink)
 {
     SLANG_UNUSED(sink);

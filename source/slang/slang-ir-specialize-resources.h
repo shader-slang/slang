@@ -34,8 +34,8 @@ bool specializeResourceUsage(CodeGenContext* codeGenContext, IRModule* irModule)
 /// a handle to a stateful entity rather than a mutable value itself.
 ///
 void legalizeModesOfNonCopyableOpaqueTypedParamsForGLSL(
-    CodeGenContext* codeGenContext,
-    IRModule* irModule);
+    IRModule* irModule,
+    CodeGenContext* codeGenContext);
 
 bool isIllegalGLSLParameterType(IRType* type);
 bool isIllegalSPIRVParameterType(IRType* type, bool isArray);

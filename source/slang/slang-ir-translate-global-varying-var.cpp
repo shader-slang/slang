@@ -503,7 +503,7 @@ struct GlobalVarTranslationContext
     }
 };
 
-void translateGlobalVaryingVar(CodeGenContext* context, IRModule* module)
+void translateGlobalVaryingVar(IRModule* module, CodeGenContext* context)
 {
     GlobalVarTranslationContext ctx;
     ctx.context = context;

@@ -77,7 +77,7 @@ IRVarLayout* createResourceHeapVarLayoutWithSpaceAndBinding(
     return varLayoutBuilder.build();
 }
 
-void lowerDynamicResourceHeap(TargetProgram* targetProgram, IRModule* module, DiagnosticSink* sink)
+void lowerDynamicResourceHeap(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
     SLANG_UNUSED(sink);
     auto unusedSpaceIndex = findUnusedSpaceIndex(targetProgram, module);

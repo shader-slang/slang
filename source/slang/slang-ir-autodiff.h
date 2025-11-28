@@ -573,7 +573,7 @@ struct IRAutodiffPassOptions
     // Nothing for now...
 };
 
-void checkAutodiffPatterns(TargetProgram* target, IRModule* module, DiagnosticSink* sink);
+void checkAutodiffPatterns(IRModule* module, TargetProgram* target, DiagnosticSink* sink);
 
 bool processAutodiffCalls(
     TargetProgram* target,
@@ -581,7 +581,7 @@ bool processAutodiffCalls(
     DiagnosticSink* sink,
     IRAutodiffPassOptions const& options = IRAutodiffPassOptions());
 
-bool finalizeAutoDiffPass(TargetProgram* target, IRModule* module);
+bool finalizeAutoDiffPass(IRModule* module, TargetProgram* target);
 
 // Utility methods
 

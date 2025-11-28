@@ -3915,7 +3915,7 @@ struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
 // wrappers around `legalizeTypes()` that pick an appropriately
 // specialized context type to use to get the job done.
 
-void legalizeResourceTypes(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
+void legalizeResourceTypes(IRModule* module, TargetProgram* target, DiagnosticSink* sink)
 {
     SLANG_PROFILE;
 
@@ -3923,7 +3923,7 @@ void legalizeResourceTypes(TargetProgram* target, IRModule* module, DiagnosticSi
     legalizeTypes(&context);
 }
 
-void legalizeExistentialTypeLayout(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
+void legalizeExistentialTypeLayout(IRModule* module, TargetProgram* target, DiagnosticSink* sink)
 {
     SLANG_PROFILE;
 
@@ -3931,7 +3931,7 @@ void legalizeExistentialTypeLayout(TargetProgram* target, IRModule* module, Diag
     legalizeTypes(&context);
 }
 
-void legalizeEmptyTypes(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
+void legalizeEmptyTypes(IRModule* module, TargetProgram* target, DiagnosticSink* sink)
 {
     IREmptyTypeLegalizationContext context(target, module, sink);
     legalizeTypes(&context);

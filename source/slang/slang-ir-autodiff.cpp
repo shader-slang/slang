@@ -3695,7 +3695,7 @@ protected:
     DifferentialPairTypeBuilder pairBuilderStorage;
 };
 
-void checkAutodiffPatterns(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
+void checkAutodiffPatterns(IRModule* module, TargetProgram* target, DiagnosticSink* sink)
 {
     SLANG_UNUSED(target);
 
@@ -3868,7 +3868,7 @@ void releaseNullDifferentialType(AutoDiffSharedContext* context)
     }
 }
 
-bool finalizeAutoDiffPass(TargetProgram* target, IRModule* module)
+bool finalizeAutoDiffPass(IRModule* module, TargetProgram* target)
 {
     bool modified = false;
 

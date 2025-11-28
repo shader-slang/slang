@@ -1386,8 +1386,8 @@ bool isIllegalWGSLParameterType(IRType* type)
 }
 
 void legalizeModesOfNonCopyableOpaqueTypedParamsForGLSL(
-    CodeGenContext* codeGenContext,
-    IRModule* irModule)
+    IRModule* irModule,
+    CodeGenContext* codeGenContext)
 {
     SLANG_UNUSED(codeGenContext);
 
