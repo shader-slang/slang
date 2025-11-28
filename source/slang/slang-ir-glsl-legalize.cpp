@@ -5160,6 +5160,14 @@ void legalizeDispatchMeshPayloadForGLSL(IRModule* module)
                     v->setFullType(builder.getRateQualifiedType(
                         builder.getGroupSharedRate(),
                         v->getFullType()));
+
+                    // Add a name hint to the global variable for debuginfo
+                    // Use the original payload's name if available, otherwise use a default
+                    if (auto nameHint = payload->findDecoration<IRNameHintDecoration>())
+                        builder.addNameHintDecoration(v, nameHint->getName());
+                    else
+                        builder.addNameHintDecoration(v, toSlice("taskPayload"));
+
                     builder.setInsertBefore(call);
                     builder.emitStore(v, builder.emitLoad(payload));
 
