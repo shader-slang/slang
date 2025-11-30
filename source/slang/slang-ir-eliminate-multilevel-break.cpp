@@ -114,6 +114,18 @@ struct EliminateMultiLevelBreakContext
         // Track how many multi-level branches target each exit block
         Dictionary<IRBlock*, Count> exitBlockMultiLevelBranchCount;
 
+        // Check if a block is already in any ancestor region's blockSet.
+        // This prevents adding blocks that belong to parent regions into child regions.
+        bool isInAncestorBlocks(BreakableRegionInfo* info, IRBlock* block)
+        {
+            for (auto ancestor = info->parent; ancestor; ancestor = ancestor->parent)
+            {
+                if (ancestor->blockSet.contains(block))
+                    return true;
+            }
+            return false;
+        }
+
         void collectBreakableRegionBlocks(BreakableRegionInfo& info)
         {
             // Push all exit blocks to a stack so we can easily check if a block is an exit block in
@@ -162,6 +174,11 @@ struct EliminateMultiLevelBreakContext
                 {
                     if (!exitBlocks.contains(succ))
                     {
+                        // Don't add blocks that are already in an ancestor region's blockSet.
+                        // This can happen when a child region (e.g., switch) has a branch
+                        // (e.g., continue) that targets a block in the parent region (e.g., loop).
+                        if (isInAncestorBlocks(&info, succ))
+                            continue;
                         if (info.blockSet.add(succ))
                             info.blocks.add(succ);
                     }
