@@ -2312,6 +2312,10 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     ? MatrixLayoutMode::kMatrixLayoutMode_RowMajor
                     : MatrixLayoutMode::kMatrixLayoutMode_ColumnMajor);
             break;
+        case OptionKind::ZeroInitialize:
+            // Zero-initialize is now enabled by default, but accept the option for compatibility
+            linkage->m_optionSet.set(optionKind, true);
+            break;
         case OptionKind::NoCodeGen:
             linkage->m_optionSet.set(OptionKind::SkipCodeGen, true);
             break;

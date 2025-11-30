@@ -1,0 +1,1 @@
+example(cpu-hello-world)
