@@ -715,7 +715,8 @@ void LLVMBuilder::makeVariadicArgsCCompatible(
         else if (valueType->isIntegerTy() && valueType->getScalarSizeInBits() < 32)
         {
             // Ints are upcasted to at least i32.
-            llvmValue = emitCast(llvmValue, llvmBuilder->getInt32Ty(), argIsSigned[i], argIsSigned[i]);
+            llvmValue =
+                emitCast(llvmValue, llvmBuilder->getInt32Ty(), argIsSigned[i], argIsSigned[i]);
         }
         outArgs.add(llvmValue);
     }
@@ -1045,10 +1046,14 @@ LLVMInst* LLVMBuilder::emitBitfieldExtract(
     offset = emitCast(offset, resultType, false, false);
     bits = emitCast(bits, resultType, false, false);
 
-    auto shiftedVal = llvmBuilder->CreateLShr(value, emitCast(offset, value->getType(), false, false));
+    auto shiftedVal =
+        llvmBuilder->CreateLShr(value, emitCast(offset, value->getType(), false, false));
 
-    auto numBits =
-        emitCast(llvmBuilder->getInt32(resultType->getScalarSizeInBits()), value->getType(), false, false);
+    auto numBits = emitCast(
+        llvmBuilder->getInt32(resultType->getScalarSizeInBits()),
+        value->getType(),
+        false,
+        false);
     auto highBits = llvmBuilder->CreateSub(numBits, bits);
     shiftedVal = llvmBuilder->CreateShl(shiftedVal, highBits);
     if (isSigned)
@@ -1267,7 +1272,11 @@ LLVMInst* LLVMBuilder::emitUnreachable()
     return llvmBuilder->CreateUnreachable();
 }
 
-LLVMInst* LLVMBuilder::emitCast(LLVMInst* src, LLVMType* dstType, bool srcIsSigned, bool dstIsSigned)
+LLVMInst* LLVMBuilder::emitCast(
+    LLVMInst* src,
+    LLVMType* dstType,
+    bool srcIsSigned,
+    bool dstIsSigned)
 {
     auto valType = src->getType();
     auto valWidth = valType->getPrimitiveSizeInBits();
