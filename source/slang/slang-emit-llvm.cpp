@@ -1760,8 +1760,8 @@ struct LLVMEmitter
                 auto lowbits = findValue(inst->getOperand(0));
                 auto highbits = findValue(inst->getOperand(1));
 
-                lowbits = builder->emitCast(lowbits, int64Type, false);
-                highbits = builder->emitCast(highbits, int64Type, false);
+                lowbits = builder->emitCast(lowbits, int64Type, false, false);
+                highbits = builder->emitCast(highbits, int64Type, false, false);
 
                 highbits = builder->emitBinaryOp(
                     LLVMBinaryOp::LeftShift,
@@ -1962,7 +1962,8 @@ struct LLVMEmitter
             llvmInst = builder->emitCast(
                 findValue(inst->getOperand(0)),
                 types->getType(inst->getDataType()),
-                isSigned(inst->getOperand(0)));
+                isSigned(inst->getOperand(0)),
+                isSignedType(inst->getDataType()));
             break;
 
         case kIROp_PtrCast:
@@ -2318,7 +2319,7 @@ struct LLVMEmitter
                 IRTypeLayoutRules* layout = getBufferLayoutRules(bufferType);
 
                 auto llvmBaseCount = builder->emitGetBufferSize(llvmBuffer);
-                llvmBaseCount = builder->emitCast(llvmBaseCount, int32Type, false);
+                llvmBaseCount = builder->emitCast(llvmBaseCount, int32Type, false, false);
 
                 auto returnType = builder->getVectorType(2, int32Type);
                 llvmInst = builder->getPoison(returnType);

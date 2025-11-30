@@ -253,10 +253,10 @@ public:
     virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL emitUnreachable() = 0;
 
     // Coerces the given value to the given type. Because LLVM IR does not carry
-    // signedness, the information on whether the original type of 'val' is
-    // signed is passed separately. This only affects integer extension.
+    // signedness, the information on whether the types are signed is passed
+    // separately.
     virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL
-    emitCast(LLVMInst* src, LLVMType* dstType, bool valueIsSigned) = 0;
+    emitCast(LLVMInst* src, LLVMType* dstType, bool srcIsSigned, bool dstIsSigned) = 0;
     virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL emitBitCast(LLVMInst* src, LLVMType* dstType) = 0;
 
     virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL

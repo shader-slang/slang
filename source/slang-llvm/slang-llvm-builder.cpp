@@ -290,7 +290,7 @@ public:
     SLANG_NO_THROW LLVMInst* SLANG_MCALL emitUnreachable() override;
 
     SLANG_NO_THROW LLVMInst* SLANG_MCALL
-    emitCast(LLVMInst* src, LLVMType* dstType, bool valueIsSigned) override;
+    emitCast(LLVMInst* src, LLVMType* dstType, bool srcIsSigned, bool dstIsSigned) override;
     SLANG_NO_THROW LLVMInst* SLANG_MCALL emitBitCast(LLVMInst* src, LLVMType* dstType) override;
 
     SLANG_NO_THROW LLVMInst* SLANG_MCALL
@@ -715,7 +715,7 @@ void LLVMBuilder::makeVariadicArgsCCompatible(
         else if (valueType->isIntegerTy() && valueType->getScalarSizeInBits() < 32)
         {
             // Ints are upcasted to at least i32.
-            llvmValue = emitCast(llvmValue, llvmBuilder->getInt32Ty(), argIsSigned[i]);
+            llvmValue = emitCast(llvmValue, llvmBuilder->getInt32Ty(), argIsSigned[i], argIsSigned[i]);
         }
         outArgs.add(llvmValue);
     }
@@ -1041,14 +1041,14 @@ LLVMInst* LLVMBuilder::emitBitfieldExtract(
     LLVMType* resultType,
     bool isSigned)
 {
-    value = emitCast(value, resultType, false);
-    offset = emitCast(offset, resultType, false);
-    bits = emitCast(bits, resultType, false);
+    value = emitCast(value, resultType, false, false);
+    offset = emitCast(offset, resultType, false, false);
+    bits = emitCast(bits, resultType, false, false);
 
-    auto shiftedVal = llvmBuilder->CreateLShr(value, emitCast(offset, value->getType(), false));
+    auto shiftedVal = llvmBuilder->CreateLShr(value, emitCast(offset, value->getType(), false, false));
 
     auto numBits =
-        emitCast(llvmBuilder->getInt32(resultType->getScalarSizeInBits()), value->getType(), false);
+        emitCast(llvmBuilder->getInt32(resultType->getScalarSizeInBits()), value->getType(), false, false);
     auto highBits = llvmBuilder->CreateSub(numBits, bits);
     shiftedVal = llvmBuilder->CreateShl(shiftedVal, highBits);
     if (isSigned)
@@ -1068,12 +1068,12 @@ LLVMInst* LLVMBuilder::emitBitfieldInsert(
     LLVMInst* bits,
     LLVMType* resultType)
 {
-    value = emitCast(value, resultType, false);
-    insert = emitCast(insert, resultType, false);
-    offset = emitCast(offset, resultType, false);
-    bits = emitCast(bits, resultType, false);
+    value = emitCast(value, resultType, false, false);
+    insert = emitCast(insert, resultType, false, false);
+    offset = emitCast(offset, resultType, false, false);
+    bits = emitCast(bits, resultType, false, false);
 
-    auto one = emitCast(llvmBuilder->getInt32(1), value->getType(), false);
+    auto one = emitCast(llvmBuilder->getInt32(1), value->getType(), false, false);
     auto mask = llvmBuilder->CreateShl(one, bits);
     mask = llvmBuilder->CreateSub(mask, one);
     mask = llvmBuilder->CreateShl(mask, offset);
@@ -1207,8 +1207,8 @@ LLVMInst* LLVMBuilder::emitBinaryOp(
     // the result type. Hence, we coerce as needed.
     if (resultType)
     {
-        a = emitCast(a, resultType, resultIsSigned);
-        b = emitCast(b, resultType, resultIsSigned);
+        a = emitCast(a, resultType, resultIsSigned, resultIsSigned);
+        b = emitCast(b, resultType, resultIsSigned, resultIsSigned);
     }
     else
     {
@@ -1267,7 +1267,7 @@ LLVMInst* LLVMBuilder::emitUnreachable()
     return llvmBuilder->CreateUnreachable();
 }
 
-LLVMInst* LLVMBuilder::emitCast(LLVMInst* src, LLVMType* dstType, bool valueIsSigned)
+LLVMInst* LLVMBuilder::emitCast(LLVMInst* src, LLVMType* dstType, bool srcIsSigned, bool dstIsSigned)
 {
     auto valType = src->getType();
     auto valWidth = valType->getPrimitiveSizeInBits();
@@ -1290,7 +1290,7 @@ LLVMInst* LLVMBuilder::emitCast(LLVMInst* src, LLVMType* dstType, bool valueIsSi
         // Splat scalar into vector
         dst = llvmBuilder->CreateVectorSplat(
             vecType->getElementCount(),
-            emitCast(src, vecType->getElementType(), valueIsSigned));
+            emitCast(src, vecType->getElementType(), srcIsSigned, dstIsSigned));
     }
     else if (dstIsBool)
     {
@@ -1311,8 +1311,8 @@ LLVMInst* LLVMBuilder::emitCast(LLVMInst* src, LLVMType* dstType, bool valueIsSi
     {
         if (srcIsInt)
         {
-            dst = valueIsSigned ? llvmBuilder->CreateSIToFP(src, dstType)
-                                : llvmBuilder->CreateUIToFP(src, dstType);
+            dst = srcIsSigned ? llvmBuilder->CreateSIToFP(src, dstType)
+                              : llvmBuilder->CreateUIToFP(src, dstType);
         }
         else if (valWidth < targetWidth)
         {
@@ -1327,8 +1327,8 @@ LLVMInst* LLVMBuilder::emitCast(LLVMInst* src, LLVMType* dstType, bool valueIsSi
     {
         if (srcIsFloat)
         {
-            dst = valueIsSigned ? llvmBuilder->CreateFPToSI(src, dstType)
-                                : llvmBuilder->CreateFPToUI(src, dstType);
+            dst = dstIsSigned ? llvmBuilder->CreateFPToSI(src, dstType)
+                              : llvmBuilder->CreateFPToUI(src, dstType);
         }
         else if (srcIsPointer)
         {
@@ -1336,8 +1336,8 @@ LLVMInst* LLVMBuilder::emitCast(LLVMInst* src, LLVMType* dstType, bool valueIsSi
         }
         else if (valWidth != targetWidth)
         {
-            dst = valueIsSigned ? llvmBuilder->CreateSExtOrTrunc(src, dstType)
-                                : llvmBuilder->CreateZExtOrTrunc(src, dstType);
+            dst = srcIsSigned ? llvmBuilder->CreateSExtOrTrunc(src, dstType)
+                              : llvmBuilder->CreateZExtOrTrunc(src, dstType);
         }
     }
     else if (dstIsPointer)
@@ -1476,8 +1476,8 @@ void LLVMBuilder::operationPromote(
         promotedType =
             llvm::VectorType::get(promotedType, llvm::ElementCount::getFixed(maxElementCount));
 
-    *aValInOut = emitCast(*aValInOut, promotedType, promotedSign);
-    *bValInOut = emitCast(*bValInOut, promotedType, promotedSign);
+    *aValInOut = emitCast(*aValInOut, promotedType, aIsSigned, promotedSign);
+    *bValInOut = emitCast(*bValInOut, promotedType, bIsSigned, promotedSign);
 }
 
 LLVMInst* LLVMBuilder::getPoison(LLVMType* type)
