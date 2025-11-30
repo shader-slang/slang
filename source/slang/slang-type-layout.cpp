@@ -1279,6 +1279,7 @@ struct LLVMLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     LayoutRulesImpl* getHitAttributesParameterRules() override;
 
     LayoutRulesImpl* getShaderRecordConstantBufferRules() override;
+    LayoutRulesImpl* getEntryPointParameterRules() override;
     LayoutRulesImpl* getStructuredBufferRules(CompilerOptionSet& compilerOptions) override;
 };
 
@@ -2246,6 +2247,11 @@ LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getHitAttributesParameterRules()
 LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
 {
     return nullptr;
+}
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getEntryPointParameterRules()
+{
+    return &kLLVMCLayoutRulesImpl_;
 }
 
 LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getStructuredBufferRules(
