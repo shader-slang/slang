@@ -9686,7 +9686,26 @@ void SemanticsDeclBodyVisitor::visitParamDecl(ParamDecl* paramDecl)
         // actual type of the parameter.
         //
         initExpr = CheckTerm(initExpr);
-        initExpr = coerce(CoercionSite::Initializer, typeExpr.type, initExpr, getSink());
+
+        // For synthesized constructor parameters, the default value is derived
+        // from the field initializer, which has already been checked and warned
+        // about. Suppress duplicate warnings by using the synthesized default
+        // init context.
+        bool isSynthesizedCtorParam = false;
+        if (auto ctorDecl = as<ConstructorDecl>(paramDecl->parentDecl))
+        {
+            isSynthesizedCtorParam = ctorDecl->findModifier<SynthesizedModifier>() != nullptr;
+        }
+
+        if (isSynthesizedCtorParam)
+        {
+            SemanticsVisitor subVisitor(withInSynthesizedDefaultInit());
+            initExpr = subVisitor.coerce(CoercionSite::Initializer, typeExpr.type, initExpr, getSink());
+        }
+        else
+        {
+            initExpr = coerce(CoercionSite::Initializer, typeExpr.type, initExpr, getSink());
+        }
         paramDecl->initExpr = initExpr;
 
         // TODO: a default argument expression needs to

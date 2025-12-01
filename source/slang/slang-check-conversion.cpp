@@ -986,7 +986,7 @@ void SemanticsVisitor::_warnAboutDefaultInitializedResources(
     // Check if it contains resource types
     if (as<ResourceType>(type))
     {
-        diagnoseOnce(loc, Diagnostics::cannotDefaultInitializeResourceType, type);
+        getSink()->diagnose(loc, Diagnostics::cannotDefaultInitializeResourceType, type);
         return;
     }
 
@@ -1053,12 +1053,6 @@ bool SemanticsVisitor::_coerceInitializerList(
         return true;
     }
 
-    // Try to invoke the synthesized constructor if it exists
-    if (createInvokeExprForSynthesizedCtor(toType, fromInitializerListExpr, outToExpr))
-    {
-        return true;
-    }
-
     // Before falling back to legacy initializer list logic, check for resource types
     // that would be default-initialized and warn about them.
     // Skip this check when synthesizing default initializers (e.g., for ParameterBlocks).
@@ -1070,6 +1064,12 @@ bool SemanticsVisitor::_coerceInitializerList(
             argCount,
             warningArgIndex,
             fromInitializerListExpr->loc);
+    }
+
+    // Try to invoke the synthesized constructor if it exists
+    if (createInvokeExprForSynthesizedCtor(toType, fromInitializerListExpr, outToExpr))
+    {
+        return true;
     }
 
     // We will fall back to the legacy logic of initialize list.
