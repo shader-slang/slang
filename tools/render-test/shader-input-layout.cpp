@@ -1595,7 +1595,9 @@ void generateTextureDataRGB8(TextureData& output, const InputTextureDesc& inputD
     }
 }
 
-void collectUsedAttributes(slang::VariableLayoutReflection* varLayout, bool* usedAttributes)
+void collectUsedAttributes(
+    slang::VariableLayoutReflection* varLayout,
+    HashSet<unsigned>& usedAttributeSet)
 {
     slang::TypeLayoutReflection* typeLayout = varLayout->getTypeLayout();
 
@@ -1605,7 +1607,7 @@ void collectUsedAttributes(slang::VariableLayoutReflection* varLayout, bool* use
         unsigned fieldCount = typeLayout->getFieldCount();
         for (unsigned i = 0; i < fieldCount; i++)
         {
-            collectUsedAttributes(typeLayout->getFieldByIndex(i), usedAttributes);
+            collectUsedAttributes(typeLayout->getFieldByIndex(i), usedAttributeSet);
         }
     }
     else
@@ -1622,7 +1624,7 @@ void collectUsedAttributes(slang::VariableLayoutReflection* varLayout, bool* use
                 unsigned slotCount = (unsigned)size;
                 for (unsigned k = 0; (k < slotCount) && (index + k < 7); k++)
                 {
-                    usedAttributes[index + k] = true;
+                    usedAttributeSet.add(index + k);
                 }
             }
         }
@@ -1635,7 +1637,7 @@ List<InputElementDesc> filterInputElements(
     slang::ProgramLayout* programLayout)
 {
     // Identify which attributes are actually used by the vertex shader
-    bool usedAttributes[7] = {false};
+    HashSet<unsigned> usedAttributeSet;
     for (unsigned i = 0; i < programLayout->getEntryPointCount(); i++)
     {
         auto entryPoint = programLayout->getEntryPointByIndex(i);
@@ -1644,16 +1646,18 @@ List<InputElementDesc> filterInputElements(
             unsigned paramCount = entryPoint->getParameterCount();
             for (unsigned j = 0; j < paramCount; j++)
             {
-                collectUsedAttributes(entryPoint->getParameterByIndex(j), usedAttributes);
+                collectUsedAttributes(entryPoint->getParameterByIndex(j), usedAttributeSet);
             }
         }
     }
 
     // Build the filtered list of input elements
     List<InputElementDesc> inputElements;
+    inputElements.reserve(allInputElementsCount);
+
     for (int i = 0; i < allInputElementsCount; i++)
     {
-        if (i < 7 && usedAttributes[i])
+        if (usedAttributeSet.contains(i))
         {
             inputElements.add(allInputElements[i]);
         }
