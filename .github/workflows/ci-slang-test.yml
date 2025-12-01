@@ -34,6 +34,11 @@ on:
         required: false
         type: boolean
         default: true
+      artifact-suffix:
+        required: false
+        type: string
+        default: ""
+        description: "Optional suffix for artifact name (e.g., '-cuda')"
 
 jobs:
   test-slang:
@@ -53,6 +58,7 @@ jobs:
           compiler: ${{ inputs.compiler }}
           platform: ${{ inputs.platform }}
           config: ${{ inputs.config }}
+          artifact-suffix: ${{ inputs.artifact-suffix }}
 
       - name: Test Slang
         run: |
@@ -139,6 +145,7 @@ jobs:
           compiler: ${{ inputs.compiler }}
           platform: ${{ inputs.platform }}
           config: ${{ inputs.config }}
+          artifact-suffix: ${{ inputs.artifact-suffix }}
 
       - name: Run slang-rhi tests
         run: |
@@ -178,6 +185,7 @@ jobs:
           compiler: ${{ inputs.compiler }}
           platform: ${{ inputs.platform }}
           config: ${{ inputs.config }}
+          artifact-suffix: ${{ inputs.artifact-suffix }}
 
       - name: Setup Python
         if: ${{ runner.environment != 'self-hosted' }}
