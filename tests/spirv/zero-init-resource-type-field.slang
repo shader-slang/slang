@@ -1,4 +1,3 @@
-// Test case for issue #8443
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type
 //TEST:SIMPLE(filecheck=CHECK):-target spirv
 
@@ -20,10 +19,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     uint index = dispatchThreadID.x + dispatchThreadID.y * 2;
     float param = float(dispatchThreadID.x) / 2.0;
     float2 coord = float2(dispatchThreadID.xy) / 2.0;
-    
+
     bool b = (param >= 0.5);
 
-    //CHECK: ([[# @LINE+1]]): warning 30506{{.*}}'Texture2D<vector<float,4>>'
+    //CHECK: ([[# @LINE+1]]): warning 41016{{.*}}Texture2D
     S s = (S)0;
     s.uv = coord;
 
