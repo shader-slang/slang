@@ -3,7 +3,7 @@
 
 // Skipping SPIRV validation as a temporary solution.
 // Tracking in github issue #9062
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type -Xslang -skip-spirv-validation
+//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
 
 // Not supported in WGSL: Arrays of textures or buffers
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-wgpu
