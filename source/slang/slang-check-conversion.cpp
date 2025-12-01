@@ -127,22 +127,6 @@ bool SemanticsVisitor::_readValueFromInitializerList(
         // on whether the type we are trying to read
         // is default-initializable.
         //
-        // For resource types, this is definitely not true.
-        // Resource types can only ever be bound to parameters.
-        // But there is likely a fair amount of legacy code
-        // out there that depends on it being true. This should
-        // eventually be an error, but for now it's a warning.
-        // Use diagnoseOnce to avoid duplicate warnings when iterating
-        // over array elements or struct fields.
-        // Skip the diagnostic when synthesizing default initializers (e.g., for ParameterBlocks).
-        if (as<ResourceType>(toType) && !isInSynthesizedDefaultInit())
-        {
-            diagnoseOnce(
-                fromInitializerListExpr->loc,
-                Diagnostics::cannotDefaultInitializeResourceType,
-                toType);
-        }
-
         // For now, we will just pretend like everything
         // is default-initializable and move along.
         return true;
@@ -945,6 +929,100 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
     return true;
 }
 
+// Recursively walk a type to find resource types that would be default-initialized
+// (i.e., not explicitly provided in the initializer list) and emit warnings.
+void SemanticsVisitor::_warnAboutDefaultInitializedResources(
+    Type* type,
+    UInt argCount,
+    UInt& ioArgIndex,
+    SourceLoc loc)
+{
+    // If we still have arguments available, this type will be explicitly initialized
+    if (ioArgIndex < argCount)
+    {
+        // For resource types, one argument is consumed
+        if (as<ResourceType>(type))
+        {
+            ioArgIndex++;
+            return;
+        }
+
+        // For arrays, recurse into elements
+        if (auto arrayType = as<ArrayExpressionType>(type))
+        {
+            auto elementType = arrayType->getElementType();
+            if (!arrayType->isUnsized())
+            {
+                if (auto constCount = as<ConstantIntVal>(arrayType->getElementCount()))
+                {
+                    UInt elementCount = (UInt)constCount->getValue();
+                    for (UInt i = 0; i < elementCount; i++)
+                    {
+                        _warnAboutDefaultInitializedResources(elementType, argCount, ioArgIndex, loc);
+                    }
+                }
+            }
+            return;
+        }
+
+        // For structs, recurse into fields
+        if (auto structDeclRef = isDeclRefTypeOf<StructDecl>(type))
+        {
+            for (auto field : structDeclRef.getDecl()->getMembersOfType<VarDeclBase>())
+            {
+                if (field->hasModifier<HLSLStaticModifier>())
+                    continue;
+                _warnAboutDefaultInitializedResources(field->getType(), argCount, ioArgIndex, loc);
+            }
+            return;
+        }
+
+        // For other types (scalars, vectors, matrices), one argument is consumed
+        ioArgIndex++;
+        return;
+    }
+
+    // No more arguments - this type will be default-initialized
+    // Check if it contains resource types
+    if (as<ResourceType>(type))
+    {
+        diagnoseOnce(loc, Diagnostics::cannotDefaultInitializeResourceType, type);
+        return;
+    }
+
+    // For arrays, recurse to check element type
+    if (auto arrayType = as<ArrayExpressionType>(type))
+    {
+        auto elementType = arrayType->getElementType();
+        if (!arrayType->isUnsized())
+        {
+            if (auto constCount = as<ConstantIntVal>(arrayType->getElementCount()))
+            {
+                UInt elementCount = (UInt)constCount->getValue();
+                for (UInt i = 0; i < elementCount; i++)
+                {
+                    _warnAboutDefaultInitializedResources(elementType, argCount, ioArgIndex, loc);
+                }
+            }
+        }
+        return;
+    }
+
+    // For structs, recurse into fields
+    if (auto structDeclRef = isDeclRefTypeOf<StructDecl>(type))
+    {
+        for (auto field : structDeclRef.getDecl()->getMembersOfType<VarDeclBase>())
+        {
+            if (field->hasModifier<HLSLStaticModifier>())
+                continue;
+            _warnAboutDefaultInitializedResources(field->getType(), argCount, ioArgIndex, loc);
+        }
+        return;
+    }
+
+    // Other types (scalars, vectors, matrices) are default-initializable - no warning needed
+}
+
 bool SemanticsVisitor::_coerceInitializerList(
     Type* toType,
     Expr** outToExpr,
@@ -979,6 +1057,19 @@ bool SemanticsVisitor::_coerceInitializerList(
     if (createInvokeExprForSynthesizedCtor(toType, fromInitializerListExpr, outToExpr))
     {
         return true;
+    }
+
+    // Before falling back to legacy initializer list logic, check for resource types
+    // that would be default-initialized and warn about them.
+    // Skip this check when synthesizing default initializers (e.g., for ParameterBlocks).
+    if (!isInSynthesizedDefaultInit())
+    {
+        UInt warningArgIndex = 0;
+        _warnAboutDefaultInitializedResources(
+            toType,
+            argCount,
+            warningArgIndex,
+            fromInitializerListExpr->loc);
     }
 
     // We will fall back to the legacy logic of initialize list.

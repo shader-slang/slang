@@ -1769,6 +1769,14 @@ public:
         Expr** outToExpr,
         InitializerListExpr* fromInitializerListExpr);
 
+    /// Recursively walk a type to find resource types that would be default-initialized
+    /// and emit warnings.
+    void _warnAboutDefaultInitializedResources(
+        Type* type,
+        UInt argCount,
+        UInt& ioArgIndex,
+        SourceLoc loc);
+
     /// Report that implicit type coercion is not possible.
     bool _failedCoercion(Type* toType, Expr** outToExpr, Expr* fromExpr, DiagnosticSink* sink);
 
