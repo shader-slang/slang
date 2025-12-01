@@ -33,6 +33,9 @@ struct EliminateMultiLevelBreakContext
         // Track exit blocks for this region (break block and continue block for loops)
         List<IRBlock*> exitBlocks;
 
+        // For loops, store the continue block separately
+        IRBlock* continueBlock = nullptr;
+
         IRBlock* getBreakBlock()
         {
             switch (headerInst->getOp())
@@ -64,11 +67,11 @@ struct EliminateMultiLevelBreakContext
             exitBlocks.clear();
             exitBlocks.add(getBreakBlock());
 
-            // If this is a loop, add any non-trivial continue block to the exit blocks
-            if (auto loop = as<IRLoop>(headerInst))
-                if (auto continueBlock = getContinueBlock())
-                    if (continueBlock != loop->getTargetBlock())
-                        exitBlocks.add(continueBlock);
+            // If this is a loop, store the continue block.
+            // We add it to the exitBlocks stack separately in collectBreakableRegionBlocks
+            // so that nested constructs treat it as an exit point.
+            if (as<IRLoop>(headerInst))
+                continueBlock = getContinueBlock();
         }
 
         void replaceBreakBlock(IRBuilder* builder, IRBlock* block)
@@ -114,18 +117,6 @@ struct EliminateMultiLevelBreakContext
         // Track how many multi-level branches target each exit block
         Dictionary<IRBlock*, Count> exitBlockMultiLevelBranchCount;
 
-        // Check if a block is already in any ancestor region's blockSet.
-        // This prevents adding blocks that belong to parent regions into child regions.
-        bool isInAncestorBlocks(BreakableRegionInfo* info, IRBlock* block)
-        {
-            for (auto ancestor = info->parent; ancestor; ancestor = ancestor->parent)
-            {
-                if (ancestor->blockSet.contains(block))
-                    return true;
-            }
-            return false;
-        }
-
         void collectBreakableRegionBlocks(BreakableRegionInfo& info)
         {
             // Push all exit blocks to a stack so we can easily check if a block is an exit block in
@@ -141,6 +132,11 @@ struct EliminateMultiLevelBreakContext
                 if (info.blockSet.add(successor))
                     info.blocks.add(successor);
             }
+
+            // Add continueBlock to the exitBlocks stack so nested constructs
+            // (e.g., switch with continue) treat it as an exit point.
+            if (info.continueBlock)
+                exitBlocks.add(info.continueBlock);
 
             for (Index i = 0; i < info.blocks.getCount(); i++)
             {
@@ -174,11 +170,6 @@ struct EliminateMultiLevelBreakContext
                 {
                     if (!exitBlocks.contains(succ))
                     {
-                        // Don't add blocks that are already in an ancestor region's blockSet.
-                        // This can happen when a child region (e.g., switch) has a branch
-                        // (e.g., continue) that targets a block in the parent region (e.g., loop).
-                        if (isInAncestorBlocks(&info, succ))
-                            continue;
                         if (info.blockSet.add(succ))
                             info.blocks.add(succ);
                     }
