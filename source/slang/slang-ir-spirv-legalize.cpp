@@ -902,11 +902,20 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             auto paramType = funcType->getParamType(i);
             if (auto ptrType = as<IRPtrType>(paramType))
             {
-                if (ptrType->getAddressSpace() == AddressSpace::UserPointer ||
-                    ptrType->getAddressSpace() == AddressSpace::GroupShared)
+                if (ptrType->getAddressSpace() == AddressSpace::GroupShared)
+                {
+                    // If the parameter has an explicit pointer type in groupshared space,
+                    // then we know the user is using the variable pointer
+                    // capability to pass a true pointer.
+                    // In this case we should not rewrite the call.
+                    newArgs.add(arg);
+                    m_sharedContext->m_needVariablePointer = true;
+                    continue;
+                }
+                if (ptrType->getAddressSpace() == AddressSpace::UserPointer)
                 {
                     // If the parameter has an explicit pointer type,
-                    // then we know the user is using the variable pointer
+                    // then we know the user is using the PhysicalStorageBuffer
                     // capability to pass a true pointer.
                     // In this case we should not rewrite the call.
                     newArgs.add(arg);
@@ -956,6 +965,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                         }
                     }
                 }
+            }
+
+            // If the user is requesting variable pointers, we don't need to do any transform.
+            if (m_sharedContext->m_needVariablePointer)
+            {
+                newArgs.add(arg);
+                continue;
             }
 
             // If we reach here, we need to allocate a temp var.
@@ -1975,6 +1991,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         if (targetCaps.implies(CapabilityAtom::SPV_KHR_vulkan_memory_model))
         {
             m_sharedContext->m_memoryModel = SpvMemoryModelVulkan;
+        }
+
+        if (targetCaps.implies(CapabilityAtom::SPV_KHR_variable_pointers))
+        {
+            m_sharedContext->m_needVariablePointer = true;
         }
 
         if (m_sharedContext->m_spvVersion < 0x10300)
