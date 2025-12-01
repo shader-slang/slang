@@ -1266,7 +1266,7 @@ void performGLSLResourceReturnFunctionInlining(IRModule* module, TargetProgram* 
     while (changed)
     {
         changed = pass.considerAllCallSites();
-        simplifyIR(nullptr, module, IRSimplificationOptions::getFast(targetProgram));
+        simplifyIR(module, nullptr, IRSimplificationOptions::getFast(targetProgram));
     }
 }
 

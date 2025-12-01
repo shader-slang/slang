@@ -264,8 +264,8 @@ void lowerGenerics(IRModule* module, TargetProgram* targetProgram, DiagnosticSin
     specializeRTTIObjects(&sharedContext, sink);
 
     simplifyIR(
-        sharedContext.targetProgram,
         module,
+        sharedContext.targetProgram,
         IRSimplificationOptions::getFast(sharedContext.targetProgram));
 
     lowerTuples(module, sink);

@@ -909,7 +909,7 @@ Result linkAndOptimizeIR(
     deadCodeEliminationOptions.keepGlobalParamsAlive =
         targetProgram->getOptionSet().getBoolOption(CompilerOptionName::PreserveParameters);
 
-    simplifyIR(targetProgram, irModule, defaultIRSimplificationOptions, sink);
+    SLANG_PASS(simplifyIR, targetProgram, defaultIRSimplificationOptions, sink);
 
     if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::ValidateUniformity))
     {
@@ -982,7 +982,7 @@ Result linkAndOptimizeIR(
             SpecializationOptions specOptions;
             specOptions.lowerWitnessLookups = false;
             changed |=
-                specializeModule(targetProgram, irModule, codeGenContext->getSink(), specOptions);
+                SLANG_PASS(specializeModule, targetProgram, codeGenContext->getSink(), specOptions);
         }
 
         if (codeGenContext->getSink()->getErrorCount() != 0)
@@ -991,21 +991,21 @@ Result linkAndOptimizeIR(
 
         if (changed)
         {
-            applySparseConditionalConstantPropagation(irModule, codeGenContext->getSink());
+            SLANG_PASS(static_cast<bool(*)(IRModule*, DiagnosticSink*)>(applySparseConditionalConstantPropagation), codeGenContext->getSink());
         }
         validateIRModuleIfEnabled(codeGenContext, irModule);
 
         // Inline calls to any functions marked with [__unsafeInlineEarly] again,
         // since we may be missing out cases prevented by the functions that we just specialzied.
         SLANG_PASS(performMandatoryEarlyInlining, nullptr);
-        eliminateDeadCode(irModule, deadCodeEliminationOptions);
+        SLANG_PASS(static_cast<bool(*)(IRModule*, const IRDeadCodeEliminationOptions&)>(eliminateDeadCode), deadCodeEliminationOptions);
 
         // Unroll loops.
         if (!fastIRSimplificationOptions.minimalOptimization)
         {
             if (codeGenContext->getSink()->getErrorCount() == 0)
             {
-                if (!unrollLoopsInModule(targetProgram, irModule, codeGenContext->getSink()))
+                if (!SLANG_PASS(unrollLoopsInModule, targetProgram, codeGenContext->getSink()))
                     return SLANG_FAIL;
             }
         }
@@ -1016,14 +1016,14 @@ Result linkAndOptimizeIR(
         // Specialize away these parameters
         // TODO: We should implement a proper defunctionalization pass
         if (requiredLoweringPassSet.higherOrderFunc)
-            changed |= specializeHigherOrderParameters(codeGenContext, irModule);
+            changed |= SLANG_PASS(specializeHigherOrderParameters, codeGenContext);
 
         if (requiredLoweringPassSet.autodiff)
         {
             dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-AUTODIFF");
             {
                 auto validationScope = enableIRValidationScope();
-                changed |= processAutodiffCalls(targetProgram, irModule, sink);
+                changed |= SLANG_PASS(processAutodiffCalls, targetProgram, sink, IRAutodiffPassOptions());
             }
             dumpIRIfEnabled(codeGenContext, irModule, "AFTER-AUTODIFF");
         }
@@ -1035,7 +1035,7 @@ Result linkAndOptimizeIR(
     // Report checkpointing information
     if (codeGenContext->shouldReportCheckpointIntermediates())
     {
-        simplifyIR(targetProgram, irModule, fastIRSimplificationOptions, sink);
+        SLANG_PASS(simplifyIR, targetProgram, fastIRSimplificationOptions, sink);
         reportCheckpointIntermediates(codeGenContext, sink, irModule);
     }
 
@@ -1043,7 +1043,7 @@ Result linkAndOptimizeIR(
     // even if the AD pass itself is not run.
     //
     SLANG_PASS(finalizeAutoDiffPass, targetProgram);
-    eliminateDeadCode(irModule, deadCodeEliminationOptions);
+    SLANG_PASS(static_cast<bool(*)(IRModule*, const IRDeadCodeEliminationOptions&)>(eliminateDeadCode), deadCodeEliminationOptions);
 
     // After auto-diff, we can perform more aggressive specialization with dynamic-dispatch
     // lowering.
@@ -1052,7 +1052,7 @@ Result linkAndOptimizeIR(
     {
         SpecializationOptions specOptions;
         specOptions.lowerWitnessLookups = true;
-        specializeModule(targetProgram, irModule, codeGenContext->getSink(), specOptions);
+        SLANG_PASS(specializeModule, targetProgram, codeGenContext->getSink(), specOptions);
     }
 
     SLANG_PASS(finalizeSpecialization);
@@ -1147,14 +1147,14 @@ Result linkAndOptimizeIR(
     }
 
     if (requiredLoweringPassSet.reinterpret)
-        lowerReinterpret(targetProgram, irModule, sink);
+        SLANG_PASS(lowerReinterpret, targetProgram, sink);
 
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    inferAnyValueSizeWhereNecessary(targetProgram, irModule);
+    SLANG_PASS(inferAnyValueSizeWhereNecessary, targetProgram);
 
     // If we have any witness tables that are marked as `KeepAlive`,
     // but are not used for dynamic dispatch, unpin them so we don't
@@ -1163,11 +1163,11 @@ Result linkAndOptimizeIR(
 
     if (!fastIRSimplificationOptions.minimalOptimization)
     {
-        simplifyIR(targetProgram, irModule, fastIRSimplificationOptions, sink);
+        SLANG_PASS(simplifyIR, targetProgram, fastIRSimplificationOptions, sink);
     }
     else if (requiredLoweringPassSet.generics)
     {
-        eliminateDeadCode(irModule, fastIRSimplificationOptions.deadCodeElimOptions);
+        SLANG_PASS(static_cast<bool(*)(IRModule*, const IRDeadCodeEliminationOptions&)>(eliminateDeadCode), fastIRSimplificationOptions.deadCodeElimOptions);
     }
 
     if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc) &&
@@ -1196,7 +1196,7 @@ Result linkAndOptimizeIR(
     if (target == CodeGenTarget::HostVM)
     {
         SLANG_PASS(static_cast<void(*)(IRModule*)>(performForceInlining));
-        simplifyIR(targetProgram, irModule, defaultIRSimplificationOptions, sink);
+        SLANG_PASS(simplifyIR, targetProgram, defaultIRSimplificationOptions, sink);
         return SLANG_OK;
     }
 
@@ -1242,12 +1242,12 @@ Result linkAndOptimizeIR(
         // like inlining allowing us to find dead branches.
         // These must be cleaned since otherwise static_assert's will falsely
         // detect true due to dead branches with static_assert not being removed.
-        applySparseConditionalConstantPropagation(irModule, sink);
-        eliminateDeadCode(irModule, deadCodeEliminationOptions);
+        SLANG_PASS(static_cast<bool(*)(IRModule*, DiagnosticSink*)>(applySparseConditionalConstantPropagation), sink);
+        SLANG_PASS(static_cast<bool(*)(IRModule*, const IRDeadCodeEliminationOptions&)>(eliminateDeadCode), deadCodeEliminationOptions);
     }
     else
     {
-        simplifyIR(targetProgram, irModule, defaultIRSimplificationOptions, sink);
+        SLANG_PASS(simplifyIR, targetProgram, defaultIRSimplificationOptions, sink);
     }
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
@@ -1313,9 +1313,8 @@ Result linkAndOptimizeIR(
             BufferElementTypeLoweringOptions bufferElementTypeLoweringOptions = {};
             bufferElementTypeLoweringOptions.loweringPolicyKind =
                 BufferElementTypeLoweringPolicyKind::MetalParameterBlock;
-            lowerBufferElementTypeToStorageType(
+            SLANG_PASS(lowerBufferElementTypeToStorageType,
                 targetProgram,
-                irModule,
                 bufferElementTypeLoweringOptions);
         }
 
@@ -1404,9 +1403,9 @@ Result linkAndOptimizeIR(
     // (e.g., things that used to be aggregated might now be split up,
     // so that we can work with the individual fields).
     if (fastIRSimplificationOptions.minimalOptimization)
-        eliminateDeadCode(irModule, deadCodeEliminationOptions);
+        SLANG_PASS(static_cast<bool(*)(IRModule*, const IRDeadCodeEliminationOptions&)>(eliminateDeadCode), deadCodeEliminationOptions);
     else
-        simplifyIR(targetProgram, irModule, fastIRSimplificationOptions, sink);
+        SLANG_PASS(simplifyIR, targetProgram, fastIRSimplificationOptions, sink);
 
     if (requiredLoweringPassSet.dynamicResourceHeap)
         SLANG_PASS(lowerDynamicResourceHeap, targetProgram, sink);
@@ -1709,7 +1708,7 @@ Result linkAndOptimizeIR(
 
     if (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) ||
         isWGPUTarget(targetRequest) || isMetalTarget(targetRequest))
-        legalizeLogicalAndOr(irModule->getModuleInst());
+        SLANG_PASS(static_cast<void(*)(IRModule*)>(legalizeLogicalAndOr));
 
     // Legalize non struct parameters that are expected to be structs for HLSL.
     if (isD3DTarget(targetRequest))
@@ -1835,7 +1834,7 @@ Result linkAndOptimizeIR(
     //
     // We run DCE pass again to clean things up.
     //
-    eliminateDeadCode(irModule, deadCodeEliminationOptions);
+    SLANG_PASS(static_cast<bool(*)(IRModule*, const IRDeadCodeEliminationOptions&)>(eliminateDeadCode), deadCodeEliminationOptions);
 
     SLANG_PASS(cleanUpVoidType);
 
@@ -1855,7 +1854,7 @@ Result linkAndOptimizeIR(
     // Lower the `getRegisterIndex` and `getRegisterSpace` intrinsics.
     //
     if (requiredLoweringPassSet.bindingQuery)
-        lowerBindingQueries(irModule, sink);
+        SLANG_PASS(lowerBindingQueries, sink);
 
     // For some small improvement in type safety we represent these as opaque
     // structs instead of regular arrays.
@@ -1895,7 +1894,7 @@ Result linkAndOptimizeIR(
     else
         bufferElementTypeLoweringOptions.loweringPolicyKind =
             BufferElementTypeLoweringPolicyKind::Default;
-    lowerBufferElementTypeToStorageType(targetProgram, irModule, bufferElementTypeLoweringOptions);
+    SLANG_PASS(lowerBufferElementTypeToStorageType, targetProgram, bufferElementTypeLoweringOptions);
 
     // If we are generating code for glsl or metal, perform address space propagation now.
     // For SPIRV, we will do that during spirv legalization that happens after
@@ -1903,7 +1902,7 @@ Result linkAndOptimizeIR(
     if (target == CodeGenTarget::GLSL)
     {
         NoOpInitialAddressSpaceAssigner addrSpaceAssigner;
-        specializeAddressSpace(irModule, &addrSpaceAssigner);
+        SLANG_PASS(specializeAddressSpace, &addrSpaceAssigner);
     }
     else if (isMetalTarget(targetRequest))
     {
@@ -1946,7 +1945,7 @@ Result linkAndOptimizeIR(
     {
         IRSimplificationOptions simplificationOptions = fastIRSimplificationOptions;
         simplificationOptions.cfgOptions.removeTrivialSingleIterationLoops = true;
-        simplifyIR(targetProgram, irModule, simplificationOptions, sink);
+        SLANG_PASS(simplifyIR, targetProgram, simplificationOptions, sink);
     }
 
     if (isKhronosTarget(targetRequest) && !emitSpirvDirectly)
@@ -1986,7 +1985,7 @@ Result linkAndOptimizeIR(
             phiEliminationOptions.eliminateCompositeTypedPhiOnly = false;
             phiEliminationOptions.useRegisterAllocation = true;
         }
-        eliminatePhis(livenessMode, irModule, phiEliminationOptions);
+        SLANG_PASS(static_cast<void(*)(IRModule*, LivenessMode, PhiEliminationOptions)>(eliminatePhis), livenessMode, phiEliminationOptions);
 #if 0
         dumpIRIfEnabled(codeGenContext, irModule, "PHIS ELIMINATED");
 #endif
@@ -2037,7 +2036,7 @@ Result linkAndOptimizeIR(
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
     // Run a final round of simplifications to clean up unused things after phi-elimination.
-    simplifyNonSSAIR(targetProgram, irModule, fastIRSimplificationOptions);
+    SLANG_PASS(simplifyNonSSAIR, targetProgram, fastIRSimplificationOptions);
 
     // We include one final step to (optionally) dump the IR and validate
     // it after all of the optimization passes are complete. This should
@@ -2056,7 +2055,7 @@ Result linkAndOptimizeIR(
         // This is a separate pass because it needs to run after
         // all the other optimization passes have been performed.
 
-        applyVariableScopeCorrection(irModule, targetRequest);
+        SLANG_PASS(applyVariableScopeCorrection, targetRequest);
         validateIRModuleIfEnabled(codeGenContext, irModule);
     }
 

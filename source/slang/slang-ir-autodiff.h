@@ -576,8 +576,8 @@ struct IRAutodiffPassOptions
 void checkAutodiffPatterns(IRModule* module, TargetProgram* target, DiagnosticSink* sink);
 
 bool processAutodiffCalls(
-    TargetProgram* target,
     IRModule* module,
+    TargetProgram* target,
     DiagnosticSink* sink,
     IRAutodiffPassOptions const& options = IRAutodiffPassOptions());
 

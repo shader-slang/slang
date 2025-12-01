@@ -1300,8 +1300,8 @@ bool specializeResourceUsage(IRModule* irModule, CodeGenContext* codeGenContext)
             if (changed)
             {
                 simplifyIR(
-                    codeGenContext->getTargetProgram(),
                     irModule,
+                    codeGenContext->getTargetProgram(),
                     IRSimplificationOptions::getFast(codeGenContext->getTargetProgram()));
             }
             result |= changed;
@@ -1314,8 +1314,8 @@ bool specializeResourceUsage(IRModule* irModule, CodeGenContext* codeGenContext)
             inlineAllCallsOfFunction(func);
 
         simplifyIR(
-            codeGenContext->getTargetProgram(),
             irModule,
+            codeGenContext->getTargetProgram(),
             IRSimplificationOptions::getFast(codeGenContext->getTargetProgram()));
     }
     return result;
