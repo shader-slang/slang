@@ -1258,10 +1258,6 @@ struct OptionsParser
 
     List<RawTranslationUnit> m_rawTranslationUnits;
 
-    // If we already have a translation unit for Slang code, then this will give its index.
-    // If not, it will be `-1`.
-    int m_slangTranslationUnitIndex = -1;
-
     int m_translationUnitCount = 0;
     int m_currentTranslationUnitIndex = -1;
 
@@ -1924,7 +1920,6 @@ SlangResult OptionsParser::addReferencedModule(String path, SourceLoc loc, bool 
         m_rawTranslationUnits.add(rawTU);
     }
     m_currentTranslationUnitIndex = m_requestImpl->getTranslationUnitCount() - 1;
-    m_slangTranslationUnitIndex = m_currentTranslationUnitIndex;
     return SLANG_OK;
 }
 
