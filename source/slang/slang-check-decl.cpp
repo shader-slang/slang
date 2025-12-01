@@ -2685,7 +2685,10 @@ static Expr* constructDefaultConstructorForType(SemanticsVisitor* visitor, Type*
         {
             fromType = atomicType->getElementType();
         }
-        if (visitor->_coerceInitializerList(fromType, &outExpr, initListExpr))
+        // Use a sub-visitor with the synthesized default init flag set to suppress
+        // warnings about default-initializing resource types.
+        SemanticsVisitor subVisitor(visitor->withInSynthesizedDefaultInit());
+        if (subVisitor._coerceInitializerList(fromType, &outExpr, initListExpr))
             return outExpr;
     }
 

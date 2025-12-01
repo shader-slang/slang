@@ -134,7 +134,8 @@ bool SemanticsVisitor::_readValueFromInitializerList(
         // eventually be an error, but for now it's a warning.
         // Use diagnoseOnce to avoid duplicate warnings when iterating
         // over array elements or struct fields.
-        if (as<ResourceType>(toType))
+        // Skip the diagnostic when synthesizing default initializers (e.g., for ParameterBlocks).
+        if (as<ResourceType>(toType) && !isInSynthesizedDefaultInit())
         {
             diagnoseOnce(
                 fromInitializerListExpr->loc,

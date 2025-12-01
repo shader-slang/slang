@@ -1077,6 +1077,16 @@ public:
 
     bool getInForLoopSideEffect() { return m_inForLoopSideEffect; }
 
+    // Setup the flag to indicate we're synthesizing a default initializer,
+    // where warnings about default-initializing resource types should be suppressed.
+    SemanticsContext withInSynthesizedDefaultInit()
+    {
+        SemanticsContext result(*this);
+        result.m_inSynthesizedDefaultInit = true;
+        return result;
+    }
+
+    bool isInSynthesizedDefaultInit() { return m_inSynthesizedDefaultInit; }
 
     TryClauseType getEnclosingTryClauseType() { return m_enclosingTryClauseType; }
 
@@ -1215,6 +1225,9 @@ protected:
     // allowed
     bool m_inForLoopSideEffect = false;
 
+    // Flag to track when we're synthesizing a default initializer, where warnings about
+    // default-initializing resource types should be suppressed.
+    bool m_inSynthesizedDefaultInit = false;
 
     ExpandExpr* m_parentExpandExpr = nullptr;
 
