@@ -649,13 +649,15 @@ SLANG_FORCE_INLINE float f16tof32(const uint32_t value)
 #include <stdfloat> // C++23
 #else
 // Define __STDC_WANT_IEC_60559_TYPES_EXT__ for compilers with reliable _Float16 support:
-// - Clang 14+
+// - Clang 15+
 // - GCC 12+
-#if (defined(__clang__) && __clang_major__ >= 14) || (defined(__GNUC__) && __GNUC__ >= 12)
+#if (defined(__clang__) && __clang_major__ >= 15) || (defined(__GNUC__) && __GNUC__ >= 12)
+#ifndef __STDC_WANT_IEC_60559_TYPES_EXT__
 #define __STDC_WANT_IEC_60559_TYPES_EXT__
+#endif
 #include <float.h>
 #endif // __STDC_WANT_IEC_60559_TYPES_EXT__
-#endif // (defined(__clang__) && __clang_major__ >= 14) || (defined(__GNUC__) && __GNUC__ >= 12)
+#endif // (defined(__clang__) && __clang_major__ >= 15) || (defined(__GNUC__) && __GNUC__ >= 12)
 #endif // C++23
 
 #ifdef FLT16_MIN
