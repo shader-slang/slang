@@ -209,6 +209,7 @@ struct TestResourceContext
     List<ComPtr<IResource>> resources;
 };
 
+
 class RenderTestApp
 {
 public:
@@ -912,16 +913,17 @@ SlangResult RenderTestApp::initialize(
         case Options::ShaderProgramType::Graphics:
         case Options::ShaderProgramType::GraphicsCompute:
             {
-                // TODO: We should conceivably be able to match up the "available" vertex
-                // attributes, as defined by the vertex stream(s) on the model being
-                // renderer, with the "required" vertex attributes as defiend on the
-                // shader.
+                // We define a fixed set of "available" vertex attributes for the single
+                // triangle used by all graphics tests.
                 //
-                // For now we just create a fixed input layout for all graphics tests
-                // since at present they all draw the same single triangle with a
-                // fixed/known set of attributes.
+                // We filter this list to only include attributes actually used by the
+                // vertex shader to avoid validation warnings.
                 //
-                const InputElementDesc inputElements[] = {
+                // TODO: In the future we should be more flexible and support matching
+                // available attributes from arbitrary models/streams with the shader's
+                // requirements.
+                //
+                const InputElementDesc allInputElements[] = {
                     {"A", 0, Format::RGB32Float, offsetof(Vertex, position)},
                     {"A", 1, Format::RGB32Float, offsetof(Vertex, color)},
                     {"A", 2, Format::RG32Float, offsetof(Vertex, uv)},
@@ -931,11 +933,18 @@ SlangResult RenderTestApp::initialize(
                     {"A", 6, Format::RGBA32Float, offsetof(Vertex, customData3)},
                 };
 
+
+                List<InputElementDesc> inputElements = filterInputElements(
+                    allInputElements,
+                    SLANG_COUNT_OF(allInputElements),
+                    m_compilationOutput.output.slangProgram->getLayout());
+
+
                 ComPtr<IInputLayout> inputLayout;
                 SLANG_RETURN_ON_FAIL(device->createInputLayout(
                     sizeof(Vertex),
-                    inputElements,
-                    SLANG_COUNT_OF(inputElements),
+                    inputElements.getBuffer(),
+                    inputElements.getCount(),
                     inputLayout.writeRef()));
 
                 BufferDesc vertexBufferDesc;
