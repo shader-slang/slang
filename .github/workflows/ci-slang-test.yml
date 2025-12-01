@@ -88,6 +88,11 @@ jobs:
             slang_test_args+=("-expected-failure-list" "tests/expected-failure-no-gpu.txt")
           fi
 
+          # Add Linux GPU expected failure list for CUDA builds (Tesla T4 driver limitations)
+          if [[ "${{ inputs.artifact-suffix }}" == "-cuda" ]]; then
+            slang_test_args+=("-expected-failure-list" "tests/expected-failure-linux-gpu.txt")
+          fi
+
           # Execute slang-test with all arguments
           "$bin_dir/slang-test" "${slang_test_args[@]}"
       - name: Run Slang examples
