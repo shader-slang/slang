@@ -1650,6 +1650,7 @@ static SlangResult _innerMain(
                 if (SLANG_FAILED(
                         spSessionCheckPassThroughSupport(session, SLANG_PASS_THROUGH_NVRTC)))
                     return SLANG_FAIL;
+                break;
 #else
                 return SLANG_FAIL;
 #endif
