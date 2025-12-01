@@ -75,7 +75,7 @@ jobs:
           enableCrossOsArchive: false
 
       # Build Slang from checked-out source
-      # Uses the same approach as CI: cmake --preset default + cmake --workflow --preset release
+      # Note: We only need slangc.exe, so skip the packaging step
       - name: Build Slang
         run: |
           echo "Building Slang..."
@@ -94,8 +94,8 @@ jobs:
             -DSLANG_ENABLE_SLANG_GLSLANG=ON \
             -DSLANG_ENABLE_TESTS=OFF
 
-          # Build using workflow preset (configure + build + package)
-          cmake --workflow --preset release
+          # Build only (skip packaging to avoid gfx.slang install error)
+          cmake --build --preset release
 
           endTime=$(date +%s)
           duration=$(( (endTime - startTime) / 60 ))
@@ -111,14 +111,19 @@ jobs:
             exit 1
           fi
 
-      # Clone dxvk-remix with all submodules (pinned to specific commit for stability)
-      - name: Clone dxvk-remix repository
+      # Clone dxvk-remix with all submodules (testing PR #116)
+      - name: Clone dxvk-remix repository (PR #116)
         run: |
-          echo "Cloning dxvk-remix repository..."
-          git clone --recursive --depth 1 https://github.com/NVIDIAGameWorks/dxvk-remix.git
+          echo "Cloning dxvk-remix repository (testing PR #116)..."
+          git clone --recursive https://github.com/NVIDIAGameWorks/dxvk-remix.git
           cd dxvk-remix
+          echo "Fetching PR #116 (init-shader-structs branch)..."
+          git fetch origin pull/116/head:pr-116
+          git checkout pr-116
+          git submodule update --init --recursive
           commit=$(git rev-parse HEAD)
-          echo "Using dxvk-remix commit: $commit"
+          echo "Using dxvk-remix commit: $commit (PR #116)"
+          echo "PR #116: Fix struct initialization for Slang compiler compatibility"
 
       # Cache packman packages between runs to save ~2-5 minutes
       - name: Cache Packman packages
