@@ -1,12 +1,98 @@
 // slang-pass-wrapper.cpp
 
 #include "slang-pass-wrapper.h"
+#include "slang-ir-validate.h"
+#include "../core/slang-writer.h"
+#include "../core/slang-dictionary.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
 
-void prePassHooks(CodeGenContext* codeGenContext, IRModule* irModule) {}
+// Forward declaration for dumpIR function
+void dumpIR(
+    IRModule* module,
+    IRDumpOptions const& options,
+    char const* label,
+    SourceManager* sourceManager,
+    ISlangWriter* writer);
 
-void postPassHooks(CodeGenContext* codeGenContext, IRModule* irModule) {}
+// Helper function to check if a pass name is in a hash set of pass names
+static bool isPassNameInSet(const HashSet<String>& passNamesSet, const char* passName)
+{
+    return passName && passNamesSet.contains(String(passName));
+}
+
+// Helper function to dump IR for specific passes (doesn't check shouldDumpIR)
+static void dumpIRForPass(CodeGenContext* codeGenContext, IRModule* irModule, const char* label)
+{
+    DiagnosticSinkWriter writer(codeGenContext->getSink());
+    dumpIR(
+        irModule,
+        codeGenContext->getIRDumpOptions(),
+        label,
+        codeGenContext->getSourceManager(),
+        &writer);
+}
+
+void prePassHooks(CodeGenContext* codeGenContext, IRModule* irModule, const char* passName)
+{
+    auto targetRequest = codeGenContext->getTargetReq();
+    auto targetCompilerOptions = targetRequest->getOptionSet();
+    
+    // Check if we should dump IR before this pass
+    auto& dumpBeforeList = targetCompilerOptions.getStringOptions(CompilerOptionName::DumpIRBefore);
+    HashSet<String> dumpBeforeSet;
+    for (const auto& name : dumpBeforeList)
+        dumpBeforeSet.add(name);
+        
+    if (isPassNameInSet(dumpBeforeSet, passName))
+    {
+        String label = String("BEFORE ") + passName;
+        dumpIRForPass(codeGenContext, irModule, label.getBuffer());
+    }
+}
+
+void postPassHooks(CodeGenContext* codeGenContext, IRModule* irModule, const char* passName)
+{
+    auto targetRequest = codeGenContext->getTargetReq();
+    auto targetCompilerOptions = targetRequest->getOptionSet();
+    
+    // Check if we should perform detailed IR validation
+    if (targetCompilerOptions.getBoolOption(CompilerOptionName::ValidateIRDetailed))
+    {
+        validateIRModule(irModule, codeGenContext->getSink());
+    }
+    
+    // Check if we should dump IR after this pass
+    bool shouldDumpForThisPass = false;
+    String dumpLabel;
+    
+    // Dump IR after every pass if -dump-ir is enabled
+    if (targetCompilerOptions.getBoolOption(CompilerOptionName::DumpIr))
+    {
+        shouldDumpForThisPass = true;
+        dumpLabel = String("AFTER ") + passName;
+    }
+    // Otherwise check if we should dump IR after this specific pass
+    else
+    {
+        auto& dumpAfterList = targetCompilerOptions.getStringOptions(CompilerOptionName::DumpIRAfter);
+        HashSet<String> dumpAfterSet;
+        for (const auto& name : dumpAfterList)
+            dumpAfterSet.add(name);
+            
+        if (isPassNameInSet(dumpAfterSet, passName))
+        {
+            shouldDumpForThisPass = true;
+            dumpLabel = String("AFTER ") + passName;
+        }
+    }
+    
+    if (shouldDumpForThisPass)
+    {
+        dumpIRForPass(codeGenContext, irModule, dumpLabel.getBuffer());
+    }
+}
 
 } // namespace Slang

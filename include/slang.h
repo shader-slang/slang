@@ -1070,6 +1070,9 @@ typedef uint32_t SlangSizeT;
         ExperimentalFeature,         // bool, enable experimental features
         ReportDetailedPerfBenchmark, // bool, reports detailed compiler performance benchmark
                                      // results
+        ValidateIRDetailed,          // bool, enable detailed IR validation in pass hooks
+        DumpIRBefore,               // string, comma-separated pass names to dump IR before
+        DumpIRAfter,                // string, comma-separated pass names to dump IR after
 
         CountOf,
     };

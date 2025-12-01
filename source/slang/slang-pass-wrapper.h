@@ -4,6 +4,7 @@
 #define SLANG_PASS_WRAPPER_H
 
 #include "../core/slang-performance-profiler.h"
+#include "slang-code-gen.h"
 #include "slang-compiler-options.h"
 
 #include <optional>
@@ -16,8 +17,8 @@ struct IRModule;
 struct CodeGenContext;
 
 // Standalone hook functions
-void prePassHooks(CodeGenContext* codeGenContext, IRModule* irModule);
-void postPassHooks(CodeGenContext* codeGenContext, IRModule* irModule);
+void prePassHooks(CodeGenContext* codeGenContext, IRModule* irModule, const char* passName);
+void postPassHooks(CodeGenContext* codeGenContext, IRModule* irModule, const char* passName);
 
 template<typename PassFunc, typename... Args>
 auto wrapPass(
@@ -36,17 +37,17 @@ auto wrapPass(
         perfContext.emplace(passName);
     }
 
-    prePassHooks(codeGenContext, irModule);
+    prePassHooks(codeGenContext, irModule, passName);
 
     if constexpr (std::is_void_v<decltype(passFunc(irModule, std::forward<Args>(args)...))>)
     {
         passFunc(irModule, std::forward<Args>(args)...);
-        postPassHooks(codeGenContext, irModule);
+        postPassHooks(codeGenContext, irModule, passName);
     }
     else
     {
         auto result = passFunc(irModule, std::forward<Args>(args)...);
-        postPassHooks(codeGenContext, irModule);
+        postPassHooks(codeGenContext, irModule, passName);
         return result;
     }
 }

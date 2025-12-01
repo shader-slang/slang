@@ -853,7 +853,7 @@ void initCommandOptions(CommandOptions& options)
          "-dump-intermediates",
          nullptr,
          "Dump intermediate outputs for debugging."},
-        {OptionKind::DumpIr, "-dump-ir", nullptr, "Dump the IR for debugging."},
+        {OptionKind::DumpIr, "-dump-ir", nullptr, "Dump the IR after every pass for debugging."},
         {OptionKind::DumpIrIds,
          "-dump-ir-ids",
          nullptr,
@@ -876,6 +876,9 @@ void initCommandOptions(CommandOptions& options)
          "[REMOVED] Serialize the IR between front-end and back-end."},
         {OptionKind::SkipCodeGen, "-skip-codegen", nullptr, "Skip the code generation phase."},
         {OptionKind::ValidateIr, "-validate-ir", nullptr, "Validate the IR between the phases."},
+        {OptionKind::ValidateIRDetailed, "-validate-ir-detailed", nullptr, "Enable detailed IR validation in pass hooks."},
+        {OptionKind::DumpIRBefore, "-dump-ir-before", "-dump-ir-before <pass-names>", "Dump IR before specified pass(es) - comma-separated list."},
+        {OptionKind::DumpIRAfter, "-dump-ir-after", "-dump-ir-after <pass-names>", "Dump IR after specified pass(es) - comma-separated list."},
         {OptionKind::VerbosePaths,
          "-verbose-paths",
          nullptr,
@@ -2269,6 +2272,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::SkipCodeGen:
         case OptionKind::ParameterBlocksUseRegisterSpaces:
         case OptionKind::ValidateIr:
+        case OptionKind::ValidateIRDetailed:
         case OptionKind::DumpIr:
         case OptionKind::VulkanInvertY:
         case OptionKind::VulkanUseDxPositionW:
@@ -2431,6 +2435,22 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 SLANG_RETURN_ON_FAIL(m_reader.expectArg(moduleName));
 
                 m_compileRequest->setDefaultModuleName(moduleName.value.getBuffer());
+                break;
+            }
+        case OptionKind::DumpIRBefore:
+            {
+                CommandLineArg passNames;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(passNames));
+
+                linkage->m_optionSet.add(CompilerOptionName::DumpIRBefore, passNames.value);
+                break;
+            }
+        case OptionKind::DumpIRAfter:
+            {
+                CommandLineArg passNames;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(passNames));
+
+                linkage->m_optionSet.add(CompilerOptionName::DumpIRAfter, passNames.value);
                 break;
             }
         case OptionKind::LoadRepro:
