@@ -37,7 +37,7 @@ groupshared uint4[256 / 4] tempShared1;
 [shader("compute")]
 void computeMain()
 {
-    let stride = 16;
+    let stride = 4;
 
     let mat = coopMatLoad<int32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator, CoopMatMatrixLayout.RowMajor>(input, 0, stride);
     mat.Store<CoopMatMatrixLayout.RowMajor>(tempShared, 0, stride);
