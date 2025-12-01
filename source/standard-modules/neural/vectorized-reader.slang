@@ -2,9 +2,9 @@ implementing neural;
 
 // Extension for RWStructuredBuffer to implement IArray interface such that we can implement readUint4 once, and
 // use it for both storage buffer and thread local array.
-internal extension<T> RWStructuredBuffer<T> : IArray<T>
+internal extension<T> RWStructuredBuffer<T> : IRWArray<T>
 {
-    internal __subscript(int index) -> T { get { return this[index]; }}
+    internal __subscript(int index) -> T { get { return this[index]; } set { this[index] = newValue; }}
     internal int getCount()
     {
         int count = 0;
@@ -18,7 +18,7 @@ internal extension<T> RWStructuredBuffer<T> : IArray<T>
 internal static uint4 readUint4<T, BufferType>(BufferType buffer, int startIndex)
     where T : __BuiltinFloatingPointType
     where T.Differential == T
-    where BufferType : IArray<T>
+    where BufferType : IRWArray<T>
 {
     uint4 result = uint4(0, 0, 0, 0);
     const int nBytes = sizeof(T);
@@ -57,7 +57,7 @@ internal static uint4 readUint4<T, BufferType>(BufferType buffer, int startIndex
 internal uint4 readUint4<T, BufferType, bool IsAligned, uint Stride, uint AlignedStride>(BufferType buffer, int baseIndex, int startIndex)
     where T : __BuiltinFloatingPointType
     where T.Differential == T
-    where BufferType : IArray<T>
+    where BufferType : IRWArray<T>
 {
     if (IsAligned)
     {
@@ -119,4 +119,38 @@ internal uint4 readUint4<T, BufferType, bool IsAligned, uint Stride, uint Aligne
         }
     }
     return result;
+}
+
+[ForceInline]
+internal static void writeUint4<T, BufferType>(out BufferType buffer, int startIndex, uint4 value)
+    where T : __BuiltinFloatingPointType
+    where T.Differential == T
+    where BufferType : IRWArray<T>
+{
+    const int nBytes = sizeof(T);
+    const int WritePerElement = 4 / nBytes;
+    const int BitsShiftPerWrite = 32 / WritePerElement;
+    [ForceUnroll]
+    for (int i = 0; i < 4; i++)
+    {
+        [ForceUnroll]
+        for (int j = 0; j < WritePerElement; j++)
+        {
+            int index = startIndex + i * WritePerElement + j;
+            switch (nBytes)
+            {
+            case 1:
+                buffer[index] = bit_cast<T>((uint8_t)(value[i] >> (BitsShiftPerWrite * (WritePerElement - 1 - j))));
+                break;
+            case 2:
+                buffer[index] = bit_cast<T>((uint16_t)(value[i] >> (BitsShiftPerWrite * (WritePerElement - 1 - j))));
+                break;
+            case 4:
+                buffer[index] = bit_cast<T>((uint)(value[i] >> (BitsShiftPerWrite * (WritePerElement - 1 - j))));
+                break;
+            default:
+                static_assert(false, "Unsupported data type T");
+            }
+        }
+    }
 }

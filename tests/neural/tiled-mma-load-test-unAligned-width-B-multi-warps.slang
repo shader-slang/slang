@@ -68,7 +68,8 @@ static const int SUBGROUP_COUNT = (THREAD_COUNT + 31) / 32;
 
 // Tile B is size of 16 * 32 bytes.
 static const int TILE_SIZE = 16 * 2;
-groupshared uint4 s_sharedMemoryB[SUBGROUP_COUNT * TILE_SIZE];
+static const int N_TILES_PER_SUBGROUP = 2;
+groupshared uint4 s_sharedMemoryB[SUBGROUP_COUNT * N_TILES_PER_SUBGROUP * TILE_SIZE];
 
 typealias SPtr = Ptr<uint4, Access::ReadWrite, AddressSpace::GroupShared>;
 
@@ -76,15 +77,17 @@ void invalidateSharedMemory(uint tid, SPtr shmPtr)
 {
     // Initialize the shared memory with all 1.0h.
     // Each subgroup will initialize the shared memory for its own threads.
-    uint subgroupIndex = tid / 31;
+    uint subgroupIndex = tid / 32;
     uint laneId = WaveGetLaneIndex();
-    uint offset = subgroupIndex * TILE_SIZE;
+    uint offset = subgroupIndex * (TILE_SIZE * N_TILES_PER_SUBGROUP);
     uint activeThreadCount = WaveActiveCountBits(true);
-    uint numIters = (TILE_SIZE + activeThreadCount - 1) / activeThreadCount;
+    uint numIters = ((TILE_SIZE * N_TILES_PER_SUBGROUP) + activeThreadCount - 1) / activeThreadCount;
+    uint offsetPerThread = activeThreadCount;
+
     for (int i = 0; i < numIters; i++)
     {
-        uint index = laneId * numIters + i;
-        if (index >= TILE_SIZE)
+        uint index = i * offsetPerThread + laneId;
+        if (index >= TILE_SIZE * N_TILES_PER_SUBGROUP)
             break;
 
         shmPtr[offset + index] = uint4(0x3C003C00);
@@ -105,13 +108,14 @@ void testLoadShB(uint tid, uint tileIndex)
     SPtr sharedMemoryB = __getAddress(s_sharedMemoryB[0]);
 
     uint activeThreadCount = WaveActiveCountBits(true);
+    uint subgroupIndex = tid / 32;
     if (activeThreadCount == InCompleteSubgroupSize)
     {
-        MMAHelper<half, InputSize, OutputSize, InCompleteSubgroupSize>.LoadSharedMemoryFromLocalVector(sharedMemoryB, tileIndex, inputVector);
+        MMAHelper<half, InputSize, OutputSize, InCompleteSubgroupSize>.LoadSharedMemoryFromLocalVector(sharedMemoryB, tileIndex, subgroupIndex, inputVector);
     }
     else
     {
-        MMAHelper<half, InputSize, OutputSize, SubgroupSize>.LoadSharedMemoryFromLocalVector(sharedMemoryB, tileIndex, inputVector);
+        MMAHelper<half, InputSize, OutputSize, SubgroupSize>.LoadSharedMemoryFromLocalVector(sharedMemoryB, tileIndex, subgroupIndex, inputVector);
     }
     GroupMemoryBarrierWithWaveSync();
 }
@@ -206,7 +210,6 @@ void Test(uint tid, uint tileIndex, int resIndex)
     // Waiting for all threads to finish the previous test as this is multi-warps test.
     // So need to sync whole workgroup.
     GroupMemoryBarrierWithGroupSync();
-
     invalidateSharedMemory(tid, __getAddress(s_sharedMemoryB[0]));
 
     // Each warp will load its own tile.
@@ -219,7 +222,7 @@ void Test(uint tid, uint tileIndex, int resIndex)
 
     uint subgroupIndex = tid / 32;
     int laneId = WaveGetLaneIndex();
-    uint offset = subgroupIndex * TILE_SIZE;
+    uint offset = subgroupIndex * (TILE_SIZE * N_TILES_PER_SUBGROUP);
     bool res = verifiedOutput(laneId, subgroupIndex, __getAddress(s_sharedMemoryB[offset]), tileIndex);
     res = WaveActiveAllTrue(res);
 
@@ -235,7 +238,8 @@ void serialRead(uint tid, SPtr sharedMem)
     if (tid > 0)
         return;
 
-    for (int id = 0; id < SUBGROUP_COUNT * 32; id++)
+    uint columnsPerTile = 16;
+    for (int id = 0; id < SUBGROUP_COUNT * N_TILES_PER_SUBGROUP * columnsPerTile; id++)
     {
         printf("row: %d\n", id);
         for (int i = 0; i < 2; i++)
