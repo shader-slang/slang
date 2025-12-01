@@ -25,6 +25,7 @@ void computeMain(int tid : SV_GroupThreadID)
 {
     let p = getPtr(tid);
     writeData(p, (tid+1) * 100);
+    GroupMemoryBarrierWithGroupSync();
     if (tid == 0)
     {
         // CHECK: 300 
