@@ -6623,7 +6623,7 @@ inline unsigned __device__ Pack32Helper<unsigned char>(unsigned char value)
 
 // The dimensions of the fragment are specified by M, N, K which are totally determined during
 // compile time, so slang already did the pre-filter on the shape & type combination.
-template<typename T, int M, int N, int K, MatrixUse R, Layout MatrixLayout = RowMajor>
+template<typename T, int M, int N, int K, MatrixUse R>
 struct WmmaFragment
 {
     __device__ WmmaFragment() {}
@@ -6859,19 +6859,19 @@ struct WmmaFragment
     template<Layout layout>
     static This __device__ Load(T* buffer, uint element, uint stride)
     {
-        WmmaFragment<T, M, N, K, R, layout> fragment;
+        WmmaFragment<T, M, N, K, R> fragment;
 
         // Force compile-time check, so we know the template parameter comibination is valid.
         (void)RegisterCount<T, M, N, K, R>::value;
         wmmaLoad<T, M, N, K, R, layout>(fragment.regs, buffer + element, stride);
-
+        fragment.m_layout = layout;
         return fragment;
     }
 
     template<Layout layout, typename PtrU>
     static This __device__ Load(PtrU buffer, uint stride)
     {
-        WmmaFragment<T, M, N, K, R, layout> fragment;
+        WmmaFragment<T, M, N, K, R> fragment;
 
         // Force compile-time check, so we know the template parameter comibination is valid.
         (void)RegisterCount<T, M, N, K, R>::value;
@@ -6887,7 +6887,7 @@ struct WmmaFragment
     static constexpr int m_M = M;
     static constexpr int m_N = N;
     static constexpr int m_K = K;
-    static constexpr Layout m_layout = MatrixLayout;
+    Layout m_layout = Layout::RowMajor;
 
     // Maximum registers needed across all fragment types and data types
     static constexpr int MAX_REGS = 8;
@@ -7370,12 +7370,10 @@ template<
     int M,
     int N,
     int K,
-    Layout layoutA,
-    Layout layoutB,
     bool saturatingAccumulation>
 WmmaFragment<DType, M, N, K, MatrixC> __device__ coopMatMulAdd(
-    WmmaFragment<AType, M, N, K, MatrixUse::MatrixA, layoutA> matA,
-    WmmaFragment<BType, M, N, K, MatrixUse::MatrixB, layoutB> matB,
+    WmmaFragment<AType, M, N, K, MatrixUse::MatrixA> matA,
+    WmmaFragment<BType, M, N, K, MatrixUse::MatrixB> matB,
     WmmaFragment<CType, M, N, K, MatrixUse::MatrixC> matC)
 {
     constexpr ShapeCombination shape = (M == 16 && N == 16 && K == 16) ? ShapeCombination::m16n16k16
@@ -7384,11 +7382,44 @@ WmmaFragment<DType, M, N, K, MatrixC> __device__ coopMatMulAdd(
                                            : ShapeCombination::m32n8k16;
 
     WmmaFragment<DType, M, N, K, MatrixC> matD;
-    MMAHelper<AType, BType, CType, DType, shape, layoutA, layoutB, saturatingAccumulation>::eval(
-        matD,
-        matA,
-        matB,
-        matC);
+    uint32_t encodedLayout = (matA.m_layout == Layout::RowMajor ? 0 : 1) << 4 |
+                             (matB.m_layout == Layout::RowMajor ? 0 : 1);
+
+    switch(encodedLayout)
+    {
+        // 00010001
+        case 0x11:
+            MMAHelper<AType, BType, CType, DType, shape, Layout::RowMajor, Layout::RowMajor, saturatingAccumulation>::eval(
+                matD,
+                matA,
+                matB,
+                matC);
+            break;
+        // 00010001
+        case 0x10:
+            MMAHelper<AType, BType, CType, DType, shape, Layout::RowMajor, Layout::ColMajor, saturatingAccumulation>::eval(
+                matD,
+                matA,
+                matB,
+                matC);
+            break;
+        // 00000001
+        case 0x01:
+            MMAHelper<AType, BType, CType, DType, shape, Layout::ColMajor, Layout::RowMajor, saturatingAccumulation>::eval(
+                matD,
+                matA,
+                matB,
+                matC);
+            break;
+        // 00000000
+        case 0x00:
+            MMAHelper<AType, BType, CType, DType, shape, Layout::ColMajor, Layout::ColMajor, saturatingAccumulation>::eval(
+                matD,
+                matA,
+                matB,
+                matC);
+            break;
+    }
 
     return matD;
 }

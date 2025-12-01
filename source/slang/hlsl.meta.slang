@@ -28473,8 +28473,6 @@ CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> coopMatMulAdd<
                                                          $T0::m_M,
                                                          $T0::m_N,
                                                          $T0::m_K,
-                                                         $T0::m_layout,
-                                                         $T1::m_layout,
                                                          true
                                                         >($0, $1, $2))";
         else
@@ -28486,8 +28484,6 @@ CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> coopMatMulAdd<
                                                          $T0::m_M,
                                                          $T0::m_N,
                                                          $T0::m_K,
-                                                         $T0::m_layout,
-                                                         $T1::m_layout,
                                                          false
                                                         >($0, $1, $2))";
 
