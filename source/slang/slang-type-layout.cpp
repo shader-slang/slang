@@ -50,7 +50,8 @@ static size_t _roundUpToPowerOfTwo(size_t value)
 
     // Subtract 1 to handle exact powers of two correctly
     value--;
-#if SLANG_VC
+#if SLANG_VC && 0
+    // TODO: Disabled to avoid build failure on aarch64/windows
     return 1ULL << (64 - (size_t)__lzcnt64(value));
 #elif SLANG_GCC || SLANG_CLANG
     return 1ULL << (sizeof(size_t) * 8 - __builtin_clzll(value));
@@ -2642,6 +2643,15 @@ static LayoutSize GetElementCount(IntVal* val)
     else if (as<FuncCallIntVal>(val))
     {
         return LayoutSize::invalid();
+    }
+    else if (const auto typeCastIntVal = as<TypeCastIntVal>(val))
+    {
+        // Recursively check the base IntVal
+        auto baseIntVal = as<IntVal>(typeCastIntVal->getBase());
+        if (baseIntVal)
+        {
+            return GetElementCount(baseIntVal);
+        }
     }
     SLANG_UNEXPECTED("unhandled integer literal kind");
     UNREACHABLE_RETURN(LayoutSize(0));
