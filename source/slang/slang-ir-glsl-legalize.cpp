@@ -5021,8 +5021,8 @@ void decorateModuleWithSPIRVVersion(IRModule* module, SemanticVersion spirvVersi
 }
 
 void legalizeEntryPointsForGLSL(
-    Session* session,
     IRModule* module,
+    Session* session,
     const List<IRFunc*>& funcs,
     CodeGenContext* context,
     ShaderExtensionTracker* glslExtensionTracker)

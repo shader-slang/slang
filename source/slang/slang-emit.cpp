@@ -1143,7 +1143,7 @@ Result linkAndOptimizeIR(
     {
         // We could fail because
         // 1) It's not inlinable for some reason (for example if it's recursive)
-        SLANG_RETURN_ON_FAIL(performTypeInlining(irModule, targetProgram, sink));
+        SLANG_RETURN_ON_FAIL(SLANG_PASS(performTypeInlining, targetProgram, sink));
     }
 
     if (requiredLoweringPassSet.reinterpret)
@@ -1175,7 +1175,7 @@ Result linkAndOptimizeIR(
     {
         // We could fail because (perhaps, somehow) end up with getStringHash that the operand is
         // not a string literal
-        SLANG_RETURN_ON_FAIL(checkGetStringHashInsts(irModule, sink));
+        SLANG_RETURN_ON_FAIL(SLANG_PASS(checkGetStringHashInsts, sink));
     }
 
     // For targets that supports dynamic dispatch, we need to lower the
@@ -1582,12 +1582,7 @@ Result linkAndOptimizeIR(
             break;
         }
 
-        legalizeByteAddressBufferOps(
-            session,
-            targetProgram,
-            irModule,
-            codeGenContext->getSink(),
-            byteAddressBufferOptions);
+        SLANG_PASS(legalizeByteAddressBufferOps, session, targetProgram, codeGenContext->getSink(), byteAddressBufferOptions);
 
 #if 0
         dumpIRIfEnabled(codeGenContext, irModule, "AFTER legalizeByteAddressBufferOps");
@@ -1599,7 +1594,7 @@ Result linkAndOptimizeIR(
     if (target != CodeGenTarget::SPIRV && target != CodeGenTarget::SPIRVAssembly)
     {
         bool skipFuncParamValidation = true;
-        validateAtomicOperations(skipFuncParamValidation, sink, irModule->getModuleInst());
+        SLANG_PASS(static_cast<void(*)(IRModule*, bool, DiagnosticSink*)>(validateAtomicOperations), skipFuncParamValidation, sink);
     }
 
     // For CUDA targets only, we will need to turn operations
@@ -1656,12 +1651,7 @@ Result linkAndOptimizeIR(
             dumpIRIfEnabled(codeGenContext, irModule, "PRE GLSL LEGALIZED");
 #endif
 
-            legalizeEntryPointsForGLSL(
-                session,
-                irModule,
-                irEntryPoints,
-                codeGenContext,
-                glslExtensionTrackerPtr);
+            SLANG_PASS(legalizeEntryPointsForGLSL, session, irEntryPoints, codeGenContext, glslExtensionTrackerPtr);
 
 #if 0
             dumpIRIfEnabled(codeGenContext, irModule, "GLSL LEGALIZED");

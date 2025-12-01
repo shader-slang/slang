@@ -15,8 +15,8 @@ struct IRFunc;
 struct IRModule;
 
 void legalizeEntryPointsForGLSL(
-    Session* session,
     IRModule* module,
+    Session* session,
     const List<IRFunc*>& func,
     CodeGenContext* context,
     ShaderExtensionTracker* glslExtensionTracker);
