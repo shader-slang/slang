@@ -103,7 +103,7 @@ void checkFunctionRecursion(HashSet<IRFunc*>& checkedFuncs, IRFunc* func, Diagno
     }
 }
 
-void checkForRecursiveFunctions(TargetRequest* target, IRModule* module, DiagnosticSink* sink)
+void checkForRecursiveFunctions(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
 {
     HashSet<IRFunc*> checkedFuncsForRecursionDetection;
     for (auto globalInst : module->getGlobalInsts())

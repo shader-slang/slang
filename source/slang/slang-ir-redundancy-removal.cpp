@@ -352,7 +352,7 @@ bool removeRedundancyInFunc(IRGlobalValueWithCode* func, bool hoistLoopInvariant
 // Remove IR definitions from all AvailableInDownstreamIR functions where the
 // languages match what we're currently targetting,  as these functions are
 // already defined in the embedded precompiled library.
-void removeAvailableInDownstreamModuleDecorations(CodeGenTarget target, IRModule* module)
+void removeAvailableInDownstreamModuleDecorations(IRModule* module, CodeGenTarget target)
 {
     List<IRInst*> toRemove;
     auto builder = IRBuilder(module);

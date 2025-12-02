@@ -773,4 +773,9 @@ bool validateStructuredBufferResourceTypes(
     return context.validate(module);
 }
 
+void validateAtomicOperations(IRModule* module, bool skipFuncParamValidation, DiagnosticSink* sink)
+{
+    validateAtomicOperations(skipFuncParamValidation, sink, module->getModuleInst());
+}
+
 } // namespace Slang

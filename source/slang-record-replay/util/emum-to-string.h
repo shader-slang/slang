@@ -235,6 +235,10 @@ static Slang::String CompilerOptionNameToString(const slang::CompilerOptionName 
         CASE(VulkanBindShiftAll);
         CASE(GenerateWholeProgram);
         CASE(UseUpToDateBinaryModule);
+        CASE(ReportDetailedPerfBenchmark);
+        CASE(ValidateIRDetailed);
+        CASE(DumpIRBefore);
+        CASE(DumpIRAfter);
         CASE(CountOf);
     default:
         Slang::StringBuilder str;

@@ -90,8 +90,8 @@ List<IRInterfaceType*> sortTopologically(
 }
 
 void inferAnyValueSizeWhereNecessary(
-    TargetProgram* targetProgram,
     IRModule* module,
+    TargetProgram* targetProgram,
     DiagnosticSink* sink)
 {
     // Go through the global insts and collect all interface types.

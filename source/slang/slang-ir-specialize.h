@@ -19,8 +19,8 @@ struct SpecializationOptions
 
 /// Specialize generic and interface-based code to use concrete types.
 bool specializeModule(
-    TargetProgram* target,
     IRModule* module,
+    TargetProgram* target,
     DiagnosticSink* sink,
     SpecializationOptions options);
 
