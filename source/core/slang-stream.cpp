@@ -5,13 +5,11 @@
 #include "slang-io.h"
 #include "slang-process.h"
 
-#include <errno.h>
 #include <stdio.h>
 #include <thread>
 
 #ifndef _WIN32
 #include <pthread.h>
-#include <sys/stat.h>
 #endif
 
 namespace Slang
@@ -26,30 +24,6 @@ bool isDiagnosticEnabled(const char* category)
     if (strcmp(diagnostics, "all") == 0 || strcmp(diagnostics, "1") == 0)
         return true;
     return strstr(diagnostics, category) != nullptr;
-}
-
-struct FileHandleInfo
-{
-    FILE* handle;
-    int fd;
-    pthread_t thread;
-    const char* operation;
-};
-
-static void logFileHandle(FILE* handle, const char* operation)
-{
-    if (!isDiagnosticEnabled("feof") || !handle)
-        return;
-
-#ifndef _WIN32
-    fprintf(
-        stderr,
-        "[FD-LIFECYCLE] %s FILE*=%p fd=%d thread=%lu\n",
-        operation,
-        (void*)handle,
-        fileno(handle),
-        (unsigned long)pthread_self());
-#endif
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FileStream !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -232,8 +206,6 @@ SlangResult FileStream::_init(
             (unsigned long)pthread_self());
     }
 
-    logFileHandle(m_handle, "OPEN");
-
     // Just set the access specified
     m_fileAccess = access;
     return SLANG_OK;
@@ -303,73 +275,7 @@ SlangResult FileStream::read(void* buffer, size_t length, size_t& outBytesRead)
         // If we have reached the end, then reading nothing is ok.
         if (!m_endReached)
         {
-            // DIAGNOSTIC MODE: Check if feof() would have failed (proving the fix works)
-            if (isDiagnosticEnabled("feof"))
-            {
-                bool feofResult = feof(m_handle);
-                int ferrResult = ferror(m_handle);
-                int savedErrno = errno;
-
-                // Get file position to verify if we're actually at EOF
-                Int64 currentPos = getPosition();
-                Int64 currentSize = 0;
-#if defined(_WIN32) || defined(__CYGWIN__)
-                _fseeki64(m_handle, 0, SEEK_END);
-                currentSize = _ftelli64(m_handle);
-                _fseeki64(m_handle, currentPos, SEEK_SET);
-#else
-                fseeko(m_handle, 0, SEEK_END);
-                currentSize = ftello(m_handle);
-                fseeko(m_handle, currentPos, SEEK_SET);
-#endif
-                bool actuallyAtEOF = (currentPos >= currentSize);
-
-                // Check if this is a pipe or regular file
-                int fd = fileno(m_handle);
-#ifndef _WIN32
-                struct stat st;
-                int statResult = fstat(fd, &st);
-                bool isPipe = (statResult == 0 && S_ISFIFO(st.st_mode));
-                bool isRegularFile = (statResult == 0 && S_ISREG(st.st_mode));
-#else
-                bool isPipe = false;
-                bool isRegularFile = true;
-#endif
-
-                fprintf(
-                    stderr,
-                    "[FEOF-DIAG] fread=0: feof=%d ferror=%d errno=%d(%s) pos=%lld size=%lld "
-                    "actualEOF=%d fd=%d isPipe=%d isReg=%d FILE*=%p\n",
-                    feofResult,
-                    ferrResult,
-                    savedErrno,
-                    strerror(savedErrno),
-                    (long long)currentPos,
-                    (long long)currentSize,
-                    actuallyAtEOF,
-                    fd,
-                    isPipe,
-                    isRegularFile,
-                    (void*)m_handle);
-
-                // Check if the old buggy code would have failed
-                if (!feofResult && actuallyAtEOF)
-                {
-                    fprintf(
-                        stderr,
-                        "[FEOF-CORRUPTION] *** FILE* CORRUPTION DETECTED *** feof=false but "
-                        "actually at EOF! ferror=%d errno=%d(%s) FILE*=%p fd=%d\n"
-                        "[FEOF-CORRUPTION] The fix prevents infinite loop by using position "
-                        "check instead of feof().\n",
-                        ferrResult,
-                        savedErrno,
-                        strerror(savedErrno),
-                        (void*)m_handle,
-                        fd);
-                }
-            }
-
-            // THE FIX (from PR #9017): Use file position to verify EOF, don't rely on feof()
+            // Use file position to verify EOF, don't rely on feof()
             Int64 currentPos = getPosition();
             Int64 currentSize = 0;
 #if defined(_WIN32) || defined(__CYGWIN__)
@@ -384,7 +290,6 @@ SlangResult FileStream::read(void* buffer, size_t length, size_t& outBytesRead)
 
             if (currentPos >= currentSize)
             {
-                // Confirmed at EOF
                 m_endReached = true;
             }
             else
@@ -436,7 +341,6 @@ void FileStream::close()
                 (unsigned long)pthread_self());
         }
 
-        logFileHandle(m_handle, "CLOSE");
         fclose(m_handle);
         m_handle = nullptr;
 
