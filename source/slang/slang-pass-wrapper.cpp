@@ -1,9 +1,10 @@
 // slang-pass-wrapper.cpp
 
 #include "slang-pass-wrapper.h"
-#include "slang-ir-validate.h"
-#include "../core/slang-writer.h"
+
 #include "../core/slang-dictionary.h"
+#include "../core/slang-writer.h"
+#include "slang-ir-validate.h"
 #include "slang-ir.h"
 
 namespace Slang
@@ -39,16 +40,17 @@ void prePassHooks(CodeGenContext* codeGenContext, IRModule* irModule, const char
 {
     auto targetRequest = codeGenContext->getTargetReq();
     auto targetCompilerOptions = targetRequest->getOptionSet();
-    
+
     // Check if we should dump IR before this pass
-    if (auto dumpBeforeOptions = targetCompilerOptions.options.tryGetValue(CompilerOptionName::DumpIRBefore))
+    if (auto dumpBeforeOptions =
+            targetCompilerOptions.options.tryGetValue(CompilerOptionName::DumpIRBefore))
     {
         HashSet<String> dumpBeforeSet;
         for (const auto& option : *dumpBeforeOptions)
         {
             dumpBeforeSet.add(option.stringValue);
         }
-            
+
         if (isPassNameInSet(dumpBeforeSet, passName))
         {
             String label = String("BEFORE ") + passName;
@@ -61,17 +63,17 @@ void postPassHooks(CodeGenContext* codeGenContext, IRModule* irModule, const cha
 {
     auto targetRequest = codeGenContext->getTargetReq();
     auto targetCompilerOptions = targetRequest->getOptionSet();
-    
+
     // Check if we should perform detailed IR validation
     if (targetCompilerOptions.getBoolOption(CompilerOptionName::ValidateIRDetailed))
     {
         validateIRModule(irModule, codeGenContext->getSink());
     }
-    
+
     // Check if we should dump IR after this pass
     bool shouldDumpForThisPass = false;
     String dumpLabel;
-    
+
     // Dump IR after every pass if -dump-ir is enabled
     if (targetCompilerOptions.getBoolOption(CompilerOptionName::DumpIr))
     {
@@ -79,21 +81,23 @@ void postPassHooks(CodeGenContext* codeGenContext, IRModule* irModule, const cha
         dumpLabel = String("AFTER ") + passName;
     }
     // Otherwise check if we should dump IR after this specific pass
-    else if (auto dumpAfterOptions = targetCompilerOptions.options.tryGetValue(CompilerOptionName::DumpIRAfter))
+    else if (
+        auto dumpAfterOptions =
+            targetCompilerOptions.options.tryGetValue(CompilerOptionName::DumpIRAfter))
     {
         HashSet<String> dumpAfterSet;
         for (const auto& option : *dumpAfterOptions)
         {
             dumpAfterSet.add(option.stringValue);
         }
-            
+
         if (isPassNameInSet(dumpAfterSet, passName))
         {
             shouldDumpForThisPass = true;
             dumpLabel = String("AFTER ") + passName;
         }
     }
-    
+
     if (shouldDumpForThisPass)
     {
         dumpIRForPass(codeGenContext, irModule, dumpLabel.getBuffer());

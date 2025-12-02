@@ -943,12 +943,11 @@ Result RootShaderObjectLayoutImpl::create(
     {
         auto slangEntryPoint = programLayout->getEntryPointByIndex(e);
         RefPtr<ShaderObjectLayoutImpl> entryPointLayout;
-        SLANG_RETURN_ON_FAIL(
-            ShaderObjectLayoutImpl::createForElementType(
-                device,
-                program->getSession(),
-                slangEntryPoint->getTypeLayout(),
-                entryPointLayout.writeRef()));
+        SLANG_RETURN_ON_FAIL(ShaderObjectLayoutImpl::createForElementType(
+            device,
+            program->getSession(),
+            slangEntryPoint->getTypeLayout(),
+            entryPointLayout.writeRef()));
         builder.addEntryPoint(slangEntryPoint->getStage(), entryPointLayout);
     }
 

@@ -290,6 +290,11 @@ Reports the time spent in the downstream compiler.
 Reports compiler performance benchmark results. 
 
 
+<a id="report-detailed-perf-benchmark"></a>
+### -report-detailed-perf-benchmark
+Reports detailed compiler performance benchmark results (implies [-report-perf-benchmark](#report-perf-benchmark)). 
+
+
 <a id="report-checkpoint-intermediates"></a>
 ### -report-checkpoint-intermediates
 Reports information about checkpoint contexts used for reverse-mode automatic differentiation. 
@@ -638,7 +643,7 @@ Dump intermediate outputs for debugging.
 
 <a id="dump-ir"></a>
 ### -dump-ir
-Dump the IR for debugging. 
+Dump the IR after every pass for debugging. 
 
 
 <a id="dump-ir-ids"></a>
@@ -674,6 +679,27 @@ Skip the code generation phase.
 <a id="validate-ir"></a>
 ### -validate-ir
 Validate the IR between the phases. 
+
+
+<a id="validate-ir-detailed"></a>
+### -validate-ir-detailed
+Enable detailed IR validation in pass hooks. 
+
+
+<a id="dump-ir-before"></a>
+### -dump-ir-before
+
+**-dump-ir-before &lt;pass-names&gt;**
+
+Dump IR before specified pass(es) - comma-separated list. 
+
+
+<a id="dump-ir-after"></a>
+### -dump-ir-after
+
+**-dump-ir-after &lt;pass-names&gt;**
+
+Dump IR after specified pass(es) - comma-separated list. 
 
 
 <a id="verbose-paths"></a>

@@ -739,7 +739,7 @@ Result linkAndOptimizeIR(
         SLANG_PASS(translateGlobalVaryingVar, codeGenContext);
 
     if (requiredLoweringPassSet.resolveVaryingInputRef)
-        SLANG_PASS(static_cast<void(*)(IRModule*)>(resolveVaryingInputRef));
+        SLANG_PASS(static_cast<void (*)(IRModule*)>(resolveVaryingInputRef));
 
     SLANG_PASS(fixEntryPointCallsites);
 
@@ -940,14 +940,20 @@ Result linkAndOptimizeIR(
 
         if (changed)
         {
-            SLANG_PASS(static_cast<bool(*)(IRModule*, DiagnosticSink*)>(applySparseConditionalConstantPropagation), codeGenContext->getSink());
+            SLANG_PASS(
+                static_cast<bool (*)(IRModule*, DiagnosticSink*)>(
+                    applySparseConditionalConstantPropagation),
+                codeGenContext->getSink());
         }
         validateIRModuleIfEnabled(codeGenContext, irModule);
 
         // Inline calls to any functions marked with [__unsafeInlineEarly] again,
         // since we may be missing out cases prevented by the functions that we just specialzied.
         SLANG_PASS(performMandatoryEarlyInlining, nullptr);
-        SLANG_PASS(static_cast<bool(*)(IRModule*, const IRDeadCodeEliminationOptions&)>(eliminateDeadCode), deadCodeEliminationOptions);
+        SLANG_PASS(
+            static_cast<bool (*)(IRModule*, const IRDeadCodeEliminationOptions&)>(
+                eliminateDeadCode),
+            deadCodeEliminationOptions);
 
         // Unroll loops.
         if (!fastIRSimplificationOptions.minimalOptimization)
@@ -971,7 +977,8 @@ Result linkAndOptimizeIR(
         {
             {
                 auto validationScope = enableIRValidationScope();
-                changed |= SLANG_PASS(processAutodiffCalls, targetProgram, sink, IRAutodiffPassOptions());
+                changed |=
+                    SLANG_PASS(processAutodiffCalls, targetProgram, sink, IRAutodiffPassOptions());
             }
         }
 
@@ -990,7 +997,9 @@ Result linkAndOptimizeIR(
     // even if the AD pass itself is not run.
     //
     SLANG_PASS(finalizeAutoDiffPass, targetProgram);
-    SLANG_PASS(static_cast<bool(*)(IRModule*, const IRDeadCodeEliminationOptions&)>(eliminateDeadCode), deadCodeEliminationOptions);
+    SLANG_PASS(
+        static_cast<bool (*)(IRModule*, const IRDeadCodeEliminationOptions&)>(eliminateDeadCode),
+        deadCodeEliminationOptions);
 
     // After auto-diff, we can perform more aggressive specialization with dynamic-dispatch
     // lowering.
@@ -1114,7 +1123,10 @@ Result linkAndOptimizeIR(
     }
     else if (requiredLoweringPassSet.generics)
     {
-        SLANG_PASS(static_cast<bool(*)(IRModule*, const IRDeadCodeEliminationOptions&)>(eliminateDeadCode), fastIRSimplificationOptions.deadCodeElimOptions);
+        SLANG_PASS(
+            static_cast<bool (*)(IRModule*, const IRDeadCodeEliminationOptions&)>(
+                eliminateDeadCode),
+            fastIRSimplificationOptions.deadCodeElimOptions);
     }
 
     if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc) &&
@@ -1140,7 +1152,7 @@ Result linkAndOptimizeIR(
     // for host vm.
     if (target == CodeGenTarget::HostVM)
     {
-        SLANG_PASS(static_cast<void(*)(IRModule*)>(performForceInlining));
+        SLANG_PASS(static_cast<void (*)(IRModule*)>(performForceInlining));
         SLANG_PASS(simplifyIR, targetProgram, defaultIRSimplificationOptions, sink);
         return SLANG_OK;
     }
@@ -1171,7 +1183,7 @@ Result linkAndOptimizeIR(
     }
 
     // Inline calls to any functions marked with [__unsafeInlineEarly] or [ForceInline].
-    SLANG_PASS(static_cast<void(*)(IRModule*)>(performForceInlining));
+    SLANG_PASS(static_cast<void (*)(IRModule*)>(performForceInlining));
 
     // Specialization can introduce dead code that could trip
     // up downstream passes like type legalization, so we
@@ -1184,8 +1196,14 @@ Result linkAndOptimizeIR(
         // like inlining allowing us to find dead branches.
         // These must be cleaned since otherwise static_assert's will falsely
         // detect true due to dead branches with static_assert not being removed.
-        SLANG_PASS(static_cast<bool(*)(IRModule*, DiagnosticSink*)>(applySparseConditionalConstantPropagation), sink);
-        SLANG_PASS(static_cast<bool(*)(IRModule*, const IRDeadCodeEliminationOptions&)>(eliminateDeadCode), deadCodeEliminationOptions);
+        SLANG_PASS(
+            static_cast<bool (*)(IRModule*, DiagnosticSink*)>(
+                applySparseConditionalConstantPropagation),
+            sink);
+        SLANG_PASS(
+            static_cast<bool (*)(IRModule*, const IRDeadCodeEliminationOptions&)>(
+                eliminateDeadCode),
+            deadCodeEliminationOptions);
     }
     else
     {
@@ -1255,7 +1273,8 @@ Result linkAndOptimizeIR(
             BufferElementTypeLoweringOptions bufferElementTypeLoweringOptions = {};
             bufferElementTypeLoweringOptions.loweringPolicyKind =
                 BufferElementTypeLoweringPolicyKind::MetalParameterBlock;
-            SLANG_PASS(lowerBufferElementTypeToStorageType,
+            SLANG_PASS(
+                lowerBufferElementTypeToStorageType,
                 targetProgram,
                 bufferElementTypeLoweringOptions);
         }
@@ -1337,7 +1356,10 @@ Result linkAndOptimizeIR(
     // (e.g., things that used to be aggregated might now be split up,
     // so that we can work with the individual fields).
     if (fastIRSimplificationOptions.minimalOptimization)
-        SLANG_PASS(static_cast<bool(*)(IRModule*, const IRDeadCodeEliminationOptions&)>(eliminateDeadCode), deadCodeEliminationOptions);
+        SLANG_PASS(
+            static_cast<bool (*)(IRModule*, const IRDeadCodeEliminationOptions&)>(
+                eliminateDeadCode),
+            deadCodeEliminationOptions);
     else
         SLANG_PASS(simplifyIR, targetProgram, fastIRSimplificationOptions, sink);
 
@@ -1506,8 +1528,12 @@ Result linkAndOptimizeIR(
             break;
         }
 
-        SLANG_PASS(legalizeByteAddressBufferOps, session, targetProgram, codeGenContext->getSink(), byteAddressBufferOptions);
-
+        SLANG_PASS(
+            legalizeByteAddressBufferOps,
+            session,
+            targetProgram,
+            codeGenContext->getSink(),
+            byteAddressBufferOptions);
     }
 
     // For SPIR-V, this function is called elsewhere, so that it can happen after address space
@@ -1515,7 +1541,10 @@ Result linkAndOptimizeIR(
     if (target != CodeGenTarget::SPIRV && target != CodeGenTarget::SPIRVAssembly)
     {
         bool skipFuncParamValidation = true;
-        SLANG_PASS(static_cast<void(*)(IRModule*, bool, DiagnosticSink*)>(validateAtomicOperations), skipFuncParamValidation, sink);
+        SLANG_PASS(
+            static_cast<void (*)(IRModule*, bool, DiagnosticSink*)>(validateAtomicOperations),
+            skipFuncParamValidation,
+            sink);
     }
 
     // For CUDA targets only, we will need to turn operations
@@ -1565,7 +1594,12 @@ Result linkAndOptimizeIR(
                     ? as<ShaderExtensionTracker>(options.sourceEmitter->getExtensionTracker())
                     : &glslExtensionTracker;
 
-            SLANG_PASS(legalizeEntryPointsForGLSL, session, irEntryPoints, codeGenContext, glslExtensionTrackerPtr);
+            SLANG_PASS(
+                legalizeEntryPointsForGLSL,
+                session,
+                irEntryPoints,
+                codeGenContext,
+                glslExtensionTrackerPtr);
 
             validateIRModuleIfEnabled(codeGenContext, irModule);
         }
@@ -1609,7 +1643,7 @@ Result linkAndOptimizeIR(
 
     if (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) ||
         isWGPUTarget(targetRequest) || isMetalTarget(targetRequest))
-        SLANG_PASS(static_cast<void(*)(IRModule*)>(legalizeLogicalAndOr));
+        SLANG_PASS(static_cast<void (*)(IRModule*)>(legalizeLogicalAndOr));
 
     // Legalize non struct parameters that are expected to be structs for HLSL.
     if (isD3DTarget(targetRequest))
@@ -1723,7 +1757,9 @@ Result linkAndOptimizeIR(
     //
     // We run DCE pass again to clean things up.
     //
-    SLANG_PASS(static_cast<bool(*)(IRModule*, const IRDeadCodeEliminationOptions&)>(eliminateDeadCode), deadCodeEliminationOptions);
+    SLANG_PASS(
+        static_cast<bool (*)(IRModule*, const IRDeadCodeEliminationOptions&)>(eliminateDeadCode),
+        deadCodeEliminationOptions);
 
     SLANG_PASS(cleanUpVoidType);
 
@@ -1780,7 +1816,10 @@ Result linkAndOptimizeIR(
     else
         bufferElementTypeLoweringOptions.loweringPolicyKind =
             BufferElementTypeLoweringPolicyKind::Default;
-    SLANG_PASS(lowerBufferElementTypeToStorageType, targetProgram, bufferElementTypeLoweringOptions);
+    SLANG_PASS(
+        lowerBufferElementTypeToStorageType,
+        targetProgram,
+        bufferElementTypeLoweringOptions);
 
     // If we are generating code for glsl or metal, perform address space propagation now.
     // For SPIRV, we will do that during spirv legalization that happens after
@@ -1818,7 +1857,7 @@ Result linkAndOptimizeIR(
         SLANG_PASS(lowerImmutableBufferLoadForCUDA, targetProgram);
     }
 
-    SLANG_PASS(static_cast<void(*)(IRModule*)>(performForceInlining));
+    SLANG_PASS(static_cast<void (*)(IRModule*)>(performForceInlining));
 
     if (emitSpirvDirectly)
     {
@@ -1871,13 +1910,15 @@ Result linkAndOptimizeIR(
             phiEliminationOptions.eliminateCompositeTypedPhiOnly = false;
             phiEliminationOptions.useRegisterAllocation = true;
         }
-        SLANG_PASS(static_cast<void(*)(IRModule*, LivenessMode, PhiEliminationOptions)>(eliminatePhis), livenessMode, phiEliminationOptions);
+        SLANG_PASS(
+            static_cast<void (*)(IRModule*, LivenessMode, PhiEliminationOptions)>(eliminatePhis),
+            livenessMode,
+            phiEliminationOptions);
         // If liveness is enabled add liveness ranges based on the accumulated liveness locations
 
         if (isEnabled(livenessMode))
         {
             SLANG_PASS(LivenessUtil::addRangeEnds, livenessMode);
-
         }
     }
 
@@ -2190,11 +2231,10 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
     if (sourceMap)
     {
-        auto sourceMapArtifact = ArtifactUtil::createArtifact(
-            ArtifactDesc::make(
-                ArtifactKind::Json,
-                ArtifactPayload::SourceMap,
-                ArtifactStyle::None));
+        auto sourceMapArtifact = ArtifactUtil::createArtifact(ArtifactDesc::make(
+            ArtifactKind::Json,
+            ArtifactPayload::SourceMap,
+            ArtifactStyle::None));
 
         sourceMapArtifact->addRepresentation(sourceMap);
 
