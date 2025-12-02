@@ -41,15 +41,19 @@ void prePassHooks(CodeGenContext* codeGenContext, IRModule* irModule, const char
     auto targetCompilerOptions = targetRequest->getOptionSet();
     
     // Check if we should dump IR before this pass
-    auto& dumpBeforeList = targetCompilerOptions.getStringOptions(CompilerOptionName::DumpIRBefore);
-    HashSet<String> dumpBeforeSet;
-    for (const auto& name : dumpBeforeList)
-        dumpBeforeSet.add(name);
-        
-    if (isPassNameInSet(dumpBeforeSet, passName))
+    if (auto dumpBeforeOptions = targetCompilerOptions.options.tryGetValue(CompilerOptionName::DumpIRBefore))
     {
-        String label = String("BEFORE ") + passName;
-        dumpIRForPass(codeGenContext, irModule, label.getBuffer());
+        HashSet<String> dumpBeforeSet;
+        for (const auto& option : *dumpBeforeOptions)
+        {
+            dumpBeforeSet.add(option.stringValue);
+        }
+            
+        if (isPassNameInSet(dumpBeforeSet, passName))
+        {
+            String label = String("BEFORE ") + passName;
+            dumpIRForPass(codeGenContext, irModule, label.getBuffer());
+        }
     }
 }
 
@@ -75,12 +79,13 @@ void postPassHooks(CodeGenContext* codeGenContext, IRModule* irModule, const cha
         dumpLabel = String("AFTER ") + passName;
     }
     // Otherwise check if we should dump IR after this specific pass
-    else
+    else if (auto dumpAfterOptions = targetCompilerOptions.options.tryGetValue(CompilerOptionName::DumpIRAfter))
     {
-        auto& dumpAfterList = targetCompilerOptions.getStringOptions(CompilerOptionName::DumpIRAfter);
         HashSet<String> dumpAfterSet;
-        for (const auto& name : dumpAfterList)
-            dumpAfterSet.add(name);
+        for (const auto& option : *dumpAfterOptions)
+        {
+            dumpAfterSet.add(option.stringValue);
+        }
             
         if (isPassNameInSet(dumpAfterSet, passName))
         {
