@@ -20,36 +20,44 @@ struct CodeGenContext;
 void prePassHooks(CodeGenContext* codeGenContext, IRModule* irModule, const char* passName);
 void postPassHooks(CodeGenContext* codeGenContext, IRModule* irModule, const char* passName);
 
+// RAII helper for pass hooks and performance profiling
+struct PassHooksRAII
+{
+    CodeGenContext* codeGenContext;
+    IRModule* irModule;
+    const char* passName;
+    std::optional<PerformanceProfilerFuncRAIIContext> perfContext;
+
+    PassHooksRAII(CodeGenContext* ctx, IRModule* module, const char* name)
+        : codeGenContext(ctx), irModule(module), passName(name)
+    {
+        prePassHooks(codeGenContext, irModule, passName);
+        
+        auto targetRequest = codeGenContext->getTargetReq();
+        auto targetCompilerOptions = targetRequest->getOptionSet();
+        if (targetCompilerOptions.getBoolOption(CompilerOptionName::ReportDetailedPerfBenchmark))
+        {
+            perfContext.emplace(passName);
+        }
+    }
+
+    ~PassHooksRAII()
+    {
+        perfContext.reset(); // End profiler timing before post hooks
+        postPassHooks(codeGenContext, irModule, passName);
+    }
+};
+
 template<typename PassFunc, typename... Args>
 auto wrapPass(
     CodeGenContext* codeGenContext,
     const char* passName,
     PassFunc&& passFunc,
     IRModule* irModule,
-    Args&&... args) -> decltype(passFunc(irModule, std::forward<Args>(args)...))
+    Args&&... args)
 {
-    auto targetRequest = codeGenContext->getTargetReq();
-    auto targetCompilerOptions = targetRequest->getOptionSet();
-
-    std::optional<PerformanceProfilerFuncRAIIContext> perfContext;
-    if (targetCompilerOptions.getBoolOption(CompilerOptionName::ReportDetailedPerfBenchmark))
-    {
-        perfContext.emplace(passName);
-    }
-
-    prePassHooks(codeGenContext, irModule, passName);
-
-    if constexpr (std::is_void_v<decltype(passFunc(irModule, std::forward<Args>(args)...))>)
-    {
-        passFunc(irModule, std::forward<Args>(args)...);
-        postPassHooks(codeGenContext, irModule, passName);
-    }
-    else
-    {
-        auto result = passFunc(irModule, std::forward<Args>(args)...);
-        postPassHooks(codeGenContext, irModule, passName);
-        return result;
-    }
+    PassHooksRAII passHooks(codeGenContext, irModule, passName);
+    return passFunc(irModule, std::forward<Args>(args)...);
 }
 
 } // namespace Slang

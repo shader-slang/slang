@@ -2,7 +2,6 @@
 
 #include "slang-pass-wrapper.h"
 
-#include "../core/slang-dictionary.h"
 #include "../core/slang-writer.h"
 #include "slang-ir-validate.h"
 #include "slang-ir.h"
@@ -18,10 +17,25 @@ void dumpIR(
     SourceManager* sourceManager,
     ISlangWriter* writer);
 
-// Helper function to check if a pass name is in a hash set of pass names
-static bool isPassNameInSet(const HashSet<String>& passNamesSet, const char* passName)
+// Helper function to check if we should dump IR for a pass
+static bool shouldDumpPass(const CompilerOptionSet& options, CompilerOptionName optionName, const char* passName)
 {
-    return passName && passNamesSet.contains(String(passName));
+    if (!passName)
+        return false;
+        
+    // For after dumps, -dump-ir enables dumping after every pass
+    if (optionName == CompilerOptionName::DumpIRAfter && options.getBoolOption(CompilerOptionName::DumpIr))
+        return true;
+        
+    // Check if this specific pass is in the list
+    if (auto passOptions = options.options.tryGetValue(optionName))
+    {
+        return passOptions->findFirstIndex([passName](const CompilerOptionValue& option) {
+            return option.stringValue == passName;
+        }) != -1;
+    }
+    
+    return false;
 }
 
 // Helper function to dump IR for specific passes (doesn't check shouldDumpIR)
@@ -42,20 +56,10 @@ void prePassHooks(CodeGenContext* codeGenContext, IRModule* irModule, const char
     auto targetCompilerOptions = targetRequest->getOptionSet();
 
     // Check if we should dump IR before this pass
-    if (auto dumpBeforeOptions =
-            targetCompilerOptions.options.tryGetValue(CompilerOptionName::DumpIRBefore))
+    if (shouldDumpPass(targetCompilerOptions, CompilerOptionName::DumpIRBefore, passName))
     {
-        HashSet<String> dumpBeforeSet;
-        for (const auto& option : *dumpBeforeOptions)
-        {
-            dumpBeforeSet.add(option.stringValue);
-        }
-
-        if (isPassNameInSet(dumpBeforeSet, passName))
-        {
-            String label = String("BEFORE ") + passName;
-            dumpIRForPass(codeGenContext, irModule, label.getBuffer());
-        }
+        String label = String("BEFORE ") + passName;
+        dumpIRForPass(codeGenContext, irModule, label.getBuffer());
     }
 }
 
@@ -71,36 +75,10 @@ void postPassHooks(CodeGenContext* codeGenContext, IRModule* irModule, const cha
     }
 
     // Check if we should dump IR after this pass
-    bool shouldDumpForThisPass = false;
-    String dumpLabel;
-
-    // Dump IR after every pass if -dump-ir is enabled
-    if (targetCompilerOptions.getBoolOption(CompilerOptionName::DumpIr))
+    if (shouldDumpPass(targetCompilerOptions, CompilerOptionName::DumpIRAfter, passName))
     {
-        shouldDumpForThisPass = true;
-        dumpLabel = String("AFTER ") + passName;
-    }
-    // Otherwise check if we should dump IR after this specific pass
-    else if (
-        auto dumpAfterOptions =
-            targetCompilerOptions.options.tryGetValue(CompilerOptionName::DumpIRAfter))
-    {
-        HashSet<String> dumpAfterSet;
-        for (const auto& option : *dumpAfterOptions)
-        {
-            dumpAfterSet.add(option.stringValue);
-        }
-
-        if (isPassNameInSet(dumpAfterSet, passName))
-        {
-            shouldDumpForThisPass = true;
-            dumpLabel = String("AFTER ") + passName;
-        }
-    }
-
-    if (shouldDumpForThisPass)
-    {
-        dumpIRForPass(codeGenContext, irModule, dumpLabel.getBuffer());
+        String label = String("AFTER ") + passName;
+        dumpIRForPass(codeGenContext, irModule, label.getBuffer());
     }
 }
 
