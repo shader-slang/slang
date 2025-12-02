@@ -958,7 +958,11 @@ void SemanticsVisitor::_warnAboutDefaultInitializedResources(
                     UInt elementCount = (UInt)constCount->getValue();
                     for (UInt i = 0; i < elementCount; i++)
                     {
-                        _warnAboutDefaultInitializedResources(elementType, argCount, ioArgIndex, loc);
+                        _warnAboutDefaultInitializedResources(
+                            elementType,
+                            argCount,
+                            ioArgIndex,
+                            loc);
                     }
                 }
             }

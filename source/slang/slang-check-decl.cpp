@@ -2646,7 +2646,10 @@ bool isDefaultInitializable(VarDeclBase* varDecl)
     return true;
 }
 
-static Expr* constructDefaultConstructorForType(SemanticsVisitor* visitor, Type* type, SourceLoc loc)
+static Expr* constructDefaultConstructorForType(
+    SemanticsVisitor* visitor,
+    Type* type,
+    SourceLoc loc)
 {
     ConstructorDecl* defaultCtor = nullptr;
     auto declRefType = as<DeclRefType>(type);
@@ -2703,7 +2706,8 @@ static Expr* constructDefaultInitExprForType(SemanticsVisitor* visitor, VarDeclB
     if (!isDefaultInitializable(varDecl))
         return nullptr;
 
-    if (auto defaultInitExpr = constructDefaultConstructorForType(visitor, varDecl->type.type, varDecl->loc))
+    if (auto defaultInitExpr =
+            constructDefaultConstructorForType(visitor, varDecl->type.type, varDecl->loc))
     {
         return defaultInitExpr;
     }
@@ -9700,7 +9704,8 @@ void SemanticsDeclBodyVisitor::visitParamDecl(ParamDecl* paramDecl)
         if (isSynthesizedCtorParam)
         {
             SemanticsVisitor subVisitor(withInSynthesizedDefaultInit());
-            initExpr = subVisitor.coerce(CoercionSite::Initializer, typeExpr.type, initExpr, getSink());
+            initExpr =
+                subVisitor.coerce(CoercionSite::Initializer, typeExpr.type, initExpr, getSink());
         }
         else
         {
