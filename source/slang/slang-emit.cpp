@@ -1129,21 +1129,21 @@ Result linkAndOptimizeIR(
     }
 
     // Tagged union type lowering typically generates more reinterpret instructions.
-    if (lowerTaggedUnionTypes(irModule, sink))
+    if (SLANG_PASS(lowerTaggedUnionTypes, sink))
         requiredLoweringPassSet.reinterpret = true;
 
-    lowerUntaggedUnionTypes(irModule, targetProgram, sink);
+    SLANG_PASS(lowerUntaggedUnionTypes, targetProgram, sink);
 
     if (requiredLoweringPassSet.reinterpret)
         SLANG_PASS(lowerReinterpret, targetProgram, sink);
 
-    lowerSequentialIDTagCasts(irModule, codeGenContext->getLinkage(), sink);
-    lowerTagInsts(irModule, sink);
-    lowerTagTypes(irModule);
+    SLANG_PASS(lowerSequentialIDTagCasts, codeGenContext->getLinkage(), sink);
+    SLANG_PASS(lowerTagInsts, sink);
+    SLANG_PASS(lowerTagTypes);
 
-    eliminateDeadCode(irModule, fastIRSimplificationOptions.deadCodeElimOptions);
+    SLANG_PASS(eliminateDeadCode, fastIRSimplificationOptions.deadCodeElimOptions);
 
-    lowerExistentials(irModule, targetProgram, sink);
+    SLANG_PASS(lowerExistentials, targetProgram, sink);
 
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
