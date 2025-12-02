@@ -875,7 +875,7 @@ struct SpecializationContext
                     {
                         if (auto table = as<IRWitnessTable>(instElement))
                         {
-                            if (auto satisfyingVal = findWitnessVal(table, requirementKey))
+                            if (auto satisfyingVal = findWitnessTableEntry(table, requirementKey))
                             {
                                 satisfyingValSet.add(satisfyingVal);
                                 return;
