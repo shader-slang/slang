@@ -282,6 +282,13 @@ struct AnyValueMarshallingContext
                 }
                 break;
             }
+        case kIROp_DescriptorHandleType:
+            {
+                // DescriptorHandle<T> is represented as uint2 (8 bytes) on most targets.
+                // We use marshalResourceHandle which handles 8-byte values by casting to uint2.
+                context->marshalResourceHandle(builder, dataType, concreteTypedVar);
+                break;
+            }
         default:
             if (isResourceType(dataType))
             {
@@ -956,6 +963,7 @@ SlangInt _getAnyValueSizeRaw(IRType* type, SlangInt offset)
     case kIROp_IntPtrType:
     case kIROp_UIntPtrType:
 #endif
+    case kIROp_DescriptorHandleType:
         return alignUp(offset, 8) + 8;
     case kIROp_Int16Type:
     case kIROp_UInt16Type:
