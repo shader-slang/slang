@@ -1067,7 +1067,8 @@ typedef uint32_t SlangSizeT;
 
         ForceCLayout, // bool
 
-        ExperimentalFeature,         // bool, enable experimental features
+        ExperimentalFeature, // bool, enable experimental features
+
         ReportDetailedPerfBenchmark, // bool, reports detailed compiler performance benchmark
                                      // results
         ValidateIRDetailed,          // bool, enable detailed IR validation

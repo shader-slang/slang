@@ -292,7 +292,7 @@ Reports compiler performance benchmark results.
 
 <a id="report-detailed-perf-benchmark"></a>
 ### -report-detailed-perf-benchmark
-Reports detailed compiler performance benchmark results (implies [-report-perf-benchmark](#report-perf-benchmark)). 
+Reports compiler performance benchmark results for each intermediate pass (implies [-report-perf-benchmark](#report-perf-benchmark)). 
 
 
 <a id="report-checkpoint-intermediates"></a>
@@ -678,12 +678,12 @@ Skip the code generation phase.
 
 <a id="validate-ir"></a>
 ### -validate-ir
-Validate the IR between the phases. 
+Validate the IR after select intermediate passes. 
 
 
 <a id="validate-ir-detailed"></a>
 ### -validate-ir-detailed
-Enable detailed IR validation in pass hooks. 
+Perform debug validation on IR after each intermediate pass. 
 
 
 <a id="dump-ir-before"></a>
@@ -691,7 +691,7 @@ Enable detailed IR validation in pass hooks.
 
 **-dump-ir-before &lt;pass-names&gt;**
 
-Dump IR before specified pass(es) - comma-separated list. 
+Dump IR before specified pass, may be specified more than once 
 
 
 <a id="dump-ir-after"></a>
@@ -699,7 +699,7 @@ Dump IR before specified pass(es) - comma-separated list.
 
 **-dump-ir-after &lt;pass-names&gt;**
 
-Dump IR after specified pass(es) - comma-separated list. 
+Dump IR after specified pass, may be specified more than once 
 
 
 <a id="verbose-paths"></a>
