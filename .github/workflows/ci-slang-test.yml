@@ -96,8 +96,9 @@ jobs:
           # Execute slang-test with all arguments
           "$bin_dir/slang-test" "${slang_test_args[@]}"
       - name: Run Slang examples
-        # Run GLSL backend tests on release for pull requests, and not on merge_group, to reduce CI load.
-        if: inputs.full-gpu-tests && inputs.config == 'release' && github.event_name == 'pull_request'
+        # Run examples on release for pull requests, and not on merge_group, to reduce CI load.
+        # Skip for CUDA builds since CPU examples require LLVM which is disabled in CUDA builds.
+        if: inputs.full-gpu-tests && inputs.config == 'release' && github.event_name == 'pull_request' && inputs.artifact-suffix != '-cuda'
         run: |
           .github/workflows/ci-examples.sh \
            --bin-dir "$bin_dir" \
