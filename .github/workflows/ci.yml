@@ -236,6 +236,8 @@ jobs:
       test-category: full
       full-gpu-tests: true
       artifact-suffix: "-cuda"
+      # Reduce parallelism to avoid CUDA OOM on Tesla T4 (16GB VRAM)
+      server-count: 4
 
   test-linux-release-gcc-x86_64-gpu:
     needs: [filter, build-linux-release-gcc-x86_64-gpu]
@@ -250,6 +252,8 @@ jobs:
       test-category: full
       full-gpu-tests: true
       artifact-suffix: "-cuda"
+      # Reduce parallelism to avoid CUDA OOM on Tesla T4 (16GB VRAM)
+      server-count: 4
 
   check-ci:
     needs:
