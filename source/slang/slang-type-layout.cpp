@@ -2644,6 +2644,15 @@ static LayoutSize GetElementCount(IntVal* val)
     {
         return LayoutSize::invalid();
     }
+    else if (const auto typeCastIntVal = as<TypeCastIntVal>(val))
+    {
+        // Recursively check the base IntVal
+        auto baseIntVal = as<IntVal>(typeCastIntVal->getBase());
+        if (baseIntVal)
+        {
+            return GetElementCount(baseIntVal);
+        }
+    }
     SLANG_UNEXPECTED("unhandled integer literal kind");
     UNREACHABLE_RETURN(LayoutSize(0));
 }

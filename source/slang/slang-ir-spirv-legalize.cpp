@@ -878,6 +878,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // >     - a pointer to an element in an array that is a memory object
         // >       declaration, where the element type is OpTypeSampler or OpTypeImage.
         //
+        // However, this restriction is removed for Workgroup and StorageBuffer if
+        // VariablePointers or VariablePointersStorageBuffer is declared.
+        // > If the VariablePointers or VariablePointersStorageBuffer capability is declared, (...)
+        // > For pointer operands to OpFunctionCall, the memory object declaration-restriction is
+        // > removed for the following storage classes:
+        // > - StorageBuffer
+        // > - Workgroup
         List<IRInst*> newArgs;
         struct WriteBackPair
         {
@@ -895,7 +902,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             auto paramType = funcType->getParamType(i);
             if (auto ptrType = as<IRPtrType>(paramType))
             {
-                if (ptrType->getAddressSpace() == AddressSpace::UserPointer)
+                if (ptrType->getAddressSpace() == AddressSpace::UserPointer ||
+                    ptrType->getAddressSpace() == AddressSpace::GroupShared)
                 {
                     // If the parameter has an explicit pointer type,
                     // then we know the user is using the variable pointer
