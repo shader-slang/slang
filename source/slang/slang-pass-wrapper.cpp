@@ -18,23 +18,26 @@ void dumpIR(
     ISlangWriter* writer);
 
 // Helper function to check if we should dump IR for a pass
-static bool shouldDumpPass(const CompilerOptionSet& options, CompilerOptionName optionName, const char* passName)
+static bool shouldDumpPass(
+    CompilerOptionSet& options,
+    CompilerOptionName optionName,
+    const char* passName)
 {
     if (!passName)
         return false;
-        
+
     // For after dumps, -dump-ir enables dumping after every pass
-    if (optionName == CompilerOptionName::DumpIRAfter && options.getBoolOption(CompilerOptionName::DumpIr))
+    if (optionName == CompilerOptionName::DumpIRAfter &&
+        options.getBoolOption(CompilerOptionName::DumpIr))
         return true;
-        
+
     // Check if this specific pass is in the list
     if (auto passOptions = options.options.tryGetValue(optionName))
     {
-        return passOptions->findFirstIndex([passName](const CompilerOptionValue& option) {
-            return option.stringValue == passName;
-        }) != -1;
+        return passOptions->findFirstIndex([passName](const CompilerOptionValue& option)
+                                           { return option.stringValue == passName; }) != -1;
     }
-    
+
     return false;
 }
 

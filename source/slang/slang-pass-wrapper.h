@@ -32,7 +32,7 @@ struct PassHooksRAII
         : codeGenContext(ctx), irModule(module), passName(name)
     {
         prePassHooks(codeGenContext, irModule, passName);
-        
+
         auto targetRequest = codeGenContext->getTargetReq();
         auto targetCompilerOptions = targetRequest->getOptionSet();
         if (targetCompilerOptions.getBoolOption(CompilerOptionName::ReportDetailedPerfBenchmark))
