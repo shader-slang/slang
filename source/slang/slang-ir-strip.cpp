@@ -67,7 +67,7 @@ void stripImportedWitnessTable(IRModule* module)
         default:
             continue;
         }
-        if (inst->getOp() != kIROp_WitnessTable)
+        if (!inst || inst->getOp() != kIROp_WitnessTable)
             continue;
         if (!globalInst->findDecoration<IRImportDecoration>())
             continue;

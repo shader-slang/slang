@@ -216,7 +216,7 @@ struct BindExistentialSlots
         UInt slotCount = 0;
         if (auto typeResInfo =
                 varLayout->getTypeLayout()->findSizeAttr(LayoutResourceKind::ExistentialTypeParam))
-            slotCount = UInt(typeResInfo->getFiniteSize());
+            slotCount = typeResInfo->getFiniteSize();
 
         // At this point we know that the parameter consumes
         // some number of slots, so it would be an error

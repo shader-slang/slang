@@ -22,5 +22,6 @@ void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink, CodeGenTarget target);
 // If they are in integer type, as an example, we need to explicitly cast to bool type.
 // Also the return type from the logical operators should be a boolean type.
 void legalizeLogicalAndOr(IRInst* inst);
+void legalizeLogicalAndOr(IRModule* module);
 
 } // namespace Slang

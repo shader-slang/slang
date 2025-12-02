@@ -234,7 +234,7 @@ struct LValueCastLoweringContext
     OrderedHashSet<IRInst*> m_workList;
 };
 
-void lowerLValueCast(TargetProgram* target, IRModule* module)
+void lowerLValueCast(IRModule* module, TargetProgram* target)
 {
     LValueCastLoweringContext context(target, module);
     context.processModule();

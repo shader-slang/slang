@@ -24,6 +24,9 @@ struct PhiEliminationOptions
 /// If livenessMode is enabled LiveRangeStarts will be inserted into the module.
 void eliminatePhis(LivenessMode livenessMode, IRModule* module, PhiEliminationOptions options);
 
+// Overload that takes IRModule* first for use with SLANG_PASS macro
+void eliminatePhis(IRModule* module, LivenessMode livenessMode, PhiEliminationOptions options);
+
 void eliminatePhisInFunc(
     LivenessMode livenessMode,
     IRModule* module,

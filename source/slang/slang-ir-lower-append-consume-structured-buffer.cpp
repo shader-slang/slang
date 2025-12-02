@@ -245,7 +245,7 @@ static void lowerStructuredBufferType(TargetProgram* target, IRHLSLStructuredBuf
                             descriptorTableSlotOffsetAttr = offsetAttr;
                         auto info = newVarLayoutBuilder.findOrAddResourceInfo(
                             offsetAttr->getResourceKind());
-                        info->offset = offsetAttr->getOffset();
+                        info->offset = LayoutOffset{offsetAttr->getOffset()};
                         info->space = offsetAttr->getSpace();
                         info->kind = offsetAttr->getResourceKind();
                     }
@@ -255,7 +255,7 @@ static void lowerStructuredBufferType(TargetProgram* target, IRHLSLStructuredBuf
                     {
                         auto info = newVarLayoutBuilder.findOrAddResourceInfo(
                             LayoutResourceKind::DescriptorTableSlot);
-                        info->offset = uavOffsetAttr->getOffset();
+                        info->offset = LayoutOffset{uavOffsetAttr->getOffset()};
                         info->space = uavOffsetAttr->getSpace();
                         info->kind = LayoutResourceKind::DescriptorTableSlot;
                     }
@@ -314,8 +314,8 @@ static void lowerStructuredBufferType(TargetProgram* target, IRHLSLStructuredBuf
 }
 
 void lowerAppendConsumeStructuredBuffers(
-    TargetProgram* target,
     IRModule* module,
+    TargetProgram* target,
     DiagnosticSink* sink)
 {
     SLANG_UNUSED(sink);

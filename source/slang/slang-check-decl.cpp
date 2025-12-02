@@ -6681,9 +6681,8 @@ bool SemanticsVisitor::trySynthesizeEnumTypeMethodRequirementWitness(
     context->parentDecl->addDirectMemberDecl(synFunc);
 
     addModifier(synFunc, intrinsicOpModifier);
-    witnessTable->add(
-        funcDeclRef.getDecl(),
-        RequirementWitness(m_astBuilder->getDirectDeclRef(synFunc)));
+    DeclRef<Decl> memberDeclRef = getDefaultDeclRef(synFunc);
+    witnessTable->add(funcDeclRef.getDecl(), RequirementWitness(memberDeclRef));
     return true;
 }
 
