@@ -677,8 +677,16 @@ Result linkAndOptimizeIR(
 {
     SLANG_PROFILE;
 
-#define SLANG_PASS(passFunc, ...) \
-    wrapPass(codeGenContext, #passFunc, passFunc, irModule, ##__VA_ARGS__)
+    // This lambda is here so that we can select the correct overload for our parameters, without it
+    // the overload deduction fails for passes which have overloads not taking an IRModule*
+#define SLANG_PASS(passFunc, ...)                                                          \
+    wrapPass(                                                                              \
+        codeGenContext,                                                                    \
+        #passFunc,                                                                         \
+        [](auto* m, auto&&... a) { return passFunc(m, std::forward<decltype(a)>(a)...); }, \
+        irModule,                                                                          \
+        ##__VA_ARGS__)
+
     auto session = codeGenContext->getSession();
     auto sink = codeGenContext->getSink();
     auto target = codeGenContext->getTargetFormat();
@@ -725,8 +733,8 @@ Result linkAndOptimizeIR(
     requiredLoweringPassSet = {};
     calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
 
-    // Debug info is added by the front-end, and therefore needs to be stripped out by targets that
-    // opt out of debug info.
+    // Debug info is added by the front-end, and therefore needs to be stripped out by targets
+    // that opt out of debug info.
     if (requiredLoweringPassSet.debugInfo &&
         (targetCompilerOptions.getIntOption(CompilerOptionName::DebugInformation) ==
          SLANG_DEBUG_INFO_LEVEL_NONE))
@@ -739,7 +747,7 @@ Result linkAndOptimizeIR(
         SLANG_PASS(translateGlobalVaryingVar, codeGenContext);
 
     if (requiredLoweringPassSet.resolveVaryingInputRef)
-        SLANG_PASS(static_cast<void (*)(IRModule*)>(resolveVaryingInputRef));
+        SLANG_PASS(resolveVaryingInputRef);
 
     SLANG_PASS(fixEntryPointCallsites);
 
@@ -784,8 +792,8 @@ Result linkAndOptimizeIR(
     SLANG_PASS(checkEntryPointDecorations, target, sink);
 
     // Add floating point denormal handling mode decorations to entry point functions based on
-    // compiler options. This is done post-linking to ensure all entry points from linked modules
-    // are processed.
+    // compiler options. This is done post-linking to ensure all entry points from linked
+    // modules are processed.
     SLANG_PASS(addDenormalModeDecorations, codeGenContext);
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
@@ -940,20 +948,15 @@ Result linkAndOptimizeIR(
 
         if (changed)
         {
-            SLANG_PASS(
-                static_cast<bool (*)(IRModule*, DiagnosticSink*)>(
-                    applySparseConditionalConstantPropagation),
-                codeGenContext->getSink());
+            SLANG_PASS(applySparseConditionalConstantPropagation, codeGenContext->getSink());
         }
         validateIRModuleIfEnabled(codeGenContext, irModule);
 
         // Inline calls to any functions marked with [__unsafeInlineEarly] again,
-        // since we may be missing out cases prevented by the functions that we just specialzied.
+        // since we may be missing out cases prevented by the functions that we just
+        // specialzied.
         SLANG_PASS(performMandatoryEarlyInlining, nullptr);
-        SLANG_PASS(
-            static_cast<bool (*)(IRModule*, const IRDeadCodeEliminationOptions&)>(
-                eliminateDeadCode),
-            deadCodeEliminationOptions);
+        SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
 
         // Unroll loops.
         if (!fastIRSimplificationOptions.minimalOptimization)
@@ -997,9 +1000,7 @@ Result linkAndOptimizeIR(
     // even if the AD pass itself is not run.
     //
     SLANG_PASS(finalizeAutoDiffPass, targetProgram);
-    SLANG_PASS(
-        static_cast<bool (*)(IRModule*, const IRDeadCodeEliminationOptions&)>(eliminateDeadCode),
-        deadCodeEliminationOptions);
+    SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
 
     // After auto-diff, we can perform more aggressive specialization with dynamic-dispatch
     // lowering.
@@ -1123,17 +1124,14 @@ Result linkAndOptimizeIR(
     }
     else if (requiredLoweringPassSet.generics)
     {
-        SLANG_PASS(
-            static_cast<bool (*)(IRModule*, const IRDeadCodeEliminationOptions&)>(
-                eliminateDeadCode),
-            fastIRSimplificationOptions.deadCodeElimOptions);
+        SLANG_PASS(eliminateDeadCode, fastIRSimplificationOptions.deadCodeElimOptions);
     }
 
     if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc) &&
         targetProgram->getOptionSet().shouldRunNonEssentialValidation())
     {
-        // We could fail because (perhaps, somehow) end up with getStringHash that the operand is
-        // not a string literal
+        // We could fail because (perhaps, somehow) end up with getStringHash that the operand
+        // is not a string literal
         SLANG_RETURN_ON_FAIL(SLANG_PASS(checkGetStringHashInsts, sink));
     }
 
@@ -1152,7 +1150,7 @@ Result linkAndOptimizeIR(
     // for host vm.
     if (target == CodeGenTarget::HostVM)
     {
-        SLANG_PASS(static_cast<void (*)(IRModule*)>(performForceInlining));
+        SLANG_PASS(performForceInlining);
         SLANG_PASS(simplifyIR, targetProgram, defaultIRSimplificationOptions, sink);
         return SLANG_OK;
     }
@@ -1183,7 +1181,7 @@ Result linkAndOptimizeIR(
     }
 
     // Inline calls to any functions marked with [__unsafeInlineEarly] or [ForceInline].
-    SLANG_PASS(static_cast<void (*)(IRModule*)>(performForceInlining));
+    SLANG_PASS(performForceInlining);
 
     // Specialization can introduce dead code that could trip
     // up downstream passes like type legalization, so we
@@ -1197,13 +1195,10 @@ Result linkAndOptimizeIR(
         // These must be cleaned since otherwise static_assert's will falsely
         // detect true due to dead branches with static_assert not being removed.
         SLANG_PASS(
-            static_cast<bool (*)(IRModule*, DiagnosticSink*)>(
-                applySparseConditionalConstantPropagation),
+
+            applySparseConditionalConstantPropagation,
             sink);
-        SLANG_PASS(
-            static_cast<bool (*)(IRModule*, const IRDeadCodeEliminationOptions&)>(
-                eliminateDeadCode),
-            deadCodeEliminationOptions);
+        SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
     }
     else
     {
@@ -1266,10 +1261,10 @@ Result linkAndOptimizeIR(
             // Metal is a special target in that we want to legalize constant buffer
             // types as if it is a bindful target, and skip legalizing parameter block
             // types as if it is a bindless target.
-            // To achieve this, we want to ensure that all resource typed fields in parameter blocks
-            // are translated into descriptor handles first before running the resource type
-            // legalization pass for metal, so that type legalization pass won't mess around with
-            // them.
+            // To achieve this, we want to ensure that all resource typed fields in parameter
+            // blocks are translated into descriptor handles first before running the resource
+            // type legalization pass for metal, so that type legalization pass won't mess
+            // around with them.
             BufferElementTypeLoweringOptions bufferElementTypeLoweringOptions = {};
             bufferElementTypeLoweringOptions.loweringPolicyKind =
                 BufferElementTypeLoweringPolicyKind::MetalParameterBlock;
@@ -1356,10 +1351,7 @@ Result linkAndOptimizeIR(
     // (e.g., things that used to be aggregated might now be split up,
     // so that we can work with the individual fields).
     if (fastIRSimplificationOptions.minimalOptimization)
-        SLANG_PASS(
-            static_cast<bool (*)(IRModule*, const IRDeadCodeEliminationOptions&)>(
-                eliminateDeadCode),
-            deadCodeEliminationOptions);
+        SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
     else
         SLANG_PASS(simplifyIR, targetProgram, fastIRSimplificationOptions, sink);
 
@@ -1541,10 +1533,7 @@ Result linkAndOptimizeIR(
     if (target != CodeGenTarget::SPIRV && target != CodeGenTarget::SPIRVAssembly)
     {
         bool skipFuncParamValidation = true;
-        SLANG_PASS(
-            static_cast<void (*)(IRModule*, bool, DiagnosticSink*)>(validateAtomicOperations),
-            skipFuncParamValidation,
-            sink);
+        SLANG_PASS(validateAtomicOperations, skipFuncParamValidation, sink);
     }
 
     // For CUDA targets only, we will need to turn operations
@@ -1643,7 +1632,7 @@ Result linkAndOptimizeIR(
 
     if (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) ||
         isWGPUTarget(targetRequest) || isMetalTarget(targetRequest))
-        SLANG_PASS(static_cast<void (*)(IRModule*)>(legalizeLogicalAndOr));
+        SLANG_PASS(legalizeLogicalAndOr);
 
     // Legalize non struct parameters that are expected to be structs for HLSL.
     if (isD3DTarget(targetRequest))
@@ -1706,8 +1695,8 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::Metal:
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CUDASource:
-        // For CUDA/OptiX like targets, add our pass to replace inout parameter copies with direct
-        // pointers
+        // For CUDA/OptiX like targets, add our pass to replace inout parameter copies with
+        // direct pointers
         SLANG_PASS(undoParameterCopy);
         // Transform struct parameters to use ConstRef for better performance
         if (isCPUTarget(targetRequest) || isCUDATarget(targetRequest) ||
@@ -1757,17 +1746,15 @@ Result linkAndOptimizeIR(
     //
     // We run DCE pass again to clean things up.
     //
-    SLANG_PASS(
-        static_cast<bool (*)(IRModule*, const IRDeadCodeEliminationOptions&)>(eliminateDeadCode),
-        deadCodeEliminationOptions);
+    SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
 
     SLANG_PASS(cleanUpVoidType);
 
     if (isKhronosTarget(targetRequest))
     {
         // As a fallback, if the above specialization steps failed to remove resource type
-        // parameters, we will inline the functions in question to make sure we can produce valid
-        // GLSL.
+        // parameters, we will inline the functions in question to make sure we can produce
+        // valid GLSL.
         SLANG_PASS(performGLSLResourceReturnFunctionInlining, targetProgram);
     }
     validateIRModuleIfEnabled(codeGenContext, irModule);
@@ -1857,7 +1844,7 @@ Result linkAndOptimizeIR(
         SLANG_PASS(lowerImmutableBufferLoadForCUDA, targetProgram);
     }
 
-    SLANG_PASS(static_cast<void (*)(IRModule*)>(performForceInlining));
+    SLANG_PASS(performForceInlining);
 
     if (emitSpirvDirectly)
     {
@@ -1910,11 +1897,9 @@ Result linkAndOptimizeIR(
             phiEliminationOptions.eliminateCompositeTypedPhiOnly = false;
             phiEliminationOptions.useRegisterAllocation = true;
         }
-        SLANG_PASS(
-            static_cast<void (*)(IRModule*, LivenessMode, PhiEliminationOptions)>(eliminatePhis),
-            livenessMode,
-            phiEliminationOptions);
-        // If liveness is enabled add liveness ranges based on the accumulated liveness locations
+        SLANG_PASS(eliminatePhis, livenessMode, phiEliminationOptions);
+        // If liveness is enabled add liveness ranges based on the accumulated liveness
+        // locations
 
         if (isEnabled(livenessMode))
         {
