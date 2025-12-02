@@ -1533,8 +1533,7 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
     case ASTNodeType::OverrideModifier:
         {
             Decl* parent = getParentDecl(decl);
-            return as<FunctionDeclBase>(decl) &&
-                   (as<AggTypeDecl>(parent) || as<ExtensionDecl>(parent));
+            return as<FunctionDeclBase>(decl) && as<AggTypeDeclBase>(parent);
         }
     default:
         return true;
