@@ -1,4 +1,4 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -output-using-type
 //TEST:SIMPLE(filecheck=CHECK):-target spirv
 
 //TEST_INPUT: Texture2D(size=4, content = zero):name tex1
@@ -37,5 +37,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     }
 
     outputBuffer[index] = col.x;
+    // BUF: 1.000000
+    // BUF: 0.000000
+    // BUF: 1.000000
+    // BUF: 0.000000
 }
 
