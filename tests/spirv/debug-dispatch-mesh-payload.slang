@@ -14,8 +14,8 @@ void main() {
     DispatchMesh(1, 1, 1, payload);
 }
 
-// Verify the global payload variable has a name "payload" (not "unnamed")
+// Verify the global payload variable has a distinctive name (not "unnamed")
 // CHECK: OpEntryPoint TaskEXT %main "main"
-// CHECK: OpString "payload"
+// CHECK: OpString "__EmitMeshTasks_Payload"
 // CHECK: TaskPayloadWorkgroupEXT
 // CHECK: DebugGlobalVariable

@@ -5161,12 +5161,9 @@ void legalizeDispatchMeshPayloadForGLSL(IRModule* module)
                         builder.getGroupSharedRate(),
                         v->getFullType()));
 
-                    // Add a name hint to the global variable for debuginfo
-                    // Use the original payload's name if available, otherwise use a default
-                    if (auto nameHint = payload->findDecoration<IRNameHintDecoration>())
-                        builder.addNameHintDecoration(v, nameHint->getName());
-                    else
-                        builder.addNameHintDecoration(v, toSlice("taskPayload"));
+                    // Add a name hint to the global variable for debuginfo.
+                    // Use a distinctive name to avoid confusion with the user's local variable.
+                    builder.addNameHintDecoration(v, toSlice("__EmitMeshTasks_Payload"));
 
                     builder.setInsertBefore(call);
                     builder.emitStore(v, builder.emitLoad(payload));
