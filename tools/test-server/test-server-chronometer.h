@@ -1,6 +1,6 @@
 // test-server-chronometer.h
 // Lightweight chronometer for timing test-server phases
-// Enabled via SLANG_DIAGNOSTICS=timing environment variable
+// Enabled via SLANG_TEST_DIAGNOSTICS=timing environment variable
 
 #ifndef TEST_SERVER_CHRONOMETER_H
 #define TEST_SERVER_CHRONOMETER_H
@@ -33,8 +33,8 @@ struct TimingInfo
 };
 
 // Simple chronometer for test-server phase timing
-// Enabled via SLANG_DIAGNOSTICS=timing (or "all")
-// Phase details enabled via SLANG_DIAGNOSTICS=timing-phases
+// Enabled via SLANG_TEST_DIAGNOSTICS=timing (or "all")
+// Phase details enabled via SLANG_TEST_DIAGNOSTICS=timing-phases
 class Chronometer
 {
 public:
@@ -179,14 +179,14 @@ public:
         fprintf(stderr, "\n");
     }
 
-    // Check if timing is enabled (SLANG_DIAGNOSTICS=timing)
+    // Check if timing is enabled (SLANG_TEST_DIAGNOSTICS=timing)
     static bool isEnabled()
     {
         static bool enabled = isDiagnosticEnabled("timing");
         return enabled;
     }
 
-    // Check if phase-level logging is enabled (SLANG_DIAGNOSTICS=timing-phases)
+    // Check if phase-level logging is enabled (SLANG_TEST_DIAGNOSTICS=timing-phases)
     static bool isPhaseLoggingEnabled()
     {
         static bool enabled = isDiagnosticEnabled("timing-phases");

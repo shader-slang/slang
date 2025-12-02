@@ -109,7 +109,7 @@ protected:
                                             ///< returns results via JSON-RPC
 
     Chronometer
-        m_chronometer; ///< Timing data for test phases (enabled via SLANG_DIAGNOSTICS=timing)
+        m_chronometer; ///< Timing data for test phases (enabled via SLANG_TEST_DIAGNOSTICS=timing)
 };
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!! TestServer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */

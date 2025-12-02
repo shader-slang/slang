@@ -18,7 +18,7 @@ namespace Slang
 // Unified diagnostic control (defined here, used in other files via extern)
 bool isDiagnosticEnabled(const char* category)
 {
-    static const char* diagnostics = getenv("SLANG_DIAGNOSTICS");
+    static const char* diagnostics = getenv("SLANG_TEST_DIAGNOSTICS");
     if (!diagnostics)
         return false;
     if (strcmp(diagnostics, "all") == 0 || strcmp(diagnostics, "1") == 0)
