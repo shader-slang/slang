@@ -1,6 +1,6 @@
 // Test for limited support of groupshared pointers.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -output-using-type
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -output-using-type -emit-spirv-directly
 
 groupshared int gData[1024];
 
