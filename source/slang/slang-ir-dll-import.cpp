@@ -205,7 +205,7 @@ struct DllImportContext
     }
 };
 
-void generateDllImportFuncs(TargetProgram* targetProgram, IRModule* module, DiagnosticSink* sink)
+void generateDllImportFuncs(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
     DllImportContext context;
     context.module = module;

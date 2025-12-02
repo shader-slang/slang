@@ -200,6 +200,8 @@ bool CompilerOptionSet::allowDuplicate(CompilerOptionName name)
     case CompilerOptionName::VulkanBindShift:
     case CompilerOptionName::VulkanBindShiftAll:
     case CompilerOptionName::TypeConformance:
+    case CompilerOptionName::DumpIRBefore:
+    case CompilerOptionName::DumpIRAfter:
         return true;
     }
     return false;

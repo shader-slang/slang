@@ -302,4 +302,9 @@ void legalizeLogicalAndOr(IRInst* inst)
     }
 }
 
+void legalizeLogicalAndOr(IRModule* module)
+{
+    legalizeLogicalAndOr(module->getModuleInst());
+}
+
 } // namespace Slang

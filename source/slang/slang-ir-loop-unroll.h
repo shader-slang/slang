@@ -19,7 +19,7 @@ bool unrollLoopsInFunc(
     IRGlobalValueWithCode* func,
     DiagnosticSink* sink);
 
-bool unrollLoopsInModule(TargetProgram* target, IRModule* module, DiagnosticSink* sink);
+bool unrollLoopsInModule(IRModule* module, TargetProgram* target, DiagnosticSink* sink);
 
 // Turn a loop with continue block into a loop with only back jumps and breaks.
 // Each iteration will be wrapped in a breakable region, where everything before `continue`

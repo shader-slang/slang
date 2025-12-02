@@ -654,7 +654,7 @@ struct MatrixTypeLoweringContext
     }
 };
 
-void legalizeMatrixTypes(TargetProgram* targetProgram, IRModule* module, DiagnosticSink* sink)
+void legalizeMatrixTypes(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
     MatrixTypeLoweringContext context(targetProgram, module);
     context.sink = sink;
