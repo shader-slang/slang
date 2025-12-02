@@ -140,6 +140,7 @@ SlangResult CommandLineDownstreamCompiler::compile(
 
     // Compile stage if executable or library target: compile source to object code
 
+    List<ComPtr<IArtifact>> compileArtifacts;
     ComPtr<IArtifact> objectArtifact;
 
     if (shouldSeparateCompileAndLink)
@@ -154,7 +155,6 @@ SlangResult CommandLineDownstreamCompiler::compile(
             return SLANG_FAIL;
         }
 
-        List<ComPtr<IArtifact>> compileArtifacts;
         if (SLANG_FAILED(calcCompileProducts(
                 compileOptions,
                 DownstreamProductFlag::All,
@@ -165,8 +165,7 @@ SlangResult CommandLineDownstreamCompiler::compile(
             return SLANG_FAIL;
         }
 
-        // There should only be one object file (.o/.obj) as artifact
-        SLANG_ASSERT(compileArtifacts.getCount() == 1);
+        // The object file (.o/.obj) should be the first artifact
         SLANG_ASSERT(compileArtifacts[0]->getDesc().kind == ArtifactKind::ObjectCode);
         objectArtifact = compileArtifacts[0];
 
@@ -188,13 +187,13 @@ SlangResult CommandLineDownstreamCompiler::compile(
 
     // Link stage if executable or library target, or single-stage compile if object code target
 
-    CommandLine cmdLine(m_cmdLine);
-
     if (shouldSeparateCompileAndLink)
     {
         // Pass compiled object to linker
         options.sourceArtifacts = makeSlice(objectArtifact.readRef(), 1);
     }
+
+    CommandLine cmdLine(m_cmdLine);
 
     // Append command line args to the end of cmdLine using the target specific function for the
     // specified options
