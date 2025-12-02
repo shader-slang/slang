@@ -18,10 +18,15 @@ inline bool isDiagnosticEnabled(const char* category)
 #ifdef _WIN32
     static const char* diagnostics = []() -> const char*
     {
+        static char buffer[256];
         char* buf = nullptr;
         size_t len = 0;
-        if (_dupenv_s(&buf, &len, "SLANG_TEST_DIAGNOSTICS") == 0)
-            return buf;
+        if (_dupenv_s(&buf, &len, "SLANG_TEST_DIAGNOSTICS") == 0 && buf != nullptr)
+        {
+            strncpy_s(buffer, sizeof(buffer), buf, _TRUNCATE);
+            free(buf);
+            return buffer;
+        }
         return nullptr;
     }();
 #else
