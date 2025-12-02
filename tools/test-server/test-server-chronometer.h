@@ -8,16 +8,11 @@
 #include "../../source/core/slang-dictionary.h"
 #include "../../source/core/slang-process.h"
 #include "../../source/core/slang-string.h"
+#include "../../source/core/slang-test-diagnostics.h"
 
 #include <chrono>
 #include <cstdio>
 #include <cstring>
-
-namespace Slang
-{
-// Forward declaration for diagnostic function in slang-stream.cpp
-bool isDiagnosticEnabled(const char* category);
-} // namespace Slang
 
 namespace TestServer
 {

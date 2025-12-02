@@ -2,6 +2,7 @@
 
 #include "slang-process.h"
 #include "slang-string-util.h"
+#include "slang-test-diagnostics.h"
 
 #include <chrono>
 #include <stdio.h>
@@ -350,8 +351,6 @@ struct SleepState
 
 SlangResult HTTPPacketConnection::waitForResult(Int timeOutInMs)
 {
-    // Debug logging for RPC operations
-    extern bool isDiagnosticEnabled(const char*);
     auto startTime = std::chrono::steady_clock::now();
 
     m_readResult = SLANG_OK;
@@ -440,8 +439,6 @@ void HTTPPacketConnection::consumeContent()
 
 SlangResult HTTPPacketConnection::write(const void* content, size_t sizeInBytes)
 {
-    // Debug logging for RPC operations
-    extern bool isDiagnosticEnabled(const char*);
     auto startTime = std::chrono::steady_clock::now();
 
     // Write the header

@@ -32,12 +32,6 @@
 SLANG_RHI_EXPORT_AGILITY_SDK
 #endif
 
-namespace Slang
-{
-// Forward declaration for diagnostic function in slang-stream.cpp
-bool isDiagnosticEnabled(const char* category);
-} // namespace Slang
-
 namespace TestServer
 {
 using namespace Slang;

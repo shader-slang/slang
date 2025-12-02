@@ -14,6 +14,7 @@
 #include "../../source/core/slang-std-writers.h"
 #include "../../source/core/slang-string-escape-util.h"
 #include "../../source/core/slang-string-util.h"
+#include "../../source/core/slang-test-diagnostics.h"
 #include "../../source/core/slang-token-reader.h"
 #include "../../source/core/slang-type-text-util.h"
 #include "slang-com-helper.h"
@@ -55,12 +56,6 @@ SLANG_RHI_EXPORT_AGILITY_SDK
 #endif
 
 using namespace Slang;
-
-// Forward declaration for diagnostic function in slang-stream.cpp
-namespace Slang
-{
-extern bool isDiagnosticEnabled(const char* category);
-}
 
 // Helper function to check if phase-level timing is enabled
 static bool isPhaseTimingEnabled()

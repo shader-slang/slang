@@ -1,9 +1,11 @@
 #include "slang-stream.h"
 #ifdef _WIN32
 #include <share.h>
+#include <windows.h>
 #endif
 #include "slang-io.h"
 #include "slang-process.h"
+#include "slang-test-diagnostics.h"
 
 #include <stdio.h>
 #include <thread>
@@ -14,17 +16,6 @@
 
 namespace Slang
 {
-
-// Unified diagnostic control (defined here, used in other files via extern)
-bool isDiagnosticEnabled(const char* category)
-{
-    static const char* diagnostics = getenv("SLANG_TEST_DIAGNOSTICS");
-    if (!diagnostics)
-        return false;
-    if (strcmp(diagnostics, "all") == 0 || strcmp(diagnostics, "1") == 0)
-        return true;
-    return strstr(diagnostics, category) != nullptr;
-}
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FileStream !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -197,6 +188,15 @@ SlangResult FileStream::_init(
     // Debug logging for file descriptor tracking
     if (isDiagnosticEnabled("fd"))
     {
+#ifdef _WIN32
+        fprintf(
+            stderr,
+            "[FD-DEBUG] Opened '%s' mode='%s' fd=%d (thread=%lu)\n",
+            fileName.getBuffer(),
+            mode,
+            _fileno(m_handle),
+            (unsigned long)GetCurrentThreadId());
+#else
         fprintf(
             stderr,
             "[FD-DEBUG] Opened '%s' mode='%s' fd=%d (thread=%lu)\n",
@@ -204,6 +204,7 @@ SlangResult FileStream::_init(
             mode,
             fileno(m_handle),
             (unsigned long)pthread_self());
+#endif
     }
 
     // Just set the access specified
@@ -334,11 +335,19 @@ void FileStream::close()
     {
         if (isDiagnosticEnabled("fd"))
         {
+#ifdef _WIN32
+            fprintf(
+                stderr,
+                "[FD-DEBUG] Closing fd=%d (thread=%lu)\n",
+                _fileno(m_handle),
+                (unsigned long)GetCurrentThreadId());
+#else
             fprintf(
                 stderr,
                 "[FD-DEBUG] Closing fd=%d (thread=%lu)\n",
                 fileno(m_handle),
                 (unsigned long)pthread_self());
+#endif
         }
 
         fclose(m_handle);

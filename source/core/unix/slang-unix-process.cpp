@@ -4,6 +4,7 @@
 #include "../slang-process.h"
 #include "../slang-string-escape-util.h"
 #include "../slang-string-util.h"
+#include "../slang-test-diagnostics.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -309,8 +310,6 @@ SlangResult UnixPipeStream::read(void* buffer, size_t length, size_t& outReadByt
         return SLANG_OK;
     }
 
-    // Debug logging for pipe operations
-    extern bool isDiagnosticEnabled(const char*);
     auto startTime = std::chrono::steady_clock::now();
 
     // Check if it's hung up.
@@ -430,8 +429,6 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
         return SLANG_FAIL;
     }
 
-    // Debug logging for pipe operations
-    extern bool isDiagnosticEnabled(const char*);
     auto startTime = std::chrono::steady_clock::now();
 
     pollfd pollInfo;
