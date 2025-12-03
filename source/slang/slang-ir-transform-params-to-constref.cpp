@@ -140,13 +140,18 @@ struct TransformParamsToConstRefContext
                             // (such temp var can be introduced during `updateCallSites` when we
                             // were processing the callee.)
 
-                            // Transform IRStore(ptr, load(x))   where ptr has attribute
-                            //                                   TempCallArgImmutableVarDecoration
-                            //           IRCall(func, ptr, ...)
-                            //
-                            //       ==> IRCall(func, x, ...)
+                            // Transform IRStore(storeDest, load(ptr)) where storeDest has attribute
+                            //                                     TempCallArgImmutableVarDecoration
+                            //           IRInst(storeDest)
+                            //           ==>
+                            //           IRInst(ptr)
 
-                            auto storeDest = as<IRStore>(userInst)->getPtr();
+                            auto storeInst = as<IRStore>(userInst);
+                            auto storeDest = storeInst->getPtr();
+
+                            // double-check that the value is actually the load instruction
+                            assert(storeInst->getVal() == loadInst);
+
                             if (storeDest->findDecorationImpl(
                                     kIROp_TempCallArgImmutableVarDecoration))
                             {
