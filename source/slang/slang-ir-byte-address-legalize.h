@@ -29,9 +29,9 @@ struct ByteAddressBufferLegalizationOptions
 /// scalar or vector types.
 ///
 void legalizeByteAddressBufferOps(
+    IRModule* module,
     Session* session,
     TargetProgram* target,
-    IRModule* module,
     DiagnosticSink* sink,
     ByteAddressBufferLegalizationOptions const& options);
 } // namespace Slang

@@ -1261,7 +1261,7 @@ bool specializeResourceOutputs(
     return pass.processModule();
 }
 
-bool specializeResourceUsage(CodeGenContext* codeGenContext, IRModule* irModule)
+bool specializeResourceUsage(IRModule* irModule, CodeGenContext* codeGenContext)
 {
     bool result = false;
     // We apply two kinds of specialization to clean up resource value usage:
@@ -1300,8 +1300,8 @@ bool specializeResourceUsage(CodeGenContext* codeGenContext, IRModule* irModule)
             if (changed)
             {
                 simplifyIR(
-                    codeGenContext->getTargetProgram(),
                     irModule,
+                    codeGenContext->getTargetProgram(),
                     IRSimplificationOptions::getFast(codeGenContext->getTargetProgram()));
             }
             result |= changed;
@@ -1314,8 +1314,8 @@ bool specializeResourceUsage(CodeGenContext* codeGenContext, IRModule* irModule)
             inlineAllCallsOfFunction(func);
 
         simplifyIR(
-            codeGenContext->getTargetProgram(),
             irModule,
+            codeGenContext->getTargetProgram(),
             IRSimplificationOptions::getFast(codeGenContext->getTargetProgram()));
     }
     return result;
@@ -1386,8 +1386,8 @@ bool isIllegalWGSLParameterType(IRType* type)
 }
 
 void legalizeModesOfNonCopyableOpaqueTypedParamsForGLSL(
-    CodeGenContext* codeGenContext,
-    IRModule* irModule)
+    IRModule* irModule,
+    CodeGenContext* codeGenContext)
 {
     SLANG_UNUSED(codeGenContext);
 

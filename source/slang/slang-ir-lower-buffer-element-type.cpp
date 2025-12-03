@@ -2152,8 +2152,8 @@ struct LoweredElementTypeContext
 };
 
 void lowerBufferElementTypeToStorageType(
-    TargetProgram* target,
     IRModule* module,
+    TargetProgram* target,
     BufferElementTypeLoweringOptions options)
 {
     LoweredElementTypeContext context(target, options);

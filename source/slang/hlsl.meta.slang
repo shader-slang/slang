@@ -19744,7 +19744,7 @@ uint GeometryIndex()
 /// Get the vertex positions of the currently hit triangle in any-hit or closest-hit shader.
 /// https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GLSL_EXT_ray_tracing_position_fetch.txt
 /// @param index Index of the vertex (0-2)
-/// @return World-space position of the specified vertex
+/// @return Object-space position of the specified vertex
 /// @remarks Requires ray tracing position fetch extension
 /// @see GL_EXT_ray_tracing_position_fetch
 /// @category raytracing

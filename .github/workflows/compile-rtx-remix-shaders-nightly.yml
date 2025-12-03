@@ -75,7 +75,7 @@ jobs:
           enableCrossOsArchive: false
 
       # Build Slang from checked-out source
-      # Uses the same approach as CI: cmake --preset default + cmake --workflow --preset release
+      # Note: We only need slangc.exe, so skip the packaging step to avoid CPack errors
       - name: Build Slang
         run: |
           echo "Building Slang..."
@@ -94,8 +94,8 @@ jobs:
             -DSLANG_ENABLE_SLANG_GLSLANG=ON \
             -DSLANG_ENABLE_TESTS=OFF
 
-          # Build using workflow preset (configure + build + package)
-          cmake --workflow --preset release
+          # Build only (skip packaging to avoid gfx.slang install error)
+          cmake --build --preset release
 
           endTime=$(date +%s)
           duration=$(( (endTime - startTime) / 60 ))

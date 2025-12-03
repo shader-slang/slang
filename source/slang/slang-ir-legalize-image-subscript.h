@@ -7,5 +7,5 @@ namespace Slang
 {
 class DiagnosticSink;
 
-void legalizeImageSubscript(TargetRequest* target, IRModule* module, DiagnosticSink* sink);
+void legalizeImageSubscript(IRModule* module, TargetRequest* target, DiagnosticSink* sink);
 } // namespace Slang

@@ -153,8 +153,8 @@ IRTextureTypeBase* isCombinedTextureSamplerType(IRInst* typeInst)
 }
 
 void lowerCombinedTextureSamplers(
-    CodeGenContext* codeGenContext,
     IRModule* module,
+    CodeGenContext* codeGenContext,
     DiagnosticSink* sink)
 {
     SLANG_UNUSED(sink);
