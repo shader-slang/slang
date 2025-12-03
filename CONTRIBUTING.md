@@ -93,9 +93,9 @@ Download and install CMake from [CMake.org/download](https://cmake.org/download)
 Run CMake with the following command to generate a Visual Studio 2022 Solution:
 
 ```
-C:\git\slang> cmake.exe --preset vs2026 # For Visual Studio 2026
-C:\git\slang> cmake.exe --preset vs2022 # For Visual Studio 2022
 C:\git\slang> cmake.exe --preset vs2019 # For Visual Studio 2019
+C:\git\slang> cmake.exe --preset vs2022 # For Visual Studio 2022
+C:\git\slang> cmake.exe --preset vs2026 # For Visual Studio 2026
 ```
 
 Open `build/slang.sln` with Visual Studio IDE and build it for "x64".
