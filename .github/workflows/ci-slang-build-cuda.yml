@@ -53,7 +53,10 @@ jobs:
             spirv-tools \
             glslang-tools \
             wget \
-            ca-certificates
+            ca-certificates \
+            llvm-14-dev \
+            libclang-14-dev \
+            clang-14
           rm -rf /var/lib/apt/lists/*
 
           # Install CMake 3.30 (required for CMakePresets.json version 6)
@@ -77,10 +80,10 @@ jobs:
           fi
           echo "cmake_config=$cmake_config" >> $GITHUB_ENV
 
-          # Configure with CUDA support, disable LLVM (not needed for GPU tests)
+          # Configure with CUDA and LLVM support for full test coverage
           cmake --preset default --fresh \
             -DSLANG_ENABLE_CUDA=ON \
-            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
+            -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM
 
           # Build
           cmake --build --preset ${{ inputs.config }} -j$(nproc)

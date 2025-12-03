@@ -97,8 +97,7 @@ jobs:
           "$bin_dir/slang-test" "${slang_test_args[@]}"
       - name: Run Slang examples
         # Run examples on release for pull requests, and not on merge_group, to reduce CI load.
-        # Skip for CUDA builds since CPU examples require LLVM which is disabled in CUDA builds.
-        if: inputs.full-gpu-tests && inputs.config == 'release' && github.event_name == 'pull_request' && inputs.artifact-suffix != '-cuda'
+        if: inputs.full-gpu-tests && inputs.config == 'release' && github.event_name == 'pull_request'
         run: |
           .github/workflows/ci-examples.sh \
            --bin-dir "$bin_dir" \
@@ -172,14 +171,13 @@ jobs:
 
   # Run slangpy tests and examples when:
   # 1. full-gpu-tests is enabled AND
-  # 2. Either it's a pull request OR config is release AND
-  # 3. Not a Linux GPU (CUDA) build - CUDA builds don't include LLVM which is required for filecheck
+  # 2. Either it's a pull request OR config is release
   # This is to reduce the CI load but do some check on pull requests.
   # Includes both slangpy pytest tests and slangpy-samples examples.
   test-slangpy:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
     timeout-minutes: 30
-    if: inputs.full-gpu-tests && (github.event_name == 'pull_request' || inputs.config == 'release') && inputs.artifact-suffix != '-cuda'
+    if: inputs.full-gpu-tests && (github.event_name == 'pull_request' || inputs.config == 'release')
     defaults:
       run:
         shell: bash
