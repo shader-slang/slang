@@ -717,7 +717,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
         else if (!subTypeWitness && constraintIsOptional)
         {
             // Optional witness failed to resolve; not an error.
-            auto noneWitness = m_astBuilder->getOrCreate<NoneWitness>();
+            auto noneWitness = m_astBuilder->getNoneWitness(sub, sup);
             args.add(noneWitness);
             outBaseCost += kConversionCost_FailedOptionalConstraint;
         }
@@ -870,20 +870,21 @@ bool SemanticsVisitor::TryUnifyVals(
     // Two subtype witnesses can be unified if they exist (non-null) and
     // prove that some pair of types are subtypes of types that can be unified.
     //
-    const auto fstSubtypeWitness = as<SubtypeWitness>(fst);
-    const auto sndSubtypeWitness = as<SubtypeWitness>(snd);
-    const auto fstNoneWitness = as<NoneWitness>(fst);
-    const auto sndNoneWitness = as<NoneWitness>(snd);
-    if (fstSubtypeWitness && sndSubtypeWitness)
+    auto fstSubtypeWitness = as<SubtypeWitness>(fst);
+    auto sndSubtypeWitness = as<SubtypeWitness>(snd);
+    auto fstNoneWitness = as<NoneWitness>(fst);
+    auto sndNoneWitness = as<NoneWitness>(snd);
+    if ((fstNoneWitness && !sndNoneWitness) || (!fstNoneWitness && sndNoneWitness))
+    {
+        // Don't confuse a NoneWitness with a real SubtypeWitness.
+        return false;
+    }
+    else if (fstSubtypeWitness && sndSubtypeWitness)
         return TryUnifyTypes(
             constraints,
             unifyCtx,
             fstSubtypeWitness->getSup(),
             sndSubtypeWitness->getSup());
-    else if (fstNoneWitness && sndNoneWitness)
-        return true;
-    else if ((fstNoneWitness && sndSubtypeWitness) || (fstSubtypeWitness && sndNoneWitness))
-        return false;
 
     SLANG_UNIMPLEMENTED_X("value unification case");
 

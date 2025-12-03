@@ -666,6 +666,15 @@ local insts = {
 						},
 					},
 					{
+						witness_table_none_t = {
+							-- A type for NoneWitness, which is used to satisfy
+							-- optional constraints when the base type does not
+							-- conform.
+							struct_name = "WitnessTableNoneType",
+							operands = { { "baseType", "IRType" } },
+						},
+					},
+					{
 						witness_table_id_t = {
 							-- An integer type representing a witness table for targets where
 							-- witness tables are represented as integer IDs. This type is used
@@ -713,6 +722,7 @@ local insts = {
 	{ key = { struct_name = "StructKey", global = true } },
 	{ global_generic_param = { global = true } },
 	{ witness_table = { hoistable = true } },
+	{ none_witness_table = { hoistable = true } },
 	{ indexedFieldKey = { operands = { { "baseType" }, { "index" } }, hoistable = true } },
 	-- A placeholder witness that ThisType implements the enclosing interface.
 	-- Used only in interface definitions.
@@ -852,6 +862,7 @@ local insts = {
 			operands = { { "param", "IRGlobalGenericParam" }, { "val", "IRInst" } },
 		},
 	},
+	{ CheckOptionalWitness = { operands = { { "witness" } }, hoistable = true } },
 	{ allocObj = {} },
 	{ globalValueRef = { operands = { { "value" } } } },
 	{ makeUInt64 = { operands = { { "low" }, { "high" } } } },

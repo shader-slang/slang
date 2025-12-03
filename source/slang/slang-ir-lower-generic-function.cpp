@@ -297,11 +297,8 @@ struct GenericFunctionLoweringContext
     // and emission of wrapper functions.
     void lowerWitnessTable(IRWitnessTable* witnessTable)
     {
-        IRInterfaceType* conformanceType = as<IRInterfaceType>(witnessTable->getConformanceType());
-        if (!conformanceType)
-            return;
-
-        auto interfaceType = maybeLowerInterfaceType(conformanceType);
+        auto interfaceType =
+            maybeLowerInterfaceType(cast<IRInterfaceType>(witnessTable->getConformanceType()));
         IRBuilder builderStorage(sharedContext->module);
         auto builder = &builderStorage;
         builder->setInsertBefore(witnessTable);
@@ -357,17 +354,8 @@ struct GenericFunctionLoweringContext
             return;
         if (witnessTableType->getConformanceType()->findDecoration<IRComInterfaceDecoration>())
             return;
-
-        IRInterfaceType* conformanceType =
-            as<IRInterfaceType>(witnessTableType->getConformanceType());
-
-        // NoneWitness generates conformance types which aren't interfaces. In
-        // that case, the method can just be skipped entirely, since there's no
-        // real witness for it and it should be in unreachable code at this
-        // point.
-        if (!conformanceType)
-            return;
-        auto interfaceType = maybeLowerInterfaceType(conformanceType);
+        auto interfaceType =
+            maybeLowerInterfaceType(cast<IRInterfaceType>(witnessTableType->getConformanceType()));
         interfaceRequirementVal = sharedContext->findInterfaceRequirementVal(
             interfaceType,
             lookupInst->getRequirementKey());

@@ -2209,6 +2209,21 @@ struct IRWitnessTable : IRInst
     IRType* getConcreteType() { return (IRType*)getOperand(0); }
 };
 
+// The NoneWitnessTable is used in place of a witness table when the constraint
+// is optional and not being conformed to.
+FIDDLE()
+struct IRNoneWitnessTable : IRInst
+{
+    FIDDLE(leafInst())
+
+    IRInst* getConformanceType()
+    {
+        return cast<IRWitnessTableNoneType>(getDataType())->getConformanceType();
+    }
+
+    IRType* getConcreteType() { return (IRType*)getOperand(0); }
+};
+
 /// Represents an RTTI object.
 /// An IRRTTIObject has 1 operand, specifying the type
 /// this RTTI object provides info for.
@@ -3415,6 +3430,8 @@ $(type_info.return_type) $(type_info.method_name)(
 
     IRInst* emitGetSequentialIDInst(IRInst* rttiObj);
 
+    IRInst* emitCheckOptionalWitness(IRInst* witness);
+
     IRInst* emitAlloca(IRInst* type, IRInst* rttiObjPtr);
 
     IRInst* emitGlobalValueRef(IRInst* globalInst);
@@ -3666,7 +3683,9 @@ $(type_info.return_type) $(type_info.method_name)(
         IRInst* requirementKey,
         IRInst* satisfyingVal);
 
-    IRInst* getNoneWitnessTable();
+    // Create an empty witness table, this is used for optional constraints
+    // when baseType does not conform to subType.
+    IRNoneWitnessTable* createNoneWitnessTable(IRType* baseType, IRType* subType);
 
     IRInst* createThisTypeWitness(IRType* interfaceType);
 

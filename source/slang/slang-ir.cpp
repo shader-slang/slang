@@ -3530,6 +3530,14 @@ IRInst* IRBuilder::emitGetSequentialIDInst(IRInst* rttiObj)
     return inst;
 }
 
+IRInst* IRBuilder::emitCheckOptionalWitness(IRInst* witness)
+{
+    auto inst = createInst<IRCheckOptionalWitness>(
+        this, kIROp_CheckOptionalWitness, getBoolType(), witness);
+    addInst(inst);
+    return inst;
+}
+
 IRInst* IRBuilder::emitBitfieldExtract(IRType* type, IRInst* value, IRInst* offset, IRInst* bits)
 {
     auto inst = createInst<IRInst>(this, kIROp_BitfieldExtract, type, value, offset, bits);
@@ -4569,16 +4577,13 @@ IRWitnessTableEntry* IRBuilder::createWitnessTableEntry(
     return entry;
 }
 
-IRInst* IRBuilder::getNoneWitnessTable()
+IRNoneWitnessTable* IRBuilder::createNoneWitnessTable(IRType* baseType, IRType* subType)
 {
-    IRVoidType* voidType = getVoidType();
-    IRWitnessTable* witnessTable = createInst<IRWitnessTable>(
+    return createInst<IRNoneWitnessTable>(
         this,
-        kIROp_WitnessTable,
-        getWitnessTableType(voidType),
-        voidType);
-    addHoistableInst(this, witnessTable);
-    return witnessTable;
+        kIROp_NoneWitnessTable,
+        getWitnessTableNoneType(baseType),
+        subType);
 }
 
 IRInterfaceRequirementEntry* IRBuilder::createInterfaceRequirementEntry(

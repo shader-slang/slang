@@ -685,4 +685,7 @@ return {
 	["StoreBase.copyLogical"] = 681,
 	["MakeStorageTypeLoweringConfig"] = 682,
 	["Decoration.experimentalModule"] = 683,
+	["Type.WitnessTableTypeBase.witness_table_none_t"] = 684,
+	["none_witness_table"] = 685,
+	["CheckOptionalWitness"] = 686
 }

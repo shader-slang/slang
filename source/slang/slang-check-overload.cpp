@@ -1040,7 +1040,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
         }
         else if (!subTypeWitness && constraintIsOptional)
         {
-            newArgs.add(m_astBuilder->getOrCreate<NoneWitness>());
+            newArgs.add(m_astBuilder->getNoneWitness(sub, sup));
         }
         else
         {

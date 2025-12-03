@@ -2104,9 +2104,13 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             builder->emitGetTupleElement(elementType, conjunctionWitness, indexInConjunction));
     }
 
-    LoweredValInfo visitNoneWitness(NoneWitness*)
+    LoweredValInfo visitNoneWitness(NoneWitness* val)
     {
-        return LoweredValInfo::simple(getBuilder()->getNoneWitnessTable());
+        auto subType = lowerType(context, val->getSub());
+        auto supType = lowerType(context, val->getSup());
+        return LoweredValInfo::simple(getBuilder()->createNoneWitnessTable(
+            supType, subType
+        ));
     }
 
     LoweredValInfo visitConstantIntVal(ConstantIntVal* val)
@@ -6072,12 +6076,9 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
             if (declWitness && declWitness->isOptional())
             {
-                // Optional constraint check. NoneWitness lowers to a specific
-                // ID, so that we can check for that here.
-                auto witnessID = builder->emitGetSequentialIDInst(witness);
-                auto noneWitnessID = builder->getIntValue(builder->getUIntType(), -1);
-                auto irVal = builder->emitNeq(witnessID, noneWitnessID);
-                return LoweredValInfo::simple(irVal);
+                // Optional constraint check.
+                auto val = builder->emitCheckOptionalWitness(witness);
+                return LoweredValInfo::simple(val);
             }
             else
             { // This is a run-time type check from for an existential type.

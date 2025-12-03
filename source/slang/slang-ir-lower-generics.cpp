@@ -152,6 +152,34 @@ void specializeRTTIObjects(SharedGenericsLoweringContext* sharedContext, Diagnos
     cleanUpInterfaceTypes(sharedContext);
 }
 
+void lowerOptionalWitnesses(SharedGenericsLoweringContext* sharedContext)
+{
+    InstPassBase pass(sharedContext->module);
+    IRBuilder builder(sharedContext->module);
+
+    pass.processInstsOfType<IRCheckOptionalWitness>(
+        kIROp_CheckOptionalWitness,
+        [&](IRCheckOptionalWitness* inst)
+        {
+            builder.setInsertBefore(inst);
+            auto checkInst = builder.getBoolValue(inst->getWitness()->getOp() != kIROp_NoneWitnessTable);
+            inst->replaceUsesWith(checkInst);
+            inst->removeAndDeallocate();
+        });
+
+    // Remove all NoneWitnessTables, they're no longer referenced.
+    builder.setInsertInto(sharedContext->module->getModuleInst());
+
+    List<IRInst*> noneWitnesses;
+    for (auto inst : sharedContext->module->getGlobalInsts())
+    {
+        if (inst->getOp() == kIROp_NoneWitnessTable)
+            noneWitnesses.add(inst);
+    }
+    for (auto inst : noneWitnesses)
+        inst->removeAndDeallocate();
+}
+
 void checkTypeConformanceExists(SharedGenericsLoweringContext* context)
 {
     HashSet<IRInst*> implementedInterfaces;
@@ -177,7 +205,7 @@ void checkTypeConformanceExists(SharedGenericsLoweringContext* context)
                 if (!witnessTableType)
                     return;
                 auto interfaceType =
-                    cast<IRWitnessTableType>(witnessTableType)->getConformanceType();
+                    cast<IRWitnessTableTypeBase>(witnessTableType)->getConformanceType();
                 if (isComInterfaceType((IRType*)interfaceType))
                     return;
                 if (!implementedInterfaces.contains(interfaceType))
@@ -257,6 +285,8 @@ void lowerGenerics(TargetProgram* targetProgram, IRModule* module, DiagnosticSin
     generateWitnessTableWrapperFunctions(&sharedContext);
     if (sink->getErrorCount() != 0)
         return;
+
+    lowerOptionalWitnesses(&sharedContext);
 
     // This optional step replaces all uses of witness tables and RTTI objects with
     // sequential IDs. Without this step, we will emit code that uses function pointers and

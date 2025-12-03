@@ -843,7 +843,7 @@ class ExtractFromConjunctionSubtypeWitness : public SubtypeWitness
 
 /// A witness for the "none" value of optional constraints.
 FIDDLE()
-class NoneWitness : public Witness
+class NoneWitness : public SubtypeWitness
 {
     FIDDLE(...)
 
