@@ -933,19 +933,18 @@ SlangResult RenderTestApp::initialize(
                     {"A", 6, Format::RGBA32Float, offsetof(Vertex, customData3)},
                 };
 
-
-                slang::IComponentType* slangProgram = m_compilationOutput.output.slangProgram;
-                SLANG_ASSERT(slangProgram);
-                if (nullptr == slangProgram)
+                List<InputElementDesc> inputElements;
+                if (slang::IComponentType* slangProgram = m_compilationOutput.output.slangProgram)
                 {
-                    return SLANG_FAIL;
+                    inputElements = filterInputElements(
+                        allInputElements,
+                        SLANG_COUNT_OF(allInputElements),
+                        slangProgram->getLayout());
                 }
-
-                List<InputElementDesc> inputElements = filterInputElements(
-                    allInputElements,
-                    SLANG_COUNT_OF(allInputElements),
-                    slangProgram->getLayout());
-
+                else
+                {
+                    inputElements.addRange(allInputElements, SLANG_COUNT_OF(allInputElements));
+                } 
 
                 ComPtr<IInputLayout> inputLayout;
                 SLANG_RETURN_ON_FAIL(device->createInputLayout(
