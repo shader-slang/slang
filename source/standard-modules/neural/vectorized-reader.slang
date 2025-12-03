@@ -2,19 +2,19 @@ implementing neural;
 
 // Extension for RWStructuredBuffer to implement IArray interface such that we can implement readUint4 once, and
 // use it for both storage buffer and thread local array.
-internal extension<T> RWStructuredBuffer<T> : IRWArray<T>
-{
-    internal __subscript(int index) -> T { get { return this[index]; } set { this[index] = newValue; }}
-    internal int getCount()
-    {
-        int count = 0;
-        int stride = 0;
-        this.GetDimensions(count, stride);
-        return count;
-    }
-}
+// internal extension<T> RWStructuredBuffer<T> : IRWArray<T>
+// {
+//     internal __subscript(int index) -> T { get { return this[index]; } set { this[index] = newValue; }}
+//     internal int getCount()
+//     {
+//         int count = 0;
+//         int stride = 0;
+//         this.GetDimensions(count, stride);
+//         return count;
+//     }
+// }
 
-[ForceInline]
+// [ForceInline]
 internal static uint4 readUint4<T, BufferType>(BufferType buffer, int startIndex)
     where T : __BuiltinFloatingPointType
     where T.Differential == T
@@ -35,15 +35,15 @@ internal static uint4 readUint4<T, BufferType>(BufferType buffer, int startIndex
             {
             case 1:
                 result[i] |= uint(bit_cast<uint8_t>(buffer[index]))
-                                << (BitsShiftPerRead * (ReadPerElement - 1 - j));
+                                << (BitsShiftPerRead * j);
                 break;
             case 2:
                 result[i] |= uint(bit_cast<uint16_t>(buffer[index]))
-                                << (BitsShiftPerRead * (ReadPerElement - 1 - j));
+                                << (BitsShiftPerRead * j);
                 break;
             case 4:
                 result[i] |= uint(bit_cast<uint>(buffer[index]))
-                                << (BitsShiftPerRead * (ReadPerElement - 1 - j));
+                                << (BitsShiftPerRead * j);
                 break;
             default:
                 static_assert(false, "Unsupported data type T");
@@ -101,16 +101,16 @@ internal uint4 readUint4<T, BufferType, bool IsAligned, uint Stride, uint Aligne
             switch (nBytes)
             {
             case 1:
-                result[i] |= uint(bit_cast<uint8_t>(buffer[index]))
-                                << (BitsShiftPerRead * (ReadPerElement - 1 - j));
+                // result[i] |= uint(bit_cast<uint8_t>(buffer[index]))
+                //                 << (BitsShiftPerRead * j);
                 break;
             case 2:
                 result[i] |= uint(bit_cast<uint16_t>(buffer[index]))
-                                << (BitsShiftPerRead * (ReadPerElement - 1 - j));
+                                << (BitsShiftPerRead * j);
                 break;
             case 4:
                 result[i] |= uint(bit_cast<uint>(buffer[index]))
-                                << (BitsShiftPerRead * (ReadPerElement - 1 - j));
+                                << (BitsShiftPerRead * j);
                 break;
             default:
                 static_assert(false, "Unsupported data type T");
@@ -140,13 +140,13 @@ internal static void writeUint4<T, BufferType>(out BufferType buffer, int startI
             switch (nBytes)
             {
             case 1:
-                buffer[index] = bit_cast<T>((uint8_t)(value[i] >> (BitsShiftPerWrite * (WritePerElement - 1 - j))));
+                buffer[index] = bit_cast<T>((uint8_t)(value[i] >> (BitsShiftPerWrite * j)));
                 break;
             case 2:
-                buffer[index] = bit_cast<T>((uint16_t)(value[i] >> (BitsShiftPerWrite * (WritePerElement - 1 - j))));
+                buffer[index] = bit_cast<T>((uint16_t)(value[i] >> (BitsShiftPerWrite * j)));
                 break;
             case 4:
-                buffer[index] = bit_cast<T>((uint)(value[i] >> (BitsShiftPerWrite * (WritePerElement - 1 - j))));
+                buffer[index] = bit_cast<T>((uint)(value[i] >> (BitsShiftPerWrite * j)));
                 break;
             default:
                 static_assert(false, "Unsupported data type T");

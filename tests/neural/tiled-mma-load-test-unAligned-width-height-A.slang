@@ -134,8 +134,8 @@ bool verifiedOutput<int M, int K>(uint tid, SPtr sharedMem, uint tileIndex)
             {
                 uint xIndex = (i * 8 + j * 2) + tileIndex * 16;
                 uint value = element[j];
-                uint16_t a = (uint16_t)((value >> 16) & 0xFFFF);
-                uint16_t b = (uint16_t)(value & 0xFFFF);
+                uint16_t a = (uint16_t)(value & 0xFFFF);
+                uint16_t b = (uint16_t)((value >> 16) & 0xFFFF);
                 half actual[2] = { bit_cast<half>(a), bit_cast<half>(b) };
                 half expectedValues[2] = { expected, expected + 1.0h };
                 for (int verifyIndex = 0; verifyIndex < 2; verifyIndex++)
@@ -208,8 +208,8 @@ void serialRead(uint tid, SPtr sharedMem)
             for (int j = 0; j < 4; j++)
             {
                 uint value = element[j];
-                uint16_t a = (uint16_t)((value >> 16) & 0xFFFF);
-                uint16_t b = (uint16_t)(value & 0xFFFF);
+                uint16_t a = (uint16_t)(value & 0xFFFF);
+                uint16_t b = (uint16_t)((value >> 16) & 0xFFFF);
 
                 half aa = bit_cast<half>(a);
                 half bb = bit_cast<half>(b);
@@ -226,7 +226,7 @@ void computeMain(uint tid : SV_DispatchThreadID)
 {
     initWeightMatrix(tid);
 
-    Test<3, 19>(tid, 1, 0);         // M == 3, K = 19, read tile 1
+    Test<3, 19>(tid, 1, 0);      // M == 3, K = 19, read tile 1
     // BUFFER: 1
 
     Test<5, 32>(tid, 1, 1);      // M == 5, K = 32, read tile 1

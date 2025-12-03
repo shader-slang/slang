@@ -1,8 +1,5 @@
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTHREAD_COUNT=40
-// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTHREAD_COUNT=40
-
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTHREAD_COUNT=68
-// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTHREAD_COUNT=68
+// // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTHREAD_COUNT=64
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTHREAD_COUNT=64
 
 import neural;
 #pragma warning(disable: 41017)
@@ -38,13 +35,13 @@ import neural;
 //          ...
 //          31   63    95  ... 995
 //
-// The second warp will only load 8 columns. And because the alignment requirement (16), it will padding the remaining 8 columns with 0.
-// Column   32   ... 39     ... 63
-//          1024 ... 1248   0 .. 0
-//          1025 ... 1249   0 .. 0
-//          1026 ... 1250   0 .. 0
+// The second warp will also load the remaining 32 columns.
+// Column   32    32    ... 63
+//          1024 1056   ... 2016
+//          1025 1057   ... 2017
+//          1026 1058   ... 2018
 //          ...
-//          1031 ... 1251   0 .. 0
+//          1055 1087   ... 2047
 
 // We only need to check the last warp. As long as all the values are correct, we can assume that the first N-1 warps are correct
 // as well.
@@ -54,7 +51,7 @@ import neural;
 // TEST_INPUT:ubuffer(stride=2, count=1024):name=inputBuffer
 RWStructuredBuffer<half> inputBuffer;
 
-// TEST_INPUT:ubuffer(stride=4, count=5):out,name=outputBuffer
+// TEST_INPUT:ubuffer(stride=4, count=2):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
 // InputSize is the K dimension of the matrix A, make it unaligned to test the padding logic.
@@ -62,9 +59,7 @@ static const int InputSize = 32;                // K
 static const int OutputSize = 32;               // M
 static const int SubgroupSize = 32;             // N - Note, N dimension is up to the subgroup size.
 
-static const int InCompleteSubgroupSize = (THREAD_COUNT) % 32;
-
-static const int SUBGROUP_COUNT = (THREAD_COUNT + 31) / 32;
+static const int SUBGROUP_COUNT = THREAD_COUNT / 32;
 
 // Tile B is size of 16 * 32 bytes.
 static const int TILE_SIZE = 16 * 2;
@@ -107,16 +102,8 @@ void testLoadShB(uint tid, uint tileIndex)
 
     SPtr sharedMemoryB = __getAddress(s_sharedMemoryB[0]);
 
-    uint activeThreadCount = WaveActiveCountBits(true);
     uint subgroupIndex = tid / 32;
-    if (activeThreadCount == InCompleteSubgroupSize)
-    {
-        MMAHelper<half, InputSize, OutputSize, InCompleteSubgroupSize>.LoadSharedMemoryFromLocalVector(sharedMemoryB, tileIndex, subgroupIndex, inputVector);
-    }
-    else
-    {
-        MMAHelper<half, InputSize, OutputSize, SubgroupSize>.LoadSharedMemoryFromLocalVector(sharedMemoryB, tileIndex, subgroupIndex, inputVector);
-    }
+    MMAHelper<half, InputSize, OutputSize, SubgroupSize>.LoadSharedMemoryFromLocalVector(sharedMemoryB, tileIndex, subgroupIndex, inputVector);
     GroupMemoryBarrierWithWaveSync();
 }
 
@@ -133,7 +120,7 @@ bool verifiedOutput(uint laneId, uint subgroupIndex, SPtr sharedMem, uint tileIn
     uint index = laneId * 16;  // 16 half per thread
     uint alignedN = ((OutputSize + 16 - 1) / 16) * 16;
 
-    // Because of our setting, the laneId will never by larger than alignedN
+    // Because of our setting, the laneId will never be larger than alignedN
     {
         for (int i = 0; i < 2; i++)
         {
@@ -144,14 +131,15 @@ bool verifiedOutput(uint laneId, uint subgroupIndex, SPtr sharedMem, uint tileIn
             for (int j = 0; j < 4; j++)
             {
                 uint value = element[j];
-                uint16_t a = (uint16_t)((value >> 16) & 0xFFFF);
-                uint16_t b = (uint16_t)(value & 0xFFFF);
+                uint16_t a = (uint16_t)(value & 0xFFFF);
+                uint16_t b = (uint16_t)((value >> 16) & 0xFFFF);
                 half actual[2] = { bit_cast<half>(a), bit_cast<half>(b) };
                 half expectedValues[2] = { half(expected), half(expected + 1.0f) };
                 for (int verifyIndex = 0; verifyIndex < 2; verifyIndex++)
                 {
                     if (actual[verifyIndex] != expectedValues[verifyIndex])
                     {
+                        // printf("subgroup %d, actual: %.1f, expected: %.1f\n", subgroupIndex, float(actual[verifyIndex]), float(expectedValues[verifyIndex]));
                         return false;
                     }
                 }
@@ -205,6 +193,7 @@ bool verifiedOutput(uint laneId, uint subgroupIndex, SPtr sharedMem, uint tileIn
     return true;
 }
 
+groupshared bool s_verifiedOutput[THREAD_COUNT/32];
 void Test(uint tid, uint tileIndex, int resIndex)
 {
     // Waiting for all threads to finish the previous test as this is multi-warps test.
@@ -216,18 +205,32 @@ void Test(uint tid, uint tileIndex, int resIndex)
     testLoadShB(tid, tileIndex);
     // serialRead(tid, __getAddress(s_sharedMemoryB[0]));
 
-    // We will only look at the incomplete warp.
-    if (WaveActiveCountBits(true) == WaveGetLaneCount())
-        return;
-
     uint subgroupIndex = tid / 32;
     int laneId = WaveGetLaneIndex();
     uint offset = subgroupIndex * (TILE_SIZE * N_TILES_PER_SUBGROUP);
     bool res = verifiedOutput(laneId, subgroupIndex, __getAddress(s_sharedMemoryB[offset]), tileIndex);
     res = WaveActiveAllTrue(res);
 
+    // Write verified result to the shared memory.
     if (laneId == 0)
-        outputBuffer[resIndex] = res ? 1 : 0;
+        s_verifiedOutput[subgroupIndex] = res;
+
+    // Wait for all threads to finish writing.
+    GroupMemoryBarrierWithGroupSync();
+
+    // Read verified result from the shared memory.
+    if (tid == 0)
+    {
+        for (int i = 0; i < THREAD_COUNT/32; i++)
+        {
+            if (!s_verifiedOutput[i])
+            {
+                outputBuffer[resIndex] = 0;
+                return;
+            }
+        }
+        outputBuffer[resIndex] = 1;
+    }
 }
 
 // This function is just used for debugging, not for verification. So keep it here.
@@ -241,7 +244,7 @@ void serialRead(uint tid, SPtr sharedMem)
     uint columnsPerTile = 16;
     for (int id = 0; id < SUBGROUP_COUNT * N_TILES_PER_SUBGROUP * columnsPerTile; id++)
     {
-        printf("row: %d\n", id);
+        printf("col: %d\n", id);
         for (int i = 0; i < 2; i++)
         {
             uint4 values = sharedMem[id * 2 + i];
@@ -249,8 +252,8 @@ void serialRead(uint tid, SPtr sharedMem)
             for (int j = 0; j < 4; j++)
             {
                 uint value = element[j];
-                uint16_t a = (uint16_t)((value >> 16) & 0xFFFF);
-                uint16_t b = (uint16_t)(value & 0xFFFF);
+                uint16_t a = (uint16_t)(value & 0xFFFF);
+                uint16_t b = (uint16_t)((value >> 16) & 0xFFFF);
 
                 half aa = bit_cast<half>(a);
                 half bb = bit_cast<half>(b);

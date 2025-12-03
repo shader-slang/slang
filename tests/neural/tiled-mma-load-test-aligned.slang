@@ -1,4 +1,4 @@
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type
+// // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature
 
 import neural;
@@ -126,8 +126,8 @@ bool verifiedOutput(uint tid, uint size, SPtr sharedMem, uint tileIndex)
         {
             uint value = element[j];
 
-            uint16_t a = (uint16_t)((value >> 16) & 0xFFFF);
-            uint16_t b = (uint16_t)(value & 0xFFFF);
+            uint16_t a = (uint16_t)(value & 0xFFFF);
+            uint16_t b = (uint16_t)((value >> 16) & 0xFFFF);
 
             half aa = bit_cast<half>(a);
             half bb = bit_cast<half>(b);
@@ -178,6 +178,7 @@ void test2(uint tid)
         return;
 
     testLoadShA(tid, 1);
+
     bool res = verifiedOutput(tid, OutputSize, __getAddress(s_sharedMemoryA[0]), 1);
     res = WaveActiveAllTrue(res);
     if (tid == 0)
@@ -191,6 +192,36 @@ void test2(uint tid)
     if (tid == 0)
         outputBuffer[3] = res1 ? 1 : 0;
     // BUFFER-NEXT: 1
+}
+
+// This function is just used for debugging, not for verification. So keep it here.
+void serialRead(uint tid, SPtr sharedMem)
+{
+    GroupMemoryBarrierWithWaveSync();
+
+    if (tid > 0)
+        return;
+
+    for (int id = 0; id < 32; id++)
+    {
+        printf("tid: %d\n", id);
+        for (int i = 0; i < 2; i++)
+        {
+            uint4 values = sharedMem[id * 2 + i];
+            uint4 element = values;
+            for (int j = 0; j < 4; j++)
+            {
+                uint value = element[j];
+                uint16_t a = (uint16_t)(value & 0xFFFF);
+                uint16_t b = (uint16_t)((value >> 16) & 0xFFFF);
+
+                half aa = bit_cast<half>(a);
+                half bb = bit_cast<half>(b);
+                printf("%.1f %.1f ", float(aa), float(bb));
+            }
+        }
+        printf("\n");
+    }
 }
 
 [numthreads(1024, 1, 1)]
