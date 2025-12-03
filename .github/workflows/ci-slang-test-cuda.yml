@@ -52,7 +52,6 @@ jobs:
             libvulkan1 \
             vulkan-tools \
             vulkan-validationlayers \
-            mesa-vulkan-drivers \
             python3 \
             python3-pip \
             python3-venv
@@ -88,9 +87,20 @@ jobs:
           echo "=== GPU Info ==="
           nvidia-smi || echo "nvidia-smi not available"
 
+          # Debug: Check Vulkan ICD files
+          echo "=== Vulkan ICD files ==="
+          ls -la /usr/share/vulkan/icd.d/ 2>/dev/null || echo "No /usr/share/vulkan/icd.d/"
+          ls -la /etc/vulkan/icd.d/ 2>/dev/null || echo "No /etc/vulkan/icd.d/"
+          cat /usr/share/vulkan/icd.d/*.json 2>/dev/null || true
+          cat /etc/vulkan/icd.d/*.json 2>/dev/null || true
+
           # Check Vulkan
           echo "=== Vulkan Info ==="
           vulkaninfo --summary 2>/dev/null || echo "vulkaninfo not available"
+
+          # Debug: Check CUDA
+          echo "=== CUDA libraries ==="
+          ldconfig -p | grep -i cuda || echo "No CUDA libraries in ldconfig"
 
       - name: Test Slang
         run: |
@@ -167,8 +177,7 @@ jobs:
           apt-get update && apt-get install -y \
             libx11-6 \
             libvulkan1 \
-            vulkan-tools \
-            mesa-vulkan-drivers
+            vulkan-tools
           rm -rf /var/lib/apt/lists/*
 
       - name: Download artifacts
