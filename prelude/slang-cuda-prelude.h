@@ -5989,12 +5989,12 @@ struct WmmaFragment
         wmmaStore<T, M, N, K, layout>(buffer + element, regs, stride);
     }
 
-    template<Layout layout, typename PtrU>
-    void __device__ Store(PtrU buffer, uint stride)
+    template<Layout layout, typename U>
+    void __device__ Store(U* buffer, uint stride)
     {
         // Force compile-time check, so we know the template parameter comibination is valid.
         (void)RegisterCount<T, M, N, K, R>::value;
-        wmmaStore<T, M, N, K, layout>(buffer, regs, stride);
+        wmmaStore<T, M, N, K, layout>(buffer, regs, stride * sizeof(U) / sizeof(T));
     }
 
     template<Layout layout>
@@ -6009,15 +6009,15 @@ struct WmmaFragment
         return fragment;
     }
 
-    template<Layout layout, typename PtrU>
-    static This __device__ Load(PtrU buffer, uint stride)
+    template<Layout layout, typename U>
+    static This __device__ Load(U* buffer, uint stride)
     {
         WmmaFragment<T, M, N, K, R> fragment;
 
         // Force compile-time check, so we know the template parameter comibination is valid.
         (void)RegisterCount<T, M, N, K, R>::value;
-        wmmaLoad<T, M, N, K, R, layout>(fragment.regs, buffer, stride);
-
+        wmmaLoad<T, M, N, K, R, layout>(fragment.regs, buffer, stride * sizeof(U) / sizeof(T));
+        fragment.m_layout = layout;
         return fragment;
     }
 
@@ -6030,9 +6030,9 @@ struct WmmaFragment
     static constexpr int m_K = K;
     Layout m_layout = Layout::RowMajor;
 
-    // Maximum registers needed across all fragment types and data types
-    static constexpr int MAX_REGS = 8;
-    uint32_t regs[MAX_REGS] = {};
+    // Register Count requirement
+    static constexpr int RegsCount = RegisterCount<T, M, N, K, R>::value;
+    unsigned regs[RegsCount] = {};
 
     static constexpr uint32_t elements_per_warp = (R == MatrixUse::MatrixA)   ? (M * K)
                                                   : (R == MatrixUse::MatrixB) ? (K * N)
@@ -6523,28 +6523,28 @@ WmmaFragment<DType, M, N, K, MatrixC> __device__ coopMatMulAdd(
                                            : ShapeCombination::m32n8k16;
 
     WmmaFragment<DType, M, N, K, MatrixC> matD;
-    uint32_t encodedLayout = (matA.m_layout == Layout::RowMajor ? 0 : 1) << 4 |
-                             (matB.m_layout == Layout::RowMajor ? 0 : 1);
+    uint32_t encodedLayout = (matA.m_layout == Layout::RowMajor ? 1 : 0) << 1 |
+                             (matB.m_layout == Layout::RowMajor ? 1 : 0);
 
     switch(encodedLayout)
     {
-        // 00010001
-        case 0x11:
+        // 00011
+        case 0x3:
             MMAHelper<AType, BType, CType, DType, shape, Layout::RowMajor, Layout::RowMajor, saturatingAccumulation>::eval(
                 matD,
                 matA,
                 matB,
                 matC);
             break;
-        // 00010001
-        case 0x10:
+        // 00010
+        case 0x2:
             MMAHelper<AType, BType, CType, DType, shape, Layout::RowMajor, Layout::ColMajor, saturatingAccumulation>::eval(
                 matD,
                 matA,
                 matB,
                 matC);
             break;
-        // 00000001
+        // 0001
         case 0x01:
             MMAHelper<AType, BType, CType, DType, shape, Layout::ColMajor, Layout::RowMajor, saturatingAccumulation>::eval(
                 matD,
@@ -6552,7 +6552,7 @@ WmmaFragment<DType, M, N, K, MatrixC> __device__ coopMatMulAdd(
                 matB,
                 matC);
             break;
-        // 00000000
+        // 0000
         case 0x00:
             MMAHelper<AType, BType, CType, DType, shape, Layout::ColMajor, Layout::ColMajor, saturatingAccumulation>::eval(
                 matD,
