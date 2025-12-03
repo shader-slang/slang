@@ -116,15 +116,7 @@ jobs:
 
           "$bin_dir/slang-test" "${slang_test_args[@]}"
 
-      - name: Run Slang examples
-        if: inputs.config == 'release' && github.event_name == 'pull_request'
-        run: |
-          .github/workflows/ci-examples.sh \
-           --bin-dir "$bin_dir" \
-           --os "linux" \
-           --platform "x86_64" \
-           --config "${{ inputs.config }}" \
-           --skip-file tests/expected-example-failure-github.txt
+      # Skip Slang examples - CPU examples require LLVM which is disabled in CUDA builds
 
       - name: Run slangc tests
         run: |
@@ -211,82 +203,4 @@ jobs:
         run: |
           "$bin_dir/slang-rhi-tests" -check-devices -optix-version=80100 -tc="ray-tracing-*.cuda"
 
-  test-slangpy:
-    runs-on: ["Linux", "self-hosted", "GPU"]
-    timeout-minutes: 30
-    if: github.event_name == 'pull_request' || inputs.config == 'release'
-    container:
-      image: nvidia/cuda:12.9.1-devel-ubuntu22.04
-      options: --gpus all --user root
-
-    defaults:
-      run:
-        shell: bash
-
-    steps:
-      - name: Install Git
-        run: |
-          apt-get update && apt-get install -y git
-          git --version
-
-      - uses: actions/checkout@v4
-        with:
-          submodules: "recursive"
-          fetch-depth: "1"
-
-      - name: Install test dependencies
-        run: |
-          apt-get update && apt-get install -y \
-            libx11-6 \
-            libvulkan1 \
-            mesa-vulkan-drivers \
-            python3 \
-            python3-pip \
-            python3-venv
-          rm -rf /var/lib/apt/lists/*
-
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: slang-tests-linux-x86_64-gcc-${{ inputs.config }}-cuda
-          path: artifacts
-
-      - name: Setup test environment
-        run: |
-          if [[ "${{ inputs.config }}" == "release" ]]; then
-            cmake_config="Release"
-          else
-            cmake_config="Debug"
-          fi
-          echo "cmake_config=$cmake_config" >> $GITHUB_ENV
-
-          bin_dir="$PWD/artifacts/${cmake_config}/bin"
-          echo "bin_dir=$bin_dir" >> $GITHUB_ENV
-
-          chmod +x "$bin_dir"/* 2>/dev/null || true
-          echo "LD_LIBRARY_PATH=$PWD/artifacts/${cmake_config}/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
-
-      - name: Setup Python
-        run: |
-          python3 -m venv .venv
-          source .venv/bin/activate
-          pip install --upgrade pip
-          pip install pytest filecheck numpy
-          echo "VIRTUAL_ENV=$PWD/.venv" >> $GITHUB_ENV
-          echo "$PWD/.venv/bin" >> $GITHUB_PATH
-
-      - name: Run slangpy tests
-        run: |
-          source .venv/bin/activate
-          cd tools/slangpy
-          pip install -e .
-          cd ../slangpy-test
-          pip install -e .
-          pytest -v
-
-      - name: Run slangpy samples
-        run: |
-          source .venv/bin/activate
-          cd tools/slangpy-samples
-          pip install -e .
-          python run_samples.py
+  # Skip slangpy tests - requires LLVM which is disabled in CUDA builds
