@@ -934,10 +934,17 @@ SlangResult RenderTestApp::initialize(
                 };
 
 
+                slang::IComponentType* slangProgram = m_compilationOutput.output.slangProgram;
+                SLANG_ASSERT(slangProgram);
+                if (nullptr == slangProgram)
+                {
+                    return SLANG_FAIL;
+                }
+
                 List<InputElementDesc> inputElements = filterInputElements(
                     allInputElements,
                     SLANG_COUNT_OF(allInputElements),
-                    m_compilationOutput.output.slangProgram->getLayout());
+                    slangProgram->getLayout());
 
 
                 ComPtr<IInputLayout> inputLayout;
