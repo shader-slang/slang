@@ -1564,9 +1564,9 @@ struct ByteAddressBufferLegalizationContext
 
 
 void legalizeByteAddressBufferOps(
+    IRModule* module,
     Session* session,
     TargetProgram* program,
-    IRModule* module,
     DiagnosticSink* sink,
     ByteAddressBufferLegalizationOptions const& options)
 {
@@ -1578,5 +1578,6 @@ void legalizeByteAddressBufferOps(
     context.m_sink = sink;
     context.processModule(module);
 }
+
 
 } // namespace Slang

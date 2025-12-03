@@ -17,5 +17,5 @@ struct IRModule;
 /// from global shader parameters directly.
 /// This is an optimization for GL/VK backend since the downstream
 /// compiler doesn't seem to optimize such code well.
-void specializeArrayParameters(CodeGenContext* codeGenContext, IRModule* module);
+void specializeArrayParameters(IRModule* module, CodeGenContext* codeGenContext);
 } // namespace Slang

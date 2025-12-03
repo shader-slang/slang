@@ -90,7 +90,7 @@ List<IRInterfaceType*> sortTopologically(
     return sortedInterfaceTypes;
 }
 
-void inferAnyValueSizeWhereNecessary(TargetProgram* targetProgram, IRModule* module)
+void inferAnyValueSizeWhereNecessary(IRModule* module, TargetProgram* targetProgram)
 {
     // Go through the global insts and collect all interface types.
     // For each interface type, infer its any-value-size, by looking up

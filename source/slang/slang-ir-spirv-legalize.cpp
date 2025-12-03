@@ -2362,7 +2362,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
         // The above step may produce empty struct types, so we need to lower them out of
         // existence.
-        legalizeEmptyTypes(m_sharedContext->m_targetProgram, m_module, m_sink);
+        legalizeEmptyTypes(m_module, m_sharedContext->m_targetProgram, m_sink);
 
         // Propagate alignment hints on address instructions.
         propagateAddressAlignment();

@@ -22,7 +22,7 @@ bool specializeResourceParameters(CodeGenContext* codeGenContext, IRModule* modu
 bool specializeResourceOutputs(CodeGenContext* codeGenContext, IRModule* module);
 
 /// Combined iterative passes of `specializeResourceParameters` and `specializeResourceOutputs`.
-bool specializeResourceUsage(CodeGenContext* codeGenContext, IRModule* irModule);
+bool specializeResourceUsage(IRModule* irModule, CodeGenContext* codeGenContext);
 
 /// Convert parameter-passing modes for non-copyable types to ones that are valid for GLSL.
 ///
@@ -34,8 +34,8 @@ bool specializeResourceUsage(CodeGenContext* codeGenContext, IRModule* irModule)
 /// a handle to a stateful entity rather than a mutable value itself.
 ///
 void legalizeModesOfNonCopyableOpaqueTypedParamsForGLSL(
-    CodeGenContext* codeGenContext,
-    IRModule* irModule);
+    IRModule* irModule,
+    CodeGenContext* codeGenContext);
 
 bool isIllegalGLSLParameterType(IRType* type);
 bool isIllegalSPIRVParameterType(IRType* type, bool isArray);

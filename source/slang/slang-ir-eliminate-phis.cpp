@@ -1159,4 +1159,9 @@ void eliminatePhisInFunc(
     context.eliminatePhisInFunc(func);
 }
 
+void eliminatePhis(IRModule* module, LivenessMode livenessMode, PhiEliminationOptions options)
+{
+    eliminatePhis(livenessMode, module, options);
+}
+
 } // namespace Slang

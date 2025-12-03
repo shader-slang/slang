@@ -6,5 +6,5 @@ struct IRModule;
 class DiagnosticSink;
 class TargetRequest;
 
-void checkUnsupportedInst(TargetRequest* target, IRModule* module, DiagnosticSink* sink);
+void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSink* sink);
 } // namespace Slang

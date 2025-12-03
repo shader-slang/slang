@@ -218,7 +218,7 @@ void stripWrapExistential(IRModule* module)
     }
 }
 
-void lowerGenerics(TargetProgram* targetProgram, IRModule* module, DiagnosticSink* sink)
+void lowerGenerics(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
     SLANG_PROFILE;
 
@@ -264,8 +264,8 @@ void lowerGenerics(TargetProgram* targetProgram, IRModule* module, DiagnosticSin
     specializeRTTIObjects(&sharedContext, sink);
 
     simplifyIR(
-        sharedContext.targetProgram,
         module,
+        sharedContext.targetProgram,
         IRSimplificationOptions::getFast(sharedContext.targetProgram));
 
     lowerTuples(module, sink);
@@ -283,7 +283,7 @@ void lowerGenerics(TargetProgram* targetProgram, IRModule* module, DiagnosticSin
     stripWrapExistential(module);
 }
 
-void cleanupGenerics(TargetProgram* program, IRModule* module, DiagnosticSink* sink)
+void cleanupGenerics(IRModule* module, TargetProgram* program, DiagnosticSink* sink)
 {
     SharedGenericsLoweringContext sharedContext(module);
     sharedContext.targetProgram = program;
