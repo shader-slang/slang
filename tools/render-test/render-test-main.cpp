@@ -944,7 +944,7 @@ SlangResult RenderTestApp::initialize(
                 else
                 {
                     inputElements.addRange(allInputElements, SLANG_COUNT_OF(allInputElements));
-                } 
+                }
 
                 ComPtr<IInputLayout> inputLayout;
                 SLANG_RETURN_ON_FAIL(device->createInputLayout(
