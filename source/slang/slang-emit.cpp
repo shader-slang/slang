@@ -126,6 +126,7 @@
 #include "slang-legalize-types.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
+#include "slang-pass-wrapper.h"
 #include "slang-syntax.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
@@ -210,26 +211,6 @@ StructTypeLayout* getGlobalStructLayout(ProgramLayout* programLayout)
     return getScopeStructLayout(programLayout);
 }
 
-static void dumpIRIfEnabled(
-    CodeGenContext* codeGenContext,
-    IRModule* irModule,
-    char const* label = nullptr)
-{
-    if (codeGenContext->shouldDumpIR())
-    {
-        DiagnosticSinkWriter writer(codeGenContext->getSink());
-        // FILE* f = nullptr;
-        // fopen_s(&f, (String("dump-") + label + ".txt").getBuffer(), "wt");
-        // FileWriter writer(f, 0);
-        dumpIR(
-            irModule,
-            codeGenContext->getIRDumpOptions(),
-            label,
-            codeGenContext->getSourceManager(),
-            &writer);
-        // fclose(f);
-    }
-}
 
 static void reportCheckpointIntermediates(
     CodeGenContext* codeGenContext,
@@ -548,7 +529,7 @@ bool checkStaticAssert(IRInst* inst, DiagnosticSink* sink)
     return false;
 }
 
-static void unexportNonEmbeddableIR(CodeGenTarget target, IRModule* irModule)
+static void unexportNonEmbeddableIR(IRModule* irModule, CodeGenTarget target)
 {
     for (auto inst : irModule->getGlobalInsts())
     {
@@ -695,6 +676,17 @@ Result linkAndOptimizeIR(
     LinkedIR& outLinkedIR)
 {
     SLANG_PROFILE;
+
+    // This lambda is here so that we can select the correct overload for our parameters, without it
+    // the overload deduction fails for passes which have overloads not taking an IRModule*
+#define SLANG_PASS(passFunc, ...)                                                          \
+    wrapPass(                                                                              \
+        codeGenContext,                                                                    \
+        #passFunc,                                                                         \
+        [](auto* m, auto&&... a) { return passFunc(m, std::forward<decltype(a)>(a)...); }, \
+        irModule,                                                                          \
+        ##__VA_ARGS__)
+
     auto session = codeGenContext->getSession();
     auto sink = codeGenContext->getSink();
     auto target = codeGenContext->getTargetFormat();
@@ -730,46 +722,38 @@ Result linkAndOptimizeIR(
         builder.emitDebugBuildIdentifier(buildIdentifier.getUnownedSlice(), buildIdentifierFlags);
     }
 
-#if 0
-    dumpIRIfEnabled(codeGenContext, irModule, "LINKED");
-#endif
-
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
     // If the user specified the flag that they want us to dump
     // IR, then do it here, for the target-specific, but
     // un-specialized IR.
-    dumpIRIfEnabled(codeGenContext, irModule, "POST IR VALIDATION");
 
     // Scan the IR module and determine which lowering/legalization passes are needed.
     RequiredLoweringPassSet& requiredLoweringPassSet = codeGenContext->getRequiredLoweringPassSet();
     requiredLoweringPassSet = {};
     calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
 
-    // Debug info is added by the front-end, and therefore needs to be stripped out by targets that
-    // opt out of debug info.
+    // Debug info is added by the front-end, and therefore needs to be stripped out by targets
+    // that opt out of debug info.
     if (requiredLoweringPassSet.debugInfo &&
         (targetCompilerOptions.getIntOption(CompilerOptionName::DebugInformation) ==
          SLANG_DEBUG_INFO_LEVEL_NONE))
-        stripDebugInfo(irModule);
+        SLANG_PASS(stripDebugInfo);
 
     if (!isKhronosTarget(targetRequest) && requiredLoweringPassSet.glslSSBO)
-        lowerGLSLShaderStorageBufferObjectsToStructuredBuffers(irModule, sink);
+        SLANG_PASS(lowerGLSLShaderStorageBufferObjectsToStructuredBuffers, sink);
 
     if (requiredLoweringPassSet.globalVaryingVar)
-        translateGlobalVaryingVar(codeGenContext, irModule);
+        SLANG_PASS(translateGlobalVaryingVar, codeGenContext);
 
     if (requiredLoweringPassSet.resolveVaryingInputRef)
-        resolveVaryingInputRef(irModule);
+        SLANG_PASS(resolveVaryingInputRef);
 
-    fixEntryPointCallsites(irModule);
+    SLANG_PASS(fixEntryPointCallsites);
 
     // Replace any global constants with their values.
     //
-    replaceGlobalConstants(irModule);
-#if 0
-    dumpIRIfEnabled(codeGenContext, irModule, "GLOBAL CONSTANTS REPLACED");
-#endif
+    SLANG_PASS(replaceGlobalConstants);
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
 
@@ -781,10 +765,7 @@ Result linkAndOptimizeIR(
     // use sites.
     //
     if (requiredLoweringPassSet.bindExistential)
-        bindExistentialSlots(irModule, sink);
-#if 0
-    dumpIRIfEnabled(codeGenContext, irModule, "EXISTENTIALS BOUND");
-#endif
+        SLANG_PASS(bindExistentialSlots, sink);
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
     // Now that we've linked the IR code, any layout/binding
@@ -805,21 +786,15 @@ Result linkAndOptimizeIR(
     // can assume that all ordinary/uniform data is strictly
     // passed using constant buffers.
     //
-    collectGlobalUniformParameters(irModule, outLinkedIR.globalScopeVarLayout, target);
-#if 0
-    dumpIRIfEnabled(codeGenContext, irModule, "GLOBAL UNIFORMS COLLECTED");
-#endif
+    SLANG_PASS(collectGlobalUniformParameters, outLinkedIR.globalScopeVarLayout, target);
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    checkEntryPointDecorations(irModule, target, sink);
+    SLANG_PASS(checkEntryPointDecorations, target, sink);
 
     // Add floating point denormal handling mode decorations to entry point functions based on
-    // compiler options. This is done post-linking to ensure all entry points from linked modules
-    // are processed.
-    addDenormalModeDecorations(irModule, codeGenContext);
-#if 0
-    dumpIRIfEnabled(codeGenContext, irModule, "FP DENORMAL MODE DECORATIONS ADDED");
-#endif
+    // compiler options. This is done post-linking to ensure all entry points from linked
+    // modules are processed.
+    SLANG_PASS(addDenormalModeDecorations, codeGenContext);
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
     // Another transformation that needed to wait until we
@@ -839,10 +814,7 @@ Result linkAndOptimizeIR(
         case CodeGenTarget::HostVM:
             break;
         case CodeGenTarget::CUDASource:
-            collectOptiXEntryPointUniformParams(irModule);
-#if 0
-            dumpIRIfEnabled(codeGenContext, irModule, "OPTIX ENTRY POINT UNIFORMS COLLECTED");
-#endif
+            SLANG_PASS(collectOptiXEntryPointUniformParams);
             validateIRModuleIfEnabled(codeGenContext, irModule);
             break;
 
@@ -850,10 +822,7 @@ Result linkAndOptimizeIR(
             passOptions.alwaysCreateCollectedParam = true;
             [[fallthrough]];
         default:
-            collectEntryPointUniformParams(irModule, passOptions);
-#if 0
-            dumpIRIfEnabled(codeGenContext, irModule, "ENTRY POINT UNIFORMS COLLECTED");
-#endif
+            SLANG_PASS(collectEntryPointUniformParams, passOptions);
             validateIRModuleIfEnabled(codeGenContext, irModule);
             break;
         }
@@ -862,10 +831,7 @@ Result linkAndOptimizeIR(
     switch (target)
     {
     default:
-        moveEntryPointUniformParamsToGlobalScope(irModule);
-#if 0
-        dumpIRIfEnabled(codeGenContext, irModule, "ENTRY POINT UNIFORMS MOVED");
-#endif
+        SLANG_PASS(moveEntryPointUniformParamsToGlobalScope);
         validateIRModuleIfEnabled(codeGenContext, irModule);
         break;
     case CodeGenTarget::HostCPPSource:
@@ -882,17 +848,14 @@ Result linkAndOptimizeIR(
         break;
 
     default:
-        removeTorchAndCUDAEntryPoints(irModule);
+        SLANG_PASS(removeTorchAndCUDAEntryPoints);
         break;
     }
 
-#if 0
-    dumpIRIfEnabled(codeGenContext, irModule, "UNIONS DESUGARED");
-#endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
     // Lower all the LValue implict casts (used for out/inout/ref scenarios)
-    lowerLValueCast(targetProgram, irModule);
+    SLANG_PASS(lowerLValueCast, targetProgram);
 
     IRSimplificationOptions defaultIRSimplificationOptions =
         IRSimplificationOptions::getDefault(targetProgram);
@@ -905,23 +868,23 @@ Result linkAndOptimizeIR(
     deadCodeEliminationOptions.keepGlobalParamsAlive =
         targetProgram->getOptionSet().getBoolOption(CompilerOptionName::PreserveParameters);
 
-    simplifyIR(targetProgram, irModule, defaultIRSimplificationOptions, sink);
+    SLANG_PASS(simplifyIR, targetProgram, defaultIRSimplificationOptions, sink);
 
     if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::ValidateUniformity))
     {
-        validateUniformity(irModule, sink);
+        SLANG_PASS(validateUniformity, sink);
         if (sink->getErrorCount() != 0)
             return SLANG_FAIL;
     }
 
     // Fill in default matrix layout into matrix types that left layout unspecified.
-    specializeMatrixLayout(targetProgram, irModule);
+    SLANG_PASS(specializeMatrixLayout, targetProgram);
 
     // It's important that this takes place before defunctionalization as we
     // want to be able to easily discover the cooperate and fallback funcitons
     // being passed to saturated_cooperation
     if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
-        fuseCallsToSaturatedCooperation(irModule);
+        SLANG_PASS(fuseCallsToSaturatedCooperation);
 
     switch (target)
     {
@@ -930,7 +893,7 @@ Result linkAndOptimizeIR(
         {
             // Generate any requested derivative wrappers
             if (requiredLoweringPassSet.derivativePyBindWrapper)
-                generateDerivativeWrappers(irModule, sink);
+                SLANG_PASS(generateDerivativeWrappers, sink);
             break;
         }
     default:
@@ -940,7 +903,7 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.autodiff)
     {
         // Generate warnings for potentially incorrect or badly-performing autodiff patterns.
-        checkAutodiffPatterns(targetProgram, irModule, sink);
+        SLANG_PASS(checkAutodiffPatterns, targetProgram, sink);
     }
 
     // Next, we need to ensure that the code we emit for
@@ -967,7 +930,6 @@ Result linkAndOptimizeIR(
     for (;;)
     {
         bool changed = false;
-        dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-SPECIALIZE");
         if (!codeGenContext->isSpecializationDisabled())
         {
             // Pre-autodiff, we will attempt to specialize as much as possible.
@@ -978,30 +940,30 @@ Result linkAndOptimizeIR(
             SpecializationOptions specOptions;
             specOptions.lowerWitnessLookups = false;
             changed |=
-                specializeModule(targetProgram, irModule, codeGenContext->getSink(), specOptions);
+                SLANG_PASS(specializeModule, targetProgram, codeGenContext->getSink(), specOptions);
         }
 
         if (codeGenContext->getSink()->getErrorCount() != 0)
             return SLANG_FAIL;
-        dumpIRIfEnabled(codeGenContext, irModule, "AFTER-SPECIALIZE");
 
         if (changed)
         {
-            applySparseConditionalConstantPropagation(irModule, codeGenContext->getSink());
+            SLANG_PASS(applySparseConditionalConstantPropagation, codeGenContext->getSink());
         }
         validateIRModuleIfEnabled(codeGenContext, irModule);
 
         // Inline calls to any functions marked with [__unsafeInlineEarly] again,
-        // since we may be missing out cases prevented by the functions that we just specialzied.
-        performMandatoryEarlyInlining(irModule);
-        eliminateDeadCode(irModule, deadCodeEliminationOptions);
+        // since we may be missing out cases prevented by the functions that we just
+        // specialzied.
+        SLANG_PASS(performMandatoryEarlyInlining, nullptr);
+        SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
 
         // Unroll loops.
         if (!fastIRSimplificationOptions.minimalOptimization)
         {
             if (codeGenContext->getSink()->getErrorCount() == 0)
             {
-                if (!unrollLoopsInModule(targetProgram, irModule, codeGenContext->getSink()))
+                if (!SLANG_PASS(unrollLoopsInModule, targetProgram, codeGenContext->getSink()))
                     return SLANG_FAIL;
             }
         }
@@ -1012,16 +974,15 @@ Result linkAndOptimizeIR(
         // Specialize away these parameters
         // TODO: We should implement a proper defunctionalization pass
         if (requiredLoweringPassSet.higherOrderFunc)
-            changed |= specializeHigherOrderParameters(codeGenContext, irModule);
+            changed |= SLANG_PASS(specializeHigherOrderParameters, codeGenContext);
 
         if (requiredLoweringPassSet.autodiff)
         {
-            dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-AUTODIFF");
             {
                 auto validationScope = enableIRValidationScope();
-                changed |= processAutodiffCalls(targetProgram, irModule, sink);
+                changed |=
+                    SLANG_PASS(processAutodiffCalls, targetProgram, sink, IRAutodiffPassOptions());
             }
-            dumpIRIfEnabled(codeGenContext, irModule, "AFTER-AUTODIFF");
         }
 
         if (!changed)
@@ -1031,15 +992,15 @@ Result linkAndOptimizeIR(
     // Report checkpointing information
     if (codeGenContext->shouldReportCheckpointIntermediates())
     {
-        simplifyIR(targetProgram, irModule, fastIRSimplificationOptions, sink);
+        SLANG_PASS(simplifyIR, targetProgram, fastIRSimplificationOptions, sink);
         reportCheckpointIntermediates(codeGenContext, sink, irModule);
     }
 
     // Finalization is always run so AD-related instructions can be removed,
     // even if the AD pass itself is not run.
     //
-    finalizeAutoDiffPass(targetProgram, irModule);
-    eliminateDeadCode(irModule, deadCodeEliminationOptions);
+    SLANG_PASS(finalizeAutoDiffPass, targetProgram);
+    SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
 
     // After auto-diff, we can perform more aggressive specialization with dynamic-dispatch
     // lowering.
@@ -1048,26 +1009,26 @@ Result linkAndOptimizeIR(
     {
         SpecializationOptions specOptions;
         specOptions.lowerWitnessLookups = true;
-        specializeModule(targetProgram, irModule, codeGenContext->getSink(), specOptions);
+        SLANG_PASS(specializeModule, targetProgram, codeGenContext->getSink(), specOptions);
     }
 
-    finalizeSpecialization(irModule);
+    SLANG_PASS(finalizeSpecialization);
 
     // Lower `Result<T,E>` types into ordinary struct types. This must happen
     // after specialization, since otherwise incompatible copies of the lowered
     // result structure are generated.
     if (requiredLoweringPassSet.resultType)
-        lowerResultType(irModule, sink);
+        SLANG_PASS(lowerResultType, sink);
 
     if (requiredLoweringPassSet.optionalType)
-        lowerOptionalType(irModule, sink);
+        SLANG_PASS(lowerOptionalType, sink);
 
     if (requiredLoweringPassSet.nonVectorCompositeSelect)
     {
         switch (target)
         {
         case CodeGenTarget::HLSL:
-            legalizeNonVectorCompositeSelect(irModule);
+            SLANG_PASS(legalizeNonVectorCompositeSelect);
             break;
         default:
             break;
@@ -1079,9 +1040,9 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::HostCPPSource:
         {
-            lowerComInterfaces(irModule, artifactDesc.style, sink);
-            generateDllImportFuncs(codeGenContext->getTargetProgram(), irModule, sink);
-            generateDllExportFuncs(irModule, sink);
+            SLANG_PASS(lowerComInterfaces, artifactDesc.style, sink);
+            SLANG_PASS(generateDllImportFuncs, codeGenContext->getTargetProgram(), sink);
+            SLANG_PASS(generateDllExportFuncs, sink);
             break;
         }
     default:
@@ -1093,40 +1054,40 @@ Result linkAndOptimizeIR(
     switch (target)
     {
     case CodeGenTarget::PyTorchCppBinding:
-        generateHostFunctionsForAutoBindCuda(irModule, sink);
-        lowerBuiltinTypesForKernelEntryPoints(irModule, sink);
-        generatePyTorchCppBinding(irModule, sink);
-        handleAutoBindNames(irModule);
+        SLANG_PASS(generateHostFunctionsForAutoBindCuda, sink);
+        SLANG_PASS(lowerBuiltinTypesForKernelEntryPoints, sink);
+        SLANG_PASS(generatePyTorchCppBinding, sink);
+        SLANG_PASS(handleAutoBindNames);
         break;
     case CodeGenTarget::CUDASource:
-        lowerBuiltinTypesForKernelEntryPoints(irModule, sink);
-        removeTorchKernels(irModule);
-        handleAutoBindNames(irModule);
+        SLANG_PASS(lowerBuiltinTypesForKernelEntryPoints, sink);
+        SLANG_PASS(removeTorchKernels);
+        SLANG_PASS(handleAutoBindNames);
         break;
     default:
         break;
     }
 
-    detectUninitializedResources(irModule, sink);
+    SLANG_PASS(detectUninitializedResources, sink);
 
     if (codeGenContext->removeAvailableInDownstreamIR)
     {
-        removeAvailableInDownstreamModuleDecorations(target, irModule);
+        SLANG_PASS(removeAvailableInDownstreamModuleDecorations, target);
     }
 
     if (targetProgram->getOptionSet().shouldRunNonEssentialValidation())
     {
-        checkForRecursiveTypes(irModule, sink);
-        checkForRecursiveFunctions(codeGenContext->getTargetReq(), irModule, sink);
-        checkForOutOfBoundAccess(irModule, sink);
+        SLANG_PASS(checkForRecursiveTypes, sink);
+        SLANG_PASS(checkForRecursiveFunctions, codeGenContext->getTargetReq(), sink);
+        SLANG_PASS(checkForOutOfBoundAccess, sink);
 
         if (requiredLoweringPassSet.missingReturn)
-            checkForMissingReturns(irModule, sink, target, false);
+            SLANG_PASS(checkForMissingReturns, sink, target, false);
 
         // For some targets, we are more restrictive about what types are allowed
         // to be used as shader parameters in ConstantBuffer/ParameterBlock.
         // We will check for these restrictions here.
-        checkForInvalidShaderParameterType(targetRequest, irModule, sink);
+        SLANG_PASS(checkForInvalidShaderParameterType, targetRequest, sink);
     }
 
     if (sink->getErrorCount() != 0)
@@ -1139,72 +1100,67 @@ Result linkAndOptimizeIR(
     {
         // We could fail because
         // 1) It's not inlinable for some reason (for example if it's recursive)
-        SLANG_RETURN_ON_FAIL(performTypeInlining(irModule, targetProgram, sink));
+        SLANG_RETURN_ON_FAIL(SLANG_PASS(performTypeInlining, targetProgram, sink));
     }
 
     if (requiredLoweringPassSet.reinterpret)
-        lowerReinterpret(targetProgram, irModule, sink);
+        SLANG_PASS(lowerReinterpret, targetProgram, sink);
 
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    inferAnyValueSizeWhereNecessary(targetProgram, irModule);
+    SLANG_PASS(inferAnyValueSizeWhereNecessary, targetProgram);
 
     // If we have any witness tables that are marked as `KeepAlive`,
     // but are not used for dynamic dispatch, unpin them so we don't
     // do unnecessary work to lower them.
-    unpinWitnessTables(irModule);
+    SLANG_PASS(unpinWitnessTables);
 
     if (!fastIRSimplificationOptions.minimalOptimization)
     {
-        simplifyIR(targetProgram, irModule, fastIRSimplificationOptions, sink);
+        SLANG_PASS(simplifyIR, targetProgram, fastIRSimplificationOptions, sink);
     }
     else if (requiredLoweringPassSet.generics)
     {
-        eliminateDeadCode(irModule, fastIRSimplificationOptions.deadCodeElimOptions);
+        SLANG_PASS(eliminateDeadCode, fastIRSimplificationOptions.deadCodeElimOptions);
     }
 
     if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc) &&
         targetProgram->getOptionSet().shouldRunNonEssentialValidation())
     {
-        // We could fail because (perhaps, somehow) end up with getStringHash that the operand is
-        // not a string literal
-        SLANG_RETURN_ON_FAIL(checkGetStringHashInsts(irModule, sink));
+        // We could fail because (perhaps, somehow) end up with getStringHash that the operand
+        // is not a string literal
+        SLANG_RETURN_ON_FAIL(SLANG_PASS(checkGetStringHashInsts, sink));
     }
 
     // For targets that supports dynamic dispatch, we need to lower the
     // generics / interface types to ordinary functions and types using
     // function pointers.
-    dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-LOWER-GENERICS");
     if (requiredLoweringPassSet.generics)
-        lowerGenerics(targetProgram, irModule, sink);
+        SLANG_PASS(lowerGenerics, targetProgram, sink);
     else
-        cleanupGenerics(targetProgram, irModule, sink);
-    dumpIRIfEnabled(codeGenContext, irModule, "AFTER-LOWER-GENERICS");
+        SLANG_PASS(cleanupGenerics, targetProgram, sink);
 
     if (requiredLoweringPassSet.enumType)
-        lowerEnumType(irModule, sink);
+        SLANG_PASS(lowerEnumType, sink);
 
     // Don't need to run any further target-dependent passes if we are generating code
     // for host vm.
     if (target == CodeGenTarget::HostVM)
     {
-        performForceInlining(irModule);
-        simplifyIR(targetProgram, irModule, defaultIRSimplificationOptions, sink);
+        SLANG_PASS(performForceInlining);
+        SLANG_PASS(simplifyIR, targetProgram, defaultIRSimplificationOptions, sink);
         return SLANG_OK;
     }
 
     // After dynamic dispatch logic is resolved into ordinary function calls,
     // we can now run our stage specialization logic.
     if (requiredLoweringPassSet.specializeStageSwitch)
-        specializeStageSwitch(irModule);
+        SLANG_PASS(specializeStageSwitch);
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
-#if 0
-    dumpIRIfEnabled(codeGenContext, irModule, "SPECIALIZED");
-#endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
     switch (target)
@@ -1217,15 +1173,15 @@ Result linkAndOptimizeIR(
         {
             auto targetCaps = targetRequest->getTargetCaps();
             if (!targetCaps.implies(CapabilityAtom::optix_coopvec))
-                lowerCooperativeVectors(irModule, sink);
+                SLANG_PASS(lowerCooperativeVectors, sink);
         }
         break;
     default:
-        lowerCooperativeVectors(irModule, sink);
+        SLANG_PASS(lowerCooperativeVectors, sink);
     }
 
     // Inline calls to any functions marked with [__unsafeInlineEarly] or [ForceInline].
-    performForceInlining(irModule);
+    SLANG_PASS(performForceInlining);
 
     // Specialization can introduce dead code that could trip
     // up downstream passes like type legalization, so we
@@ -1238,12 +1194,15 @@ Result linkAndOptimizeIR(
         // like inlining allowing us to find dead branches.
         // These must be cleaned since otherwise static_assert's will falsely
         // detect true due to dead branches with static_assert not being removed.
-        applySparseConditionalConstantPropagation(irModule, sink);
-        eliminateDeadCode(irModule, deadCodeEliminationOptions);
+        SLANG_PASS(
+
+            applySparseConditionalConstantPropagation,
+            sink);
+        SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
     }
     else
     {
-        simplifyIR(targetProgram, irModule, defaultIRSimplificationOptions, sink);
+        SLANG_PASS(simplifyIR, targetProgram, defaultIRSimplificationOptions, sink);
     }
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
@@ -1253,7 +1212,7 @@ Result linkAndOptimizeIR(
     // of `RWStructuredBuffer` typed fields now.
     if (target != CodeGenTarget::HLSL)
     {
-        lowerAppendConsumeStructuredBuffers(targetProgram, irModule, sink);
+        SLANG_PASS(lowerAppendConsumeStructuredBuffers, targetProgram, sink);
     }
 
     switch (target)
@@ -1268,17 +1227,17 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::MetalLibAssembly:
     case CodeGenTarget::WGSL:
         if (requiredLoweringPassSet.combinedTextureSamplers)
-            lowerCombinedTextureSamplers(codeGenContext, irModule, sink);
+            SLANG_PASS(lowerCombinedTextureSamplers, codeGenContext, sink);
         break;
     }
 
     if (codeGenContext->getTargetProgram()->getOptionSet().getBoolOption(
             CompilerOptionName::VulkanEmitReflection))
     {
-        addUserTypeHintDecorations(irModule);
+        SLANG_PASS(addUserTypeHintDecorations);
     }
 
-    legalizeEmptyArray(irModule, sink);
+    SLANG_PASS(legalizeEmptyArray, sink);
 
     // For CUDA targets, always inline global constants to avoid dynamic initialization
     // of __device__ variables rejected by NVRTC. This runs independently of the broader
@@ -1291,7 +1250,7 @@ Result linkAndOptimizeIR(
         (isCPUTarget(targetRequest) && isKernelTarget(target)) ||
         options.shouldLegalizeExistentialAndResourceTypes)
     {
-        inlineGlobalConstantsForLegalization(irModule);
+        SLANG_PASS(inlineGlobalConstantsForLegalization);
     }
 
     // We don't need the legalize pass for C/C++ based types
@@ -1302,16 +1261,16 @@ Result linkAndOptimizeIR(
             // Metal is a special target in that we want to legalize constant buffer
             // types as if it is a bindful target, and skip legalizing parameter block
             // types as if it is a bindless target.
-            // To achieve this, we want to ensure that all resource typed fields in parameter blocks
-            // are translated into descriptor handles first before running the resource type
-            // legalization pass for metal, so that type legalization pass won't mess around with
-            // them.
+            // To achieve this, we want to ensure that all resource typed fields in parameter
+            // blocks are translated into descriptor handles first before running the resource
+            // type legalization pass for metal, so that type legalization pass won't mess
+            // around with them.
             BufferElementTypeLoweringOptions bufferElementTypeLoweringOptions = {};
             bufferElementTypeLoweringOptions.loweringPolicyKind =
                 BufferElementTypeLoweringPolicyKind::MetalParameterBlock;
-            lowerBufferElementTypeToStorageType(
+            SLANG_PASS(
+                lowerBufferElementTypeToStorageType,
                 targetProgram,
-                irModule,
                 bufferElementTypeLoweringOptions);
         }
 
@@ -1342,12 +1301,9 @@ Result linkAndOptimizeIR(
         //
         if (requiredLoweringPassSet.existentialTypeLayout)
         {
-            legalizeExistentialTypeLayout(targetProgram, irModule, sink);
+            SLANG_PASS(legalizeExistentialTypeLayout, targetProgram, sink);
         }
 
-#if 0
-        dumpIRIfEnabled(codeGenContext, irModule, "EXISTENTIALS LEGALIZED");
-#endif
         validateIRModuleIfEnabled(codeGenContext, irModule);
 
         if (!validateStructuredBufferResourceTypes(irModule, sink, targetRequest))
@@ -1364,7 +1320,7 @@ Result linkAndOptimizeIR(
         // What used to be individual variables/parameters/arguments/etc.
         // then become multiple variables/parameters/arguments/etc.
         //
-        legalizeResourceTypes(targetProgram, irModule, sink);
+        SLANG_PASS(legalizeResourceTypes, targetProgram, sink);
 
         // We also need to legalize empty types for Metal targets.
         switch (target)
@@ -1372,27 +1328,22 @@ Result linkAndOptimizeIR(
         case CodeGenTarget::Metal:
         case CodeGenTarget::MetalLib:
         case CodeGenTarget::MetalLibAssembly:
-            legalizeEmptyTypes(targetProgram, irModule, sink);
+            SLANG_PASS(legalizeEmptyTypes, targetProgram, sink);
             break;
         }
         //  Debugging output of legalization
-#if 0
-        dumpIRIfEnabled(codeGenContext, irModule, "LEGALIZED");
-#endif
         validateIRModuleIfEnabled(codeGenContext, irModule);
     }
     else
     {
         // On CPU/CUDA targets, we simply elminate any empty types if
         // they are not part of public interface.
-        legalizeEmptyTypes(targetProgram, irModule, sink);
+        SLANG_PASS(legalizeEmptyTypes, targetProgram, sink);
     }
 
-    legalizeMatrixTypes(targetProgram, irModule, sink);
-    dumpIRIfEnabled(codeGenContext, irModule, "AFTER-MATRIX-LEGALIZATION");
+    SLANG_PASS(legalizeMatrixTypes, targetProgram, sink);
 
-    legalizeVectorTypes(irModule, sink);
-    dumpIRIfEnabled(codeGenContext, irModule, "AFTER-VECTOR-LEGALIZATION");
+    SLANG_PASS(legalizeVectorTypes, sink);
 
     // Once specialization and type legalization have been performed,
     // we should perform some of our basic optimization steps again,
@@ -1400,16 +1351,13 @@ Result linkAndOptimizeIR(
     // (e.g., things that used to be aggregated might now be split up,
     // so that we can work with the individual fields).
     if (fastIRSimplificationOptions.minimalOptimization)
-        eliminateDeadCode(irModule, deadCodeEliminationOptions);
+        SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
     else
-        simplifyIR(targetProgram, irModule, fastIRSimplificationOptions, sink);
+        SLANG_PASS(simplifyIR, targetProgram, fastIRSimplificationOptions, sink);
 
     if (requiredLoweringPassSet.dynamicResourceHeap)
-        lowerDynamicResourceHeap(targetProgram, irModule, sink);
+        SLANG_PASS(lowerDynamicResourceHeap, targetProgram, sink);
 
-#if 0
-    dumpIRIfEnabled(codeGenContext, irModule, "AFTER SSA");
-#endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
     // After type legalization and subsequent SSA cleanup we expect
@@ -1421,25 +1369,21 @@ Result linkAndOptimizeIR(
     // resource types can be used, so that having them as
     // function parameters, reults, etc. is invalid.
     // We clean up the usages of resource values here.
-    specializeResourceUsage(codeGenContext, irModule);
+    SLANG_PASS(specializeResourceUsage, codeGenContext);
 
     // Specialize calls to functions with values loaded from an immutable location,
     // so that we directly load the value inside the callee, instead of loading the
     // value outside of the callee and copy it in. This is necessary to avoid copying
     // large values (e.g. arrays) in registers, where most of the elements are not
     // actually used.
-    specializeFuncsForBufferLoadArgs(codeGenContext, irModule);
+    SLANG_PASS(specializeFuncsForBufferLoadArgs, codeGenContext);
 
     // Push `structuredBufferLoad` to the end of access chain to avoid loading unnecessary data.
-    deferBufferLoad(codeGenContext, irModule);
+    SLANG_PASS(deferBufferLoad, codeGenContext);
 
     // We also want to specialize calls to functions that
     // takes unsized array parameters if possible.
-    specializeArrayParameters(codeGenContext, irModule);
-
-#if 0
-    dumpIRIfEnabled(codeGenContext, irModule, "AFTER RESOURCE SPECIALIZATION");
-#endif
+    SLANG_PASS(specializeArrayParameters, codeGenContext);
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
@@ -1458,10 +1402,7 @@ Result linkAndOptimizeIR(
             // the options for matrix layout set via `#pragma`
             // or command-line options.
             //
-            wrapStructuredBuffersOfMatrices(irModule);
-#if 0
-            dumpIRIfEnabled(codeGenContext, irModule, "STRUCTURED BUFFERS WRAPPED");
-#endif
+            SLANG_PASS(wrapStructuredBuffersOfMatrices);
             validateIRModuleIfEnabled(codeGenContext, irModule);
         }
         break;
@@ -1469,7 +1410,7 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::MetalLib:
         // Metal does not allow `ConstantBuffer<StructuredBuffer<T>>`, so we need to create
         // a wrapper struct for the `StructuredBuffer<T>`.
-        wrapCBufferElementsForMetal(irModule);
+        SLANG_PASS(wrapCBufferElementsForMetal);
         break;
     default:
         break;
@@ -1579,16 +1520,12 @@ Result linkAndOptimizeIR(
             break;
         }
 
-        legalizeByteAddressBufferOps(
+        SLANG_PASS(
+            legalizeByteAddressBufferOps,
             session,
             targetProgram,
-            irModule,
             codeGenContext->getSink(),
             byteAddressBufferOptions);
-
-#if 0
-        dumpIRIfEnabled(codeGenContext, irModule, "AFTER legalizeByteAddressBufferOps");
-#endif
     }
 
     // For SPIR-V, this function is called elsewhere, so that it can happen after address space
@@ -1596,7 +1533,7 @@ Result linkAndOptimizeIR(
     if (target != CodeGenTarget::SPIRV && target != CodeGenTarget::SPIRVAssembly)
     {
         bool skipFuncParamValidation = true;
-        validateAtomicOperations(skipFuncParamValidation, sink, irModule->getModuleInst());
+        SLANG_PASS(validateAtomicOperations, skipFuncParamValidation, sink);
     }
 
     // For CUDA targets only, we will need to turn operations
@@ -1608,11 +1545,8 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::CUDASource:
     case CodeGenTarget::PTX:
         {
-            synthesizeActiveMask(irModule, codeGenContext->getSink());
+            SLANG_PASS(synthesizeActiveMask, codeGenContext->getSink());
 
-#if 0
-            dumpIRIfEnabled(codeGenContext, irModule, "AFTER synthesizeActiveMask");
-#endif
             validateIRModuleIfEnabled(codeGenContext, irModule);
         }
         break;
@@ -1626,7 +1560,7 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::GLSL:
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::WGSL:
-        resolveTextureFormat(irModule);
+        SLANG_PASS(resolveTextureFormat);
         break;
     }
 
@@ -1649,20 +1583,13 @@ Result linkAndOptimizeIR(
                     ? as<ShaderExtensionTracker>(options.sourceEmitter->getExtensionTracker())
                     : &glslExtensionTracker;
 
-#if 0
-            dumpIRIfEnabled(codeGenContext, irModule, "PRE GLSL LEGALIZED");
-#endif
-
-            legalizeEntryPointsForGLSL(
+            SLANG_PASS(
+                legalizeEntryPointsForGLSL,
                 session,
-                irModule,
                 irEntryPoints,
                 codeGenContext,
                 glslExtensionTrackerPtr);
 
-#if 0
-            dumpIRIfEnabled(codeGenContext, irModule, "GLSL LEGALIZED");
-#endif
             validateIRModuleIfEnabled(codeGenContext, irModule);
         }
         break;
@@ -1670,19 +1597,19 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::MetalLib:
     case CodeGenTarget::MetalLibAssembly:
         {
-            legalizeIRForMetal(irModule, sink);
+            SLANG_PASS(legalizeIRForMetal, sink);
         }
         break;
     case CodeGenTarget::CSource:
     case CodeGenTarget::CPPSource:
         {
-            legalizeEntryPointVaryingParamsForCPU(irModule, codeGenContext->getSink());
+            SLANG_PASS(legalizeEntryPointVaryingParamsForCPU, codeGenContext->getSink());
         }
         break;
 
     case CodeGenTarget::CUDASource:
         {
-            legalizeEntryPointVaryingParamsForCUDA(irModule, codeGenContext->getSink());
+            SLANG_PASS(legalizeEntryPointVaryingParamsForCUDA, codeGenContext->getSink());
         }
         break;
 
@@ -1690,7 +1617,7 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::WGSLSPIRV:
     case CodeGenTarget::WGSLSPIRVAssembly:
         {
-            legalizeIRForWGSL(irModule, sink);
+            SLANG_PASS(legalizeIRForWGSL, sink);
         }
         break;
 
@@ -1700,20 +1627,20 @@ Result linkAndOptimizeIR(
 
     if (!isSPIRV(targetRequest->getTarget()))
     {
-        floatNonUniformResourceIndex(irModule, NonUniformResourceIndexFloatMode::Textual);
+        SLANG_PASS(floatNonUniformResourceIndex, NonUniformResourceIndexFloatMode::Textual);
     }
 
     if (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) ||
         isWGPUTarget(targetRequest) || isMetalTarget(targetRequest))
-        legalizeLogicalAndOr(irModule->getModuleInst());
+        SLANG_PASS(legalizeLogicalAndOr);
 
     // Legalize non struct parameters that are expected to be structs for HLSL.
     if (isD3DTarget(targetRequest))
-        legalizeNonStructParameterToStructForHLSL(irModule);
+        SLANG_PASS(legalizeNonStructParameterToStructForHLSL);
 
     // Create aliases for all dynamic resource parameters.
     if (requiredLoweringPassSet.dynamicResource && isKhronosTarget(targetRequest))
-        legalizeDynamicResourcesForGLSL(codeGenContext, irModule);
+        SLANG_PASS(legalizeDynamicResourcesForGLSL, codeGenContext);
 
     // Legalize `ImageSubscript` loads.
     switch (target)
@@ -1725,7 +1652,7 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
         {
-            legalizeImageSubscript(targetRequest, irModule, sink);
+            SLANG_PASS(legalizeImageSubscript, targetRequest, sink);
         }
         break;
     default:
@@ -1739,8 +1666,8 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
         {
-            legalizeConstantBufferLoadForGLSL(irModule);
-            legalizeDispatchMeshPayloadForGLSL(irModule);
+            SLANG_PASS(legalizeConstantBufferLoadForGLSL);
+            SLANG_PASS(legalizeDispatchMeshPayloadForGLSL);
         }
         break;
     default:
@@ -1754,45 +1681,36 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::HLSL:
     case CodeGenTarget::GLSL:
     case CodeGenTarget::WGSL:
-        moveGlobalVarInitializationToEntryPoints(irModule, targetProgram);
+        SLANG_PASS(moveGlobalVarInitializationToEntryPoints, targetProgram);
         break;
     // For SPIR-V to SROA across 2 entry-points a value must not be a global
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
-        moveGlobalVarInitializationToEntryPoints(irModule, targetProgram);
+        SLANG_PASS(moveGlobalVarInitializationToEntryPoints, targetProgram);
         if (targetProgram->getOptionSet().getBoolOption(
                 CompilerOptionName::EnableExperimentalPasses))
-            introduceExplicitGlobalContext(irModule, target);
-        transformParamsToConstRef(irModule, codeGenContext->getSink());
-#if 0
-        dumpIRIfEnabled(codeGenContext, irModule, "EXPLICIT GLOBAL CONTEXT INTRODUCED");
-#endif
+            SLANG_PASS(introduceExplicitGlobalContext, target);
+        SLANG_PASS(transformParamsToConstRef, codeGenContext->getSink());
         break;
     case CodeGenTarget::Metal:
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CUDASource:
-        // For CUDA/OptiX like targets, add our pass to replace inout parameter copies with direct
-        // pointers
-        undoParameterCopy(irModule);
+        // For CUDA/OptiX like targets, add our pass to replace inout parameter copies with
+        // direct pointers
+        SLANG_PASS(undoParameterCopy);
         // Transform struct parameters to use ConstRef for better performance
         if (isCPUTarget(targetRequest) || isCUDATarget(targetRequest) ||
             isMetalTarget(targetRequest))
         {
-            transformParamsToConstRef(irModule, codeGenContext->getSink());
+            SLANG_PASS(transformParamsToConstRef, codeGenContext->getSink());
         }
-#if 0
-        dumpIRIfEnabled(codeGenContext, irModule, "PARAMETER COPIES REPLACED WITH DIRECT POINTERS");
-#endif
         validateIRModuleIfEnabled(codeGenContext, irModule);
-        moveGlobalVarInitializationToEntryPoints(irModule, targetProgram);
-        introduceExplicitGlobalContext(irModule, target);
+        SLANG_PASS(moveGlobalVarInitializationToEntryPoints, targetProgram);
+        SLANG_PASS(introduceExplicitGlobalContext, target);
         if (target == CodeGenTarget::CPPSource)
         {
-            convertEntryPointPtrParamsToRawPtrs(irModule);
+            SLANG_PASS(convertEntryPointPtrParamsToRawPtrs);
         }
-#if 0
-        dumpIRIfEnabled(codeGenContext, irModule, "EXPLICIT GLOBAL CONTEXT INTRODUCED");
-#endif
         validateIRModuleIfEnabled(codeGenContext, irModule);
         break;
     }
@@ -1800,7 +1718,7 @@ Result linkAndOptimizeIR(
     // TODO: our current dynamic dispatch pass will remove all uses of witness tables.
     // If we are going to support function-pointer based, "real" modular dynamic dispatch,
     // we will need to disable this pass.
-    stripLegalizationOnlyInstructions(irModule);
+    SLANG_PASS(stripLegalizationOnlyInstructions);
 
     switch (target)
     {
@@ -1809,19 +1727,16 @@ Result linkAndOptimizeIR(
     //
     case CodeGenTarget::SPIRV:
         if (targetProgram->shouldEmitSPIRVDirectly())
-            removeRawDefaultConstructors(irModule);
+            SLANG_PASS(removeRawDefaultConstructors);
         break;
     default:
         break;
     }
 
-#if 0
-    dumpIRIfEnabled(codeGenContext, irModule, "AFTER STRIP WITNESS TABLES");
-#endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
     // Validate vectors and matrices according to what the target allows
-    validateVectorsAndMatrices(irModule, sink, targetRequest);
+    SLANG_PASS(validateVectorsAndMatrices, sink, targetRequest);
 
     // The resource-based specialization pass above
     // may create specialized versions of functions, but
@@ -1831,27 +1746,24 @@ Result linkAndOptimizeIR(
     //
     // We run DCE pass again to clean things up.
     //
-    eliminateDeadCode(irModule, deadCodeEliminationOptions);
+    SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
 
-    cleanUpVoidType(irModule);
+    SLANG_PASS(cleanUpVoidType);
 
     if (isKhronosTarget(targetRequest))
     {
         // As a fallback, if the above specialization steps failed to remove resource type
-        // parameters, we will inline the functions in question to make sure we can produce valid
-        // GLSL.
-        performGLSLResourceReturnFunctionInlining(targetProgram, irModule);
+        // parameters, we will inline the functions in question to make sure we can produce
+        // valid GLSL.
+        SLANG_PASS(performGLSLResourceReturnFunctionInlining, targetProgram);
     }
-#if 0
-    dumpIRIfEnabled(codeGenContext, irModule, "AFTER DCE");
-#endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
 
     // Lower the `getRegisterIndex` and `getRegisterSpace` intrinsics.
     //
     if (requiredLoweringPassSet.bindingQuery)
-        lowerBindingQueries(irModule, sink);
+        SLANG_PASS(lowerBindingQueries, sink);
 
     // For some small improvement in type safety we represent these as opaque
     // structs instead of regular arrays.
@@ -1859,26 +1771,26 @@ Result linkAndOptimizeIR(
     // If any have survived this far, change them back to regular (decorated)
     // arrays that the emitters can deal with.
     if (requiredLoweringPassSet.meshOutput)
-        legalizeMeshOutputTypes(irModule);
+        SLANG_PASS(legalizeMeshOutputTypes);
 
 
     // Lower all bit_cast operations on complex types into leaf-level
     // bit_cast on basic types.
     if (requiredLoweringPassSet.bitcast)
-        lowerBitCast(targetProgram, irModule, sink);
+        SLANG_PASS(lowerBitCast, targetProgram, sink);
 
     // Rewrite functions that return arrays to return them via `out` parameter,
     // since our target languages doesn't allow returning arrays.
     if (!isMetalTarget(targetRequest) && !isSPIRV(target))
-        legalizeArrayReturnType(irModule);
+        SLANG_PASS(legalizeArrayReturnType);
 
     if (isKhronosTarget(targetRequest) || target == CodeGenTarget::HLSL)
     {
-        legalizeUniformBufferLoad(irModule);
+        SLANG_PASS(legalizeUniformBufferLoad);
         if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::VulkanInvertY))
-            invertYOfPositionOutput(irModule);
+            SLANG_PASS(invertYOfPositionOutput);
         if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::VulkanUseDxPositionW))
-            rcpWOfPositionInput(irModule);
+            SLANG_PASS(rcpWOfPositionInput);
     }
 
     BufferElementTypeLoweringOptions bufferElementTypeLoweringOptions = {};
@@ -1891,7 +1803,10 @@ Result linkAndOptimizeIR(
     else
         bufferElementTypeLoweringOptions.loweringPolicyKind =
             BufferElementTypeLoweringPolicyKind::Default;
-    lowerBufferElementTypeToStorageType(targetProgram, irModule, bufferElementTypeLoweringOptions);
+    SLANG_PASS(
+        lowerBufferElementTypeToStorageType,
+        targetProgram,
+        bufferElementTypeLoweringOptions);
 
     // If we are generating code for glsl or metal, perform address space propagation now.
     // For SPIRV, we will do that during spirv legalization that happens after
@@ -1899,15 +1814,15 @@ Result linkAndOptimizeIR(
     if (target == CodeGenTarget::GLSL)
     {
         NoOpInitialAddressSpaceAssigner addrSpaceAssigner;
-        specializeAddressSpace(irModule, &addrSpaceAssigner);
+        SLANG_PASS(specializeAddressSpace, &addrSpaceAssigner);
     }
     else if (isMetalTarget(targetRequest))
     {
-        specializeAddressSpaceForMetal(irModule);
+        SLANG_PASS(specializeAddressSpaceForMetal);
     }
     else if (isWGPUTarget(targetRequest))
     {
-        specializeAddressSpaceForWGSL(irModule);
+        SLANG_PASS(specializeAddressSpaceForWGSL);
     }
 
     bool emitSpirvDirectly = targetProgram->shouldEmitSPIRVDirectly();
@@ -1919,35 +1834,35 @@ Result linkAndOptimizeIR(
         // lowerBufferElementTypeToStorageType, so that we can be more SPIRV conformant by
         // eliminating the case where an access chain is passed as function argument.
         // This is disallowed by SPIRV rule 2.16.1 when VariablePointer is not declared.
-        specializeFuncsForBufferLoadArgs(codeGenContext, irModule);
+        SLANG_PASS(specializeFuncsForBufferLoadArgs, codeGenContext);
     }
 
     // If we are generating code for CUDA, we should translate all immutable buffer loads to
     // using `__ldg` intrinsic for improved performance.
     if (isCUDATarget(targetRequest))
     {
-        lowerImmutableBufferLoadForCUDA(targetProgram, irModule);
+        SLANG_PASS(lowerImmutableBufferLoadForCUDA, targetProgram);
     }
 
-    performForceInlining(irModule);
+    SLANG_PASS(performForceInlining);
 
     if (emitSpirvDirectly)
     {
-        performIntrinsicFunctionInlining(irModule);
+        SLANG_PASS(performIntrinsicFunctionInlining);
     }
 
-    eliminateMultiLevelBreak(irModule);
+    SLANG_PASS(eliminateMultiLevelBreak);
 
     if (!fastIRSimplificationOptions.minimalOptimization)
     {
         IRSimplificationOptions simplificationOptions = fastIRSimplificationOptions;
         simplificationOptions.cfgOptions.removeTrivialSingleIterationLoops = true;
-        simplifyIR(targetProgram, irModule, simplificationOptions, sink);
+        SLANG_PASS(simplifyIR, targetProgram, simplificationOptions, sink);
     }
 
     if (isKhronosTarget(targetRequest) && !emitSpirvDirectly)
     {
-        legalizeModesOfNonCopyableOpaqueTypedParamsForGLSL(codeGenContext, irModule);
+        SLANG_PASS(legalizeModesOfNonCopyableOpaqueTypedParamsForGLSL, codeGenContext);
     }
 
     // As a late step, we need to take the SSA-form IR and move things *out*
@@ -1972,7 +1887,7 @@ Result linkAndOptimizeIR(
         //
         if (isEnabled(livenessMode))
         {
-            LivenessUtil::addVariableRangeStarts(irModule, livenessMode);
+            SLANG_PASS(LivenessUtil::addVariableRangeStarts, livenessMode);
         }
 
         // We only want to accumulate locations if liveness tracking is enabled.
@@ -1982,20 +1897,13 @@ Result linkAndOptimizeIR(
             phiEliminationOptions.eliminateCompositeTypedPhiOnly = false;
             phiEliminationOptions.useRegisterAllocation = true;
         }
-        eliminatePhis(livenessMode, irModule, phiEliminationOptions);
-#if 0
-        dumpIRIfEnabled(codeGenContext, irModule, "PHIS ELIMINATED");
-#endif
-
-        // If liveness is enabled add liveness ranges based on the accumulated liveness locations
+        SLANG_PASS(eliminatePhis, livenessMode, phiEliminationOptions);
+        // If liveness is enabled add liveness ranges based on the accumulated liveness
+        // locations
 
         if (isEnabled(livenessMode))
         {
-            LivenessUtil::addRangeEnds(irModule, livenessMode);
-
-#if 0
-            dumpIRIfEnabled(codeGenContext, irModule, "LIVENESS");
-#endif
+            SLANG_PASS(LivenessUtil::addRangeEnds, livenessMode);
         }
     }
 
@@ -2021,27 +1929,24 @@ Result linkAndOptimizeIR(
     {
         if (isKhronosTarget(targetRequest))
         {
-            applyGLSLLiveness(irModule);
+            SLANG_PASS(applyGLSLLiveness);
         }
     }
 
     if (isKhronosTarget(targetRequest) && emitSpirvDirectly)
     {
-        replaceLocationIntrinsicsWithRaytracingObject(targetProgram, irModule, sink);
+        SLANG_PASS(replaceLocationIntrinsicsWithRaytracingObject, targetProgram, sink);
     }
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
     // Run a final round of simplifications to clean up unused things after phi-elimination.
-    simplifyNonSSAIR(targetProgram, irModule, fastIRSimplificationOptions);
+    SLANG_PASS(simplifyNonSSAIR, targetProgram, fastIRSimplificationOptions);
 
     // We include one final step to (optionally) dump the IR and validate
     // it after all of the optimization passes are complete. This should
     // reflect the IR that code is generated from as closely as possible.
     //
-#if 0
-    dumpIRIfEnabled(codeGenContext, irModule, "OPTIMIZED");
-#endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
     if ((target != CodeGenTarget::SPIRV) && (target != CodeGenTarget::SPIRVAssembly))
@@ -2052,7 +1957,7 @@ Result linkAndOptimizeIR(
         // This is a separate pass because it needs to run after
         // all the other optimization passes have been performed.
 
-        applyVariableScopeCorrection(irModule, targetRequest);
+        SLANG_PASS(applyVariableScopeCorrection, targetRequest);
         validateIRModuleIfEnabled(codeGenContext, irModule);
     }
 
@@ -2061,17 +1966,19 @@ Result linkAndOptimizeIR(
 
     if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmbedDownstreamIR))
     {
-        unexportNonEmbeddableIR(target, irModule);
+        SLANG_PASS(unexportNonEmbeddableIR, target);
     }
 
-    collectMetadata(irModule, *metadata);
+    SLANG_PASS(collectMetadata, *metadata);
 
     outLinkedIR.metadata = metadata;
 
     if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
-        checkUnsupportedInst(codeGenContext->getTargetReq(), irModule, sink);
+        SLANG_PASS(checkUnsupportedInst, codeGenContext->getTargetReq(), sink);
 
     return sink->getErrorCount() == 0 ? SLANG_OK : SLANG_FAIL;
+
+#undef SLANG_PASS
 }
 
 SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outArtifact)
@@ -2796,7 +2703,6 @@ SlangResult emitSPIRVForEntryPointsDirectly(
     auto irModule = linkedIR.module;
     auto irEntryPoints = linkedIR.entryPoints;
 
-    dumpIRIfEnabled(codeGenContext, irModule, "POST LINK AND OPTIMIZE");
 
     auto targetRequest = codeGenContext->getTargetReq();
     auto targetCompilerOptions = targetRequest->getOptionSet();

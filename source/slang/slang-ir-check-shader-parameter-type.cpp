@@ -92,8 +92,8 @@ void checkForInvalidShaderParameterTypeForMetal(IRModule* module, DiagnosticSink
     }
 }
 void checkForInvalidShaderParameterType(
-    TargetRequest* target,
     IRModule* module,
+    TargetRequest* target,
     DiagnosticSink* sink)
 {
     if (isMetalTarget(target))

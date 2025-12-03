@@ -30,13 +30,13 @@ struct IRSimplificationOptions
 // Run a combination of SSA, SCCP, SimplifyCFG, and DeadCodeElimination pass
 // until no more changes are possible.
 void simplifyIR(
-    TargetProgram* target,
     IRModule* module,
+    TargetProgram* target,
     IRSimplificationOptions options,
     DiagnosticSink* sink = nullptr);
 
 // Run simplifications on IR that is out of SSA form.
-void simplifyNonSSAIR(TargetProgram* target, IRModule* module, IRSimplificationOptions options);
+void simplifyNonSSAIR(IRModule* module, TargetProgram* target, IRSimplificationOptions options);
 
 void simplifyFunc(
     TargetProgram* target,

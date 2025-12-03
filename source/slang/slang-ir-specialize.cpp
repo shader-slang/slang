@@ -3017,8 +3017,8 @@ struct SpecializationContext
 };
 
 bool specializeModule(
-    TargetProgram* target,
     IRModule* module,
+    TargetProgram* target,
     DiagnosticSink* sink,
     SpecializationOptions options)
 {

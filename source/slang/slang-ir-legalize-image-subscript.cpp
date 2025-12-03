@@ -177,7 +177,7 @@ void legalizeStore(
         break;
     }
 }
-void legalizeImageSubscript(TargetRequest* target, IRModule* module, DiagnosticSink* sink)
+void legalizeImageSubscript(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
 {
     IRBuilder builder(module);
     for (auto globalInst : module->getModuleInst()->getChildren())

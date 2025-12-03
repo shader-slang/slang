@@ -25,7 +25,7 @@ void visitParent(List<IRMatrixType*>& typeWorkList, IRInst* parent)
     }
 }
 
-void specializeMatrixLayout(TargetProgram* target, IRModule* module)
+void specializeMatrixLayout(IRModule* module, TargetProgram* target)
 {
     List<IRMatrixType*> typeWorkList;
     visitParent(typeWorkList, module->getModuleInst());
