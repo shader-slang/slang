@@ -1364,7 +1364,8 @@ Result linkAndOptimizeIR(
         BufferElementTypeLoweringOptions bufferElementTypeLoweringOptions = {};
         bufferElementTypeLoweringOptions.loweringPolicyKind =
             BufferElementTypeLoweringPolicyKind::LLVM;
-        SLANG_PASS(lowerBufferElementTypeToStorageType,
+        SLANG_PASS(
+            lowerBufferElementTypeToStorageType,
             targetProgram,
             bufferElementTypeLoweringOptions);
     }
