@@ -2313,7 +2313,7 @@ struct IRPrelinkContext : IRSpecContext
         if (auto linkage = originalVal->findDecoration<IRLinkageDecoration>())
         {
             RefPtr<IRSpecSymbol> symbol;
-            if (shared->symbols.tryGetValue(linkage->getMangledName()), symbol)
+            if (shared->symbols.tryGetValue(linkage->getMangledName(), symbol))
             {
                 return symbol->irGlobalValue;
             }
