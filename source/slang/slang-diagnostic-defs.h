@@ -2624,9 +2624,10 @@ DIAGNOSTIC(
     cannotDefaultInitializeResource,
     "cannot default-initialize $0 with '{}'. Resource types must be explicitly initialized")
 
+// TODO: WAR for #8655. Change to error once Remix shaders initialize texture fields.
 DIAGNOSTIC(
     41024,
-    Error,
+    Warning,
     cannotDefaultInitializeStructWithUninitializedResource,
     "cannot default-initialize struct '$0' with '{}' because it contains an uninitialized $1 field")
 
