@@ -1220,6 +1220,7 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_KHR_fragment_shader_barycentric` : enables the SPV_KHR_fragment_shader_barycentric extension 
 * `SPV_KHR_non_semantic_info` : enables the SPV_KHR_non_semantic_info extension 
 * `SPV_KHR_device_group` : enables the SPV_KHR_device_group extension 
+* `SPV_KHR_variable_pointers` : enables the SPV_KHR_variable_pointers extension 
 * `SPV_KHR_ray_tracing` : enables the SPV_KHR_ray_tracing extension 
 * `SPV_KHR_ray_query` : enables the SPV_KHR_ray_query extension 
 * `SPV_KHR_ray_tracing_position_fetch` : enables the SPV_KHR_ray_tracing_position_fetch extension 
