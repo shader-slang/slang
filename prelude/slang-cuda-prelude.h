@@ -5332,7 +5332,8 @@ __forceinline__ __device__ VecTOut slangOptixCoopVecMatMul(
 
 
 // This implementation can only be enabled on CUDA Toolkit 12.5+
-#if (((__CUDACC_VER_MAJOR__ >= 12) && (__CUDACC_VER_MINOR__ >= 5)) || (CUDA_VERSION >= 12050))
+#if ((__CUDACC_VER_MAJOR__ > 12) || (__CUDACC_VER_MAJOR__ == 12 && __CUDACC_VER_MINOR__ >= 5)) \
+    || (CUDA_VERSION >= 12050)
 // The reason we have to implement our own wmma operation on CUDA is the interface
 // design of cooperative_matrix on Vulkan is quite different from CUDA WMMA API, where
 // SPIRV spec doesn't require the matrix layout during declaration of the cooperative_matrix,
