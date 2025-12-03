@@ -199,9 +199,27 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
 
     // Collect all stores and insert debug value insts to update debug vars.
 
+    // Helper func to check if the debug var's type is a specialized (generic) type.
+    // When a debug var has a specialized type, we can't use emitElementAddress
+    // with access chains because it expects IRStructType for field accesses.
+    auto hasSpecializedType = [&](IRInst* debugVar)
+    {
+        auto ptrType = as<IRPtrTypeBase>(debugVar->getDataType());
+        if (!ptrType)
+            return false;
+        return as<IRSpecialize>(ptrType->getValueType()) != nullptr;
+    };
+
     // Helper func to insert debugValue updates.
     auto setDebugValue = [&](IRInst* debugVar, IRInst* newValue, ArrayView<IRInst*> accessChain)
     {
+        // Skip debug value stores with non-empty access chains for specialized types,
+        // because emitElementAddress cannot handle field accesses on IRSpecialize types.
+        // This is a known limitation: we generate DebugLocalVariable and DebugTypeComposite
+        // for generic struct types, but we skip detailed value tracking for field accesses.
+        // The specialized types will be resolved after the specialization pass runs.
+        if (accessChain.getCount() > 0 && hasSpecializedType(debugVar))
+            return;
         auto ptr = builder.emitElementAddress(debugVar, accessChain);
         builder.emitDebugValue(ptr, newValue);
     };

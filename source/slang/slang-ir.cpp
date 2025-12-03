@@ -5010,11 +5010,9 @@ IRInst* IRBuilder::emitFieldExtract(IRInst* base, IRInst* fieldKey)
 {
     IRType* resultType = nullptr;
     auto valueType = base->getDataType();
-    // Resolve specialized types to get the underlying struct type
-    auto resolvedValueType = getResolvedInstForDecorations(valueType);
-    auto structType = as<IRStructType>(resolvedValueType);
+    auto structType = as<IRStructType>(valueType);
     SLANG_RELEASE_ASSERT(structType);
-    for (auto child : structType->getChildren())
+    for (auto child : valueType->getChildren())
     {
         auto field = as<IRStructField>(child);
         if (!field)
@@ -5073,11 +5071,9 @@ IRInst* IRBuilder::emitFieldAddress(IRInst* basePtr, IRInst* fieldKey)
         valueType = ptrLikeType->getElementType();
     }
     IRType* resultType = nullptr;
-    // Resolve specialized types to get the underlying struct type
-    auto resolvedValueType = getResolvedInstForDecorations(valueType);
-    auto structType = as<IRStructType>(resolvedValueType);
+    auto structType = as<IRStructType>(valueType);
     SLANG_RELEASE_ASSERT(structType);
-    for (auto child : structType->getChildren())
+    for (auto child : valueType->getChildren())
     {
         auto field = as<IRStructField>(child);
         if (!field)
@@ -5153,9 +5149,7 @@ IRInst* IRBuilder::emitElementExtract(IRInst* base, const ArrayView<IRInst*>& ac
         IRType* resultType = nullptr;
         if (auto structKey = as<IRStructKey>(access))
         {
-            // Resolve specialized types to get the underlying struct type
-            auto resolvedType = getResolvedInstForDecorations(base->getDataType());
-            auto structType = as<IRStructType>(resolvedType);
+            auto structType = as<IRStructType>(base->getDataType());
             SLANG_RELEASE_ASSERT(structType);
             for (auto field : structType->getFields())
             {
