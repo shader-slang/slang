@@ -11,7 +11,7 @@ void useStruct(SomeStruct s)
 [numthreads(1,1,1)]
 void computeMain(uint3 threadId : SV_DispatchThreadID)
 {
-    // CHECK: ([[# @LINE+1]]): error {{.*}} cannot default-initialize struct 'SomeStruct' with '{}' because it contains an uninitialized texture field
+    // CHECK: ([[# @LINE+1]]): warning {{.*}} cannot default-initialize struct 'SomeStruct' with '{}' because it contains an uninitialized texture field
     SomeStruct s = {};
 
     s.value = 10 + threadId.x;
