@@ -126,15 +126,13 @@ jobs:
 
   # Run slang-rhi tests when:
   # 1. full-gpu-tests is enabled AND
-  # 2. Either it's a pull request OR config is release AND
-  # 3. Not a Linux GPU (CUDA) build - slang-rhi-tests has hardcoded build paths that don't work
-  #    when build and test machines differ. See: https://github.com/shader-slang/slang-rhi/issues/592
+  # 2. Either it's a pull request OR config is release
   # This is to reduce the CI load but do some check on pull requests.
   # expensive slang-rhi tests are excluded with -tce option, because they are not relevant for Slang.
   test-slang-rhi:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
     timeout-minutes: 30
-    if: inputs.full-gpu-tests && (github.event_name == 'pull_request' || inputs.config == 'release') && inputs.artifact-suffix != '-cuda'
+    if: inputs.full-gpu-tests && (github.event_name == 'pull_request' || inputs.config == 'release')
     defaults:
       run:
         shell: bash
