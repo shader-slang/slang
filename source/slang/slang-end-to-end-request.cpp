@@ -1746,6 +1746,8 @@ static SlangResult _getWholeProgramResult(
     if (!targetProgram)
         return SLANG_FAIL;
     outArtifact = targetProgram->getExistingWholeProgramResult();
+    if (!outArtifact)
+        return SLANG_FAIL;
     return SLANG_OK;
 }
 

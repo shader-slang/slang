@@ -486,7 +486,7 @@ bool unrollLoopsInFunc(
     return true;
 }
 
-bool unrollLoopsInModule(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
+bool unrollLoopsInModule(IRModule* module, TargetProgram* target, DiagnosticSink* sink)
 {
     SLANG_PROFILE;
 

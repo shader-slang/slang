@@ -290,6 +290,11 @@ Reports the time spent in the downstream compiler.
 Reports compiler performance benchmark results. 
 
 
+<a id="report-detailed-perf-benchmark"></a>
+### -report-detailed-perf-benchmark
+Reports compiler performance benchmark results for each intermediate pass (implies [-report-perf-benchmark](#report-perf-benchmark)). 
+
+
 <a id="report-checkpoint-intermediates"></a>
 ### -report-checkpoint-intermediates
 Reports information about checkpoint contexts used for reverse-mode automatic differentiation. 
@@ -638,7 +643,7 @@ Dump intermediate outputs for debugging.
 
 <a id="dump-ir"></a>
 ### -dump-ir
-Dump the IR for debugging. 
+Dump the IR after every pass for debugging. 
 
 
 <a id="dump-ir-ids"></a>
@@ -673,7 +678,28 @@ Skip the code generation phase.
 
 <a id="validate-ir"></a>
 ### -validate-ir
-Validate the IR between the phases. 
+Validate the IR after select intermediate passes. 
+
+
+<a id="validate-ir-detailed"></a>
+### -validate-ir-detailed
+Perform debug validation on IR after each intermediate pass. 
+
+
+<a id="dump-ir-before"></a>
+### -dump-ir-before
+
+**-dump-ir-before &lt;pass-names&gt;**
+
+Dump IR before specified pass, may be specified more than once 
+
+
+<a id="dump-ir-after"></a>
+### -dump-ir-after
+
+**-dump-ir-after &lt;pass-names&gt;**
+
+Dump IR after specified pass, may be specified more than once 
 
 
 <a id="verbose-paths"></a>
@@ -1194,6 +1220,7 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_KHR_fragment_shader_barycentric` : enables the SPV_KHR_fragment_shader_barycentric extension 
 * `SPV_KHR_non_semantic_info` : enables the SPV_KHR_non_semantic_info extension 
 * `SPV_KHR_device_group` : enables the SPV_KHR_device_group extension 
+* `SPV_KHR_variable_pointers` : enables the SPV_KHR_variable_pointers extension 
 * `SPV_KHR_ray_tracing` : enables the SPV_KHR_ray_tracing extension 
 * `SPV_KHR_ray_query` : enables the SPV_KHR_ray_query extension 
 * `SPV_KHR_ray_tracing_position_fetch` : enables the SPV_KHR_ray_tracing_position_fetch extension 

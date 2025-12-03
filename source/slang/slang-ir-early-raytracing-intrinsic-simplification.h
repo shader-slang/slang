@@ -12,7 +12,7 @@ class DiagnosticSink;
 class TargetProgram;
 
 void replaceLocationIntrinsicsWithRaytracingObject(
-    TargetProgram* target,
     IRModule* module,
+    TargetProgram* target,
     DiagnosticSink* sink);
 } // namespace Slang

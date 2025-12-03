@@ -878,6 +878,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // >     - a pointer to an element in an array that is a memory object
         // >       declaration, where the element type is OpTypeSampler or OpTypeImage.
         //
+        // However, this restriction is removed for Workgroup and StorageBuffer if
+        // VariablePointers or VariablePointersStorageBuffer is declared.
+        // > If the VariablePointers or VariablePointersStorageBuffer capability is declared, (...)
+        // > For pointer operands to OpFunctionCall, the memory object declaration-restriction is
+        // > removed for the following storage classes:
+        // > - StorageBuffer
+        // > - Workgroup
         List<IRInst*> newArgs;
         struct WriteBackPair
         {
@@ -895,10 +902,20 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             auto paramType = funcType->getParamType(i);
             if (auto ptrType = as<IRPtrType>(paramType))
             {
+                if (ptrType->getAddressSpace() == AddressSpace::GroupShared)
+                {
+                    // If the parameter has an explicit pointer type in groupshared space,
+                    // then we know the user is using the variable pointer
+                    // capability to pass a true pointer.
+                    // In this case we should not rewrite the call.
+                    newArgs.add(arg);
+                    m_sharedContext->m_needVariablePointer = true;
+                    continue;
+                }
                 if (ptrType->getAddressSpace() == AddressSpace::UserPointer)
                 {
                     // If the parameter has an explicit pointer type,
-                    // then we know the user is using the variable pointer
+                    // then we know the user is using the PhysicalStorageBuffer
                     // capability to pass a true pointer.
                     // In this case we should not rewrite the call.
                     newArgs.add(arg);
@@ -948,6 +965,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                         }
                     }
                 }
+            }
+
+            // If the user is requesting variable pointers, we don't need to do any transform.
+            if (m_sharedContext->m_needVariablePointer)
+            {
+                newArgs.add(arg);
+                continue;
             }
 
             // If we reach here, we need to allocate a temp var.
@@ -1969,6 +1993,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             m_sharedContext->m_memoryModel = SpvMemoryModelVulkan;
         }
 
+        if (targetCaps.implies(CapabilityAtom::SPV_KHR_variable_pointers))
+        {
+            m_sharedContext->m_needVariablePointer = true;
+        }
+
         if (m_sharedContext->m_spvVersion < 0x10300)
         {
             // Direct SPIRV backend does not support generating SPIRV before 1.3,
@@ -2333,7 +2362,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
         // The above step may produce empty struct types, so we need to lower them out of
         // existence.
-        legalizeEmptyTypes(m_sharedContext->m_targetProgram, m_module, m_sink);
+        legalizeEmptyTypes(m_module, m_sharedContext->m_targetProgram, m_sink);
 
         // Propagate alignment hints on address instructions.
         propagateAddressAlignment();

@@ -312,7 +312,7 @@ struct DeferBufferLoadContext
     }
 };
 
-void deferBufferLoad(CodeGenContext* codeGenContext, IRModule* module)
+void deferBufferLoad(IRModule* module, CodeGenContext* codeGenContext)
 {
     DeferBufferLoadContext context;
     context.codeGenContext = codeGenContext;
