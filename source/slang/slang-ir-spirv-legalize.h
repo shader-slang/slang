@@ -29,6 +29,7 @@ struct SPIRVEmitSharedContext
     IRInst* m_voidType;
 
     unsigned int m_spvVersion = 0x10000;
+    bool m_needVariablePointer = false;
     bool m_useDemoteToHelperInvocationExtension = false;
 
     SpvMemoryModel m_memoryModel = SpvMemoryModelGLSL450;

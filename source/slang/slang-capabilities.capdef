@@ -527,6 +527,9 @@ def SPV_KHR_non_semantic_info : _spirv_1_0;
 /// [EXT]
 def SPV_KHR_device_group : _spirv_1_0;
 
+/// Represents the SPIRV-V Variable Pointers extension.
+def SPV_KHR_variable_pointers : _spirv_1_0;
+
 /// Represents the SPIR-V extension for ray tracing.
 /// [EXT]
 def SPV_KHR_ray_tracing : _spirv_1_4;
