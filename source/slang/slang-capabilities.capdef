@@ -556,10 +556,15 @@ def SPV_KHR_subgroup_rotate : _spirv_1_3;
 /// [EXT]
 def SPV_NV_ray_tracing_motion_blur : _spirv_1_0;
 
-/// Represents the SPIR-V extension for shader invocation reorder.
+/// Represents the SPIR-V extension for shader invocation reorder (NVIDIA-specific).
 /// Requires SPV_KHR_ray_tracing.
 /// [EXT]
 def SPV_NV_shader_invocation_reorder : _spirv_1_5 + SPV_KHR_ray_tracing;
+
+/// Represents the SPIR-V extension for shader invocation reorder (cross-vendor standard).
+/// Requires SPV_KHR_ray_tracing and SPIR-V 1.4.
+/// [EXT]
+def SPV_EXT_shader_invocation_reorder : _spirv_1_4 + SPV_KHR_ray_tracing;
 
 /// Represents the SPIR-V extension for cluster acceleration structure.
 /// [EXT]
@@ -735,9 +740,13 @@ def spvRayQueryKHR : SPV_KHR_ray_query;
 /// [EXT]
 def spvRayQueryPositionFetchKHR : SPV_KHR_ray_tracing_position_fetch + spvRayQueryKHR;
 
-/// Represents the SPIR-V capability for shader invocation reorder.
+/// Represents the SPIR-V capability for shader invocation reorder (NVIDIA-specific).
 /// [EXT]
 def spvShaderInvocationReorderNV : SPV_NV_shader_invocation_reorder;
+
+/// Represents the SPIR-V capability for shader invocation reorder (cross-vendor standard).
+/// [EXT]
+def spvShaderInvocationReorderEXT : SPV_EXT_shader_invocation_reorder;
 
 /// Represents the SPIR-V capability for cluster acceleration structure.
 /// [EXT]
@@ -903,6 +912,7 @@ def _GL_NV_ray_tracing : _GL_EXT_ray_tracing;
 def _GL_NV_ray_tracing_motion_blur : _GLSL_460;
 def _GL_NV_shader_atomic_fp16_vector : _GL_NV_gpu_shader5;
 def _GL_NV_shader_invocation_reorder : _GLSL_460;
+def _GL_EXT_shader_invocation_reorder : _GLSL_460;
 def _GL_NV_shader_subgroup_partitioned : _GLSL_140;
 def _GL_NV_shader_texture_footprint : _GLSL_450;
 def _GL_NV_cluster_acceleration_structure : _GLSL_460;
@@ -1147,9 +1157,22 @@ alias GL_NV_ray_tracing_motion_blur = _GL_NV_ray_tracing_motion_blur | spvRayTra
 /// [EXT]
 alias GL_NV_shader_atomic_fp16_vector = _GL_NV_shader_atomic_fp16_vector + _GL_NV_gpu_shader5 | _spirv_1_0;
 
-/// Represents the GL_NV_shader_invocation_reorder extension.
+/// Represents the GL_NV_shader_invocation_reorder extension (NVIDIA-specific).
 /// [EXT]
 alias GL_NV_shader_invocation_reorder = _GL_NV_shader_invocation_reorder + _GL_EXT_buffer_reference_uvec2 | spvShaderInvocationReorderNV;
+
+/// Represents the GL_EXT_shader_invocation_reorder extension (cross-vendor standard).
+/// Requires GL_EXT_ray_tracing and GL_EXT_buffer_reference_uvec2.
+/// [EXT]
+alias GL_EXT_shader_invocation_reorder = _GL_EXT_shader_invocation_reorder + _GL_EXT_buffer_reference_uvec2 | spvShaderInvocationReorderEXT;
+
+/// Represents GLSL targeting NVIDIA-specific SER (for backward compatibility).
+/// [Target]
+def glsl_nv : glsl + GL_NV_shader_invocation_reorder;
+
+/// Represents SPIRV targeting NVIDIA-specific SER (for backward compatibility).
+/// [Target]
+def spirv_nv : spirv + spvShaderInvocationReorderNV;
 
 /// Represents the GL_NV_shader_subgroup_partitioned extension.
 /// [EXT]
@@ -1189,8 +1212,9 @@ def ser_hlsl_native : _sm_6_9;
 alias ser_dxr = raytracing + ser_hlsl_native;
 
 /// Capabilities needed for shader-execution-reordering (all paths)
+/// Includes NVIDIA-specific (NV), cross-vendor standard (EXT), DXR 1.3 native, and CUDA paths
 /// [Compound]
-alias ser = raytracing + GL_NV_shader_invocation_reorder | ser_nvapi | ser_dxr | cuda;
+alias ser = raytracing + GL_NV_shader_invocation_reorder | raytracing + GL_EXT_shader_invocation_reorder | ser_nvapi | ser_dxr | cuda;
 
 /// Capabilities needed for raytracing-motionblur
 /// [Compound]

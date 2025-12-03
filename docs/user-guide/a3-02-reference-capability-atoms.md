@@ -30,6 +30,9 @@ Targets
 `glsl`
 > Represents the GLSL code generation target.
 
+`glsl_nv`
+> Represents GLSL targeting NVIDIA-specific SER (for backward compatibility).
+
 `hlsl`
 > Represents the HLSL code generation target.
 
@@ -41,6 +44,9 @@ Targets
 
 `spirv`
 > Represents the SPIR-V code generation target.
+
+`spirv_nv`
+> Represents SPIRV targeting NVIDIA-specific SER (for backward compatibility).
 
 `textualTarget`
 > Represents a non-assembly code generation target.
@@ -478,6 +484,10 @@ Extensions
 `GL_EXT_shader_image_load_store`
 > Represents the GL_EXT_shader_image_load_store extension.
 
+`GL_EXT_shader_invocation_reorder`
+> Represents the GL_EXT_shader_invocation_reorder extension (cross-vendor standard).
+> Requires GL_EXT_ray_tracing and GL_EXT_buffer_reference_uvec2.
+
 `GL_EXT_shader_quad_control`
 > Represents the GL_EXT_shader_quad_control extension.
 
@@ -554,7 +564,7 @@ Extensions
 > Represents the GL_NV_shader_atomic_fp16_vector extension.
 
 `GL_NV_shader_invocation_reorder`
-> Represents the GL_NV_shader_invocation_reorder extension.
+> Represents the GL_NV_shader_invocation_reorder extension (NVIDIA-specific).
 
 `GL_NV_shader_subgroup_partitioned`
 > Represents the GL_NV_shader_subgroup_partitioned extension.
@@ -591,6 +601,10 @@ Extensions
 
 `SPV_EXT_shader_atomic_float_min_max`
 > Represents the SPIR-V extension for atomic float min/max operations.
+
+`SPV_EXT_shader_invocation_reorder`
+> Represents the SPIR-V extension for shader invocation reorder (cross-vendor standard).
+> Requires SPV_KHR_ray_tracing and SPIR-V 1.4.
 
 `SPV_GOOGLE_user_type`
 > Represents the SPIR-V extension for SPV_GOOGLE_user_type.
@@ -660,7 +674,7 @@ Extensions
 > Represents the SPIR-V extension for shader image footprint.
 
 `SPV_NV_shader_invocation_reorder`
-> Represents the SPIR-V extension for shader invocation reorder.
+> Represents the SPIR-V extension for shader invocation reorder (NVIDIA-specific).
 > Requires SPV_KHR_ray_tracing.
 
 `SPV_NV_shader_subgroup_partitioned`
@@ -810,8 +824,11 @@ Extensions
 `spvShaderClockKHR`
 > Represents the SPIR-V capability for shader clock.
 
+`spvShaderInvocationReorderEXT`
+> Represents the SPIR-V capability for shader invocation reorder (cross-vendor standard).
+
 `spvShaderInvocationReorderNV`
-> Represents the SPIR-V capability for shader invocation reorder.
+> Represents the SPIR-V capability for shader invocation reorder (NVIDIA-specific).
 
 `spvShaderNonUniform`
 > Represents the SPIR-V capability for non-uniform resource indexing.
@@ -1244,6 +1261,7 @@ Compound Capabilities
 
 `ser`
 > Capabilities needed for shader-execution-reordering (all paths)
+> Includes NVIDIA-specific (NV), cross-vendor standard (EXT), DXR 1.3 native, and CUDA paths
 
 `ser_any_closesthit_intersection_miss`
 > Collection of capabilities for raytracing + shader execution reordering and the shader stages of anyhit, closesthit, intersection, and miss.

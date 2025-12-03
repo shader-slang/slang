@@ -20737,7 +20737,7 @@ struct HitObject
                 Payload = p;
             }
         case cuda: __intrinsic_asm "optixTraverse";
-        case spirv:
+        case spirv_nv:
             {
                 [__vulkanRayPayload]
                 static payload_t p;
@@ -20754,6 +20754,40 @@ struct HitObject
                     OpExtension "SPV_NV_shader_invocation_reorder";
                     OpCapability ShaderInvocationReorderNV;
                     OpHitObjectTraceRayNV
+                        /**/ &__return_val
+                        /**/ $AccelerationStructure
+                        /**/ $RayFlags
+                        /**/ $InstanceInclusionMask
+                        /**/ $RayContributionToHitGroupIndex
+                        /**/ $MultiplierForGeometryContributionToHitGroupIndex
+                        /**/ $MissShaderIndex
+                        /**/ $origin
+                        /**/ $tmin
+                        /**/ $direction
+                        /**/ $tmax
+                        /**/ &p;
+                };
+
+                // Write the payload out
+                Payload = p;
+            }
+        case spirv:
+            {
+                [__vulkanRayPayload]
+                static payload_t p;
+
+                // Save the payload
+                p = Payload;
+
+                let origin = Ray.Origin;
+                let direction = Ray.Direction;
+                let tmin = Ray.TMin;
+                let tmax = Ray.TMax;
+                spirv_asm
+                {
+                    OpExtension "SPV_EXT_shader_invocation_reorder";
+                    OpCapability ShaderInvocationReorderEXT;
+                    OpHitObjectTraceRayEXT
                         /**/ &__return_val
                         /**/ $AccelerationStructure
                         /**/ $RayFlags
@@ -20829,7 +20863,7 @@ struct HitObject
                 Payload = p;
             }
         case cuda: __intrinsic_asm "optixTraverse";
-        case spirv:
+        case spirv_nv:
             {
                 [__vulkanRayPayload]
                 static payload_t p;
@@ -20866,6 +20900,43 @@ struct HitObject
                 // Write the payload out
                 Payload = p;
             }
+        case spirv:
+            {
+                [__vulkanRayPayload]
+                static payload_t p;
+
+                // Save the payload
+                p = Payload;
+
+                let origin = Ray.Origin;
+                let direction = Ray.Direction;
+                let tmin = Ray.TMin;
+                let tmax = Ray.TMax;
+                spirv_asm
+                {
+                    OpExtension "SPV_EXT_shader_invocation_reorder";
+                    OpCapability ShaderInvocationReorderEXT;
+                    OpExtension "SPV_NV_ray_tracing_motion_blur";
+                    OpCapability RayTracingMotionBlurNV;
+                    OpHitObjectTraceRayMotionEXT
+                        /**/ &__return_val
+                        /**/ $AccelerationStructure
+                        /**/ $RayFlags
+                        /**/ $InstanceInclusionMask
+                        /**/ $RayContributionToHitGroupIndex
+                        /**/ $MultiplierForGeometryContributionToHitGroupIndex
+                        /**/ $MissShaderIndex
+                        /**/ $origin
+                        /**/ $tmin
+                        /**/ $direction
+                        /**/ $tmax
+                        /**/ $CurrentTime
+                        /**/ &p;
+                };
+
+                // Write the payload out
+                Payload = p;
+            }
         }
 
     }
@@ -20877,7 +20948,10 @@ struct HitObject
         /// Attributes parameter must either be an attribute struct, such as
         /// BuiltInTriangleIntersectionAttributes, or another HitObject to copy the attributes from.
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda, ser_raygen_closesthit_miss)]
+    [require(glsl, ser_raygen_closesthit_miss)]
+    [require(hlsl, ser_raygen_closesthit_miss)]
+    [require(spirv_nv, ser_raygen_closesthit_miss)]
     static HitObject MakeHit<attr_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         uint InstanceIndex,
@@ -20926,7 +21000,7 @@ struct HitObject
                     __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
             }
         case cuda: __intrinsic_asm "optixMakeHitObject";
-        case spirv:
+        case spirv_nv:
             {
                 // Save the attributes
                 __Addr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
@@ -20963,7 +21037,10 @@ struct HitObject
         /// See MakeHit but handles Motion
         /// Currently only supported on VK
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, ser_motion_raygen_closesthit_miss)]
+    [require(cuda, ser_motion_raygen_closesthit_miss)]
+    [require(glsl, ser_motion_raygen_closesthit_miss)]
+    [require(hlsl, ser_motion_raygen_closesthit_miss)]
+    [require(spirv_nv, ser_motion_raygen_closesthit_miss)]
     static HitObject MakeMotionHit<attr_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         uint InstanceIndex,
@@ -21001,7 +21078,7 @@ struct HitObject
                 __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
         }
         case cuda: __intrinsic_asm "optixMakeHitObject";
-        case spirv:
+        case spirv_nv:
         {
             // Save the attributes
             __Addr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
@@ -21046,7 +21123,10 @@ struct HitObject
         /// attribute struct, such as BuiltInTriangleIntersectionAttributes, or another HitObject to copy the
         /// attributes from.
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda, ser_raygen_closesthit_miss)]
+    [require(glsl, ser_raygen_closesthit_miss)]
+    [require(hlsl, ser_raygen_closesthit_miss)]
+    [require(spirv_nv, ser_raygen_closesthit_miss)]
     static HitObject MakeHit<attr_t>(
         uint HitGroupRecordIndex,
         RaytracingAccelerationStructure AccelerationStructure,
@@ -21092,7 +21172,7 @@ struct HitObject
                 __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
         }
         case cuda: __intrinsic_asm "optixMakeHitObject";
-        case spirv:
+        case spirv_nv:
         {
             // Save the attributes
             __Addr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
@@ -21125,7 +21205,9 @@ struct HitObject
         /// See MakeHit but handles Motion
         /// Currently only supported on VK
     [ForceInline]
-    [require(cuda_glsl_spirv, ser_motion_raygen_closesthit_miss)]
+    [require(cuda, ser_motion_raygen_closesthit_miss)]
+    [require(glsl, ser_motion_raygen_closesthit_miss)]
+    [require(spirv_nv, ser_motion_raygen_closesthit_miss)]
     static HitObject MakeMotionHit<attr_t>(
         uint HitGroupRecordIndex,
         RaytracingAccelerationStructure AccelerationStructure,
@@ -21160,7 +21242,7 @@ struct HitObject
                 __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
         }
         case cuda: __intrinsic_asm "optixMakeHitObject";
-        case spirv:
+        case spirv_nv:
         {
             // Save the attributes
             __Addr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
@@ -21208,7 +21290,7 @@ struct HitObject
         case glsl:
             __glslMakeMiss(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
         case cuda: __intrinsic_asm "optixMakeMissHitObject";
-        case spirv:
+        case spirv_nv:
             {
                 let origin = Ray.Origin;
                 let direction = Ray.Direction;
@@ -21219,6 +21301,25 @@ struct HitObject
                     OpExtension "SPV_NV_shader_invocation_reorder";
                     OpCapability ShaderInvocationReorderNV;
                     OpHitObjectRecordMissNV
+                        /**/ &__return_val
+                        /**/ $MissShaderIndex
+                        /**/ $origin
+                        /**/ $tmin
+                        /**/ $direction
+                        /**/ $tmax;
+                };
+            }
+        case spirv:
+            {
+                let origin = Ray.Origin;
+                let direction = Ray.Direction;
+                let tmin = Ray.TMin;
+                let tmax = Ray.TMax;
+                spirv_asm
+                {
+                    OpExtension "SPV_EXT_shader_invocation_reorder";
+                    OpCapability ShaderInvocationReorderEXT;
+                    OpHitObjectRecordMissEXT
                         /**/ &__return_val
                         /**/ $MissShaderIndex
                         /**/ $origin
@@ -21245,7 +21346,7 @@ struct HitObject
         case glsl:
             __glslMakeMotionMiss(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax, CurrentTime);
         case cuda: __intrinsic_asm "optixMakeMissHitObject";
-        case spirv:
+        case spirv_nv:
             {
                 let origin = Ray.Origin;
                 let direction = Ray.Direction;
@@ -21258,6 +21359,28 @@ struct HitObject
                     OpExtension "SPV_NV_shader_invocation_reorder";
                     OpCapability ShaderInvocationReorderNV;
                     OpHitObjectRecordMissMotionNV
+                        /**/ &__return_val
+                        /**/ $MissShaderIndex
+                        /**/ $origin
+                        /**/ $tmin
+                        /**/ $direction
+                        /**/ $tmax
+                        /**/ $CurrentTime;
+                };
+            }
+        case spirv:
+            {
+                let origin = Ray.Origin;
+                let direction = Ray.Direction;
+                let tmin = Ray.TMin;
+                let tmax = Ray.TMax;
+                spirv_asm
+                {
+                    OpExtension "SPV_NV_ray_tracing_motion_blur";
+                    OpCapability RayTracingMotionBlurNV;
+                    OpExtension "SPV_EXT_shader_invocation_reorder";
+                    OpCapability ShaderInvocationReorderEXT;
+                    OpHitObjectRecordMissMotionEXT
                         /**/ &__return_val
                         /**/ $MissShaderIndex
                         /**/ $origin
@@ -21288,12 +21411,20 @@ struct HitObject
         case glsl:
             __glslMakeNop(__return_val);
         case cuda: __intrinsic_asm "slangOptixMakeNopHitObject";
-        case spirv:
+        case spirv_nv:
             spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 OpHitObjectRecordEmptyNV
+                    /**/ &__return_val;
+            };
+        case spirv:
+            spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                OpHitObjectRecordEmptyEXT
                     /**/ &__return_val;
             };
         case hlsl:
@@ -21358,6 +21489,26 @@ struct HitObject
                 Payload = p;
             }
         case cuda: __intrinsic_asm "optixInvoke";
+        case spirv_nv:
+            {
+                [__vulkanRayPayload]
+                static payload_t p;
+
+                // Save the payload
+                p = Payload;
+
+                spirv_asm
+                {
+                    OpExtension "SPV_NV_shader_invocation_reorder";
+                    OpCapability ShaderInvocationReorderNV;
+                    OpHitObjectExecuteShaderNV
+                        /**/ &HitOrMiss
+                        /**/ &p;
+                };
+
+                // Write payload result
+                Payload = p;
+            }
         case spirv:
             {
                 [__vulkanRayPayload]
@@ -21368,9 +21519,9 @@ struct HitObject
 
                 spirv_asm
                 {
-                OpExtension "SPV_NV_shader_invocation_reorder";
-                OpCapability ShaderInvocationReorderNV;
-                    OpHitObjectExecuteShaderNV
+                    OpExtension "SPV_EXT_shader_invocation_reorder";
+                    OpCapability ShaderInvocationReorderEXT;
+                    OpHitObjectExecuteShaderEXT
                         /**/ &HitOrMiss
                         /**/ &p;
                 };
@@ -21408,12 +21559,19 @@ struct HitObject
         case hlsl: __intrinsic_asm ".IsMiss";
         case glsl: __intrinsic_asm "hitObjectIsMissNV($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectIsMiss";
-        case spirv:
+        case spirv_nv:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$bool = OpHitObjectIsMissNV &this;
+            };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$bool = OpHitObjectIsMissEXT &this;
             };
         }
     }
@@ -21428,12 +21586,19 @@ struct HitObject
         case hlsl: __intrinsic_asm ".IsHit";
         case glsl: __intrinsic_asm "hitObjectIsHitNV($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectIsHit";
-        case spirv:
+        case spirv_nv:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$bool = OpHitObjectIsHitNV &this;
+            };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$bool = OpHitObjectIsHitEXT &this;
             };
         }
     }
@@ -21448,12 +21613,19 @@ struct HitObject
         case hlsl: __intrinsic_asm ".IsNop";
         case glsl: __intrinsic_asm "hitObjectIsEmptyNV($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectIsNop";
-        case spirv:
+        case spirv_nv:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$bool = OpHitObjectIsEmptyNV &this;
+            };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$bool = OpHitObjectIsEmptyEXT &this;
             };
         }
     }
@@ -21475,7 +21647,7 @@ struct HitObject
                 return ray;
             }
         case cuda: __intrinsic_asm "optixHitObjectGetRayDesc";
-        case spirv:
+        case spirv_nv:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
@@ -21484,6 +21656,17 @@ struct HitObject
                 %tmin:$$float = OpHitObjectGetRayTMinNV &this;
                 %direction:$$float3 = OpHitObjectGetWorldRayDirectionNV &this;
                 %tmax:$$float = OpHitObjectGetRayTMaxNV &this;
+                result:$$RayDesc = OpCompositeConstruct %origin %tmin %direction %tmax;
+            };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                %origin:$$float3 = OpHitObjectGetWorldRayOriginEXT &this;
+                %tmin:$$float = OpHitObjectGetRayTMinEXT &this;
+                %direction:$$float3 = OpHitObjectGetWorldRayDirectionEXT &this;
+                %tmax:$$float = OpHitObjectGetRayTMaxEXT &this;
                 result:$$RayDesc = OpCompositeConstruct %origin %tmin %direction %tmax;
             };
         }
@@ -21501,12 +21684,19 @@ struct HitObject
             __intrinsic_asm ".GetShaderTableIndex";
         case glsl: __intrinsic_asm "hitObjectGetShaderBindingTableRecordIndexNV($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetSbtRecordIndex";
-        case spirv:
+        case spirv_nv:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$uint = OpHitObjectGetShaderBindingTableRecordIndexNV &this;
+            };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$uint = OpHitObjectGetShaderBindingTableRecordIndexEXT &this;
             };
         }
     }
@@ -21535,12 +21725,19 @@ struct HitObject
             __intrinsic_asm ".GetInstanceIndex";
         case glsl: __intrinsic_asm "hitObjectGetInstanceIdNV($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetInstanceIndex";
-        case spirv:
+        case spirv_nv:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$uint = OpHitObjectGetInstanceIdNV &this;
+            };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$uint = OpHitObjectGetInstanceIdEXT &this;
             };
         }
     }
@@ -21557,12 +21754,19 @@ struct HitObject
             __intrinsic_asm ".GetInstanceID";
         case glsl: __intrinsic_asm "hitObjectGetInstanceCustomIndexNV($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetInstanceId";
-        case spirv:
+        case spirv_nv:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$uint = OpHitObjectGetInstanceCustomIndexNV &this;
+            };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$uint = OpHitObjectGetInstanceCustomIndexEXT &this;
             };
         }
     }
@@ -21579,12 +21783,19 @@ struct HitObject
             __intrinsic_asm ".GetGeometryIndex";
         case glsl: __intrinsic_asm "hitObjectGetGeometryIndexNV($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetSbtGASIndex";
-        case spirv:
+        case spirv_nv:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$uint = OpHitObjectGetGeometryIndexNV &this;
+            };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$uint = OpHitObjectGetGeometryIndexEXT &this;
             };
         }
     }
@@ -21601,12 +21812,19 @@ struct HitObject
             __intrinsic_asm ".GetPrimitiveIndex";
         case glsl: __intrinsic_asm "hitObjectGetPrimitiveIndexNV($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetPrimitiveIndex";
-        case spirv:
+        case spirv_nv:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$uint = OpHitObjectGetPrimitiveIndexNV &this;
+            };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$uint = OpHitObjectGetPrimitiveIndexEXT &this;
             };
         }
     }
@@ -21623,12 +21841,19 @@ struct HitObject
             __intrinsic_asm ".GetHitKind";
         case glsl: __intrinsic_asm "hitObjectGetHitKindNV($0)";
         case cuda: __intrinsic_asm "optixHitObjectGetHitKind()";
-        case spirv:
+        case spirv_nv:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$uint = OpHitObjectGetHitKindNV &this;
+            };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$uint = OpHitObjectGetHitKindEXT &this;
             };
         }
     }
@@ -21769,12 +21994,19 @@ struct HitObject
         {
         case hlsl_nvapi: __intrinsic_asm ".GetWorldToObject";
         case glsl: __intrinsic_asm "hitObjectGetWorldToObjectNV($0)";
-        case spirv:
+        case spirv_nv:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$float4x3 = OpHitObjectGetWorldToObjectNV &this;
+            };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$float4x3 = OpHitObjectGetWorldToObjectEXT &this;
             };
         }
     }
@@ -21791,12 +22023,19 @@ struct HitObject
         {
         case hlsl_nvapi: __intrinsic_asm ".GetObjectToWorld";
         case glsl: __intrinsic_asm "hitObjectGetObjectToWorldNV($0)";
-        case spirv:
+        case spirv_nv:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$float4x3 = OpHitObjectGetObjectToWorldNV &this;
+            };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$float4x3 = OpHitObjectGetObjectToWorldEXT &this;
             };
         }
     }
@@ -21808,12 +22047,19 @@ struct HitObject
         {
         case glsl:
             __intrinsic_asm "hitObjectGetCurrentTimeNV($0)";
-        case spirv:
+        case spirv_nv:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$float = OpHitObjectGetCurrentTimeNV &this
+            };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$float = OpHitObjectGetCurrentTimeEXT &this
             };
         }
     }
@@ -21829,12 +22075,19 @@ struct HitObject
         case glsl:
             __intrinsic_asm "hitObjectGetObjectRayOriginNV($0)";
         case cuda: __intrinsic_asm "optixGetObjectRayOrigin()";
-        case spirv:
+        case spirv_nv:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$float3 = OpHitObjectGetObjectRayOriginNV &this
+            };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$float3 = OpHitObjectGetObjectRayOriginEXT &this
             };
         }
     }
@@ -21850,12 +22103,19 @@ struct HitObject
         case glsl:
             __intrinsic_asm "hitObjectGetObjectRayDirectionNV($0)";
         case cuda: __intrinsic_asm "optixGetObjectRayDirection()";
-        case spirv:
+        case spirv_nv:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$float3 = OpHitObjectGetObjectRayDirectionNV &this
+            };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$float3 = OpHitObjectGetObjectRayDirectionEXT &this
             };
         }
     }
@@ -21867,12 +22127,19 @@ struct HitObject
         {
         case glsl:
             __intrinsic_asm "hitObjectGetShaderRecordBufferHandleNV($0)";
-        case spirv:
+        case spirv_nv:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$uint2 = OpHitObjectGetShaderRecordBufferHandleNV &this
+            };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$uint2 = OpHitObjectGetShaderRecordBufferHandleEXT &this
             };
         }
     }
@@ -21905,7 +22172,7 @@ struct HitObject
                 return __hitObjectAttributes<attr_t>();
             }
         case cuda: __intrinsic_asm "optixHitObjectGetAttribute<$TR>($0)";
-        case spirv:
+        case spirv_nv:
             {
                 __Addr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
                 spirv_asm
@@ -21913,6 +22180,17 @@ struct HitObject
                     OpExtension "SPV_NV_shader_invocation_reorder";
                     OpCapability ShaderInvocationReorderNV;
                     OpHitObjectGetAttributesNV &this $attr;
+                };
+                return *attr;
+            }
+        case spirv:
+            {
+                __Addr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
+                spirv_asm
+                {
+                    OpExtension "SPV_EXT_shader_invocation_reorder";
+                    OpCapability ShaderInvocationReorderEXT;
+                    OpHitObjectGetAttributesEXT &this $attr;
                 };
                 return *attr;
             }
@@ -22472,12 +22750,19 @@ void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
     case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
     case glsl: __intrinsic_asm "reorderThreadNV";
     case cuda: __intrinsic_asm "optixReorder";
-    case spirv:
+    case spirv_nv:
         spirv_asm
         {
             OpExtension "SPV_NV_shader_invocation_reorder";
             OpCapability ShaderInvocationReorderNV;
             OpReorderThreadWithHintNV $CoherenceHint $NumCoherenceHintBitsFromLSB;
+        };
+    case spirv:
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpReorderThreadWithHintEXT $CoherenceHint $NumCoherenceHintBitsFromLSB;
         };
     }
 }
@@ -22510,12 +22795,19 @@ void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHi
     case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
     case glsl: __intrinsic_asm "reorderThreadNV";
     case cuda: __intrinsic_asm "optixReorder($1, $2)";
-    case spirv:
+    case spirv_nv:
         spirv_asm
         {
             OpExtension "SPV_NV_shader_invocation_reorder";
             OpCapability ShaderInvocationReorderNV;
             OpReorderThreadWithHitObjectNV &HitOrMiss $CoherenceHint $NumCoherenceHintBitsFromLSB;
+        };
+    case spirv:
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpReorderThreadWithHitObjectEXT &HitOrMiss $CoherenceHint $NumCoherenceHintBitsFromLSB;
         };
     }
 }
@@ -22538,12 +22830,19 @@ void ReorderThread( HitObject HitOrMiss )
     case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
     case glsl: __intrinsic_asm "reorderThreadNV";
     case cuda: __intrinsic_asm "optixReorder()";
-    case spirv:
+    case spirv_nv:
         spirv_asm
         {
             OpExtension "SPV_NV_shader_invocation_reorder";
             OpCapability ShaderInvocationReorderNV;
             OpReorderThreadWithHitObjectNV &HitOrMiss;
+        };
+    case spirv:
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpReorderThreadWithHitObjectEXT &HitOrMiss;
         };
     }
 }
