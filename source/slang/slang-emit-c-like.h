@@ -766,9 +766,6 @@ protected:
     // Rename entry point if target doesn't allow the name (e.g., 'main')
     virtual String maybeMakeEntryPointNameValid(String name, DiagnosticSink* sink);
 
-    // Indicates if we are emiting for DXC cooperative vector POC.
-    bool isCoopvecPoc = false;
-
     // Indicates if we are emiting for Optix cooperative vector.
     bool isOptixCoopVec = false;
 
