@@ -5,7 +5,7 @@
 
 namespace Slang
 {
-UInt findUnusedSpaceIndex(TargetProgram* targetProgram, IRModule* module)
+UInt findUnusedSpaceIndex(TargetProgram* targetProgram, IRModule* module, DiagnosticSink* sink)
 {
     HashSet<int> usedSpaces;
     auto processVarLayout = [&](IRVarLayout* varLayout)
@@ -50,12 +50,25 @@ UInt findUnusedSpaceIndex(TargetProgram* targetProgram, IRModule* module)
     }
 
     // Find next unused space index.
-    int index = targetProgram->getOptionSet().getIntOption(CompilerOptionName::BindlessSpaceIndex);
-    while (usedSpaces.contains(index))
+    int requestedIndex =
+        targetProgram->getOptionSet().getIntOption(CompilerOptionName::BindlessSpaceIndex);
+    int availableIndex = requestedIndex;
+
+    while (usedSpaces.contains(availableIndex))
     {
-        index++;
+        availableIndex++;
     }
-    return index;
+
+    if (availableIndex != requestedIndex &&
+        targetProgram->getOptionSet().hasOption(CompilerOptionName::BindlessSpaceIndex))
+    {
+        sink->diagnose(
+            SourceLoc(),
+            Diagnostics::requestedBindlessSpaceIndexUnavailable,
+            requestedIndex,
+            availableIndex);
+    }
+    return availableIndex;
 }
 
 IRVarLayout* createResourceHeapVarLayoutWithSpaceAndBinding(
@@ -79,8 +92,7 @@ IRVarLayout* createResourceHeapVarLayoutWithSpaceAndBinding(
 
 void lowerDynamicResourceHeap(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
-    SLANG_UNUSED(sink);
-    auto unusedSpaceIndex = findUnusedSpaceIndex(targetProgram, module);
+    auto unusedSpaceIndex = findUnusedSpaceIndex(targetProgram, module, sink);
     List<IRInst*> workList;
     for (auto globalInst : module->getGlobalInsts())
     {

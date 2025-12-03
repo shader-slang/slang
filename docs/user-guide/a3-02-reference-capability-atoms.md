@@ -1473,6 +1473,9 @@ Other
 `SPIRV_1_6`
 > Use `spirv_1_6` instead
 
+`SPV_KHR_variable_pointers`
+> Represents the SPIRV-V Variable Pointers extension.
+
 `all`
 > User should not use this capability
 
