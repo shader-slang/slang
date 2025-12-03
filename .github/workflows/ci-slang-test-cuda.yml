@@ -32,6 +32,7 @@ jobs:
       - name: Install Git
         run: |
           apt-get update && apt-get install -y git
+          git config --global --add safe.directory '*'
           git --version
 
       - uses: actions/checkout@v4
@@ -153,6 +154,7 @@ jobs:
       - name: Install Git
         run: |
           apt-get update && apt-get install -y git
+          git config --global --add safe.directory '*'
           git --version
 
       - uses: actions/checkout@v4
