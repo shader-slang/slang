@@ -222,36 +222,22 @@ jobs:
       config: release
       runs-on: '["ubuntu-22.04"]'
 
-  # Linux GPU tests (self-hosted runner with NVIDIA GPU)
+  # Linux GPU tests (self-hosted runner with NVIDIA GPU, containerized)
   test-linux-debug-gcc-x86_64-gpu:
     needs: [filter, build-linux-debug-gcc-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-test.yml
+    uses: ./.github/workflows/ci-slang-test-cuda.yml
     with:
-      os: linux
-      compiler: gcc
-      platform: x86_64
       config: debug
-      runs-on: '["Linux", "self-hosted", "GPU"]'
-      test-category: full
-      full-gpu-tests: true
-      artifact-suffix: "-cuda"
       # Reduce parallelism to avoid CUDA OOM on Tesla T4 (16GB VRAM)
       server-count: 4
 
   test-linux-release-gcc-x86_64-gpu:
     needs: [filter, build-linux-release-gcc-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-test.yml
+    uses: ./.github/workflows/ci-slang-test-cuda.yml
     with:
-      os: linux
-      compiler: gcc
-      platform: x86_64
       config: release
-      runs-on: '["Linux", "self-hosted", "GPU"]'
-      test-category: full
-      full-gpu-tests: true
-      artifact-suffix: "-cuda"
       # Reduce parallelism to avoid CUDA OOM on Tesla T4 (16GB VRAM)
       server-count: 4
 
