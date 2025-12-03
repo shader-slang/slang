@@ -2363,6 +2363,11 @@ DIAGNOSTIC(39010, Error, expectedSpaceIndex, "expected a register space index af
 DIAGNOSTIC(39011, Error, invalidComponentMask, "invalid register component mask '$0'.")
 
 DIAGNOSTIC(
+    39012,
+    Warning,
+    requestedBindlessSpaceIndexUnavailable,
+    "requested bindless space index '$0' is unavailable, using the next available index '$1'.")
+DIAGNOSTIC(
     39013,
     Warning,
     registerModifierButNoVulkanLayout,
