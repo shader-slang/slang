@@ -818,11 +818,13 @@ Result linkAndOptimizeIR(
         case CodeGenTarget::LLVMHostHostCallable:
             break;
         case CodeGenTarget::CUDASource:
+        case CodeGenTarget::CUDAHeader:
             SLANG_PASS(collectOptiXEntryPointUniformParams);
             validateIRModuleIfEnabled(codeGenContext, irModule);
             break;
 
         case CodeGenTarget::CPPSource:
+        case CodeGenTarget::CPPHeader:
         case CodeGenTarget::LLVMShaderAssembly:
         case CodeGenTarget::LLVMShaderObjectCode:
         case CodeGenTarget::LLVMShaderHostCallable:
@@ -843,7 +845,9 @@ Result linkAndOptimizeIR(
         break;
     case CodeGenTarget::HostCPPSource:
     case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::HostVM:
     case CodeGenTarget::LLVMHostAssembly:
     case CodeGenTarget::LLVMHostObjectCode:
@@ -857,6 +861,7 @@ Result linkAndOptimizeIR(
     switch (target)
     {
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::PyTorchCppBinding:
         break;
 
@@ -902,6 +907,7 @@ Result linkAndOptimizeIR(
     switch (target)
     {
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::PyTorchCppBinding:
         {
             // Generate any requested derivative wrappers
@@ -1051,6 +1057,7 @@ Result linkAndOptimizeIR(
     switch (target)
     {
     case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
     case CodeGenTarget::HostCPPSource:
         {
             SLANG_PASS(lowerComInterfaces, artifactDesc.style, sink);
@@ -1073,6 +1080,7 @@ Result linkAndOptimizeIR(
         SLANG_PASS(handleAutoBindNames);
         break;
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
         SLANG_PASS(lowerBuiltinTypesForKernelEntryPoints, sink);
         SLANG_PASS(removeTorchKernels);
         SLANG_PASS(handleAutoBindNames);
@@ -1572,6 +1580,7 @@ Result linkAndOptimizeIR(
     switch (target)
     {
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::PTX:
         {
             SLANG_PASS(synthesizeActiveMask, codeGenContext->getSink());
@@ -1631,6 +1640,7 @@ Result linkAndOptimizeIR(
         break;
     case CodeGenTarget::CSource:
     case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
     case CodeGenTarget::LLVMShaderAssembly:
     case CodeGenTarget::LLVMShaderObjectCode:
     case CodeGenTarget::LLVMShaderHostCallable:
@@ -1640,6 +1650,7 @@ Result linkAndOptimizeIR(
         break;
 
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
         {
             SLANG_PASS(legalizeEntryPointVaryingParamsForCUDA, codeGenContext->getSink());
         }
@@ -1726,7 +1737,9 @@ Result linkAndOptimizeIR(
         break;
     case CodeGenTarget::Metal:
     case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
         // For CUDA/OptiX like targets, add our pass to replace inout parameter copies with
         // direct pointers
         SLANG_PASS(undoParameterCopy);
@@ -1743,7 +1756,7 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::LLVMShaderHostCallable:
         SLANG_PASS(moveGlobalVarInitializationToEntryPoints, targetProgram);
         SLANG_PASS(introduceExplicitGlobalContext, target);
-        if (target == CodeGenTarget::CPPSource)
+        if (target == CodeGenTarget::CPPSource || target == CodeGenTarget::CPPHeader)
         {
             SLANG_PASS(convertEntryPointPtrParamsToRawPtrs);
         }

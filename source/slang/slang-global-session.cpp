@@ -172,7 +172,10 @@ void Session::_initCodeGenTransitionMap()
 
     // For C and C++ we default to use the 'genericCCpp' compiler
     {
-        const CodeGenTarget sources[] = {CodeGenTarget::CSource, CodeGenTarget::CPPSource};
+        const CodeGenTarget sources[] = {
+            CodeGenTarget::CSource,
+            CodeGenTarget::CPPSource,
+            CodeGenTarget::CPPHeader};
         for (auto source : sources)
         {
             // We *don't* add a default for host callable, as we will determine what is suitable
@@ -195,6 +198,7 @@ void Session::_initCodeGenTransitionMap()
 
     // Add all the straightforward transitions
     map.addTransition(CodeGenTarget::CUDASource, CodeGenTarget::PTX, PassThroughMode::NVRTC);
+    map.addTransition(CodeGenTarget::CUDAHeader, CodeGenTarget::PTX, PassThroughMode::NVRTC);
     map.addTransition(CodeGenTarget::HLSL, CodeGenTarget::DXBytecode, PassThroughMode::Fxc);
     map.addTransition(CodeGenTarget::HLSL, CodeGenTarget::DXIL, PassThroughMode::Dxc);
     map.addTransition(CodeGenTarget::GLSL, CodeGenTarget::SPIRV, PassThroughMode::Glslang);
@@ -1014,7 +1018,8 @@ SlangPassThrough Session::getDownstreamCompilerForTransition(
 
     // Special case host-callable
     if ((desc.kind == ArtifactKind::HostCallable) &&
-        (source == CodeGenTarget::CSource || source == CodeGenTarget::CPPSource))
+        (source == CodeGenTarget::CSource || source == CodeGenTarget::CPPSource ||
+         source == CodeGenTarget::CPPHeader))
     {
         // We prefer LLVM if it's available
         if (const auto llvm = getOrLoadDownstreamCompiler(PassThroughMode::LLVM, nullptr))

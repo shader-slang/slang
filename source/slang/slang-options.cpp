@@ -333,9 +333,11 @@ void initCommandOptions(CommandOptions& options)
             {"spv-asm", "SPIR-V assembly"},
             {"c", nullptr},
             {"cpp,c++,cxx", "C++"},
+            {"hpp", "C++ Header"},
             {"exe", "executable"},
             {"dll,so", "sharedlibrary/dll"},
             {"cu", "CUDA"},
+            {"cuh", "CUDA Header"},
             {"ptx", "PTX"},
             {"obj,o", "object-code"},
             {"zip", "container"},
@@ -3851,6 +3853,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             (m_rawTargets[0].format == CodeGenTarget::HostCPPSource ||
              m_rawTargets[0].format == CodeGenTarget::PyTorchCppBinding ||
              m_rawTargets[0].format == CodeGenTarget::CUDASource ||
+             m_rawTargets[0].format == CodeGenTarget::CUDAHeader ||
              m_rawTargets[0].format == CodeGenTarget::SPIRV ||
              m_rawTargets[0].format == CodeGenTarget::SPIRVAssembly ||
              m_rawTargets[0].format == CodeGenTarget::Metal ||
@@ -3922,8 +3925,10 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     switch (outputFormat)
                     {
                     case CodeGenTarget::CPPSource:
+                    case CodeGenTarget::CPPHeader:
                     case CodeGenTarget::PTX:
                     case CodeGenTarget::CUDASource:
+                    case CodeGenTarget::CUDAHeader:
 
                     case CodeGenTarget::HostHostCallable:
                     case CodeGenTarget::ShaderHostCallable:

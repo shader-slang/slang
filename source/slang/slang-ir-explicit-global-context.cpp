@@ -53,6 +53,7 @@ struct IntroduceExplicitGlobalContextPass
                 hoistGlobalVarOptions = HoistGlobalVarOptions::PlainGlobal;
                 break;
             case CodeGenTarget::CUDASource:
+            case CodeGenTarget::CUDAHeader:
                 hoistableGlobalObjectKind = GlobalObjectKind::GlobalVar;
 
                 // One important exception is that CUDA *does* support
@@ -241,7 +242,8 @@ struct IntroduceExplicitGlobalContextPass
                     // For CUDA output, we want to leave the global uniform
                     // parameter where it is, because it will translate to
                     // a global `__constant__` variable.
-                    if (m_target == CodeGenTarget::CUDASource)
+                    if (m_target == CodeGenTarget::CUDASource ||
+                        m_target == CodeGenTarget::CUDAHeader)
                         continue;
 
                     GlobalParamInfo globalParamInfo;
@@ -304,6 +306,12 @@ struct IntroduceExplicitGlobalContextPass
         // type with a name hint of `KernelContext`.
         //
         m_contextStructType = builder.createStructType();
+        if (m_target == CodeGenTarget::CPPHeader)
+        {
+            builder.addExternCppDecoration(
+                m_contextStructType,
+                UnownedTerminatedStringSlice("KernelContext"));
+        }
         builder.addNameHintDecoration(
             m_contextStructType,
             UnownedTerminatedStringSlice("KernelContext"));
@@ -435,6 +443,12 @@ struct IntroduceExplicitGlobalContextPass
         // Clone all original decorations to the new struct key.
         IRCloneEnv cloneEnv;
         cloneInstDecorationsAndChildren(&cloneEnv, m_module, originalInst, key);
+        if (m_target == CodeGenTarget::CPPHeader)
+        {
+            builder.addExternCppDecoration(
+                key,
+                originalInst->findDecoration<IRNameHintDecoration>()->getName());
+        }
 
         // We end by making note of the key that was created
         // for the instruction, so that we can use the key

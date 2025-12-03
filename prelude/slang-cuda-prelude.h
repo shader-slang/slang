@@ -1,3 +1,6 @@
+#ifndef SLANG_CUDA_PRELUDE_H
+#define SLANG_CUDA_PRELUDE_H
+
 #define SLANG_PRELUDE_EXPORT
 
 #ifdef __CUDACC_RTC__
@@ -3818,12 +3821,12 @@ __inline__ __device__ uint4 _waveMatchMultiple(WarpMask mask, const T& inVal)
     return make_uint4(matchBits, 0, 0, 0);
 }
 
-__device__ uint getAt(dim3 a, int b)
+__inline__ __device__ uint getAt(dim3 a, int b)
 {
     SLANG_PRELUDE_ASSERT(b >= 0 && b < 3);
     return (&a.x)[b];
 }
-__device__ uint3 operator*(uint3 a, dim3 b)
+__inline__ __device__ uint3 operator*(uint3 a, dim3 b)
 {
     uint3 r;
     r.x = a.x * b.x;
@@ -6508,3 +6511,5 @@ WmmaFragment<DType, M, N, K, MatrixC> __device__ coopMatMulAdd(
 
 } // namespace Slang_CUDA_WMMA
 #endif // #if (((__CUDACC_VER_MAJOR__ >=12)&&(__CUDACC_VER_MINOR__>=5)) || (CUDA_VERSION >= 12050))
+
+#endif
