@@ -2051,13 +2051,19 @@ SlangResult Linkage::loadSerializedModuleContents(
     //
     SourceLoc serializedModuleLoc;
     {
-        auto sourceFile =
-            sourceManager->findSourceFileByPathRecursively(moduleFilePathInfo.foundPath);
-        if (!sourceFile)
-        {
-            sourceFile = sourceManager->createSourceFileWithString(moduleFilePathInfo, String());
-            sourceManager->addSourceFile(moduleFilePathInfo.getMostUniqueIdentity(), sourceFile);
-        }
+        // For the purposes of diagnostics, we create a source file to represent
+        // the binary module file. We intentionally create this with empty content
+        // to avoid displaying binary data in error messages.
+        //
+        // Note: We do NOT reuse any existing source file for this path, because
+        // an earlier code path (e.g., IncludeSystem::loadFile) may have loaded
+        // the binary module content into a source file, and we don't want to
+        // display that binary data when showing diagnostic source lines.
+        //
+        auto sourceFile = sourceManager->createSourceFileWithString(moduleFilePathInfo, String());
+        sourceManager->addSourceFileIfNotExist(
+            moduleFilePathInfo.getMostUniqueIdentity(),
+            sourceFile);
         auto sourceView =
             sourceManager->createSourceView(sourceFile, &moduleFilePathInfo, SourceLoc());
         serializedModuleLoc = sourceView->getRange().begin;

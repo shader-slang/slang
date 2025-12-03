@@ -282,12 +282,18 @@ static void _sourceLocationNoteDiagnostic(
         return;
     }
 
-    UnownedStringSlice content = sourceFile->getContent();
-
-    // Make sure the offset is within content.
+    // Check if the source file has actual content available.
     // This is important because it's possible to have a 'SourceFile' that doesn't contain any
     // content (for example when reconstructed via serialization with just line offsets, the actual
     // source text 'content' isn't available).
+    if (!sourceFile->hasContent())
+    {
+        return;
+    }
+
+    UnownedStringSlice content = sourceFile->getContent();
+
+    // Make sure the offset is within content.
     const int offset = sourceView->getRange().getOffset(sourceLoc);
     if (offset < 0 || offset >= content.getLength())
     {
@@ -388,12 +394,18 @@ static void _tokenLengthNoteDiagnostic(
         return;
     }
 
-    UnownedStringSlice content = sourceFile->getContent();
-
-    // Make sure the offset is within content.
+    // Check if the source file has actual content available.
     // This is important because it's possible to have a 'SourceFile' that doesn't contain any
     // content (for example when reconstructed via serialization with just line offsets, the actual
     // source text 'content' isn't available).
+    if (!sourceFile->hasContent())
+    {
+        return;
+    }
+
+    UnownedStringSlice content = sourceFile->getContent();
+
+    // Make sure the offset is within content.
     const int offset = sourceView->getRange().getOffset(sourceLoc);
     if (offset < 0 || offset >= content.getLength())
     {
