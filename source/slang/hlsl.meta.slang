@@ -5437,7 +5437,7 @@ When generating code for other targets, this parameter is ignored and has no eff
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
 __magic_type(HLSLStructuredBufferType)
 __intrinsic_type($(kIROp_HLSLStructuredBufferType))
-struct StructuredBuffer
+struct StructuredBuffer : IArray<T>
 {
 
     /// Get the dimensions of the buffer.
@@ -6629,7 +6629,7 @@ When generating code for other targets, this parameter is ignored and has no eff
  @see `StructuredBuffer`, `AppendStructuredBuffer`, `ConsumeStructuredBuffer`
  @category buffer_types
 **/
-struct $(item.name)
+struct $(item.name) : IRWArray<T>
 {
     /// Decrements the object's hidden counter.
     /// @return The post-decremented counter value.
@@ -27220,9 +27220,9 @@ struct CoopMat
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor, $T1>(($1), $2)";
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>(($1), $2)";
             else
-                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor, $T1>(($1), $2)";
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>(($1), $2)";
         }
     }
 
@@ -27460,9 +27460,9 @@ $}
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor, $T0>($0, $1)";
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>($0, $1)";
             else
-                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor, $T0>($0, $1)";
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>($0, $1)";
         }
     }
 

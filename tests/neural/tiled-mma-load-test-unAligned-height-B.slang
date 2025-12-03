@@ -107,8 +107,8 @@ bool verifiedOutput<int K>(uint tid, SPtr sharedMem, uint tileIndex)
         {
             uint yIndex = (i * 8 + j * 2) + tileIndex * 16;
             uint value = element[j];
-            uint16_t a = (uint16_t)((value >> 16) & 0xFFFF);
-            uint16_t b = (uint16_t)(value & 0xFFFF);
+            uint16_t a = (uint16_t)(value & 0xFFFF);
+            uint16_t b = (uint16_t)((value >> 16) & 0xFFFF);
             half actual[2] = { bit_cast<half>(a), bit_cast<half>(b) };
             half expectedValues[2] = { expected, expected + 1.0h };
 
@@ -165,8 +165,8 @@ void serialRead(uint tid, SPtr sharedMem)
             for (int j = 0; j < 4; j++)
             {
                 uint value = element[j];
-                uint16_t a = (uint16_t)((value >> 16) & 0xFFFF);
-                uint16_t b = (uint16_t)(value & 0xFFFF);
+                uint16_t a = (uint16_t)(value & 0xFFFF);
+                uint16_t b = (uint16_t)((value >> 16) & 0xFFFF);
 
                 half aa = bit_cast<half>(a);
                 half bb = bit_cast<half>(b);
