@@ -11097,7 +11097,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             getBuilder()->addRequireGLSLVersionDecoration(
                 inst,
-                Int(getIntegerLiteralValue(versionMod->versionNumberToken)));
+                Int(getIntegerLiteralValue(versionMod->versionNumberToken, getSink())));
         }
         for (auto versionMod : decl->getModifiersOfType<RequiredSPIRVVersionModifier>())
         {
@@ -12133,7 +12133,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             else if (auto versionMod = as<RequiredGLSLVersionModifier>(modifier))
                 getBuilder()->addRequireGLSLVersionDecoration(
                     irFunc,
-                    Int(getIntegerLiteralValue(versionMod->versionNumberToken)));
+                    Int(getIntegerLiteralValue(versionMod->versionNumberToken, getSink())));
             else if (auto spvVersion = as<RequiredSPIRVVersionModifier>(modifier))
                 getBuilder()->addRequireSPIRVVersionDecoration(irFunc, spvVersion->version);
             else if (auto wgslExtensionMod = as<RequiredWGSLExtensionModifier>(modifier))
