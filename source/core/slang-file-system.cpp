@@ -197,7 +197,6 @@ SlangResult OSFileSystem::loadFile(char const* pathIn, ISlangBlob** outBlob)
     // filesystem calls.
 
     const String path = _fixPathDelimiters(pathIn);
-
     if (!File::exists(path))
     {
         return SLANG_E_NOT_FOUND;
