@@ -149,10 +149,8 @@ struct TransformParamsToConstRefContext
                             auto storeInst = as<IRStore>(userInst);
                             auto storeDest = storeInst->getPtr();
 
-                            // double-check that the value is actually the load instruction
-                            assert(storeInst->getVal() == loadInst);
-
-                            if (storeDest->findDecorationImpl(
+                            if (storeInst->getValUse() == use &&
+                                storeDest->findDecorationImpl(
                                     kIROp_TempCallArgImmutableVarDecoration))
                             {
                                 storeDest->replaceUsesWith(loadInst->getPtr());
