@@ -1,0 +1,1330 @@
+SPV_EXT_shader_invocation_reorder
+=================================
+
+Name Strings
+------------
+
+SPV_EXT_shader_invocation_reorder
+
+Contact
+-------
+
+See *Issues* list in the Khronos SPIRV-Registry repository:
+https://github.com/KhronosGroup/SPIRV-Registry
+
+Contributors
+------------
+
+- Ashwin Lele, NVIDIA
+- Eric Werness, NVIDIA
+- Daniel Koch, NVIDIA
+- Pankaj Mistry, NVIDIA
+- Aaron Hagan, AMD
+- Stu Smith, AMD
+- Sebastian Neubauer, AMD
+- Alan Baker, Google
+- Sven Woop, Intel
+- Ben Ashbaugh, Intel
+- Baldur Karlsson, Valve
+- Matthew Moulton, Samsung
+- Tim Kong, Samsung
+- Members of Vulkan Ray Tracing TSG
+
+Status
+------
+
+- Approved by the SPIR-V Working Group: 2025-09-03
+- Ratified by the Khronos Board: 2025-10-17
+
+Version
+-------
+
+[width="40%",cols="25,25"]
+|========================================
+| Last Modified Date | 2025-01-27
+| Revision           | 2
+|========================================
+
+Dependencies
+------------
+
+This extension is written against the Unified SPIR-V Specification,
+Version 1.6, Revision 1.
+
+This extension requires SPIR-V 1.4.
+
+This extension requires SPV_KHR_ray_tracing.
+
+This extension requires SPV_EXT_physical_storage_buffer, SPV_KHR_physical_storage_buffer
+or SPIR-V 1.5.
+
+This extension interacts with SPV_NV_ray_tracing_motion_blur.
+
+This extension interacts with SPV_KHR_ray_tracing_position_fetch.
+
+This extension interacts with SPV_KHR_ray_query.
+
+Overview
+--------
+
+This extension adds hit objects and reordering builtins to provide finer
+grain control over traversal during ray tracing.
+
+Extension Name
+--------------
+
+To use this extension within a SPIR-V module, the following
+*OpExtension* must be present in the module:
+
+----
+OpExtension "SPV_EXT_shader_invocation_reorder"
+----
+
+
+New Capabilities
+----------------
+
+This extension introduces new capabilities:
+
+----
+ShaderInvocationReorderEXT
+----
+
+New Storage Classes
+-------------------
+
+Storage classes added under the *ShaderInvocationReorderEXT* capability
+
+----
+HitObjectAttributeEXT
+
+----
+
+New Decorations
+----------------
+
+This extension introduces new decorations:
+
+----
+HitObjectShaderRecordBufferEXT
+----
+
+New Instructions
+----------------
+
+Instructions added under the *ShaderInvocationReorderEXT* capability
+
+----
+OpTypeHitObjectEXT 
+OpReorderThreadWithHintEXT
+OpReorderThreadWithHitObjectEXT
+OpHitObjectIsMissEXT
+OpHitObjectIsHitEXT
+OpHitObjectIsEmptyEXT
+OpHitObjectGetRayTMinEXT
+OpHitObjectGetRayTMaxEXT
+OpHitObjectGetRayFlagsEXT
+OpHitObjectGetObjectRayOriginEXT
+OpHitObjectGetObjectRayDirectionEXT
+OpHitObjectGetWorldRayOriginEXT
+OpHitObjectGetWorldRayDirectionEXT
+OpHitObjectGetObjectToWorldEXT
+OpHitObjectGetWorldToObjectEXT
+OpHitObjectGetIntersectionTriangleVertexPositionsEXT
+OpHitObjectGetInstanceCustomIndexEXT
+OpHitObjectGetInstanceIdEXT
+OpHitObjectGetGeometryIndexEXT
+OpHitObjectGetPrimitiveIndexEXT
+OpHitObjectGetHitKindEXT
+OpHitObjectGetAttributesEXT
+OpHitObjectGetCurrentTimeEXT
+OpHitObjectGetShaderBindingTableRecordIndexEXT
+OpHitObjectSetShaderBindingTableRecordIndexEXT
+OpHitObjectGetShaderRecordBufferHandleEXT
+OpHitObjectExecuteShaderEXT
+OpHitObjectRecordFromQueryEXT
+OpHitObjectRecordMissEXT
+OpHitObjectRecordMissMotionEXT
+OpHitObjectRecordEmptyEXT
+OpHitObjectTraceRayEXT
+OpHitObjectTraceRayMotionEXT
+OpHitObjectReorderExecuteShaderEXT
+OpHitObjectTraceReorderExecuteEXT
+OpHitObjectTraceMotionReorderExecuteEXT
+----
+
+
+Modifications to the SPIR-V Specification
+-----------------------------------------
+
+(Modify Section 2.2.1, Instructions ) ::
++
+Add <<OpTraceRayWithHitObjectEXT,*OpTraceRayWithHitObjectEXT*>>,
+<<OpHitObjectExecuteShaderEXT,*OpHitObjectExecuteShaderEXT*>>,
+<<OpHitObjectReorderExecuteShaderEXT,*OpHitObjectReorderExecuteShaderEXT>>,
+<<OpHitObjectTraceReorderExecuteEXT,*OpHitObjectTraceReorderExecuteEXT>> to the list
+of shader call instructions.
+
+(Add the following terminology to section 2.2.2, Types) ::
++
+--
+'Hit object type': The type returned by *OpTypeHitObjectEXT*.
+--
+
+(Add to the list of opaque types in section 2.2.2, Types) ::
++
+--
+ * *OpTypeHitObjectEXT*
+--
+
+(Modify Section 3.2, Decorations, adding a row to the Decoration table) ::
++
+--
+[cols="^.^1,25,15",options="header",width="100%"]
+|====
+2+^.^| Decoration | Requires
+| 5389 | *HitObjectShaderRecordBufferEXT* +
+Apply to a variable to indicate that it represents a shader record buffer address obtained from a hit object.
+This decoration marks variables that store physical storage buffer pointers returned by *OpHitObjectGetShaderRecordBufferHandleEXT*. +
+Valid targets: *OpVariable* +
+| *ShaderInvocationReorderEXT* +
+|====
+--
+
+
+(Modify Section 3.7, Storage Class, adding rows to the Storage Class table) ::
++
+--
+[cols="1,15,2*2",options="header",width = "100%"]
+|====
+2+^.^| Storage Class | <<Capability,Enabling Capabilities>> | Enabled by Extension
+| 5411 | *HitObjectAttributeEXT* +
+Used for storing attributes of geometry intersected by a ray to be passed on to
+hit object instructions. Visible across all functions in the current invocation. 
+Not shared externally. Variables declared with this storage class can be both read and written to, but cannot have initializers.
+Only allowed in *RayGenerationKHR*, *ClosestHitKHR*, and *MissKHR* execution models.
+| *ShaderInvocationReorderEXT* | SPV_EXT_shader_invocation_reorder
+|====
+--
+
+(Modify Section 3.31, Capability, adding a row to the Capability table) ::
++
+--
+[cols="1,25,15",options="header",width = "100%"]
+:capability: ShaderInvocationReorderEXT
+|====
+2+^.^| Capability | Implicitly Declares
+| 5388 | *ShaderInvocationReorderEXT* +
+| *RayTracingKHR*
+|====
+--
+
+
+
+
+(Add the following line to the description of OpTypePointer, in Section 3.32.6, Type-Declaration Instructions) ::
++
+--
+If 'Type' is *OpTypeHitObjectEXT*, 'Storage Class' must be 'Private' or 'Function'.
+--
+
+
+(Add the following line to the description of OpStore and OpLoad, in Section 3.32.8, Memory Instructions) ::
++
+--
+The 'Type' operand to the *OpTypePointer* used for 'Pointer' must not be *OpTypeHitObjectEXT*.
+--
+
+
+(Add the following line to the description of OpCopyMemory and OpCopyMemorySized, in Section 3.32.8, Memory Instructions) ::
++
+--
+The 'Type' operand to the *OpTypePointer* used for 'Target' or 'Source' must not be *OpTypeHitObjectEXT*.
+--
+
+
+(Modify Section 2.16.1, Universal Validation Rules) ::
++
+Add the following instructions to the list of instructions that may have a pointer as an operand:
++
+--
+ * *OpReorderThreadWithHitObjectEXT*
+ * *OpHitObjectTraceRayEXT*
+ * *OpHitObjectTraceRayMotionEXT*
+ * *OpHitObjectRecordFromQueryEXT*
+ * *OpHitObjectRecordMissEXT*
+ * *OpHitObjectRecordMissMotionEXT*
+ * *OpHitObjectRecordEmptyEXT*
+ * *OpHitObjectExecuteShaderEXT*
+ * *OpHitObjectGetCurrentTimeEXT*
+ * *OpHitObjectGetAttributesEXT*
+ * *OpHitObjectGetHitKindEXT*
+ * *OpHitObjectGetPrimitiveIndexEXT*
+ * *OpHitObjectGetGeometryIndexEXT*
+ * *OpHitObjectGetInstanceIdEXT*
+ * *OpHitObjectGetInstanceCustomIndexEXT*
+ * *OpHitObjectGetObjectRayOriginEXT*
+ * *OpHitObjectGetObjectRayDirectionEXT*
+ * *OpHitObjectGetWorldRayDirectionEXT*
+ * *OpHitObjectGetWorldRayOriginEXT*
+ * *OpHitObjectGetObjectToWorldEXT*
+ * *OpHitObjectGetWorldToObjectEXT*
+ * *OpHitObjectGetIntersectionTriangleVertexPositionsEXT*
+ * *OpHitObjectGetRayTMaxEXT*
+ * *OpHitObjectGetRayTMinEXT*
+ * *OpHitObjectGetRayFlagsEXT*
+ * *OpHitObjectGetShaderBindingTableRecordIndexEXT*
+ * *OpHitObjectSetShaderBindingTableRecordIndexEXT*
+ * *OpHitObjectGetShaderRecordBufferHandleEXT*
+ * *OpHitObjectIsEmptyEXT*
+ * *OpHitObjectIsHitEXT*
+ * *OpHitObjectIsMissEXT*
+ * *OpHitObjectReorderExecuteShaderEXT*
+ * *OpHitObjectTraceReorderExecuteEXT*
+ * *OpHitObjectTraceMotionReorderExecuteEXT*
+--
+
+
+(Add a new sub section 3.36.Reorder Instructions) ::
++
+For reorder instructions providing a hint, the hint value used for reordering
+is the specified number of bits from the LSBs of the hint value interpreted as
+an unsigned integer. The higher bits of that hint value are higher priority than the
+lower bits. If both the hint and the hit object are provided, the implementation
+should prioritize the hint bits lower in the reorder priority than the shader
+referenced by the hit object but higher than any other information in the hit
+object.
+--
+[cols="4*1"]
+|======
+3+|[[OpReorderThreadWithHintEXT]]*OpReorderThreadWithHintEXT* +
+ +
+ Reorder threads based on user provided hint. Similar 'Hint' values indicate similarity of subsequent work done after this call. Behavior is described above. +
+ +
+ 'Hint' must be a 32-bit 'integer-type' scalar. +
+ +
+ 'Bits' must be a 32-bit 'integer-type' scalar. +
+ +
+ This instruction is allowed only in *RayGenerationKHR* execution models. +
+1+|Capability: +
+*ShaderInvocationReorderEXT*
+| 3 | 5314
+| '<id>' 'Hint'
+| '<id>' 'Bits'
+|======
+
+[cols="5*1"]
+|======
+4+|[[OpReorderThreadWithHitObjectEXT]]*OpReorderThreadWithHitObjectEXT* +
+ +
+ Reorder threads based on hit object supplemented by 'Hint' and 'Bits' if they are optionally provided values. Behavior is described above. +
+ +
+ 'Hit Object' must be a pointer to hit object used to reorder threads. +
+ +
+ 'Hint' must be a 32-bit 'integer-type' scalar. +
+ +
+ 'Bits' must be a 32-bit 'integer-type' scalar. +
+ +
+ 'Hint' and 'Bits' are optional together i.e Either both 'Hint' and 'Bits'
+ should be provided or neither. +
+ +
+ This instruction is allowed only in *RayGenerationKHR* execution models. +
+ +
+1+|Capability: +
+*ShaderInvocationReorderEXT*
+| 2 + variable | 5315
+| '<id>' 'Hit Object'
+| Optional '<id>' 'Hint'
+| Optional '<id>' 'Bits'
+|======
+--
+
+(Add a new sub section 3.36.Hit Object Instructions) ::
++
+The semantics of the arguments of *OpHitObjectTraceRayEXT* and *OpHitObjectTraceRayMotionEXT*
+are same as those with the same names of <<OpTraceRayKHR,*OpTraceRayKHR*>> and
+<<OpTraceRayMotioNV,*OpTraceRayMotionNV*>> as defined in the 'SPV_KHR_ray_tracing' and
+'SPV_NV_ray_tracing_motion_blur' extensions, respectively. The sequence
+*OpHitObjectTraceRayEXT*, *OpReorderThreadWithHitObjectEXT*, *OpHitObjectExecuteShaderEXT*
+is equivalent to *OpTraceRayKHR* instruction.
+--
+
+[cols="14*1"]
+|======
+13+|[[OpHitObjectTraceRayEXT]]*OpHitObjectTraceRayEXT* +
+ +
+ Traces a ray and triggers execution on any-hit or intersection shaders and populates resulting hit or miss information in the hit object. +
+ +
+ 'Hit Object' is a pointer to the hit object. +
+ +
+ 'Acceleration Structure' is the descriptor for the acceleration structure to trace into. +
+ +
+ 'Ray Flags' contains one or more of the ray flag values. Refer to the client API specification for details.
+ +
+ 'Cull Mask' is the mask to test against the instance mask. +
+ +
+ 'SBT Offset' and 'SBT Stride' control indexing into the SBT for hit shaders called from this trace.
+ 'SBT' stands for Shader Binding Table. Refer to the client API specification for details. +
+ +
+ 'Miss Index' is the index of the miss shader to be called from this trace call. +
+ +
+ 'Ray Origin', 'Ray Tmin', 'Ray Direction', and 'Ray Tmax' control the basic parameters of the ray to be traced. +
+ +
+ 'Payload' is a pointer to the ray payload structure to use for this trace. 'Payload' must be the result of an *OpVariable* with a storage class of *RayPayloadKHR* or **IncomingRayPayloadKHR**. +
+ +
+ 'Ray Flags', 'Cull Mask', 'SBT Offset', 'SBT Stride', and 'Miss Index' must be a 32-bit 'integer type' scalar. +
+ +
+ Only the 8 least-significant bits of 'Cull Mask' are used by this instruction - other bits are ignored.
+ +
+ Only the 4 least-significant bits of 'SBT Offset' and 'SBT Stride' are used by this instruction - other bits are ignored.
+ +
+ Only the 16 least-significant bits of 'Miss Index' are used by this instruction - other bits are ignored.
+ +
+ 'Ray Origin' and 'Ray Direction' must be a 32-bit 'float type' 3-component vector. +
+ +
+ 'Ray Tmin' and 'Ray Tmax' must be a 32-bit 'float type' scalar. +
+ +
+ This instruction is allowed only in *RayGenerationKHR*, *ClosestHitKHR* and *MissKHR* execution models. +
+ +
+ This instruction is a _shader call instruction_ which may invoke shaders with the *IntersectionKHR* and *AnyHitKHR* execution models. +
+ +
+1+|Capability: +
+*ShaderInvocationReorderEXT*
+| 13 | 5316
+| '<id>' 'Hit Object'
+| '<id>' 'Acceleration Structure'
+| '<id>' 'Ray Flags'
+| '<id>' 'Cull Mask'
+| '<id>' 'SBT Offset'
+| '<id>' 'SBT Stride'
+| '<id>' 'Miss Index'
+| '<id>' 'Ray Origin'
+| '<id>' 'Ray Tmin'
+| '<id>' 'Ray Direction'
+| '<id>' 'Ray Tmax'
+| '<id>' 'Payload'
+|======
+
+[cols="15*1"]
+|======
+14+|[[OpHitObjectTraceRayMotionEXT]]*OpHitObjectTraceRayMotionEXT* +
+ +
+ Traces a ray and triggers execution of any-hit or intersection shaders and populates resulting hit or miss information in the hit object. +
+ +
+ 'Hit Object' is a pointer to the hit object. +
+ +
+ 'Acceleration Structure' is the descriptor for the acceleration structure to trace into. +
+ +
+ 'Ray Flags' contains one or more of the ray flag values. Refer to the client API specification for details.
+ +
+ 'Cull Mask' is the mask to test against the instance mask. +
+ +
+ 'SBT Offset' and 'SBT Stride' control indexing into the SBT for hit shaders called from this trace.
+ 'SBT' stands for Shader Binding Table. Refer to the client API specification for details. +
+ +
+ 'Miss Index' is the index of the miss shader to be called from this trace call. +
+ +
+ 'Ray Origin', 'Ray Tmin', 'Ray Direction', and 'Ray Tmax' control the basic parameters of the ray to be traced. +
+ +
+ 'Payload' is a pointer to the ray payload structure to use for this trace. 'Payload' must be the result of an *OpVariable* with a storage class of *RayPayloadKHR* or **IncomingRayPayloadKHR**. +
+ +
+ 'Ray Flags', 'Cull Mask', 'SBT Offset', 'SBT Stride', and 'Miss Index' must be a 32-bit 'integer type' scalar. +
+ +
+ Only the 8 least-significant bits of 'Cull Mask' are used by this instruction - other bits are ignored.
+ +
+ Only the 4 least-significant bits of 'SBT Offset' and 'SBT Stride' are used by this instruction - other bits are ignored.
+ +
+ Only the 16 least-significant bits of 'Miss Index' are used by this instruction - other bits are ignored.
+ +
+ 'Ray Origin' and 'Ray Direction' must be a 32-bit 'float type' 3-component vector. +
+ +
+ 'Ray Tmin' and 'Ray Tmax' must be a 32-bit 'float type' scalar. +
+ + 
+ 'Current Time' must be a 32-bit float type scalar. +
+ +
+ This instruction is allowed only in *RayGenerationKHR*, *ClosestHitKHR* and *MissKHR* execution models with *SPV_NV_ray_tracing_motion_blur* extension. +
+ +
+ This instruction is a _shader call instruction_ which may invoke shaders with the *IntersectionKHR* and *AnyHitKHR* execution models. +
+ +
+1+|Capability: +
+*ShaderInvocationReorderEXT*, *RayTracingMotionBlurNV*
+| 14 | 5317
+| '<id>' 'Hit Object'
+| '<id>' 'Acceleration Structure'
+| '<id>' 'Ray Flags'
+| '<id>' 'Cull Mask'
+| '<id>' 'SBT Offset'
+| '<id>' 'SBT Stride'
+| '<id>' 'Miss Index'
+| '<id>' 'Ray Origin'
+| '<id>' 'Ray Tmin'
+| '<id>' 'Ray Direction'
+| '<id>' 'Ray Tmax'
+| '<id>' 'Current Time'
+| '<id>' 'Payload'
+|======
+
+[cols="6*1"]
+|======
+5+|[[OpHitObjectRecordFromQueryEXT]]*OpHitObjectRecordFromQueryEXT* +
+ +
+ Populates the hit object to represent a hit without tracing a ray. +
+ +
+ 'Hit Object' is a pointer to the hit object. +
+ +
+ 'Ray Query' is a pointer to the ray query pull hit information from. +
+ +
+ 'SBT Record Index' controls indexing into the SBT to determine the closest-hit shader to be encoded in the hit object.
+ 'SBT' stands for Shader Binding Table. Refer to the client API specification for details. +
+ +
+ 'SBT Record Index'  must be a 32 bit 'integer type' scalar.
+ +
+ 'Hit Object Attributes' contains the attributes of the hit which are to be encoded in 'Hit Object'. This must be an OpVariable in *HitObjectAttributeEXT* storage class. +
+ +
+ This instruction is allowed only in *RayGenerationKHR*, *ClosestHitKHR* and *MissKHR* execution models. +
+ +
+1+|Capability: +
+*ShaderInvocationReorderEXT*
+| 5 | 5304
+| '<id>' 'Hit Object'
+| '<id>' 'Ray Query'
+| '<id>' 'SBT Record Index'
+| '<id>' 'Hit Object Attributes'
+|======
+
+[cols="9*1"]
+|======
+8+|[[OpHitObjectRecordMissEXT]]*OpHitObjectRecordMissEXT* +
+ +
+ Encodes the hit object to represent a miss without tracing a ray. +
+ +
+ 'Hit Object' is a pointer to the hit object. +
+ +
+ 'Ray Flags' contains one or more of the ray flag values. Refer to the client API specification for details.
+ +
+ 'Miss Index' is the index of the miss shader to be encoded in the hit object. +
+ +
+ 'Miss Index' must be a 32-bit 'unsigned integer type' scalar.
+ +
+ 'Ray Origin', 'Ray Tmin', 'Ray Direction', and 'Ray Tmax' control the basic parameters of the ray. +
+ +
+ 'Ray Origin' and 'Ray Direction' must be a 32-bit 'float type' 3-component vector. +
+ +
+ 'Ray Tmin' and 'Ray Tmax' must be a 32-bit 'float type' scalar. +
+ +
+ This instruction is allowed only in *RayGenerationKHR*, *ClosestHitKHR* and *MissKHR* execution models. +
+ +
+1+|Capability: +
+*ShaderInvocationReorderEXT*
+| 8 | 5305
+| '<id>' 'Hit Object'
+| '<id>' 'Ray Flags'
+| '<id>' 'Miss Index'
+| '<id>' 'Ray Origin'
+| '<id>' 'Ray TMin'
+| '<id>' 'Ray Direction'
+| '<id>' 'Ray TMax'
+|======
+
+[cols="10*1"]
+|======
+9+|[[OpHitObjectRecordMissMotionEXT]]*OpHitObjectRecordMissMotionEXT* +
+ +
+ Encodes the hit object to represent a miss without tracing a ray. +
+ +
+ 'Hit Object' is a pointer to the hit object. +
+ +
+ 'Ray Flags' contains one or more of the ray flag values. Refer to the client API specification for details.
+ +
+ 'Miss Index' is the index of the miss shader to be encoded in the hit object. +
+ +
+ 'Miss Index' must be a 32-bit 'unsigned integer type' scalar.
+ +
+ 'Ray Origin', 'Ray Tmin', 'Ray Direction', and 'Ray Tmax' control the basic parameters of the ray. +
+ +
+ 'Ray Origin' and 'Ray Direction' must be a 32-bit 'float type' 3-component vector. +
+ +
+ 'Ray Tmin' and 'Ray Tmax' must be a 32-bit 'float type' scalar. +
+ +
+ 'Current Time' must be a 32-bit float type scalar. +
+ +
+ This instruction is allowed only in *RayGenerationKHR*, *ClosestHitKHR* and *MissKHR* execution models with *SPV_NV_ray_tracing_motion_blur* extension. +
+ +
+1+|Capability: +
+*ShaderInvocationReorderEXT*, *RayTracingMotionBlurNV*
+| 9 | 5306
+| '<id>' 'Hit Object'
+| '<id>' 'Ray Flags'
+| '<id>' 'Miss Index'
+| '<id>' 'Ray Origin'
+| '<id>' 'Ray TMin'
+| '<id>' 'Ray Direction'
+| '<id>' 'Ray TMax'
+| '<id>' 'Current Time'
+|======
+
+
+[cols="3*1"]
+|======
+2+|[[OpHitObjectRecordEmptyEXT]]*OpHitObjectRecordEmptyEXT* +
+ +
+ Encodes the hit object to represent an empty hit object which is neither a hit nor a miss. +
+ +
+ 'Hit Object' is a pointer to the hit object. +
+ +
+ This instruction is allowed only in *RayGenerationKHR*, *ClosestHitKHR* and *MissKHR* execution models. +
+1+|Capability: +
+*ShaderInvocationReorderEXT*
+| 2 | 5318
+| '<id>' 'Hit Object'
+|======
+
+[cols="4*1"]
+|======
+3+|[[OpHitObjectExecuteShaderEXT]]*OpHitObjectExecuteShaderEXT* +
+ +
+ Executes the closest-hit or miss shader as encoded in the hit object. +
+ If the hit object encodes an empty hit object or was created from a ray query with no shader index set, no function is called. +
+ +
+ 'Hit Object' is a pointer to the hit object. +
+ +
+ 'Payload' is a pointer to the ray payload structure to use for this trace. 'Payload' must be the result of an *OpVariable* with a storage class of *RayPayloadKHR* or **IncomingRayPayloadKHR**. +
+ +
+ This instruction is allowed only in *RayGenerationKHR*, *ClosestHitKHR* and *MissKHR* execution models. +
+ +
+ This instruction is a _shader call instruction_ which may invoke shaders with the 
+*ClosestHitKHR*, and *MissKHR* execution models. +
+1+|Capability: +
+*ShaderInvocationReorderEXT*
+| 3 | 5319
+| '<id>' 'Hit Object'
+| '<id>' 'Payload'
+|======
+
+[cols="5*1"]
+|======
+4+|[[OpHitObjectGetCurrentTimeEXT]]*OpHitObjectGetCurrentTimeEXT* +
+ +
+ Returns the current time value encoded in the hit object. +
+ +
+ 'Result' is the current time value as encoded in the hit object. +
+ +
+ 'Result Type' must be a 32-bit 'floating-point type' scalar. +
+ +
+ 'Hit Object' is a pointer to the hit object. +
+ +
+ This instruction is allowed only in *RayGenerationKHR*, *ClosestHitKHR* and *MissKHR* execution models. +
+1+|Capability: +
+*ShaderInvocationReorderEXT*
+| 4 | 5320
+| '<id>' 'Result Type'
+| '<id>' 'Result' 
+| '<id>' 'Hit Object'
+|======
+
+[cols="4*1"]
+|======
+3+|[[OpHitObjectGetAttributesEXT]]*OpHitObjectGetAttributesEXT* +
+ +
+ Returns the attributes as encoded in the hit object. +
+ +
+ 'Hit Object' is a pointer to the hit object. +
+ +
+ 'Hit Object Attributes' contains the attributes of the hit which are to be encoded in 'Hit Object'. This must be an OpVariable in *HitObjectAttributeEXT* storage class. +
+ +
+ This instruction is allowed only in *RayGenerationKHR*, *ClosestHitKHR* and *MissKHR* execution models. +
+1+|Capability: +
+*ShaderInvocationReorderEXT*
+| 3 | 5321
+| '<id>' 'Hit Object'
+| '<id>' 'Hit Object Attributes'
+|======
+
+[cols="5*1"]
+|======
+4+|[[OpHitObjectGetHitKindEXT]]*OpHitObjectGetHitKindEXT* +
+ +
+ Returns a unsigned integer value of the hit as encoded in the hit object with front
+ face or back face of a primitive. +
+ +
+ 'Result' is 0xFE if hit encoded in the hit object is with front facing primitive else
+ is 0xFF if it is back facing primitive. +
+ +
+ 'Result Type' must be a '32bit integer type' scalar. +
+ +
+ 'Hit Object' is a pointer to the hit object. +
+ +
+ This instruction is allowed only in *RayGenerationKHR*, *ClosestHitKHR* and *MissKHR* execution models. +
+1+|Capability: +
+*ShaderInvocationReorderEXT*
+| 4 | 5322
+| '<id>' 'Result Type'
+| '<id>' 'Result' 
+| '<id>' 'Hit Object'
+|======
+
+[cols="5*1"]
+|======
+4+|[[OpHitObjectGetPrimitiveIndexEXT]]*OpHitObjectGetPrimitiveIndexEXT* +
+ +
+ Returns the primitive index as encoded in the hit object. +
+ +
+ 'Result' is the primitive index as encoded in the hit object. +
+ +
+ 'Result Type' must be a 32-bit 'integer type' scalar. +
+ +
+ 'Hit Object' is a pointer to the hit object. +
+ +
+ This instruction is allowed only in *RayGenerationKHR*, *ClosestHitKHR* and *MissKHR* execution models. +
+1+|Capability: +
+*ShaderInvocationReorderEXT*
+| 4 | 5323
+| '<id>' 'Result Type'
+| '<id>' 'Result' 
+| '<id>' 'Hit Object'
+|======
+
+[cols="5*1"]
+|======
+4+|[[OpHitObjectGetGeometryIndexEXT]]*OpHitObjectGetGeometryIndexEXT* +
+ +
+ Returns the geometry index as encoded in the hit object. +
+ +
+ 'Result' is the geometry index as encoded in the hit object. +
+ +
+ 'Result Type' must be a 32-bit 'integer type' scalar. +
+ +
+ 'Hit Object' is a pointer to the hit object. +
+ +
+ This instruction is allowed only in *RayGenerationKHR*, *ClosestHitKHR* and *MissKHR* execution models. +
+1+|Capability: +
+*ShaderInvocationReorderEXT*
+| 4 | 5324
+| '<id>' 'Result Type'
+| '<id>' 'Result' 
+| '<id>' 'Hit Object'
+|======
+
+[cols="5*1"]
+|======
+4+|[[OpHitObjectGetInstanceIdEXT]]*OpHitObjectGetInstanceIdEXT* +
+ +
+ Returns the instance id as encoded in the hit object. +
+ +
+ 'Result' is the instance id as encoded in the hit object. +
+ +
+ 'Result Type' must be a 32-bit 'integer type' scalar. +
+ +
+ 'Hit Object' is a pointer to the hit object. +
+ +
+ This instruction is allowed only in *RayGenerationKHR*, *ClosestHitKHR* and *MissKHR* execution models. +
+1+|Capability: +
+*ShaderInvocationReorderEXT*
+| 4 | 5325
+| '<id>' 'Result Type'
+| '<id>' 'Result' 
+| '<id>' 'Hit Object'
+|======
+
+[cols="5*1"]
+|======
+4+|[[OpHitObjectGetInstanceCustomIndexEXT]]*OpHitObjectGetInstanceCustomIndexEXT* +
+ +
+ Returns the application specified custom index value as encoded in the hit object. +
+ +
+ 'Result' is the application specified custom index value as encoded in the hit object. +
+ +
+ 'Result Type' must be a 32-bit 'integer type' scalar. +
+ +
+ 'Hit Object' is a pointer to the hit object. +
+ +
+ This instruction is allowed only in *RayGenerationKHR*, *ClosestHitKHR* and *MissKHR* execution models. +
+1+|Capability: +
+*ShaderInvocationReorderEXT*
+| 4 | 5326
+| '<id>' 'Result Type'
+| '<id>' 'Result' 
+| '<id>' 'Hit Object'
+|======
+
+[cols="5*1"]
+|======
+4+|[[OpHitObjectGetObjectRayOriginEXT]]*OpHitObjectGetObjectRayOriginEXT* +
+ +
+ Returns the object-space ray origin as encoded in the hit object. +
+ +
+ 'Result' is the ray object-space ray origin as encoded in the hit object. +
+ +
+ 'Result Type' must be a 32-bit 'floating-point type' 3-component vector. +
+ +
+ 'Hit Object' is a pointer to the hit object. +
+ +
+ This instruction is allowed only in *RayGenerationKHR*, *ClosestHitKHR* and *MissKHR* execution models. +
+1+|Capability: +
+*ShaderInvocationReorderEXT*
+| 4 | 5327
+| '<id>' 'Result Type'
+| '<id>' 'Result' 
+| '<id>' 'Hit Object'
+|======
+
+[cols="5*1"]
+|======
+4+|[[OpHitObjectGetObjectRayDirectionEXT]]*OpHitObjectGetObjectRayDirectionEXT* +
+ +
+ Returns the object-space ray direction as encoded in the hit object. +
+ +
+ 'Result' is the ray object-space ray direction as encoded in the hit object. +
+ +
+ 'Result Type' must be a 32-bit 'floating-point type' 3-component vector. +
+ +
+ 'Hit Object' is a pointer to the hit object. +
+ +
+ This instruction is allowed only in *RayGenerationKHR*, *ClosestHitKHR* and *MissKHR* execution models. +
+1+|Capability: +
+*ShaderInvocationReorderEXT*
+| 4 | 5328
+| '<id>' 'Result Type'
+| '<id>' 'Result' 
+| '<id>' 'Hit Object'
+|======
+
+[cols="5*1"]
+|======
+4+|[[OpHitObjectGetWorldRayDirectionEXT]]*OpHitObjectGetWorldRayDirectionEXT* +
+ +
+ Returns the world-space ray direction as encoded in the hit object. +
+ +
+ 'Result' is the ray world-space ray direction as encoded in the hit object. +
+ +
+ 'Result Type' must be a 32-bit 'floating-point type' 3-component vector. +
+ +
+ 'Hit Object' is a pointer to the hit object. +
+ +
+ This instruction is allowed only in *RayGenerationKHR*, *ClosestHitKHR* and *MissKHR* execution models. +
+1+|Capability: +
+*ShaderInvocationReorderEXT*
+| 4 | 5329
+| '<id>' 'Result Type'
+| '<id>' 'Result' 
+| '<id>' 'Hit Object'
+|======
+
+[cols="5*1"]
+|======
+4+|[[OpHitObjectGetWorldRayOriginEXT]]*OpHitObjectGetWorldRayOriginEXT* +
+ +
+ Returns the world-space ray origin as encoded in the hit object. +
+ +
+ 'Result' is the ray world-space ray origin as encoded in the hit object. +
+ +
+ 'Result Type' must be a 32-bit 'floating-point type' 3-component vector. +
+ +
+ 'Hit Object' is a pointer to the hit object. +
+ +
+ This instruction is allowed only in *RayGenerationKHR*, *ClosestHitKHR* and *MissKHR* execution models. +
+1+|Capability: +
+*ShaderInvocationReorderEXT*
+| 4 | 5330
+| '<id>' 'Result Type'
+| '<id>' 'Result' 
+| '<id>' 'Hit Object'
+|======
+
+[cols="5*1"]
+|======
+4+|[[OpHitObjectGetObjectToWorldEXT]]*OpHitObjectGetObjectToWorldEXT* +
+ +
+ Returns a matrix that transforms values from object-space to world-space as encoded in the hit object. +
+ +
+ 'Result' is the matrix. +
+ +
+ 'Result Type'  must be a matrix with a 'Column Count' of 4, and a 'Column Type' that is a vector type with a 'Component Type' that is a 32-bit 'floating-point type' and a 'Component Count' of 3. +
+ +
+ 'Hit Object' is a pointer to the hit object. +
+ +
+ This instruction is allowed only in *RayGenerationKHR*, *ClosestHitKHR* and *MissKHR* execution models. +
+1+|Capability: +
+*ShaderInvocationReorderEXT*
+| 4 | 5331
+| '<id>' 'Result Type'
+| '<id>' 'Result' 
+| '<id>' 'Hit Object'
+|======
+
+
+[cols="5*1"]
+|======
+4+|[[OpHitObjectGetWorldToObjectEXT]]*OpHitObjectGetWorldToObjectEXT* +
+ +
+ Returns a matrix that transforms values from world-space to object-space as encoded in the hit object. +
+ +
+ 'Result' is the matrix. +
+ +
+ 'Result Type'  must be a matrix with a 'Column Count' of 4, and a 'Column Type' that is a vector type with a 'Component Type' that is a 32-bit 'floating-point type' and a 'Component Count' of 3. +
+ +
+ 'Hit Object' is a pointer to the hit object. +
+ +
+ This instruction is allowed only in *RayGenerationKHR*, *ClosestHitKHR* and *MissKHR* execution models. +
+1+|Capability: +
+*ShaderInvocationReorderEXT*
+| 4 | 5332
+| '<id>' 'Result Type'
+| '<id>' 'Result' 
+| '<id>' 'Hit Object'
+|======
+
+[cols="5*1"]
+|======
+4+|[[OpHitObjectGetIntersectionTriangleVertexPositionsEXT]]*OpHitObjectGetIntersectionTriangleVertexPositionsEXT* +
+ +
+ Gets the vertex positions for the triangle encoded in the hit object. +
+ +
+ 'Result' is the returned vertex positions. +
+ +
+ 'Result Type' must be an array with a 'Length' of 3, and an 'Element Type' that is a vector type with a 'Component Type' that is a 32-bit 'floating-point type' and a 'Component Count' of 3. +
+ +
+ 'Hit Object' is a pointer to the hit object. +
+ +
+ This instruction is allowed only in *RayGenerationKHR*, *ClosestHitKHR* and *MissKHR* execution models. +
+1+|Capability: +
+*ShaderInvocationReorderEXT*
+| 4 | 5307
+| '<id>' 'Result Type'
+| '<id>' 'Result' 
+| '<id>' 'Hit Object'
+|======
+
+
+[cols="5*1"]
+|======
+4+|[[OpHitObjectGetRayTMaxEXT]]*OpHitObjectGetRayTMaxEXT* +
+ +
+ Returns the 'Ray Tmax' value encoded in the hit object. +
+ Semantics are similar to RayTMaxKHR builtin as defined in SPV_KHR_ray_tracing.
+ +
+ 'Result' is the Ray Tmax value as encoded in the hit object. +
+ +
+ 'Result Type' must be a 32-bit 'floating-point type' scalar. +
+ +
+ 'Hit Object' is a pointer to the hit object. +
+ +
+ This instruction is allowed only in *RayGenerationKHR*, *ClosestHitKHR* and *MissKHR* execution models. +
+1+|Capability: +
+*ShaderInvocationReorderEXT*
+| 4 | 5333
+| '<id>' 'Result Type'
+| '<id>' 'Result' 
+| '<id>' 'Hit Object'
+|======
+
+[cols="5*1"]
+|======
+4+|[[OpHitObjectGetRayTMinEXT]]*OpHitObjectGetRayTMinEXT* +
+ +
+ Returns the 'Ray Tmin' value encoded in the hit object. +
+ Semantics are similar to RayTMinKHR builtin as defined in SPV_KHR_ray_tracing.
+ +
+ 'Result' is the Ray Tmin value as encoded in the hit object. +
+ +
+ 'Result Type' must be a 32-bit 'floating-point type' scalar. +
+ +
+ 'Hit Object' is a pointer to the hit object. +
+ +
+ This instruction is allowed only in *RayGenerationKHR*, *ClosestHitKHR* and *MissKHR* execution models. +
+1+|Capability: +
+*ShaderInvocationReorderEXT*
+| 4 | 5347
+| '<id>' 'Result Type'
+| '<id>' 'Result' 
+| '<id>' 'Hit Object'
+|======
+
+[cols="5*1"]
+|======
+4+|[[OpHitObjectGetRayFlagsEXT]]*OpHitObjectGetRayFlagsEXT* +
+ +
+ Returns the 'Ray Flags' value encoded in the hit object. +
+ Semantics are similar to RayFlagsKHR builtin as defined in SPV_KHR_ray_tracing.
+ +
+ 'Result' is the Ray Flags value as encoded in the hit object. +
+ +
+ 'Result Type' must be a 32-bit 'integer type' scalar. +
+ +
+ 'Hit Object' is a pointer to the hit object. +
+ +
+ This instruction is allowed only in *RayGenerationKHR*, *ClosestHitKHR* and *MissKHR* execution models. +
+1+|Capability: +
+*ShaderInvocationReorderEXT*
+| 4 | 5308
+| '<id>' 'Result Type'
+| '<id>' 'Result' 
+| '<id>' 'Hit Object'
+|======
+
+[cols="5*1"]
+|======
+4+|[[OpHitObjectGetShaderBindingTableRecordIndexEXT]]*OpHitObjectGetShaderBindingTableRecordIndexEXT* +
+ +
+ Returns the index for the record in shader binding table as encoded in hit object. +
+ +
+ 'Result' is the current SBT index value as encoded in the hit object. +
+ +
+ 'Result Type' must be a 32-bit 'integer type' scalar. +
+ +
+ 'Hit Object' is a pointer to the hit object. +
+ +
+ This instruction is allowed only in *RayGenerationKHR*, *ClosestHitKHR* and *MissKHR* execution models. +
+1+|Capability: +
+*ShaderInvocationReorderEXT*
+| 4 | 5348
+| '<id>' 'Result Type'
+| '<id>' 'Result' 
+| '<id>' 'Hit Object'
+|======
+
+[cols="4*1"]
+|======
+3+|[[OpHitObjectSetShaderBindingTableRecordIndexEXT]]*OpHitObjectSetShaderBindingTableRecordIndexEXT* +
+ +
+ Sets the index for the record in shader binding table as encoded in hit object. +
+ +
+ 'Hit Object' is a pointer to the hit object. +
+ +
+ 'SBT Record Index' is the new SBT index value to be encoded in the hit object. +
+ +
+ 'SBT Record Index' must be a 32-bit 'integer type' scalar. +
+ This instruction is allowed only in *RayGenerationKHR*, *ClosestHitKHR* and *MissKHR* execution models. +
+1+|Capability: +
+*ShaderInvocationReorderEXT*
+| 3 | 5309
+| '<id>' 'Hit Object'
+| '<id>' 'SBT Record Index'
+|======
+
+[cols="5*1"]
+|======
+4+|[[OpHitObjectGetShaderRecordBufferHandleEXT]]*OpHitObjectGetShaderRecordBufferHandleEXT* +
+ +
+ Returns the address of shader record buffer for the hit or miss record encoded in hit object. +
+ +
+ 'Result' is the address of data in shader record as encoded in the hit object. +
+ +
+ 'Result Type' must be a 32-bit 'integer type' 2-component vector. +
+ +
+ 'Hit Object' is a pointer to the hit object. +
+ +
+ This instruction is allowed only in *RayGenerationKHR*, *ClosestHitKHR* and *MissKHR* execution models. +
+1+|Capability: +
+*ShaderInvocationReorderEXT*
+| 4 | 5349
+| '<id>' 'Result Type'
+| '<id>' 'Result' 
+| '<id>' 'Hit Object'
+|======
+
+
+[cols="5*1"]
+|======
+4+|[[OpHitObjectIsEmptyEXT]]*OpHitObjectIsEmptyEXT* +
+ +
+ Returns a boolean indicating whether the hit object is an empty hit object. +
+ +
+ 'Result' is true if hit object encodes a NOP, false otherwise. +
+ +
+ 'Result Type' must be a 'boolean type' scalar. +
+ +
+ 'Hit Object' must be a pointer to hit object. +
+ +
+ This instruction is allowed only in *RayGenerationKHR*, *ClosestHitKHR* and *MissKHR* execution models. +
+1+|Capability: +
+*ShaderInvocationReorderEXT*
+| 4 | 5350
+| '<id>' 'Result Type'
+| '<id>' 'Result'
+| '<id>' 'Hit Object'
+|======
+
+
+[cols="5*1"]
+|======
+4+|[[OpHitObjectIsHitEXT]]*OpHitObjectIsHitEXT* +
+ +
+ Returns a boolean indicating whether the hit object has encoded a hit. +
+ +
+ 'Result' is true if hit object encodes a hit, false otherwise. +
+ +
+ 'Result Type' must be a 'boolean type' scalar. +
+ +
+ 'Hit Object' must be a pointer to hit object. +
+ +
+ This instruction is allowed only in *RayGenerationKHR*, *ClosestHitKHR* and *MissKHR* execution models. +
+1+|Capability: +
+*ShaderInvocationReorderEXT*
+| 4 | 5351
+| '<id>' 'Result Type'
+| '<id>' 'Result'
+| '<id>' 'Hit Object'
+|======
+
+
+[cols="5*1"]
+|======
+4+|[[OpHitObjectIsMissEXT]]*OpHitObjectIsMissEXT* +
+ +
+ Returns a boolean indicating whether the hit object has encoded a miss. +
+ +
+ 'Result' is true if hit object encodes a miss, false otherwise. +
+ +
+ 'Result Type' must be a 'boolean type' scalar. +
+ +
+ 'Hit Object' must be a pointer to hit object. +
+ +
+ This instruction is allowed only in *RayGenerationKHR*, *ClosestHitKHR* and *MissKHR* execution models. +
+1+|Capability: +
+*ShaderInvocationReorderEXT*
+| 3 | 5352
+| '<id>' 'Result Type'
+| '<id>' 'Result'
+| '<id>' 'Hit Object'
+|======
+--
+
+(Add a new sub section 3.36.Fused Hit Object Instructions) ::
++
+--
+[cols="6*1"]
+|======
+5+|[[OpHitObjectReorderExecuteShaderEXT]]*OpHitObjectReorderExecuteShaderEXT* +
+ +
+ Reorder threads based on hit object supplemented by 'Hint' and 'Bits' if they are optionally provided values followed by executing the shader. Behavior is as described in Reorder Instructions above. +
+ +
+ 'Hit Object' must be a pointer to hit object used to reorder threads. +
+ +
+ 'Payload' is a pointer to the ray payload structure to use for this trace. 'Payload' must be the result of an *OpVariable* with a storage class of *RayPayloadKHR* or **IncomingRayPayloadKHR**. +
+ +
+ 'Hint' must be a 32-bit 'integer-type' scalar. +
+ +
+ 'Bits' must be a 32-bit 'integer-type' scalar. +
+ +
+ 'Hint' and 'Bits' are optional together i.e Either both 'Hint' and 'Bits'
+ should be provided or neither. +
+ +
+ This instruction is allowed only in *RayGenerationKHR* execution models. +
+ +
+ This instruction is a _shader call instruction_ which may invoke shaders with the 
+*ClosestHitKHR*, and *MissKHR* execution models. +
+1+|Capability: +
+*ShaderInvocationReorderEXT*
+| 2 + variable | 5310
+| '<id>'  Hit Object
+| '<id>'  Payload
+| Optional '<id>' 'Hint'
+| Optional '<id>' 'Bits'
+|======
+
+[cols="16*1"]
+|======
+15+|[[OpHitObjectTraceReorderExecuteEXT]]*OpHitObjectTraceReorderExecuteEXT* +
+ +
+ Traces a ray and triggers execution on any-hit or intersection shaders and populates resulting hit or miss information in the hit object. +
+ +
+ 'Hit Object' is a pointer to the hit object. +
+ +
+ 'Acceleration Structure' is the descriptor for the acceleration structure to trace into. +
+ +
+ 'Ray Flags' contains one or more of the ray flag values. Refer to the client API specification for details.
+ +
+ 'Cull Mask' is the mask to test against the instance mask. +
+ +
+ 'SBT Offset' and 'SBT Stride' control indexing into the SBT for hit shaders called from this trace.
+ 'SBT' stands for Shader Binding Table. Refer to the client API specification for details. +
+ +
+ 'Miss Index' is the index of the miss shader to be called from this trace call. +
+ +
+ 'Ray Origin', 'Ray Tmin', 'Ray Direction', and 'Ray Tmax' control the basic parameters of the ray to be traced. +
+ +
+ 'Payload' is a pointer to the ray payload structure to use for this trace. 'Payload' must be the result of an *OpVariable* with a storage class of *RayPayloadKHR* or **IncomingRayPayloadKHR**. +
+ +
+ 'Ray Flags', 'Cull Mask', 'SBT Offset', 'SBT Stride', and 'Miss Index' must be a 32-bit 'integer type' scalar. +
+ +
+ Only the 8 least-significant bits of 'Cull Mask' are used by this instruction - other bits are ignored.
+ +
+ Only the 4 least-significant bits of 'SBT Offset' and 'SBT Stride' are used by this instruction - other bits are ignored.
+ +
+ Only the 16 least-significant bits of 'Miss Index' are used by this instruction - other bits are ignored.
+ +
+ 'Ray Origin' and 'Ray Direction' must be a 32-bit 'float type' 3-component vector. +
+ +
+ 'Ray Tmin' and 'Ray Tmax' must be a 32-bit 'float type' scalar. +
+ +
+ 'Hint' must be a 32-bit 'integer-type' scalar. +
+ +
+ 'Bits' must be a 32-bit 'integer-type' scalar. +
+ +
+ 'Hint' and 'Bits' are optional together i.e Either both 'Hint' and 'Bits'
+ should be provided or neither. +
+ +
+ This instruction is allowed only in *RayGenerationKHR* execution models. +
+ +
+ This instruction is a _shader call instruction_ which may invoke shaders with the *IntersectionKHR*, *AnyHitKHR*, *ClosestHitKHR*, and *MissKHR* execution models. +
+ +
+1+|Capability: +
+*ShaderInvocationReorderEXT*
+| 13 + variable | 5311
+| '<id>' 'Hit Object'
+| '<id>' 'Acceleration Structure'
+| '<id>' 'Ray Flags'
+| '<id>' 'Cull Mask'
+| '<id>' 'SBT Offset'
+| '<id>' 'SBT Stride'
+| '<id>' 'Miss Index'
+| '<id>' 'Ray Origin'
+| '<id>' 'Ray Tmin'
+| '<id>' 'Ray Direction'
+| '<id>' 'Ray Tmax'
+| '<id>' 'Payload'
+| Optional '<id>' 'Hint'
+| Optional '<id>' 'Bits'
+|======
+
+[cols="17*1"]
+|======
+16+|[[OpHitObjectTraceMotionReorderExecuteEXT]]*OpHitObjectTraceMotionReorderExecuteEXT* +
+ +
+ Traces a ray and triggers execution of any-hit or intersection shaders and populates resulting hit or miss information in the hit object. +
+ +
+ 'Hit Object' is a pointer to the hit object. +
+ +
+ 'Acceleration Structure' is the descriptor for the acceleration structure to trace into. +
+ +
+ 'Ray Flags' contains one or more of the ray flag values. Refer to the client API specification for details.
+ +
+ 'Cull Mask' is the mask to test against the instance mask. +
+ +
+ 'SBT Offset' and 'SBT Stride' control indexing into the SBT for hit shaders called from this trace.
+ 'SBT' stands for Shader Binding Table. Refer to the client API specification for details. +
+ +
+ 'Miss Index' is the index of the miss shader to be called from this trace call. +
+ +
+ 'Ray Origin', 'Ray Tmin', 'Ray Direction', and 'Ray Tmax' control the basic parameters of the ray to be traced. +
+ +
+ 'Payload' is a pointer to the ray payload structure to use for this trace. 'Payload' must be the result of an *OpVariable* with a storage class of *RayPayloadKHR* or **IncomingRayPayloadKHR**. +
+ +
+ 'Ray Flags', 'Cull Mask', 'SBT Offset', 'SBT Stride', and 'Miss Index' must be a 32-bit 'integer type' scalar. +
+ +
+ Only the 8 least-significant bits of 'Cull Mask' are used by this instruction - other bits are ignored.
+ +
+ Only the 4 least-significant bits of 'SBT Offset' and 'SBT Stride' are used by this instruction - other bits are ignored.
+ +
+ Only the 16 least-significant bits of 'Miss Index' are used by this instruction - other bits are ignored.
+ +
+ 'Ray Origin' and 'Ray Direction' must be a 32-bit 'float type' 3-component vector. +
+ +
+ 'Ray Tmin' and 'Ray Tmax' must be a 32-bit 'float type' scalar. +
+ + 
+ 'Current Time' must be a 32-bit float type scalar. +
+ +
+ 'Hint' must be a 32-bit 'integer-type' scalar. +
+ +
+ 'Bits' must be a 32-bit 'integer-type' scalar. +
+ +
+ 'Hint' and 'Bits' are optional together i.e Either both 'Hint' and 'Bits'
+ should be provided or neither. +
+ +
+ This instruction is allowed only in *RayGenerationKHR* execution models with *SPV_NV_ray_tracing_motion_blur* extension. +
+ +
+ This instruction is a _shader call instruction_ which may invoke shaders with the *IntersectionKHR*, *AnyHitKHR*, *ClosestHitKHR*, and *MissKHR* execution models. +
+ +
+1+|Capability: +
+*ShaderInvocationReorderEXT*, *RayTracingMotionBlurNV*
+| 14 + variable | 5312
+| '<id>' 'Hit Object'
+| '<id>' 'Acceleration Structure'
+| '<id>' 'Ray Flags'
+| '<id>' 'Cull Mask'
+| '<id>' 'SBT Offset'
+| '<id>' 'SBT Stride'
+| '<id>' 'Miss Index'
+| '<id>' 'Ray Origin'
+| '<id>' 'Ray Tmin'
+| '<id>' 'Ray Direction'
+| '<id>' 'Ray Tmax'
+| '<id>' 'Current Time'
+| '<id>' 'Payload'
+| Optional '<id>' 'Hint'
+| Optional '<id>' 'Bits'
+|======
+
+--
+
+(Modify Section 3.36.6, Type-Declaration Instructions, adding a new table) ::
++
+--
+:capability: ShaderInvocationReorderEXT
+
+[cols="5,1,1*3",width="100%"]
+|=====
+2+|[[OpTypeHitObjectEXT]]*OpTypeHitObjectEXT* +
+ +
+Declares a hit object type which is an opaque object representing state during
+ray tracing traversal.
+
+This type is opaque: values of this type have no defined physical size or
+bit pattern.
+
+1+|Capability: +
+*ShaderInvocationReorderEXT*
+| 2 | 5313 | '<id>' 'Result'
+|=====
+--
+
+Validation Rules
+----------------
+
+An OpExtension must be added to the SPIR-V for validation layers to check
+legal use of this extension:
+
+----
+OpExtension "SPV_EXT_shader_invocation_reorder"
+----
+
+Interactions with SPV_NV_ray_tracing_motion_blur
+------------------------------------------------
+
+If the 'SPV_NV_ray_tracing_motion_blur' extension is not supported, the
+*OpHitObjectTraceRayMotionEXT*, *OpHitObjectRecordMissMotionEXT*,
+and *OpHitObjectTraceMotionReorderExecuteEXT* instructions are not supported.
+
+Interactions with SPV_KHR_ray_tracing_position_fetch
+----------------------------------------------------
+
+If the 'SPV_KHR_ray_tracing_position_fetch' extension is not supported
+the *OpHitObjectGetIntersectionTriangleVertexPositionsEXT* instruction
+is not supported.
+
+Interactions with SPV_KHR_ray_query
+-----------------------------------
+
+If the 'SPV_KHR_ray_query' extension is not supported the
+*OpHitObjectRecordFromQueryEXT* instruction is not supported.
+
+Issues
+------
+
+None
+
+Revision History
+----------------
+
+[cols="5,15,15,70"]
+[grid="rows"]
+[options="header"]
+|========================================
+|Rev|Date|Author|Changes
+|1 |2024-05-08 |Eric Werness         | Port to EXT
+|2 |2025-01-27 |Ashwin Lele          | Renumber enums
+|========================================
+
+
+

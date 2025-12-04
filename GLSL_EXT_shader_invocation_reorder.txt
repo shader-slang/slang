@@ -1,0 +1,896 @@
+Name
+
+    EXT_shader_invocation_reorder
+
+Name Strings
+
+    GL_EXT_shader_invocation_reorder
+
+Contact
+
+    Ashwin Lele (alele 'at' nvidia.com), NVIDIA
+
+Contributors
+
+    Eric Werness, NVIDIA
+    Daniel Koch, NVIDIA
+    Vikram Kushwaha, NVIDIA
+    Nia Bickford, NVIDIA
+    Aaron Hagan, AMD
+    Tyler Nowicki, AMD
+    Sebastian Neubauer, AMD
+    Sven Woop, Intel
+    Radoslav Drabinski, Intel
+    Members of Vulkan Ray Tracing TSG
+
+Status
+
+    Complete
+
+Version
+
+    Last Modified Date: 2025-11-11
+    Revision: 2
+
+Dependencies
+
+    This extension can be applied to OpenGL GLSL versions 4.60
+    (#version 460) and higher.
+
+    This extension is written against revision 5 of the OpenGL Shading Language
+    version 4.60, dated September 4, 2017.
+
+    This extension interacts with revision 43 of the GL_KHR_vulkan_glsl
+    extension, dated October 25, 2017.
+
+    This extension requires GLSL_EXT_ray_tracing.
+
+    This extension interacts with GLSL_NV_ray_tracing_motion_blur.
+
+    This extension requires GLSL_EXT_buffer_reference_uvec2.
+
+    This extension interacts with GL_EXT_nonuniform_qualifier.
+
+Overview
+
+    Ray tracing workloads are known to suffer from divergent shader execution
+    and data divergence. The current ray tracing pipeline API allows implementations
+    to dynamically schedule work triggered on execution of 'traceRayEXT'
+    or 'executeCallableEXT' but this does not allow applications any control
+    over it. Furthermore not all real world use cases require tight coupling
+    of ray tracing traversal and shading.
+
+    This extension document modifies GLSL for ray tracing stages to add support 
+    for 'hitObjectEXT' which is an opaque type which encapsulates the state of
+    traversal and allows queries to read this state. Additionally new functions 
+    using this hitobject, enable user explicit control over ray tracing traversal and shading. 
+    Furthermore new builtins are added to explicitly communicate reordering
+    information to implementations to allow them to reorder threads to minimize 
+    shader and data divergence and improving coherent execution.
+
+    This extension document adds support for the following extensions to be used
+    within GLSL:
+
+    - GL_EXT_shader_invocation_reorder - enables reordering operations
+
+    Mapping to SPIR-V
+    -----------------
+
+    For informational purposes (non-normative), the following is an
+    expected way for an implementation to map GLSL constructs to SPIR-V
+    constructs:
+
+      hitObjectEXT type -> OpTypeHitObjectEXT instruction
+
+      hitObjectEXT variable -> OpVariable instruction with type OpTypeHitObjectEXT
+
+      hitObjectTraceRayEXT -> OpHitObjectTraceRayEXT instruction
+      hitObjectTraceRayMotionEXT -> OpHitObjectTraceRayMotionEXT instruction
+
+      hitObjectRecordFromQueryEXT -> OpHitObjectRecordFromQueryEXT instruction
+
+      hitObjectRecordMissEXT -> OpHitObjectRecordMissEXT instruction
+      hitObjectRecordMissMotionEXT -> OpHitObjectRecordMissMotionEXT instruction
+
+      hitObjectRecordEmptyEXT -> OpHitObjectRecordEmptyEXT instruction
+
+      hitObjectExecuteShaderEXT -> OpHitObjectExecuteShaderEXT instruction 
+
+      hitObjectIsHitEXT -> OpHitObjectIsHitEXT instruction
+      hitObjectIsMissEXT -> OpHitObjectIsMissEXT instruction
+      hitObjectIsEmptyEXT -> OpHitObjectIsEmptyEXT instruction
+
+      hitObjectGetRayTMinEXT -> OpHitObjectGetRayTMinEXT instruction
+      hitObjectGetRayTMaxEXT -> OpHitObjectGetRayTMaxEXT instruction
+      hitObjectGetRayFlagsEXT -> OpHitObjectGetRayFlagsEXT instruction
+      hitObjectGetWorldRayOriginEXT -> OpHitObjectGetWorldRayOriginEXT instruction
+      hitObjectGetWorldRayDirectionEXT -> OpHitObjectGetWorldDirectionEXT instruction
+      hitObjectGetObjectRayOriginEXT -> OpHitObjectGetObjectRayOriginEXT instruction
+      hitObjectGetObjectRayDirectionEXT -> OpHitObjectGetObjectRayDirectionEXT instruction
+      hitObjectGetObjectToWorldEXT -> OpHitObjectGetObjectToWorldEXT instruction
+      hitObjectGetWorldToObjectEXT -> OpHitObjectGetWorldToObjectEXT instruction
+
+      hitObjectGetIntersectionTriangleVertexPositionsEXT ->
+            OpHitObjectGetIntersectionTriangleVertexPositionsEXT instructions
+      hitObjectGetInstanceIdEXT -> OpHitObjectGetInstanceIdEXT instruction
+      hitObjectGetInstanceCustomIndexEXT -> OpHitObjectGetInstanceCustomIndexEXT instruction
+      hitObjectGetGeometryIndexEXT -> OpHitObjectGetGeometryIndexEXT instruction 
+      hitObjectGetPrimitiveIndexEXT -> OpHitObjectGetPrimitiveIndexEXT instruction
+      hitObjectGetHitKindEXT -> OpHitObjectGetHitKindEXT instruction
+      hitObjectGetCurrentTimeEXT -> OpHitObjectGetCurrentTimeEXT instruction
+      hitObjectGetAttributeEXT -> OpHitObjectGetAttributesEXT instruction
+      hitObjectGetShaderBindingTableRecordIndexEXT ->
+            OpHitObjectGetShaderBindingTableRecordIndexEXT instruction
+      hitObjectSetShaderBindingTableRecordIndexEXT ->
+            OpHitObjectSetShaderBindingTableRecordIndexEXT instruction
+
+      hitObjectGetShaderRecordBufferHandleEXT ->
+            OpHitObjectGetShaderRecordBufferHandleEXT instruction
+
+
+      reorderThreadEXT ->
+            OpReorderThreadWithHintEXT/OpReorderThreadWithHitObjectEXT instruction
+     
+      hitObjectReorderExecuteEXT -> OpHitObjectReorderExecuteEXT instruction
+      hitObjectTraceReorderExecuteEXT -> OpHitObjectTraceReorderExecuteEXT instruction
+      hitObjectTraceMotionReorderExecuteEXT -> OpHitObjectTraceMotionReorderExecuteEXT instruction
+
+
+Modifications to the OpenGL Shading Language Specification, Version 4.60
+
+    Including the following line in a shader can be used to control the
+    language features described in this extension:
+
+      #extension GL_EXT_shader_invocation_reorder  : <behavior>
+
+    where <behavior> is as specified in section 3.3.
+    New preprocessor #defines are added:
+
+      #define GL_EXT_shader_invocation_reorder                          1
+
+Changes to Chapter 3 of The OpenGL Shading Language Specification, Version 4.60
+
+    Modify Section 3.6, (Keywords)
+
+    (add the following to the list of reserved keywords)
+
+    hitObjectEXT
+
+Changes to Chapter 4 of The OpenGL Shading Language Specification, Version 4.60
+
+    Add following to Section 4.1 (Basic Types)
+
+    Hit Object Opaque Types
+
+    Types                           Meaning
+    -----                           -------
+
+    hitObjectEXT                    A handle representing the state
+                                    captured during traversal through 
+                                    acceleration structure or populated
+                                    via builtins.
+                                    This is available only in ray-generation,
+                                    closest-hit and miss shading stages.
+                                    
+                                    
+
+    Change the following sentence in the first paragraph of 4.1.7 (Opaque
+    Types) from
+
+        They can only be declared as function parameters or in uniform-
+        qualified variables (see Uniform  Variables).
+
+    to
+
+        With the exception of hitObjectEXT (see "Hit Object Type"), they can
+        only be declared as function parameters or in uniform-qualified
+        variables (see Uniform  Variables).
+
+    Add two new sub-sections under Section 4.1.7 (Opaque Types)
+
+    4.1.7.y Hit Object Type
+
+    hitObjectEXT is an opaque type representing the state captured during
+    traversal of acceleration structures or manually populated via builtins.
+    It is declared and behaves like above described opaque types. When aggregated
+    into arrays within a shader, hitObjectEXT can only be indexed with
+    a dynamically uniform integral expression, otherwise results are undefined.
+    Unlike other opaque types, hitObjectEXT variables are declared with no storage
+    qualifiers, either in the global scope or within function scope.
+
+    [[If GL_EXT_nonuniform_qualifier]] is supported
+    When aggregated into arrays within a shader, hitObjectEXT can
+    be indexed with a non-uniform integral expressions, when decorated with the
+    nonuniformEXT qualifier.
+    [[end]]
+
+    This type is used in various hit object builtins described in Section 8.19
+    Members of a structure cannot be declared with this type.
+
+    
+    Modify Section 4.3 (Storage Qualifiers)
+
+
+    Storage Qualifier              Meaning
+    -----------------              -------
+
+
+    hitObjectAttributeEXT          Ray-generation, closest-hit or miss shader only.
+                                   Storage associated with attibutes for
+                                   geometry intersected by a ray when used for
+                                   a hit object.
+
+
+    4.3.X hitObjectAttributeEXT Variables
+
+    These are allowed only in ray-generation, closest-hit, and miss shaders.
+    It is a compile-time error to use them in any other stage. They can be
+    both read from and written to. They cannot have any other storage qualifiers. 
+    It is a compile-time error to declare unsized arrays of this type.
+
+
+    Modify table in Section 4.4 (Layout Qualifiers)
+
+
+    Layout Qualifier            Qualifier  Individual   Block    Block      Allowed
+                                  Only      Variable             Member    Interface
+    -----------------           ---------  ----------   ------   ------    ---------
+
+    hitobjectshaderrecordext                              X                  buffer                    
+
+
+
+    Add a new subsection to Section 4.4
+
+    4.4.10 Hit Object Shader Record Buffer
+
+    This allows a buffer reference to be used in context of reading from
+    data section of a shader record as it is encoded in a hit object.
+
+    This layout qualifier can only be used on a buffer interface block
+    which is a buffer reference i.e annotated with 
+    layout qualifier 'buffer_reference'
+
+    It is a compile-time error to use this qualifier with any other 
+    interface-qualifier or member of an interface block.
+
+
+Additions to Chapter 8 of the OpenGL Shading Language Specification
+(Built-in Functions)
+
+    Add Section 8.19, Hit Object Functions
+     (Modify section 8.19 from Ray Tracing functions from EXT_ray_tracing
+     to add following)
+
+    The hitObjectTraceRayEXT(), hitObjectTraceRayMotionEXT(), 
+    hitObjectExecuteShaderEXT(), hitObjectReorderExecuteEXT(),
+    hitObjectTraceReorderExecuteEXT(), and
+    hitObjectTraceMotionReorderExecuteEXT() are considered shader call
+    functions.  The above functions as well as reorderThreadEXT() are
+    considered as invocation repack functions.
+
+
+    Syntax:
+
+        void hitObjectTraceRayEXT(hitObjectEXT hitobject, 
+                   accelerationStructureEXT topLevel,
+                   uint rayFlags,
+                   uint cullMask,
+                   uint sbtRecordOffset,
+                   uint sbtRecordStride,
+                   uint missIndex,
+                   vec3 origin,
+                   float Tmin,
+                   vec3 direction,
+                   float Tmax,
+                   int payload);
+
+
+    This function is only available in the ray generation, closest-hit, and
+    miss shaders.
+
+    Initiates a ray query against a top-level <accelerationStructureEXT>
+    structure, triggering the execution of various intersection and any-hit
+    shaders as ray-geometry intersections are being evaluated, and returns the
+    resulting hit or miss information in the hit object. This does not
+    execute any closest-hit or miss shaders.
+
+    When a hit occurs, attributes written by intersection shaders
+    to hitAttributeEXT variables are encoded and stored in the hit object.
+    These stored attributes are available for retrieval via hitObjectGetAttributesEXT
+    and are automatically available to closest-hit shaders executed via
+    hitObjectExecuteShaderEXT, as described in the specification for that
+    function. The type and structure of attributes stored must match the
+    type expected when retrieved or used in closest-hit shaders.
+
+    Refer to 'traceRayEXT' for various parameter definitions.
+
+
+    Syntax:
+
+        void hitObjectTraceRayMotionEXT(hitObjectEXT hitobject, 
+                   accelerationStructureEXT topLevel,
+                   uint rayFlags,
+                   uint cullMask,
+                   uint sbtRecordOffset,
+                   uint sbtRecordStride,
+                   uint missIndex,
+                   vec3 origin,
+                   float Tmin,
+                   vec3 direction,
+                   float Tmax,
+                   float currentTime,
+                   int payload);
+
+
+    This function is only available in the ray generation, closest-hit, and
+    miss shaders.
+
+    Initiates a ray query against a top-level <accelerationStructureEXT>
+    structure, triggering the execution of various intersection and any-hit
+    shaders as ray-geometry intersections are being evaluated, and returns the
+    resulting hit or miss information in the hit object. This does not
+    execute any closest-hit or miss shaders.
+
+    When a hit occurs, attributes written by intersection shaders
+    to hitAttributeEXT variables are encoded and stored in the hit object.
+    These stored attributes are available for retrieval via hitObjectGetAttributesEXT
+    and are automatically available to closest-hit shaders executed via
+    hitObjectExecuteShaderEXT, as described in the specification for that
+    function. The type and structure of attributes stored must match the
+    type expected when retrieved or used in closest-hit shaders.
+
+    'hitObjectTraceRayMotionEXT' operates the same as 'hitObjectTraceRayEXT', 
+    with the exception of <currentTime> parameter.
+
+    This function is allowed only when GLSL_NV_ray_tracing_motion_blur 
+    extension is present.
+
+    Refer to 'traceRayMotionNV' for various parameter definitions.
+
+
+    Syntax:
+
+        void hitObjectRecordFromQueryEXT(hitObjectEXT hitobject,
+                    rayQueryEXT rayQuery, uint sbtRecordIndex
+                    int attributeLocation)
+
+    Populates 'hitobject' representing a hit without tracing a ray.
+
+    <rayQuery> is the ray query from which the intersection parameters
+    are copied.
+
+    <sbtRecordIndex> is the record index of the hit shader of
+    <shader binding table> to be encoded in the hit object.
+
+    <attributeLocation> is a compile-time constant to select
+    a shader defined structure containing attributes which is used to populate
+    this hit object. 
+    It is possible for a shader to contain multiple invocations 'hitObjectRecordFromQueryEXT'
+    with different attribute types. Different attribute types are chosen based on the 
+    different values of the compile-time constant <attributeLocation> which correspond 
+    to the hitObjectAttributeEXT qualified variables having the same value for the
+    location layout qualifier. 
+
+    The attributes from the hitObjectAttributeEXT variable selected by
+    <attributeLocation> are encoded and stored in the hit object. These stored
+    attributes are available for retrieval via hitObjectGetAttributesEXT and
+    are automatically available to closest-hit shaders executed via
+    hitObjectExecuteShaderEXT, as described in the specification for that
+    function. The type and structure of attributes stored must match the
+    type expected when retrieved or used in closest-hit shaders.
+    
+
+    Syntax:
+
+        void hitObjectRecordMissEXT(hitObjectEXT hitObject, 
+                   uint rayFlags,
+                   uint sbtRecordIndex, 
+                   vec3 origin,
+                   float Tmin,
+                   vec3 direction,
+                   float TMax)
+
+    Populates 'hitobject' representing a miss without tracing a ray
+    It is legal to construct a miss in a hit object for a ray that 
+    could have hit some geometry if traced.
+
+    <sbtRecordIndex> refers to the record index of the miss shader of
+    the <shader binding table> for which this hit object is created.
+
+    Refer to shader binding table, hit shader indexing of the Vulkan 
+    specification for more information.
+
+    Syntax:
+
+        void hitObjectRecordMissMotionEXT(hitObjectEXT hitObject, 
+                   uint rayFlags,
+                   uint sbtRecordIndex, 
+                   vec3 origin,
+                   float Tmin,
+                   vec3 direction,
+                   float TMax,
+                   float currentTime)
+
+    Populates 'hitobject' representing a miss without tracing a ray
+    It is legal to construct a miss in a hit object for a ray that 
+    could have hit some geometry if traced.
+
+    Refer to 'hitObjectRecordMissEXT' for various parameter definitions.
+
+    Refer to 'traceRayMotionNV' for defintion of <currentTime>
+
+    This function is allowed only when GLSL_NV_ray_tracing_motion_blur 
+    extension is present.
+
+    Syntax:
+
+        void hitObjectRecordEmptyEXT(hitObjectEXT hitObject)
+
+    Encodes the hitobject to represent an empty hit object which represents
+    neither a hit nor a miss.
+
+
+    Syntax:
+
+        void hitObjectExecuteShaderEXT(hitObjectEXT hitObject,
+                    int payload)
+
+
+    Execute the closest-hit or miss shader encoded in the 'hitobject'
+    
+    For an empty hit object or a hit object created from a ray query where
+    hitObjectSetShaderBindingTableRecordIndexEXT hasn't been called then
+    no shader will be called.
+
+    When a closest-hit shader is executed, the attributes stored in the hit object
+    (via hitObjectRecordFromQueryEXT, hitObjectTraceRayEXT, or
+    hitObjectTraceRayMotionEXT) are made available to that shader through 
+    hitAttributeEXT variables, following the same mechanism as traceRayEXT.
+    For attributes stored via hitObjectTraceRayEXT or hitObjectTraceRayMotionEXT,
+    the type of hitAttributeEXT variables in the closest-hit shader must match 
+    the type that was written by the intersection shader. For attributes stored 
+    via hitObjectRecordFromQueryEXT, the type must match the structure type 
+    selected by the <attributeLocation> parameter when the attributes were stored.
+    If the types do not match, the behavior is undefined. 
+
+
+    Syntax:
+
+        bool hitObjectIsEmptyEXT(hitObjectEXT hitObject)
+
+    Returns 'true' if <hitObject> encodes a empty hit object, 'false' otherwise.
+
+
+    Syntax:
+
+        bool hitObjectIsMissEXT(hitObjectEXT hitObject)
+
+    Returns 'true' if <hitobject> encodes a miss, 'false' otherwise.
+
+
+    Syntax:
+
+        bool hitObjectIsHitEXT(hitObjectEXT hitObject)
+
+    Returns 'true' if <hitobject> encodes a hit, 'false' otherwise.
+
+
+    Syntax:
+
+        float hitObjectGetRayTMinEXT(hitObjectEXT hitObject)
+
+    Returns the parametric <tMin> value encoded in the hit object.
+    Refer to the semantics of gl_RayTMinEXT as defined in EXT_ray_tracing.
+
+
+    Syntax:
+
+        float hitObjectGetRayTMaxEXT(hitObjectEXT hitObject)
+
+    Returns the parametric <tMax> value encoded in the hit object.
+    Refer to the semantics of gl_RayTMaxEXT as defined in EXT_ray_tracing.
+
+    Syntax:
+
+        uint hitObjectGetRayFlagsEXT(hitObjectEXT hitObject)
+
+    Returns the <rayFlags> value encoded in the hit object.
+    Refer to the semantics of gl_RayFlagsEXT as defined in EXT_ray_tracing.
+
+    Syntax:
+
+        vec3 hitObjectGetObjectRayOriginEXT(hitObjectEXT hitObject)
+
+    Returns the object-space origin of ray encoded in the hit object.
+
+
+    Syntax:
+
+        vec3 hitObjectGetObjectRayDirectionEXT(hitObjectEXT hitObject)
+
+    Returns the object-space direction of ray encoded in the hit object.
+
+    Syntax:
+
+        vec3 hitObjectGetWorldRayOriginEXT(hitObjectEXT hitObject)
+
+    Returns the world-space origin of ray encoded in the hit object.
+
+
+    Syntax:
+
+        vec3 hitObjectGetWorldRayDirectionEXT(hitObjectEXT hitObject)
+
+    Returns the world-space direction of ray encoded in the hit object.
+
+
+    Syntax:
+
+        mat4x3 hitObjectGetObjectToWorldEXT(hitObjectEXT hitObject)
+
+    Returns the object to world transformation matrix as encoded in the hit object.
+
+    Syntax:
+
+        mat4x3 hitObjectGetWorldToObjectEXT(hitObjectEXT hitObject)
+
+    Returns the world to object transformation matrix as encoded in the hit object.
+
+    Syntax:
+
+        void hitObjectGetIntersectionTriangleVertexPositionsEXT(hitObjectEXT hitObject, out vec3 positions[3])
+
+    Returns the three vertex positions encoded in the hit object if the
+    intersection is a triangle.
+
+    Syntax:
+
+        int hitObjectGetInstanceCustomIndexEXT(hitObjectEXT hitObject);
+
+    Returns the custom index of the instance encoded in the hit object.
+
+
+    Syntax:
+
+        int hitObjectGetInstanceIdEXT(hitObjectEXT hitObject);
+
+    Returns the index of the instance encoded in the hit object.
+
+
+    Syntax:
+
+        int hitObjectGetGeometryIndexEXT(hitObjectEXT hitObject);
+
+    Returns implementation defined index of geometry encoded in the hit
+    object.
+
+
+    Syntax:
+
+        int hitObjectGetPrimitiveIndexEXT(hitObjectEXT hitObject);
+
+    Returns the index of the primitive (triangle or bounding box) within the
+    geometry as encoded in the hit object.
+
+
+    Syntax:
+
+        uint hitObjectGetHitKindEXT(hitObjectEXT hitObject);
+
+    Returns values as defined in EXT_ray_tracing specification for
+    gl_HitKindEXT.
+
+
+    Syntax:
+
+        void hitObjectGetAttributesEXT(hitObjectEXT hitObject, int attributeLocation);
+
+    
+    Extracts the attributes encoded in the hit object and writes to 
+    'hitObjectAttributeEXT' storage class decorated variable selected using
+    'attributeLocation' as specified below.
+
+    <attributeLocation> is a compile-time constant to select
+    a shader defined structure used to populate with attributes associated
+    with this hit object. 
+    It is possible for a shader to contain multiple invocations
+    'hitObjectGetAttributeEXT'
+    with different attribute types. Different attribute types are chosen based on the 
+    different values of the compile-time constant <attributeLocation> which correspond 
+    to the hitObjectAttributeEXT qualified variables having the same value for the
+    location layout qualifier. 
+
+    This function retrieves attributes that were previously stored in the hit object
+    via hitObjectRecordFromQueryEXT or via hitObjectTraceRayEXT / hitObjectTraceRayMotionEXT.
+    The type of the hitObjectAttributeEXT variable selected using <attributeLocation> 
+    must match the type that was stored. The behavior is undefined if attributes were not 
+    stored in the hit object or if the types referenced by the <attributeLocation> do not match.
+
+
+    Syntax:
+
+        uvec2 hitObjectGetShaderRecordBufferHandleEXT(hitObjectEXT hitObject);
+
+
+    Returns a uvec2 handle representing the address for data for a record in
+    the shader binding table as encoded in the hit object.
+
+    This can be used with a buffer reference with additional layout qualifier 
+    'hitobjectshaderrecordnv' as defined in EXT_buffer_reference_uvec2.
+
+
+    Syntax:
+
+        uint hitObjectGetShaderBindingTableRecordIndexEXT(hitObjectEXT hitObject);
+
+    Returns the index for the record in the shader binding table as encoded in the hit
+    object. For a hit, returns an index relative to the hit group base. For a miss,
+    returns the index relative to the miss table. 
+
+    Syntax:
+
+        void hitObjectSetShaderBindingTableRecordIndexEXT(hitObjectEXT hitObject, uint index);
+
+    Sets the index for the record in shader binding table as encoded in hit
+    object.
+
+
+    Syntax:
+    
+        float hitObjectGetCurrentTimeEXT(hitObjectEXT hitObject);
+
+    Returns the current time as encoded in the hit object.
+    Only applicable if hit object was constructed for hitObjectTraceRayMotionEXT
+
+
+    Add Section 8.20, Reorder Functions
+
+
+    Reorder functions allow implementations to reorder threads based
+    on input given to these builtins to so that subsequent code can
+    execute with improved coherence.
+
+    For reorder functions providing a hint, the implementation will reorder 
+    based on the unsigned numerical value of the number of bits provided. 
+    The sorting may be coarse, be bucketed rather than sorted, or only use
+    the high bits of the hint provided. If both the hint and the hit object 
+    are provided the implementation should reorder based on the hint after 
+    the shader being executed.
+
+    These functions are available only in ray-generation shader stage.
+
+    Syntax:
+
+        void reorderThreadEXT(uint hint, uint bits);
+
+
+    Reorder threads based on user provided <hint>. Similar hint values
+    indicate similarity of subsequent work done after this call. Behavior
+    is implementation defined.
+
+    <hint> determines desired ordering of threads relative to others.
+
+    <bits> indicates number of least significant bits an implementation
+    should take into account from <hint> in determining ordering. 
+    
+    Value of <bits> should be <= 32. Values greater than 32 will 
+    lead to undefined behavior.
+
+
+    Syntax:
+
+        void reorderThreadEXT(hitObjectEXT hitObject)
+
+    Reorder threads based on provided <hitObject>. The exact properties
+    from hit object which are used to reorder the threads is implementation
+    defined.
+
+
+    Syntax:
+
+        void reorderThreadEXT(hitObjectEXT hitObject, uint hint, uint bits)
+
+    Reorder threads based on provided <hitObject> supplemented by additional
+    information based on user provided <hint>. The exact properties from 
+    hit object and user specified hint which are used to reorder theads is
+    implementation defined.
+
+    <hint> determines desired ordering of threads relative to others.
+
+    <bits> indicates number of least significant bits an implementation
+    should take into account from <hint> in determining ordering.
+
+    Value of <bits> should be <= 32. Values greater than 32 will 
+    lead to undefined behavior.
+
+    Add Section 8.21, Fused Hit Object Functions
+
+    Fused functions are combinations of the above hit object functions for
+    convenience and to ease compiler analysis when an implementation can 
+    better optimize combinations of functionality.
+
+    Syntax:
+
+        void hitObjectReorderExecuteEXT(hitObjectEXT hitObject,
+                    int payload)
+
+    Equivalent of:
+
+        reorderThreadEXT(hitObject);
+        hitObjectExecuteShaderEXT(hitObject, payload);
+
+    Syntax:
+
+        void hitObjectReorderExecuteEXT(hitObjectEXT hitObject,
+                    uint hint, uint bits, int payload)
+
+    Equivalent of:
+    
+        reorderThreadEXT(hitObject, hint, bits);
+        hitObjectExecuteShaderEXT(hitObject, payload);
+
+    Syntax:
+
+        void hitObjectTraceReorderExecuteEXT(hitObjectEXT hitobject, 
+                   accelerationStructureEXT topLevel,
+                   uint rayFlags,
+                   uint cullMask,
+                   uint sbtRecordOffset,
+                   uint sbtRecordStride,
+                   uint missIndex,
+                   vec3 origin,
+                   float Tmin,
+                   vec3 direction,
+                   float Tmax,
+                   int payload);
+
+    Equivalent of:
+
+        hitObjectTraceRayEXT(hitObject, topLevel, rayFlags, cullMask, sbtRecordOffset, sbtRecordStride, missIndex, origin, Tmin, direction, Tmax);
+        reorderThreadEXT(hitObject);
+        hitObjectExecuteShaderEXT(hitObject, payload);
+
+    Syntax:
+
+        void hitObjectTraceReorderExecuteEXT(hitObjectEXT hitobject,
+                   accelerationStructureEXT topLevel,
+                   uint rayFlags,
+                   uint cullMask,
+                   uint sbtRecordOffset,
+                   uint sbtRecordStride,
+                   uint missIndex,
+                   vec3 origin,
+                   float Tmin,
+                   vec3 direction,
+                   float Tmax,
+                   uint hint,
+                   uint bits,
+                   int payload);
+
+    Equivalent of:
+
+        hitObjectTraceRayEXT(hitObject, topLevel, rayFlags, cullMask, sbtRecordOffset, sbtRecordStride, missIndex, origin, Tmin, direction, Tmax);
+        reorderThreadEXT(hitObject, hint, bits);
+        hitObjectExecuteShaderEXT(hitObject, payload);
+
+    Syntax:
+
+        void hitObjectTraceMotionReorderExecuteEXT(hitObjectEXT hitobject,
+               accelerationStructureEXT topLevel,
+               uint rayFlags,
+               uint cullMask,
+               uint sbtRecordOffset,
+               uint sbtRecordStride,
+               uint missIndex,
+               vec3 origin,
+               float Tmin,
+               vec3 direction,
+               float Tmax,
+               float currentTime,
+               uint hint,
+               uint bits,
+               int payload);
+
+    Equivalent of:
+
+        hitObjectTraceRayMotionEXT(hitObject, topLevel, rayFlags, cullMask, sbtRecordOffset, sbtRecordStride, missIndex, origin, Tmin, direction, Tmax, currentTime, payload);
+        reorderThreadEXT(hitObject, hint, bits);
+        hitObjectExecuteShaderEXT(hitObject, payload);
+
+Interactions with GLSL_EXT_ray_tracing
+
+    This extension requires acceleration structures, shader stages,
+    storage qualifiers and the various ray flags added by GLSL_EXT_ray_tracing.
+
+Interactions with GL_EXT_nonuniform_qualifier
+
+    If GL_EXT_nonuniform_qualifier is supported, arrays of
+    hitObjectEXT can be indexed with non-unform integral
+    expressions when they are decorated with the nonuniformEXT qualifier.
+
+Interactions with GL_EXT_scalar_block_layout
+
+    If GL_EXT_scalar_block_layout is supported, buffer references with
+    a layout of hitobjectshaderrecordnv can also be laid out using the scalar
+    block layout.
+
+Interactions with GLSL_NV_ray_tracing_motion_blur
+
+    If GLSL_NV_ray_tracing_motion_blur is not supported then
+    hitObjectTraceMotionReorderExecuteEXT, hitObjectTraceRayMotionEXT,
+    and hitObjectRecordMissMotionEXT are not allowed.
+
+
+Example
+
+    #version 460
+    #extension GL_EXT_ray_tracing : enable
+    #extension GL_EXT_buffer_reference_uvec2 : enable
+    #extension GL_EXT_shader_invocation_reorder : enable
+    layout(binding = 0) uniform accelerationStructureEXT as;
+    layout(binding = 1, rgba32f) uniform image2D img;
+    layout(binding = 2) uniform RayParams { vec3 origin;};
+    layout(location = 0) rayPayloadEXT vec4 Color;
+    layout(buffer_reference, hitobjectshaderrecordnv) buffer SRB 
+    {
+        uint materialId;
+    };
+    layout(location = 0) hitObjectAttributeEXT vec3 sphereAABB;
+    void main()
+    {
+        //Trace rays executing custom intersection/any-hit
+        vec4 outputColor = vec4(0);
+        hitObjectEXT hObj;
+        //Initialize to an empty hit object
+        hitObjectRecordEmptyEXT(hObj);
+
+        hitObjectTraceRayEXT(hObj,
+                   as,
+                   0,
+                   0,
+                   0,
+                   4,
+                   0,
+                   origin + vec3(gl_LaunchIDEXT.xyz),
+                   0.0f,
+                   origin + vec3(gl_LaunchIDEXT.xyz) + vec3(0,0,1.0f),
+                   1.0f,
+                   0);
+
+        uint materialIdHint = 0;
+        
+        if (hitObjectIsHitEXT(hObj)) {
+            uvec2 handle = hitObjectGetShaderRecordBufferHandleEXT(hObj);
+            materialIdHint = SRB(handle).materialId;
+        }
+
+        //Reorder threads based on hit object and additional hint on material type
+        //Use 3 LSB bits only
+        reorderThreadEXT(hObj, materialIdHint, 3);
+
+        //Execute closest-hit shaders only
+        if (hitObjectIsHitEXT(hObj)) {
+            //Get Attributes of intersection
+            hitObjectGetAttributesEXT(hObj, 0);
+            hitObjectExecuteShaderEXT(hObj, 0);
+            outputColor = vec4(Color.x + distance(sphereAABB, vec3(0)));
+        } 
+        
+        imageStore(img, ivec2(gl_LaunchIDEXT.xy), outputColor);
+
+    }
+
+Issues
+
+      1) What is the point of empty hit object?
+      A) Can use them to participate in reordering when state of hitobject of
+         thread represents neither a hit nor a miss.
+
+
+Revision History
+
+    Rev.  Date          Author     Changes
+    ----  -----------   ------     -------------------------------------------
+     1    2024-05-29    ewerness   Port from NV to EXT
+     2    2025-11-11    alele      Misc fixes 
