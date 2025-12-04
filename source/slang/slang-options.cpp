@@ -1587,8 +1587,7 @@ void OptionsParser::setProfile(RawTarget* rawTarget, Profile profile)
     default:
         break;
     }
-    if (isD3DFormat &&
-        profile.getFamily() == ProfileFamily::DX &&
+    if (isD3DFormat && profile.getFamily() == ProfileFamily::DX &&
         profile.getVersion() >= ProfileVersion::DX_6_3 &&
         profile.getVersion() < ProfileVersion::DX_6_9)
     {
