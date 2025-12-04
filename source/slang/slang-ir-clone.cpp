@@ -138,23 +138,28 @@ static void specializeLinkageDecoration(IRInst* target, IRSpecialize* oldInst, I
             {
                 specializationProvider = targetAsSpec;
             }
+
+            DigestBuilder<SHA1> digestBuilder;
             for (UInt i = 0; i < specializationProvider->getArgCount(); ++i)
             {
                 auto arg = specializationProvider->getArg(i);
-                sb.append(i);
                 if (auto typeLinkage = arg->findDecoration<IRLinkageDecoration>())
                 {
-                    sb.append(typeLinkage->getMangledName());
+                    digestBuilder.append(typeLinkage->getMangledName().begin());
                 }
                 else
                 {
                     // getTypeNameHint may produce a name with characters that can't
                     // be part of an identifier, so we need to filter it afterward.
-                    StringBuilder tmp;
-                    getTypeNameHint(tmp, arg);
-                    emitNameForLinkage(sb, tmp.getUnownedSlice());
+                    StringBuilder typeNameHint;
+                    StringBuilder linkageName;
+                    getTypeNameHint(typeNameHint, arg);
+                    emitNameForLinkage(linkageName, typeNameHint.getUnownedSlice());
+                    digestBuilder.append(linkageName.getUnownedSlice().begin());
                 }
             }
+            sb.append(digestBuilder.finalize().toString());
+
             if (auto previousLinkage = target->findDecoration<IRLinkageDecoration>())
             {
                 // Overwrite the previous linkage decoration, since it was not specialized
