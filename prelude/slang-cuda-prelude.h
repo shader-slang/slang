@@ -4468,8 +4468,9 @@ slangOptixHitObjectGetSbtRecordIndex(OptixTraversableHandle* Obj)
 #endif
 
 #if (OPTIX_VERSION >= 90000)
-static __forceinline__ __device__ void
-slangOptixHitObjectSetSbtRecordIndex(OptixTraversableHandle* Obj, uint sbtRecordIndex)
+static __forceinline__ __device__ void slangOptixHitObjectSetSbtRecordIndex(
+    OptixTraversableHandle* Obj,
+    uint sbtRecordIndex)
 {
     optixHitObjectSetSbtRecordIndex(sbtRecordIndex);
 }
