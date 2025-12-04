@@ -899,8 +899,7 @@ void EndToEndCompileRequest::setTargetProfile(int targetIndex, SlangProfileID pr
         break;
     }
     if (isD3DFormat && p.getFamily() == ProfileFamily::DX &&
-        p.getVersion() >= ProfileVersion::DX_6_3 &&
-        p.getVersion() < ProfileVersion::DX_6_9)
+        p.getVersion() >= ProfileVersion::DX_6_3 && p.getVersion() < ProfileVersion::DX_6_9)
     {
         optionSet.addCapabilityAtom(CapabilityName::hlsl_nvapi);
     }
@@ -919,8 +918,7 @@ void EndToEndCompileRequest::setTargetProfile(int targetIndex, SlangProfileID pr
         break;
     }
     if (isSpirvFormat && p.getFamily() == ProfileFamily::DX &&
-        p.getVersion() >= ProfileVersion::DX_6_3 &&
-        p.getVersion() < ProfileVersion::DX_6_9)
+        p.getVersion() >= ProfileVersion::DX_6_3 && p.getVersion() < ProfileVersion::DX_6_9)
     {
         optionSet.addCapabilityAtom(CapabilityName::spirv_nv);
     }
