@@ -1034,6 +1034,15 @@ InstPair AutoDiffTranscriberBase::transcribeGeneric(IRBuilder* inBuilder, IRGene
     mapDifferentialInst(origGeneric->getFirstBlock(), bodyBlock);
     transcribeBlockImpl(&builder, origGeneric->getFirstBlock(), instsToSkip);
 
+    auto diffReturnVal = getGenericReturnVal(diffGeneric);
+    if (auto func = as<IRFunc>(diffReturnVal))
+    {
+        IRInst* outSpecializedValue = nullptr;
+        auto hoistedFuncType =
+            hoistValueFromGeneric(builder, func->getDataType(), outSpecializedValue);
+        diffGeneric->setFullType((IRType*)hoistedFuncType);
+    }
+
     return InstPair(primalGeneric, diffGeneric);
 }
 
