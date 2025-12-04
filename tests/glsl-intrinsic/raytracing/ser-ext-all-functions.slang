@@ -22,10 +22,10 @@ void main()
         vec3(0.0), 0.001, vec3(0.0, 0.0, 1.0), 1000.0, 0.5, 0);
 
     // CHECK_GLSL: hitObjectRecordMissEXT
-    hitObjectRecordMissEXT(ho, 0u, vec3(0.0), 0.001, vec3(0.0, 0.0, 1.0), 1000.0);
+    hitObjectRecordMissEXT(ho, 0u, 0u, vec3(0.0), 0.001, vec3(0.0, 0.0, 1.0), 1000.0);
 
     // CHECK_GLSL: hitObjectRecordMissMotionEXT
-    hitObjectRecordMissMotionEXT(ho, 0u, vec3(0.0), 0.001, vec3(0.0, 0.0, 1.0), 1000.0, 0.5);
+    hitObjectRecordMissMotionEXT(ho, 0u, 0u, vec3(0.0), 0.001, vec3(0.0, 0.0, 1.0), 1000.0, 0.5);
 
     // CHECK_GLSL: hitObjectRecordEmptyEXT
     hitObjectRecordEmptyEXT(ho);

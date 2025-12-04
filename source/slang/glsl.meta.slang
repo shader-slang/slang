@@ -6506,6 +6506,7 @@ __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [require(spirv, ser_raygen_closesthit_miss)]
 public void hitObjectRecordMissEXT(
     inout hitObjectEXT hitObject,
+    uint rayFlags,
     uint missShaderIndex,
     vec3 origin,
     float Tmin,
@@ -6516,12 +6517,10 @@ public void hitObjectRecordMissEXT(
     {
     case glsl:
     {
-        // EXT spec requires RayFlags, pass 0 as default for backward compatibility
-        __intrinsic_asm "hitObjectRecordMissEXT($0, 0, $1, $2, $3, $4, $5)";
+        __intrinsic_asm "hitObjectRecordMissEXT($0, $1, $2, $3, $4, $5, $6)";
     }
     case spirv:
     {
-        let rayFlags = 0u;  // EXT requires RayFlags
         spirv_asm
         {
             OpExtension "SPV_EXT_shader_invocation_reorder";
@@ -6548,6 +6547,7 @@ __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [require(spirv, ser_motion_raygen_closesthit_miss)]
 public void hitObjectRecordMissMotionEXT(
     inout hitObjectEXT hitObject,
+    uint rayFlags,
     uint missShaderIndex,
     vec3 origin,
     float Tmin,
@@ -6559,12 +6559,10 @@ public void hitObjectRecordMissMotionEXT(
     {
     case glsl:
     {
-        // EXT spec requires RayFlags, pass 0 as default for backward compatibility
-        __intrinsic_asm "hitObjectRecordMissMotionEXT($0, 0, $1, $2, $3, $4, $5, $6)";
+        __intrinsic_asm "hitObjectRecordMissMotionEXT($0, $1, $2, $3, $4, $5, $6, $7)";
     }
     case spirv:
     {
-        let rayFlags = 0u;  // EXT requires RayFlags
         spirv_asm
         {
             OpExtension "SPV_NV_ray_tracing_motion_blur";
@@ -6611,8 +6609,6 @@ public void hitObjectRecordEmptyEXT(inout hitObjectEXT hitObject)
     }
     }
 }
-
-// Batch 2: Execute & Query Functions (EXT)
 
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_EXT_shader_invocation_reorder)
@@ -6696,8 +6692,6 @@ public float hitObjectGetRayTMinEXT(hitObjectEXT hitObject)
         };
     }
 }
-
-// Batch 3: Ray Property Getters (EXT)
 
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_EXT_shader_invocation_reorder)
@@ -6798,8 +6792,6 @@ public vec3 hitObjectGetObjectRayOriginEXT(hitObjectEXT hitObject)
     return hitObject.GetObjectRayOrigin();
 }
 
-// Batch 4: Transform & Instance Getters (EXT)
-
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_EXT_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
@@ -6854,8 +6846,6 @@ public int hitObjectGetInstanceCustomIndexEXT(hitObjectEXT hitObject)
 {
     return hitObject.GetInstanceIndex();
 }
-
-// Batch 5: Geometry & Hit Property Getters (EXT)
 
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_EXT_shader_invocation_reorder)
@@ -6930,8 +6920,6 @@ public void hitObjectGetAttributesEXT<attr_t>(hitObjectEXT hitObject, out attr_t
         }
     }
 }
-
-// Batch 6: Shader Binding Table Functions (EXT)
 
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_EXT_shader_invocation_reorder)
@@ -7025,8 +7013,6 @@ public void reorderThreadEXT(hitObjectEXT hitObject)
         };
     }
 }
-
-// Batch 7: Advanced Functions (EXT)
 
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_EXT_shader_invocation_reorder)
@@ -7153,8 +7139,6 @@ public void hitObjectReorderExecuteEXT(hitObjectEXT hitObject, uint coherenceHin
         };
     }
 }
-
-// Batch 8: Fused Trace Functions (EXT)
 
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_EXT_shader_invocation_reorder)
