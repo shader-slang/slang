@@ -22,7 +22,8 @@ jobs:
     container:
       # Use same base image as build for consistency
       image: nvidia/cuda:12.9.1-devel-ubuntu22.04
-      options: --gpus all --user root
+      # Mount NVIDIA Vulkan ICD from host so tests use the real GPU instead of llvmpipe
+      options: --gpus all --user root -v /etc/vulkan/icd.d/nvidia_icd.json:/etc/vulkan/icd.d/nvidia_icd.json:ro
 
     defaults:
       run:
@@ -154,7 +155,8 @@ jobs:
     timeout-minutes: 30
     container:
       image: nvidia/cuda:12.9.1-devel-ubuntu22.04
-      options: --gpus all --user root
+      # Mount NVIDIA Vulkan ICD from host so tests use the real GPU instead of llvmpipe
+      options: --gpus all --user root -v /etc/vulkan/icd.d/nvidia_icd.json:/etc/vulkan/icd.d/nvidia_icd.json:ro
 
     defaults:
       run:
