@@ -1073,6 +1073,16 @@ public:
 
     bool getInForLoopSideEffect() { return m_inForLoopSideEffect; }
 
+    // Setup the flag to indicate we're synthesizing a default initializer,
+    // where warnings about default-initializing resource types should be suppressed.
+    SemanticsContext withInSynthesizedDefaultInit()
+    {
+        SemanticsContext result(*this);
+        result.m_inSynthesizedDefaultInit = true;
+        return result;
+    }
+
+    bool isInSynthesizedDefaultInit() { return m_inSynthesizedDefaultInit; }
 
     TryClauseType getEnclosingTryClauseType() { return m_enclosingTryClauseType; }
 
@@ -1211,6 +1221,9 @@ protected:
     // allowed
     bool m_inForLoopSideEffect = false;
 
+    // Flag to track when we're synthesizing a default initializer, where warnings about
+    // default-initializing resource types should be suppressed.
+    bool m_inSynthesizedDefaultInit = false;
 
     ExpandExpr* m_parentExpandExpr = nullptr;
 
@@ -1733,6 +1746,14 @@ public:
         Type* toType,
         Expr** outToExpr,
         InitializerListExpr* fromInitializerListExpr);
+
+    /// Recursively walk a type to find resource types that would be default-initialized
+    /// and emit warnings.
+    void _warnAboutDefaultInitializedResources(
+        Type* type,
+        UInt argCount,
+        UInt& ioArgIndex,
+        SourceLoc loc);
 
     /// Report that implicit type coercion is not possible.
     bool _failedCoercion(Type* toType, Expr** outToExpr, Expr* fromExpr, DiagnosticSink* sink);

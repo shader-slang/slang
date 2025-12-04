@@ -1771,6 +1771,11 @@ DIAGNOSTIC(
     Error,
     cannotUseInitializerListForCoopVectorOfUnknownSize,
     "cannot use initializer list for CoopVector of statically unknown size '$0'")
+DIAGNOSTIC(
+    30506,
+    Warning,
+    cannotDefaultInitializeResourceType,
+    "cannot default-initialize resource type '$0', leaving uninitialized")
 
 // 3062x: variables
 DIAGNOSTIC(
@@ -2581,6 +2586,7 @@ DIAGNOSTIC(
     "capabilities are: '$2'")
 DIAGNOSTIC(41015, Warning, usingUninitializedOut, "use of uninitialized out parameter '$0'")
 DIAGNOSTIC(41016, Warning, usingUninitializedVariable, "use of uninitialized variable '$0'")
+DIAGNOSTIC(41016, Warning, usingUninitializedValue, "use of uninitialized value of type '$0'")
 DIAGNOSTIC(
     41017,
     Warning,

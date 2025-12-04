@@ -2646,7 +2646,10 @@ bool isDefaultInitializable(VarDeclBase* varDecl)
     return true;
 }
 
-static Expr* constructDefaultConstructorForType(SemanticsVisitor* visitor, Type* type)
+static Expr* constructDefaultConstructorForType(
+    SemanticsVisitor* visitor,
+    Type* type,
+    SourceLoc loc)
 {
     ConstructorDecl* defaultCtor = nullptr;
     auto declRefType = as<DeclRefType>(type);
@@ -2677,6 +2680,7 @@ static Expr* constructDefaultConstructorForType(SemanticsVisitor* visitor, Type*
     if (visitor->isCStyleType(type, visitSet))
     {
         auto initListExpr = visitor->getASTBuilder()->create<InitializerListExpr>();
+        initListExpr->loc = loc;
         initListExpr->type = visitor->getASTBuilder()->getInitializerListType();
         Expr* outExpr = nullptr;
         auto fromType = type;
@@ -2684,7 +2688,10 @@ static Expr* constructDefaultConstructorForType(SemanticsVisitor* visitor, Type*
         {
             fromType = atomicType->getElementType();
         }
-        if (visitor->_coerceInitializerList(fromType, &outExpr, initListExpr))
+        // Use a sub-visitor with the synthesized default init flag set to suppress
+        // warnings about default-initializing resource types.
+        SemanticsVisitor subVisitor(visitor->withInSynthesizedDefaultInit());
+        if (subVisitor._coerceInitializerList(fromType, &outExpr, initListExpr))
             return outExpr;
     }
 
@@ -2699,7 +2706,8 @@ static Expr* constructDefaultInitExprForType(SemanticsVisitor* visitor, VarDeclB
     if (!isDefaultInitializable(varDecl))
         return nullptr;
 
-    if (auto defaultInitExpr = constructDefaultConstructorForType(visitor, varDecl->type.type))
+    if (auto defaultInitExpr =
+            constructDefaultConstructorForType(visitor, varDecl->type.type, varDecl->loc))
     {
         return defaultInitExpr;
     }
@@ -9681,7 +9689,27 @@ void SemanticsDeclBodyVisitor::visitParamDecl(ParamDecl* paramDecl)
         // actual type of the parameter.
         //
         initExpr = CheckTerm(initExpr);
-        initExpr = coerce(CoercionSite::Initializer, typeExpr.type, initExpr, getSink());
+
+        // For synthesized constructor parameters, the default value is derived
+        // from the field initializer, which has already been checked and warned
+        // about. Suppress duplicate warnings by using the synthesized default
+        // init context.
+        bool isSynthesizedCtorParam = false;
+        if (auto ctorDecl = as<ConstructorDecl>(paramDecl->parentDecl))
+        {
+            isSynthesizedCtorParam = ctorDecl->findModifier<SynthesizedModifier>() != nullptr;
+        }
+
+        if (isSynthesizedCtorParam)
+        {
+            SemanticsVisitor subVisitor(withInSynthesizedDefaultInit());
+            initExpr =
+                subVisitor.coerce(CoercionSite::Initializer, typeExpr.type, initExpr, getSink());
+        }
+        else
+        {
+            initExpr = coerce(CoercionSite::Initializer, typeExpr.type, initExpr, getSink());
+        }
         paramDecl->initExpr = initExpr;
 
         // TODO: a default argument expression needs to
@@ -13596,9 +13624,8 @@ static Expr* _getParamDefaultValue(SemanticsVisitor* visitor, VarDeclBase* varDe
     if (!isDefaultInitializable(varDecl))
         return nullptr;
 
-    if (auto expr = constructDefaultConstructorForType(visitor, varDecl->type.type))
+    if (auto expr = constructDefaultConstructorForType(visitor, varDecl->type.type, varDecl->loc))
     {
-        expr->loc = varDecl->loc;
         return expr;
     }
 
