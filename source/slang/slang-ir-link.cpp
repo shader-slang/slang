@@ -302,6 +302,7 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
     case kIROp_GlobalGenericParam:
     case kIROp_WitnessTable:
     case kIROp_InterfaceType:
+    case kIROp_EnumType:
     case kIROp_SymbolAlias:
         return cloneGlobalValue(this, originalValue);
 
@@ -803,6 +804,18 @@ IRStructType* cloneStructTypeImpl(
     auto clonedStruct = builder->createStructType();
     cloneSimpleGlobalValueImpl(context, originalStruct, originalValues, clonedStruct);
     return clonedStruct;
+}
+
+IREnumType* cloneEnumTypeImpl(
+    IRSpecContextBase* context,
+    IRBuilder* builder,
+    IREnumType* originalEnum,
+    IROriginalValuesForClone const& originalValues)
+{
+    auto clonedEnum =
+        builder->createEnumType(cloneType(context, (IRType*)originalEnum->getOperand(0)));
+    cloneSimpleGlobalValueImpl(context, originalEnum, originalValues, clonedEnum);
+    return clonedEnum;
 }
 
 
@@ -1387,6 +1400,9 @@ IRInst* cloneInst(
             builder,
             cast<IRStructType>(originalInst),
             originalValues);
+
+    case kIROp_EnumType:
+        return cloneEnumTypeImpl(context, builder, cast<IREnumType>(originalInst), originalValues);
 
     case kIROp_InterfaceType:
         return cloneInterfaceTypeImpl(
@@ -2315,7 +2331,7 @@ struct IRPrelinkContext : IRSpecContext
         if (auto linkage = originalVal->findDecoration<IRLinkageDecoration>())
         {
             RefPtr<IRSpecSymbol> symbol;
-            if (shared->symbols.tryGetValue(linkage->getMangledName()), symbol)
+            if (shared->symbols.tryGetValue(linkage->getMangledName(), symbol))
             {
                 return symbol->irGlobalValue;
             }
@@ -2406,6 +2422,10 @@ struct IRPrelinkContext : IRSpecContext
             break;
         case kIROp_ClassType:
             clonedInst = builderForClone->createClassType();
+            break;
+        case kIROp_EnumType:
+            clonedInst = builderForClone->createEnumType(
+                cloneType(this, (IRType*)cast<IREnumType>(originalVal)->getOperand(0)));
             break;
         default:
             return completeClonedInst(IRSpecContext::maybeCloneValue(originalVal));

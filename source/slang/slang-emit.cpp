@@ -23,6 +23,7 @@
 #include "slang-emit-vm.h"
 #include "slang-emit-wgsl.h"
 #include "slang-ir-any-value-inference.h"
+#include "slang-ir-any-value-marshalling.h"
 #include "slang-ir-autodiff.h"
 #include "slang-ir-bind-existentials.h"
 #include "slang-ir-byte-address-legalize.h"
@@ -78,9 +79,9 @@
 #include "slang-ir-lower-buffer-element-type.h"
 #include "slang-ir-lower-combined-texture-sampler.h"
 #include "slang-ir-lower-coopvec.h"
+#include "slang-ir-lower-dynamic-dispatch-insts.h"
 #include "slang-ir-lower-dynamic-resource-heap.h"
 #include "slang-ir-lower-enum-type.h"
-#include "slang-ir-lower-generics.h"
 #include "slang-ir-lower-glsl-ssbo-types.h"
 #include "slang-ir-lower-l-value-cast.h"
 #include "slang-ir-lower-optional-type.h"
@@ -115,6 +116,7 @@
 #include "slang-ir-synthesize-active-mask.h"
 #include "slang-ir-transform-params-to-constref.h"
 #include "slang-ir-translate-global-varying-var.h"
+#include "slang-ir-typeflow-specialize.h"
 #include "slang-ir-undo-param-copy.h"
 #include "slang-ir-uniformity.h"
 #include "slang-ir-user-type-hint.h"
@@ -875,6 +877,12 @@ Result linkAndOptimizeIR(
     // Lower all the LValue implict casts (used for out/inout/ref scenarios)
     SLANG_PASS(lowerLValueCast, targetProgram);
 
+    // Lower enum types early since enums and enum casts may appear in
+    // specialization & not resolving them here would block specialization.
+    //
+    if (requiredLoweringPassSet.enumType)
+        SLANG_PASS(lowerEnumType, sink);
+
     IRSimplificationOptions defaultIRSimplificationOptions =
         IRSimplificationOptions::getDefault(targetProgram);
     IRSimplificationOptions fastIRSimplificationOptions =
@@ -1124,21 +1132,14 @@ Result linkAndOptimizeIR(
         SLANG_RETURN_ON_FAIL(SLANG_PASS(performTypeInlining, targetProgram, sink));
     }
 
-    if (requiredLoweringPassSet.reinterpret)
-        SLANG_PASS(lowerReinterpret, targetProgram, sink);
-
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    SLANG_PASS(inferAnyValueSizeWhereNecessary, targetProgram);
+    SLANG_PASS(inferAnyValueSizeWhereNecessary, targetProgram, sink);
 
-    // If we have any witness tables that are marked as `KeepAlive`,
-    // but are not used for dynamic dispatch, unpin them so we don't
-    // do unnecessary work to lower them.
     SLANG_PASS(unpinWitnessTables);
-
     if (!fastIRSimplificationOptions.minimalOptimization)
     {
         SLANG_PASS(simplifyIR, targetProgram, fastIRSimplificationOptions, sink);
@@ -1148,6 +1149,26 @@ Result linkAndOptimizeIR(
         SLANG_PASS(eliminateDeadCode, fastIRSimplificationOptions.deadCodeElimOptions);
     }
 
+    // Tagged union type lowering typically generates more reinterpret instructions.
+    if (SLANG_PASS(lowerTaggedUnionTypes, sink))
+        requiredLoweringPassSet.reinterpret = true;
+
+    SLANG_PASS(lowerUntaggedUnionTypes, targetProgram, sink);
+
+    if (requiredLoweringPassSet.reinterpret)
+        SLANG_PASS(lowerReinterpret, targetProgram, sink);
+
+    SLANG_PASS(lowerSequentialIDTagCasts, codeGenContext->getLinkage(), sink);
+    SLANG_PASS(lowerTagInsts, sink);
+    SLANG_PASS(lowerTagTypes);
+
+    SLANG_PASS(eliminateDeadCode, fastIRSimplificationOptions.deadCodeElimOptions);
+
+    SLANG_PASS(lowerExistentials, targetProgram, sink);
+
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
+
     if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc) &&
         targetProgram->getOptionSet().shouldRunNonEssentialValidation())
     {
@@ -1156,16 +1177,9 @@ Result linkAndOptimizeIR(
         SLANG_RETURN_ON_FAIL(SLANG_PASS(checkGetStringHashInsts, sink));
     }
 
-    // For targets that supports dynamic dispatch, we need to lower the
-    // generics / interface types to ordinary functions and types using
-    // function pointers.
-    if (requiredLoweringPassSet.generics)
-        SLANG_PASS(lowerGenerics, targetProgram, sink);
-    else
-        SLANG_PASS(cleanupGenerics, targetProgram, sink);
+    SLANG_PASS(lowerTuples, sink);
 
-    if (requiredLoweringPassSet.enumType)
-        SLANG_PASS(lowerEnumType, sink);
+    SLANG_PASS(generateAnyValueMarshallingFunctions);
 
     // Don't need to run any further target-dependent passes if we are generating code
     // for host vm.
