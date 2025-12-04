@@ -14,7 +14,6 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-constexpr.h"
 #include "slang-ir-dce.h"
-#include "slang-ir-diff-call.h"
 #include "slang-ir-entry-point-decorations.h"
 #include "slang-ir-inline.h"
 #include "slang-ir-insert-debug-value-store.h"
@@ -491,6 +490,9 @@ struct IRGenEnv
     // Map an AST-level declaration to the IR-level value that represents it.
     Dictionary<Decl*, LoweredValInfo> mapDeclToValue;
 
+    // Associated vals working set. TODO: Document properly.
+    HashSet<Val*> seenVals;
+
     // The next outer env around this one
     IRGenEnv* outer = nullptr;
 };
@@ -638,7 +640,7 @@ struct IRGenContext
 
     // A reference to the Function decl to identify the parent function
     // that contains the Inst.
-    FunctionDeclBase* funcDecl;
+    FunctionDeclBase* funcDecl = nullptr;
 
     bool includeDebugInfo = false;
 
@@ -920,6 +922,8 @@ LoweredValInfo lowerRValueExpr(IRGenContext* context, Expr* expr);
 void lowerRValueExprWithDestination(IRGenContext* context, LoweredValInfo destination, Expr* expr);
 
 IRType* lowerType(IRGenContext* context, Type* type);
+
+void lowerAssociatedVals(IRGenContext* context, Val* val, IRInst* irVal);
 
 static IRType* lowerType(IRGenContext* context, QualType const& type)
 {
@@ -2252,7 +2256,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                     });
 
             auto undefined = getBuilder()->emitPoison(operands[1]->getFullType());
-            return getBuilder()->getDifferentialPairUserCodeType(primalType, undefined);
+            // return getBuilder()->getDifferentialPairUserCodeType(primalType, undefined);
+            return getBuilder()->getDifferentialPairType(primalType, undefined);
         }
         else
             return lowerSimpleIntrinsicType(pairType);
@@ -2595,8 +2600,10 @@ IRType* lowerType(IRGenContext* context, Type* type)
     visitor.context = context;
     IRType* loweredType = (IRType*)getSimpleVal(context, visitor.dispatchType(type));
 
-    if (context->lowerTypeCallback && loweredType)
+    /*if (context->lowerTypeCallback && loweredType)
         context->lowerTypeCallback(context, type, loweredType);
+    */
+    lowerAssociatedVals(context, type, loweredType);
 
     return loweredType;
 }
@@ -3641,8 +3648,8 @@ void _lowerFuncDeclBaseTypeInfo(
         ParameterListCollectMode innerMode =
             getModeForCollectingParentParameters(declRef.getDecl(), declRef.getParent().getDecl());
 
-        ParameterDirection innerThisParamDirection =
-            getThisParamDirection(declRef.getDecl(), kParameterDirection_In);
+        ParamPassingMode innerThisParamDirection =
+            getThisParamDirection(declRef.getDecl(), ParamPassingMode::In);
 
         if (innerMode != kParameterListCollectMode_Static)
         {
@@ -3688,21 +3695,21 @@ void _lowerFuncDeclBaseTypeInfo(
 
                 switch (innerThisParamDirection)
                 {
-                case kParameterDirection_In:
+                case ParamPassingMode::In:
                     // The `this` parameter is passed by value, so we
                     // don't need to do anything special here.
                     break;
-                case kParameterDirection_Ref:
+                case ParamPassingMode::Ref:
                     // The `this` parameter is passed by reference, so we
-                    thisType = context->astBuilder->getRefType(thisType);
+                    thisType = context->astBuilder->getRefParamType(thisType);
                     break;
-                case kParameterDirection_ConstRef:
+                case ParamPassingMode::BorrowIn:
                     // The `this` parameter is passed by const reference, so we
-                    thisType = context->astBuilder->getConstRefType(thisType);
+                    thisType = context->astBuilder->getConstRefParamType(thisType);
                     break;
-                case kParameterDirection_InOut:
+                case ParamPassingMode::BorrowInOut:
                     // The `this` parameter is passed by in-out reference, so we
-                    thisType = context->astBuilder->getInOutType(thisType);
+                    thisType = context->astBuilder->getBorrowInOutParamType(thisType);
                     break;
                 default:
                     SLANG_UNEXPECTED("unknown this parameter direction");
@@ -3894,6 +3901,96 @@ static LoweredValInfo _emitCallToAccessor(
 
     return result;
 }
+
+
+void lowerAssociatedVal(IRGenContext* context, IRInst* irKey, SlangInt id, Val* associatedVal)
+{
+    IRInst* irAssocVal = nullptr;
+    if (auto associatedDeclRef = as<DeclRefBase>(associatedVal))
+    {
+        if (auto funcAliasDeclRef = DeclRef<Decl>(associatedDeclRef).as<FuncAliasDecl>())
+        {
+            associatedDeclRef = substituteDeclRef(
+                SubstitutionSet(associatedDeclRef),
+                getCurrentASTBuilder(),
+                funcAliasDeclRef.getDecl()->targetDeclRef);
+        }
+
+        if (auto funcDeclRef = DeclRef<Decl>(associatedDeclRef).as<FunctionDeclBase>())
+        {
+            FuncDeclBaseTypeInfo innerInfo;
+            _lowerFuncDeclBaseTypeInfo(context, funcDeclRef, innerInfo);
+
+            auto targetDeclRefInfo = emitDeclRef(context, funcDeclRef, innerInfo.type);
+
+            SLANG_ASSERT(targetDeclRefInfo.flavor == LoweredValInfo::Flavor::Simple);
+            auto _targetIRFunc = getSimpleVal(context, targetDeclRefInfo);
+            irAssocVal = _targetIRFunc;
+        }
+        else if (auto typeAliasDeclRef = DeclRef<Decl>(associatedDeclRef).as<TypeDefDecl>())
+        {
+
+            auto typeToLower = substituteType(
+                SubstitutionSet(typeAliasDeclRef),
+                getCurrentASTBuilder(),
+                typeAliasDeclRef.getDecl()->type);
+            irAssocVal = lowerType(context, typeToLower);
+        }
+        else
+        {
+            // Assume that we have a direct reference to a type here...
+            LoweredValInfo info =
+                emitDeclRef(context, associatedDeclRef, context->irBuilder->getTypeKind());
+            SLANG_ASSERT(info.flavor == LoweredValInfo::Flavor::Simple);
+            if (info.flavor == LoweredValInfo::Flavor::Simple)
+            {
+                irAssocVal = getSimpleVal(context, info);
+            }
+        }
+    }
+    else
+    {
+        auto loweredVal = lowerVal(context, associatedVal);
+        SLANG_ASSERT(loweredVal.flavor == LoweredValInfo::Flavor::Simple);
+        irAssocVal = getSimpleVal(context, loweredVal);
+    }
+
+    if (irAssocVal)
+    {
+        IRInst* args[] = {
+            irKey,
+            context->irBuilder->getIntValue(context->irBuilder->getIntType(), id),
+            irAssocVal};
+        context->irBuilder->emitIntrinsicInst(
+            context->irBuilder->getVoidType(),
+            kIROp_AssociatedInstAnnotation,
+            3,
+            args);
+    }
+};
+
+void lowerAssociatedVals(IRGenContext* context, Val* val, IRInst* irVal)
+{
+    // TODO: Eventually change this to work with any container that can hold associated values.
+    DifferentiableAttribute* diffAttr = nullptr;
+    if (context->funcDecl && !isInterfaceRequirement(context->funcDecl))
+        diffAttr = context->funcDecl->findModifier<DifferentiableAttribute>();
+    if (!diffAttr)
+        return;
+
+    if (context->env->seenVals.add(val))
+    {
+        if (diffAttr->hasAssociatedVals(val))
+        {
+            for (auto it = diffAttr->begin(val); it != diffAttr->end(val); it++)
+            {
+                auto pair = *it;
+                lowerAssociatedVal(context, irVal, pair.key, pair.value->resolve());
+            }
+        }
+    }
+}
+
 
 template<typename Derived>
 struct ExprLoweringContext
@@ -4729,6 +4826,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitBackwardDifferentiateExpr(BackwardDifferentiateExpr* expr)
     {
         SLANG_ASSERT("Should not appear in lower-to-ir with AD 2.0 change");
+        return LoweredValInfo();
         /*auto baseVal = lowerSubExpr(expr->baseFunction);
         SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
 
@@ -9625,6 +9723,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             subContextStorage.returnDestination = LoweredValInfo();
             subContextStorage.lowerTypeCallback = nullptr;
             subContextStorage.catchHandler = nullptr;
+            subContextStorage.funcDecl = nullptr;
         }
 
         IRBuilder* getBuilder() { return &subBuilderStorage; }
@@ -11803,9 +11902,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         HashSet<DeclRefBase*> workingSet;
         HashSet<Type*> workingTypeSet;
 
+        if (decl->findModifier<DifferentiableAttribute>() && !isInterfaceRequirement(decl))
+        {
+            auto diffAttr = decl->findModifier<DifferentiableAttribute>();
+            diffAttr->resolveDictionaryKeys();
+        }
+
         // If our function is differentiable, register a callback so the derivative
         // annotations for types can be lowered.
         //
+        /*
         if (decl->findModifier<DifferentiableAttribute>() && !isInterfaceRequirement(decl))
         {
             auto diffAttr = decl->findModifier<DifferentiableAttribute>();
@@ -11822,27 +11928,90 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     as<SubtypeWitness>(as<Val>(entry.value)->resolve());
             }
 
+            auto lowerAssociatedVal = [&](IRInst* irKey, SlangInt id, Val* associatedVal)
+            {
+                IRInst* irAssocVal = nullptr;
+                if (auto associatedDeclRef = as<DeclRefBase>(associatedVal))
+                {
+                    if (auto funcAliasDeclRef =
+                            DeclRef<Decl>(associatedDeclRef).as<FuncAliasDecl>())
+                    {
+                        associatedDeclRef = substituteDeclRef(
+                            SubstitutionSet(associatedDeclRef),
+                            getCurrentASTBuilder(),
+                            funcAliasDeclRef.getDecl()->targetDeclRef);
+                    }
+
+                    if (auto funcDeclRef = DeclRef<Decl>(associatedDeclRef).as<FunctionDeclBase>())
+                    {
+                        FuncDeclBaseTypeInfo innerInfo;
+                        _lowerFuncDeclBaseTypeInfo(subContext, funcDeclRef, innerInfo);
+
+                        auto targetDeclRefInfo =
+                            emitDeclRef(subContext, funcDeclRef, innerInfo.type);
+
+                        SLANG_ASSERT(targetDeclRefInfo.flavor == LoweredValInfo::Flavor::Simple);
+                        auto _targetIRFunc = getSimpleVal(subContext, targetDeclRefInfo);
+                        irAssocVal = _targetIRFunc;
+                    }
+                    else if (
+                        auto typeAliasDeclRef =
+                            DeclRef<Decl>(associatedDeclRef).as<TypeAliasDecl>())
+                    {
+
+                        auto typeToLower = substituteType(
+                            SubstitutionSet(typeAliasDeclRef),
+                            getCurrentASTBuilder(),
+                            typeAliasDeclRef.getDecl()->type);
+                        irAssocVal = lowerType(subContext, typeToLower);
+                    }
+                    else
+                    {
+                        // Assume that we have a direct reference to a type here...
+                        LoweredValInfo info =
+                            emitDeclRef(subContext, associatedDeclRef, subBuilder->getTypeKind());
+                        SLANG_ASSERT(info.flavor == LoweredValInfo::Flavor::Simple);
+                        if (info.flavor == LoweredValInfo::Flavor::Simple)
+                        {
+                            irAssocVal = getSimpleVal(subContext, info);
+                        }
+                    }
+                }
+                else
+                {
+                    auto loweredVal = lowerVal(subContext, associatedVal);
+                    SLANG_ASSERT(loweredVal.flavor == LoweredValInfo::Flavor::Simple);
+                    irAssocVal = getSimpleVal(subContext, loweredVal);
+                }
+
+                if (irAssocVal)
+                {
+                    IRInst* args[] = {
+                        irKey,
+                        context->irBuilder->getIntValue(context->irBuilder->getIntType(), id),
+                        irAssocVal};
+                    context->irBuilder->emitIntrinsicInst(
+                        context->irBuilder->getVoidType(),
+                        kIROp_AssociatedInstAnnotation,
+                        3,
+                        args);
+                }
+            };
+
             subContext->registerTypeCallback(
-                [resolveddiffTypeWitnessMap,
-                 subContext,
-                 &workingTypeSet](IRGenContext* context, Type* type, IRType* irType)
+                [&](IRGenContext* context, Type* type, IRType* irType)
                 {
                     if (workingTypeSet.contains(type))
                         return irType;
 
-                    if (resolveddiffTypeWitnessMap.containsKey(type))
+                    if (diffAttr->hasAssociatedVals(type))
                     {
                         workingTypeSet.add(type);
 
-                        auto irWitness = lowerVal(subContext, resolveddiffTypeWitnessMap[type]).val;
-                        if (irWitness)
+                        auto dict = diffAttr->tryGetAssociatedVals(type);
+                        for (auto idValPair : dict)
                         {
-                            IRInst* args[] = {irType, irWitness};
-                            context->irBuilder->emitIntrinsicInst(
-                                context->irBuilder->getVoidType(),
-                                kIROp_DifferentiableTypeAnnotation,
-                                2,
-                                args);
+                            lowerAssociatedVal(irType, idValPair.key, idValPair.value->resolve());
                         }
 
                         workingTypeSet.remove(type);
@@ -11864,81 +12033,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         auto dict = diffAttr->tryGetAssociatedVals(val);
                         for (auto idValPair : dict)
                         {
-                            auto id = idValPair.key;
-                            auto associatedVal = idValPair.value->resolve();
-
-                            IRInst* irAssocVal = nullptr;
-                            if (auto associatedDeclRef = as<DeclRefBase>(associatedVal))
-                            {
-                                if (auto funcAliasDeclRef =
-                                        DeclRef<Decl>(associatedDeclRef).as<FuncAliasDecl>())
-                                {
-                                    associatedDeclRef = substituteDeclRef(
-                                        SubstitutionSet(associatedDeclRef),
-                                        getCurrentASTBuilder(),
-                                        funcAliasDeclRef.getDecl()->targetDeclRef);
-                                }
-
-                                if (auto funcDeclRef =
-                                        DeclRef<Decl>(associatedDeclRef).as<FunctionDeclBase>())
-                                {
-                                    FuncDeclBaseTypeInfo innerInfo;
-                                    _lowerFuncDeclBaseTypeInfo(context, funcDeclRef, innerInfo);
-
-                                    auto targetDeclRefInfo =
-                                        emitDeclRef(context, funcDeclRef, innerInfo.type);
-
-                                    SLANG_ASSERT(
-                                        targetDeclRefInfo.flavor == LoweredValInfo::Flavor::Simple);
-                                    auto _targetIRFunc = getSimpleVal(context, targetDeclRefInfo);
-                                    irAssocVal = _targetIRFunc;
-                                }
-                                else if (
-                                    auto typeAliasDeclRef =
-                                        DeclRef<Decl>(associatedDeclRef).as<TypeAliasDecl>())
-                                {
-
-                                    auto typeToLower = substituteType(
-                                        SubstitutionSet(typeAliasDeclRef),
-                                        getCurrentASTBuilder(),
-                                        typeAliasDeclRef.getDecl()->type);
-                                    irAssocVal = lowerType(context, typeToLower);
-                                }
-                                else
-                                {
-                                    // Assume that we have a direct reference to a type here...
-                                    LoweredValInfo info = emitDeclRef(
-                                        context,
-                                        associatedDeclRef,
-                                        subBuilder->getTypeKind());
-                                    SLANG_ASSERT(info.flavor == LoweredValInfo::Flavor::Simple);
-                                    if (info.flavor == LoweredValInfo::Flavor::Simple)
-                                    {
-                                        irAssocVal = getSimpleVal(context, info);
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                auto loweredVal = lowerVal(context, associatedVal);
-                                SLANG_ASSERT(loweredVal.flavor == LoweredValInfo::Flavor::Simple);
-                                irAssocVal = getSimpleVal(context, loweredVal);
-                            }
-
-                            if (irAssocVal)
-                            {
-                                IRInst* args[] = {
-                                    irVal,
-                                    context->irBuilder->getIntValue(
-                                        context->irBuilder->getIntType(),
-                                        id),
-                                    irAssocVal};
-                                context->irBuilder->emitIntrinsicInst(
-                                    context->irBuilder->getVoidType(),
-                                    kIROp_AssociatedInstAnnotation,
-                                    3,
-                                    args);
-                            }
+                            lowerAssociatedVal(irVal, idValPair.key, idValPair.value->resolve());
                         }
 
                         workingSet.remove(val);
@@ -11946,6 +12041,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     return irVal;
                 });
         }
+        */
 
         // Register the value now, to avoid any possible infinite recursion when lowering the body
         // or attributes.
@@ -13237,8 +13333,14 @@ LoweredValInfo emitDeclRef(IRGenContext* context, DeclRef<Decl> declRef, IRType*
 {
     auto info = emitDeclRef(context, declRef.getDecl(), declRef.declRefBase, type);
 
+    /*
     if (context->lowerDeclRefCallback && info.flavor == LoweredValInfo::Flavor::Simple)
         context->lowerDeclRefCallback(context, declRef.declRefBase, getSimpleVal(context, info));
+        */
+    if (info.flavor == LoweredValInfo::Flavor::Simple)
+    {
+        lowerAssociatedVals(context, declRef.declRefBase, getSimpleVal(context, info));
+    }
 
     return info;
 }

@@ -1787,11 +1787,15 @@ FIDDLE() namespace Slang
     {
         DefaultInitializableConstructor, ///< The `IDefaultInitializable.__init()` method
 
-        DifferentialType,    ///< The `IDifferentiable.Differential` associated type requirement
-        DifferentialPtrType, ///< The `IDifferentiable.DifferentialPtr` associated type requirement
-        DZeroFunc,           ///< The `IDifferentiable.dzero` function requirement
-        DAddFunc,            ///< The `IDifferentiable.dadd` function requirement
-        DMulFunc,            ///< The `IDifferentiable.dmul` function requirement
+        DifferentialType,     ///< The `IDifferentiable.Differential` associated type requirement
+        DifferentialPairType, ///< The `IDifferentiable.DifferentialPair` associated type
+                              ///< requirement
+        DifferentialPtrType,  ///< The `IDifferentiable.DifferentialPtr` associated type requirement
+        DifferentialPtrPairType, ///< The `IDifferentiable.DifferentialPtrPair` associated type
+                                 ///< requirement
+        DZeroFunc,               ///< The `IDifferentiable.dzero` function requirement
+        DAddFunc,                ///< The `IDifferentiable.dadd` function requirement
+        DMulFunc,                ///< The `IDifferentiable.dmul` function requirement
 
         InitLogicalFromInt,        ///< The `ILogical.__init` method.
         Equals,                    ///< The `ILogical.equals` method.

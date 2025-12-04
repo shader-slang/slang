@@ -270,14 +270,26 @@ IRType* AutoDiffTranscriberBase::getOrCreateDiffPairType(IRBuilder* builder, IRI
     auto primalType = lookupPrimalInst(builder, originalType, originalType);
     SLANG_RELEASE_ASSERT(primalType);
 
-    IRInst* witness = nullptr;
+    auto diffValuePairType = (IRType*)differentiableTypeConformanceContext.tryGetAssociationOfKind(
+        primalType,
+        ValAssociationKind::DifferentialPairType);
 
+    auto diffPtrPairType = (IRType*)differentiableTypeConformanceContext.tryGetAssociationOfKind(
+        primalType,
+        ValAssociationKind::DifferentialPtrPairType);
+
+    SLANG_ASSERT(diffValuePairType || diffPtrPairType);
+
+    return diffValuePairType ? diffValuePairType : diffPtrPairType;
+
+    /*
+    IRInst* witness = nullptr;
     // Obtain the witness that primalType conforms to IDifferentiable/IDifferentiablePtrType
     if (!witness)
         witness = tryGetDifferentiableWitness(builder, primalType, DiffConformanceKind::Any);
     SLANG_RELEASE_ASSERT(witness);
 
-    return getOrCreateDiffPairType(builder, primalType, witness);
+    return getOrCreateDiffPairType(builder, primalType, witness);*/
 }
 
 static void addTypeAnnotationsForHigherOrderDiff(
@@ -329,6 +341,7 @@ IRType* AutoDiffTranscriberBase::differentiateType(IRBuilder* builder, IRType* o
     }
 
     // Special-case for differentiable existential types.
+    /*
     if (as<IRInterfaceType>(origType))
     {
         if (differentiableTypeConformanceContext.lookUpConformanceForType(
@@ -346,6 +359,7 @@ IRType* AutoDiffTranscriberBase::differentiateType(IRBuilder* builder, IRType* o
     {
         SLANG_UNEXPECTED("unexpected associated type during auto-diff");
     }
+    */
 
     auto primalType = lookupPrimalInst(builder, origType, origType);
     /*
@@ -361,29 +375,24 @@ IRType* AutoDiffTranscriberBase::differentiateType(IRBuilder* builder, IRType* o
 
     // AD 2.0
     // TODO: Replace with tryGetAssociationOfKind()
-    auto diffTypeWitness = differentiableTypeConformanceContext.lookUpConformanceForType(
-        origType,
-        DiffConformanceKind::Any);
-    if (differentiableTypeConformanceContext.isDifferentiableValueType(origType))
-    {
-        auto diffValueType = (IRType*)differentiableTypeConformanceContext.lookUpInterfaceMethod(
-            builder,
+    if (auto diffValueType = differentiableTypeConformanceContext.tryGetAssociationOfKind(
             origType,
-            this->autoDiffSharedContext->differentialAssocTypeStructKey,
-            builder->getTypeKind());
+            ValAssociationKind::DifferentialType))
+    {
+        /*
         addTypeAnnotationsForHigherOrderDiff(
             builder,
             &differentiableTypeConformanceContext,
             origType,
             diffValueType);
-        return diffValueType;
+        */
+        return (IRType*)diffValueType;
     }
-    else if (differentiableTypeConformanceContext.isDifferentiablePtrType(origType))
-        return (IRType*)differentiableTypeConformanceContext.lookUpInterfaceMethod(
-            builder,
+    else if (
+        auto diffPtrType = differentiableTypeConformanceContext.tryGetAssociationOfKind(
             origType,
-            this->autoDiffSharedContext->differentialAssocRefTypeStructKey,
-            builder->getTypeKind());
+            ValAssociationKind::DifferentialPtrType))
+        return (IRType*)diffPtrType;
     else
         return nullptr;
 }
@@ -659,6 +668,7 @@ IRType* AutoDiffTranscriberBase::differentiateExtractExistentialType(
 
 IRType* AutoDiffTranscriberBase::tryGetDiffPairType(IRBuilder* builder, IRType* originalType)
 {
+    /*
     // If this is a PtrType (out, inout, etc..), then create diff pair from
     // value type and re-apply the appropropriate PtrType wrapper.
     //
@@ -676,6 +686,18 @@ IRType* AutoDiffTranscriberBase::tryGetDiffPairType(IRBuilder* builder, IRType* 
     if (tryGetDifferentiableWitness(builder, originalType, DiffConformanceKind::Any))
         return (IRType*)getOrCreateDiffPairType(builder, originalType);
     return nullptr;
+    */
+
+    // In case we're dealing with a parameter type, we need to split out the direction first.
+    // If we're not, then the split & merge are no-ops.
+    //
+    auto [passingMode, baseType] = splitParameterDirectionAndType(originalType);
+    return fromDirectionAndType(
+        builder,
+        passingMode,
+        (IRType*)differentiableTypeConformanceContext.tryGetAssociationOfKind(
+            baseType,
+            ValAssociationKind::DifferentialPairType));
 }
 
 InstPair AutoDiffTranscriberBase::transcribeParam(IRBuilder* builder, IRParam* origParam)
@@ -750,19 +772,15 @@ InstPair AutoDiffTranscriberBase::transcribeLookupInterfaceMethod(
         if (returnWitnessType->getConformanceType() ==
             autoDiffSharedContext->differentiableInterfaceType)
         {
-            auto primalDiffType = builder->emitLookupInterfaceMethodInst(
-                builder->getTypeKind(),
-                primal,
-                autoDiffSharedContext->differentialAssocTypeStructKey);
             auto diffWitness = builder->emitLookupInterfaceMethodInst(
-                (IRType*)primalDiffType,
+                (IRType*)builder->getWitnessTableType(
+                    autoDiffSharedContext->differentiableInterfaceType),
                 primal,
                 autoDiffSharedContext->differentialAssocTypeWitnessStructKey);
 
             // Mark both as primal since we're working with types
             // (which don't need transposing)
             //
-            builder->markInstAsPrimal(primalDiffType);
             builder->markInstAsPrimal(diffWitness);
 
             return InstPair(primal, diffWitness);

@@ -390,6 +390,27 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 if (typeConstraintDeclRef.getDecl()->hasModifier<IgnoreForLookupModifier>())
                     continue;
 
+                Type* subTypeForWitness = selfType;
+                if (auto interfaceDeclRef = containerDeclRef.as<InterfaceDecl>())
+                {
+                    // If we're dealing with an interface decl, we'll need to
+                    // represent the constraint as a lookup on the 'this' type of the
+                    // interface.
+                    //
+
+                    typeConstraintDeclRef = substituteDeclRef(
+                                                SubstitutionSet(declRef),
+                                                astBuilder,
+                                                visitor.getRequirementAsLookedUpDecl(
+                                                    astBuilder,
+                                                    typeConstraintDeclRef.getDecl()))
+                                                .as<TypeConstraintDecl>();
+                    subTypeForWitness = substituteType(
+                        SubstitutionSet(declRef),
+                        astBuilder,
+                        visitor.calcThisType(interfaceDeclRef));
+                }
+
                 // The only case we will ever see a GenericTypeConstraintDecl inside a AggTypeDecl
                 // is when AggTypeDecl is a associatedtype decl. In this case, we will only lookup
                 // the type constraint if the constraint is on the associated type itself.
@@ -427,7 +448,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 //
                 auto baseType = getSup(astBuilder, typeConstraintDeclRef);
                 auto satisfyingWitness = astBuilder->getDeclaredSubtypeWitness(
-                    selfType,
+                    subTypeForWitness,
                     baseType,
                     typeConstraintDeclRef);
 
@@ -888,25 +909,53 @@ void SharedSemanticsContext::_mergeFacetLists(
             auto baseType = selfIsSubtypeOfBase->getSup();
             auto facetType = baseIsSubtypeOfFacet->getSup();
 
-            if (selfType && baseType && facetType)
+            if (as<TypeEqualityWitness>(baseIsSubtypeOfFacet))
             {
-                auto selfDeclRef = isDeclRefTypeOf<StructDecl>(selfType);
-                auto baseDeclRef = isDeclRefTypeOf<StructDecl>(baseType);
-                auto facetDeclRef = isDeclRefTypeOf<InterfaceDecl>(facetType);
-
-                // Only skip if we have struct->struct->interface
-                // and the struct->struct witness is not the identity witness
-                shouldSkipTransitiveWitness = selfDeclRef && baseDeclRef && facetDeclRef &&
-                                              !isTypeEqualityWitness(selfIsSubtypeOfBase);
+                indirectFacet->setSubtypeWitness(_getASTBuilder(), selfIsSubtypeOfBase);
+                ioMergedFacets.add(indirectFacet);
             }
-
-            if (!shouldSkipTransitiveWitness)
+            else if (isTypeEqualityWitness(selfIsSubtypeOfBase))
             {
-                auto selfIsSubtypeOfFacet = _getASTBuilder()->getTransitiveSubtypeWitness(
-                    selfIsSubtypeOfBase,
-                    baseIsSubtypeOfFacet);
+                indirectFacet->setSubtypeWitness(_getASTBuilder(), baseIsSubtypeOfFacet);
+                ioMergedFacets.add(indirectFacet);
+            }
+            else if (
+                isDeclRefTypeOf<StructDecl>(baseType) && isDeclRefTypeOf<InterfaceDecl>(facetType))
+            {
+                if (isDeclRefTypeOf<StructDecl>(selfType))
+                {
+                    // Do nothing. This facet will not be accepted since
+                    // conformance and inheritance cannot be mixed.
+                    // i.e. (struct Child : struct Parent) and (struct Parent : interface IFoo)
+                    // does not imply (struct Child : interface IFoo)
+                    //
+                }
+                else
+                {
+                    // Shouldn't really have a non-struct inherit from a struct...
+                    SLANG_UNEXPECTED("Unexpected witness structure");
+                }
+            }
+            else if (
+                isDeclRefTypeOf<InterfaceDecl>(baseType) &&
+                isDeclRefTypeOf<InterfaceDecl>(facetType))
+            {
+                // (class | struct | interface) -> interface -> interface
+                // can use the base' witness, with a substitution of self for 'this-type'
+                //
+                auto thisTypeDecl =
+                    as<InterfaceDecl>(as<DeclRefType>(baseType)->getDeclRef().getDecl())
+                        ->getThisTypeDecl();
+                auto lookupSubstitution = SubstitutionSet(
+                    _getASTBuilder()->getLookupDeclRef(selfIsSubtypeOfBase, thisTypeDecl));
 
-                indirectFacet->setSubtypeWitness(_getASTBuilder(), selfIsSubtypeOfFacet);
+                // Substitute 'selfIsSubtypeOfBase' witness in place of the `thisTypeWitness` for
+                // the base
+                //
+                indirectFacet->setSubtypeWitness(
+                    _getASTBuilder(),
+                    as<SubtypeWitness>(
+                        baseIsSubtypeOfFacet->substitute(_getASTBuilder(), lookupSubstitution)));
 
                 ioMergedFacets.add(indirectFacet);
             }

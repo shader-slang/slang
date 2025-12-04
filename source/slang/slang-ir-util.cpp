@@ -178,49 +178,50 @@ IROp getTypeStyle(BaseType op)
     }
 }
 
-// Split into direction and type
-std::tuple<ParameterDirectionInfo, IRType*> splitDirectionAndType(IRType* paramType)
+// Split parameter type into a direction and a type
+std::tuple<ParameterDirectionInfo, IRType*> splitParameterDirectionAndType(IRType* paramType)
 {
-    if (as<IROutType>(paramType))
+    if (as<IROutParamType>(paramType))
         return {
             ParameterDirectionInfo(ParameterDirectionInfo::Kind::Out),
-            as<IROutType>(paramType)->getValueType()};
-    else if (as<IRInOutType>(paramType))
+            as<IROutParamType>(paramType)->getValueType()};
+    else if (as<IRBorrowInOutParamType>(paramType))
         return {
-            ParameterDirectionInfo(ParameterDirectionInfo::Kind::InOut),
-            as<IRInOutType>(paramType)->getValueType()};
-    else if (as<IRRefType>(paramType))
+            ParameterDirectionInfo(ParameterDirectionInfo::Kind::BorrowInOut),
+            as<IRBorrowInOutParamType>(paramType)->getValueType()};
+    else if (as<IRRefParamType>(paramType))
         return {
             ParameterDirectionInfo(
                 ParameterDirectionInfo::Kind::Ref,
-                as<IRRefType>(paramType)->getAddressSpace()),
-            as<IRRefType>(paramType)->getValueType()};
-    else if (as<IRConstRefType>(paramType))
+                as<IRRefParamType>(paramType)->getAddressSpace()),
+            as<IRRefParamType>(paramType)->getValueType()};
+    else if (as<IRBorrowInParamType>(paramType))
         return {
             ParameterDirectionInfo(
-                ParameterDirectionInfo::Kind::ConstRef,
-                as<IRConstRefType>(paramType)->getAddressSpace()),
-            as<IRConstRefType>(paramType)->getValueType()};
+                ParameterDirectionInfo::Kind::BorrowIn,
+                as<IRBorrowInParamType>(paramType)->getAddressSpace()),
+            as<IRBorrowInParamType>(paramType)->getValueType()};
     else
         return {ParameterDirectionInfo(ParameterDirectionInfo::Kind::In), paramType};
 }
 
-IRType* fromDirectionAndType(IRBuilder* builder, ParameterDirectionInfo direction, IRType* type)
+// Join parameter direction and a type back into a parameter type
+IRType* fromDirectionAndType(IRBuilder* builder, ParameterDirectionInfo info, IRType* type)
 {
-    switch (direction.kind)
+    switch (info.kind)
     {
     case ParameterDirectionInfo::Kind::In:
         return type;
     case ParameterDirectionInfo::Kind::Out:
-        return builder->getOutType(type);
-    case ParameterDirectionInfo::Kind::InOut:
-        return builder->getInOutType(type);
-    case ParameterDirectionInfo::Kind::ConstRef:
-        return builder->getConstRefType(type, direction.addressSpace);
+        return builder->getOutParamType(type);
+    case ParameterDirectionInfo::Kind::BorrowInOut:
+        return builder->getBorrowInOutParamType(type);
+    case ParameterDirectionInfo::Kind::BorrowIn:
+        return builder->getBorrowInParamType(type, info.addressSpace);
     case ParameterDirectionInfo::Kind::Ref:
-        return builder->getRefType(type, direction.addressSpace);
+        return builder->getRefParamType(type, info.addressSpace);
     default:
-        SLANG_UNEXPECTED("Unhandled parameter direction in fromDirectionAndType");
+        SLANG_UNEXPECTED("Unhandled parameter info in fromDirectionAndType");
     }
 }
 
@@ -2866,30 +2867,6 @@ bool isIROpaqueType(IRType* type)
     default:
         return false;
     }
-}
-
-IRInst* tryGetTranslation(IRModule* module, IRInst* inst)
-{
-    IRWeakUse* weakUse = nullptr;
-    if (module->getTranslationCache().tryGetValue(inst, weakUse))
-    {
-        if (weakUse->getOperand(0)->getOp() != kIROp_Undefined)
-            return weakUse->getOperand(0);
-        else
-        {
-            module->getTranslationCache().remove(inst);
-            return nullptr;
-        }
-    }
-    return nullptr;
-}
-
-IRInst* registerTranslation(IRModule* module, IRInst* from, IRInst* to)
-{
-    IRBuilder builder(module);
-    auto weakUse = builder.getWeakUse(to);
-    module->getTranslationCache().add(from, weakUse);
-    return to;
 }
 
 bool isPointerToImmutableLocation(IRInst* loc)

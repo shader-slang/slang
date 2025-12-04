@@ -259,6 +259,27 @@ struct DifferentiableTypeConformanceContext
     // (inst, conformance-type) -> witness-table
     Dictionary<WitnessTableCacheKey, IRInst*> witnessTableCache;
 
+    struct ValAssociationCacheKey
+    {
+        IRInst* inst;
+        ValAssociationKind associationKind;
+        bool operator==(const ValAssociationCacheKey& other) const
+        {
+            return inst == other.inst && associationKind == other.associationKind;
+        }
+
+        HashCode getHashCode() const
+        {
+            Hasher hasher;
+            hasher.hashValue(inst);
+            hasher.hashValue(static_cast<int>(associationKind));
+            return hasher.getResult();
+        }
+    };
+
+    // (inst, association-kind) -> associated-inst
+    Dictionary<ValAssociationCacheKey, IRInst*> associationCache;
+
     IRFunc* existentialDAddFunc = nullptr;
 
     DifferentiableTypeConformanceContext(AutoDiffSharedContext* shared)
@@ -287,9 +308,8 @@ struct DifferentiableTypeConformanceContext
             bwdDiffWitness,
             contextTypeEntry->getRequirementKey());*/
 
-        return (IRType*)tryGetAssociationOfKind(
-            fnInst,
-            FunctionAssociationKind::BackwardDerivativeContext);
+        return (
+            IRType*)tryGetAssociationOfKind(fnInst, ValAssociationKind::BackwardDerivativeContext);
         // return (IRType*)bwdContextType;
     }
 
@@ -317,7 +337,7 @@ struct DifferentiableTypeConformanceContext
                 for (UIndex i = 0; i < innerFnType->getParamCount(); ++i)
                 {
                     const auto& [paramDirection, paramType] =
-                        splitDirectionAndType(innerFnType->getParamType(i));
+                        splitParameterDirectionAndType(innerFnType->getParamType(i));
                     if (auto witness = tryGetDifferentiableWitness(
                             builder,
                             paramType,
@@ -358,7 +378,8 @@ struct DifferentiableTypeConformanceContext
                 List<IRType*> paramTypes;
                 for (auto origParamType : origParamTypes)
                 {
-                    const auto& [paramDirection, paramType] = splitDirectionAndType(origParamType);
+                    const auto& [paramDirection, paramType] =
+                        splitParameterDirectionAndType(origParamType);
 
                     if (auto witness = tryGetDifferentiableWitness(
                             builder,
@@ -371,7 +392,7 @@ struct DifferentiableTypeConformanceContext
                         case ParameterDirectionInfo::Kind::In:
                             paramTypes.add(fromDirectionAndType(
                                 builder,
-                                {ParameterDirectionInfo::Kind::InOut},
+                                {ParameterDirectionInfo::Kind::BorrowInOut},
                                 getOrCreateDiffPairType(builder, paramType, witness)));
                             break;
                         case ParameterDirectionInfo::Kind::Out:
@@ -380,10 +401,10 @@ struct DifferentiableTypeConformanceContext
                                 {ParameterDirectionInfo::Kind::In},
                                 (IRType*)getDifferentialForType(builder, paramType)));
                             break;
-                        case ParameterDirectionInfo::Kind::InOut:
+                        case ParameterDirectionInfo::Kind::BorrowInOut:
                             paramTypes.add(fromDirectionAndType(
                                 builder,
-                                {ParameterDirectionInfo::Kind::InOut},
+                                {ParameterDirectionInfo::Kind::BorrowInOut},
                                 getOrCreateDiffPairType(builder, paramType, witness)));
                             break;
                         default:
@@ -398,14 +419,14 @@ struct DifferentiableTypeConformanceContext
                         {
                         case ParameterDirectionInfo::Kind::In:
                         case ParameterDirectionInfo::Kind::Ref:
-                        case ParameterDirectionInfo::Kind::ConstRef:
+                        case ParameterDirectionInfo::Kind::BorrowIn:
                             paramTypes.add(
                                 fromDirectionAndType(builder, paramDirection, paramType));
                             break;
                         case ParameterDirectionInfo::Kind::Out:
                             // skip.
                             break;
-                        case ParameterDirectionInfo::Kind::InOut:
+                        case ParameterDirectionInfo::Kind::BorrowInOut:
                             paramTypes.add(fromDirectionAndType(
                                 builder,
                                 ParameterDirectionInfo::Kind::In,
@@ -462,7 +483,7 @@ struct DifferentiableTypeConformanceContext
                 for (UIndex i = 0; i < innerFnType->getParamCount(); ++i)
                 {
                     const auto& [paramDirection, paramType] =
-                        splitDirectionAndType(innerFnType->getParamType(i));
+                        splitParameterDirectionAndType(innerFnType->getParamType(i));
                     if (auto diffType = getDifferentialForType(builder, paramType))
                     {
                         // If the parameter type is a differentiable type, we replace it with
@@ -524,7 +545,7 @@ struct DifferentiableTypeConformanceContext
 
     IRInst* tryGetWitnessOfKind(IRInst* target, FunctionConformanceKind kind);
 
-    IRInst* tryGetAssociationOfKind(IRInst* target, FunctionAssociationKind kind);
+    IRInst* tryGetAssociationOfKind(IRInst* target, ValAssociationKind kind);
 
     void buildGlobalWitnessDictionary();
 
@@ -624,6 +645,7 @@ struct DifferentiableTypeConformanceContext
                 return builder->getDifferentialPtrPairType((IRType*)diffType, diffWitness);
             }
         default:
+            /*
             if (isDifferentiableValueType(origType))
                 return lookUpInterfaceMethod(
                     builder,
@@ -638,6 +660,17 @@ struct DifferentiableTypeConformanceContext
                     builder->getTypeKind());
             else
                 return nullptr;
+            */
+            auto diffValueType =
+                tryGetAssociationOfKind(origType, ValAssociationKind::DifferentialType);
+            auto diffPtrType =
+                tryGetAssociationOfKind(origType, ValAssociationKind::DifferentialPtrType);
+
+            SLANG_ASSERT(
+                !(diffValueType && diffPtrType) &&
+                "Type cannot conform to both IDifferentiable and IDifferentiablePtrType");
+
+            return diffValueType ? diffValueType : diffPtrType;
         }
     }
 
@@ -648,6 +681,7 @@ struct DifferentiableTypeConformanceContext
 
     bool isDifferentiableValueType(IRType* origType)
     {
+        /*
         for (; origType;)
         {
             switch (origType->getOp())
@@ -670,10 +704,13 @@ struct DifferentiableTypeConformanceContext
             }
         }
         return false;
+        */
+        return tryGetAssociationOfKind(origType, ValAssociationKind::DifferentialType) != nullptr;
     }
 
     bool isDifferentiablePtrType(IRType* origType)
     {
+        /*
         for (; origType;)
         {
             switch (origType->getOp())
@@ -690,28 +727,35 @@ struct DifferentiableTypeConformanceContext
             }
         }
         return false;
+        */
+        return tryGetAssociationOfKind(origType, ValAssociationKind::DifferentialPtrType) !=
+               nullptr;
     }
 
     IRInst* getZeroMethodForType(IRBuilder* builder, IRType* origType)
     {
+        /*
         auto result = lookUpInterfaceMethod(
             builder,
             origType,
             sharedContext->zeroMethodStructKey,
             sharedContext->zeroMethodType,
             DiffConformanceKind::Value);
-        return result;
+        return result;*/
+        return tryGetAssociationOfKind(origType, ValAssociationKind::DifferentialZero);
     }
 
     IRInst* getAddMethodForType(IRBuilder* builder, IRType* origType)
     {
+        /*
         auto result = lookUpInterfaceMethod(
             builder,
             origType,
             sharedContext->addMethodStructKey,
             sharedContext->addMethodType,
-            DiffConformanceKind::Value);
-        return result;
+            DiffConformanceKind::Value);*/
+
+        return tryGetAssociationOfKind(origType, ValAssociationKind::DifferentialAdd);
     }
 
     IRInst* emitNullDifferential(IRBuilder* builder)

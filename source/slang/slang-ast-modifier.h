@@ -1605,7 +1605,6 @@ class DifferentiableAttribute : public Attribute
     FIDDLE(...)
     // TODO(tfoley): Why is there this duplication here?
     List<KeyValuePair<Type*, SubtypeWitness*>> m_typeToIDifferentiableWitnessMappings;
-    OrderedDictionary<Val*, ShortList<SubtypeWitness*, 4>> m_witnessMapping;
     OrderedDictionary<Val*, OrderedDictionary<SlangInt, Val*>> m_associatedValMapping;
 
     void addType(Type* declRef, SubtypeWitness* witness)
@@ -1618,33 +1617,35 @@ class DifferentiableAttribute : public Attribute
         }
     }
 
-    bool hasWitnessForVal(Val* targetVal) const { return m_witnessMapping.containsKey(targetVal); }
-
-    ShortList<SubtypeWitness*, 4> tryGetWitnessList(Val* targetVal) const
-    {
-        if (auto resultPtr = m_witnessMapping.tryGetValue(targetVal))
-            return *resultPtr;
-        return ShortList<SubtypeWitness*, 4>();
-    }
-
-    void addWitness(Val* targetVal, SubtypeWitness* witness)
-    {
-        auto list = tryGetWitnessList(targetVal);
-        list.add(witness);
-        m_witnessMapping[targetVal] = list;
-    }
-
     bool hasAssociatedVals(Val* targetVal) const
     {
         return m_associatedValMapping.containsKey(targetVal);
     }
 
-    OrderedDictionary<SlangInt, Val*>& tryGetAssociatedVals(Val* targetVal) const
+    /*OrderedDictionary<SlangInt, Val*>& tryGetAssociatedVals(Val* targetVal) const
     {
+
         if (!hasAssociatedVals(targetVal))
             m_associatedValMapping[targetVal] = OrderedDictionary<SlangInt, Val*>();
+
         return m_associatedValMapping[targetVal];
+    }*/
+
+    /*
+    UCount getAssociatedValCount(Val* targetVal) const
+    {
+        if (!hasAssociatedVals(targetVal))
+            return 0;
+        return m_associatedValMapping.tryGetValue(targetVal)->getCount();
     }
+    */
+
+    auto begin(Val* targetVal) const
+    {
+        return m_associatedValMapping.tryGetValue(targetVal)->begin();
+    }
+
+    auto end(Val* targetVal) const { return m_associatedValMapping.tryGetValue(targetVal)->end(); }
 
     void resolveDictionaryKeys()
     {
@@ -1663,7 +1664,9 @@ class DifferentiableAttribute : public Attribute
 
     void addAssocVal(Val* targetVal, SlangInt id, Val* assocVal)
     {
-        tryGetAssociatedVals(targetVal)[id] = assocVal;
+        if (!hasAssociatedVals(targetVal))
+            m_associatedValMapping[targetVal] = OrderedDictionary<SlangInt, Val*>();
+        m_associatedValMapping.tryGetValue(targetVal)->addIfNotExists(id, assocVal);
     }
 
     /// Mapping from types to subtype witnesses for conformance to IDifferentiable.
@@ -1795,6 +1798,14 @@ class AlwaysFoldIntoUseSiteAttribute : public Attribute
 //
 FIDDLE()
 class TreatAsDifferentiableAttribute : public DifferentiableAttribute
+{
+    FIDDLE(...)
+};
+
+/// The `[HasTrivialForwardDerivative]` attribute indicates that a function has a trivial forward
+/// derivative.
+FIDDLE()
+class HasTrivialForwardDerivativeAttribute : public DifferentiableAttribute
 {
     FIDDLE(...)
 };

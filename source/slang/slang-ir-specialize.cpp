@@ -5,6 +5,7 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-loop-unroll.h"
 #include "slang-ir-lower-dynamic-dispatch-insts.h"
 #include "slang-ir-peephole.h"
 #include "slang-ir-sccp.h"
@@ -884,6 +885,7 @@ struct SpecializationContext
                 HashSet<IRInst*> satisfyingValSet;
                 bool skipSpecialization = false;
                 forEachInSet(
+                    module,
                     witnessTableSet,
                     [&](IRInst* instElement)
                     {
@@ -936,6 +938,8 @@ struct SpecializationContext
                         return false;
 
                     interfaceType = as<IRInterfaceType>(witnessTableType->getConformanceType());
+                    if (!interfaceType)
+                        return false;
                 }
             }
             else

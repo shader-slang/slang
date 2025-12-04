@@ -579,6 +579,9 @@ Val* DeclaredSubtypeWitness::_resolveImplOverride()
 
 ConversionCost DeclaredSubtypeWitness::_getOverloadResolutionCostOverride()
 {
+    if (auto nestedLookup = as<LookupDeclRef>(getDeclRef().declRefBase))
+        return nestedLookup->getWitness()->getOverloadResolutionCost() +
+               kConversionCost_GenericParamUpcast;
     return kConversionCost_None;
 }
 
@@ -647,11 +650,6 @@ breakLabel:;
     auto substSub = as<Type>(getSub()->substituteImpl(astBuilder, subst, &diff));
     auto substSup = as<Type>(getSup()->substituteImpl(astBuilder, subst, &diff));
 
-    if (!diff)
-        return this;
-
-    (*ioDiff)++;
-
     // If we have a reference to a type constraint for an
     // associated type declaration, then we can replace it
     // with the concrete conformance witness for a concrete
@@ -686,6 +684,7 @@ breakLabel:;
                     case RequirementWitness::Flavor::val:
                         {
                             auto satisfyingVal = requirementWitness.getVal();
+                            (*ioDiff)++;
                             return satisfyingVal;
                         }
                     }
@@ -696,6 +695,12 @@ breakLabel:;
 
     auto substDeclRef = getDeclRef().substituteImpl(astBuilder, subst, &diff);
     auto rs = astBuilder->getDeclaredSubtypeWitness(substSub, substSup, substDeclRef);
+
+    if (!diff)
+        return this;
+
+    (*ioDiff)++;
+
     return rs;
 }
 
@@ -2007,10 +2012,15 @@ Val* WitnessLookupIntVal::_resolveImplOverride()
     if (!newWitness)
         return this;
 
-    auto witnessVal = tryLookUpRequirementWitness(astBuilder, newWitness, getKey());
+
+    /*auto witnessVal = tryLookUpRequirementWitness(astBuilder, newWitness, getKey());
     if (witnessVal.getFlavor() == RequirementWitness::Flavor::val)
     {
         return witnessVal.getVal();
+    }*/
+    if (auto val = tryFoldOrNull(astBuilder, newWitness, getKey()))
+    {
+        return val;
     }
 
     auto newType = as<Type>(getType()->resolve());
@@ -2050,11 +2060,17 @@ Val* WitnessLookupIntVal::_substituteImplOverride(
 
 Val* WitnessLookupIntVal::tryFoldOrNull(ASTBuilder* astBuilder, SubtypeWitness* witness, Decl* key)
 {
-    auto witnessEntry = tryLookUpRequirementWitness(astBuilder, witness, key);
-    switch (witnessEntry.getFlavor())
+    // auto witnessEntry = tryLookUpRequirementWitness(astBuilder, witness, key);
+    auto unspecializedEntry = getUnspecializedLookupRec(astBuilder, key, witness);
+    switch (unspecializedEntry.getFlavor())
     {
     case RequirementWitness::Flavor::val:
-        return witnessEntry.getVal();
+        {
+            auto specializedEntry =
+                specializeLookedUpRec(astBuilder, key, witness, unspecializedEntry);
+            SLANG_ASSERT(specializedEntry.getFlavor() == RequirementWitness::Flavor::val);
+            return specializedEntry.getVal();
+        }
         break;
     default:
         break;

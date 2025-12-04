@@ -171,11 +171,11 @@ DeclRefBase* LookupDeclRef::_getBaseOverride()
     return nullptr;
 }
 
-Val* LookupDeclRef::tryResolve(SubtypeWitness* newWitness, Type* newLookupSource)
+RequirementWitness getUnspecializedLookupRec(
+    ASTBuilder* astBuilder,
+    Decl* requirementKey,
+    SubtypeWitness* witness)
 {
-    auto astBuilder = getCurrentASTBuilder();
-    Decl* requirementKey = getDecl();
-
     // We never register the generic itself as the key, but rather use
     // the inner-most non-generic declaration.
     //
@@ -186,6 +186,153 @@ Val* LookupDeclRef::tryResolve(SubtypeWitness* newWitness, Type* newLookupSource
         requirementKey = getInner(genericDecl);
     }
 
+    if (auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(witness))
+    {
+        RefPtr<WitnessTable> witnessTable;
+        if (auto nestedLookupDeclRef =
+                as<LookupDeclRef>(declaredSubtypeWitness->getDeclRef().declRefBase))
+        {
+            RequirementWitness nestedWitness = getUnspecializedLookupRec(
+                astBuilder,
+                nestedLookupDeclRef->getDecl(),
+                nestedLookupDeclRef->getWitness());
+            if (nestedWitness.getFlavor() == RequirementWitness::Flavor::witnessTable)
+            {
+                witnessTable = nestedWitness.getWitnessTable();
+            }
+            else if (nestedWitness.getFlavor() == RequirementWitness::Flavor::none)
+            {
+                return RequirementWitness();
+            }
+            else
+            {
+                SLANG_UNEXPECTED("expected witness table, not val or declRef");
+            }
+        }
+        else if (
+            auto inheritanceDeclRef = declaredSubtypeWitness->getDeclRef().as<InheritanceDecl>())
+        {
+            witnessTable = inheritanceDeclRef.getDecl()->witnessTable;
+        }
+
+        RequirementWitness requirementWitness;
+        if (witnessTable && witnessTable->getRequirementDictionary().tryGetValue(
+                                requirementKey,
+                                requirementWitness))
+        {
+            switch (requirementWitness.getFlavor())
+            {
+            default:
+                // No usable value was found, so there is nothing we can do.
+                break;
+            case RequirementWitness::Flavor::witnessTable:
+                return requirementWitness;
+            case RequirementWitness::Flavor::declRef:
+                {
+                    auto satisfyingVal =
+                        as<DeclRefBase>(requirementWitness.getDeclRef().declRefBase->resolve());
+                    if (genericLevels == 0)
+                        return RequirementWitness(satisfyingVal);
+                    else
+                    {
+                        for (; satisfyingVal && genericLevels > 0;
+                             satisfyingVal = satisfyingVal->getParent())
+                        {
+                            if (as<GenericDecl>(satisfyingVal->getParent()->getDecl()))
+                                genericLevels--;
+                        }
+
+                        return RequirementWitness(satisfyingVal);
+                    }
+                }
+            case RequirementWitness::Flavor::val:
+                {
+                    auto satisfyingVal = requirementWitness.getVal()->resolve();
+                    SLANG_ASSERT(!genericLevels);
+                    return satisfyingVal;
+                }
+                break;
+            }
+        }
+    }
+
+    return RequirementWitness();
+}
+
+RequirementWitness specializeLookedUpRec(
+    ASTBuilder* astBuilder,
+    Decl* requirementKey,
+    SubtypeWitness* witness,
+    RequirementWitness lookedUpVal)
+{
+    // TODO: Will need to handle any generic-app-decl-refs..
+    if (auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(witness))
+    {
+        RefPtr<WitnessTable> witnessTable;
+        if (auto nestedLookupDeclRef =
+                as<LookupDeclRef>(declaredSubtypeWitness->getDeclRef().declRefBase))
+        {
+            lookedUpVal = specializeLookedUpRec(
+                astBuilder,
+                nestedLookupDeclRef->getDecl(),
+                nestedLookupDeclRef->getWitness(),
+                lookedUpVal);
+            return lookedUpVal.specialize(
+                astBuilder,
+                SubstitutionSet(declaredSubtypeWitness->getDeclRef()));
+        }
+        else if (
+            auto inheritanceDeclRef = declaredSubtypeWitness->getDeclRef().as<InheritanceDecl>())
+        {
+            return lookedUpVal.specialize(astBuilder, SubstitutionSet(inheritanceDeclRef));
+        }
+
+        /* */
+    }
+
+    return RequirementWitness();
+}
+
+
+Val* LookupDeclRef::tryResolve(SubtypeWitness* newWitness, Type* newLookupSource)
+{
+    auto astBuilder = getCurrentASTBuilder();
+    Decl* requirementKey = getDecl();
+
+    /* We never register the generic itself as the key, but rather use
+    // the inner-most non-generic declaration.
+    //
+    UCount genericLevels = 0;
+    while (auto genericDecl = as<GenericDecl>(requirementKey))
+    {
+        genericLevels++;
+        requirementKey = getInner(genericDecl);
+    }
+    */
+
+    RequirementWitness lookedUpVal =
+        getUnspecializedLookupRec(astBuilder, requirementKey, newWitness);
+    if (lookedUpVal.getFlavor() != RequirementWitness::Flavor::none)
+    {
+        if (lookedUpVal.getFlavor() == RequirementWitness::Flavor::val ||
+            lookedUpVal.getFlavor() == RequirementWitness::Flavor::declRef)
+        {
+            auto specializedEntry =
+                specializeLookedUpRec(astBuilder, requirementKey, newWitness, lookedUpVal);
+            switch (specializedEntry.getFlavor())
+            {
+            default:
+                // No usable value was found, so there is nothing we can do.
+                break;
+            case RequirementWitness::Flavor::declRef:
+                return specializedEntry.getDeclRef().declRefBase;
+            case RequirementWitness::Flavor::val:
+                return specializedEntry.getVal();
+            }
+        }
+    }
+
+    /*
     RequirementWitness requirementWitness =
         tryLookUpRequirementWitness(astBuilder, newWitness, requirementKey);
     switch (requirementWitness.getFlavor())
@@ -219,6 +366,7 @@ Val* LookupDeclRef::tryResolve(SubtypeWitness* newWitness, Type* newLookupSource
         }
         break;
     }
+    */
 
     // Hard code implementation of T.Differential.Differential == T.Differential rule.
     auto builtinReq = requirementKey->findModifier<BuiltinRequirementModifier>();
@@ -493,7 +641,8 @@ void DeclRefBase::toText(StringBuilder& out)
         {
             if (extDecl->targetType)
             {
-                getTargetType(getCurrentASTBuilder(), getParent())->toText(out);
+                getTargetType(getCurrentASTBuilder(), DeclRef(declRef).as<ExtensionDecl>())
+                    ->toText(out);
             }
         }
     }

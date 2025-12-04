@@ -5,6 +5,7 @@
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-specialize.h"
+#include "slang-ir-translate.h"
 #include "slang-ir-typeflow-set.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
@@ -337,88 +338,6 @@ IRInst* getArrayStride(IRArrayType* arrayType)
     return nullptr;
 }
 
-//
-// Helper struct to represent a parameter's direction and type component.
-// This is used by the type flow system to figure out which direction to propagate
-// information for each parameter.
-//
-struct ParameterDirectionInfo
-{
-    enum Kind
-    {
-        In,
-        BorrowIn,
-        Out,
-        BorrowInOut,
-        Ref
-    } kind;
-
-    // For Ref and BorrowInOut
-    AddressSpace addressSpace;
-
-    ParameterDirectionInfo(Kind kind, AddressSpace addressSpace = (AddressSpace)0)
-        : kind(kind), addressSpace(addressSpace)
-    {
-    }
-
-    ParameterDirectionInfo()
-        : kind(Kind::In), addressSpace((AddressSpace)0)
-    {
-    }
-
-    bool operator==(const ParameterDirectionInfo& other) const
-    {
-        return kind == other.kind && addressSpace == other.addressSpace;
-    }
-};
-
-// Split parameter type into a direction and a type
-std::tuple<ParameterDirectionInfo, IRType*> splitParameterDirectionAndType(IRType* paramType)
-{
-    if (as<IROutParamType>(paramType))
-        return {
-            ParameterDirectionInfo(ParameterDirectionInfo::Kind::Out),
-            as<IROutParamType>(paramType)->getValueType()};
-    else if (as<IRBorrowInOutParamType>(paramType))
-        return {
-            ParameterDirectionInfo(ParameterDirectionInfo::Kind::BorrowInOut),
-            as<IRBorrowInOutParamType>(paramType)->getValueType()};
-    else if (as<IRRefParamType>(paramType))
-        return {
-            ParameterDirectionInfo(
-                ParameterDirectionInfo::Kind::Ref,
-                as<IRRefParamType>(paramType)->getAddressSpace()),
-            as<IRRefParamType>(paramType)->getValueType()};
-    else if (as<IRBorrowInParamType>(paramType))
-        return {
-            ParameterDirectionInfo(
-                ParameterDirectionInfo::Kind::BorrowIn,
-                as<IRBorrowInParamType>(paramType)->getAddressSpace()),
-            as<IRBorrowInParamType>(paramType)->getValueType()};
-    else
-        return {ParameterDirectionInfo(ParameterDirectionInfo::Kind::In), paramType};
-}
-
-// Join parameter direction and a type back into a parameter type
-IRType* fromDirectionAndType(IRBuilder* builder, ParameterDirectionInfo info, IRType* type)
-{
-    switch (info.kind)
-    {
-    case ParameterDirectionInfo::Kind::In:
-        return type;
-    case ParameterDirectionInfo::Kind::Out:
-        return builder->getOutParamType(type);
-    case ParameterDirectionInfo::Kind::BorrowInOut:
-        return builder->getBorrowInOutParamType(type);
-    case ParameterDirectionInfo::Kind::BorrowIn:
-        return builder->getBorrowInParamType(type, info.addressSpace);
-    case ParameterDirectionInfo::Kind::Ref:
-        return builder->getRefParamType(type, info.addressSpace);
-    default:
-        SLANG_UNEXPECTED("Unhandled parameter info in fromDirectionAndType");
-    }
-}
-
 // Helper to test if an inst is in the global scope.
 bool isGlobalInst(IRInst* inst)
 {
@@ -534,6 +453,14 @@ IROp getSetOpFromType(IRType* type)
         return kIROp_TypeSet;
     case kIROp_TypeType: // Can be refined into set of concrete types
         return kIROp_TypeSet;
+
+    // Translatable function types (all equivalent to FuncType for our purposes)
+    case kIROp_FuncTypeOf:
+    case kIROp_ForwardDiffFuncType:
+    case kIROp_ApplyForBwdFuncType:
+    case kIROp_BwdCallableFuncType:
+    case kIROp_BackwardDiffFuncType:
+        return kIROp_FuncSet;
     default:
         break;
     }
@@ -613,6 +540,7 @@ struct TypeFlowSpecializationContext
 
         // Create a type set out of the base types from each table.
         forEachInSet(
+            module,
             tableSet,
             [&](IRInst* witnessTable)
             {
@@ -703,7 +631,7 @@ struct TypeFlowSpecializationContext
     {
         auto found = propagationMap.tryGetValue(element);
         if (found)
-            return *found;
+            return (*found)->getOperand(0);
         return none(); // Default info for any inst that we haven't registered.
     }
 
@@ -797,8 +725,8 @@ struct TypeFlowSpecializationContext
 
         HashSet<IRInst*> allValues;
         // Collect all values from both sets
-        forEachInSet(set1, [&](IRInst* value) { allValues.add(value); });
-        forEachInSet(set2, [&](IRInst* value) { allValues.add(value); });
+        forEachInSet(module, set1, [&](IRInst* value) { allValues.add(value); });
+        forEachInSet(module, set2, [&](IRInst* value) { allValues.add(value); });
 
         IRBuilder builder(module);
         return as<T>(builder.getSet(
@@ -925,7 +853,8 @@ struct TypeFlowSpecializationContext
             return;
 
         // Update the propagation map
-        propagationMap[InstWithContext(context, inst)] = unionedInfo;
+        IRBuilder builder(module);
+        propagationMap[InstWithContext(context, inst)] = builder.getWeakUse(unionedInfo);
 
         // Add all users to appropriate work items
         addUsersToWorkQueue(context, inst, unionedInfo, workQueue);
@@ -1848,6 +1777,7 @@ struct TypeFlowSpecializationContext
             IRBuilder builder(module);
             HashSet<IRInst*>& results = *module->getContainerPool().getHashSet<IRInst>();
             forEachInSet(
+                module,
                 cast<IRWitnessTableSet>(elementOfSetType->getSet()),
                 [&](IRInst* table)
                 {
@@ -1866,7 +1796,8 @@ struct TypeFlowSpecializationContext
                         return;
                     }
 
-                    results.add(findWitnessTableEntry(cast<IRWitnessTable>(table), key));
+                    auto resolvedTable = translationContext.resolveInst(table);
+                    results.add(findWitnessTableEntry(cast<IRWitnessTable>(resolvedTable), key));
                 });
 
             auto setOp = getSetOpFromType(inst->getDataType());
@@ -2068,7 +1999,9 @@ struct TypeFlowSpecializationContext
                         }
                         else
                         {
-                            SLANG_UNEXPECTED("Unexpected set type in specialization argument.");
+                            module->getContainerPool().free(&specializationArgs);
+                            return none();
+                            // SLANG_UNEXPECTED("Unexpected set type in specialization argument.");
                         }
                     }
                 }
@@ -2171,6 +2104,7 @@ struct TypeFlowSpecializationContext
                 set = elementOfSetType->getSet();
 
                 forEachInSet(
+                    module,
                     set,
                     [&](IRInst* arg)
                     {
@@ -2375,13 +2309,25 @@ struct TypeFlowSpecializationContext
         //
         if (auto elementOfSetType = as<IRElementOfSetType>(calleeInfo))
         {
+            List<IRInst*>& funcs = *module->getContainerPool().getList<IRInst>();
+
             forEachInSet(
+                module,
                 elementOfSetType->getSet(),
-                [&](IRInst* func) { propagateToCallSite(func); });
+                [&](IRInst* func) { funcs.add(func); });
+
+            for (auto func : funcs)
+            {
+                auto resolvedFunc = translationContext.resolveInst(func);
+                propagateToCallSite(resolvedFunc);
+            }
+
+            module->getContainerPool().free(&funcs);
         }
         else if (isGlobalInst(callee))
         {
-            propagateToCallSite(callee);
+            auto resolvedCallee = translationContext.resolveInst(callee);
+            propagateToCallSite(resolvedCallee);
         }
 
         if (auto callInfo = tryGetInfo(context, inst))
@@ -2830,6 +2776,20 @@ struct TypeFlowSpecializationContext
         return hasChanges;
     }
 
+    bool resolveTypesInFunc(IRFunc* func /*, HashSet<IRType*>& aggTypesToResolve*/)
+    {
+        bool hasChanges = false;
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst : block->getChildren())
+            {
+                if (inst->getDataType())
+                    translationContext.resolveInst(inst->getDataType());
+            }
+        }
+        return hasChanges;
+    }
+
     // Implements phase 2 of the type-flow specialization pass.
     //
     // This method is called after information propagation is complete and
@@ -2848,11 +2808,13 @@ struct TypeFlowSpecializationContext
         List<IRFunc*> funcsToProcess;
         List<IRStructType*> structsToProcess;
 
+        for (auto context : this->availableContexts)
+            if (auto func = as<IRFunc>(context))
+                funcsToProcess.add(func);
+
         for (auto globalInst : module->getGlobalInsts())
         {
-            if (auto func = as<IRFunc>(globalInst))
-                funcsToProcess.add(func);
-            else if (auto structType = as<IRStructType>(globalInst))
+            if (auto structType = as<IRStructType>(globalInst))
                 structsToProcess.add(structType);
         }
 
@@ -2866,6 +2828,9 @@ struct TypeFlowSpecializationContext
 
         for (auto func : funcsToProcess)
             hasChanges |= specializeFunc(func);
+
+        for (auto func : funcsToProcess)
+            hasChanges |= resolveTypesInFunc(func);
 
         return hasChanges;
     }
@@ -3227,6 +3192,7 @@ struct TypeFlowSpecializationContext
         {
             HashSet<IRInst*>& setElements = *module->getContainerPool().getHashSet<IRInst>();
             forEachInSet(
+                module,
                 valOfSetType->getSet(),
                 [&](IRInst* element) { setElements.add(element); });
 
@@ -3234,6 +3200,7 @@ struct TypeFlowSpecializationContext
             {
                 // If the new type is also a set, merge the two sets
                 forEachInSet(
+                    module,
                     newValOfSetType->getSet(),
                     [&](IRInst* element) { setElements.add(element); });
             }
@@ -3365,7 +3332,7 @@ struct TypeFlowSpecializationContext
         };
 
         List<IRInst*>& calleesToProcess = *module->getContainerPool().getList<IRInst>();
-        forEachInSet(calleeSet, [&](IRInst* func) { calleesToProcess.add(func); });
+        forEachInSet(module, calleeSet, [&](IRInst* func) { calleesToProcess.add(func); });
 
         for (auto context : calleesToProcess)
         {
@@ -3484,6 +3451,7 @@ struct TypeFlowSpecializationContext
         HashSet<IRInst*>& filteredElements = *module->getContainerPool().getHashSet<IRInst>();
         bool containsNone = false;
         forEachInSet(
+            module,
             set,
             [&](IRInst* element)
             {
@@ -4475,7 +4443,8 @@ struct TypeFlowSpecializationContext
                 builder.emitDefaultConstruct(makeUntaggedUnionType(taggedUnionType->getTypeSet())));
 
             inst->replaceUsesWith(newTuple);
-            propagationMap[InstWithContext(context, newTuple)] = taggedUnionType;
+            propagationMap[InstWithContext(context, newTuple)] =
+                builder.getWeakUse(taggedUnionType);
             inst->removeAndDeallocate();
 
             return true;
@@ -4588,6 +4557,7 @@ struct TypeFlowSpecializationContext
 
             bool containsNone = false;
             forEachInSet(
+                module,
                 taggedUnionType->getWitnessTableSet(),
                 [&](IRInst* wt)
                 {
@@ -4690,7 +4660,7 @@ struct TypeFlowSpecializationContext
     }
 
     TypeFlowSpecializationContext(IRModule* module, DiagnosticSink* sink)
-        : module(module), sink(sink)
+        : module(module), sink(sink), translationContext(module, sink)
     {
     }
 
@@ -4699,8 +4669,8 @@ struct TypeFlowSpecializationContext
     IRModule* module;
     DiagnosticSink* sink;
 
-    // Mapping from (context, inst) --> propagated info
-    Dictionary<InstWithContext, IRInst*> propagationMap;
+    // Mapping from (context, weakUse) --> propagated info
+    Dictionary<InstWithContext, IRWeakUse*> propagationMap;
 
     // Mapping from context --> return value info
     Dictionary<IRInst*, IRInst*> funcReturnInfo;
@@ -4724,6 +4694,9 @@ struct TypeFlowSpecializationContext
 
     // Set of already discovered contexts.
     HashSet<IRInst*> availableContexts;
+
+    // Translation context.
+    TranslationContext translationContext;
 };
 
 // Main entry point

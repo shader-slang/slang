@@ -21,15 +21,33 @@ struct TranslationContext
 
 public:
     TranslationContext(IRModule* module, DiagnosticSink* inSink)
-        : irModule(module)
-        , sink(inSink)
-        , autodiffContext(module->getModuleInst())
-        , pairBuilderStorage(&autodiffContext)
-        , diffTypeConformanceContext(&autodiffContext)
+        : irModule(module), sink(inSink), autodiffContext(module->getModuleInst())
     {
+        if (!module->getTranslationDict())
+        {
+            IRBuilder builder(module);
+            builder.setInsertInto(module);
+            auto dict = cast<IRCompilerDictionary>(builder.emitIntrinsicInst(
+                builder.getVoidType(),
+                kIROp_CompilerDictionary,
+                0,
+                nullptr));
+            module->setTranslationDict(dict);
+
+            builder.setInsertInto(dict);
+            builder.emitIntrinsicInst(
+                builder.getVoidType(),
+                kIROp_CompilerDictionaryScope,
+                0,
+                nullptr);
+        }
     }
 
     IRInst* maybeTranslateInst(IRInst* inst);
+
+    IRInst* resolveInst(IRInst* inst);
+
+    IRModule* getModule() const { return irModule; }
 
 private:
     IRModule* irModule;
@@ -40,11 +58,6 @@ private:
 
     // Shared context.
     AutoDiffSharedContext autodiffContext;
-
-    // Builder for dealing with differential pair types.
-    DifferentialPairTypeBuilder pairBuilderStorage;
-
-    DifferentiableTypeConformanceContext diffTypeConformanceContext;
 };
 
 }; // namespace Slang

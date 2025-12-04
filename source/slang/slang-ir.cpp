@@ -2887,38 +2887,11 @@ IRTorchTensorType* IRBuilder::getTorchTensorType(IRType* elementType)
     return (IRTorchTensorType*)getType(kIROp_TorchTensorType, 1, (IRInst**)&elementType);
 }
 
-IRDifferentialPairType* IRBuilder::getDifferentialPairType(IRType* valueType, IRInst* witnessTable)
-{
-    IRInst* operands[] = {valueType, witnessTable};
-    return (IRDifferentialPairType*)
-        getType(kIROp_DifferentialPairType, sizeof(operands) / sizeof(operands[0]), operands);
-}
-
 /*IRForwardDiffFuncType* IRBuilder::getForwardDiffFuncType(IRType* baseFuncType)
 {
     return (
         IRForwardDiffFuncType*)getType(kIROp_ForwardDiffFuncType, 1, (IRInst* const*)&baseFuncType);
 }*/
-
-IRDifferentialPtrPairType* IRBuilder::getDifferentialPtrPairType(
-    IRType* valueType,
-    IRInst* witnessTable)
-{
-    IRInst* operands[] = {valueType, witnessTable};
-    return (IRDifferentialPtrPairType*)
-        getType(kIROp_DifferentialPtrPairType, sizeof(operands) / sizeof(operands[0]), operands);
-}
-
-IRDifferentialPairUserCodeType* IRBuilder::getDifferentialPairUserCodeType(
-    IRType* valueType,
-    IRInst* witnessTable)
-{
-    IRInst* operands[] = {valueType, witnessTable};
-    return (IRDifferentialPairUserCodeType*)getType(
-        kIROp_DifferentialPairUserCodeType,
-        sizeof(operands) / sizeof(operands[0]),
-        operands);
-}
 
 IRBackwardDiffIntermediateContextType* IRBuilder::getBackwardDiffIntermediateContextType(
     IRInst* func)
@@ -3111,6 +3084,83 @@ IRInst* IRBuilder::emitOutImplicitCast(IRInst* type, IRInst* value)
 IRInst* IRBuilder::emitSymbolAlias(IRInst* aliasedSymbol)
 {
     return emitIntrinsicInst(aliasedSymbol->getFullType(), kIROp_SymbolAlias, 1, &aliasedSymbol);
+}
+
+IRCompilerDictionaryEntry* IRBuilder::_getCompilerDictionaryEntry(List<IRInst*> const& keys)
+{
+    return cast<IRCompilerDictionaryEntry>(emitIntrinsicInst(
+        getVoidType(),
+        kIROp_CompilerDictionaryEntry,
+        (UInt)keys.getCount(),
+        keys.getBuffer()));
+}
+
+static IRCompilerDictionaryScope* findScope(IRCompilerDictionary* dict)
+{
+    for (auto dictChildren : dict->getDecorationsAndChildren())
+    {
+        if (auto dictScope = as<IRCompilerDictionaryScope>(dictChildren))
+        {
+            return dictScope;
+        }
+    }
+    return nullptr;
+}
+
+void IRBuilder::addCompilerDictionaryEntry(
+    IRCompilerDictionary* dict,
+    IRInst* translationInst,
+    IRInst* resultInst)
+{
+    IRCompilerDictionaryScope* scope = findScope(dict);
+    SLANG_ASSERT(scope);
+
+    List<IRInst*>& keyVals = *getModule()->getContainerPool().getList<IRInst>();
+
+    keyVals.reserve(2 + translationInst->getOperandCount());
+    keyVals.add(scope);
+    keyVals.add(getIntValue(getUIntType(), (UInt)translationInst->getOp()));
+    for (UInt ii = 0; ii < translationInst->getOperandCount(); ++ii)
+    {
+        keyVals.add(translationInst->getOperand(ii));
+    }
+
+    auto entry = _getCompilerDictionaryEntry(keyVals);
+    if (auto existingVal = entry->getValue())
+    {
+        // Invalid.
+        SLANG_UNEXPECTED("Translation entry already exists");
+    }
+
+    auto currentLoc = getInsertLoc();
+    setInsertInto(entry);
+    emitIntrinsicInst(getVoidType(), kIROp_CompilerDictionaryValue, 1, &resultInst);
+    setInsertLoc(currentLoc);
+
+    getModule()->getContainerPool().free(&keyVals);
+}
+
+IRInst* IRBuilder::tryLookupCompilerDictionaryValue(
+    IRCompilerDictionary* dict,
+    IRInst* translationInst)
+{
+    IRCompilerDictionaryScope* scope = findScope(dict);
+    SLANG_ASSERT(scope);
+
+    List<IRInst*>& keyVals = *getModule()->getContainerPool().getList<IRInst>();
+
+    keyVals.reserve(2 + translationInst->getOperandCount());
+    keyVals.add(scope);
+    keyVals.add(getIntValue(getUIntType(), (UInt)translationInst->getOp()));
+    for (UInt ii = 0; ii < translationInst->getOperandCount(); ++ii)
+    {
+        keyVals.add(translationInst->getOperand(ii));
+    }
+
+    auto entry = _getCompilerDictionaryEntry(keyVals);
+    getModule()->getContainerPool().free(&keyVals);
+
+    return entry->getValue();
 }
 
 IRInst* IRBuilder::emitDebugSource(
@@ -8029,6 +8079,7 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
     addToWorkList(thisInst, other);
 
     List<IRInst*> duplicateAnnotations;
+    List<IRSetBase*> setsToUpdate;
     for (Index i = 0; i < workList.getCount(); i++)
     {
         auto workItem = workList[i];
@@ -8090,7 +8141,11 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
             bool userIsSetInst = as<IRSetBase>(uu->getUser()) != nullptr;
             if (userIsSetInst)
             {
-                // Set insts need their operands sorted
+                setsToUpdate.add(as<IRSetBase>(user));
+            }
+
+            /*{
+                    // Set insts need their operands sorted
                 auto module = user->getModule();
                 SLANG_ASSERT(module);
 
@@ -8113,11 +8168,26 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
                 operands.sort(
                     [&](IRInst* a, IRInst* b) -> bool { return getUniqueId(a) < getUniqueId(b); });
 
+                Int newIndexOfOther = -1;
                 for (UInt ii = 0; ii < user->getOperandCount(); ii++)
+                {
+                    if (operands[ii] == other)
+                        newIndexOfOther = ii;
                     user->getOperandUse(ii)->usedValue = operands[ii];
+                }
+                // invariant.
+                SLANG_ASSERT(newIndexOfOther >= 0);
+
+                // In case we changed the IRUse that is pointing to our inst.
+                auto newUse = user->getOperandUse(UInt(newIndexOfOther));
+                if (newUse != uu)
+                {
+                    // Splice out `uu` from the use list.
+                    if (uu->prevLink)
+                }
 
                 module->getContainerPool().free(&operands);
-            }
+            }*/
 
             // If `other` is hoistable, then we need to make sure `other` is hoisted
             // to a point before `user`, if it is not already so.
@@ -8189,6 +8259,29 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
 
     for (auto annotation : duplicateAnnotations)
         annotation->removeAndDeallocate();
+
+    for (auto setInst : setsToUpdate)
+    {
+        auto module = setInst->getModule();
+        IRBuilder builder(module);
+
+        HashSet<IRInst*>& elements = *module->getContainerPool().getHashSet<IRInst>();
+
+        for (UInt i = 0; i < setInst->getOperandCount(); i++)
+            elements.add(setInst->getElement(i));
+
+        auto newSetInst = builder.getSet(setInst->getOp(), elements);
+        if (newSetInst != setInst)
+        {
+            // setInst was improperly ordered, so we need to replace its uses.
+            // and then delete it.
+            //
+            setInst->replaceUsesWith(newSetInst);
+            setInst->removeAndDeallocate();
+        }
+
+        module->getContainerPool().free(&elements);
+    }
 }
 
 void IRInst::replaceUsesWith(IRInst* other)

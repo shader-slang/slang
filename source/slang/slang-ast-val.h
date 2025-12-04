@@ -1080,4 +1080,15 @@ inline bool isTypeEqualityWitness(Val* witness)
     return false;
 }
 
+RequirementWitness getUnspecializedLookupRec(
+    ASTBuilder* astBuilder,
+    Decl* requirementKey,
+    SubtypeWitness* witness);
+
+RequirementWitness specializeLookedUpRec(
+    ASTBuilder* astBuilder,
+    Decl* requirementKey,
+    SubtypeWitness* witness,
+    RequirementWitness lookedUpVal);
+
 } // namespace Slang

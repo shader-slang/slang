@@ -153,6 +153,9 @@ __attributeTarget(DeclBase)
 attribute_syntax [TreatAsDifferentiable] : TreatAsDifferentiableAttribute;
 
 __attributeTarget(DeclBase)
+attribute_syntax [HasTrivialForwardDerivative] : HasTrivialForwardDerivativeAttribute;
+
+__attributeTarget(DeclBase)
 attribute_syntax [MaybeDifferentiable] : MaybeDifferentiableAttribute;
 
 /// Represents types that provide arithmetic operations.
@@ -478,6 +481,22 @@ void __requireTargetExtension(constexpr String preludeText);
 __intrinsic_op($(kIROp_StaticAssert))
 void static_assert(constexpr bool condition, NativeString errorMessage);
 
+/*
+interface IDiffPair<T : IDifferentiable> : IDifferentiable
+{
+    __init(T value, T.Differential differential);
+    T getPrimal();
+    T.Differential getDifferential();
+}
+
+interface IDiffPtrPair<T : IDifferentiablePtrType> : IDifferentiablePtrType
+{
+    __init(T value, T.Differential differential);
+    T getPrimal();
+    T.Differential getDifferential();
+}
+*/
+
 /// Represents a 'value' type that is differentiable for the purposes of automatic differentiation.
 ///
 /// See the auto-diff user guide section for an introduction to 
@@ -747,30 +766,30 @@ interface ILegacyBackwardDifferentiable<FType>
 ///
 __generic<T : IDifferentiable>
 __magic_type(DifferentialPairType)
-__intrinsic_type($(kIROp_DifferentialPairUserCodeType))
+__intrinsic_type($(kIROp_DifferentialPairType))
 struct DifferentialPair : IDifferentiable
 {
     typedef DifferentialPair<T.Differential> Differential;
     typedef T.Differential DifferentialElementType;
 
-    __intrinsic_op($(kIROp_MakeDifferentialPairUserCode))
+    __intrinsic_op($(kIROp_MakeDifferentialPair))
     [Differentiable] __init(T _primal, T.Differential _differential);
 
     property p : T
     {
-        __intrinsic_op($(kIROp_DifferentialPairGetPrimalUserCode))
+        __intrinsic_op($(kIROp_DifferentialPairGetPrimal))
         get;
     }
 
     property v : T
     {
-        __intrinsic_op($(kIROp_DifferentialPairGetPrimalUserCode))
+        __intrinsic_op($(kIROp_DifferentialPairGetPrimal))
         get;
     }
 
     property d : T.Differential
     {
-        __intrinsic_op($(kIROp_DifferentialPairGetDifferentialUserCode))
+        __intrinsic_op($(kIROp_DifferentialPairGetDifferential))
         get;
     }
 

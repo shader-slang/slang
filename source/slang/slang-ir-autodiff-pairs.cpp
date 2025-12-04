@@ -306,7 +306,7 @@ struct DifferentialPairUserCodeTranscribePass : public InstPassBase
 
     IRInst* rewriteMakePair(IRBuilder* builder, IRMakeDifferentialPair* inst)
     {
-        auto pairType = as<IRDifferentialPairType>(inst->getFullType());
+        auto pairType = as<IRDifferentialPairType>(inst->getDataType());
         builder->setInsertBefore(inst);
         auto newInst = builder->emitMakeDifferentialPairUserCode(
             (IRType*)pairType,

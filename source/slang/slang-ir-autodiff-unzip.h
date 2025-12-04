@@ -285,7 +285,7 @@ struct DiffUnzipPass
 
         auto applyBwdFunc = diffTypeContext.tryGetAssociationOfKind(
             baseFn,
-            FunctionAssociationKind::BackwardDerivativeApply);
+            ValAssociationKind::BackwardDerivativeApply);
         auto applyBwdFuncType = cast<IRFuncType>(applyBwdFunc->getDataType());
 
         List<IRInst*> applyFuncArgs;
@@ -325,7 +325,7 @@ struct DiffUnzipPass
         primalBuilder->markInstAsPrimal(getValFunc);*/
         auto getValFunc = diffTypeContext.tryGetAssociationOfKind(
             baseFn,
-            FunctionAssociationKind::BackwardDerivativeContextGetVal);
+            ValAssociationKind::BackwardDerivativeContextGetVal);
         SLANG_ASSERT(getValFunc);
 
         // Extract the primal return value from the context.
@@ -367,7 +367,7 @@ struct DiffUnzipPass
         for (UIndex ii = 0; ii < baseFuncType->getParamCount(); ii++)
         {
             const auto& [paramDirection, paramType] =
-                splitDirectionAndType(baseFuncType->getParamType(ii));
+                splitParameterDirectionAndType(baseFuncType->getParamType(ii));
             if (auto diffType = diffTypeContext.getDifferentialForType(diffBuilder, paramType))
             {
                 fwdPropFuncParamTypes.add(
@@ -926,7 +926,7 @@ struct DiffUnzipPass
             if (isMixedDifferentialInst(fwdParam))
             {
                 const auto& [pairDirection, pairType] =
-                    splitDirectionAndType(fwdParam->getDataType());
+                    splitParameterDirectionAndType(fwdParam->getDataType());
                 SLANG_ASSERT(isRelevantDifferentialPair(pairType));
 
                 auto primalType = as<IRDifferentialPairTypeBase>(pairType)->getValueType();

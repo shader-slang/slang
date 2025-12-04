@@ -1,6 +1,8 @@
 #include "slang-ir-translate.h"
 
 #include "slang-ir-insts.h"
+#include "slang-ir-sccp.h"
+#include "slang-ir-typeflow-specialize.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 
@@ -9,13 +11,18 @@ namespace Slang
 
 IRInst* TranslationContext::maybeTranslateInst(IRInst* inst)
 {
-    if (auto translatedInst = tryGetTranslation(irModule, inst))
-        return translatedInst;
+    IRBuilder builder(irModule);
 
-    auto memoize = [&](IRInst* result)
+    if (auto existingTranslation =
+            builder.tryLookupCompilerDictionaryValue(irModule->getTranslationDict(), inst))
     {
-        registerTranslation(irModule, inst, result);
-        return result;
+        return existingTranslation;
+    }
+
+    auto memoize = [&](IRInst* resultInst)
+    {
+        builder.addCompilerDictionaryEntry(irModule->getTranslationDict(), inst, resultInst);
+        return resultInst;
     };
 
     IRInst* translationResult = nullptr;
@@ -25,8 +32,6 @@ IRInst* TranslationContext::maybeTranslateInst(IRInst* inst)
     {
     case kIROp_BackwardDifferentiate:
         {
-            // translationResult =
-            //     fwdDiffTranslator.processTranslationRequest(inst, &autodiffContext, sink);
             return memoize(maybeTranslateBackwardDerivative(
                 &autodiffContext,
                 sink,
@@ -84,7 +89,7 @@ IRInst* TranslationContext::maybeTranslateInst(IRInst* inst)
             // Translate the full 4-tuple result.
             auto translatedTuple = maybeTranslateInst(cast<IRBackwardDifferentiate>(bwdDiffInst));
             if (translatedTuple == bwdDiffInst)
-                return memoize(bwdDiffInst);
+                return (bwdDiffInst);
 
             SLANG_ASSERT(as<IRMakeTuple>(translatedTuple));
             switch (inst->getOp())
@@ -120,7 +125,7 @@ IRInst* TranslationContext::maybeTranslateInst(IRInst* inst)
             auto translatedTuple =
                 maybeTranslateInst(cast<IRTrivialBackwardDifferentiate>(bwdDiffInst));
             if (translatedTuple == bwdDiffInst)
-                return memoize(bwdDiffInst);
+                return (bwdDiffInst);
 
             SLANG_ASSERT(as<IRMakeTuple>(translatedTuple));
             switch (inst->getOp())
@@ -167,7 +172,7 @@ IRInst* TranslationContext::maybeTranslateInst(IRInst* inst)
             auto translatedTuple =
                 maybeTranslateInst(cast<IRBackwardFromLegacyBwdDiffFunc>(legacyToNewBwdDiffInst));
             if (translatedTuple == legacyToNewBwdDiffInst)
-                return memoize(legacyToNewBwdDiffInst);
+                return (legacyToNewBwdDiffInst);
 
             SLANG_ASSERT(as<IRMakeTuple>(translatedTuple));
             switch (inst->getOp())
@@ -205,19 +210,20 @@ IRInst* TranslationContext::maybeTranslateInst(IRInst* inst)
     case kIROp_MakeIDifferentiableWitness:
         {
             IRBuilder builder(autodiffContext.moduleInst);
+            DifferentiableTypeConformanceContext ctx(&autodiffContext);
             auto baseType = inst->getOperand(0);
             SLANG_ASSERT(as<IRDifferentialPairTypeBase>(baseType));
             if (as<IRDifferentialPairType>(baseType) ||
                 as<IRDifferentialPairUserCodeType>(baseType))
             {
-                return memoize(diffTypeConformanceContext.buildDifferentiablePairWitness(
+                return memoize(ctx.buildDifferentiablePairWitness(
                     &builder,
                     cast<IRDifferentialPairTypeBase>(baseType),
                     DiffConformanceKind::Value));
             }
             else if (as<IRDifferentialPtrPairType>(baseType))
             {
-                return memoize(diffTypeConformanceContext.buildDifferentiablePairWitness(
+                return memoize(ctx.buildDifferentiablePairWitness(
                     &builder,
                     cast<IRDifferentialPtrPairType>(baseType),
                     DiffConformanceKind::Ptr));
@@ -250,6 +256,186 @@ IRInst* TranslationContext::maybeTranslateInst(IRInst* inst)
     }
 
     return translationResult;
+}
+
+static IRInst* specializeWitnessLookup(IRLookupWitnessMethod* lookupInst)
+{
+    // We can only specialize in the case where the lookup
+    // is being done on a concrete witness table, and not
+    // the result of a `specialize` instruction or other
+    // operation that will yield such a table.
+    //
+    auto witnessTable = cast<IRWitnessTable>(lookupInst->getWitnessTable());
+
+    // Because we have a concrete witness table, we can
+    // use it to look up the IR value that satisfies
+    // the given interface requirement.
+    //
+    auto requirementKey = lookupInst->getRequirementKey();
+    auto satisfyingVal = findWitnessTableEntry(witnessTable, requirementKey);
+
+    return satisfyingVal;
+}
+
+// TODO: DEDUPLICATE with constant folding code?
+static bool isEvaluableOpCode(IROp op)
+{
+    switch (op)
+    {
+    case kIROp_IntLit:
+    case kIROp_BoolLit:
+    case kIROp_FloatLit:
+    case kIROp_StringLit:
+    case kIROp_Add:
+    case kIROp_Sub:
+    case kIROp_Mul:
+    case kIROp_Div:
+    case kIROp_Neg:
+    case kIROp_Not:
+    case kIROp_Eql:
+    case kIROp_Neq:
+    case kIROp_Leq:
+    case kIROp_Geq:
+    case kIROp_Less:
+    case kIROp_IRem:
+    case kIROp_FRem:
+    case kIROp_Greater:
+    case kIROp_Lsh:
+    case kIROp_Rsh:
+    case kIROp_BitAnd:
+    case kIROp_BitOr:
+    case kIROp_BitXor:
+    case kIROp_BitNot:
+    case kIROp_BitCast:
+    case kIROp_CastIntToFloat:
+    case kIROp_CastFloatToInt:
+    case kIROp_IntCast:
+    case kIROp_FloatCast:
+    case kIROp_Select:
+        return true;
+    default:
+        return false;
+    }
+}
+
+// Resolve any specialization and translations.
+IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
+{
+    if (!inst)
+        return nullptr;
+
+    // Don't attempt to resolve insts that are potentially recursive.
+    if (as<IRInterfaceType>(inst))
+    {
+        return inst;
+    }
+
+    SLANG_ASSERT(as<IRModuleInst>(inst->getParent()));
+
+    if (isEvaluableOpCode(inst->getOp()))
+    {
+        if (auto constFoldedResult = tryConstantFoldInst(ctx->getModule(), inst))
+        {
+            inst->replaceUsesWith(constFoldedResult);
+            return constFoldedResult;
+        }
+        else
+        {
+            SLANG_UNEXPECTED(
+                "Something went wrong.. a global inst with evaluable opcode should have been "
+                "constant folded");
+        }
+    }
+
+    // Otherwise we'll fall back to recreating the instruction
+
+    List<IRInst*> operands;
+    bool changed = false;
+
+    IRBuilder builder(ctx->getModule());
+    IRWeakUse* instRef = builder.getWeakUse(inst);
+
+    // Make sure all operands are resolved.
+    for (UInt i = 0; i < inst->getOperandCount(); ++i)
+    {
+        auto operand = inst->getOperand(i);
+        auto resolvedOperand = ctx->resolveInst(operand);
+        if (resolvedOperand != operand)
+            changed = true;
+        // operands.add(resolvedOperand);
+    }
+
+    // If any operand changed, we need to recreate the instruction.
+    /*
+    IRInst* instWithCanonicalOperands = inst;
+    if (changed)
+    {
+        IRBuilder builder(ctx->getModule());
+        builder.setInsertBefore(inst);
+        instWithCanonicalOperands = builder.emitIntrinsicInst(
+            inst->getDataType(),
+            inst->getOp(),
+            operands.getCount(),
+            operands.getBuffer());
+    }*/
+
+    // Extract effective inst post-resolution. (the inst may have changed).
+    IRInst* instWithCanonicalOperands = instRef->getOperand(0);
+
+    if (as<IRTranslateBase>(instWithCanonicalOperands) ||
+        as<IRTranslatedTypeBase>(instWithCanonicalOperands))
+    {
+        auto translateInst = ctx->maybeTranslateInst(instWithCanonicalOperands);
+        instWithCanonicalOperands->replaceUsesWith(translateInst);
+        return translateInst;
+    }
+
+    // Assume at this point that we have a specializable inst with resolved operands.
+    if (auto specializedInst = builder.tryLookupCompilerDictionaryValue(
+            ctx->getModule()->getTranslationDict(),
+            instWithCanonicalOperands))
+    {
+        instWithCanonicalOperands->replaceUsesWith(specializedInst);
+        return specializedInst;
+    }
+
+    auto memoize = [&](IRInst* resultInst)
+    {
+        builder.addCompilerDictionaryEntry(
+            ctx->getModule()->getTranslationDict(),
+            instWithCanonicalOperands,
+            resultInst);
+        return resultInst;
+    };
+
+    switch (instWithCanonicalOperands->getOp())
+    {
+    case kIROp_Specialize:
+        {
+            if (!isSetSpecializedGeneric(instWithCanonicalOperands))
+                return memoize(specializeGeneric(cast<IRSpecialize>(instWithCanonicalOperands)));
+            break;
+        }
+    case kIROp_LookupWitnessMethod:
+        return memoize(
+            specializeWitnessLookup(cast<IRLookupWitnessMethod>(instWithCanonicalOperands)));
+    }
+
+    return instWithCanonicalOperands;
+}
+
+IRInst* TranslationContext::resolveInst(IRInst* inst)
+{
+    IRBuilder builder(irModule);
+    while (auto resolvedInst = _resolveInstRec(this, inst))
+    {
+        if (resolvedInst == inst)
+        {
+            return resolvedInst;
+        }
+
+        inst = resolvedInst;
+    }
 }
 
 }; // namespace Slang

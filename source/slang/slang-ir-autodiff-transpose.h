@@ -580,7 +580,7 @@ struct DiffTransposePass
 
         for (auto param : paramsToProcess)
         {
-            const auto& [direction, type] = splitDirectionAndType(param->getDataType());
+            const auto& [direction, type] = splitParameterDirectionAndType(param->getDataType());
 
             if (as<IRVoidType>(param->getDataType()))
             {
@@ -617,7 +617,7 @@ struct DiffTransposePass
                     transposedParams.add(param, transposedParam);
                     break;
                 }
-            case ParameterDirectionInfo::Kind::InOut:
+            case ParameterDirectionInfo::Kind::BorrowInOut:
                 {
                     // For inout parameters, the param is effectively a read-write
                     // address, so we can use it as-is.
@@ -827,7 +827,8 @@ struct DiffTransposePass
                 auto fwdParam = pair.key;
                 auto revParam = pair.value;
 
-                const auto& [direction, type] = splitDirectionAndType(fwdParam->getDataType());
+                const auto& [direction, type] =
+                    splitParameterDirectionAndType(fwdParam->getDataType());
 
                 switch (direction.kind)
                 {
@@ -849,7 +850,7 @@ struct DiffTransposePass
                         instsToRemove.add(fwdParam);
                         break;
                     }
-                case ParameterDirectionInfo::Kind::InOut:
+                case ParameterDirectionInfo::Kind::BorrowInOut:
                     {
                         // Do nothing.. the in-out var is being used directly as
                         // an address.
@@ -1309,7 +1310,7 @@ struct DiffTransposePass
 
         auto bwdPropFunc = diffTypeContext.tryGetAssociationOfKind(
             baseFn,
-            FunctionAssociationKind::BackwardDerivativePropagate);
+            ValAssociationKind::BackwardDerivativePropagate);
 
         List<IRInst*> bwdPropArgs;
         List<std::pair<IRInst*, IRVar*>> writebacks;
@@ -1321,7 +1322,7 @@ struct DiffTransposePass
         for (UIndex ii = 1; ii < fwdCall->getArgCount(); ii++)
         {
             const auto& [argDirection, argType] =
-                splitDirectionAndType(fwdPropCalleeFuncType->getParamType(ii));
+                splitParameterDirectionAndType(fwdPropCalleeFuncType->getParamType(ii));
             if (as<IRVoidType>(argType))
             {
                 bwdPropArgs.add(builder->getVoidValue());
@@ -1350,7 +1351,7 @@ struct DiffTransposePass
                     bwdPropArgs.add(diffVal);
                     break;
                 }
-            case ParameterDirectionInfo::Kind::InOut:
+            case ParameterDirectionInfo::Kind::BorrowInOut:
                 {
                     bwdPropArgs.add(fwdCall->getArg(ii));
                     break;

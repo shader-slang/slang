@@ -582,6 +582,9 @@ RequirementWitness RequirementWitness::specialize(
     }
 }
 
+// TODO: Make it so we can handle a recursive lookup (don't substitute the entire
+// table at each lookup, just find the entry and make all the substitutions at once).
+//
 RequirementWitness tryLookUpRequirementWitness(
     ASTBuilder* astBuilder,
     SubtypeWitness* subtypeWitness,

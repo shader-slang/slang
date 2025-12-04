@@ -152,7 +152,7 @@ local insts = {
 				{
 					hoistable = true,
 					{
-						BwdDiffIntermediateCtxType = {
+						BackwardDiffIntermediateContextType = {
 							struct_name = "BackwardDiffIntermediateContextType",
 							operands = { { "func" } }
 						}
@@ -2465,7 +2465,7 @@ local insts = {
 		{ FunctionCopy = { min_operands = 1 } },
 
 		{ BackwardDifferentiate = { min_operands = 3 } },
-		{ ForwardDifferentiate = { min_operands = 1 } },
+		{ ForwardDifferentiate = { min_operands = 1, operands = { { "baseFn" } } } },
 
 		{ LegacyBackwardDifferentiate = { min_operands = 3 } },
 		
@@ -2982,6 +2982,11 @@ local insts = {
 		hoistable = true
 	} },
 	{ WeakUse = { hoistable = true } },
+	{ FuncTypeOf = { hoistable = true }},
+	{ CompilerDictionaryEntry = { hoistable = true, parent = true }},
+	{ CompilerDictionaryValue = { operands = { {"value"} } } },
+	{ CompilerDictionary = { parent = true } },
+	{ CompilerDictionaryScope = { parent = true } },
 }
 
 -- A function to calculate some useful properties and put it in the table,

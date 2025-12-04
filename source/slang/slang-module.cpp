@@ -171,6 +171,8 @@ void Module::_processFindDeclsExportSymbolsRec(Decl* decl)
 {
     if (_canExportDeclSymbol(decl->astNodeType))
     {
+        SLANG_AST_BUILDER_RAII(m_astBuilder);
+
         // It's a reference to a declaration in another module, so first get the symbol name.
         String mangledName = getMangledName(getCurrentASTBuilder(), decl);
 

@@ -2100,7 +2100,9 @@ public:
 
     ContainerPool& getContainerPool() { return m_containerPool; }
 
-    Dictionary<IRInst*, IRWeakUse*>& getTranslationCache() { return m_mapInstToTranslation; }
+    // TODO: Could be better...
+    IRCompilerDictionary* getTranslationDict() { return m_translationDict; }
+    void setTranslationDict(IRCompilerDictionary* dict) { m_translationDict = dict; }
 
     //
     // The range of module versions this compiler supports
@@ -2176,7 +2178,8 @@ private:
     Dictionary<IRInst*, UInt> m_mapInstToUniqueId;
 
     // Translation cache.
-    Dictionary<IRInst*, IRWeakUse*> m_mapInstToTranslation;
+    // Dictionary<IRInst*, IRWeakUse*> m_mapInstToTranslation;
+    IRCompilerDictionary* m_translationDict = nullptr;
 };
 
 

@@ -1307,20 +1307,28 @@ IRInst* DifferentiableTypeConformanceContext::tryGetWitnessOfKind(
 
 IRInst* DifferentiableTypeConformanceContext::tryGetAssociationOfKind(
     IRInst* target,
-    FunctionAssociationKind kind)
+    ValAssociationKind kind)
 {
-    // TODO: Cache results.
+    ValAssociationCacheKey key = {target, kind};
+    if (IRInst* cachedResult; associationCache.tryGetValue(key, cachedResult))
+        return cachedResult;
+
+    IRInst* result = nullptr;
     for (auto use = target->firstUse; use; use = use->nextUse)
     {
         if (auto annotation = as<IRAssociatedInstAnnotation>(use->getUser()))
         {
             if (annotation->getConformanceID() == (IRIntegerValue)kind &&
                 annotation->getTarget() == target)
-                return annotation->getInst();
+            {
+                result = annotation->getInst();
+                break;
+            }
         }
     }
 
-    return nullptr;
+    associationCache.add(key, result);
+    return result;
 }
 
 void DifferentiableTypeConformanceContext::setFunc(IRInst* func)
@@ -2121,6 +2129,8 @@ IRInst* DifferentiableTypeConformanceContext::buildArrayWitness(
     IRArrayType* arrayType,
     DiffConformanceKind target)
 {
+    SLANG_UNEXPECTED("Shouldn't be required any more");
+
     // Differentiate the pair type to get it's differential (which is itself a pair)
     auto diffArrayType = (IRType*)differentiateType(builder, (IRType*)arrayType);
 
@@ -2255,6 +2265,8 @@ IRInst* DifferentiableTypeConformanceContext::buildTupleWitness(
     IRInst* inTupleType,
     DiffConformanceKind target)
 {
+    SLANG_UNEXPECTED("Shouldn't be required any more");
+
     // Differentiate the pair type to get it's differential (which is itself a pair)
     auto diffTupleType = (IRType*)differentiateType(builder, (IRType*)inTupleType);
 
@@ -2727,13 +2739,13 @@ ParameterDirectionInfo transposeDirection(ParameterDirectionInfo direction)
         return ParameterDirectionInfo(ParameterDirectionInfo::Kind::Out);
     case ParameterDirectionInfo::Kind::Out:
         return ParameterDirectionInfo(ParameterDirectionInfo::Kind::In);
-    case ParameterDirectionInfo::Kind::InOut:
-        return ParameterDirectionInfo(ParameterDirectionInfo::Kind::InOut);
+    case ParameterDirectionInfo::Kind::BorrowInOut:
+        return ParameterDirectionInfo(ParameterDirectionInfo::Kind::BorrowInOut);
     case ParameterDirectionInfo::Kind::Ref:
         return ParameterDirectionInfo(ParameterDirectionInfo::Kind::Ref, direction.addressSpace);
-    case ParameterDirectionInfo::Kind::ConstRef:
+    case ParameterDirectionInfo::Kind::BorrowIn:
         return ParameterDirectionInfo(
-            ParameterDirectionInfo::Kind::ConstRef,
+            ParameterDirectionInfo::Kind::BorrowIn,
             direction.addressSpace);
     default:
         SLANG_UNREACHABLE("Invalid parameter direction");
@@ -3175,6 +3187,8 @@ struct AutoDiffPass : public InstPassBase
         IRStructType* originalType,
         IRStructType* diffType)
     {
+        SLANG_UNEXPECTED("shouldn't be needed anymore");
+
         IntermediateContextTypeDifferentialInfo result;
         result.diffType = diffType;
 
@@ -4309,23 +4323,26 @@ void releaseDifferentiableInterfaces(AutoDiffSharedContext* context)
 {
     // Remove all KeepAlive decorations on the differentiable interfaces
     List<IRInst*> decorationsToRemove;
-    for (auto decoration : context->forwardDifferentiableInterfaceType->getDecorations())
-    {
-        if (auto keepAliveDecoration = decoration->findDecoration<IRKeepAliveDecoration>())
-            decorationsToRemove.add(keepAliveDecoration);
-    }
+    if (context->forwardDifferentiableInterfaceType)
+        for (auto decoration : context->forwardDifferentiableInterfaceType->getDecorations())
+        {
+            if (auto keepAliveDecoration = decoration->findDecoration<IRKeepAliveDecoration>())
+                decorationsToRemove.add(keepAliveDecoration);
+        }
 
-    for (auto decoration : context->backwardDifferentiableInterfaceType->getDecorations())
-    {
-        if (auto keepAliveDecoration = decoration->findDecoration<IRKeepAliveDecoration>())
-            decorationsToRemove.add(keepAliveDecoration);
-    }
+    if (context->backwardDifferentiableInterfaceType)
+        for (auto decoration : context->backwardDifferentiableInterfaceType->getDecorations())
+        {
+            if (auto keepAliveDecoration = decoration->findDecoration<IRKeepAliveDecoration>())
+                decorationsToRemove.add(keepAliveDecoration);
+        }
 
-    for (auto decoration : context->backwardCallableInterfaceType->getDecorations())
-    {
-        if (auto keepAliveDecoration = decoration->findDecoration<IRKeepAliveDecoration>())
-            decorationsToRemove.add(keepAliveDecoration);
-    }
+    if (context->backwardCallableInterfaceType)
+        for (auto decoration : context->backwardCallableInterfaceType->getDecorations())
+        {
+            if (auto keepAliveDecoration = decoration->findDecoration<IRKeepAliveDecoration>())
+                decorationsToRemove.add(keepAliveDecoration);
+        }
 
     for (auto decoration : decorationsToRemove)
         decoration->removeAndDeallocate();
@@ -4340,7 +4357,7 @@ bool finalizeAutoDiffPass(TargetProgram* target, IRModule* module)
 
     // modified |= processDiffTypeWitnessSynthesisInsts(&autodiffContext);
 
-    rewriteDifferentialPairToUserCode(module);
+    // rewriteDifferentialPairToUserCode(module);
 
     // Replaces IRDifferentialPairType with an auto-generated struct,
     // IRDifferentialPairGetDifferential with 'differential' field access,

@@ -38,7 +38,6 @@
 #include "slang-ir-defer-buffer-load.h"
 #include "slang-ir-defunctionalization.h"
 #include "slang-ir-detect-uninitialized-resources.h"
-#include "slang-ir-diff-call.h"
 #include "slang-ir-dll-export.h"
 #include "slang-ir-dll-import.h"
 #include "slang-ir-early-raytracing-intrinsic-simplification.h"
@@ -2027,7 +2026,8 @@ Result linkAndOptimizeIR(
         weakUse->removeAndDeallocate();
     }
 
-    irModule->getTranslationCache().clear();
+    irModule->getTranslationDict()->removeAndDeallocate();
+    irModule->setTranslationDict(nullptr);
 
     // -----
 

@@ -361,7 +361,7 @@ IRType* BackwardDiffTranscriberBase::transcribeParamTypeForPropagateFunc(
         return diffValueType;
     }
 
-    auto maybeConvertInOutTypeToValueType = [](IRType* type)
+    auto maybeConvertBorrowInOutParamTypeToValueType = [](IRType* type)
     {
         if (auto inoutType = as<IRBorrowInOutParamType>(type))
             return inoutType->getValueType();
@@ -370,7 +370,7 @@ IRType* BackwardDiffTranscriberBase::transcribeParamTypeForPropagateFunc(
 
     // If the param is marked as no_diff, return the primal type.
     if (auto primalNoDiffType = _getPrimalTypeFromNoDiffType(this, builder, paramType))
-        return maybeConvertInOutTypeToValueType(primalNoDiffType);
+        return maybeConvertBorrowInOutParamTypeToValueType(primalNoDiffType);
 
     auto diffPairType = tryGetDiffPairType(builder, paramType);
     if (diffPairType)
@@ -380,7 +380,7 @@ IRType* BackwardDiffTranscriberBase::transcribeParamTypeForPropagateFunc(
         return diffPairType;
     }
     auto primalType = (IRType*)findOrTranscribePrimalInst(builder, paramType);
-    return maybeConvertInOutTypeToValueType(primalType);
+    return maybeConvertBorrowInOutParamTypeToValueType(primalType);
 }
 
 // Create an empty func to represent the transcribed func of `origFunc`.
@@ -916,7 +916,8 @@ void BackwardDiffTranscriberBase::_transcribeFuncImpl(
 
     for (UInt i = 0; i < targetFunc->getParamCount(); i++)
     {
-        const auto& [direction, paramType] = splitDirectionAndType(targetFunc->getParamType(i));
+        const auto& [direction, paramType] =
+            splitParameterDirectionAndType(targetFunc->getParamType(i));
         auto diffParamType = (IRType*)differentiableTypeConformanceContext.getDifferentialForType(
             builder,
             paramType);
@@ -1300,9 +1301,9 @@ ParameterBlockTransposeInfo BackwardDiffTranscriberBase::splitAndTransposeParame
         {
             primalType = fwdParam->getDataType();
 
-            if (auto outType = as<IROutType>(primalType))
+            if (auto outType = as<IROutParamType>(primalType))
                 primalType = outType->getValueType();
-            else if (auto inoutType = as<IRInOutType>(primalType))
+            else if (auto inoutType = as<IRBorrowInOutParamType>(primalType))
                 primalType = inoutType->getValueType();
         }
 
@@ -1314,7 +1315,7 @@ ParameterBlockTransposeInfo BackwardDiffTranscriberBase::splitAndTransposeParame
         //
         switch (fwdParam->getDataType()->getOp())
         {
-        case kIROp_OutType:
+        case kIROp_OutParamType:
             // Out.
             if (diffType)
             {
@@ -1332,17 +1333,18 @@ ParameterBlockTransposeInfo BackwardDiffTranscriberBase::splitAndTransposeParame
             }
 
             primalRefReplacement = builder->emitParam( // Out primal.
-                builder->getOutType(primalType));
+                builder->getOutParamType(primalType));
             result.primalFuncParams.add(primalRefReplacement);
             copyNameHintAndDebugDecorations(primalRefReplacement, fwdParam);
 
             break;
 
-        case kIROp_InOutType:
+        case kIROp_BorrowInOutParamType:
             // In Out.
             if (diffType)
             {
-                auto diffParam = builder->emitParam(builder->getInOutType(diffType)); // InOut diff.
+                auto diffParam =
+                    builder->emitParam(builder->getBorrowInOutParamType(diffType)); // InOut diff.
                 markDiffTypeInst(builder, diffParam, primalType);
 
                 result.propagateFuncParams.add(diffParam);
@@ -1358,12 +1360,12 @@ ParameterBlockTransposeInfo BackwardDiffTranscriberBase::splitAndTransposeParame
             }
 
             primalRefReplacement =
-                builder->emitParam(builder->getInOutType(primalType)); // InOut primal.
+                builder->emitParam(builder->getBorrowInOutParamType(primalType)); // InOut primal.
             result.primalFuncParams.add(primalRefReplacement);
             break;
 
-        case kIROp_RefType:
-        case kIROp_ConstRefType:
+        case kIROp_RefParamType:
+        case kIROp_BorrowInParamType:
             SLANG_UNEXPECTED("Unexpected ref/constref type in backward diff transcriber");
             break;
 
@@ -1371,7 +1373,8 @@ ParameterBlockTransposeInfo BackwardDiffTranscriberBase::splitAndTransposeParame
             // In.
             if (diffPairType)
             {
-                auto diffParam = builder->emitParam(builder->getOutType(diffType)); // Out diff.
+                auto diffParam =
+                    builder->emitParam(builder->getOutParamType(diffType)); // Out diff.
                 markDiffTypeInst(builder, diffParam, primalType);
 
                 result.propagateFuncParams.add(diffParam);
@@ -1407,7 +1410,7 @@ ParameterBlockTransposeInfo BackwardDiffTranscriberBase::splitAndTransposeParame
                     auto diffParam = builder->emitParam(diffType);
                     copyNameHintAndDebugDecorations(diffParam, fwdParam);
                     result.propagateFuncParams.add(diffParam);
-                    primalRefReplacement = builder->emitParam(builder->getOutType(primalType));
+                    primalRefReplacement = builder->emitParam(builder->getOutParamType(primalType));
                     copyNameHintAndDebugDecorations(primalRefReplacement, fwdParam);
 
                     // Create a local var for read access in pre-transpose code.
@@ -1491,7 +1494,7 @@ ParameterBlockTransposeInfo BackwardDiffTranscriberBase::splitAndTransposeParame
                 SLANG_RELEASE_ASSERT(diffPairType);
 
                 // Create inout version.
-                auto inoutDiffPairType = builder->getInOutType(diffPairType);
+                auto inoutDiffPairType = builder->getBorrowInOutParamType(diffPairType);
                 primalRefReplacement = builder->emitParam(primalType);
                 copyNameHintAndDebugDecorations(primalRefReplacement, fwdParam);
 
@@ -1532,7 +1535,7 @@ ParameterBlockTransposeInfo BackwardDiffTranscriberBase::splitAndTransposeParame
                 SLANG_ASSERT(inoutType && diffPairType);
 
                 // Process differentiable inout parameters.
-                auto primalParam = builder->emitParam(builder->getInOutType(primalType));
+                auto primalParam = builder->emitParam(builder->getBorrowInOutParamType(primalType));
                 copyNameHintAndDebugDecorations(primalParam, fwdParam);
                 result.primalFuncParams.add(primalParam);
 
@@ -1891,7 +1894,7 @@ LegacyBackwardDiffTranslationFuncContext::Result LegacyBackwardDiffTranslationFu
             bwdPropFuncParams.add(builder->getVoidValue());
         }
 
-        if (as<IROutType>(applyParamType))
+        if (as<IROutParamType>(applyParamType))
         {
             // There won't be any parameter in the legacy bwd_diff function for this parameter.
             applyBwdFuncArgs.add(
@@ -1905,7 +1908,7 @@ LegacyBackwardDiffTranslationFuncContext::Result LegacyBackwardDiffTranslationFu
             }
             continue;
         }
-        else if (as<IRInOutType>(applyParamType) && as<IRVoidType>(bwdPropParamType))
+        else if (as<IRBorrowInOutParamType>(applyParamType) && as<IRVoidType>(bwdPropParamType))
         {
             auto var = builder->emitVar(as<IRPtrTypeBase>(applyParamType)->getValueType());
             applyBwdFuncArgs.add(var);
@@ -2120,12 +2123,12 @@ LegacyToNewBackwardDiffTranslationFuncContext::Result LegacyToNewBackwardDiffTra
         generateName(builder, primalFuncParams[idx], bwdPropParam, "d_");
         bwdPropParam->sourceLoc = primalFuncParams[idx]->sourceLoc;
 
-        if (!as<IROutType>(applyForBwdParam->getDataType()))
+        if (!as<IROutParamType>(applyForBwdParam->getDataType()))
         {
             auto key = contextTypeBuilder.createStructKey();
             auto structFieldType = applyForBwdParam->getDataType();
 
-            if (auto inoutParamType = as<IRInOutType>(applyForBwdParam->getDataType()))
+            if (auto inoutParamType = as<IRBorrowInOutParamType>(applyForBwdParam->getDataType()))
             {
                 structFieldType = inoutParamType->getValueType();
                 contextTypeBuilder.createStructField(contextType, key, structFieldType);
@@ -2152,7 +2155,7 @@ LegacyToNewBackwardDiffTranslationFuncContext::Result LegacyToNewBackwardDiffTra
                 // If this is not a void type, we need to construct a differential pair
                 // var.
                 //
-                auto inOutPairType = cast<IRInOutType>(
+                auto inOutPairType = cast<IRBorrowInOutParamType>(
                     legacyBwdDiffFuncType->getParamType(bwdDiffFuncArgs.getCount()));
                 IRInst* pairVar = bwdPropFuncBuilder.emitVar(inOutPairType->getValueType());
 
@@ -2167,12 +2170,12 @@ LegacyToNewBackwardDiffTranslationFuncContext::Result LegacyToNewBackwardDiffTra
 
                 auto diffPtr = bwdPropFuncBuilder.emitIntrinsicInst(
                     bwdPropFuncBuilder.getPtrType(
-                        as<IROutTypeBase>(bwdPropParam->getDataType())->getValueType()),
+                        as<IROutParamTypeBase>(bwdPropParam->getDataType())->getValueType()),
                     kIROp_DifferentialPairGetDifferentialUserCode,
                     1,
                     &pairVar);
 
-                if (as<IRInOutType>(bwdPropParam->getDataType()))
+                if (as<IRBorrowInOutParamType>(bwdPropParam->getDataType()))
                 {
                     bwdPropFuncBuilder.emitStore(
                         diffPtr,
@@ -2192,7 +2195,7 @@ LegacyToNewBackwardDiffTranslationFuncContext::Result LegacyToNewBackwardDiffTra
             // Primal => Out param
             // Diff => In diff param.
             //
-            // SLANG_ASSERT(!as<IROutTypeBase>(bwdPropParam->getDataType()));
+            // SLANG_ASSERT(!as<IROutParamTypeBase>(bwdPropParam->getDataType()));
             bwdDiffFuncArgs.add(bwdPropParam);
         }
         else

@@ -740,8 +740,8 @@ public:
 
     List<RefPtr<DeclAssociation>> const& getAssociatedDeclsForDecl(Decl* decl);
 
-    bool isDifferentiableFunc(FunctionDeclBase* func);
-    bool isBackwardDifferentiableFunc(FunctionDeclBase* func);
+    // bool isDifferentiableFunc(FunctionDeclBase* func);
+    // bool isBackwardDifferentiableFunc(FunctionDeclBase* func);
     FunctionDifferentiableLevel _getFuncDifferentiableLevelImpl(
         FunctionDeclBase* func,
         int recurseLimit);
@@ -2110,6 +2110,11 @@ public:
         DeclRef<AssocTypeDecl> requirementDeclRef,
         RefPtr<WitnessTable> witnessTable);
 
+    bool trySynthesizeDifferentialPairAssociatedTypeRequirementWitness(
+        ConformanceCheckingContext* context,
+        DeclRef<AssocTypeDecl> requirementDeclRef,
+        RefPtr<WitnessTable> witnessTable);
+
     bool trySynthesizeForwardDiffFuncTypeRequirementWitness(
         ConformanceCheckingContext* context,
         DeclRef<AssocTypeDecl> requirementDeclRef,
@@ -2394,6 +2399,7 @@ public:
     /// Determine what type `This` should refer to in an extension of `type`.
     Type* calcThisType(Type* type);
 
+    DeclRef<Decl> getRequirementAsLookedUpDecl(ASTBuilder* astBuilder, Decl* decl);
 
     //
 

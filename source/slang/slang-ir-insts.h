@@ -3003,6 +3003,30 @@ struct IRUntaggedUnionType : IRType
     IRSetBase* getSet() { return as<IRSetBase>(getOperand(0)); }
 };
 
+FIDDLE()
+struct IRCompilerDictionaryValue : IRInst
+{
+    FIDDLE(leafInst())
+};
+
+FIDDLE()
+struct IRCompilerDictionaryEntry : IRInst
+{
+    FIDDLE(leafInst())
+    IRInst* getValue()
+    {
+        for (auto child : getDecorationsAndChildren())
+        {
+            if (auto dictValue = as<IRCompilerDictionaryValue>(child))
+            {
+                return dictValue->getValue();
+            }
+        }
+
+        return nullptr;
+    }
+};
+
 // Generate struct definitions for all IR instructions not explicitly defined in this file
 #if 0 // FIDDLE TEMPLATE:
 % local lua_module = require("source/slang/slang-ir.h.lua")
@@ -3462,6 +3486,14 @@ $(type_info.return_type) $(type_info.method_name)(
         return emitIntrinsicInst(getVoidType(), kIROp_IndexedFieldKey, 2, args);
     }
 
+    IRCompilerDictionaryEntry* _getCompilerDictionaryEntry(List<IRInst*> const& keys);
+
+    void addCompilerDictionaryEntry(
+        IRCompilerDictionary* dict,
+        IRInst* translationInst,
+        IRInst* resultInst);
+
+    IRInst* tryLookupCompilerDictionaryValue(IRCompilerDictionary* dict, IRInst* translationInst);
 
     IRInst* emitSymbolAlias(IRInst* aliasedSymbol);
 

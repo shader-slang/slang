@@ -65,18 +65,23 @@ struct DeduplicateContext
     }
 };
 
+
+//
+// Helper struct to represent a parameter's direction and type component separately.
+// Useful for passes that need to reason about parameter directions (like `in`, `out`, `ref`, etc.)
+//
 struct ParameterDirectionInfo
 {
     enum Kind
     {
         In,
+        BorrowIn,
         Out,
-        InOut,
-        Ref,
-        ConstRef
+        BorrowInOut,
+        Ref
     } kind;
 
-    // For Ref and ConstRef
+    // For Ref and BorrowInOut
     AddressSpace addressSpace;
 
     ParameterDirectionInfo(Kind kind, AddressSpace addressSpace = (AddressSpace)0)
@@ -97,9 +102,9 @@ struct ParameterDirectionInfo
 
 
 // Split into direction and type
-std::tuple<ParameterDirectionInfo, IRType*> splitDirectionAndType(IRType* paramType);
+std::tuple<ParameterDirectionInfo, IRType*> splitParameterDirectionAndType(IRType* paramType);
 
-IRType* fromDirectionAndType(IRBuilder* builder, ParameterDirectionInfo direction, IRType* type);
+IRType* fromDirectionAndType(IRBuilder* builder, ParameterDirectionInfo info, IRType* type);
 
 bool isAnnotation(IRInst* inst);
 

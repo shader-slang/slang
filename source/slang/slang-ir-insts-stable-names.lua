@@ -726,7 +726,7 @@ return {
 	["TranslateBase.BackwardPropagateFromLegacyBwdDiffFunc"] = 729,
 	["TranslateBase.BackwardFromLegacyBwdDiffFunc"] = 730,
 	["TranslateBase.ForwardDifferentiatePropagate"] = 731,
-	["Type.TranslatedTypeBase.BwdDiffIntermediateCtxType"] = 732,
+	["Type.TranslatedTypeBase.BackwardDiffIntermediateContextType"] = 732,
 	["Type.TranslatedTypeBase.TrivialBackwardDiffIntermediateContextType"] = 733,
 	["Type.TranslatedTypeBase.BackwardContextFromLegacyBwdDiffFunc"] = 734,
 	["Type.ForwardDiffFuncType"] = 735,
@@ -746,4 +746,8 @@ return {
 	["TranslateBase.TrivialBackwardDifferentiate"] = 749,
 	["WeakUse"] = 750,
 	["TranslateBase.SynthesizedBackwardDerivativeWitnessTableFromLegacyBwdDiffFunc"] = 751,
+	["CompilerDictionaryEntry"] = 752,
+	["CompilerDictionaryValue"] = 753,
+	["CompilerDictionary"] = 754,
+	["CompilerDictionaryScope"] = 755
 }

@@ -593,10 +593,11 @@ struct DispatcherLoweringContext : public InstPassBase
         auto witnessTableSet = cast<IRWitnessTableSet>(dispatcher->getOperand(0));
         auto key = cast<IRStructKey>(dispatcher->getOperand(1));
 
-        IRBuilder builder(dispatcher->getModule());
+        IRBuilder builder(module);
 
         Dictionary<IRInst*, IRInst*> elements;
         forEachInSet(
+            module,
             witnessTableSet,
             [&](IRInst* table)
             {
@@ -663,16 +664,17 @@ struct DispatcherLoweringContext : public InstPassBase
         }
 
         Dictionary<IRInst*, IRInst*> elements;
-        IRBuilder builder(dispatcher->getModule());
+        IRBuilder builder(module);
         forEachInSet(
+            module,
             witnessTableSet,
             [&](IRInst* table)
             {
                 auto generic =
                     cast<IRGeneric>(findWitnessTableEntry(cast<IRWitnessTable>(table), key));
 
-                auto specializedFuncType =
-                    (IRType*)specializeGeneric(cast<IRSpecialize>(builder.emitSpecializeInst(
+                auto specializedFuncType = (IRType*)specializeGeneric(
+                    cast<IRSpecialize>(builder.emitSpecializeInst(
                         builder.getTypeKind(),
                         generic->getDataType(),
                         specArgs.getCount(),
@@ -914,6 +916,7 @@ struct SequentialIDTagLoweringContext : public InstPassBase
         builder.setInsertAfter(inst);
 
         forEachInSet(
+            module,
             destSet,
             [&](IRInst* table)
             {
@@ -963,6 +966,7 @@ struct SequentialIDTagLoweringContext : public InstPassBase
         builder.setInsertAfter(inst);
 
         forEachInSet(
+            module,
             destSet,
             [&](IRInst* table)
             {
@@ -1345,9 +1349,10 @@ struct TaggedUnionLoweringContext : public InstPassBase
         auto tableSet = taggedUnion->getWitnessTableSet();
 
         if (taggedUnion->getTypeSet()->isSingleton())
-            return builder.getTupleType(List<IRType*>(
-                {(IRType*)builder.getSetTagType(tableSet),
-                 (IRType*)taggedUnion->getTypeSet()->getElement(0)}));
+            return builder.getTupleType(
+                List<IRType*>(
+                    {(IRType*)builder.getSetTagType(tableSet),
+                     (IRType*)taggedUnion->getTypeSet()->getElement(0)}));
 
         return builder.getTupleType(
             List<IRType*>({(IRType*)builder.getSetTagType(tableSet), (IRType*)typeSet}));

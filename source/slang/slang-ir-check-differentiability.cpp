@@ -41,42 +41,6 @@ public:
         return false;
     }
 
-    bool _isDifferentiableFuncImpl(
-        DifferentiableTypeConformanceContext& ctx,
-        IRInst* func,
-        DifferentiableLevel level)
-    {
-        /*
-        func = getResolvedInstForDecorations(func);
-        if (!func)
-            return false;
-        if (auto substDecor = func->findDecoration<IRPrimalSubstituteDecoration>())
-        {
-            func = getResolvedInstForDecorations(substDecor->getPrimalSubstituteFunc());
-            if (!func)
-                return false;
-        }
-
-        for (auto decorations : func->getDecorations())
-        {
-            switch (decorations->getOp())
-            {
-            case kIROp_ForwardDerivativeDecoration:
-            case kIROp_ForwardDifferentiableDecoration:
-                if (level == DifferentiableLevel::Forward)
-                    return true;
-                break;
-            case kIROp_UserDefinedBackwardDerivativeDecoration:
-            case kIROp_BackwardDerivativeDecoration:
-            case kIROp_BackwardDifferentiableDecoration:
-                return true;
-            default:
-                break;
-            }
-        }
-        return false;*/
-    }
-
     bool shouldTreatCallAsDifferentiable(IRInst* callInst)
     {
         SLANG_ASSERT(as<IRCall>(callInst));
@@ -134,89 +98,16 @@ public:
         IRInst* func,
         DifferentiableLevel level)
     {
-        if (ctx.tryGetAssociationOfKind(func, FunctionAssociationKind::ForwardDerivative))
+        if (ctx.tryGetAssociationOfKind(func, ValAssociationKind::ForwardDerivative))
         {
             if (level == DifferentiableLevel::Forward)
                 return true;
         }
 
-        if (ctx.tryGetAssociationOfKind(func, FunctionAssociationKind::BackwardDerivativeApply))
+        if (ctx.tryGetAssociationOfKind(func, ValAssociationKind::BackwardDerivativeApply))
         {
             return true;
         }
-
-        /*
-        switch (func->getOp())
-        {
-        case kIROp_ForwardDifferentiate:
-            if (auto fwdDerivative =
-                    func->getOperand(0)->findDecoration<IRForwardDerivativeDecoration>())
-                return isDifferentiableFunc(fwdDerivative->getForwardDerivativeFunc(), level);
-            return isDifferentiableFunc(func->getOperand(0), level);
-        case kIROp_BackwardDifferentiate:
-            if (auto bwdDerivative =
-                    func->getOperand(0)
-                        ->findDecoration<IRUserDefinedBackwardDerivativeDecoration>())
-                return isDifferentiableFunc(bwdDerivative->getBackwardDerivativeFunc(), level);
-            return isDifferentiableFunc(func->getOperand(0), level);
-        default:
-            break;
-        }
-
-        func = getResolvedInstForDecorations(func);
-        if (!func)
-            return false;
-
-        if (auto substDecor = func->findDecoration<IRPrimalSubstituteDecoration>())
-        {
-            func = getResolvedInstForDecorations(substDecor->getPrimalSubstituteFunc());
-            if (!func)
-                return false;
-        }
-
-        if (auto existingLevel = differentiableFunctions.tryGetValue(func))
-            return *existingLevel >= level;
-
-        if (func->findDecoration<IRTreatAsDifferentiableDecoration>())
-            return true;
-
-        if (auto lookupInterfaceMethod = as<IRLookupWitnessMethod>(func))
-        {
-            auto wit = lookupInterfaceMethod->getWitnessTable();
-            if (!wit)
-                return false;
-            auto witType = as<IRWitnessTableTypeBase>(wit->getDataType());
-            if (!witType)
-                return false;
-            auto interfaceType = witType->getConformanceType();
-            if (!interfaceType)
-                return false;
-            if (interfaceType->findDecoration<IRTreatAsDifferentiableDecoration>())
-                return true;
-            if (sharedContext.differentiableInterfaceType &&
-                interfaceType == sharedContext.differentiableInterfaceType)
-                return true;
-            if (lookupInterfaceMethod->getRequirementKey()
-                    ->findDecoration<IRBackwardDerivativeDecoration>())
-                return true;
-            if (lookupInterfaceMethod->getRequirementKey()
-                    ->findDecoration<IRForwardDerivativeDecoration>())
-                return level == DifferentiableLevel::Forward;
-        }
-
-        for (; func; func = func->parent)
-        {
-            if (as<IRGeneric>(func))
-            {
-                if (auto existingLevel = differentiableFunctions.tryGetValue(func))
-                {
-                    if (*existingLevel >= level)
-                        return true;
-                }
-            }
-        }
-        return false;
-        */
     }
 
     bool isInstInFunc(IRInst* inst, IRInst* func)
@@ -242,8 +133,16 @@ public:
             switch (addr->getOp())
             {
             case kIROp_Var:
+                {
+                    auto valueType = as<IRPtrTypeBase>(addr->getDataType())->getValueType();
+                    return isDifferentiableType(diffTypeContext, valueType);
+                }
             case kIROp_Param:
-                return isDifferentiableType(diffTypeContext, addr->getDataType());
+                {
+                    auto [passingMode, valueType] =
+                        splitParameterDirectionAndType(addr->getDataType());
+                    return isDifferentiableType(diffTypeContext, valueType);
+                }
             case kIROp_FieldAddress:
                 if (!as<IRFieldAddress>(addr)->getField() ||
                     as<IRFieldAddress>(addr)
@@ -255,7 +154,8 @@ public:
             case kIROp_GetElementPtr:
                 if (!isDifferentiableType(
                         diffTypeContext,
-                        as<IRGetElementPtr>(addr)->getBase()->getDataType()))
+                        as<IRPtrTypeBase>(as<IRGetElementPtr>(addr)->getBase()->getDataType())
+                            ->getValueType()))
                     return false;
                 addr = as<IRGetElementPtr>(addr)->getBase();
                 break;
