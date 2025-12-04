@@ -17836,6 +17836,11 @@ static const RAY_FLAG RAY_FLAG_SKIP_TRIANGLES = 0x100;
 /// @category raytracing
 static const RAY_FLAG RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES = 0x200;
 
+/// Forces unknown opaque and unknown transparent as opaque and transparent during traversal.
+/// Used with Opacity Micromaps (OMM) - DXR 1.2+
+/// @category raytracing
+static const RAY_FLAG RAY_FLAG_FORCE_OMM_2_STATE = 0x400;
+
 // 10.1.2 - Ray Description Structure
 /// Describes a ray for traversal through an acceleration structure.
 /// @category raytracing
@@ -19564,6 +19569,19 @@ static const CANDIDATE_TYPE CANDIDATE_PROCEDURAL_PRIMITIVE = 1;
 ///
 ///cannot use a cap for struct with unequal target support
 ///since it will propegate rules to children.
+
+/// https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#rayquery-flags
+/// @category raytracing
+typedef uint RAYQUERY_FLAG;
+
+/// No options selected
+/// @category raytracing
+static const RAYQUERY_FLAG RAYQUERY_FLAG_NONE = 0x00;
+
+/// Flag to specify rayquery object supports Opacity Micromaps.
+/// @category raytracing
+static const RAYQUERY_FLAG RAYQUERY_FLAG_ALLOW_OPACITY_MICROMAPS = 0x01;
+
 /// @category raytracing Ray-tracing
 __glsl_extension(GL_EXT_ray_query)
 [__NonCopyableType]
