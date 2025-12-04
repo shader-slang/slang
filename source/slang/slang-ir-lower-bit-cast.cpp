@@ -215,6 +215,33 @@ struct BitCastLoweringContext
                 return builder.emitBitCast(type, object);
             }
             break;
+        case kIROp_DescriptorHandleType:
+            {
+                // DescriptorHandle has the same layout as uint2 (64 bits).
+                // We read two uint values and use the dedicated cast intrinsic.
+                auto uintType = builder.getUIntType();
+                IRSizeAndAlignment uintLayout;
+                SLANG_RELEASE_ASSERT(
+                    getNaturalSizeAndAlignment(
+                        targetProgram->getOptionSet(),
+                        uintType,
+                        &uintLayout) == SLANG_OK);
+
+                // Read two uint values at offset and offset+4
+                auto low = readObject(builder, src, uintType, offset);
+                auto high =
+                    readObject(builder, src, uintType, offset + (uint32_t)uintLayout.getStride());
+
+                // Make uint2 vector
+                auto uint2Type = builder.getVectorType(uintType, 2);
+                IRInst* elements[] = {low, high};
+                auto uint2Val = builder.emitMakeVector(uint2Type, 2, elements);
+
+                // Cast to DescriptorHandle using the dedicated intrinsic
+                return builder
+                    .emitIntrinsicInst(type, kIROp_CastUInt2ToDescriptorHandle, 1, &uint2Val);
+            }
+            break;
         default:
             {
                 SLANG_UNEXPECTED("Unable to generate bit_cast code for the given type");

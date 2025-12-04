@@ -2,9 +2,8 @@
 
 // Test that DescriptorHandle<T> types can be used with dynamic dispatch
 // This addresses issue #9131
-// repro compiler option: ./slangc ./tests/language-feature/dynamic-dispatch/descriptor-handle-dynamic-dispatch.slang -target glsl -stage compute -entry main -o dynamic.glsl -gminimal
 
-// CHECK-NOT: error 41014
+// CHECK: OpEntryPoint GLCompute
 public interface ILight {
     float2 sample(float2 direction);
 };
@@ -62,8 +61,8 @@ ByteAddressBuffer lightData;
 StructuredBuffer<LightDescriptor> descriptors;
 
 [shader("compute")]
-[numthreads(1, 1, 1)]
-void main(uint3 id: SV_DispatchThreadID)
+[numthreads(4, 4, 1)]
+void computeMain(uint3 id: SV_DispatchThreadID)
 {
     LightDescriptor desc = descriptors[id.x];
 
