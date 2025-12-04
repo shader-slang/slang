@@ -111,19 +111,19 @@ jobs:
             exit 1
           fi
 
-      # Clone dxvk-remix with all submodules (testing PR #116)
-      - name: Clone dxvk-remix repository (PR 116)
+      # Clone dxvk-remix with all submodules (testing PR #117)
+      - name: Clone dxvk-remix repository (PR 117)
         run: |
-          echo "Cloning dxvk-remix repository (testing PR #116)..."
+          echo "Cloning dxvk-remix repository (testing PR #117)..."
           git clone --recursive https://github.com/NVIDIAGameWorks/dxvk-remix.git
           cd dxvk-remix
-          echo "Fetching PR #116 (init-shader-structs branch)..."
-          git fetch origin pull/116/head:pr-116
-          git checkout pr-116
+          echo "Fetching PR #117 (slang-2025.8 branch)..."
+          git fetch origin pull/117/head:pr-117
+          git checkout pr-117
           git submodule update --init --recursive
           commit=$(git rev-parse HEAD)
-          echo "Using dxvk-remix commit: $commit (PR #116)"
-          echo "PR #116: Fix struct initialization for Slang compiler compatibility"
+          echo "Using dxvk-remix commit: $commit (PR #117)"
+          echo "PR #117: Slang 2025.8 compatibility updates"
 
       # Cache packman packages between runs to save ~2-5 minutes
       - name: Cache Packman packages
