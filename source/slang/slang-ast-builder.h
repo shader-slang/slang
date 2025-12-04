@@ -48,6 +48,7 @@ public:
     Type* getBottomType();
     Type* getInitializerListType();
     Type* getOverloadedType();
+    Type* getUndefinedLiteralType();
 
     SyntaxClass<NodeBase> findSyntaxClass(Name* name);
 

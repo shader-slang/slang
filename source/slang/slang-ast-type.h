@@ -1179,7 +1179,17 @@ class ModifiedType : public Type
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
-bool isCopyableType(Type* type);
+// The type of an `__undefined` literal expression.
+FIDDLE()
+class UndefinedLiteralType : public Type
+{
+    FIDDLE(...)
+
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+};
+
+bool isCopyableType(Type * type);
 bool isNonCopyableType(Type* type);
 
 } // namespace Slang

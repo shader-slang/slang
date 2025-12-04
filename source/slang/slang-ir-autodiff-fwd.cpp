@@ -2145,6 +2145,7 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
 
     case kIROp_Poison:
     case kIROp_LoadFromUninitializedMemory:
+    case kIROp_DeliberatelyUninitialized:
         return transcribeUndefined(builder, origInst);
 
     case kIROp_Reinterpret:

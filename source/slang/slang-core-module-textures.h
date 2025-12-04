@@ -30,6 +30,12 @@ static const struct BaseTextureAccessInfo
     {"Feedback", SLANG_RESOURCE_ACCESS_FEEDBACK},
 };
 
+//
+// TODO: This entire file and its implementation approach is a sign that something
+// should have been fixed in how the `.meta.slang` generation logic was being structured
+// and/or implemented. Going back to just having raw C++ code bashing strings together
+// is not the right solution for this kind of problem.
+//
 struct TextureTypeInfo
 {
     TextureTypeInfo(
@@ -68,6 +74,7 @@ public:
         const char* funcName,
         const String& glsl,
         const String& cuda,
+        const String& spirvPrefixBeforeASMBlocks,
         const String& spirvDefault,
         const String& spirvRWDefault,
         const String& spirvCombined,
@@ -76,26 +83,28 @@ public:
     void writeFuncWithSig(
         const char* funcName,
         const String& sig,
-        const String& glsl = String{},
-        const String& spirvDefault = String{},
-        const String& spirvRWDefault = String{},
-        const String& spirvCombined = String{},
-        const String& cuda = String{},
-        const String& metal = String{},
-        const String& wgsl = String{},
-        const ReadNoneMode readNoneMode = ReadNoneMode::Never);
+        const String& glsl,
+        const String& spirvPrefixBeforeASMBlocks,
+        const String& spirvDefault,
+        const String& spirvRWDefault,
+        const String& spirvCombined,
+        const String& cuda,
+        const String& metal,
+        const String& wgsl,
+        const ReadNoneMode readNoneMode);
     void writeFunc(
         const char* returnType,
         const char* funcName,
         const String& params,
-        const String& glsl = String{},
-        const String& spirvDefault = String{},
-        const String& spirvRWDefault = String{},
-        const String& spirvCombined = String{},
-        const String& cuda = String{},
-        const String& metal = String{},
-        const String& wgsl = String{},
-        const ReadNoneMode readNoneMode = ReadNoneMode::Never);
+        const String& glsl,
+        const String& spirvPrefixBeforeASMBlocks,
+        const String& spirvDefault,
+        const String& spirvRWDefault,
+        const String& spirvCombined,
+        const String& cuda,
+        const String& metal,
+        const String& wgsl,
+        const ReadNoneMode readNoneMode);
 
     // A pointer to a string representing the current level of indentation
     const char* i;

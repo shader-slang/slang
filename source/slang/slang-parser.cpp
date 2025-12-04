@@ -7091,6 +7091,13 @@ static NodeBase* parseTreatAsDifferentiableExpr(Parser* parser, void* /*userData
     return noDiffExpr;
 }
 
+static NodeBase* parseUndefinedLiteralExpr(Parser* parser, void* /*userData*/)
+{
+    auto undefinedLiteralExpr = parser->astBuilder->create<UndefinedLiteralExpr>();
+    return undefinedLiteralExpr;
+}
+
+
 static bool _isFinite(double value)
 {
     // Lets type pun double to uint64_t, so we can detect special double values
@@ -9689,6 +9696,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseExpr("alignof", parseAlignOfExpr),
     _makeParseExpr("countof", parseCountOfExpr),
     _makeParseExpr("__getAddress", parseAddressOfExpr),
+    _makeParseExpr("__undefined", parseUndefinedLiteralExpr),
 };
 
 ConstArrayView<SyntaxParseInfo> getSyntaxParseInfos()

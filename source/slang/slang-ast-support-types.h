@@ -94,6 +94,8 @@ FIDDLE() namespace Slang
 
         kConversionCost_GenericParamUpcast = 1,
         kConversionCost_LambdaToFunc = 1,
+        kConversionCost_FromUndefinedLiteral = 1,
+
         kConversionCost_UnconstraintGenericParam = 20,
         kConversionCost_SizedArrayToUnsizedArray = 30,
 

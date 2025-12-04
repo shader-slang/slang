@@ -1443,6 +1443,42 @@ bool SemanticsVisitor::_coerce(
         return true;
     }
 
+    // The handling of undefined-value literals is akin to the cases above
+    // for initializer lists and null/none literals. When these types appear
+    // as the "from" type of a coercion (e.g., because they are being used
+    // to initialize a variable), it represents less of a conversion and more
+    // of a request to construct a reasonable value of the "to" type.
+    //
+    if (as<UndefinedLiteralType>(fromType))
+    {
+        // When creating a value from an `__undefined` literal, we really
+        // just want to create an undefined value of the corresponding type.
+        //
+        // TODO: Eventually we will want to have some kind of checking to
+        // ensure that `__undefined` is only allowed for types that meet
+        // suitable constraints, where the basic notion of an "undefined"
+        // value of that type makes sense (e.g., for many targets there
+        // is no way to represent an undefined texture, sampler, or buffer;
+        // the restrictions of the format rule such a thing out entirely).
+        // For now we don't attempt to deal with that issue here, since
+        // the current Slang IR passes already need to contend with the
+        // possibility of undefined values of any type.
+        //
+        if (outCost)
+        {
+            *outCost = kConversionCost_FromUndefinedLiteral;
+        }
+        if (outToExpr)
+        {
+            auto resultExpr = getASTBuilder()->create<UndefinedLiteralExpr>();
+            resultExpr->loc = fromExpr->loc;
+            resultExpr->type = toType;
+            resultExpr->checked = true;
+            *outToExpr = resultExpr;
+        }
+        return true;
+    }
+
     // A enum type can be converted into its underlying tag type.
     if (auto enumDecl = isEnumType(fromType))
     {
