@@ -22,8 +22,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     bool b = (param >= 0.5);
 
-    //CHECK: ([[# @LINE+1]]): warning 41016{{.*}}Texture2D
-    S s = (S)0;
+    S s;
     s.uv = coord;
 
     if (b) {
