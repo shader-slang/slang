@@ -1,0 +1,217 @@
+name: CI CUDA Test Workflow
+
+on:
+  workflow_call:
+    inputs:
+      config:
+        required: true
+        type: string
+      server-count:
+        required: false
+        type: number
+        default: 4
+      enable-debug-layers:
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  test-slang:
+    runs-on: ["Linux", "self-hosted", "GPU"]
+    timeout-minutes: 60
+    container:
+      # Use same base image as build for consistency
+      image: nvidia/cuda:12.9.1-devel-ubuntu22.04
+      options: --gpus all --user root
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Install Git
+        run: |
+          apt-get update && apt-get install -y git
+          git config --global --add safe.directory '*'
+          git --version
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          fetch-depth: "1"
+
+      - name: Install test dependencies
+        run: |
+          apt-get update && apt-get install -y \
+            libx11-6 \
+            libxcursor1 \
+            libxrandr2 \
+            libxinerama1 \
+            libxi6 \
+            libgl1 \
+            libvulkan1 \
+            vulkan-tools \
+            vulkan-validationlayers \
+            python3 \
+            python3-pip \
+            python3-venv
+          rm -rf /var/lib/apt/lists/*
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: slang-tests-linux-x86_64-gcc-${{ inputs.config }}-cuda
+          path: artifacts
+
+      - name: Setup test environment
+        run: |
+          # Determine config directory name
+          if [[ "${{ inputs.config }}" == "release" ]]; then
+            cmake_config="Release"
+          else
+            cmake_config="Debug"
+          fi
+          echo "cmake_config=$cmake_config" >> $GITHUB_ENV
+
+          # Set binary directory
+          bin_dir="$PWD/artifacts/${cmake_config}/bin"
+          echo "bin_dir=$bin_dir" >> $GITHUB_ENV
+
+          # Make binaries executable
+          chmod +x "$bin_dir"/* 2>/dev/null || true
+
+          # Set library path
+          echo "LD_LIBRARY_PATH=$PWD/artifacts/${cmake_config}/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+
+          # Verify GPU is accessible
+          echo "=== GPU Info ==="
+          nvidia-smi || echo "nvidia-smi not available"
+
+          # Debug: Check Vulkan ICD files
+          echo "=== Vulkan ICD files ==="
+          ls -la /usr/share/vulkan/icd.d/ 2>/dev/null || echo "No /usr/share/vulkan/icd.d/"
+          ls -la /etc/vulkan/icd.d/ 2>/dev/null || echo "No /etc/vulkan/icd.d/"
+          cat /usr/share/vulkan/icd.d/*.json 2>/dev/null || true
+          cat /etc/vulkan/icd.d/*.json 2>/dev/null || true
+
+          # Check Vulkan
+          echo "=== Vulkan Info ==="
+          vulkaninfo --summary 2>/dev/null || echo "vulkaninfo not available"
+
+          # Debug: Check CUDA
+          echo "=== CUDA libraries ==="
+          ldconfig -p | grep -i cuda || echo "No CUDA libraries in ldconfig"
+
+      - name: Test Slang
+        run: |
+          export SLANG_RUN_SPIRV_VALIDATION=1
+          export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
+          if [ "${{ inputs.enable-debug-layers }}" == "true" ]; then
+            export VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation
+          fi
+
+          slang_test_args=(
+            "-category" "full"
+            "-expected-failure-list" "tests/expected-failure-github.txt"
+            "-expected-failure-list" "tests/expected-failure-linux-gpu.txt"
+            "-skip-reference-image-generation"
+            "-show-adapter-info"
+            "-ignore-abort-msg"
+            "-enable-debug-layers" "${{ inputs.enable-debug-layers }}"
+          )
+
+          if [ "${{ inputs.server-count }}" -gt 1 ]; then
+            slang_test_args+=("-use-test-server")
+            slang_test_args+=("-server-count" "${{ inputs.server-count }}")
+          fi
+
+          "$bin_dir/slang-test" "${slang_test_args[@]}"
+
+      # Skip Slang examples - CPU examples require LLVM which is disabled in CUDA builds
+
+      - name: Run slangc tests
+        run: |
+          PATH=$bin_dir:$PATH tools/slangc-test/test.sh
+
+      - name: Test Slang via glsl
+        if: inputs.config == 'release' && github.event_name == 'pull_request'
+        run: |
+          export SLANG_RUN_SPIRV_VALIDATION=1
+          export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
+          "$bin_dir/slang-test" \
+            -use-test-server \
+            -server-count ${{ inputs.server-count }} \
+            -category full \
+            -emit-spirv-via-glsl \
+            -ignore-abort-msg \
+            -api vk \
+            -expected-failure-list tests/expected-failure-github.txt \
+            -expected-failure-list tests/expected-glsl-failure-github.txt \
+            -expected-failure-list tests/expected-failure-linux-gpu.txt
+
+  test-slang-rhi:
+    runs-on: ["Linux", "self-hosted", "GPU"]
+    timeout-minutes: 30
+    container:
+      image: nvidia/cuda:12.9.1-devel-ubuntu22.04
+      options: --gpus all --user root
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Install Git
+        run: |
+          apt-get update && apt-get install -y git
+          git config --global --add safe.directory '*'
+          git --version
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          fetch-depth: "1"
+
+      - name: Install test dependencies
+        run: |
+          apt-get update && apt-get install -y \
+            libx11-6 \
+            libvulkan1 \
+            vulkan-tools
+          rm -rf /var/lib/apt/lists/*
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: slang-tests-linux-x86_64-gcc-${{ inputs.config }}-cuda
+          path: artifacts
+
+      - name: Setup test environment
+        run: |
+          if [[ "${{ inputs.config }}" == "release" ]]; then
+            cmake_config="Release"
+          else
+            cmake_config="Debug"
+          fi
+          echo "cmake_config=$cmake_config" >> $GITHUB_ENV
+
+          bin_dir="$PWD/artifacts/${cmake_config}/bin"
+          echo "bin_dir=$bin_dir" >> $GITHUB_ENV
+
+          chmod +x "$bin_dir"/* 2>/dev/null || true
+          echo "LD_LIBRARY_PATH=$PWD/artifacts/${cmake_config}/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+
+      - name: Run slang-rhi tests
+        run: |
+          export SLANG_RHI_EXCLUDE_TESTS="md-clear*,cmd-copy*,cmd-upload*,fence*,staging-heap*,texture-create*"
+          "$bin_dir/slang-rhi-tests" -check-devices -tce="$SLANG_RHI_EXCLUDE_TESTS"
+
+      - name: Run slang-rhi tests (OptiX 8.0)
+        run: |
+          "$bin_dir/slang-rhi-tests" -check-devices -optix-version=80000 -tc="ray-tracing-*.cuda"
+
+      - name: Run slang-rhi tests (OptiX 8.1)
+        run: |
+          "$bin_dir/slang-rhi-tests" -check-devices -optix-version=80100 -tc="ray-tracing-*.cuda"
+
+  # Skip slangpy tests - requires LLVM which is disabled in CUDA builds
