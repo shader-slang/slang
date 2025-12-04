@@ -1231,6 +1231,7 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_KHR_subgroup_rotate` : enables the SPV_KHR_subgroup_rotate extension 
 * `SPV_NV_ray_tracing_motion_blur` : enables the SPV_NV_ray_tracing_motion_blur extension 
 * `SPV_NV_shader_invocation_reorder` : enables the SPV_NV_shader_invocation_reorder extension 
+* `SPV_EXT_shader_invocation_reorder` : enables the SPV_EXT_shader_invocation_reorder extension 
 * `SPV_NV_cluster_acceleration_structure` : enables the SPV_NV_cluster_acceleration_structure extension 
 * `SPV_NV_linear_swept_spheres` : enables the SPV_NV_linear_swept_spheres extension 
 * `SPV_NV_shader_image_footprint` : enables the SPV_NV_shader_image_footprint extension 
@@ -1274,6 +1275,7 @@ A capability describes an optional feature that a target may or may not support.
 * `spvRayQueryKHR` 
 * `spvRayQueryPositionFetchKHR` 
 * `spvShaderInvocationReorderNV` 
+* `spvShaderInvocationReorderEXT` 
 * `spvRayTracingClusterAccelerationStructureNV` 
 * `spvRayTracingLinearSweptSpheresGeometryNV` 
 * `spvShaderClockKHR` 
@@ -1296,6 +1298,11 @@ A capability describes an optional feature that a target may or may not support.
 * `spvVulkanMemoryModelKHR` 
 * `spvVulkanMemoryModelDeviceScopeKHR` 
 * `spvBindlessTextureNV` 
+* `glsl_nv` 
+* `spirv_nv` 
+* `glsl_ext` 
+* `spirv_ext` 
+* `ser_hlsl_native` 
 * `metallib_latest` 
 * `hlsl_coopvec_poc_sm_6_9` 
 * `dxil_lib` 
@@ -1401,12 +1408,15 @@ A capability describes an optional feature that a target may or may not support.
 * `GL_NV_ray_tracing_motion_blur` : enables the GL_NV_ray_tracing_motion_blur extension 
 * `GL_NV_shader_atomic_fp16_vector` : enables the GL_NV_shader_atomic_fp16_vector extension 
 * `GL_NV_shader_invocation_reorder` : enables the GL_NV_shader_invocation_reorder extension 
+* `GL_EXT_shader_invocation_reorder` : enables the GL_EXT_shader_invocation_reorder extension 
 * `GL_NV_shader_subgroup_partitioned` : enables the GL_NV_shader_subgroup_partitioned extension 
 * `GL_NV_shader_texture_footprint` : enables the GL_NV_shader_texture_footprint extension 
 * `GL_NV_cluster_acceleration_structure` : enables the GL_NV_cluster_acceleration_structure extension 
 * `GL_NV_cooperative_vector` : enables the GL_NV_cooperative_vector extension 
 * `nvapi` 
 * `raytracing` 
+* `ser_nvapi` 
+* `ser_dxr` 
 * `ser` 
 * `motionblur` 
 * `rayquery` 
@@ -1630,6 +1640,8 @@ A capability describes an optional feature that a target may or may not support.
 * `ser_anyhit_closesthit` 
 * `ser_motion_raygen_closesthit_miss` 
 * `ser_motion_raygen` 
+* `ser_dxr_raygen_closesthit_miss` 
+* `ser_dxr_raygen` 
 * `all` 
 
 <a id="file-extension"></a>
