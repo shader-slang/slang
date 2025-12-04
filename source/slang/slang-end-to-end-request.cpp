@@ -876,7 +876,54 @@ int EndToEndCompileRequest::addCodeGenTarget(SlangCompileTarget target)
 
 void EndToEndCompileRequest::setTargetProfile(int targetIndex, SlangProfileID profile)
 {
-    getTargetOptionSet(targetIndex).setProfile(Profile(profile));
+    auto& optionSet = getTargetOptionSet(targetIndex);
+    optionSet.setProfile(Profile(profile));
+
+    Profile p(profile);
+    auto target = m_linkage->targets[targetIndex]->getTarget();
+
+    // Auto-enable hlsl_nvapi for HLSL raytracing profiles < sm_6_9
+    // DXR 1.3 native (sm_6_9+) doesn't need NVAPI, but older profiles do
+    // Only apply to D3D targets (HLSL/DXIL), not SPIRV or other targets
+    bool isD3DFormat = false;
+    switch (target)
+    {
+    case CodeGenTarget::HLSL:
+    case CodeGenTarget::DXBytecode:
+    case CodeGenTarget::DXBytecodeAssembly:
+    case CodeGenTarget::DXIL:
+    case CodeGenTarget::DXILAssembly:
+        isD3DFormat = true;
+        break;
+    default:
+        break;
+    }
+    if (isD3DFormat && p.getFamily() == ProfileFamily::DX &&
+        p.getVersion() >= ProfileVersion::DX_6_3 &&
+        p.getVersion() < ProfileVersion::DX_6_9)
+    {
+        optionSet.addCapabilityAtom(CapabilityName::hlsl_nvapi);
+    }
+
+    // Auto-enable spirv_nv (NV SER extension) for SPIR-V raytracing profiles
+    // This enables NV-specific SER features like HitObject::MakeHit for Vulkan
+    bool isSpirvFormat = false;
+    switch (target)
+    {
+    case CodeGenTarget::SPIRV:
+    case CodeGenTarget::SPIRVAssembly:
+    case CodeGenTarget::GLSL:
+        isSpirvFormat = true;
+        break;
+    default:
+        break;
+    }
+    if (isSpirvFormat && p.getFamily() == ProfileFamily::DX &&
+        p.getVersion() >= ProfileVersion::DX_6_3 &&
+        p.getVersion() < ProfileVersion::DX_6_9)
+    {
+        optionSet.addCapabilityAtom(CapabilityName::spirv_nv);
+    }
 }
 
 void EndToEndCompileRequest::setTargetFlags(int targetIndex, SlangTargetFlags flags)
