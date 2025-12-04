@@ -1,6 +1,6 @@
 // Test HitObject API emitting SPIRV-EXT opcodes (SPV_EXT_shader_invocation_reorder)
 
-//TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -entry rayGenerationMain -stage raygeneration -emit-spirv-directly
+//TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -entry rayGenerationMain -stage raygeneration -emit-spirv-directly -capability spvShaderInvocationReorderEXT
 
 // SPIRV-DAG: OpExtension "SPV_EXT_shader_invocation_reorder"
 // SPIRV-DAG: OpCapability ShaderInvocationReorderEXT
