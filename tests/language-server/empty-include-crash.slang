@@ -7,7 +7,7 @@
 #include
 
 void test() {
-//HOVER:10,5
+//HOVER:11,5
     int x = 0;
 }
 
