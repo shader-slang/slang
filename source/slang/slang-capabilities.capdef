@@ -1177,6 +1177,14 @@ def glsl_nv : glsl + GL_NV_shader_invocation_reorder;
 /// [Target]
 def spirv_nv : spirv + spvShaderInvocationReorderNV;
 
+/// Represents GLSL targeting cross-vendor standard SER (EXT).
+/// [Target]
+def glsl_ext : glsl + GL_EXT_shader_invocation_reorder;
+
+/// Represents SPIRV targeting cross-vendor standard SER (EXT).
+/// [Target]
+def spirv_ext : spirv + spvShaderInvocationReorderEXT;
+
 /// Represents the GL_NV_shader_subgroup_partitioned extension.
 /// [EXT]
 alias GL_NV_shader_subgroup_partitioned = _GL_NV_shader_subgroup_partitioned | spvGroupNonUniformPartitionedNV;
