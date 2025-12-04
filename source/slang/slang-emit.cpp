@@ -1801,6 +1801,7 @@ Result linkAndOptimizeIR(
         SLANG_PASS(legalizeMeshOutputTypes);
 
 
+    calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
     // Lower all bit_cast operations on complex types into leaf-level
     // bit_cast on basic types.
     if (requiredLoweringPassSet.bitcast)
