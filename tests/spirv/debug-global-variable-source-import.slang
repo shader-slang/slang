@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK):-target spirv -entry main -stage fragment -g2 -emit-spirv-directly
 
-// Test that DebugGlobalVariable references the correct source file (this main file)
-// when using import syntax instead of #include.
+// Test that DebugGlobalVariable and DebugCompilationUnit reference the correct source file
+// (this main file) when using import syntax instead of #include.
 
 import shader_utils_module;
 
@@ -29,6 +29,9 @@ float4 main(VertexOutput input) : SV_Target
 // Verify that DebugSource for the main file is defined
 // CHECK-DAG: [[MAIN_FILE:%[0-9]+]] = OpString "{{.*}}debug-global-variable-source-import.slang"
 // CHECK-DAG: [[SOURCE_MAIN:%[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugSource [[MAIN_FILE]] %{{[0-9]+}}
+
+// Verify that DebugCompilationUnit references the main file source, not the imported module
+// CHECK-DAG: OpExtInst %void %{{[0-9]+}} DebugCompilationUnit %uint_{{[0-9]+}} %uint_{{[0-9]+}} [[SOURCE_MAIN]] %uint_{{[0-9]+}}
 
 // Verify that DebugGlobalVariable for entry point parameters references the main file source
 // The key fix: DebugGlobalVariable should reference the main file source, not the imported file source

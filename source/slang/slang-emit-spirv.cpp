@@ -2371,7 +2371,19 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     else if (!m_entryPointDebugSource && !isIncludedFile)
                         m_defaultDebugSource = debugSource;
                 }
-                if (!m_mapIRInstToSpvDebugInst.containsKey(moduleInst) && !isIncludedFile)
+                // Create DebugCompilationUnit only for the entry point's source file.
+                // If we have an entry point debug source, only create compilation unit for it.
+                // Otherwise, fall back to using any non-included file.
+                bool shouldCreateCompilationUnit =
+                    !m_mapIRInstToSpvDebugInst.containsKey(moduleInst);
+                if (shouldCreateCompilationUnit)
+                {
+                    if (m_entryPointDebugSource)
+                        shouldCreateCompilationUnit = (debugSource == m_entryPointDebugSource);
+                    else
+                        shouldCreateCompilationUnit = !isIncludedFile;
+                }
+                if (shouldCreateCompilationUnit)
                 {
                     IRBuilder builder(inst);
                     builder.setInsertBefore(inst);
