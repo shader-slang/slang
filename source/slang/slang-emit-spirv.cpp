@@ -9836,7 +9836,7 @@ SlangResult emitSPIRVFromIR(
     }
 #endif
 
-    removeAvailableInDownstreamModuleDecorations(CodeGenTarget::SPIRV, irModule);
+    removeAvailableInDownstreamModuleDecorations(irModule, CodeGenTarget::SPIRV);
 
     auto shouldPreserveParams = codeGenContext->getTargetProgram()->getOptionSet().getBoolOption(
         CompilerOptionName::PreserveParameters);

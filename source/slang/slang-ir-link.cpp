@@ -1714,7 +1714,9 @@ static bool doesTargetAllowUnresolvedFuncSymbol(TargetRequest* req)
     case CodeGenTarget::ShaderSharedLibrary:
     case CodeGenTarget::HostHostCallable:
     case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::SPIRV:
         if (req->getOptionSet().getBoolOption(CompilerOptionName::IncompleteLibrary))
             return true;
@@ -2346,7 +2348,7 @@ struct IRPrelinkContext : IRSpecContext
         if (auto linkage = originalVal->findDecoration<IRLinkageDecoration>())
         {
             RefPtr<IRSpecSymbol> symbol;
-            if (shared->symbols.tryGetValue(linkage->getMangledName()), symbol)
+            if (shared->symbols.tryGetValue(linkage->getMangledName(), symbol))
             {
                 return symbol->irGlobalValue;
             }

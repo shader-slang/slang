@@ -12617,6 +12617,8 @@ LoweredValInfo emitDeclRef(IRGenContext* context, Decl* decl, DeclRefBase* subst
         // Once we have both the generic and its arguments,
         // we can emit a `specialize` instruction and use
         // its value as the result.
+        if (genericVal.flavor == LoweredValInfo::Flavor::Ptr)
+            type = context->irBuilder->getPtrType(type);
         auto irSpecializedVal = context->irBuilder->emitSpecializeInst(
             type,
             irGenericVal,

@@ -1150,7 +1150,7 @@ IRTypeLayout* createPatchConstantFuncResultTypeLayout(
 
                 auto unusedBinding =
                     context->usedBindingIndex[LayoutResourceKind::VaryingOutput].getLSBZero();
-                varLayoutForKind->offset = unusedBinding;
+                varLayoutForKind->offset = (UInt)unusedBinding;
                 context->usedBindingIndex[LayoutResourceKind::VaryingOutput].add(unusedBinding);
             }
             builder.addField(field->getKey(), fieldVarLayoutBuilder.build());
@@ -5018,8 +5018,8 @@ void decorateModuleWithSPIRVVersion(IRModule* module, SemanticVersion spirvVersi
 }
 
 void legalizeEntryPointsForGLSL(
-    Session* session,
     IRModule* module,
+    Session* session,
     const List<IRFunc*>& funcs,
     CodeGenContext* context,
     ShaderExtensionTracker* glslExtensionTracker)
@@ -5173,7 +5173,7 @@ void legalizeDispatchMeshPayloadForGLSL(IRModule* module)
         });
 }
 
-void legalizeDynamicResourcesForGLSL(CodeGenContext* context, IRModule* module)
+void legalizeDynamicResourcesForGLSL(IRModule* module, CodeGenContext* context)
 {
     List<IRInst*> toRemove;
 

@@ -8,6 +8,12 @@ permissions:
   id-token: write
 
 on:
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue or PR number to test with"
+        required: false
+        type: number
   issue_comment:
     types: [created]
   pull_request_review_comment:
@@ -26,12 +32,13 @@ jobs:
   claude:
     name: Claude Code Assistant
     if: |
+      github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
       (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude')))
 
-    runs-on: ubuntu-latest
+    runs-on: [Windows, self-hosted, GCP-T4]
     timeout-minutes: 360
 
     # Cancel previous runs on new pushes
@@ -40,6 +47,71 @@ jobs:
       cancel-in-progress: true
 
     steps:
+      # Windows-specific setup: Add bash to PATH (must be before any bash steps)
+      - name: Add bash to PATH (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files\Git\bin"
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files\Git\usr\bin"
+
+      # Install Claude Code on Windows (the action's install.sh doesn't support Windows)
+      - name: Install Claude Code (Windows)
+        id: install-claude
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Write-Host "Installing Claude Code on Windows..."
+          irm https://claude.ai/install.ps1 | iex
+
+          # Search for claude.exe in likely locations
+          Write-Host "Searching for claude.exe..."
+
+          $searchPaths = @(
+            "$env:USERPROFILE\.local\bin",
+            "$env:USERPROFILE\.claude",
+            "C:\Windows\ServiceProfiles\NetworkService\.local\bin",
+            "$env:LOCALAPPDATA\Claude",
+            "$env:LOCALAPPDATA\Programs\Claude",
+            "$env:APPDATA\Claude",
+            "$env:PROGRAMFILES\Claude",
+            "${env:PROGRAMFILES(x86)}\Claude"
+          )
+
+          # Debug: List contents of .claude directory if it exists
+          if (Test-Path "$env:USERPROFILE\.claude") {
+            Write-Host "Contents of $env:USERPROFILE\.claude:"
+            Get-ChildItem -Path "$env:USERPROFILE\.claude" -Recurse -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.FullName }
+          }
+
+          # Search for claude.exe
+          $claudeExe = $null
+          foreach ($searchPath in $searchPaths) {
+            if (Test-Path $searchPath) {
+              $found = Get-ChildItem -Path $searchPath -Filter "claude.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+              if ($found) {
+                $claudeExe = $found.FullName
+                break
+              }
+            }
+          }
+
+          if ($claudeExe) {
+            Write-Host "Claude Code found at: $claudeExe"
+            echo "claude-exe-path=$claudeExe" >> $env:GITHUB_OUTPUT
+            # Add directory to PATH
+            $claudeDir = Split-Path $claudeExe -Parent
+            Add-Content -Path $env:GITHUB_PATH -Value $claudeDir
+          } else {
+            Write-Host "::error::Claude Code executable not found after installation"
+            Write-Host "Searched paths: $($searchPaths -join ', ')"
+            exit 1
+          }
+
+      # Note: jq is not installed on Windows - the claude-code-action has a bug with
+      # Windows cmd quoting for jq commands. The action's output formatting will show
+      # a warning but Claude itself runs successfully.
+
       # Format setup and environment preparation
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -51,6 +123,7 @@ jobs:
         run: git submodule update --init --recursive --depth=1
 
       - name: Format Setup and Environment Preparation
+        if: runner.os != 'Windows'
         uses: ./.github/actions/format-setup
 
       # Complete Claude execution with authentication, setup, and execution
@@ -64,26 +137,43 @@ jobs:
           llmgw-token-url: ${{ secrets.LLMGW_TOKEN_URL }}
           github-token-fallback: ${{ secrets.GITHUB_TOKEN }}
 
-          # Repository-specific setup
+          # Direct prompt for workflow_dispatch testing
+          prompt: ${{ github.event.inputs.prompt || '' }}
+
+          # Path to pre-installed Claude Code executable (Windows only)
+          claude-code-executable-path: ${{ steps.install-claude.outputs.claude-exe-path || '' }}
+
+          # Repository-specific setup (Windows)
           setup-commands: |
             set -euo pipefail
-            echo "🏗️ Setting up environment dependencies..."
+            echo "🏗️ Setting up Windows environment..."
 
-            sudo apt-get update
-            sudo apt-get install -y libx11-dev
+            # Windows self-hosted runners have pre-installed:
+            # - Visual Studio 2022
+            # - CUDA toolkit
+            # - Vulkan SDK
+            # - NVIDIA GPU drivers
 
-            # Configure and build the project
-            cmake --preset default --fresh
-            cmake --workflow --preset debug
+            # Configure and build the project (use cmake.exe for Windows)
+            cmake.exe --preset vs2022 --fresh
+            cmake.exe --build --preset release
 
             echo "✅ Environment setup completed"
 
           # Custom instructions for Slang
           custom-instructions: |
             ### **Build System Information:**
-            - OS: Ubuntu Linux
-            - Build commands: Configure `cmake --preset default`, Build `cmake --build --preset debug`, Test `./build/Debug/bin/slang-test tests/path/to/test.slang`
+            - OS: Windows Server 2022 (self-hosted runner with NVIDIA T4 GPU)
+            - GPU: NVIDIA T4 available for GPU tests (D3D12, Vulkan)
+            - Build commands: Configure `cmake.exe --preset vs2022`, Build `cmake.exe --build --preset release`
+            - Test: `./build/Release/bin/slang-test.exe tests/path/to/test.slang`
+            - GPU tests: Can use `-api dx12` or `-api vk` flags for GPU-specific tests
             - Project is pre-built and ready for development tasks
+
+            ### **IMPORTANT: Windows-Specific Notes**
+            - Always use `cmake.exe` (not `cmake`) to ensure proper execution
+            - Use forward slashes in paths for bash scripts, backslashes for PowerShell
+            - The runner has Visual Studio 2022, CUDA toolkit, and Vulkan SDK pre-installed
 
             ### **IMPORTANT: Deep Repository Knowledge & Debugging**
             **Repository Knowledge Tool**: Use `mcp__deepwiki__ask_question` with repoName "shader-slang/slang" for architectural insights and implementation patterns.

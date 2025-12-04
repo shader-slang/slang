@@ -34,6 +34,16 @@ fetch the submodules also.
 git clone https://github.com/shader-slang/slang --recursive
 ```
 
+You will need the git tags from this repository, otherwise versioning
+information (including the Slang modules directory name and the library
+filenames on macOS and Linux) will be incorrect. The above command should fetch
+them for you, but if you're fetching from a fork you may need to explicitly
+fetch the latest tags from the shader-slang repository with:
+
+```bash
+git fetch https://github.com/shader-slang/slang.git 'refs/tags/*:refs/tags/*'
+```
+
 ## Configure and build
 
 > This section assumes cmake 3.25 or greater, if you're on a lower version
@@ -47,12 +57,12 @@ cmake --build --preset releaseWithDebugInfo # or --preset debug, or --preset rel
 
 For Visual Studio run:
 ```bash
-cmake --preset vs2022 # or 'vs2019' or `vs2022-dev`
+cmake --preset vs2022 # or 'vs2019' or 'vs2026'
 start devenv ./build/slang.sln # to optionally open the project in Visual Studio
 cmake --build --preset releaseWithDebugInfo # to build from the CLI, could also use --preset release or --preset debug
 ```
 
-There also exists a `vs2022-dev` preset which turns on features to aid
+There are also `*-dev` variants like `vs2022-dev` and `vs2026-dev` which turn on features to aid
 debugging.
 
 ### WebAssembly build
@@ -160,7 +170,7 @@ against the fully versioned library filenames (e.g.,
 `libslang-compiler.so.0.2025.21` instead of `libslang-compiler.so`).
 
 Slang libraries for **Windows** do not have an explicit version in the
-filename, but the same guidance about stability of the ABI applies.
+library filename, but the the same guidance about stability of the ABI applies.
 
 Downstream users of Slang distributing their products as binaries should
 therefor **on all platforms, including Windows** redistribute the Slang
@@ -331,7 +341,7 @@ Another option is to build using the Visual Studio generator which can find
 this automatically
 
 ```
-cmake --preset vs2022 # or --preset vs2019
+cmake --preset vs2022 # or --preset vs2019, vs2026
 cmake --build --preset generators # to build from the CLI
 cmake --install build --prefix generators --component generators
 rm -rf build # The Visual Studio generator will complain if this is left over from a previous build

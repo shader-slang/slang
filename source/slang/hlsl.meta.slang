@@ -6631,6 +6631,7 @@ struct $(item.name)
     /// @return The post-decremented counter value.
     /// @remarks
     /// This function is not implemented when targeting non-HLSL.
+    [require(hlsl)]
     uint DecrementCounter();
 
     /// Get the dimensions of the buffer.
@@ -6657,6 +6658,7 @@ struct $(item.name)
     /// @return The pre-incremented counter value.
     /// @remarks
     /// This function is not implemented when targeting non-HLSL.
+    [require(hlsl)]
     uint IncrementCounter();
 
     /// Load a element from the buffer at the specified location.
@@ -19469,7 +19471,7 @@ uint GeometryIndex()
 /// Get the vertex positions of the currently hit triangle in any-hit or closest-hit shader.
 /// https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GLSL_EXT_ray_tracing_position_fetch.txt
 /// @param index Index of the vertex (0-2)
-/// @return World-space position of the specified vertex
+/// @return Object-space position of the specified vertex
 /// @remarks Requires ray tracing position fetch extension
 /// @see GL_EXT_ray_tracing_position_fetch
 /// @category raytracing
