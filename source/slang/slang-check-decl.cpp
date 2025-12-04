@@ -11488,6 +11488,65 @@ void SemanticsDeclScopeWiringVisitor::visitNamespaceDecl(NamespaceDecl* decl)
         if (!as<FileDecl>(parentScope->containerDecl))
             break;
     }
+
+    // Also search through imported modules for namespace declarations with the same name
+    // This fixes issue #9157: extension not finding identifier from same namespace across module boundary
+    //
+    // Note: We can't rely on getShared()->importedModulesList here because imports are processed
+    // later (at SignatureChecked state), while namespace scope wiring happens at ScopesWired state.
+    // Instead, we directly examine ImportDecls in the current module and try to load them if needed.
+    if (auto currentModule = getModule(decl))
+    {
+        auto currentModuleDecl = currentModule->getModuleDecl();
+        for (auto importDecl : currentModuleDecl->getMembersOfType<ImportDecl>())
+        {
+            auto importedModuleDecl = importDecl->importedModuleDecl;
+
+            // If the imported module isn't loaded yet, try to load it now
+            if (!importedModuleDecl)
+            {
+                auto name = importDecl->moduleNameAndLoc.name;
+                auto importedModule = findOrImportModule(
+                    getLinkage(),
+                    name,
+                    importDecl->moduleNameAndLoc.loc,
+                    getSink(),
+                    getShared()->m_environmentModules);
+
+                if (importedModule)
+                {
+                    importedModuleDecl = importedModule->getModuleDecl();
+                    importDecl->importedModuleDecl = importedModuleDecl;
+                }
+            }
+
+            if (importedModuleDecl)
+            {
+                for (auto moduleScope = importedModuleDecl->ownedScope; moduleScope; moduleScope = moduleScope->nextSibling)
+                {
+                    auto container = moduleScope->containerDecl;
+                    auto nsDecl = container->findLastDirectMemberDeclOfName(decl->getName());
+                    if (!nsDecl)
+                        continue;
+                    for (auto ns = nsDecl; ns; ns = container->getPrevDirectMemberDeclWithSameName(ns))
+                    {
+                        if (ns == decl)
+                            continue;
+                        auto otherNamespace = as<NamespaceDeclBase>(ns);
+                        if (!otherNamespace)
+                            continue;
+
+                        if (!ns->checkState.isBeingChecked())
+                        {
+                            ensureDecl(ns, DeclCheckState::ScopesWired);
+                        }
+                        addSiblingScopeForContainerDecl(getASTBuilder(), decl, otherNamespace);
+                    }
+                }
+            }
+        }
+    }
+
     for (auto usingDecl : decl->getMembersOfType<UsingDecl>())
     {
         ensureDecl(usingDecl, DeclCheckState::ScopesWired);
