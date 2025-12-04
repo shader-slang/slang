@@ -1759,6 +1759,12 @@ struct IRWitnessTableType : IRWitnessTableTypeBase
 };
 
 FIDDLE()
+struct IRWitnessTableNoneType : IRWitnessTableTypeBase
+{
+    FIDDLE(leafInst())
+};
+
+FIDDLE()
 struct IRBindExistentialsTypeBase : IRType
 {
     FIDDLE(baseInst())

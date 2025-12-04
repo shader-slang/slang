@@ -794,6 +794,20 @@ IRWitnessTable* cloneWitnessTableWithoutRegistering(
         false);
 }
 
+IRNoneWitnessTable* cloneNoneWitnessTableImpl(
+    IRSpecContextBase* context,
+    IRBuilder* builder,
+    IRNoneWitnessTable* originalTable,
+    IROriginalValuesForClone const& originalValues)
+{
+    auto clonedBaseType = cloneType(context, (IRType*)(originalTable->getConformanceType()));
+    auto clonedSubType = cloneType(context, (IRType*)(originalTable->getConcreteType()));
+    auto clonedTable = builder->createNoneWitnessTable(clonedBaseType, clonedSubType);
+    registerClonedValue(context, clonedTable, originalValues);
+
+    return clonedTable;
+}
+
 IRStructType* cloneStructTypeImpl(
     IRSpecContextBase* context,
     IRBuilder* builder,
@@ -1379,6 +1393,13 @@ IRInst* cloneInst(
             context,
             builder,
             cast<IRWitnessTable>(originalInst),
+            originalValues);
+
+    case kIROp_NoneWitnessTable:
+        return cloneNoneWitnessTableImpl(
+            context,
+            builder,
+            cast<IRNoneWitnessTable>(originalInst),
             originalValues);
 
     case kIROp_StructType:

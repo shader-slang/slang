@@ -232,31 +232,23 @@ void ensureWitnessTableSequentialIDs(SharedGenericsLoweringContext* sharedContex
             {
                 auto interfaceType =
                     cast<IRWitnessTableType>(inst->getDataType())->getConformanceType();
-                if (as<IRInterfaceType>(interfaceType))
+                auto interfaceLinkage = interfaceType->findDecoration<IRLinkageDecoration>();
+                SLANG_ASSERT(
+                    interfaceLinkage && "An interface type does not have a linkage,"
+                                        "but a witness table associated with it has one.");
+                auto interfaceName = interfaceLinkage->getMangledName();
+                auto idAllocator =
+                    linkage->mapInterfaceMangledNameToSequentialIDCounters.tryGetValue(
+                        interfaceName);
+                if (!idAllocator)
                 {
-                    auto interfaceLinkage = interfaceType->findDecoration<IRLinkageDecoration>();
-                    SLANG_ASSERT(
-                        interfaceLinkage && "An interface type does not have a linkage,"
-                                            "but a witness table associated with it has one.");
-                    auto interfaceName = interfaceLinkage->getMangledName();
-                    auto idAllocator =
+                    linkage->mapInterfaceMangledNameToSequentialIDCounters[interfaceName] = 0;
+                    idAllocator =
                         linkage->mapInterfaceMangledNameToSequentialIDCounters.tryGetValue(
                             interfaceName);
-                    if (!idAllocator)
-                    {
-                        linkage->mapInterfaceMangledNameToSequentialIDCounters[interfaceName] = 0;
-                        idAllocator =
-                            linkage->mapInterfaceMangledNameToSequentialIDCounters.tryGetValue(
-                                interfaceName);
-                    }
-                    seqID = *idAllocator;
-                    ++(*idAllocator);
                 }
-                else
-                {
-                    // NoneWitness, has special ID of -1.
-                    seqID = uint32_t(-1);
-                }
+                seqID = *idAllocator;
+                ++(*idAllocator);
                 linkage->mapMangledNameToRTTIObjectIndex[witnessTableMangledName] = seqID;
             }
 

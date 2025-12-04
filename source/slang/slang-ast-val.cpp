@@ -901,12 +901,28 @@ Val* TypeCoercionWitness::_resolveImplOverride()
 
 void NoneWitness::_toTextOverride(StringBuilder& out)
 {
-    out.append("none");
+    out << "NoneWitness(";
+    if (getSub())
+        out << getSub();
+    out << ",";
+    if (getSup())
+        out << getSup();
+    out << ")";
 }
 
 Val* NoneWitness::_resolveImplOverride()
 {
-    return this;
+    int diff = 0;
+    auto newSub = as<Type>(getSub()->resolve());
+    if (newSub != getSub())
+        diff++;
+    auto newSup = as<Type>(getSup()->resolve());
+    if (newSup != getSup())
+        diff++;
+
+    if (!diff)
+        return this;
+    return getCurrentASTBuilder()->getNoneWitness(newSub, newSup);
 }
 
 // UNormModifierVal

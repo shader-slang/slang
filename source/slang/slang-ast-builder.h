@@ -696,6 +696,8 @@ public:
         Type* toType,
         DeclRef<Decl> declRef);
 
+    NoneWitness* getNoneWitness(Type* subType, Type* superType);
+
     /// Helpers to get type info from the SharedASTBuilder
     SyntaxClass<NodeBase> findSyntaxClass(const UnownedStringSlice& slice)
     {
