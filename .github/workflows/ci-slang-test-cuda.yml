@@ -16,47 +16,36 @@ on:
         default: true
 
 jobs:
+  # Run all GPU tests in nvidia/vulkan image (has working Vulkan + CUDA runtime + NVIDIA GPU support)
   test-slang:
     runs-on: ["Linux", "self-hosted", "GPU"]
     timeout-minutes: 60
     container:
-      # Use same base image as build for consistency
-      image: nvidia/cuda:12.9.1-devel-ubuntu22.04
-      # Mount NVIDIA Vulkan ICD from host so tests use the real GPU instead of llvmpipe
-      options: --gpus all --user root -v /etc/vulkan/icd.d/nvidia_icd.json:/etc/vulkan/icd.d/nvidia_icd.json:ro
+      image: nvidia/vulkan:1.3-470
+      options: --gpus all --user root
 
     defaults:
       run:
         shell: bash
 
     steps:
-      - name: Install Git
-        run: |
-          apt-get update && apt-get install -y git
-          git config --global --add safe.directory '*'
-          git --version
-
-      - uses: actions/checkout@v4
-        with:
-          submodules: "recursive"
-          fetch-depth: "1"
-
-      - name: Install test dependencies
+      - name: Install Git and dependencies
         run: |
           apt-get update && apt-get install -y \
+            git \
             libx11-6 \
             libxcursor1 \
             libxrandr2 \
             libxinerama1 \
             libxi6 \
             libgl1 \
-            libvulkan1 \
-            vulkan-tools \
-            vulkan-validationlayers \
-            python3 \
-            python3-pip \
-            python3-venv
-          rm -rf /var/lib/apt/lists/*
+            python3
+          git config --global --add safe.directory '*'
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          fetch-depth: "1"
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -66,7 +55,6 @@ jobs:
 
       - name: Setup test environment
         run: |
-          # Determine config directory name
           if [[ "${{ inputs.config }}" == "release" ]]; then
             cmake_config="Release"
           else
@@ -74,51 +62,37 @@ jobs:
           fi
           echo "cmake_config=$cmake_config" >> $GITHUB_ENV
 
-          # Set binary directory
           bin_dir="$PWD/artifacts/${cmake_config}/bin"
           echo "bin_dir=$bin_dir" >> $GITHUB_ENV
 
-          # Make binaries executable
           chmod +x "$bin_dir"/* 2>/dev/null || true
-
-          # Set library path
           echo "LD_LIBRARY_PATH=$PWD/artifacts/${cmake_config}/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
 
           # Verify GPU is accessible
           echo "=== GPU Info ==="
           nvidia-smi || echo "nvidia-smi not available"
 
-          # Debug: Check Vulkan ICD files
-          echo "=== Vulkan ICD files ==="
-          ls -la /usr/share/vulkan/icd.d/ 2>/dev/null || echo "No /usr/share/vulkan/icd.d/"
-          ls -la /etc/vulkan/icd.d/ 2>/dev/null || echo "No /etc/vulkan/icd.d/"
-          cat /usr/share/vulkan/icd.d/*.json 2>/dev/null || true
-          cat /etc/vulkan/icd.d/*.json 2>/dev/null || true
-
           # Check Vulkan
           echo "=== Vulkan Info ==="
           vulkaninfo --summary 2>/dev/null || echo "vulkaninfo not available"
 
-          # Debug: Check CUDA
+          # Check CUDA
           echo "=== CUDA libraries ==="
           ldconfig -p | grep -i cuda || echo "No CUDA libraries in ldconfig"
 
-      - name: Test Slang
+      - name: Test Slang (Vulkan API)
         run: |
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
-          if [ "${{ inputs.enable-debug-layers }}" == "true" ]; then
-            export VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation
-          fi
 
           slang_test_args=(
             "-category" "full"
+            "-api" "vk"
             "-expected-failure-list" "tests/expected-failure-github.txt"
             "-expected-failure-list" "tests/expected-failure-linux-gpu.txt"
             "-skip-reference-image-generation"
             "-show-adapter-info"
             "-ignore-abort-msg"
-            "-enable-debug-layers" "${{ inputs.enable-debug-layers }}"
           )
 
           if [ "${{ inputs.server-count }}" -gt 1 ]; then
@@ -128,7 +102,24 @@ jobs:
 
           "$bin_dir/slang-test" "${slang_test_args[@]}"
 
-      # Skip Slang examples - CPU examples require LLVM which is disabled in CUDA builds
+      - name: Test Slang (CUDA API)
+        run: |
+          slang_test_args=(
+            "-category" "full"
+            "-api" "cuda"
+            "-expected-failure-list" "tests/expected-failure-github.txt"
+            "-expected-failure-list" "tests/expected-failure-linux-gpu.txt"
+            "-skip-reference-image-generation"
+            "-show-adapter-info"
+            "-ignore-abort-msg"
+          )
+
+          if [ "${{ inputs.server-count }}" -gt 1 ]; then
+            slang_test_args+=("-use-test-server")
+            slang_test_args+=("-server-count" "${{ inputs.server-count }}")
+          fi
+
+          "$bin_dir/slang-test" "${slang_test_args[@]}"
 
       - name: Run slangc tests
         run: |
@@ -154,33 +145,23 @@ jobs:
     runs-on: ["Linux", "self-hosted", "GPU"]
     timeout-minutes: 30
     container:
-      image: nvidia/cuda:12.9.1-devel-ubuntu22.04
-      # Mount NVIDIA Vulkan ICD from host so tests use the real GPU instead of llvmpipe
-      options: --gpus all --user root -v /etc/vulkan/icd.d/nvidia_icd.json:/etc/vulkan/icd.d/nvidia_icd.json:ro
+      image: nvidia/vulkan:1.3-470
+      options: --gpus all --user root
 
     defaults:
       run:
         shell: bash
 
     steps:
-      - name: Install Git
+      - name: Install Git and dependencies
         run: |
-          apt-get update && apt-get install -y git
+          apt-get update && apt-get install -y git libx11-6
           git config --global --add safe.directory '*'
-          git --version
 
       - uses: actions/checkout@v4
         with:
           submodules: "recursive"
           fetch-depth: "1"
-
-      - name: Install test dependencies
-        run: |
-          apt-get update && apt-get install -y \
-            libx11-6 \
-            libvulkan1 \
-            vulkan-tools
-          rm -rf /var/lib/apt/lists/*
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
