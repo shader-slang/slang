@@ -7,6 +7,17 @@
 #include "slang-json-value.h"
 #include "slang.h"
 
+// WARNING: ABI Compatibility
+// These structs are part of the binary interface between test-server and pre-built binaries
+// (e.g., VK-GL-CTS). Adding or removing fields will change struct layout and break
+// compatibility, causing memory corruption or crashes.
+//
+// To safely add new fields:
+// 1. First update and release new versions of all pre-built binaries that use this protocol
+// 2. Then add the new fields here
+//
+// The VK-GL-CTS nightly CI workflow will fail if this ABI is broken.
+
 namespace TestServerProtocol
 {
 
