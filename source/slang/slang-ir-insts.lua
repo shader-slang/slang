@@ -2556,7 +2556,7 @@ local insts = {
 			min_operands = 5,
 		},
 	},
-	{ DebugVar = { operands = { { "name" }, { "type" }, { "scope" }, { "location" } } } },
+	{ DebugVar = { min_operands = 4 } },
 	{
 		DebugValue = {
 			min_operands = 2,
@@ -2568,6 +2568,7 @@ local insts = {
 			min_operands = 5,
 		},
 	},
+	{ DebugLexicalBlock = { min_operands = 4 } }, -- operands: file, line, col, parentScope, [optional discriminator]
 	{ DebugInlinedVariable = { min_operands = 2 } },
 	{
 		DebugScope = {

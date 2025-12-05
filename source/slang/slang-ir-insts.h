@@ -2613,7 +2613,8 @@ struct IRDebugVar : IRInst
     IRInst* getSource() { return getOperand(0); }
     IRInst* getLine() { return getOperand(1); }
     IRInst* getCol() { return getOperand(2); }
-    IRInst* getArgIndex() { return getOperandCount() >= 4 ? getOperand(3) : nullptr; }
+    IRInst* getScope() { return getOperandCount() >= 4 ? getOperand(3) : nullptr; }
+    IRInst* getArgIndex() { return getOperandCount() >= 5 ? getOperand(4) : nullptr; }
 };
 
 FIDDLE()
@@ -2647,7 +2648,7 @@ struct IRDebugScope : IRInst
 {
     FIDDLE(leafInst())
     IRInst* getScope() { return getOperand(0); }
-    IRInst* getInlinedAt() { return getOperand(1); }
+    IRInst* getInlinedAt() { return getOperandCount() > 1 ? getOperand(1) : nullptr; }
     void setInlinedAt(IRInst* inlinedAt) { setOperand(1, inlinedAt); }
 };
 
@@ -2675,6 +2676,18 @@ struct IRDebugFunction : IRInst
     IRInst* getCol() { return getOperand(2); }
     IRInst* getFile() { return getOperand(3); }
     IRInst* getDebugType() { return getOperand(4); }
+};
+
+FIDDLE()
+struct IRDebugLexicalBlock : IRInst
+{
+    FIDDLE(leafInst())
+    IRInst* getFile() { return getOperand(0); }
+    IRInst* getLine() { return getOperand(1); }
+    IRInst* getCol() { return getOperand(2); }
+    IRInst* getParentScope() { return getOperand(3); }
+    IRInst* getDiscriminator() { return getOperandCount() >= 5 ? getOperand(4) : nullptr; }
+    bool hasDiscriminator() { return getOperandCount() >= 5; }
 };
 
 FIDDLE()
@@ -3418,6 +3431,7 @@ $(type_info.return_type) $(type_info.method_name)(
         IRInst* source,
         IRInst* line,
         IRInst* col,
+        IRInst* scope,
         IRInst* argIndex = nullptr);
     IRInst* emitDebugValue(IRInst* debugVar, IRInst* debugValue);
     IRInst* emitDebugInlinedAt(
@@ -3435,6 +3449,12 @@ $(type_info.return_type) $(type_info.method_name)(
         IRInst* col,
         IRInst* file,
         IRInst* debugType);
+    IRInst* emitDebugLexicalBlock(
+        IRInst* file,
+        IRInst* line,
+        IRInst* col,
+        IRInst* parentScope,
+        IRInst* discriminator = nullptr);
 
     /// Emit an LiveRangeStart instruction indicating the referenced item is live following this
     /// instruction

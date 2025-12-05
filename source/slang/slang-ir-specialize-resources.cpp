@@ -120,6 +120,31 @@ void inlineAllCallsOfFunction(IRFunc* func)
         });
 }
 
+/// Check if a function has any uses other than from debug instructions.
+bool hasNonDebugUses(IRFunc* func)
+{
+    for (auto use = func->firstUse; use; use = use->nextUse)
+    {
+        auto user = use->getUser();
+        switch (user->getOp())
+        {
+        case kIROp_DebugScope:
+        case kIROp_DebugFuncDecoration:
+        case kIROp_DebugVar:
+        case kIROp_DebugValue:
+        case kIROp_DebugLexicalBlock:
+        case kIROp_DebugInlinedAt:
+        case kIROp_DebugInlinedVariable:
+        case kIROp_DebugLine:
+        case kIROp_DebugLocationDecoration:
+            break;
+        default:
+            return true;
+        }
+    }
+    return false;
+}
+
 /// A pass to specialize resource-typed function outputs
 struct ResourceOutputSpecializationPass
 {
@@ -253,10 +278,12 @@ struct ResourceOutputSpecializationPass
             // Check if `oldFunc` is the reason for failing,
             // Otherwise don't add to 'unspecializableFuncs'
             //
-            // Ensure oldFunc has uses, else, there is nothing to specialize here.
+            // Ensure oldFunc has non-debug uses, else, there is nothing to specialize here.
+            // Debug uses (like IRDebugScope) are preserved after inlining to maintain proper
+            // debug information, but they don't prevent the function from being removed.
             // If oldFunc has IRKeepAlive, this code should be assumed to have a
             // "dynamic" resource value.
-            if (result == SpecializeFuncResult::ThisFuncFailed && oldFunc->hasUses())
+            if (result == SpecializeFuncResult::ThisFuncFailed && hasNonDebugUses(oldFunc))
                 unspecializableFuncs->add(oldFunc);
             return false;
         } else {
