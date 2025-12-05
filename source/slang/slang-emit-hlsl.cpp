@@ -1453,7 +1453,26 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         }
     case kIROp_HitObjectType:
         {
-            m_writer->emit("NvHitObject");
+            // Check if NVAPI is explicitly enabled first
+            auto targetCaps = getTargetReq()->getTargetCaps();
+            auto nvapiCapabilitySet = CapabilitySet(CapabilityName::hlsl_nvapi);
+            auto sm69CapabilitySet = CapabilitySet(CapabilityName::_sm_6_9);
+
+            if (targetCaps.implies(nvapiCapabilitySet))
+            {
+                // Explicit NVAPI: use NvHitObject
+                m_writer->emit("NvHitObject");
+            }
+            else if (targetCaps.implies(sm69CapabilitySet))
+            {
+                // DXR 1.3 standard: use dx::HitObject namespace
+                m_writer->emit("dx::HitObject");
+            }
+            else
+            {
+                // Fallback to legacy NVAPI
+                m_writer->emit("NvHitObject");
+            }
             return;
         }
     case kIROp_TextureFootprintType:
@@ -1862,9 +1881,18 @@ void HLSLSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
     }
 }
 
-void HLSLSourceEmitter::emitFrontMatterImpl(TargetRequest*)
+void HLSLSourceEmitter::emitFrontMatterImpl(TargetRequest* targetReq)
 {
-    if (m_extensionTracker->m_requiresNVAPI)
+    // Check if NVAPI is required either by decoration or by capability
+    bool requiresNVAPI = m_extensionTracker->m_requiresNVAPI;
+    if (!requiresNVAPI && targetReq)
+    {
+        auto targetCaps = targetReq->getTargetCaps();
+        auto nvapiCapabilitySet = CapabilitySet(CapabilityName::hlsl_nvapi);
+        requiresNVAPI = targetCaps.implies(nvapiCapabilitySet);
+    }
+
+    if (requiresNVAPI)
     {
         // If the generated code includes implicit NVAPI use,
         // then we need to ensure that NVAPI support is included

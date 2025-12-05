@@ -148,6 +148,35 @@ void Linkage::addTarget(slang::TargetDesc const& desc)
     optionSet.set(CompilerOptionName::FloatingPointMode, FloatingPointMode(desc.floatingPointMode));
     optionSet.addTargetFlags(desc.flags);
     optionSet.setProfile(Profile(desc.profile));
+
+    // Auto-enable SER capabilities for raytracing profiles
+    // This ensures backward compatibility with code using HitObject APIs
+    Profile profile(desc.profile);
+    CodeGenTarget format = CodeGenTarget(desc.format);
+    if (profile.getFamily() == ProfileFamily::DX && profile.getVersion() >= ProfileVersion::DX_6_3)
+    {
+        // For D3D targets (HLSL/DXIL) with sm_6_3 to sm_6_8, enable NVAPI for SER
+        // DXR 1.3 native (sm_6_9+) doesn't need NVAPI
+        bool isD3DFormat =
+            (format == CodeGenTarget::HLSL || format == CodeGenTarget::DXBytecode ||
+             format == CodeGenTarget::DXBytecodeAssembly || format == CodeGenTarget::DXIL ||
+             format == CodeGenTarget::DXILAssembly);
+        if (isD3DFormat && profile.getVersion() < ProfileVersion::DX_6_9)
+        {
+            optionSet.addCapabilityAtom(CapabilityName::hlsl_nvapi);
+        }
+
+        // For SPIR-V/GLSL targets with sm_6_3 to sm_6_8, enable NV SER extension
+        // This enables NV-specific SER features like HitObject::MakeHit for Vulkan
+        bool isSpirvFormat =
+            (format == CodeGenTarget::SPIRV || format == CodeGenTarget::SPIRVAssembly ||
+             format == CodeGenTarget::GLSL);
+        if (isSpirvFormat && profile.getVersion() < ProfileVersion::DX_6_9)
+        {
+            optionSet.addCapabilityAtom(CapabilityName::spirv_nv);
+        }
+    }
+
     optionSet.set(CompilerOptionName::LineDirectiveMode, LineDirectiveMode(desc.lineDirectiveMode));
     optionSet.set(CompilerOptionName::GLSLForceScalarLayout, desc.forceGLSLScalarBufferLayout);
 
