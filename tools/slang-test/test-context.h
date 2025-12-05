@@ -10,6 +10,7 @@
 #include "../../source/core/slang-platform.h"
 #include "../../source/core/slang-render-api-util.h"
 #include "../../source/core/slang-std-writers.h"
+#include "../../source/core/slang-stream.h"
 #include "../../source/core/slang-string-util.h"
 #include "../../source/core/slang-test-tool-util.h"
 #include "filecheck.h"
@@ -142,6 +143,9 @@ public:
     Slang::JSONRPCConnection* getOrCreateJSONRPCConnection();
     void destroyRPCConnection();
 
+    /// Drain and print any stderr output from test-server processes
+    void drainTestServerStderr();
+
     /// Ctor
     TestContext();
     /// Dtor
@@ -216,6 +220,7 @@ protected:
     };
 
     Slang::List<Slang::RefPtr<Slang::JSONRPCConnection>> m_jsonRpcConnections;
+    Slang::List<Slang::RefPtr<Slang::BufferedReadStream>> m_testServerStderrStreams;
     Slang::List<TestReporter*> m_reporters;
     Slang::List<TestRequirements*> m_testRequirements = nullptr;
 

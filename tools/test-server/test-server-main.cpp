@@ -4,19 +4,23 @@
 #include "../../source/compiler-core/slang-test-server-protocol.h"
 #include "../../source/core/slang-io.h"
 #include "../../source/core/slang-process-util.h"
+#include "../../source/core/slang-process.h"
 #include "../../source/core/slang-secure-crt.h"
 #include "../../source/core/slang-shared-library.h"
 #include "../../source/core/slang-string-util.h"
 #include "../../source/core/slang-string.h"
+#include "../../source/core/slang-test-diagnostics.h"
 #include "../../source/core/slang-test-tool-util.h"
 #include "../../source/core/slang-writer.h"
 #include "../render-test/slang-support.h"
 #include "gfx-unit-test/gfx-test-util.h"
 #include "slang-com-helper.h"
 #include "slang-rhi.h"
+#include "test-server-chronometer.h"
 #include "test-server-diagnostics.h"
 #include "unit-test/slang-unit-test.h"
 
+#include <chrono>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -99,6 +103,8 @@ protected:
 
     RefPtr<JSONRPCConnection> m_connection; ///< RPC connection, recieves calls to execute and
                                             ///< returns results via JSON-RPC
+
+    Chronometer m_chronometer; ///< For timing test execution phases
 };
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!! TestServer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -345,6 +351,14 @@ TestServer::InnerMainFunc TestServer::getToolFunction(const String& name, Diagno
 
 SlangResult TestServer::_executeSingle()
 {
+    // Debug logging for test-server operations (writes to stderr, not RPC stdout)
+    auto startTime = std::chrono::steady_clock::now();
+
+    if (isDiagnosticEnabled("rpc"))
+    {
+        fprintf(stderr, "[TEST-SERVER] Waiting for RPC message (pid=%d)\n", Process::getId());
+    }
+
     // Block waiting for content (or error/closed)
     SLANG_RETURN_ON_FAIL(m_connection->waitForResult());
 
@@ -363,20 +377,73 @@ SlangResult TestServer::_executeSingle()
             JSONRPCCall call;
             SLANG_RETURN_ON_FAIL(m_connection->getRPCOrSendError(&call));
 
+            if (isDiagnosticEnabled("rpc"))
+            {
+                fprintf(
+                    stderr,
+                    "[TEST-SERVER] Received call: %s (pid=%d)\n",
+                    String(call.method).getBuffer(),
+                    Process::getId());
+            }
+
             // Do different things
             if (call.method == TestServerProtocol::QuitArgs::g_methodName)
             {
+                if (isDiagnosticEnabled("rpc"))
+                {
+                    fprintf(
+                        stderr,
+                        "[TEST-SERVER] Quit request received (pid=%d)\n",
+                        Process::getId());
+                }
                 m_quit = true;
                 return SLANG_OK;
             }
             else if (call.method == TestServerProtocol::ExecuteUnitTestArgs::g_methodName)
             {
                 SLANG_RETURN_ON_FAIL(_executeUnitTest(call));
+
+                if (isDiagnosticEnabled("rpc"))
+                {
+                    auto endTime = std::chrono::steady_clock::now();
+                    auto duration =
+                        std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime)
+                            .count();
+                    fprintf(
+                        stderr,
+                        "[TEST-SERVER] ExecuteUnitTest completed in %lldms (pid=%d)\n",
+                        (long long)duration,
+                        Process::getId());
+                }
+
                 return SLANG_OK;
             }
             else if (call.method == TestServerProtocol::ExecuteToolTestArgs::g_methodName)
             {
                 SLANG_RETURN_ON_FAIL(_executeTool(call));
+
+                if (isDiagnosticEnabled("rpc"))
+                {
+                    auto endTime = std::chrono::steady_clock::now();
+                    auto duration =
+                        std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime)
+                            .count();
+                    fprintf(
+                        stderr,
+                        "[TEST-SERVER] ExecuteTool completed in %lldms (pid=%d)\n",
+                        (long long)duration,
+                        Process::getId());
+
+                    // Warn if test took more than 5 seconds
+                    if (duration > 5000)
+                    {
+                        fprintf(
+                            stderr,
+                            "[TEST-SERVER-WARNING] Slow test execution: %lldms\n",
+                            (long long)duration);
+                    }
+                }
+
                 break;
             }
             else
@@ -419,14 +486,14 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
 
     auto sink = m_connection->getSink();
 
-    IUnitTestModule* testModule = getUnitTestModule(args.moduleName, m_connection->getSink());
+    IUnitTestModule* testModule = getUnitTestModule(args.moduleName, sink);
     if (!testModule)
     {
         sink->diagnose(SourceLoc(), ServerDiagnostics::unableToFindUnitTestModule, args.moduleName);
         return m_connection->sendError(JSONRPC::ErrorCode::InvalidParams, id);
     }
 
-    const Index testIndex = _findTestIndex(testModule, args.testName);
+    Index testIndex = _findTestIndex(testModule, args.testName);
     if (testIndex < 0)
     {
         sink->diagnose(SourceLoc(), ServerDiagnostics::unableToFindTest, args.testName);
@@ -440,7 +507,6 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
 
     testModule->setTestReporter(&testReporter);
 
-    // Assume we will used the shared session
     slang::IGlobalSession* session = getOrCreateGlobalSession();
     if (!session)
     {
@@ -460,6 +526,7 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
 
     UnitTestFunc testFunc = testModule->getTestFunc(testIndex);
 
+    auto testStartTime = m_chronometer.beginTest();
     try
     {
         testFunc(&unitTestContext);
@@ -470,6 +537,7 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
     }
 
     TestServerProtocol::ExecutionResult result;
+    result.executionTimeMs = m_chronometer.endTest(testStartTime);
     result.result = SLANG_OK;
     result.debugLayer = coreDebugCallback.getString();
 
@@ -542,10 +610,12 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
         stdWriters.setWriter(SLANG_WRITER_CHANNEL_DIAGNOSTIC, stdErrorWriter);
     }
 
+    auto testStartTime = m_chronometer.beginTest();
     const SlangResult funcRes =
         func(&stdWriters, session, int(toolArgs.getCount()), toolArgs.begin());
 
     TestServerProtocol::ExecutionResult result;
+    result.executionTimeMs = m_chronometer.endTest(testStartTime);
     result.result = funcRes;
     result.stdError = stdError;
     result.stdOut = stdOut;
