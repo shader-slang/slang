@@ -18,7 +18,6 @@ namespace Slang
 
 enum class BaseType;
 class Type;
-class DescriptorHandleType;
 
 struct IRLayout;
 struct TypeLayoutContext;
@@ -1355,9 +1354,8 @@ struct SimpleLayoutRulesImpl
     // (DirectX is the exception in managing these together)
     virtual bool DoStructuredBuffersNeedSeparateCounterBuffer() = 0;
 
-    // Get layout for a descriptor handle type
-    virtual SimpleLayoutInfo GetDescriptorHandleLayout(
-        DescriptorHandleType* descriptorHandleType) = 0;
+    // Get layout for DescriptorHandle<T>
+    virtual SimpleLayoutInfo GetDescriptorHandleLayout(LayoutResourceKind varyingKind, Type* elementType, const TypeLayoutContext& context) = 0;
 };
 
 struct ObjectLayoutRulesImpl
@@ -1431,9 +1429,9 @@ struct LayoutRulesImpl
         return simpleRules->DoStructuredBuffersNeedSeparateCounterBuffer();
     }
 
-    SimpleLayoutInfo GetDescriptorHandleLayout(DescriptorHandleType* descriptorHandleType)
+    SimpleLayoutInfo GetDescriptorHandleLayout(LayoutResourceKind varyingKind, Type* elementType, const TypeLayoutContext& context)
     {
-        return simpleRules->GetDescriptorHandleLayout(descriptorHandleType);
+        return simpleRules->GetDescriptorHandleLayout(varyingKind, elementType, context);
     }
 
     // Forward `ObjectLayoutRulesImpl` interface

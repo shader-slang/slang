@@ -20,15 +20,13 @@ struct Vertex
 
 float4 vertexMain(Vertex vertex) : SV_Position
 {
-    // Use the fields to avoid warnings
     float4 result = float4(vertex.position, 1.0);
     result.xyz += vertex.normal * 0.1;
     result.xy += vertex.uv * 0.1;
-    
-    // Use the handles in some way to avoid warnings
+
     uint2 handle1 = (uint2)vertex.not_decomposed;
     uint2 handle2 = vertex.explicit_handle;
     result.x += float(handle1.x + handle2.x) * 0.0001;
-    
+
     return result;
 }
