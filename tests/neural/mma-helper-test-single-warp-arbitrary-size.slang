@@ -1,4 +1,4 @@
-// // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature
 
 import neural;
@@ -60,7 +60,8 @@ void fillWeightMatrix<int InputSize, int OutputSize>(uint tid)
     }
 }
 
-half[OutputSize] testMatVecMul<int InputSize, int OutputSize>(uint tid)
+
+half[MMAHelper<half, InputSize, OutputSize, SubgroupSize>.Uint4AlignedM] testMatVecMul<int InputSize, int OutputSize>(uint tid)
 {
     typealias Storage = StructuredBufferStorage<half>;
     Storage storage = Storage(inputBuffer);
@@ -82,7 +83,7 @@ half[OutputSize] testMatVecMul<int InputSize, int OutputSize>(uint tid)
     SPtr ptrC = __getAddress(s_sharedMemoryB[0]);
 
     let res = MMAHelper<half, InputSize, OutputSize, SubgroupSize>.mma<Storage>(inputVector, ptrA, ptrB, ptrC, storage, 0);
-    // serialRead(tid, ptrB, 16);
+    // serialRead(tid, ptrC, 32);
     return res;
 }
 
@@ -124,16 +125,6 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 {
     let outputVector = testMatVecMul<InputSize, OutputSize>(tid);
 
-    if (tid == 1)
-    {
-        printf("outputVector: ");
-        for (int i = 0; i < OutputSize; i++)
-        {
-            printf("%.1f ", float(outputVector[i]));
-        }
-        printf("\n");
-    }
-
     bool res = true;
     if (tid < OutputSize)
     {
@@ -142,7 +133,6 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
         {
             if (outputVector[i] != half(expected))
             {
-                // printf("outputVector[%d] = %.1f, expected = %.1f\n", i, float(outputVector[i]), expected);
                 res = false;
                 break;
             }
@@ -159,17 +149,38 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 [shader("compute")]
 void computeMain(uint tid : SV_DispatchThreadID)
 {
-    // {
-    //     fillWeightMatrix<3, 5>(tid);
-    //     GroupMemoryBarrierWithWaveSync();
-    //     test<3, 5>(tid, 0);
-    // }
+    {
+        fillWeightMatrix<3, 5>(tid);
+        GroupMemoryBarrierWithWaveSync();
+        test<3, 5>(tid, 0);
+    }
 
     {
         fillWeightMatrix<11, 18>(tid);
         GroupMemoryBarrierWithWaveSync();
         test<11, 18>(tid, 1);
     }
+
+    {
+        fillWeightMatrix<23, 9>(tid);
+        GroupMemoryBarrierWithWaveSync();
+        test<23, 9>(tid, 2);
+    }
+
+    {
+        fillWeightMatrix<35, 3>(tid);
+        GroupMemoryBarrierWithWaveSync();
+        test<35, 3>(tid, 3);
+    }
+
+    {
+        fillWeightMatrix<17, 64>(tid);
+        GroupMemoryBarrierWithWaveSync();
+        test<17, 64>(tid, 4);
+    }
     // BUFFER: 1
+    // BUFFER-NEXT: 1
+    // BUFFER-NEXT: 1
+    // BUFFER-NEXT: 1
     // BUFFER-NEXT: 1
 }
