@@ -342,7 +342,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
 
             // Bounds check on Y direction. If y coordinate out of the input vector length, just break.
             // Because we don't need padding when store the result back to thread-local vector.
-            if (startIndex >= K)
+            if (startIndex >= M)
             {
                 break;
             }
