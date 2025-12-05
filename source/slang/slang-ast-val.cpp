@@ -1201,7 +1201,9 @@ Val* PolynomialIntVal::_substituteImplOverride(
 
             if (auto constantVal = as<ConstantIntVal>(substResult))
             {
-                evaluatedTermConstFactor *= constantVal->getValue();
+                auto power = factor->getPower();
+                for (IntegerLiteralValue i = 0; i < power; i++)
+                    evaluatedTermConstFactor *= constantVal->getValue();
             }
             else if (auto intResult = as<IntVal>(substResult))
             {
