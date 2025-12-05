@@ -1638,7 +1638,7 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
             if (auto typeVal = as<Type>(specializationArg.val))
             {
                 auto typeExpr = astBuilder->create<SharedTypeExpr>();
-                typeExpr->type = astBuilder->getTypeType((Type*)specializationArg.val);
+                typeExpr->type = astBuilder->getTypeType(typeVal);
                 genericArgs.add(typeExpr);
             }
             else if (auto intVal = as<ConstantIntVal>(specializationArg.val))
