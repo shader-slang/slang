@@ -1648,7 +1648,7 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
                     auto intExpr = astBuilder->create<BoolLiteralExpr>();
                     intExpr->type = intVal->getType();
                     intExpr->value = intVal->getValue() != 0;
-                    genericArgs.add(intExpr); 
+                    genericArgs.add(intExpr);
                 }
                 else
                 {
@@ -1660,10 +1660,7 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
             }
             else
             {
-                sink->diagnose(
-                    SourceLoc(),
-                    Diagnostics::invalidFormOfSpecializationArg,
-                    ii + 1);
+                sink->diagnose(SourceLoc(), Diagnostics::invalidFormOfSpecializationArg, ii + 1);
             }
         }
         auto genAppExpr = astBuilder->create<GenericAppExpr>();
