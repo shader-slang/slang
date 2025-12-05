@@ -170,6 +170,35 @@ When checking the IR dump, look for type consistency or logical errors in the IR
 pass at fault. Focus on passes that makes significant and systematic changes to the IR, such as specialization, inlining,
 type legalization, and buffer lowering passes. You may iterate this process multiple times to narrow down the issue.
 
+#### extras/split-ir-dump.py
+
+The IR dump can be huge (thousands of lines with 70+ sections), making it difficult for LLMs and humans to analyze. Use `extras/split-ir-dump.py` to split the dump into separate files, one per compilation pass:
+
+```bash
+# Recommended: Pipe directly to the script
+slangc.exe -dump-ir -target spirv-asm -o tmp.spv test.slang | python extras/split-ir-dump.py
+
+# Or save to file first
+slangc.exe -dump-ir -target spirv-asm -o tmp.spv test.slang > test.dump
+python extras/split-ir-dump.py test.dump
+```
+
+**IMPORTANT**: When using `-dump-ir` with targets like `spirv-asm`, always use `-o <file>` to redirect the compiled output. Otherwise, the SPIRV/CUDA code will be mixed with the IR dump on stdout.
+
+This creates a `dump-XXX/` directory with:
+- `000-INDEX.txt` - Overview of all sections
+- `001-LOWER-TO-IR.txt` - Initial IR generation
+- `002-AFTER-fixEntryPointCallsites.txt` - After first pass
+- ... (one file per pass)
+
+Use this to:
+- Binary search through passes to find where IR becomes invalid
+- Track how a specific value/instruction transforms through the pipeline
+- Compare before/after states of specific optimization passes
+- Provide focused context to LLMs for analysis
+
+See `extras/split-ir-dump.md` for complete documentation.
+
 #### InstTrace
 
 Note that any issues in the generated target code could stem from IR passes or even the front-end type checking
