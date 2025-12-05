@@ -14,7 +14,7 @@ class TargetProgram;
 struct IRInst;
 
 /// Any call to a function that takes or returns a string/RefType parameter is inlined
-Result performTypeInlining(IRModule* module, DiagnosticSink* sink);
+Result performTypeInlining(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink);
 
 /// Inline any call sites to functions marked `[unsafeForceInlineEarly]`
 bool performMandatoryEarlyInlining(IRModule* module, HashSet<IRInst*>* modifiedFuncs = nullptr);
@@ -33,7 +33,7 @@ bool performPreAutoDiffForceInlining(IRModule* module);
 
 /// Inline calls to functions that returns a resource/sampler via either return value or output
 /// parameter.
-void performGLSLResourceReturnFunctionInlining(TargetProgram* targetProgram, IRModule* module);
+void performGLSLResourceReturnFunctionInlining(IRModule* module, TargetProgram* targetProgram);
 
 /// Inline simple intrinsic functions whose definition is a single asm block.
 void performIntrinsicFunctionInlining(IRModule* module);

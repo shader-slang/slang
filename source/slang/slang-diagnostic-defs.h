@@ -301,6 +301,13 @@ DIAGNOSTIC(96, Error, kindNotLinkable, "not a known linkable kind '$0'")
 DIAGNOSTIC(97, Error, libraryDoesNotExist, "library '$0' does not exist")
 DIAGNOSTIC(98, Error, cannotAccessAsBlob, "cannot access as a blob")
 DIAGNOSTIC(99, Error, unknownDebugOption, "unknown debug option, known options are ($0)")
+DIAGNOSTIC(
+    104,
+    Error,
+    needToEnableExperimentFeature,
+    "'$0' is an experimental module, need to enable"
+    "'-experimental-feature' to load this module")
+DIAGNOSTIC(105, Error, nullComponentType, "componentTypes[$0] is `nullptr`")
 
 //
 // 001xx - Downstream Compilers
@@ -383,13 +390,21 @@ DIAGNOSTIC(-1, Note, seeOpeningToken, "see opening '$0'")
 // 153xx - #include
 DIAGNOSTIC(15300, Error, includeFailed, "failed to find include file '$0'")
 DIAGNOSTIC(15301, Error, importFailed, "failed to find imported file '$0'")
+DIAGNOSTIC(15302, Error, cyclicInclude, "cyclic `#include` of file '$0'")
 DIAGNOSTIC(-1, Error, noIncludeHandlerSpecified, "no `#include` handler was specified")
 DIAGNOSTIC(
     15302,
     Error,
     noUniqueIdentity,
     "`#include` handler didn't generate a unique identity for file '$0'")
-
+DIAGNOSTIC(
+    15303,
+    Error,
+    cannotResolveImportedDecl,
+    "cannot resolve imported declaration '$0' from precompiled module '$1'. Make sure "
+    "module '$1' is up-to-date. If you suspect this to be a compiler bug, file an issue "
+    "on GitHub (https://github.com/shader-slang/slang/issues) or join the Slang Discord for "
+    "assistance")
 
 // 154xx - macro definition
 DIAGNOSTIC(15400, Warning, macroRedefinition, "redefinition of macro '$0'")
@@ -660,8 +675,14 @@ DIAGNOSTIC(30025, Error, invalidArraySize, "array size must be non-negative.")
 DIAGNOSTIC(
     30027,
     Error,
-    disallowedArrayOfParameterBlock,
-    "Arrays of ParameterBlock are not allowed")
+    disallowedArrayOfNonAddressableType,
+    "Arrays of non-addressable type '$0' are not allowed")
+
+DIAGNOSTIC(
+    30028,
+    Error,
+    nonAddressableTypeInStructuredBuffer,
+    "'$0' is non-addressable and cannot be used in StructuredBuffer")
 DIAGNOSTIC(
     30029,
     Error,
@@ -837,6 +858,12 @@ DIAGNOSTIC(
     Error,
     cannotTakeConstantPointers,
     "Not allowed to take the address of an immutable object")
+DIAGNOSTIC(
+    33180,
+    Error,
+    cannotSpecializeGenericWithExistential,
+    "specializing '$0' with an existential type is not allowed. All generic arguments "
+    "must be statically resolvable at compile time.")
 DIAGNOSTIC(
     30100,
     Error,
@@ -1233,11 +1260,20 @@ DIAGNOSTIC(
     subTypeHasSubsetOfAbstractAtomsToSuperType,
     "subtype '$0' must have the same target/stage support as the supertype; '$0' is missing '$1'")
 DIAGNOSTIC(
-    36118,
+    36119,
     Error,
     requirmentHasSubsetOfAbstractAtomsToImplementation,
     "requirement '$0' must have the same target/stage support as the implementation; '$0' is "
     "missing '$1'")
+
+DIAGNOSTIC(
+    36120,
+    Error,
+    targetSwitchCapCasesConflict,
+    "the capability for case '$0' is '$1', which is conflicts with previous case which requires "
+    "'$2'."
+    "In target_switch, if two cases are belong to the same target, then one capability set has to "
+    "be a subset of the other.")
 
 // Attributes
 DIAGNOSTIC(31000, Warning, unknownAttributeName, "unknown attribute '$0'")
@@ -2328,6 +2364,11 @@ DIAGNOSTIC(39010, Error, expectedSpaceIndex, "expected a register space index af
 DIAGNOSTIC(39011, Error, invalidComponentMask, "invalid register component mask '$0'.")
 
 DIAGNOSTIC(
+    39012,
+    Warning,
+    requestedBindlessSpaceIndexUnavailable,
+    "requested bindless space index '$0' is unavailable, using the next available index '$1'.")
+DIAGNOSTIC(
     39013,
     Warning,
     registerModifierButNoVulkanLayout,
@@ -2855,6 +2896,11 @@ DIAGNOSTIC(
     noTypeConformancesFoundForInterface,
     "No type conformances are found for interface '$0'. Code generation for current target "
     "requires at least one implementation type present in the linkage.")
+DIAGNOSTIC(
+    50101,
+    Error,
+    dynamicDispatchOnPotentiallyUninitializedExistential,
+    "Cannot dynamically dispatch on potentially uninitialized interface object '$0'.")
 
 DIAGNOSTIC(
     52000,
@@ -2895,6 +2941,11 @@ DIAGNOSTIC(
     Error,
     dynamicDispatchOnSpecializeOnlyInterface,
     "type '$0' is marked for specialization only, but dynamic dispatch is needed for the call.")
+DIAGNOSTIC(
+    52009,
+    Error,
+    cannotEmitReflectionWithoutTarget,
+    "cannot emit reflection JSON; no compilation target available")
 DIAGNOSTIC(
     53001,
     Error,
@@ -3141,4 +3192,18 @@ DIAGNOSTIC(
     "invalid stage name '$0' in ray payload access qualifier; valid stages are 'anyhit', "
     "'closesthit', 'miss', and 'caller'")
 
+//
+// Cooperative Matrix
+//
+DIAGNOSTIC(
+    50000,
+    Error,
+    cooperativeMatrixUnsupportedElementType,
+    "Element type '$0' is not supported for matrix'$1'.")
+
+DIAGNOSTIC(
+    50000,
+    Error,
+    cooperativeMatrixInvalidShape,
+    "Invalid shape ['$0', '$1'] for cooperative matrix'$2'.")
 #undef DIAGNOSTIC

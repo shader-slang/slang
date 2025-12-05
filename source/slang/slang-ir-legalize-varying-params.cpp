@@ -185,11 +185,10 @@ void assign(IRBuilder& builder, LegalizedVaryingVal const& dest, IRInst* src)
 
 IRInst* emitCalcGroupExtents(IRBuilder& builder, IRFunc* entryPoint, IRVectorType* type)
 {
+    static const int kAxisCount = 3;
+    IRInst* groupExtentAlongAxis[kAxisCount] = {};
     if (auto numThreadsDecor = entryPoint->findDecoration<IRNumThreadsDecoration>())
     {
-        static const int kAxisCount = 3;
-        IRInst* groupExtentAlongAxis[kAxisCount] = {};
-
         for (int axis = 0; axis < kAxisCount; axis++)
         {
             auto litValue = as<IRIntLit>(numThreadsDecor->getOperand(axis));
@@ -199,16 +198,14 @@ IRInst* emitCalcGroupExtents(IRBuilder& builder, IRFunc* entryPoint, IRVectorTyp
             groupExtentAlongAxis[axis] =
                 builder.getIntValue(type->getElementType(), litValue->getValue());
         }
-
-        return builder.emitMakeVector(type, kAxisCount, groupExtentAlongAxis);
+    }
+    else
+    {
+        for (int axis = 0; axis < kAxisCount; axis++)
+            groupExtentAlongAxis[axis] = builder.getIntValue(type->getElementType(), 1);
     }
 
-    // TODO: We may want to implement a backup option here,
-    // in case we ever want to support compute shaders with
-    // dynamic/flexible group size on targets that allow it.
-    //
-    SLANG_UNEXPECTED("Expected '[numthreads(...)]' attribute on compute entry point.");
-    UNREACHABLE_RETURN(nullptr);
+    return builder.emitMakeVector(type, kAxisCount, groupExtentAlongAxis);
 }
 
 // There are some cases of system-value inputs that can be derived
@@ -289,6 +286,46 @@ IRInst* emitCalcGroupIndex(IRBuilder& builder, IRInst* groupThreadID, IRInst* gr
 
     return offset;
 }
+
+IRInst* tryConvertValue(IRBuilder& builder, IRInst* val, IRType* toType)
+{
+    auto fromType = val->getFullType();
+    if (auto fromVector = as<IRVectorType>(fromType))
+    {
+        if (auto toVector = as<IRVectorType>(toType))
+        {
+            if (fromVector->getElementCount() != toVector->getElementCount())
+            {
+                fromType = builder.getVectorType(
+                    fromVector->getElementType(),
+                    toVector->getElementCount());
+                val = builder.emitVectorReshape(fromType, val);
+            }
+        }
+        else if (as<IRBasicType>(toType))
+        {
+            UInt index = 0;
+            val = builder.emitSwizzle(fromVector->getElementType(), val, 1, &index);
+            if (toType->getOp() == kIROp_VoidType)
+                return nullptr;
+        }
+    }
+    else if (auto fromBasicType = as<IRBasicType>(fromType))
+    {
+        if (fromBasicType->getOp() == kIROp_VoidType)
+            return nullptr;
+        if (!as<IRBasicType>(toType))
+            return nullptr;
+        if (toType->getOp() == kIROp_VoidType)
+            return nullptr;
+    }
+    else
+    {
+        return nullptr;
+    }
+    return builder.emitCast(toType, val);
+}
+
 
 /// Context for the IR pass that legalizing entry-point
 /// varying parameters for a target.
@@ -1018,6 +1055,25 @@ protected:
 
         return LegalizedVaryingVal();
     }
+
+    LegalizedVaryingVal createLegalizedSystemVaryingValInst(
+        VaryingParamInfo const& info,
+        IRInst* id)
+    {
+        IRType* paramType = info.type;
+
+        // CUDA and C++ targets wrap parameters in a BorrowInParamType, but that
+        // may not always be the case for every target.
+        if (auto ptr = as<IRBorrowInParamType>(info.type))
+            paramType = ptr->getValueType();
+
+        IRBuilder builder(m_module);
+        builder.setInsertBefore(m_firstOrdinaryInst);
+
+        auto converted = tryConvertValue(builder, id, as<IRType>(paramType));
+
+        return LegalizedVaryingVal::makeValue(converted);
+    }
 };
 
 // With the target-independent core of the pass out of the way, we can
@@ -1048,7 +1104,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     {
         for (auto attr : typeLayout->getSizeAttrs())
         {
-            if (attr->getSize() != 0)
+            if (attr->getSize().compare(0) == std::partial_ordering::greater)
                 return attr->getResourceKind();
         }
         return LayoutResourceKind::None;
@@ -1274,13 +1330,13 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         switch (info.systemValueSemanticName)
         {
         case SystemValueSemanticName::GroupID:
-            return createLegalizedVal(info, blockIdxGlobalParam);
+            return createLegalizedSystemVaryingValInst(info, blockIdxGlobalParam);
         case SystemValueSemanticName::GroupThreadID:
-            return createLegalizedVal(info, threadIdxGlobalParam);
+            return createLegalizedSystemVaryingValInst(info, threadIdxGlobalParam);
         case SystemValueSemanticName::GroupIndex:
-            return createLegalizedVal(info, groupThreadIndex);
+            return createLegalizedSystemVaryingValInst(info, groupThreadIndex);
         case SystemValueSemanticName::DispatchThreadID:
-            return createLegalizedVal(info, dispatchThreadID);
+            return createLegalizedSystemVaryingValInst(info, dispatchThreadID);
         default:
             return diagnoseUnsupportedSystemVal(info);
         }
@@ -1334,62 +1390,6 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         default:
             return diagnoseUnsupportedUserVal(info);
         }
-    }
-
-    LegalizedVaryingVal createLegalizedVal(VaryingParamInfo const& info, IRInst* id)
-    {
-        // If the parameter type is not uint3, we need to extract components as needed
-        auto paramType = info.type->getOperand(0);
-        IRBuilder builder(m_module);
-        builder.setInsertBefore(m_firstOrdinaryInst);
-
-        if (as<IRBasicType>(paramType))
-        {
-            auto uintType = builder.getBasicType(BaseType::UInt);
-            UInt swizzleIndex = 0;
-            auto xComponent = builder.emitSwizzle(uintType, id, 1, &swizzleIndex);
-
-            if (auto basicType = as<IRBasicType>(paramType))
-            {
-                if (basicType->getBaseType() != BaseType::UInt)
-                {
-                    xComponent = builder.emitBitCast(basicType, xComponent);
-                }
-            }
-            return LegalizedVaryingVal::makeValue(xComponent);
-        }
-        // For vector types, use a swizzle to extract the needed components
-        else if (auto vectorType = as<IRVectorType>(paramType))
-        {
-            auto elementCount = getIntVal(vectorType->getElementCount());
-
-            if (elementCount > 0 && elementCount <= 3)
-            {
-                // Setup indices for the swizzle (0 for x, 1 for y, 2 for z)
-                UInt swizzleIndices[3] = {0, 1, 2};
-                auto uintType = builder.getBasicType(BaseType::UInt);
-
-                // Use a swizzle to extract all needed components at once
-                auto extractedVector = builder.emitSwizzle(
-                    builder.getVectorType(uintType, elementCount),
-                    id,
-                    elementCount,
-                    swizzleIndices);
-
-                // Cast if the element type is not uint
-                auto elementType = vectorType->getElementType();
-                if (auto basicElementType = as<IRBasicType>(elementType))
-                {
-                    if (basicElementType->getBaseType() != BaseType::UInt)
-                    {
-                        extractedVector = builder.emitBitCast(vectorType, extractedVector);
-                    }
-                }
-                return LegalizedVaryingVal::makeValue(extractedVector);
-            }
-        }
-        // Default to the full uint3 if the parameter type doesn't match our expectations
-        return LegalizedVaryingVal::makeValue(id);
     }
 };
 
@@ -1529,14 +1529,13 @@ struct CPUEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalize
         switch (info.systemValueSemanticName)
         {
         case SystemValueSemanticName::GroupID:
-            return LegalizedVaryingVal::makeValue(groupID);
+            return createLegalizedSystemVaryingValInst(info, groupID);
         case SystemValueSemanticName::GroupThreadID:
-            return LegalizedVaryingVal::makeValue(groupThreadID);
+            return createLegalizedSystemVaryingValInst(info, groupThreadID);
         case SystemValueSemanticName::GroupIndex:
-            return LegalizedVaryingVal::makeValue(groupThreadIndex);
+            return createLegalizedSystemVaryingValInst(info, groupThreadIndex);
         case SystemValueSemanticName::DispatchThreadID:
-            return LegalizedVaryingVal::makeValue(dispatchThreadID);
-
+            return createLegalizedSystemVaryingValInst(info, dispatchThreadID);
         default:
             return diagnoseUnsupportedSystemVal(info);
         }
@@ -2997,45 +2996,6 @@ private:
         fixUpFuncType(func, structType);
     }
 
-    IRInst* tryConvertValue(IRBuilder& builder, IRInst* val, IRType* toType)
-    {
-        auto fromType = val->getFullType();
-        if (auto fromVector = as<IRVectorType>(fromType))
-        {
-            if (auto toVector = as<IRVectorType>(toType))
-            {
-                if (fromVector->getElementCount() != toVector->getElementCount())
-                {
-                    fromType = builder.getVectorType(
-                        fromVector->getElementType(),
-                        toVector->getElementCount());
-                    val = builder.emitVectorReshape(fromType, val);
-                }
-            }
-            else if (as<IRBasicType>(toType))
-            {
-                UInt index = 0;
-                val = builder.emitSwizzle(fromVector->getElementType(), val, 1, &index);
-                if (toType->getOp() == kIROp_VoidType)
-                    return nullptr;
-            }
-        }
-        else if (auto fromBasicType = as<IRBasicType>(fromType))
-        {
-            if (fromBasicType->getOp() == kIROp_VoidType)
-                return nullptr;
-            if (!as<IRBasicType>(toType))
-                return nullptr;
-            if (toType->getOp() == kIROp_VoidType)
-                return nullptr;
-        }
-        else
-        {
-            return nullptr;
-        }
-        return builder.emitCast(toType, val);
-    }
-
     void legalizeSystemValueParameters(EntryPointInfo entryPoint)
     {
         List<SystemValLegalizationWorkItem> systemValWorkItems =
@@ -3613,7 +3573,8 @@ protected:
         }
 
         const auto topologyEnum = outputDeco->getTopologyType();
-        IRInst* topologyConst = builder.getIntValue(builder.getIntType(), topologyEnum);
+        IRIntLit* topologyConst =
+            (IRIntLit*)builder.getIntValue(builder.getIntType(), topologyEnum);
 
         IRType* vertexType = nullptr;
         IRType* indicesType = nullptr;

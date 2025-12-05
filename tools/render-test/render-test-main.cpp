@@ -209,6 +209,7 @@ struct TestResourceContext
     List<ComPtr<IResource>> resources;
 };
 
+
 class RenderTestApp
 {
 public:
@@ -330,6 +331,80 @@ struct AssignValsFromLayoutContext
         return SLANG_OK;
     }
 
+    static bool isDescriptorHandleType(const ShaderCursor& cursor)
+    {
+        // Descriptor handles in SPIRV/DX12 with bindless are lowered to uint2 or uint64
+        // stored in uniform data.
+        //
+        // Two representations:
+        // - uint2: Standard SPIRV path (OpAccessChain into __slang_resource_heap)
+        // - uint64: NVIDIA spvBindlessTextureNV path (OpConvertUToSampledImageNV)
+        //
+        // Note: uint64 can also be device addresses (buffer pointers).
+        // We use try-and-fallback: if getDescriptorHandle() fails, we fall back
+        // to the device address path (which checks uint64 again).
+        //
+        // We DON'T check for Kind::Resource in uniform data because:
+        // - On Metal/CUDA, regular resources appear as pointers in uniform data
+        // - Those work fine with regular setBinding(), not descriptor handles
+
+        auto typeLayout = cursor.getTypeLayout();
+
+        // Check if this parameter is stored in uniform data (not descriptor table)
+        auto uniformSize = typeLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM);
+        auto descriptorSlotSize =
+            typeLayout->getSize(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT);
+
+        if (uniformSize == 8 && descriptorSlotSize == 0)
+        {
+            auto type = typeLayout->getType();
+            auto kind = type->getKind();
+
+            // Check for uint2 (standard SPIRV/DX12 descriptor handle)
+            if (kind == slang::TypeReflection::Kind::Vector && type->getElementCount() == 2 &&
+                type->getElementType()->getScalarType() ==
+                    slang::TypeReflection::ScalarType::UInt32)
+                return true;
+
+            // Check for uint64 (NVIDIA spvBindlessTextureNV descriptor handle)
+            // Note: uint64 can also be a device address. We distinguish by checking
+            // if there's an element type - descriptor handles are pointers to resources.
+            if (kind == slang::TypeReflection::Kind::Scalar &&
+                type->getScalarType() == slang::TypeReflection::ScalarType::UInt64)
+            {
+                // Only treat as descriptor handle if it has an element type (resource)
+                // Plain uint64 with no element type is a device address
+                auto elementType = type->getElementType();
+                if (elementType &&
+                    (elementType->getKind() == slang::TypeReflection::Kind::Resource ||
+                     elementType->getKind() == slang::TypeReflection::Kind::SamplerState))
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    static DescriptorHandleAccess getDescriptorHandleAccess(SlangResourceAccess resourceAccess)
+    {
+        // Map Slang resource access to descriptor handle access
+        // Most write-capable resources map to ReadWrite
+        switch (resourceAccess)
+        {
+        case SLANG_RESOURCE_ACCESS_READ:
+            return DescriptorHandleAccess::Read;
+        case SLANG_RESOURCE_ACCESS_READ_WRITE:
+        case SLANG_RESOURCE_ACCESS_WRITE:
+        case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+        case SLANG_RESOURCE_ACCESS_APPEND:
+        case SLANG_RESOURCE_ACCESS_CONSUME:
+        case SLANG_RESOURCE_ACCESS_FEEDBACK:
+            return DescriptorHandleAccess::ReadWrite;
+        default:
+            return DescriptorHandleAccess::ReadWrite;
+        }
+    }
+
     SlangResult assignBuffer(ShaderCursor const& dstCursor, ShaderInputLayout::BufferVal* srcVal)
     {
         const InputBufferDesc& srcBuffer = srcVal->bufferDesc;
@@ -350,19 +425,80 @@ struct AssignValsFromLayoutContext
             device,
             bufferResource));
 
+        // Keep buffer alive in resource context
+        resourceContext.resources.add(ComPtr<IResource>(bufferResource.get()));
+
+        // Check for device address/pointer FIRST (before descriptor handles)
+        // This ensures plain uint64/pointer types use device addresses, not descriptor handles
         if ((dstCursor.getTypeLayout()->getType()->getKind() ==
                  slang::TypeReflection::Kind::Scalar &&
              dstCursor.getTypeLayout()->getType()->getScalarType() ==
                  slang::TypeReflection::ScalarType::UInt64) ||
             dstCursor.getTypeLayout()->getType()->getKind() == slang::TypeReflection::Kind::Pointer)
         {
-            // dstCursor is pointer to an ordinary uniform data field,
-            // we should write bufferResource as a pointer.
+            // Check if this is actually a descriptor handle lowered to uint64
+            // (NVIDIA spvBindlessTextureNV path)
+            if (isDescriptorHandleType(dstCursor))
+            {
+                // Try to allocate descriptor handle for bindless access
+                DescriptorHandle handle;
+
+                // Determine access mode from the shader parameter's resource type
+                auto handleType = dstCursor.getTypeLayout()->getType();
+                auto resourceType = handleType->getElementType();
+                auto resourceAccess = resourceType ? resourceType->getResourceAccess()
+                                                   : SLANG_RESOURCE_ACCESS_READ_WRITE;
+                DescriptorHandleAccess access = getDescriptorHandleAccess(resourceAccess);
+
+                // Try to get descriptor handle
+                auto result = bufferResource->getDescriptorHandle(
+                    access,
+                    srcBuffer.format,
+                    BufferRange{0, bufferSize},
+                    &handle);
+
+                if (SLANG_SUCCEEDED(result))
+                {
+                    SLANG_RETURN_ON_FAIL(dstCursor.setDescriptorHandle(handle));
+                    maybeAddOutput(dstCursor, srcVal, bufferResource);
+                    return SLANG_OK;
+                }
+            }
+
+            // Regular device address/pointer (not a descriptor handle)
             uint64_t addr = bufferResource->getDeviceAddress();
             dstCursor.setData(&addr, sizeof(addr));
-            resourceContext.resources.add(ComPtr<IResource>(bufferResource.get()));
             maybeAddOutput(dstCursor, srcVal, bufferResource);
             return SLANG_OK;
+        }
+
+        // Check if this is a uint2 descriptor handle (standard SPIRV path)
+        if (isDescriptorHandleType(dstCursor))
+        {
+            // Try to allocate descriptor handle for bindless access
+            DescriptorHandle handle;
+
+            // Determine access mode from the shader parameter's resource type
+            auto handleType = dstCursor.getTypeLayout()->getType();
+            auto resourceType = handleType->getElementType();
+            auto resourceAccess =
+                resourceType ? resourceType->getResourceAccess() : SLANG_RESOURCE_ACCESS_READ_WRITE;
+            DescriptorHandleAccess access = getDescriptorHandleAccess(resourceAccess);
+
+            // Try to get descriptor handle - will fail on backends that don't support it
+            auto result = bufferResource->getDescriptorHandle(
+                access,
+                srcBuffer.format,
+                BufferRange{0, bufferSize},
+                &handle);
+
+            if (SLANG_SUCCEEDED(result))
+            {
+                SLANG_RETURN_ON_FAIL(dstCursor.setDescriptorHandle(handle));
+                maybeAddOutput(dstCursor, srcVal, bufferResource);
+                return SLANG_OK;
+            }
+            // If getDescriptorHandle fails, fall through to regular binding
         }
 
         ComPtr<IBuffer> counterResource;
@@ -405,6 +541,8 @@ struct AssignValsFromLayoutContext
 
         if (counterResource)
         {
+            // Keep counter buffer alive
+            resourceContext.resources.add(ComPtr<IResource>(counterResource.get()));
             dstCursor.setBinding(Binding(bufferResource, counterResource));
         }
         else
@@ -430,7 +568,13 @@ struct AssignValsFromLayoutContext
             device,
             texture));
 
+        // Keep texture alive in resource context
+        resourceContext.resources.add(ComPtr<IResource>(texture.get()));
+
         auto sampler = _createSampler(device, samplerEntry->samplerDesc);
+
+        // Keep sampler alive in resource context
+        resourceContext.resources.add(ComPtr<IResource>(sampler.get()));
 
         dstCursor.setBinding(Binding(texture, sampler));
         maybeAddOutput(dstCursor, srcVal, texture);
@@ -451,6 +595,36 @@ struct AssignValsFromLayoutContext
             device,
             texture));
 
+        // Keep texture alive in resource context
+        resourceContext.resources.add(ComPtr<IResource>(texture.get()));
+
+        // Check if this is a descriptor handle type
+        if (isDescriptorHandleType(dstCursor))
+        {
+            // Try to allocate descriptor handle for bindless access
+            // Get default texture view first, as handles are allocated from views
+            ComPtr<ITextureView> textureView;
+            SLANG_RETURN_ON_FAIL(texture->getDefaultView(textureView.writeRef()));
+
+            // Determine access mode from the shader parameter's resource type
+            auto handleType = dstCursor.getTypeLayout()->getType();
+            auto resourceType = handleType->getElementType();
+            auto resourceAccess =
+                resourceType ? resourceType->getResourceAccess() : SLANG_RESOURCE_ACCESS_READ_WRITE;
+            DescriptorHandle handle;
+            DescriptorHandleAccess access = getDescriptorHandleAccess(resourceAccess);
+
+            // Try to get descriptor handle - will fail on backends that don't support it
+            auto result = textureView->getDescriptorHandle(access, &handle);
+            if (SLANG_SUCCEEDED(result))
+            {
+                SLANG_RETURN_ON_FAIL(dstCursor.setDescriptorHandle(handle));
+                maybeAddOutput(dstCursor, srcVal, texture);
+                return SLANG_OK;
+            }
+            // If getDescriptorHandle fails, fall through to regular binding
+        }
+
         dstCursor.setBinding(texture);
         maybeAddOutput(dstCursor, srcVal, texture);
         return SLANG_OK;
@@ -459,6 +633,23 @@ struct AssignValsFromLayoutContext
     SlangResult assignSampler(ShaderCursor const& dstCursor, ShaderInputLayout::SamplerVal* srcVal)
     {
         auto sampler = _createSampler(device, srcVal->samplerDesc);
+
+        // Keep sampler alive in resource context
+        resourceContext.resources.add(ComPtr<IResource>(sampler.get()));
+
+        // Check if this is a descriptor handle type
+        if (isDescriptorHandleType(dstCursor))
+        {
+            // Try to allocate descriptor handle for bindless access
+            DescriptorHandle handle;
+            auto result = sampler->getDescriptorHandle(&handle);
+            if (SLANG_SUCCEEDED(result))
+            {
+                SLANG_RETURN_ON_FAIL(dstCursor.setDescriptorHandle(handle));
+                return SLANG_OK;
+            }
+            // If getDescriptorHandle fails, fall through to regular binding
+        }
 
         dstCursor.setBinding(sampler);
         return SLANG_OK;
@@ -722,16 +913,17 @@ SlangResult RenderTestApp::initialize(
         case Options::ShaderProgramType::Graphics:
         case Options::ShaderProgramType::GraphicsCompute:
             {
-                // TODO: We should conceivably be able to match up the "available" vertex
-                // attributes, as defined by the vertex stream(s) on the model being
-                // renderer, with the "required" vertex attributes as defiend on the
-                // shader.
+                // We define a fixed set of "available" vertex attributes for the single
+                // triangle used by all graphics tests.
                 //
-                // For now we just create a fixed input layout for all graphics tests
-                // since at present they all draw the same single triangle with a
-                // fixed/known set of attributes.
+                // We filter this list to only include attributes actually used by the
+                // vertex shader to avoid validation warnings.
                 //
-                const InputElementDesc inputElements[] = {
+                // TODO: In the future we should be more flexible and support matching
+                // available attributes from arbitrary models/streams with the shader's
+                // requirements.
+                //
+                const InputElementDesc allInputElements[] = {
                     {"A", 0, Format::RGB32Float, offsetof(Vertex, position)},
                     {"A", 1, Format::RGB32Float, offsetof(Vertex, color)},
                     {"A", 2, Format::RG32Float, offsetof(Vertex, uv)},
@@ -741,11 +933,24 @@ SlangResult RenderTestApp::initialize(
                     {"A", 6, Format::RGBA32Float, offsetof(Vertex, customData3)},
                 };
 
+                List<InputElementDesc> inputElements;
+                if (slang::IComponentType* slangProgram = m_compilationOutput.output.slangProgram)
+                {
+                    inputElements = filterInputElements(
+                        allInputElements,
+                        SLANG_COUNT_OF(allInputElements),
+                        slangProgram->getLayout());
+                }
+                else
+                {
+                    inputElements.addRange(allInputElements, SLANG_COUNT_OF(allInputElements));
+                }
+
                 ComPtr<IInputLayout> inputLayout;
                 SLANG_RETURN_ON_FAIL(device->createInputLayout(
                     sizeof(Vertex),
-                    inputElements,
-                    SLANG_COUNT_OF(inputElements),
+                    inputElements.getBuffer(),
+                    inputElements.getCount(),
                     inputLayout.writeRef()));
 
                 BufferDesc vertexBufferDesc;
@@ -1112,7 +1317,7 @@ Result RenderTestApp::update()
         auto passEncoder = encoder->beginComputePass();
         auto rootObject =
             passEncoder->bindPipeline(static_cast<IComputePipeline*>(m_pipeline.get()));
-        applyBinding(rootObject);
+        SLANG_RETURN_ON_FAIL(applyBinding(rootObject));
         passEncoder->dispatchCompute(
             m_options.computeDispatchSize[0],
             m_options.computeDispatchSize[1],
@@ -1125,7 +1330,7 @@ Result RenderTestApp::update()
         auto rootObject = passEncoder->bindPipeline(
             static_cast<IRayTracingPipeline*>(m_pipeline.get()),
             m_shaderTable);
-        applyBinding(rootObject);
+        SLANG_RETURN_ON_FAIL(applyBinding(rootObject));
         passEncoder->dispatchRays(
             0,
             m_options.computeDispatchSize[0],
@@ -1151,7 +1356,7 @@ Result RenderTestApp::update()
         auto passEncoder = encoder->beginRenderPass(renderPass);
         auto rootObject =
             passEncoder->bindPipeline(static_cast<IRenderPipeline*>(m_pipeline.get()));
-        applyBinding(rootObject);
+        SLANG_RETURN_ON_FAIL(applyBinding(rootObject));
         setProjectionMatrix(rootObject);
 
         RenderState state;
@@ -1460,6 +1665,7 @@ static SlangResult _innerMain(
                 if (SLANG_FAILED(
                         spSessionCheckPassThroughSupport(session, SLANG_PASS_THROUGH_NVRTC)))
                     return SLANG_FAIL;
+                break;
 #else
                 return SLANG_FAIL;
 #endif

@@ -14,7 +14,7 @@ int doThing(RWStructuredBuffer<int> buf, int index)
     return buf[index];
 }
 
-[numthreads(16, 1, 1)]
+[numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     int tid = int(dispatchThreadID.x); 

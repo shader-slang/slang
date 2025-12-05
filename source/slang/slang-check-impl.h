@@ -821,6 +821,10 @@ private:
     /// Is the `m_mapTypeDeclToCandidateExtensions` dictionary valid and up to date?
     bool m_candidateExtensionListsBuilt = false;
 
+    /// The count of loadedModulesList when the candidate extension cache was last built.
+    /// Used to detect when loadedModulesList has changed and the cache needs updating.
+    Index m_candidateExtensionListsBuiltForModuleCount = 0;
+
     /// Add candidate extensions declared in `moduleDecl` to `m_mapTypeDeclToCandidateExtensions`
     void _addCandidateExtensionsFromModule(ModuleDecl* moduleDecl);
 
@@ -2009,33 +2013,12 @@ public:
         DeclRef<PropertyDecl> requiredMemberDeclRef,
         RefPtr<WitnessTable> witnessTable);
 
-    bool trySynthesizeWrapperTypePropertyRequirementWitness(
-        ConformanceCheckingContext* context,
-        DeclRef<PropertyDecl> requiredMemberDeclRef,
-        RefPtr<WitnessTable> witnessTable);
-
     bool trySynthesizeSubscriptRequirementWitness(
         ConformanceCheckingContext* context,
         const LookupResult& lookupResult,
         DeclRef<SubscriptDecl> requiredMemberDeclRef,
         RefPtr<WitnessTable> witnessTable);
 
-    bool trySynthesizeWrapperTypeSubscriptRequirementWitness(
-        ConformanceCheckingContext* context,
-        DeclRef<SubscriptDecl> requiredMemberDeclRef,
-        RefPtr<WitnessTable> witnessTable);
-
-    bool trySynthesizeAssociatedTypeRequirementWitness(
-        ConformanceCheckingContext* context,
-        LookupResult const& lookupResult,
-        DeclRef<AssocTypeDecl> requiredMemberDeclRef,
-        RefPtr<WitnessTable> witnessTable);
-
-    bool trySynthesizeAssociatedConstantRequirementWitness(
-        ConformanceCheckingContext* context,
-        LookupResult const& lookupResult,
-        DeclRef<VarDeclBase> requiredMemberDeclRef,
-        RefPtr<WitnessTable> witnessTable);
 
     /// Attempt to synthesize a declartion that can satisfy `requiredMemberDeclRef` using
     /// `lookupResult`.
@@ -2789,6 +2772,18 @@ public:
         DeclRef<VarDeclBase> const& varRef,
         IntVal* val);
 
+    bool TryUnifyFunctorByStructuralMatch(
+        ConstraintSystem& constraints,
+        ValUnificationContext unifyCtx,
+        StructDecl* fst,
+        FuncType* snd);
+
+    bool TryUnifyFuncTypesByStructuralMatch(
+        ConstraintSystem& constraints,
+        ValUnificationContext unifyCtx,
+        FuncType* fst,
+        FuncType* snd);
+
     bool TryUnifyTypesByStructuralMatch(
         ConstraintSystem& constraints,
         ValUnificationContext unificationContext,
@@ -3259,7 +3254,7 @@ void diagnoseMissingCapabilityProvenance(
     CompilerOptionSet& optionSet,
     DiagnosticSink* sink,
     Decl* decl,
-    CapabilitySet& setToFind);
+    CapabilitySet const& setToFind);
 void diagnoseCapabilityProvenance(
     CompilerOptionSet& optionSet,
     DiagnosticSink* sink,

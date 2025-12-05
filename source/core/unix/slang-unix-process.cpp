@@ -13,6 +13,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <spawn.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -23,6 +24,8 @@
 #endif
 
 #include <time.h>
+
+extern char** environ;
 
 namespace Slang
 {
@@ -300,11 +303,22 @@ SlangResult UnixPipeStream::read(void* buffer, size_t length, size_t& outReadByt
         {
             return SLANG_OK;
         }
+
+        // End of file.
+        if (count == 0)
+        {
+            close();
+        }
     }
 
     if (pollInfo.revents & POLLHUP)
     {
         close();
+    }
+
+    if (pollInfo.revents & POLLERR || pollInfo.revents & POLLNVAL)
+    {
+        return SLANG_FAIL;
     }
 
     return SLANG_OK;
@@ -371,31 +385,13 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
     return StringEscapeUtil::getHandler(StringEscapeUtil::Style::Space);
 }
 
-static const int kCannotExecute = 126;
-
-static int pipeCLOEXEC(int pipefd[2])
-{
-#if SLANG_APPLE_FAMILY
-    // without pipe2 on macOS, there's an unavoidable race here where
-    // another process could fork and execv with execWatchPipe before we
-    // can set CLOEXEC on it...
-    if (pipe(pipefd) == -1 || fcntl(pipefd[1], F_SETFD, FD_CLOEXEC) == -1 ||
-        fcntl(pipefd[0], F_SETFD, FD_CLOEXEC) == -1)
-    {
-        return -1;
-    }
-    return 0;
-#else
-    return pipe2(pipefd, O_CLOEXEC);
-#endif
-}
-
 /* static */ SlangResult Process::create(
     const CommandLine& commandLine,
     Process::Flags,
     RefPtr<Process>& outProcess)
 {
     const char* whatFailed = nullptr;
+    int spawnResult = 0;
     pid_t childPid;
 
     //
@@ -405,17 +401,14 @@ static int pipeCLOEXEC(int pipefd[2])
 
     const auto& exe = commandLine.m_executableLocation;
 
-    // Add the command
+    // The command
     argPtrs.add(exe.m_pathOrName.getBuffer());
 
-    // Add all the args - they don't need any explicit escaping
+    // The args - they don't need any explicit escaping
     for (auto arg : commandLine.m_args)
     {
-        // All args for this target must be unescaped (as they are in CommandLine)
         argPtrs.add(arg.getBuffer());
     }
-
-    // Terminate with a null
     argPtrs.add(nullptr);
 
     //
@@ -425,183 +418,150 @@ static int pipeCLOEXEC(int pipefd[2])
     int stdoutPipe[2] = {-1, -1};
     int stderrPipe[2] = {-1, -1};
 
-    // We will create this pipe with O_CLOEXEC, so that it gets closed
-    // automatically if the child's exec succeeds
-    int execWatchPipe[2] = {-1, -1};
-
-    if (pipe(stdinPipe) == -1 || pipe(stdoutPipe) == -1 || pipe(stderrPipe) == -1 ||
-        pipeCLOEXEC(execWatchPipe) == -1)
+    if (pipe(stdinPipe) == -1 || pipe(stdoutPipe) == -1 || pipe(stderrPipe) == -1)
     {
         whatFailed = "pipe";
-        goto reportErr;
-    }
-
-    // Make sure that none of our pipes are going to be clobbered by dup2 to
-    // 0,1,2 in the child.
-    whatFailed = "fcntl";
-    int next;
-    if (stdinPipe[0] < 3)
-    {
-        if (-1 == (next = fcntl(stdinPipe[0], F_DUPFD, 3)))
-        {
-            goto reportErr;
-        }
-        close(stdinPipe[0]);
-        stdinPipe[0] = next;
-    }
-    if (stdoutPipe[1] < 3)
-    {
-        if (-1 == (next = fcntl(stdoutPipe[1], F_DUPFD, 3)))
-        {
-            goto reportErr;
-        }
-        close(stdoutPipe[1]);
-        stdoutPipe[1] = next;
-    }
-    if (stderrPipe[1] < 3)
-    {
-        if (-1 == (next = fcntl(stderrPipe[1], F_DUPFD, 3)))
-        {
-            goto reportErr;
-        }
-        close(stderrPipe[1]);
-        stderrPipe[1] = next;
-    }
-    if (execWatchPipe[1] < 3)
-    {
-        if (-1 == (next = fcntl(execWatchPipe[1], F_DUPFD_CLOEXEC, 3)))
-        {
-            goto reportErr;
-        }
-        close(execWatchPipe[1]);
-        execWatchPipe[1] = next;
-    }
-    whatFailed = nullptr;
-
-    childPid = fork();
-    if (childPid == -1)
-    {
-        whatFailed = "fork";
-        goto reportErr;
-    }
-
-    if (childPid == 0)
-    {
-        // We are the child process.
-
-        // Close unused fds and duplicate into standard handles
-
-        ::close(execWatchPipe[0]);
-        ::close(stdinPipe[1]);
-        ::close(stdoutPipe[0]);
-        ::close(stderrPipe[0]);
-
-        dup2(stdinPipe[0], STDIN_FILENO);
-        ::close(stdinPipe[0]);
-        dup2(stdoutPipe[1], STDOUT_FILENO);
-        ::close(stdoutPipe[1]);
-        dup2(stderrPipe[1], STDERR_FILENO);
-        ::close(stderrPipe[1]);
-
-        // Reset locale to ensure the output can be parsed regardless of user's
-        // locale.
-        setenv("LC_ALL", "C", 1);
-
-        if (exe.m_type == ExecutableLocation::Type::Path)
-        {
-            // Use the specified path (ie don't search)
-            ::execv(argPtrs[0], (char* const*)&argPtrs[0]);
-        }
-        else
-        {
-            // Search for the executable
-            ::execvp(argPtrs[0], (char* const*)&argPtrs[0]);
-        }
-
-        // If we get here, then `exec` failed
-
-        // Signal the failure to our parent
-        int execErr = errno;
-        if (::write(execWatchPipe[1], &execErr, sizeof(execErr)))
-            fprintf(stderr, "error: `exec` watch pipe write failed\n");
-
-        // NOTE! Because we have dup2 into STDERR_FILENO, this error will *not* generally appear on
-        // the terminal but in the stderrPipe.
-        fprintf(stderr, "error: `exec` failed\n");
-
-        // Terminate with failure.
-        // Call _exit() rather than exit() so we don't run anything registered with atexit()
-        ::_exit(kCannotExecute);
     }
     else
     {
-        // We are the parent process
-        ::close(execWatchPipe[1]);
-        ::close(stdinPipe[0]);
-        ::close(stdoutPipe[1]);
-        ::close(stderrPipe[1]);
+        //
+        // The meat
+        //
+        posix_spawn_file_actions_t file_actions;
+        posix_spawnattr_t attr;
 
-        RefPtr<Stream> streams[Index(StdStreamType::CountOf)];
-
-        // Previously code didn't need to close, so we'll make stream now own the handles
-        streams[Index(StdStreamType::Out)] =
-            new UnixPipeStream(stdoutPipe[0], FileAccess::Read, true);
-        stdoutPipe[0] = -1;
-        streams[Index(StdStreamType::ErrorOut)] =
-            new UnixPipeStream(stderrPipe[0], FileAccess::Read, true);
-        stderrPipe[0] = -1;
-        streams[Index(StdStreamType::In)] =
-            new UnixPipeStream(stdinPipe[1], FileAccess::Write, true);
-        stdinPipe[1] = -1;
-
-        // Check that the exec actually succeeded
-        int execErrCode;
-        // Our success is if we read zero bytes, indicating that the pipe was
-        // closed by the child's exec and O_CLOEXEC. (and us just above)
-        const int readRes = ::read(execWatchPipe[0], &execErrCode, sizeof(execErrCode));
-        if (readRes < 0)
+        if (posix_spawn_file_actions_init(&file_actions) != 0 || posix_spawnattr_init(&attr) != 0)
         {
-            whatFailed = "read from forked process";
-            goto reportErr;
+            whatFailed = "posix_spawn init";
         }
-        else if (readRes > 0)
+        else
         {
-            // exec failed, and the child reported back to us
-            // don't print messages by default, as we do some speculative
-            // execution of processes to see if they exist and it gets noisy
-            const bool verbose = false;
-            if (verbose)
+            //
+            // Stdio redirections
+            //
+            posix_spawn_file_actions_adddup2(&file_actions, stdinPipe[0], STDIN_FILENO);
+            posix_spawn_file_actions_addclose(&file_actions, stdinPipe[0]);
+            posix_spawn_file_actions_addclose(&file_actions, stdinPipe[1]);
+
+            posix_spawn_file_actions_adddup2(&file_actions, stdoutPipe[1], STDOUT_FILENO);
+            posix_spawn_file_actions_addclose(&file_actions, stdoutPipe[0]);
+            posix_spawn_file_actions_addclose(&file_actions, stdoutPipe[1]);
+
+            posix_spawn_file_actions_adddup2(&file_actions, stderrPipe[1], STDERR_FILENO);
+            posix_spawn_file_actions_addclose(&file_actions, stderrPipe[0]);
+            posix_spawn_file_actions_addclose(&file_actions, stderrPipe[1]);
+
+            //
+            // Set up environment - inherit parent but override LC_ALL=C
+            //
+            List<char const*> envPtrs;
+
+            for (char** env = environ; *env != nullptr; env++)
             {
-                fprintf(
-                    stderr,
-                    "error: exec for \"%s\" failed: %s\n",
-                    argPtrs[0],
-                    ::strerror(execErrCode));
+                if (strncmp(*env, "LC_ALL=", 7) != 0)
+                {
+                    envPtrs.add(*env);
+                }
             }
-            whatFailed = "exec";
-            // Don't report the exec as we expect some of them to fail
-            goto closePipes;
-        }
+            envPtrs.add("LC_ALL=C");
+            envPtrs.add(nullptr);
 
-        outProcess = new UnixProcess(childPid, streams[0].readRef());
+            // WASM doesn't have posix_spawnp, but it also doesn't have things
+            // like PATH so it's fine to fall back to posix_spawn (what are we even spawning on WASM
+            // anyway)
+#if !SLANG_WASM
+            if (exe.m_type == ExecutableLocation::Type::Name)
+            {
+                spawnResult = posix_spawnp(
+                    &childPid,
+                    argPtrs[0],
+                    &file_actions,
+                    &attr,
+                    (char* const*)&argPtrs[0],
+                    (char* const*)&envPtrs[0]);
+            }
+            else
+#endif
+            {
+                spawnResult = posix_spawn(
+                    &childPid,
+                    argPtrs[0],
+                    &file_actions,
+                    &attr,
+                    (char* const*)&argPtrs[0],
+                    (char* const*)&envPtrs[0]);
+            }
+
+            //
+            // cleanup
+            //
+            posix_spawn_file_actions_destroy(&file_actions);
+            posix_spawnattr_destroy(&attr);
+
+            if (spawnResult != 0)
+            {
+                // Only report unexpected errors - ENOENT/EACCES are expected for
+                // missing/inaccessible tools
+                if (spawnResult != ENOENT && spawnResult != EACCES)
+                {
+                    whatFailed = "posix_spawn";
+                }
+
+                // Don't print messages by default for failed spawns (some are speculative)
+                const bool verbose = false;
+                if (verbose)
+                {
+                    fprintf(
+                        stderr,
+                        "error: posix_spawn for \"%s\" failed: %s\n",
+                        argPtrs[0],
+                        strerror(spawnResult));
+                }
+            }
+            else
+            {
+                // Close child-side pipes in parent
+                ::close(stdinPipe[0]);
+                ::close(stdoutPipe[1]);
+                ::close(stderrPipe[1]);
+                stdinPipe[0] = stdoutPipe[1] = stderrPipe[1] = -1;
+
+                // Create stream objects for parent-side pipes
+                RefPtr<Stream> streams[Index(StdStreamType::CountOf)];
+                streams[Index(StdStreamType::Out)] =
+                    new UnixPipeStream(stdoutPipe[0], FileAccess::Read, true);
+                streams[Index(StdStreamType::ErrorOut)] =
+                    new UnixPipeStream(stderrPipe[0], FileAccess::Read, true);
+                streams[Index(StdStreamType::In)] =
+                    new UnixPipeStream(stdinPipe[1], FileAccess::Write, true);
+
+                // Mark as owned by streams so cleanup doesn't close them
+                stdoutPipe[0] = stderrPipe[0] = stdinPipe[1] = -1;
+
+                outProcess = new UnixProcess(childPid, streams[0].readRef());
+            }
+        }
     }
 
-    goto closePipes;
+    // Report any error
+    if (whatFailed)
+    {
+        fprintf(
+            stderr,
+            "error: `%s` failed (%s)\n",
+            whatFailed,
+            strerror(spawnResult ? spawnResult : errno));
+    }
 
-    // Report any error and then cleanup
-reportErr:
-    fprintf(stderr, "error: `%s` failed (%s)\n", whatFailed, strerror(errno));
-closePipes:
-    ::close(execWatchPipe[0]);
-    ::close(execWatchPipe[1]);
+    // Clean up any remaining open pipes
     ::close(stdinPipe[0]);
     ::close(stdinPipe[1]);
-    ::close(stderrPipe[0]);
-    ::close(stderrPipe[1]);
     ::close(stdoutPipe[0]);
     ::close(stdoutPipe[1]);
+    ::close(stderrPipe[0]);
+    ::close(stderrPipe[1]);
 
-    return whatFailed ? SLANG_FAIL : SLANG_OK;
+    return whatFailed || spawnResult ? SLANG_FAIL : SLANG_OK;
 }
 
 /* static */ uint64_t Process::getClockFrequency()

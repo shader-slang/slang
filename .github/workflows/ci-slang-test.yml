@@ -143,15 +143,23 @@ jobs:
       - name: Run slang-rhi tests
         run: |
           export SLANG_RHI_EXCLUDE_TESTS="md-clear*,cmd-copy*,cmd-upload*,fence*,staging-heap*,texture-create*"
-          if [[ "${{ inputs.os }}" == "macos" ]]; then
-            export SLANG_RHI_EXCLUDE_TESTS="sampler-array"
-          fi
           "$bin_dir/slang-rhi-tests" -check-devices -tce="$SLANG_RHI_EXCLUDE_TESTS"
 
-  # Run slangpy tests when:
+      - name: Run slang-rhi tests (OptiX 8.0)
+        if: inputs.os == 'windows' || inputs.os == 'linux'
+        run: |
+          "$bin_dir/slang-rhi-tests" -check-devices -optix-version=80000 -tc="ray-tracing-*.cuda"
+
+      - name: Run slang-rhi tests (OptiX 8.1)
+        if: inputs.os == 'windows' || inputs.os == 'linux'
+        run: |
+          "$bin_dir/slang-rhi-tests" -check-devices -optix-version=80100 -tc="ray-tracing-*.cuda"
+
+  # Run slangpy tests and examples when:
   # 1. full-gpu-tests is enabled AND
   # 2. Either it's a pull request OR config is release
   # This is to reduce the CI load but do some check on pull requests.
+  # Includes both slangpy pytest tests and slangpy-samples examples.
   test-slangpy:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
     timeout-minutes: 30
@@ -197,21 +205,57 @@ jobs:
           if [[ "${{ inputs.os }}" == "windows" ]]; then
             cp "$bin_dir"/slang*.dll "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy library files"; exit 1; }
           else
+            # This is kind of awkward because the version numbers might be
+            # different between the old libslang-compiler and the new one, so
+            # we need to make sure we overwrite the old one. This logic also
+            # tries to avoid making assumptions about filename extension due to
+            # differences in macos and Linux conventions.
+
+            # There should only be one libslang-compiler library present; the
+            # one that slangpy linked to.
+            OLD_SLANGLIB=$(find "$SITE_PACKAGES/slangpy/" -type f -name "libslang-compiler.*")
+            echo "old slang library location: $OLD_SLANGLIB"
+
+            # Find the new libslang-compiler library via developer symlink
+            # filename. This is unlikely to still be a symlink since it went
+            # through artifactory, but in practice symlink or not shouldn't
+            # matter, since we copy the rest of the libraries over.
+            NEW_SLANGLIB=$(find "$lib_dir" -name "libslang-compiler.*" ! -name "*.*.*")
+            echo "new slang library location: $NEW_SLANGLIB"
+
+            cp "$NEW_SLANGLIB" "$OLD_SLANGLIB" || { echo "Failed to copy main library file"; exit 1; }
+
+            # Copy the rest of the library files
             cp "$lib_dir"/libslang*.* "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy library files"; exit 1; }
           fi
 
           echo "Listing files in slangpy directory..."
           ls -la "$SITE_PACKAGES/slangpy/"
 
-          # Skip package installation on self-hosted runners to avoid permission issues
-          if [[ ! "${{ inputs.runs-on }}" =~ self-hosted ]]; then
-            echo "Installing python packages..."
-            curl -fsSL https://raw.githubusercontent.com/shader-slang/slangpy/main/requirements-dev.txt -o requirements-dev.txt
-            python -m pip install -r requirements-dev.txt --user
-            python -m pip install pytest-github-actions-annotate-failures --user
-            python -m pip install pytest-xdist --user
-          fi
+          # Export SITE_PACKAGES for use in slangpy-samples step
+          echo "SITE_PACKAGES=$SITE_PACKAGES" >> $GITHUB_ENV
+
+          echo "Installing python packages..."
+          curl -fsSL https://raw.githubusercontent.com/shader-slang/slangpy/main/requirements-dev.txt -o requirements-dev.txt
+          python -m pip install -r requirements-dev.txt --user
+          python -m pip install pytest-github-actions-annotate-failures --user
+          python -m pip install pytest-xdist --user
 
           echo "Running pytest on slangpy tests..."
           export PYTHONPATH="$SITE_PACKAGES"
           python -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n auto --maxprocesses=3
+
+      - name: Clone slangpy-samples
+        run: |
+          echo "Cloning slangpy-samples repository..."
+          git clone --depth 1 https://github.com/shader-slang/slangpy-samples.git
+
+      - name: Install slangpy-samples dependencies
+        run: |
+          echo "Installing slangpy-samples dependencies..."
+          python -m pip install -r slangpy-samples/requirements.txt --user
+
+      - name: Run slangpy-samples tests
+        run: |
+          echo "Running slangpy-samples tests..."
+          python -m pytest -n 4 slangpy-samples/tests

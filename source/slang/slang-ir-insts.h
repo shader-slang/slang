@@ -47,7 +47,6 @@ struct IRHighLevelDeclDecoration : IRDecoration
 {
     FIDDLE(leafInst())
 
-    IRPtrLit* getDeclOperand() { return cast<IRPtrLit>(getOperand(0)); }
     Decl* getDecl() { return (Decl*)getDeclOperand()->getValue(); }
 };
 
@@ -62,8 +61,6 @@ struct IRLoopControlDecoration : IRDecoration
 {
     FIDDLE(leafInst())
 
-    IRConstant* getModeOperand() { return cast<IRConstant>(getOperand(0)); }
-
     IRLoopControl getMode() { return IRLoopControl(getModeOperand()->value.intVal); }
 };
 
@@ -72,7 +69,6 @@ struct IRLoopMaxItersDecoration : IRDecoration
 {
     FIDDLE(leafInst())
 
-    IRConstant* getMaxItersInst() { return cast<IRConstant>(getOperand(0)); }
     IRIntegerValue getMaxIters() { return as<IRIntLit>(getOperand(0))->getValue(); }
 };
 
@@ -112,18 +108,12 @@ struct IRTargetSpecificDefinitionDecoration : IRTargetSpecificDecoration
     FIDDLE(baseInst())
 };
 
-FIDDLE()
-struct IRTargetDecoration : IRTargetSpecificDefinitionDecoration
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRTargetSystemValueDecoration : IRDecoration
 {
     FIDDLE(leafInst())
 
-    IRStringLit* getSemanticOperand() { return cast<IRStringLit>(getOperand(0)); }
 
     UnownedStringSlice getSemantic() { return getSemanticOperand()->getStringSlice(); }
 };
@@ -132,8 +122,6 @@ FIDDLE()
 struct IRTargetIntrinsicDecoration : IRTargetSpecificDefinitionDecoration
 {
     FIDDLE(leafInst())
-
-    IRStringLit* getDefinitionOperand() { return cast<IRStringLit>(getOperand(1)); }
 
     UnownedStringSlice getDefinition() { return getDefinitionOperand()->getStringSlice(); }
 };
@@ -151,24 +139,14 @@ struct IRIntrinsicOpDecoration : IRDecoration
 {
     FIDDLE(leafInst())
 
-    IRIntLit* getIntrinsicOpOperand() { return cast<IRIntLit>(getOperand(0)); }
-
     IROp getIntrinsicOp() { return (IROp)getIntrinsicOpOperand()->getValue(); }
 };
 
-FIDDLE()
-struct IRAlignedAddressDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-    IRInst* getAlignment() { return getOperand(0); }
-};
 
 FIDDLE()
 struct IRGLSLOuterArrayDecoration : IRDecoration
 {
     FIDDLE(leafInst())
-
-    IRStringLit* getOuterArrayNameOperand() { return cast<IRStringLit>(getOperand(0)); }
 
     UnownedStringSlice getOuterArrayName() { return getOuterArrayNameOperand()->getStringSlice(); }
 };
@@ -201,8 +179,6 @@ struct IRInterpolationModeDecoration : IRDecoration
 {
     FIDDLE(leafInst())
 
-    IRConstant* getModeOperand() { return cast<IRConstant>(getOperand(0)); }
-
     IRInterpolationMode getMode() { return IRInterpolationMode(getModeOperand()->value.intVal); }
 };
 
@@ -215,8 +191,6 @@ struct IRNameHintDecoration : IRDecoration
 {
     FIDDLE(leafInst())
 
-    IRStringLit* getNameOperand() { return cast<IRStringLit>(getOperand(0)); }
-
     UnownedStringSlice getName() { return getNameOperand()->getStringSlice(); }
 };
 
@@ -226,7 +200,6 @@ struct IRRTTITypeSizeDecoration : IRDecoration
 {
     FIDDLE(leafInst())
 
-    IRIntLit* getTypeSizeOperand() { return cast<IRIntLit>(getOperand(0)); }
     IRIntegerValue getTypeSize() { return getTypeSizeOperand()->getValue(); }
 };
 
@@ -237,48 +210,9 @@ struct IRAnyValueSizeDecoration : IRDecoration
 {
     FIDDLE(leafInst())
 
-    IRIntLit* getSizeOperand() { return cast<IRIntLit>(getOperand(0)); }
     IRIntegerValue getSize() { return getSizeOperand()->getValue(); }
 };
 
-FIDDLE()
-struct IRDispatchFuncDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-
-    IRInst* getFunc() { return getOperand(0); }
-};
-
-FIDDLE()
-struct IRSpecializeDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRComInterfaceDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRCOMWitnessDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-
-    IRInst* getWitnessTable() { return getOperand(0); }
-};
-
-/// A decoration on `IRParam`s that represent generic parameters,
-/// marking the interface type that the generic parameter conforms to.
-/// A generic parameter can have more than one `IRTypeConstraintDecoration`s
-FIDDLE()
-struct IRTypeConstraintDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-
-    IRInst* getConstraintType() { return getOperand(0); }
-};
 
 bool isSimpleDecoration(IROp op);
 
@@ -286,8 +220,6 @@ FIDDLE()
 struct IRRequireGLSLVersionDecoration : IRDecoration
 {
     FIDDLE(leafInst())
-
-    IRConstant* getLanguageVersionOperand() { return cast<IRConstant>(getOperand(0)); }
 
     Int getLanguageVersion() { return Int(getLanguageVersionOperand()->value.intVal); }
 };
@@ -297,7 +229,6 @@ struct IRSPIRVNonUniformResourceDecoration : IRDecoration
 {
     FIDDLE(leafInst())
 
-    IRConstant* getSPIRVNonUniformResourceOperand() { return cast<IRConstant>(getOperand(0)); }
     IntegerLiteralValue getSPIRVNonUniformResource()
     {
         return getSPIRVNonUniformResourceOperand()->value.intVal;
@@ -309,7 +240,6 @@ struct IRRequireSPIRVVersionDecoration : IRDecoration
 {
     FIDDLE(leafInst())
 
-    IRConstant* getSPIRVVersionOperand() { return cast<IRConstant>(getOperand(0)); }
     SemanticVersion getSPIRVVersion()
     {
         return SemanticVersion::fromRaw(getSPIRVVersionOperand()->value.intVal);
@@ -321,7 +251,6 @@ struct IRRequireCapabilityAtomDecoration : IRDecoration
 {
     FIDDLE(leafInst())
 
-    IRConstant* getCapabilityAtomOperand() { return cast<IRConstant>(getOperand(0)); }
     CapabilityName getAtom() { return (CapabilityName)getCapabilityAtomOperand()->value.intVal; }
 };
 
@@ -330,7 +259,6 @@ struct IRRequireCUDASMVersionDecoration : IRDecoration
 {
     FIDDLE(leafInst())
 
-    IRConstant* getCUDASMVersionOperand() { return cast<IRConstant>(getOperand(0)); }
     SemanticVersion getCUDASMVersion()
     {
         return SemanticVersion::fromRaw(getCUDASMVersionOperand()->value.intVal);
@@ -342,8 +270,6 @@ struct IRRequireGLSLExtensionDecoration : IRDecoration
 {
     FIDDLE(leafInst())
 
-    IRStringLit* getExtensionNameOperand() { return cast<IRStringLit>(getOperand(0)); }
-
     UnownedStringSlice getExtensionName() { return getExtensionNameOperand()->getStringSlice(); }
 };
 
@@ -351,8 +277,6 @@ FIDDLE()
 struct IRRequireWGSLExtensionDecoration : IRDecoration
 {
     FIDDLE(leafInst())
-
-    IRStringLit* getExtensionNameOperand() { return cast<IRStringLit>(getOperand(0)); }
 
     UnownedStringSlice getExtensionName() { return getExtensionNameOperand()->getStringSlice(); }
 };
@@ -374,34 +298,12 @@ struct IRAvailableInDownstreamIRDecoration : IRDecoration
     }
 };
 
-FIDDLE()
-struct IRGLSLLocationDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-    IRIntLit* getLocation() { return cast<IRIntLit>(getOperand(0)); }
-};
-
-
-FIDDLE()
-struct IRGLSLOffsetDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-    IRIntLit* getOffset() { return cast<IRIntLit>(getOperand(0)); }
-};
-
-FIDDLE()
-struct IRVkStructOffsetDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-    IRIntLit* getOffset() { return cast<IRIntLit>(getOperand(0)); }
-};
 
 FIDDLE()
 struct IRNVAPIMagicDecoration : IRDecoration
 {
     FIDDLE(leafInst())
 
-    IRStringLit* getNameOperand() { return cast<IRStringLit>(getOperand(0)); }
     UnownedStringSlice getName() { return getNameOperand()->getStringSlice(); }
 };
 
@@ -410,28 +312,11 @@ struct IRNVAPISlotDecoration : IRDecoration
 {
     FIDDLE(leafInst())
 
-    IRStringLit* getRegisterNameOperand() { return cast<IRStringLit>(getOperand(0)); }
     UnownedStringSlice getRegisterName() { return getRegisterNameOperand()->getStringSlice(); }
 
-    IRStringLit* getSpaceNameOperand() { return cast<IRStringLit>(getOperand(1)); }
     UnownedStringSlice getSpaceName() { return getSpaceNameOperand()->getStringSlice(); }
 };
 
-FIDDLE()
-struct IRMaxTessFactorDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-
-    IRFloatLit* getMaxTessFactor() { return cast<IRFloatLit>(getOperand(0)); }
-};
-
-FIDDLE()
-struct IROutputControlPointsDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-
-    IRIntLit* getControlPointCount() { return cast<IRIntLit>(getOperand(0)); }
-};
 
 // This is used for mesh shaders too
 FIDDLE()
@@ -439,42 +324,12 @@ struct IROutputTopologyDecoration : IRDecoration
 {
     FIDDLE(leafInst())
 
-    IRStringLit* getTopology() { return cast<IRStringLit>(getOperand(0)); }
-
-    IRIntegerValue getTopologyType() { return cast<IRIntLit>(getOperand(1))->getValue(); }
+    IRIntegerValue getTopologyType()
+    {
+        return cast<IRIntLit>(getTopologyTypeOperand())->getValue();
+    }
 };
 
-FIDDLE()
-struct IRPartitioningDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-
-    IRStringLit* getPartitioning() { return cast<IRStringLit>(getOperand(0)); }
-};
-
-FIDDLE()
-struct IRDomainDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-
-    IRStringLit* getDomain() { return cast<IRStringLit>(getOperand(0)); }
-};
-
-FIDDLE()
-struct IRMaxVertexCountDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-
-    IRIntLit* getCount() { return cast<IRIntLit>(getOperand(0)); }
-};
-
-FIDDLE()
-struct IRInstanceDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-
-    IRIntLit* getCount() { return cast<IRIntLit>(getOperand(0)); }
-};
 
 struct IRGlobalParam;
 FIDDLE()
@@ -491,57 +346,17 @@ struct IRNumThreadsDecoration : IRDecoration
     IRGlobalParam* getZSpecConst() { return as<IRGlobalParam>(getOperand(2)); }
 };
 
-FIDDLE()
-struct IRFpDenormalPreserveDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-    IRIntLit* getWidth() { return cast<IRIntLit>(getOperand(0)); }
-};
-
-FIDDLE()
-struct IRFpDenormalFlushToZeroDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-
-    IRIntLit* getWidth() { return cast<IRIntLit>(getOperand(0)); }
-};
-
-FIDDLE()
-struct IRWaveSizeDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-
-    IRIntLit* getNumLanes() { return cast<IRIntLit>(getOperand(0)); }
-};
 
 FIDDLE()
 struct IREntryPointDecoration : IRDecoration
 {
     FIDDLE(leafInst())
 
-    IRIntLit* getProfileInst() { return cast<IRIntLit>(getOperand(0)); }
     Profile getProfile() { return Profile(Profile::RawVal(getIntVal(getProfileInst()))); }
 
-    IRStringLit* getName() { return cast<IRStringLit>(getOperand(1)); }
-    IRStringLit* getModuleName() { return cast<IRStringLit>(getOperand(2)); }
     void setName(IRStringLit* name) { setOperand(1, name); }
 };
 
-FIDDLE()
-struct IRCudaKernelForwardDerivativeDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-
-    IRInst* getForwardDerivativeFunc() { return getOperand(0); }
-};
-
-FIDDLE()
-struct IRCudaKernelBackwardDerivativeDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-
-    IRInst* getBackwardDerivativeFunc() { return getOperand(0); }
-};
 
 FIDDLE()
 struct IRGeometryInputPrimitiveTypeDecoration : IRDecoration
@@ -559,8 +374,6 @@ FIDDLE()
 struct IRStreamOutputTypeDecoration : IRDecoration
 {
     FIDDLE(leafInst())
-
-    IRHLSLStreamOutputType* getStreamType() { return cast<IRHLSLStreamOutputType>(getOperand(0)); }
 };
 
 /// A decoration that marks a value as having linkage.
@@ -584,56 +397,29 @@ struct IRTargetBuiltinVarDecoration : IRDecoration
 {
     FIDDLE(leafInst())
 
-    IRIntLit* getBuiltinVarOperand() { return cast<IRIntLit>(getOperand(0)); }
     IRTargetBuiltinVarName getBuiltinVarName()
     {
         return IRTargetBuiltinVarName(getBuiltinVarOperand()->getValue());
     }
 };
 
-FIDDLE()
-struct IRUserExternDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRImportDecoration : IRLinkageDecoration
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRExportDecoration : IRLinkageDecoration
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRExternCppDecoration : IRDecoration
 {
     FIDDLE(leafInst())
 
-    IRStringLit* getNameOperand() { return cast<IRStringLit>(getOperand(0)); }
-
     UnownedStringSlice getName() { return getNameOperand()->getStringSlice(); }
 };
 
-FIDDLE()
-struct IRExternCDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRDllImportDecoration : IRDecoration
 {
     FIDDLE(leafInst())
 
-    IRStringLit* getLibraryNameOperand() { return cast<IRStringLit>(getOperand(0)); }
     UnownedStringSlice getLibraryName() { return getLibraryNameOperand()->getStringSlice(); }
 
-    IRStringLit* getFunctionNameOperand() { return cast<IRStringLit>(getOperand(1)); }
     UnownedStringSlice getFunctionName() { return getFunctionNameOperand()->getStringSlice(); }
 };
 
@@ -642,7 +428,6 @@ struct IRDllExportDecoration : IRDecoration
 {
     FIDDLE(leafInst())
 
-    IRStringLit* getFunctionNameOperand() { return cast<IRStringLit>(getOperand(0)); }
     UnownedStringSlice getFunctionName() { return getFunctionNameOperand()->getStringSlice(); }
 };
 
@@ -651,7 +436,6 @@ struct IRTorchEntryPointDecoration : IRDecoration
 {
     FIDDLE(leafInst())
 
-    IRStringLit* getFunctionNameOperand() { return cast<IRStringLit>(getOperand(0)); }
     UnownedStringSlice getFunctionName() { return getFunctionNameOperand()->getStringSlice(); }
 };
 
@@ -660,7 +444,6 @@ struct IRAutoPyBindCudaDecoration : IRDecoration
 {
     FIDDLE(leafInst())
 
-    IRStringLit* getFunctionNameOperand() { return cast<IRStringLit>(getOperand(0)); }
     UnownedStringSlice getFunctionName() { return getFunctionNameOperand()->getStringSlice(); }
 };
 
@@ -669,7 +452,6 @@ struct IRPyExportDecoration : IRDecoration
 {
     FIDDLE(leafInst())
 
-    IRStringLit* getExportNameOperand() { return cast<IRStringLit>(getOperand(0)); }
     UnownedStringSlice getExportName() { return getExportNameOperand()->getStringSlice(); }
 };
 
@@ -679,7 +461,6 @@ struct IRKnownBuiltinDecoration : IRDecoration
 {
     FIDDLE(leafInst())
 
-    IRIntLit* getNameOperand() { return cast<IRIntLit>(getOperand(0)); }
     KnownBuiltinDeclName getName() { return KnownBuiltinDeclName(getIntVal(getNameOperand())); }
 };
 
@@ -687,17 +468,12 @@ FIDDLE()
 struct IREntryPointParamDecoration : IRDecoration
 {
     FIDDLE(leafInst())
-
-    /// Get the entry point that this parameter orignates from.
-    IRFunc* getEntryPoint() { return cast<IRFunc>(getOperand(0)); }
 };
 
 FIDDLE()
 struct IRFormatDecoration : IRDecoration
 {
     FIDDLE(leafInst())
-
-    IRConstant* getFormatOperand() { return cast<IRConstant>(getOperand(0)); }
 
     ImageFormat getFormat() { return ImageFormat(getFormatOperand()->value.intVal); }
 };
@@ -709,11 +485,9 @@ struct IRSizeAndAlignmentDecoration : IRDecoration
 
     IRTypeLayoutRuleName getLayoutName()
     {
-        return IRTypeLayoutRuleName(cast<IRIntLit>(getOperand(0))->getValue());
+        return IRTypeLayoutRuleName(cast<IRIntLit>(getLayoutNameOperand())->getValue());
     }
 
-    IRIntLit* getSizeOperand() { return cast<IRIntLit>(getOperand(1)); }
-    IRIntLit* getAlignmentOperand() { return cast<IRIntLit>(getOperand(2)); }
     IRIntegerValue getSize() { return getSizeOperand()->getValue(); }
     IRIntegerValue getAlignment() { return getAlignmentOperand()->getValue(); }
 };
@@ -725,18 +499,12 @@ struct IROffsetDecoration : IRDecoration
 
     IRTypeLayoutRuleName getLayoutName()
     {
-        return IRTypeLayoutRuleName(cast<IRIntLit>(getOperand(0))->getValue());
+        return IRTypeLayoutRuleName(cast<IRIntLit>(getLayoutNameOperand())->getValue());
     }
 
-    IRIntLit* getOffsetOperand() { return cast<IRIntLit>(getOperand(1)); }
     IRIntegerValue getOffset() { return getOffsetOperand()->getValue(); }
 };
 
-FIDDLE()
-struct IRBuiltinDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRSequentialIDDecoration : IRDecoration
@@ -751,59 +519,38 @@ FIDDLE()
 struct IRResultWitnessDecoration : IRDecoration
 {
     FIDDLE(leafInst())
-
-    IRInst* getWitness() { return getOperand(0); }
 };
 
-FIDDLE()
-struct IRDynamicDispatchWitnessDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRAutoDiffOriginalValueDecoration : IRDecoration
 {
     FIDDLE(leafInst())
-    IRInst* getOriginalValue() { return getOperand(0); }
 };
 
-FIDDLE()
-struct IRForwardDifferentiableDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRForwardDerivativeDecoration : IRDecoration
 {
     FIDDLE(leafInst())
-
-    IRInst* getForwardDerivativeFunc() { return getOperand(0); }
 };
 
 FIDDLE()
 struct IRPrimalSubstituteDecoration : IRDecoration
 {
     FIDDLE(leafInst())
-
-    IRInst* getPrimalSubstituteFunc() { return getOperand(0); }
 };
 
 FIDDLE()
 struct IRBackwardDerivativeIntermediateTypeDecoration : IRDecoration
 {
     FIDDLE(leafInst())
-
-    IRInst* getBackwardDerivativeIntermediateType() { return getOperand(0); }
 };
 
 FIDDLE()
 struct IRBackwardDerivativePrimalDecoration : IRDecoration
 {
     FIDDLE(leafInst())
-
-    IRInst* getBackwardDerivativePrimalFunc() { return getOperand(0); }
 };
 
 // Used to associate the restore context var to use in a call to splitted backward propgate
@@ -814,31 +561,24 @@ struct IRBackwardDerivativePrimalContextDecoration : IRDecoration
     FIDDLE(leafInst())
 
     IRUse primalContextVar;
-    IRInst* getBackwardDerivativePrimalContextVar() { return getOperand(0); }
 };
 
 FIDDLE()
 struct IRBackwardDerivativePrimalReturnDecoration : IRDecoration
 {
     FIDDLE(leafInst())
-
-    IRInst* getBackwardDerivativePrimalReturnValue() { return getOperand(0); }
 };
 
 FIDDLE()
 struct IRBackwardDerivativePropagateDecoration : IRDecoration
 {
     FIDDLE(leafInst())
-
-    IRInst* getBackwardDerivativePropagateFunc() { return getOperand(0); }
 };
 
 FIDDLE()
 struct IRBackwardDerivativeDecoration : IRDecoration
 {
     FIDDLE(leafInst())
-
-    IRInst* getBackwardDerivativeFunc() { return getOperand(0); }
 };
 
 FIDDLE()
@@ -847,34 +587,9 @@ struct IRCheckpointHintDecoration : public IRDecoration
     FIDDLE(baseInst())
 };
 
-FIDDLE()
-struct IRPreferRecomputeDecoration : IRCheckpointHintDecoration
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRPreferCheckpointDecoration : IRCheckpointHintDecoration
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRCheckpointIntermediateDecoration : IRCheckpointHintDecoration
-{
-    FIDDLE(leafInst())
-
-    IRInst* getSourceFunction() { return getOperand(0); }
-};
-
-FIDDLE()
-struct IRLoopCounterDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRLoopCounterUpdateDecoration : IRDecoration
 {
     FIDDLE(leafInst())
 };
@@ -887,8 +602,6 @@ struct IRLoopExitPrimalValueDecoration : IRDecoration
 
     IRUse target;
     IRUse exitVal;
-    IRInst* getTargetInst() { return getOperand(0); }
-    IRInst* getLoopExitValInst() { return getOperand(1); }
 };
 
 FIDDLE()
@@ -903,17 +616,8 @@ struct IRDifferentialInstDecoration : IRAutodiffInstDecoration
     FIDDLE(leafInst())
 
     IRUse primalType;
-
-    IRType* getPrimalType() { return (IRType*)(getOperand(0)); }
-    IRInst* getPrimalInst() { return getOperand(1); }
-    IRInst* getWitness() { return getOperand(2); }
 };
 
-FIDDLE()
-struct IRPrimalInstDecoration : IRAutodiffInstDecoration
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRMixedDifferentialInstDecoration : IRAutodiffInstDecoration
@@ -921,102 +625,39 @@ struct IRMixedDifferentialInstDecoration : IRAutodiffInstDecoration
     FIDDLE(leafInst())
 
     IRUse pairType;
-
-    IRType* getPairType() { return (IRType*)(getOperand(0)); }
 };
 
-FIDDLE()
-struct IRRecomputeBlockDecoration : IRAutodiffInstDecoration
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRPrimalValueStructKeyDecoration : IRDecoration
 {
     FIDDLE(leafInst())
-
-
-    IRStructKey* getStructKey() { return as<IRStructKey>(getOperand(0)); }
 };
 
 FIDDLE()
 struct IRPrimalElementTypeDecoration : IRDecoration
 {
     FIDDLE(leafInst())
-
-
-    IRInst* getPrimalElementType() { return getOperand(0); }
 };
 
 FIDDLE()
 struct IRIntermediateContextFieldDifferentialTypeDecoration : IRDecoration
 {
     FIDDLE(leafInst())
-
-
-    IRInst* getDifferentialWitness() { return getOperand(0); }
 };
 
-FIDDLE()
-struct IRBackwardDifferentiableDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRUserDefinedBackwardDerivativeDecoration : IRDecoration
 {
     FIDDLE(leafInst())
-    IRInst* getBackwardDerivativeFunc() { return getOperand(0); }
 };
 
-FIDDLE()
-struct IRTreatAsDifferentiableDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
-
-// Mark a call as explicitly calling a differentiable function.
-FIDDLE()
-struct IRDifferentiableCallDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
-
-// Mark a type as being eligible for trimming if necessary. If
-// any fields don't have any effective loads from them, they can be
-// removed.
-//
-FIDDLE()
-struct IROptimizableTypeDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
-
-// Informs the DCE pass to ignore side-effects on this call for
-// the purposes of dead code elimination, even if the call does have
-// side-effects.
-//
-FIDDLE()
-struct IRIgnoreSideEffectsDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
-
-// Treat a call to a non-differentiable function as a differentiable call.
-FIDDLE()
-struct IRTreatCallAsDifferentiableDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRDerivativeMemberDecoration : IRDecoration
 {
     FIDDLE(leafInst())
-
-    IRInst* getDerivativeMemberStructKey() { return getOperand(0); }
 };
 
 // An instruction that replaces the function symbol
@@ -1027,7 +668,6 @@ struct IRForwardDifferentiate : IRInst
     FIDDLE(leafInst())
     // The base function for the call.
     IRUse base;
-    IRInst* getBaseFn() { return getOperand(0); }
 };
 
 // An instruction that replaces the function symbol
@@ -1042,7 +682,6 @@ struct IRBackwardDifferentiatePrimal : IRInst
     FIDDLE(leafInst())
     // The base function for the call.
     IRUse base;
-    IRInst* getBaseFn() { return getOperand(0); }
 };
 
 // An instruction that replaces the function symbol with its backward derivative propagate function.
@@ -1055,7 +694,6 @@ struct IRBackwardDifferentiatePropagate : IRInst
     FIDDLE(leafInst())
     // The base function for the call.
     IRUse base;
-    IRInst* getBaseFn() { return getOperand(0); }
 };
 
 // An instruction that replaces the function symbol with its backward derivative function.
@@ -1068,14 +706,12 @@ struct IRBackwardDifferentiate : IRInst
     FIDDLE(leafInst())
     // The base function for the call.
     IRUse base;
-    IRInst* getBaseFn() { return getOperand(0); }
 };
 
 FIDDLE()
 struct IRIsDifferentialNull : IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getBase() { return getOperand(0); }
 };
 
 // Retrieves the primal substitution function for the given function.
@@ -1083,24 +719,18 @@ FIDDLE()
 struct IRPrimalSubstitute : IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getBaseFn() { return getOperand(0); }
 };
 
 FIDDLE()
 struct IRDifferentiableTypeAnnotation : IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getBaseType() { return getOperand(0); }
-    IRInst* getWitness() { return getOperand(1); }
 };
 
 FIDDLE()
 struct IRDispatchKernel : IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getBaseFn() { return getOperand(0); }
-    IRInst* getThreadGroupSize() { return getOperand(1); }
-    IRInst* getDispatchSize() { return getOperand(2); }
     UInt getArgCount() { return getOperandCount() - 3; }
     IRInst* getArg(UInt i) { return getOperand(3 + i); }
     IROperandList<IRInst> getArgsList()
@@ -1122,16 +752,8 @@ FIDDLE()
 struct IRDifferentiableTypeDictionaryItem : IRInst
 {
     FIDDLE(leafInst())
-
-    IRInst* getConcreteType() { return getOperand(0); }
-    IRInst* getWitness() { return getOperand(1); }
 };
 
-FIDDLE()
-struct IRDifferentiableTypeDictionaryDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRFloatingPointModeOverrideDecoration : IRDecoration
@@ -1153,7 +775,6 @@ struct IRSpecialize : IRInst
     FIDDLE(leafInst())
     // The "base" for the call is the generic to be specialized
     IRUse base;
-    IRInst* getBase() { return getOperand(0); }
 
     // after the generic value come the arguments
     UInt getArgCount() { return getOperandCount() - 1; }
@@ -1181,8 +802,6 @@ FIDDLE()
 struct IRGetSequentialID : IRInst
 {
     FIDDLE(leafInst())
-
-    IRInst* getRTTIOperand() { return getOperand(0); }
 };
 
 /// Allocates space from local stack.
@@ -1191,8 +810,6 @@ FIDDLE()
 struct IRAlloca : IRInst
 {
     FIDDLE(leafInst())
-
-    IRInst* getAllocSize() { return getOperand(0); }
 };
 
 /// A non-hoistable inst used to "pin" a global value inside a function body so any insts dependent
@@ -1203,8 +820,6 @@ FIDDLE()
 struct IRGlobalValueRef : IRInst
 {
     FIDDLE(leafInst())
-
-    IRInst* getValue() { return getOperand(0); }
 };
 
 /// Packs a value into an `AnyValue`.
@@ -1213,7 +828,6 @@ FIDDLE()
 struct IRPackAnyValue : IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getValue() { return getOperand(0); }
 };
 
 /// Unpacks a `AnyValue` value into a concrete type.
@@ -1222,7 +836,6 @@ FIDDLE()
 struct IRUnpackAnyValue : IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getValue() { return getOperand(0); }
 };
 
 FIDDLE()
@@ -1250,10 +863,7 @@ struct IRSemanticDecoration : public IRDecoration
 {
     FIDDLE(leafInst())
 
-    IRStringLit* getSemanticNameOperand() { return cast<IRStringLit>(getOperand(0)); }
     UnownedStringSlice getSemanticName() { return getSemanticNameOperand()->getStringSlice(); }
-
-    IRIntLit* getSemanticIndexOperand() { return cast<IRIntLit>(getOperand(1)); }
     int getSemanticIndex() { return int(getIntVal(getSemanticIndexOperand())); }
 };
 
@@ -1269,23 +879,18 @@ FIDDLE()
 struct IRPackOffsetDecoration : IRDecoration
 {
     FIDDLE(leafInst())
-
-    IRIntLit* getRegisterOffset() { return cast<IRIntLit>(getOperand(0)); }
-    IRIntLit* getComponentOffset() { return cast<IRIntLit>(getOperand(1)); }
 };
 
 FIDDLE()
 struct IRUserTypeNameDecoration : IRDecoration
 {
     FIDDLE(leafInst())
-    IRStringLit* getUserTypeName() { return cast<IRStringLit>(getOperand(0)); }
 };
 
 FIDDLE()
 struct IRCounterBufferDecoration : IRDecoration
 {
     FIDDLE(leafInst())
-    IRInst* getCounterBuffer() { return getOperand(0); }
 };
 
 FIDDLE()
@@ -1297,23 +902,6 @@ struct IRStageAccessDecoration : public IRDecoration
     UnownedStringSlice getStageName(Int index) { return getStageOperand(index)->getStringSlice(); }
 };
 
-FIDDLE()
-struct IRStageReadAccessDecoration : public IRStageAccessDecoration
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRStageWriteAccessDecoration : public IRStageAccessDecoration
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRRayPayloadDecoration : public IRDecoration
-{
-    FIDDLE(leafInst())
-};
 
 // Mesh shader decorations
 
@@ -1324,48 +912,11 @@ struct IRMeshOutputDecoration : public IRDecoration
     IRIntLit* getMaxSize() { return cast<IRIntLit>(getOperand(0)); }
 };
 
-FIDDLE()
-struct IRVerticesDecoration : public IRMeshOutputDecoration
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRIndicesDecoration : public IRMeshOutputDecoration
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRPrimitivesDecoration : public IRMeshOutputDecoration
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRGLSLPrimitivesRateDecoration : public IRDecoration
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRGLPositionOutputDecoration : public IRDecoration
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRGLPositionInputDecoration : public IRDecoration
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRMeshOutputRef : public IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getBase() { return getOperand(0); }
-    IRInst* getIndex() { return getOperand(1); }
     IRInst* getOutputType() { return cast<IRPtrTypeBase>(getFullType())->getValueType(); }
 };
 
@@ -1373,33 +924,24 @@ FIDDLE()
 struct IRMeshOutputSet : public IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getBase() { return getOperand(0); }
-    IRInst* getIndex() { return getOperand(1); }
-    IRInst* getElementValue() { return getOperand(2); }
 };
 
 FIDDLE()
 struct IRMetalSetVertex : public IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getIndex() { return getOperand(0); }
-    IRInst* getElementValue() { return getOperand(1); }
 };
 
 FIDDLE()
 struct IRMetalSetPrimitive : public IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getIndex() { return getOperand(0); }
-    IRInst* getElementValue() { return getOperand(1); }
 };
 
 FIDDLE()
 struct IRMetalSetIndices : public IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getIndex() { return getOperand(0); }
-    IRInst* getElementValue() { return getOperand(1); }
 };
 
 /// An attribute that can be attached to another instruction as an operand.
@@ -1471,15 +1013,8 @@ FIDDLE()
 struct IRFuncThrowTypeAttr : IRAttr
 {
     FIDDLE(leafInst())
-
-    IRType* getErrorType() { return (IRType*)getOperand(0); }
 };
 
-FIDDLE()
-struct IRNoDiffAttr : IRAttr
-{
-    FIDDLE(leafInst())
-};
 
 /// An attribute that specifies size information for a single resource kind.
 FIDDLE()
@@ -1492,7 +1027,11 @@ struct IRTypeSizeAttr : public IRLayoutResourceInfoAttr
     {
         return LayoutSize::fromRaw(LayoutSize::RawValue(getIntVal(getSizeInst())));
     }
-    size_t getFiniteSize() { return getSize().getFiniteValue(); }
+    UInt getFiniteSize()
+    {
+        SLANG_ASSERT(getSize().isFinite());
+        return getSize().getFiniteValue().getValidValue();
+    }
 };
 
 // Layout
@@ -1508,21 +1047,6 @@ struct IRLayout : IRInst
 };
 
 struct IRVarLayout;
-
-/// An attribute to specify that a layout has another layout attached for "pending" data.
-///
-/// "Pending" data refers to the parts of a type or variable that
-/// couldn't be laid out until the concrete types for existential
-/// type slots were filled in. The layout of pending data may not
-/// be contiguous with the layout of the original type/variable.
-///
-FIDDLE()
-struct IRPendingLayoutAttr : IRAttr
-{
-    FIDDLE(leafInst())
-
-    IRLayout* getLayout() { return cast<IRLayout>(getOperand(0)); }
-};
 
 /// Layout information for a type.
 ///
@@ -1552,8 +1076,6 @@ struct IRTypeLayout : IRLayout
     /// Unwrap any layers of array-ness and return the outer-most non-array type.
     IRTypeLayout* unwrapArray();
 
-    /// Get the layout for pending data, if present.
-    IRTypeLayout* getPendingDataTypeLayout();
 
     /// A builder for constructing `IRTypeLayout`s
     struct Builder
@@ -1574,8 +1096,6 @@ struct IRTypeLayout : IRLayout
         /// Add all resource usage from `typeLayout`.
         void addResourceUsageFrom(IRTypeLayout* typeLayout);
 
-        /// Set the (optional) layout for pending data.
-        void setPendingTypeLayout(IRTypeLayout* typeLayout) { m_pendingTypeLayout = typeLayout; }
 
         /// Build a type layout according to the information specified so far.
         IRTypeLayout* build();
@@ -1603,7 +1123,6 @@ struct IRTypeLayout : IRLayout
         void addAttrs(List<IRInst*>& ioOperands);
 
         IRBuilder* m_irBuilder = nullptr;
-        IRTypeLayout* m_pendingTypeLayout = nullptr;
 
         struct ResInfo
         {
@@ -1825,10 +1344,6 @@ FIDDLE()
 struct IRStructFieldLayoutAttr : IRAttr
 {
     FIDDLE(leafInst())
-
-    IRInst* getFieldKey() { return getOperand(0); }
-
-    IRVarLayout* getLayout() { return cast<IRVarLayout>(getOperand(1)); }
 };
 
 /// Specialized layout information for structure types.
@@ -2011,7 +1526,6 @@ struct IRStageAttr : IRAttr
 {
     FIDDLE(leafInst())
 
-    IRIntLit* getStageOperand() { return cast<IRIntLit>(getOperand(0)); }
     Stage getStage() { return Stage(getIntVal(getStageOperand())); }
 };
 
@@ -2073,8 +1587,6 @@ struct IRVarLayout : IRLayout
     /// Find the system-value semantic attribute for this variable, if any.
     IRSystemValueSemanticAttr* findSystemValueSemanticAttr();
 
-    /// Get the (optional) layout for any "pending" data assocaited with this variable.
-    IRVarLayout* getPendingVarLayout();
 
     /// Builder for construction `IRVarLayout`s in a stateful fashion
     struct Builder
@@ -2090,7 +1602,7 @@ struct IRVarLayout : IRLayout
         struct ResInfo
         {
             LayoutResourceKind kind = LayoutResourceKind::None;
-            UInt offset = 0;
+            LayoutOffset offset = 0;
             UInt space = 0;
         };
 
@@ -2100,8 +1612,6 @@ struct IRVarLayout : IRLayout
         /// Either fetch or add a `ResInfo` record for `kind` and return it
         ResInfo* findOrAddResourceInfo(LayoutResourceKind kind);
 
-        /// Set the (optional) variable layout for pending data.
-        void setPendingVarLayout(IRVarLayout* varLayout) { m_pendingVarLayout = varLayout; }
 
         /// Set the (optional) system-valeu semantic for this variable.
         void setSystemValueSemantic(String const& name, UInt index);
@@ -2126,7 +1636,6 @@ struct IRVarLayout : IRLayout
         IRBuilder* getIRBuilder() { return m_irBuilder; };
 
         IRTypeLayout* m_typeLayout = nullptr;
-        IRVarLayout* m_pendingVarLayout = nullptr;
 
         IRSystemValueSemanticAttr* m_systemValueSemantic = nullptr;
         IRUserSemanticAttr* m_userSemantic = nullptr;
@@ -2163,7 +1672,6 @@ FIDDLE()
 struct IRAlignOf : IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getBaseOp() { return getOperand(0); }
 };
 
 FIDDLE()
@@ -2171,7 +1679,6 @@ struct IRCall : IRInst
 {
     FIDDLE(leafInst())
 
-    IRInst* getCallee() { return getOperand(0); }
     IRUse* getCalleeUse() { return getOperands(); }
     UInt getArgCount() { return getOperandCount() - 1; }
     IRUse* getArgs() { return getOperands() + 1; }
@@ -2187,7 +1694,13 @@ FIDDLE()
 struct IRAlignedAttr : IRAttr
 {
     FIDDLE(leafInst())
-    IRInst* getAlignment() { return getOperand(0); }
+};
+
+FIDDLE()
+struct IRMemoryScopeAttr : IRAttr
+{
+    FIDDLE(leafInst())
+    IRInst* getMemoryScope() { return getOperand(0); }
 };
 
 FIDDLE()
@@ -2242,12 +1755,20 @@ struct IRAtomicStore : IRAtomicOperation
 };
 
 FIDDLE()
+struct IRAtomicExchange : IRAtomicOperation
+{
+    FIDDLE(leafInst())
+    IRUse ptr;
+    IRUse val;
+
+    IRInst* getPtr() { return ptr.get(); }
+    IRInst* getVal() { return val.get(); }
+};
+
+FIDDLE()
 struct IRRWStructuredBufferStore : IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getStructuredBuffer() { return getOperand(0); }
-    IRInst* getIndex() { return getOperand(1); }
-    IRInst* getVal() { return getOperand(2); }
 };
 
 FIDDLE()
@@ -2276,153 +1797,112 @@ FIDDLE()
 struct IRGetElement : IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getBase() { return getOperand(0); }
-    IRInst* getIndex() { return getOperand(1); }
 };
 
 FIDDLE()
 struct IRGetCharFromString : IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getBase() { return getOperand(0); }
-    IRInst* getIndex() { return getOperand(1); }
 };
 
 FIDDLE()
 struct IRGetElementPtr : IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getBase() { return getOperand(0); }
-    IRInst* getIndex() { return getOperand(1); }
 };
 
 FIDDLE()
 struct IRGetOffsetPtr : IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getBase() { return getOperand(0); }
-    IRInst* getOffset() { return getOperand(1); }
 };
 
 FIDDLE()
 struct IRRWStructuredBufferGetElementPtr : IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getBase() { return getOperand(0); }
-    IRInst* getIndex() { return getOperand(1); }
 };
 
 FIDDLE()
 struct IRStructuredBufferAppend : IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getBuffer() { return getOperand(0); }
-    IRInst* getElement() { return getOperand(1); }
 };
 
 FIDDLE()
 struct IRStructuredBufferConsume : IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getBuffer() { return getOperand(0); }
 };
 
 FIDDLE()
 struct IRStructuredBufferGetDimensions : IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getBuffer() { return getOperand(0); }
 };
 
-FIDDLE()
-struct IRNonUniformResourceIndex : IRInst
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRLoadReverseGradient : IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getValue() { return getOperand(0); }
 };
 
 FIDDLE()
 struct IRReverseGradientDiffPairRef : IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getPrimal() { return getOperand(0); }
-    IRInst* getDiff() { return getOperand(1); }
 };
 
 FIDDLE()
 struct IRPrimalParamRef : IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getReferencedParam() { return getOperand(0); }
 };
 
 FIDDLE()
 struct IRDiffParamRef : IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getReferencedParam() { return getOperand(0); }
 };
 
 FIDDLE()
 struct IRGetNativePtr : IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getElementType() { return getOperand(0); }
 };
 
 FIDDLE()
 struct IRGetManagedPtrWriteRef : IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getPtrToManagedPtr() { return getOperand(0); }
 };
 
-FIDDLE()
-struct IRGetAddress : IRInst
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRImageSubscript : IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getImage() { return getOperand(0); }
-    IRInst* getCoord() { return getOperand(1); }
     bool hasSampleCoord() { return getOperandCount() > 2 && getOperand(2) != nullptr; }
-    IRInst* getSampleCoord() { return getOperand(2); }
 };
 
 FIDDLE()
 struct IRImageLoad : IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getImage() { return getOperand(0); }
-    IRInst* getCoord() { return getOperand(1); }
 
     /// If GLSL/SPIR-V, Sample coord
     /// If Metal, Array or Sample coord
     bool hasAuxCoord1() { return getOperandCount() > 2 && getOperand(2) != nullptr; }
-    IRInst* getAuxCoord1() { return getOperand(2); }
 
     /// If Metal, Sample coord
     bool hasAuxCoord2() { return getOperandCount() > 3 && getOperand(3) != nullptr; }
-    IRInst* getAuxCoord2() { return getOperand(3); }
 };
 
 FIDDLE()
 struct IRImageStore : IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getImage() { return getOperand(0); }
-    IRInst* getCoord() { return getOperand(1); }
-    IRInst* getValue() { return getOperand(2); }
 
     /// If GLSL/SPIR-V, Sample coord
     /// Metal array/face index
@@ -2435,10 +1915,6 @@ FIDDLE()
 struct IRSelect : IRInst
 {
     FIDDLE(leafInst());
-
-    IRInst* getCondition() { return getOperand(0); }
-    IRInst* getTrueResult() { return getOperand(1); }
-    IRInst* getFalseResult() { return getOperand(2); }
 };
 
 
@@ -2446,23 +1922,14 @@ FIDDLE()
 struct IRReturn : IRTerminatorInst
 {
     FIDDLE(leafInst())
-
-    IRInst* getVal() { return getOperand(0); }
 };
 
 FIDDLE()
 struct IRYield : IRTerminatorInst
 {
     FIDDLE(leafInst())
-
-    IRInst* getVal() { return getOperand(0); }
 };
 
-FIDDLE()
-struct IRDiscard : IRTerminatorInst
-{
-    FIDDLE(leafInst())
-};
 
 // Used for representing a distinct copy of an object.
 // This will get lowered into a no-op in the backend,
@@ -2493,17 +1960,7 @@ struct IRLoopExitValue : IRInst
 // We can/should emit a dataflow error if we can ever determine
 // that a block ending in one of these can actually be
 // executed.
-FIDDLE()
-struct IRUnreachable : IRTerminatorInst
-{
-    FIDDLE(leafInst())
-};
 
-FIDDLE()
-struct IRMissingReturn : IRUnreachable
-{
-    FIDDLE(leafInst())
-};
 
 struct IRBlock;
 
@@ -2514,6 +1971,7 @@ struct IRUnconditionalBranch : IRTerminatorInst
     IRUse block;
 
     IRBlock* getTargetBlock() { return (IRBlock*)block.get(); }
+    IRUse* getTargetBlockUse() { return &block; }
 
     UInt getArgCount();
     IRUse* getArgs();
@@ -2608,8 +2066,6 @@ FIDDLE()
 struct IRThrow : IRTerminatorInst
 {
     FIDDLE(leafInst())
-
-    IRInst* getValue() { return getOperand(0); }
 };
 
 FIDDLE()
@@ -2617,9 +2073,6 @@ struct IRTryCall : IRTerminatorInst
 {
     FIDDLE(leafInst())
 
-    IRBlock* getSuccessBlock() { return cast<IRBlock>(getOperand(0)); }
-    IRBlock* getFailureBlock() { return cast<IRBlock>(getOperand(1)); }
-    IRInst* getCallee() { return getOperand(2); }
     UInt getArgCount() { return getOperandCount() - 3; }
     IRUse* getArgs() { return getOperands() + 3; }
     IRInst* getArg(UInt index) { return getOperand(index + 3); }
@@ -2629,10 +2082,6 @@ FIDDLE()
 struct IRDefer : IRTerminatorInst
 {
     FIDDLE(leafInst())
-
-    IRBlock* getDeferBlock() { return cast<IRBlock>(getOperand(0)); }
-    IRBlock* getMergeBlock() { return cast<IRBlock>(getOperand(1)); }
-    IRBlock* getScopeBlock() { return cast<IRBlock>(getOperand(2)); }
 };
 
 FIDDLE()
@@ -2663,8 +2112,6 @@ FIDDLE()
 struct IRSwizzledStore : IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getDest() { return getOperand(0); }
-    IRInst* getSource() { return getOperand(1); }
     UInt getElementCount() { return getOperandCount() - 2; }
     IRInst* getElementIndex(UInt index) { return getOperand(index + 2); }
 };
@@ -2674,8 +2121,6 @@ FIDDLE()
 struct IRPatchConstantFuncDecoration : IRDecoration
 {
     FIDDLE(leafInst())
-
-    IRInst* getFunc() { return getOperand(0); }
 };
 
 // An IR `var` instruction conceptually represents
@@ -2746,9 +2191,6 @@ struct IRWitnessTableEntry : IRInst
 
     // The IR-level value that satisfies the requirement
     IRUse satisfyingVal;
-
-    IRInst* getRequirementKey() { return getOperand(0); }
-    IRInst* getSatisfyingVal() { return getOperand(1); }
 };
 
 // A witness table is a global value that stores
@@ -2784,17 +2226,6 @@ struct IRRTTIObject : IRInst
     FIDDLE(leafInst())
 };
 
-// An instruction that yields an undefined value.
-//
-// Note that we make this an instruction rather than a value,
-// so that we will be able to identify a variable that is
-// used when undefined.
-FIDDLE()
-struct IRUndefined : IRInst
-{
-    FIDDLE(leafInst())
-};
-
 // Special inst for targets that support default initialization,
 // like the braces '= {}' in C/HLSL
 FIDDLE()
@@ -2817,8 +2248,6 @@ FIDDLE()
 struct IRBindGlobalGenericParam : IRInst
 {
     FIDDLE(leafInst())
-    IRGlobalGenericParam* getParam() { return cast<IRGlobalGenericParam>(getOperand(0)); }
-    IRInst* getVal() { return getOperand(1); }
 };
 
 FIDDLE()
@@ -2839,43 +2268,6 @@ struct IREach : IRInst
     IRInst* getElement() { return getOperand(0); }
 };
 
-FIDDLE()
-struct IRMakeArray : IRInst
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRMakeArrayFromElement : IRInst
-{
-    FIDDLE(leafInst())
-};
-
-
-// An Instruction that creates a tuple value.
-FIDDLE()
-struct IRMakeTuple : IRInst
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRMakeValuePack : IRInst
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRMakeStruct : IRInst
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRMakeWitnessPack : IRInst
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRGetTupleElement : IRInst
@@ -2893,23 +2285,6 @@ struct IRGetTargetTupleElement : IRInst
     IRInst* getElementIndex() { return getOperand(1); }
 };
 
-FIDDLE()
-struct IRMakeVector : IRInst
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRMakeVectorFromScalar : IRInst
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRMakeCoopVector : IRInst
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRCoopMatMapElementIFunc : IRInst
@@ -2934,21 +2309,7 @@ struct IRMakeDifferentialPairBase : IRInst
     IRInst* getPrimalValue() { return getOperand(0); }
     IRInst* getDifferentialValue() { return getOperand(1); }
 };
-FIDDLE()
-struct IRMakeDifferentialPair : IRMakeDifferentialPairBase
-{
-    FIDDLE(leafInst())
-};
-FIDDLE()
-struct IRMakeDifferentialPairUserCode : IRMakeDifferentialPairBase
-{
-    FIDDLE(leafInst())
-};
-FIDDLE()
-struct IRMakeDifferentialPtrPair : IRMakeDifferentialPairBase
-{
-    FIDDLE(leafInst())
-};
+
 
 FIDDLE()
 struct IRDifferentialPairGetDifferentialBase : IRInst
@@ -2956,21 +2317,7 @@ struct IRDifferentialPairGetDifferentialBase : IRInst
     FIDDLE(baseInst())
     IRInst* getBase() { return getOperand(0); }
 };
-FIDDLE()
-struct IRDifferentialPairGetDifferential : IRDifferentialPairGetDifferentialBase
-{
-    FIDDLE(leafInst())
-};
-FIDDLE()
-struct IRDifferentialPairGetDifferentialUserCode : IRDifferentialPairGetDifferentialBase
-{
-    FIDDLE(leafInst())
-};
-FIDDLE()
-struct IRDifferentialPtrPairGetDifferential : IRDifferentialPairGetDifferentialBase
-{
-    FIDDLE(leafInst())
-};
+
 
 FIDDLE()
 struct IRDifferentialPairGetPrimalBase : IRInst
@@ -2978,16 +2325,7 @@ struct IRDifferentialPairGetPrimalBase : IRInst
     FIDDLE(baseInst())
     IRInst* getBase() { return getOperand(0); }
 };
-FIDDLE()
-struct IRDifferentialPairGetPrimal : IRDifferentialPairGetPrimalBase
-{
-    FIDDLE(leafInst())
-};
-FIDDLE()
-struct IRDifferentialPairGetPrimalUserCode : IRDifferentialPairGetPrimalBase
-{
-    FIDDLE(leafInst())
-};
+
 FIDDLE()
 struct IRDifferentialPtrPairGetPrimal : IRDifferentialPairGetPrimalBase
 {
@@ -3006,8 +2344,6 @@ struct IRUpdateElement : IRInst
 {
     FIDDLE(leafInst())
 
-    IRInst* getOldValue() { return getOperand(0); }
-    IRInst* getElementValue() { return getOperand(1); }
     IRInst* getAccessKey(UInt index) { return getOperand(2 + index); }
     UInt getAccessKeyCount() { return getOperandCount() - 2; }
     List<IRInst*> getAccessChain()
@@ -3024,8 +2360,6 @@ FIDDLE()
 struct IRMakeResultError : IRInst
 {
     FIDDLE(leafInst())
-
-    IRInst* getErrorValue() { return getOperand(0); }
 };
 
 // Constructs an `Result<T,E>` value from an valid value.
@@ -3033,8 +2367,6 @@ FIDDLE()
 struct IRMakeResultValue : IRInst
 {
     FIDDLE(leafInst())
-
-    IRInst* getValue() { return getOperand(0); }
 };
 
 // Determines if a `Result` value represents an error.
@@ -3042,8 +2374,6 @@ FIDDLE()
 struct IRIsResultError : IRInst
 {
     FIDDLE(leafInst())
-
-    IRInst* getResultOperand() { return getOperand(0); }
 };
 
 // Extract the value from a `Result`.
@@ -3051,8 +2381,6 @@ FIDDLE()
 struct IRGetResultValue : IRInst
 {
     FIDDLE(leafInst())
-
-    IRInst* getResultOperand() { return getOperand(0); }
 };
 
 // Extract the error code from a `Result`.
@@ -3060,39 +2388,30 @@ FIDDLE()
 struct IRGetResultError : IRInst
 {
     FIDDLE(leafInst())
-
-    IRInst* getResultOperand() { return getOperand(0); }
 };
 
 FIDDLE()
 struct IROptionalHasValue : IRInst
 {
     FIDDLE(leafInst())
-
-    IRInst* getOptionalOperand() { return getOperand(0); }
 };
 
 FIDDLE()
 struct IRGetOptionalValue : IRInst
 {
     FIDDLE(leafInst())
-
-    IRInst* getOptionalOperand() { return getOperand(0); }
 };
 
 FIDDLE()
 struct IRMakeOptionalValue : IRInst
 {
     FIDDLE(leafInst())
-
-    IRInst* getValue() { return getOperand(0); }
 };
 
 FIDDLE()
 struct IRMakeOptionalNone : IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getDefaultValue() { return getOperand(0); }
 };
 
 /// An instruction that packs a concrete value into an existential-type "box"
@@ -3117,8 +2436,6 @@ FIDDLE()
 struct IRCreateExistentialObject : IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getTypeID() { return getOperand(0); }
-    IRInst* getValue() { return getOperand(1); }
 };
 
 /// Generalizes `IRMakeExistential` by allowing a type with existential sub-fields to be boxed
@@ -3126,7 +2443,6 @@ FIDDLE()
 struct IRWrapExistential : IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getWrappedValue() { return getOperand(0); }
 
     UInt getSlotOperandCount() { return getOperandCount() - 1; }
     IRInst* getSlotOperand(UInt index) { return getOperand(index + 1); }
@@ -3195,12 +2511,6 @@ FIDDLE()
 struct IRIsType : IRInst
 {
     FIDDLE(leafInst())
-
-    IRInst* getValue() { return getOperand(0); }
-    IRInst* getValueWitness() { return getOperand(1); }
-
-    IRInst* getTypeOperand() { return getOperand(2); }
-    IRInst* getTargetWitness() { return getOperand(3); }
 };
 
 /// Demarks where the referenced item is no longer live, optimimally (although not
@@ -3268,7 +2578,10 @@ struct IRCastStorageToLogicalBase : IRInst
 {
     FIDDLE(baseInst())
     IRInst* getVal() { return getOperand(0); }
-    IRInst* getBufferType() { return getOperand(1); }
+    IRMakeStorageTypeLoweringConfig* getLayoutConfig()
+    {
+        return as<IRMakeStorageTypeLoweringConfig>(getOperand(1));
+    }
 };
 
 FIDDLE()
@@ -3374,16 +2687,12 @@ FIDDLE()
 struct IRDebugFuncDecoration : IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getDebugFunc() { return getOperand(0); }
 };
 
 FIDDLE()
 struct IRDebugLocationDecoration : IRDecoration
 {
     FIDDLE(leafInst())
-    IRInst* getSource() { return getOperand(0); }
-    IRInst* getLine() { return getOperand(1); }
-    IRInst* getCol() { return getOperand(2); }
 };
 
 struct IRSPIRVAsm;
@@ -3515,14 +2824,161 @@ FIDDLE()
 struct IREmbeddedDownstreamIR : IRInst
 {
     FIDDLE(leafInst())
-    CodeGenTarget getTarget()
-    {
-        return static_cast<CodeGenTarget>(cast<IRIntLit>(getOperand(0))->getValue());
-    }
-    IRBlobLit* getBlob() { return cast<IRBlobLit>(getOperand(1)); }
+    CodeGenTarget getTarget() { return static_cast<CodeGenTarget>(getTargetOperand()->getValue()); }
 };
 
-FIDDLE(allOtherInstStructs())
+FIDDLE()
+struct IRSetBase : IRInst
+{
+    FIDDLE(baseInst())
+    UInt getCount() { return getOperandCount(); }
+    IRInst* getElement(UInt idx) { return getOperand(idx); }
+    bool isEmpty() { return getOperandCount() == 0; }
+    bool isSingleton() { return (getOperandCount() == 1) && !isUnbounded(); }
+    bool isUnbounded()
+    {
+        // This is an unbounded set if any of its elements are unbounded.
+        for (UInt ii = 0; ii < getOperandCount(); ++ii)
+        {
+            switch (getElement(ii)->getOp())
+            {
+            case kIROp_UnboundedTypeElement:
+            case kIROp_UnboundedWitnessTableElement:
+            case kIROp_UnboundedFuncElement:
+            case kIROp_UnboundedGenericElement:
+                return true;
+            }
+        }
+        return false;
+    }
+
+    IRInst* tryGetUnboundedElement()
+    {
+        for (UInt ii = 0; ii < getOperandCount(); ++ii)
+        {
+            switch (getElement(ii)->getOp())
+            {
+            case kIROp_UnboundedTypeElement:
+            case kIROp_UnboundedWitnessTableElement:
+            case kIROp_UnboundedFuncElement:
+            case kIROp_UnboundedGenericElement:
+                return getElement(ii);
+            }
+        }
+        return nullptr;
+    }
+
+    bool containsUninitializedElement()
+    {
+        // This is a "potentially uninitialized" set if any of its elements are unbounded.
+        for (UInt ii = 0; ii < getOperandCount(); ++ii)
+        {
+            switch (getElement(ii)->getOp())
+            {
+            case kIROp_UninitializedTypeElement:
+            case kIROp_UninitializedWitnessTableElement:
+                return true;
+            }
+        }
+        return false;
+    }
+
+    IRInst* tryGetUninitializedElement()
+    {
+        for (UInt ii = 0; ii < getOperandCount(); ++ii)
+        {
+            switch (getElement(ii)->getOp())
+            {
+            case kIROp_UninitializedTypeElement:
+            case kIROp_UninitializedWitnessTableElement:
+                return getElement(ii);
+            }
+        }
+        return nullptr;
+    }
+};
+
+FIDDLE()
+struct IRWitnessTableSet : IRSetBase
+{
+    FIDDLE(leafInst())
+};
+
+
+FIDDLE()
+struct IRTypeSet : IRSetBase
+{
+    FIDDLE(leafInst())
+};
+
+FIDDLE()
+struct IRSetTagType : IRType
+{
+    FIDDLE(leafInst())
+    IRSetBase* getSet() { return as<IRSetBase>(getOperand(0)); }
+    bool isSingleton() { return getSet()->isSingleton(); }
+};
+
+FIDDLE()
+struct IRTaggedUnionType : IRType
+{
+    FIDDLE(leafInst())
+    IRWitnessTableSet* getWitnessTableSet() { return as<IRWitnessTableSet>(getOperand(0)); }
+    IRTypeSet* getTypeSet() { return as<IRTypeSet>(getOperand(1)); }
+    bool isSingleton()
+    {
+        return getTypeSet()->isSingleton() && getWitnessTableSet()->isSingleton();
+    }
+};
+
+FIDDLE()
+struct IRElementOfSetType : IRType
+{
+    FIDDLE(leafInst())
+    IRSetBase* getSet() { return as<IRSetBase>(getOperand(0)); }
+};
+
+FIDDLE()
+struct IRUntaggedUnionType : IRType
+{
+    FIDDLE(leafInst())
+    IRSetBase* getSet() { return as<IRSetBase>(getOperand(0)); }
+};
+
+// Generate struct definitions for all IR instructions not explicitly defined in this file
+#if 0 // FIDDLE TEMPLATE:
+% local lua_module = require("source/slang/slang-ir.h.lua")
+% local inst_structs = lua_module.getAllOtherInstStructsData()
+% for _, inst in ipairs(inst_structs) do
+struct IR$(inst.struct_name) : IR$(inst.parent_struct)
+{
+%   if inst.is_leaf then
+    static bool isaImpl(IROp op)
+    {
+        return (kIROpMask_OpMask & op) == kIROp_$(inst.struct_name);
+    }
+    enum { kOp = kIROp_$(inst.struct_name) };
+%   else
+    static bool isaImpl(IROp opIn)
+    {
+        const int op = (kIROpMask_OpMask & opIn);
+        return op >= kIROp_First$(inst.struct_name) && op <= kIROp_Last$(inst.struct_name);
+    }
+%   end
+%   for _, operand in ipairs(inst.operands) do
+%     if operand.has_type then
+    $(operand.type)* $(operand.getter_name)() { return ($(operand.type)*)getOperand($(operand.index)); }
+%     else
+    IRInst* $(operand.getter_name)() { return getOperand($(operand.index)); }
+%     end
+%   end
+};
+
+% end
+#else // FIDDLE OUTPUT:
+#define FIDDLE_GENERATED_OUTPUT_ID 0
+#include "slang-ir-insts.h.fiddle"
+#endif // FIDDLE END
 
 struct IRBuilderSourceLocRAII;
 
@@ -3678,76 +3134,179 @@ public:
     IRPtrLit* getNullPtrValue(IRType* type);
     IRPtrLit* getNullVoidPtrValue() { return getNullPtrValue(getPtrType(getVoidType())); }
     IRVoidLit* getVoidValue();
+    IRVoidLit* getVoidValue(IRType* type);
     IRInst* getCapabilityValue(CapabilitySet const& caps);
 
     IRBasicType* getBasicType(BaseType baseType);
-    IRBasicType* getVoidType();
-    IRBasicType* getBoolType();
-    IRBasicType* getIntType();
-    IRBasicType* getInt64Type();
-    IRBasicType* getUIntType();
-    IRBasicType* getUInt64Type();
-    IRBasicType* getUInt16Type();
-    IRBasicType* getUInt8Type();
-    IRBasicType* getFloatType();
-    IRBasicType* getCharType();
-    IRShortStringType* getShortStringType(IRIntLit* length);
-    IRStringType* getStringType();
-    IRNativeStringType* getNativeStringType();
-    IRNativePtrType* getNativePtrType(IRType* valueType);
 
-    IRType* getCapabilitySetType();
+#if 0 // FIDDLE TEMPLATE:
+%local ir_lua = require("source/slang/slang-ir.h.lua")
+%local basic_types = ir_lua.getBasicTypesForBuilderMethods()
+%for _, type_info in ipairs(basic_types) do
+%  -- Declare variables for both variadic and non-variadic cases
+%  local non_variadic_operands = {}
+%  local variadic_operand = nil
+%  
+%  -- For variadic types, separate operands by type
+%  if type_info.is_variadic then
+%    for _, op in ipairs(type_info.operands) do
+%      if op.variadic then
+%        variadic_operand = op
+%      else
+%        table.insert(non_variadic_operands, op)
+%      end
+%    end
+%  end
+%
+%  -- Unified approach: N lists with specified counts (1 for single operands, paramCount for variadic)
+%  if type_info.is_variadic then
+$(type_info.return_type) $(type_info.method_name)(
+%    for i, operand in ipairs(non_variadic_operands) do
+    $(operand.type)* $(operand.name),
+%    end
+    UInt $(variadic_operand.name)Count, $(variadic_operand.type)* const* $(variadic_operand.name))
+%  else
+$(type_info.return_type) $(type_info.method_name)(
+%    for i, operand in ipairs(type_info.operands) do
+    $(operand.type)* $(operand.name)$(operand.optional and " = nullptr" or "")
+%      if i < #type_info.operands then
+,
+%      end
+%    end
+)
+%  end
+{
+%  if #type_info.operands == 0 then
+    return ($(type_info.return_type))createIntrinsicInst(
+        nullptr,
+        $(type_info.opcode),
+        0,
+        nullptr,
+        nullptr);
+%  else
+    UInt operandCounts[] = {
+%    if type_info.is_variadic then
+%      -- For variadic: 1 for each non-variadic, paramCount for variadic
+%      for _, orig_operand in ipairs(type_info.operands) do
+%        if orig_operand.variadic then
+        $(variadic_operand.name)Count,
+%        else
+        1,
+%        end
+%      end
+%    else
+%      -- For non-variadic: 1 for each operand
+%      for i = 1, #type_info.operands do
+        1,
+%      end
+%    end
+    };
+    IRInst* const* operandLists[] = {
+%    if type_info.is_variadic then
+%      -- For variadic: address of each non-variadic, cast variadic pointer for type compatibility
+%      local non_variadic_index = 0
+%      for _, orig_operand in ipairs(type_info.operands) do
+%        if orig_operand.variadic then
+        (IRInst* const*)$(variadic_operand.name),
+%        else
+%          non_variadic_index = non_variadic_index + 1
+%          local matching_operand = non_variadic_operands[non_variadic_index]
+        (IRInst* const*)&$(matching_operand.name),
+%        end
+%      end
+%    else
+%      -- For non-variadic: address of each operand
+%      for i, operand in ipairs(type_info.operands) do
+        (IRInst* const*)&$(operand.name),
+%      end
+%    end
+    };
+%    -- Count number of present lists using ternary pattern for optional operands
+%    -- This works for both variadic and non-variadic cases
+%    local first_optional_index = nil
+%    for i, operand in ipairs(type_info.operands) do
+%      if operand.optional and not first_optional_index then
+%        first_optional_index = i
+%        break
+%      end
+%    end
+%    if not first_optional_index then
+%      first_optional_index = #type_info.operands+1
+%    end
+%    -- Build left-to-right ternary expression - if operand N is present, then operands 1..N are all present
+%    local ternary_expr = ""
+%    for i = #type_info.operands, first_optional_index, -1 do
+%      local operand = type_info.operands[i]
+%      ternary_expr = ternary_expr .. operand.name .. " ? " .. tostring(i) .. " : "
+%    end
+%    ternary_expr = ternary_expr .. tostring(first_optional_index - 1)
+    UInt listCount = $(ternary_expr);
+    
+    return ($(type_info.return_type))createIntrinsicInst(
+        nullptr,
+        $(type_info.opcode),
+        listCount,
+        operandCounts,
+        operandLists);
+%  end
+}
 
-    IRAssociatedType* getAssociatedType(ArrayView<IRInterfaceType*> constraintTypes);
-    IRThisType* getThisType(IRType* interfaceType);
-    IRRawPointerType* getRawPointerType();
-    IRRTTIPointerType* getRTTIPointerType(IRInst* rttiPtr);
-    IRRTTIType* getRTTIType();
-    IRRTTIHandleType* getRTTIHandleType();
+%  -- Add List and ArrayView convenience overloads for variadic types
+%  if type_info.is_variadic then
+$(type_info.return_type) $(type_info.method_name)(
+%    for i, operand in ipairs(non_variadic_operands) do
+    $(operand.type)* $(operand.name),
+%    end
+    List<$(variadic_operand.type)*> const& $(variadic_operand.name))
+{
+    return $(type_info.method_name)(
+%      for i, operand in ipairs(non_variadic_operands) do
+        $(operand.name),
+%      end
+        $(variadic_operand.name).getCount(), $(variadic_operand.name).getBuffer());
+}
+
+$(type_info.return_type) $(type_info.method_name)(
+%    for i, operand in ipairs(non_variadic_operands) do
+    $(operand.type)* $(operand.name),
+%    end
+    ArrayView<$(variadic_operand.type)*> $(variadic_operand.name))
+{
+    return $(type_info.method_name)(
+%      for i, operand in ipairs(non_variadic_operands) do
+        $(operand.name),
+%      end
+        $(variadic_operand.name).getCount(), $(variadic_operand.name).getBuffer());
+}
+%  end
+%end
+#else // FIDDLE OUTPUT:
+#define FIDDLE_GENERATED_OUTPUT_ID 1
+#include "slang-ir-insts.h.fiddle"
+#endif // FIDDLE END
+
+
     IRAnyValueType* getAnyValueType(IRIntegerValue size);
-    IRAnyValueType* getAnyValueType(IRInst* size);
-    IRDynamicType* getDynamicType();
 
-    IRTargetTupleType* getTargetTupleType(UInt count, IRType* const* types);
 
-    IRTupleType* getTupleType(UInt count, IRType* const* types);
-    IRTupleType* getTupleType(List<IRType*> const& types)
-    {
-        return getTupleType(types.getCount(), types.getBuffer());
-    }
-
+    // Keep the 1,2,3,4 parameter helper methods as requested
     IRTupleType* getTupleType(IRType* type0, IRType* type1);
     IRTupleType* getTupleType(IRType* type0, IRType* type1, IRType* type2);
     IRTupleType* getTupleType(IRType* type0, IRType* type1, IRType* type2, IRType* type3);
-
-    IRTypePack* getTypePack(UInt count, IRType* const* types);
 
     IRExpandTypeOrVal* getExpandTypeOrVal(
         IRType* type,
         IRInst* pattern,
         ArrayView<IRInst*> capture);
 
-    IRResultType* getResultType(IRType* valueType, IRType* errorType);
-    IROptionalType* getOptionalType(IRType* valueType);
 
-    IRBasicBlockType* getBasicBlockType();
-    IRWitnessTableType* getWitnessTableType(IRType* baseType);
-    IRWitnessTableIDType* getWitnessTableIDType(IRType* baseType);
-    IRType* getTypeType() { return getType(IROp::kIROp_TypeType); }
-    IRType* getTypeParameterPackKind() { return getType(IROp::kIROp_TypeParameterPackKind); }
     IRType* getKeyType() { return nullptr; }
 
-    IRTypeKind* getTypeKind();
-    IRGenericKind* getGenericKind();
-
-    IRPtrType* getPtrType(IRType* valueType);
     IRPtrTypeBase* getPtrType(IROp op, IRType* valueType);
 
     // Form a ptr type to `valueType` using the same opcode and address space as `ptrWithAddrSpace`.
     IRPtrTypeBase* getPtrTypeWithAddressSpace(IRType* valueType, IRPtrTypeBase* ptrWithAddrSpace);
 
-    IROutParamType* getOutParamType(IRType* valueType);
-    IRBorrowInOutParamType* getBorrowInOutParamType(IRType* valueType);
     IRRefParamType* getRefParamType(IRType* valueType, AddressSpace addrSpace);
     IRBorrowInParamType* getBorrowInParamType(IRType* valueType, AddressSpace addrSpace);
     IRPtrType* getPtrType(
@@ -3786,21 +3345,8 @@ public:
             oldPtrType->getAddressSpace());
     }
 
-    IRTextureTypeBase* getTextureType(
-        IRType* elementType,
-        IRInst* shape,
-        IRInst* isArray,
-        IRInst* isMS,
-        IRInst* sampleCount,
-        IRInst* access,
-        IRInst* isShadow,
-        IRInst* isCombined,
-        IRInst* format);
-
-    IRComPtrType* getComPtrType(IRType* valueType);
-
-    /// Get a 'SPIRV literal'
-    IRSPIRVLiteralType* getSPIRVLiteralType(IRType* type);
+    /// Get a GLSL output parameter group type
+    IRGLSLOutputParameterGroupType* getGLSLOutputParameterGroupType(IRType* elementType);
 
     IRArrayTypeBase* getArrayTypeBase(
         IROp op,
@@ -3808,37 +3354,11 @@ public:
         IRInst* elementCount,
         IRInst* stride = nullptr);
 
-    IRArrayType* getArrayType(IRType* elementType, IRInst* elementCount);
-
-    IRUnsizedArrayType* getUnsizedArrayType(IRType* elementType);
-
-    IRArrayType* getArrayType(IRType* elementType, IRInst* elementCount, IRInst* stride);
-
-    IRUnsizedArrayType* getUnsizedArrayType(IRType* elementType, IRInst* stride);
-
-    IRVectorType* getVectorType(IRType* elementType, IRInst* elementCount);
-
+    // Keep the IRIntegerValue version as it has a different signature
     IRVectorType* getVectorType(IRType* elementType, IRIntegerValue elementCount);
 
-    IRCoopVectorType* getCoopVectorType(IRType* elementType, IRInst* elementCount);
-
-    IRMatrixType* getMatrixType(
-        IRType* elementType,
-        IRInst* rowCount,
-        IRInst* columnCount,
-        IRInst* layout);
-
-    IRArrayListType* getArrayListType(IRType* elementType);
-    IRTensorViewType* getTensorViewType(IRType* elementType);
     IRTorchTensorType* getTorchTensorType(IRType* elementType);
 
-    IRDifferentialPairType* getDifferentialPairType(IRType* valueType, IRInst* witnessTable);
-
-    IRDifferentialPtrPairType* getDifferentialPtrPairType(IRType* valueType, IRInst* witnessTable);
-
-    IRDifferentialPairUserCodeType* getDifferentialPairUserCodeType(
-        IRType* valueType,
-        IRInst* witnessTable);
 
     IRBackwardDiffIntermediateContextType* getBackwardDiffIntermediateContextType(IRInst* func);
 
@@ -3855,17 +3375,6 @@ public:
         return getFuncType(paramTypes.getCount(), paramTypes.getBuffer(), resultType);
     }
 
-    IRConstantBufferType* getConstantBufferType(IRType* elementType, IRType* layout);
-
-    IRGLSLOutputParameterGroupType* getGLSLOutputParameterGroupType(IRType* valueType);
-
-    IRConstExprRate* getConstExprRate();
-    IRGroupSharedRate* getGroupSharedRate();
-    IRActualGlobalRate* getActualGlobalRate();
-    IRSpecConstRate* getSpecConstRate();
-
-    IRRateQualifiedType* getRateQualifiedType(IRRate* rate, IRType* dataType);
-
     IRType* getBindExistentialsType(IRInst* baseType, UInt slotArgCount, IRInst* const* slotArgs);
 
     IRType* getBindExistentialsType(IRInst* baseType, UInt slotArgCount, IRUse const* slotArgs);
@@ -3875,7 +3384,6 @@ public:
         IRType* concreteType,
         IRInst* witnessTable);
 
-    IRType* getPseudoPtrType(IRType* concreteType);
 
     IRType* getConjunctionType(UInt typeCount, IRType* const* types);
 
@@ -3898,21 +3406,8 @@ public:
         return emitIntrinsicInst(getVoidType(), kIROp_IndexedFieldKey, 2, args);
     }
 
-    IRMetalMeshGridPropertiesType* getMetalMeshGridPropertiesType()
-    {
-        return (IRMetalMeshGridPropertiesType*)getType(kIROp_MetalMeshGridPropertiesType);
-    }
 
-    IRMetalMeshType* getMetalMeshType(
-        IRType* vertexType,
-        IRType* primitiveType,
-        IRInst* numVertices,
-        IRInst* numPrimitives,
-        IRInst* topology)
-    {
-        IRInst* ops[5] = {vertexType, primitiveType, numVertices, numPrimitives, topology};
-        return (IRMetalMeshType*)getType(kIROp_MetalMeshType, 5, ops);
-    }
+    IRInst* emitSymbolAlias(IRInst* aliasedSymbol);
 
     IRInst* emitDebugSource(
         UnownedStringSlice fileName,
@@ -4147,6 +3642,16 @@ public:
         return emitMakeTuple(SLANG_COUNT_OF(args), args);
     }
 
+    IRMakeTaggedUnion* emitMakeTaggedUnion(
+        IRType* type,
+        IRInst* typeTag,
+        IRInst* witnessTableTag,
+        IRInst* value)
+    {
+        IRInst* args[] = {typeTag, witnessTableTag, value};
+        return cast<IRMakeTaggedUnion>(emitIntrinsicInst(type, kIROp_MakeTaggedUnion, 3, args));
+    }
+
     IRInst* emitMakeValuePack(IRType* type, UInt count, IRInst* const* args);
     IRInst* emitMakeValuePack(UInt count, IRInst* const* args);
 
@@ -4268,7 +3773,8 @@ public:
 
     IRInst* emitGpuForeach(List<IRInst*> args);
 
-    IRUndefined* emitUndefined(IRType* type);
+    IRLoadFromUninitializedMemory* emitLoadFromUninitializedMemory(IRType* type);
+    IRPoison* emitPoison(IRType* type);
 
     IRInst* emitReinterpret(IRInst* type, IRInst* value);
     IRInst* emitOutImplicitCast(IRInst* type, IRInst* value);
@@ -4374,7 +3880,7 @@ public:
 
     IRInst* emitLoad(IRType* type, IRInst* ptr);
     IRInst* emitLoad(IRType* type, IRInst* ptr, IRInst* align);
-    IRInst* emitLoad(IRType* type, IRInst* ptr, IRAlignedAttr* align);
+    IRInst* emitLoad(IRType* type, IRInst* ptr, ArrayView<IRInst*> attributes);
     IRInst* emitLoad(IRInst* ptr);
 
     IRInst* emitLoadReverseGradient(IRType* type, IRInst* diffValue);
@@ -4384,6 +3890,9 @@ public:
 
     IRInst* emitStore(IRInst* dstPtr, IRInst* srcVal);
     IRInst* emitStore(IRInst* dstPtr, IRInst* srcVal, IRInst* align);
+    IRInst* emitStore(IRInst* dstPtr, IRInst* srcVal, IRInst* align, IRInst* memoryScope);
+
+    IRInst* emitCopyLogical(IRInst* dest, IRInst* srcPtr, IRInst* instsToCopyLoadAttributesFrom);
 
     IRInst* emitAtomicStore(IRInst* dstPtr, IRInst* srcVal, IRInst* memoryOrder);
 
@@ -4592,11 +4101,18 @@ public:
     IRInst* emitCastPtrToInt(IRInst* val);
     IRInst* emitCastIntToPtr(IRType* ptrType, IRInst* val);
 
-    IRInst* emitCastStorageToLogical(IRType* type, IRInst* val, IRInst* bufferType);
-    IRCastStorageToLogicalDeref* emitCastStorageToLogicalDeref(
+    IRMakeStorageTypeLoweringConfig* emitMakeStorageTypeLoweringConfig(
+        AddressSpace addrspace,
+        IRTypeLayoutRuleName ruleName,
+        bool lowerToPhysicalType);
+    IRInst* emitCastStorageToLogical(
         IRType* type,
         IRInst* val,
-        IRInst* bufferType);
+        IRMakeStorageTypeLoweringConfig* config);
+    IRInst* emitCastStorageToLogicalDeref(
+        IRType* type,
+        IRInst* val,
+        IRMakeStorageTypeLoweringConfig* config);
 
     IRGlobalConstant* emitGlobalConstant(IRType* type);
 
@@ -4656,6 +4172,170 @@ public:
     IRMetalSetVertex* emitMetalSetVertex(IRInst* index, IRInst* vertex);
     IRMetalSetPrimitive* emitMetalSetPrimitive(IRInst* index, IRInst* primitive);
     IRMetalSetIndices* emitMetalSetIndices(IRInst* index, IRInst* indices);
+
+    IRGetElementFromTag* emitGetElementFromTag(IRInst* tag)
+    {
+        auto tagType = cast<IRSetTagType>(tag->getDataType());
+        IRInst* set = tagType->getSet();
+        auto elementType =
+            cast<IRElementOfSetType>(emitIntrinsicInst(nullptr, kIROp_ElementOfSetType, 1, &set));
+        return cast<IRGetElementFromTag>(
+            emitIntrinsicInst(elementType, kIROp_GetElementFromTag, 1, &tag));
+    }
+
+    IRGetTagFromTaggedUnion* emitGetTagFromTaggedUnion(IRInst* tag)
+    {
+        auto taggedUnionType = cast<IRTaggedUnionType>(tag->getDataType());
+
+        IRInst* set = taggedUnionType->getWitnessTableSet();
+        auto tableTagType =
+            cast<IRSetTagType>(emitIntrinsicInst(nullptr, kIROp_SetTagType, 1, &set));
+
+        return cast<IRGetTagFromTaggedUnion>(
+            emitIntrinsicInst(tableTagType, kIROp_GetTagFromTaggedUnion, 1, &tag));
+    }
+
+    IRGetTypeTagFromTaggedUnion* emitGetTypeTagFromTaggedUnion(IRInst* tag)
+    {
+        auto taggedUnionType = cast<IRTaggedUnionType>(tag->getDataType());
+
+        IRInst* typeSet = taggedUnionType->getTypeSet();
+        auto typeTagType =
+            cast<IRSetTagType>(emitIntrinsicInst(nullptr, kIROp_SetTagType, 1, &typeSet));
+
+        return cast<IRGetTypeTagFromTaggedUnion>(
+            emitIntrinsicInst(typeTagType, kIROp_GetTypeTagFromTaggedUnion, 1, &tag));
+    }
+
+    IRGetValueFromTaggedUnion* emitGetValueFromTaggedUnion(IRInst* taggedUnion)
+    {
+        auto taggedUnionType = cast<IRTaggedUnionType>(taggedUnion->getDataType());
+
+        IRInst* typeSet = taggedUnionType->getTypeSet();
+        auto valueOfTypeSetType = cast<IRUntaggedUnionType>(
+            emitIntrinsicInst(nullptr, kIROp_UntaggedUnionType, 1, &typeSet));
+
+        return cast<IRGetValueFromTaggedUnion>(
+            emitIntrinsicInst(valueOfTypeSetType, kIROp_GetValueFromTaggedUnion, 1, &taggedUnion));
+    }
+
+    IRGetDispatcher* emitGetDispatcher(
+        IRFuncType* funcType,
+        IRWitnessTableSet* witnessTableSet,
+        IRStructKey* key)
+    {
+        IRInst* args[] = {witnessTableSet, key};
+        return cast<IRGetDispatcher>(emitIntrinsicInst(funcType, kIROp_GetDispatcher, 2, args));
+    }
+
+    IRGetSpecializedDispatcher* emitGetSpecializedDispatcher(
+        IRFuncType* funcType,
+        IRWitnessTableSet* witnessTableSet,
+        IRStructKey* key,
+        List<IRInst*> const& specArgs)
+    {
+        List<IRInst*> args;
+        args.add(witnessTableSet);
+        args.add(key);
+        for (auto specArg : specArgs)
+        {
+            args.add(specArg);
+        }
+        return cast<IRGetSpecializedDispatcher>(emitIntrinsicInst(
+            funcType,
+            kIROp_GetSpecializedDispatcher,
+            (UInt)args.getCount(),
+            args.getBuffer()));
+    }
+
+    IRUntaggedUnionType* getUntaggedUnionType(IRInst* operand)
+    {
+        return as<IRUntaggedUnionType>(
+            emitIntrinsicInst(nullptr, kIROp_UntaggedUnionType, 1, &operand));
+    }
+
+    IRElementOfSetType* getElementOfSetType(IRInst* operand)
+    {
+        return as<IRElementOfSetType>(
+            emitIntrinsicInst(nullptr, kIROp_ElementOfSetType, 1, &operand));
+    }
+
+    IRTaggedUnionType* getTaggedUnionType(IRWitnessTableSet* tables, IRTypeSet* types)
+    {
+        IRInst* operands[] = {tables, types};
+        return as<IRTaggedUnionType>(
+            emitIntrinsicInst(nullptr, kIROp_TaggedUnionType, 2, operands));
+    }
+
+    IRSetTagType* getSetTagType(IRSetBase* collection)
+    {
+        IRInst* operands[] = {collection};
+        return cast<IRSetTagType>(emitIntrinsicInst(nullptr, kIROp_SetTagType, 1, operands));
+    }
+
+    IRUnboundedTypeElement* getUnboundedTypeElement(IRInst* interfaceType)
+    {
+        return cast<IRUnboundedTypeElement>(
+            emitIntrinsicInst(nullptr, kIROp_UnboundedTypeElement, 1, &interfaceType));
+    }
+
+    IRUnboundedWitnessTableElement* getUnboundedWitnessTableElement(IRInst* interfaceType)
+    {
+        return cast<IRUnboundedWitnessTableElement>(
+            emitIntrinsicInst(nullptr, kIROp_UnboundedWitnessTableElement, 1, &interfaceType));
+    }
+
+    IRUnboundedFuncElement* getUnboundedFuncElement()
+    {
+        return cast<IRUnboundedFuncElement>(
+            emitIntrinsicInst(nullptr, kIROp_UnboundedFuncElement, 0, nullptr));
+    }
+
+    IRUnboundedGenericElement* getUnboundedGenericElement()
+    {
+        return cast<IRUnboundedGenericElement>(
+            emitIntrinsicInst(nullptr, kIROp_UnboundedGenericElement, 0, nullptr));
+    }
+
+    IRUninitializedTypeElement* getUninitializedTypeElement(IRInst* interfaceType)
+    {
+        return cast<IRUninitializedTypeElement>(
+            emitIntrinsicInst(nullptr, kIROp_UninitializedTypeElement, 1, &interfaceType));
+    }
+
+    IRUninitializedWitnessTableElement* getUninitializedWitnessTableElement(IRInst* interfaceType)
+    {
+        return cast<IRUninitializedWitnessTableElement>(
+            emitIntrinsicInst(nullptr, kIROp_UninitializedWitnessTableElement, 1, &interfaceType));
+    }
+
+    IRNoneTypeElement* getNoneTypeElement()
+    {
+        return cast<IRNoneTypeElement>(
+            emitIntrinsicInst(nullptr, kIROp_NoneTypeElement, 0, nullptr));
+    }
+
+    IRNoneWitnessTableElement* getNoneWitnessTableElement()
+    {
+        return cast<IRNoneWitnessTableElement>(
+            emitIntrinsicInst(nullptr, kIROp_NoneWitnessTableElement, 0, nullptr));
+    }
+
+    IRGetTagOfElementInSet* emitGetTagOfElementInSet(
+        IRType* tagType,
+        IRInst* element,
+        IRInst* collection)
+    {
+        SLANG_ASSERT(tagType->getOp() == kIROp_SetTagType);
+        IRInst* args[] = {element, collection};
+        return cast<IRGetTagOfElementInSet>(
+            emitIntrinsicInst(tagType, kIROp_GetTagOfElementInSet, 2, args));
+    }
+
+    IRSetTagType* getSetTagType(IRInst* collection)
+    {
+        return cast<IRSetTagType>(emitIntrinsicInst(nullptr, kIROp_SetTagType, 1, &collection));
+    }
 
     //
     // Decorations
@@ -4754,7 +4434,6 @@ public:
 
     IRTypeSizeAttr* getTypeSizeAttr(LayoutResourceKind kind, LayoutSize size);
     IRVarOffsetAttr* getVarOffsetAttr(LayoutResourceKind kind, UInt offset, UInt space = 0);
-    IRPendingLayoutAttr* getPendingLayoutAttr(IRLayout* pendingLayout);
     IRStructFieldLayoutAttr* getFieldLayoutAttr(IRInst* key, IRVarLayout* layout);
     IRTupleFieldLayoutAttr* getTupleFieldLayoutAttr(IRTypeLayout* layout);
     IRCaseTypeLayoutAttr* getCaseTypeLayoutAttr(IRTypeLayout* layout);
@@ -4949,13 +4628,13 @@ public:
 
     void addRequirePreludeDecoration(
         IRInst* value,
-        const CapabilitySet& caps,
+        const CapabilitySetVal* caps,
         UnownedStringSlice prelude)
     {
         addDecoration(
             value,
             kIROp_RequirePreludeDecoration,
-            getCapabilityValue(caps),
+            getCapabilityValue(CapabilitySet{caps}),
             getStringValue(prelude));
     }
 
@@ -5433,6 +5112,12 @@ public:
     }
 
     void addRayPayloadDecoration(IRType* inst) { addDecoration(inst, kIROp_RayPayloadDecoration); }
+
+    IRSetBase* getSet(IROp op, const HashSet<IRInst*>& elements);
+
+    IRSetBase* getSingletonSet(IROp op, IRInst* element);
+
+    UInt getUniqueID(IRInst* inst);
 };
 
 // Helper to establish the source location that will be used

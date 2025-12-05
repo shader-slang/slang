@@ -1,4 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda
 
 // CHECK: 1
 // CHECK-NEXT: 2
@@ -13,20 +14,20 @@
 ByteAddressBuffer input;
 
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer
-RWStructuredBuffer<uint32_t> outputBuffer;
+RWStructuredBuffer<int32_t> outputBuffer;
 
 using namespace linalg;
 
-groupshared uint32_t[256] tempShared;
+groupshared int32_t[256] tempShared;
 
 [numthreads(32, 1, 1)]
 void computeMain()
 {
     let stride = 16;
 
-    let mat = coopMatLoad<uint32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator, CoopMatMatrixLayout.RowMajor>(input, 0, stride);
+    let mat = coopMatLoad<int32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator, CoopMatMatrixLayout.RowMajor>(input, 0, stride);
     mat.Store<CoopMatMatrixLayout.RowMajor>(tempShared, 0, stride);
 
-    let result = coopMatLoad<uint32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator, CoopMatMatrixLayout.RowMajor>(tempShared, 0, stride);
+    let result = coopMatLoad<int32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator, CoopMatMatrixLayout.RowMajor>(tempShared, 0, stride);
     result.Store<CoopMatMatrixLayout.RowMajor>(outputBuffer, 0, stride);
 }

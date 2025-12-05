@@ -201,6 +201,7 @@ struct ValKeyEqual
 class ASTBuilder : public RefObject
 {
     friend class SharedASTBuilder;
+    friend struct CapabilitySet;
 
 public:
     /// Get a `Val` that has the AST node class and operands described by `desc`.
@@ -633,6 +634,12 @@ public:
     Val* getSNormModifierVal();
     Val* getNoDiffModifierVal();
 
+    /// Create a UIntSetVal from a UIntSet
+    UIntSetVal* getUIntSetVal(const UIntSet& uintSet);
+
+    /// Create a singleton CapabilitySetVal from a single CapabilityName
+    CapabilitySetVal* getCapabilitySetVal(CapabilityName capability);
+
     TupleType* getTupleType(ArrayView<Type*> types);
 
     FuncType* getFuncType(ArrayView<Type*> parameters, Type* result, Type* errorType = nullptr);
@@ -802,6 +809,9 @@ protected:
 
     /// List of all nodes that require being dtored when ASTBuilder is dtored
     List<NodeBase*> m_dtorNodes;
+
+    /// Cache for CapabilitySet::freeze() to avoid recreating identical CapabilitySetVal objects
+    Dictionary<CapabilitySet, CapabilitySetVal*> m_capabilitySetCache;
 
     MemoryArena m_arena;
 };

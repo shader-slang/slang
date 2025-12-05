@@ -336,10 +336,12 @@ void WGSLSourceEmitter::emit(const AddressSpace addressSpace)
         break;
 
     case AddressSpace::StorageBuffer:
+    case AddressSpace::Global:
         m_writer->emit("storage");
         break;
 
     case AddressSpace::Generic:
+    case AddressSpace::Function:
         m_writer->emit("function");
         break;
 
@@ -1311,7 +1313,7 @@ bool WGSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 
 void WGSLSourceEmitter::emitCallArg(IRInst* inst)
 {
-    if (as<IRPtrTypeBase>(inst->getDataType()))
+    if (as<IRPointerLikeType>(inst->getDataType()) || as<IRPtrTypeBase>(inst->getDataType()))
     {
         // If we are calling a function with a pointer-typed argument, we need to
         // explicitly prefix the argument with `&` to pass a pointer.

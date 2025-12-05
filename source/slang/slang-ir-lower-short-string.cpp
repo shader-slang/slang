@@ -176,8 +176,8 @@ struct ShortStringLoweringPass : InstPassBase
                 // The ShortString is/will be lowered to a string literal (const char[N+1]), or an
                 // Array<uint8_t, N> So we need to cast the result of getElement
                 IRBasicType* getElementType = options.targetSupportsStringLiterals
-                                                  ? builder.getCharType()
-                                                  : builder.getUInt8Type();
+                                                  ? as<IRBasicType>(builder.getCharType())
+                                                  : as<IRBasicType>(builder.getUInt8Type());
                 IRInst* getElement = builder.emitElementExtract(
                     getElementType,
                     getChar->getBase(),

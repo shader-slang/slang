@@ -33,6 +33,9 @@ struct EliminateMultiLevelBreakContext
         // Track exit blocks for this region (break block and continue block for loops)
         List<IRBlock*> exitBlocks;
 
+        // For loops, store the continue block separately
+        IRBlock* continueBlock = nullptr;
+
         IRBlock* getBreakBlock()
         {
             switch (headerInst->getOp())
@@ -64,11 +67,11 @@ struct EliminateMultiLevelBreakContext
             exitBlocks.clear();
             exitBlocks.add(getBreakBlock());
 
-            // If this is a loop, add any non-trivial continue block to the exit blocks
-            if (auto loop = as<IRLoop>(headerInst))
-                if (auto continueBlock = getContinueBlock())
-                    if (continueBlock != loop->getTargetBlock())
-                        exitBlocks.add(continueBlock);
+            // If this is a loop, store the continue block.
+            // We add it to the exitBlocks stack separately in collectBreakableRegionBlocks
+            // so that nested constructs treat it as an exit point.
+            if (as<IRLoop>(headerInst))
+                continueBlock = getContinueBlock();
         }
 
         void replaceBreakBlock(IRBuilder* builder, IRBlock* block)
@@ -129,6 +132,11 @@ struct EliminateMultiLevelBreakContext
                 if (info.blockSet.add(successor))
                     info.blocks.add(successor);
             }
+
+            // Add continueBlock to the exitBlocks stack so nested constructs
+            // (e.g., switch with continue) treat it as an exit point.
+            if (info.continueBlock)
+                exitBlocks.add(info.continueBlock);
 
             for (Index i = 0; i < info.blocks.getCount(); i++)
             {
@@ -501,7 +509,7 @@ struct EliminateMultiLevelBreakContext
             builder.setInsertInto(newBreakBlock);
             auto targetLevelParam = builder.emitParam(builder.getIntType());
 
-            if (as<IRUnreachable>(breakBlock->getTerminator()))
+            if (as<IRUnreachableBase>(breakBlock->getTerminator()))
             {
                 builder.setInsertInto(newBreakBlock);
                 builder.emitBranch(jumpToOuterBlock);

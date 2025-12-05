@@ -959,6 +959,42 @@ class BackwardDifferentiatePropagateVal : public DifferentiateVal
     }
 };
 
+/// A value that represents a UInt set stored as a list of bitmask operands.
+/// This is used for efficient deduplication of capability sets through ASTBuilder caching.
+FIDDLE()
+class UIntSetVal : public Val
+{
+    FIDDLE(...)
+
+    /// Get the number of bitmask operands
+    Index getBitmaskCount() const { return getOperandCount(); }
+
+    /// Get a specific bitmask operand as a constant integer value
+    ConstantIntVal* getBitmaskOperand(Index index) const
+    {
+        return as<ConstantIntVal>(getOperand(index));
+    }
+    UIntSet::Element getBitmask(Index index) const
+    {
+        return static_cast<UIntSet::Element>(getBitmaskOperand(index)->getValue());
+    }
+
+    /// Get all bitmask operands as a view
+    Val::OperandView<ConstantIntVal> getBitmasks() const
+    {
+        return Val::OperandView<ConstantIntVal>(this, 0, getOperandCount());
+    }
+
+    /// Convert this UIntSetVal to a UIntSet
+    UIntSet toUIntSet() const;
+
+    /// Create a UIntSetVal from a UIntSet using the given ASTBuilder
+    static UIntSetVal* fromUIntSet(ASTBuilder* astBuilder, const UIntSet& uintSet);
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride() { return this; }
+};
+
 
 template<typename F>
 void SubstitutionSet::forEachGenericSubstitution(F func) const
@@ -1013,6 +1049,10 @@ inline bool isTypeEqualityWitness(Val* witness)
                 return false;
         }
         return true;
+    }
+    else if (auto expandWitness = as<ExpandSubtypeWitness>(witness))
+    {
+        return isTypeEqualityWitness(expandWitness->getPatternTypeWitness());
     }
     return false;
 }

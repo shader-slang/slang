@@ -38,8 +38,6 @@ struct ByteAddressBufferLegalizationContext
     IRModule* m_module;
     IRBuilder m_builder;
 
-    Dictionary<IRInst*, IRType*> byteAddrBufferToReplace;
-
     // Everything starts with a request to process a module,
     // which delegates to the central recursive walk of the IR.
     //
@@ -985,6 +983,18 @@ struct ByteAddressBufferLegalizationContext
                 index);
         }
 
+        // Handle IRParam by changing its type to StructuredBuffer
+        if (auto babParam = as<IRParam>(byteAddressBuffer))
+        {
+            IRType* babType = babParam->getDataType();
+            IRType* structuredBufferType =
+                getEquivalentStructuredBufferParamType(elementType, babType);
+
+            // Propagate type change to all uses via replaceUsesWith
+            babType->replaceUsesWith(structuredBufferType);
+            return babParam;
+        }
+
         // If we failed to pattern-match the byte-address buffer operand
         // against something we can handle, then we need to bail out
         // of our attempt to legalize things here.
@@ -1090,6 +1100,9 @@ struct ByteAddressBufferLegalizationContext
         IRType* elementType,
         IRType* byteAddressBufferType)
     {
+        if (as<IRHLSLStructuredBufferTypeBase>(byteAddressBufferType))
+            return byteAddressBufferType;
+
         // Our task in this function is to compute the type for
         // a structure buffer that is equivalent to `byteAddressBufferType`,
         // but with the given `elementType`.
@@ -1551,9 +1564,9 @@ struct ByteAddressBufferLegalizationContext
 
 
 void legalizeByteAddressBufferOps(
+    IRModule* module,
     Session* session,
     TargetProgram* program,
-    IRModule* module,
     DiagnosticSink* sink,
     ByteAddressBufferLegalizationOptions const& options)
 {
@@ -1565,5 +1578,6 @@ void legalizeByteAddressBufferOps(
     context.m_sink = sink;
     context.processModule(module);
 }
+
 
 } // namespace Slang

@@ -855,7 +855,7 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
             if (auto aggTypeDecl = as<AggTypeDecl>(container))
             {
                 ASTLookupExprVisitor visitor(&context);
-                if (visitor.dispatchIfNotNull(aggTypeDecl->wrappedType.exp))
+                if (visitor.dispatchIfNotNull(aggTypeDecl->aliasedType.exp))
                     return true;
             }
         }

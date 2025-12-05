@@ -129,6 +129,7 @@ bool GlobalInstInliningContextGeneric::isInlinableGlobalInst(IRInst* inst)
     case kIROp_Neq:
     case kIROp_Eql:
     case kIROp_Call:
+    case kIROp_Load:
         return true;
     default:
         if (isInlinableGlobalInstForTarget(inst))

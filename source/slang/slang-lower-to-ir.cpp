@@ -10,6 +10,7 @@
 #include "slang-ir-bit-field-accessors.h"
 #include "slang-ir-check-differentiability.h"
 #include "slang-ir-check-recursion.h"
+#include "slang-ir-check-specialize-generic-with-existential.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-constexpr.h"
 #include "slang-ir-dce.h"
@@ -1487,6 +1488,108 @@ static void addLinkageDecoration(IRGenContext* context, IRInst* inst, Decl* decl
     }
 }
 
+static String getNameForNameHint(IRGenContext* context, Decl* decl)
+{
+    // We will use a bit of an ad hoc convention here for now.
+
+    Name* leafName = decl->getName();
+
+    // Handle custom name for a global parameter group (e.g., a `cbuffer`)
+    if (auto reflectionNameModifier = decl->findModifier<ParameterGroupReflectionName>())
+    {
+        leafName = reflectionNameModifier->nameAndLoc.name;
+    }
+
+    // There is no point in trying to provide a name hint for something with no name,
+    // or with an empty name
+    if (!leafName)
+        return String();
+    if (leafName->text.getLength() == 0)
+        return String();
+
+
+    if (const auto varDecl = as<VarDeclBase>(decl))
+    {
+        // For an ordinary local variable, global variable,
+        // parameter, or field, we will just use the name
+        // as declared, and now work in anything from
+        // its parent declaration(s).
+        //
+        // TODO: consider whether global/static variables should
+        // follow different rules.
+        //
+        return leafName->text;
+    }
+
+    // For other cases of declaration, we want to consider
+    // merging its name with the name of its parent declaration.
+    auto parentDecl = decl->parentDecl;
+
+    // Skip past a generic parent, if we are a declaration nested in a generic.
+    if (auto genericParentDecl = as<GenericDecl>(parentDecl))
+        parentDecl = genericParentDecl->parentDecl;
+
+    // Skip past a FileDecl parent.
+    if (auto fileParentDecl = as<FileDecl>(parentDecl))
+        parentDecl = fileParentDecl->parentDecl;
+
+    // A `ModuleDecl` can have a name too, but in the common case
+    // we don't want to generate name hints that include the module
+    // name, simply because they would lead to every global symbol
+    // getting a much longer name.
+    //
+    // TODO: We should probably include the module name for symbols
+    // being `import`ed, and not for symbols being compiled directly
+    // (those coming from a module that had no name given to it).
+    //
+    // For now we skip past a `ModuleDecl` parent.
+    //
+    if (auto moduleParentDecl = as<ModuleDecl>(parentDecl))
+        parentDecl = moduleParentDecl->parentDecl;
+
+    if (!parentDecl)
+    {
+        return leafName->text;
+    }
+
+    auto parentName = getNameForNameHint(context, parentDecl);
+    if (parentName.getLength() == 0)
+    {
+        return leafName->text;
+    }
+
+    // We will now construct a new `Name` to use as the hint,
+    // combining the name of the parent and the leaf declaration.
+
+    StringBuilder sb;
+    sb.append(parentName);
+    sb.append(".");
+    sb.append(leafName->text);
+
+    return sb.produceString();
+}
+
+/// Try to add an appropriate name hint to the instruction,
+/// that can be used for back-end code emission or debug info.
+static void addNameHint(IRGenContext* context, IRInst* inst, Decl* decl)
+{
+    String name = getNameForNameHint(context, decl);
+    if (name.getLength() == 0)
+        return;
+    context->irBuilder->addNameHintDecoration(inst, name.getUnownedSlice());
+}
+
+/// Add a name hint based on a fixed string.
+static void addNameHint(IRGenContext* context, IRInst* inst, char const* text)
+{
+    if (context->shared->m_obfuscateCode)
+    {
+        return;
+    }
+
+    context->irBuilder->addNameHintDecoration(inst, UnownedTerminatedStringSlice(text));
+}
+
 bool shouldDeclBeTreatedAsInterfaceRequirement(Decl* requirementDecl)
 {
     if (const auto funcDecl = as<CallableDecl>(requirementDecl))
@@ -1559,6 +1662,7 @@ IRStructKey* getInterfaceRequirementKey(IRGenContext* context, Decl* requirement
     requirementKey = builder->createStructKey();
 
     addLinkageDecoration(context, requirementKey, requirementDecl);
+    addNameHint(context, requirementKey, requirementDecl);
 
     context->shared->interfaceRequirementKeys.add(requirementDecl, requirementKey);
 
@@ -2028,7 +2132,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                         operands.add(argVal);
                     });
 
-            auto undefined = getBuilder()->emitUndefined(operands[1]->getFullType());
+            auto undefined = getBuilder()->emitPoison(operands[1]->getFullType());
             return getBuilder()->getDifferentialPairUserCodeType(primalType, undefined);
         }
         else
@@ -2042,7 +2146,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         List<IRType*> paramTypes;
         for (Index pp = 0; pp < paramCount; ++pp)
         {
-            paramTypes.add(lowerType(context, type->getParamTypeWithDirectionWrapper(pp)));
+            paramTypes.add(lowerType(context, type->getParamTypeWithModeWrapper(pp)));
         }
         if (type->getErrorType()->equals(context->astBuilder->getBottomType()))
         {
@@ -2573,107 +2677,6 @@ void maybeSetRate(IRGenContext* context, IRInst* inst, Decl* decl)
     }
 }
 
-static String getNameForNameHint(IRGenContext* context, Decl* decl)
-{
-    // We will use a bit of an ad hoc convention here for now.
-
-    Name* leafName = decl->getName();
-
-    // Handle custom name for a global parameter group (e.g., a `cbuffer`)
-    if (auto reflectionNameModifier = decl->findModifier<ParameterGroupReflectionName>())
-    {
-        leafName = reflectionNameModifier->nameAndLoc.name;
-    }
-
-    // There is no point in trying to provide a name hint for something with no name,
-    // or with an empty name
-    if (!leafName)
-        return String();
-    if (leafName->text.getLength() == 0)
-        return String();
-
-
-    if (const auto varDecl = as<VarDeclBase>(decl))
-    {
-        // For an ordinary local variable, global variable,
-        // parameter, or field, we will just use the name
-        // as declared, and now work in anything from
-        // its parent declaration(s).
-        //
-        // TODO: consider whether global/static variables should
-        // follow different rules.
-        //
-        return leafName->text;
-    }
-
-    // For other cases of declaration, we want to consider
-    // merging its name with the name of its parent declaration.
-    auto parentDecl = decl->parentDecl;
-
-    // Skip past a generic parent, if we are a declaration nested in a generic.
-    if (auto genericParentDecl = as<GenericDecl>(parentDecl))
-        parentDecl = genericParentDecl->parentDecl;
-
-    // Skip past a FileDecl parent.
-    if (auto fileParentDecl = as<FileDecl>(parentDecl))
-        parentDecl = fileParentDecl->parentDecl;
-
-    // A `ModuleDecl` can have a name too, but in the common case
-    // we don't want to generate name hints that include the module
-    // name, simply because they would lead to every global symbol
-    // getting a much longer name.
-    //
-    // TODO: We should probably include the module name for symbols
-    // being `import`ed, and not for symbols being compiled directly
-    // (those coming from a module that had no name given to it).
-    //
-    // For now we skip past a `ModuleDecl` parent.
-    //
-    if (auto moduleParentDecl = as<ModuleDecl>(parentDecl))
-        parentDecl = moduleParentDecl->parentDecl;
-
-    if (!parentDecl)
-    {
-        return leafName->text;
-    }
-
-    auto parentName = getNameForNameHint(context, parentDecl);
-    if (parentName.getLength() == 0)
-    {
-        return leafName->text;
-    }
-
-    // We will now construct a new `Name` to use as the hint,
-    // combining the name of the parent and the leaf declaration.
-
-    StringBuilder sb;
-    sb.append(parentName);
-    sb.append(".");
-    sb.append(leafName->text);
-
-    return sb.produceString();
-}
-
-/// Try to add an appropriate name hint to the instruction,
-/// that can be used for back-end code emission or debug info.
-static void addNameHint(IRGenContext* context, IRInst* inst, Decl* decl)
-{
-    String name = getNameForNameHint(context, decl);
-    if (name.getLength() == 0)
-        return;
-    context->irBuilder->addNameHintDecoration(inst, name.getUnownedSlice());
-}
-
-/// Add a name hint based on a fixed string.
-static void addNameHint(IRGenContext* context, IRInst* inst, char const* text)
-{
-    if (context->shared->m_obfuscateCode)
-    {
-        return;
-    }
-
-    context->irBuilder->addNameHintDecoration(inst, UnownedTerminatedStringSlice(text));
-}
 
 LoweredValInfo createVar(IRGenContext* context, IRType* type, Decl* decl = nullptr)
 {
@@ -2728,8 +2731,14 @@ LoweredValInfo tryGetAddress(
     LoweredValInfo const& inVal,
     TryGetAddressMode mode);
 
-/// Add a single `in` argument value to a list of arguments
-void addInArg(IRGenContext* context, List<IRInst*>* ioArgs, LoweredValInfo argVal)
+/// Add a single simple argument value to a list of arguments
+///
+/// This function should typically only be called directly for `in`
+/// arguments, or from other routines that know how to handle the
+/// parameter-passing mode for the corresponding parameter, and
+/// set up the `argVal` accordingly.
+///
+void addSimpleArg(IRGenContext* context, List<IRInst*>* ioArgs, LoweredValInfo argVal)
 {
     auto& args = *ioArgs;
     switch (argVal.flavor)
@@ -2745,7 +2754,7 @@ void addInArg(IRGenContext* context, List<IRInst*>* ioArgs, LoweredValInfo argVa
         break;
 
     default:
-        SLANG_UNIMPLEMENTED_X("addInArg case");
+        SLANG_UNIMPLEMENTED_X("unhandled representation of a lowered value in `addSimpleArg()`");
         break;
     }
 }
@@ -2775,36 +2784,55 @@ static void applyOutArgumentFixups(IRGenContext* context, List<OutArgumentFixup>
 /// Add one argument value to the argument list for a call being constructed
 void addArg(
     IRGenContext* context,
-    List<IRInst*>* ioArgs,            //< The argument list being built
-    List<OutArgumentFixup>* ioFixups, //< "Fixup" logic to apply for `out` or `inout` arguments
-    LoweredValInfo argVal,            //< The lowered value of the argument to add
-    IRType* paramType,                //< The type of the corresponding parameter
-    ParamPassingMode paramDirection,  //< The direction of the parameter (`in`, `out`, etc.)
-    Type* argType,                    //< The AST-level type of the argument
-    SourceLoc loc)                    //< A location to use if we need to report an error
+    List<IRInst*>* ioArgs,             //< The argument list being built
+    List<OutArgumentFixup>* ioFixups,  //< "Fixup" logic to apply for `out` or `inout` arguments
+    LoweredValInfo argVal,             //< The lowered value of the argument to add
+    ParamPassingMode paramPassingMode, //< The mode of the parameter (`in`, `out`, etc.)
+    Type* argType,                     //< The AST-level type of the argument
+    SourceLoc loc)                     //< A location to use if we need to report an error
 {
-    switch (paramDirection)
+    switch (paramPassingMode)
     {
+    case ParamPassingMode::In:
+        // Default `in` parameters are the easiest case: we can
+        // pretty much just add them to the argument list.
+        //
+        addSimpleArg(context, ioArgs, argVal);
+        break;
+
     case ParamPassingMode::Ref:
         {
-            // According to our "calling convention" we need to
-            // pass a pointer into the callee. Unlike the case for
-            // `out` and `inout` below, it is never valid to do
-            // copy-in/copy-out for a `ref` parameter, so we just
-            // pass in the actual pointer.
+            // The next easiest case is the `ref` parameter passing
+            // mode, because we always want to pass a pointer to
+            // the actual argument.
             //
-            IRInst* argPtr = getAddress(context, argVal, loc);
-            if (argPtr)
-                addInArg(context, ioArgs, LoweredValInfo::simple(argPtr));
+            // The `LoweredValInfo` representation (used for `argVal`)
+            // can store either an r-value or a few different cases
+            // of l-value. We will use `getAddress()` to try to
+            // force the representation to provide a single pointer
+            // as an `IRInst*`, and then use that value as the
+            // simple argument value to add.
+            //
+            if (IRInst* argPtr = getAddress(context, argVal, loc))
+            {
+                addSimpleArg(context, ioArgs, LoweredValInfo::simple(argPtr));
+            }
             else
             {
-                // If arg can't be converted to a pointer, we have already
-                // reported an error, so just pass a null pointer to allow
-                // the remaining lowering steps to finish.
-                addInArg(
-                    context,
-                    ioArgs,
-                    LoweredValInfo::simple(context->irBuilder->getNullVoidPtrValue()));
+                // If the `argVal` wasn't already in form where we could
+                // get a pointer, and couldn't be forced into such a form,
+                // then the `getAddress()` call above will have already
+                // reported an error (note that such an error would always
+                // represent an internal compiler error, since the semantic
+                // checking pass should be responsible for checking the
+                // suitability of the argument for the `ref` mode).
+                //
+                // Just to keep the arguments and parameters correctly lined up,
+                // we will synthesize a null pointer that we can pass instead.
+                //
+                auto placeholderArg =
+                    LoweredValInfo::simple(context->irBuilder->getNullVoidPtrValue());
+                addSimpleArg(context, ioArgs, placeholderArg);
             }
         }
         break;
@@ -2813,76 +2841,129 @@ void addArg(
     case ParamPassingMode::BorrowInOut:
     case ParamPassingMode::BorrowIn:
         {
-            // According to our "calling convention" we need to
-            // pass a pointer into the callee.
+            // The remaining parameter-passing modes are the ones that
+            // have the most complicated rules.
             //
-            // Ideally we would like to just pass the address of
-            // `loweredArg`, and when that it possible we will do so.
-            // It may happen, though, that `loweredArg` is not an
-            // addressable l-value (e.g., it is `foo.xyz`, so that
-            // the bytes of the l-value are not contiguous).
+            // First, if we are able to easily get an address for the
+            // `argVal`, then we will simply use that and be done.
+            //
+            // Note that by passing `TryGetAddressMode::Default` here we
+            // are ensuring that the operation will not diagnose an error
+            // if it fails to get a simple address, but as a consequence
+            // it might actually fail to yield an address in some of the
+            // cases where it would have been able to for a `ref` parameter.
             //
             LoweredValInfo argPtr = tryGetAddress(context, argVal, TryGetAddressMode::Default);
             if (argPtr.flavor == LoweredValInfo::Flavor::Ptr)
             {
-                addInArg(context, ioArgs, LoweredValInfo::simple(argPtr.val));
+                addSimpleArg(context, ioArgs, LoweredValInfo::simple(argPtr.val));
+                return;
             }
-            else
+
+            // At this point we know that the `argVal` is not a simple
+            // l-value that names a memory location. There are a few
+            // options for what it could be instead:
+            //
+            // * The argument could be an l-value that names an abstract
+            //   storage location (such as a `property`) that is not
+            //   a memory location. A simple example is `v.xz` for a
+            //   `float4 v`; such an expression is a valid l-value of
+            //   type `float2`, but it does not name a valid memory
+            //   location because it is non-contiguous.
+            //
+            // * The argument might not even be an l-value, in the
+            //   case where the parameter-passing mode is `borrow in`.
+            //
+            // We will handle these cases by creating a temporary
+            // variable matching the argument's type, which will always
+            // name a valid memory location. We will then pass the
+            // address of the temporary to the callee.
+            //
+            auto irArgType = lowerType(context, argType);
+            LoweredValInfo tempVar = createVar(context, irArgType);
+
+            //
+            // Depending on what direction(s) data is being passed,
+            // we may need to transfer the argument value into the
+            // temporary before the call, transfer it out after the
+            // call, or both.
+            //
+            // TODO(tfoley): For now, all of the "transfer" operations
+            // being described here are implemented using `assign()`,
+            // which currently implies copying. We should either
+            // change this logic to conditionally perform *move* operations
+            // instead of copying, in the case where the `argType` is
+            // non-copyable, or (for the simpler answer) we should change
+            // the `assign` operation to implement a move instead of
+            // a copy, in the case where the type being assigned is
+            // non-copyable.
+            //
+
+            // If the parameter isn't output-only (that is, `out`),
+            // then we need to transfer the initial value of the
+            // argument into the temporary before the call.
+            //
+            if (paramPassingMode != ParamPassingMode::Out)
             {
-                // If the value is not one that could yield a simple l-value
-                // then we need to convert it into a temporary
-                //
-                if (as<IRThisType>(paramType))
-                {
-                    // When paramType is ThisType, we need to get the actual argument type
-                    // from the arg.
-                    paramType = lowerType(context, argType);
-                }
-#if 0
-                if (auto refType = as<IRBorrowInParamType>(paramType))
-                {
-                    paramType = refType->getValueType();
-                    argVal = LoweredValInfo::simple(
-                        context->irBuilder->emitLoad(getSimpleVal(context, argPtr)));
-                }
-#endif
+                assign(context, tempVar, argVal);
+            }
 
-                LoweredValInfo tempVar = createVar(context, paramType);
+            // We can pass the address of the temporary variable directly
+            // through the callee now, as a simple argument. We know that
+            // the `flavor` must be suitable for getting an address
+            // directly, since we explicitly created a temporary.
+            //
+            SLANG_ASSERT(tempVar.flavor == LoweredValInfo::Flavor::Ptr);
+            IRInst* tempPtr = getAddress(context, tempVar, loc);
+            addSimpleArg(context, ioArgs, LoweredValInfo::simple(tempPtr));
 
-                // If the parameter is `in out` or `inout`, then we need
-                // to ensure that we pass in the original value stored
-                // in the argument, which we accomplish by assigning
-                // from the l-value to our temp.
-                //
-                if (paramDirection == ParamPassingMode::BorrowInOut ||
-                    paramDirection == ParamPassingMode::BorrowIn)
-                {
-                    assign(context, tempVar, argVal);
-                }
+            // If the parameter isn't input-only (that is, `borrow in`),
+            // then we need to ensure that the value in the temporary
+            // after the call gets transferred back to the original
+            // argument (which must be an l-value in this case, so should
+            // be a valid destination for `assign()`.
+            //
+            // Currently the write-backs are handled by putting a request
+            // for the transfer to be executed into the `ioFixups` array,
+            // which will be flushed after the `call` instruction is
+            // emitted.
+            //
+            // TODO(tfoley): The way we've currently structured the
+            // handling of temporaries for arguments is kind of backwards.
+            // We should really have an operation like `getAddress()` that
+            // takes a desired kind of access as input (read, write, read/write,
+            // or `ref`) and always either produces a pointer or diagnoses
+            // an (internal) error. Rather than only returning a `LoweredValInfo`
+            // representing a pointer, it should also return a representation
+            // of any required "fixup" logic as a more flexible object than
+            // the simple `OutArgumentFixup` currently being used (the representation
+            // might even be as general as a `std::function` closure).
+            //
+            // The allocation of a temporary variable would then be an internal
+            // implementation detail of `getAddress()`, and the logic here
+            // in `addArg()` wouldn't need do this song-and-dance of *trying* to
+            // get an address and then falling back to a temporary if we fail.
+            //
+            // Passing in the desired access mode(s) would also ensure that the
+            // `getAddress()` operation has sufficient information to do things
+            // like pick between `get`/`set` and `ref` accessors on properties.
+            //
+            if (paramPassingMode != ParamPassingMode::BorrowIn)
+            {
+                OutArgumentFixup fixup;
+                fixup.src = tempVar;
+                fixup.dst = argVal;
 
-                // Now we can pass the address of the temporary variable
-                // to the callee as the actual argument for the `in out`
-                SLANG_ASSERT(tempVar.flavor == LoweredValInfo::Flavor::Ptr);
-                IRInst* tempPtr = getAddress(context, tempVar, loc);
-                addInArg(context, ioArgs, LoweredValInfo::simple(tempPtr));
-
-                // Finally, after the call we will need
-                // to copy in the other direction: from our
-                // temp back to the original l-value.
-                if (paramDirection != ParamPassingMode::BorrowIn)
-                {
-                    OutArgumentFixup fixup;
-                    fixup.src = tempVar;
-                    fixup.dst = argVal;
-
-                    (*ioFixups).add(fixup);
-                }
+                (*ioFixups).add(fixup);
             }
         }
         break;
 
     default:
-        addInArg(context, ioArgs, argVal);
+        SLANG_DIAGNOSE_UNEXPECTED(
+            context->getSink(),
+            loc,
+            "unhandled parameter-passing mode in `addArg()`");
         break;
     }
 }
@@ -2890,7 +2971,7 @@ void addArg(
 /// Add argument(s) corresponding to one parameter to a call
 ///
 /// The `argExpr` is the AST-level expression being passed as an argument to the call.
-/// The `paramType` and `paramDirection` represent what is known about the receiving
+/// The `paramType` and `paramPassingMode` represent what is known about the receiving
 /// parameter of the callee (e.g., if the parameter `in`, `inout`, etc.).
 /// The `ioArgs` array receives the IR-level argument(s) that are added for the given
 /// argument expression.
@@ -2900,13 +2981,12 @@ void addArg(
 ///
 void addCallArgsForParam(
     IRGenContext* context,
-    IRType* paramType,
-    ParamPassingMode paramDirection,
+    ParamPassingMode paramPassingMode,
     Expr* argExpr,
     List<IRInst*>* ioArgs,
     List<OutArgumentFixup>* ioFixups)
 {
-    switch (paramDirection)
+    switch (paramPassingMode)
     {
     case ParamPassingMode::Ref:
     case ParamPassingMode::BorrowIn:
@@ -2919,8 +2999,7 @@ void addCallArgsForParam(
                 ioArgs,
                 ioFixups,
                 loweredArg,
-                paramType,
-                paramDirection,
+                paramPassingMode,
                 argExpr->type,
                 argExpr->loc);
         }
@@ -2929,7 +3008,7 @@ void addCallArgsForParam(
     default:
         {
             LoweredValInfo loweredArg = lowerRValueExpr(context, argExpr);
-            addInArg(context, ioArgs, loweredArg);
+            addSimpleArg(context, ioArgs, loweredArg);
         }
         break;
     }
@@ -2938,8 +3017,7 @@ void addCallArgsForParam(
 
 //
 
-/// Compute the direction for a parameter based on its declaration
-ParamPassingMode getParameterDirection(VarDeclBase* paramDecl)
+ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl)
 {
     if (paramDecl->hasModifier<RefModifier>())
     {
@@ -2974,84 +3052,228 @@ ParamPassingMode getParameterDirection(VarDeclBase* paramDecl)
     }
 }
 
-/// Compute the direction for a `this` parameter based on the declaration of its parent function
-///
-/// If the given declaration doesn't care about the direction of a `this` parameter, then
-/// it will return the provided `defaultDirection` instead.
-///
-ParamPassingMode getThisParamDirection(Decl* parentDecl, ParamPassingMode defaultDirection)
+
+ParamPassingMode adjustParamPassingModeBasedOnParamType(
+    ParamPassingMode originalMode,
+    Type* paramType)
 {
-    auto parentParent = getParentAggTypeDecl(parentDecl);
-
-    // The `this` parameter for a `class` is always `in`.
-    if (as<ClassDecl>(parentParent))
-    {
-        return ParamPassingMode::In;
-    }
-
-    if (parentParent && parentParent->findModifier<NonCopyableTypeAttribute>())
-    {
-        if (parentDecl->hasModifier<MutatingAttribute>())
-            return ParamPassingMode::Ref;
-        else
-            return ParamPassingMode::BorrowIn;
-    }
-
-    // Applications can opt in to a mutable `this` parameter,
-    // by applying the `[mutating]` attribute to their
-    // declaration.
+    // If the type is copyable, then the original mode is appropriate to use.
     //
-    if (parentDecl->hasModifier<MutatingAttribute>())
+    if (isCopyableType(paramType))
+        return originalMode;
+
+    // If we have a non-copyable parameter type, we will inspect
+    // the original mode and see whether it needs adjustting.
+    //
+    switch (originalMode)
+    {
+    default:
+        return originalMode;
+
+    case ParamPassingMode::In:
+        // We will adjust the `in` parameter-passing mode over
+        // to `borrow in`, since there is no way to do the by-value
+        // copy-in that is implied by `in` when we are dealing
+        // with a non-copyable type.
+        //
+        return ParamPassingMode::BorrowIn;
+    }
+}
+
+ParamPassingMode getParamPassingMode(ParamDecl* paramDecl)
+{
+    auto declaredMode = getExplicitlyDeclaredParamPassingMode(paramDecl);
+    auto actualMode = adjustParamPassingModeBasedOnParamType(declaredMode, paramDecl->getType());
+    return actualMode;
+}
+
+/// The default parameter-passing mode to use for a `this` parameter,
+/// if no explicit modifiers/attributes or other contextual information
+/// implies a specific other mode.
+///
+static const ParamPassingMode kDefaultModeForImplicitThisParam = ParamPassingMode::In;
+
+/// Compute the "declared" direction for an implicit `this` parameter,
+///
+/// This function doesn't take the type of the `this` parameter into
+/// account; the chosen mode is based only on the declarations
+/// involved and their modifiers/attributes.
+///
+/// The `declWithImplicitThisParam` should be the declaration of the
+/// function/property/etc. that has an implicit `this` parameter.
+///
+/// The `defaultModeFromContext` can be a mode that is implied by
+/// more deeply nested context, that should be used as a default if
+/// the `declWithImplicitParam` and the outer declarations it is
+/// nested under don't indicate a more specific mode.
+///
+/// Note that in some cases the declaration that has an implicit
+/// `this` parameter may be nested multiple levels under the
+/// corresponding type declaration that `this` will use for its
+/// type. For example, we can have an accessor in a generic subscript:
+///
+///     struct MyContainer<T>
+///     {
+///         subscript<K : IKeyType>(K key) -> T
+///         {
+///             get { /* ... */ }
+///         }
+///     }
+///
+/// In this case, the nesting is something like (from inner-most
+/// to outer-most):
+///
+/// * the `get` accessor (a `GetterDecl`)
+/// * the `subscript` (a `SubscriptDecl`)
+/// * the generic `<K ...>` wrapping the subscript (a `GenericDecl`)
+/// * the `struct` type (a `StructDecl`)
+/// * the generic `<T>` wrapping the `struct` (a `GenericDecl`)
+///
+/// In order to compute the correct mode for the implicit `this`
+/// parameter of the `get` accessor, each of those levels will
+/// end up being queried (from inner to outer), until a type
+/// declaration (the `struct`) is reached. A modifier or other
+/// piece of context on, e.g., the `subscript` declaration might
+/// have an influence on what mode will be used for the `get`.
+///
+/// Currently, the lowering logic in this file will walk up the
+/// hierarchy calling `getDeclaredParamPassingModeForImplicitThisParam()`,
+/// and pass the result of an inner invocation to the next outer one,
+/// to accumulate a mode based on all the contextual information available.
+///
+ParamPassingMode getDeclaredParamPassingModeForImplicitThisParam(
+    Decl* declWithImplicitThisParam,
+    ParamPassingMode defaultModeFromContext = kDefaultModeForImplicitThisParam)
+{
+    // If this declaration of the function/property/whatever is nested
+    // under a type declaration such as a `struct`, then that declaration
+    // may dictate the mode that should be used.
+    //
+    if (auto outerAggTypeDecl = getParentAggTypeDecl(declWithImplicitThisParam))
+    {
+        // An implicit `this` parameter of a `class` is always `in`,
+        // because classes are reference types and mutability of the
+        // parameter would thus apply to the reference/pointer and not
+        // to the contents of the instance being pointed to.
+        //
+        if (as<ClassDecl>(outerAggTypeDecl))
+        {
+            return ParamPassingMode::In;
+        }
+    }
+
+    // Slang currently provides a set of attributes that a declaration
+    // can use to explicitly specify a parameter-passing mode for
+    // the implicit `this` parameter. We will check for those here,
+    // since the explicit request from the programmer should in general
+    // take precedence over other considerations.
+    //
+    // If there are ever cases where it would be semantically incorrect
+    // to follow what these modifiers indicate, then we should be detecting
+    // and diagnosing such situations during semantic checking, rather than
+    // hacking in workarounds here.
+    //
+    if (declWithImplicitThisParam->hasModifier<MutatingAttribute>())
     {
         return ParamPassingMode::BorrowInOut;
     }
-    else if (parentDecl->hasModifier<ConstRefAttribute>())
+    if (declWithImplicitThisParam->hasModifier<ConstRefAttribute>())
     {
         return ParamPassingMode::BorrowIn;
     }
-    else if (parentDecl->hasModifier<RefAttribute>())
+    if (declWithImplicitThisParam->hasModifier<RefAttribute>())
     {
         return ParamPassingMode::Ref;
     }
-
-    // A `set` accessor on a property or subscript declaration
-    // defaults to a mutable `this` parameter, but the programmer
-    // can opt out of this behavior using `[nonmutating]`
     //
-    if (parentDecl->hasModifier<NonmutatingAttribute>())
+    // The `[nonmutating]` attribute is really just another case of
+    // these attributes that specify a mode, except that it should
+    // in principle only be allowed on declarations where the
+    // implicit `this` parameter would otherwise be `inout`.
+    //
+    // TODO: ensure that semantic checking is diagnosing errors when
+    // these attributes are applied inappropriately.
+    //
+    if (declWithImplicitThisParam->hasModifier<NonmutatingAttribute>())
     {
         return ParamPassingMode::In;
     }
-    else if (as<SetterDecl>(parentDecl))
+
+    // Once we'e considered the attributes on the declaration,
+    // and given them an opportunity to dictate a parameter-passing
+    // mode, we turn our attention to the kind of declaration
+    // under consideration.
+    //
+    // For example, a `set` accessor (e.g., on a `property` or
+    // `subscript` declaration) defaults to having a mutable
+    // `this` parameter, unless the programmer explicitly
+    // opts out using `[nomutating]` (which was already checked
+    // for above).
+    //
+    if (as<SetterDecl>(declWithImplicitThisParam))
     {
         return ParamPassingMode::BorrowInOut;
     }
 
-    // Declarations that represent abstract storage (a property
-    // or subscript) do not want to dictate anything about
-    // the direction of an outer `this` parameter, since that
-    // should be determined by their inner accessors.
+    // Declarations that represent abstract storage (e.g., a `property`
+    // or `subscript`) do not want to dictate anything about the mode
+    // of an implicit `this` parameter; the decision hinges on the
+    // inner accessor (e.g., a `get` or `set`) that will actually
+    // be invoked, and the outer type declaration that will determine
+    // the type of `this`.
     //
-    if (as<PropertyDecl>(parentDecl))
+    // The same is true of generic declarations, which are currently
+    // encoded in the Slang AST as wrappers around the thing that
+    // is generic (e.g., a generic function is a `FuncDecl` wrapped
+    // in a `GenericDecl`).
+    //
+    // In all of these cases, we will just pass along the default
+    // parameter-passing mode (which will have been computed from
+    // the inner declaration).
+    //
+    if (as<PropertyDecl>(declWithImplicitThisParam))
     {
-        return defaultDirection;
+        return defaultModeFromContext;
     }
-    if (as<SubscriptDecl>(parentDecl))
+    if (as<SubscriptDecl>(declWithImplicitThisParam))
     {
-        return defaultDirection;
+        return defaultModeFromContext;
+    }
+    if (as<GenericDecl>(declWithImplicitThisParam))
+    {
+        return defaultModeFromContext;
     }
 
-    // A parent generic declaration should not change the
-    // mutating-ness of the inner declaration.
+    // If we reach the end of this function, then that means
+    // that the declaration itself didn't dictate a mode
+    // (either via modifiers or its AST node class), and
+    // it wasn't identified as one of the cases that should
+    // just pass through the information from an inner
+    // declaration.
     //
-    if (as<GenericDecl>(parentDecl))
-    {
-        return defaultDirection;
-    }
+    // At this point we can finally fall back on the
+    // default parameter-passing mode for an implicit `this`.
+    //
+    return kDefaultModeForImplicitThisParam;
+}
 
-    // For now we make any `this` parameter default to `in`.
+ParamPassingMode getActualParamPassingModeForImplicitThisParam(
+    Decl* declWithImplicitThisParam,
+    Type* thisParamType)
+{
     //
-    return ParamPassingMode::In;
+    // TODO(tfoley): This logic largely mirrors what was in place when I factored out this
+    // subroutine, but it doesn't seem to be correct when we consider the way that `collectParams()`
+    // in this same file computes the actual parameter-passing mode for an implicit `this` by
+    // traversing the declaration hierarchy.
+    //
+    // We should refactor the queries so that they are mutually consistent between the case where
+    // we are emitting a declaration and where we are invoking it.
+    //
+
+    auto declaredMode = getDeclaredParamPassingModeForImplicitThisParam(declWithImplicitThisParam);
+    auto actualMode = adjustParamPassingModeBasedOnParamType(declaredMode, thisParamType);
+    return actualMode;
 }
 
 DeclRef<Decl> createDefaultSpecializedDeclRefImpl(
@@ -3203,11 +3425,24 @@ struct IRLoweringParameterInfo
     // This AST-level type of the parameter
     Type* type = nullptr;
 
-    // The direction (`in` vs `out` vs `in out`)
-    ParamPassingMode direction;
+    /// The parameter-passing mode that was *intended* by the user,
+    /// as determined from the declaration (and declaration context)
+    /// of the paraemter, as well as its type.
+    ///
+    /// This is in most respects the "correct" parameter-passing mode
+    /// for the parameter.
+    ///
+    ParamPassingMode intendedParamPassingMode = ParamPassingMode::In;
 
-    // The direction declared in user code.
-    ParamPassingMode declaredDirection = ParamPassingMode::In;
+    /// The final parameter-passing mode that is actually being used
+    /// as part of lowering.
+    ///
+    /// This mode might have been changed as a result of some outright
+    /// hackery being committed in this file, such as changing the
+    /// parameter-passing mode of entry-point varying parameters away
+    /// from what they were declared as without informing the user.
+    ///
+    ParamPassingMode actualParamPassingModeToUse = ParamPassingMode::In;
 
     // The variable/parameter declaration for
     // this parameter (if any)
@@ -3219,24 +3454,28 @@ struct IRLoweringParameterInfo
     // Is this the destination of address for non-copyable return val?
     bool isReturnDestination = false;
 };
-//
-// We need a way to be able to create a `IRLoweringParameterInfo` given the declaration
-// of a parameter:
-//
+
+/// Compute information about an explicitly-declared parameter, based on its declaration.
+///
 IRLoweringParameterInfo getParameterInfo(
     IRGenContext* context,
-    DeclRef<VarDeclBase> const& paramDecl)
+    DeclRef<ParamDecl> const& paramDeclRef)
 {
-    IRLoweringParameterInfo info;
+    auto paramDecl = paramDeclRef.getDecl();
+    auto paramType = getParamValueType(context->astBuilder, paramDeclRef);
 
-    info.type = getParamType(context->astBuilder, paramDecl);
-    info.decl = paramDecl.getDecl();
-    info.direction = getParameterDirection(paramDecl.getDecl());
-    info.declaredDirection = info.direction;
+    auto declaredParamPassingMode = getExplicitlyDeclaredParamPassingMode(paramDecl);
+    auto adjustedParamPassingMode =
+        adjustParamPassingModeBasedOnParamType(declaredParamPassingMode, paramType);
+
+    IRLoweringParameterInfo info;
+    info.type = paramType;
+    info.decl = paramDecl;
+    info.intendedParamPassingMode = adjustedParamPassingMode;
+    info.actualParamPassingModeToUse = adjustedParamPassingMode;
     info.isThisParam = false;
     return info;
 }
-//
 
 // Here's the declaration for the type to hold the lists:
 struct ParameterLists
@@ -3269,46 +3508,148 @@ ParameterListCollectMode getModeForCollectingParentParameters(Decl* decl, Contai
     // Otherwise, let's default to collecting everything
     return kParameterListCollectMode_Default;
 }
-//
-// When dealing with a member function, we need to be able to add the `this`
-// parameter for the enclosing type:
-//
-void addThisParameter(ParamPassingMode direction, Type* type, ParameterLists* ioParameterLists)
+
+/// Add a suitable `this` parameter to a parameter list being constructed.
+///
+/// The `impliedParamPassingMode` is the parameter-passing mode that has
+/// been determined based on the declaration that needs a `this` parameter,
+/// as well as its lexical context, but does *not* take into account the
+/// type of the `this` parameter.
+///
+void addThisParameter(
+    ParamPassingMode impliedParamPassingMode,
+    Type* type,
+    ParameterLists* ioParameterLists)
 {
+    auto adjustedParamPassingMode =
+        adjustParamPassingModeBasedOnParamType(impliedParamPassingMode, type);
+
     IRLoweringParameterInfo info;
     info.type = type;
     info.decl = nullptr;
-    info.direction = direction;
-    info.declaredDirection = direction;
+    info.intendedParamPassingMode = adjustedParamPassingMode;
+    info.actualParamPassingModeToUse = adjustedParamPassingMode;
     info.isThisParam = true;
 
     ioParameterLists->params.add(info);
 }
 
+/// If the `resultType` of a function needs to be returned via an `out` parameter, then add it.
+///
 void maybeAddReturnDestinationParam(ParameterLists* ioParameterLists, Type* resultType)
 {
     if (isNonCopyableType(resultType))
     {
+        auto paramPassingMode = ParamPassingMode::Out;
+
         IRLoweringParameterInfo info;
         info.type = resultType;
         info.decl = nullptr;
-        info.direction = ParamPassingMode::Ref;
-        info.declaredDirection = info.direction;
+        info.intendedParamPassingMode = paramPassingMode;
+        info.actualParamPassingModeToUse = paramPassingMode;
         info.isReturnDestination = true;
         ioParameterLists->params.add(info);
     }
 }
 
-void makeVaryingInputParamConstRef(IRLoweringParameterInfo& paramInfo)
+/// Does the given `declRef` appear to be a declaration of an entry point?
+///
+/// This function does a best-effort job of detecting whether something is
+/// a shader entry point, but it cannot answer the question definitively,
+/// because the compilation model of Slang allows functions to be tagged
+/// as entry points separately from their declaration in the AST.
+///
+bool doesDeclAppearToBeAnEntryPoint(DeclRef<CallableDecl> const& declRef)
 {
-    if (paramInfo.direction != ParamPassingMode::In)
-        return;
-    if (paramInfo.decl->findModifier<HLSLUniformModifier>())
-        return;
-    if (as<HLSLPatchType>(paramInfo.type))
-        return;
-    paramInfo.direction = ParamPassingMode::BorrowIn;
+    auto decl = declRef.getDecl();
+    if (decl->hasModifier<EntryPointAttribute>())
+        return true;
+    if (decl->hasModifier<NumThreadsAttribute>())
+        return true;
+    return false;
 }
+
+/// Does a parameter appear to be a declaration of an entry-point varying input.
+///
+/// The `paramInfo` represents the parameter being inspected, and
+/// the `funcDeclRef` should represent the outer declaration that
+/// might or might not be an entry point.
+///
+/// This function is only able to do a best-effort check for what is an
+/// entry point (see `doesDeclAppearToBeAnEntryPoint()`), and cannot be
+/// fully robust in detection.
+///
+bool doesParamAppearToBeAnEntryPointVaryingInput(
+    IRLoweringParameterInfo const& paramInfo,
+    DeclRef<CallableDecl> const& funcDeclRef)
+{
+    // If the outer declaration doesn't appear to be an entry
+    // point, then it seems this isn't an entry point parameter
+    // at all, much less an input.
+    //
+    if (!doesDeclAppearToBeAnEntryPoint(funcDeclRef))
+        return false;
+
+    // We are only intereste in parameters that would otherwise
+    // be lowered to just use `in`.
+    //
+    if (paramInfo.actualParamPassingModeToUse != ParamPassingMode::In)
+        return false;
+
+    // We are only concerned with varying parameters, so `uniform`
+    // parameters aren't relevant.
+    //
+    if (paramInfo.decl->findModifier<HLSLUniformModifier>())
+        return false;
+
+    // Certain types conceptually represent uniform parameters even
+    // if they aren't declared with `uniform`, so we also want to
+    // ignore those.
+    //
+    // TODO: It would be best for logic like this to be factored into
+    // a shared subroutine somewhere, so that we don't have multiple
+    // places in the code doing ad hoc checks for a particular list
+    // of types, that might change over time.
+    //
+    if (as<HLSLPatchType>(paramInfo.type))
+        return false;
+
+    if (as<MeshOutputType>(paramInfo.type))
+        return false;
+
+    return true;
+}
+
+/// Modify the parameter passing mode for the given parameter, if it can
+/// be detected that it seems to be used as a varying input to an entry point.
+///
+/// If a varying `in` parameter is detected, its actual parameter-passing
+/// mode will be changed to `borrow in`.
+///
+/// This function is only able to do a best-effort check for what is an
+/// entry point (see `doesDeclAppearToBeAnEntryPoint()`), and cannot be
+/// fully robust in detection.
+///
+void maybeModifyParamPassingModeForDetectedEntryPointVaryingInput(
+    IRLoweringParameterInfo& ioParamInfo,
+    DeclRef<CallableDecl> const& funcDeclRef)
+{
+    // If we cannot detect that this seems to be a varying `in`
+    // parameter of an entry point, then we'll just skip it.
+    //
+    // There's no way for this code to be sure it isn't skipping
+    // over a function it shouldn't, but there's nothign we can
+    // do about it from here.
+    //
+    if (!doesParamAppearToBeAnEntryPointVaryingInput(ioParamInfo, funcDeclRef))
+        return;
+
+    // We basically just want to change the parameter from `in`
+    // to `borrow in`, so that it is an immutable by-reference parameter.
+    //
+    ioParamInfo.actualParamPassingModeToUse = ParamPassingMode::BorrowIn;
+}
+
 //
 // And here is our function that will do the recursive walk:
 void collectParameterLists(
@@ -3316,47 +3657,186 @@ void collectParameterLists(
     DeclRef<Decl> const& declRef,
     ParameterLists* ioParameterLists,
     ParameterListCollectMode mode,
-    ParamPassingMode thisParamDirection)
+    ParamPassingMode defaultParamPassingModeForImplicitThisParam)
 {
-    // Don't collect any parameters beyond certain decls.
+    // The basic idea here is that we are walking up the parent chain
+    // of declarations, starting at some declaration for which we want
+    // to emit an IR function, and we want to accumulate all relevant
+    // parameters along the way.
+    //
+    // As a concrete example, consider this code:
+    //
+    //      struct MyArray<T>
+    //      {
+    //          subscript(int index)
+    //          {
+    //              set(newValue) { /* ... */ }
+    //          }
+    //      }
+    //
+    // The eventual signature that we want to see on the IR function
+    // for the `set` accessor there is something like:
+    //
+    //      void MyArray_subscript_set<T>(
+    //          inout MyArray<T> this,
+    //          int index,
+    //          T newValue)
+    //      { /* ... */ }
+    //
+    // Note how in this example there are multiple declarations
+    // that contribute to the complete parameter list:
+    //
+    //      * The `GenericDecl` that wraps the `StructDecl`
+    //        contributes the `<T>`.
+    //
+    //      * The `StructDecl` for `MyArray` contributes
+    //        the `this` parameter.
+    //
+    //      * The `SubscriptDecl` contributes the `index` parameter.
+    //
+    //      * The `SetterDecl` contributes the `newValue` parameter and,
+    //        additionally determines that the `this` parameter should
+    //        use `inout`.
+    //
+    // (Note that this function is currently only responsible for value
+    // parameters, so the generic `<T>` in the example above is discovered
+    // via a different subroutine)
+    //
+    // The basic idea here is that we are recursively traversing up
+    // through the declaration hierarchy (via `declRef`), potentially
+    // collecting parameters (into `ioParameterLists`) along the way.
+    // Along the way we thread two pieces of state that allow inner
+    // declarations to control what parts of an outer declaration
+    // (if any) contribute to the result:
+    //
+    // * The `ParameterListCollectMode` `mode` determines if we are in an
+    //   (implicitly or explicitly) `static` context, so that no
+    //   implicit `this` parameter should be added.
+    //
+    // * The `defaultParamPassingModeForImplicitThisParam` parameter
+    //   encodes the parameter-passing mode (e.g., `in` vs `inout`)
+    //   that should be used for an implicit `this` parameter, if
+    //   one ends up being introduced.
+    //
+
+    // We terminate the traversal when we encounter certain kinds of
+    // declarations. The most clear-cut case here is that if we
+    // run into an aggregate type declaration (like a `struct` or
+    // `class`) then we stop searching, even if that type might
+    // itself be nested in yet another type declaration. We thus
+    // will not accumulate multiple `this` parameters when there
+    // are nested types, because all aggregate type declarations
+    // in Slang are implicitly `static`.
+    //
+    // TODO(tfoley): Because such declarations are implicitly static,
+    // we should in theory be able to handle this case below,
+    // because `getModeForCollectingParentParameters()` would already
+    // indicate the static-ness.
+    //
+    // This early-out check also applies to default implementations
+    // of interface methods because we are currently desugaring
+    // such declarations to be explicitly generic and take an explicit
+    // `this` parameter, rather than handling that translation as
+    // part of lowering from the AST to the IR. As such, a default
+    // implementation of an interface method will appear as a non-`static`
+    // member of the corresponding `InterfaceDecl`, even though it
+    // is conceptually static.
+    //
+    // TODO(tfoley): Change how default implementations of interface
+    // requirements are being handled so that they can be semantically
+    // checked without that transformation, and then have the AST-to-IR
+    // lowering logic take responsibility for generating the generic.
+    //
     if (as<InterfaceDefaultImplDecl>(declRef) || as<AggTypeDeclBase>(declRef))
         return;
 
-    // The parameters introduced by any "parent" declarations
-    // will need to come first, so we'll deal with that
-    // logic here.
-    if (auto parentDeclRef = declRef.getParent())
+    // Any outer declaration(s) of the `declRef` under consideration
+    // will be added to the parameter list ahead of those for the
+    // declaration itself.
+    //
+    if (auto outerDeclRef = declRef.getParent())
     {
-        // Compute the mode to use when collecting parameters from
-        // the outer declaration. The most important question here
-        // is whether parameters of the outer declaration should
-        // also count as parameters of the inner declaration.
-        ParameterListCollectMode innerMode =
-            getModeForCollectingParentParameters(declRef.getDecl(), parentDeclRef.getDecl());
+        // We will compute a `ParameterListCollectMode` to be
+        // used when collecting parameters of the outer declaration,
+        // based on a combination of the modifiers on the current
+        // `declRef` (e.g., is it declared with `static`?) as well
+        // as the AST node class of both the inner `declRef` and
+        // the `outerDeclRef`.
+        //
+        // Basically we are computing whether this `declRef` is
+        // effectively `static` in this context.
+        //
+        ParameterListCollectMode outerMode =
+            getModeForCollectingParentParameters(declRef.getDecl(), outerDeclRef.getDecl());
 
-        // Don't down-grade our `static`-ness along the chain.
-        if (innerMode < mode)
-            innerMode = mode;
+        // If we have already decided that we are in "`static` mode"
+        // based on some inner context, then we do not let the current
+        // `declRef` and `outerDeclRef` override that choice.
+        //
+        if (outerMode < mode)
+            outerMode = mode;
 
-        ParamPassingMode innerThisParamDirection =
-            getThisParamDirection(declRef.getDecl(), thisParamDirection);
+        // As we traverse up the hierarchy, we are collecting information
+        // that helps us determine the correct parameter-passing mode to
+        // use for any implicit `this` that might be inserted.
+        //
+        // We need to update this information as we traverse, because we
+        // might start out thinking one thing (e.g., a `set` accessor
+        // defaults to using `inout` for `this`), and then discover new
+        // information (if that accessor was nested under a property of
+        // a `class` declaration, then it should use `in` instead).
+        //
+        ParamPassingMode impliedParamPassingModeForImplicitThisParam =
+            getDeclaredParamPassingModeForImplicitThisParam(
+                declRef.getDecl(),
+                defaultParamPassingModeForImplicitThisParam);
 
-
-        // Now collect any parameters from the parent declaration itself
+        // Once we've computed the mode(s) to use, we can recurse on
+        // the outer declaration and work our way further up the chain.
+        //
+        // TODO(tfoley): The original intention of this subroutine was that
+        // it could be used to collect both value and generic parameters in
+        // the same traversal. Right now it is only being used to collect
+        // value parameters and, as a result, it is a little silly to
+        // continue the traversal after we have decided to be in "`static` mode."
+        //
+        // If we don't intend to ever include generic parameter collection
+        // into this same routine, we should be able to move the recursive
+        // `collectParameterLists` call below to be under the `if` statement
+        // on the mode, and save ourselves some trouble.
+        //
         collectParameterLists(
             context,
-            parentDeclRef,
+            outerDeclRef,
             ioParameterLists,
-            innerMode,
-            innerThisParamDirection);
+            outerMode,
+            impliedParamPassingModeForImplicitThisParam);
 
-        // We also need to consider whether the inner declaration needs to have a `this`
-        // parameter corresponding to the outer declaration.
-        if (innerMode != kParameterListCollectMode_Static)
+        // Now we will check to see if the `outerDeclRef` is one that would
+        // indicate that an implicit `this` parameter is needed and, if so,
+        // add such a parameter. The obvious case is when `outerDeclRef`
+        // is a type declaration like a `struct`, but we also need to
+        // consider the case of an `extension` declaration.
+        //
+        // TODO(tfoley): It seems like this logic could more cleanly be handled
+        // in the context of the recursive call on `outerDeclRef` (at which point
+        // it is just the `declRef`). At that point the logic below that adds
+        // the parameters of a `CallableDecl` would just need to have an alternative
+        // path for the case of a surrounding type (or `extension`) declaration.
+        //
+        if (outerMode != kParameterListCollectMode_Static)
         {
-            auto thisType = getThisParamTypeForContainer(context, parentDeclRef);
+            auto thisType = getThisParamTypeForContainer(context, outerDeclRef);
             if (thisType)
             {
+                // At this point we've concluded that an implicit `this`
+                // parameter is called for, and computed what its type
+                // should be under normal circumstances.
+                //
+                // However, the autodiff features add a few wrinkles here
+                // that can modify the type of `this` and, in one case,
+                // change the parameter-passing mode that should be used.
+                //
                 if (declRef.getDecl()->findModifier<NoDiffThisAttribute>())
                 {
                     auto noDiffAttr = context->astBuilder->getNoDiffModifierVal();
@@ -3369,51 +3849,78 @@ void collectParameterLists(
                 else if (auto bwdDerivDeclRef = declRef.as<BackwardDerivativeRequirementDecl>())
                 {
                     thisType = bwdDerivDeclRef.getDecl()->diffThisType;
-                    innerThisParamDirection = ParamPassingMode::BorrowInOut;
+
+                    // TODO(tfoley): It isn't clear why this logic shouldn't be folded
+                    // into `getDeclaredParamPassingModeForImplicitThisParam()`, since that
+                    // subroutine already has checks for a few different cases of declarations
+                    // that override the default parameter-passing mode.
+                    //
+                    impliedParamPassingModeForImplicitThisParam = ParamPassingMode::BorrowInOut;
                 }
 
-                addThisParameter(innerThisParamDirection, thisType, ioParameterLists);
+                addThisParameter(
+                    impliedParamPassingModeForImplicitThisParam,
+                    thisType,
+                    ioParameterLists);
             }
         }
     }
 
-    // Once we've added any parameters based on parent declarations,
+    // Once we've added any parameters based on enclosing declarations,
     // we can see if this declaration itself introduces parameters.
     //
-    if (auto callableDeclRef = declRef.as<CallableDecl>())
-    {
-        // We need a special case here when lowering the varying parameters of an entrypoint
-        // function. Due to the existence of `EvaluateAttributeAtSample` and friends, we need to
-        // always lower the varying inputs as `borrow in` parameters so we can pass pointers to
-        // these intrinsics.
-        // This means that although these parameters are declared as "in" parameters in the source,
-        // we will actually treat them as `borrow in` parameters when lowering to IR. A complication
-        // result from this is that if the original source code actually modifies the input
-        // parameter we still need to create a local var to hold the modified value. In the future
-        // when we are able to update our language spec to always assume input parameters are
-        // immutable, then we can remove this adhoc logic of introducing temporary variables. For
-        // For now we will rely on a follow up pass to remove unnecessary temporary variables if
-        // we can determine that they are never actually writtten to by the user.
-        //
-        bool lowerVaryingInputAsConstRef = declRef.getDecl()->hasModifier<EntryPointAttribute>() ||
-                                           declRef.getDecl()->hasModifier<NumThreadsAttribute>();
+    // If we are in the a `static` context - meaning that this `declRef`
+    // is something like the enclosing type around a `static` method,
+    // then the parameters of this declaration should not contribute
+    // to the list. That status was passed down to us as the `mode`
+    // parameter, when the inner declaration requested the outer
+    // declaration to add parameters.
+    //
+    if (mode != kParameterListCollectMode_Default)
+        return;
 
-        // Don't collect parameters from the outer scope if
-        // we are in a `static` context.
-        if (mode == kParameterListCollectMode_Default)
-        {
-            for (auto paramDeclRef : getParameters(context->astBuilder, callableDeclRef))
-            {
-                auto paramInfo = getParameterInfo(context, paramDeclRef);
-                if (lowerVaryingInputAsConstRef)
-                    makeVaryingInputParamConstRef(paramInfo);
-                ioParameterLists->params.add(paramInfo);
-            }
-            maybeAddReturnDestinationParam(
-                ioParameterLists,
-                getResultType(context->astBuilder, callableDeclRef));
-        }
+    // Only callable declarations have parameters, so if this declaration
+    // isn't callable, there's nothing to do.
+    //
+    auto callableDeclRef = declRef.as<CallableDecl>();
+    if (!callableDeclRef)
+        return;
+
+    // If we've determined that the paramters of this declaration might
+    // be relevant, then we will iterate over them and add appropriate
+    // entries to the `ioParameterLists`.
+    //
+    for (auto paramDeclRef : getParameters(context->astBuilder, callableDeclRef))
+    {
+        auto paramInfo = getParameterInfo(context, paramDeclRef);
+
+        // One unfortunate wrinkle that arises is that all the downstream
+        // logic in the Slang IR *really* wants the varying input parameters
+        // to a shader entry point to use `ParamPassingMode::BorrowIn`,
+        // so that they don't force copying, but syntactically such parameters
+        // are conventionally declared using `in` (meaning `ParamPassingMode::In`).
+        //
+        // We include logic here to switch up the parameter-passing mode
+        // in the case where we can statically detect that something is
+        // being compiled as an entry point. Note, however, that this logic
+        // is inherently fragile, since not every entry point that a user specifies
+        // is guaranteed to have had a `[shader(...)]` attribute on it.
+        //
+        maybeModifyParamPassingModeForDetectedEntryPointVaryingInput(paramInfo, callableDeclRef);
+
+        ioParameterLists->params.add(paramInfo);
     }
+
+    // Finally, in some cases the result value of a function will
+    // be lowered to an `out` parameter (e.g. for a non-copyable type
+    // this avoids the copying implied by the ordinary function return).
+    //
+    // We detect such cases here and add a suitable `out` parameter to
+    // the end of the parameter list.
+    //
+    maybeAddReturnDestinationParam(
+        ioParameterLists,
+        getResultType(context->astBuilder, callableDeclRef));
 }
 
 bool isConstExprVar(Decl* decl)
@@ -3476,16 +3983,17 @@ void _lowerFuncDeclBaseTypeInfo(
     {
         IRType* irParamType = lowerType(context, paramInfo.type);
 
-        switch (paramInfo.direction)
+        // Depending on the parameter-passing mode we chose to use
+        // for the parameter, the actual IR type of the parameter
+        // might include a wrapper to represent that mode as a
+        // specific case of pointer type.
+        //
+        switch (paramInfo.actualParamPassingModeToUse)
         {
         case ParamPassingMode::In:
-            // Simple case of a by-value input parameter.
+            // The default `in` parameter-passing mode required no wrapping.
             break;
 
-        // If the parameter is declared `out` or `inout`,
-        // then we will represent it with a pointer type in
-        // the IR, but we will use a specialized pointer
-        // type that encodes the parameter direction information.
         case ParamPassingMode::Out:
             irParamType = builder->getOutParamType(irParamType);
             break;
@@ -3498,6 +4006,7 @@ void _lowerFuncDeclBaseTypeInfo(
         case ParamPassingMode::BorrowIn:
             irParamType = builder->getBorrowInParamType(irParamType, AddressSpace::Generic);
             break;
+
         default:
             SLANG_UNEXPECTED("unknown parameter direction");
             break;
@@ -3595,15 +4104,13 @@ static LoweredValInfo _emitCallToAccessor(
         SLANG_ASSERT(info.parameterLists.params[0].isThisParam);
 
         auto thisParam = info.parameterLists.params[0];
-        auto thisParamType = lowerType(context, thisParam.type);
 
         addArg(
             context,
             &allArgs,
             &fixups,
             base,
-            thisParamType,
-            thisParam.direction,
+            thisParam.actualParamPassingModeToUse,
             thisParam.type,
             SourceLoc());
     }
@@ -3753,8 +4260,7 @@ struct ExprLoweringContext
     void addDirectCallArgs(
         InvokeExpr* expr,
         Index argIndex,
-        IRType* paramType,
-        ParamPassingMode paramDirection,
+        ParamPassingMode actualParamPassingMode,
         DeclRef<ParamDecl> paramDeclRef,
         List<IRInst*>* ioArgs,
         List<OutArgumentFixup>* ioFixups)
@@ -3763,7 +4269,7 @@ struct ExprLoweringContext
         if (argIndex < argCount)
         {
             auto argExpr = expr->arguments[argIndex];
-            addCallArgsForParam(context, paramType, paramDirection, argExpr, ioArgs, ioFixups);
+            addCallArgsForParam(context, actualParamPassingMode, argExpr, ioArgs, ioFixups);
         }
         else
         {
@@ -3798,8 +4304,7 @@ struct ExprLoweringContext
 
             addCallArgsForParam(
                 subContext,
-                paramType,
-                paramDirection,
+                actualParamPassingMode,
                 argExpr.getExpr(),
                 ioArgs,
                 ioFixups);
@@ -3835,15 +4340,7 @@ struct ExprLoweringContext
         for (Index i = 0; i < argCount; ++i)
         {
             auto paramInfo = funcType->getParamInfo(i);
-            IRType* paramType = lowerType(context, paramInfo.type);
-            addDirectCallArgs(
-                expr,
-                i,
-                paramType,
-                paramInfo.direction,
-                DeclRef<ParamDecl>(),
-                ioArgs,
-                ioFixups);
+            addDirectCallArgs(expr, i, paramInfo.mode, DeclRef<ParamDecl>(), ioArgs, ioFixups);
         }
     }
 
@@ -3857,18 +4354,10 @@ struct ExprLoweringContext
         for (auto paramDeclRef : getMembersOfType<ParamDecl>(getASTBuilder(), funcDeclRef))
         {
             auto paramDecl = paramDeclRef.getDecl();
-            IRType* paramType = lowerType(context, getType(getASTBuilder(), paramDeclRef));
-            auto paramDirection = getParameterDirection(paramDecl);
+            auto paramDirection = getParamPassingMode(paramDecl);
 
             Index argIndex = argCounter++;
-            addDirectCallArgs(
-                expr,
-                argIndex,
-                paramType,
-                paramDirection,
-                paramDeclRef,
-                ioArgs,
-                ioFixups);
+            addDirectCallArgs(expr, argIndex, paramDirection, paramDeclRef, ioArgs, ioFixups);
         }
     }
 
@@ -4070,14 +4559,10 @@ struct ExprLoweringContext
             if (baseExpr)
             {
                 auto thisType = getThisParamTypeForCallable(context, funcDeclRef);
-                auto irThisType = lowerType(context, thisType);
-                addCallArgsForParam(
-                    context,
-                    irThisType,
-                    getThisParamDirection(funcDeclRef.getDecl(), ParamPassingMode::In),
-                    baseExpr,
-                    &irArgs,
-                    &argFixups);
+                auto thisParamMode =
+                    getActualParamPassingModeForImplicitThisParam(funcDeclRef.getDecl(), thisType);
+
+                addCallArgsForParam(context, thisParamMode, baseExpr, &irArgs, &argFixups);
             }
 
             // Then we have the "direct" arguments to the call.
@@ -4120,6 +4605,12 @@ struct ExprLoweringContext
                     irArgs.add(tempVar);
                     result = LoweredValInfo::ptr(tempVar);
                 }
+
+                // In this case we also need to change the `type` that was
+                // computed earlier, since that is the IR-level type corresponding
+                // to the AST-level call expression, but the actual IR-level call
+                // in this case will return the unit type (`void`).
+                type = context->irBuilder->getVoidType();
             }
 
             auto callResult =
@@ -4948,34 +5439,17 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
         else if (auto vectorType = as<VectorExpressionType>(type))
         {
-            UInt elementCount = (UInt)getIntVal(vectorType->getElementCount());
-
             auto irDefaultValue =
                 getSimpleVal(context, getDefaultVal(vectorType->getElementType()));
-
-            List<IRInst*> args;
-            for (UInt ee = 0; ee < elementCount; ++ee)
-            {
-                args.add(irDefaultValue);
-            }
             return LoweredValInfo::simple(
-                getBuilder()->emitMakeVector(irType, args.getCount(), args.getBuffer()));
+                getBuilder()->emitMakeVectorFromScalar(irType, irDefaultValue));
         }
         else if (auto matrixType = as<MatrixExpressionType>(type))
         {
-            UInt rowCount = (UInt)getIntVal(matrixType->getRowCount());
-
-            auto rowType = matrixType->getRowType();
-
-            auto irDefaultValue = getSimpleVal(context, getDefaultVal(rowType));
-
-            List<IRInst*> args;
-            for (UInt rr = 0; rr < rowCount; ++rr)
-            {
-                args.add(irDefaultValue);
-            }
+            auto irDefaultValue =
+                getSimpleVal(context, getDefaultVal(matrixType->getElementType()));
             return LoweredValInfo::simple(
-                getBuilder()->emitMakeMatrix(irType, args.getCount(), args.getBuffer()));
+                getBuilder()->emitMakeMatrixFromScalar(irType, irDefaultValue));
         }
         else if (auto arrayType = as<ArrayExpressionType>(type))
         {
@@ -5284,7 +5758,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitStringLiteralExpr(StringLiteralExpr* expr)
     {
-        IROp type = kIROp_Undefined;
+        IROp type = kIROp_Poison;
         if (as<ShortStringType>(expr->type))
         {
             type = kIROp_ShortStringType;
@@ -8154,7 +8628,7 @@ top:
                 // for input parameters, we might have to deal with
                 // that here.
                 //
-                addInArg(context, &allArgs, right);
+                addSimpleArg(context, &allArgs, right);
 
                 _emitCallToAccessor(
                     context,
@@ -8613,12 +9087,48 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitInheritanceDecl(InheritanceDecl* inheritanceDecl)
     {
+        // If the inheritance decl is nested inside a link-time type alias declaration,
+        // e.g. in `export struct Foo:IFoo = FooImpl`,
+        // then we need to emit a symbo alias to the `FooImpl:IFoo`.
+        //
+        auto parentDecl = inheritanceDecl->parentDecl;
+        auto aggTypeParentDecl = as<AggTypeDecl>(parentDecl);
+        if (aggTypeParentDecl && aggTypeParentDecl->aliasedType.type && inheritanceDecl->witnessVal)
+        {
+            NestedContext nested(this);
+            auto subBuilder = nested.getBuilder();
+            auto subContext = nested.getContext();
+            auto outerGeneric = emitOuterGenerics(subContext, inheritanceDecl, inheritanceDecl);
+
+            auto wrappedWitness = lowerVal(subContext, inheritanceDecl->witnessVal);
+            IRInst* alias = nullptr;
+            if (outerGeneric)
+            {
+                alias = finishOuterGenerics(subBuilder, wrappedWitness.val, outerGeneric);
+            }
+            else
+            {
+                alias = getBuilder()->emitSymbolAlias(wrappedWitness.val);
+            }
+            auto mangledName = getMangledNameForConformanceWitness(
+                context->astBuilder,
+                parentDecl,
+                inheritanceDecl->base.type);
+            bool explicitExtern = false;
+            if (isImportedDecl(context, parentDecl, explicitExtern))
+                getBuilder()->addImportDecoration(alias, mangledName.getUnownedSlice());
+            else
+                getBuilder()->addExportDecoration(alias, mangledName.getUnownedSlice());
+
+            context->setGlobalValue(inheritanceDecl, LoweredValInfo::simple(alias));
+            return LoweredValInfo::simple(alias);
+        }
+
         // An inheritance clause inside of an `interface`
         // declaration should not give rise to a witness
         // table, because it represents something the
         // interface requires, and not what it provides.
         //
-        auto parentDecl = inheritanceDecl->parentDecl;
         if (const auto parentInterfaceDecl = as<InterfaceDecl>(parentDecl))
         {
             return LoweredValInfo::simple(getInterfaceRequirementKey(inheritanceDecl));
@@ -9744,10 +10254,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             SLANG_UNREACHABLE("associatedtype should have been handled by visitAssocTypeDecl.");
         }
 
-        // TODO(JS):
-        // Not clear what to do around HLSLExportModifier.
-        // The HLSL spec says it only applies to functions, so we ignore for now.
-
         // We are going to create nested IR building state
         // to use when emitting the members of the type.
         //
@@ -9757,6 +10263,35 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // Emit any generics that should wrap the actual type.
         auto outerGeneric = emitOuterGenerics(subContext, decl, decl);
+
+        if (decl->aliasedType)
+        {
+            // If the type decl is an alias of another type, then we lower it into
+            // a IRSymbolAlias.
+            auto loweredType = lowerType(subContext, decl->aliasedType);
+            if (loweredType)
+            {
+                IRInst* alias = nullptr;
+                if (outerGeneric)
+                {
+                    alias = finishOuterGenerics(subBuilder, loweredType, outerGeneric);
+                }
+                else
+                {
+                    alias = subBuilder->emitSymbolAlias(loweredType);
+                }
+                addLinkageDecoration(subContext, alias, decl);
+
+                // Enumerate all witnesses and lower IRSymbolAlias for them as well.
+                for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
+                {
+                    if (!inheritanceDecl->witnessVal)
+                        continue;
+                    ensureDecl(subContext, inheritanceDecl);
+                }
+                return LoweredValInfo::simple(alias);
+            }
+        }
 
         IRType* irAggType = nullptr;
         if (as<StructDecl>(decl))
@@ -10011,6 +10546,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             addNameHint(context, irFieldKey, fieldDecl);
             addVarDecorations(context, irFieldKey, fieldDecl);
             addLinkageDecoration(context, irFieldKey, fieldDecl);
+            maybeAddDebugLocationDecoration(context, irFieldKey);
         }
 
         if (auto semanticModifier = fieldDecl->findModifier<HLSLSimpleSemantic>())
@@ -10386,10 +10922,22 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     for (auto param : paramCloneInfos)
                     {
                         typeBuilder.setInsertInto(param.clonedParam);
-                        param.clonedParam->setFullType((IRType*)cloneInst(
-                            &cloneEnv,
-                            &typeBuilder,
-                            param.originalParam->getFullType()));
+
+                        // If the type is present in the generic (i.e. not in module scope),
+                        // then we need to make a clone since it is likely to be dependent on the
+                        // new parameters we just emitted and we want to obtain the effective type
+                        // in the current context.
+                        //
+                        // If it's in the global scope, we're good if we use the same type.
+                        //
+                        if (!as<IRModuleInst>(param.originalParam->getFullType()->getParent()))
+                            param.clonedParam->setFullType((IRType*)cloneInst(
+                                &cloneEnv,
+                                &typeBuilder,
+                                param.originalParam->getFullType()));
+                        else
+                            param.clonedParam->setFullType(param.originalParam->getFullType());
+
                         cloneInstDecorationsAndChildren(
                             &cloneEnv,
                             typeBuilder.getModule(),
@@ -10802,6 +11350,75 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return type->getOp() == kIROp_ClassType;
     }
 
+    /// Does the given `in` parameter need a temporary created for it?
+    ///
+    /// This function determines whether code within a function body might
+    /// try to use a given parameter as a mutable local variable, such
+    /// that we need to explicitly allocate that variable as part of
+    /// lowering the function body to IR.
+    ///
+    static bool doesInParamNeedAMutableTempCreated(IRLoweringParameterInfo const& paramInfo)
+    {
+        // Some parameters at the IR level are created to corespond
+        // to AST-level declarations, and some aren't. We need to
+        // distinguish the two cases here.
+        //
+        auto paramDecl = paramInfo.decl;
+        if (paramDecl)
+        {
+            // One distinction that Slang draws between functions declared
+            // using the traditional C-style syntax (`void f(int a)`) and
+            // those declared in the modern syntax (`func f(a: int)`) is
+            // that all `in` parameters of modern functions are read-only
+            // by default.
+            //
+            if (as<ModernParamDecl>(paramDecl))
+                return false;
+
+            // As a concession to developers who insist on putting `const`
+            // on parameter declarations, we will detect those cases and
+            // ensure that we don't create a temporary, to abide with
+            // their intent.
+            //
+            // Note: putting `const` on function parameters is a habit to
+            // avoid. Doing so encodes details about a function's
+            // *implementation* (whether or not it uses a parameter's name
+            // as a temporary inside its body) into its *interface*
+            // (the type signature of the function itself). It is better
+            // to just establish a convention and discipline of not using
+            // function parameters as temporaries, and then clearly marking
+            // those cases where you deviate from the convention. A future
+            // version of Slang *will* warn on attempts to assign to `in`
+            // function parameters, and a version subsequent to that will
+            // make all `in` function parameters read-only.
+            //
+            // Note: if Slang were to ever allow taking the address of
+            // local variables, care must be taken to *either* disable the
+            // optimization being made here, or to disallow taking the
+            // address of `const` function parameters (but not non-`const`
+            // ones).
+            //
+            if (paramDecl->findModifier<ConstModifier>())
+                return false;
+        }
+        else
+        {
+            // Currently, we treat all IR-level parameters that were
+            // introduced that don't represent any AST-level declaration
+            // as if they need a temporary.
+            //
+            // TODO(tfoley): This choice seems questionable. At the very
+            // least, it seems like there would be no reason to treat
+            // an `in` parameter for `this` as a mutable temporary (we
+            // should be diagnosing an error on attempts to write to it).
+        }
+
+        // If none of the special cases above detected that we can safely
+        // avoid allocating a temporary, then we default to creating one.
+        //
+        return true;
+    }
+
     LoweredValInfo lowerFuncDeclInContext(
         IRGenContext* subContext,
         IRBuilder* subBuilder,
@@ -10929,128 +11546,241 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             IRBlock* entryBlock = subBuilder->emitBlock();
             subBuilder->setInsertInto(entryBlock);
 
+            // The paramters of the entry block are used to encode the
+            // parameters of the function itself, so we will create them
+            // based on the `parameterLists` that were collected.
+            //
             UInt paramTypeIndex = 0;
             for (auto paramInfo : parameterLists.params)
             {
+                // Note that the IR-level type of a parameter may include
+                // a wrapper type to represent a non-default parameter-passing
+                // mode. Thus, the `irParamType` here may actually be a pointer
+                // to what the conceptual type of the parameter was at the
+                // source/AST level.
+                //
                 auto irParamType = paramTypes[paramTypeIndex++];
 
+                // We need to use the information in the `paramInfo` to:
+                //
+                // * create the actual `IRParam` instruction
+                //
+                // * generate any code that needs to appear in the function's
+                //   prologue to handle that parameter
+                //
+                // * wrap up a `LoweredValInfo` that will represent the logical
+                //   value of the parameter in any places where it is referenced
+                //   within the function body
+                //
+                // We have already computed the appropriate type for the IR-level
+                // parameter, so emitting it is easy.
+                //
+                IRParam* irParam = subBuilder->emitParam(irParamType);
+
+                // If the IR parameter is being used to represent some AST-level
+                // declaration, then we want to attach appropriate decorations
+                // and location information to the parameter based on that
+                // declaration.
+                //
+                if (auto paramDecl = paramInfo.decl)
+                {
+                    addVarDecorations(context, irParam, paramDecl);
+                    subBuilder->addHighLevelDeclDecoration(irParam, paramDecl);
+                    irParam->sourceLoc = paramDecl->loc;
+                }
+
+                // We will also add a name hint to the parameter. This will
+                // often be computed from the AST-level declaration (for an IR
+                // parameter corresponding to an AST-level parameter), but
+                // it might also be a synthesized name to represent a `this`
+                // parameter, or a parameter generated for a function result.
+                //
+                addParamNameHint(irParam, paramInfo);
+
+                // The remaining work we need to do will depend on the
+                // parameter-passing mode that was selected for the parameter.
+                // Depending on the mode, the `LoweredValInfo` representing
+                // the parameter might or might not have some levels of
+                // indirection.
+                //
                 LoweredValInfo paramVal;
 
-                IRParam* irParam = nullptr;
-
-                switch (paramInfo.direction)
+                switch (paramInfo.actualParamPassingModeToUse)
                 {
-                default:
+                case ParamPassingMode::In:
                     {
-                        // The parameter is being used for input/output purposes,
-                        // so it will lower to an actual parameter with a pointer type.
+                        // The simplest case (in principle) is when a parameter is
+                        // declared with the default parameter-passing mode of `in`.
                         //
-                        // TODO: Is this the best representation we can use?
-
-                        irParam = subBuilder->emitParam(irParamType);
-                        if (auto paramDecl = paramInfo.decl)
+                        // What we'd *like* to do here is simply set the `paramVal`
+                        // to reference the `irParam` we already created as a simple
+                        // value, and be done:
+                        //
+                        paramVal = LoweredValInfo::simple(irParam);
+                        //
+                        // However, we have to worry about the additional complication
+                        // that by virtue of inherited language-design choices that
+                        // go all the way back to C (at least), Slang allows a developer
+                        // to use a function parameter as a mutable local variable in
+                        // a function body.
+                        //
+                        // We don't always need to allocate such a temporary, so we'll
+                        // delegate the policy for whether to create one to a subroutine,
+                        // and focus on the mechanism here.
+                        //
+                        if (doesInParamNeedAMutableTempCreated(paramInfo))
                         {
-                            addVarDecorations(context, irParam, paramDecl);
-                            subBuilder->addHighLevelDeclDecoration(irParam, paramDecl);
-                            irParam->sourceLoc = paramDecl->loc;
-                        }
-                        addParamNameHint(irParam, paramInfo);
+                            // We need to create a mutable local variable in the
+                            // prologue of the function we are emitting, matching
+                            // the type of the parameter itself.
+                            //
+                            // Note that because we are working with an `in` parameter
+                            // here, we know that the `irParamType` is consistent
+                            // with the AST-level type of the parameter (there is no
+                            // wrapper type for the parameter-passing mode).
+                            //
+                            auto irLocal = subBuilder->emitVar(irParamType);
 
-                        paramVal = LoweredValInfo::ptr(irParam);
-
-                        if (paramInfo.isReturnDestination)
-                            subContext->returnDestination = paramVal;
-
-                        if (paramInfo.declaredDirection == ParamPassingMode::In &&
-                            paramInfo.direction == ParamPassingMode::BorrowIn)
-                        {
-                            // If the parameter is originally declared as "in", but we are
-                            // lowering it as constref for any reason (e.g. it is a varying input),
-                            // then we need to emit a local variable to hold the original value, so
-                            // that we can still generate correct code when the user trys to mutate
-                            // the variable.
-                            // The local variable introduced here is cleaned up by the SSA pass, if
-                            // we can determine that there are no actual writes into the local var.
-                            auto irLocal =
-                                subBuilder->emitVar(tryGetPointedToType(subBuilder, irParamType));
+                            // A Slang IR `var` instruction conceptually allocates
+                            // memory on the stack and returns a pointer, so the
+                            // logical value of the local is actually pointed to
+                            // by `irLocal`:
+                            //
                             auto localVal = LoweredValInfo::ptr(irLocal);
+
+                            // Right after allocating our temporary variable,
+                            // we simply want to assign from the actual parameter
+                            // into the temp.
+                            //
                             assign(subContext, localVal, paramVal);
+                            //
+                            // From this point on, any AST-level code that refers
+                            // to the parameter should actually be redirected to
+                            // refer to the temporary instead.
+                            //
                             paramVal = localVal;
+
+                            // One final detail here is that due to design decisions
+                            // made in how to represent debug information in the Slang IR,
+                            // we need to attach information to the local variable
+                            // identifying its role as a temporary for the given
+                            // parameter, so that the pass in
+                            // `slang-ir-insert-debug-value-store.cpp` can handle it appropriately.
+                            //
+                            // TODO(tfoley): Integrate debug information generation
+                            // more cleanly into IR lowering so that this step feels
+                            // less like a wart.
+                            //
+                            subBuilder->addDecoration(
+                                irLocal,
+                                kIROp_InParamProxyVarDecoration,
+                                irParam);
                         }
-                        // TODO: We might want to copy the pointed-to value into
-                        // a temporary at the start of the function, and then copy
-                        // back out at the end, so that we don't have to worry
-                        // about things like aliasing in the function body.
-                        //
-                        // For now we will just use the storage that was passed
-                        // in by the caller, knowing that our current lowering
-                        // at call sites will guarantee a fresh/unique location.
                     }
                     break;
 
-                case ParamPassingMode::In:
+                default:
                     {
-                        // Simple case of a by-value input parameter.
+                        // The remaining parameter-passing modes all result in
+                        // the `irParam` being a pointer to the logical value
+                        // of the AST-level parameter. We can represent that
+                        // fact in the `LoweredValInfo` we construct:
                         //
-                        // We start by declaring an IR parameter of the same type.
+                        paramVal = LoweredValInfo::ptr(irParam);
                         //
-                        auto paramDecl = paramInfo.decl;
-                        irParam = subBuilder->emitParam(irParamType);
-                        if (paramDecl)
+                        // Note: we have consciously designed the semantics of
+                        // parameter-pasing modes like `inout` and `out` in Slang
+                        // so that we do not need to introduce a temporary copy
+                        // of the parameter here. This is one place where the
+                        // semantics we implement differ from a strictly spec-compliant
+                        // implementation of GLSL (or an implementation of HLSL
+                        // that strives to exactly match other compilers).
+                        //
+
+                        // There is one deeply frustrating special case we need to
+                        // now contend with...
+                        //
+                        // There is logic elsewhere in the lowering pass that tries
+                        // to detect entry-point varying `in` parameters, and converts
+                        // them to use `borrow in` as their mode instead. The problem
+                        // in that case is that logic inside the function body might
+                        // still be using the parameter as a mutable temporary inside the
+                        // function body (as is allowed by the language; see the
+                        // logic handling `in` parameters above), and we can't allow
+                        // such logic to actually attempt to mutate a `borrow in`
+                        // parameter. Thus, we need to add additional workaround logic
+                        // here, to account for the other workaround logic that was
+                        // implemented.
+                        //
+                        // We detect the case where the parameter was *intended* to
+                        // be `in`, but has been realized as a `borrow in` parameter
+                        // in the IR, and insert a temporary.
+                        //
+                        // TODO: Once a fix is made to the overall approach taken to
+                        // lowering of entry points to Slang IR, this hackery can be
+                        // removed.
+                        //
+                        if (paramInfo.intendedParamPassingMode == ParamPassingMode::In)
                         {
-                            addVarDecorations(context, irParam, paramDecl);
-                            subBuilder->addHighLevelDeclDecoration(irParam, paramDecl);
-                            irParam->sourceLoc = paramDecl->loc;
-                        }
-                        addParamNameHint(irParam, paramInfo);
-                        paramVal = LoweredValInfo::simple(irParam);
-                        //
-                        // HLSL allows a function parameter to be used as a local
-                        // variable in the function body (just like C/C++), so
-                        // we need to support that case as well.
-                        //
-                        // However, if we notice that the parameter was marked
-                        // `const`, then we can skip this step.
-                        //
-                        // TODO: we should consider having all parameter be implicitly
-                        // immutable except in a specific "compatibility mode."
-                        //
-                        if (paramDecl && paramDecl->findModifier<ConstModifier>())
-                        {
-                            // This parameter was declared to be immutable,
-                            // so there should be no assignment to it in the
-                            // function body, and we don't need a temporary.
-                        }
-                        else
-                        {
-                            // The parameter migth get used as a temporary in
-                            // the function body. We will allocate a mutable
-                            // local variable for is value, and then assign
-                            // from the parameter to the local at the start
-                            // of the function.
-                            //
-                            auto irLocal = subBuilder->emitVar(irParamType);
-                            auto localVal = LoweredValInfo::ptr(irLocal);
-                            assign(subContext, localVal, paramVal);
-                            //
-                            // When code later in the body of the function refers
-                            // to the parameter declaration, it will actually refer
-                            // to the value stored in the local variable.
-                            //
-                            paramVal = localVal;
+                            if (auto irBorrowInParamType = as<IRBorrowInParamType>(irParamType))
+                            {
+                                auto irParamValueType = irBorrowInParamType->getValueType();
+
+                                // Note that the logic here is comparable to that for the ordinary
+                                // `in` case above, when a temporary is required. However, this
+                                // version of the logic is missing some aspects of what gets done
+                                // for the `in` case:
+                                //
+                                // * There is no check being made here if we can skip allocating
+                                //   a temporary.
+                                //
+                                // * There is no logic being inserted to mark up the temporary
+                                //   for the sake of debug-value code.
+                                //
+                                auto irLocal = subBuilder->emitVar(irParamValueType);
+                                auto localVal = LoweredValInfo::ptr(irLocal);
+                                assign(subContext, localVal, paramVal);
+                                paramVal = localVal;
+                            }
                         }
                     }
                     break;
                 }
 
+                //
+                // Now that we've created a `paramVal` to represent the
+                // parameter and emitted any required prologue code, we
+                // can move on to registering that value as necessary
+                // for subsequence code generation steps.
+                //
+
+                // If this is an IR parameter corresponding to some
+                // AST-level declaration, then we will want to register
+                // the mapping from AST decl to IR value here.
+                //
                 if (auto paramDecl = paramInfo.decl)
                 {
                     subContext->setValue(paramDecl, paramVal);
                 }
 
+                // We currently track the value corresponding to a `this`
+                // parameter separate from the main AST-to-IR mapping,
+                // so we need to detect and handle that case too.
+                //
                 if (paramInfo.isThisParam)
                 {
                     subContext->thisVal = paramVal;
+                }
+
+                // Finally, if the parameter was one created to represent
+                // the result value of the function itself, then we need
+                // to stash away the value (which must be an l-value) so
+                // that we can assign to it when generating code for a
+                // `return` statement in the body.
+                //
+                if (paramInfo.isReturnDestination)
+                {
+                    subContext->returnDestination = paramVal;
                 }
             }
 
@@ -11919,6 +12649,8 @@ LoweredValInfo emitDeclRef(IRGenContext* context, Decl* decl, DeclRefBase* subst
         // Once we have both the generic and its arguments,
         // we can emit a `specialize` instruction and use
         // its value as the result.
+        if (genericVal.flavor == LoweredValInfo::Flavor::Ptr)
+            type = context->irBuilder->getPtrType(type);
         auto irSpecializedVal = context->irBuilder->emitSpecializeInst(
             type,
             irGenericVal,
@@ -12045,7 +12777,8 @@ static void lowerFrontEndEntryPointToIR(
         // then we make sure to add one here, so the lowering logic knows it is an
         // entry point.
         auto entryPointAttr = context->astBuilder->create<EntryPointAttribute>();
-        entryPointAttr->capabilitySet = entryPoint->getProfile().getCapabilityName();
+        entryPointAttr->capabilitySet =
+            entryPoint->getProfile().getCapabilityName().freeze(context->astBuilder);
         addModifier(entryPointFuncDecl, entryPointAttr);
     }
 
@@ -12208,6 +12941,10 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     context->includeDebugInfo =
         compileRequest->getLinkage()->m_optionSet.getDebugInfoLevel() != DebugInfoLevel::None;
 
+    if (translationUnit->getModuleDecl()->findModifier<ExperimentalModuleAttribute>())
+    {
+        builder->addDecoration(module->getModuleInst(), kIROp_ExperimentalModuleDecoration);
+    }
     // We need to emit IR for all public/exported symbols
     // in the translation unit.
     //
@@ -12444,6 +13181,15 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         checkAutoDiffUsages(module, compileRequest->getSink());
 
         checkForOperatorShiftOverflow(module, linkage->m_optionSet, compileRequest->getSink());
+
+        if (translationUnit->getModuleDecl()->languageVersion >=
+            SlangLanguageVersion::SLANG_LANGUAGE_VERSION_2025)
+        {
+            // We do not allow specializing a generic function with an existential type.
+            checkForIllegalGenericSpecializationWithExistentialType(
+                module,
+                compileRequest->getSink());
+        }
     }
 
     // The "mandatory" optimization passes may make use of the
@@ -12764,22 +13510,14 @@ IRVarLayout* lowerVarLayout(IRLayoutGenContext* context, VarLayout* varLayout);
 
 /// Shared code for most `lowerTypeLayout` cases.
 ///
-/// Handles copying of resource usage and pending data type layout
-/// from the AST `typeLayout` to the specified `builder`.
+/// Handles copying of resource usage from the AST `typeLayout` to the
+/// specified `builder`.
 ///
-static IRTypeLayout* _lowerTypeLayoutCommon(
-    IRLayoutGenContext* context,
-    IRTypeLayout::Builder* builder,
-    TypeLayout* typeLayout)
+static IRTypeLayout* _lowerTypeLayoutCommon(IRTypeLayout::Builder* builder, TypeLayout* typeLayout)
 {
     for (auto resInfo : typeLayout->resourceInfos)
     {
         builder->addResourceUsage(resInfo.kind, resInfo.count);
-    }
-
-    if (auto pendingTypeLayout = typeLayout->pendingDataTypeLayout)
-    {
-        builder->setPendingTypeLayout(lowerTypeLayout(context, pendingTypeLayout));
     }
 
     return builder->build();
@@ -12807,14 +13545,14 @@ IRTypeLayout* lowerTypeLayout(IRLayoutGenContext* context, TypeLayout* typeLayou
         builder.setOffsetElementTypeLayout(
             lowerTypeLayout(context, paramGroupTypeLayout->offsetElementTypeLayout));
 
-        return _lowerTypeLayoutCommon(context, &builder, paramGroupTypeLayout);
+        return _lowerTypeLayoutCommon(&builder, paramGroupTypeLayout);
     }
     else if (auto structuredBufferTypeLayout = as<StructuredBufferTypeLayout>(typeLayout))
     {
         auto irElementTypeLayout =
             lowerTypeLayout(context, structuredBufferTypeLayout->elementTypeLayout);
         IRStructuredBufferTypeLayout::Builder builder(context->irBuilder, irElementTypeLayout);
-        return _lowerTypeLayoutCommon(context, &builder, structuredBufferTypeLayout);
+        return _lowerTypeLayoutCommon(&builder, structuredBufferTypeLayout);
     }
     else if (auto structTypeLayout = as<StructTypeLayout>(typeLayout))
     {
@@ -12890,13 +13628,13 @@ IRTypeLayout* lowerTypeLayout(IRLayoutGenContext* context, TypeLayout* typeLayou
             builder.addField(irFieldKey, irFieldLayout);
         }
 
-        return _lowerTypeLayoutCommon(context, &builder, structTypeLayout);
+        return _lowerTypeLayoutCommon(&builder, structTypeLayout);
     }
     else if (auto arrayTypeLayout = as<ArrayTypeLayout>(typeLayout))
     {
         auto irElementTypeLayout = lowerTypeLayout(context, arrayTypeLayout->elementTypeLayout);
         IRArrayTypeLayout::Builder builder(context->irBuilder, irElementTypeLayout);
-        return _lowerTypeLayoutCommon(context, &builder, arrayTypeLayout);
+        return _lowerTypeLayoutCommon(&builder, arrayTypeLayout);
     }
     else if (auto ptrTypeLayout = as<PointerTypeLayout>(typeLayout))
     {
@@ -12906,7 +13644,7 @@ IRTypeLayout* lowerTypeLayout(IRLayoutGenContext* context, TypeLayout* typeLayou
 
         // auto irValueTypeLayout = lowerTypeLayout(context, ptrTypeLayout->valueTypeLayout);
         IRPointerTypeLayout::Builder builder(context->irBuilder);
-        return _lowerTypeLayoutCommon(context, &builder, ptrTypeLayout);
+        return _lowerTypeLayoutCommon(&builder, ptrTypeLayout);
     }
     else if (auto streamOutputTypeLayout = as<StreamOutputTypeLayout>(typeLayout))
     {
@@ -12914,7 +13652,7 @@ IRTypeLayout* lowerTypeLayout(IRLayoutGenContext* context, TypeLayout* typeLayou
             lowerTypeLayout(context, streamOutputTypeLayout->elementTypeLayout);
 
         IRStreamOutputTypeLayout::Builder builder(context->irBuilder, irElementTypeLayout);
-        return _lowerTypeLayoutCommon(context, &builder, streamOutputTypeLayout);
+        return _lowerTypeLayoutCommon(&builder, streamOutputTypeLayout);
     }
     else if (auto matrixTypeLayout = as<MatrixTypeLayout>(typeLayout))
     {
@@ -12927,19 +13665,19 @@ IRTypeLayout* lowerTypeLayout(IRLayoutGenContext* context, TypeLayout* typeLayou
         // along this data as best we can for now.
 
         IRMatrixTypeLayout::Builder builder(context->irBuilder, matrixTypeLayout->mode);
-        return _lowerTypeLayoutCommon(context, &builder, matrixTypeLayout);
+        return _lowerTypeLayoutCommon(&builder, matrixTypeLayout);
     }
     else if (auto existentialTypeLayout = as<ExistentialTypeLayout>(typeLayout))
     {
         IRExistentialTypeLayout::Builder builder(context->irBuilder);
-        return _lowerTypeLayoutCommon(context, &builder, existentialTypeLayout);
+        return _lowerTypeLayoutCommon(&builder, existentialTypeLayout);
     }
     else
     {
         // If no special case applies we will build a generic `IRTypeLayout`.
         //
         IRTypeLayout::Builder builder(context->irBuilder);
-        return _lowerTypeLayoutCommon(context, &builder, typeLayout);
+        return _lowerTypeLayoutCommon(&builder, typeLayout);
     }
 }
 
@@ -12957,10 +13695,6 @@ IRVarLayout* lowerVarLayout(
         irResInfo->space = resInfo.space;
     }
 
-    if (auto pendingVarLayout = varLayout->pendingVarLayout)
-    {
-        irLayoutBuilder.setPendingVarLayout(lowerVarLayout(context, pendingVarLayout));
-    }
 
     // We will only generate layout information with *either* a system-value
     // semantic or a user-defined semantic, and we will always check for
@@ -13098,7 +13832,7 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         globalStructTypeLayoutBuilder.addField(irVar, irLayout);
     }
     auto irGlobalStructTypeLayout =
-        _lowerTypeLayoutCommon(context, &globalStructTypeLayoutBuilder, globalStructLayout);
+        _lowerTypeLayoutCommon(&globalStructTypeLayoutBuilder, globalStructLayout);
 
     auto globalScopeVarLayout = programLayout->parametersLayout;
     auto globalScopeTypeLayout = globalScopeVarLayout->typeLayout;
@@ -13117,10 +13851,8 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         globalParameterGroupTypeLayoutBuilder.setOffsetElementTypeLayout(
             lowerTypeLayout(context, paramGroupTypeLayout->offsetElementTypeLayout));
 
-        auto irParamGroupTypeLayout = _lowerTypeLayoutCommon(
-            context,
-            &globalParameterGroupTypeLayoutBuilder,
-            paramGroupTypeLayout);
+        auto irParamGroupTypeLayout =
+            _lowerTypeLayoutCommon(&globalParameterGroupTypeLayoutBuilder, paramGroupTypeLayout);
 
         irGlobalScopeTypeLayout = irParamGroupTypeLayout;
     }
@@ -13153,8 +13885,10 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
                 getMangledName(astBuilder, funcDeclRef).getUnownedSlice());
         }
 
-        for (auto atomSet :
-             as<FuncDecl>(funcDeclRef.getDecl())->inferredCapabilityRequirements.getAtomSets())
+        auto asFuncDecl = as<FuncDecl>(funcDeclRef.getDecl());
+        SLANG_ASSERT(asFuncDecl);
+        CapabilitySet set{asFuncDecl->inferredCapabilityRequirements};
+        for (auto atomSet : set.getAtomSets())
         {
             for (auto atomVal : atomSet)
             {

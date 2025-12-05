@@ -228,6 +228,12 @@ def hlsl_2018 : _sm_5_1;
 /// [Version]
 def hlsl_coopvec_poc : _sm_6_8;
 
+/// Represent compatibility support for the deprecated POC DXC, but we need to use
+/// this capability to be compatible with cooperative_vector in target_switch, so
+/// join '_sm_6_9' here.
+/// [Compound]
+alias hlsl_coopvec_poc_sm_6_9 = hlsl_coopvec_poc + _sm_6_9;
+
 /// Represents capabilities required for DXIL Library compilation.
 /// [Version]
 alias dxil_lib = _sm_6_3;
@@ -246,6 +252,8 @@ def _cuda_sm_8_0 : _cuda_sm_7_0;
 def _cuda_sm_9_0 : _cuda_sm_8_0;
 /// Represents capabilities required for optix cooperative vector support.
 def optix_coopvec : _cuda_sm_9_0;
+/// Represents capabilities required for optix multi-level traversal support.
+def optix_multilevel_traversal : _cuda_sm_5_0;
 
 /// All code-gen targets
 /// [Compound]
@@ -518,6 +526,9 @@ def SPV_KHR_non_semantic_info : _spirv_1_0;
 /// Represents the SPIR-V extension for device-group information.
 /// [EXT]
 def SPV_KHR_device_group : _spirv_1_0;
+
+/// Represents the SPIRV-V Variable Pointers extension.
+def SPV_KHR_variable_pointers : _spirv_1_0;
 
 /// Represents the SPIR-V extension for ray tracing.
 /// [EXT]
@@ -1107,6 +1118,15 @@ alias GL_KHR_shader_subgroup_vote = _GL_KHR_shader_subgroup_vote | spvGroupNonUn
 alias GL_KHR_shader_subgroup_rotate = _GL_KHR_shader_subgroup_rotate | spvGroupNonUniformRotateKHR;
 
 /// Represents the GL_NV_compute_shader_derivatives extension.
+///
+/// This capability enables the use of implicit derivatives in compute, ray tracing, and mesh stages.
+///
+/// This capability changes the interpretation of GLSL implicit-LOD texture sampling functions as follows, matching
+/// the GLSL shader specification:
+/// - Derivatives enabled: Implicit-LOD `texture()` functions are assumed to use implicit LOD.
+/// - Derivatives disabled: Implicit-LOD `texture()` functions are assumed to use the base texture.
+///
+/// This applies to GLSL as both source and target.
 /// [EXT]
 alias GL_NV_compute_shader_derivatives = _GL_NV_compute_shader_derivatives | SPV_KHR_compute_shader_derivatives | _sm_6_6;
 
@@ -1212,13 +1232,16 @@ alias cooperative_vector = _sm_6_9 | cpp | _cuda_sm_9_0 | spvCooperativeVectorNV
 alias cooperative_vector_training = spvCooperativeVectorTrainingNV | _GL_NV_cooperative_vector;
 /// Capabilities needed to use cooperative matrices
 /// [Compound]
-alias cooperative_matrix = spvCooperativeMatrixKHR;
+alias cooperative_matrix = spvCooperativeMatrixKHR | cuda;
+/// Capabilities needed to use reduction operations with cooperative matrix
+/// [Compound]
+alias cooperative_matrix_spirv = spvCooperativeMatrixKHR;
 /// Capabilities needed to use reduction operations with cooperative matrix
 /// [Compound]
 alias cooperative_matrix_reduction = spvCooperativeMatrixReductionsNV;
-/// Capabilities needed to convert cooperative matrices
+/// Capabilities needed to convert cooperative matrices, all the conversions can be supported by cuda
 /// [Compound]
-alias cooperative_matrix_conversion = spvCooperativeMatrixConversionsNV;
+alias cooperative_matrix_conversion = spvCooperativeMatrixConversionsNV | cuda;
 /// Capabilities needed to use MapElement operation with cooperative matrix
 /// [Compound]
 alias cooperative_matrix_map_element = spvCooperativeMatrixPerElementOperationsNV;
@@ -2015,6 +2038,23 @@ alias structuredbuffer = sm_4_0_version;
 /// [Compound]
 alias structuredbuffer_rw = sm_4_0_version;
 
+/// Capabilities required for implicit derivatives sampling.
+///
+/// This capability is required by texture sampling functions such as `_Texture.Sample()`
+/// where the level of detail is determined by implicit derivatives.
+///
+/// @remark In GLSL, implicit level-of-detail `texture()` functions use the base texture when
+/// the implicit derivatives are unavailable. When this capability is not present, invocations of
+/// these functions are translated to invocations of `_Texture.SampleLevelZero()`.
+///
+/// @remark Implicit derivatives for the compute stage can be enabled by declaring capability `GL_NV_compute_shader_derivatives` (GLSL),
+/// `SPV_KHR_compute_shader_derivatives` (SPIR-V), or profile `cs_6_6` (HLSL).
+///
+/// [compound]
+alias implicit_derivatives_sampling = fragment
+                                    | raytracingstages_compute_amplification_mesh + GL_NV_compute_shader_derivatives
+                                    ;
+
 /// Capabilities required to use fragment derivative operations (without GLSL derivativecontrol)
 /// [Compound]
 alias fragmentprocessing = fragment + _sm_5_0
@@ -2089,6 +2129,10 @@ alias texture_querylevels = texture_sm_4_1 | GL_ARB_texture_query_levels;
 /// [Compound]
 alias texture_shadowlod = texture_sm_4_1 | GL_EXT_texture_shadow_lod
                         | texture_sm_4_1;
+/// Capabilities required for shadow texture sampling with bias and gradients.
+/// New in HLSL SM6.8 but existed in older GLSL and SPIRV targets.
+/// [Compound]
+alias texture_shadowgrad = _sm_6_8 | _GLSL_150 | spirv_1_0 | GL_EXT_texture_shadow_lod;
 
 /// (GLSL/SPIRV) Capabilities required to use GLSL-tier-1 float-atomic operations
 /// [Compound]

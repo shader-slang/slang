@@ -35,7 +35,7 @@ static bool isUninitializedValue(IRInst* inst)
     // Also consider var since it does not
     // automatically mean it will be initialized
     // (at least not as the user may have intended)
-    return (inst->m_op == kIROp_Undefined) || (inst->m_op == kIROp_Var);
+    return (as<IRUndefined>(inst) || (inst->m_op == kIROp_Var));
 }
 
 static bool isUnmodifying(IRFunc* func)

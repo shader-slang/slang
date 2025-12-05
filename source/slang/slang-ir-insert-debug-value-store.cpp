@@ -140,6 +140,17 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
 
         mapVarToDebugVar[param] = debugVar;
 
+        // Map any in-param proxy vars to the debug var.
+        bool hasProxyVar = false;
+        for (auto use = param->firstUse; use; use = use->nextUse)
+        {
+            if (auto inParamProxyVarDecor = as<IRInParamProxyVarDecoration>(use->getUser()))
+            {
+                mapVarToDebugVar[inParamProxyVarDecor->parent] = debugVar;
+                hasProxyVar = true;
+            }
+        }
+
         // Store the initial value of the parameter into the debug var.
         IRInst* paramVal = nullptr;
         if (!isRefParam)
@@ -153,7 +164,7 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
             paramVal = builder.emitLoad(param);
         }
 
-        if (paramVal)
+        if (paramVal && !hasProxyVar)
         {
             builder.emitDebugValue(debugVar, paramVal);
         }

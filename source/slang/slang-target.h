@@ -33,6 +33,7 @@ enum class CodeGenTarget : SlangCompileTargetIntegral
     DXILAssembly = SLANG_DXIL_ASM,
     CSource = SLANG_C_SOURCE,
     CPPSource = SLANG_CPP_SOURCE,
+    CPPHeader = SLANG_CPP_HEADER,
     PyTorchCppBinding = SLANG_CPP_PYTORCH_BINDING,
     HostCPPSource = SLANG_HOST_CPP_SOURCE,
     HostExecutable = SLANG_HOST_EXECUTABLE,
@@ -40,6 +41,7 @@ enum class CodeGenTarget : SlangCompileTargetIntegral
     ShaderSharedLibrary = SLANG_SHADER_SHARED_LIBRARY,
     ShaderHostCallable = SLANG_SHADER_HOST_CALLABLE,
     CUDASource = SLANG_CUDA_SOURCE,
+    CUDAHeader = SLANG_CUDA_HEADER,
     PTX = SLANG_PTX,
     CUDAObjectCode = SLANG_CUDA_OBJECT_CODE,
     ObjectCode = SLANG_OBJECT_CODE,
@@ -82,6 +84,9 @@ bool isCPUTarget(TargetRequest* targetReq);
 /// Are we generating code for the WebGPU API?
 bool isWGPUTarget(TargetRequest* targetReq);
 bool isWGPUTarget(CodeGenTarget target);
+
+// Are we generating code for a Kernel-style target (as opposed to host-style target)
+bool isKernelTarget(CodeGenTarget codeGenTarget);
 
 /// A request to generate output in some target format.
 class TargetRequest : public RefObject

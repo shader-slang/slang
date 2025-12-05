@@ -22,7 +22,20 @@ bool specializeResourceParameters(CodeGenContext* codeGenContext, IRModule* modu
 bool specializeResourceOutputs(CodeGenContext* codeGenContext, IRModule* module);
 
 /// Combined iterative passes of `specializeResourceParameters` and `specializeResourceOutputs`.
-bool specializeResourceUsage(CodeGenContext* codeGenContext, IRModule* irModule);
+bool specializeResourceUsage(IRModule* irModule, CodeGenContext* codeGenContext);
+
+/// Convert parameter-passing modes for non-copyable types to ones that are valid for GLSL.
+///
+/// This pass is needed because Slang requires certain non-copyable types like
+/// `RayQuery` to be passed via `inout` parameters in order to be mutable, while
+/// GLSL does not allow that type to be used for `out` or `inout` parameters.
+/// It is semantically okay to change the mode of such parameters over to just
+/// use `borrow in` or `in`, because in practice the GLSL type acts more like
+/// a handle to a stateful entity rather than a mutable value itself.
+///
+void legalizeModesOfNonCopyableOpaqueTypedParamsForGLSL(
+    IRModule* irModule,
+    CodeGenContext* codeGenContext);
 
 bool isIllegalGLSLParameterType(IRType* type);
 bool isIllegalSPIRVParameterType(IRType* type, bool isArray);

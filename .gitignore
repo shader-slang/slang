@@ -106,10 +106,25 @@ vkd3d-proton.cache.write
 .*.swp
 .*.swo
 
-# Claude local settings
+# Claude local settings and memory
 /.claude/settings.local.json
+CLAUDE.local.md
 
 # Other temporary files
 /generators
 /lock
 /tests/library/linked.spirv
+
+# Coverage reports and data
+*.profraw
+*.profdata
+/coverage-html/
+/coverage.lcov
+
+# Valgrind, perf,
+callgrind.out.*
+perf.data
+perf.data.*
+
+# gh command
+.gh-pm.yml

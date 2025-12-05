@@ -4,7 +4,7 @@
 
 namespace Slang
 {
-void CompilerOptionSet::load(uint32_t count, slang::CompilerOptionEntry* entries)
+void CompilerOptionSet::load(uint32_t count, const slang::CompilerOptionEntry* entries)
 {
     for (uint32_t i = 0; i < count; i++)
     {
@@ -200,6 +200,8 @@ bool CompilerOptionSet::allowDuplicate(CompilerOptionName name)
     case CompilerOptionName::VulkanBindShift:
     case CompilerOptionName::VulkanBindShiftAll:
     case CompilerOptionName::TypeConformance:
+    case CompilerOptionName::DumpIRBefore:
+    case CompilerOptionName::DumpIRAfter:
         return true;
     }
     return false;

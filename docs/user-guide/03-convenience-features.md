@@ -697,7 +697,7 @@ export T getDescriptorFromHandle<T>(DescriptorHandle<T> handle) where T : IOpaqu
     __target_switch
     {
     case spirv:
-        if (T.kind == ResourceKind.Sampler)
+        if (T.kind == DescriptorKind.Sampler)
             return samplerHandles[((uint2)handle).x].asOpaqueDescriptor<T>();
         else
             return resourceHandles[((uint2)handle).x].asOpaqueDescriptor<T>();

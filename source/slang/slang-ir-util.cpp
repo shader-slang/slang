@@ -184,8 +184,29 @@ IRInst* specializeWithGeneric(
     {
         genArgs.add(param);
     }
+
+    // Default to type kind for now.
+    IRType* typeForSpecialization = builder.getTypeKind();
+
+    auto dataType = genericToSpecialize->getDataType();
+    if (dataType)
+    {
+        if (dataType->getOp() == kIROp_TypeKind || dataType->getOp() == kIROp_GenericKind)
+        {
+            typeForSpecialization = (genericToSpecialize)->getDataType();
+        }
+        else if (dataType->getOp() == kIROp_Generic)
+        {
+            typeForSpecialization = (IRType*)builder.emitSpecializeInst(
+                builder.getTypeKind(),
+                (genericToSpecialize)->getDataType(),
+                genArgs.getCount(),
+                genArgs.getBuffer());
+        }
+    }
+
     return builder.emitSpecializeInst(
-        builder.getTypeKind(),
+        typeForSpecialization,
         genericToSpecialize,
         (UInt)genArgs.getCount(),
         genArgs.getBuffer());
@@ -478,31 +499,31 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
         sb << "int";
         break;
     case kIROp_Int8Type:
-        sb << "int8";
+        sb << "int8_t";
         break;
     case kIROp_Int16Type:
-        sb << "int16";
+        sb << "int16_t";
         break;
     case kIROp_Int64Type:
-        sb << "int64";
+        sb << "int64_t";
         break;
     case kIROp_IntPtrType:
-        sb << "intptr";
+        sb << "intptr_t";
         break;
     case kIROp_UIntType:
         sb << "uint";
         break;
     case kIROp_UInt8Type:
-        sb << "uint8";
+        sb << "uint8_t";
         break;
     case kIROp_UInt16Type:
-        sb << "uint16";
+        sb << "uint16_t";
         break;
     case kIROp_UInt64Type:
-        sb << "uint64";
+        sb << "uint64_t";
         break;
     case kIROp_UIntPtrType:
-        sb << "uintptr";
+        sb << "uintptr_t";
         break;
     case kIROp_CharType:
         sb << "char";
@@ -643,7 +664,7 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
         sb << "AtomicCounter";
         break;
     case kIROp_RaytracingAccelerationStructureType:
-        sb << "RayTracingAccelerationStructure";
+        sb << "RaytracingAccelerationStructure";
         break;
     case kIROp_HitObjectType:
         sb << "HitObject";
@@ -801,6 +822,7 @@ IRInst* getRootAddr(IRInst* addr, List<IRInst*>& outAccessChain, List<IRInst*>* 
     return addr;
 }
 
+
 IRInst* getRootBufferOrAddr(IRInst* addr)
 {
     auto rootAddr = getRootAddr(addr);
@@ -954,11 +976,11 @@ bool canAddressesPotentiallyAlias(
     if (addr1 == addr2)
         return true;
 
-    addr1 = getRootBufferOrAddr(addr1);
-    addr2 = getRootBufferOrAddr(addr2);
+    auto root1 = getRootBufferOrAddr(addr1);
+    auto root2 = getRootBufferOrAddr(addr2);
 
-    auto addr1Class = getAliasingClass(addr1);
-    auto addr2Class = getAliasingClass(addr2);
+    auto addr1Class = getAliasingClass(root1);
+    auto addr2Class = getAliasingClass(root2);
 
     if (!canAddrClassesAlias(addr1Class, addr2Class))
         return false;
@@ -975,17 +997,17 @@ bool canAddressesPotentiallyAlias(
         case AddressAliasingClass::BoundBuffer:
         case AddressAliasingClass::BoundTexture:
         case AddressAliasingClass::ConstantBuffer:
-            if (addr1 != addr2)
+            if (root1 != root2)
                 return false;
             break;
         }
     }
 
     // A param and a var can never alias.
-    if (addr1->getOp() == kIROp_Param && addr1->getParent() == func->getFirstBlock() &&
-            addr2->getOp() == kIROp_Var ||
-        addr1->getOp() == kIROp_Var && addr2->getOp() == kIROp_Param &&
-            addr2->getParent() == func->getFirstBlock())
+    if (root1->getOp() == kIROp_Param && root1->getParent() == func->getFirstBlock() &&
+            root2->getOp() == kIROp_Var ||
+        root1->getOp() == kIROp_Var && root2->getOp() == kIROp_Param &&
+            root2->getParent() == func->getFirstBlock())
         return false;
 
     // If one addr is user pointer and one addr is a var,
@@ -993,11 +1015,53 @@ bool canAddressesPotentiallyAlias(
     // the var.
     if (addr1Class == AddressAliasingClass::Var && addr2Class == AddressAliasingClass::UserPointer)
     {
-        return canVarAliasWithUserPointer(target, addr1);
+        return canVarAliasWithUserPointer(target, root1);
     }
     if (addr2Class == AddressAliasingClass::Var && addr1Class == AddressAliasingClass::UserPointer)
     {
-        return canVarAliasWithUserPointer(target, addr2);
+        return canVarAliasWithUserPointer(target, root2);
+    }
+
+    // If two addrs are rooted from the same object but found to statically differ in access chain,
+    // then they cannot alias.
+    if (root1 == root2)
+    {
+        List<IRInst*> accessChain1;
+        List<IRInst*> accessChain2;
+
+        // Since getRootBufferOrAddr has a different behavior around
+        // RWStructuredBufferGetElementPtr compared to getRootAddr,
+        // we need to call getRootAddr here again to get a simpler access chain
+        // that we can handle here, so that we don't need to handle the nuance
+        // of whether or not to trace past any RWStructuredBufferGetElementPtr.
+        //
+        root1 = getRootAddr(addr1, accessChain1, nullptr);
+        root2 = getRootAddr(addr2, accessChain2, nullptr);
+        if (root1 != root2)
+            return true;
+        for (Index i = 0; i < Math::Min(accessChain1.getCount(), accessChain2.getCount()); i++)
+        {
+            auto node1 = accessChain1[i];
+            auto node2 = accessChain2[i];
+            if (as<IRStructKey>(node1) && as<IRStructKey>(node2))
+            {
+                // Two different field keys means the two addresses cannot alias.
+                // TODO: If we are going to support union types, we need to exclude that
+                // here.
+                if (node1 != node2)
+                    return false;
+                // If the keys are the same, continue looking further down the access chain.
+                continue;
+            }
+            // Two different constant indices means the two addresses cannot alias.
+            auto index1 = as<IRIntLit>(node1);
+            auto index2 = as<IRIntLit>(node2);
+            if (index1 && index2 && index1->getValue() != index2->getValue())
+                return false;
+            // In all other cases, such as when either one of the indices is
+            // a untime value, we treat the two indices as potentially being the same.
+            return true;
+        }
     }
     return true;
 }
@@ -1129,13 +1193,13 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
     return false;
 }
 
-IRInst* getUndefInst(IRBuilder builder, IRModule* module)
+IRInst* getUnitPoisonVal(IRBuilder builder, IRModule* module)
 {
     IRInst* undefInst = nullptr;
 
     for (auto inst : module->getModuleInst()->getChildren())
     {
-        if (inst->getOp() == kIROp_Undefined && inst->getDataType() &&
+        if (inst->getOp() == kIROp_Poison && inst->getDataType() &&
             inst->getDataType()->getOp() == kIROp_VoidType)
         {
             undefInst = inst;
@@ -1146,7 +1210,7 @@ IRInst* getUndefInst(IRBuilder builder, IRModule* module)
     {
         auto voidType = builder.getVoidType();
         builder.setInsertAfter(voidType);
-        undefInst = builder.emitUndefined(voidType);
+        undefInst = builder.emitPoison(voidType);
     }
     return undefInst;
 }
@@ -1185,7 +1249,7 @@ IRInst* emitLoopBlocks(
     auto ifBreakBlock = loopBuilder.emitBlock();
     loopBreakBlock = loopBuilder.emitBlock();
     auto loopContinueBlock = loopBuilder.emitBlock();
-    builder->emitLoop(loopHeadBlock, loopBreakBlock, loopHeadBlock, 1, &initVal);
+    builder->emitLoop(loopHeadBlock, loopBreakBlock, loopContinueBlock, 1, &initVal);
     loopBuilder.setInsertInto(loopHeadBlock);
     auto loopParam = loopBuilder.emitParam(initVal->getFullType());
     auto cmpResult = loopBuilder.emitLess(loopParam, finalVal);
@@ -1668,6 +1732,7 @@ bool isGlobalOrUnknownMutableAddress(IRGlobalValueWithCode* parentFunc, IRInst* 
     case kIROp_GlobalConstant:
     case kIROp_Var:
     case kIROp_Param:
+    case kIROp_DebugVar:
         break;
     case kIROp_Call:
         return true;
@@ -1927,7 +1992,7 @@ List<IRBlock*> collectBlocksInRegion(
                 continue;
             if (!dom->dominates(firstBlock, succ))
                 continue;
-            if (!as<IRUnreachable>(breakBlock->getTerminator()))
+            if (!as<IRUnreachableBase>(breakBlock->getTerminator()))
             {
                 if (dom->dominates(breakBlock, succ))
                     continue;
@@ -2098,23 +2163,23 @@ UnownedStringSlice getBasicTypeNameHint(IRType* basicType)
     case kIROp_IntType:
         return UnownedStringSlice::fromLiteral("int");
     case kIROp_Int8Type:
-        return UnownedStringSlice::fromLiteral("int8");
+        return UnownedStringSlice::fromLiteral("int8_t");
     case kIROp_Int16Type:
-        return UnownedStringSlice::fromLiteral("int16");
+        return UnownedStringSlice::fromLiteral("int16_t");
     case kIROp_Int64Type:
-        return UnownedStringSlice::fromLiteral("int64");
+        return UnownedStringSlice::fromLiteral("int64_t");
     case kIROp_IntPtrType:
-        return UnownedStringSlice::fromLiteral("intptr");
+        return UnownedStringSlice::fromLiteral("intptr_t");
     case kIROp_UIntType:
         return UnownedStringSlice::fromLiteral("uint");
     case kIROp_UInt8Type:
-        return UnownedStringSlice::fromLiteral("uint8");
+        return UnownedStringSlice::fromLiteral("uint8_t");
     case kIROp_UInt16Type:
-        return UnownedStringSlice::fromLiteral("uint16");
+        return UnownedStringSlice::fromLiteral("uint16_t");
     case kIROp_UInt64Type:
-        return UnownedStringSlice::fromLiteral("uint64");
+        return UnownedStringSlice::fromLiteral("uint64_t");
     case kIROp_UIntPtrType:
-        return UnownedStringSlice::fromLiteral("uintptr");
+        return UnownedStringSlice::fromLiteral("uintptr_t");
     case kIROp_FloatType:
         return UnownedStringSlice::fromLiteral("float");
     case kIROp_HalfType:
@@ -2344,6 +2409,22 @@ IRType* getElementType(IRBuilder& builder, IRType* valueType)
     else if (auto hlslInputPatchType = as<IRHLSLInputPatchType>(valueType))
     {
         return hlslInputPatchType->getElementType();
+    }
+    return nullptr;
+}
+
+IRType* getFieldType(IRType* valueType, IRStructKey* key)
+{
+    valueType = (IRType*)unwrapAttributedType(valueType);
+    if (auto structType = as<IRStructType>(valueType))
+    {
+        for (auto field : structType->getFields())
+        {
+            if (field->getKey() == key)
+            {
+                return field->getFieldType();
+            }
+        }
     }
     return nullptr;
 }
@@ -2694,8 +2775,13 @@ bool isIROpaqueType(IRType* type)
     switch (type->getOp())
     {
     case kIROp_TextureType:
+    case kIROp_GLSLImageType:
     case kIROp_SamplerStateType:
     case kIROp_SamplerComparisonStateType:
+    case kIROp_SubpassInputType:
+    case kIROp_RaytracingAccelerationStructureType:
+    case kIROp_RayQueryType:
+    case kIROp_HitObjectType:
         return true;
     default:
         return false;
@@ -2707,6 +2793,7 @@ bool isPointerToImmutableLocation(IRInst* loc)
     switch (loc->getOp())
     {
     case kIROp_GetStructuredBufferPtr:
+    case kIROp_RWStructuredBufferGetElementPtr:
     case kIROp_ImageSubscript:
         return isPointerToImmutableLocation(loc->getOperand(0));
     default:
@@ -2742,6 +2829,8 @@ bool isPointerToImmutableLocation(IRInst* loc)
         case AddressSpace::UniformConstant:
             return true;
         }
+        if (ptrType->getAccessQualifier() == AccessQualifier::Immutable)
+            return true;
     }
     return false;
 }
@@ -2762,6 +2851,25 @@ bool canRelaxInstOrderRule(IRInst* inst, IRInst* useOfInst)
 {
     bool isSameBlock = (inst->getParent() == useOfInst->getParent());
     return isSameBlock && isGenericParameter(useOfInst) && (useOfInst->getDataType() == inst);
+}
+
+IRIntegerValue getInterfaceAnyValueSize(IRInst* type, SourceLoc usageLoc)
+{
+    SLANG_UNUSED(usageLoc);
+
+    if (auto decor = type->findDecoration<IRAnyValueSizeDecoration>())
+    {
+        return decor->getSize();
+    }
+
+    // We could conceivably make it an error to have an interface
+    // without an `[anyValueSize(...)]` attribute, but then we risk
+    // producing error messages even when doing 100% static specialization.
+    //
+    // It is simpler to use a reasonable default size and treat any
+    // type without an explicit attribute as using that size.
+    //
+    return kDefaultAnyValueSize;
 }
 
 } // namespace Slang

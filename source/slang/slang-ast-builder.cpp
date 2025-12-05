@@ -801,6 +801,28 @@ Val* ASTBuilder::getNoDiffModifierVal()
     return getOrCreate<NoDiffModifierVal>();
 }
 
+UIntSetVal* ASTBuilder::getUIntSetVal(const UIntSet& uintSet)
+{
+    // Convert UIntSet buffer to list of ConstantIntVals
+    List<ConstantIntVal*> bitmasks;
+    const auto& buffer = uintSet.getBuffer();
+    bitmasks.reserve(buffer.getCount());
+
+    for (Index i = 0; i < buffer.getCount(); i++)
+    {
+        auto element = buffer[i];
+        auto bitmask = getIntVal(getUInt64Type(), element);
+        bitmasks.add(bitmask);
+    }
+
+    return getOrCreate<UIntSetVal>(bitmasks);
+}
+
+CapabilitySetVal* ASTBuilder::getCapabilitySetVal(CapabilityName capability)
+{
+    return CapabilitySet{capability}.freeze(this);
+}
+
 FuncType* ASTBuilder::getFuncType(ArrayView<Type*> parameters, Type* result, Type* errorType)
 {
     if (!errorType)

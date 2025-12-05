@@ -600,28 +600,6 @@ SpvInst* emitOpLoad(
     return emitInst(parent, inst, SpvOpLoad, idResultType, kResultID, pointer, memoryAccess);
 }
 
-// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpLoad
-template<typename T1, typename T2>
-SpvInst* emitOpLoadAligned(
-    SpvInstParent* parent,
-    IRInst* inst,
-    const T1& idResultType,
-    const T2& pointer,
-    const SpvLiteralInteger& literalInteger)
-{
-    static_assert(isSingular<T1>);
-    static_assert(isSingular<T2>);
-    return emitInst(
-        parent,
-        inst,
-        SpvOpLoad,
-        idResultType,
-        kResultID,
-        pointer,
-        SpvMemoryAccessAlignedMask,
-        literalInteger);
-}
-
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpStore
 template<typename T1, typename T2>
 SpvInst* emitOpStore(
@@ -634,27 +612,6 @@ SpvInst* emitOpStore(
     static_assert(isSingular<T1>);
     static_assert(isSingular<T2>);
     return emitInst(parent, inst, SpvOpStore, pointer, object, memoryAccess);
-}
-
-// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpStore
-template<typename T1, typename T2>
-SpvInst* emitOpStoreAligned(
-    SpvInstParent* parent,
-    IRInst* inst,
-    const T1& pointer,
-    const T2& object,
-    const SpvLiteralInteger& literalInteger)
-{
-    static_assert(isSingular<T1>);
-    static_assert(isSingular<T2>);
-    return emitInst(
-        parent,
-        inst,
-        SpvOpStore,
-        pointer,
-        object,
-        SpvMemoryAccessAlignedMask,
-        literalInteger);
 }
 
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpAccessChain

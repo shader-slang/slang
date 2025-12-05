@@ -6,6 +6,8 @@ slang_add_target(
     USE_EXTRA_WARNINGS
     LINK_WITH_PRIVATE core
     INCLUDE_FROM_PUBLIC SPIRV-Headers::SPIRV-Headers
+    INCLUDE_DIRECTORIES_PRIVATE
+        ${CMAKE_CURRENT_BINARY_DIR}/../slang/slang-version-header
 )
 if(NOT MSVC)
     # This is necessary to compile the DXC headers

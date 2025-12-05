@@ -1,6 +1,7 @@
 name: Compile Regression-Test
 
 on:
+  workflow_dispatch:
   push:
     branches: [master]
     paths-ignore:
@@ -23,7 +24,7 @@ concurrency:
 jobs:
   build:
     timeout-minutes: 100
-    continue-on-error: true
+    continue-on-error: false
     strategy:
       fail-fast: false
       matrix:

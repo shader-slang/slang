@@ -225,6 +225,7 @@ static RefPtr<ExtensionTracker> _newExtensionTracker(CodeGenTarget target)
     {
     case CodeGenTarget::PTX:
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
         {
             return new CUDAExtensionTracker;
         }
@@ -1012,12 +1013,16 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
     // Compile
     ComPtr<IArtifact> artifact;
     auto downstreamStartTime = std::chrono::high_resolution_clock::now();
-    SLANG_RETURN_ON_FAIL(compiler->compile(options, artifact.writeRef()));
+    SlangResult compileResult = compiler->compile(options, artifact.writeRef());
     auto downstreamElapsedTime =
         (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() * 0.000000001;
     getSession()->addDownstreamCompileTime(downstreamElapsedTime);
 
+    // Extract diagnostics regardless of compile result
     SLANG_RETURN_ON_FAIL(passthroughDownstreamDiagnostics(getSink(), compiler, artifact));
+
+    // Now check if compile failed
+    SLANG_RETURN_ON_FAIL(compileResult);
 
     // Copy over all of the information associated with the source into the output
     if (sourceArtifact)
@@ -1216,7 +1221,9 @@ SlangResult CodeGenContext::emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     case CodeGenTarget::GLSL:
     case CodeGenTarget::HLSL:
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
     case CodeGenTarget::HostCPPSource:
     case CodeGenTarget::PyTorchCppBinding:
     case CodeGenTarget::CSource:

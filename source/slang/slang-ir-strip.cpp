@@ -16,6 +16,7 @@ static bool _shouldStripInst(IRInst* inst, IRStripOptions const& options)
         return false;
 
     case kIROp_HighLevelDeclDecoration:
+    case kIROp_InParamProxyVarDecoration:
         return true;
 
     case kIROp_NameHintDecoration:
@@ -66,7 +67,7 @@ void stripImportedWitnessTable(IRModule* module)
         default:
             continue;
         }
-        if (inst->getOp() != kIROp_WitnessTable)
+        if (!inst || inst->getOp() != kIROp_WitnessTable)
             continue;
         if (!globalInst->findDecoration<IRImportDecoration>())
             continue;

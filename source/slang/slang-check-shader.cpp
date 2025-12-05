@@ -604,7 +604,8 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         auto targetCaps = target->getTargetCaps();
         auto stageCapabilitySet = entryPoint->getProfile().getCapabilityName();
         targetCaps.join(stageCapabilitySet);
-        if (targetCaps.isIncompatibleWith(entryPointFuncDecl->inferredCapabilityRequirements))
+        if (targetCaps.isIncompatibleWith(
+                CapabilitySet{entryPointFuncDecl->inferredCapabilityRequirements}))
         {
             // Incompatable means we don't support a set of abstract atoms.
             // Diagnose that we lack support for 'stage' and 'target' atoms with our provided
@@ -666,11 +667,12 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             // Only attempt to error if a specific profile or capability is requested
             if ((specificCapabilityRequested || specificProfileRequested) &&
                 targetCaps.atLeastOneSetImpliedInOther(
-                    entryPointFuncDecl->inferredCapabilityRequirements) ==
+                    CapabilitySet{entryPointFuncDecl->inferredCapabilityRequirements}) ==
                     CapabilitySet::ImpliesReturnFlags::NotImplied)
             {
                 CapabilitySet combinedSets = targetCaps;
-                combinedSets.join(entryPointFuncDecl->inferredCapabilityRequirements);
+                combinedSets.join(
+                    CapabilitySet{entryPointFuncDecl->inferredCapabilityRequirements});
                 CapabilityAtomSet addedAtoms{};
                 if (auto targetCapSet = targetCaps.getAtomSets())
                 {
@@ -707,7 +709,8 @@ bool resolveStageOfProfileWithEntryPoint(
     if (auto entryPointAttr = entryPointFuncDecl->findModifier<EntryPointAttribute>())
     {
         auto entryPointProfileStage = entryPointProfile.getStage();
-        auto entryPointStage = getStageFromAtom(entryPointAttr->capabilitySet.getTargetStage());
+        auto entryPointStage =
+            getStageFromAtom(CapabilitySet{entryPointAttr->capabilitySet}.getTargetStage());
 
         // Ensure every target is specifying the same stage as an entry-point
         // if a profile+stage was set, else user will not be aware that their
@@ -740,7 +743,7 @@ bool resolveStageOfProfileWithEntryPoint(
                 entryPointFuncDecl->getName(),
                 entryPointProfileStage,
                 entryPointStage);
-        entryPointProfile.additionalCapabilities.add(entryPointAttr->capabilitySet);
+        entryPointProfile.additionalCapabilities.add(CapabilitySet{entryPointAttr->capabilitySet});
         return true;
     }
     return false;
@@ -826,7 +829,7 @@ Name* getReflectionName(VarDeclBase* varDecl)
     return varDecl->getName();
 }
 
-Type* getParamType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> paramDeclRef)
+Type* getParamValueType(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef)
 {
     auto paramType = getType(astBuilder, paramDeclRef);
     if (paramDeclRef.getDecl()->findModifier<NoDiffModifier>())
@@ -837,24 +840,33 @@ Type* getParamType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> paramDeclRef)
     return paramType;
 }
 
-Type* getParamTypeWithDirectionWrapper(ASTBuilder* astBuilder, DeclRef<VarDeclBase> paramDeclRef)
+Type* getParamTypeWithModeWrapper(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef)
 {
-    auto result = getParamType(astBuilder, paramDeclRef);
-    auto direction = getParameterDirection(paramDeclRef.getDecl());
-    switch (direction)
+    auto paramValueType = getParamValueType(astBuilder, paramDeclRef);
+    auto paramMode = getParamPassingMode(paramDeclRef.getDecl());
+    return getParamTypeWithModeWrapper(astBuilder, paramValueType, paramMode);
+}
+
+Type* getParamTypeWithModeWrapper(
+    ASTBuilder* astBuilder,
+    Type* paramValueType,
+    ParamPassingMode paramMode)
+{
+    switch (paramMode)
     {
     case ParamPassingMode::In:
-        return result;
+        return paramValueType;
     case ParamPassingMode::BorrowIn:
-        return astBuilder->getConstRefParamType(result);
+        return astBuilder->getConstRefParamType(paramValueType);
     case ParamPassingMode::Out:
-        return astBuilder->getOutParamType(result);
+        return astBuilder->getOutParamType(paramValueType);
     case ParamPassingMode::BorrowInOut:
-        return astBuilder->getBorrowInOutParamType(result);
+        return astBuilder->getBorrowInOutParamType(paramValueType);
     case ParamPassingMode::Ref:
-        return astBuilder->getRefParamType(result);
+        return astBuilder->getRefParamType(paramValueType);
     default:
-        return result;
+        SLANG_UNEXPECTED("unhandled parameter-passing mode");
+        UNREACHABLE_RETURN(paramValueType);
     }
 }
 

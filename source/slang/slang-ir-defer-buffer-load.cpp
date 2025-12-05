@@ -151,9 +151,19 @@ struct DeferBufferLoadContext
 
     void deferBufferLoadInst(IRBuilder& builder, List<IRInst*>& workList, IRInst* loadInst)
     {
+        bool failDueToAttributeFound = false;
+        for (auto attr : loadInst->getAllAttrs())
+        {
+            if (as<IRAlignedAttr>(attr) || as<IRMemoryScopeAttr>(attr))
+            {
+                failDueToAttributeFound = true;
+                break;
+            }
+        }
+
         // Don't defer the load anymore if the type is simple.
-        if (!isTypePreferrableToDeferLoad(codeGenContext, loadInst->getDataType()) ||
-            loadInst->findAttr<IRAlignedAttr>())
+        if (failDueToAttributeFound ||
+            !isTypePreferrableToDeferLoad(codeGenContext, loadInst->getDataType()))
         {
             return;
         }
@@ -302,7 +312,7 @@ struct DeferBufferLoadContext
     }
 };
 
-void deferBufferLoad(CodeGenContext* codeGenContext, IRModule* module)
+void deferBufferLoad(IRModule* module, CodeGenContext* codeGenContext)
 {
     DeferBufferLoadContext context;
     context.codeGenContext = codeGenContext;

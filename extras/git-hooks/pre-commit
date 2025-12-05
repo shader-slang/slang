@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+
+# Pre-commit hook to automatically format staged files
+# This hook will run the appropriate formatters based on which file types
+# are being committed and re-stage the formatted files.
+
+set -e
+
+# Get the repository root
+REPO_ROOT=$(git rev-parse --show-toplevel)
+FORMAT_SCRIPT="$REPO_ROOT/extras/formatting.sh"
+
+# Check if formatting script exists
+if [ ! -x "$FORMAT_SCRIPT" ]; then
+  echo "Warning: formatting script not found at $FORMAT_SCRIPT"
+  exit 0
+fi
+
+# Get list of staged files
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACMR)
+
+if [ -z "$STAGED_FILES" ]; then
+  exit 0
+fi
+
+# Determine which file types are staged
+has_cpp=0
+has_yaml=0
+has_md=0
+has_sh=0
+has_cmake=0
+
+while IFS= read -r file; do
+  case "$file" in
+    *.cpp|*.hpp|*.c|*.h)
+      has_cpp=1
+      ;;
+    *.yaml|*.yml|*.json)
+      has_yaml=1
+      ;;
+    *.md)
+      has_md=1
+      ;;
+    *.sh)
+      has_sh=1
+      ;;
+    *.cmake|CMakeLists.txt)
+      has_cmake=1
+      ;;
+  esac
+done <<< "$STAGED_FILES"
+
+# Build the formatter command with appropriate flags
+format_args=()
+
+if [ $has_cpp -eq 1 ]; then
+  format_args+=(--cpp)
+fi
+
+if [ $has_yaml -eq 1 ]; then
+  format_args+=(--yaml)
+fi
+
+if [ $has_md -eq 1 ]; then
+  format_args+=(--md)
+fi
+
+if [ $has_sh -eq 1 ]; then
+  format_args+=(--sh)
+fi
+
+if [ $has_cmake -eq 1 ]; then
+  format_args+=(--cmake)
+fi
+
+# If we have files to format, run the formatter
+if [ ${#format_args[@]} -gt 0 ]; then
+  echo "Formatting staged files..."
+
+  # Run formatter on modified files
+  if ! "$FORMAT_SCRIPT" "${format_args[@]}" --modified --no-version-check; then
+    echo "Error: Formatting failed"
+    exit 1
+  fi
+
+  # Re-stage any files that were formatted
+  # Only re-add files that were originally staged
+  while IFS= read -r file; do
+    if [ -f "$file" ]; then
+      git add "$file"
+    fi
+  done <<< "$STAGED_FILES"
+
+  echo "Formatting complete. Modified files have been re-staged."
+fi
+
+exit 0

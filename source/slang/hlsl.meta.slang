@@ -551,7 +551,7 @@ extension<T:__BuiltinArithmeticType> T : ITexelElement
     __intrinsic_op(0) __init(Element x);
 }
 
-${{{
+${
 // Scalar types that can be used as texel element.
 const char* texeElementScalarTypes[] = {
     "half",
@@ -565,16 +565,16 @@ const char* texeElementScalarTypes[] = {
 };
 for (auto elementType : texeElementScalarTypes)
 {
-}}}
+$}
 extension<int N> vector<$(elementType), N> : ITexelElement
 {
     typealias Element = $(elementType);
     static const int elementCount = N;
     __intrinsic_op($(kIROp_MakeVectorFromScalar)) __init(Element x);
 }
-${{{
+${
 } // end for texelElementScalarTypes.
-}}}
+$}
 
 // Additional 64-bit types that can be used as texel element.
 extension double:ITexelElement
@@ -698,8 +698,48 @@ struct _Texture<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let is
 }
 
 //@hidden:
-// Combined texture sampler specific functions
 
+// Returns true when the stage supports implicit derivatives on the
+// target. This must match with capability `implicit_derivatives_sampling`.
+//
+[__readNone]
+[ForceInline]
+bool __targetHasImplicitDerivatives()
+{
+    __stage_switch
+    {
+    case fragment:
+        return true;
+
+    case _amplification:
+    case _anyhit:
+    case _callable:
+    case _closesthit:
+    case _intersection:
+    case _mesh:
+    case _miss:
+    case _raygen:
+    case compute:
+        __target_switch
+        {
+        case _GL_NV_compute_shader_derivatives:
+        case SPV_KHR_compute_shader_derivatives:
+        case _sm_6_6:
+            return true;
+
+        case hlsl:
+        case glsl:
+        case spirv:
+        default:
+            return false;
+        }
+
+    default:
+        return false;
+    }
+}
+
+// Combined texture sampler specific functions
 [require(glsl, texture_sm_4_1)]
 float __glsl_texture<TSampler, TCoord>(TSampler s, TCoord value)
 {
@@ -721,7 +761,7 @@ float __glsl_texture_1d_shadow<TSampler, TCoord>(TSampler s, TCoord value)
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
 [require(glsl, texture_shadowlod)]
-float __glsl_texture_3d_array_shadow<TSampler, TCoord>(TSampler s, TCoord value, float compare)
+float __glsl_texture_cube_array_shadow<TSampler, TCoord>(TSampler s, TCoord value, float compare)
 {
     __target_switch
     {
@@ -771,6 +811,16 @@ float __glsl_texture_level_1d_shadow<TSampler, TCoord>(TSampler s, TCoord value,
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
 [require(glsl, texture_shadowlod)]
+float __glsl_texture_level_cube_array_shadow<TSampler, TCoord>(TSampler s, TCoord value, float comparison, float level)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureLod($0, $1, $2, $3)";
+    }
+}
+
+__glsl_extension(GL_EXT_texture_shadow_lod)
+[require(glsl, texture_shadowlod)]
 float __glsl_texture_level_offset<TSampler, TCoord, TOffset>(TSampler s, TCoord value, float level, constexpr TOffset offset)
 {
     __target_switch
@@ -810,7 +860,7 @@ float __glsl_texture_1d_shadow<TTexture, TCoord>(TTexture t, SamplerComparisonSt
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
 [require(glsl, texture_shadowlod)]
-float __glsl_texture_3d_array_shadow<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value, float compare)
+float __glsl_texture_cube_array_shadow<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value, float compare)
 {
     __target_switch
     {
@@ -858,6 +908,16 @@ float __glsl_texture_level_1d_shadow<TTexture, TCoord>(TTexture t,SamplerCompari
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
 [require(glsl, texture_shadowlod)]
+float __glsl_texture_level_cube_array_shadow<TTexture, TCoord>(TTexture t,SamplerComparisonState s, TCoord value, float compare, float level)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureLod($p, $2, $3, $4)";
+    }
+}
+
+__glsl_extension(GL_EXT_texture_shadow_lod)
+[require(glsl, texture_shadowlod)]
 float __glsl_texture_level_offset<TTexture, TCoord, TOffset>(TTexture t,SamplerComparisonState s, TCoord value, float level, constexpr TOffset offset)
 {
     __target_switch
@@ -879,6 +939,43 @@ float __glsl_texture_level_offset_1d_shadow<TTexture, TCoord, TOffset>(TTexture 
 __intrinsic_op($(kIROp_MetalCastToDepthTexture))
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
 _Texture<T,Shape,isArray,isMS,sampleCount,access,1,isCombined,format> __metal_asDepthTexture(_Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> tex);
+
+[require(wgsl)]
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
+void __wgsl_check_texture_type()
+{
+    // Texel element type checks
+    static_assert(
+        T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4> ||
+        T is int   || T is vector<int,  2> || T is vector<int,  3> || T is vector<int,  4> ||
+        T is uint  || T is vector<uint, 2> || T is vector<uint, 3> || T is vector<uint, 4>
+        , "WGSL supports only f32/i32/u32 type textures");
+    static_assert(isShadow == 0 || T is float
+        , "WGSL depth textures must be scalar f32");
+
+    // Array types
+    static_assert(isArray == 0 || isMS == 0
+        , "WGSL does not support multisampled texture arrays");
+    static_assert(isArray == 0 || Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE)
+        , "WGSL array texture shape must be either 2D or Cube");
+
+    // Depth texture shapes
+    static_assert(isShadow == 0 || Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE)
+        , "WGSL depth texture shape must be either 2D or Cube");
+
+    // Multisampled texture shapes
+    static_assert(isMS == 0 || Shape.flavor == $(SLANG_TEXTURE_2D)
+        , "WGSL multisampled texture shape must be 2D");
+}
+
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
+void __wgsl_check_texture_type_texel_offset()
+{
+     __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+
+     static_assert(Shape.flavor != $(SLANG_TEXTURE_2D) || Shape.flavor != $(SLANG_TEXTURE_3D)
+         , "WGSL texture shape must be 2D or 3D when sampling with texel offsets");
+}
 
 //@public:
 
@@ -952,26 +1049,40 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         }
     }
 
-    /// Samples the texture at the given location.
+    /// Samples the texture at a given location using implicit level of detail.
     ///
     ///@param s The `SamplerState` to use for the sampling operation. This parameter is omitted when `this` is a combined texture sampler type (`isCombined == 0`).
     ///@param location The location to sample the texture at.
     ///@param offset Texel offset to apply.
-    ///@param clamp The max level of detail to use.
+    ///@param clamp The maximum level of detail to use.
     ///@param[out] status The result status of the operation.
     ///                   This parameter is currently only used when targeting HLSL.
     ///                   For other targets, the result status is always 0.
     ///@return The sampled texture value.
-    ///@see `SampleBias`, `SampleLevel`, `SampleGrad`, `SampleCmp`, `SampleCmpLevelZero`, `SampleCmpLevel`.
+    ///
+    /// `location` is a vector of floats as follows:
+    /// - For 1d/2d/3d-textures, the vector is a 1d/2d/3d-vector specifying the sample location. Usually, normalized coordinates are used
+    ///   such that the coordinate range `[0, 1]` denotes the full span of the texture. Depending on the sampler state and the sampled texture type,
+    ///   other conventions may also be used. For example, `GL_TEXTURE_RECTANGLE` uses non-normalized texel locations.
+    /// - For cube textures, the location is a 3d-vector specifying the direction from the center of the cube at the sample. The direction
+    ///   does not need to be normalized.
+    /// - For texture arrays, the location vector is appended with the array index. The array
+    ///   index (float) is first rounded to the nearest integer value and then clamped to `[0, d-1]` where `d` is the number of array elements.
+    ///
     ///@remarks
     /// The `Sample` function is defined for all read-only texture types, including
     /// `Texture1D`, `Texture2D`, `Texture3D`, `TextureCube`,
     /// `Texture1DArray`, `Texture2DArray` and `TextureCubeArray`.
     ///
-    /// The function is not available for read-write texture types.
+    /// This function requires the implicit sampling derivatives, which are always available in the fragment stage. In other stages, the derivatives
+    /// are enabled on the target using the appropriate target extensions as necessary. It is an error to use this function when
+    /// implicit derivatives cannot be enabled. See also capability `GL_NV_compute_shader_derivatives`.
+    ///
+    /// This function is not available for read-write and write-only texture types.
     ///
     /// For HLSL/D3D targets, the texture element type must be a scalar or vector of float or half types.
     ///
+    ///@see `SampleBias`, `SampleLevel`, `SampleLevelZero`, `SampleGrad`, `SampleCmp`, `SampleCmpLevelZero`, `SampleCmpLevel`, `SampleCmpBias`, `SampleCmpGrad`.
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0_fragment)]
@@ -1224,7 +1335,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             }
             else if (Shape.dimensions == 3 && isArray == 1)
             {
-                return __glsl_texture_3d_array_shadow(this, location, compareValue);
+                return __glsl_texture_cube_array_shadow(this, location, compareValue);
             }
             else
             {
@@ -1261,6 +1372,27 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             return __getTexture().SampleCmpLevelZero(__getComparisonSampler(), location, compareValue);
         case wgsl:
             return __getTexture().SampleCmpLevelZero(__getComparisonSampler(), location, compareValue);
+        case glsl:
+            if (!__targetHasImplicitDerivatives())
+            {
+                if (Shape.dimensions == 1 && isArray == 0)
+                {
+                    return __glsl_texture_1d_shadow(this, __makeVector(__makeVector(location, 0.0), compareValue));
+                }
+                else if (Shape.dimensions == 3 && isArray == 1)
+                {
+                    return __glsl_texture_cube_array_shadow(this, location, compareValue);
+                }
+                else
+                {
+                    return __glsl_texture(this, __makeVector(location, compareValue));
+                }
+            }
+            else
+            {
+                return SampleCmpLevel(location, compareValue, 0.0);
+            }
+
         default:
             return SampleCmpLevel(location, compareValue, 0.0);
         }
@@ -1344,6 +1476,22 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             return __getTexture().SampleCmpLevelZero(__getComparisonSampler(), location, compareValue, offset);
         case wgsl:
             return __getTexture().SampleCmpLevelZero(__getComparisonSampler(), location, compareValue, offset);
+        case glsl:
+            if (!__targetHasImplicitDerivatives())
+            {
+                if (Shape.dimensions == 1 && isArray == 0)
+                {
+                    return __glsl_texture_offset_1d_shadow(this, __makeVector(__makeVector(location, 0.0), compareValue), offset);
+                }
+                else
+                {
+                    return __glsl_texture_offset(this, __makeVector(location, compareValue), offset);
+                }
+            }
+            else
+            {
+                return SampleCmpLevel(location, compareValue, 0.0, offset);
+            }
         default:
             return SampleCmpLevel(location, compareValue, 0.0, offset);
         }
@@ -1377,6 +1525,10 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             if (Shape.dimensions == 1 && isArray == 0)
             {
                 return __glsl_texture_level_1d_shadow(this, __makeVector(__makeVector(location, 0.0), compareValue), level);
+            }
+            else if (Shape.dimensions == 3 && isArray == 1)
+            {
+                return __glsl_texture_level_cube_array_shadow(this, location, compareValue, level);
             }
             else
             {
@@ -1447,6 +1599,150 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 %sparseResultType = OpTypeStruct $$uint $$float;
 
                 %sparseResult:%sparseResultType = OpImageSparseSampleDrefExplicitLod $this $location $compareValue Lod|ConstOffset $level $offset;
+
+                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                OpStore &status %residentCode;
+                result:$$float = OpCompositeExtract %sparseResult 1;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpGrad(vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
+    {
+        static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmpGrad(__getComparisonSampler(), location, compareValue, gradX, gradY);
+        case spirv:
+            return spirv_asm
+            {
+                result:$$float = OpImageSampleDrefExplicitLod $this $location $compareValue Grad $gradX $gradY;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpGrad(vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
+        static_assert(!(Shape is __ShapeCube), "SampleCmpGrad with offset is not supported for TextureCube or TextureCubeArray");
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmpGrad(__getComparisonSampler(), location, compareValue, gradX, gradY, offset);
+        case spirv:
+            return spirv_asm
+            {
+                result:$$float = OpImageSampleDrefExplicitLod $this $location $compareValue Grad|ConstOffset $gradX $gradY $offset;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpGrad(vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
+    {
+        static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
+        static_assert(!(Shape is __ShapeCube), "SampleCmpGrad with offset is not supported for TextureCube or TextureCubeArray");
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmpGrad(__getComparisonSampler(), location, compareValue, gradX, gradY, offset, status);
+        case spirv:
+            return spirv_asm
+            {
+                OpCapability SparseResidency;
+                %sparseResultType = OpTypeStruct $$uint $$float;
+
+                %sparseResult:%sparseResultType = OpImageSparseSampleDrefExplicitLod $this $location $compareValue Grad|ConstOffset $gradX $gradY $offset;
+
+                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                OpStore &status %residentCode;
+                result:$$float = OpCompositeExtract %sparseResult 1;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpBias(vector<float, Shape.dimensions+isArray> location, float compareValue, float bias)
+    {
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmpBias(__getComparisonSampler(), location, compareValue, bias);
+        case spirv:
+            return spirv_asm
+            {
+                result:$$float = OpImageSampleDrefImplicitLod $this $location $compareValue Bias $bias;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpBias(vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmpBias(__getComparisonSampler(), location, compareValue, bias, offset);
+        case spirv:
+            return spirv_asm
+            {
+                result:$$float = OpImageSampleDrefImplicitLod $this $location $compareValue Bias|ConstOffset $bias $offset;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpBias(vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
+    {
+        static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmpBias(__getComparisonSampler(), location, compareValue, bias, offset, status);
+        case spirv:
+            return spirv_asm
+            {
+                OpCapability SparseResidency;
+                %sparseResultType = OpTypeStruct $$uint $$float;
+
+                %sparseResult:%sparseResultType = OpImageSparseSampleDrefImplicitLod $this $location $compareValue Bias|ConstOffset $bias $offset;
 
                 %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
                 OpStore &status %residentCode;
@@ -1682,6 +1978,70 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             };
         }
     }
+
+    /// Samples the texture at a given location using MIP level 0.
+    ///
+    ///@param s The `SamplerState` to use for the sampling operation. This parameter is omitted when `this` is a combined texture sampler type (`isCombined == 0`).
+    ///@param location The location to sample the texture at.
+    ///@param offset Texel offset to apply.
+    ///@param[out] status The result status of the operation.
+    ///                   This parameter is currently only used when targeting HLSL.
+    ///                   For other targets, the result status is always 0.
+    ///@return The sampled texture value.
+    ///
+    /// See `Sample()` for the full specification.
+    ///
+    ///@remarks
+    /// When targeting GLSL, depending on whether implicit derivatives are enabled, this function translates to `texture()` (derivatives disabled)
+    /// or `textureLod()` (derivatives enabled). This allows the use of texture types in stages without implicit derivatives that would otherwise
+    /// be unusable due to the missing `textureLod()` variants.
+    ///
+    ///@see `Sample`, `SampleBias`, `SampleLevel`, `SampleGrad`, `SampleCmp`, `SampleCmpLevelZero`, `SampleCmpLevel`, `GL_NV_compute_shader_derivatives`.
+    [__readNone]
+    [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
+    T SampleLevelZero(vector<float, Shape.dimensions+isArray> location)
+    {
+        __target_switch
+        {
+        case glsl:
+            if (!__targetHasImplicitDerivatives())
+                __intrinsic_asm "$ctexture($0, $1)$z";
+            break;
+
+        default:
+            break;
+        }
+
+        return SampleLevel(location, 0.0f);
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
+    T SampleLevelZero(vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        __target_switch
+        {
+        case glsl:
+            if (!__targetHasImplicitDerivatives())
+                __intrinsic_asm "$ctextureOffset($0, $1, $2)$z";
+            break;
+
+        default:
+            break;
+        }
+
+        return SampleLevel(location, 0.0f, offset);
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, sm_5_0)]
+    T SampleLevelZero(vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
+    {
+        return SampleLevel(location, 0.0f, offset, status);
+    }
 }
 
 // Non-combined texture types specific functions
@@ -1877,6 +2237,11 @@ float __metal_SampleCmpLevel(_Texture<T,Shape,isArray,isMS,sampleCount,0,1,0,for
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int, let format:int>
 extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 {
+    //@hidden:
+    static const int access = 0;
+    static const int isCombined = 0;
+
+    //@public:
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0_fragment)]
@@ -1959,8 +2324,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     __truncate $$T result __sampledType(T) %sampled;
                 };
             case wgsl:
-                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
-                    , "WGSL supports only f32 type textures");
+                __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+
                 if (isArray == 1)
                 {
                     switch (Shape.flavor)
@@ -1971,6 +2336,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                         __intrinsic_asm "textureSample($0, $1, ($2).xy, i32(($2).z))$z";
                     case $(SLANG_TEXTURE_CUBE):
                         __intrinsic_asm "textureSample($0, $1, ($2).xyz, i32(($2).w))$z";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
                     }
                 }
                 __intrinsic_asm "textureSample($0, $1, $2)$z";
@@ -2023,18 +2390,17 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     __truncate $$T result __sampledType(T) %sampled;
                 };
             case wgsl:
-                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
-                    , "WGSL supports only f32 type textures");
+                __wgsl_check_texture_type_texel_offset<
+                    T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+
                 if (isArray == 1)
                 {
                     switch (Shape.flavor)
                     {
-                    case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "textureSample($0, $1, ($2).x, i32(($2).y), $3)$z";
                     case $(SLANG_TEXTURE_2D):
                         __intrinsic_asm "textureSample($0, $1, ($2).xy, i32(($2).z), $3)$z";
-                    case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "textureSample($0, $1, ($2).xyz, i32(($2).w), $3)$z";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
                     }
                 }
                 __intrinsic_asm "textureSample($0, $1, $2, $3)$z";
@@ -2171,18 +2537,18 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     __truncate $$T result __sampledType(T) %sampled;
                 };
             case wgsl:
-                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
-                    , "WGSL supports only f32 type textures");
+                __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+
                 if (isArray == 1)
                 {
                     switch (Shape.flavor)
                     {
-                    case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "textureSampleBias($0, $1, ($2).x, i32(($2).y), $3)$z";
                     case $(SLANG_TEXTURE_2D):
                         __intrinsic_asm "textureSampleBias($0, $1, ($2).xy, i32(($2).z), $3)$z";
                     case $(SLANG_TEXTURE_CUBE):
                         __intrinsic_asm "textureSampleBias($0, $1, ($2).xyz, i32(($2).w), $3)$z";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
                     }
                 }
                 __intrinsic_asm "textureSampleBias($0, $1, $2, $3)$z";
@@ -2234,18 +2600,16 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     __truncate $$T result __sampledType(T) %sampled;
                 };
             case wgsl:
-                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
-                    , "WGSL supports only f32 type textures");
+                __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+
                 if (isArray == 1)
                 {
                     switch (Shape.flavor)
                     {
-                    case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "textureSampleBias($0, $1, ($2).x, i32(($2).y), $3, $4)$z";
                     case $(SLANG_TEXTURE_2D):
                         __intrinsic_asm "textureSampleBias($0, $1, ($2).xy, i32(($2).z), $3, $4)$z";
-                    case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "textureSampleBias($0, $1, ($2).xyz, i32(($2).w), $3, $4)$z";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
                     }
                 }
                 __intrinsic_asm "textureSampleBias($0, $1, $2, $3, $4)$z";
@@ -2298,7 +2662,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             }
             else if (Shape.dimensions == 3 && isArray == 1)
             {
-                return __glsl_texture_3d_array_shadow(this, s, location, compareValue);
+                return __glsl_texture_cube_array_shadow(this, s, location, compareValue);
             }
             else
             {
@@ -2318,18 +2682,18 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 result:$$float = OpImageSampleDrefImplicitLod %sampledImage $location $compareValue;
             };
         case wgsl:
-            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
-                , "WGSL supports only f32 type textures");
+            __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+
             if (isArray == 1)
             {
                 switch (Shape.flavor)
                 {
-                case $(SLANG_TEXTURE_1D):
-                    __intrinsic_asm "textureSampleCompare($0, $1, ($2).x, i32(($2).y), $3)";
                 case $(SLANG_TEXTURE_2D):
                     __intrinsic_asm "textureSampleCompare($0, $1, ($2).xy, i32(($2).z), $3)";
                 case $(SLANG_TEXTURE_CUBE):
                     __intrinsic_asm "textureSampleCompare($0, $1, ($2).xyz, i32(($2).w), $3)";
+                default:
+                    __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
                 }
             }
             __intrinsic_asm "textureSampleCompare($0, $1, $2, $3)";
@@ -2349,18 +2713,18 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".SampleCmpLevelZero";
         case wgsl:
-            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
-                , "WGSL supports only f32 type textures");
+            __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+
             if (isArray == 1)
             {
                 switch (Shape.flavor)
                 {
-                case $(SLANG_TEXTURE_1D):
-                    __intrinsic_asm "textureSampleCompareLevel($0, $1, ($2).x, i32(($2).y), $3)";
                 case $(SLANG_TEXTURE_2D):
                     __intrinsic_asm "textureSampleCompareLevel($0, $1, ($2).xy, i32(($2).z), $3)";
                 case $(SLANG_TEXTURE_CUBE):
                     __intrinsic_asm "textureSampleCompareLevel($0, $1, ($2).xyz, i32(($2).w), $3)";
+                default:
+                    __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
                 }
             }
             __intrinsic_asm "textureSampleCompareLevel($0, $1, $2, $3)";
@@ -2400,18 +2764,16 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 result:$$float = OpImageSampleDrefImplicitLod %sampledImage $location $compareValue ConstOffset $offset;
             };
         case wgsl:
-            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
-                , "WGSL supports only f32 type textures");
+            __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+
             if (isArray == 1)
             {
                 switch (Shape.flavor)
                 {
-                case $(SLANG_TEXTURE_1D):
-                    __intrinsic_asm "textureSampleCompare($0, $1, ($2).x, i32(($2).y), $3, $4)";
                 case $(SLANG_TEXTURE_2D):
                     __intrinsic_asm "textureSampleCompare($0, $1, ($2).xy, i32(($2).z), $3, $4)";
-                case $(SLANG_TEXTURE_CUBE):
-                    __intrinsic_asm "textureSampleCompare($0, $1, ($2).xyz, i32(($2).w), $3, $4)";
+                default:
+                    __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
                 }
             }
             __intrinsic_asm "textureSampleCompare($0, $1, $2, $3, $4)";
@@ -2461,18 +2823,16 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".SampleCmpLevelZero";
         case wgsl:
-            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
-                , "WGSL supports only f32 type textures");
+            __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+
             if (isArray == 1)
             {
                 switch (Shape.flavor)
                 {
-                case $(SLANG_TEXTURE_1D):
-                    __intrinsic_asm "textureSampleCompareLevel($0, $1, ($2).x, i32(($2).y), $3, $4)";
                 case $(SLANG_TEXTURE_2D):
                     __intrinsic_asm "textureSampleCompareLevel($0, $1, ($2).xy, i32(($2).z), $3, $4)";
-                case $(SLANG_TEXTURE_CUBE):
-                    __intrinsic_asm "textureSampleCompareLevel($0, $1, ($2).xyz, i32(($2).w), $3, $4)";
+                default:
+                    __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
                 }
             }
             __intrinsic_asm "textureSampleCompareLevel($0, $1, $2, $3, $4)";
@@ -2509,6 +2869,10 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             if (Shape.dimensions == 1 && isArray == 0)
             {
                 return __glsl_texture_level_1d_shadow(this, s, __makeVector(__makeVector(location, 0.0), compareValue), level);
+            }
+            else if (Shape.dimensions == 3 && isArray == 1)
+            {
+                return __glsl_texture_level_cube_array_shadow(this, s, location, compareValue, level);
             }
             else
             {
@@ -2592,6 +2956,156 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpGrad(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
+    {
+        static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleCmpGrad";
+        case spirv:
+            return spirv_asm
+            {
+                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
+                result:$$float = OpImageSampleDrefExplicitLod %sampledImage $location $compareValue Grad $gradX $gradY;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpGrad(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
+        static_assert(!(Shape is __ShapeCube), "SampleCmpGrad with offset is not supported for TextureCube or TextureCubeArray");
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleCmpGrad";
+        case spirv:
+            return spirv_asm
+            {
+                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
+                result:$$float = OpImageSampleDrefExplicitLod %sampledImage $location $compareValue Grad|ConstOffset $gradX $gradY $offset;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpGrad(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
+    {
+        static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
+        static_assert(!(Shape is __ShapeCube), "SampleCmpGrad with offset is not supported for TextureCube or TextureCubeArray");
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleCmpGrad";
+        case spirv:
+            return spirv_asm
+            {
+                OpCapability SparseResidency;
+                %sparseResultType = OpTypeStruct $$uint $$float;
+                %sampledImage:__sampledImageType(this) = OpSampledImage $this $s;
+
+                %sparseResult:%sparseResultType = OpImageSparseSampleDrefExplicitLod %sampledImage $location $compareValue Grad|ConstOffset $gradX $gradY $offset;
+
+                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                OpStore &status %residentCode;
+                result:$$float = OpCompositeExtract %sparseResult 1;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpBias(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float bias)
+    {
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleCmpBias";
+        case spirv:
+            return spirv_asm
+            {
+                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
+                result:$$float = OpImageSampleDrefImplicitLod %sampledImage $location $compareValue Bias $bias;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpBias(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleCmpBias";
+        case spirv:
+            return spirv_asm
+            {
+                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
+                result:$$float = OpImageSampleDrefImplicitLod %sampledImage $location $compareValue Bias|ConstOffset $bias $offset;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpBias(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
+    {
+        static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleCmpBias";
+        case spirv:
+            return spirv_asm
+            {
+                OpCapability SparseResidency;
+                %sparseResultType = OpTypeStruct $$uint $$float;
+                %sampledImage:__sampledImageType(this) = OpSampledImage $this $s;
+
+                %sparseResult:%sparseResultType = OpImageSparseSampleDrefImplicitLod %sampledImage $location $compareValue Bias|ConstOffset $bias $offset;
+
+                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                OpStore &status %residentCode;
+                result:$$float = OpCompositeExtract %sparseResult 1;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
     [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
     T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
     {
@@ -2639,18 +3153,18 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     __truncate $$T result __sampledType(T) %sampled;
                 };
             case wgsl:
-                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
-                    , "WGSL supports only f32 type textures");
+                __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+
                 if (isArray == 1)
                 {
                     switch (Shape.flavor)
                     {
-                    case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "textureSampleGrad($0, $1, ($2).x, i32(($2).y), $3, $4)$z";
                     case $(SLANG_TEXTURE_2D):
                         __intrinsic_asm "textureSampleGrad($0, $1, ($2).xy, i32(($2).z), $3, $4)$z";
                     case $(SLANG_TEXTURE_CUBE):
                         __intrinsic_asm "textureSampleGrad($0, $1, ($2).xyz, i32(($2).w), $3, $4)$z";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
                     }
                 }
                 __intrinsic_asm "textureSampleGrad($0, $1, $2, $3, $4)$z";
@@ -2703,18 +3217,16 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
                 };
             case wgsl:
-                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
-                    , "WGSL supports only f32 type textures");
+                __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+
                 if (isArray == 1)
                 {
                     switch (Shape.flavor)
                     {
-                    case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "textureSampleGrad($0, $1, ($2).x, i32(($2).y), $3, $4, $5)$z";
                     case $(SLANG_TEXTURE_2D):
                         __intrinsic_asm "textureSampleGrad($0, $1, ($2).xy, i32(($2).z), $3, $4, $5)$z";
-                    case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "textureSampleGrad($0, $1, ($2).xyz, i32(($2).w), $3, $4, $5)$z";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
                     }
                 }
                 __intrinsic_asm "textureSampleGrad($0, $1, $2, $3, $4, $5)$z";
@@ -2882,18 +3394,18 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     __truncate $$T result __sampledType(T) %sampled;
                 };
             case wgsl:
-                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
-                    , "WGSL supports only f32 type textures");
+                __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+
                 if (isArray == 1)
                 {
                     switch (Shape.flavor)
                     {
-                    case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "textureSampleLevel($0, $1, ($2).x, i32(($2).y), $3)$z";
                     case $(SLANG_TEXTURE_2D):
                         __intrinsic_asm "textureSampleLevel($0, $1, ($2).xy, i32(($2).z), $3)$z";
                     case $(SLANG_TEXTURE_CUBE):
                         __intrinsic_asm "textureSampleLevel($0, $1, ($2).xyz, i32(($2).w), $3)$z";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
                     }
                 }
                 __intrinsic_asm "textureSampleLevel($0, $1, $2, $3)$z";
@@ -2946,18 +3458,16 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     __truncate $$T result __sampledType(T) %sampled;
                 };
             case wgsl:
-                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
-                    , "WGSL supports only f32 type textures");
+                __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+
                 if (isArray == 1)
                 {
                     switch (Shape.flavor)
                     {
-                    case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "textureSampleLevel($0, $1, ($2).x, i32(($2).y), $3, $4)$z";
                     case $(SLANG_TEXTURE_2D):
                         __intrinsic_asm "textureSampleLevel($0, $1, ($2).xy, i32(($2).z), $3, $4)$z";
-                    case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "textureSampleLevel($0, $1, ($2).xyz, i32(($2).w), $3, $4)$z";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
                     }
                 }
                 __intrinsic_asm "textureSampleLevel($0, $1, $2, $3, $4)$z";
@@ -2995,7 +3505,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 }
 
 // Texture.GetDimensions and Sampler.GetDimensions
-${{{{
+${
 const char* kTextureShapeTypeNames[] = {
     "__Shape1D", "__Shape2D", "__Shape3D", "__ShapeCube"};
 for (int shapeIndex = 0; shapeIndex < 4; shapeIndex++)
@@ -3013,19 +3523,19 @@ for (int isMS = 0; isMS <= 1; isMS++) {
     }
     auto shapeTypeName = kTextureShapeTypeNames[shapeIndex];
     TextureTypeInfo textureTypeInfo(kBaseTextureShapes[shapeIndex], isArray, isMS, 0, sb, path);
-}}}}
+$}
 
 __generic<T:ITexelElement, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
 extension _Texture<T,$(shapeTypeName),$(isArray),$(isMS),sampleCount,access,isShadow,isCombined,format>
 {
-    ${{{{
+    ${
     textureTypeInfo.writeGetDimensionFunctions();
-    }}}}
+    $}
 }
 
-${{{{
+${
 }
-}}}}
+$}
 
 // Texture.GetSamplePosition(int s);
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
@@ -3049,6 +3559,9 @@ vector<T.Element,4> __texture_gather(
     vector<float, Shape.dimensions+isArray> location,
     int component)
 {
+    static const int isMS = 0;
+    static const int isCombined = 0;
+
     __target_switch
     {
     case glsl:
@@ -3079,6 +3592,8 @@ vector<T.Element,4> __texture_gather(
             result:$$vector<T.Element,4> = OpImageGather %sampledImage $location $component;
         };
     case wgsl:
+        __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+
         if (isShadow == 1)
         {
             // If depth texture, `textureGather` doesn't take channel value, `$3`.
@@ -3090,6 +3605,8 @@ vector<T.Element,4> __texture_gather(
                     __intrinsic_asm "textureGather($0, $1, ($2).xy, u32(($2).z))";
                 case $(SLANG_TEXTURE_CUBE):
                     __intrinsic_asm "textureGather($0, $1, ($2).xyz, u32(($2).w))";
+                default:
+                    __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
                 }
             }
             __intrinsic_asm "textureGather($0, $1, $2)";
@@ -3103,6 +3620,8 @@ vector<T.Element,4> __texture_gather(
                 __intrinsic_asm "textureGather($3, $0, $1, ($2).xy, u32(($2).z))";
             case $(SLANG_TEXTURE_CUBE):
                 __intrinsic_asm "textureGather($3, $0, $1, ($2).xyz, u32(($2).w))";
+            default:
+                __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
             }
         }
         __intrinsic_asm "textureGather($3, $0, $1, $2)";
@@ -3138,6 +3657,9 @@ vector<T.Element,4> __texture_gather_offset(
     vector<int, Shape.planeDimensions> offset,
     int component)
 {
+    static const int isMS = 0;
+    static const int isCombined = 0;
+
     __target_switch
     {
     case glsl:
@@ -3160,6 +3682,10 @@ vector<T.Element,4> __texture_gather_offset(
             result:$$vector<T.Element,4> = OpImageGather %sampledImage $location $component Offset $offset;
         };
     case wgsl:
+        __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+        static_assert(Shape.flavor == $(SLANG_TEXTURE_2D)
+            , "WGSL texture gather with offset is supported only on 2D textures");
+
         if (isShadow == 1)
         {
             // If depth texture, `textureGather` doesn't take channel value, `$4`.
@@ -3169,8 +3695,8 @@ vector<T.Element,4> __texture_gather_offset(
                 {
                 case $(SLANG_TEXTURE_2D):
                     __intrinsic_asm "textureGather($0, $1, ($2).xy, u32(($2).z), $3)";
-                case $(SLANG_TEXTURE_CUBE):
-                    __intrinsic_asm "textureGather($0, $1, ($2).xyz, u32(($2).w), $3)";
+                default:
+                    __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
                 }
             }
             __intrinsic_asm "textureGather($0, $1, $2, $3)";
@@ -3182,8 +3708,8 @@ vector<T.Element,4> __texture_gather_offset(
             {
             case $(SLANG_TEXTURE_2D):
                 __intrinsic_asm "textureGather($4, $0, $1, ($2).xy, u32(($2).z), $3)";
-            case $(SLANG_TEXTURE_CUBE):
-                __intrinsic_asm "textureGather($4, $0, $1, ($2).xyz, u32(($2).w), $3)";
+            default:
+                __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
             }
         }
         __intrinsic_asm "textureGather($4, $0, $1, $2, $3)";
@@ -3272,6 +3798,9 @@ vector<T.Element,4> __texture_gatherCmp(
     vector<float, Shape.dimensions+isArray> location,
     T.Element compareValue)
 {
+    static const int isMS = 0;
+    static const int isCombined = 0;
+
     __target_switch
     {
     case glsl:
@@ -3297,7 +3826,9 @@ vector<T.Element,4> __texture_gatherCmp(
             result:$$vector<T.Element,4> = OpImageDrefGather %sampledImage $location $compareValue;
         };
     case wgsl:
-        static_assert(isShadow == 1, "WGSL supports textureGatherCompare only for depth textures.");
+        __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+        static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE)
+            , "WGSL texture gather is supported only on 2D and Cube textures");
 
         if (isArray == 1)
         {
@@ -3307,6 +3838,8 @@ vector<T.Element,4> __texture_gatherCmp(
                 __intrinsic_asm "textureGatherCompare($0, $1, ($2).xy, u32(($2).z), $3)";
             case $(SLANG_TEXTURE_CUBE):
                 __intrinsic_asm "textureGatherCompare($0, $1, ($2).xyz, u32(($2).w), $3)";
+            default:
+                __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
             }
         }
         __intrinsic_asm "textureGatherCompare($0, $1, $2, $3)";
@@ -3342,6 +3875,9 @@ vector<T.Element,4> __texture_gatherCmp_offset(
     T.Element compareValue,
     vector<int, Shape.planeDimensions> offset)
 {
+    static const int isMS = 0;
+    static const int isCombined = 0;
+
     __target_switch
     {
     case glsl:
@@ -3363,7 +3899,9 @@ vector<T.Element,4> __texture_gatherCmp_offset(
             result:$$vector<T.Element,4> = OpImageDrefGather %sampledImage $location $compareValue ConstOffset $offset;
         };
     case wgsl:
-        static_assert(isShadow == 1, "WGSL supports textureGatherCompare only for depth textures.");
+        __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+        static_assert(Shape.flavor == $(SLANG_TEXTURE_2D)
+            , "WGSL texture gather with offset is supported only on 2D textures");
 
         if (isArray == 1)
         {
@@ -3371,8 +3909,8 @@ vector<T.Element,4> __texture_gatherCmp_offset(
             {
             case $(SLANG_TEXTURE_2D):
                 __intrinsic_asm "textureGatherCompare($0, $1, ($2).xy, u32(($2).z), $3, $4)";
-            case $(SLANG_TEXTURE_CUBE):
-                __intrinsic_asm "textureGatherCompare($0, $1, ($2).xyz, u32(($2).w), $3, $4)";
+            default:
+                __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
             }
         }
         __intrinsic_asm "textureGatherCompare($0, $1, $2, $3, $4)";
@@ -3451,16 +3989,16 @@ vector<T.Element,4> __texture_gatherCmp_offsets(
     }
 }
 
-${{{{
+${
 for (int isCombined = 0; isCombined < 2; isCombined++)
 {
-}}}}
+$}
 // Gather for [isCombined = $(isCombined)]
 
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
 extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,$(isCombined),format>
 {
-${{{{
+${
     for (int isShadow = 0; isShadow < 2; isShadow++)
     for (auto componentId = 0;  componentId < 5; componentId++)
     {
@@ -3478,7 +4016,7 @@ ${{{{
         const char* componentArgString[] = { ", 0", ", 0", ", 1", ", 2", ", 3" };
         const char* componentFunc = componentFuncString[componentId];
         const char* componentArg = (isShadow ? "" : componentArgString[componentId]);
-}}}}
+$}
     [ForceInline]
     [require(cuda_glsl_hlsl_metal_spirv_wgsl, texture_gather)]
     vector<T.Element,4> Gather$(compareFunc)$(componentFunc)(
@@ -3621,14 +4159,14 @@ ${{{{
         }
     }
 
-${{{{
+${
     } // for (componentId)
-}}}}
+$}
 } // End of: Gather for [isCombined = $(isCombined)]
 
-${{{{
+${
 } // for (isScalarTexture)
-}}}}
+$}
 
 // End of all Texture Gather
 
@@ -3654,32 +4192,29 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
             __intrinsic_asm ".Load";
 		case cuda:
             if (isArray != 0)
+            {
+                switch(Shape.flavor)
                 {
-     				static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_3D),
-                              "Integer coordinates are supported for texture reads only for 2D and 3D textures and 2D array textures.");
-
-                    if (Shape.flavor == $(SLANG_TEXTURE_2D))
-                    {
-						__intrinsic_asm "tex2DArrayfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z)";
-				    }
-                    else
-					{
-                        __intrinsic_asm "<invalid intrinsic>";
-                    }
+                case $(SLANG_TEXTURE_1D):
+                    __intrinsic_asm "tex1DArrayfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z)";
+                case $(SLANG_TEXTURE_2D):
+                    __intrinsic_asm "tex2DArrayfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z, ($1).w)";
                 }
-                else
+            }
+            else
+            {
+                switch(Shape.flavor)
                 {
-                    switch(Shape.flavor)
-                    {
-                    case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "tex2Dfetch_int<$T0>($0, ($1).x, ($1).y)";
-                    case $(SLANG_TEXTURE_3D):
-                        __intrinsic_asm "tex3Dfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z)";
-					case $(SLANG_TEXTURE_CUBE):
-                    default:
-                        __intrinsic_asm "<invalid intrinsic>";
-                    }
+                case $(SLANG_TEXTURE_1D):
+                    __intrinsic_asm "tex1Dfetch_int<$T0>($0, ($1).x, ($1).y)";
+                case $(SLANG_TEXTURE_2D):
+                    __intrinsic_asm "tex2Dfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z)";
+                case $(SLANG_TEXTURE_3D):
+                    __intrinsic_asm "tex3Dfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z, ($1).w)";
                 }
+            }
+            static_assert(false, "Unsupported 'Load' of 'texture' for 'cuda' target");
+            __intrinsic_asm "<invalid intrinsic>";
         case metal:
             switch (Shape.flavor)
             {
@@ -3767,12 +4302,12 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                 };
             }
         case wgsl:
+            __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
+
             static_assert(Shape.flavor == $(SLANG_TEXTURE_1D)
                 || Shape.flavor == $(SLANG_TEXTURE_2D)
                 || Shape.flavor == $(SLANG_TEXTURE_3D)
-                , "WGSL doesn't supports textureLoad for Cube texture.");
-            static_assert(isArray == 0 || Shape.flavor == $(SLANG_TEXTURE_2D)
-                , "WGSL supports textureLoad for texture_2d_array but not for array of 1D, 3D or Cube.");
+                , "WGSL does not support textureLoad for Cube textures.");
 
             if (isArray == 1)
             {
@@ -3790,6 +4325,8 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                 __intrinsic_asm "textureLoad($0, ($1).xy, ($1).z)$z";
             case $(SLANG_TEXTURE_3D):
                 __intrinsic_asm "textureLoad($0, ($1).xyz, ($1).w)$z";
+            default:
+                __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
             }
             return __default<T>();
         }
@@ -3997,10 +4534,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                     };
                 }
             case wgsl:
-                static_assert(Shape.flavor == $(SLANG_TEXTURE_2D)
-                    , "WGSL supports textureLoad for texture_multisampled_2d but not for multisampled of 1D, 3D or Cube.");
-                static_assert(isArray == 0
-                    , "WGSL doesn't support array variants of multisampled textures for textureLoad.");
+                __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
 
                 __intrinsic_asm "textureLoad($0, $1, $2)$z";
         }
@@ -4144,21 +4678,27 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
 }
 
 // Load/Subscript for readwrite textures
-${{{{
+${
     for (int access = kCoreModule_ResourceAccessReadWrite; access <= kCoreModule_ResourceAccessRasterizerOrdered; access++) {
         const char* glslIntrinsic = "$cimageLoad($0, $1)$z";
         const char* glslIntrinsicOffset = "$cimageLoad($0, ($1)+($2))$z";
         const char* glslIntrinsicMS = "$cimageLoad($0, $1, $2)$z";
         const char* glslIntrinsicMSOffset = "$cimageLoad($0, ($1)+($3), $2)$z";
-}}}}
+$}
 
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
 extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
 {
-    ${{{{
+    //@hidden:
+    static const int isMS = 0;
+    static const int isCombined = 0;
+
+    //@public:
+
+    ${
         if (access != kCoreModule_ResourceAccessWriteOnly)
         {
-    }}}}
+    $}
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1)]
@@ -4268,14 +4808,12 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
                 static_assert(false, "Unsupported 'Load' of 'texture' for 'metal' target");
                 __intrinsic_asm "<invalid intrinsics>";
             case wgsl:
+                __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, $(access), isShadow, isCombined, format>();
+
                 static_assert(Shape.flavor == $(SLANG_TEXTURE_1D)
                     || Shape.flavor == $(SLANG_TEXTURE_2D)
                     || Shape.flavor == $(SLANG_TEXTURE_3D)
-                    , "WGSL doesn't supports textureLoad for Cube texture.");
-                static_assert(isArray == 0 || Shape.flavor == $(SLANG_TEXTURE_2D)
-                    , "WGSL supports textureLoad for 2d_array but not for array of 1D, 3D or Cube.");
-                static_assert(isShadow == 0 || T is float
-                    , "WGSL supports only f32 depth textures");
+                    , "WGSL does not support textureLoad for Cube texture.");
 
                 if (isArray == 1)
                 {
@@ -4283,6 +4821,8 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
                     {
                     case $(SLANG_TEXTURE_2D):
                         __intrinsic_asm "textureLoad($0, ($1).xy, i32(($1).z))$z";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic: unimplemented shape>";
                     }
                 }
                 __intrinsic_asm "textureLoad($0, $1)$z";
@@ -4325,9 +4865,9 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
         }
     }
 
-    ${{{{
+    ${
         } // if (access != kCoreModule_ResourceAccessWriteOnly)
-    }}}}
+    $}
     [require(glsl, texture_sm_4_1)]
     void __glslImageStore(vector<int, Shape.dimensions+isArray> location, T value)
     {
@@ -4397,12 +4937,12 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
                     __metalImageStore(this, location, newValue);
                 }
         case wgsl:
+            __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, $(access), isShadow, isCombined, format>();
+
             static_assert(Shape.flavor == $(SLANG_TEXTURE_1D)
                 || Shape.flavor == $(SLANG_TEXTURE_2D)
                 || Shape.flavor == $(SLANG_TEXTURE_3D)
-                , "WGSL doesn't supports textureStore for Cube texture.");
-            static_assert(isArray == 0 || Shape.flavor == $(SLANG_TEXTURE_2D)
-                , "WGSL supports textureStore for texture_store_2d_array but not for array of 1D, 3D or Cube.");
+                , "WGSL does not support textureStore for Cube textures.");
 
             // WGSL requires the value type to be always `vec4`
             if (isArray == 1)
@@ -4437,10 +4977,10 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
         }
     }
 
-    ${{{{
+    ${
         if (access != kCoreModule_ResourceAccessWriteOnly)
         {
-    }}}}
+    $}
     __subscript(vector<uint, Shape.dimensions+isArray> location) -> T
     {
         [__readNone]
@@ -4473,23 +5013,30 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
         // If a 'Texture[location]' is referred to by a '__ref', call 'kIROp_ImageSubscript(location)'.
         // This allows call's to stay aware that the input is from a 'Texture'.
         __intrinsic_op($(kIROp_ImageSubscript))
+        [nonmutating]
         ref;
     }
-    ${{{{
+    ${
         } // if (access != kCoreModule_ResourceAccessWriteOnly)
-    }}}}
+    $}
 
 }
 
-${{{{
+${
 if (access == kCoreModule_ResourceAccessReadWrite) {
-}}}}
+$}
 
 // RW MS textures.
 
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
 extension _Texture<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,format>
 {
+    //@hidden:
+    static const int isMS = 1;
+    static const int isCombined = 0;
+
+    //@public:
+
     [__readNone]
     [ForceInline]
     [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_compute_fragment)]
@@ -4537,10 +5084,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,format>
                     __truncate $$T result __sampledType(T) %sampled;
                 };
             case wgsl:
-                static_assert(Shape.flavor == $(SLANG_TEXTURE_2D)
-                    , "WGSL supports textureLoad for texture_multisampled_2d but not for multisampled of 1D, 3D or Cube.");
-                static_assert(isArray == 0
-                    , "WGSL doesn't support array variants of multisampled textures for textureLoad.");
+                __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, $(access), isShadow, isCombined, format>();
 
                 __intrinsic_asm "textureLoad($0, $1, $2)$z";
         }
@@ -4630,14 +5174,15 @@ extension _Texture<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,format>
         // If a 'Texture[location, sampleIndex]' is referred to by a '__ref', call 'kIROp_ImageSubscript(location, sampleIndex)'.
         // This allows call's to stay aware that the input is from a 'Texture'.
         __intrinsic_op($(kIROp_ImageSubscript))
+        [nonmutating]
         ref;
     }
 }
 
-${{{{
+${
 } // if (access == kCoreModule_ResourceAccessReadWrite) // for RW MS textures.
 } // for (access).
-}}}}
+$}
 
 // Definitions to support the legacy texture .mips[][] operator.
 struct __TextureMip<T:ITexelElement, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
@@ -4708,7 +5253,7 @@ extension _Texture<T, Shape, isArray, 1 /*isMS*/, 0 /*sampleCount*/, 0 /*access*
 
 // Texture type aliases.
 // T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int
-${{{{
+${
     const char* shapeTypeNames[] = {"1D", "2D", "3D", "Cube"};
     const char* accessPrefix[] = {"", "RW", "W", "RasterizerOrdered", "Feedback"};
     const char* accessDocumentation[] = {"read-only", "read-write", "write-only", "rasterizer-ordered", "feedback"};
@@ -4744,7 +5289,7 @@ ${{{{
         if (shape == kCoreModule_ShapeIndex3D && isArray == 1)
             continue;
         const char* textureTypeName = isCombined ? "Sampler" : "Texture";
-}}}}
+$}
 /// Represents a handle to a $(accessDocumentation[access])$(isMS?", multisampled": "") $(shapeTypeNames[shape]) $(isCombined?"combined texture-sampler": "texture")$(isArray?" array":"").
 /// @param T The texel type of the texture.
 /// @param sampleCount The number of samples in the texture, when the texture is multisampled.
@@ -4752,24 +5297,42 @@ ${{{{
 /// @see Please refer to `_Texture` for more information about texture types.
 /// @category texture_types
 typealias $(accessPrefix[access])$(textureTypeName)$(shapeTypeNames[shape])$(msPostFix[isMS])$(arrayPostFix[isArray])<T:ITexelElement=float4, let sampleCount:int=0, let format:int=0> = _Texture<T, __Shape$(shapeTypeNames[shape]), $(isArray), $(isMS), sampleCount, $(access), 0, $(isCombined), format>;
-${{{{
+${
 }
-}}}}
+$}
 
-// Declare Sampler*Shadow type aliases.
-${{{{
+// Declare DepthTexture* and Sampler*Shadow type aliases.
+${
     for (int shape = 0; shape < 4; shape++)
-    for (int isArray = 0; isArray<=1; isArray++)
+    for (int isArray : { 0, 1 })
+    for (int isMS : { 0, 1 })
     {
-}}}}
-/// Represents a handle to a $(shapeTypeNames[shape]) combined texture-sampler for shadow comparison.
+        if (isMS)
+        {
+            // Only DepthTexture2DMS and Sampler2DMSShadow.
+            if (shape != kCoreModule_ShapeIndex2D)
+                continue;
+        }
+
+        // No 3D Array.
+        if (shape == kCoreModule_ShapeIndex3D && isArray == 1)
+            continue;
+$}
+/// Represents a handle to a$(isMS?" multisampled": "") $(shapeTypeNames[shape]) depth texture$(isArray?" array":"").
 /// @param format The storage format of the texture.
 /// @see Please refer to `_Texture` for more information about texture types.
 /// @category texture_types
-typealias Sampler$(shapeTypeNames[shape])$(arrayPostFix[isArray])Shadow<int format=0> = _Texture<float, __Shape$(shapeTypeNames[shape]), $(isArray), 0, 0, 0, 1, 1, format>;
-${{{{
+typealias DepthTexture$(shapeTypeNames[shape])$(msPostFix[isMS])$(arrayPostFix[isArray])<int format=0> = _Texture<float, __Shape$(shapeTypeNames[shape]), $(isArray), $(isMS), 0, 0, 1, 0, format>;
+
+/// Represents a handle to a$(isMS?" multisampled": "") $(shapeTypeNames[shape]) combined texture-sampler$(isArray?" array":"") for shadow comparison.
+/// @param format The storage format of the texture.
+/// @see Please refer to `_Texture` for more information about texture types.
+/// @category texture_types
+typealias Sampler$(shapeTypeNames[shape])$(msPostFix[isMS])$(arrayPostFix[isArray])Shadow<int format=0> = _Texture<float, __Shape$(shapeTypeNames[shape]), $(isArray), $(isMS), 0, 0, 1, 1, format>;
+
+${
     }
-}}}}
+$}
 
 // Atomic intrinsic insts.
 
@@ -5021,7 +5584,7 @@ struct OutputPatch
     }
 };
 
-${{{{
+${
 static const struct {
     IROp op;
     char const* name;
@@ -5031,7 +5594,7 @@ static const struct {
     { kIROp_HLSLRasterizerOrderedByteAddressBufferType, "RasterizerOrderedByteAddressBuffer" },
 };
 for(auto item : kMutableByteAddressBufferCases) {
-}}}}
+$}
 
 //@public:
 /**
@@ -5338,7 +5901,7 @@ struct $(item.name)
         return __byteAddressBufferLoad<T>(this, location, __naturalStrideOf<T>());
     }
 
-${{{{
+${
     struct BufferAtomicOps
     {
         const char* name;
@@ -5355,7 +5918,7 @@ ${{{{
     };
     if (item.op == kIROp_HLSLRWByteAddressBufferType)
     {
-}}}}
+$}
 
     // float32 and int64 atomic support. This is a Slang specific extension, it uses
     // GL_EXT_shader_atomic_float on Vulkan
@@ -5594,9 +6157,9 @@ ${{{{
     // SM6.6 6 64bit atomics.
 
     // InterlockedMax64, InterlockedMin64, InterlockedAdd64, InterlockedAnd64, InterlockedOr64, InterlockedXor64, InterlockedExchange64
-${{{{
+${
     for (auto op : bufferAtomicOps) {
-}}}}
+$}
 
     /// Perform a 64-bit unsigned integer atomic $(op.internalName) operation at `byteAddress`.
     /// @param byteAddress The address at which to perform the atomic $(op.internalName) operation.
@@ -5635,9 +6198,9 @@ ${{{{
             return;
         }
     }
-${{{{
+${
 } // for (each bufferOps)
-}}}}
+$}
 
     /// Perform a 64-bit integer atomic compare-and-exchange operation at `byteAddress`.
     /// @param byteAddress The address at which to perform the atomic compare-and-exchange operation.
@@ -5750,15 +6313,15 @@ ${{{{
         }
     }
 
-${{{{
+${
     } // endif (type == RWByteAddressBuffer)
-}}}}
+$}
 
     // 32-bit atomic operations:
     // InterlockedMax, InterlockedMin, InterlockedAdd, InterlockedAnd, InterlockedOr, InterlockedXor, InterlockedExchange
-${{{{
+${
     for (auto op : bufferAtomicOps) {
-}}}}
+$}
 
     /// Perform an atomic $(op.internalName) operation at the specified byte
     /// location of the byte address buffer.
@@ -5795,9 +6358,9 @@ ${{{{
             ::Interlocked$(op.name)(buf[dest / 4], value);
         }
     }
-${{{{
+${
 } // for (buffer atomic ops)
-}}}}
+$}
 
     /// Perform a 32-bit integer atomic compare-and-exchange operation at
     /// the specified byte address within the `RWByteAddressBuffer`.
@@ -6001,14 +6564,14 @@ ${{{{
         }
     }
 
-    [ForceInline]
+    [__unsafeForceInlineEarly]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
     void Store<T>(uint address, T value)
     {
         __byteAddressBufferStore(this, address, 0, value);
     }
 
-    [ForceInline]
+    [__unsafeForceInlineEarly]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
     void Store<T>(uint address, T value, uint alignment)
     {
@@ -6020,7 +6583,7 @@ ${{{{
     ///@param T The type of the input value.
     ///@param address The input address in bytes, which must be a multiple of size of `T`.
     ///@param value The input value.
-    [ForceInline]
+    [__unsafeForceInlineEarly]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
     void StoreAligned<T>(uint address, T value)
     {
@@ -6028,11 +6591,11 @@ ${{{{
     }
 };
 
-${{{{
+${
 }
-}}}}
+$}
 
-${{{{
+${
 static const struct {
     IROp op;
     char const* name;
@@ -6042,7 +6605,7 @@ static const struct {
     { kIROp_HLSLRasterizerOrderedStructuredBufferType, "RasterizerOrderedStructuredBuffer" },
 };
 for(auto item : kMutableStructuredBufferCases) {
-}}}}
+$}
 
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
 __magic_type(HLSL$(item.name)Type)
@@ -6068,6 +6631,7 @@ struct $(item.name)
     /// @return The post-decremented counter value.
     /// @remarks
     /// This function is not implemented when targeting non-HLSL.
+    [require(hlsl)]
     uint DecrementCounter();
 
     /// Get the dimensions of the buffer.
@@ -6094,6 +6658,7 @@ struct $(item.name)
     /// @return The pre-incremented counter value.
     /// @remarks
     /// This function is not implemented when targeting non-HLSL.
+    [require(hlsl)]
     uint IncrementCounter();
 
     /// Load a element from the buffer at the specified location.
@@ -6134,9 +6699,9 @@ struct $(item.name)
     }
 };
 
-${{{{
+${
 }
-}}}}
+$}
 
 /// @category stage_io
 __generic<T>
@@ -7374,7 +7939,7 @@ matrix<uint,N,M> asuint(matrix<uint,N,M> x)
 // Float->unsigned cases:
 
 [__readNone]
-[require(cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 uint16_t asuint16(float16_t value)
 {
     __target_switch
@@ -7385,11 +7950,13 @@ uint16_t asuint16(float16_t value)
     case spirv: return spirv_asm {
         OpBitcast $$uint16_t result $value
     };
+    default:
+        return bit_cast<uint16_t>(value);
     }
 }
 
 [__readNone]
-[require(cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 vector<uint16_t,N> asuint16<let N : int>(vector<float16_t,N> value)
 {
     __target_switch
@@ -7404,14 +7971,14 @@ vector<uint16_t,N> asuint16<let N : int>(vector<float16_t,N> value)
 }
 
 [__readNone]
-[require(cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 matrix<uint16_t,R,C> asuint16<let R : int, let C : int>(matrix<float16_t,R,C> value)
 { MATRIX_MAP_UNARY(uint16_t, R, C, asuint16, value); }
 
 // Unsigned->float cases:
 
 [__readNone]
-[require(cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 float16_t asfloat16(uint16_t value)
 {
     __target_switch
@@ -7422,6 +7989,8 @@ float16_t asfloat16(uint16_t value)
     case spirv: return spirv_asm {
         OpBitcast $$float16_t result $value
     };
+    default:
+        return bit_cast<float16_t>(value);
     }
 }
 
@@ -8369,10 +8938,10 @@ int4 D3DCOLORtoUBYTE4(float4 color)
 }
 
 // Partial-difference derivatives
-${{{{
+${
 const char* diffDimensions[2] = {"x", "y"};
 for (auto xOrY : diffDimensions) {
-}}}}
+$}
 /// Take the partial derivative of `p` with respect to $(xOrY) in screen space.
 /// @param p The value to take partial derivative for.
 /// @return The partial derivative of `p`.
@@ -8539,9 +9108,9 @@ matrix<T, N, M> dd$(xOrY)_fine(matrix<T, N, M> p)
     }
 }
 
-${{{{
+${
 } // for (xOrY)
-}}}}
+$}
 
 
 /// Convert radians to degrees.
@@ -8869,6 +9438,12 @@ __generic<T : __BuiltinFloatingPointType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 T dot(vector<T, N> x, vector<T, N> y)
 {
+    // Handle 1-vector case explicitly since many backends don't support it natively
+    if (N == 1)
+    {
+        return x[0] * y[0];
+    }
+
     __target_switch
     {
     case glsl: __intrinsic_asm "dot";
@@ -8891,6 +9466,12 @@ __generic<T : __BuiltinIntegerType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 T dot(vector<T, N> x, vector<T, N> y)
 {
+    // Handle 1-vector case explicitly since many backends don't support it natively
+    if (N == 1)
+    {
+        return x[0] * y[0];
+    }
+
     __target_switch
     {
     case hlsl: __intrinsic_asm "dot";
@@ -10560,7 +11141,7 @@ __generic<TextureAccess>
 __intrinsic_op($(kIROp_ExtractArrayCoordFromTextureAccess))
 uint __extractArrayCoordFromTextureAccess(__ref TextureAccess x);
 
-${{{{
+${
 // Generates code for:
 // InterlockedAdd, InterlockedAnd, InterlockedOr, InterlockedXor,
 // InterlockedMax, InterlockedMin, InterlockedExchange
@@ -10583,7 +11164,7 @@ SlangAtomicOperationInfo slangAtomicOperationInfo[7] = {
 
 for (SlangAtomicOperationInfo atomicOp : slangAtomicOperationInfo)
 {
-}}}}
+$}
 
 /// Perform an atomic $(atomicOp.internalCallSuffix) operation on `dest`.
 /// @param T The type of the value to perform the atomic operation on.
@@ -10620,9 +11201,9 @@ void Interlocked$(atomicOp.slangCallSuffix)(__ref uint dest, int value)
     __atomic_$(atomicOp.internalCallSuffix)(dest, (uint)value);
 }
 
-${{{{
+${
 } // for (SlangAtomicOperationInfo atomicOp : slangAtomicOperationInfo)
-}}}}
+$}
 
 /// Perform an atomic compare and exchange operation on `dest`.
 /// @param T The type of the value to perform the atomic operation on.
@@ -12190,6 +12771,7 @@ vector<T, M> mul(vector<T, N> left, matrix<T, N, M> right)
 }
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [__readNone]
+[OverloadRank(-1)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 vector<T, M> mul(vector<T, N> left, matrix<T, N, M> right)
 {
@@ -12353,6 +12935,7 @@ matrix<T,R,C> mul(matrix<T,R,N> left, matrix<T,N,C> right)
 }
 __generic<T : __BuiltinLogicalType, let R : int, let N : int, let C : int>
 [__readNone]
+[OverloadRank(-1)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
 matrix<T,R,C> mul(matrix<T,R,N> left, matrix<T,N,C> right)
 {
@@ -15149,11 +15732,11 @@ vector<T,N> QuadReadAcrossDiagonal(vector<T,N> localValue)
 __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadAcrossDiagonal(matrix<T,N,M> localValue);
 
 // WaveActiveBitAnd, WaveActiveBitOr, WaveActiveBitXor
-${{{{
+${
 struct WaveActiveBitOpEntry { const char* hlslName; const char* glslName; const char* spirvName; const char* metalName; };
 const WaveActiveBitOpEntry kWaveActiveBitOpEntries[] = {{"BitAnd", "And", "BitwiseAnd", "and"}, {"BitOr", "Or", "BitwiseOr", "or"}, {"BitXor", "Xor", "BitwiseXor", "xor"}};
 for (auto opName : kWaveActiveBitOpEntries) {
-}}}}
+$}
 /// @category wave Wave and quad functions
 __generic<T : __BuiltinLogicalType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
@@ -15219,16 +15802,16 @@ matrix<T, N, M> WaveActive$(opName.hlslName)(matrix<T, N, M> expr)
         return result;
     }
 }
-${{{{
+${
 } // WaveActiveBitAnd, WaveActiveBitOr, WaveActiveBitXor
-}}}}
+$}
 
 // WaveActiveMin/Max
-${{{{
+${
 struct WaveActiveMinMaxEntry { const char* name; const char* metalName; };
 const WaveActiveMinMaxEntry kWaveActiveMinMaxNames[] = {{"Min", "min"}, {"Max", "max"}};
 for (const auto opName : kWaveActiveMinMaxNames) {
-}}}}
+$}
 /// @category wave
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
@@ -15305,16 +15888,16 @@ matrix<T, N, M> WaveActive$(opName.name)(matrix<T, N, M> expr)
     }
 }
 
-${{{{
+${
 } // WaveActiveMinMax.
-}}}}
+$}
 
 // WaveActiveProduct/Sum
-${{{{
+${
 struct WaveActiveProductSumEntry { const char* hlslName; const char* glslName; const char* metalName; };
 const WaveActiveProductSumEntry kWaveActivProductSumNames[] = {{"Product", "Mul", "product"}, {"Sum", "Add", "sum"}};
 for (auto opName : kWaveActivProductSumNames) {
-}}}}
+$}
 /// @category wave
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
@@ -15404,9 +15987,9 @@ matrix<T, N, M> WaveActive$(opName.hlslName)(matrix<T, N, M> expr)
         return result;
     }
 }
-${{{{
+${
 } // WaveActiveProduct/WaveActiveProductSum.
-}}}}
+$}
 
 /// @category wave
 __generic<T : __BuiltinType>
@@ -16458,11 +17041,11 @@ void __shaderSubgroupPartitionedPreamble()
 //
 // WaveMultiSum/WaveMultiProduct.
 //
-${{{{
+${
 struct WaveMultiSumProductEntry { const char* name; const char* spirvName; };
 const WaveMultiSumProductEntry kWaveMultiSumProductNames[] = { {"Sum", "Add"}, {"Product", "Mul"} };
 for (auto opName : kWaveMultiSumProductNames) {
-}}}}
+$}
 
 __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
@@ -16526,9 +17109,9 @@ matrix<T,N,M> WaveMulti$(opName.name)(matrix<T,N,M> value, uint4 mask)
     }
 }
 
-${{{{
+${
 } // WaveMultiSum/WaveMultiProduct.
-}}}}
+$}
 
 
 //
@@ -16536,7 +17119,7 @@ ${{{{
 // WaveMultiPrefixExclusiveSum/WaveMultiPrefixExclusiveProduct.
 // WaveMultiPrefixSum/WaveMultiPrefixProduct.
 //
-${{{{
+${
 struct WaveMultiPrefixSumProductEntry
 {
     const char* name;
@@ -16567,7 +17150,7 @@ const WaveMultiPrefixSumProductEntry kWaveMultiPrefixSumProductNames[] =
 };
 
 for (auto opName : kWaveMultiPrefixSumProductNames) {
-}}}}
+$}
 
 __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
@@ -16625,10 +17208,10 @@ matrix<T,N,M> WaveMultiPrefix$(opName.name)(matrix<T,N,M> value, uint4 mask)
 {
     __target_switch
     {
-    ${{{{ if(opName.cudaMatrixVariantSupport) { }}}}
+    ${ if(opName.cudaMatrixVariantSupport) { $}
     case cuda:
         __intrinsic_asm "_wavePrefix$(opName.cudaName)Multiple($1.x, $0) $(opName.cudaExtraOperation)";
-    ${{{{ } }}}}
+    ${ } $}
     default:
         matrix<T, N, M> result;
         for (int i = 0; i < N; ++i)
@@ -16637,22 +17220,22 @@ matrix<T,N,M> WaveMultiPrefix$(opName.name)(matrix<T,N,M> value, uint4 mask)
     }
 }
 
-${{{{
+${
 }
 // WaveMultiPrefixInclusiveSum/WaveMultiPrefixInclusiveProduct.
 // WaveMultiPrefixExclusiveSum/WaveMultiPrefixExclusiveProduct.
 // WaveMultiPrefixSum/WaveMultiPrefixProduct.
-}}}}
+$}
 
 
 //
 // WaveMultiMin/WaveMultiMax.
 //
-${{{{
+${
 struct WaveMultiMinMaxEntry { const char* name; };
 const WaveMultiMinMaxEntry kWaveMultiMinMaxNames[] = { {"Min"}, {"Max"} };
 for (auto opName : kWaveMultiMinMaxNames) {
-}}}}
+$}
 
 __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
@@ -16721,16 +17304,16 @@ matrix<T, N, M> WaveMulti$(opName.name)(matrix<T, N, M> value, uint4 mask)
     }
 }
 
-${{{{
+${
 } // WaveMultiMin/WaveMultiMax.
-}}}}
+$}
 
 
 //
 // WaveMultiPrefixInclusiveMin/WaveMultiPrefixInclusiveMax.
 // WaveMultiPrefixExclusiveMin/WaveMultiPrefixExclusiveMax.
 //
-${{{{
+${
 struct WaveMultiPrefixMinMaxEntry
 {
     const char* name;
@@ -16749,7 +17332,7 @@ const WaveMultiPrefixMinMaxEntry kWaveMultiPrefixMinMaxNames[] =
 };
 
 for (auto opName : kWaveMultiPrefixMinMaxNames) {
-}}}}
+$}
 
 __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
@@ -16812,21 +17395,21 @@ matrix<T, N, M> WaveMultiPrefix$(opName.name)(matrix<T, N, M> value, uint4 mask)
     return result;
 }
 
-${{{{
+${
 }
 // WaveMultiPrefixInclusiveMin/WaveMultiPrefixInclusiveMax.
 // WaveMultiPrefixExclusiveMin/WaveMultiPrefixExclusiveMax.
-}}}}
+$}
 
 
 //
 // WaveMultiBitAnd/WaveMultiBitOr/WaveMultiBitXor.
 //
-${{{{
+${
 struct WaveMultiBitsEntry { const char* name; };
 const WaveMultiBitsEntry kWaveMultiBitsNames[] = { {"And"}, {"Or"} , {"Xor"} };
 for (auto opName : kWaveMultiBitsNames) {
-}}}}
+$}
 
 __generic<T : __BuiltinLogicalType>
 __spirv_version(1.3)
@@ -16887,9 +17470,9 @@ matrix<T, N, M> WaveMultiBit$(opName.name)(matrix<T, N, M> value, uint4 mask)
     }
 }
 
-${{{{
+${
 } // WaveMultiBitAnd/WaveMultiBitOr/WaveMultiBitXor.
-}}}}
+$}
 
 
 //
@@ -16897,7 +17480,7 @@ ${{{{
 // WaveMultiPrefixExclusiveBitAnd/WaveMultiPrefixExclusiveBitXor/WaveMultiExclusiveBitXor.
 // WaveMultiPrefixBitAnd/WaveMultiPrefixBitOr/WaveMultiBitXor.
 //
-${{{{
+${
 struct WaveMultiPrefixBitwiseEntry
 {
     const char* name;
@@ -16927,7 +17510,7 @@ const WaveMultiPrefixBitwiseEntry kWaveMultiPrefixBitwiseNames[] =
 };
 
 for (auto opName : kWaveMultiPrefixBitwiseNames) {
-}}}}
+$}
 
 __generic<T : __BuiltinLogicalType>
 __spirv_version(1.3)
@@ -16981,14 +17564,14 @@ matrix<T, N, M> WaveMultiPrefix$(opName.name)(matrix<T, N, M> value, uint4 mask)
 {
     __target_switch
     {
-${{{{
+${
     if (opName.cudaMatrixVariantSupport) {
-}}}}
+$}
     case cuda:
         __intrinsic_asm "_wavePrefix$(opName.spirvName)Multiple($1.x, $0) $(opName.cudaExtraOperation)";
-${{{{
+${
     }
-}}}}
+$}
     default:
         matrix<T,N,M> result;
         [ForceUnroll]
@@ -16997,12 +17580,12 @@ ${{{{
         return result;
     }
 }
-${{{{
+${
 }
 // WaveMultiPrefixInclusiveBitAnd/WaveMultiPrefixInclusiveBitOr/WaveMultiInclusiveBitXor.
 // WaveMultiPrefixExclusiveBitAnd/WaveMultiPrefixExclusiveBitXor/WaveMultiExclusiveBitXor.
 // WaveMultiPrefixBitAnd/WaveMultiPrefixBitOr/WaveMultiBitXor.
-}}}}
+$}
 
 
 //
@@ -17071,7 +17654,7 @@ bool QuadAll(bool expr)
 typedef Texture2D texture2D;
 //@public:
 
-${{{{
+${
 
 // Buffer types
 
@@ -17102,7 +17685,7 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
     char const* requireToSetQuery = (isReadOnly) ? "[require(glsl_hlsl_metal_spirv, texture_size)]" : "[require(glsl_hlsl_metal_spirv, image_size)]";
     char const* requireToSet = (isReadOnly) ? "[require(glsl_hlsl_metal_spirv, texture_sm_4_1)]" : "[require(glsl_hlsl_metal_spirv, texture_sm_4_1_compute_fragment)]";
     char const* requireToSet_onlyHLSL = (isReadOnly) ? "[require(hlsl, texture_sm_4_1)]" : "[require(hlsl, texture_sm_4_1_compute_fragment)]";
-}}}}
+$}
 
 __generic<T:ITexelElement, let format:int>
 extension _Texture<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
@@ -17160,9 +17743,9 @@ extension _Texture<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
         [ForceInline]
         $(requireToSet)
         get { return Load((int)index); }
-${{{{
+${
         if (access != SLANG_RESOURCE_ACCESS_READ) {
-}}}}
+$}
             [nonmutating]
             $(requireToSet)
             set
@@ -17181,19 +17764,19 @@ ${{{{
             // If a 'Texture[index]' is referred to by a '__ref', call 'kIROp_ImageSubscript(index)'.
             // This allows call's to stay aware that the input is from a 'Texture'.
             __intrinsic_op($(kIROp_ImageSubscript))
-            [constref]
+            [nonmutating]
             ref;
-${{{{
+${
         } // access != SLANG_RESOURCE_ACCESS_READ
-}}}}
+$}
 
         }
 
 
     };  // end extension
-${{{{
+${
 }
-}}}}
+$}
 
 
 // DirectX Raytracing (DXR) Support
@@ -17289,7 +17872,17 @@ __magic_type(RaytracingAccelerationStructureType)
 __intrinsic_type($(kIROp_RaytracingAccelerationStructureType))
 struct RaytracingAccelerationStructure
 {
-    [require(glsl_spirv, raytracing)]
+    // Here, we don't require 'raytracing' capability, instead, we add the
+    // extension directly in the generated code. The reason is that this
+    // struct is used in both raytracing and rayquery APIs, our current capability
+    // system cannot represent this struct with raytracing OR rayquery capability.
+    // So, we cannot add capability requirement on the struct itself.
+    // However, any use of this type will definitely require either raytracing or rayquery,
+    // so we have the guarantee that either raytracing or rayquery capability will be present.
+    // But if rayquery want to use this struct that is constructed from a descriptor handle,
+    // we need to make sure the raytracing extension is present.
+    __glsl_extension(GL_EXT_ray_tracing)
+    [require(glsl_spirv)]
     [__readNone]
     __init(uint64_t address)
     {
@@ -17297,6 +17890,7 @@ struct RaytracingAccelerationStructure
         {
         case spirv:
             return spirv_asm {
+                OpExtension "SPV_KHR_ray_tracing";
                 result: $$RaytracingAccelerationStructure = OpConvertUToAccelerationStructureKHR $address;
             };
         case glsl:
@@ -18071,13 +18665,14 @@ float3 ObjectRayDirection()
 /// @remarks Includes position and orientation of the current instance
 /// @category raytracing
 [NonUniformReturn]
-[require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
+[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float3x4 ObjectToWorld3x4()
 {
     __target_switch
     {
     case hlsl:  __intrinsic_asm "ObjectToWorld3x4";
     case glsl: __intrinsic_asm "transpose(gl_ObjectToWorldEXT)";
+    case cuda: __intrinsic_asm "slangOptixGetObjectToWorldTransformMatrix";
     case spirv:
         return spirv_asm
         {
@@ -18092,13 +18687,14 @@ float3x4 ObjectToWorld3x4()
 /// @remarks Inverse of the object-to-world transform
 /// @category raytracing
 [NonUniformReturn]
-[require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
+[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float3x4 WorldToObject3x4()
 {
     __target_switch
     {
     case hlsl:  __intrinsic_asm "WorldToObject3x4";
     case glsl: __intrinsic_asm "transpose(gl_WorldToObjectEXT)";
+    case cuda: __intrinsic_asm "slangOptixGetWorldToObjectTransformMatrix";
     case spirv:
         return spirv_asm
         {
@@ -18113,13 +18709,14 @@ float3x4 WorldToObject3x4()
 /// @remarks Transposed version of ObjectToWorld3x4
 /// @category raytracing
 [NonUniformReturn]
-[require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
+[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float4x3 ObjectToWorld4x3()
 {
     __target_switch
     {
     case hlsl:  __intrinsic_asm "ObjectToWorld4x3";
     case glsl: __intrinsic_asm "(gl_ObjectToWorldEXT)";
+    case cuda: __intrinsic_asm "slangOptixGetObjectToWorldTransformMatrix4x3";
     case spirv:
         return spirv_asm
         {
@@ -18133,13 +18730,14 @@ float4x3 ObjectToWorld4x3()
 /// @remarks Transposed version of WorldToObject3x4
 /// @category raytracing
 [NonUniformReturn]
-[require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
+[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float4x3 WorldToObject4x3()
 {
     __target_switch
     {
     case hlsl:  __intrinsic_asm "WorldToObject4x3";
     case glsl: __intrinsic_asm "(gl_WorldToObjectEXT)";
+    case cuda: __intrinsic_asm "slangOptixGetWorldToObjectTransformMatrix4x3";
     case spirv:
         return spirv_asm
         {
@@ -18190,6 +18788,8 @@ int GetClusterID()
     case spirv:
         return spirv_asm
         {
+            OpExtension "SPV_NV_cluster_acceleration_structure";
+            OpCapability RayTracingClusterAccelerationStructureNV;
             result:$$int = OpLoad builtin(ClusterIDNV:int);
         };
     }
@@ -18348,6 +18948,159 @@ static const uint HIT_KIND_TRIANGLE_FRONT_FACE = 254;
 /// Predefined hit kind value for back-facing triangle intersections.
 /// @category raytracing
 static const uint HIT_KIND_TRIANGLE_BACK_FACE = 255;
+
+//
+// Multi-level Traversal Intrinsics
+//
+
+/// Type representing transform types in multi-level traversal.
+/// @category raytracing
+enum TRAVERSABLE_TRANSFORM_TYPE : uint
+{
+    /// No transformation applied
+    TRAVERSABLE_TRANSFORM_TYPE_NONE = 0,
+
+    /// Static matrix transformation
+    TRAVERSABLE_TRANSFORM_TYPE_STATIC = 1,
+
+    /// Matrix motion transformation
+    TRAVERSABLE_TRANSFORM_TYPE_MATRIX_MOTION = 2,
+
+    /// SRT (scale/rotation/translation) motion transformation
+    TRAVERSABLE_TRANSFORM_TYPE_SRT_MOTION = 3,
+
+    /// Instance transformation
+    TRAVERSABLE_TRANSFORM_TYPE_INSTANCE = 4
+};
+
+/// Returns the transform type of a traversable handle from a transform list.
+/// @param handle Traversable handle to query
+/// @return Transform type enumeration value
+/// @remarks Currently only supported on CUDA/OptiX
+/// @category raytracing
+[NonUniformReturn]
+[__readNone]
+[require(optix_multilevel_traversal, raytracing_stages)]
+TRAVERSABLE_TRANSFORM_TYPE GetTraversableTransformType(uint64_t handle)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "optixGetTransformTypeFromHandle";
+    }
+}
+
+/// Returns an instance traversable from an IAS by index.
+/// @param ias Instance acceleration structure handle
+/// @param instIdx Instance index
+/// @return Traversable handle for the specified instance
+/// @remarks IAS must be built with OPTIX_BUILD_FLAG_ALLOW_RANDOM_INSTANCE_ACCESS
+/// @remarks Currently only supported on CUDA/OptiX
+/// @category raytracing
+[NonUniformReturn]
+[__readNone]
+[require(optix_multilevel_traversal, raytracing_stages)]
+uint64_t GetInstanceTraversable(uint64_t ias, uint instIdx)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "optixGetInstanceTraversableFromIAS";
+    }
+}
+
+/// Returns the instance ID from a traversable handle.
+/// @param handle Traversable handle to query
+/// @return Instance ID, or 0 if handle does not reference an instance
+/// @remarks Currently only supported on CUDA/OptiX
+/// @category raytracing
+[NonUniformReturn]
+[__readNone]
+[require(optix_multilevel_traversal, raytracing_stages)]
+uint GetTraversableInstanceId(uint64_t handle)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "optixGetInstanceIdFromHandle";
+    }
+}
+
+/// Returns the child traversable handle from an instance traversable.
+/// @param handle Instance traversable handle to query
+/// @return Child traversable handle, or 0 if handle does not reference an instance
+/// @remarks Currently only supported on CUDA/OptiX
+/// @category raytracing
+[NonUniformReturn]
+[__readNone]
+[require(optix_multilevel_traversal, raytracing_stages)]
+uint64_t GetTraversableChild(uint64_t handle)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "optixGetInstanceChildFromHandle";
+    }
+}
+
+/// Returns the object-to-world transform from an instance traversable.
+/// @param handle Instance traversable handle to query
+/// @return 3x4 transform matrix representing the object-to-world transformation
+/// @remarks Currently only supported on CUDA/OptiX
+/// @category raytracing
+[NonUniformReturn]
+[__readNone]
+[require(optix_multilevel_traversal, raytracing_stages)]
+float3x4 GetTraversableObjectToWorld(uint64_t handle)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "_slang_optixGetInstanceTransformFromHandle";
+    }
+}
+
+/// Returns the world-to-object transform from an instance traversable.
+/// @param handle Instance traversable handle to query
+/// @return 3x4 transform matrix representing the world-to-object transformation
+/// @remarks Currently only supported on CUDA/OptiX
+/// @category raytracing
+[NonUniformReturn]
+[__readNone]
+[require(optix_multilevel_traversal, raytracing_stages)]
+float3x4 GetTraversableWorldToObject(uint64_t handle)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "_slang_optixGetInstanceInverseTransformFromHandle";
+    }
+}
+
+/// Returns the number of transforms in the path from root to the current primitive.
+/// @return Number of transforms from root traversable to current primitive
+/// @remarks Currently only supported on CUDA/OptiX. Can only be called from intersection, any-hit, or closest-hit programs.
+/// @category raytracing
+[NonUniformReturn]
+[__readNone]
+[require(optix_multilevel_traversal, raytracing_anyhit_closesthit_intersection)]
+uint GetTransformListSize()
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "optixGetTransformListSize";
+    }
+}
+
+/// Returns the traversable handle at a specific index in the transform path.
+/// @param index Index in the transform list (0 = root, GetTransformListSize()-1 = closest to primitive)
+/// @return Traversable handle at the specified index
+/// @remarks Currently only supported on CUDA/OptiX. Can only be called from intersection, any-hit, or closest-hit programs.
+/// @category raytracing
+[NonUniformReturn]
+[__readNone]
+[require(optix_multilevel_traversal, raytracing_anyhit_closesthit_intersection)]
+uint64_t GetTransformListHandle(uint index)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "optixGetTransformListHandle";
+    }
+}
 
 //
 // Shader Model 6.4
@@ -18718,7 +19471,7 @@ uint GeometryIndex()
 /// Get the vertex positions of the currently hit triangle in any-hit or closest-hit shader.
 /// https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GLSL_EXT_ray_tracing_position_fetch.txt
 /// @param index Index of the vertex (0-2)
-/// @return World-space position of the specified vertex
+/// @return Object-space position of the specified vertex
 /// @remarks Requires ray tracing position fetch extension
 /// @see GL_EXT_ray_tracing_position_fetch
 /// @category raytracing
@@ -19567,7 +20320,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     }
 ///~
 
-${{{{
+${
     const char* kCandidateCommitted[] = {"Candidate", "Committed"};
 
     // Access Candidate and Committed Matrices.
@@ -19575,7 +20328,7 @@ ${{{{
     {
         auto ccName = kCandidateCommitted[candidateOrCommitted];
         auto ccTF = candidateOrCommitted == 0 ? "false" : "true";
-}}}}
+$}
 
     __glsl_extension(GL_EXT_ray_query)
     __glsl_extension(GL_EXT_ray_tracing_position_fetch)
@@ -19617,10 +20370,10 @@ ${{{{
 
     // CandidateObjectToWorld3x4, CandidateWorldToObject4x3
     // CommittedObjectToWorld3x4, CommittedObjectToWorld4x3
-    ${{{{
+    ${
     const char* kRayQueryMatrixNames[] = {"ObjectToWorld", "WorldToObject"};
     for (auto matName : kRayQueryMatrixNames) {
-    }}}}
+    $}
 
     /// Gets the object-to-world transform as a 3x4 matrix.
     /// @return 3x4 matrix transforming from object to world space
@@ -19667,7 +20420,7 @@ ${{{{
         }
     }
 
-${{{{
+${
     } // ObjectToWorld/WorldToObject.
 
     // Access Candidate and Committed properties.
@@ -19689,7 +20442,7 @@ ${{{{
         {"float2", "TriangleBarycentrics", "Barycentrics"},
     };
     for (auto method : rayQueryMethods) {
-}}}}
+$}
 
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
@@ -19709,10 +20462,10 @@ ${{{{
             };
         }
     }
-${{{{
+${
     } // Candidate/Committed properties.
     } // for ("Candidate", "Committed")
-}}}}
+$}
 
     // Access properties of the ray being traced.
 
@@ -20831,13 +21584,14 @@ struct HitObject
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetHitKind()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".GetHitKind";
         case glsl: __intrinsic_asm "hitObjectGetHitKindNV($0)";
+        case cuda: __intrinsic_asm "optixHitObjectGetHitKind()";
         case spirv:
             return spirv_asm
             {
@@ -21029,12 +21783,13 @@ struct HitObject
     }
 
     [ForceInline]
-    [require(glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
     float3 GetObjectRayOrigin() {
         __target_switch
         {
         case glsl:
             __intrinsic_asm "hitObjectGetObjectRayOriginNV($0)";
+        case cuda: __intrinsic_asm "optixGetObjectRayOrigin()";
         case spirv:
             return spirv_asm
             {
@@ -21046,12 +21801,13 @@ struct HitObject
     }
 
     [ForceInline]
-    [require(glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
     float3 GetObjectRayDirection() {
         __target_switch
         {
         case glsl:
             __intrinsic_asm "hitObjectGetObjectRayDirectionNV($0)";
+        case cuda: __intrinsic_asm "optixGetObjectRayDirection()";
         case spirv:
             return spirv_asm
             {
@@ -21822,7 +22578,6 @@ func saturated_cooperation_using<A, B, C>(
 }
 
 
-${
 // The NVAPI operations are defined to take the space/register
 // indices of their texture and sampler parameters, rather than
 // taking the texture/sampler objects directly.
@@ -21834,7 +22589,6 @@ ${
 // have a built-in `interface` that all of the opaque resource
 // types conform to, so that we can define builtins that work
 // for any resource type.
-}
 
 __intrinsic_op($(kIROp_GetRegisterSpace)) uint __getRegisterSpace<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>(_Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> texture);
 __intrinsic_op($(kIROp_GetRegisterSpace)) uint __getRegisterSpace(SamplerState sampler);
@@ -21844,7 +22598,6 @@ __intrinsic_op($(kIROp_GetRegisterIndex)) uint __getRegisterIndex(SamplerState s
 
 //@public:
 
-${{{{
 //
 // Texture Footprint Queries
 //
@@ -21876,7 +22629,6 @@ ${{{{
 // data that is returned by the GLSL API via the
 // function reuslt.
 //
-}}}}
 
 [__NoSideEffect]
 [__requiresNVAPI]
@@ -22023,46 +22775,40 @@ typealias TextureFootprint2D = TextureFootprint<2>;
 ///@category stage_io
 typealias TextureFootprint3D = TextureFootprint<3>;
 
-${
 // We define the new operations via an `extension`
 // on the relevant texture type(s), rather than
 // further clutter the original type declarations.
-}
 
 __generic<T:ITexelElement, Shape: __ITextureShape, let sampleCount:int, let isShadow:int, let format:int>
 extension _Texture<T,Shape,0,0,sampleCount,0,isShadow,0,format>
 {
-${
-// We introduce a few convenience type aliases here,
-// which both keep our declarations simpler and easier
-// to understand, but which might *also* be useful to
-// users of the standard module, so that they can write things
-// like `Texture2D.Footprint`, and also have auto-complete
-// help them find such members.
-//
-// TODO: The `Coords` type really ought to be something
-// defined on the base texture types, rather than via
-// this `extension`.
-}
+    // We introduce a few convenience type aliases here,
+    // which both keep our declarations simpler and easier
+    // to understand, but which might *also* be useful to
+    // users of the standard module, so that they can write things
+    // like `Texture2D.Footprint`, and also have auto-complete
+    // help them find such members.
+    //
+    // TODO: The `Coords` type really ought to be something
+    // defined on the base texture types, rather than via
+    // this `extension`.
+
     typealias Coords = vector<float, Shape.dimensions>;
     typealias Footprint = TextureFootprint<Shape.dimensions>;
     typealias __FootprintData = __TextureFootprintData<Shape.dimensions>;
     typealias FootprintGranularity = Footprint.Granularity;
 
-${
-// For the GLSL extension, the choice between the
-// coarse and fine level is modeled as a `bool`
-// parameter to the query operation(s). We define
-// the GLSL functions here as intrinsics, so that
-// we can refer to them later in the definitions
-// of our standard module operaitons; not just in glsl module.
-//
-// Note: despite the GLSL extension defining the `granularity`
-// member of the query result as having type `uint`, the
-// function signatures all take `int` parameters for the
-// granularity instead.
-//
-}
+    // For the GLSL extension, the choice between the
+    // coarse and fine level is modeled as a `bool`
+    // parameter to the query operation(s). We define
+    // the GLSL functions here as intrinsics, so that
+    // we can refer to them later in the definitions
+    // of our standard module operaitons; not just in glsl module.
+    //
+    // Note: despite the GLSL extension defining the `granularity`
+    // member of the query result as having type `uint`, the
+    // function signatures all take `int` parameters for the
+    // granularity instead.
 
     [__NoSideEffect]
     __glsl_version(450)
@@ -22210,9 +22956,8 @@ ${
     }
 
 
-${{{
     // Texture sampling with gradient is only available for 2D textures.
-}}}
+
     [__NoSideEffect]
     __glsl_version(450)
     __glsl_extension(GL_NV_shader_texture_footprint)
@@ -22274,12 +23019,11 @@ ${{{
             };
         }
     }
-${{{
+
     // End texture2D specific functions.
-}}}
 
 
-${{{{
+${
 // The NVAPI texture query operations encode the choice
 // between coarse and fine levels as part of the function
 // name, and so we are forced to match this convention
@@ -22311,7 +23055,7 @@ for(auto levelChoice : kLevelChoices)
 // with that parameter, since they have no equivalent in
 // the GLSL extension.
 //
-}}}}
+$}
 
     [__NoSideEffect]
     [__requiresNVAPI]
@@ -22393,24 +23137,21 @@ for(auto levelChoice : kLevelChoices)
         }
     }
 
-${
-// We now define the portable operations that will be officially
-// supported by the standard module. For each operation, we
-// need to provide both a version that maps to the GLSL extension,
-// and a version that uses the NVAPI functions.
-//
-// Some function variations are only available with one extension
-// or the other, so we try our best to only define them where
-// each is available.
-//
-// Note that these functions cannot be marked as [ForceInline] for now
-// because the texture resource may get removed after DCE, since the only
-// use of those resources are done through __GetRegisterIndex/Space, which is
-// replaced early with their binding slot in the compilation process.
-// Not inlining these function is a quick way to make sure the texture always
-// has live uses.
-//
-}
+    // We now define the portable operations that will be officially
+    // supported by the standard module. For each operation, we
+    // need to provide both a version that maps to the GLSL extension,
+    // and a version that uses the NVAPI functions.
+    //
+    // Some function variations are only available with one extension
+    // or the other, so we try our best to only define them where
+    // each is available.
+    //
+    // Note that these functions cannot be marked as [ForceInline] for now
+    // because the texture resource may get removed after DCE, since the only
+    // use of those resources are done through __GetRegisterIndex/Space, which is
+    // replaced early with their binding slot in the compilation process.
+    // Not inlining these function is a quick way to make sure the texture always
+    // has live uses.
 
     /// Query the footprint that would be accessed by a texture sampling operation.
     ///
@@ -22563,9 +23304,7 @@ ${
         }
     }
 
-${{{
     // TODO: Texture sampling with gradient is only available for 2D textures.
-}}}
 
     /// Query the footprint that would be accessed by a texture sampling operation.
     ///
@@ -22628,13 +23367,11 @@ ${{{
         }
     }
 
-${{{
     // TODO: end texture2D specific functions.
-}}}
 
-${{{{
-}
-}}}}
+${
+} // for(auto levelChoice : kLevelChoices)
+$}
 
 } // extension
 
@@ -22842,7 +23579,7 @@ extension _Texture<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCom
     }
 }
 
-${{{{
+${
 struct DynamicResourceTypeInfo
 {
     const char* name;
@@ -22876,7 +23613,7 @@ for (auto type : kDynamicResourceCastableTypes) {
         sb << "__generic<T, L : IBufferDataLayout>\n";
     else if (strstr(typeName, "<T>"))
         sb << "__generic<T>\n";
-}}}}
+$}
 
 extension $(typeName) : __IDynamicResourceCastable<__DynamicResourceKind.$(dynamicKind)>
 {
@@ -22897,9 +23634,9 @@ extension $(typeName) : __IDynamicResourceCastable<__DynamicResourceKind.$(dynam
     }
 }
 
-${{{{
-}
-}}}}
+${
+} // for (auto type : kDynamicResourceCastableTypes) {
+$}
 
 
 /// Represents a bindless handle to a descriptor. A descriptor handle is always an ordinary data type and can be
@@ -23071,7 +23808,7 @@ T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handle
 
         switch(bindlessOptions)
         {
-${{{{
+${
 {
     static const struct
     {
@@ -23090,7 +23827,7 @@ ${{{{
 
         bindlessOptionIfElsePre << "case BindlessDescriptorOptions." << bindlessOption.option <<":\n{\n";
         bindlessOptionIfElsePost << "}\n";
-}}}}
+$}
     $(bindlessOptionIfElsePre.toString())
     switch(T.kind)
     {
@@ -23130,10 +23867,10 @@ ${{{{
         return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Unknown)[((uint2)handleValue).x];
     }
     $(bindlessOptionIfElsePost.toString())
-${{{{
+${
     }
 }
-}}}}
+$}
     default:
     {
         static_assert(false, "Impossible to end up here unless something went very wrong");
@@ -23210,6 +23947,18 @@ extension<T, L : IBufferDataLayout> RasterizerOrderedStructuredBuffer<T, L> : IR
     int getCount() { uint count; uint stride; this.GetDimensions(count, stride); return count; }
 }
 
+[require(vk_mem_model)]
+internal void enableVMMDeviceScopeCapabilityIfNeeded(constexpr MemoryScope memoryScope)
+{
+    if (memoryScope == MemoryScope::Device)
+    {
+        spirv_asm
+        {
+            OpCapability VulkanMemoryModelDeviceScopeKHR;
+        };
+    }
+}
+
 namespace linalg
 {
 
@@ -23240,7 +23989,7 @@ enum CoopMatClampMode
 };
 
 
-${{{{
+${
 // SPIRV described that the max value for `Dim` is 5.
 //
 // https://github.khronos.org/SPIRV-Registry/extensions/NV/SPV_NV_tensor_addressing.html#OpTypeTensorLayoutNV
@@ -23256,7 +24005,7 @@ ${{{{
 // zero and less than or equal to 5.
 //
 const int kMaxCoopMatTensorDimension = 5;
-}}}}
+$}
 
 //
 // TensorLayout
@@ -23275,7 +24024,7 @@ struct TensorLayout
 };
 
 
-${{{{
+${
     for (int iDim = 1; iDim < kMaxCoopMatTensorDimension; ++iDim)
     {
         StringBuilder dimParams;
@@ -23297,7 +24046,7 @@ ${{{{
             blockSizeParams << ", uint32_t blockSize" << j;
             blockSizeAsms << " $blockSize" << j;
         }
-}}}}
+$}
 
 
 extension<
@@ -23370,15 +24119,15 @@ extension<
     }
 };
 
-${{{{
+${
     } // iDim
-}}}}
+$}
 
 //
 // TensorView
 //
 
-${{{{
+${
     StringBuilder tensorViewStruct;
     for (int j = 0; j < kMaxCoopMatTensorDimension; ++j)
     {
@@ -23387,7 +24136,7 @@ ${{{{
         // is explicitly set by the user or not.
         tensorViewStruct << ", let p" << j << " : uint32_t = 0xff";
     }
-}}}}
+$}
 
 __intrinsic_type($(kIROp_TensorAddressingTensorViewType))
 __generic<
@@ -23401,7 +24150,7 @@ struct TensorView
     __init();
 };
 
-${{{{
+${
     for (int iDim = 1; iDim < kMaxCoopMatTensorDimension; ++iDim)
     {
         StringBuilder tensorViewTypes;
@@ -23423,7 +24172,7 @@ ${{{{
         {
             tensorViewExtensions << ", 0xff";
         }
-}}}}
+$}
 
 [require(tensor_addressing)]
 extension<
@@ -23472,15 +24221,70 @@ extension<
     }
 };
 
-${{{{
+${
     } // iDim
-}}}}
+$}
 
 
 //
 // Cooperative Matrix type
 //
 
+//@public:
+/**
+Represents a cooperative matrix for efficient warp/subgroup-level matrix operations on GPU hardware.
+CoopMat enables high-performance matrix multiply-accumulate operations by distributing matrix
+fragments across threads within a warp or subgroup. This type leverages specialized hardware
+instructions such as CUDA's WMMA (Warp Matrix Multiply-Accumulate) or Vulkan cooperative
+matrix extensions.
+
+@param T The element type of the matrix. Must be a built-in arithmetic type.
+@param S The memory scope defining the cooperative group (e.g., device, workgroup, subgroup).
+@param M The number of rows in the matrix fragment.
+@param N The number of columns in the matrix fragment.
+@param R The matrix use specifier indicating whether this is a Matrix A, Matrix B, or accumulator matrix.
+
+@remarks
+The dimensions M and N must match hardware-supported fragment shapes. For CUDA WMMA,
+valid shape combinations are (where k is always 16):
+- Shape m16n16k16: Matrix A (16×16), Matrix B (16×16), Accumulator (16×16)
+- Shape m8n32k16:  Matrix A (8×16),  Matrix B (16×32), Accumulator (8×32)
+- Shape m32n8k16:  Matrix A (32×16), Matrix B (16×8),  Accumulator (32×8)
+
+Matrix A dimensions are (m×k), Matrix B dimensions are (k×n), and Accumulator dimensions are (m×n).
+For all CUDA WMMA shapes listed above:
+- Matrix A and B support: half, uint8, int8
+- Accumulator (Matrix C) supports: float, half, int
+
+All matrices involved in a multiply-accumulate operation must use the same shape combination.
+The actual physical layout and distribution of elements across threads is hardware-specific.
+
+When targeting Vulkan/SPIR-V, this type uses the SPV_KHR_cooperative_matrix extension (and optionally
+SPV_NV_cooperative_matrix2 for advanced features like transpose, reductions, and per-element operations).
+Valid shape combinations for Vulkan cooperative matrices (example device properties):
+
+With float16 elements (A/B/C element types):
+- Shape m16n16k16: Matrix A (16×16), Matrix B (16×16), Accumulator (16×16) - half/half/half
+- Shape m16n8k16:  Matrix A (16×16), Matrix B (16×8),  Accumulator (16×8)  - half/half/half
+- Shape m16n8k8:   Matrix A (16×8),  Matrix B (8×8),   Accumulator (16×8)  - half/half/half
+- Shape m16n16k16: Matrix A (16×16), Matrix B (16×16), Accumulator (16×16) - half/half/float
+- Shape m16n8k16:  Matrix A (16×16), Matrix B (16×8),  Accumulator (16×8)  - half/half/float
+- Shape m16n8k8:   Matrix A (16×8),  Matrix B (8×8),   Accumulator (16×8)  - half/half/float
+
+With 8-bit integer elements (A/B/C element types):
+- Shape m16n16k32: Matrix A (16×32), Matrix B (32×16), Accumulator (16×16) - uint8/uint8/uint32
+- Shape m16n16k32: Matrix A (16×32), Matrix B (32×16), Accumulator (16×16) - int8/int8/int32
+- Shape m16n8k32:  Matrix A (16×32), Matrix B (32×8),  Accumulator (16×8)  - uint8/uint8/uint32
+- Shape m16n8k32:  Matrix A (16×32), Matrix B (32×8),  Accumulator (16×8)  - int8/int8/int32
+
+Note: Vulkan's supported shapes are device-specific and can be queried at runtime using
+VkPhysicalDeviceCooperativeMatrixPropertiesKHR. The above list represents common configurations
+but may vary by GPU vendor and driver. The element distribution across threads in a subgroup
+may differ between CUDA and Vulkan implementations, so code using the subscript operator
+should only perform uniform operations for portability.
+
+@category matrix_types
+*/
 __intrinsic_type($(kIROp_CoopMatrixType))
 [require(cooperative_matrix)]
 __generic<
@@ -23498,12 +24302,15 @@ struct CoopMat
     // Initialization
     //
 
+    /// Default constructor. Creates an uninitialized cooperative matrix.
     [ForceInline]
     [require(cooperative_matrix)]
     __init()
     {
     }
 
+    /// Constructs a cooperative matrix and fills all elements with the specified value.
+    /// @param t The value to fill the matrix with.
     [ForceInline]
     [require(cooperative_matrix)]
     __init(T t)
@@ -23511,6 +24318,9 @@ struct CoopMat
         this.fill(t);
     }
 
+    /// Constructs a cooperative matrix by copying and converting from another cooperative matrix.
+    /// @param U The element type of the source cooperative matrix.
+    /// @param other The source cooperative matrix to copy from.
     [ForceInline]
     [require(cooperative_matrix_conversion)]
     __init<
@@ -23520,6 +24330,8 @@ struct CoopMat
         this.copyFrom(other);
     }
 
+    /// Copy constructor. Creates a cooperative matrix from another matrix of the same type.
+    /// @param x The cooperative matrix to copy from.
     [ForceInline]
     [require(cooperative_matrix)]
     __init(This x)
@@ -23527,7 +24339,8 @@ struct CoopMat
         this = x;
     }
 
-    // Required for `IArithmetic`.
+    /// Constructs a cooperative matrix from an integer value. Required for `IArithmetic` conformance.
+    /// @param i The integer value to convert to the element type and fill the matrix with.
     [ForceInline]
     [OverloadRank(-10)]
     [require(cooperative_matrix)]
@@ -23547,10 +24360,16 @@ struct CoopMat
     [require(cooperative_matrix)]
     void fill(T t)
     {
-        this = spirv_asm
+        __target_switch
         {
-            result:$$CoopMat<T, S, M, N, R> = OpConstantComposite $t;
-        };
+        case spirv:
+            this = spirv_asm
+            {
+                result:$$CoopMat<T, S, M, N, R> = OpConstantComposite $t;
+            };
+        case cuda:
+            __intrinsic_asm "($0)->fill($1)";
+        }
     }
 
     /// Copies the contents from another cooperative matrix into this matrix.
@@ -23563,6 +24382,9 @@ struct CoopMat
         U : __BuiltinArithmeticType
     >(CoopMat<U, S, M, N, R> other)
     {
+    __target_switch
+    {
+    case spirv:
         if (__isFloat<T>() && __isInt<U>())
             this = __int_to_float_cast<T>(other);
         else if (__isInt<T>() && __isFloat<U>())
@@ -23571,6 +24393,10 @@ struct CoopMat
             this = __real_cast<T>(other);
         else if (__isInt<T>() && __isInt<U>())
             this = __int_cast<T>(other);
+    case cuda:
+        __intrinsic_asm "($0)->copyFrom<$T1::ElementType>($1)";
+    }
+
     }
 
     //
@@ -23586,7 +24412,12 @@ struct CoopMat
     [__NoSideEffect]
     Ref<T> __indexRef(int index);
 
-    /// Returns the count as an integer value.
+    /// Returns the number of elements for accessible by the current thread.
+    /// The number of components accessible by current thread is implementation-dependent.
+    /// @return The number of elements accessible by the current thread.
+    ///
+    ///
+    /// @remarks The return value is unlikely to be same to M * N.
     [ForceInline]
     [require(cooperative_matrix)]
     [__NoSideEffect]
@@ -23595,19 +24426,38 @@ struct CoopMat
         return GetLength();
     }
 
+    /// Subscript operator to access elements in the cooperative matrix.
+    /// The components of a cooperative matrix are spread cross the threads in its scope,
+    /// it's implementation-dependent manner. Therefore, Vulkan and CUDA could have different
+    /// distributions. The subscript operator only provides the access to the elements that
+    /// belong to the current thread, but the locations of those elements on the matrix is
+    /// unspecified. It indicates that user can only use this operator to perform uniform
+    /// operations.
     __subscript(int index) -> T
     {
         [__NoSideEffect]
         [nonmutating]
         get
         {
-            return __indexRead(index);
+            __target_switch
+            {
+            case spirv:
+                return __indexRead(index);
+            case cuda:
+                __intrinsic_asm "($0).get($1)";
+            }
         }
 
         [mutating]
         set
         {
-            __indexRef(index) = newValue;
+            __target_switch
+            {
+            case spirv:
+                __indexRef(index) = newValue;
+            case cuda:
+                __intrinsic_asm "($0)->set($1, $2)";
+            }
         }
     }
 
@@ -23615,19 +24465,33 @@ struct CoopMat
     // CoopMat operations
     //
 
-    /// Returns the number of elements for the current thread.
-    /// Depending on the number of threads for the given matrix, each
-    /// thread will get smaller length.
+    /// Returns the number of elements for accessible by the current thread.
+    /// The number of components accessible by current thread is implementation-dependent.
+    /// @return The number of elements accessible by the current thread.
+    ///
     ///
     /// @remarks The return value is unlikely to be same to M * N.
     [ForceInline]
     [require(cooperative_matrix)]
     static uint GetLength()
     {
-        return spirv_asm
+        __target_switch
         {
-            result:$$uint = OpCooperativeMatrixLengthKHR $$CoopMat<T, S, M, N, R>;
-        };
+        case spirv:
+            return spirv_asm
+            {
+                result:$$uint = OpCooperativeMatrixLengthKHR $$CoopMat<T, S, M, N, R>;
+            };
+        case cuda:
+            This result;
+            return __getNumElementsPerThread(result);
+        }
+    }
+
+    [require(cuda_sm_8_0)]
+    internal static uint __getNumElementsPerThread(__ref This coopMat)
+    {
+        __intrinsic_asm "($0)->GetLength()";
     }
 
     /// Returns the number of rows in the matrix.
@@ -23646,6 +24510,8 @@ struct CoopMat
         return N;
     }
 
+    /// Transposes the cooperative matrix. Requires Vulkan with SPV_NV_cooperative_matrix2 extension.
+    /// @return A transposed cooperative matrix with dimensions N×M and MatrixB usage.
     [require(cooperative_matrix_conversion)]
     CoopMat<T, S, N, M, CoopMatMatrixUse.MatrixB> Transpose()
     {
@@ -23657,6 +24523,11 @@ struct CoopMat
         };
     }
 
+    /// Reduces the matrix along rows using the specified combining operation.
+    /// Requires Vulkan with SPV_NV_cooperative_matrix2 extension.
+    /// @param RN The number of columns in the resulting reduced matrix.
+    /// @param combineOp The binary function used to combine elements (e.g., addition, multiplication).
+    /// @return A reduced accumulator matrix with dimensions M×RN.
     [require(cooperative_matrix_reduction)]
     CoopMat<T, S, M, RN, CoopMatMatrixUse.MatrixAccumulator> ReduceRow<
         let RN : int
@@ -23670,6 +24541,11 @@ struct CoopMat
         };
     }
 
+    /// Reduces the matrix along columns using the specified combining operation.
+    /// Requires Vulkan with SPV_NV_cooperative_matrix2 extension.
+    /// @param RM The number of rows in the resulting reduced matrix.
+    /// @param combineOp The binary function used to combine elements (e.g., addition, multiplication).
+    /// @return A reduced accumulator matrix with dimensions RM×N.
     [require(cooperative_matrix_reduction)]
     CoopMat<T, S, RM, N, CoopMatMatrixUse.MatrixAccumulator> ReduceColumn<
         let RM : int
@@ -23683,6 +24559,12 @@ struct CoopMat
         };
     }
 
+    /// Reduces the matrix along both rows and columns using the specified combining operation.
+    /// Requires Vulkan with SPV_NV_cooperative_matrix2 extension.
+    /// @param RM The number of rows in the resulting reduced matrix.
+    /// @param RN The number of columns in the resulting reduced matrix.
+    /// @param combineOp The binary function used to combine elements (e.g., addition, multiplication).
+    /// @return A reduced accumulator matrix with dimensions RM×RN.
     [require(cooperative_matrix_reduction)]
     CoopMat<T, S, RM, RN, CoopMatMatrixUse.MatrixAccumulator> ReduceRowAndColumn<
         let RM : int,
@@ -23697,6 +24579,10 @@ struct CoopMat
         };
     }
 
+    /// Reduces the matrix in 2×2 blocks using the specified combining operation.
+    /// Requires Vulkan with SPV_NV_cooperative_matrix2 extension.
+    /// @param combineOp The binary function used to combine elements within each 2×2 block.
+    /// @return A reduced accumulator matrix with dimensions (M/2)×(N/2).
     [require(cooperative_matrix_reduction)]
     CoopMat<T, S, M / 2, N / 2, CoopMatMatrixUse.MatrixAccumulator> Reduce2x2(functype(T, T)->T combineOp)
     {
@@ -23708,6 +24594,10 @@ struct CoopMat
         };
     }
 
+    /// Applies a per-element operation to the cooperative matrix.
+    /// Requires Vulkan with SPV_NV_cooperative_matrix2 extension.
+    /// @param mapOp A function that takes (row, column, element) and returns a new element value.
+    /// @return A new cooperative matrix with the operation applied to each element.
     [require(cooperative_matrix_map_element)]
     This MapElement(functype(uint32_t, uint32_t, T)->T mapOp)
     {
@@ -23729,6 +24619,11 @@ struct CoopMat
         TFunc mapObj
     );
 
+    /// Applies a per-element operation to the cooperative matrix using a functor.
+    /// Requires Vulkan with SPV_NV_cooperative_matrix2 extension.
+    /// @param TFunc The functor type implementing IFunc<T, uint32_t, uint32_t, T>.
+    /// @param mapOp A functor object that takes (row, column, element) and returns a new element value.
+    /// @return A new cooperative matrix with the operation applied to each element.
     This MapElement<
         TFunc : IFunc<T, uint32_t, uint32_t, T>
     >(TFunc mapOp)
@@ -23740,7 +24635,12 @@ struct CoopMat
     // Store
     //
 
-    [require(cooperative_matrix)]
+    /// Stores the cooperative matrix into a byte address buffer.
+    /// @param buffer The RWByteAddressBuffer to store the matrix into.
+    /// @param element The starting element index in the buffer to store the matrix into.
+    /// @param stride The stride in elements between consecutive rows (for row major layout) or columns (for column major layout)
+    ///        and must be a multiple of 8 for __half element type or multiple of 4 for float element type. (i.e., multiple of 16 bytes in both cases)
+    [require(cooperative_matrix, byteaddressbuffer)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout
     >(RWByteAddressBuffer buffer, uint element, uint stride)
@@ -23748,6 +24648,12 @@ struct CoopMat
         __store<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
     }
 
+    /// Stores the cooperative matrix into a structured buffer.
+    /// @param buffer The RWStructuredBuffer to store the matrix into.
+    /// @param element The starting element index in the buffer to store the matrix into.
+    /// @param stride The stride in elements between consecutive rows (for row major layout) or
+    ///        columns (for column major layout) and must be a multiple of 8 for __half element type
+    ///        or multiple of 4 for float element type. (i.e., multiple of 16 bytes in both cases)
     [require(cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout
@@ -23763,27 +24669,79 @@ struct CoopMat
     {
         let zero = 0;
         let alignment = 16U;
-        spirv_asm
+        __target_switch
         {
-            %storagePointerType = OpTypePointer StorageBuffer $$T;
-            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-            OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
-        };
+        case spirv:
+            spirv_asm
+            {
+                %storagePointerType = OpTypePointer StorageBuffer $$T;
+                %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
+                OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>($1, $2, $3)";
+            else
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>($1, $2, $3)";
+        }
     }
 
+    /// Stores the cooperative matrix into a pointer buffer.
+    /// @param matrixLayout The memory layout (RowMajor or ColMajor) to use when storing.
+    /// @param buffer The pointer to the buffer to store the matrix into.
+    /// @param element The starting element index in the buffer.
+    /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     [require(cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout
     >(T* buffer, uint element, uint stride)
     {
+        __target_switch
+        {
+        case spirv:
+            let alignment = 16U;
+            return spirv_asm
+            {
+                %pointer:$$T* = OpPtrAccessChain $buffer $element;
+                OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>($1, $2, $3)";
+            else
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>($1, $2, $3)";
+        }
+    }
+
+    // TODO: make this function an intrinsic and support all types via the single intrinsic
+    /// Stores the cooperative matrix into a pointer buffer with coherent memory access.
+    /// Ensures memory writes are made available across the specified memory scope. Vulkan only.
+    /// @param matrixLayout The memory layout (RowMajor or ColMajor) to use when storing.
+    /// @param buffer The pointer to the buffer to store the matrix into.
+    /// @param element The starting element index in the buffer.
+    /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
+    /// @param memoryScope The scope across which the write should be made visible (e.g., Device, Workgroup).
+    [require(cooperative_matrix_spirv, vk_mem_model)]
+    void StoreCoherent<
+        let matrixLayout : CoopMatMatrixLayout
+    >(T* buffer, uint element, uint stride, constexpr MemoryScope memoryScope)
+    {
+        enableVMMDeviceScopeCapabilityIfNeeded(memoryScope);
         let alignment = 16U;
+        const int32_t scope = (int32_t)memoryScope;
         return spirv_asm
         {
             %pointer:$$T* = OpPtrAccessChain $buffer $element;
-            OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
+            OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned|MakePointerAvailable|NonPrivatePointer !alignment $scope;
         };
     }
 
+    /// Stores the cooperative matrix into a groupshared (workgroup) memory array.
+    /// @param matrixLayout The memory layout (RowMajor or ColMajor) to use when storing.
+    /// @param V The size of the groupshared array.
+    /// @param data The groupshared array to store the matrix into.
+    /// @param element The starting element index in the array.
+    /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     [ForceInline]
     [require(cooperative_matrix)]
     void Store<
@@ -23791,17 +24749,34 @@ struct CoopMat
         let V : int
     >(__ref groupshared T[V] data, uint element, uint stride)
     {
-        let alignment = 16U;
-        spirv_asm
+        __target_switch
         {
-            %workgroupPointerType = OpTypePointer Workgroup $$T;
-            %pointer:%workgroupPointerType = OpAccessChain &data $element;
-            OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
-        };
+        case spirv:
+            let alignment = 16U;
+            spirv_asm
+            {
+                %workgroupPointerType = OpTypePointer Workgroup $$T;
+                %pointer:%workgroupPointerType = OpAccessChain &data $element;
+                OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>(($1)->m_data, $2, $3)";
+            else
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>(($1)->m_data, $2, $3)";
+        }
     }
 
+    /// Stores the cooperative matrix into a groupshared (workgroup) memory array with a different element type.
+    /// Vulkan only.
+    /// @param matrixLayout The memory layout (RowMajor or ColMajor) to use when storing.
+    /// @param U The element type of the groupshared array (may differ from T).
+    /// @param V The size of the groupshared array.
+    /// @param data The groupshared array to store the matrix into.
+    /// @param element The starting element index in the array.
+    /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     [ForceInline]
-    [require(cooperative_matrix)]
+    [require(cooperative_matrix_spirv)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -23817,6 +24792,15 @@ struct CoopMat
         };
     }
 
+    /// Stores the cooperative matrix into a groupshared (workgroup) memory array of vectors.
+    /// Vulkan only.
+    /// @param matrixLayout The memory layout (RowMajor or ColMajor) to use when storing.
+    /// @param U The element type of the vectors in the groupshared array.
+    /// @param V The size of the groupshared array.
+    /// @param L The length of each vector in the array.
+    /// @param data The groupshared vector array to store the matrix into.
+    /// @param element The starting element index in the array.
+    /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     [ForceInline]
     [require(cooperative_matrix)]
     void Store<
@@ -23840,13 +24824,13 @@ struct CoopMat
     // Load
     //
 
-${{{{
+${
     for (const char* RW : { "", "RW" })
     {
-}}}}
+$}
 
     [__NoSideEffect]
-    [require(cooperative_matrix)]
+    [require(cooperative_matrix, byteaddressbuffer)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout
     >(
@@ -23868,18 +24852,33 @@ ${{{{
     {
         let zero = 0;
         let alignment = 16U;
-        return spirv_asm
+        __target_switch
         {
-            %storagePointerType = OpTypePointer StorageBuffer $$T;
-            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
-        };
+        case spirv:
+            return spirv_asm
+            {
+                %storagePointerType = OpTypePointer StorageBuffer $$T;
+                %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
+                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>($0, $1, $2)";
+            else
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>($0, $1, $2)";
+        }
     }
 
-${{{{
+${
     } // RW
-}}}}
+$}
 
+    /// Loads a cooperative matrix from a pointer buffer.
+    /// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the buffer.
+    /// @param buffer The pointer to the buffer to load from.
+    /// @param element The starting element index in the buffer.
+    /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
+    /// @return A cooperative matrix loaded from the buffer.
     [ForceInline]
     [__NoSideEffect]
     [require(cooperative_matrix)]
@@ -23887,14 +24886,56 @@ ${{{{
         let matrixLayout : CoopMatMatrixLayout
     >(T* buffer, uint element, uint stride)
     {
-        let alignment = 16;
+        __target_switch
+        {
+        case spirv:
+            let alignment = 16;
+            return spirv_asm
+            {
+                %pointer:$$T* = OpPtrAccessChain $buffer $element;
+                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>($0, $1, $2)";
+            else
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>($0, $1, $2)";
+        }
+    }
+
+    // TODO: make this function an intrinsic and support all types via the single intrinsic
+    /// Loads a cooperative matrix from a pointer buffer with coherent memory access.
+    /// Ensures memory reads observe writes made visible across the specified memory scope. Vulkan only.
+    /// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the buffer.
+    /// @param buffer The pointer to the buffer to load from.
+    /// @param element The starting element index in the buffer.
+    /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
+    /// @param memoryScope The scope from which writes should be visible (e.g., Device, Workgroup).
+    /// @return A cooperative matrix loaded from the buffer.
+    [ForceInline]
+    [__NoSideEffect]
+    [require(cooperative_matrix_spirv, vk_mem_model)]
+    static This LoadCoherent<
+        let matrixLayout : CoopMatMatrixLayout
+    >(T* buffer, uint element, uint stride, constexpr MemoryScope memoryScope)
+    {
+        enableVMMDeviceScopeCapabilityIfNeeded(memoryScope);
+        let alignment = 16U;
+        const int32_t scope = (int32_t)memoryScope;
         return spirv_asm
         {
             %pointer:$$T* = OpPtrAccessChain $buffer $element;
-            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
+            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned|MakePointerVisible|NonPrivatePointer !alignment $scope;
         };
     }
 
+    /// Loads a cooperative matrix from a groupshared (workgroup) memory array.
+    /// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the array.
+    /// @param V The size of the groupshared array.
+    /// @param data The groupshared array to load from.
+    /// @param element The starting element index in the array.
+    /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
+    /// @return A cooperative matrix loaded from the groupshared array.
     [ForceInline]
     [require(cooperative_matrix)]
     static This Load<
@@ -23902,17 +24943,35 @@ ${{{{
         let V : int
     >(__constref groupshared T[V] data, uint element, uint stride)
     {
-        let alignment = 16U;
-        return spirv_asm
+        __target_switch
         {
-            %workgroupPointerType = OpTypePointer Workgroup $$T;
-            %pointer:%workgroupPointerType = OpAccessChain &data $element;
-            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
-        };
+        case spirv:
+            let alignment = 16U;
+            return spirv_asm
+            {
+                %workgroupPointerType = OpTypePointer Workgroup $$T;
+                %pointer:%workgroupPointerType = OpAccessChain &data $element;
+                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>(($0)->m_data, $1, $2)";
+            else
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>(($0)->m_data, $1, $2)";
+        }
     }
 
+    /// Loads a cooperative matrix from a groupshared (workgroup) memory array with a different element type.
+    /// Vulkan only.
+    /// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the array.
+    /// @param U The element type of the groupshared array (may differ from T).
+    /// @param V The size of the groupshared array.
+    /// @param data The groupshared array to load from.
+    /// @param element The starting element index in the array.
+    /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
+    /// @return A cooperative matrix loaded from the groupshared array.
     [ForceInline]
-    [require(cooperative_matrix)]
+    [require(cooperative_matrix_spirv)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -23928,8 +24987,18 @@ ${{{{
         };
     }
 
+    /// Loads a cooperative matrix from a groupshared (workgroup) memory array of vectors.
+    /// Vulkan only.
+    /// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the array.
+    /// @param U The element type of the vectors in the groupshared array.
+    /// @param V The size of the groupshared array.
+    /// @param L The length of each vector in the array.
+    /// @param data The groupshared vector array to load from.
+    /// @param element The starting element index in the array.
+    /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
+    /// @return A cooperative matrix loaded from the groupshared vector array.
     [ForceInline]
-    [require(cooperative_matrix)]
+    [require(cooperative_matrix_spirv)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -23950,21 +25019,38 @@ ${{{{
     // Arithmetic
     //
 
+    /// Performs element-wise addition of two cooperative matrices.
+    /// @param other The cooperative matrix to add.
+    /// @return A new cooperative matrix containing the element-wise sum.
     __intrinsic_op($(kIROp_Add))
     This add(This other);
 
+    /// Performs element-wise subtraction of two cooperative matrices.
+    /// @param other The cooperative matrix to subtract.
+    /// @return A new cooperative matrix containing the element-wise difference.
     __intrinsic_op($(kIROp_Sub))
     This sub(This other);
 
+    /// Performs element-wise multiplication of two cooperative matrices.
+    /// @param other The cooperative matrix to multiply with.
+    /// @return A new cooperative matrix containing the element-wise product.
     __intrinsic_op($(kIROp_Mul))
     This mul(This other);
 
+    /// Performs element-wise division of two cooperative matrices.
+    /// @param other The cooperative matrix to divide by.
+    /// @return A new cooperative matrix containing the element-wise quotient.
     __intrinsic_op($(kIROp_Div))
     This div(This other);
 
+    /// Negates all elements in the cooperative matrix.
+    /// @return A new cooperative matrix with all elements negated.
     __intrinsic_op($(kIROp_Neg))
     This neg();
 
+    /// Performs element-wise modulo operation of two cooperative matrices.
+    /// @param other The cooperative matrix to compute modulo with.
+    /// @return A new cooperative matrix containing the element-wise remainder.
     This mod(This other)
     {
         This ret;
@@ -23979,6 +25065,9 @@ ${{{{
     // Equality and ordering
     //
 
+    /// Tests if two cooperative matrices are equal by comparing all elements.
+    /// @param other The cooperative matrix to compare with.
+    /// @return True if all corresponding elements are equal, false otherwise.
     bool equals(This other)
     {
         for (int i = 0; i < GetLength(); i++)
@@ -23991,6 +25080,9 @@ ${{{{
         return true;
     }
 
+    /// Performs lexicographic comparison to test if this matrix is less than another.
+    /// @param other The cooperative matrix to compare with.
+    /// @return True if this matrix is lexicographically less than other, false otherwise.
     bool lessThan(This other)
     {
         for (int i = 0; i < GetLength(); i++)
@@ -24007,6 +25099,9 @@ ${{{{
         return false;
     }
 
+    /// Performs lexicographic comparison to test if this matrix is less than or equal to another.
+    /// @param other The cooperative matrix to compare with.
+    /// @return True if this matrix is lexicographically less than or equal to other, false otherwise.
     bool lessThanOrEquals(This other)
     {
         for (int i = 0; i < GetLength(); i++)
@@ -24027,7 +25122,7 @@ ${{{{
     // Load with TensorLayout and TensorView
     //
 
-${{{{
+${
     StringBuilder tensorViewTypes;
     StringBuilder tensorViewParams;
     for (int j = 0; j < kMaxCoopMatTensorDimension; ++j)
@@ -24038,7 +25133,7 @@ ${{{{
 
     for (const char* RW : { "", "RW" })
     {
-}}}}
+$}
 
     [require(cooperative_matrix_tensor_addressing)]
     static This Load<
@@ -24269,9 +25364,9 @@ ${{{{
         };
     }
 
-${{{{
+${
     } // RW
-}}}}
+$}
 
     [require(cooperative_matrix_tensor_addressing)]
     void Store<
@@ -24365,8 +25460,20 @@ ${{{{
 // element type for structured buffers, pointers and groupshared arrays.
 //
 
+/// Loads a cooperative matrix from a ByteAddressBuffer.
+/// Convenience function that simplifies template argument resolution by inferring the element type.
+/// @param T The element type of the cooperative matrix.
+/// @param S The memory scope defining the cooperative group.
+/// @param M The number of rows in the matrix fragment.
+/// @param N The number of columns in the matrix fragment.
+/// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
+/// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the buffer.
+/// @param buffer The ByteAddressBuffer to load from.
+/// @param element The starting element index in the buffer.
+/// @param stride The stride in elements between consecutive rows or columns.
+/// @return A cooperative matrix loaded from the buffer.
 [ForceInline]
-[require(cooperative_matrix)]
+[require(cooperative_matrix, byteaddressbuffer)]
 CoopMat<T, S, M, N, R> coopMatLoad<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,
@@ -24382,8 +25489,20 @@ CoopMat<T, S, M, N, R> coopMatLoad<
     return CoopMat<T, S, M, N, R>.Load<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
 }
 
+/// Loads a cooperative matrix from an RWByteAddressBuffer.
+/// Convenience function that simplifies template argument resolution by inferring the element type.
+/// @param T The element type of the cooperative matrix.
+/// @param S The memory scope defining the cooperative group.
+/// @param M The number of rows in the matrix fragment.
+/// @param N The number of columns in the matrix fragment.
+/// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
+/// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the buffer.
+/// @param buffer The RWByteAddressBuffer to load from.
+/// @param element The starting element index in the buffer.
+/// @param stride The stride in elements between consecutive rows or columns.
+/// @return A cooperative matrix loaded from the buffer.
 [ForceInline]
-[require(cooperative_matrix)]
+[require(cooperative_matrix, byteaddressbuffer)]
 CoopMat<T, S, M, N, R> coopMatLoad<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,
@@ -24399,6 +25518,18 @@ CoopMat<T, S, M, N, R> coopMatLoad<
     return CoopMat<T, S, M, N, R>.Load<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
 }
 
+/// Loads a cooperative matrix from a StructuredBuffer.
+/// Convenience function that simplifies template argument resolution by inferring the element type.
+/// @param T The element type of the cooperative matrix.
+/// @param S The memory scope defining the cooperative group.
+/// @param M The number of rows in the matrix fragment.
+/// @param N The number of columns in the matrix fragment.
+/// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
+/// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the buffer.
+/// @param buffer The StructuredBuffer to load from.
+/// @param element The starting element index in the buffer.
+/// @param stride The stride in elements between consecutive rows or columns.
+/// @return A cooperative matrix loaded from the buffer.
 [ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
@@ -24416,6 +25547,18 @@ CoopMat<T, S, M, N, R> coopMatLoad<
     return CoopMat<T, S, M, N, R>.Load<matrixLayout>(buffer, element, stride);
 }
 
+/// Loads a cooperative matrix from an RWStructuredBuffer.
+/// Convenience function that simplifies template argument resolution by inferring the element type.
+/// @param T The element type of the cooperative matrix.
+/// @param S The memory scope defining the cooperative group.
+/// @param M The number of rows in the matrix fragment.
+/// @param N The number of columns in the matrix fragment.
+/// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
+/// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the buffer.
+/// @param buffer The RWStructuredBuffer to load from.
+/// @param element The starting element index in the buffer.
+/// @param stride The stride in elements between consecutive rows or columns.
+/// @return A cooperative matrix loaded from the buffer.
 [ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
@@ -24433,6 +25576,18 @@ CoopMat<T, S, M, N, R> coopMatLoad<
     return CoopMat<T, S, M, N, R>.Load<matrixLayout>(buffer, element, stride);
 }
 
+/// Loads a cooperative matrix from a pointer buffer.
+/// Convenience function that simplifies template argument resolution by inferring the element type.
+/// @param T The element type of the cooperative matrix.
+/// @param S The memory scope defining the cooperative group.
+/// @param M The number of rows in the matrix fragment.
+/// @param N The number of columns in the matrix fragment.
+/// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
+/// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the buffer.
+/// @param buffer The pointer to the buffer to load from.
+/// @param element The starting element index in the buffer.
+/// @param stride The stride in elements between consecutive rows or columns.
+/// @return A cooperative matrix loaded from the buffer.
 [ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
@@ -24450,6 +25605,51 @@ CoopMat<T, S, M, N, R> coopMatLoad<
     return CoopMat<T, S, M, N, R>.Load<matrixLayout>(buffer, element, stride);
 }
 
+/// Loads a cooperative matrix from a pointer buffer with coherent memory access. Vulkan only.
+/// Ensures memory reads observe writes made visible across the specified memory scope.
+/// Convenience function that simplifies template argument resolution by inferring the element type.
+/// @param T The element type of the cooperative matrix.
+/// @param S The memory scope defining the cooperative group.
+/// @param M The number of rows in the matrix fragment.
+/// @param N The number of columns in the matrix fragment.
+/// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
+/// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the buffer.
+/// @param buffer The pointer to the buffer to load from.
+/// @param element The starting element index in the buffer.
+/// @param stride The stride in elements between consecutive rows or columns.
+/// @param memoryScope The scope from which writes should be visible (e.g., Device, Workgroup).
+/// @return A cooperative matrix loaded from the buffer.
+[ForceInline]
+[require(cooperative_matrix_spirv, vk_mem_model)]
+CoopMat<T, S, M, N, R> coopMatLoadCoherent<
+    T : __BuiltinArithmeticType,
+    let S : MemoryScope,
+    let M : int,
+    let N : int,
+    let R : CoopMatMatrixUse,
+    let matrixLayout : CoopMatMatrixLayout
+>(
+    T* buffer,
+    uint element,
+    uint stride,
+    constexpr MemoryScope memoryScope)
+{
+    return CoopMat<T, S, M, N, R>.LoadCoherent<matrixLayout>(buffer, element, stride, memoryScope);
+}
+
+/// Loads a cooperative matrix from a groupshared (workgroup) memory array.
+/// Convenience function that simplifies template argument resolution by inferring the element type.
+/// @param T The element type of the cooperative matrix.
+/// @param S The memory scope defining the cooperative group.
+/// @param M The number of rows in the matrix fragment.
+/// @param N The number of columns in the matrix fragment.
+/// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
+/// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the array.
+/// @param U The size of the groupshared array.
+/// @param data The groupshared array to load from.
+/// @param element The starting element index in the array.
+/// @param stride The stride in elements between consecutive rows or columns.
+/// @return A cooperative matrix loaded from the groupshared array.
 [ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
@@ -24521,6 +25721,16 @@ CoopMat<T,S,M,N,R> __float_to_int_cast<
 // Cooperative Matrix multiplication with scalar
 //
 
+/// Multiplies a cooperative matrix by a scalar value: CoopMat * scalar
+/// Performs element-wise multiplication of each element in the matrix by the scalar.
+/// @param T The element type of the cooperative matrix.
+/// @param S The memory scope defining the cooperative group.
+/// @param M The number of rows in the matrix fragment.
+/// @param N The number of columns in the matrix fragment.
+/// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
+/// @param lhs The cooperative matrix to multiply.
+/// @param rhs The scalar value to multiply each element by.
+/// @return A new cooperative matrix with all elements multiplied by the scalar.
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> operator *<
     T : __BuiltinArithmeticType,
@@ -24530,12 +25740,28 @@ CoopMat<T, S, M, N, R> operator *<
     let R : CoopMatMatrixUse
 >(CoopMat<T, S, M, N, R> lhs, const T rhs)
 {
-    return spirv_asm
+    __target_switch
     {
-        result:$$CoopMat<T, S, M, N, R> = OpMatrixTimesScalar $lhs $rhs;
-    };
+    case spirv:
+        return spirv_asm
+        {
+            result:$$CoopMat<T, S, M, N, R> = OpMatrixTimesScalar $lhs $rhs;
+        };
+    case cuda:
+        __intrinsic_asm "$0 * $1";
+    }
 }
 
+/// Multiplies a scalar value by a cooperative matrix: scalar * CoopMat
+/// Performs element-wise multiplication of each element in the matrix by the scalar.
+/// @param T The element type of the cooperative matrix.
+/// @param S The memory scope defining the cooperative group.
+/// @param M The number of rows in the matrix fragment.
+/// @param N The number of columns in the matrix fragment.
+/// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
+/// @param lhs The scalar value to multiply each element by.
+/// @param rhs The cooperative matrix to multiply.
+/// @return A new cooperative matrix with all elements multiplied by the scalar.
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> operator *<
     T : __BuiltinArithmeticType,
@@ -24552,6 +25778,22 @@ CoopMat<T, S, M, N, R> operator *<
 // Cooperative Matrix Multiply-Accumulate
 //
 
+/// Performs cooperative matrix multiply-accumulate operation: D = A * B + C
+/// This is the fundamental operation for hardware-accelerated matrix multiplication.
+/// All threads in the warp/subgroup cooperate to compute the result.
+/// @param T The element type of the result accumulator matrix.
+/// @param saturatingAccumulation If true, uses saturating accumulation (clamps to representable range).
+/// @param U The element type of Matrix A.
+/// @param V The element type of Matrix B.
+/// @param W The element type of the input accumulator Matrix C.
+/// @param S The memory scope defining the cooperative group.
+/// @param M The number of rows in Matrix A and the result (shared dimension).
+/// @param K The number of columns in Matrix A and rows in Matrix B (reduction dimension).
+/// @param N The number of columns in Matrix B and the result (shared dimension).
+/// @param matA Matrix A with dimensions M×K (MatrixA use).
+/// @param matB Matrix B with dimensions K×N (MatrixB use).
+/// @param matC Accumulator matrix C with dimensions M×N to add to the product.
+/// @return Result accumulator matrix D = A * B + C with dimensions M×N.
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> coopMatMulAdd<
     T : __BuiltinArithmeticType,
@@ -24568,33 +25810,65 @@ CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> coopMatMulAdd<
     CoopMat<V, S, K, N, CoopMatMatrixUse.MatrixB> matB,
     CoopMat<W, S, M, N, CoopMatMatrixUse.MatrixAccumulator> matC)
 {
-    // https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/KHR/SPV_KHR_cooperative_matrix.asciidoc#3x-cooperative-matrix-operands
-    int operands = 0; // NoneKHR
-    if (__isSignedInt<U>())
+    __target_switch
     {
-        operands |= 0x01; // MatrixASignedComponentsKHR
-    }
-    if (__isSignedInt<V>())
-    {
-        operands |= 0x02; // MatrixBSignedComponentsKHR
-    }
-    if (__isSignedInt<W>())
-    {
-        operands |= 0x04; // MatrixCSignedComponentsKHR
-    }
-    if (__isSignedInt<T>())
-    {
-        operands |= 0x08; // MatrixResultSignedComponentsKHR
-    }
-    if (saturatingAccumulation)
-    {
-        operands |= 0x10; // SaturatingAccumulationKHR
-    }
+    case spirv:
+        // https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/KHR/SPV_KHR_cooperative_matrix.asciidoc#3x-cooperative-matrix-operands
+        int operands = 0; // NoneKHR
+        if (__isSignedInt<U>())
+        {
+            operands |= 0x01; // MatrixASignedComponentsKHR
+        }
+        if (__isSignedInt<V>())
+        {
+            operands |= 0x02; // MatrixBSignedComponentsKHR
+        }
+        if (__isSignedInt<W>())
+        {
+            operands |= 0x04; // MatrixCSignedComponentsKHR
+        }
+        if (__isSignedInt<T>())
+        {
+            operands |= 0x08; // MatrixResultSignedComponentsKHR
+        }
+        if (saturatingAccumulation)
+        {
+            operands |= 0x10; // SaturatingAccumulationKHR
+        }
 
-    return spirv_asm
-    {
-        result:$$CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> = OpCooperativeMatrixMulAddKHR $matA $matB $matC !operands;
-    };
+        return spirv_asm
+        {
+            result:$$CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> = OpCooperativeMatrixMulAddKHR $matA $matB $matC !operands;
+        };
+    case cuda:
+        if (saturatingAccumulation)
+            __intrinsic_asm R"(Slang_CUDA_WMMA::coopMatMulAdd<
+                                                         $T0::ElementType,
+                                                         $T1::ElementType,
+                                                         $T2::ElementType,
+                                                         $TR::ElementType,
+                                                         $T0::m_M,
+                                                         $T0::m_N,
+                                                         $T0::m_K,
+                                                         $T0::m_layout,
+                                                         $T1::m_layout,
+                                                         true
+                                                        >($0, $1, $2))";
+        else
+            __intrinsic_asm R"(Slang_CUDA_WMMA::coopMatMulAdd<
+                                                         $T0::ElementType,
+                                                         $T1::ElementType,
+                                                         $T2::ElementType,
+                                                         $TR::ElementType,
+                                                         $T0::m_M,
+                                                         $T0::m_N,
+                                                         $T0::m_K,
+                                                         $T0::m_layout,
+                                                         $T1::m_layout,
+                                                         false
+                                                        >($0, $1, $2))";
+
+    }
 }
 
 extension<
@@ -24713,7 +25987,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         case hlsl_coopvec_poc:
             __intrinsic_asm ".CopyFrom";
         case optix_coopvec:
-            __intrinsic_asm "optixCoopVecCvt<$TR>(*($0));";
+            __intrinsic_asm "optixCoopVecCvt<OptixCoopVec<$[0], $[1]>>(*($0))", T, N;
         default:
             if (__isFloat<T>() && __isInt<U>())
                 this = __int_to_float_cast<T>(other);
@@ -24816,6 +26090,20 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         };
     }
 
+    // TODO: make this function an intrinsic and support all types via the single intrinsic
+    [require(cooperative_vector, vk_mem_model)]
+    void storeCoherent(T* buffer, int32_t byteOffset16ByteAligned = 0, constexpr MemoryScope memoryScope = MemoryScope::Device)
+    {
+        enableVMMDeviceScopeCapabilityIfNeeded(memoryScope);
+        let pointer = Ptr<T[]>(buffer);
+        let alignment = 16U;
+        const int32_t scope = (int32_t)memoryScope;
+        spirv_asm
+        {
+            OpCooperativeVectorStoreNV $pointer $byteOffset16ByteAligned $this Aligned|MakePointerAvailable|NonPrivatePointer !alignment $scope;
+        };
+    }
+
     [ForceInline]
     [require(cooperative_vector)]
     [require(hlsl_coopvec_poc)]
@@ -24893,7 +26181,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             ret.__Load(buffer, byteOffset16ByteAligned);
             return ret;
         case optix_coopvec:
-            __intrinsic_asm "optixCoopVecLoad<$TR>((CUdeviceptr)(&($0)));";
+            __intrinsic_asm "optixCoopVecLoad<$TR>((CUdeviceptr)(&($0)))";
         default:
             var vec = CoopVec<T, N>();
             for(int i = 0; i < N; ++i)
@@ -24923,7 +26211,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             ret.__Load(buffer, byteOffset16ByteAligned);
             return ret;
         case optix_coopvec:
-            __intrinsic_asm "optixCoopVecLoad<$TR>((CUdeviceptr)(&($0)));";
+            __intrinsic_asm "optixCoopVecLoad<$TR>((CUdeviceptr)(&($0)))";
         default:
             var vec = CoopVec<T, N>();
             for(int i = 0; i < N; ++i)
@@ -24988,6 +26276,20 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         };
     }
 
+    // TODO: make this function an intrinsic and support all types via the single intrinsic
+    [require(cooperative_vector, vk_mem_model)]
+    static CoopVec<T, N> loadCoherent(T* buffer, int32_t byteOffset16ByteAligned = 0, constexpr MemoryScope memoryScope = MemoryScope::Device)
+    {
+        enableVMMDeviceScopeCapabilityIfNeeded(memoryScope);
+        let pointer = Ptr<T[]>(buffer);
+        let alignment = 16U;
+        const int32_t scope = (int32_t)memoryScope;
+        return spirv_asm
+        {
+            result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV $pointer $byteOffset16ByteAligned Aligned|MakePointerVisible|NonPrivatePointer !alignment $scope;
+        };
+    }
+
     // Groupshared
     [ForceInline]
     [__NoSideEffect]
@@ -25009,7 +26311,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             ret.__Load(data, __byteToElemOffset<T>(byteOffset16ByteAligned));
             return ret;
         case optix_coopvec:
-            __intrinsic_asm "optixCoopVecLoad<$TR>((CUdeviceptr)(&($0)));";
+            __intrinsic_asm "optixCoopVecLoad<$TR>((CUdeviceptr)(&($0)))";
         default:
             CoopVec<T,N> result;
             for(int i = 0; i < N; ++i)
@@ -25490,7 +26792,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     // Careful, this takes the offset in elements
     [ForceInline]
     [require(hlsl)]
-    [require(hlsl_coopvec_poc)]
+    [require(hlsl_coopvec_poc_sm_6_9)]
     void __Load(__constref groupshared T buffer[M], uint elemOffset)
     {
         static_assert(N <= M, "The given groupshared array is smaller than the given CoopVec");
@@ -25501,7 +26803,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             for(int i = 0; i < N; ++i)
                 this[i] = buffer[i + elemOffset];
             return;
-        case hlsl_coopvec_poc:
+        case hlsl_coopvec_poc_sm_6_9:
             __intrinsic_asm ".Load";
         }
     }
@@ -25530,7 +26832,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         }
     }
 
-${{{{
+${
 static const struct {
     bool isRW;
     char const* type;
@@ -25540,7 +26842,7 @@ static const struct {
     {false, "ByteAddressBuffer"}
 };
 for(auto buffer : kByteAddressBufferCases) {
-}}}}
+$}
     [mutating]
     [ForceInline]
     [require(hlsl, byteaddressbuffer_rw)]
@@ -25620,6 +26922,7 @@ for(auto buffer : kByteAddressBufferCases) {
     [mutating]
     [require(cooperative_vector)]
     [require(hlsl_coopvec_poc)]
+    [require(optix_coopvec)]
     void matMulAccumPacked<U : __BuiltinArithmeticType, let PackedK : int>(
         CoopVec<U, PackedK> input,
         constexpr CoopVecComponentType inputInterpretation,
@@ -25685,6 +26988,7 @@ for(auto buffer : kByteAddressBufferCases) {
     [ForceInline]
     [require(cooperative_vector)]
     [require(hlsl_coopvec_poc)]
+    [require(optix_coopvec)]
     void matMulAccum<U : __BuiltinArithmeticType, let K : int>(
         CoopVec<U, K> input,
         constexpr CoopVecComponentType inputInterpretation,
@@ -25714,6 +27018,7 @@ for(auto buffer : kByteAddressBufferCases) {
     [mutating]
     [require(cooperative_vector)]
     [require(hlsl_coopvec_poc)]
+    [require(optix_coopvec)]
     void matMulAddAccumPacked<U : __BuiltinArithmeticType, let PackedK : int>(
         CoopVec<U, PackedK> input,
         constexpr CoopVecComponentType inputInterpretation,
@@ -25794,6 +27099,7 @@ for(auto buffer : kByteAddressBufferCases) {
     [ForceInline]
     [require(cooperative_vector)]
     [require(hlsl_coopvec_poc)]
+    [require(optix_coopvec)]
     void matMulAddAccum<U : __BuiltinArithmeticType, let K : int>(
         CoopVec<U, K> input,
         constexpr CoopVecComponentType inputInterpretation,
@@ -25845,9 +27151,9 @@ for(auto buffer : kByteAddressBufferCases) {
     }
 
 
-${{{{
+${
 }
-}}}}
+$}
 }
 
 __intrinsic_op($(kIROp_MakeCoopVectorFromValuePack))
@@ -26428,6 +27734,13 @@ CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(T* buffer, i
     return CoopVec<T, N>.load(buffer, byteOffset16ByteAligned);
 }
 
+[ForceInline]
+[require(spirv, cooperative_vector, vk_mem_model)]
+CoopVec<T, N> coopVecLoadCoherent<let N : int, T : __BuiltinArithmeticType>(T* buffer, int32_t byteOffset16ByteAligned = 0, constexpr MemoryScope memoryScope = MemoryScope::Device)
+{
+    return CoopVec<T, N>.loadCoherent(buffer, byteOffset16ByteAligned, memoryScope);
+}
+
 // Groupshared
 [ForceInline]
 [require(cooperative_vector)]
@@ -26686,7 +27999,7 @@ uint32_t __coopVecComponentTypeStride(CoopVecComponentType componentType)
     return 0xffffffff;
 }
 
-${{{{
+${
 static const struct {
     bool isRW;
     char const* type;
@@ -26696,29 +28009,15 @@ static const struct {
     {false, "ByteAddressBuffer"},
 };
 for(auto buffer : kByteAddressBufferCases_) {
-}}}}
+$}
 
-/// Multiply a cooperative vector with a matrix and return the result.
-/// @param input The input cooperative vector to multiply with the matrix.
-/// @param inputInterpretation Specifies how to interpret the values in the input vector (e.g. as packed values).
-/// @param k The number of columns in the matrix.
-/// @param matrix The matrix buffer to multiply with.
-/// @param matrixOffset Byte offset into the matrix buffer.
-/// @param matrixInterpretation Specifies how to interpret the values in the matrix.
-/// @param memoryLayout Specifies the memory layout of the matrix (row-major or column-major).
-/// @param transpose Whether to transpose the matrix before multiplication.
-/// @param matrixStride The stride between matrix rows/columns in bytes.
-/// @return A new cooperative vector containing the result of the matrix multiplication.
-/// @remarks Unlike coopVecMatMul, this function supports packed input interpretations where multiple values
-/// can be packed into each element of the input vector. The k parameter specifies the actual number of
-/// values to use from the packed input.
-// TODO: Can we ForceInline for just hlsl? the other platforms don't really
-// need it
+// Internal implementation without static_assert; github issue 8620
 [ForceInline]
 [require(cooperative_vector)]
 [require(hlsl_coopvec_poc)]
+[require(optix_coopvec)]
 __generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>
-CoopVec<T, M> coopVecMatMulPacked(
+CoopVec<T, M> __coopVecMatMulPacked_impl(
     CoopVec<U, PackedK> input,
     constexpr CoopVecComponentType inputInterpretation,
     constexpr int k,
@@ -26730,12 +28029,6 @@ CoopVec<T, M> coopVecMatMulPacked(
     constexpr uint matrixStride
 )
 {
-    static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
-                 , "for non-packed inputInterpretation values k must be equal to the input vector length");
-    static_assert(!__isPackedInputInterpretation(inputInterpretation)
-                || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
-                 , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
-
     __target_switch
     {
     case spirv:
@@ -26778,6 +28071,9 @@ CoopVec<T, M> coopVecMatMulPacked(
              matrixStride
         );
         return ret;
+
+    case optix_coopvec:
+        __intrinsic_asm "slangOptixCoopVecMatMul<OptixCoopVec<$[0], $[1]>, OptixCoopVec<$[2], $[3]>, $1, $5, $6>($0, (CUdeviceptr)(&($3)), $4, $7, $8)", T, M, U, PackedK;
 
     default:
         var result = CoopVec<T, M>(0);
@@ -26859,6 +28155,60 @@ CoopVec<T, M> coopVecMatMulPacked(
     }
 }
 
+/// Multiply a cooperative vector with a matrix and return the result.
+/// @param input The input cooperative vector to multiply with the matrix.
+/// @param inputInterpretation Specifies how to interpret the values in the input vector (e.g. as packed values).
+/// @param k The number of columns in the matrix.
+/// @param matrix The matrix buffer to multiply with.
+/// @param matrixOffset Byte offset into the matrix buffer.
+/// @param matrixInterpretation Specifies how to interpret the values in the matrix.
+/// @param memoryLayout Specifies the memory layout of the matrix (row-major or column-major).
+/// @param transpose Whether to transpose the matrix before multiplication.
+/// @param matrixStride The stride between matrix rows/columns in bytes.
+/// @return A new cooperative vector containing the result of the matrix multiplication.
+/// @remarks Unlike coopVecMatMul, this function supports packed input interpretations where multiple values
+/// can be packed into each element of the input vector. The k parameter specifies the actual number of
+/// values to use from the packed input.
+// TODO: Can we ForceInline for just hlsl? the other platforms don't really
+// need it
+[ForceInline]
+[require(cooperative_vector)]
+[require(hlsl_coopvec_poc)]
+[require(optix_coopvec)]
+__generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>
+CoopVec<T, M> coopVecMatMulPacked(
+    CoopVec<U, PackedK> input,
+    constexpr CoopVecComponentType inputInterpretation,
+    constexpr int k,
+    $(buffer.type) matrix,
+    int32_t matrixOffset,
+    constexpr CoopVecComponentType matrixInterpretation,
+    constexpr CoopVecMatrixLayout memoryLayout,
+    constexpr bool transpose,
+    constexpr uint matrixStride
+)
+{
+    // Static assertions to validate parameters at compile time
+    // These can be evaluated because this wrapper function can be inlined (no GenericAsm)
+    static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
+                 , "for non-packed inputInterpretation values k must be equal to the input vector length");
+    static_assert(!__isPackedInputInterpretation(inputInterpretation)
+                || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
+                 , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
+
+    // Delegate to implementation function (which contains GenericAsm for OptiX)
+    return __coopVecMatMulPacked_impl<T, M, PackedK, U>(
+        input,
+        inputInterpretation,
+        k,
+        matrix,
+        matrixOffset,
+        matrixInterpretation,
+        memoryLayout,
+        transpose,
+        matrixStride);
+}
+
 /// Multiply a matrix with a cooperative vector. Given a M-row by K-col `matrix`, and a K-element column vector `input`, computes `matrix * input`, and
 /// returns a M-element vector.
 /// @param input The K-element input cooperative vector to multiply with the matrix.
@@ -26880,6 +28230,7 @@ CoopVec<T, M> coopVecMatMulPacked(
 [ForceInline]
 [require(cooperative_vector)]
 [require(hlsl_coopvec_poc)]
+[require(optix_coopvec)]
 __generic<T : __BuiltinArithmeticType, let M : int, let K : int, U : __BuiltinArithmeticType>
 CoopVec<T, M> coopVecMatMul(
     CoopVec<U, K> input,
@@ -26907,37 +28258,12 @@ CoopVec<T, M> coopVecMatMul(
         matrixStride);
 }
 
-/// Multiply a matrix with a cooperative vector and add a bias vector to the result.
-/// Given a M-row by K-col `matrix`, a K-element column vector `input`, and a M-element vector `bias`, computes `matrix * input + bias`, and
-/// returns a M-element vector.
-/// @param input The input cooperative vector to multiply with the matrix.
-/// @param inputInterpretation Specifies how to interpret the values in the input vector (e.g. as packed values).
-/// @param k The number of columns in the matrix.
-/// @param matrix The matrix buffer to multiply with.
-/// @param matrixOffset Byte offset into the matrix buffer.
-/// @param matrixInterpretation Specifies how to interpret the values in the matrix.
-/// @param bias The bias buffer to add after multiplication.
-/// @param biasOffset Byte offset into the bias buffer.
-/// @param biasInterpretation Specifies how to interpret the values in the bias vector.
-/// @param memoryLayout Specifies the memory layout of the matrix (row-major or column-major).
-/// @param transpose Whether to transpose the matrix before multiplication.
-/// @param matrixStride The stride between matrix rows/columns in bytes.
-/// @return A new cooperative vector containing the result of the matrix multiplication with added bias.
-/// @remarks Unlike coopVecMatMulAdd, this function supports packed input interpretations where multiple values
-/// can be packed into each element of the input vector. The k parameter specifies the actual number of
-/// values to use from the packed input.
-///
-/// Depending on target hardware, some combinations of `inputInterpretation`, `matrixInterpretation` and `memoryLayout` may not be supported.
-/// For example, CoopVecComponentType.Float32 is not widely supported. Developers should query device properties through the host graphics API to
-/// find out which interpretations are supported.
-///
-/// Transposing is not supported when `memoryLayout` is `RowMajor` or `ColumnMajor`, and `transpose` must be `false`.
-/// Not all component types support transposing.
-/// When `memoryLayout` is `InferencingOptimal` or `TrainingOptimal`, `matrixStride` is ignored.
+// Internal implementation without static_assert; github issue 8620
 [ForceInline]
 [require(cooperative_vector)]
 [require(hlsl_coopvec_poc)]
-CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>(
+[require(optix_coopvec)]
+CoopVec<T, M> __coopVecMatMulAddPacked_impl<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>(
     CoopVec<U, PackedK> input,
     constexpr CoopVecComponentType inputInterpretation,
     constexpr int k,
@@ -26952,12 +28278,6 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
     constexpr uint matrixStride
 )
 {
-    static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
-                 , "for non-packed inputInterpretation values k must be equal to the input vector length");
-    static_assert(!__isPackedInputInterpretation(inputInterpretation)
-                || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
-                 , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
-
     __target_switch
     {
     case spirv:
@@ -27006,6 +28326,9 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
              matrixStride
         );
         return ret;
+
+    case optix_coopvec:
+        __intrinsic_asm "slangOptixCoopVecMatMul<OptixCoopVec<$[0], $[1]>, OptixCoopVec<$[2], $[3]>, $1, $5, $9, $8>($0, (CUdeviceptr)(&($3)), $4, (CUdeviceptr)(&($6)), $7, $11)", T, M, U, PackedK;
 
     default:
         var result = coopVecMatMulPacked<T, M, PackedK, U>(
@@ -27068,6 +28391,60 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
 
         return result;
     }
+}
+
+/// Multiply a matrix with a cooperative vector and add a bias vector to the result.
+/// Given a M-row by K-col `matrix`, a K-element column vector `input`, and a M-element vector `bias`, computes `matrix * input + bias`, and
+/// returns a M-element vector.
+/// @param input The input cooperative vector to multiply with the matrix.
+/// @param inputInterpretation Specifies how to interpret the values in the input vector (e.g. as packed values).
+/// @param k The number of columns in the matrix.
+/// @param matrix The matrix buffer to multiply with.
+/// @param matrixOffset Byte offset into the matrix buffer.
+/// @param matrixInterpretation Specifies how to interpret the values in the matrix.
+/// @param bias The bias buffer to add after multiplication.
+/// @param biasOffset Byte offset into the bias buffer.
+/// @param biasInterpretation Specifies how to interpret the values in the bias vector.
+/// @param memoryLayout Specifies the memory layout of the matrix (row-major or column-major).
+/// @param transpose Whether to transpose the matrix before multiplication.
+/// @param matrixStride The stride between matrix rows/columns in bytes.
+/// @return A new cooperative vector containing the result of the matrix multiplication with added bias.
+/// @remarks Unlike coopVecMatMulAdd, this function supports packed input interpretations where multiple values
+/// can be packed into each element of the input vector. The k parameter specifies the actual number of
+/// values to use from the packed input.
+///
+/// Depending on target hardware, some combinations of `inputInterpretation`, `matrixInterpretation` and `memoryLayout` may not be supported.
+/// For example, CoopVecComponentType.Float32 is not widely supported. Developers should query device properties through the host graphics API to
+/// find out which interpretations are supported.
+///
+/// Transposing is not supported when `memoryLayout` is `RowMajor` or `ColumnMajor`, and `transpose` must be `false`.
+/// Not all component types support transposing.
+/// When `memoryLayout` is `InferencingOptimal` or `TrainingOptimal`, `matrixStride` is ignored.
+[ForceInline]
+[require(cooperative_vector)]
+[require(hlsl_coopvec_poc)]
+[require(optix_coopvec)]
+CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>(
+    CoopVec<U, PackedK> input,
+    constexpr CoopVecComponentType inputInterpretation,
+    constexpr int k,
+    $(buffer.type) matrix,
+    int32_t matrixOffset,
+    constexpr CoopVecComponentType matrixInterpretation,
+    $(buffer.type) bias,
+    int32_t biasOffset,
+    constexpr CoopVecComponentType biasInterpretation,
+    constexpr CoopVecMatrixLayout memoryLayout,
+    constexpr bool transpose,
+    constexpr uint matrixStride
+)
+{
+    static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
+                 , "for non-packed inputInterpretation values k must be equal to the input vector length");
+    static_assert(!__isPackedInputInterpretation(inputInterpretation)
+                || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
+                 , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
+    return __coopVecMatMulAddPacked_impl<T, M, PackedK, U>(input, inputInterpretation, k, matrix, matrixOffset, matrixInterpretation, bias, biasOffset, biasInterpretation, memoryLayout, transpose, matrixStride);
 }
 
 /// Multiply a matrix with a cooperative vector and add a bias vector.
@@ -27133,10 +28510,10 @@ CoopVec<T, M> coopVecMatMulAdd(
 // Coop Vector accumulation
 //
 
-${{{{
+${
 if(buffer.isRW)
 {
-}}}}
+$}
 /// Atomically accumulates the outer product of two cooperative vectors into a matrix. Given an M-element vector `a`, and an N-element vector `b`,
 /// compute the outer product of `a` and `b`, forming a M-row by N-col matrix. The elements in the matrix is then atomically accumulated
 /// to memory location represented by `matrix`.
@@ -27163,7 +28540,7 @@ if(buffer.isRW)
 /// }
 /// ```
 [require(cooperative_vector)]
-[require(hlsl_coopvec_poc)]
+[require(hlsl_coopvec_poc_sm_6_9)]
 [require(optix_coopvec)]
 void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let N : int>(
     CoopVec<T, M> a,
@@ -27181,7 +28558,7 @@ void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let
         uint matrixInterpretationHLSL = __getHLSLCoopVecComponentType(matrixInterpretation);
         uint memoryLayoutHLSL = __getHLSLCoopVecMatrixLayout(memoryLayout);
         return a.__OuterProductAccumulate(b, matrix, matrixOffset, matrixStride, memoryLayoutHLSL, matrixInterpretationHLSL);
-    case hlsl_coopvec_poc:
+    case hlsl_coopvec_poc_sm_6_9:
         __intrinsic_asm "$0.OuterProductAccumulate($1, $2, $3, $4, $5, $6)";
     case spirv:
         let matrixInterpretationSpirv : int = __getSpvCoopVecComponentType(matrixInterpretation);
@@ -27295,12 +28672,12 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int>(
     }
 }
 
-${{{{
+${
 } // if rw
 } // buffer type loop
-}}}}
+$}
 
-${{{{
+${
 static const struct {
     bool isRW;
     char const* type;
@@ -27310,11 +28687,14 @@ static const struct {
     {false, "StructuredBuffer<IgnoredBufferElementType>"},
 };
 for(auto buffer : kStructuredBufferCases_) {
-}}}}
+$}
 
+// Internal implementation without static_assert; github issue 8620
+[ForceInline]
 [require(spirv, cooperative_vector)]
+[require(optix_coopvec)]
 __generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType,IgnoredBufferElementType>
-CoopVec<T, M> coopVecMatMulPacked(
+CoopVec<T, M> __coopVecMatMulPacked_impl(
     CoopVec<U, PackedK> input,
     constexpr CoopVecComponentType inputInterpretation,
     constexpr int k,
@@ -27326,11 +28706,6 @@ CoopVec<T, M> coopVecMatMulPacked(
     constexpr uint matrixStride
 )
 {
-    static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
-                 , "for non-packed inputInterpretation values k must be equal to the input vector length");
-    static_assert(!__isPackedInputInterpretation(inputInterpretation)
-                || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
-                 , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
     __target_switch
     {
     case spirv:
@@ -27354,11 +28729,38 @@ CoopVec<T, M> coopVecMatMulPacked(
         {
             result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulNV $input $inputInterpretationSpirv $matrixPtr $matrixOffset $matrixInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
         };
+    case optix_coopvec:
+        __intrinsic_asm "slangOptixCoopVecMatMul<$T0, $T0, $1, $5, $6>($0, (CUdeviceptr)(&($3)), $4, $8)";
     }
+}
+
+[ForceInline]
+[require(spirv, cooperative_vector)]
+[require(optix_coopvec)]
+__generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType,IgnoredBufferElementType>
+CoopVec<T, M> coopVecMatMulPacked(
+    CoopVec<U, PackedK> input,
+    constexpr CoopVecComponentType inputInterpretation,
+    constexpr int k,
+    $(buffer.type) matrix,
+    int32_t matrixOffset,
+    constexpr CoopVecComponentType matrixInterpretation,
+    constexpr CoopVecMatrixLayout memoryLayout,
+    constexpr bool transpose,
+    constexpr uint matrixStride
+)
+{
+    static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
+                 , "for non-packed inputInterpretation values k must be equal to the input vector length");
+    static_assert(!__isPackedInputInterpretation(inputInterpretation)
+                || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
+                 , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
+    return __coopVecMatMulPacked_impl<T, M, PackedK, U, IgnoredBufferElementType>(input, inputInterpretation, k, matrix, matrixOffset, matrixInterpretation, memoryLayout, transpose, matrixStride);
 }
 
 // specialized coopVecMatMul for non-packed inputs
 [require(spirv, cooperative_vector)]
+[require(optix_coopvec)]
 __generic<T : __BuiltinArithmeticType, let M : int, let K : int, U : __BuiltinArithmeticType,IgnoredBufferElementType>
 CoopVec<T, M> coopVecMatMul(
     CoopVec<U, K> input,
@@ -27386,8 +28788,11 @@ CoopVec<T, M> coopVecMatMul(
         matrixStride);
 }
 
+// Internal implementation without static_assert; github issue 8620
+[ForceInline]
 [require(spirv, cooperative_vector)]
-CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType, IgnoredBufferElementType>(
+[require(optix_coopvec)]
+CoopVec<T, M> __coopVecMatMulAddPacked_impl<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType, IgnoredBufferElementType>(
     CoopVec<U, PackedK> input,
     constexpr CoopVecComponentType inputInterpretation,
     constexpr int k,
@@ -27402,12 +28807,6 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
     constexpr uint matrixStride
 )
 {
-    static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
-                 , "for non-packed inputInterpretation values k must be equal to the input vector length");
-    static_assert(!__isPackedInputInterpretation(inputInterpretation)
-                || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
-                 , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
-
     __target_switch
     {
     case spirv:
@@ -27434,10 +28833,39 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
         {
             result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulAddNV $input $inputInterpretationSpirv $matrixPtr $matrixOffset $matrixInterpretationSpirv $biasPtr $biasOffset $biasInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
         };
+    case optix_coopvec:
+        __intrinsic_asm "slangOptixCoopVecMatMul<OptixCoopVec<$[0], $[1]>, OptixCoopVec<$[2], $[3]>, $1, $5, $9, $8>($0, (CUdeviceptr)(&($3)), $4, (CUdeviceptr)(&($6)), $7, $11)", T, M, U, PackedK;
     }
 }
 
+[ForceInline]
 [require(spirv, cooperative_vector)]
+[require(optix_coopvec)]
+CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType, IgnoredBufferElementType>(
+    CoopVec<U, PackedK> input,
+    constexpr CoopVecComponentType inputInterpretation,
+    constexpr int k,
+    $(buffer.type) matrix,
+    int32_t matrixOffset,
+    constexpr CoopVecComponentType matrixInterpretation,
+    $(buffer.type) bias,
+    int32_t biasOffset,
+    constexpr CoopVecComponentType biasInterpretation,
+    constexpr CoopVecMatrixLayout memoryLayout,
+    constexpr bool transpose,
+    constexpr uint matrixStride
+)
+{
+    static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
+                 , "for non-packed inputInterpretation values k must be equal to the input vector length");
+    static_assert(!__isPackedInputInterpretation(inputInterpretation)
+                || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
+                 , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
+    return __coopVecMatMulAddPacked_impl<T, M, PackedK, U, IgnoredBufferElementType>(input, inputInterpretation, k, matrix, matrixOffset, matrixInterpretation, bias, biasOffset, biasInterpretation, memoryLayout, transpose, matrixStride);
+}
+
+[require(spirv, cooperative_vector)]
+[require(optix_coopvec)]
 CoopVec<T, M> coopVecMatMulAdd<T : __BuiltinArithmeticType, let M : int, let K : int, U : __BuiltinArithmeticType, IgnoredBufferElementType>(
     CoopVec<U, K> input,
     constexpr CoopVecComponentType inputInterpretation,
@@ -27474,10 +28902,10 @@ CoopVec<T, M> coopVecMatMulAdd<T : __BuiltinArithmeticType, let M : int, let K :
 // Coop Vector accumulation
 //
 
-${{{{
+${
 if(buffer.isRW)
 {
-}}}}
+$}
 [require(spirv, cooperative_vector_training)]
 void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let N : int, IgnoredBufferElementType>(
     CoopVec<T, M> a,
@@ -27522,10 +28950,10 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int, Ignore
     }
 }
 
-${{{{
+${
 } // if rw
 } // buffer type loop
-}}}}
+$}
 
 
 [require(spirv, cooperative_vector_training)]

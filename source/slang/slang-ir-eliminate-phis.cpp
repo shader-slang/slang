@@ -1038,7 +1038,7 @@ struct PhiEliminationContext
             // so that any logic that might have moved another parameter
             // into a temporary will influence our result.
             //
-            if ((*srcArg.currentValPtr)->getOp() != kIROp_Undefined)
+            if (!as<IRUndefined>(*srcArg.currentValPtr))
             {
                 // If we are trying to emit a store directly after a load from the same var,
                 // skip the store.
@@ -1157,6 +1157,11 @@ void eliminatePhisInFunc(
 {
     PhiEliminationContext context(livenessMode, module, options);
     context.eliminatePhisInFunc(func);
+}
+
+void eliminatePhis(IRModule* module, LivenessMode livenessMode, PhiEliminationOptions options)
+{
+    eliminatePhis(livenessMode, module, options);
 }
 
 } // namespace Slang

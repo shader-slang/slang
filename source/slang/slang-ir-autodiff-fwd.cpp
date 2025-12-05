@@ -752,7 +752,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
     SLANG_RELEASE_ASSERT(diffCalleeType->getParamCount() == origCall->getArgCount());
 
     auto placeholderCall =
-        builder->emitCallInst(nullptr, builder->emitUndefined(builder->getTypeKind()), 0, nullptr);
+        builder->emitCallInst(nullptr, builder->emitPoison(builder->getTypeKind()), 0, nullptr);
     builder->setInsertBefore(placeholderCall);
     IRBuilder argBuilder = *builder;
     IRBuilder afterBuilder = argBuilder;
@@ -1194,7 +1194,11 @@ InstPair ForwardDiffTranscriber::transcribeSpecialize(
         // the generic args to specialize the primal function. This is true for all of our core
         // module functions, but we may need to rely on more general substitution logic here.
         auto diffSpecialize = builder->emitSpecializeInst(
-            builder->getTypeKind(),
+            (IRType*)builder->emitSpecializeInst(
+                builder->getTypeKind(),
+                diffBaseSpecialize->getBase()->getDataType(),
+                args.getCount(),
+                args.getBuffer()),
             diffBaseSpecialize->getBase(),
             args.getCount(),
             args.getBuffer());
@@ -1209,7 +1213,11 @@ InstPair ForwardDiffTranscriber::transcribeSpecialize(
         }
         diffBase = findOrTranscribeDiffInst(builder, origSpecialize->getBase());
         auto diffSpecialize = builder->emitSpecializeInst(
-            builder->getTypeKind(),
+            (IRType*)builder->emitSpecializeInst(
+                builder->getTypeKind(),
+                diffBase->getDataType(),
+                args.getCount(),
+                args.getBuffer()),
             diffBase,
             args.getCount(),
             args.getBuffer());
@@ -2143,7 +2151,8 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_DefaultConstruct:
         return transcribeDefaultConstruct(builder, origInst);
 
-    case kIROp_Undefined:
+    case kIROp_Poison:
+    case kIROp_LoadFromUninitializedMemory:
         return transcribeUndefined(builder, origInst);
 
     case kIROp_Reinterpret:

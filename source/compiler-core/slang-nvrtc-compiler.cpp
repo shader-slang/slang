@@ -133,8 +133,14 @@ protected:
     SlangResult _findOptixIncludePath(String& outIncludePath);
     SlangResult _getOptixIncludePath(String& outIncludePath);
 
-    SlangResult _maybeAddHalfSupport(const CompileOptions& options, CommandLine& ioCmdLine);
-    SlangResult _maybeAddOptixSupport(const CompileOptions& options, CommandLine& ioCmdLine);
+    SlangResult _maybeAddHalfSupport(
+        const CompileOptions& options,
+        CommandLine& ioCmdLine,
+        IArtifactDiagnostics* diagnostics);
+    SlangResult _maybeAddOptixSupport(
+        const CompileOptions& options,
+        CommandLine& ioCmdLine,
+        IArtifactDiagnostics* diagnostics);
 
 #define SLANG_NVTRC_MEMBER_FUNCS(ret, name, params) ret(*m_##name) params;
 
@@ -880,7 +886,8 @@ SlangResult NVRTCDownstreamCompiler::_getOptixIncludePath(String& outPath)
 
 SlangResult NVRTCDownstreamCompiler::_maybeAddHalfSupport(
     const DownstreamCompileOptions& options,
-    CommandLine& ioCmdLine)
+    CommandLine& ioCmdLine,
+    IArtifactDiagnostics* diagnostics)
 {
     if ((options.flags & DownstreamCompileOptions::Flag::EnableFloat16) == 0)
     {
@@ -914,7 +921,14 @@ SlangResult NVRTCDownstreamCompiler::_maybeAddHalfSupport(
     }
 
     String includePath;
-    SLANG_RETURN_ON_FAIL(_getCUDAIncludePath(includePath));
+    if (SLANG_FAILED(_getCUDAIncludePath(includePath)))
+    {
+        String msg = "Failed to locate CUDA headers (cuda_fp16.h) required for half/float16 "
+                     "support. Please install CUDA Toolkit or set CUDA_PATH environment variable.";
+        diagnostics->setRaw(SliceUtil::asCharSlice(msg));
+        diagnostics->requireErrorDiagnostic();
+        return SLANG_E_NOT_FOUND;
+    }
 
     // Add the found include path
     ioCmdLine.addArg("-I");
@@ -927,7 +941,8 @@ SlangResult NVRTCDownstreamCompiler::_maybeAddHalfSupport(
 
 SlangResult NVRTCDownstreamCompiler::_maybeAddOptixSupport(
     const DownstreamCompileOptions& options,
-    CommandLine& ioCmdLine)
+    CommandLine& ioCmdLine,
+    IArtifactDiagnostics* diagnostics)
 {
     // First check if we know if one of the include paths contains optix.h
     for (const auto& includePath : options.includePaths)
@@ -956,7 +971,14 @@ SlangResult NVRTCDownstreamCompiler::_maybeAddOptixSupport(
     }
 
     String includePath;
-    SLANG_RETURN_ON_FAIL(_getOptixIncludePath(includePath));
+    if (SLANG_FAILED(_getOptixIncludePath(includePath)))
+    {
+        String msg = "Failed to locate OptiX headers (optix.h) required for OptiX ray tracing "
+                     "support. Please install OptiX SDK.";
+        diagnostics->setRaw(SliceUtil::asCharSlice(msg));
+        diagnostics->requireErrorDiagnostic();
+        return SLANG_E_NOT_FOUND;
+    }
 
     // Add the found include path
     ioCmdLine.addArg("-I");
@@ -986,6 +1008,11 @@ SlangResult NVRTCDownstreamCompiler::compile(
     }
 
     IArtifact* sourceArtifact = options.sourceArtifacts[0];
+
+    // Create artifact and diagnostics early so we can report errors from any stage
+    auto artifact = ArtifactUtil::createArtifactForCompileTarget(options.targetType);
+    auto diagnostics = ArtifactDiagnostics::create();
+    ArtifactUtil::addAssociated(artifact, diagnostics);
 
     CommandLine cmdLine;
 
@@ -1061,7 +1088,24 @@ SlangResult NVRTCDownstreamCompiler::compile(
         cmdLine.addArg(asString(include));
     }
 
-    SLANG_RETURN_ON_FAIL(_maybeAddHalfSupport(options, cmdLine));
+    if (SLANG_FAILED(_maybeAddHalfSupport(options, cmdLine, diagnostics)))
+    {
+        diagnostics->setResult(SLANG_FAIL);
+        *outArtifact = artifact.detach();
+        return SLANG_FAIL;
+    }
+
+    // Previously, we relied on `_maybeAddHalfSupport` to find the cuda include path, but
+    // that was incorrect. Because if there is no half support needed, we will not add the
+    // CUDA include path at all. So we always try to find and add the CUDA include path here.
+    String includePath;
+    if (_getCUDAIncludePath(includePath) == SLANG_OK)
+    {
+        // Add the found include path
+        cmdLine.addArg("-I");
+        cmdLine.addArg(includePath);
+    }
+
 
     // Neither of these options are strictly required, for general use of nvrtc,
     // but are enabled to make use withing Slang work more smoothly
@@ -1139,7 +1183,12 @@ SlangResult NVRTCDownstreamCompiler::compile(
     //
     if (options.pipelineType == PipelineType::RayTracing)
     {
-        SLANG_RETURN_ON_FAIL(_maybeAddOptixSupport(options, cmdLine));
+        if (SLANG_FAILED(_maybeAddOptixSupport(options, cmdLine, diagnostics)))
+        {
+            diagnostics->setResult(SLANG_FAIL);
+            *outArtifact = artifact.detach();
+            return SLANG_FAIL;
+        }
     }
 
     // Add any compiler specific options
@@ -1186,11 +1235,6 @@ SlangResult NVRTCDownstreamCompiler::compile(
     }
 
     res = m_nvrtcCompileProgram(program, int(dstOptions.getCount()), dstOptions.getBuffer());
-
-    auto artifact = ArtifactUtil::createArtifactForCompileTarget(options.targetType);
-    auto diagnostics = ArtifactDiagnostics::create();
-
-    ArtifactUtil::addAssociated(artifact, diagnostics);
 
     ComPtr<ISlangBlob> blob;
 

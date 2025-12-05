@@ -10,7 +10,7 @@ struct Data {
 
     // CUDA: __device__ float Data_fetch{{.*}}(int {{.*}}, int {{.*}})
     // CUDA-NEXT: {
-    // CUDA-NEXT: return globalParams{{.*}}->data{{.*}}->input{{.*}}[{{.*}}].Load
+    // CUDA-NEXT: globalParams{{.*}}->data{{.*}}->input{{.*}}[{{.*}}]
     float fetch(int buffer, int index)
     {
         return input[buffer][index];

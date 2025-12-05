@@ -4,6 +4,7 @@
 #include "slang-ast-builder.h"
 #include "slang-ast-dispatch.h"
 #include "slang-ast-modifier.h"
+#include "slang-check.h"
 #include "slang-syntax.h"
 
 #include <assert.h>
@@ -13,6 +14,7 @@ namespace Slang
 
 bool isAbstractTypePack(Type* type)
 {
+    type = unwrapModifiedType(type);
     if (as<ExpandType>(type))
         return true;
     if (isDeclRefTypeOf<GenericTypePackParamDecl>(type))
@@ -22,6 +24,7 @@ bool isAbstractTypePack(Type* type)
 
 bool isTypePack(Type* type)
 {
+    type = unwrapModifiedType(type);
     if (as<ConcreteTypePack>(type))
         return true;
     return isAbstractTypePack(type);
@@ -488,23 +491,23 @@ void maybePrintAddrSpaceOperand(StringBuilder& out, AddressSpace addrSpace)
     switch (addrSpace)
     {
     case AddressSpace::Generic:
-        out << toSlice(", AddressSpace::Generic");
+        out << toSlice(", AddressSpace.Generic");
         break;
     case AddressSpace::UserPointer:
         // We expose UserPointer as Device to users
-        out << toSlice(", AddressSpace::Device");
+        out << toSlice(", AddressSpace.Device");
         break;
     case AddressSpace::GroupShared:
-        out << toSlice(", AddressSpace::GroupShared");
+        out << toSlice(", AddressSpace.GroupShared");
         break;
     case AddressSpace::Global:
-        out << toSlice(", AddressSpace::Global");
+        out << toSlice(", AddressSpace.Global");
         break;
     case AddressSpace::ThreadLocal:
-        out << toSlice(", AddressSpace::ThreadLocal");
+        out << toSlice(", AddressSpace.ThreadLocal");
         break;
     case AddressSpace::Uniform:
-        out << toSlice(", AddressSpace::Uniform");
+        out << toSlice(", AddressSpace.Uniform");
         break;
     default:
         break;
@@ -516,10 +519,13 @@ void maybePrintAccessQualifierOperand(StringBuilder& out, AccessQualifier access
     switch (accessQualifier)
     {
     case AccessQualifier::ReadWrite:
-        out << toSlice(", Access::ReadWrite");
+        out << toSlice(", Access.ReadWrite");
         break;
     case AccessQualifier::Read:
-        out << toSlice(", Access::Read");
+        out << toSlice(", Access.Read");
+        break;
+    case AccessQualifier::Immutable:
+        out << toSlice(", Access.Immutable");
         break;
     default:
         break;
@@ -611,15 +617,15 @@ ParamPassingMode getParamPassingModeFromPossiblyWrappedParamType(Type* paramType
     }
 }
 
-ParamPassingMode FuncType::getParamDirection(Index index)
+ParamPassingMode FuncType::getParamPassingMode(Index index)
 {
-    auto paramType = getParamTypeWithDirectionWrapper(index);
+    auto paramType = getParamTypeWithModeWrapper(index);
     return getParamPassingModeFromPossiblyWrappedParamType(paramType);
 }
 
 Type* FuncType::getParamValueType(Index index)
 {
-    auto paramType = getParamTypeWithDirectionWrapper(index);
+    auto paramType = getParamTypeWithModeWrapper(index);
     if (auto wrappedParamType = as<ParamPassingModeType>(paramType))
         return wrappedParamType->getValueType();
     return paramType;
@@ -636,7 +642,7 @@ void FuncType::_toTextOverride(StringBuilder& out)
         {
             out << toSlice(", ");
         }
-        out << getParamTypeWithDirectionWrapper(pp);
+        out << getParamTypeWithModeWrapper(pp);
     }
     out << ") -> " << getResultType();
 
@@ -660,8 +666,8 @@ Val* FuncType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet s
     List<Type*> substParamTypes;
     for (Index pp = 0; pp < getParamCount(); pp++)
     {
-        auto substParamType = as<Type>(
-            getParamTypeWithDirectionWrapper(pp)->substituteImpl(astBuilder, subst, &diff));
+        auto substParamType =
+            as<Type>(getParamTypeWithModeWrapper(pp)->substituteImpl(astBuilder, subst, &diff));
         if (auto typePack = as<ConcreteTypePack>(substParamType))
         {
             // Unwrap the ConcreteTypePack and add each element as a parameter
@@ -696,7 +702,7 @@ Type* FuncType::_createCanonicalTypeOverride()
     List<Type*> canParamTypes;
     for (Index pp = 0; pp < getParamCount(); pp++)
     {
-        canParamTypes.add(getParamTypeWithDirectionWrapper(pp)->getCanonicalType());
+        canParamTypes.add(getParamTypeWithModeWrapper(pp)->getCanonicalType());
     }
 
     FuncType* canType = getCurrentASTBuilder()->getFuncType(
@@ -1407,14 +1413,9 @@ Val* TextureTypeBase::getFormat()
     return as<Type>(_getGenericTypeArg(this, 8));
 }
 
-Type* removeParamDirType(Type* type)
+bool isCopyableType(Type* type)
 {
-    for (auto paramDirType = as<ParamPassingModeType>(type); paramDirType;)
-    {
-        type = paramDirType->getValueType();
-        paramDirType = as<ParamPassingModeType>(type);
-    }
-    return type;
+    return !isNonCopyableType(type);
 }
 
 bool isNonCopyableType(Type* type)

@@ -54,62 +54,11 @@ Texture2DMS<float4> t2DMS_f32v4;
 //
 // Depth textures.
 //
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
-typealias depth2d = _Texture<
-    T,
-    __Shape2D,
-    0, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    0, // isCombined
-    format
->;
-
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
-typealias depth2d_array = _Texture<
-    T,
-    __Shape2D,
-    1, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    0, // isCombined
-    format
->;
-
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
-typealias depthcube = _Texture<
-    T,
-    __ShapeCube,
-    0, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    0, // isCombined
-    format
->;
-
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
-typealias depthcube_array = _Texture<
-    T,
-    __ShapeCube,
-    1, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    0, // isCombined
-    format
->;
 
 //TEST_INPUT: Texture2D(size=4, content = zero, format=D32Float):name d2D
-depth2d<float> d2D;
+DepthTexture2D d2D;
 //TEST_INPUT: Texture2D(size=4, content = zero, arrayLength=2, format=D32Float):name d2DArray
-depth2d_array<float> d2DArray;
+DepthTexture2DArray d2DArray;
 
 uint getNotMapped()
 {

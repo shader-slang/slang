@@ -3,6 +3,9 @@ on:
   push:
     tags:
       - "v20[2-9][0-9].[0-9]*"
+  schedule:
+    # Run nightly at 2 AM UTC
+    - cron: "0 2 * * *"
 
 name: ubuntu18-gcc11 Release
 jobs:
@@ -13,6 +16,7 @@ jobs:
         with:
           submodules: "recursive"
           fetch-depth: "0"
+          fetch-tags: true
 
       # build the binary in docker image
       - name: Run the build process with Docker
@@ -31,6 +35,7 @@ jobs:
             cpack --preset release -G TGZ
       - name: Package Slang
         id: package
+        if: startsWith(github.ref, 'refs/tags/v')
         run: |
           triggering_ref=${{ github.ref_name }}
           if [[ $triggering_ref =~ ^v[0-9] ]]; then
@@ -38,6 +43,8 @@ jobs:
           else
             version=$triggering_ref
           fi
+          # Sanitize version for use in filenames (replace path separators)
+          version=${version//\//-}
           base=$(pwd)/slang-${version}-linux-x86_64-glibc-2.27
           sudo mv "$(pwd)/build/dist-release/slang.zip" "${base}.zip"
           echo "SLANG_BINARY_ARCHIVE_ZIP=${base}.zip" >> "$GITHUB_OUTPUT"

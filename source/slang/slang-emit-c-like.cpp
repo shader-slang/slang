@@ -79,12 +79,14 @@ struct CLikeSourceEmitter::ComputeEmitActionsContext
             return SourceLanguage::C;
         }
     case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
     case CodeGenTarget::HostCPPSource:
     case CodeGenTarget::PyTorchCppBinding:
         {
             return SourceLanguage::CPP;
         }
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
         {
             return SourceLanguage::CUDA;
         }
@@ -123,6 +125,10 @@ SlangResult CLikeSourceEmitter::init()
 void CLikeSourceEmitter::emitFrontMatterImpl(TargetRequest* targetReq)
 {
     SLANG_UNUSED(targetReq);
+    if (shouldEmitOnlyHeader())
+    {
+        m_writer->emit("#pragma once\n\n");
+    }
 }
 
 void CLikeSourceEmitter::emitPreModuleImpl()
@@ -1679,7 +1685,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     // for GLSL), so we check this only after all those special cases are
     // considered.
     //
-    if (inst->getOp() == kIROp_Undefined)
+    if (as<IRUndefined>(inst))
         return false;
 
     // Okay, at this point we know our instruction must have a single use.
@@ -2388,7 +2394,8 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
     case kIROp_RTTIPointerType:
         break;
 
-    case kIROp_Undefined:
+    case kIROp_LoadFromUninitializedMemory:
+    case kIROp_Poison:
     case kIROp_DefaultConstruct:
         m_writer->emit(getName(inst));
         break;
@@ -3228,7 +3235,8 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     case kIROp_LiveRangeEnd:
         emitLiveness(inst);
         break;
-    case kIROp_Undefined:
+    case kIROp_LoadFromUninitializedMemory:
+    case kIROp_Poison:
     case kIROp_DefaultConstruct:
         {
             auto type = inst->getDataType();
@@ -3917,6 +3925,8 @@ void CLikeSourceEmitter::emitFuncDecl(IRFunc* func, const String& name)
 
     auto funcType = func->getDataType();
     auto resultType = func->getResultType();
+
+    emitFunctionPreambleImpl(func);
 
     emitFuncDecorations(func);
     emitType(resultType, name);
@@ -5278,6 +5288,24 @@ void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& 
     ctx.actions = &ioActions;
     ctx.openInsts = InstHashSet(module);
 
+    if (shouldEmitOnlyHeader())
+    {
+        // remove body from all functions when emitting a header
+        for (auto inst : module->getGlobalInsts())
+        {
+            if (as<IRFunc>(inst))
+            {
+                for (auto child : inst->getModifiableChildren())
+                {
+                    if (as<IRBlock>(child))
+                    {
+                        child->removeAndDeallocate();
+                    }
+                }
+            }
+        }
+    }
+
     for (auto inst : module->getGlobalInsts())
     {
         // Emit all resource-typed objects first. This is to avoid an odd scenario in HLSL
@@ -5313,6 +5341,13 @@ void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& 
     }
     for (auto inst : module->getGlobalInsts())
     {
+        if (shouldEmitOnlyHeader())
+        {
+            // Don't emit types without ExternCppDecoration in a header
+            if (!inst->findDecoration<IRExternCppDecoration>())
+                continue;
+        }
+
         if (as<IRType>(inst))
         {
             // Don't emit a type unless it is actually used or is marked exported.

@@ -152,8 +152,12 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
         # Enable mimalloc for SPIRV-Tools to improve compilation performance
         # Based on SPIRV-Tools PR #6267: https://github.com/KhronosGroup/SPIRV-Tools/pull/6267
         if(SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC)
-            # Place mimalloc in slang/external instead of spirv-tools/external for better organization
-            set(MIMALLOC_PATH "${CMAKE_CURRENT_SOURCE_DIR}/mimalloc")
+            if(NOT SLANG_OVERRIDE_MIMALLOC_PATH)
+                # Place mimalloc in slang/external instead of spirv-tools/external for better organization
+                set(MIMALLOC_PATH "${CMAKE_CURRENT_SOURCE_DIR}/mimalloc")
+            else()
+                set(MIMALLOC_PATH "${SLANG_OVERRIDE_MIMALLOC_PATH}/mimalloc")
+            endif()
 
             # Download mimalloc if it's not available
             if(NOT EXISTS "${MIMALLOC_PATH}/CMakeLists.txt")
@@ -235,29 +239,34 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
     endif()
 endif()
 
-# imgui
-add_library(imgui INTERFACE)
-if(NOT SLANG_OVERRIDE_IMGUI_PATH)
+if(
+    SLANG_ENABLE_GFX
+    OR (SLANG_ENABLE_SLANG_RHI AND (SLANG_ENABLE_TESTS OR SLANG_ENABLE_EXAMPLES))
+)
+    # imgui
+    add_library(imgui INTERFACE)
+    if(NOT SLANG_OVERRIDE_IMGUI_PATH)
+        target_include_directories(
+            imgui
+            ${system}
+            INTERFACE "${CMAKE_CURRENT_LIST_DIR}/imgui"
+        )
+    else()
+        target_include_directories(
+            imgui
+            ${system}
+            INTERFACE "${SLANG_OVERRIDE_IMGUI_PATH}/imgui"
+        )
+    endif()
+
+    # stb
+    add_library(stb INTERFACE)
     target_include_directories(
-        imgui
+        stb
         ${system}
-        INTERFACE "${CMAKE_CURRENT_LIST_DIR}/imgui"
-    )
-else()
-    target_include_directories(
-        imgui
-        ${system}
-        INTERFACE "${SLANG_OVERRIDE_IMGUI_PATH}/imgui"
+        INTERFACE "${CMAKE_CURRENT_LIST_DIR}/stb"
     )
 endif()
-
-# stb
-add_library(stb INTERFACE)
-target_include_directories(
-    stb
-    ${system}
-    INTERFACE "${CMAKE_CURRENT_LIST_DIR}/stb"
-)
 
 # slang-rhi
 if(SLANG_ENABLE_SLANG_RHI)

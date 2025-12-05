@@ -1027,15 +1027,88 @@ bool SemanticsVisitor::TryUnifyIntParam(
     }
 }
 
+bool SemanticsVisitor::TryUnifyFunctorByStructuralMatch(
+    ConstraintSystem& constraints,
+    ValUnificationContext unifyCtx,
+    StructDecl* fstStructDecl,
+    FuncType* sndFuncType)
+{
+    // Here we just need to find an invocation method for our functor
+    // to perform unification with.
+    // We do not validate the validity of the functor at this step,
+    // we only need to perform a reasonable unification so that constraints
+    // can correctly solve.
+    FuncDecl* functorInvokeMethod =
+        as<FuncDecl>(fstStructDecl->findLastDirectMemberDeclOfName(getName("()")));
+    if (!functorInvokeMethod)
+        return false;
+
+    return TryUnifyFuncTypesByStructuralMatch(
+        constraints,
+        unifyCtx,
+        getFuncType(this->getASTBuilder(), functorInvokeMethod),
+        sndFuncType);
+}
+
+bool SemanticsVisitor::TryUnifyFuncTypesByStructuralMatch(
+    ConstraintSystem& constraints,
+    ValUnificationContext unifyCtx,
+    FuncType* fstFunType,
+    FuncType* sndFunType)
+{
+    const Index numParams = fstFunType->getParamCount();
+    if (numParams != sndFunType->getParamCount())
+        return false;
+    for (Index i = 0; i < numParams; ++i)
+    {
+        if (!TryUnifyTypes(
+                constraints,
+                unifyCtx,
+                fstFunType->getParamTypeWithModeWrapper(i),
+                sndFunType->getParamTypeWithModeWrapper(i)))
+            return false;
+    }
+    return TryUnifyTypes(
+        constraints,
+        unifyCtx,
+        fstFunType->getResultType(),
+        sndFunType->getResultType());
+}
+
 bool SemanticsVisitor::TryUnifyTypesByStructuralMatch(
     ConstraintSystem& constraints,
     ValUnificationContext unifyCtx,
     QualType fst,
     QualType snd)
 {
+    if (auto sndDeclRefType = as<DeclRefType>(snd))
+    {
+        auto sndDeclRef = sndDeclRefType->getDeclRef();
+
+        if (auto sndStructDecl = as<StructDecl>(sndDeclRef))
+        {
+            if (auto fstFunType = as<FuncType>(fst))
+                return TryUnifyFunctorByStructuralMatch(
+                    constraints,
+                    unifyCtx,
+                    sndStructDecl.getDecl(),
+                    fstFunType);
+        }
+    }
+
     if (auto fstDeclRefType = as<DeclRefType>(fst))
     {
         auto fstDeclRef = fstDeclRefType->getDeclRef();
+
+        if (auto fstStructDecl = as<StructDecl>(fstDeclRef))
+        {
+            if (auto sndFunType = as<FuncType>(snd))
+                return TryUnifyFunctorByStructuralMatch(
+                    constraints,
+                    unifyCtx,
+                    fstStructDecl.getDecl(),
+                    sndFunType);
+        }
 
         if (auto typeParamDecl = as<GenericTypeParamDecl>(fstDeclRef.getDecl()))
             if (typeParamDecl->parentDecl == constraints.genericDecl)
@@ -1102,23 +1175,11 @@ bool SemanticsVisitor::TryUnifyTypesByStructuralMatch(
     {
         if (auto sndFunType = as<FuncType>(snd))
         {
-            const Index numParams = fstFunType->getParamCount();
-            if (numParams != sndFunType->getParamCount())
-                return false;
-            for (Index i = 0; i < numParams; ++i)
-            {
-                if (!TryUnifyTypes(
-                        constraints,
-                        unifyCtx,
-                        fstFunType->getParamTypeWithDirectionWrapper(i),
-                        sndFunType->getParamTypeWithDirectionWrapper(i)))
-                    return false;
-            }
-            return TryUnifyTypes(
+            return TryUnifyFuncTypesByStructuralMatch(
                 constraints,
                 unifyCtx,
-                fstFunType->getResultType(),
-                sndFunType->getResultType());
+                fstFunType,
+                sndFunType);
         }
     }
     else if (auto expandType = as<ExpandType>(fst))

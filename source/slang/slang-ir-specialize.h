@@ -4,6 +4,8 @@
 namespace Slang
 {
 struct IRModule;
+struct IRInst;
+struct IRSpecialize;
 class DiagnosticSink;
 class TargetProgram;
 
@@ -17,11 +19,18 @@ struct SpecializationOptions
 
 /// Specialize generic and interface-based code to use concrete types.
 bool specializeModule(
-    TargetProgram* target,
     IRModule* module,
+    TargetProgram* target,
     DiagnosticSink* sink,
     SpecializationOptions options);
 
 void finalizeSpecialization(IRModule* module);
+
+IRInst* specializeGeneric(IRSpecialize* specInst);
+
+// Specialize a generic with one or more arguments that are collections rather
+// than single concrete values.
+//
+IRInst* specializeDynamicGeneric(IRSpecialize* specializeInst);
 
 } // namespace Slang

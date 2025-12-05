@@ -667,9 +667,10 @@ Modifier* SemanticsVisitor::validateAttribute(
 
             // Ensure this capability only defines 1 stage per target, else diagnose an error.
             // This is a fatal error, do not allow toggling this error off.
-            entryPointAttr->capabilitySet = CapabilitySet(capName);
+            CapabilitySet set{capName};
+            entryPointAttr->capabilitySet = set.freeze(getASTBuilder());
             HashSet<CapabilityAtom> stageToBeUsed;
-            for (auto& targetSet : entryPointAttr->capabilitySet.getCapabilityTargetSets())
+            for (auto& targetSet : set.getCapabilityTargetSets())
             {
                 for (auto& stageSet : targetSet.second.shaderStageSets)
                     stageToBeUsed.add(stageSet.first);
@@ -1101,8 +1102,8 @@ Modifier* SemanticsVisitor::validateAttribute(
                         capName);
             }
         }
-        requireCapAttr->capabilitySet = CapabilitySet(capabilityNames);
-        if (requireCapAttr->capabilitySet.isInvalid())
+        requireCapAttr->capabilitySet = CapabilitySet(capabilityNames).freeze(getASTBuilder());
+        if (requireCapAttr->capabilitySet->isInvalid())
             maybeDiagnose(
                 getSink(),
                 this->getOptionSet(),
@@ -1129,7 +1130,7 @@ Modifier* SemanticsVisitor::validateAttribute(
         {
             return nullptr;
         }
-        requirePreludeAttr->capabilitySet = CapabilitySet(capName);
+        requirePreludeAttr->capabilitySet = CapabilitySet(capName).freeze(getASTBuilder());
         if (auto stringLitExpr = as<StringLiteralExpr>(attr->args[1]))
         {
             requirePreludeAttr->prelude = getStringLiteralTokenValue(stringLitExpr->token);
@@ -1530,7 +1531,10 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
     case ASTNodeType::DynModifier:
         return as<InterfaceDecl>(decl) || as<VarDecl>(decl) || as<ParamDecl>(decl);
     case ASTNodeType::OverrideModifier:
-        return as<FunctionDeclBase>(decl) && as<AggTypeDecl>(getParentDecl(decl));
+        {
+            Decl* parent = getParentDecl(decl);
+            return as<FunctionDeclBase>(decl) && as<AggTypeDeclBase>(parent);
+        }
     default:
         return true;
     }
@@ -2070,16 +2074,18 @@ void SemanticsVisitor::checkVisibility(Decl* decl)
     }
 }
 
-void postProcessingOnModifiers(Modifiers& modifiers)
+void postProcessingOnModifiers(ASTBuilder* astBuilder, Modifiers& modifiers)
 {
     // compress all `require` nodes into 1 `require` modifier
     RequireCapabilityAttribute* firstRequire = nullptr;
+    CapabilitySet accumulatedCapSet;
+    bool hasChanges = false;
     Modifier* previous = nullptr;
     Modifier* next = nullptr;
+
     for (auto m = modifiers.first; m != nullptr; m = next)
     {
         next = m->next;
-        //
 
         if (auto req = as<RequireCapabilityAttribute>(m))
         {
@@ -2089,14 +2095,28 @@ void postProcessingOnModifiers(Modifiers& modifiers)
                 previous = m;
                 continue;
             }
-            firstRequire->capabilitySet.unionWith(req->capabilitySet);
+
+            if (!hasChanges)
+            {
+                // If we are about to start making changes, thaw the capability set
+                accumulatedCapSet = CapabilitySet{firstRequire->capabilitySet};
+            }
+
+            accumulatedCapSet.unionWith(req->capabilitySet);
+            hasChanges = true;
+
             if (previous)
                 previous->next = next;
             continue;
         }
 
-        //
         previous = m;
+    }
+
+    // Only freeze once at the end if we made changes
+    if (hasChanges)
+    {
+        firstRequire->capabilitySet = accumulatedCapSet.freeze(astBuilder);
     }
 }
 
@@ -2205,7 +2225,7 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
         }
     }
 
-    postProcessingOnModifiers(syntaxNode->modifiers);
+    postProcessingOnModifiers(m_astBuilder, syntaxNode->modifiers);
 }
 
 void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
