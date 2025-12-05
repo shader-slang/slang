@@ -37,4 +37,10 @@ DIAGNOSTIC(
 
 DIAGNOSTIC(10011, Error, unexpectedEndOfInput, "unexpected end of input")
 
+DIAGNOSTIC(
+    10012,
+    Error,
+    integerLiteralTooLargeForAnyType,
+    "integer literal is too large to be represented in any integer type")
+
 #undef DIAGNOSTIC
