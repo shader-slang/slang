@@ -2491,6 +2491,7 @@ struct LLVMEmitter
             }
             return nullptr;
 
+        case kIROp_DebugLexicalBlock: // TODO: lexical scope for LLVM
         case kIROp_DebugInlinedAt:
         case kIROp_DebugInlinedVariable:
             debugInsts.add(inst);

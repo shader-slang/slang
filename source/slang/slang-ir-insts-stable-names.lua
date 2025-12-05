@@ -717,5 +717,6 @@ return {
 	["NoneWitnessTableElement"] = 715,
 	["GetTagForSubSet"] = 716,
 	["Decoration.DisallowSpecializationWithExistentialsDecoration"] = 717,
-	["makeCoopMatrixFromScalar"] = 718
+	["makeCoopMatrixFromScalar"] = 718,
+	["DebugLexicalBlock"] = 719
 }

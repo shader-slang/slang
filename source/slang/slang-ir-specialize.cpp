@@ -3367,7 +3367,10 @@ IRInst* specializeGenericWithSetArgs(IRSpecialize* specializeInst)
             // Emit out into the global scope.
             IRBuilder globalBuilder(builder.getModule());
             globalBuilder.setInsertInto(builder.getModule());
-            cloneInst(&staticCloningEnv, &globalBuilder, inst);
+            auto clonedDebugFunc = cloneInst(&staticCloningEnv, &globalBuilder, inst);
+            // Add mapping to cloneEnv so DebugVar references inside the function
+            // get properly remapped to this cloned debug function.
+            cloneEnv.mapOldValToNew[inst] = clonedDebugFunc;
         }
         else if (!as<IRReturn>(inst))
         {
