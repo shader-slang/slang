@@ -1,6 +1,5 @@
 //TEST:COMPILE(filecheck=CHECK-CUDA):-stage compute -entry computeMain -target cuda
 //TEST:COMPILE(filecheck=CHECK-HLSL):-stage compute -entry computeMain -target hlsl
-//
 
 
 public struct MyStruct<T, uint N, uint SubgroupSize>
