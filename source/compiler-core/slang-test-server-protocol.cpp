@@ -24,7 +24,6 @@ static const StructRttiInfo _makeExecuteToolTestArgsRtti()
     StructRttiBuilder builder(&obj, "TestServerProtocol::ExecuteToolTestArgs", nullptr);
     builder.addField("toolName", &obj.toolName);
     builder.addField("args", &obj.args);
-    builder.addField("testCommand", &obj.testCommand);
     return builder.make();
 }
 /* static */ const StructRttiInfo ExecuteToolTestArgs::g_rttiInfo = _makeExecuteToolTestArgsRtti();
@@ -40,7 +39,6 @@ static const StructRttiInfo _makeExecutionResultRtti()
     builder.addField("debugLayer", &obj.debugLayer);
     builder.addField("result", &obj.result);
     builder.addField("returnCode", &obj.returnCode);
-    builder.addField("executionTimeMs", &obj.executionTimeMs);
     return builder.make();
 }
 /* static */ const StructRttiInfo ExecutionResult::g_rttiInfo = _makeExecutionResultRtti();
