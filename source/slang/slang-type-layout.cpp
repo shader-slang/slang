@@ -305,6 +305,28 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
     }
 
     bool DoStructuredBuffersNeedSeparateCounterBuffer() override { return true; }
+
+    SimpleLayoutInfo GetDescriptorHandleLayout(
+        LayoutResourceKind varyingKind,
+        Type* elementType,
+        const TypeLayoutContext& context) override
+    {
+        SLANG_UNUSED(elementType);
+
+        // Check if SPIRV with spvBindlessTextureNV extension is enabled
+        if (context.targetReq &&
+            context.targetReq->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV))
+        {
+            // For spvBindlessTextureNV, DescriptorHandle<T> is represented as uint64_t
+            auto uint64Info = GetScalarLayout(BaseType::UInt64);
+            return SimpleLayoutInfo(varyingKind, uint64Info.size, uint64Info.alignment);
+        }
+
+        // For non-bindless targets, DescriptorHandle<T> has the layout of uint2
+        auto uintInfo = GetScalarLayout(BaseType::UInt);
+        auto uint2Info = GetVectorLayout(BaseType::UInt, uintInfo, 2);
+        return SimpleLayoutInfo(varyingKind, uint2Info.size, uint2Info.alignment);
+    }
 };
 
 /// Common behavior for GLSL-family layout.
@@ -539,6 +561,36 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
         // Conform to C/C++ size is adjusted to the largest alignment
         ioStructInfo->size = _roundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
     }
+
+    SimpleLayoutInfo GetDescriptorHandleLayout(
+        LayoutResourceKind varyingKind,
+        Type* elementType,
+        const TypeLayoutContext& context) override
+    {
+        // For CPU targets, DescriptorHandle<T> has the layout of T
+        // Determine ShaderParameterKind from the element type
+        ShaderParameterKind paramKind = ShaderParameterKind::Texture;
+        if (auto textureType = as<TextureType>(elementType))
+        {
+            if (textureType->isCombined())
+                paramKind = (textureType->getAccess() == SLANG_RESOURCE_ACCESS_READ)
+                                ? ShaderParameterKind::TextureSampler
+                                : ShaderParameterKind::MutableTextureSampler;
+            else
+                paramKind = (textureType->getAccess() == SLANG_RESOURCE_ACCESS_READ)
+                                ? ShaderParameterKind::Texture
+                                : ShaderParameterKind::MutableTexture;
+        }
+        else if (as<SamplerStateType>(elementType))
+        {
+            paramKind = ShaderParameterKind::SamplerState;
+        }
+
+        // Get the object layout to get size
+        auto objLayout = context.rules->GetObjectLayout(paramKind, context.objectLayoutOptions);
+        // Return the object size as a varying layout with the specified resource kind
+        return SimpleLayoutInfo(varyingKind, objLayout.getSimple().size);
+    }
 };
 
 // The CUDA compiler NVRTC only works on 64 bit operating systems.
@@ -702,6 +754,36 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
     {
         // Conform to CUDA/C/C++ size is adjusted to the largest alignment
         ioStructInfo->size = _roundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
+    }
+
+    SimpleLayoutInfo GetDescriptorHandleLayout(
+        LayoutResourceKind varyingKind,
+        Type* elementType,
+        const TypeLayoutContext& context) override
+    {
+        // For CUDA targets, DescriptorHandle<T> has the layout of T
+        // Determine ShaderParameterKind from the element type
+        ShaderParameterKind paramKind = ShaderParameterKind::Texture;
+        if (auto textureType = as<TextureType>(elementType))
+        {
+            if (textureType->isCombined())
+                paramKind = (textureType->getAccess() == SLANG_RESOURCE_ACCESS_READ)
+                                ? ShaderParameterKind::TextureSampler
+                                : ShaderParameterKind::MutableTextureSampler;
+            else
+                paramKind = (textureType->getAccess() == SLANG_RESOURCE_ACCESS_READ)
+                                ? ShaderParameterKind::Texture
+                                : ShaderParameterKind::MutableTexture;
+        }
+        else if (as<SamplerStateType>(elementType))
+        {
+            paramKind = ShaderParameterKind::SamplerState;
+        }
+
+        // Get the object layout to get size
+        auto objLayout = context.rules->GetObjectLayout(paramKind, context.objectLayoutOptions);
+        // Return the object size as a varying layout with the specified resource kind
+        return SimpleLayoutInfo(varyingKind, objLayout.getSimple().size);
     }
 };
 
@@ -5049,8 +5131,19 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     }
     else if (auto resPtrType = as<DescriptorHandleType>(type))
     {
+        // For spvBindlessTextureNV, DescriptorHandle<T> has the layout of uint64_t
+        if (context.targetReq &&
+            context.targetReq->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV))
+        {
+            auto uint64Type = context.astBuilder->getUInt64Type();
+            return _createTypeLayout(context, uint64Type);
+        }
+
+        // On bindless targets, DescriptorHandle<T> has the layout of T
         if (areResourceTypesBindlessOnTarget(context.targetReq))
             return _createTypeLayout(context, resPtrType->getElementType());
+
+        // On non-bindless targets, DescriptorHandle<T> has the layout of uint2
         auto uint2Type = context.astBuilder->getVectorType(
             context.astBuilder->getUIntType(),
             context.astBuilder->getIntVal(context.astBuilder->getIntType(), 2));
@@ -5680,6 +5773,28 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
                     varyingRuleSet->GetVectorLayout(elementBaseType, elementInfo, colCount);
                 rowTypeLayout->addResourceUsage(rowInfo.kind, rowInfo.size);
             }
+        }
+
+        return typeLayout;
+    }
+    else if (auto descriptorHandleType = as<DescriptorHandleType>(type))
+    {
+        RefPtr<TypeLayout> typeLayout = new TypeLayout();
+        typeLayout->type = type; // Preserve the original DescriptorHandle type
+        typeLayout->rules = rules;
+
+        for (int rr = 0; rr < varyingRulesCount; ++rr)
+        {
+            // Determine the layout resource kind based on the direction mask
+            LayoutResourceKind varyingKind = LayoutResourceKind::VaryingInput;
+            if (directionMask & kEntryPointParameterDirection_Output)
+                varyingKind = LayoutResourceKind::VaryingOutput;
+
+            auto info = varyingRules[rr]->simpleRules->GetDescriptorHandleLayout(
+                varyingKind,
+                descriptorHandleType->getElementType(),
+                context);
+            typeLayout->addResourceUsage(info.kind, info.size);
         }
 
         return typeLayout;

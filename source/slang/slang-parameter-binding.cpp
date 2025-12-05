@@ -2210,6 +2210,14 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                 varLayout,
                 (int)rowCount);
         }
+        else if (auto descriptorHandleType = as<DescriptorHandleType>(type))
+        {
+            return processSimpleEntryPointParameter(
+                context,
+                descriptorHandleType,
+                state,
+                varLayout);
+        }
         else if (auto arrayType = as<ArrayExpressionType>(type))
         {
             // Note: Bad Things will happen if we have an array input
