@@ -1,18 +1,12 @@
 #include "slang-stream.h"
 #ifdef _WIN32
 #include <share.h>
-#include <windows.h>
 #endif
 #include "slang-io.h"
 #include "slang-process.h"
-#include "slang-test-diagnostics.h"
 
 #include <stdio.h>
 #include <thread>
-
-#ifndef _WIN32
-#include <pthread.h>
-#endif
 
 namespace Slang
 {
@@ -185,28 +179,6 @@ SlangResult FileStream::_init(
         return SLANG_E_CANNOT_OPEN;
     }
 
-    // Debug logging for file descriptor tracking
-    if (isDiagnosticEnabled("fd"))
-    {
-#ifdef _WIN32
-        fprintf(
-            stderr,
-            "[FD-DEBUG] Opened '%s' mode='%s' fd=%d (thread=%lu)\n",
-            fileName.getBuffer(),
-            mode,
-            _fileno(m_handle),
-            (unsigned long)GetCurrentThreadId());
-#else
-        fprintf(
-            stderr,
-            "[FD-DEBUG] Opened '%s' mode='%s' fd=%d (thread=%lu)\n",
-            fileName.getBuffer(),
-            mode,
-            fileno(m_handle),
-            (unsigned long)pthread_self());
-#endif
-    }
-
     // Just set the access specified
     m_fileAccess = access;
     return SLANG_OK;
@@ -276,9 +248,11 @@ SlangResult FileStream::read(void* buffer, size_t length, size_t& outBytesRead)
         // If we have reached the end, then reading nothing is ok.
         if (!m_endReached)
         {
-            // Use file position to verify EOF, don't rely on feof()
+            // Verify EOF using file position.
             Int64 currentPos = getPosition();
             Int64 currentSize = 0;
+
+// Save position, seek to end, get size, restore position
 #if defined(_WIN32) || defined(__CYGWIN__)
             _fseeki64(m_handle, 0, SEEK_END);
             currentSize = _ftelli64(m_handle);
@@ -291,6 +265,7 @@ SlangResult FileStream::read(void* buffer, size_t length, size_t& outBytesRead)
 
             if (currentPos >= currentSize)
             {
+                // Confirmed at EOF
                 m_endReached = true;
             }
             else
@@ -333,23 +308,6 @@ void FileStream::close()
 {
     if (m_handle)
     {
-        if (isDiagnosticEnabled("fd"))
-        {
-#ifdef _WIN32
-            fprintf(
-                stderr,
-                "[FD-DEBUG] Closing fd=%d (thread=%lu)\n",
-                _fileno(m_handle),
-                (unsigned long)GetCurrentThreadId());
-#else
-            fprintf(
-                stderr,
-                "[FD-DEBUG] Closing fd=%d (thread=%lu)\n",
-                fileno(m_handle),
-                (unsigned long)pthread_self());
-#endif
-        }
-
         fclose(m_handle);
         m_handle = nullptr;
 
