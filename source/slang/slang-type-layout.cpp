@@ -306,12 +306,16 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
 
     bool DoStructuredBuffersNeedSeparateCounterBuffer() override { return true; }
 
-    SimpleLayoutInfo GetDescriptorHandleLayout(LayoutResourceKind varyingKind, Type* elementType, const TypeLayoutContext& context) override
+    SimpleLayoutInfo GetDescriptorHandleLayout(
+        LayoutResourceKind varyingKind,
+        Type* elementType,
+        const TypeLayoutContext& context) override
     {
         SLANG_UNUSED(elementType);
 
         // Check if SPIRV with spvBindlessTextureNV extension is enabled
-        if (context.targetReq && context.targetReq->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV))
+        if (context.targetReq &&
+            context.targetReq->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV))
         {
             // For spvBindlessTextureNV, DescriptorHandle<T> is represented as uint64_t
             auto uint64Info = GetScalarLayout(BaseType::UInt64);
@@ -558,7 +562,10 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
         ioStructInfo->size = _roundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
     }
 
-    SimpleLayoutInfo GetDescriptorHandleLayout(LayoutResourceKind varyingKind, Type* elementType, const TypeLayoutContext& context) override
+    SimpleLayoutInfo GetDescriptorHandleLayout(
+        LayoutResourceKind varyingKind,
+        Type* elementType,
+        const TypeLayoutContext& context) override
     {
         // For CPU targets, DescriptorHandle<T> has the layout of T
         // Determine ShaderParameterKind from the element type
@@ -567,12 +574,12 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
         {
             if (textureType->isCombined())
                 paramKind = (textureType->getAccess() == SLANG_RESOURCE_ACCESS_READ)
-                    ? ShaderParameterKind::TextureSampler
-                    : ShaderParameterKind::MutableTextureSampler;
+                                ? ShaderParameterKind::TextureSampler
+                                : ShaderParameterKind::MutableTextureSampler;
             else
                 paramKind = (textureType->getAccess() == SLANG_RESOURCE_ACCESS_READ)
-                    ? ShaderParameterKind::Texture
-                    : ShaderParameterKind::MutableTexture;
+                                ? ShaderParameterKind::Texture
+                                : ShaderParameterKind::MutableTexture;
         }
         else if (as<SamplerStateType>(elementType))
         {
@@ -749,7 +756,10 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
         ioStructInfo->size = _roundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
     }
 
-    SimpleLayoutInfo GetDescriptorHandleLayout(LayoutResourceKind varyingKind, Type* elementType, const TypeLayoutContext& context) override
+    SimpleLayoutInfo GetDescriptorHandleLayout(
+        LayoutResourceKind varyingKind,
+        Type* elementType,
+        const TypeLayoutContext& context) override
     {
         // For CUDA targets, DescriptorHandle<T> has the layout of T
         // Determine ShaderParameterKind from the element type
@@ -758,12 +768,12 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
         {
             if (textureType->isCombined())
                 paramKind = (textureType->getAccess() == SLANG_RESOURCE_ACCESS_READ)
-                    ? ShaderParameterKind::TextureSampler
-                    : ShaderParameterKind::MutableTextureSampler;
+                                ? ShaderParameterKind::TextureSampler
+                                : ShaderParameterKind::MutableTextureSampler;
             else
                 paramKind = (textureType->getAccess() == SLANG_RESOURCE_ACCESS_READ)
-                    ? ShaderParameterKind::Texture
-                    : ShaderParameterKind::MutableTexture;
+                                ? ShaderParameterKind::Texture
+                                : ShaderParameterKind::MutableTexture;
         }
         else if (as<SamplerStateType>(elementType))
         {
@@ -5118,7 +5128,8 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     {
         TypeLayoutResult result;
         // Check if SPIRV with spvBindlessTextureNV extension is enabled
-        if (context.targetReq && context.targetReq->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV))
+        if (context.targetReq &&
+            context.targetReq->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV))
         {
             // For spvBindlessTextureNV, DescriptorHandle<T> has the layout of uint64_t
             auto uint64Type = context.astBuilder->getUInt64Type();

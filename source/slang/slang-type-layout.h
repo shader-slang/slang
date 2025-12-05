@@ -1355,7 +1355,10 @@ struct SimpleLayoutRulesImpl
     virtual bool DoStructuredBuffersNeedSeparateCounterBuffer() = 0;
 
     // Get layout for DescriptorHandle<T>
-    virtual SimpleLayoutInfo GetDescriptorHandleLayout(LayoutResourceKind varyingKind, Type* elementType, const TypeLayoutContext& context) = 0;
+    virtual SimpleLayoutInfo GetDescriptorHandleLayout(
+        LayoutResourceKind varyingKind,
+        Type* elementType,
+        const TypeLayoutContext& context) = 0;
 };
 
 struct ObjectLayoutRulesImpl
@@ -1429,7 +1432,10 @@ struct LayoutRulesImpl
         return simpleRules->DoStructuredBuffersNeedSeparateCounterBuffer();
     }
 
-    SimpleLayoutInfo GetDescriptorHandleLayout(LayoutResourceKind varyingKind, Type* elementType, const TypeLayoutContext& context)
+    SimpleLayoutInfo GetDescriptorHandleLayout(
+        LayoutResourceKind varyingKind,
+        Type* elementType,
+        const TypeLayoutContext& context)
     {
         return simpleRules->GetDescriptorHandleLayout(varyingKind, elementType, context);
     }
