@@ -2289,7 +2289,8 @@ IRConstant* IRBuilder::_findOrEmitConstant(IRConstant& keyInst)
             // Turn into pointer to avoid warning of array overrun
             char* dstChars = dstString.chars;
             // Copy the chars
-            memcpy(dstChars, slice.begin(), sliceSize);
+            if (sliceSize > 0)
+                memcpy(dstChars, slice.begin(), sliceSize);
 
             break;
         }

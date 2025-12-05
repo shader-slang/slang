@@ -119,15 +119,11 @@ struct Builder;
 struct Chunk
 {
 public:
-    //
-    // The starting offset of a chunk in a RIFF file
-    // is only guaranteed to be 2-byte aligned.
-    // Code that reads from a chunk must be cautious about
-    // the possibility of performing unaligned loads.
-    //
-
     /// Required alignment for the starting offset of a chunk.
-    static const UInt32 kChunkAlignment = 2;
+    ///
+    /// We align chunks to 8 bytes instead of the traditional 2 bytes to avoid unaligned loads and
+    /// member calls on misaligned pointers, which are undefined behavior.
+    static const UInt32 kChunkAlignment = 8;
 
     //
     // Every chunk starts with a *header*, which includes

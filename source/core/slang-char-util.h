@@ -54,7 +54,10 @@ struct CharUtil
     SLANG_FORCE_INLINE static bool isOctalDigit(char c) { return c >= '0' && c <= '7'; }
 
     /// For a given character get the associated flags
-    SLANG_FORCE_INLINE static Flags getFlags(char c) { return g_charFlagMap.flags[size_t(c)]; }
+    SLANG_FORCE_INLINE static Flags getFlags(unsigned char c)
+    {
+        return g_charFlagMap.flags[size_t(c)];
+    }
 
     /// Given a character return the lower case equivalent
     SLANG_FORCE_INLINE static char toLower(char c)

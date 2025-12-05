@@ -100,6 +100,9 @@ bool UIntSet::operator==(const UIntSet& set) const
     const Index bCount = set.m_buffer.getCount();
     const auto bElems = set.m_buffer.getBuffer();
 
+    if (aCount == 0)
+        return bCount == 0;
+
     const Index minCount = Math::Min(aCount, bCount);
 
     return ::memcmp(aElems, bElems, minCount * sizeof(Element)) == 0 &&
