@@ -1635,9 +1635,36 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
                 genericArgs.add(specializationArg.expr);
                 continue;
             }
-            auto typeExpr = astBuilder->create<SharedTypeExpr>();
-            typeExpr->type = astBuilder->getTypeType((Type*)specializationArg.val);
-            genericArgs.add(typeExpr);
+            if (auto typeVal = as<Type>(specializationArg.val))
+            {
+                auto typeExpr = astBuilder->create<SharedTypeExpr>();
+                typeExpr->type = astBuilder->getTypeType((Type*)specializationArg.val);
+                genericArgs.add(typeExpr);
+            }
+            else if (auto intVal = as<ConstantIntVal>(specializationArg.val))
+            {
+                if (intVal->getType() == astBuilder->getBoolType())
+                {
+                    auto intExpr = astBuilder->create<BoolLiteralExpr>();
+                    intExpr->type = intVal->getType();
+                    intExpr->value = intVal->getValue() != 0;
+                    genericArgs.add(intExpr); 
+                }
+                else
+                {
+                    auto intExpr = astBuilder->create<IntegerLiteralExpr>();
+                    intExpr->type = intVal->getType();
+                    intExpr->value = intVal->getValue();
+                    genericArgs.add(intExpr);
+                }
+            }
+            else
+            {
+                sink->diagnose(
+                    SourceLoc(),
+                    Diagnostics::invalidFormOfSpecializationArg,
+                    ii + 1);
+            }
         }
         auto genAppExpr = astBuilder->create<GenericAppExpr>();
         auto genExpr = astBuilder->create<VarExpr>();

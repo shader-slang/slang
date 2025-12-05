@@ -11959,28 +11959,28 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 {
                     extents[i] = numThreadsAttr->specConstExtents[i]
                                      ? emitDeclRef(
-                                           context,
+                                           subContext,
                                            numThreadsAttr->specConstExtents[i],
                                            lowerType(
-                                               context,
+                                               subContext,
                                                getType(
-                                                   context->astBuilder,
+                                                   subContext->astBuilder,
                                                    numThreadsAttr->specConstExtents[i])))
-                                     : lowerVal(context, numThreadsAttr->extents[i]);
+                                     : lowerVal(subContext, numThreadsAttr->extents[i]);
                 }
 
                 numThreadsDecor = as<IRNumThreadsDecoration>(getBuilder()->addNumThreadsDecoration(
                     irFunc,
-                    getSimpleVal(context, extents[0]),
-                    getSimpleVal(context, extents[1]),
-                    getSimpleVal(context, extents[2])));
+                    getSimpleVal(subContext, extents[0]),
+                    getSimpleVal(subContext, extents[1]),
+                    getSimpleVal(subContext, extents[2])));
                 numThreadsDecor->sourceLoc = numThreadsAttr->loc;
             }
             else if (auto waveSizeAttr = as<WaveSizeAttribute>(modifier))
             {
                 getBuilder()->addWaveSizeDecoration(
                     irFunc,
-                    getSimpleVal(context, lowerVal(context, waveSizeAttr->numLanes)));
+                    getSimpleVal(subContext, lowerVal(subContext, waveSizeAttr->numLanes)));
             }
             else if (as<ReadNoneAttribute>(modifier))
             {
@@ -13743,6 +13743,28 @@ IREntryPointLayout* lowerEntryPointLayout(
     return context->irBuilder->getEntryPointLayout(irParamsLayout, irResultLayout);
 }
 
+bool isUnspecializedGenericDeclRef(DeclRef<Decl> declRef)
+{
+    auto genericDeclRef = as<GenericAppDeclRef>(declRef.declRefBase);
+    if (!genericDeclRef)
+        return false;
+    if (genericDeclRef->getArgCount() == 0)
+        return false;
+    DeclRef<Decl> argDeclRef;
+    if (auto intVal = as<DeclRefIntVal>(genericDeclRef->getArg(0)))
+    {
+        argDeclRef = intVal->getDeclRef();
+    }
+    else if (auto type = as<DeclRefType>(genericDeclRef->getArg(0)))
+    {
+        argDeclRef = type->getDeclRef();
+    }
+    if (argDeclRef.getDecl() &&
+        argDeclRef.getDecl()->parentDecl == genericDeclRef->getGenericDecl())
+        return true;
+    return false;
+}
+
 RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
 {
     if (m_irModuleForLayout)
@@ -13853,6 +13875,11 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         // and thus don't have AST-level information for us to work with.
         //
         if (!funcDeclRef)
+            continue;
+
+        // Skip unspecialized functions because we cannot produce IR layouts to
+        // them yet.
+        if (isUnspecializedGenericDeclRef(funcDeclRef))
             continue;
 
         auto irFuncType = lowerType(context, getFuncType(astBuilder, funcDeclRef));

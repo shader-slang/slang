@@ -4890,7 +4890,8 @@ static void CompleteDecl(
     Parser* parser,
     Decl* decl,
     ContainerDecl* containerDecl,
-    Modifiers modifiers)
+    Modifiers modifiers,
+    Scope* modifierScope)
 {
     // Add any modifiers we parsed before the declaration to the list
     // of modifiers on the declaration itself.
@@ -4900,7 +4901,17 @@ static void CompleteDecl(
     //
     Decl* declToModify = decl;
     if (auto genericDecl = as<GenericDecl>(decl))
+    {
+        // If `decl` is a generic decl, hookup modifierScope to be nested inside
+        // the generic decl's scope, so that generic parameters can be accessible
+        // from the modifiers.
+        if (modifierScope)
+        {
+            modifierScope->containerDecl = genericDecl;
+            modifierScope->parent = genericDecl->ownedScope;
+        }
         declToModify = genericDecl->inner;
+    }
 
     if (as<ModuleDeclarationDecl>(decl))
     {
@@ -5007,7 +5018,8 @@ static void CompleteDecl(
 static DeclBase* ParseDeclWithModifiers(
     Parser* parser,
     ContainerDecl* containerDecl,
-    Modifiers modifiers)
+    Modifiers modifiers,
+    Scope* modifierScope)
 {
     DeclBase* decl = nullptr;
 
@@ -5157,7 +5169,7 @@ static DeclBase* ParseDeclWithModifiers(
     {
         if (auto dd = as<Decl>(decl))
         {
-            CompleteDecl(parser, dd, containerDecl, modifiers);
+            CompleteDecl(parser, dd, containerDecl, modifiers, modifierScope);
         }
         else if (auto declGroup = as<DeclGroup>(decl))
         {
@@ -5171,7 +5183,7 @@ static DeclBase* ParseDeclWithModifiers(
 
             for (auto subDecl : declGroup->decls)
             {
-                CompleteDecl(parser, subDecl, containerDecl, modifiers);
+                CompleteDecl(parser, subDecl, containerDecl, modifiers, nullptr);
             }
         }
     }
@@ -5180,8 +5192,19 @@ static DeclBase* ParseDeclWithModifiers(
 
 static DeclBase* ParseDecl(Parser* parser, ContainerDecl* containerDecl)
 {
+    // If the decl to be parsed is a generic decl (e.g. a `func<T>(...)`), we need to
+    // to make sure any exprs in the modifiers will have the correct scope so that the
+    // generic parameters can be referenced.
+    // However at this point, we don't even know if the decl is generic or not.
+    // So we will create a temporary scope for the modifiers, and then hookup the temp
+    // scope with the generic decl's scope once it is parsed.
+    Scope* modifierScope = parser->astBuilder->create<Scope>();
+    modifierScope->containerDecl = containerDecl;
+    modifierScope->parent = parser->currentScope;
+    parser->PushScope(modifierScope);
     Modifiers modifiers = ParseModifiers(parser);
-    return ParseDeclWithModifiers(parser, containerDecl, modifiers);
+    parser->PopScope();
+    return ParseDeclWithModifiers(parser, containerDecl, modifiers, modifierScope);
 }
 
 static Decl* ParseSingleDecl(Parser* parser, ContainerDecl* containerDecl)
@@ -6310,7 +6333,7 @@ DeclStmt* Parser::parseVarDeclrStatement(Modifiers modifiers)
     DeclStmt* varDeclrStatement = astBuilder->create<DeclStmt>();
 
     FillPosition(varDeclrStatement);
-    auto decl = ParseDeclWithModifiers(this, currentScope->containerDecl, modifiers);
+    auto decl = ParseDeclWithModifiers(this, currentScope->containerDecl, modifiers, nullptr);
     varDeclrStatement->decl = decl;
 
     if (as<VarDeclBase>(decl))
