@@ -7630,9 +7630,9 @@ bool SemanticsVisitor::checkConformance(
         }
         if (auto genericApp = as<GenericAppDeclRef>(declRef.declRefBase))
         {
-            // When the inheritance decl is generic, we can't just make a direct declref to it,
+            // When the sub type is generic, we can't just make a direct declref to inheritanceDecl
             // because it won't be lowered to a concrete type. Instead, we need to form a
-            // GenericAppDeclRef.
+            // GenericAppDeclRef to represent a concrete type.
             declRefForSubTypeWitness = m_astBuilder->getGenericAppDeclRef(
                 genericApp->getGenericDecl(),
                 genericApp->getArgs(),
