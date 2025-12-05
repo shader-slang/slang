@@ -7,10 +7,9 @@
 #include
 
 void test() {
-//HOVER:11,5
+//HOVER:11,9
     int x = 0;
 }
 
 // The important part is that the test doesn't crash
-// The hover may return null due to parse errors, which is acceptable
-// CHECK: null
+// CHECK: int x
