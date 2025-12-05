@@ -1,9 +1,9 @@
 //TEST:REFLECTION(filecheck=CHECK_REFLECTION):-target spirv -stage compute -entry computeMain
-//TEST:REFLECTION(filecheck=CHECK_REFLECTION):-target hlsl -stage compute -entry computeMain
+//TEST:REFLECTION(filecheck=CHECK_REFLECTION):-target hlsl -stage compute -entry computeMain -profile sm_6_6
 //TEST:REFLECTION(filecheck=CHECK_REFLECTION):-target glsl -stage compute -entry computeMain
 //TEST:REFLECTION(filecheck=CHECK_REFLECTION):-target wgsl -stage compute -entry computeMain
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_RUNTIME):-vk -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_RUNTIME):-dx12 -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_RUNTIME):-dx12 -shaderobj -output-using-type -profile sm_6_6
 
 // Test that DescriptorHandle<T> in a structured buffer is correctly reflected
 // and works at runtime on non-bindless targets

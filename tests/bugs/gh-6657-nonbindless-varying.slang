@@ -1,5 +1,5 @@
-//TEST:REFLECTION(filecheck=CHECK):-target spirv -stage vertex -entry vertexMain
-//TEST:REFLECTION(filecheck=CHECK):-target hlsl -stage vertex -entry vertexMain
+// TEST:REFLECTION(filecheck=CHECK):-target spirv -stage vertex -entry vertexMain
+// TEST:REFLECTION(filecheck=CHECK):-target hlsl -stage vertex -entry vertexMain -profile sm_6_6
 //TEST:REFLECTION(filecheck=CHECK):-target glsl -stage vertex -entry vertexMain
 //TEST:REFLECTION(filecheck=CHECK):-target wgsl -stage vertex -entry vertexMain
 
