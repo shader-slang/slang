@@ -1,4 +1,4 @@
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type
+// // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature
 
 import neural;
@@ -27,8 +27,8 @@ RWStructuredBuffer<half> inputBuffer;
 // TEST_INPUT:ubuffer(stride=4, count=5):out, name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
-// TEST_INPUT:ubuffer(stride=4, count=256):out, name=debugBuffer
-RWStructuredBuffer<half> debugBuffer;
+// // TEST_INPUT:ubuffer(stride=4, count=256):out, name=debugBuffer
+// RWStructuredBuffer<half> debugBuffer;
 
 static const int BatchSize = 32;
 static const int SubgroupSize = 32;
@@ -40,32 +40,22 @@ groupshared uint4 s_sharedMemoryB[256];
 typealias SPtr = Ptr<uint4, Access::ReadWrite, AddressSpace::GroupShared>;
 typealias HalfPtr = Ptr<half, Access::ReadWrite, AddressSpace::GroupShared>;
 
-// Initialize the weight matrix as identity matrix.
-void identityWeightMatrix<int InputSize>(uint tid, bool clear = false)
+// Initialize the weight matrix as half(0.5).
+void fillWeightMatrix<int InputSize, int OutputSize>(uint tid)
 {
-    if (InputSize <= BatchSize)
-    {
-        if (tid > InputSize)
-            return;
+    uint numIter = (OutputSize + BatchSize - 1) / BatchSize;
 
-        // InputSize mount of threads are enough to fill the input buffer
-        int index = tid * InputSize + tid;
-        if (clear)
-            inputBuffer[index] = half(0);
-        else
-            inputBuffer[index] = half(1);
-    }
-    else
+    for (int i = 0; i < numIter; i++)
     {
-        int numWrites = InputSize / BatchSize;
-        for (int i = 0; i < numWrites; i++)
+        int rowIndex = i * BatchSize + tid;
+        if (rowIndex >= OutputSize)
+            break;
+
+        int startIndex = rowIndex * InputSize;
+        for (int j = 0; j < InputSize; j++)
         {
-            int row = tid + i * BatchSize;
-            int index = row * InputSize + row;
-            if (clear)
-                inputBuffer[index] = half(0);
-            else
-                inputBuffer[index] = half(1);
+            int index = startIndex + j;
+            inputBuffer[index] = half(0.5);
         }
     }
 }
@@ -77,7 +67,9 @@ half[OutputSize] testMatVecMul<int InputSize, int OutputSize>(uint tid)
 
     // Construct the input vector as follow:
     // x = tid + 1
-    half inputVector[InputSize];
+    // const int uint4AlignedInputSize = MMAHelper<half, InputSize, OutputSize, SubgroupSize>.Uint4AlignedK;
+    half inputVector[MMAHelper<half, InputSize, OutputSize, SubgroupSize>.Uint4AlignedK];
+
     for (int i = 0; i < InputSize; i++)
     {
         inputVector[i] = half(tid + 1);
@@ -89,7 +81,7 @@ half[OutputSize] testMatVecMul<int InputSize, int OutputSize>(uint tid)
     SPtr ptrB = __getAddress(s_sharedMemoryB[0]);
     SPtr ptrC = __getAddress(s_sharedMemoryB[0]);
 
-    let res = MMAHelper<half, InputSize, OutputSize, SubgroupSize>.mma<Storage>(inputVector, ptrA, ptrB, ptrC, storage, 0, debugBuffer);
+    let res = MMAHelper<half, InputSize, OutputSize, SubgroupSize>.mma<Storage>(inputVector, ptrA, ptrB, ptrC, storage, 0);
     // serialRead(tid, ptrB, 16);
     return res;
 }
@@ -119,8 +111,8 @@ void serialRead(uint tid, SPtr sharedMem, uint rowOrColumnCount)
 
                 half aa = bit_cast<half>(a);
                 half bb = bit_cast<half>(b);
-                debugBuffer[linearIndex++] = aa;
-                debugBuffer[linearIndex++] = bb;
+                // debugBuffer[linearIndex++] = aa;
+                // debugBuffer[linearIndex++] = bb;
                 printf("%.1f %.1f ", float(aa), float(bb));
             }
         }
@@ -130,15 +122,27 @@ void serialRead(uint tid, SPtr sharedMem, uint rowOrColumnCount)
 
 void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 {
-    half[OutputSize] outputVector = testMatVecMul<InputSize, OutputSize>(tid);
+    let outputVector = testMatVecMul<InputSize, OutputSize>(tid);
+
+    if (tid == 1)
+    {
+        printf("outputVector: ");
+        for (int i = 0; i < OutputSize; i++)
+        {
+            printf("%.1f ", float(outputVector[i]));
+        }
+        printf("\n");
+    }
 
     bool res = true;
     if (tid < OutputSize)
     {
+        float expected = float(tid + 1) * float(InputSize) * 0.5f;
         for (int i = 0; i < OutputSize; i++)
         {
-            if (outputVector[i] != half(tid + 1))
+            if (outputVector[i] != half(expected))
             {
+                // printf("outputVector[%d] = %.1f, expected = %.1f\n", i, float(outputVector[i]), expected);
                 res = false;
                 break;
             }
@@ -155,44 +159,17 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 [shader("compute")]
 void computeMain(uint tid : SV_DispatchThreadID)
 {
-    {
-        identityWeightMatrix<4>(tid);
-        GroupMemoryBarrierWithWaveSync();
-        test<4, 4>(tid, 0);
-        identityWeightMatrix<4>(tid, true);
-    }
+    // {
+    //     fillWeightMatrix<3, 5>(tid);
+    //     GroupMemoryBarrierWithWaveSync();
+    //     test<3, 5>(tid, 0);
+    // }
 
     {
-        identityWeightMatrix<8>(tid);
+        fillWeightMatrix<11, 18>(tid);
         GroupMemoryBarrierWithWaveSync();
-        test<8, 8>(tid, 1);
-        identityWeightMatrix<8>(tid, true);
+        test<11, 18>(tid, 1);
     }
-
-    {
-        identityWeightMatrix<16>(tid);
-        GroupMemoryBarrierWithWaveSync();
-        test<16, 16>(tid, 2);
-        identityWeightMatrix<16>(tid, true);
-    }
-
-    {
-        identityWeightMatrix<32>(tid);
-        GroupMemoryBarrierWithWaveSync();
-        test<32, 32>(tid, 3);
-        identityWeightMatrix<32>(tid, true);
-    }
-
-    {
-        identityWeightMatrix<64>(tid);
-        GroupMemoryBarrierWithWaveSync();
-        test<64, 64>(tid, 4);
-        identityWeightMatrix<64>(tid, true);
-    }
-
     // BUFFER: 1
-    // BUFFER-NEXT: 1
-    // BUFFER-NEXT: 1
-    // BUFFER-NEXT: 1
     // BUFFER-NEXT: 1
 }

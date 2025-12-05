@@ -125,7 +125,8 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
     // `Uint4AlignedK` is the K value that is aligned with the uint4 vector size. Because we always do the vectorized load
     // along K dimension, so we need to align the K value with the vector size.
     // Measured in T.
-    static const int Uint4AlignedK = ((K + (ElementCountPerVector - 1)) / ElementCountPerVector) * ElementCountPerVector;
+    VISIBILITY_LEVEL static const int Uint4AlignedK = ((K + (ElementCountPerVector - 1)) / ElementCountPerVector) * ElementCountPerVector;
+    VISIBILITY_LEVEL static const int Uint4AlignedM = ((M + (ElementCountPerVector - 1)) / ElementCountPerVector) * ElementCountPerVector;
 
 
     // In order to achieve the high throughput, we will write data to shared memory in vectorized way.
@@ -257,7 +258,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
         SPtr<uint4> sharedMemoryB,
         int tileIndex,
         int subgroupIndex,
-        T[K] inputVector)
+        T[Uint4AlignedK] inputVector)
     {
         const uint laneId = WaveGetLaneIndex();
         SPtr<uint4> sharedMemoryBSubgroup = sharedMemoryB + subgroupIndex * SharedMemSizeInVectorMatB;
@@ -326,7 +327,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
         SPtr<uint4> sharedMemoryB,
         int tileIndex,
         int subgroupIndex,
-        out T[M] outputVector)
+        out T[Uint4AlignedM] outputVector)
     {
         const uint laneId = WaveGetLaneIndex();
         SPtr<uint4> sharedMemoryBSubgroup = sharedMemoryB + subgroupIndex * SharedMemSizeInVectorMatB;
@@ -357,12 +358,12 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
     // The workload is different from the large size matrix-matrix multiply, we actually perform the matrix-vector multiply
     //  for each thread, so the matrix-matrix multiply only needs to be performed for each warp (sub-group).
     [require(cooperative_matrix, subgroup_basic)]
-    VISIBILITY_LEVEL static T[M] mma<Storage>( T[K] inputVector,
+    VISIBILITY_LEVEL static T[Uint4AlignedM] mma<Storage>( T[Uint4AlignedK] inputVector,
         SPtr<uint4> sharedMemoryA,
         SPtr<uint4> sharedMemoryB,
         SPtr<uint4> sharedMemoryC,
         Storage weightStorage,
-        Storage.Address weightAddress, RWStructuredBuffer<T> debugBuffer
+        Storage.Address weightAddress
         )
             where Storage : IStorage<T>
     {
@@ -459,7 +460,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
         // actually the output vector of the matrix-vector multiply, which is also a thread-local vector.
         // TODO: First, get the offset of C for each warp.
         // ptrCPerWarp = ptrC + subgroupIndex * (subGroupSize * AlignedM / ElementCountPerVector);
-        T[M] outputVector;
+        T[Uint4AlignedM] outputVector;
         // Get start address of the shared memory for current warp.
         SPtr<uint4> ptrPerWarp = ptrC + subgroupIndex * SharedMemSizeInVectorMatC;
         for (int i = 0; i < NTilesRow; i ++)
