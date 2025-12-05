@@ -7617,19 +7617,6 @@ bool SemanticsVisitor::checkConformance(
                         Diagnostics::structCannotImplementComInterface);
                 }
             }
-            if (auto genericApp = as<GenericAppDeclRef>(superDeclRefType->getDeclRefBase()))
-            {
-                // When the inheritance decl is generic, we can't just make a direct declref to it,
-                // because this won't be lowered to a valid witness table entry, as it will finally
-                // result into a generic. But we need this to be lowered to some concrete type. So
-                // we create a GenericAppDeclRef to the inheritance decl, where the generic Decl is
-                // just the supertype references to, and the substitutions is also coming from the
-                // supertype's generic arguments.
-                declRefForSubTypeWitness = m_astBuilder->getGenericAppDeclRef(
-                    genericApp->getGenericDecl(),
-                    genericApp->getArgs(),
-                    inheritanceDecl);
-            }
         }
 
         // Don't check conformances for abstract types that
@@ -7640,6 +7627,16 @@ bool SemanticsVisitor::checkConformance(
             // in an outer interface declaration, and its members
             // (type constraints) represent additional requirements.
             return true;
+        }
+        if (auto genericApp = as<GenericAppDeclRef>(declRef.declRefBase))
+        {
+            // When the inheritance decl is generic, we can't just make a direct declref to it,
+            // because it won't be lowered to a concrete type. Instead, we need to form a
+            // GenericAppDeclRef.
+            declRefForSubTypeWitness = m_astBuilder->getGenericAppDeclRef(
+                genericApp->getGenericDecl(),
+                genericApp->getArgs(),
+                inheritanceDecl);
         }
         else if (auto interfaceDeclRef = declRef.as<InterfaceDecl>())
         {
