@@ -1581,6 +1581,8 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
     Index& outConsumedArgCount,
     DiagnosticSink* sink)
 {
+    SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
+
     auto args = inArgs;
     auto argCount = inArgCount;
 

@@ -11954,7 +11954,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             else if (auto numThreadsAttr = as<NumThreadsAttribute>(modifier))
             {
                 LoweredValInfo extents[3];
-
+                subContext->irBuilder->setInsertBefore(irFunc);
                 for (int i = 0; i < 3; ++i)
                 {
                     extents[i] = numThreadsAttr->specConstExtents[i]
@@ -11978,6 +11978,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
             else if (auto waveSizeAttr = as<WaveSizeAttribute>(modifier))
             {
+                subContext->irBuilder->setInsertBefore(irFunc);
                 getBuilder()->addWaveSizeDecoration(
                     irFunc,
                     getSimpleVal(subContext, lowerVal(subContext, waveSizeAttr->numLanes)));
