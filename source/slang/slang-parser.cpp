@@ -5199,7 +5199,9 @@ static DeclBase* ParseDecl(Parser* parser, ContainerDecl* containerDecl)
     // So we will create a temporary scope for the modifiers, and then hookup the temp
     // scope with the generic decl's scope once it is parsed.
     Scope* modifierScope = parser->astBuilder->create<Scope>();
-    modifierScope->containerDecl = containerDecl;
+    ScopeDecl* scopeDecl = parser->astBuilder->create<ScopeDecl>();
+    scopeDecl->ownedScope = modifierScope;
+    modifierScope->containerDecl = scopeDecl;
     modifierScope->parent = parser->currentScope;
     parser->PushScope(modifierScope);
     Modifiers modifiers = ParseModifiers(parser);
