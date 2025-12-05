@@ -7584,6 +7584,7 @@ bool SemanticsVisitor::checkConformance(
     ContainerDecl* parentDecl)
 {
     auto superType = inheritanceDecl->base.type;
+    DeclRef<Decl> declRefForSubTypeWitness;
 
     if (auto declRefType = as<DeclRefType>(subType))
     {
@@ -7615,6 +7616,19 @@ bool SemanticsVisitor::checkConformance(
                         inheritanceDecl,
                         Diagnostics::structCannotImplementComInterface);
                 }
+            }
+            if (auto genericApp = as<GenericAppDeclRef>(superDeclRefType->getDeclRefBase()))
+            {
+                // When the inheritance decl is generic, we can't just make a direct declref to it,
+                // because this won't be lowered to a valid witness table entry, as it will finally
+                // result into a generic. But we need this to be lowered to some concrete type. So
+                // we create a GenericAppDeclRef to the inheritance decl, where the generic Decl is
+                // just the supertype references to, and the substitutions is also coming from the
+                // supertype's generic arguments.
+                declRefForSubTypeWitness = m_astBuilder->getGenericAppDeclRef(
+                    genericApp->getGenericDecl(),
+                    genericApp->getArgs(),
+                    inheritanceDecl);
             }
         }
 
@@ -7670,9 +7684,12 @@ bool SemanticsVisitor::checkConformance(
 
     // Look at the type being inherited from, and validate
     // appropriately.
-
+    if (!declRefForSubTypeWitness)
+    {
+        declRefForSubTypeWitness = makeDeclRef(inheritanceDecl);
+    }
     DeclaredSubtypeWitness* subIsSuperWitness =
-        m_astBuilder->getDeclaredSubtypeWitness(subType, superType, makeDeclRef(inheritanceDecl));
+        m_astBuilder->getDeclaredSubtypeWitness(subType, superType, declRefForSubTypeWitness);
 
     ConformanceCheckingContext context;
     context.conformingType = subType;
