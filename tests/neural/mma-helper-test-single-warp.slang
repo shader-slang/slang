@@ -27,8 +27,8 @@ RWStructuredBuffer<half> inputBuffer;
 // TEST_INPUT:ubuffer(stride=4, count=5):out, name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
-// TEST_INPUT:ubuffer(stride=4, count=256):out, name=debugBuffer
-RWStructuredBuffer<half> debugBuffer;
+// // TEST_INPUT:ubuffer(stride=4, count=256):out, name=debugBuffer
+// RWStructuredBuffer<half> debugBuffer;
 
 static const int BatchSize = 32;
 static const int SubgroupSize = 32;
@@ -70,14 +70,14 @@ void identityWeightMatrix<int InputSize>(uint tid, bool clear = false)
     }
 }
 
-half[OutputSize] testMatVecMul<int InputSize, int OutputSize>(uint tid)
+half[MMAHelper<half, InputSize, OutputSize, SubgroupSize>.Uint4AlignedM] testMatVecMul<int InputSize, int OutputSize>(uint tid)
 {
     typealias Storage = StructuredBufferStorage<half>;
     Storage storage = Storage(inputBuffer);
 
     // Construct the input vector as follow:
     // x = tid + 1
-    half inputVector[InputSize];
+    half inputVector[MMAHelper<half, InputSize, OutputSize, SubgroupSize>.Uint4AlignedK];
     for (int i = 0; i < InputSize; i++)
     {
         inputVector[i] = half(tid + 1);
@@ -89,7 +89,7 @@ half[OutputSize] testMatVecMul<int InputSize, int OutputSize>(uint tid)
     SPtr ptrB = __getAddress(s_sharedMemoryB[0]);
     SPtr ptrC = __getAddress(s_sharedMemoryB[0]);
 
-    let res = MMAHelper<half, InputSize, OutputSize, SubgroupSize>.mma<Storage>(inputVector, ptrA, ptrB, ptrC, storage, 0, debugBuffer);
+    let res = MMAHelper<half, InputSize, OutputSize, SubgroupSize>.mma<Storage>(inputVector, ptrA, ptrB, ptrC, storage, 0);
     // serialRead(tid, ptrB, 16);
     return res;
 }
@@ -119,8 +119,8 @@ void serialRead(uint tid, SPtr sharedMem, uint rowOrColumnCount)
 
                 half aa = bit_cast<half>(a);
                 half bb = bit_cast<half>(b);
-                debugBuffer[linearIndex++] = aa;
-                debugBuffer[linearIndex++] = bb;
+                // debugBuffer[linearIndex++] = aa;
+                // debugBuffer[linearIndex++] = bb;
                 printf("%.1f %.1f ", float(aa), float(bb));
             }
         }
@@ -130,18 +130,15 @@ void serialRead(uint tid, SPtr sharedMem, uint rowOrColumnCount)
 
 void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 {
-    half[OutputSize] outputVector = testMatVecMul<InputSize, OutputSize>(tid);
+    let outputVector = testMatVecMul<InputSize, OutputSize>(tid);
 
     bool res = true;
-    if (tid < OutputSize)
+    for (int i = 0; i < OutputSize; i++)
     {
-        for (int i = 0; i < OutputSize; i++)
+        if (outputVector[i] != half(tid + 1))
         {
-            if (outputVector[i] != half(tid + 1))
-            {
-                res = false;
-                break;
-            }
+            res = false;
+            break;
         }
     }
 
