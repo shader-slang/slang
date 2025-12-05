@@ -5126,31 +5126,23 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     }
     else if (auto resPtrType = as<DescriptorHandleType>(type))
     {
-        TypeLayoutResult result;
-        // Check if SPIRV with spvBindlessTextureNV extension is enabled
+        // For spvBindlessTextureNV, DescriptorHandle<T> has the layout of uint64_t
         if (context.targetReq &&
             context.targetReq->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV))
         {
-            // For spvBindlessTextureNV, DescriptorHandle<T> has the layout of uint64_t
             auto uint64Type = context.astBuilder->getUInt64Type();
-            result = _createTypeLayout(context, uint64Type);
+            return _createTypeLayout(context, uint64Type);
         }
-        else if (areResourceTypesBindlessOnTarget(context.targetReq))
-        {
-            // On bindless targets (CPU/CUDA/Metal), DescriptorHandle<T> has the layout of T
-            result = _createTypeLayout(context, resPtrType->getElementType());
-        }
-        else
-        {
-            // On non-bindless targets, DescriptorHandle<T> has the layout of uint2
-            auto uint2Type = context.astBuilder->getVectorType(
-                context.astBuilder->getUIntType(),
-                context.astBuilder->getIntVal(context.astBuilder->getIntType(), 2));
-            result = _createTypeLayout(context, uint2Type);
-        }
-        // Preserve the original DescriptorHandle type in reflection
-        result.layout->type = type;
-        return result;
+
+        // On bindless targets, DescriptorHandle<T> has the layout of T
+        if (areResourceTypesBindlessOnTarget(context.targetReq))
+            return _createTypeLayout(context, resPtrType->getElementType());
+
+        // On non-bindless targets, DescriptorHandle<T> has the layout of uint2
+        auto uint2Type = context.astBuilder->getVectorType(
+            context.astBuilder->getUIntType(),
+            context.astBuilder->getIntVal(context.astBuilder->getIntType(), 2));
+        return _createTypeLayout(context, uint2Type);
     }
     else if (auto optionalType = as<OptionalType>(type))
     {

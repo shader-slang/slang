@@ -4,8 +4,8 @@
 // as uint64_t when spvBindlessTextureNV is enabled
 
 // CHECK: "name": "texture_handle"
-// CHECK: "kind": "struct"
-// CHECK: "name": "DescriptorHandle"
+// CHECK: "kind": "scalar"
+// CHECK: "scalarType": "uint64"
 // CHECK: "offset": 16
 // CHECK: "size": 8
 

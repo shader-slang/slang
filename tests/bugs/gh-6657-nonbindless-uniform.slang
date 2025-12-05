@@ -8,12 +8,13 @@
 // Test that DescriptorHandle<T> in a structured buffer is correctly reflected
 // and works at runtime on non-bindless targets
 
-// Reflection test: Type should be DescriptorHandle
+// Reflection test: DescriptorHandle is reflected as uint2 (vector of 2 uint32s)
 // Reflection test: Layout should match uint2 (size 8, same as uint2)
 
 // CHECK_REFLECTION: "name": "texture_handle"
-// CHECK_REFLECTION: "kind": "struct"
-// CHECK_REFLECTION: "name": "DescriptorHandle"
+// CHECK_REFLECTION: "kind": "vector"
+// CHECK_REFLECTION: "elementCount": 2
+// CHECK_REFLECTION: "scalarType": "uint32"
 // CHECK_REFLECTION: "offset": 16
 // CHECK_REFLECTION: "size": 8
 

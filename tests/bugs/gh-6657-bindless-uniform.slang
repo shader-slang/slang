@@ -6,14 +6,14 @@
 // Test that DescriptorHandle<T> in a structured buffer is correctly reflected
 // and works at runtime on bindless targets
 
-// Reflection test: Type should be DescriptorHandle
+// Reflection test: On bindless targets, DescriptorHandle<T> is reflected as T
 // Reflection test: Layout should match T (pointer size for Texture2D on bindless targets)
 // Reflection test: On 64-bit CPU/CUDA, Texture2D is 8 bytes (pointer or cudaTextureObject_t)
 
 // CPU/CUDA reflection test: Verify that the DescriptorHandle<T> has the size of T with uniform offset
 // CHECK_REFLECTION: "name": "texture_handle"
-// CHECK_REFLECTION: "kind": "struct"
-// CHECK_REFLECTION: "name": "DescriptorHandle"
+// CHECK_REFLECTION: "kind": "resource"
+// CHECK_REFLECTION: "baseShape": "texture2D"
 // CHECK_REFLECTION: "offset": 16
 // CHECK_REFLECTION: "size": 8
 
@@ -23,8 +23,8 @@
 
 // Metal reflection test: Verify that texture resources use shaderResource binding
 // CHECK_METAL: "name": "texture_handle"
-// CHECK_METAL: "kind": "struct"
-// CHECK_METAL: "name": "DescriptorHandle"
+// CHECK_METAL: "kind": "resource"
+// CHECK_METAL: "baseShape": "texture2D"
 // CHECK_METAL: "kind": "shaderResource"
 // CHECK_METAL: "index": 0
 
