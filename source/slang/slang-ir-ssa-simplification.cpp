@@ -110,7 +110,11 @@ void simplifyIR(
     eliminateDeadCode(module, options.deadCodeElimOptions);
 }
 
-void simplifyNonSSAIR(IRModule* module, TargetProgram* target, IRSimplificationOptions options)
+void simplifyNonSSAIR(
+    IRModule* module,
+    TargetProgram* target,
+    IRSimplificationOptions options,
+    DiagnosticSink* sink)
 {
     bool changed = true;
     const int kMaxIterations = 8;
@@ -119,6 +123,7 @@ void simplifyNonSSAIR(IRModule* module, TargetProgram* target, IRSimplificationO
     while (changed && iterationCounter < kMaxIterations)
     {
         changed = false;
+        changed |= applySparseConditionalConstantPropagationForGlobalScope(module, sink);
         changed |= peepholeOptimize(target, module, options.peepholeOptions);
 
         if (!options.minimalOptimization)
