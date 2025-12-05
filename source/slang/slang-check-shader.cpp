@@ -799,9 +799,22 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
         linkage->targets,
         entryPointFuncDeclRef.getDecl(),
         sink);
-    // TODO: Should we attach a `[shader(...)]` attribute to an
-    // entry point that didn't have one, so that we can have
-    // a more uniform representation in the AST?
+
+    // If the entry point doesn't have an explicit `[shader("...")]` attribute,
+    // we attach one now to ensure uniform representation in the AST.
+    // This is important because later passes (like parameter binding and
+    // layout computation) may need to know this function is an entry point
+    // in order to properly process system-value semantics on parameters.
+    //
+    auto entryPointFuncDecl = entryPointFuncDeclRef.getDecl();
+    if (!entryPointFuncDecl->findModifier<EntryPointAttribute>())
+    {
+        auto astBuilder = linkage->getASTBuilder();
+        auto entryPointAttr = astBuilder->create<EntryPointAttribute>();
+        entryPointAttr->capabilitySet =
+            entryPointProfile.getCapabilityName().freeze(astBuilder);
+        addModifier(entryPointFuncDecl, entryPointAttr);
+    }
 
     RefPtr<EntryPoint> entryPoint =
         EntryPoint::create(linkage, entryPointFuncDeclRef, entryPointProfile);
