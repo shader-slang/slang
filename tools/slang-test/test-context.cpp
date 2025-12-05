@@ -32,6 +32,7 @@ void TestContext::setThreadIndex(int index)
 void TestContext::setMaxTestRunnerThreadCount(int count)
 {
     m_jsonRpcConnections.setCount(count);
+    m_testServerStderrStreams.setCount(count);
     m_testRequirements.setCount(count);
     m_reporters.setCount(count);
     for (auto& reporter : m_reporters)
@@ -97,6 +98,36 @@ Result TestContext::init(const char* inExePath)
 
 TestContext::~TestContext()
 {
+    // Shut down all test-server connections and drain their stderr
+    for (Index i = 0; i < m_jsonRpcConnections.getCount(); ++i)
+    {
+        if (m_jsonRpcConnections[i])
+        {
+            m_jsonRpcConnections[i]->disconnect();
+            m_jsonRpcConnections[i].setNull();
+
+            // Drain stderr from this test-server
+            if (i < m_testServerStderrStreams.getCount() && m_testServerStderrStreams[i])
+            {
+                List<uint8_t> buffer;
+                buffer.setCount(4096);
+                while (!m_testServerStderrStreams[i]->isEnd())
+                {
+                    size_t bytesRead = 0;
+                    SlangResult res = m_testServerStderrStreams[i]->read(
+                        buffer.getBuffer(),
+                        buffer.getCount(),
+                        bytesRead);
+                    if (SLANG_FAILED(res) || bytesRead == 0)
+                        break;
+                    fwrite(buffer.getBuffer(), 1, bytesRead, stderr);
+                }
+                m_testServerStderrStreams[i].setNull();
+            }
+        }
+    }
+    fflush(stderr);
+
     if (m_languageServerConnection)
     {
         m_languageServerConnection->sendCall(
@@ -214,6 +245,9 @@ SlangResult TestContext::_createJSONRPCConnection(RefPtr<JSONRPCConnection>& out
     RefPtr<BufferedReadStream> readErrStream(
         new BufferedReadStream(process->getStream(StdStreamType::ErrorOut)));
 
+    // Store stderr stream for later draining (for diagnostic output from test-server)
+    m_testServerStderrStreams[slangTestThreadIndex] = readErrStream;
+
     RefPtr<HTTPPacketConnection> connection = new HTTPPacketConnection(readStream, writeStream);
     RefPtr<JSONRPCConnection> rpcConnection = new JSONRPCConnection;
 
@@ -256,9 +290,43 @@ void TestContext::destroyRPCConnection()
 {
     if (m_jsonRpcConnections[slangTestThreadIndex])
     {
+        // Disconnect sends quit message and waits for process to terminate
         m_jsonRpcConnections[slangTestThreadIndex]->disconnect();
         m_jsonRpcConnections[slangTestThreadIndex].setNull();
+
+        // Drain any remaining stderr output from test-server after it terminates
+        drainTestServerStderr();
+
+        // Clear the stderr stream reference
+        if (m_testServerStderrStreams[slangTestThreadIndex])
+        {
+            m_testServerStderrStreams[slangTestThreadIndex].setNull();
+        }
     }
+}
+
+void TestContext::drainTestServerStderr()
+{
+    auto& stderrStream = m_testServerStderrStreams[slangTestThreadIndex];
+    if (!stderrStream)
+        return;
+
+    // Read any available data from the test-server's stderr and forward to our stderr
+    List<uint8_t> buffer;
+    buffer.setCount(4096);
+
+    while (!stderrStream->isEnd())
+    {
+        size_t bytesRead = 0;
+        SlangResult res = stderrStream->read(buffer.getBuffer(), buffer.getCount(), bytesRead);
+
+        if (SLANG_FAILED(res) || bytesRead == 0)
+            break;
+
+        // Write to our stderr
+        fwrite(buffer.getBuffer(), 1, bytesRead, stderr);
+    }
+    fflush(stderr);
 }
 
 Slang::JSONRPCConnection* TestContext::getOrCreateJSONRPCConnection()
