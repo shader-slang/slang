@@ -12746,12 +12746,6 @@ void checkDerivativeAttributeImpl(
 
                 DeclRef<FunctionDeclBase> funcDeclRef = defaultFuncDeclRef.as<FunctionDeclBase>();
                 auto funcThisType = getTypeForThisExpr(visitor, funcDeclRef);
-                if (!funcThisType)
-                {
-                    // The function is not static but not an instance member of a class either (it's
-                    // most likely a global function).
-                    return;
-                }
                 DeclRef<FunctionDeclBase> calleeFuncDeclRef =
                     calleeDeclRef->declRef.template as<FunctionDeclBase>();
                 auto derivativeFuncThisType = getTypeForThisExpr(visitor, calleeFuncDeclRef);
