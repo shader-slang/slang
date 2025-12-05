@@ -33,8 +33,7 @@ SLANG_UNIT_TEST(getTargetCode)
 
     String userSource = userSourceBody;
     ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
     slang::TargetDesc targetDesc = {};
     // Request SPIR-V disassembly so we can check the content.
     targetDesc.format = SLANG_SPIRV_ASM;
@@ -44,7 +43,7 @@ SLANG_UNIT_TEST(getTargetCode)
     sessionDesc.targets = &targetDesc;
 
     ComPtr<slang::ISession> session;
-    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
 
     ComPtr<slang::IBlob> diagnosticBlob;
     auto module = session->loadModuleFromSourceString(
@@ -52,17 +51,17 @@ SLANG_UNIT_TEST(getTargetCode)
         "m.slang",
         userSourceBody,
         diagnosticBlob.writeRef());
-    SLANG_CHECK_ABORT(module != nullptr);
+    SLANG_CHECK(module != nullptr);
 
     ComPtr<slang::IComponentType> linkedProgram;
     module->link(linkedProgram.writeRef(), diagnosticBlob.writeRef());
-    SLANG_CHECK_ABORT(linkedProgram != nullptr);
+    SLANG_CHECK(linkedProgram != nullptr);
 
     ComPtr<slang::IBlob> code;
     linkedProgram->getTargetCode(0, code.writeRef(), diagnosticBlob.writeRef());
-    SLANG_CHECK_ABORT(code != nullptr);
+    SLANG_CHECK(code != nullptr);
 
-    SLANG_CHECK_ABORT(code->getBufferSize() != 0);
+    SLANG_CHECK(code->getBufferSize() != 0);
 
     UnownedStringSlice resultStr = UnownedStringSlice((char*)code->getBufferPointer());
 

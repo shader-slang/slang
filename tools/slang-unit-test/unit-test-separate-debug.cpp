@@ -41,8 +41,7 @@ SLANG_UNIT_TEST(separateDebug)
     )";
     String userSource = userSourceBody;
     ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
 
     // Setup the target descriptor.
     slang::TargetDesc targetDesc = {};
@@ -68,7 +67,7 @@ SLANG_UNIT_TEST(separateDebug)
     sessionDesc.compilerOptionEntryCount = 2;
 
     ComPtr<slang::ISession> session;
-    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
 
     // Compile the module.
     ComPtr<slang::IBlob> diagnosticBlob;
@@ -77,7 +76,7 @@ SLANG_UNIT_TEST(separateDebug)
         "m.slang",
         userSourceBody,
         diagnosticBlob.writeRef());
-    SLANG_CHECK_ABORT(module != nullptr);
+    SLANG_CHECK(module != nullptr);
 
     ComPtr<slang::IEntryPoint> entryPoint;
     module->findAndCheckEntryPoint(
@@ -85,7 +84,7 @@ SLANG_UNIT_TEST(separateDebug)
         SLANG_STAGE_COMPUTE,
         entryPoint.writeRef(),
         diagnosticBlob.writeRef());
-    SLANG_CHECK_ABORT(entryPoint != nullptr);
+    SLANG_CHECK(entryPoint != nullptr);
 
     ComPtr<slang::IComponentType> compositeProgram;
     slang::IComponentType* components[] = {module, entryPoint.get()};
@@ -94,11 +93,11 @@ SLANG_UNIT_TEST(separateDebug)
         2,
         compositeProgram.writeRef(),
         diagnosticBlob.writeRef());
-    SLANG_CHECK_ABORT(compositeProgram != nullptr);
+    SLANG_CHECK(compositeProgram != nullptr);
 
     ComPtr<slang::IComponentType> linkedProgram;
     compositeProgram->link(linkedProgram.writeRef(), diagnosticBlob.writeRef());
-    SLANG_CHECK_ABORT(linkedProgram != nullptr);
+    SLANG_CHECK(linkedProgram != nullptr);
 
     // Use getEntryPointCompileResult to get the base and debug spirv, and metadata
     // containing the debug build identifier.
@@ -111,22 +110,22 @@ SLANG_UNIT_TEST(separateDebug)
     // to query for it, and then use it to get the results.
     ComPtr<slang::ICompileResult> compileResult;
     ComPtr<slang::IComponentType2> linkedProgram2;
-    SLANG_CHECK_ABORT(
+    SLANG_CHECK(
         linkedProgram->queryInterface(SLANG_IID_PPV_ARGS(linkedProgram2.writeRef())) == SLANG_OK);
     auto result = linkedProgram2->getEntryPointCompileResult(
         0,
         0,
         compileResult.writeRef(),
         diagnosticBlob.writeRef());
-    SLANG_CHECK_ABORT(result == SLANG_OK);
-    SLANG_CHECK_ABORT(compileResult != nullptr);
-    SLANG_CHECK_ABORT(compileResult->getItemCount() == 2);
-    SLANG_CHECK_ABORT(compileResult->getItemData(0, code.writeRef()) == SLANG_OK);
-    SLANG_CHECK_ABORT(compileResult->getItemData(1, debugCode.writeRef()) == SLANG_OK);
-    SLANG_CHECK_ABORT(compileResult->getMetadata(metadata.writeRef()) == SLANG_OK);
+    SLANG_CHECK(result == SLANG_OK);
+    SLANG_CHECK(compileResult != nullptr);
+    SLANG_CHECK(compileResult->getItemCount() == 2);
+    SLANG_CHECK(compileResult->getItemData(0, code.writeRef()) == SLANG_OK);
+    SLANG_CHECK(compileResult->getItemData(1, debugCode.writeRef()) == SLANG_OK);
+    SLANG_CHECK(compileResult->getMetadata(metadata.writeRef()) == SLANG_OK);
 
     debugBuildIdentifier = metadata->getDebugBuildIdentifier();
-    SLANG_CHECK_ABORT(debugBuildIdentifier != nullptr);
+    SLANG_CHECK(debugBuildIdentifier != nullptr);
 
     // Get the data for the stripped SPIRV.
     // This is already verified by the separate-debug.slang test but we
