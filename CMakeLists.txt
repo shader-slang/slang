@@ -20,7 +20,7 @@ set(PROJECT_VERSION "${SLANG_VERSION_FULL}")
 # Global CMake options
 #
 if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.24")
-    cmake_policy(SET CMP0135 OLD)
+    cmake_policy(SET CMP0135 NEW)
 endif()
 cmake_policy(SET CMP0077 NEW)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
