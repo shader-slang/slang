@@ -646,24 +646,44 @@ public:
         return align(vectorAlignment.size, vectorAlignment.alignment) / elementAlignment.size;
     }
 
-    // True for arrays that have trailing padding. Those arrays are split into
-    // a struct:
+    // Checks if an array type would be incorrectly padded if translated to LLVM
+    // naively.
+    //
+    // The problematic situation occurs when there is a Slang array type T[...]
+    // where T is a type that gets laid out so that its size is less than its
+    // stride in the given layout rules.
+    //
+    // LLVM is heavily influenced by C/C++, which enforce that the size of a
+    // type is always rounded up to its alignment, so that the size and stride
+    // are always identical, and an LLVM array type bakes in this behavior.
+    //
+    // The transformation we use to work around this is to translate problematic
+    // Slang array types into:
     //
     // struct
     // {
     //     paddedElemType init[count-1];
     //     unpaddedElemType last;
     // };
-    bool needsUnpaddedArrayTypeWorkaround(IRArrayTypeBase* arrayType, IRTypeLayoutRules* rules)
+    //
+    // This change to the LLVM representation of the type doesn't create
+    // problems for logic that indexes into an array, because we use untyped
+    // pointers and explicit offsets rather than relying on type-based
+    // getElementPtr operations. The only place where we need to consider this
+    // layout detail (other than lowering the type itself) is when emitting
+    // constants in `maybeEmitConstants`, as that's the only place where
+    // aggregate types (like arrays) actually need to be present in the emitted
+    // IR.
+    bool needsArrayTypePaddingWorkaround(IRArrayTypeBase* arrayType, IRTypeLayoutRules* rules)
     {
         auto irElemCount = arrayType->getElementCount();
         auto elemCount = int(getIntVal(irElemCount));
         IRSizeAndAlignment sizeAndAlignment =
             getSizeAndAlignment(arrayType->getElementType(), rules);
 
-        bool hasTrailingPadding =
-            sizeAndAlignment.size != align(sizeAndAlignment.size, sizeAndAlignment.alignment);
-        return elemCount != 0 && hasTrailingPadding;
+        bool elementIsPaddedToAlignment =
+            sizeAndAlignment.size == align(sizeAndAlignment.size, sizeAndAlignment.alignment);
+        return elemCount != 0 && !elementIsPaddedToAlignment;
     }
 };
 
@@ -1011,7 +1031,7 @@ struct LLVMEmitter
 
                 llvmConstant = builder->getConstantArray(Slice(values.begin(), values.getCount()));
 
-                if (types->needsUnpaddedArrayTypeWorkaround(arrayType, defaultPointerRules))
+                if (types->needsArrayTypePaddingWorkaround(arrayType, defaultPointerRules))
                 {
                     auto lastPart = maybeEmitConstant(
                         inst->getOperand(inst->getOperandCount() - 1),
