@@ -3,7 +3,7 @@
 // Metal/CPP/CUDA do not deal with packing currently, different results will occur.
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cpu -compute -xslang -DTARGET_WITHOUT_PACKING
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -xslang -DTARGET_WITHOUT_PACKING
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-llvm -compute
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-llvm -compute -xslang -DTARGET_WITHOUT_PACKING
 
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -emit-spirv-via-glsl
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -compute

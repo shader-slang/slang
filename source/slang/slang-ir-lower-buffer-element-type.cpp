@@ -2236,7 +2236,14 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
             auto layoutTypeOp = parameterGroupType->getDataLayout()
                                     ? parameterGroupType->getDataLayout()->getOp()
                                     : kIROp_DefaultBufferLayoutType;
-            return getTypeLayoutRulesFromOp(layoutTypeOp, IRTypeLayoutRuleName::Std140);
+
+            // The CPU LLVM targets default to the C buffer layout for
+            // compatibility with the previous C++-based target.
+            auto defaultTypeOp = isLLVMTarget(targetReq)
+                                    ? IRTypeLayoutRuleName::C
+                                    : IRTypeLayoutRuleName::Std140;
+
+            return getTypeLayoutRulesFromOp(layoutTypeOp, defaultTypeOp);
         }
     case kIROp_GLSLShaderStorageBufferType:
         {

@@ -9,7 +9,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -xslang -matrix-layout-column-major -shaderobj
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -xslang -matrix-layout-column-major -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=METAL):-slang  -output-using-type -shaderobj -mtl
-//TEST(compute):COMPARE_COMPUTE_EX:-llvm -compute -output-using-type -xslang -matrix-layout-column-major -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=LLVM):-llvm -compute -output-using-type -xslang -matrix-layout-column-major -shaderobj
 
 // matrix<R, C>
 //TEST_INPUT:cbuffer(data=[1.0 0.0 10.0 0.0  0.0 1.0 20.0 0.0]):name matrixBuffer
@@ -34,6 +34,10 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     // METAL: 21
     // METAL: 1
     //
+    // LLVM on CPU uses scalar layout + column major.
+    //
+    // LLVM: 11
+    // LLVM: 1
     output[0] = r.x;
     output[1] = r.y;
 }
