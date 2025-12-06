@@ -220,6 +220,13 @@ BoundsCheckedChunkPtr ListChunk::getFirstChild() const
     if (availableSizeForChildren == 0)
         return nullptr;
 
+    // There will be padding after the `ListChunk::Header` to align the first child to 8 bytes.
+    // However, if the parent chunk has no children, then its total size will only be the size of
+    // `ListChunk::Header` without the padding. Thus, we can only align the child offset after the
+    // previous size checks.
+    firstChildOffset = _roundUpToChunkAlignment(firstChildOffset);
+    availableSizeForChildren = reportedParentSize - firstChildOffset;
+
     // If the parent chunk has a non-zero size, then it should
     // have at least one child, and the available size had better
     // be big enough to at least hold the *header* of that first
