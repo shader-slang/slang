@@ -1,7 +1,4 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -output-using-type
-// I don't understand how this is supposed to compile - ConstantBuffer<Foo> is
-// not Foo, and therefore shouldn't be implementing IFoo?
-//DISABLE_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -llvm -output-using-type
 
 interface IFoo
 {
