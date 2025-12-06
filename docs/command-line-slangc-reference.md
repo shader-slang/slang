@@ -575,6 +575,16 @@ Specify the space index for the system defined global bindless resource array.
 Emit debug data to a separate file, and strip it from the main output file. 
 
 
+<a id="emit-cpu-via-cpp"></a>
+### -emit-cpu-via-cpp
+Generate CPU targets using C++ (default) 
+
+
+<a id="emit-cpu-via-llvm"></a>
+### -emit-cpu-via-llvm
+Generate CPU targets using LLVM 
+
+
 <a id="llvm-target-triple"></a>
 ### -llvm-target-triple
 
@@ -1152,7 +1162,7 @@ Target
 * `ptx` : PTX assembly 
 * `cuobj`, `cubin` : CUDA binary 
 * `host-callable`, `callable` : Host callable 
-* `object-code` : Object code 
+* `object-code`, `shader-object-code` : Object code for host execution (shader style)
 * `host-host-callable` : Host callable for host execution 
 * `metal` : Metal shader source 
 * `metallib` : Metal Library Bytecode 
@@ -1161,12 +1171,9 @@ Target
 * `wgsl-spirv-asm`, `wgsl-spirv-assembly` : SPIR-V assembly via WebGPU shading language 
 * `wgsl-spirv` : SPIR-V via WebGPU shading language 
 * `slangvm`, `slang-vm` : Slang VM byte code 
-* `llvm-host-ir`, `llvm-ir` : LLVM IR assembly (host style) 
-* `llvm-host-obj`, `llvm-obj` : Object code compiled with LLVM (host style) 
-* `llvm-host-host-callable` : Host callable via LLVM (host style) 
-* `llvm-shader-ir` : LLVM IR assembly (shader style) 
-* `llvm-shader-obj` : Object code compiled with LLVM (shader style) 
-* `llvm-shader-host-callable` : Host callable via LLVM (shader style) 
+* `host-object-code` : Object code for host execution (host style)
+* `llvm-host-ir`, `llvm-ir` : LLVM IR assembly (host style)
+* `llvm-shader-ir` : LLVM IR assembly (shader style)
 
 <a id="stage"></a>
 ## stage
