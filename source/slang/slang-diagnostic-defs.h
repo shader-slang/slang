@@ -2236,6 +2236,13 @@ DIAGNOSTIC(
     Error,
     mismatchExistentialSlotArgCount,
     "expected $0 existential slot arguments ($1 provided)")
+
+DIAGNOSTIC(
+    38028,
+    Error,
+    semanticNotAvailableInStage,
+    "semantic '$0' is not available in $1 shader stage")
+
 DIAGNOSTIC(
     38029,
     Error,
