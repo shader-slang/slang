@@ -115,6 +115,9 @@ CLAUDE.local.md
 /lock
 /tests/library/linked.spirv
 
+# IR dump split directories
+dump-*/
+
 # Coverage reports and data
 *.profraw
 *.profdata
