@@ -1376,13 +1376,14 @@ Result linkAndOptimizeIR(
         SLANG_PASS(legalizeEmptyTypes, targetProgram, sink);
     }
 
-    if (isLLVMTarget(targetRequest))
+    if (isCPUTargetViaLLVM(targetRequest))
     {
         // The LLVM targets are special in that we always lower all matrices
-        // into arrays of vectors. Due to this,
-        // lowerBufferElementTypeToStorageType needs to occur earlier than
-        // usual, because otherwise it no longer knows what is a matrix and
-        // can't generate proper code for column/row-major matrix loads/stores.
+        // into arrays of vectors, because matrices aren't (yet?) built-in types
+        // in LLVM. Due to this, lowerBufferElementTypeToStorageType needs to
+        // occur earlier than usual, because otherwise it no longer knows what
+        // is a matrix and can't generate proper code for column/row-major
+        // matrix loads/stores.
         BufferElementTypeLoweringOptions bufferElementTypeLoweringOptions = {};
         bufferElementTypeLoweringOptions.loweringPolicyKind =
             BufferElementTypeLoweringPolicyKind::LLVM;

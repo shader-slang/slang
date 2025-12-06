@@ -88,16 +88,15 @@ bool isCUDATarget(TargetRequest* targetReq);
 bool isCPUTarget(TargetRequest* targetReq);
 bool isCPUTarget(CodeGenTarget codeGenTarget);
 
+// Are we generating code for a CPU target, using LLVM
+bool isCPUTargetViaLLVM(TargetRequest* targetReq);
+
 /// Are we generating code for the WebGPU API?
 bool isWGPUTarget(TargetRequest* targetReq);
 bool isWGPUTarget(CodeGenTarget target);
 
 // Are we generating code for a Kernel-style target (as opposed to host-style target)
 bool isKernelTarget(CodeGenTarget codeGenTarget);
-
-// Are we generating code for LLVM IR
-bool isLLVMTarget(TargetRequest* targetReq);
-bool isLLVMTarget(CodeGenTarget target);
 
 /// A request to generate output in some target format.
 class TargetRequest : public RefObject

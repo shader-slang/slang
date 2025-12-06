@@ -2187,11 +2187,11 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
     auto targetReq = target->getTargetReq();
     if (targetReq->getTarget() != CodeGenTarget::WGSL)
     {
-        if (!isKhronosTarget(target->getTargetReq()) && !isLLVMTarget(targetReq))
+        if (!isKhronosTarget(target->getTargetReq()) && !isCPUTargetViaLLVM(targetReq))
             return IRTypeLayoutRuleName::Natural;
 
         // If we are just emitting GLSL, we can just use the general layout rule.
-        if (!target->shouldEmitSPIRVDirectly() && !isLLVMTarget(targetReq))
+        if (!target->shouldEmitSPIRVDirectly() && !isCPUTargetViaLLVM(targetReq))
             return IRTypeLayoutRuleName::Natural;
 
         // If the user specified a C-compatible buffer layout, then do that.
@@ -2237,11 +2237,11 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
                                     ? parameterGroupType->getDataLayout()->getOp()
                                     : kIROp_DefaultBufferLayoutType;
 
-            // The CPU LLVM targets default to the C buffer layout for
-            // compatibility with the previous C++-based target.
-            auto defaultTypeOp = isLLVMTarget(targetReq)
-                                    ? IRTypeLayoutRuleName::C
-                                    : IRTypeLayoutRuleName::Std140;
+            // The CPU targets default to the C buffer layout for compatibility
+            // with C/C++.
+            auto defaultTypeOp = isCPUTarget(targetReq)
+                                     ? IRTypeLayoutRuleName::C
+                                     : IRTypeLayoutRuleName::Std140;
 
             return getTypeLayoutRulesFromOp(layoutTypeOp, defaultTypeOp);
         }

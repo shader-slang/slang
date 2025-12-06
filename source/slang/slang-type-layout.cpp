@@ -3112,6 +3112,23 @@ bool isCPUTarget(CodeGenTarget codeGenTarget)
         ArtifactDescUtil::makeDescForCompileTarget(asExternal(codeGenTarget)));
 }
 
+bool isCPUTargetViaLLVM(TargetRequest* targetReq)
+{
+    switch (targetReq->getTarget())
+    {
+    default:
+        return false;
+
+    case CodeGenTarget::LLVMHostAssembly:
+    case CodeGenTarget::LLVMHostObjectCode:
+    case CodeGenTarget::LLVMHostHostCallable:
+    case CodeGenTarget::LLVMShaderObjectCode:
+    case CodeGenTarget::LLVMShaderAssembly:
+    case CodeGenTarget::LLVMShaderHostCallable:
+        return isCPUTarget(targetReq);
+    }
+}
+
 bool isCUDATarget(TargetRequest* targetReq)
 {
     switch (targetReq->getTarget())
@@ -3149,28 +3166,6 @@ bool isKernelTarget(CodeGenTarget codeGenTarget)
 {
     return ArtifactDescUtil::makeDescForCompileTarget(asExternal(codeGenTarget)).style ==
            ArtifactStyle::Kernel;
-}
-
-bool isLLVMTarget(TargetRequest* targetReq)
-{
-    return isLLVMTarget(targetReq->getTarget());
-}
-
-bool isLLVMTarget(CodeGenTarget target)
-{
-    switch (target)
-    {
-    default:
-        return false;
-
-    case CodeGenTarget::LLVMHostAssembly:
-    case CodeGenTarget::LLVMHostObjectCode:
-    case CodeGenTarget::LLVMHostHostCallable:
-    case CodeGenTarget::LLVMShaderObjectCode:
-    case CodeGenTarget::LLVMShaderAssembly:
-    case CodeGenTarget::LLVMShaderHostCallable:
-        return true;
-    }
 }
 
 SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgram)
