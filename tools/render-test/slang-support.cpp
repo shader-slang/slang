@@ -186,6 +186,15 @@ static SlangResult _compileProgramImpl(
         sessionOptionEntries.add(entry);
     }
 
+    if (options.useLLVMDirectly)
+    {
+        slang::CompilerOptionEntry entry;
+        entry.name = slang::CompilerOptionName::EmitCPUMethod;
+        entry.value.kind = slang::CompilerOptionValueKind::Int;
+        entry.value.intValue0 = int(SlangEmitCPUMethod::SLANG_EMIT_CPU_VIA_LLVM);
+        sessionOptionEntries.add(entry);
+    }
+
     sessionTargetDesc.format = input.target;
     if (input.profile.getLength()) // do not set profile unless requested
         sessionTargetDesc.profile = globalSession->findProfile(input.profile.getBuffer());

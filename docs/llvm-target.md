@@ -1,25 +1,32 @@
-Slang LLVM Target
-=================
+Slang LLVM Targets
+==================
 
-The LLVM target is capable of creating LLVM IR and object code for arbitrary
+The LLVM targets are capable of creating LLVM IR and object code for arbitrary
 target triples (`<machine>-<vendor>-<os>`, e.g. `x86_64-unknown-linux`). This
 allows for highly performant and debuggable Slang code on almost any platform,
 as long as an LLVM backend exists for it.
 
 The current state is highly experimental and there are many missing features.
+The feature also focuses heavily on CPUs for now.
 
 ## Targets
 
 The HOST / SHADER split from the [CPU target](cpu-target.md) applies here as well.
-* `llvm-ir` / `SLANG_LLVM_HOST_ASSEMBLY` generates LLVM IR in the text representation, suitable for free-standing functions.
-* `llvm-obj` / `SLANG_LLVM_HOST_OBJECT_CODE` generates position-independent object code, which can be
-linked into an executable or a static or dynamic library.
-* `llvm-shader-ir` / `SLANG_LLVM_SHADER_ASSEMBLY` generates LLVM IR for compute shader entry points.
-* `llvm-shader-obj` / `SLANG_LLVM_SHADER_OBJECT_CODE` generates object code for compute shader entry points.
-* `SLANG_LLVM_HOST_HOST_CALLABLE` and `SLANG_LLVM_SHADER_HOST_CALLABLE` JIT compile the module.
 
-Direct-to-executable or library targets may be added later, once the LLVM target
-has stabilized. For further target selection, the following options are provided:
+The following targets always use LLVM:
+* `llvm-ir` / `SLANG_HOST_LLVM_IR` generates LLVM IR in the text representation, suitable for free-standing functions.
+* `llvm-shader-ir` / `SLANG_SHADER_LLVM_IR` generates LLVM IR for compute shader entry points.
+
+The following targets use LLVM when `-emit-cpu-via-llvm` or `EmitCPUMethod=SLANG_EMIT_CPU_VIA_LLVM` is specified:
+* `host-object-code` / `SLANG_HOST_OBJECT_CODE` generates position-independent object code, which can be
+linked into an executable or a static or dynamic library.
+* `shader-object-code` / `SLANG_OBJECT_CODE` generates object code for compute shader entry points.
+* `SLANG_HOST_HOST_CALLABLE` and `SLANG_SHADER_HOST_CALLABLE` JIT compile the module.
+
+Support for `exe` / `SLANG_HOST_EXECUTABLE` and `sharedlib` /
+`SLANG_HOST_SHARED_LIBRARY` may be added later, once the LLVM target has
+stabilized. For compiling to platforms other than the current CPU running the
+Slang compiler, the following options are provided:
 
 * `-llvm-target-triple <target-triple>`. The default is the host machine's triple.
 * `-llvm-cpu <cpu-name>` sets the target CPU, similar to Clang's `-mcpu=<cpu-name>`.
@@ -97,42 +104,8 @@ of the parameter list.
 
 Due to the aggregate parameter passing limitation of LLVM, calling arbitrary C
 functions from Slang is complicated, and a hypothetical binding generator would
-need to generate calling convention adapters like this:
-
-```slang
-// Struct declarations can usually be the same between C and Slang.
-// Take care with bitfields and unions, though!
-struct MyStruct
-{
-    int a;
-    int b;
-}
-
-[ForceInline]
-void funcAdapter(MyStruct* val, MyStruct* returnval)
-{
-    __requirePrelude("declare i64 @func(i64)");
-    __intrinsic_asm R"(
-      %0 = load i64, $0, align 4
-      %call = tail call i64 @func(i64 %0)
-      store i64 %call, $1, align 4
-      ret void
-    )";
-}
-
-// This 'func' name gets mangled because it's not marked as __extern_cpp,
-// which is good, since it isn't an external function but just calls into one.
-[ForceInline]
-public MyStruct func(MyStruct val)
-{
-    MyStruct returnval;
-    funcAdapter(&val, &returnval);
-    return returnval;
-}
-```
-
-A binding generator would be a useful tool to include, but remains as future
-work.
+need to generate calling convention adapter functions. A binding generator would
+be a useful tool to include, but remains as future work.
 
 ## Limitations
 

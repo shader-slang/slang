@@ -95,8 +95,7 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
     case CodeGenTarget::HostHostCallable:
     case CodeGenTarget::HostExecutable:
     case CodeGenTarget::HostSharedLibrary:
-    case CodeGenTarget::LLVMShaderHostCallable:
-    case CodeGenTarget::LLVMHostHostCallable:
+    case CodeGenTarget::ShaderHostCallable:
         kPointerSize = (int)sizeof(void*);
         break;
     }

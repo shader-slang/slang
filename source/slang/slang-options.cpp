@@ -751,6 +751,14 @@ void initCommandOptions(CommandOptions& options)
          "-separate-debug-info",
          nullptr,
          "Emit debug data to a separate file, and strip it from the main output file."},
+        {OptionKind::EmitCPUViaCPP,
+         "-emit-cpu-via-cpp",
+         nullptr,
+         "Generate CPU targets using C++ (default)"},
+        {OptionKind::EmitCPUViaLLVM,
+         "-emit-cpu-via-llvm",
+         nullptr,
+         "Generate CPU targets using LLVM"},
         {OptionKind::LLVMTargetTriple,
          "-llvm-target-triple",
          "-llvm-target-triple <target triple>",
@@ -3325,6 +3333,16 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 linkage->m_optionSet.set(OptionKind::EmitSeparateDebug, true);
                 break;
             }
+        case OptionKind::EmitCPUViaCPP:
+        case OptionKind::EmitCPUViaLLVM:
+            {
+                SlangEmitCPUMethod selectMethod = (optionKind == OptionKind::EmitCPUViaCPP)
+                                                      ? SLANG_EMIT_CPU_VIA_CPP
+                                                      : SLANG_EMIT_CPU_VIA_LLVM;
+
+                getCurrentTarget()->optionSet.set(OptionKind::EmitCPUMethod, selectMethod);
+            }
+            break;
         case OptionKind::LLVMTargetTriple:
             {
                 CommandLineArg targetTriple;
@@ -3942,12 +3960,10 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     case CodeGenTarget::Metal:
                     case CodeGenTarget::WGSL:
                     case CodeGenTarget::HostVM:
-                    case CodeGenTarget::LLVMHostAssembly:
-                    case CodeGenTarget::LLVMHostObjectCode:
-                    case CodeGenTarget::LLVMHostHostCallable:
-                    case CodeGenTarget::LLVMShaderAssembly:
-                    case CodeGenTarget::LLVMShaderObjectCode:
-                    case CodeGenTarget::LLVMShaderHostCallable:
+                    case CodeGenTarget::HostObjectCode:
+                    case CodeGenTarget::ShaderObjectCode:
+                    case CodeGenTarget::HostLLVMIR:
+                    case CodeGenTarget::ShaderLLVMIR:
                         rawOutput.isWholeProgram = true;
                         break;
                     case CodeGenTarget::SPIRV:

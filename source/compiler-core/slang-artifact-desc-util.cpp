@@ -333,23 +333,14 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
     case SLANG_HOST_VM:
         return Desc::make(Kind::ObjectCode, Payload::UniversalCPU, Style::Host, 0);
 
-    case SLANG_LLVM_HOST_ASSEMBLY:
-        return Desc::make(Kind::Assembly, Payload::LLVMIR, Style::Host, 0);
-
-    case SLANG_LLVM_HOST_OBJECT_CODE:
+    case SLANG_HOST_OBJECT_CODE:
         return Desc::make(Kind::ObjectCode, Payload::UniversalCPU, Style::Host, 0);
 
-    case SLANG_LLVM_HOST_HOST_CALLABLE:
-        return Desc::make(Kind::HostCallable, Payload::HostCPU, Style::Host, 0);
+    case SLANG_HOST_LLVM_IR:
+        return Desc::make(Kind::Assembly, Payload::LLVMIR, Style::Host, 0);
 
-    case SLANG_LLVM_SHADER_ASSEMBLY:
+    case SLANG_SHADER_LLVM_IR:
         return Desc::make(Kind::Assembly, Payload::LLVMIR, Style::Kernel, 0);
-
-    case SLANG_LLVM_SHADER_OBJECT_CODE:
-        return Desc::make(Kind::ObjectCode, Payload::UniversalCPU, Style::Kernel, 0);
-
-    case SLANG_LLVM_SHADER_HOST_CALLABLE:
-        return Desc::make(Kind::HostCallable, Payload::HostCPU, Style::Kernel, 0);
 
     default:
         break;

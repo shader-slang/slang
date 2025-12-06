@@ -815,9 +815,9 @@ Result linkAndOptimizeIR(
         {
         case CodeGenTarget::HostCPPSource:
         case CodeGenTarget::HostVM:
-        case CodeGenTarget::LLVMHostAssembly:
-        case CodeGenTarget::LLVMHostObjectCode:
-        case CodeGenTarget::LLVMHostHostCallable:
+        case CodeGenTarget::HostLLVMIR:
+        case CodeGenTarget::HostObjectCode:
+        case CodeGenTarget::HostHostCallable:
             break;
         case CodeGenTarget::CUDASource:
         case CodeGenTarget::CUDAHeader:
@@ -827,9 +827,9 @@ Result linkAndOptimizeIR(
 
         case CodeGenTarget::CPPSource:
         case CodeGenTarget::CPPHeader:
-        case CodeGenTarget::LLVMShaderAssembly:
-        case CodeGenTarget::LLVMShaderObjectCode:
-        case CodeGenTarget::LLVMShaderHostCallable:
+        case CodeGenTarget::ShaderLLVMIR:
+        case CodeGenTarget::ShaderObjectCode:
+        case CodeGenTarget::ShaderHostCallable:
             passOptions.alwaysCreateCollectedParam = true;
             [[fallthrough]];
         default:
@@ -851,12 +851,12 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::CUDASource:
     case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::HostVM:
-    case CodeGenTarget::LLVMHostAssembly:
-    case CodeGenTarget::LLVMHostObjectCode:
-    case CodeGenTarget::LLVMHostHostCallable:
-    case CodeGenTarget::LLVMShaderAssembly:
-    case CodeGenTarget::LLVMShaderObjectCode:
-    case CodeGenTarget::LLVMShaderHostCallable:
+    case CodeGenTarget::HostLLVMIR:
+    case CodeGenTarget::HostObjectCode:
+    case CodeGenTarget::HostHostCallable:
+    case CodeGenTarget::ShaderLLVMIR:
+    case CodeGenTarget::ShaderObjectCode:
+    case CodeGenTarget::ShaderHostCallable:
         break;
     }
 
@@ -1656,9 +1656,9 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::CSource:
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CPPHeader:
-    case CodeGenTarget::LLVMShaderAssembly:
-    case CodeGenTarget::LLVMShaderObjectCode:
-    case CodeGenTarget::LLVMShaderHostCallable:
+    case CodeGenTarget::ShaderLLVMIR:
+    case CodeGenTarget::ShaderObjectCode:
+    case CodeGenTarget::ShaderHostCallable:
         {
             SLANG_PASS(legalizeEntryPointVaryingParamsForCPU, codeGenContext->getSink());
         }
@@ -1766,9 +1766,9 @@ Result linkAndOptimizeIR(
         }
         validateIRModuleIfEnabled(codeGenContext, irModule);
         [[fallthrough]];
-    case CodeGenTarget::LLVMShaderAssembly:
-    case CodeGenTarget::LLVMShaderObjectCode:
-    case CodeGenTarget::LLVMShaderHostCallable:
+    case CodeGenTarget::ShaderLLVMIR:
+    case CodeGenTarget::ShaderObjectCode:
+    case CodeGenTarget::ShaderHostCallable:
         SLANG_PASS(moveGlobalVarInitializationToEntryPoints, targetProgram);
         SLANG_PASS(introduceExplicitGlobalContext, target);
         if (target == CodeGenTarget::CPPSource || target == CodeGenTarget::CPPHeader)
@@ -2870,24 +2870,24 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
     // At this point there should be no difference between host style and shader
     // style from LLVM's perspective: the shader style has already been
     // lowered/legalized into host style.
-    case CodeGenTarget::LLVMHostObjectCode:
-    case CodeGenTarget::LLVMShaderObjectCode:
+    case CodeGenTarget::HostObjectCode:
+    case CodeGenTarget::ShaderObjectCode:
         {
             IArtifact* artifact = nullptr;
             emitLLVMObjectFromIR(codeGenContext, irModule, &artifact);
             outArtifact = ComPtr<IArtifact>(artifact);
         }
         break;
-    case CodeGenTarget::LLVMHostAssembly:
-    case CodeGenTarget::LLVMShaderAssembly:
+    case CodeGenTarget::HostLLVMIR:
+    case CodeGenTarget::ShaderLLVMIR:
         {
             IArtifact* artifact = nullptr;
             emitLLVMAssemblyFromIR(codeGenContext, irModule, &artifact);
             outArtifact = ComPtr<IArtifact>(artifact);
         }
         break;
-    case CodeGenTarget::LLVMHostHostCallable:
-    case CodeGenTarget::LLVMShaderHostCallable:
+    case CodeGenTarget::HostHostCallable:
+    case CodeGenTarget::ShaderHostCallable:
         {
             IArtifact* artifact = nullptr;
             emitLLVMJITFromIR(codeGenContext, irModule, &artifact);

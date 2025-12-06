@@ -42,6 +42,13 @@ struct MatrixTypeLoweringContext
 
     bool shouldLowerMatrixType(IRMatrixType* matrixType)
     {
+        if (isCPUTargetViaLLVM(targetProgram->getTargetReq()))
+        {
+            // Always lower all matrices on LLVM; we'd need to break them up
+            // like this for data layout reasons anyway.
+            return true;
+        }
+
         auto target = targetProgram->getTargetReq()->getTarget();
         switch (target)
         {
@@ -59,15 +66,6 @@ struct MatrixTypeLoweringContext
                 return as<IRBoolType>(elementType) || as<IRUIntType>(elementType) ||
                        as<IRIntType>(elementType);
             }
-        case CodeGenTarget::LLVMHostAssembly:
-        case CodeGenTarget::LLVMHostObjectCode:
-        case CodeGenTarget::LLVMHostHostCallable:
-        case CodeGenTarget::LLVMShaderAssembly:
-        case CodeGenTarget::LLVMShaderObjectCode:
-        case CodeGenTarget::LLVMShaderHostCallable:
-            // Always lower all matrices on LLVM; we'd need to break them up
-            // like this for data layout reasons anyway.
-            return true;
         default:
             return false;
         }

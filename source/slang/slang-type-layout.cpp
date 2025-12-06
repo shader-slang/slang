@@ -2800,6 +2800,15 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
     case CodeGenTarget::CPPHeader:
     case CodeGenTarget::CSource:
     case CodeGenTarget::HostVM:
+    case CodeGenTarget::HostObjectCode:
+    case CodeGenTarget::ShaderObjectCode:
+    case CodeGenTarget::HostLLVMIR:
+    case CodeGenTarget::ShaderLLVMIR:
+        if (isCPUTargetViaLLVM(targetReq))
+        {
+            return &kLLVMLayoutRulesFamilyImpl;
+        }
+        else
         {
             // For now lets use some fairly simple CPU binding rules
 
@@ -2811,14 +2820,6 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
 
             return &kCPULayoutRulesFamilyImpl;
         }
-
-    case CodeGenTarget::LLVMHostAssembly:
-    case CodeGenTarget::LLVMHostObjectCode:
-    case CodeGenTarget::LLVMHostHostCallable:
-    case CodeGenTarget::LLVMShaderAssembly:
-    case CodeGenTarget::LLVMShaderObjectCode:
-    case CodeGenTarget::LLVMShaderHostCallable:
-        return &kLLVMLayoutRulesFamilyImpl;
 
     case CodeGenTarget::Metal:
     case CodeGenTarget::MetalLib:
@@ -3114,18 +3115,23 @@ bool isCPUTarget(CodeGenTarget codeGenTarget)
 
 bool isCPUTargetViaLLVM(TargetRequest* targetReq)
 {
+    SlangEmitCPUMethod emitCPUMethod =
+        targetReq->getOptionSet().getEnumOption<SlangEmitCPUMethod>(CompilerOptionName::EmitCPUMethod);
+    bool emitViaLLVM = emitCPUMethod == SlangEmitCPUMethod::SLANG_EMIT_CPU_VIA_LLVM;
     switch (targetReq->getTarget())
     {
     default:
         return false;
 
-    case CodeGenTarget::LLVMHostAssembly:
-    case CodeGenTarget::LLVMHostObjectCode:
-    case CodeGenTarget::LLVMHostHostCallable:
-    case CodeGenTarget::LLVMShaderObjectCode:
-    case CodeGenTarget::LLVMShaderAssembly:
-    case CodeGenTarget::LLVMShaderHostCallable:
-        return isCPUTarget(targetReq);
+    case CodeGenTarget::HostLLVMIR:
+    case CodeGenTarget::ShaderLLVMIR:
+    case CodeGenTarget::HostObjectCode:
+        return true;
+
+    case CodeGenTarget::ShaderObjectCode:
+    case CodeGenTarget::HostHostCallable:
+    case CodeGenTarget::ShaderHostCallable:
+        return emitViaLLVM;
     }
 }
 
@@ -3176,7 +3182,7 @@ bool isKernelTarget(CodeGenTarget codeGenTarget)
 SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgram)
 {
     // If we are emitting directly, there is no intermediate source language
-    if (targetProgram->shouldEmitSPIRVDirectly())
+    if (targetProgram->shouldEmitSPIRVDirectly() || isCPUTargetViaLLVM(targetProgram->getTargetReq()))
     {
         return SourceLanguage::Unknown;
     }
@@ -3215,7 +3221,7 @@ SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgr
         }
     case CodeGenTarget::ShaderSharedLibrary:
     case CodeGenTarget::HostSharedLibrary:
-    case CodeGenTarget::ObjectCode:
+    case CodeGenTarget::ShaderObjectCode:
     case CodeGenTarget::HostExecutable:
     case CodeGenTarget::HostHostCallable:
     case CodeGenTarget::ShaderHostCallable:

@@ -627,7 +627,7 @@ typedef uint32_t SlangSizeT;
         SLANG_CUDA_SOURCE,           ///< Cuda source
         SLANG_PTX,                   ///< PTX
         SLANG_CUDA_OBJECT_CODE,      ///< Object code that contains CUDA functions.
-        SLANG_OBJECT_CODE,           ///< Object code that can be used for later linking
+        SLANG_OBJECT_CODE,           ///< Object code that can be used for later linking (kernel/shader)
         SLANG_HOST_CPP_SOURCE,       ///< C++ code for host library or executable.
         SLANG_HOST_HOST_CALLABLE,    ///< Host callable host code (ie non kernel/shader)
         SLANG_CPP_PYTORCH_BINDING,   ///< C++ PyTorch binding code.
@@ -643,12 +643,9 @@ typedef uint32_t SlangSizeT;
         SLANG_CPP_HEADER,  ///< C++ header for shader kernels.
         SLANG_CUDA_HEADER, ///< Cuda header
 
-        SLANG_LLVM_HOST_ASSEMBLY,        ///< LLVM IR assembly
-        SLANG_LLVM_HOST_OBJECT_CODE,     ///< Object code generated via LLVM
-        SLANG_LLVM_HOST_HOST_CALLABLE,   ///< Host callable code via LLVM
-        SLANG_LLVM_SHADER_ASSEMBLY,      ///< LLVM IR assembly (kernel/shader)
-        SLANG_LLVM_SHADER_OBJECT_CODE,   ///< Object code generated via LLVM (kernel/shader)
-        SLANG_LLVM_SHADER_HOST_CALLABLE, ///< Host callable code via LLVM (kernel/shader)
+        SLANG_HOST_OBJECT_CODE, ///< Host object code
+        SLANG_HOST_LLVM_IR,     ///< Host LLVM IR assembly
+        SLANG_SHADER_LLVM_IR,   ///< Host LLVM IR assembly (kernel/shader)
 
         SLANG_TARGET_COUNT_OF,
     };
@@ -900,6 +897,13 @@ typedef uint32_t SlangSizeT;
         SLANG_EMIT_SPIRV_DIRECTLY,
     };
 
+    enum SlangEmitCPUMethod
+    {
+        SLANG_EMIT_CPU_DEFAULT = 0,
+        SLANG_EMIT_CPU_VIA_CPP,
+        SLANG_EMIT_CPU_VIA_LLVM,
+    };
+
     // All compiler option names supported by Slang.
     namespace slang
     {
@@ -1086,6 +1090,9 @@ typedef uint32_t SlangSizeT;
         DumpIRBefore,                // string, pass name to dump IR before
         DumpIRAfter,                 // string, pass name to dump IR after
 
+        EmitCPUMethod,    // enum SlangEmitCPUMethod
+        EmitCPUViaCPP,    // bool
+        EmitCPUViaLLVM,   // bool
         LLVMTargetTriple, // string
         LLVMCPU,          // string
         LLVMFeatures,     // string

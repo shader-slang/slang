@@ -163,7 +163,18 @@ CapabilitySet TargetRequest::getTargetCaps()
     case CodeGenTarget::HostSharedLibrary:
     case CodeGenTarget::HostHostCallable:
     case CodeGenTarget::ShaderHostCallable:
-        atoms.add(CapabilityName::cpp);
+    case CodeGenTarget::HostObjectCode:
+    case CodeGenTarget::ShaderObjectCode:
+    case CodeGenTarget::HostLLVMIR:
+    case CodeGenTarget::ShaderLLVMIR:
+        if (isCPUTargetViaLLVM(this))
+        {
+            atoms.add(CapabilityName::llvm);
+        }
+        else
+        {
+            atoms.add(CapabilityName::cpp);
+        }
         break;
 
     case CodeGenTarget::CUDASource:
@@ -182,15 +193,6 @@ CapabilitySet TargetRequest::getTargetCaps()
     case CodeGenTarget::WGSLSPIRVAssembly:
     case CodeGenTarget::WGSL:
         atoms.add(CapabilityName::wgsl);
-        break;
-
-    case CodeGenTarget::LLVMHostAssembly:
-    case CodeGenTarget::LLVMHostObjectCode:
-    case CodeGenTarget::LLVMHostHostCallable:
-    case CodeGenTarget::LLVMShaderAssembly:
-    case CodeGenTarget::LLVMShaderObjectCode:
-    case CodeGenTarget::LLVMShaderHostCallable:
-        atoms.add(CapabilityName::llvm);
         break;
 
     default:

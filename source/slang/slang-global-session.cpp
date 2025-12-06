@@ -191,7 +191,7 @@ void Session::_initCodeGenTransitionMap()
                 CodeGenTarget::HostSharedLibrary,
                 PassThroughMode::GenericCCpp);
             map.addTransition(source, CodeGenTarget::HostExecutable, PassThroughMode::GenericCCpp);
-            map.addTransition(source, CodeGenTarget::ObjectCode, PassThroughMode::GenericCCpp);
+            map.addTransition(source, CodeGenTarget::ShaderObjectCode, PassThroughMode::GenericCCpp);
         }
     }
 
