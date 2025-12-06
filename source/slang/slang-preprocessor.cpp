@@ -1117,7 +1117,8 @@ struct WarningTimeline
             SourceLoc lastEntryLoc = SourceLoc::fromRaw(entries.getLast().location);
             PathInfo currentPath = sourceManager->getPathInfo(debugLoc);
             PathInfo lastPath = sourceManager->getPathInfo(lastEntryLoc);
-            differentSourceFile = (currentPath.getMostUniqueIdentity() != lastPath.getMostUniqueIdentity());
+            differentSourceFile =
+                (currentPath.getMostUniqueIdentity() != lastPath.getMostUniqueIdentity());
         }
 
         // Add on top, or if we're in a different source file (module)
@@ -1260,7 +1261,8 @@ struct WarningStateTracker : SourceWarningStateTrackerBase
                 const SourceLoc::RawValue absPushed = getAbsoluteLocation(pushed);
                 for (auto& [id, timeline] : mapDiagnosticIdToTimeline)
                 {
-                    timeline.addEntryForPragmaPop(absLoc, absPushed, sink, id, location, sourceManager);
+                    timeline
+                        .addEntryForPragmaPop(absLoc, absPushed, sink, id, location, sourceManager);
                 }
             }
         }
