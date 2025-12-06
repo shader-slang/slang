@@ -132,8 +132,11 @@ struct ComTestContext
         {
             const SlangPassThrough cppCompilers[] = {
                 SLANG_PASS_THROUGH_VISUAL_STUDIO,
-                SLANG_PASS_THROUGH_GCC,
+#if SLANG_CLANG
                 SLANG_PASS_THROUGH_CLANG,
+#else
+                SLANG_PASS_THROUGH_GCC,
+#endif
             };
             // Do we have a C++ compiler
             for (const auto compiler : cppCompilers)
